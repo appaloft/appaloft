@@ -38,6 +38,7 @@ export class HermeticSandboxProvider implements SandboxProvider {
         portability: "provider-local" as const,
       },
       snapshot: ["filesystem" as const],
+      snapshotRecovery: { portability: "provider-local" as const },
       processes: true,
       files: true,
       ports: true,
@@ -264,7 +265,7 @@ export class HermeticSandboxProvider implements SandboxProvider {
     providerHandle: string;
     snapshotId: string;
     capability: "filesystem" | "filesystem-memory";
-  }): Promise<{ providerHandle: string; sizeBytes: number }> {
+  }): ReturnType<SandboxProvider["captureSnapshot"]> {
     if (request.capability !== "filesystem") {
       throw new Error("Hermetic provider supports filesystem snapshots only");
     }
@@ -278,7 +279,7 @@ export class HermeticSandboxProvider implements SandboxProvider {
         [...this.runtime(request).files].map(([path, content]) => [path, content.slice()]),
       ),
     });
-    return { providerHandle, sizeBytes };
+    return { providerHandle, sizeBytes, portability: "provider-local" as const };
   }
 
   async updateNetworkPolicy(request: {

@@ -24,6 +24,7 @@ function provider(): SandboxProvider {
       isolation: "gvisor",
       pause: { mode: "process-frozen", portability: "provider-local" },
       snapshot: ["filesystem"],
+      snapshotRecovery: { portability: "provider-local" },
       processes: true,
       files: true,
       ports: false,
@@ -65,7 +66,11 @@ function provider(): SandboxProvider {
     },
     async revokePort() {},
     async captureSnapshot() {
-      return { providerHandle: "snapshot:test", sizeBytes: 0 };
+      return {
+        providerHandle: "snapshot:test",
+        sizeBytes: 0,
+        portability: "provider-local",
+      };
     },
     async deleteSnapshot() {},
     async updateNetworkPolicy() {},

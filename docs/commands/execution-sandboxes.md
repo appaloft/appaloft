@@ -59,8 +59,13 @@ accepted through the public command.
 - Cross-provider resume requires matching provider-family recovery or portable recovery.
 - Maintenance relocation reuses pause/resume; it does not add a second migration aggregate or
   public command family.
+- An injected Snapshot lifecycle policy may schedule capture, apply TTL/count rotation, and require
+  or best-effort a fresh reusable recovery point before termination or expiry.
+- A required recovery gate fails retryably before provider cleanup; retry reuses an already-fresh
+  ready Snapshot instead of creating a duplicate.
 - Terminate is idempotent for terminating/terminated/expired state.
-- Expiration is a system command using the same aggregate transition and exact provider cleanup.
+- Expiration is a system command using the same aggregate transition, Snapshot gate and exact
+  provider cleanup.
 - Failed provider attempts persist failed/retryable status; retries use new attempt ids.
 - Terminated and expired Sandboxes reject exec/files/ports/snapshot operations.
 

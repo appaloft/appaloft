@@ -43,6 +43,12 @@ export interface SandboxProviderCapabilities {
         recoveryFamily?: string;
       };
   snapshot: ("filesystem" | "filesystem-memory")[];
+  snapshotRecovery:
+    | {
+        portability: SandboxRecoveryPortability;
+        recoveryFamily?: string;
+      }
+    | undefined;
   processes: boolean;
   files: boolean;
   ports: boolean;
@@ -54,7 +60,14 @@ export interface SandboxProviderRequest {
   sandboxId: string;
   ownerScope: string;
   ownerOrganizationId?: string;
-  source: { kind: "image"; image: string } | { kind: "snapshot"; providerHandle: string };
+  source:
+    | { kind: "image"; image: string }
+    | {
+        kind: "snapshot";
+        providerHandle: string;
+        portability: SandboxRecoveryPortability;
+        recoveryFamily?: string;
+      };
   requestedIsolation: SandboxIsolation;
   limits: SandboxResourceLimitsState;
   networkPolicy: SandboxNetworkPolicyState;
@@ -244,7 +257,12 @@ export interface SandboxProvider {
     providerHandle: string;
     snapshotId: string;
     capability: "filesystem" | "filesystem-memory";
-  }): Promise<{ providerHandle: string; sizeBytes: number }>;
+  }): Promise<{
+    providerHandle: string;
+    sizeBytes: number;
+    portability: SandboxRecoveryPortability;
+    recoveryFamily?: string;
+  }>;
   deleteSnapshot(request: { snapshotId: string; providerHandle: string }): Promise<void>;
   updateNetworkPolicy(request: {
     sandboxId: string;
@@ -340,6 +358,15 @@ export interface SandboxRepository {
   listSnapshots(
     context: RepositoryContext,
     input: { limit: number; offset: number },
+  ): Promise<StoredSnapshot[]>;
+  listSnapshotsForSandbox(
+    context: RepositoryContext,
+    sandboxId: string,
+    input: { limit: number },
+  ): Promise<StoredSnapshot[]>;
+  listSnapshotsForMaintenance(
+    context: RepositoryContext,
+    input: { expiresBefore: string; limit: number },
   ): Promise<StoredSnapshot[]>;
   saveTemplate(context: RepositoryContext, template: SandboxTemplate): Promise<void>;
   findTemplate(context: RepositoryContext, templateId: string): Promise<StoredTemplate | null>;
@@ -516,6 +543,45 @@ export class InMemorySandboxRepository implements SandboxRepository {
       .filter((item) => item.tenantId === tenantId(context))
       .slice(input.offset, input.offset + input.limit);
   }
+  async listSnapshotsForSandbox(
+    context: RepositoryContext,
+    sandboxId: string,
+    input: { limit: number },
+  ): Promise<StoredSnapshot[]> {
+    return [...this.snapshots.values()]
+      .filter(
+        (item) =>
+          item.tenantId === tenantId(context) &&
+          item.snapshot.toState().sourceSandboxId.value === sandboxId,
+      )
+      .sort(
+        (left, right) =>
+          right.snapshot.toState().createdAt.toDate().getTime() -
+          left.snapshot.toState().createdAt.toDate().getTime(),
+      )
+      .slice(0, input.limit);
+  }
+  async listSnapshotsForMaintenance(
+    context: RepositoryContext,
+    input: { expiresBefore: string; limit: number },
+  ): Promise<StoredSnapshot[]> {
+    const cutoff = new Date(input.expiresBefore);
+    return [...this.snapshots.values()]
+      .filter((item) => item.tenantId === tenantId(context))
+      .filter((item) => {
+        const state = item.snapshot.toState();
+        return (
+          !["capturing", "deleted"].includes(state.status.value) &&
+          Boolean(state.expiresAt && state.expiresAt.toDate() <= cutoff)
+        );
+      })
+      .sort(
+        (left, right) =>
+          left.snapshot.toState().createdAt.toDate().getTime() -
+          right.snapshot.toState().createdAt.toDate().getTime(),
+      )
+      .slice(0, input.limit);
+  }
   async saveTemplate(context: RepositoryContext, template: SandboxTemplate): Promise<void> {
     const tenant = tenantId(context);
     this.templates.set(`${tenant}:${template.id.value}`, { tenantId: tenant, template });
@@ -583,6 +649,9 @@ export interface SandboxSnapshotDescriptor {
   snapshotId: string;
   sourceSandboxId: string;
   capability: "filesystem" | "filesystem-memory";
+  reason: "manual" | "scheduled" | "pre-termination";
+  portability: SandboxRecoveryPortability;
+  recoveryFamily?: string;
   status: string;
   sizeBytes?: number;
   createdAt: string;
@@ -691,16 +760,78 @@ export interface SandboxMaintenancePolicy {
   idleSuspendAfterSeconds?: number;
 }
 
+export interface SandboxSnapshotLifecyclePolicyDecision {
+  scheduledIntervalSeconds?: number;
+  snapshotTtlSeconds?: number;
+  retainCount: number;
+  beforeTermination: "disabled" | "best-effort" | "required";
+  beforeExpiry: "disabled" | "best-effort" | "required";
+}
+
+export interface SandboxSnapshotLifecyclePolicy {
+  resolve(
+    context: ExecutionContext,
+    input: {
+      sandbox: SandboxDescriptor;
+      retained: { count: number; totalBytes: number; latestReadyAt?: string };
+    },
+  ):
+    | Result<SandboxSnapshotLifecyclePolicyDecision>
+    | Promise<Result<SandboxSnapshotLifecyclePolicyDecision>>;
+}
+
+export class StaticSandboxSnapshotLifecyclePolicy implements SandboxSnapshotLifecyclePolicy {
+  private readonly decision: SandboxSnapshotLifecyclePolicyDecision;
+
+  constructor(input: SandboxSnapshotLifecyclePolicyDecision) {
+    const retainCount = Math.floor(input.retainCount);
+    if (!Number.isSafeInteger(retainCount) || retainCount < 1 || retainCount > 100) {
+      throw new Error("Sandbox Snapshot retention count must be between 1 and 100");
+    }
+    const boundedSeconds = (value: number | undefined, field: string): number | undefined => {
+      if (value === undefined) return undefined;
+      const normalized = Math.floor(value);
+      if (!Number.isSafeInteger(normalized) || normalized < 60 || normalized > 365 * 24 * 60 * 60) {
+        throw new Error(`${field} must be between 60 seconds and 365 days`);
+      }
+      return normalized;
+    };
+    const scheduledIntervalSeconds = boundedSeconds(
+      input.scheduledIntervalSeconds,
+      "Sandbox Snapshot interval",
+    );
+    const snapshotTtlSeconds = boundedSeconds(input.snapshotTtlSeconds, "Sandbox Snapshot TTL");
+    const modes = new Set(["disabled", "best-effort", "required"]);
+    if (!modes.has(input.beforeTermination) || !modes.has(input.beforeExpiry)) {
+      throw new Error("Sandbox Snapshot cleanup modes must be disabled, best-effort, or required");
+    }
+    this.decision = {
+      retainCount,
+      beforeTermination: input.beforeTermination,
+      beforeExpiry: input.beforeExpiry,
+      ...(scheduledIntervalSeconds !== undefined ? { scheduledIntervalSeconds } : {}),
+      ...(snapshotTtlSeconds !== undefined ? { snapshotTtlSeconds } : {}),
+    };
+  }
+
+  resolve(): Result<SandboxSnapshotLifecyclePolicyDecision> {
+    return ok({ ...this.decision });
+  }
+}
+
 function snapshotDescriptor(stored: StoredSnapshot): SandboxSnapshotDescriptor {
   const state = stored.snapshot.toState();
   return {
     snapshotId: state.id.value,
     sourceSandboxId: state.sourceSandboxId.value,
     capability: state.capability,
+    reason: state.reason,
+    portability: state.portability,
     status: state.status.value,
     createdAt: state.createdAt.value,
     ...(state.sizeBytes !== undefined ? { sizeBytes: state.sizeBytes } : {}),
     ...(state.expiresAt ? { expiresAt: state.expiresAt.value } : {}),
+    ...(state.recoveryFamily ? { recoveryFamily: state.recoveryFamily } : {}),
   };
 }
 
@@ -742,6 +873,7 @@ export class ExecutionSandboxService {
   private readonly credentialBroker: SandboxCredentialBroker | undefined;
   private readonly quotaPolicy: SandboxQuotaPolicy | undefined;
   private readonly placementPolicy: SandboxPlacementPolicy | undefined;
+  private readonly snapshotLifecyclePolicy: SandboxSnapshotLifecyclePolicy | undefined;
   constructor(input: {
     repository: SandboxRepository;
     providerRegistry: SandboxProviderRegistry;
@@ -752,6 +884,7 @@ export class ExecutionSandboxService {
     credentialBroker?: SandboxCredentialBroker;
     quotaPolicy?: SandboxQuotaPolicy;
     placementPolicy?: SandboxPlacementPolicy;
+    snapshotLifecyclePolicy?: SandboxSnapshotLifecyclePolicy;
   }) {
     this.repository = input.repository;
     this.providerRegistry = input.providerRegistry;
@@ -762,6 +895,7 @@ export class ExecutionSandboxService {
     this.credentialBroker = input.credentialBroker;
     this.quotaPolicy = input.quotaPolicy;
     this.placementPolicy = input.placementPolicy;
+    this.snapshotLifecyclePolicy = input.snapshotLifecyclePolicy;
   }
 
   private async saveSandbox(
@@ -810,6 +944,169 @@ export class ExecutionSandboxService {
     return touched.isErr() ? err(touched.error) : ok(result.value);
   }
 
+  private snapshotCompatibleWithProvider(
+    stored: StoredSnapshot,
+    provider: SandboxProvider,
+  ): boolean {
+    if (stored.providerKey === provider.key) return true;
+    const state = stored.snapshot.toState();
+    if (state.portability === "portable") {
+      return provider.capabilities.snapshotRecovery?.portability === "portable";
+    }
+    return (
+      state.portability === "provider-family" &&
+      Boolean(state.recoveryFamily) &&
+      provider.capabilities.snapshotRecovery?.portability === "provider-family" &&
+      provider.capabilities.snapshotRecovery.recoveryFamily === state.recoveryFamily
+    );
+  }
+
+  private async snapshotPolicyFor(
+    context: ExecutionContext,
+    stored: StoredSandbox,
+    snapshots?: StoredSnapshot[],
+  ): Promise<Result<SandboxSnapshotLifecyclePolicyDecision | undefined>> {
+    if (!this.snapshotLifecyclePolicy) return ok(undefined);
+    const retained =
+      snapshots ??
+      (await this.repository.listSnapshotsForSandbox(
+        toRepositoryContext(context),
+        stored.sandbox.id.value,
+        { limit: 500 },
+      ));
+    const ready = retained
+      .filter((item) => item.snapshot.toState().status.value === "ready")
+      .sort(
+        (left, right) =>
+          right.snapshot.toState().createdAt.toDate().getTime() -
+          left.snapshot.toState().createdAt.toDate().getTime(),
+      );
+    return this.snapshotLifecyclePolicy.resolve(context, {
+      sandbox: descriptor(stored),
+      retained: {
+        count: ready.length,
+        totalBytes: ready.reduce(
+          (total, item) => total + (item.snapshot.toState().sizeBytes ?? 0),
+          0,
+        ),
+        ...(ready[0] ? { latestReadyAt: ready[0].snapshot.toState().createdAt.value } : {}),
+      },
+    });
+  }
+
+  private policySnapshotExpiry(policy: SandboxSnapshotLifecyclePolicyDecision): string | undefined {
+    if (policy.snapshotTtlSeconds === undefined) return undefined;
+    return new Date(
+      new Date(this.clock.now()).getTime() + policy.snapshotTtlSeconds * 1_000,
+    ).toISOString();
+  }
+
+  private async ensureRecoverySnapshot(
+    context: ExecutionContext,
+    stored: StoredSandbox,
+    mode: "disabled" | "best-effort" | "required",
+    policy: SandboxSnapshotLifecyclePolicyDecision,
+    allowExpired = false,
+  ): Promise<Result<{ snapshotId?: string }>> {
+    if (mode === "disabled") return ok({});
+    const requiredFailure = (
+      phase: "resume" | "capture",
+      causeCode: string,
+    ): Result<{ snapshotId?: string }> =>
+      err({
+        code: "sandbox_snapshot_required_capture_failed",
+        category: "provider",
+        message: "Required Sandbox recovery Snapshot could not be completed",
+        retryable: true,
+        details: {
+          phase: "execution-sandbox-required-snapshot-gate",
+          gatePhase: phase,
+          causeCode,
+        },
+      });
+    const repositoryContext = toRepositoryContext(context);
+    const snapshots = await this.repository.listSnapshotsForSandbox(
+      repositoryContext,
+      stored.sandbox.id.value,
+      { limit: 500 },
+    );
+    const state = stored.sandbox.toState();
+    const activityAt =
+      state.lastActivityAt?.toDate() ?? state.updatedAt?.toDate() ?? state.createdAt.toDate();
+    const fresh = snapshots
+      .filter((item) => {
+        const snapshot = item.snapshot.toState();
+        return (
+          snapshot.status.value === "ready" &&
+          (!snapshot.expiresAt || snapshot.expiresAt.toDate() > new Date(this.clock.now())) &&
+          snapshot.createdAt.toDate() >= activityAt
+        );
+      })
+      .sort(
+        (left, right) =>
+          right.snapshot.toState().createdAt.toDate().getTime() -
+          left.snapshot.toState().createdAt.toDate().getTime(),
+      )[0];
+    if (fresh) return ok({ snapshotId: fresh.snapshot.id.value });
+
+    if (state.status.value === "paused") {
+      const resumed = await this.resume(context, state.id.value);
+      if (resumed.isErr()) {
+        return mode === "required" ? requiredFailure("resume", resumed.error.code) : ok({});
+      }
+    }
+    const expiresAt = this.policySnapshotExpiry(policy);
+    const captured = await this.createSnapshot(context, state.id.value, {
+      capability: "filesystem",
+      reason: "pre-termination",
+      ...(expiresAt ? { expiresAt } : {}),
+      ...(allowExpired ? { allowExpired: true } : {}),
+    });
+    if (captured.isErr()) {
+      return mode === "required" ? requiredFailure("capture", captured.error.code) : ok({});
+    }
+    return ok({ snapshotId: captured.value.snapshotId });
+  }
+
+  private async pruneSnapshots(
+    context: ExecutionContext,
+    sandboxId: string,
+    policy: SandboxSnapshotLifecyclePolicyDecision,
+  ): Promise<Result<string[]>> {
+    const snapshots = await this.repository.listSnapshotsForSandbox(
+      toRepositoryContext(context),
+      sandboxId,
+      { limit: 500 },
+    );
+    const now = new Date(this.clock.now());
+    const deletable = snapshots.filter((item) => {
+      const state = item.snapshot.toState();
+      return !["requested", "capturing", "deleted"].includes(state.status.value);
+    });
+    const expired = deletable.filter((item) => {
+      const expiresAt = item.snapshot.toState().expiresAt;
+      return Boolean(expiresAt && expiresAt.toDate() <= now);
+    });
+    const readyNewestFirst = deletable
+      .filter((item) => item.snapshot.toState().status.value === "ready")
+      .sort(
+        (left, right) =>
+          right.snapshot.toState().createdAt.toDate().getTime() -
+          left.snapshot.toState().createdAt.toDate().getTime(),
+      );
+    const overRetention = readyNewestFirst.slice(policy.retainCount);
+    const targets = new Map(
+      [...expired, ...overRetention].map((item) => [item.snapshot.id.value, item]),
+    );
+    const pruned: string[] = [];
+    for (const snapshotId of targets.keys()) {
+      const deleted = await this.deleteSnapshot(context, snapshotId);
+      if (deleted.isErr()) return err(deleted.error);
+      pruned.push(snapshotId);
+    }
+    return ok(pruned);
+  }
+
   async create(
     context: ExecutionContext,
     input: {
@@ -829,6 +1126,7 @@ export class ExecutionSandboxService {
     const repositoryContext = toRepositoryContext(context);
     let source: Parameters<typeof Sandbox.create>[0]["source"];
     let sourceProviderKey: string | undefined;
+    let sourceSnapshot: StoredSnapshot | undefined;
     if (input.source.kind === "snapshot") {
       const snapshot = await this.repository.findSnapshot(
         repositoryContext,
@@ -846,6 +1144,7 @@ export class ExecutionSandboxService {
       }
       source = { kind: "snapshot", snapshotId: snapshot.snapshot.id };
       sourceProviderKey = snapshot.providerKey;
+      sourceSnapshot = snapshot;
     } else if (input.source.kind === "template") {
       const template = await this.repository.findTemplate(
         repositoryContext,
@@ -855,9 +1154,6 @@ export class ExecutionSandboxService {
       source = { kind: "template", templateId: template.template.id };
     } else {
       source = input.source;
-    }
-    if (input.providerKey && sourceProviderKey && input.providerKey !== sourceProviderKey) {
-      return err(domainError.conflict("Sandbox snapshot belongs to a different provider"));
     }
     const chosenProviderKey = input.providerKey ?? sourceProviderKey;
     const limits = SandboxResourceLimits.create(input.limits);
@@ -895,6 +1191,20 @@ export class ExecutionSandboxService {
       provider = candidates[0];
     }
     if (!provider) return err(isolationUnsupported(input.requestedIsolation, []));
+    if (sourceSnapshot && !this.snapshotCompatibleWithProvider(sourceSnapshot, provider)) {
+      return err({
+        code: "sandbox_snapshot_recovery_not_portable",
+        category: "user",
+        message: "Sandbox Snapshot cannot move to the requested provider",
+        retryable: false,
+        details: {
+          phase: "execution-sandbox-snapshot-placement",
+          sourceProviderKey: sourceSnapshot.providerKey,
+          targetProviderKey: provider.key,
+          portability: sourceSnapshot.snapshot.toState().portability,
+        },
+      });
+    }
     if (this.quotaPolicy) {
       const admitted = await this.quotaPolicy.admit(context, {
         usage: await this.repository.summarizeActiveUsage(repositoryContext),
@@ -1039,7 +1349,7 @@ export class ExecutionSandboxService {
       const snapshotState = snapshot?.snapshot.toState();
       if (
         !snapshot ||
-        snapshot.providerKey !== stored.providerKey ||
+        !this.snapshotCompatibleWithProvider(snapshot, provider) ||
         !snapshot.snapshot.canCreateSandbox() ||
         !snapshotState?.providerHandle
       ) {
@@ -1047,7 +1357,12 @@ export class ExecutionSandboxService {
         await this.saveSandbox(context, stored.sandbox, stored.providerKey);
         return err(domainError.conflict("Sandbox snapshot is unavailable for provisioning"));
       }
-      providerSource = { kind: "snapshot", providerHandle: snapshotState.providerHandle };
+      providerSource = {
+        kind: "snapshot",
+        providerHandle: snapshotState.providerHandle,
+        portability: snapshotState.portability,
+        ...(snapshotState.recoveryFamily ? { recoveryFamily: snapshotState.recoveryFamily } : {}),
+      };
     } else {
       const template = await this.repository.findTemplate(
         toRepositoryContext(context),
@@ -1115,6 +1430,8 @@ export class ExecutionSandboxService {
       suspended: string[];
       migrated: string[];
       reconciled: string[];
+      snapshotsCaptured: string[];
+      snapshotsPruned: string[];
       failed: string[];
     }>
   > {
@@ -1129,12 +1446,57 @@ export class ExecutionSandboxService {
     const suspended: string[] = [];
     const migrated: string[] = [];
     const reconciled: string[] = [];
+    const snapshotsCaptured: string[] = [];
+    const snapshotsPruned: string[] = [];
     const failed: string[] = [];
     const protectedSandboxIds = new Set(input.protectedSandboxIds ?? []);
+    const expiredSnapshots = await this.repository.listSnapshotsForMaintenance(repositoryContext, {
+      expiresBefore: now,
+      limit: Math.min(Math.max(input.limit ?? 100, 1), 500),
+    });
+    for (const snapshot of expiredSnapshots) {
+      const deleted = await this.deleteSnapshot(context, snapshot.snapshot.id.value);
+      if (deleted.isErr()) failed.push(snapshot.snapshot.id.value);
+      else snapshotsPruned.push(snapshot.snapshot.id.value);
+    }
     for (const stored of candidates) {
-      const state = stored.sandbox.toState();
+      let currentStored = stored;
+      let state = currentStored.sandbox.toState();
       if (state.expiresAt && state.expiresAt.toDate() <= new Date(now)) {
-        const provider = this.providerRegistry.get(stored.providerKey);
+        const snapshots = await this.repository.listSnapshotsForSandbox(
+          repositoryContext,
+          state.id.value,
+          { limit: 500 },
+        );
+        const policy = await this.snapshotPolicyFor(context, currentStored, snapshots);
+        if (policy.isErr()) {
+          failed.push(state.id.value);
+          continue;
+        }
+        if (policy.value) {
+          const recovery = await this.ensureRecoverySnapshot(
+            context,
+            currentStored,
+            policy.value.beforeExpiry,
+            policy.value,
+            true,
+          );
+          if (recovery.isErr()) {
+            failed.push(state.id.value);
+            continue;
+          }
+          if (recovery.value.snapshotId) {
+            snapshotsCaptured.push(recovery.value.snapshotId);
+          }
+          const reloaded = await this.repository.find(repositoryContext, state.id.value);
+          if (!reloaded) {
+            failed.push(state.id.value);
+            continue;
+          }
+          currentStored = reloaded;
+          state = currentStored.sandbox.toState();
+        }
+        const provider = this.providerRegistry.get(currentStored.providerKey);
         if (state.providerHandle && provider) {
           try {
             await provider.terminate({
@@ -1146,12 +1508,12 @@ export class ExecutionSandboxService {
             continue;
           }
         }
-        const result = stored.sandbox.expire({ at });
+        const result = currentStored.sandbox.expire({ at });
         if (result.isErr()) {
           failed.push(state.id.value);
           continue;
         }
-        await this.saveSandbox(context, stored.sandbox, stored.providerKey);
+        await this.saveSandbox(context, currentStored.sandbox, currentStored.providerKey);
         expired.push(state.id.value);
         continue;
       }
@@ -1163,6 +1525,73 @@ export class ExecutionSandboxService {
         if (result.isOk()) reconciled.push(state.id.value);
         else failed.push(state.id.value);
         continue;
+      }
+      const snapshots = await this.repository.listSnapshotsForSandbox(
+        repositoryContext,
+        state.id.value,
+        { limit: 500 },
+      );
+      const snapshotPolicy = await this.snapshotPolicyFor(context, currentStored, snapshots);
+      if (snapshotPolicy.isErr()) {
+        failed.push(state.id.value);
+        continue;
+      }
+      if (snapshotPolicy.value) {
+        const pruned = await this.pruneSnapshots(context, state.id.value, snapshotPolicy.value);
+        if (pruned.isErr()) {
+          failed.push(state.id.value);
+          continue;
+        }
+        snapshotsPruned.push(...pruned.value);
+        const retainedSnapshots =
+          pruned.value.length > 0
+            ? await this.repository.listSnapshotsForSandbox(repositoryContext, state.id.value, {
+                limit: 500,
+              })
+            : snapshots;
+        if (
+          state.status.value === "ready" &&
+          snapshotPolicy.value.scheduledIntervalSeconds !== undefined &&
+          !protectedSandboxIds.has(state.id.value)
+        ) {
+          const activeCapture = retainedSnapshots.some((item) =>
+            ["requested", "capturing"].includes(item.snapshot.toState().status.value),
+          );
+          const latestReady = retainedSnapshots
+            .filter((item) => item.snapshot.toState().status.value === "ready")
+            .sort(
+              (left, right) =>
+                right.snapshot.toState().createdAt.toDate().getTime() -
+                left.snapshot.toState().createdAt.toDate().getTime(),
+            )[0];
+          const dueAt =
+            (latestReady?.snapshot.toState().createdAt.toDate().getTime() ??
+              state.createdAt.toDate().getTime()) +
+            snapshotPolicy.value.scheduledIntervalSeconds * 1_000;
+          if (!activeCapture && dueAt <= new Date(now).getTime()) {
+            const expiresAt = this.policySnapshotExpiry(snapshotPolicy.value);
+            const captured = await this.createSnapshot(context, state.id.value, {
+              capability: "filesystem",
+              reason: "scheduled",
+              ...(expiresAt ? { expiresAt } : {}),
+            });
+            if (captured.isErr()) {
+              failed.push(state.id.value);
+              continue;
+            }
+            snapshotsCaptured.push(captured.value.snapshotId);
+            const rotated = await this.pruneSnapshots(
+              context,
+              state.id.value,
+              snapshotPolicy.value,
+            );
+            if (rotated.isErr()) {
+              failed.push(state.id.value);
+              continue;
+            }
+            snapshotsPruned.push(...rotated.value);
+          }
+        }
       }
       if (
         state.status.value === "ready" &&
@@ -1256,7 +1685,15 @@ export class ExecutionSandboxService {
         reconciled.push(state.id.value);
       }
     }
-    return ok({ expired, suspended, migrated, reconciled, failed });
+    return ok({
+      expired,
+      suspended,
+      migrated,
+      reconciled,
+      snapshotsCaptured,
+      snapshotsPruned,
+      failed,
+    });
   }
 
   async reconcileProviderOrphans(
@@ -1355,6 +1792,8 @@ export class ExecutionSandboxService {
         suspended: number;
         migrated: number;
         reconciled: number;
+        snapshotsCaptured: number;
+        snapshotsPruned: number;
         removedOrphans: number;
         failed: number;
       }>;
@@ -1374,6 +1813,8 @@ export class ExecutionSandboxService {
       suspended: number;
       migrated: number;
       reconciled: number;
+      snapshotsCaptured: number;
+      snapshotsPruned: number;
       removedOrphans: number;
       failed: number;
     }> = [];
@@ -1401,6 +1842,8 @@ export class ExecutionSandboxService {
           suspended: lifecycle.isOk() ? lifecycle.value.suspended.length : 0,
           migrated: lifecycle.isOk() ? lifecycle.value.migrated.length : 0,
           reconciled: lifecycle.isOk() ? lifecycle.value.reconciled.length : 0,
+          snapshotsCaptured: lifecycle.isOk() ? lifecycle.value.snapshotsCaptured.length : 0,
+          snapshotsPruned: lifecycle.isOk() ? lifecycle.value.snapshotsPruned.length : 0,
           removedOrphans: orphans.isOk() ? orphans.value.removed.length : 0,
           failed:
             (lifecycle.isOk() ? lifecycle.value.failed.length : 1) +
@@ -1941,6 +2384,7 @@ export class ExecutionSandboxService {
     if (state.status.value !== "paused" || !state.providerHandle || !state.suspension) {
       return err(domainError.conflict("Sandbox is not paused"));
     }
+    const suspension = state.suspension;
     const targetProviderKey = input.providerKey ?? stored.providerKey;
     if (targetProviderKey !== stored.providerKey) {
       const targetCapability = this.providerRegistry.get(targetProviderKey)?.capabilities.pause;
@@ -1997,7 +2441,12 @@ export class ExecutionSandboxService {
         providerHandle: state.providerHandle as string,
         ownerScope: tenantId(repositoryContext),
         ...(ownerOrganizationId ? { ownerOrganizationId } : {}),
-        source: { kind: "snapshot", providerHandle: state.providerHandle as string },
+        source: {
+          kind: "snapshot",
+          providerHandle: state.providerHandle as string,
+          portability: suspension.portability,
+          ...(suspension.recoveryFamily ? { recoveryFamily: suspension.recoveryFamily } : {}),
+        },
         requestedIsolation: state.requestedIsolation.value,
         limits: state.limits.toState(),
         networkPolicy: state.networkPolicy.toState(),
@@ -2021,9 +2470,32 @@ export class ExecutionSandboxService {
   async createSnapshot(
     context: ExecutionContext,
     sandboxId: string,
-    input: { capability: "filesystem" | "filesystem-memory"; expiresAt?: string },
+    input: {
+      capability: "filesystem" | "filesystem-memory";
+      expiresAt?: string;
+      reason?: "manual" | "scheduled" | "pre-termination";
+      allowExpired?: boolean;
+    },
   ): Promise<Result<SandboxSnapshotDescriptor>> {
-    const ready = await this.ready(context, sandboxId);
+    const ready = input.allowExpired
+      ? await (async () => {
+          const stored = await this.repository.find(toRepositoryContext(context), sandboxId);
+          if (!stored) return err(domainError.notFound("Sandbox", sandboxId));
+          const state = stored.sandbox.toState();
+          if (state.status.value !== "ready" || !state.providerHandle) {
+            return err(
+              domainError.conflict("Sandbox runtime is not ready", {
+                phase: "execution-sandbox-snapshot-admission",
+                status: state.status.value,
+              }),
+            );
+          }
+          const provider = this.providerRegistry.get(stored.providerKey);
+          return provider
+            ? ok({ stored, provider, providerHandle: state.providerHandle })
+            : err(domainError.infra("Sandbox provider is unavailable"));
+        })()
+      : await this.ready(context, sandboxId);
     if (ready.isErr()) return err(ready.error);
     if (!ready.value.provider.capabilities.snapshot.includes(input.capability)) {
       return err(domainError.conflict("Sandbox snapshot capability is unsupported"));
@@ -2035,6 +2507,7 @@ export class ExecutionSandboxService {
       id: SandboxSnapshotId.rehydrate(this.idGenerator.next("ssn")),
       sourceSandboxId: ready.value.stored.sandbox.id,
       capability: input.capability,
+      reason: input.reason ?? "manual",
       createdAt,
       ...(expiresAt?.isOk() ? { expiresAt: expiresAt.value } : {}),
     });
@@ -2063,6 +2536,31 @@ export class ExecutionSandboxService {
         ready.value.stored.providerKey,
       );
       return err(observed.error);
+    }
+    const declaredRecovery = ready.value.provider.capabilities.snapshotRecovery;
+    if (
+      !declaredRecovery ||
+      declaredRecovery.portability !== observed.value.portability ||
+      declaredRecovery.recoveryFamily !== observed.value.recoveryFamily
+    ) {
+      const cleanup = await this.providerOperation("execution-sandbox-snapshot-delete", () =>
+        ready.value.provider.deleteSnapshot({
+          snapshotId: snapshot.value.id.value,
+          providerHandle: observed.value.providerHandle,
+        }),
+      );
+      snapshot.value.markFailed({ code: "sandbox_snapshot_recovery_mismatch", at });
+      await this.repository.saveSnapshot(
+        toRepositoryContext(context),
+        snapshot.value,
+        ready.value.stored.providerKey,
+      );
+      if (cleanup.isErr()) return err(cleanup.error);
+      return err(
+        domainError.infra("Sandbox provider Snapshot recovery observation is inconsistent", {
+          phase: "execution-sandbox-snapshot-recovery-observation",
+        }),
+      );
     }
     const captured = snapshot.value.markReady({ ...observed.value, at });
     if (captured.isErr()) return err(captured.error);
@@ -2209,10 +2707,27 @@ export class ExecutionSandboxService {
     sandboxId: string,
   ): Promise<Result<SandboxDescriptor>> {
     const repositoryContext = toRepositoryContext(context);
-    const stored = await this.repository.find(repositoryContext, sandboxId);
+    let stored = await this.repository.find(repositoryContext, sandboxId);
     if (!stored) return err(domainError.notFound("Sandbox", sandboxId));
     if (["terminated", "expired"].includes(stored.sandbox.toState().status.value))
       return ok(descriptor(stored));
+    const snapshots = await this.repository.listSnapshotsForSandbox(repositoryContext, sandboxId, {
+      limit: 500,
+    });
+    const policy = await this.snapshotPolicyFor(context, stored, snapshots);
+    if (policy.isErr()) return err(policy.error);
+    if (policy.value) {
+      const recovery = await this.ensureRecoverySnapshot(
+        context,
+        stored,
+        policy.value.beforeTermination,
+        policy.value,
+      );
+      if (recovery.isErr()) return err(recovery.error);
+      const reloaded = await this.repository.find(repositoryContext, sandboxId);
+      if (!reloaded) return err(domainError.notFound("Sandbox", sandboxId));
+      stored = reloaded;
+    }
     const at = UpdatedAt.rehydrate(this.clock.now());
     const requested = stored.sandbox.requestTermination({ at });
     if (requested.isErr()) return err(requested.error);

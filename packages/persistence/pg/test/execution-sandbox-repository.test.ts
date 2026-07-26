@@ -140,6 +140,7 @@ describe("PgExecutionSandboxRepository", () => {
         .markReady({
           providerHandle: "opaque:snapshot",
           sizeBytes: 3,
+          portability: "provider-local",
           at: UpdatedAt.rehydrate("2026-07-20T00:10:02.000Z"),
         })
         ._unsafeUnwrap();

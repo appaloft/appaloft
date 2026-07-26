@@ -6,6 +6,7 @@ export const tokens = {
   sandboxQuotaPolicy: Symbol.for("appaloft.sandbox_quota_policy"),
   sandboxPlacementPolicy: Symbol.for("appaloft.sandbox_placement_policy"),
   sandboxMaintenancePolicy: Symbol.for("appaloft.sandbox_maintenance_policy"),
+  sandboxSnapshotLifecyclePolicy: Symbol.for("appaloft.sandbox_snapshot_lifecycle_policy"),
   executionSandboxService: Symbol.for("appaloft.execution_sandbox_service"),
   sandboxAgentDeliveryRepository: Symbol.for("appaloft.sandbox_agent_delivery_repository"),
   sandboxAgentDeliveryService: Symbol.for("appaloft.sandbox_agent_delivery_service"),

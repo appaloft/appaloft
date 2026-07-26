@@ -23,6 +23,7 @@ class CapturingRunner implements SandboxDockerCommandRunner {
   failureCommandIncludes: string | undefined;
   inventory = "";
   portableRecoveryDigest = "b".repeat(64);
+  snapshotImageIdentity = "ssn_demo|sbx_demo";
 
   async run(
     argv: readonly string[],
@@ -68,6 +69,12 @@ class CapturingRunner implements SandboxDockerCommandRunner {
       command.includes("appaloft.sandbox.base-image")
     )
       return this.result(`sha256:${"a".repeat(64)}\n`);
+    if (
+      command.includes("image inspect") &&
+      command.includes("appaloft.snapshot.id") &&
+      command.includes("appaloft.snapshot.source-sandbox")
+    )
+      return this.result(`${this.snapshotImageIdentity}\n`);
     if (command.includes("image inspect")) return this.result("4096\n");
     if (command.includes("exec -w") && !command.includes(" -d "))
       return {
@@ -606,6 +613,7 @@ describe("DockerSandboxProvider", () => {
     ).toEqual({
       providerHandle: "appaloft-sandbox-snapshot:ssn_demo",
       sizeBytes: 4096,
+      portability: "provider-local",
     });
     const helperCreate = runner.calls.find(
       (call) => call.argv[1] === "create" && call.argv.includes("appaloft.snapshot.id=ssn_demo"),
@@ -849,5 +857,194 @@ describe("DockerSandboxProvider", () => {
       savedPackage?.replace(/\.partial$/, "") as string,
     ]);
     expect(runner.calls.some((call) => call.argv.includes("/mnt/appaloft-recovery"))).toBe(false);
+  });
+
+  test("[SNAP-PORT-001][SNAP-PORT-002][SNAP-PORT-005] retains one portable Snapshot across repeated restores and exact deletion", async () => {
+    const sourceRunner = new CapturingRunner();
+    const source = new DockerSandboxProvider({
+      key: "server-a",
+      isolation: "gvisor",
+      runner: sourceRunner,
+      portableRecovery: {
+        kind: "shared-filesystem",
+        rootPath: "/mnt/appaloft-recovery",
+        storeId: "shared-a",
+      },
+    });
+    const provisioned = await source.provision(request);
+    const snapshot = await source.captureSnapshot({
+      sandboxId: request.sandboxId,
+      providerHandle: provisioned.providerHandle,
+      snapshotId: "ssn_demo",
+      capability: "filesystem",
+    });
+    expect(snapshot.providerHandle).toStartWith("appaloft-docker-snapshot:v1:");
+    expect(snapshot.sizeBytes).toBe(4096);
+    expect(snapshot.portability).toBe("provider-family");
+    expect(snapshot.recoveryFamily).toMatch(
+      /^docker-workspace-tar-v1:[0-9a-f]{32}$/,
+    );
+    expect(source.capabilities.snapshotRecovery).toEqual({
+      portability: "provider-family",
+      recoveryFamily: snapshot.recoveryFamily,
+    });
+    const savedPackage = sourceRunner.calls
+      .filter((call) => call.argv[1] === "save")
+      .at(-1)?.argv[3];
+    expect(savedPackage).toMatch(
+      /^\/mnt\/appaloft-recovery\/v1\/snapshots\/ssn_demo-ps_[0-9a-f]{32}\.tar\.partial$/,
+    );
+
+    for (const sandboxId of ["sbx_restore_1", "sbx_restore_2"]) {
+      const targetRunner = new CapturingRunner();
+      const target = new DockerSandboxProvider({
+        key: `target-${sandboxId}`,
+        isolation: "gvisor",
+        runner: targetRunner,
+        portableRecovery: {
+          kind: "shared-filesystem",
+          rootPath: "/mnt/appaloft-recovery",
+          storeId: "shared-a",
+        },
+      });
+      await target.provision({
+        ...request,
+        sandboxId,
+        source: {
+          kind: "snapshot",
+          providerHandle: snapshot.providerHandle,
+          portability: snapshot.portability,
+          ...(snapshot.recoveryFamily
+            ? { recoveryFamily: snapshot.recoveryFamily }
+            : {}),
+        },
+      });
+      expect(
+        targetRunner.calls.some(
+          (call) =>
+            call.argv.join(" ") ===
+            `docker load --input ${savedPackage?.replace(/\.partial$/, "")}`,
+        ),
+      ).toBe(true);
+      expect(
+        targetRunner.calls.some(
+          (call) =>
+            call.argv.join(" ") ===
+            `rm -f -- ${savedPackage?.replace(/\.partial$/, "")}`,
+        ),
+      ).toBe(false);
+    }
+
+    const deleteRunner = new CapturingRunner();
+    const deletingProvider = new DockerSandboxProvider({
+      key: "server-b",
+      isolation: "gvisor",
+      runner: deleteRunner,
+      portableRecovery: {
+        kind: "shared-filesystem",
+        rootPath: "/mnt/appaloft-recovery",
+        storeId: "shared-a",
+      },
+    });
+    await deletingProvider.deleteSnapshot({
+      snapshotId: "ssn_demo",
+      providerHandle: snapshot.providerHandle,
+    });
+    expect(deleteRunner.calls[0]?.argv).toEqual([
+      "rm",
+      "-f",
+      "--",
+      savedPackage?.replace(/\.partial$/, "") as string,
+    ]);
+    expect(deleteRunner.calls.some((call) => call.argv.includes("/mnt/appaloft-recovery"))).toBe(
+      false,
+    );
+  });
+
+  test("[SNAP-PORT-004] rejects corrupt or wrongly owned reusable Snapshot packages without deleting them", async () => {
+    const sourceRunner = new CapturingRunner();
+    const source = new DockerSandboxProvider({
+      key: "server-a",
+      isolation: "gvisor",
+      runner: sourceRunner,
+      portableRecovery: {
+        kind: "shared-filesystem",
+        rootPath: "/mnt/appaloft-recovery",
+        storeId: "shared-a",
+      },
+    });
+    const provisioned = await source.provision(request);
+    const snapshot = await source.captureSnapshot({
+      sandboxId: request.sandboxId,
+      providerHandle: provisioned.providerHandle,
+      snapshotId: "ssn_demo",
+      capability: "filesystem",
+    });
+    const packagePath = sourceRunner.calls
+      .filter((call) => call.argv[1] === "save")
+      .at(-1)?.argv[3]
+      ?.replace(/\.partial$/, "");
+
+    const corruptRunner = new CapturingRunner();
+    corruptRunner.portableRecoveryDigest = "c".repeat(64);
+    const corruptTarget = new DockerSandboxProvider({
+      key: "server-b",
+      isolation: "gvisor",
+      runner: corruptRunner,
+      portableRecovery: {
+        kind: "shared-filesystem",
+        rootPath: "/mnt/appaloft-recovery",
+        storeId: "shared-a",
+      },
+    });
+    await expect(
+      corruptTarget.provision({
+        ...request,
+        sandboxId: "sbx_restore_corrupt",
+        source: {
+          kind: "snapshot",
+          providerHandle: snapshot.providerHandle,
+          portability: snapshot.portability,
+          recoveryFamily: snapshot.recoveryFamily,
+        },
+      }),
+    ).rejects.toThrow("digest");
+    expect(corruptRunner.calls.some((call) => call.argv[1] === "load")).toBe(false);
+    expect(
+      corruptRunner.calls.some(
+        (call) => call.argv.join(" ") === `rm -f -- ${packagePath}`,
+      ),
+    ).toBe(false);
+
+    const ownershipRunner = new CapturingRunner();
+    ownershipRunner.snapshotImageIdentity = "ssn_other|sbx_other";
+    const ownershipTarget = new DockerSandboxProvider({
+      key: "server-c",
+      isolation: "gvisor",
+      runner: ownershipRunner,
+      portableRecovery: {
+        kind: "shared-filesystem",
+        rootPath: "/mnt/appaloft-recovery",
+        storeId: "shared-a",
+      },
+    });
+    await expect(
+      ownershipTarget.provision({
+        ...request,
+        sandboxId: "sbx_restore_owner",
+        source: {
+          kind: "snapshot",
+          providerHandle: snapshot.providerHandle,
+          portability: snapshot.portability,
+          recoveryFamily: snapshot.recoveryFamily,
+        },
+      }),
+    ).rejects.toThrow("ownership");
+    expect(ownershipRunner.calls.some((call) => call.argv[1] === "load")).toBe(true);
+    expect(
+      ownershipRunner.calls.some(
+        (call) => call.argv.join(" ") === `rm -f -- ${packagePath}`,
+      ),
+    ).toBe(false);
   });
 });
