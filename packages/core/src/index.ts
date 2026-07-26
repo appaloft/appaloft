@@ -1,3 +1,4 @@
+export * from "./agent-adapter";
 export * from "./configuration";
 export * from "./dependency-resources";
 export * from "./execution-sandbox";

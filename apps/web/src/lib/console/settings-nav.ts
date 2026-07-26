@@ -3,6 +3,7 @@ import { type AppaloftLocale, defaultAppaloftLocale } from "@appaloft/i18n";
 import {
   Activity,
   Archive,
+  Bot,
   Building2,
   ClipboardList,
   Globe2,
@@ -78,6 +79,11 @@ export function organizationSettingsItems(
       href: "/organization/deploy-tokens",
       labelKey: i18nKeys.console.organization.deployTokensTitle,
       icon: KeyRound,
+    },
+    {
+      href: "/organization/agent-adapters",
+      labelKey: i18nKeys.console.organization.agentAdaptersTitle,
+      icon: Bot,
     },
     {
       href: "/organization/archived-projects",

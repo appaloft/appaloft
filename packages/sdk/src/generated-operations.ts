@@ -92,6 +92,114 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "agent-adapters.disable",
+    operationGroup: "agent-adapters",
+    operationMethod: "disable",
+    facadePath: ["agentAdapters", "disable"],
+    operationId: "agentAdapters.disable",
+    kind: "command",
+    domain: "agent-adapters",
+    messageName: "DisableAgentAdapterCommand",
+    route: {
+      method: "POST",
+      path: "/agent-adapters/{installationId}/disable",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "agent-adapters.install",
+    operationGroup: "agent-adapters",
+    operationMethod: "install",
+    facadePath: ["agentAdapters", "install"],
+    operationId: "agentAdapters.install",
+    kind: "command",
+    domain: "agent-adapters",
+    messageName: "InstallAgentAdapterCommand",
+    route: {
+      method: "POST",
+      path: "/agent-adapters",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "agent-adapters.list",
+    operationGroup: "agent-adapters",
+    operationMethod: "list",
+    facadePath: ["agentAdapters", "list"],
+    operationId: "agentAdapters.list",
+    kind: "query",
+    domain: "agent-adapters",
+    messageName: "ListAgentAdaptersQuery",
+    route: {
+      method: "GET",
+      path: "/agent-adapters",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "agent-adapters.show",
+    operationGroup: "agent-adapters",
+    operationMethod: "show",
+    facadePath: ["agentAdapters", "show"],
+    operationId: "agentAdapters.show",
+    kind: "query",
+    domain: "agent-adapters",
+    messageName: "ShowAgentAdapterQuery",
+    route: {
+      method: "GET",
+      path: "/agent-adapters/{installationId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "agent-adapters.uninstall",
+    operationGroup: "agent-adapters",
+    operationMethod: "uninstall",
+    facadePath: ["agentAdapters", "uninstall"],
+    operationId: "agentAdapters.uninstall",
+    kind: "command",
+    domain: "agent-adapters",
+    messageName: "UninstallAgentAdapterCommand",
+    route: {
+      method: "DELETE",
+      path: "/agent-adapters/{installationId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "agent-adapters.validate",
+    operationGroup: "agent-adapters",
+    operationMethod: "validate",
+    facadePath: ["agentAdapters", "validate"],
+    operationId: "agentAdapters.validate",
+    kind: "query",
+    domain: "agent-adapters",
+    messageName: "ValidateAgentAdapterQuery",
+    route: {
+      method: "POST",
+      path: "/agent-adapters/validate",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "audit-events.archives.create",
     operationGroup: "audit-events",
     operationMethod: "archivesCreate",
@@ -7305,6 +7413,14 @@ export interface GeneratedAppaloftClient {
       readonly list: AppaloftSdkFacadeMethod;
       readonly revoke: AppaloftSdkFacadeMethod;
     };
+  };
+  readonly agentAdapters: {
+    readonly disable: AppaloftSdkFacadeMethod;
+    readonly install: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+    readonly uninstall: AppaloftSdkFacadeMethod;
+    readonly validate: AppaloftSdkFacadeMethod;
   };
   readonly auditEvents: {
     readonly archives: {

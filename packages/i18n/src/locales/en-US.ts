@@ -1447,6 +1447,51 @@ export const enUS = {
       writerLease: "Writer lease",
     },
     organization: {
+      agentAdapterCompatible: "Compatible",
+      agentAdapterDetailDescription:
+        "Inspect the immutable definition and tenant-scoped installation identity.",
+      agentAdapterDetailTitle: "Agent Adapter details",
+      agentAdapterDetailUnavailable: "This Agent Adapter installation is no longer available.",
+      agentAdapterDigest: "Definition digest",
+      agentAdapterDisableAction: "Disable",
+      agentAdapterDisableDescription:
+        "Block this installation from new Workspaces while existing Workspace recovery remains available.",
+      agentAdapterDisabled: "Agent Adapter disabled",
+      agentAdapterInstallAction: "Install Adapter",
+      agentAdapterInstallDescription:
+        "Paste a declarative manifest. Appaloft validates compatibility and stores its immutable digest; it does not load uploaded control-plane code.",
+      agentAdapterInstalled: "Agent Adapter installed",
+      agentAdapterInstalledAt: "Installed",
+      agentAdapterInstallationId: "Installation ID",
+      agentAdapterInstalling: "Installing",
+      agentAdapterInstallTitle: "Install Agent Adapter",
+      agentAdapterLifecycleDescription:
+        "Disable blocks new use. Uninstall is allowed only after active Workspace references are cleared.",
+      agentAdapterLifecycleTitle: "Agent Adapter lifecycle",
+      agentAdapterManifestLabel: "Adapter manifest JSON",
+      agentAdapterManifestNotice:
+        "Only bounded declarative execution inside a Sandbox is accepted. Credentials stay outside the manifest.",
+      agentAdapterManifestPlaceholder:
+        '{\n  "schemaVersion": "appaloft.agent-adapter/v1",\n  "id": "example-agent"\n}',
+      agentAdapterName: "Adapter",
+      agentAdaptersDescription:
+        "Install and govern declarative coding-agent integrations for this organization.",
+      agentAdaptersEmptyDescription:
+        "Install a validated Adapter definition before using it in a new Agent Workspace.",
+      agentAdaptersEmptyTitle: "No Agent Adapters installed",
+      agentAdaptersTitle: "Agent Adapters",
+      agentAdapterStatusDisabled: "Disabled",
+      agentAdapterStatusEnabled: "Enabled",
+      agentAdapterUnchecked: "Unchecked",
+      agentAdapterUninstallAction: "Uninstall",
+      agentAdapterUninstallDescription:
+        "Remove only this tenant installation. Active Workspace references block the operation.",
+      agentAdapterUninstalled: "Agent Adapter uninstalled",
+      agentAdapterValidateAction: "Validate",
+      agentAdapterValidated: "Agent Adapter manifest validated",
+      agentAdapterValidatedDigest: "Validated definition digest",
+      agentAdapterValidating: "Validating",
+      agentAdapterVersion: "Version",
       archivedProjectsDescription:
         "Review archived projects. They stay out of Home, Projects, and the sidebar project list.",
       archivedProjectsEmptyDescription:

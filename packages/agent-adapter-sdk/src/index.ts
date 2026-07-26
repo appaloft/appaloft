@@ -324,6 +324,7 @@ export interface AgentAdapterValidationIssue {
 export interface ValidatedAgentAdapterDefinition {
   manifest: AgentAdapterManifest;
   digest: `sha256:${string}`;
+  canonicalManifest: string;
   compatibility: {
     status: "compatible" | "unchecked";
     unavailableOptionalCapabilities: AgentAdapterHostCapability[];
@@ -466,6 +467,7 @@ export function validateAgentAdapterManifest(
     ok: true,
     definition: {
       manifest,
+      canonicalManifest: canonicalJson(manifest),
       digest: `sha256:${createHash("sha256").update(canonicalJson(manifest)).digest("hex")}`,
       compatibility: {
         status: fullyChecked ? "compatible" : "unchecked",

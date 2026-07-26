@@ -4,9 +4,9 @@
 
 - [x] `ADAPTER-MANIFEST-001/002/003`: schema, digest, compatibility, and trust-boundary tests.
 - [x] `ADAPTER-CAP-004/ADAPTER-EVENT-005/ADAPTER-CRED-006`: descriptor conformance tests.
-- [ ] `ADAPTER-INSTALL-007/008`: tenant lifecycle and reference-fencing tests.
+- [x] `ADAPTER-INSTALL-007/008`: tenant lifecycle and reference-fencing tests.
 - [ ] `PROFILE-MANIFEST-009/PROFILE-PIN-010`: Profile validation/compile/pinning tests.
-- [ ] `ADAPTER-SURFACE-011`: operation/transport/SDK parity tests.
+- [x] `ADAPTER-SURFACE-011`: operation/transport/SDK parity tests.
 - [ ] `ADAPTER-CODEX-012`: deterministic fixture and opt-in Codex smoke.
 
 ## Source Of Truth
@@ -18,13 +18,15 @@
 ## Implementation
 
 - [x] Implement manifest schemas, canonicalization, digest, validator, and conformance API.
-- [ ] Implement definition/installation lifecycle and persistence.
+- [x] Implement definition/installation lifecycle and persistence.
 - [ ] Implement Profile validation, installation, compile, and resolved Workspace pinning.
 - [ ] Implement Declarative Harness resolver and fixture/Codex adapters.
-- [ ] Add operation catalog, CLI, HTTP/oRPC, SDK, MCP metadata, and Web surfaces.
+- [x] Add the Adapter installation operation catalog, CLI, HTTP/oRPC, SDK, MCP metadata, and Web
+  surfaces. Profile surfaces remain part of the Profile implementation slice.
 
 ## Verification And Sync
 
-- [ ] Run focused tests and public lint/typecheck/test/build.
+- [x] Run focused tests and public lint/typecheck/test/build.
 - [ ] Run local Docker conformance smoke and explicit real Codex smoke.
-- [ ] Synchronize operations, docs, migration gaps, tasks, and issue evidence.
+- [x] Synchronize the Adapter installation operations, public user docs, migration, tasks, and test
+  evidence. Profile and runtime conformance evidence remains pending.

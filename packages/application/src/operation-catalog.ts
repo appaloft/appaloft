@@ -2,6 +2,14 @@ import "reflect-metadata";
 
 import { type ZodTypeAny } from "zod";
 import {
+  disableAgentAdapterInputSchema,
+  installAgentAdapterInputSchema,
+  listAgentAdaptersInputSchema,
+  showAgentAdapterInputSchema,
+  uninstallAgentAdapterInputSchema,
+  validateAgentAdapterInputSchema,
+} from "./agent-adapter-messages";
+import {
   approveAgentTaskRunInputSchema,
   cancelAgentTaskRunInputSchema,
   createAgentTaskRunInputSchema,
@@ -437,6 +445,7 @@ type OperationDomain =
   | "system"
   | "terminal-sessions"
   | "sandboxes"
+  | "agent-adapters"
   | "workspace-collaborations";
 
 export interface OperationCatalogEntry {
@@ -4878,6 +4887,96 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft upgrade apply",
       orpc: { method: "POST", path: "/api/instance-upgrade/apply" },
+    },
+  },
+  {
+    key: "agent-adapters.validate",
+    kind: "query",
+    domain: "agent-adapters",
+    messageName: "ValidateAgentAdapterQuery",
+    handlerName: "AgentAdapterQueryHandler",
+    serviceName: "AgentAdapterInstallationService",
+    inputSchema: validateAgentAdapterInputSchema,
+    serviceToken: tokens.agentAdapterInstallationService,
+    transportAccess: { productSession: { minRole: "admin" } },
+    transports: {
+      cli: "appaloft agent-adapter validate <manifest>",
+      orpc: { method: "POST", path: "/api/agent-adapters/validate" },
+    },
+  },
+  {
+    key: "agent-adapters.install",
+    kind: "command",
+    domain: "agent-adapters",
+    messageName: "InstallAgentAdapterCommand",
+    handlerName: "AgentAdapterCommandHandler",
+    serviceName: "AgentAdapterInstallationService",
+    inputSchema: installAgentAdapterInputSchema,
+    serviceToken: tokens.agentAdapterInstallationService,
+    transportAccess: { productSession: { minRole: "admin" } },
+    transports: {
+      cli: "appaloft agent-adapter install <manifest>",
+      orpc: { method: "POST", path: "/api/agent-adapters" },
+    },
+  },
+  {
+    key: "agent-adapters.list",
+    kind: "query",
+    domain: "agent-adapters",
+    messageName: "ListAgentAdaptersQuery",
+    handlerName: "AgentAdapterQueryHandler",
+    serviceName: "AgentAdapterInstallationService",
+    inputSchema: listAgentAdaptersInputSchema,
+    serviceToken: tokens.agentAdapterInstallationService,
+    transportAccess: { productSession: { minRole: "member" } },
+    transports: {
+      cli: "appaloft agent-adapter list",
+      orpc: { method: "GET", path: "/api/agent-adapters" },
+    },
+  },
+  {
+    key: "agent-adapters.show",
+    kind: "query",
+    domain: "agent-adapters",
+    messageName: "ShowAgentAdapterQuery",
+    handlerName: "AgentAdapterQueryHandler",
+    serviceName: "AgentAdapterInstallationService",
+    inputSchema: showAgentAdapterInputSchema,
+    serviceToken: tokens.agentAdapterInstallationService,
+    transportAccess: { productSession: { minRole: "member" } },
+    transports: {
+      cli: "appaloft agent-adapter show <installationId>",
+      orpc: { method: "GET", path: "/api/agent-adapters/{installationId}" },
+    },
+  },
+  {
+    key: "agent-adapters.disable",
+    kind: "command",
+    domain: "agent-adapters",
+    messageName: "DisableAgentAdapterCommand",
+    handlerName: "AgentAdapterCommandHandler",
+    serviceName: "AgentAdapterInstallationService",
+    inputSchema: disableAgentAdapterInputSchema,
+    serviceToken: tokens.agentAdapterInstallationService,
+    transportAccess: { productSession: { minRole: "admin" } },
+    transports: {
+      cli: "appaloft agent-adapter disable <installationId>",
+      orpc: { method: "POST", path: "/api/agent-adapters/{installationId}/disable" },
+    },
+  },
+  {
+    key: "agent-adapters.uninstall",
+    kind: "command",
+    domain: "agent-adapters",
+    messageName: "UninstallAgentAdapterCommand",
+    handlerName: "AgentAdapterCommandHandler",
+    serviceName: "AgentAdapterInstallationService",
+    inputSchema: uninstallAgentAdapterInputSchema,
+    serviceToken: tokens.agentAdapterInstallationService,
+    transportAccess: { productSession: { minRole: "admin" } },
+    transports: {
+      cli: "appaloft agent-adapter uninstall <installationId>",
+      orpc: { method: "DELETE", path: "/api/agent-adapters/{installationId}" },
     },
   },
   {

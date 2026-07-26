@@ -24,6 +24,7 @@ import {
   CreateStorageVolumeCommand,
   createExecutionContext,
   DefaultOperationAuditSink,
+  InstallAgentAdapterCommand,
   type OperationAuditRecordInput,
   type OperationAuditSink,
   operationAuditRecordFromCommand,
@@ -433,6 +434,34 @@ describe("operation audit pipeline", () => {
           relatedTargets: [
             { resourceType: "project", resourceId: "prj_1" },
             { resourceType: "environment", resourceId: "env_1" },
+          ],
+        },
+      },
+      {
+        command: InstallAgentAdapterCommand.create({
+          manifest: {
+            apiVersion: "appaloft.dev/v1alpha1",
+            kind: "AgentAdapter",
+            metadata: { id: "opencode", version: "1.0.0", displayName: "OpenCode" },
+          },
+        })._unsafeUnwrap(),
+        result: ok({
+          installationId: "aai_1",
+          definitionDigest: `sha256:${"a".repeat(64)}`,
+        }),
+        expected: {
+          operationKey: "agent-adapters.install",
+          domain: "agent-adapters",
+          action: "install",
+          primaryTarget: {
+            resourceType: "agent_adapter_installation",
+            resourceId: "aai_1",
+          },
+          relatedTargets: [
+            {
+              resourceType: "agent_adapter_definition",
+              resourceId: `sha256:${"a".repeat(64)}`,
+            },
           ],
         },
       },

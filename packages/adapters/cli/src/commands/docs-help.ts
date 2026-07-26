@@ -68,10 +68,36 @@ export const cliDocsHrefs = {
   selfHostedOrganizationTeam: resolvePublicDocsHelpHref(
     "self-hosting.organization-team-management",
   ),
+  agentAdapterInstallations: resolvePublicDocsHelpHref("agent.adapter-installations"),
   agentDeploySkill: resolvePublicDocsHelpHref("agent.deploy-skill"),
 } as const;
 
 export const cliCommandDescriptions = {
+  agentAdapter: withDocs(
+    "Manage tenant-scoped Agent Adapter installations",
+    "agent.adapter-installations",
+  ),
+  agentAdapterValidate: withDocs(
+    "Validate an Agent Adapter manifest",
+    "agent.adapter-installations",
+  ),
+  agentAdapterInstall: withDocs(
+    "Install an Agent Adapter for the active tenant",
+    "agent.adapter-installations",
+  ),
+  agentAdapterList: withDocs(
+    "List Agent Adapter installations for the active tenant",
+    "agent.adapter-installations",
+  ),
+  agentAdapterShow: withDocs("Show an Agent Adapter installation", "agent.adapter-installations"),
+  agentAdapterDisable: withDocs(
+    "Disable an Agent Adapter installation",
+    "agent.adapter-installations",
+  ),
+  agentAdapterUninstall: withDocs(
+    "Uninstall an unused Agent Adapter installation",
+    "agent.adapter-installations",
+  ),
   deploy: withDocs("Create a deployment", "deployment.source"),
   github: withDocs("GitHub source operations", "deployment.source"),
   githubStatus: withDocs("Show GitHub App source connection status", "deployment.source"),
