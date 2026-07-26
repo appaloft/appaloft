@@ -11,3 +11,4 @@
 | PORT-MOVE-002 | Application | Ready portable Sandbox requires relocation | Maintenance reports migration after pause/resume under the same identity. |
 | PORT-MOVE-003 | Application | Target restore fails | Sandbox remains paused and recovery can be retried. |
 | PORT-MOVE-004 | Integration | Runtime capabilities predate relocation | Old capabilities fail and newly issued capabilities work. |
+| PORT-MOVE-005 | Core/composition | A safe outer provider binding wraps a portable child recovery handle | The bounded nested handle survives pause/resume persistence; oversized or whitespace-bearing handles remain rejected. |

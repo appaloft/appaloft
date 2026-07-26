@@ -26,3 +26,5 @@
 - [x] Pass targeted public tests.
 - [x] Pass real two-provider Docker recovery smoke.
 - [x] Pass public repository gates.
+- [x] Pass nested provider/recovery handle regression; hosted compositions validate the real
+  two-Server drain separately without adding topology to the public contract.

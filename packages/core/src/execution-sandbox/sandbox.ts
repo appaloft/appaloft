@@ -82,6 +82,12 @@ function safeImage(value: string): boolean {
   return value.length > 0 && value.length <= 512 && !/[\s;&|`$<>\0]/u.test(value);
 }
 
+const maximumProviderHandleLength = 4_096;
+
+function safeProviderHandle(value: string): boolean {
+  return value.length > 0 && value.length <= maximumProviderHandleLength && !/\s/u.test(value);
+}
+
 export class Sandbox extends AggregateRoot<SandboxState, SandboxId> {
   private constructor(state: SandboxState) {
     super(state);
@@ -190,7 +196,7 @@ export class Sandbox extends AggregateRoot<SandboxState, SandboxId> {
       );
     }
     const handle = input.providerHandle.trim();
-    if (!handle || handle.length > 512 || /\s/.test(handle)) {
+    if (!safeProviderHandle(handle)) {
       return err(
         domainError.validation("Sandbox provider handle is invalid", {
           phase: "execution-sandbox-provider-observation",
@@ -231,7 +237,7 @@ export class Sandbox extends AggregateRoot<SandboxState, SandboxId> {
       return err(transitionError(this.state.status.value, "become paused"));
     }
     const handle = input.providerHandle.trim();
-    if (!handle || handle.length > 512 || /\s/.test(handle)) {
+    if (!safeProviderHandle(handle)) {
       return err(
         domainError.validation("Sandbox recovery handle is invalid", {
           phase: "execution-sandbox-provider-observation",

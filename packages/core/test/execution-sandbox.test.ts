@@ -127,4 +127,63 @@ describe("Execution Sandbox", () => {
       sandbox.touchActivity({ at: UpdatedAt.rehydrate("2026-07-20T00:00:02.000Z") }).isErr(),
     ).toBe(true);
   });
+
+  test("[PORT-MOVE-005] accepts bounded nested provider and recovery handles", () => {
+    const sandbox = fixture();
+    const nestedLiveHandle = `appaloft-cloud-server-sandbox:v1:${"a".repeat(620)}`;
+    const nestedRecoveryHandle = `appaloft-cloud-server-sandbox:v1:${"b".repeat(620)}`;
+    sandbox
+      .startProvisioning({
+        attemptId: "sat_create_1",
+        at: UpdatedAt.rehydrate("2026-07-20T00:00:01.000Z"),
+      })
+      ._unsafeUnwrap();
+    sandbox
+      .markReady({
+        realizedIsolation: SandboxIsolationLevel.gvisor(),
+        providerHandle: nestedLiveHandle,
+        at: UpdatedAt.rehydrate("2026-07-20T00:00:02.000Z"),
+      })
+      ._unsafeUnwrap();
+    sandbox.requestPause({ at: UpdatedAt.rehydrate("2026-07-20T00:00:03.000Z") })._unsafeUnwrap();
+    sandbox
+      .markPaused({
+        at: UpdatedAt.rehydrate("2026-07-20T00:00:04.000Z"),
+        providerHandle: nestedRecoveryHandle,
+        suspension: {
+          mode: "compute-released",
+          portability: "provider-family",
+          recoveryFamily: "shared-store-a",
+        },
+      })
+      ._unsafeUnwrap();
+    expect(sandbox.toState().providerHandle).toBe(nestedRecoveryHandle);
+
+    sandbox.requestResume({ at: UpdatedAt.rehydrate("2026-07-20T00:00:05.000Z") })._unsafeUnwrap();
+    sandbox
+      .markReady({
+        realizedIsolation: SandboxIsolationLevel.gvisor(),
+        providerHandle: nestedLiveHandle,
+        at: UpdatedAt.rehydrate("2026-07-20T00:00:06.000Z"),
+      })
+      ._unsafeUnwrap();
+    expect(sandbox.toState().providerHandle).toBe(nestedLiveHandle);
+
+    const oversized = fixture();
+    oversized
+      .startProvisioning({
+        attemptId: "sat_create_2",
+        at: UpdatedAt.rehydrate("2026-07-20T00:00:01.000Z"),
+      })
+      ._unsafeUnwrap();
+    expect(
+      oversized
+        .markReady({
+          realizedIsolation: SandboxIsolationLevel.gvisor(),
+          providerHandle: "x".repeat(4_097),
+          at: UpdatedAt.rehydrate("2026-07-20T00:00:02.000Z"),
+        })
+        .isErr(),
+    ).toBe(true);
+  });
 });
