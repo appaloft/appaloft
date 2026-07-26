@@ -294,6 +294,7 @@ describe("ExecutionSandboxService", () => {
     expect((await app.maintain(context))._unsafeUnwrap()).toEqual({
       expired: ["sbx_test"],
       suspended: [],
+      migrated: [],
       reconciled: [],
       failed: [],
     });
@@ -362,6 +363,7 @@ describe("ExecutionSandboxService", () => {
     expect((await app.maintain(context, { idleSuspendAfterSeconds: 60 }))._unsafeUnwrap()).toEqual({
       expired: [],
       suspended: ["sbx_test"],
+      migrated: [],
       reconciled: [],
       failed: [],
     });
@@ -473,5 +475,113 @@ describe("ExecutionSandboxService", () => {
     expect((await app.create(context, createInput)).isErr()).toBe(true);
     expect((await app.list(context, {}))._unsafeUnwrap().items).toEqual([]);
     expect(fake.provisionCalls()).toBe(0);
+  });
+
+  test("[PORT-REC-002][PORT-REC-003] restores through a compatible recovery family", async () => {
+    const first = provider();
+    const second = provider();
+    first.adapter.capabilities.pause = {
+      mode: "compute-released",
+      portability: "provider-family",
+      recoveryFamily: "shared-store-a",
+    };
+    second.adapter.capabilities.pause = {
+      mode: "compute-released",
+      portability: "provider-family",
+      recoveryFamily: "shared-store-a",
+    };
+    const firstAdapter: SandboxProvider = { ...first.adapter, key: "server-a" };
+    const secondAdapter: SandboxProvider = { ...second.adapter, key: "server-b" };
+    let restoredHandle: string | undefined;
+    secondAdapter.resume = async (request) => {
+      restoredHandle = request.providerHandle;
+      return {
+        providerHandle: `handle:${request.sandboxId}:server-b`,
+        realizedIsolation: "gvisor",
+      };
+    };
+    const repository = new InMemorySandboxRepository();
+    const app = new ExecutionSandboxService({
+      repository,
+      providerRegistry: new SandboxProviderRegistry([firstAdapter, secondAdapter]),
+      clock: { now: () => "2026-07-20T00:00:00.000Z" },
+      idGenerator: { next: (prefix) => `${prefix}_test` },
+      placementPolicy: { select: () => ok("server-a") },
+    });
+    const created = (await app.createAndReconcile(context, createInput))._unsafeUnwrap();
+    await app.pause(context, created.sandboxId);
+
+    const resumed = await app.resume(context, created.sandboxId, { providerKey: "server-b" });
+    expect(resumed._unsafeUnwrap()).toMatchObject({
+      sandboxId: created.sandboxId,
+      status: "ready",
+      providerKey: "server-b",
+    });
+    expect(restoredHandle).toBe(`recovery:${created.sandboxId}`);
+
+    await app.pause(context, created.sandboxId);
+    firstAdapter.capabilities.pause = {
+      mode: "compute-released",
+      portability: "provider-family",
+      recoveryFamily: "shared-store-b",
+    };
+    const rejected = await app.resume(context, created.sandboxId, { providerKey: "server-a" });
+    expect(rejected.isErr()).toBe(true);
+    if (rejected.isErr()) expect(rejected.error.code).toBe("sandbox_recovery_not_portable");
+  });
+
+  test("[PORT-MOVE-001][PORT-MOVE-002] maintenance relocates a ready portable Sandbox", async () => {
+    const fake = provider();
+    fake.adapter.capabilities.pause = {
+      mode: "compute-released",
+      portability: "provider-family",
+      recoveryFamily: "shared-store-a",
+    };
+    fake.adapter.requiresRelocation = async () => true;
+    const app = service(fake.adapter);
+    await app.createAndReconcile(context, createInput);
+
+    expect((await app.maintain(context))._unsafeUnwrap()).toEqual({
+      expired: [],
+      suspended: [],
+      migrated: ["sbx_test"],
+      reconciled: [],
+      failed: [],
+    });
+    expect((await app.show(context, "sbx_test"))._unsafeUnwrap()).toMatchObject({
+      sandboxId: "sbx_test",
+      status: "ready",
+    });
+  });
+
+  test("[PORT-MOVE-003] failed relocation retains retryable paused recovery", async () => {
+    const fake = provider();
+    fake.adapter.capabilities.pause = {
+      mode: "compute-released",
+      portability: "portable",
+    };
+    fake.adapter.requiresRelocation = async () => true;
+    fake.adapter.resume = async () => {
+      throw new Error("injected target restore failure");
+    };
+    const app = service(fake.adapter);
+    await app.createAndReconcile(context, createInput);
+
+    const maintained = (await app.maintain(context))._unsafeUnwrap();
+    expect(maintained).toEqual({
+      expired: [],
+      suspended: [],
+      migrated: [],
+      reconciled: [],
+      failed: ["sbx_test"],
+    });
+    expect((await app.show(context, "sbx_test"))._unsafeUnwrap()).toMatchObject({
+      sandboxId: "sbx_test",
+      status: "paused",
+      suspension: {
+        mode: "compute-released",
+        portability: "portable",
+      },
+    });
   });
 });
