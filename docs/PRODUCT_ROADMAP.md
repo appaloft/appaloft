@@ -132,6 +132,11 @@ Product constraints:
   [ADR-099](./decisions/ADR-099-reusable-workspace-snapshot-policy.md) and
   [Spec 116](./specs/116-reusable-workspace-snapshot-policy/spec.md): scheduled capture, exact
   retention, required/best-effort destructive recovery gates and portable one-to-many restore.
+- [ ] Deliver the open Agent Adapter and Workspace Profile V1 under
+  [ADR-100](./decisions/ADR-100-agent-adapter-distribution-and-workspace-profile-boundary.md) and
+  [Spec 117](./specs/117-agent-adapter-sdk-and-workspace-profiles/spec.md): canonical declarative
+  manifests, fail-closed compatibility, tenant installations, safe Profile compilation, public
+  entrypoint parity and deterministic third-party conformance without uploaded control-plane code.
 - [x] Keep Delivery Evidence Chain claims limited to observed delivery evidence; do not imply
   formal correctness, security, vulnerability absence, or compliance.
 - [x] Treat Appaloft as a self-hosted deployment control plane, not a web-first CRUD app.

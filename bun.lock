@@ -214,6 +214,13 @@
         "@appaloft/core": "workspace:*",
       },
     },
+    "packages/agent-adapter-sdk": {
+      "name": "@appaloft/agent-adapter-sdk",
+      "dependencies": {
+        "semver": "^7.8.5",
+        "zod": "^4.4.3",
+      },
+    },
     "packages/ai/mcp": {
       "name": "@appaloft/ai-mcp",
       "version": "0.1.0",
@@ -689,6 +696,8 @@
     "@appaloft/adapter-runtime": ["@appaloft/adapter-runtime@workspace:packages/adapters/runtime"],
 
     "@appaloft/adapter-secret-protection": ["@appaloft/adapter-secret-protection@workspace:packages/adapters/secret-protection"],
+
+    "@appaloft/agent-adapter-sdk": ["@appaloft/agent-adapter-sdk@workspace:packages/agent-adapter-sdk"],
 
     "@appaloft/ai-mcp": ["@appaloft/ai-mcp@workspace:packages/ai/mcp"],
 

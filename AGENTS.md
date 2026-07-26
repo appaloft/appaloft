@@ -166,6 +166,15 @@ Replace placeholders with confirmed paths; do not execute `<workspace>` or `path
 ## Specification And Decision Sync Rules
 
 - `AGENTS.md` defines durable repository-level working rules; task-specific session goals belong in the current prompt or a plan document, not in the permanent repository charter
+- all new or changed product behavior must pass `Grill -> Spec -> Ticket -> Code -> Sync` as defined
+  in [docs/FEATURE_DELIVERY_WORKFLOW.md](docs/FEATURE_DELIVERY_WORKFLOW.md): record owner-confirmed
+  decisions in feature discovery, complete governing ADR/spec/plan/tasks/test matrix, derive
+  actor-visible GitHub issues, require `ready-for-agent` before implementation, and synchronize
+  artifacts and evidence before merge
+- behavior-neutral docs/index sync and mechanical refactors must not create fake feature artifacts;
+  a bug with already-governed expected behavior still requires an issue and regression test, while
+  an emergency incident fix may restore service first and complete decision/spec sync immediately
+  afterward
 - before the first formal release, do not add compatibility aliases or legacy fallback reads for newly modeled domain fields; make breaking changes directly and align specs, contracts, adapters, persistence, and tests to the canonical domain vocabulary in the same change
 - accepted ADRs govern local specs; local specs govern implementation intent; migration notes document temporary gaps without replacing the contract
 - docs/ai/** contains background analysis and migration context only; it must not override ADRs, global contracts, or normative local specs

@@ -441,6 +441,28 @@ Governing artifacts:
 - [Agent Workspace Workflow](./workflows/agent-workspace.md)
 - [Agent Workspace Test Matrix](./testing/agent-workspace-test-matrix.md)
 
+### Agent Adapter And Workspace Profile Distribution
+
+`AgentAdapterDefinition` is an immutable, digest-addressed distributable definition.
+`AgentAdapterInstallation` is the tenant-scoped approval and availability record for that
+definition. Adapter is a packaging and distribution layer; `SandboxAgentHarness` remains the
+runtime execution port, and existing Runtime records retain their resolved Harness key and
+capability snapshot.
+
+`AgentWorkspaceProfileDefinition` is a portable composition document that references exact Adapter
+and Sandbox Template versions/digests plus bounded setup, working-directory, port, persistence and
+check defaults. It compiles into existing Sandbox, Runtime, Terminal and Port operations. It is not
+an aggregate, Blueprint, Sandbox Template replacement, or deployment engine.
+
+Declarative Adapters execute validated argv only inside a Sandbox. Trusted Code Adapters are loaded
+only by instance composition. Credential values use requirement/reference/grant boundaries and do
+not enter definitions, output, snapshots, Task state or audit.
+
+Governing artifacts:
+- [ADR-100](./decisions/ADR-100-agent-adapter-distribution-and-workspace-profile-boundary.md)
+- [Spec 117](./specs/117-agent-adapter-sdk-and-workspace-profiles/spec.md)
+- [Agent Adapter SDK And Workspace Profiles Test Matrix](./testing/agent-adapter-sdk-and-workspace-profile-test-matrix.md)
+
 ### Workspace Collaboration
 
 `WorkspaceCollaboration` is a public coordination aggregate over existing Agent Workspaces. It owns
