@@ -19,6 +19,10 @@ import {
 } from "./control-plane-client.js";
 import { type CliControlPlaneProfile } from "./control-plane-profile.js";
 import {
+  createRemoteTerminalSessionAttachmentGateway,
+  type RemoteTerminalWebSocketFactory,
+} from "./remote-terminal-session-gateway.js";
+import {
   type CliProgram,
   CliRuntime,
   type CliTerminalIO,
@@ -33,6 +37,7 @@ export interface RemoteCliProgramInput {
   readonly fetch?: AppaloftSdkFetch;
   readonly now?: () => string;
   readonly terminalIO?: CliTerminalIO;
+  readonly webSocketFactory?: RemoteTerminalWebSocketFactory;
   readonly readStdinText?: () => Promise<string>;
 }
 
@@ -448,6 +453,10 @@ export function createRemoteCliProgram(input: RemoteCliProgramInput): CliProgram
           ...(input.fetch ? { fetch: input.fetch } : {}),
         });
       },
+      terminalSessionGateway: createRemoteTerminalSessionAttachmentGateway({
+        baseUrl: input.profile.baseUrl,
+        ...(input.webSocketFactory ? { webSocketFactory: input.webSocketFactory } : {}),
+      }),
       terminalIO,
       readStdinText: () => capturedStdinText ?? sourceStdinReader(),
     }),

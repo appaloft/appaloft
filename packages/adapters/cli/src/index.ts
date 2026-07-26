@@ -74,6 +74,10 @@ export {
   resolveCliExecutionTarget,
 } from "./control-plane-target.js";
 export { createRemoteCliProgram } from "./remote-cli-program.js";
+export {
+  createRemoteTerminalSessionAttachmentGateway,
+  type RemoteTerminalWebSocketFactory,
+} from "./remote-terminal-session-gateway.js";
 export type { CliSourceLinkStore } from "./runtime.js";
 export {
   formatSafeCliError,

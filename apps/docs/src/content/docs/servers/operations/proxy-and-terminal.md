@@ -44,6 +44,9 @@ CLI 默认会打印 session descriptor，方便脚本继续处理。需要把本
 session 时，在 `appaloft server terminal <serverId>` 或
 `appaloft resource terminal <resourceId>` 后加 `--attach`。
 
+使用 active Cloud 或 self-hosted profile 时，同一命令会通过远程 control plane 打开 session，
+并把本地 TTY 接到返回的 WebSocket；CLI 不会因此初始化本地 PGlite 或读取服务器 SSH 私钥。
+
 使用 terminal session lifecycle operations 可以列出 active sessions、查看单个 session 的安全元数据、关闭一个 active session，或让旧的 active sessions 过期。这些操作只返回 session id、scope、target ids、provider key、transport path、timestamps 和 status，不暴露终端输入、终端输出、原始命令、private key、access token 或环境 secret 值。
 
 Web Instance 页面展示同一组 active-session lifecycle 视图。它可以关闭单个 active session，

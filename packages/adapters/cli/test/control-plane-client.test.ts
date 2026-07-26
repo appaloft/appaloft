@@ -2724,7 +2724,7 @@ describe("CLI remote control-plane client", () => {
     expect(created.stdout).toContain("dep_remote");
   });
 
-  test("[CONTROL-PLANE-CLI-008] explicit remote mode for terminal attach local gateway fails before local mutation", async () => {
+  test("[CONTROL-PLANE-CLI-022] explicit remote mode routes terminal attach through the active control plane", async () => {
     const result = await resolveCliExecutionTarget({
       argv: [
         "node",
@@ -2738,11 +2738,14 @@ describe("CLI remote control-plane client", () => {
       store: activeStore(),
     });
 
-    expect(result._unsafeUnwrapErr()).toMatchObject({
-      code: "control_plane_unsupported",
-      details: {
-        phase: "control-plane-resolution",
-        command: "server terminal",
+    expect(result._unsafeUnwrap()).toMatchObject({
+      kind: "remote",
+      profile: {
+        mode: "self-hosted",
+      },
+      diagnostics: {
+        command: "server",
+        effectiveMode: "self-hosted",
       },
     });
   });

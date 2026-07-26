@@ -56,7 +56,9 @@ AI agent 和 CI/automation 不应使用浏览器/user-code flow 作为默认认�
 
 没有 profile、URL、token 或其他受信任远程来源时，`auto` 和默认行为会回落到本地模式。这个回落不会联系 public Cloud、不会扫描网络、不会上传或 adopt SSH PGlite state。
 
-`serve`、`db`、`remote-state`、`init`、top-level quick `deploy`、本地 terminal attach/source-package/streaming 类命令仍保持本地或在显式 remote mode 下报 `control_plane_unsupported`。远程已选择但 auth、handshake 或 operation capability 不满足时，CLI 会失败，不会静默改走本地执行。
+`server terminal`、`resource terminal` 和 Sandbox terminal 在远程目标下会先通过 typed API 打开 session；加 `--attach` 后，CLI 直接连接 control-plane WebSocket，并转发本地 TTY 的输入、resize、输出和关闭帧，不初始化本地 PGlite，也不读取目标服务器 SSH credential。
+
+`serve`、`db`、`remote-state`、`init`、top-level quick `deploy`、source-package 和尚未支持的 streaming 类命令仍保持本地或在显式 remote mode 下报 `control_plane_unsupported`。远程已选择但 auth、handshake 或 operation capability 不满足时，CLI 会失败，不会静默改走本地执行。
 
 ## 本地文档路径 [#cli-local-server-docs]
 

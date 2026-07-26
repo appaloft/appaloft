@@ -127,15 +127,6 @@ const knownTopLevelCommands = new Set([
 function localOnlyCommandLabel(argv: readonly string[]): string | null {
   const args = commandArgs(argv);
   const command = args[0];
-  const subcommand = args[1];
-
-  if (command === "server" && subcommand === "terminal") {
-    return "server terminal";
-  }
-
-  if (command === "resource" && subcommand === "terminal") {
-    return "resource terminal";
-  }
 
   return command && localOnlyTopLevelCommands.has(command) ? command : null;
 }

@@ -5,9 +5,9 @@
 - Round: Code Round with Post-Implementation Sync for the ordinary CLI remote client bridge.
 - Artifact state: local profile/context, explicit target resolution, pre-dispatch shell routing,
   handshake, default public Cloud endpoint selection, neutral browser auth-session exchange, and
-  generic generated SDK non-streaming operation dispatch are implemented and synchronized. OS
-  keychain storage, SSH PGlite adoption, source-package quick deploy, streaming/watch, and
-  advanced MCP gateway discovery remain deferred.
+  generic generated SDK non-streaming operation dispatch, and remote terminal WebSocket attach are
+  implemented and synchronized. OS keychain storage, SSH PGlite adoption, source-package quick
+  deploy, other streaming/watch operations, and advanced MCP gateway discovery remain deferred.
 - Roadmap target: Control-plane mode Phase 1/3 bridge. It makes local CLI login/profile, target
   resolution, and ordinary generated SDK remote operation dispatch concrete without completing
   Cloud-assisted Action, self-hosted adoption, or control-plane-owned source-package execution.
@@ -215,6 +215,9 @@ The implemented Code Round slice includes:
   composition;
 - remote dispatch for generated SDK non-streaming command/query operations that are not explicitly
   webhook-signature-only, source-package, local gateway, or streaming/watch operations;
+- remote server/resource/Sandbox terminal open through `terminal-sessions.open`, followed by
+  bidirectional attach to the returned control-plane WebSocket transport without local shell
+  composition or SSH PGlite sync;
 - namespaced ids-only deployment admission through `appaloft deployments create`, which reuses the
   generated `deployments.create` contract after Resource profile and target context already exist;
 - clear unsupported-operation errors for local-only commands when remote mode is selected.
@@ -233,7 +236,7 @@ Spec/Test-First/Code Round remoteizes the missing transport/custody behavior:
 - `appaloft init`
 - pure SSH `appaloft deploy` and repository config bootstrap
 - source-package/config bootstrap quick deploy flows
-- local terminal attach and other local gateway operations
+- other local gateway operations
 - webhook-signature-only ingestion such as `source-events.ingest`
 - runtime logs, deployment event streaming, and long-running watch behavior when streaming/follow is
   requested unless a remote stream contract is explicitly implemented
@@ -349,6 +352,7 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
 | CLI-RCPC-SPEC-016 | Codex MCP install keeps bearer outside Codex config | A local bearer-backed `mcp` profile exists | The operator runs `appaloft auth mcp codex install` | The CLI writes or updates a Codex MCP stdio entry that launches `appaloft mcp remote-stdio --profile mcp`, does not copy bearer material into Codex config or stdout, and fails if the profile is missing or not bearer-backed. |
 | CLI-RCPC-SPEC-017 | Unknown command fails before runtime initialization | The operator misspells a top-level command or uses the wrong singular/plural form | The operator runs the invalid command with or without an active remote profile | The CLI returns a structured validation error before creating local shell composition, initializing PGlite, syncing SSH state, handshaking, or dispatching a remote operation. |
 | CLI-RCPC-SPEC-018 | Secret stdin survives entrypoint initialization | A remote-capable command explicitly requests stdin and receives it through a pipe or owner-readable regular file | The operator runs a command such as `dependency import --connection-url-stdin` | The shell captures stdin before parser/runtime initialization, dispatches the exact value only in the typed request body, and never emits it through argv, output, diagnostics, or logs. |
+| CLI-RCPC-SPEC-019 | Remote terminal attach uses the selected control plane | A compatible authenticated profile is active and the selected control plane exposes terminal open plus WebSocket attach | The operator runs `appaloft server terminal <serverId> --attach`, `appaloft resource terminal <resourceId> --attach`, or the equivalent Sandbox terminal command | The CLI performs handshake, dispatches `terminal-sessions.open` through the typed API contract, attaches the local TTY to the control-plane WebSocket, forwards input/resize/output/close frames, restores local TTY state, and never initializes local PGlite or exposes target SSH credentials. |
 
 ## Public Surfaces
 
@@ -379,7 +383,7 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
 - Putting `controlPlane` on `deployments.create`.
 - Storing tokens, database URLs, SSH keys, credential ids, tenant/org secret identity, or raw
   secrets in committed `appaloft.yml`.
-- Remoteizing local-only, source-package, webhook-signature-only, or streaming/watch CLI behavior
+- Remoteizing remaining local-only, source-package, webhook-signature-only, or streaming/watch CLI behavior
   without the required transport and custody specs.
 - Creating a new business operation for "CLI login" unless a later auth ADR/spec decides a
   product-level login operation is needed.
@@ -392,7 +396,7 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
 - Should context eventually include project/environment/resource defaults, and what command should
   explicitly set them without making repository config an identity selector?
 - Which local/source/streaming capability should be remoteized next: quick deploy source-package,
-  remote streaming logs/events, terminal attach gateway, or MCP/public tool exposure?
+  remote streaming logs/events, or MCP/public tool exposure?
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -409,11 +413,15 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
   control-plane options before normal CLI parsing.
 - `packages/adapters/cli/src/remote-cli-program.ts` implements the remote CLI runtime over the
   generated SDK operation descriptors, including dispatch-time handshake, path/query/body mapping,
-  streaming/follow rejection, and webhook-signature rejection.
+  declared stream handling, remote terminal attachment, unsupported streaming/follow rejection,
+  and webhook-signature rejection.
+- `packages/adapters/cli/src/remote-terminal-session-gateway.ts` adapts the accepted terminal
+  descriptor to the control-plane WebSocket, queues initial resize/input until open, validates
+  terminal frames, and preserves detach versus close semantics.
 - `apps/shell/src/run.ts` now calls `runStandaloneControlPlaneCli` and `resolveCliExecutionTarget`
   before SSH PGlite sync or shell composition. Selected remote business commands and
   profile/context commands therefore avoid local runtime setup.
 - `packages/adapters/cli/src/runtime.ts` still executes non-remoteized CLI commands and queries
   through local `CommandBus` and `QueryBus` using the shell composition.
-- OS keychain storage, source-package quick deploy, remote streaming/watch, terminal attach
-  gateway, MCP exposure, and SSH PGlite adoption remain deferred governed work.
+- OS keychain storage, source-package quick deploy, other remote streaming/watch behavior, MCP
+  exposure, and SSH PGlite adoption remain deferred governed work.

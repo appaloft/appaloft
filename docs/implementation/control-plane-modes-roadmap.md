@@ -308,9 +308,10 @@ Current implementation has Phase 1 and the ordinary CLI Phase 1.5 bridge active:
   storage, `appaloft login/logout`, `appaloft auth login/status/logout`, `appaloft context
   list/use/show`, explicit Cloud/self-hosted URL token/session profiles, `/api/version` plus
   current-context handshake, flags/env/profile/config target resolution, pre-composition shell
-  dispatch, and generic generated SDK non-streaming operation dispatch;
-- OS keychain storage, remote streaming/watch, source-package quick deploy, terminal attach gateway,
-  broader OIDC provider flows, and future MCP exposure do not exist yet;
+  dispatch, generic generated SDK non-streaming operation dispatch, and remote terminal WebSocket
+  attach;
+- OS keychain storage, other remote streaming/watch behavior, source-package quick deploy, broader
+  OIDC provider flows, and future MCP exposure do not exist yet;
 - adoption import/marker does not exist;
 - Web mode selection does not exist;
 - deploy-action has control-plane mode, URL, token, and optional trusted id inputs.
