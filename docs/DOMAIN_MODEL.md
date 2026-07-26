@@ -373,6 +373,9 @@ Governing artifacts:
 - [ADR-098: Portable Workspace Recovery And Placement Reconciliation](./decisions/ADR-098-portable-workspace-recovery-and-placement-reconciliation.md)
 - [Portable Workspace Recovery And Placement Reconciliation](./specs/115-portable-workspace-recovery-and-placement-reconciliation/spec.md)
 - [Portable Workspace Recovery Test Matrix](./testing/portable-workspace-recovery-test-matrix.md)
+- [ADR-099: Reusable Workspace Snapshot Policy](./decisions/ADR-099-reusable-workspace-snapshot-policy.md)
+- [Reusable Workspace Snapshot Policy](./specs/116-reusable-workspace-snapshot-policy/spec.md)
+- [Reusable Workspace Snapshot Policy Test Matrix](./testing/reusable-workspace-snapshot-policy-test-matrix.md)
 
 ### Sandbox Agent Runtime And Application Promotion
 

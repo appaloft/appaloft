@@ -547,6 +547,7 @@ import {
   SandboxQueryHandler,
   type SandboxQuotaPolicy,
   type SandboxRepository,
+  type SandboxSnapshotLifecyclePolicy,
   ScheduledDependencyBackupService,
   ScheduledHistoryRetentionService,
   ScheduledRuntimePrunePolicyResolver,
@@ -3428,6 +3429,14 @@ export function registerApplicationServices(
                 placementPolicy: dependencyContainer.resolve<SandboxPlacementPolicy>(
                   tokens.sandboxPlacementPolicy,
                 ),
+              }
+            : {}),
+          ...(dependencyContainer.isRegistered(tokens.sandboxSnapshotLifecyclePolicy)
+            ? {
+                snapshotLifecyclePolicy:
+                  dependencyContainer.resolve<SandboxSnapshotLifecyclePolicy>(
+                    tokens.sandboxSnapshotLifecyclePolicy,
+                  ),
               }
             : {}),
         }),

@@ -8,6 +8,7 @@ import {
   type SandboxProvider,
   SandboxProviderRegistry,
   StaticSandboxQuotaPolicy,
+  StaticSandboxSnapshotLifecyclePolicy,
 } from "../src";
 
 const context = createExecutionContext({
@@ -19,6 +20,9 @@ const context = createExecutionContext({
 function provider(input: { isolation?: "container-trusted" | "gvisor" } = {}) {
   let provisionCalls = 0;
   let terminateCalls = 0;
+  let resumeCalls = 0;
+  let snapshotCaptureCalls = 0;
+  const deletedSnapshotIds: string[] = [];
   let updatedNetworkMode: "deny" | "allowlist" | undefined;
   let lastProvisionSource: Parameters<SandboxProvider["provision"]>[0]["source"] | undefined;
   let lastProvisionOwner:
@@ -30,6 +34,7 @@ function provider(input: { isolation?: "container-trusted" | "gvisor" } = {}) {
       isolation: input.isolation ?? "gvisor",
       pause: { mode: "compute-released", portability: "provider-local" },
       snapshot: ["filesystem"],
+      snapshotRecovery: { portability: "provider-local" },
       processes: true,
       files: true,
       ports: true,
@@ -54,6 +59,7 @@ function provider(input: { isolation?: "container-trusted" | "gvisor" } = {}) {
       return { providerHandle: `recovery:${request.sandboxId}` };
     },
     async resume(request) {
+      resumeCalls += 1;
       return {
         providerHandle: request.providerHandle,
         realizedIsolation: input.isolation ?? "gvisor",
@@ -98,10 +104,17 @@ function provider(input: { isolation?: "container-trusted" | "gvisor" } = {}) {
       return [{ processId: "proc_1", status: "running" }];
     },
     async terminateProcess() {},
-    async captureSnapshot() {
-      return { providerHandle: "snapshot:1", sizeBytes: 3 };
+    async captureSnapshot(request) {
+      snapshotCaptureCalls += 1;
+      return {
+        providerHandle: `snapshot:${request.snapshotId}`,
+        sizeBytes: 3,
+        portability: "provider-local",
+      };
     },
-    async deleteSnapshot() {},
+    async deleteSnapshot(request) {
+      deletedSnapshotIds.push(request.snapshotId);
+    },
     async updateNetworkPolicy(request) {
       updatedNetworkMode = request.networkPolicy.mode;
     },
@@ -110,18 +123,32 @@ function provider(input: { isolation?: "container-trusted" | "gvisor" } = {}) {
     adapter,
     provisionCalls: () => provisionCalls,
     terminateCalls: () => terminateCalls,
+    resumeCalls: () => resumeCalls,
+    snapshotCaptureCalls: () => snapshotCaptureCalls,
+    deletedSnapshotIds: () => [...deletedSnapshotIds],
     updatedNetworkMode: () => updatedNetworkMode,
     lastProvisionSource: () => lastProvisionSource,
     lastProvisionOwner: () => lastProvisionOwner,
   };
 }
 
-function service(adapter: SandboxProvider, now: () => string = () => "2026-07-20T00:00:00.000Z") {
+function service(
+  adapter: SandboxProvider,
+  now: () => string = () => "2026-07-20T00:00:00.000Z",
+  options: {
+    repository?: InMemorySandboxRepository;
+    snapshotLifecyclePolicy?: StaticSandboxSnapshotLifecyclePolicy;
+    idGenerator?: { next(prefix: string): string };
+  } = {},
+) {
   return new ExecutionSandboxService({
-    repository: new InMemorySandboxRepository(),
+    repository: options.repository ?? new InMemorySandboxRepository(),
     providerRegistry: new SandboxProviderRegistry([adapter]),
     clock: { now },
-    idGenerator: { next: (prefix) => `${prefix}_test` },
+    idGenerator: options.idGenerator ?? { next: (prefix) => `${prefix}_test` },
+    ...(options.snapshotLifecyclePolicy
+      ? { snapshotLifecyclePolicy: options.snapshotLifecyclePolicy }
+      : {}),
   });
 }
 
@@ -239,8 +266,128 @@ describe("ExecutionSandboxService", () => {
       source: { kind: "snapshot", snapshotId: "ssn_test" },
     });
     expect(restored._unsafeUnwrap()).toMatchObject({ sourceKind: "snapshot", status: "ready" });
-    expect(fake.lastProvisionSource()).toEqual({ kind: "snapshot", providerHandle: "snapshot:1" });
+    expect(fake.lastProvisionSource()).toEqual({
+      kind: "snapshot",
+      providerHandle: "snapshot:ssn_test",
+      portability: "provider-local",
+    });
     expect((await app.deleteSnapshot(context, "ssn_test"))._unsafeUnwrap().status).toBe("deleted");
+  });
+
+  test("[SNAP-PORT-002][SNAP-PORT-003] restores a retained Snapshot only on a compatible provider family", async () => {
+    const source = provider();
+    const target = provider();
+    const incompatible = provider();
+    const sourceAdapter: SandboxProvider = {
+      ...source.adapter,
+      key: "source",
+      capabilities: {
+        ...source.adapter.capabilities,
+        snapshotRecovery: {
+          portability: "provider-family",
+          recoveryFamily: "shared-snapshot-store",
+        },
+      },
+      async captureSnapshot(request) {
+        return {
+          providerHandle: `portable:${request.snapshotId}`,
+          sizeBytes: 3,
+          portability: "provider-family",
+          recoveryFamily: "shared-snapshot-store",
+        };
+      },
+    };
+    const targetAdapter: SandboxProvider = {
+      ...target.adapter,
+      key: "target",
+      capabilities: {
+        ...target.adapter.capabilities,
+        snapshotRecovery: {
+          portability: "provider-family",
+          recoveryFamily: "shared-snapshot-store",
+        },
+      },
+    };
+    const incompatibleAdapter: SandboxProvider = {
+      ...incompatible.adapter,
+      key: "incompatible",
+      capabilities: {
+        ...incompatible.adapter.capabilities,
+        snapshotRecovery: {
+          portability: "provider-family",
+          recoveryFamily: "different-store",
+        },
+      },
+    };
+    let sandboxSequence = 0;
+    const app = new ExecutionSandboxService({
+      repository: new InMemorySandboxRepository(),
+      providerRegistry: new SandboxProviderRegistry([
+        sourceAdapter,
+        targetAdapter,
+        incompatibleAdapter,
+      ]),
+      clock: { now: () => "2026-07-20T00:00:00.000Z" },
+      idGenerator: {
+        next(prefix) {
+          if (prefix === "sbx") return `sbx_${++sandboxSequence}`;
+          if (prefix === "ssn") return "ssn_portable";
+          return `${prefix}_${sandboxSequence}`;
+        },
+      },
+    });
+    await app.createAndReconcile(context, {
+      ...createInput,
+      providerKey: "source",
+    });
+    await app.createSnapshot(context, "sbx_1", { capability: "filesystem" });
+
+    const restored = await app.createAndReconcile(context, {
+      ...createInput,
+      source: { kind: "snapshot", snapshotId: "ssn_portable" },
+      providerKey: "target",
+    });
+    expect(restored._unsafeUnwrap()).toMatchObject({
+      sandboxId: "sbx_2",
+      providerKey: "target",
+      status: "ready",
+    });
+    expect(target.lastProvisionSource()).toEqual({
+      kind: "snapshot",
+      providerHandle: "portable:ssn_portable",
+      portability: "provider-family",
+      recoveryFamily: "shared-snapshot-store",
+    });
+
+    const rejected = await app.create(context, {
+      ...createInput,
+      source: { kind: "snapshot", snapshotId: "ssn_portable" },
+      providerKey: "incompatible",
+    });
+    expect(rejected.isErr()).toBe(true);
+    if (rejected.isErr()) {
+      expect(rejected.error.code).toBe("sandbox_snapshot_recovery_not_portable");
+    }
+    expect(incompatible.provisionCalls()).toBe(0);
+  });
+
+  test("[SNAP-POL-001] cleans an observed Snapshot when provider recovery metadata contradicts its declaration", async () => {
+    const fake = provider();
+    fake.adapter.capabilities.snapshotRecovery = {
+      portability: "provider-family",
+      recoveryFamily: "shared-snapshot-store",
+    };
+    const app = service(fake.adapter);
+    await app.createAndReconcile(context, createInput);
+
+    const captured = await app.createSnapshot(context, "sbx_test", {
+      capability: "filesystem",
+    });
+    expect(captured.isErr()).toBe(true);
+    expect(fake.deletedSnapshotIds()).toEqual(["ssn_test"]);
+    expect((await app.showSnapshot(context, "ssn_test"))._unsafeUnwrap()).toMatchObject({
+      status: "failed",
+    });
   });
 
   test("[SBX-PROC-001][SBX-NET-002] reads one process and persists an applied policy", async () => {
@@ -296,10 +443,198 @@ describe("ExecutionSandboxService", () => {
       suspended: [],
       migrated: [],
       reconciled: [],
+      snapshotsCaptured: [],
+      snapshotsPruned: [],
       failed: [],
     });
     expect(fake.terminateCalls()).toBe(1);
     expect((await app.show(context, "sbx_test"))._unsafeUnwrap().status).toBe("expired");
+  });
+
+  test("[SNAP-POL-002][SNAP-POL-004] maintenance schedules and rotates reusable Snapshots", async () => {
+    let current = "2026-07-20T00:00:00.000Z";
+    let snapshotSequence = 0;
+    const fake = provider();
+    const policy = new StaticSandboxSnapshotLifecyclePolicy({
+      scheduledIntervalSeconds: 60,
+      snapshotTtlSeconds: 3_600,
+      retainCount: 1,
+      beforeTermination: "disabled",
+      beforeExpiry: "disabled",
+    });
+    const app = service(fake.adapter, () => current, {
+      snapshotLifecyclePolicy: policy,
+      idGenerator: {
+        next(prefix) {
+          return prefix === "ssn" ? `ssn_${++snapshotSequence}` : `${prefix}_test`;
+        },
+      },
+    });
+    const { expiresAt: _expiresAt, ...withoutExpiry } = createInput;
+    await app.createAndReconcile(context, withoutExpiry);
+
+    current = "2026-07-20T00:01:01.000Z";
+    expect(
+      (await app.maintain(context, { protectedSandboxIds: ["sbx_test"] }))._unsafeUnwrap()
+        .snapshotsCaptured,
+    ).toEqual([]);
+    const first = (await app.maintain(context))._unsafeUnwrap();
+    expect(first.snapshotsCaptured).toEqual(["ssn_1"]);
+    expect(first.snapshotsPruned).toEqual([]);
+
+    current = "2026-07-20T00:02:02.000Z";
+    const second = (await app.maintain(context))._unsafeUnwrap();
+    expect(second.snapshotsCaptured).toEqual(["ssn_2"]);
+    expect(second.snapshotsPruned).toEqual(["ssn_1"]);
+    expect(fake.deletedSnapshotIds()).toEqual(["ssn_1"]);
+    expect((await app.showSnapshot(context, "ssn_1"))._unsafeUnwrap().status).toBe("deleted");
+    expect((await app.showSnapshot(context, "ssn_2"))._unsafeUnwrap()).toMatchObject({
+      status: "ready",
+      reason: "scheduled",
+      portability: "provider-local",
+    });
+  });
+
+  test("[SNAP-POL-005][SNAP-POL-006] required termination captures once before cleanup", async () => {
+    const fake = provider();
+    const app = service(fake.adapter, undefined, {
+      snapshotLifecyclePolicy: new StaticSandboxSnapshotLifecyclePolicy({
+        retainCount: 3,
+        beforeTermination: "required",
+        beforeExpiry: "disabled",
+      }),
+    });
+    const { expiresAt: _expiresAt, ...withoutExpiry } = createInput;
+    await app.createAndReconcile(context, withoutExpiry);
+
+    expect((await app.terminate(context, "sbx_test")).isOk()).toBe(true);
+    expect((await app.terminate(context, "sbx_test")).isOk()).toBe(true);
+    expect(fake.snapshotCaptureCalls()).toBe(1);
+    expect(fake.terminateCalls()).toBe(1);
+    expect((await app.listSnapshots(context, {}))._unsafeUnwrap().items).toEqual([
+      expect.objectContaining({
+        reason: "pre-termination",
+        status: "ready",
+      }),
+    ]);
+  });
+
+  test("[SNAP-POL-008] required termination resumes paused recovery before capture", async () => {
+    const fake = provider();
+    const app = service(fake.adapter, undefined, {
+      snapshotLifecyclePolicy: new StaticSandboxSnapshotLifecyclePolicy({
+        retainCount: 3,
+        beforeTermination: "required",
+        beforeExpiry: "disabled",
+      }),
+    });
+    const { expiresAt: _expiresAt, ...withoutExpiry } = createInput;
+    await app.createAndReconcile(context, withoutExpiry);
+    await app.pause(context, "sbx_test");
+
+    expect((await app.terminate(context, "sbx_test")).isOk()).toBe(true);
+    expect(fake.resumeCalls()).toBe(1);
+    expect(fake.snapshotCaptureCalls()).toBe(1);
+    expect(fake.terminateCalls()).toBe(1);
+  });
+
+  test("[SNAP-POL-005] required capture failure preserves the ready runtime", async () => {
+    const fake = provider();
+    fake.adapter.captureSnapshot = async () => {
+      throw new Error("injected Snapshot failure");
+    };
+    const app = service(fake.adapter, undefined, {
+      snapshotLifecyclePolicy: new StaticSandboxSnapshotLifecyclePolicy({
+        retainCount: 3,
+        beforeTermination: "required",
+        beforeExpiry: "disabled",
+      }),
+    });
+    const { expiresAt: _expiresAt, ...withoutExpiry } = createInput;
+    await app.createAndReconcile(context, withoutExpiry);
+
+    const terminated = await app.terminate(context, "sbx_test");
+    expect(terminated.isErr()).toBe(true);
+    if (terminated.isErr()) {
+      expect(terminated.error).toMatchObject({
+        code: "sandbox_snapshot_required_capture_failed",
+        retryable: true,
+        details: {
+          phase: "execution-sandbox-required-snapshot-gate",
+          gatePhase: "capture",
+        },
+      });
+    }
+    expect(fake.terminateCalls()).toBe(0);
+    expect((await app.show(context, "sbx_test"))._unsafeUnwrap().status).toBe("ready");
+    expect((await app.listSnapshots(context, {}))._unsafeUnwrap().items[0]).toMatchObject({
+      reason: "pre-termination",
+      status: "failed",
+    });
+  });
+
+  test("[SNAP-POL-007] best-effort capture failure still terminates exact runtime", async () => {
+    const fake = provider();
+    fake.adapter.captureSnapshot = async () => {
+      throw new Error("injected Snapshot failure");
+    };
+    const app = service(fake.adapter, undefined, {
+      snapshotLifecyclePolicy: new StaticSandboxSnapshotLifecyclePolicy({
+        retainCount: 3,
+        beforeTermination: "best-effort",
+        beforeExpiry: "disabled",
+      }),
+    });
+    const { expiresAt: _expiresAt, ...withoutExpiry } = createInput;
+    await app.createAndReconcile(context, withoutExpiry);
+
+    expect((await app.terminate(context, "sbx_test")).isOk()).toBe(true);
+    expect(fake.terminateCalls()).toBe(1);
+    expect((await app.listSnapshots(context, {}))._unsafeUnwrap().items[0]).toMatchObject({
+      reason: "pre-termination",
+      status: "failed",
+    });
+  });
+
+  test("[SNAP-POL-004] maintenance expires retained Snapshot after source termination", async () => {
+    let current = "2026-07-20T00:00:00.000Z";
+    const fake = provider();
+    const app = service(fake.adapter, () => current, {
+      snapshotLifecyclePolicy: new StaticSandboxSnapshotLifecyclePolicy({
+        snapshotTtlSeconds: 60,
+        retainCount: 3,
+        beforeTermination: "required",
+        beforeExpiry: "disabled",
+      }),
+    });
+    const { expiresAt: _expiresAt, ...withoutExpiry } = createInput;
+    await app.createAndReconcile(context, withoutExpiry);
+    await app.terminate(context, "sbx_test");
+
+    current = "2026-07-20T00:01:01.000Z";
+    const maintained = (await app.maintain(context))._unsafeUnwrap();
+    expect(maintained.snapshotsPruned).toEqual(["ssn_test"]);
+    expect((await app.showSnapshot(context, "ssn_test"))._unsafeUnwrap().status).toBe("deleted");
+  });
+
+  test("[SNAP-POL-005] required pre-expiry Snapshot precedes provider cleanup", async () => {
+    let current = "2026-07-20T00:00:00.000Z";
+    const fake = provider();
+    const app = service(fake.adapter, () => current, {
+      snapshotLifecyclePolicy: new StaticSandboxSnapshotLifecyclePolicy({
+        retainCount: 3,
+        beforeTermination: "disabled",
+        beforeExpiry: "required",
+      }),
+    });
+    await app.createAndReconcile(context, createInput);
+    current = "2026-07-20T01:00:01.000Z";
+
+    const maintained = (await app.maintain(context))._unsafeUnwrap();
+    expect(maintained.expired).toEqual(["sbx_test"]);
+    expect(maintained.snapshotsCaptured).toEqual(["ssn_test"]);
+    expect(fake.snapshotCaptureCalls()).toBe(1);
+    expect(fake.terminateCalls()).toBe(1);
   });
 
   test("[HIB-APP-001][HIB-APP-002] persists compute-released recovery on one identity", async () => {
@@ -365,6 +700,8 @@ describe("ExecutionSandboxService", () => {
       suspended: ["sbx_test"],
       migrated: [],
       reconciled: [],
+      snapshotsCaptured: [],
+      snapshotsPruned: [],
       failed: [],
     });
 
@@ -546,6 +883,8 @@ describe("ExecutionSandboxService", () => {
       suspended: [],
       migrated: ["sbx_test"],
       reconciled: [],
+      snapshotsCaptured: [],
+      snapshotsPruned: [],
       failed: [],
     });
     expect((await app.show(context, "sbx_test"))._unsafeUnwrap()).toMatchObject({
@@ -573,6 +912,8 @@ describe("ExecutionSandboxService", () => {
       suspended: [],
       migrated: [],
       reconciled: [],
+      snapshotsCaptured: [],
+      snapshotsPruned: [],
       failed: ["sbx_test"],
     });
     expect((await app.show(context, "sbx_test"))._unsafeUnwrap()).toMatchObject({

@@ -71,4 +71,61 @@ describe("execution sandbox maintenance runner", () => {
     });
     expect(observedInput).toEqual({ protectedSandboxIds: ["sbx_active"] });
   });
+
+  test("[SNAP-POL-002][SNAP-POL-004] reports reusable Snapshot capture and prune counts", async () => {
+    const infoCalls: Array<{ event: string; fields?: Record<string, unknown> }> = [];
+    let resolveCompleted: (() => void) | undefined;
+    const completed = new Promise<void>((resolve) => {
+      resolveCompleted = resolve;
+    });
+    const observedLogger: AppLogger = {
+      debug() {},
+      info(event, fields) {
+        infoCalls.push({ event, ...(fields ? { fields } : {}) });
+        if (event === "execution_sandbox_maintenance.tick_completed") {
+          resolveCompleted?.();
+        }
+      },
+      warn() {},
+      error() {},
+    };
+    const service: Pick<ExecutionSandboxService, "maintainAllTenants"> = {
+      async maintainAllTenants() {
+        return ok({
+          tenants: [
+            {
+              tenantId: "tenant_a",
+              expired: 0,
+              suspended: 0,
+              migrated: 0,
+              reconciled: 0,
+              snapshotsCaptured: 2,
+              snapshotsPruned: 1,
+              removedOrphans: 0,
+              failed: 0,
+            },
+          ],
+        });
+      },
+    };
+    const runner = createExecutionSandboxMaintenanceRunner({
+      service,
+      executionContextFactory,
+      logger: observedLogger,
+    });
+
+    runner.start();
+    await completed;
+    runner.stop();
+
+    expect(
+      infoCalls.find((call) => call.event === "execution_sandbox_maintenance.tick_completed")
+        ?.fields,
+    ).toMatchObject({
+      tenantCount: 1,
+      snapshotCapturedCount: 2,
+      snapshotPrunedCount: 1,
+      failedCount: 0,
+    });
+  });
 });

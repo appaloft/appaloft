@@ -29,6 +29,7 @@ describe("SandboxSnapshot", () => {
       .markReady({
         providerHandle: "snapshot-handle-1",
         sizeBytes: 4096,
+        portability: "provider-local",
         at: UpdatedAt.rehydrate("2026-07-20T00:10:02.000Z"),
       })
       ._unsafeUnwrap();

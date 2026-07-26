@@ -65,16 +65,26 @@ sandbox-templates.create (optional)
   portable. Failed cutover leaves the Sandbox paused with its source recovery package for retry.
 - Snapshot is one-to-many: capture creates an independent Snapshot id; new create commands may use
   it as source.
+- An injected lifecycle policy may schedule reusable captures, retain a bounded number, expire exact
+  handles, and require or best-effort capture a fresh Snapshot before termination or expiry.
+- Snapshot reason is `manual`, `scheduled`, or `pre-termination`. A fresh manual Snapshot can
+  satisfy the policy interval or destructive recovery gate and avoids redundant copies.
+- Portable reusable Snapshots remain after successful restore. Cross-provider create requires
+  portable recovery or an equal declared Snapshot recovery family.
 - Providers declare filesystem-only or filesystem-plus-memory support. Appaloft never upgrades the
   claim beyond returned evidence.
 - Active streams/connections may be interrupted by pause/snapshot and clients must reconnect from
   stream cursors/read models.
 - Shared recovery handles never expose the configured store root. Packages are digest checked and
   removed only after successful target readiness or explicit termination.
+- Reusable portable Snapshot packages are removed only by exact Snapshot deletion/retention, not by
+  restore or by terminating a Sandbox created from them.
 
 ## Expiry And Cleanup
 
 - Absolute TTL and idle expiry dispatch the same aggregate-owned expiration transition.
+- Required pre-expiry Snapshot policy obtains a fresh ready recovery point before destructive
+  provider cleanup; failure preserves the runtime or paused recovery for retry.
 - Terminate/expire revokes access before provider cleanup when possible.
 - Cleanup identifies exact Appaloft ownership labels/handles and is idempotent.
 - Reconciliation compares desired terminal state with provider observation and retries scoped

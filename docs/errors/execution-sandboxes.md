@@ -27,6 +27,9 @@
 | `sandbox_port_not_ready` | conflict | port-observation | true | sandbox id, port, readiness state |
 | `sandbox_stream_cursor_expired` | conflict | stream-replay | false | stream kind, safe newest cursor and status-query operation |
 | `sandbox_snapshot_failed` | async-processing | snapshot-capture | conditional | snapshot id, sandbox id, attempt id, sanitized provider code |
+| `sandbox_snapshot_recovery_not_portable` | application | snapshot-placement | false | source/target safe provider keys and declared portability |
+| `sandbox_snapshot_required_capture_failed` | provider | required-snapshot-gate | true | resume/capture gate phase and sanitized cause code |
+| `sandbox_provider_operation_failed` | provider | provider-operation | true | bounded operation phase only |
 
 ## Security Rules
 
