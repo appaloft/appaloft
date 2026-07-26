@@ -117,6 +117,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-095: Agent Task Run Workflow](./ADR-095-agent-task-run-workflow.md) | Accepted | Defines Agent Task Run as a resumable public workflow over Agent Run, checks, Git changes, Development Preview, immutable review artifacts, external approval and forge-neutral pull-request delivery. |
 | [ADR-096: Workspace Collaboration Boundary](./ADR-096-workspace-collaboration-boundary.md) | Accepted | Defines public multi-Workspace coordination, human and Agent Runtime participants, exclusive generation-fenced writer leases, read-only PTY observers, native attach authorization and immutable artifact handoffs without duplicating Workspace lifecycle or vendor TUIs. |
 | [ADR-097: Workspace Hibernation And Recovery](./ADR-097-workspace-hibernation-and-recovery.md) | Accepted | Grades pause continuity, keeps same-identity hibernation separate from reusable snapshots, and defines idle auto-suspend, quota admission, placement and recovery portability boundaries. |
+| [ADR-098: Portable Workspace Recovery And Placement Reconciliation](./ADR-098-portable-workspace-recovery-and-placement-reconciliation.md) | Accepted | Defines integrity-checked shared recovery packages, explicit recovery-family compatibility and provider-neutral maintenance relocation without exposing topology or adding a Cloud-only migration aggregate. |
 
 ## Authoring Rules
 

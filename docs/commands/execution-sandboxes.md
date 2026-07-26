@@ -55,7 +55,10 @@ accepted through the public command.
 
 - Create persists the requested Sandbox and attempt before provider mutation.
 - Pause requires `ready` and a provider pause capability.
-- Resume requires `paused` and preserves the Sandbox id.
+- Resume requires `paused`, preserves the Sandbox id and retains source recovery on target failure.
+- Cross-provider resume requires matching provider-family recovery or portable recovery.
+- Maintenance relocation reuses pause/resume; it does not add a second migration aggregate or
+  public command family.
 - Terminate is idempotent for terminating/terminated/expired state.
 - Expiration is a system command using the same aggregate transition and exact provider cleanup.
 - Failed provider attempts persist failed/retryable status; retries use new attempt ids.

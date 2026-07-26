@@ -22,6 +22,7 @@ class CapturingRunner implements SandboxDockerCommandRunner {
   executionFailure: SandboxDockerCommandResult["failure"];
   failureCommandIncludes: string | undefined;
   inventory = "";
+  portableRecoveryDigest = "b".repeat(64);
 
   async run(
     argv: readonly string[],
@@ -42,6 +43,9 @@ class CapturingRunner implements SandboxDockerCommandRunner {
     if (command.includes("realpath"))
       return this.result(`${this.resolvedPath ?? argv.at(-1)}\n`);
     if (command.includes("tar -C /workspace -cf -")) return this.result("archive");
+    if (command.startsWith("sha256sum --")) {
+      return this.result(`${this.portableRecoveryDigest}  ${argv.at(-1)}\n`);
+    }
     if (
       command.includes("appaloft.sandbox.base-image") &&
       !command.includes("image inspect")
@@ -703,5 +707,147 @@ describe("DockerSandboxProvider", () => {
           "docker image rm appaloft-sandbox-hibernate:sbx_demo",
       ),
     ).toBe(true);
+  });
+
+  test("[PORT-REC-001][PORT-REC-002] restores through a shared recovery store", async () => {
+    const sourceRunner = new CapturingRunner();
+    const source = new DockerSandboxProvider({
+      key: "server-a",
+      isolation: "gvisor",
+      runner: sourceRunner,
+      portableRecovery: {
+        kind: "shared-filesystem",
+        rootPath: "/mnt/appaloft-recovery",
+        storeId: "shared-a",
+      },
+    });
+    const provisioned = await source.provision(request);
+    const paused = await source.pause({
+      sandboxId: request.sandboxId,
+      providerHandle: provisioned.providerHandle,
+    });
+
+    expect(source.capabilities.pause).toEqual({
+      mode: "compute-released",
+      portability: "provider-family",
+      recoveryFamily: expect.stringMatching(/^docker-workspace-tar-v1:[0-9a-f]{32}$/),
+    });
+    expect(JSON.stringify(source.capabilities)).not.toContain("shared-a");
+    expect(paused.providerHandle).toStartWith("appaloft-docker-recovery:v1:");
+    const savedPackage = sourceRunner.calls.find((call) => call.argv[1] === "save")?.argv[3];
+    expect(savedPackage).toMatch(
+      /^\/mnt\/appaloft-recovery\/v1\/sbx_demo-pr_[0-9a-f]{32}\.tar\.partial$/,
+    );
+    expect(
+      sourceRunner.calls.some(
+        (call) =>
+          call.argv.join(" ") ===
+          "docker image rm appaloft-sandbox-hibernate:sbx_demo",
+      ),
+    ).toBe(true);
+
+    const targetRunner = new CapturingRunner();
+    const target = new DockerSandboxProvider({
+      key: "server-b",
+      isolation: "gvisor",
+      runner: targetRunner,
+      portableRecovery: {
+        kind: "shared-filesystem",
+        rootPath: "/mnt/appaloft-recovery",
+        storeId: "shared-a",
+      },
+    });
+    expect(target.capabilities.pause).toEqual(source.capabilities.pause);
+    expect(await target.resume({ ...request, providerHandle: paused.providerHandle })).toEqual({
+      providerHandle: "appaloft-sbx_demo",
+      realizedIsolation: "gvisor",
+    });
+    expect(
+      targetRunner.calls.some(
+        (call) =>
+          call.argv.join(" ") ===
+          `docker load --input ${savedPackage?.replace(/\.partial$/, "")}`,
+      ),
+    ).toBe(true);
+    expect(
+      targetRunner.calls.some(
+        (call) =>
+          call.argv.join(" ") ===
+          `rm -f -- ${savedPackage?.replace(/\.partial$/, "")}`,
+      ),
+    ).toBe(true);
+  });
+
+  test("[PORT-REC-004] rejects a corrupt portable package before Docker load", async () => {
+    const sourceRunner = new CapturingRunner();
+    const source = new DockerSandboxProvider({
+      isolation: "gvisor",
+      runner: sourceRunner,
+      portableRecovery: {
+        kind: "shared-filesystem",
+        rootPath: "/mnt/appaloft-recovery",
+        storeId: "shared-a",
+      },
+    });
+    const provisioned = await source.provision(request);
+    const paused = await source.pause({
+      sandboxId: request.sandboxId,
+      providerHandle: provisioned.providerHandle,
+    });
+    const targetRunner = new CapturingRunner();
+    targetRunner.portableRecoveryDigest = "c".repeat(64);
+    const target = new DockerSandboxProvider({
+      isolation: "gvisor",
+      runner: targetRunner,
+      portableRecovery: {
+        kind: "shared-filesystem",
+        rootPath: "/mnt/appaloft-recovery",
+        storeId: "shared-a",
+      },
+    });
+
+    expect(target.resume({ ...request, providerHandle: paused.providerHandle })).rejects.toThrow(
+      "digest",
+    );
+    expect(targetRunner.calls.some((call) => call.argv[1] === "load")).toBe(false);
+    expect(
+      targetRunner.calls.some(
+        (call) =>
+          call.argv.join(" ") ===
+          "rm -f -- /mnt/appaloft-recovery/v1/sbx_demo.tar",
+      ),
+    ).toBe(false);
+  });
+
+  test("[PORT-REC-005] terminates one exact portable recovery package", async () => {
+    const runner = new CapturingRunner();
+    const provider = new DockerSandboxProvider({
+      isolation: "gvisor",
+      runner,
+      portableRecovery: {
+        kind: "shared-filesystem",
+        rootPath: "/mnt/appaloft-recovery",
+        storeId: "shared-a",
+      },
+    });
+    const provisioned = await provider.provision(request);
+    const paused = await provider.pause({
+      sandboxId: request.sandboxId,
+      providerHandle: provisioned.providerHandle,
+    });
+    const savedPackage = runner.calls.find((call) => call.argv[1] === "save")?.argv[3];
+    runner.calls.length = 0;
+
+    await provider.terminate({
+      sandboxId: request.sandboxId,
+      providerHandle: paused.providerHandle,
+    });
+    expect(runner.calls[0]?.argv).toEqual([
+      "rm",
+      "-f",
+      "--",
+      savedPackage?.replace(/\.partial$/, "") as string,
+    ]);
+    expect(runner.calls.some((call) => call.argv.includes("/mnt/appaloft-recovery"))).toBe(false);
   });
 });
