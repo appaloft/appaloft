@@ -13,8 +13,8 @@ import {
   type StreamDeploymentTimelineResult,
   type StreamOperatorWorkEventsResult,
   type StreamSandboxAgentRunEventsResult,
+  type TerminalSessionAttachmentGateway,
   type TerminalSessionDescriptor,
-  type TerminalSessionGateway,
 } from "@appaloft/application";
 import { createCliLogRenderer } from "@appaloft/cli-logging";
 import { type DomainError, domainError, type Result } from "@appaloft/core";
@@ -72,7 +72,7 @@ export interface CliProgramInput {
   commandBus: CommandBus;
   queryBus: QueryBus;
   executionContextFactory: ExecutionContextFactory;
-  terminalSessionGateway?: TerminalSessionGateway;
+  terminalSessionGateway?: TerminalSessionAttachmentGateway;
   terminalIO?: CliTerminalIO;
   readStdinText?: () => Promise<string>;
   deploymentProgressObserver?: DeploymentProgressObserver;
@@ -135,7 +135,7 @@ export class CliRuntime extends Context.Tag("CliRuntime")<
       options?: ExecuteCommandOptions,
     ) => Promise<Result<T>>;
     readonly executeQuery: <T>(message: AppQuery<T>) => Promise<Result<T>>;
-    readonly terminalSessionGateway?: TerminalSessionGateway;
+    readonly terminalSessionGateway?: TerminalSessionAttachmentGateway;
     readonly terminalIO: CliTerminalIO;
     readonly readStdinText?: () => Promise<string>;
     readonly prepareDeploymentStateBackend?: (
@@ -447,7 +447,7 @@ async function closeAsyncIterableIfPresent(stream: unknown): Promise<void> {
 
 async function pipeTerminalSession(input: {
   descriptor: TerminalSessionDescriptor;
-  gateway: TerminalSessionGateway;
+  gateway: TerminalSessionAttachmentGateway;
   io: CliTerminalIO;
   initialSize?: {
     rows: number;
@@ -537,7 +537,7 @@ export const runTerminalCommand = (
           try: () =>
             pipeTerminalSession({
               descriptor,
-              gateway: cli.terminalSessionGateway as TerminalSessionGateway,
+              gateway: cli.terminalSessionGateway as TerminalSessionAttachmentGateway,
               io: cli.terminalIO,
               ...(typeof options.initialRows === "number" && typeof options.initialCols === "number"
                 ? {
@@ -579,7 +579,7 @@ export const attachTerminalSession = <
       try: () =>
         pipeTerminalSession({
           descriptor,
-          gateway: cli.terminalSessionGateway as TerminalSessionGateway,
+          gateway: cli.terminalSessionGateway as TerminalSessionAttachmentGateway,
           io: cli.terminalIO,
           ...(typeof options.initialRows === "number" && typeof options.initialCols === "number"
             ? {

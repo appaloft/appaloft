@@ -4687,6 +4687,10 @@ export interface TerminalSession extends AsyncIterable<TerminalSessionFrame> {
   close(): Promise<void>;
 }
 
+export interface TerminalSessionAttachmentGateway {
+  attach(sessionId: string, accessToken?: string): Result<TerminalSession>;
+}
+
 export interface TerminalSessionAttachmentGrant {
   sessionId: string;
   access: "observe" | "write";
@@ -4701,7 +4705,7 @@ export interface TerminalSessionAttachmentGrant {
   writerLeaseGeneration?: number;
 }
 
-export interface TerminalSessionGateway {
+export interface TerminalSessionGateway extends TerminalSessionAttachmentGateway {
   open(
     context: ExecutionContext,
     request: TerminalSessionOpenRequest,
@@ -4720,7 +4724,6 @@ export interface TerminalSessionGateway {
     laneId: string;
     generation: number;
   }): void;
-  attach(sessionId: string, accessToken?: string): Result<TerminalSession>;
   list(input?: ListTerminalSessionsInput): TerminalSessionSummary[];
   show(sessionId: string): Result<TerminalSessionSummary>;
   close(sessionId: string): Promise<Result<CloseTerminalSessionResponse>>;

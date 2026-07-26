@@ -60,7 +60,12 @@ A remote target performs compatibility/auth handshake before the business reques
 
 Without a profile, URL, token, or other trusted remote source, `auto` and default behavior fall back to local mode. That fallback does not contact public Cloud, scan networks, upload SSH PGlite state, or adopt an SSH server.
 
-`serve`, `db`, `remote-state`, `init`, top-level quick `deploy`, local terminal attach, source-package, and streaming commands remain local or return `control_plane_unsupported` when remote mode is selected explicitly. If remote mode is selected and auth, handshake, or operation capability is not available, the CLI fails instead of silently rerunning locally.
+For a remote target, `server terminal`, `resource terminal`, and Sandbox terminal first open the
+session through the typed API. With `--attach`, the CLI connects directly to the control-plane
+WebSocket and forwards local TTY input, resize, output, and close frames without initializing local
+PGlite or reading the target server's SSH credential.
+
+`serve`, `db`, `remote-state`, `init`, top-level quick `deploy`, source-package, and unsupported streaming commands remain local or return `control_plane_unsupported` when remote mode is selected explicitly. If remote mode is selected and auth, handshake, or operation capability is not available, the CLI fails instead of silently rerunning locally.
 
 ## Local docs path [#cli-local-server-docs]
 

@@ -44,6 +44,10 @@ The CLI keeps terminal opens scriptable by printing the session descriptor by de
 `appaloft resource terminal <resourceId>` when you want the local terminal to connect directly to
 the accepted session.
 
+With an active Cloud or self-hosted profile, the same command opens the session through the remote
+control plane and attaches the local TTY to the returned WebSocket. The CLI does not initialize
+local PGlite or read the server SSH private key for that path.
+
 Use terminal session lifecycle operations to list active sessions, show one session's safe metadata, close one active session, or expire old active sessions. These operations return session ids, scope, target ids, provider key, transport path, timestamps, and status only. They do not expose terminal input, terminal output, raw commands, private keys, access tokens, or environment secret values.
 
 The Web Instance page shows the same active-session lifecycle view. It can close one active session
