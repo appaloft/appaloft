@@ -21,6 +21,7 @@ import {
 } from "./ports";
 
 const auditedDomains = new Set([
+  "agent-adapters",
   "projects",
   "resources",
   "deployments",
@@ -46,6 +47,7 @@ const ignoredOperationKeys = new Set([
 ]);
 
 const resourceTypeByDomain: Record<string, string> = {
+  "agent-adapters": "agent_adapter_installation",
   projects: "project",
   resources: "resource",
   deployments: "deployment",
@@ -59,6 +61,7 @@ const resourceTypeByDomain: Record<string, string> = {
 };
 
 const targetFieldByDomain: Record<string, readonly string[]> = {
+  "agent-adapters": ["installationId", "id"],
   projects: ["projectId", "id"],
   resources: ["resourceId", "id"],
   deployments: ["deploymentId", "id"],
@@ -72,6 +75,7 @@ const targetFieldByDomain: Record<string, readonly string[]> = {
 };
 
 const relatedTargetFields: Record<string, string> = {
+  definitionDigest: "agent_adapter_definition",
   projectId: "project",
   environmentId: "environment",
   resourceId: "resource",
