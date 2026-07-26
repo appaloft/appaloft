@@ -1,0 +1,17 @@
+{
+  "name": "@appaloft/agent-adapter-sdk",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "semver": "^7.8.5",
+    "zod": "^4.4.3"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "test": "bun test",
+    "typecheck": "tsc -p tsconfig.json --noEmit --checkers 4"
+  }
+}
