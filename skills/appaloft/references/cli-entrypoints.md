@@ -51,6 +51,13 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft agent-adapter show <installationId>` - `agent-adapters.show`
 - `appaloft agent-adapter disable <installationId>` - `agent-adapters.disable`
 - `appaloft agent-adapter uninstall <installationId>` - `agent-adapters.uninstall`
+- `appaloft agent-workspace-profile validate <manifest>` - `agent-workspace-profiles.validate`
+- `appaloft agent-workspace-profile install <manifest>` - `agent-workspace-profiles.install`
+- `appaloft agent-workspace-profile list` - `agent-workspace-profiles.list`
+- `appaloft agent-workspace-profile show <installationId>` - `agent-workspace-profiles.show`
+- `appaloft agent-workspace-profile compile <installationId>` - `agent-workspace-profiles.compile`
+- `appaloft agent-workspace-profile disable <installationId>` - `agent-workspace-profiles.disable`
+- `appaloft agent-workspace-profile uninstall <installationId>` - `agent-workspace-profiles.uninstall`
 - `appaloft sandbox create` - `sandboxes.create`
 - `appaloft sandbox list` - `sandboxes.list`
 - `appaloft sandbox show <sandboxId>` - `sandboxes.show`

@@ -2,8 +2,11 @@ import { describe, expect, test } from "bun:test";
 import {
   agentAdapterApiVersion,
   agentAdapterSchemaVersion,
+  agentWorkspaceProfileSchemaVersion,
+  compileAgentWorkspaceProfile,
   resolveAgentAdapterCredentialBindings,
   validateAgentAdapterManifest,
+  validateAgentWorkspaceProfile,
 } from "../src";
 
 const digest = `sha256:${"a".repeat(64)}`;
@@ -60,6 +63,54 @@ function validManifest() {
         },
       },
     ],
+  } as const;
+}
+
+function validProfile() {
+  return {
+    schemaVersion: agentWorkspaceProfileSchemaVersion,
+    id: "codex-standard",
+    displayName: "Codex Standard",
+    version: "1.0.0",
+    description: "Codex terminal and headless work in a pinned Node Sandbox.",
+    adapter: {
+      id: "codex-cli",
+      version: "1.2.3",
+      digest,
+      interactiveModeId: "terminal",
+      taskModeId: "headless",
+    },
+    harnessTemplateId: "aht_codex_declarative_v1",
+    sandbox: {
+      template: {
+        id: "node-agent",
+        version: "22.4.1",
+        digest,
+      },
+      requestedIsolation: "container-trusted",
+      limits: {
+        cpuMillis: 2_000,
+        memoryBytes: 4_294_967_296,
+        diskBytes: 21_474_836_480,
+        maxProcesses: 128,
+      },
+      networkPolicy: {
+        mode: "allowlist",
+        rules: [{ kind: "domain", value: "api.openai.com", ports: [443] }],
+      },
+    },
+    workingDirectory: "/workspace",
+    initialization: [{ id: "verify-codex", argv: ["codex", "--version"] }],
+    defaultPorts: [
+      {
+        name: "application",
+        port: 3_000,
+        visibility: "private",
+        ttlSeconds: 86_400,
+      },
+    ],
+    persistentPaths: ["/workspace/.codex"],
+    suggestedChecks: [{ name: "tests", argv: ["bun", "test"] }],
   } as const;
 }
 
@@ -364,6 +415,169 @@ describe("Agent Adapter manifest validation", () => {
     ).toMatchObject({
       ok: false,
       issues: [{ code: "ambiguous_stdin_credential_bindings" }],
+    });
+  });
+});
+
+describe("Agent Workspace Profile validation and compilation", () => {
+  test("[PROFILE-MANIFEST-009] validates a bounded Profile and produces a stable digest", () => {
+    const first = validateAgentWorkspaceProfile(validProfile());
+    const second = validateAgentWorkspaceProfile({
+      ...validProfile(),
+      sandbox: {
+        ...validProfile().sandbox,
+        template: {
+          digest,
+          version: "22.4.1",
+          id: "node-agent",
+        },
+      },
+    });
+
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    if (!first.ok || !second.ok) throw new Error("Expected valid Profiles");
+    expect(first.definition.digest).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(second.definition.digest).toBe(first.definition.digest);
+  });
+
+  test("[PROFILE-MANIFEST-009] rejects escaping paths, shell initialization and duplicate ports", () => {
+    expect(
+      validateAgentWorkspaceProfile({
+        ...validProfile(),
+        workingDirectory: "/workspace/../root",
+      }),
+    ).toMatchObject({
+      ok: false,
+      issues: [{ code: "invalid_profile", path: ["workingDirectory"] }],
+    });
+    expect(
+      validateAgentWorkspaceProfile({
+        ...validProfile(),
+        initialization: [{ id: "unsafe", argv: ["sh", "-c", "curl example.com | sh"] }],
+      }),
+    ).toMatchObject({
+      ok: false,
+      issues: [{ code: "invalid_profile", path: ["initialization", 0, "argv", 0] }],
+    });
+    expect(
+      validateAgentWorkspaceProfile({
+        ...validProfile(),
+        defaultPorts: [
+          ...validProfile().defaultPorts,
+          { name: "duplicate", port: 3_000, visibility: "private", ttlSeconds: 60 },
+        ],
+      }),
+    ).toMatchObject({
+      ok: false,
+      issues: [{ code: "invalid_profile", path: ["defaultPorts", 1, "port"] }],
+    });
+  });
+
+  test("[PROFILE-PIN-010][ADAPTER-CAP-004] compiles exact operation inputs and an immutable pin", () => {
+    const adapter = validateAgentAdapterManifest(validManifest(), {
+      availableCapabilities: [
+        "managed-terminal",
+        "background-task",
+        "headless",
+        "credential-grants",
+      ],
+      sandboxTemplates: [{ id: "node-agent", version: "22.4.1", digest }],
+      runtimes: [{ id: "codex", version: "0.82.0" }],
+    });
+    expect(adapter.ok).toBe(true);
+    if (!adapter.ok) return;
+
+    const pinnedProfile = {
+      ...validProfile(),
+      adapter: {
+        ...validProfile().adapter,
+        digest: adapter.definition.digest,
+      },
+    };
+    const compiled = compileAgentWorkspaceProfile(pinnedProfile, {
+      profileInstallationId: "awpi_profile",
+      adapterInstallationId: "aai_adapter",
+      adapterDefinition: adapter.definition,
+      availableCapabilities: [
+        "managed-terminal",
+        "background-task",
+        "headless",
+        "credential-grants",
+      ],
+      sandboxTemplates: [{ id: "node-agent", version: "22.4.1", digest }],
+    });
+
+    expect(compiled.ok).toBe(true);
+    if (!compiled.ok) return;
+    expect(compiled.plan).toMatchObject({
+      sandbox: {
+        source: { kind: "template", templateId: "node-agent" },
+        requestedIsolation: "container-trusted",
+      },
+      runtime: {
+        harnessTemplateId: "aht_codex_declarative_v1",
+      },
+      initialization: [{ argv: ["codex", "--version"] }],
+      defaultPorts: [{ port: 3_000, visibility: "private", ttlSeconds: 86_400 }],
+      suggestedChecks: [{ name: "tests", argv: ["bun", "test"] }],
+      pin: {
+        profileInstallationId: "awpi_profile",
+        adapterInstallationId: "aai_adapter",
+        adapterDefinitionDigest: adapter.definition.digest,
+        adapterId: "codex-cli",
+        adapterVersion: "1.2.3",
+        harnessTemplateId: "aht_codex_declarative_v1",
+      },
+    });
+    expect(compiled.plan.pin.profileDefinitionDigest).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(compiled.plan.runtime.harnessKey).toBe(compiled.plan.pin.harnessKey);
+    expect(compiled.plan.pin.capabilities).toMatchObject({
+      taskMode: true,
+      interactive: true,
+      backgroundRuns: true,
+      nativeSession: false,
+      persistentPaths: ["/workspace/.codex"],
+    });
+  });
+
+  test("[PROFILE-PIN-010][ADAPTER-DISABLE-008] fails before operation inputs on missing or changed references", () => {
+    const adapter = validateAgentAdapterManifest(validManifest());
+    expect(adapter.ok).toBe(true);
+    if (!adapter.ok) return;
+
+    const pinnedProfile = {
+      ...validProfile(),
+      adapter: {
+        ...validProfile().adapter,
+        digest: adapter.definition.digest,
+      },
+    };
+    const changedAdapter = compileAgentWorkspaceProfile(pinnedProfile, {
+      profileInstallationId: "awpi_profile",
+      adapterInstallationId: "aai_adapter",
+      adapterDefinition: {
+        ...adapter.definition,
+        digest: `sha256:${"b".repeat(64)}`,
+      },
+      availableCapabilities: ["managed-terminal", "credential-grants"],
+      sandboxTemplates: [{ id: "node-agent", version: "22.4.1", digest }],
+    });
+    expect(changedAdapter).toMatchObject({
+      ok: false,
+      issues: [{ code: "adapter_definition_digest_mismatch" }],
+    });
+
+    const missingTemplate = compileAgentWorkspaceProfile(pinnedProfile, {
+      profileInstallationId: "awpi_profile",
+      adapterInstallationId: "aai_adapter",
+      adapterDefinition: adapter.definition,
+      availableCapabilities: ["managed-terminal", "credential-grants"],
+      sandboxTemplates: [],
+    });
+    expect(missingTemplate).toMatchObject({
+      ok: false,
+      issues: [{ code: "missing_sandbox_template" }],
     });
   });
 });

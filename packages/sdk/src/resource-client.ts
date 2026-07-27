@@ -67,11 +67,13 @@ export interface AppaloftAgentCreateInput {
   readonly harness: string;
   readonly harnessTemplateId?: string;
   readonly idempotencyKey?: string;
+  readonly profileInstallationId?: string;
 }
 
 export interface AppaloftWorkspaceCreateInput {
-  readonly sandbox: AppaloftSandboxCreateInput;
-  readonly harness: "pi" | "opencode";
+  readonly profileInstallationId?: string;
+  readonly sandbox?: AppaloftSandboxCreateInput;
+  readonly harness?: "pi" | "opencode";
   readonly harnessTemplateId?: string;
   readonly idempotencyKey?: string;
   readonly source?: {
@@ -79,6 +81,31 @@ export interface AppaloftWorkspaceCreateInput {
     readonly ref?: string;
     readonly branch?: string;
   };
+}
+
+interface AppaloftWorkspaceProfilePlan {
+  readonly sandbox: {
+    readonly source: AppaloftSandboxCreateInput["source"];
+    readonly requestedIsolation: AppaloftSandboxCreateInput["requestedIsolation"];
+    readonly limits: AppaloftSandboxCreateInput["limits"];
+    readonly networkPolicy:
+      | { readonly mode: "deny" }
+      | Extract<AppaloftSandboxCreateInput["networkPolicy"], { readonly mode: "allowlist" }>;
+  };
+  readonly initialization: readonly {
+    readonly id: string;
+    readonly argv: readonly string[];
+    readonly cwd?: string;
+  }[];
+  readonly runtime: {
+    readonly harnessKey: string;
+    readonly harnessTemplateId: string;
+  };
+  readonly defaultPorts: readonly {
+    readonly port: number;
+    readonly visibility: "private" | "organization" | "public";
+    readonly ttlSeconds: number;
+  }[];
 }
 
 export interface AppaloftWorkspace {
@@ -485,26 +512,50 @@ export function createAppaloftClient(options: AppaloftSdkClientOptions): Appalof
   };
   const workspaces = {
     create: async (input: AppaloftWorkspaceCreateInput): Promise<AppaloftWorkspace> => {
+      const profilePlan = input.profileInstallationId
+        ? unwrapOperation<AppaloftWorkspaceProfilePlan>(
+            await operations.agentWorkspaceProfiles.compile({
+              installationId: input.profileInstallationId,
+            }),
+          )
+        : undefined;
+      if (!profilePlan && (!input.sandbox || !input.harness)) {
+        throw new TypeError(
+          "workspaces.create requires profileInstallationId or both sandbox and harness",
+        );
+      }
       const source = input.source
         ? {
             ...input.source,
             repository: validateRepositoryLocator(input.source.repository),
           }
         : undefined;
+      const resolvedSandbox = profilePlan
+        ? {
+            ...profilePlan.sandbox,
+            networkPolicy:
+              profilePlan.sandbox.networkPolicy.mode === "deny"
+                ? ({ mode: "deny", rules: [] } as const)
+                : profilePlan.sandbox.networkPolicy,
+          }
+        : input.sandbox;
+      if (!resolvedSandbox) {
+        throw new TypeError("Agent Workspace Sandbox plan is unavailable");
+      }
       const sandboxInput = source
         ? {
-            ...input.sandbox,
+            ...resolvedSandbox,
             networkPolicy: {
               mode: "allowlist" as const,
               rules: mergeNetworkRules(
-                input.sandbox.networkPolicy.mode === "allowlist"
-                  ? input.sandbox.networkPolicy.rules
+                resolvedSandbox.networkPolicy.mode === "allowlist"
+                  ? resolvedSandbox.networkPolicy.rules
                   : [],
                 repositoryNetworkRules(source.repository),
               ),
             },
           }
-        : input.sandbox;
+        : resolvedSandbox;
       const sandbox = await sandboxes.create(sandboxInput);
       if (source) {
         try {
@@ -518,10 +569,31 @@ export function createAppaloftClient(options: AppaloftSdkClientOptions): Appalof
         }
       }
       try {
+        for (const step of profilePlan?.initialization ?? []) {
+          requireSuccessfulExec(
+            await sandbox.exec({
+              argv: step.argv,
+              ...(step.cwd ? { cwd: step.cwd } : {}),
+            }),
+            `Workspace initialization ${step.id}`,
+          );
+        }
+        for (const port of profilePlan?.defaultPorts ?? []) {
+          await operations.sandboxPorts.expose({
+            sandboxId: sandbox.sandboxId,
+            port: port.port,
+            visibility: port.visibility,
+            expiresAt: new Date(Date.now() + port.ttlSeconds * 1_000).toISOString(),
+          });
+        }
+        const harnessTemplateId = profilePlan?.runtime.harnessTemplateId ?? input.harnessTemplateId;
         const agent = await sandbox.agents.create({
-          harness: input.harness,
-          ...(input.harnessTemplateId ? { harnessTemplateId: input.harnessTemplateId } : {}),
+          harness: profilePlan?.runtime.harnessKey ?? input.harness ?? "",
+          ...(harnessTemplateId ? { harnessTemplateId } : {}),
           ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+          ...(input.profileInstallationId
+            ? { profileInstallationId: input.profileInstallationId }
+            : {}),
         });
         return {
           workspaceId: sandbox.sandboxId,
@@ -954,6 +1026,9 @@ function createSandboxHandle(
             harnessKey: input.harness,
             harnessTemplateId,
             idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
+            ...(input.profileInstallationId
+              ? { profileInstallationId: input.profileInstallationId }
+              : {}),
           }),
         );
         return createAgentHandle(operations, sandboxId, agent);

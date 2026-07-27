@@ -454,6 +454,13 @@ and Sandbox Template versions/digests plus bounded setup, working-directory, por
 check defaults. It compiles into existing Sandbox, Runtime, Terminal and Port operations. It is not
 an aggregate, Blueprint, Sandbox Template replacement, or deployment engine.
 
+`AgentWorkspaceProfileInstallation` is the tenant-scoped approval and lifecycle record for one
+immutable Profile definition. A successful compile resolves one enabled Adapter installation,
+registers the bounded declarative Harness descriptor, and emits a `ResolvedAgentWorkspaceProfilePin`.
+The pin is copied into the Sandbox Agent Runtime record so definition changes cannot alter recovery,
+capability display, or cleanup behavior for an existing Workspace. Disable prevents new compiles;
+uninstall remains fenced while an active Workspace holds a Profile reference.
+
 Declarative Adapters execute validated argv only inside a Sandbox. Trusted Code Adapters are loaded
 only by instance composition. Credential values use requirement/reference/grant boundaries and do
 not enter definitions, output, snapshots, Task state or audit.

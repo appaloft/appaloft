@@ -1,7 +1,11 @@
 import {
   type AgentAdapterInstallationResponse,
+  type AgentWorkspaceProfileInstallationResponse,
+  type CompileAgentWorkspaceProfileResponse,
   type UninstallAgentAdapterResponse,
+  type UninstallAgentWorkspaceProfileResponse,
   type ValidateAgentAdapterResponse,
+  type ValidateAgentWorkspaceProfileResponse,
 } from "@appaloft/application";
 import {
   type AcceptBlueprintInstallCommandInput,
@@ -653,6 +657,50 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       { installationId: string },
       UninstallAgentAdapterResponse,
+      AppaloftClientError
+    >;
+  };
+  agentWorkspaceProfiles: {
+    validate: Client<
+      AppaloftClientContext,
+      { manifest: unknown },
+      ValidateAgentWorkspaceProfileResponse,
+      AppaloftClientError
+    >;
+    install: Client<
+      AppaloftClientContext,
+      { manifest: unknown },
+      AgentWorkspaceProfileInstallationResponse,
+      AppaloftClientError
+    >;
+    list: Client<
+      AppaloftClientContext,
+      { limit?: number },
+      AgentWorkspaceProfileInstallationResponse[],
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      { installationId: string },
+      AgentWorkspaceProfileInstallationResponse,
+      AppaloftClientError
+    >;
+    compile: Client<
+      AppaloftClientContext,
+      { installationId: string },
+      CompileAgentWorkspaceProfileResponse,
+      AppaloftClientError
+    >;
+    disable: Client<
+      AppaloftClientContext,
+      { installationId: string },
+      AgentWorkspaceProfileInstallationResponse,
+      AppaloftClientError
+    >;
+    uninstall: Client<
+      AppaloftClientContext,
+      { installationId: string },
+      UninstallAgentWorkspaceProfileResponse,
       AppaloftClientError
     >;
   };

@@ -65,6 +65,11 @@ export interface AgentAdapterInstallationReadModel {
   updatedAt?: string;
 }
 
+export interface ResolvedAgentAdapterInstallation {
+  installation: AgentAdapterInstallationReadModel;
+  definition: ValidatedAgentAdapterManifest;
+}
+
 export interface AgentAdapterRegistryRepository {
   saveDefinition(definition: AgentAdapterDefinition): Promise<Result<AgentAdapterDefinition>>;
   findDefinition(definitionDigest: string): Promise<AgentAdapterDefinition | null>;
@@ -423,6 +428,65 @@ export class AgentAdapterInstallationService {
     const available = found.value.installation.assertAvailableForNewWorkspace();
     if (available.isErr()) return err(available.error);
     return this.readModel(found.value.installation, found.value.definition);
+  }
+
+  async resolveDefinitionForNewWorkspace(
+    context: ExecutionContext,
+    definitionDigest: string,
+  ): Promise<Result<ResolvedAgentAdapterInstallation>> {
+    const repositoryContext = toRepositoryContext(context);
+    const installation = await this.dependencies.repository.findInstallationByDefinition(
+      repositoryContext,
+      definitionDigest,
+    );
+    if (!installation) {
+      return err(domainError.notFound("AgentAdapterInstallation", definitionDigest));
+    }
+    const available = installation.assertAvailableForNewWorkspace();
+    if (available.isErr()) return err(available.error);
+    const definition = await this.dependencies.repository.findDefinition(definitionDigest);
+    if (!definition) {
+      return err(
+        domainError.invariant("Agent Adapter installation definition is missing", {
+          installationId: installation.id.value,
+          definitionDigest,
+        }),
+      );
+    }
+    const definitionState = definition.toState();
+    let storedManifest: unknown;
+    try {
+      storedManifest = JSON.parse(definitionState.canonicalManifest.value);
+    } catch {
+      return err(
+        domainError.invariant("Stored Agent Adapter definition manifest is invalid JSON", {
+          installationId: installation.id.value,
+          definitionDigest,
+        }),
+      );
+    }
+    const admissionValidation = this.dependencies.manifestValidator.validate(
+      storedManifest,
+      "admission",
+    );
+    const structuralValidation = admissionValidation.ok
+      ? admissionValidation
+      : this.dependencies.manifestValidator.validate(storedManifest, "stored-read");
+    if (!structuralValidation.ok) {
+      return err(
+        domainError.invariant("Stored Agent Adapter definition is invalid", {
+          installationId: installation.id.value,
+          definitionDigest,
+          issues: structuralValidation.issues.map((issue) => issue.code),
+        }),
+      );
+    }
+    const installationReadModel = this.readModel(installation, definition);
+    if (installationReadModel.isErr()) return err(installationReadModel.error);
+    return ok({
+      installation: installationReadModel.value,
+      definition: structuralValidation.definition,
+    });
   }
 
   private async findInstallationWithDefinition(

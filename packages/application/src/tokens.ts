@@ -15,6 +15,18 @@ export const tokens = {
     "appaloft.agent_adapter_installation_reference_reader",
   ),
   agentAdapterInstallationService: Symbol.for("appaloft.agent_adapter_installation_service"),
+  agentWorkspaceProfileRegistryRepository: Symbol.for(
+    "appaloft.agent_workspace_profile_registry_repository",
+  ),
+  agentWorkspaceProfileInstallationReferenceReader: Symbol.for(
+    "appaloft.agent_workspace_profile_installation_reference_reader",
+  ),
+  agentWorkspaceProfileInstallationService: Symbol.for(
+    "appaloft.agent_workspace_profile_installation_service",
+  ),
+  agentWorkspaceProfileHarnessRegistrar: Symbol.for(
+    "appaloft.agent_workspace_profile_harness_registrar",
+  ),
   agentTaskRunService: Symbol.for("appaloft.agent_task_run_service"),
   workspaceCollaborationRepository: Symbol.for("appaloft.workspace_collaboration_repository"),
   workspaceCollaborationService: Symbol.for("appaloft.workspace_collaboration_service"),

@@ -22,6 +22,7 @@ import {
 
 const auditedDomains = new Set([
   "agent-adapters",
+  "agent-workspace-profiles",
   "projects",
   "resources",
   "deployments",
@@ -48,6 +49,7 @@ const ignoredOperationKeys = new Set([
 
 const resourceTypeByDomain: Record<string, string> = {
   "agent-adapters": "agent_adapter_installation",
+  "agent-workspace-profiles": "agent_workspace_profile_installation",
   projects: "project",
   resources: "resource",
   deployments: "deployment",
@@ -62,6 +64,7 @@ const resourceTypeByDomain: Record<string, string> = {
 
 const targetFieldByDomain: Record<string, readonly string[]> = {
   "agent-adapters": ["installationId", "id"],
+  "agent-workspace-profiles": ["installationId", "id"],
   projects: ["projectId", "id"],
   resources: ["resourceId", "id"],
   deployments: ["deploymentId", "id"],

@@ -43,6 +43,7 @@
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import { formatTime, projectDetailHref } from "$lib/console/utils";
   import { readErrorMessage, request } from "$lib/api/client";
+  import { capabilities, capabilityKey } from "$lib/capabilities";
   import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
   import { i18nKeys, locale, t } from "$lib/i18n";
@@ -51,6 +52,7 @@
   type MemberLifecycleAction = "remove" | "restore";
   type DeployTokenLifecycleAction = "rotate" | "revoke";
   type AgentAdapterLifecycleAction = "disable" | "uninstall";
+  type AgentWorkspaceProfileLifecycleAction = "disable" | "uninstall";
   type OrganizationManagementSection =
     | "profile"
     | "members"
@@ -118,6 +120,8 @@
   let agentAdapterInstallDialogOpen = $state(false);
   let agentAdapterDetailDialogOpen = $state(false);
   let agentAdapterLifecycleDialogOpen = $state(false);
+  let agentWorkspaceProfileInstallDialogOpen = $state(false);
+  let agentWorkspaceProfileLifecycleDialogOpen = $state(false);
   let deleteOrganizationDialogOpen = $state(false);
   let selectedMemberRoleMemberId = $state("");
   let selectedOwnerTransferMemberId = $state("");
@@ -129,7 +133,32 @@
   let validatedAgentAdapterDigest = $state("");
   let selectedAgentAdapterInstallationId = $state("");
   let selectedAgentAdapterLifecycleAction = $state<AgentAdapterLifecycleAction | null>(null);
+  let agentWorkspaceProfileManifestText = $state("");
+  let validatedAgentWorkspaceProfileDigest = $state("");
+  let selectedAgentWorkspaceProfileInstallationId = $state("");
+  let selectedAgentWorkspaceProfileLifecycleAction =
+    $state<AgentWorkspaceProfileLifecycleAction | null>(null);
   let { section = null }: Props = $props();
+
+  const agentWorkspaceProfileInstallCapability = {
+    operationKey: "agent-workspace-profiles.install",
+  } as const;
+  const agentWorkspaceProfileDisableCapability = {
+    operationKey: "agent-workspace-profiles.disable",
+  } as const;
+  const agentWorkspaceProfileUninstallCapability = {
+    operationKey: "agent-workspace-profiles.uninstall",
+  } as const;
+
+  $effect(() => {
+    if (browser && activeSection === "agent-adapters") {
+      void capabilities.fetch([
+        agentWorkspaceProfileInstallCapability,
+        agentWorkspaceProfileDisableCapability,
+        agentWorkspaceProfileUninstallCapability,
+      ]);
+    }
+  });
 
   const contextQuery = createQuery(() =>
     orpc.organizations.currentContext.queryOptions({
@@ -314,6 +343,12 @@
         Boolean(selectedAgentAdapterInstallationId),
     }),
   );
+  const agentWorkspaceProfilesQuery = createQuery(() =>
+    orpc.agentWorkspaceProfiles.list.queryOptions({
+      input: { limit: 100 },
+      enabled: browser && Boolean(currentOrganizationId) && shouldLoadAgentAdapters,
+    }),
+  );
 
   const profileQuery = createQuery(() =>
     orpc.organizations.showProfile.queryOptions({
@@ -359,6 +394,9 @@
       void queryClient.invalidateQueries({ queryKey: orpc.organizations.key({ type: "query" }) });
       void queryClient.invalidateQueries({ queryKey: orpc.deployTokens.key({ type: "query" }) });
       void queryClient.invalidateQueries({ queryKey: orpc.agentAdapters.key({ type: "query" }) });
+      void queryClient.invalidateQueries({
+        queryKey: orpc.agentWorkspaceProfiles.key({ type: "query" }),
+      });
     },
     onError: (error) => {
       operationNotice = "";
@@ -621,6 +659,80 @@
     },
   }));
 
+  function parsedAgentWorkspaceProfileManifest(): unknown {
+    return JSON.parse(agentWorkspaceProfileManifestText) as unknown;
+  }
+
+  const validateAgentWorkspaceProfileMutation = createMutation(() => ({
+    mutationFn: () =>
+      orpcClient.agentWorkspaceProfiles.validate({
+        manifest: parsedAgentWorkspaceProfileManifest(),
+      }),
+    onSuccess: (result) => {
+      validatedAgentWorkspaceProfileDigest = result.definitionDigest;
+      operationError = "";
+      operationNotice = $t(i18nKeys.console.organization.agentWorkspaceProfileValidated);
+    },
+    onError: (error) => {
+      validatedAgentWorkspaceProfileDigest = "";
+      operationNotice = "";
+      operationError = readErrorMessage(error);
+    },
+  }));
+
+  const installAgentWorkspaceProfileMutation = createMutation(() => ({
+    mutationFn: () =>
+      orpcClient.agentWorkspaceProfiles.install({
+        manifest: parsedAgentWorkspaceProfileManifest(),
+      }),
+    onSuccess: () => {
+      setAgentWorkspaceProfileInstallDialogOpen(false);
+      operationError = "";
+      operationNotice = $t(i18nKeys.console.organization.agentWorkspaceProfileInstalled);
+      void queryClient.invalidateQueries({
+        queryKey: orpc.agentWorkspaceProfiles.key({ type: "query" }),
+      });
+    },
+    onError: (error) => {
+      operationNotice = "";
+      operationError = readErrorMessage(error);
+    },
+  }));
+
+  const disableAgentWorkspaceProfileMutation = createMutation(() => ({
+    mutationFn: (installationId: string) =>
+      orpcClient.agentWorkspaceProfiles.disable({ installationId }),
+    onSuccess: () => {
+      setAgentWorkspaceProfileLifecycleDialogOpen(false);
+      operationError = "";
+      operationNotice = $t(i18nKeys.console.organization.agentWorkspaceProfileDisabled);
+      void queryClient.invalidateQueries({
+        queryKey: orpc.agentWorkspaceProfiles.key({ type: "query" }),
+      });
+    },
+    onError: (error) => {
+      operationNotice = "";
+      operationError = readErrorMessage(error);
+    },
+  }));
+
+  const uninstallAgentWorkspaceProfileMutation = createMutation(() => ({
+    mutationFn: (installationId: string) =>
+      orpcClient.agentWorkspaceProfiles.uninstall({ installationId }),
+    onSuccess: () => {
+      setAgentWorkspaceProfileLifecycleDialogOpen(false);
+      operationError = "";
+      operationNotice = $t(i18nKeys.console.organization.agentWorkspaceProfileUninstalled);
+      void queryClient.invalidateQueries({
+        queryKey: orpc.agentWorkspaceProfiles.key({ type: "query" }),
+      });
+    },
+    onError: (error) => {
+      operationNotice = "";
+      operationError = readErrorMessage(error);
+    },
+  }));
+
   const members = $derived(membersQuery.data?.items ?? []);
   const activeMembers = $derived(members.filter((member) => member.status !== "deactivated"));
   const removedMembers = $derived(members.filter((member) => member.status === "deactivated"));
@@ -636,6 +748,19 @@
   const invitations = $derived(invitationsQuery.data?.items ?? []);
   const deployTokens = $derived(deployTokensQuery.data?.items ?? []);
   const agentAdapters = $derived(agentAdaptersQuery.data ?? []);
+  const agentWorkspaceProfiles = $derived(agentWorkspaceProfilesQuery.data ?? []);
+  const canInstallAgentWorkspaceProfile = $derived(
+    $capabilities.capabilities[capabilityKey(agentWorkspaceProfileInstallCapability)]?.allowed ===
+      true,
+  );
+  const canDisableAgentWorkspaceProfile = $derived(
+    $capabilities.capabilities[capabilityKey(agentWorkspaceProfileDisableCapability)]?.allowed ===
+      true,
+  );
+  const canUninstallAgentWorkspaceProfile = $derived(
+    $capabilities.capabilities[capabilityKey(agentWorkspaceProfileUninstallCapability)]?.allowed ===
+      true,
+  );
   const selectedDeployToken = $derived(
     deployTokens.find((token) => token.tokenId === selectedDeployTokenId) ?? null,
   );
@@ -674,7 +799,7 @@
   const agentAdaptersSectionLoading = $derived(
     Boolean(currentOrganizationId) &&
       activeSection === "agent-adapters" &&
-      agentAdaptersQuery.isPending,
+      (agentAdaptersQuery.isPending || agentWorkspaceProfilesQuery.isPending),
   );
   const archivedProjectsSectionLoading = $derived(
     Boolean(currentOrganizationId) &&
@@ -713,6 +838,28 @@
       (selectedAgentAdapterLifecycleAction === "disable"
         ? selectedAgentAdapter?.status === "enabled" && !disableAgentAdapterMutation.isPending
         : !uninstallAgentAdapterMutation.isPending),
+  );
+  const canSubmitAgentWorkspaceProfileManifest = $derived(
+    Boolean(currentOrganizationId) &&
+      canInstallAgentWorkspaceProfile &&
+      agentWorkspaceProfileManifestText.trim().length > 0 &&
+      !validateAgentWorkspaceProfileMutation.isPending &&
+      !installAgentWorkspaceProfileMutation.isPending,
+  );
+  const selectedAgentWorkspaceProfile = $derived(
+    agentWorkspaceProfiles.find(
+      (profile) => profile.installationId === selectedAgentWorkspaceProfileInstallationId,
+    ) ?? null,
+  );
+  const canSubmitAgentWorkspaceProfileLifecycleAction = $derived(
+    Boolean(selectedAgentWorkspaceProfile) &&
+      Boolean(selectedAgentWorkspaceProfileLifecycleAction) &&
+      (selectedAgentWorkspaceProfileLifecycleAction === "disable"
+        ? selectedAgentWorkspaceProfile?.status === "enabled" &&
+          canDisableAgentWorkspaceProfile &&
+          !disableAgentWorkspaceProfileMutation.isPending
+        : canUninstallAgentWorkspaceProfile &&
+          !uninstallAgentWorkspaceProfileMutation.isPending),
   );
   const canSubmitMemberRole = $derived(
     Boolean(selectedMemberRoleMember) &&
@@ -870,6 +1017,38 @@
     if (!open) {
       selectedAgentAdapterInstallationId = "";
       selectedAgentAdapterLifecycleAction = null;
+      operationError = "";
+    }
+  }
+
+  function openAgentWorkspaceProfileInstallDialog(): void {
+    agentWorkspaceProfileManifestText = "";
+    validatedAgentWorkspaceProfileDigest = "";
+    operationError = "";
+    agentWorkspaceProfileInstallDialogOpen = true;
+  }
+
+  function setAgentWorkspaceProfileInstallDialogOpen(open: boolean): void {
+    agentWorkspaceProfileInstallDialogOpen = open;
+    if (!open) {
+      agentWorkspaceProfileManifestText = "";
+      validatedAgentWorkspaceProfileDigest = "";
+      operationError = "";
+    }
+  }
+
+  function openAgentWorkspaceProfileLifecycleDialog(installationId: string): void {
+    selectedAgentWorkspaceProfileInstallationId = installationId;
+    selectedAgentWorkspaceProfileLifecycleAction = null;
+    operationError = "";
+    agentWorkspaceProfileLifecycleDialogOpen = true;
+  }
+
+  function setAgentWorkspaceProfileLifecycleDialogOpen(open: boolean): void {
+    agentWorkspaceProfileLifecycleDialogOpen = open;
+    if (!open) {
+      selectedAgentWorkspaceProfileInstallationId = "";
+      selectedAgentWorkspaceProfileLifecycleAction = null;
       operationError = "";
     }
   }
@@ -1169,6 +1348,19 @@
     }
   }
 
+  function validateAgentWorkspaceProfile(event: SubmitEvent): void {
+    event.preventDefault();
+    if (canSubmitAgentWorkspaceProfileManifest) {
+      validateAgentWorkspaceProfileMutation.mutate();
+    }
+  }
+
+  function installAgentWorkspaceProfile(): void {
+    if (canSubmitAgentWorkspaceProfileManifest) {
+      installAgentWorkspaceProfileMutation.mutate();
+    }
+  }
+
   function switchOrganization(organizationId: string): void {
     if (
       !organizationId ||
@@ -1304,6 +1496,21 @@
     }
 
     uninstallAgentAdapterMutation.mutate(adapter.installationId);
+  }
+
+  function submitAgentWorkspaceProfileLifecycleAction(): void {
+    const profile = selectedAgentWorkspaceProfile;
+    const action = selectedAgentWorkspaceProfileLifecycleAction;
+    if (!profile || !action || !canSubmitAgentWorkspaceProfileLifecycleAction) {
+      return;
+    }
+
+    if (action === "disable") {
+      disableAgentWorkspaceProfileMutation.mutate(profile.installationId);
+      return;
+    }
+
+    uninstallAgentWorkspaceProfileMutation.mutate(profile.installationId);
   }
 
   function centeredOrganizationSectionClass(baseClass: string): string {
@@ -1895,6 +2102,83 @@
             {/each}
           </div>
         {/if}
+
+        <div class="border-t pt-5" data-organization-agent-workspace-profiles>
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="max-w-2xl">
+              <h3 class="text-base font-semibold">
+                {$t(i18nKeys.console.organization.agentWorkspaceProfilesTitle)}
+              </h3>
+              <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                {$t(i18nKeys.console.organization.agentWorkspaceProfilesDescription)}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!canInstallAgentWorkspaceProfile}
+              onclick={openAgentWorkspaceProfileInstallDialog}
+            >
+              <PackagePlus class="size-4" />
+              {$t(i18nKeys.console.organization.agentWorkspaceProfileInstallAction)}
+            </Button>
+          </div>
+
+          {#if agentWorkspaceProfiles.length === 0}
+            <div class="mt-4 rounded-lg border border-dashed p-5">
+              <p class="font-medium">
+                {$t(i18nKeys.console.organization.agentWorkspaceProfilesEmptyTitle)}
+              </p>
+              <p class="mt-1 text-sm text-muted-foreground">
+                {$t(i18nKeys.console.organization.agentWorkspaceProfilesEmptyDescription)}
+              </p>
+            </div>
+          {:else}
+            <div class="console-record-list mt-4">
+              {#each agentWorkspaceProfiles as profile (profile.installationId)}
+                <div
+                  class="console-record-row gap-4 lg:grid-cols-[minmax(0,1fr)_18rem_auto] lg:items-center"
+                >
+                  <div class="min-w-0 space-y-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <h4 class="truncate text-base font-semibold">{profile.displayName}</h4>
+                      <Badge variant={profile.status === "enabled" ? "outline" : "secondary"}>
+                        {profile.status === "enabled"
+                          ? $t(i18nKeys.console.organization.agentAdapterStatusEnabled)
+                          : $t(i18nKeys.console.organization.agentAdapterStatusDisabled)}
+                      </Badge>
+                    </div>
+                    <p class="text-sm text-muted-foreground">
+                      {profile.profileId} · {profile.profileVersion}
+                    </p>
+                    <p class="break-all font-mono text-xs text-muted-foreground">
+                      {profile.installationId}
+                    </p>
+                  </div>
+                  <div class="space-y-1 text-sm text-muted-foreground">
+                    <p>
+                      {$t(i18nKeys.console.organization.agentAdapterInstalledAt)} · {formatTime(
+                        profile.installedAt,
+                      )}
+                    </p>
+                    <p class="break-all font-mono text-xs">{profile.definitionDigest}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={!canDisableAgentWorkspaceProfile && !canUninstallAgentWorkspaceProfile}
+                    onclick={() =>
+                      openAgentWorkspaceProfileLifecycleDialog(profile.installationId)}
+                  >
+                    <ShieldCheck class="size-3.5" />
+                    {$t(i18nKeys.console.organization.lifecycleManageAction)}
+                  </Button>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
       </section>
       {/if}
 
@@ -3011,6 +3295,151 @@
             {installAgentAdapterMutation.isPending
               ? $t(i18nKeys.console.organization.agentAdapterInstalling)
               : $t(i18nKeys.console.organization.agentAdapterInstallAction)}
+          </Button>
+        </Dialog.Footer>
+      </form>
+    </Dialog.Content>
+  </Dialog.Root>
+
+  <Dialog.Root
+    bind:open={agentWorkspaceProfileLifecycleDialogOpen}
+    onOpenChange={setAgentWorkspaceProfileLifecycleDialogOpen}
+  >
+    <Dialog.Content
+      closeLabel={$t(i18nKeys.common.actions.close)}
+      data-organization-agent-workspace-profile-lifecycle-dialog
+    >
+      <Dialog.Header>
+        <Dialog.Title>
+          {$t(i18nKeys.console.organization.agentWorkspaceProfileLifecycleTitle)}
+        </Dialog.Title>
+        <Dialog.Description>
+          {$t(i18nKeys.console.organization.agentWorkspaceProfileLifecycleDescription)}
+        </Dialog.Description>
+      </Dialog.Header>
+      <div class="space-y-4 px-5 pb-5">
+        <button
+          type="button"
+          class="w-full rounded-md border p-4 text-left transition-colors hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50"
+          class:border-primary={selectedAgentWorkspaceProfileLifecycleAction === "disable"}
+          disabled={selectedAgentWorkspaceProfile?.status !== "enabled" ||
+            !canDisableAgentWorkspaceProfile}
+          onclick={() => (selectedAgentWorkspaceProfileLifecycleAction = "disable")}
+        >
+          <span class="flex items-center gap-2 font-medium">
+            <Power class="size-4" />
+            {$t(i18nKeys.console.organization.agentWorkspaceProfileDisableAction)}
+          </span>
+          <span class="mt-1 block text-sm leading-6 text-muted-foreground">
+            {$t(i18nKeys.console.organization.agentWorkspaceProfileDisableDescription)}
+          </span>
+        </button>
+        <button
+          type="button"
+          class="w-full rounded-md border p-4 text-left transition-colors hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50"
+          class:border-destructive={selectedAgentWorkspaceProfileLifecycleAction === "uninstall"}
+          disabled={!canUninstallAgentWorkspaceProfile}
+          onclick={() => (selectedAgentWorkspaceProfileLifecycleAction = "uninstall")}
+        >
+          <span class="flex items-center gap-2 font-medium">
+            <Trash2 class="size-4" />
+            {$t(i18nKeys.console.organization.agentWorkspaceProfileUninstallAction)}
+          </span>
+          <span class="mt-1 block text-sm leading-6 text-muted-foreground">
+            {$t(i18nKeys.console.organization.agentWorkspaceProfileUninstallDescription)}
+          </span>
+        </button>
+        <Dialog.Footer class="px-0 pb-0">
+          <Button
+            type="button"
+            variant="outline"
+            onclick={() => setAgentWorkspaceProfileLifecycleDialogOpen(false)}
+          >
+            {$t(i18nKeys.common.actions.close)}
+          </Button>
+          <Button
+            type="button"
+            variant={selectedAgentWorkspaceProfileLifecycleAction === "uninstall"
+              ? "destructive"
+              : "default"}
+            disabled={!canSubmitAgentWorkspaceProfileLifecycleAction}
+            onclick={submitAgentWorkspaceProfileLifecycleAction}
+          >
+            {$t(i18nKeys.common.actions.confirm)}
+          </Button>
+        </Dialog.Footer>
+      </div>
+    </Dialog.Content>
+  </Dialog.Root>
+
+  <Dialog.Root
+    bind:open={agentWorkspaceProfileInstallDialogOpen}
+    onOpenChange={setAgentWorkspaceProfileInstallDialogOpen}
+  >
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+      <Dialog.Header>
+        <Dialog.Title>
+          {$t(i18nKeys.console.organization.agentWorkspaceProfileInstallTitle)}
+        </Dialog.Title>
+        <Dialog.Description>
+          {$t(i18nKeys.console.organization.agentWorkspaceProfileInstallDescription)}
+        </Dialog.Description>
+      </Dialog.Header>
+      <form
+        class="space-y-4 px-5 pb-5"
+        onsubmit={validateAgentWorkspaceProfile}
+        data-organization-agent-workspace-profile-install-dialog
+      >
+        <label class="space-y-1.5 text-sm font-medium">
+          <span>{$t(i18nKeys.console.organization.agentWorkspaceProfileManifestLabel)}</span>
+          <Textarea
+            bind:value={agentWorkspaceProfileManifestText}
+            class="min-h-64 font-mono text-xs leading-5"
+            disabled={!canInstallAgentWorkspaceProfile}
+            placeholder={$t(
+              i18nKeys.console.organization.agentWorkspaceProfileManifestPlaceholder,
+            )}
+          />
+        </label>
+        <p class="text-xs leading-5 text-muted-foreground">
+          {$t(i18nKeys.console.organization.agentWorkspaceProfileManifestNotice)}
+        </p>
+        {#if validatedAgentWorkspaceProfileDigest}
+          <div class="rounded-md border border-primary/20 bg-primary/5 p-3">
+            <p class="text-xs font-medium">
+              {$t(i18nKeys.console.organization.agentAdapterValidatedDigest)}
+            </p>
+            <p class="mt-1 break-all font-mono text-xs">
+              {validatedAgentWorkspaceProfileDigest}
+            </p>
+          </div>
+        {/if}
+        <Dialog.Footer class="px-0 pb-0">
+          <Button
+            type="button"
+            variant="outline"
+            onclick={() => setAgentWorkspaceProfileInstallDialogOpen(false)}
+          >
+            {$t(i18nKeys.common.actions.close)}
+          </Button>
+          <Button
+            type="submit"
+            variant="outline"
+            disabled={!canSubmitAgentWorkspaceProfileManifest}
+          >
+            {validateAgentWorkspaceProfileMutation.isPending
+              ? $t(i18nKeys.console.organization.agentAdapterValidating)
+              : $t(i18nKeys.console.organization.agentAdapterValidateAction)}
+          </Button>
+          <Button
+            type="button"
+            disabled={!canSubmitAgentWorkspaceProfileManifest}
+            onclick={installAgentWorkspaceProfile}
+          >
+            <PackagePlus class="size-4" />
+            {installAgentWorkspaceProfileMutation.isPending
+              ? $t(i18nKeys.console.organization.agentAdapterInstalling)
+              : $t(i18nKeys.console.organization.agentWorkspaceProfileInstallAction)}
           </Button>
         </Dialog.Footer>
       </form>

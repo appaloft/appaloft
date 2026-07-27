@@ -28,6 +28,10 @@ import {
   WorkspaceRevision,
 } from "@appaloft/core";
 import {
+  type AgentWorkspaceProfileCompiledPlan,
+  type AgentWorkspaceProfilePin,
+} from "./agent-workspace-profile";
+import {
   type ExecutionContext,
   type RepositoryContext,
   toRepositoryContext,
@@ -125,6 +129,7 @@ export interface SandboxAgentRuntimeRecord {
   runtime: SandboxAgentRuntime;
   harnessKey: string;
   idempotencyKey: string;
+  profilePin?: AgentWorkspaceProfilePin;
 }
 
 export interface SandboxAgentRunRecord {
@@ -515,6 +520,12 @@ export interface SandboxAgentDeliveryDependencies {
     >;
   };
   harnessRegistry: SandboxAgentHarnessRegistry;
+  workspaceProfileResolver?: {
+    compileForNewWorkspace(
+      context: ExecutionContext,
+      installationId: string,
+    ): Promise<Result<AgentWorkspaceProfileCompiledPlan>>;
+  };
   workQueue: {
     enqueue(
       context: ExecutionContext,
@@ -601,6 +612,7 @@ export interface SandboxAgentRuntimeDescriptor {
   status: string;
   interaction?: SandboxAgentHarnessInteraction;
   capabilities: SandboxAgentHarnessCapabilities;
+  profilePin?: AgentWorkspaceProfilePin;
   activeRunId?: string;
   createdAt: string;
   updatedAt?: string;
@@ -714,14 +726,16 @@ function runtimeDescriptor(
     harnessTemplateId: state.harnessTemplateId.value,
     status: state.status.value,
     ...(interaction ? { interaction } : {}),
-    capabilities: capabilities ?? {
-      taskMode: true,
-      interactive: interaction !== undefined,
-      backgroundRuns: true,
-      nativeSession: interaction?.sessionRecovery === "native-session-store",
-      persistentPaths: [],
-      healthcheck: { kind: "process" },
-    },
+    capabilities: record.profilePin?.capabilities ??
+      capabilities ?? {
+        taskMode: true,
+        interactive: interaction !== undefined,
+        backgroundRuns: true,
+        nativeSession: interaction?.sessionRecovery === "native-session-store",
+        persistentPaths: [],
+        healthcheck: { kind: "process" },
+      },
+    ...(record.profilePin ? { profilePin: record.profilePin } : {}),
     ...(state.activeRunId ? { activeRunId: state.activeRunId.value } : {}),
     createdAt: state.createdAt.value,
     ...(state.updatedAt ? { updatedAt: state.updatedAt.value } : {}),
@@ -960,6 +974,7 @@ export class SandboxAgentDeliveryService {
       harnessKey: string;
       harnessTemplateId: string;
       idempotencyKey: string;
+      profileInstallationId?: string;
     },
   ): Promise<Result<SandboxAgentRuntimeDescriptor>> {
     const repositoryContext = toRepositoryContext(context);
@@ -980,6 +995,28 @@ export class SandboxAgentDeliveryService {
     const sandbox = await this.dependencies.sandboxReader.show(context, input.sandboxId);
     if (sandbox.status !== "ready") {
       return err(domainError.conflict("Sandbox must be ready before Runtime creation"));
+    }
+    const profilePlan = input.profileInstallationId
+      ? await this.dependencies.workspaceProfileResolver?.compileForNewWorkspace(
+          context,
+          input.profileInstallationId,
+        )
+      : undefined;
+    if (input.profileInstallationId && !this.dependencies.workspaceProfileResolver) {
+      return err(domainError.conflict("Agent Workspace Profile resolution is unavailable"));
+    }
+    if (profilePlan?.isErr()) return err(profilePlan.error);
+    const resolvedProfilePlan = profilePlan?.isOk() ? profilePlan.value : undefined;
+    if (
+      resolvedProfilePlan &&
+      (resolvedProfilePlan.runtime.harnessKey !== input.harnessKey ||
+        resolvedProfilePlan.runtime.harnessTemplateId !== input.harnessTemplateId)
+    ) {
+      return err(
+        domainError.conflict(
+          "Agent Workspace Profile Runtime input does not match its resolved pin",
+        ),
+      );
     }
     const harness = this.dependencies.harnessRegistry.resolve(input.harnessKey);
     if (!harness) return err(domainError.notFound("SandboxAgentHarness", input.harnessKey));
@@ -1012,6 +1049,7 @@ export class SandboxAgentDeliveryService {
       runtime: runtime.value,
       harnessKey: input.harnessKey,
       idempotencyKey: input.idempotencyKey,
+      ...(resolvedProfilePlan ? { profilePin: resolvedProfilePlan.pin } : {}),
     };
     if (harness.prepareRuntime) {
       try {

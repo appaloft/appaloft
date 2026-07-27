@@ -4,9 +4,15 @@ import { mkdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  type CommandSandboxAgentDescriptor,
+  CommandSandboxAgentHarness,
+} from "@appaloft/adapter-runtime";
+import {
   agentAdapterApiVersion,
   agentAdapterHostCapabilities,
+  compileAgentWorkspaceProfile,
   validateAgentAdapterManifest,
+  validateAgentWorkspaceProfile,
 } from "@appaloft/agent-adapter-sdk";
 import {
   AcceptBlueprintInstallCommandHandler,
@@ -23,6 +29,11 @@ import {
   type AgentTaskRunDependencies,
   AgentTaskRunQueryHandler,
   AgentTaskRunService,
+  AgentWorkspaceProfileCommandHandler,
+  type AgentWorkspaceProfileInstallationReferenceReader,
+  AgentWorkspaceProfileInstallationService,
+  AgentWorkspaceProfileQueryHandler,
+  type AgentWorkspaceProfileRegistryRepository,
   ApplyActionPreviewRouteCommandHandler,
   ApplyActionPreviewRouteUseCase,
   ApplyConnectorCapabilityCommandHandler,
@@ -3286,6 +3297,8 @@ export function registerApplicationServices(
   container.registerSingleton(AgentTaskRunQueryHandler);
   container.registerSingleton(AgentAdapterCommandHandler);
   container.registerSingleton(AgentAdapterQueryHandler);
+  container.registerSingleton(AgentWorkspaceProfileCommandHandler);
+  container.registerSingleton(AgentWorkspaceProfileQueryHandler);
   container.registerSingleton(WorkspaceCollaborationCommandHandler);
   container.registerSingleton(WorkspaceCollaborationQueryHandler);
   container.registerSingleton(RevokeDeployTokenCommandHandler);
@@ -3530,6 +3543,163 @@ export function registerApplicationServices(
       });
     }),
   });
+  container.register(tokens.agentWorkspaceProfileInstallationService, {
+    useFactory: instanceCachingFactory((dependencyContainer) => {
+      const harnessRegistry = dependencyContainer.resolve<SandboxAgentHarnessRegistry>(
+        tokens.sandboxAgentHarnessRegistry,
+      );
+      const sandboxService = dependencyContainer.resolve<ExecutionSandboxService>(
+        tokens.executionSandboxService,
+      );
+      const harnesses = harnessRegistry.list();
+      const sandboxTemplates = new Map<string, { id: string; version: string; digest: string }>();
+      for (const harness of harnesses) {
+        const id = harness.sandboxTemplateId ?? harness.templateId;
+        sandboxTemplates.set(id, {
+          id,
+          version: harness.version,
+          digest: harness.templateDigest,
+        });
+      }
+
+      return new AgentWorkspaceProfileInstallationService({
+        repository: dependencyContainer.resolve<AgentWorkspaceProfileRegistryRepository>(
+          tokens.agentWorkspaceProfileRegistryRepository,
+        ),
+        referenceReader:
+          dependencyContainer.resolve<AgentWorkspaceProfileInstallationReferenceReader>(
+            tokens.agentWorkspaceProfileInstallationReferenceReader,
+          ),
+        adapterService: dependencyContainer.resolve<AgentAdapterInstallationService>(
+          tokens.agentAdapterInstallationService,
+        ),
+        validatorCompiler: {
+          validate: (manifest) => {
+            const validated = validateAgentWorkspaceProfile(manifest);
+            if (!validated.ok) {
+              return {
+                ok: false,
+                issues: validated.issues.map((issue) => ({
+                  code: issue.code,
+                  path: issue.path,
+                  message: issue.message,
+                })),
+              };
+            }
+            return {
+              ok: true,
+              definition: {
+                manifest: validated.definition.manifest,
+                digest: validated.definition.digest,
+                canonicalManifest: validated.definition.canonicalManifest,
+                profileId: validated.definition.manifest.id,
+                profileVersion: validated.definition.manifest.version,
+                displayName: validated.definition.manifest.displayName,
+                adapterDefinitionDigest: validated.definition.manifest.adapter.digest,
+              },
+            };
+          },
+          compile: (manifest, input) => {
+            const validatedAdapter = validateAgentAdapterManifest(
+              input.adapterInstallation.definition.manifest,
+              {
+                adapterApiVersion: agentAdapterApiVersion,
+                availableCapabilities: agentAdapterHostCapabilities,
+                sandboxTemplates: [...sandboxTemplates.values()],
+                runtimes: harnesses.map((harness) => ({
+                  id: harness.key,
+                  version: harness.version,
+                })),
+              },
+            );
+            if (!validatedAdapter.ok) {
+              return {
+                ok: false,
+                issues: validatedAdapter.issues.map((issue) => ({
+                  code: issue.code,
+                  path: issue.path,
+                  message: issue.message,
+                })),
+              };
+            }
+            const compiled = compileAgentWorkspaceProfile(manifest, {
+              profileInstallationId: input.profileInstallationId,
+              adapterInstallationId: input.adapterInstallation.installation.installationId,
+              adapterDefinition: validatedAdapter.definition,
+              availableCapabilities: agentAdapterHostCapabilities,
+              sandboxTemplates: [...sandboxTemplates.values()],
+            });
+            if (!compiled.ok) {
+              return {
+                ok: false,
+                issues: compiled.issues.map((issue) => ({
+                  code: issue.code,
+                  path: issue.path ?? [],
+                  message: issue.message,
+                })),
+              };
+            }
+            return {
+              ok: true,
+              plan: compiled.plan,
+            };
+          },
+        },
+        harnessRegistrar: {
+          register: (descriptor) => {
+            try {
+              const input = descriptor as unknown as {
+                key: string;
+                templateId: string;
+                sandboxTemplateId: string;
+                version: string;
+                templateDigest: string;
+                cwd?: string;
+                run: {
+                  argv: readonly string[];
+                  taskInput: "append-argument" | "stdin";
+                };
+                attach?: CommandSandboxAgentDescriptor["attach"];
+                persistentPaths?: readonly string[];
+                healthcheck?: CommandSandboxAgentDescriptor["healthcheck"];
+              };
+              if (input.run.taskInput !== "append-argument") {
+                return err(
+                  domainError.validation(
+                    "Agent Workspace Profile task input mode is not supported",
+                  ),
+                );
+              }
+              const harnessDescriptor: CommandSandboxAgentDescriptor = {
+                key: input.key,
+                templateId: input.templateId,
+                sandboxTemplateId: input.sandboxTemplateId,
+                version: input.version,
+                templateDigest: input.templateDigest,
+                ...(input.cwd ? { cwd: input.cwd } : {}),
+                run: { argv: input.run.argv },
+                ...(input.attach ? { attach: input.attach } : {}),
+                ...(input.persistentPaths ? { persistentPaths: input.persistentPaths } : {}),
+                ...(input.healthcheck ? { healthcheck: input.healthcheck } : {}),
+              };
+              harnessRegistry.register(
+                new CommandSandboxAgentHarness(sandboxService, harnessDescriptor),
+              );
+              return ok(undefined);
+            } catch (cause) {
+              return err(
+                domainError.validation("Agent Workspace Profile harness is invalid", {
+                  cause: cause instanceof Error ? cause.message : String(cause),
+                }),
+              );
+            }
+          },
+        },
+        clock: dependencyContainer.resolve(tokens.clock),
+        idGenerator: dependencyContainer.resolve(tokens.idGenerator),
+      });
+    }),
+  });
   if (!container.isRegistered(tokens.sandboxAgentWorkQueue, true)) {
     container.register(tokens.sandboxAgentWorkQueue, {
       useFactory: instanceCachingFactory(
@@ -3597,6 +3767,10 @@ export function registerApplicationServices(
         artifactCapture: dependencyContainer.resolve(tokens.sandboxAgentArtifactCapture),
         previewProvider: dependencyContainer.resolve(tokens.sandboxAgentPreviewProvider),
         promotionTarget: dependencyContainer.resolve(tokens.sandboxAgentPromotionTarget),
+        workspaceProfileResolver:
+          dependencyContainer.resolve<AgentWorkspaceProfileInstallationService>(
+            tokens.agentWorkspaceProfileInstallationService,
+          ),
         taskProtector: dependencyContainer.resolve(tokens.controlPlaneSecretProtector),
         clock: dependencyContainer.resolve(tokens.clock),
         idGenerator: dependencyContainer.resolve(tokens.idGenerator),

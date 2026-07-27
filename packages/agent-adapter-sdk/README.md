@@ -49,5 +49,38 @@ The resolver requires every required credential exactly once and rejects unknown
 raw-value, or ambiguous stdin bindings. Its successful result contains reference and delivery
 metadata only; resolving the referenced value remains a runtime grant concern.
 
-The returned digest covers the normalized manifest using canonical object-key ordering. Array order
-remains significant because command and interaction ordering may be semantic.
+Compile an immutable Workspace Profile only after the exact Adapter installation and Sandbox
+Template are admitted:
+
+```ts
+import {
+  compileAgentWorkspaceProfile,
+  validateAgentWorkspaceProfile,
+} from "@appaloft/agent-adapter-sdk";
+
+const validated = validateAgentWorkspaceProfile(profile);
+if (!validated.ok) {
+  throw new Error("Invalid Workspace Profile");
+}
+
+const compiled = compileAgentWorkspaceProfile(validated.definition.manifest, {
+  profileInstallationId: "awpi_profile",
+  adapterInstallationId: "aai_adapter",
+  adapterDefinition,
+  availableCapabilities: ["managed-terminal", "headless", "credential-grants"],
+  sandboxTemplates: [
+    {
+      id: "node-agent",
+      version: "22.4.1",
+      digest: "sha256:...",
+    },
+  ],
+});
+```
+
+Compilation is side-effect free. A successful result contains bounded inputs for existing
+Sandbox/Runtime/Port operations plus an immutable pin with exact Profile, Adapter, Sandbox
+Template, Harness, and capability facts. A caller persists the pin when it creates the Runtime.
+
+Returned digests cover normalized manifests using canonical object-key ordering. Array order remains
+significant because command, initialization, port, and interaction ordering may be semantic.

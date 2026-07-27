@@ -19,6 +19,15 @@ import {
   showAgentTaskRunInputSchema,
 } from "./agent-task-run-messages";
 import {
+  compileAgentWorkspaceProfileInputSchema,
+  disableAgentWorkspaceProfileInputSchema,
+  installAgentWorkspaceProfileInputSchema,
+  listAgentWorkspaceProfilesInputSchema,
+  showAgentWorkspaceProfileInputSchema,
+  uninstallAgentWorkspaceProfileInputSchema,
+  validateAgentWorkspaceProfileInputSchema,
+} from "./agent-workspace-profile-messages";
+import {
   brokerSandboxCredentialRequestCommandInputSchema,
   configureSandboxNetworkPolicyCommandInputSchema,
   createSandboxCommandInputSchema,
@@ -446,6 +455,7 @@ type OperationDomain =
   | "terminal-sessions"
   | "sandboxes"
   | "agent-adapters"
+  | "agent-workspace-profiles"
   | "workspace-collaborations";
 
 export interface OperationCatalogEntry {
@@ -4977,6 +4987,117 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft agent-adapter uninstall <installationId>",
       orpc: { method: "DELETE", path: "/api/agent-adapters/{installationId}" },
+    },
+  },
+  {
+    key: "agent-workspace-profiles.validate",
+    kind: "query",
+    domain: "agent-workspace-profiles",
+    messageName: "ValidateAgentWorkspaceProfileQuery",
+    handlerName: "AgentWorkspaceProfileQueryHandler",
+    serviceName: "AgentWorkspaceProfileInstallationService",
+    inputSchema: validateAgentWorkspaceProfileInputSchema,
+    serviceToken: tokens.agentWorkspaceProfileInstallationService,
+    transportAccess: { productSession: { minRole: "admin" } },
+    transports: {
+      cli: "appaloft agent-workspace-profile validate <manifest>",
+      orpc: { method: "POST", path: "/api/agent-workspace-profiles/validate" },
+    },
+  },
+  {
+    key: "agent-workspace-profiles.install",
+    kind: "command",
+    domain: "agent-workspace-profiles",
+    messageName: "InstallAgentWorkspaceProfileCommand",
+    handlerName: "AgentWorkspaceProfileCommandHandler",
+    serviceName: "AgentWorkspaceProfileInstallationService",
+    inputSchema: installAgentWorkspaceProfileInputSchema,
+    serviceToken: tokens.agentWorkspaceProfileInstallationService,
+    transportAccess: { productSession: { minRole: "admin" } },
+    transports: {
+      cli: "appaloft agent-workspace-profile install <manifest>",
+      orpc: { method: "POST", path: "/api/agent-workspace-profiles" },
+    },
+  },
+  {
+    key: "agent-workspace-profiles.list",
+    kind: "query",
+    domain: "agent-workspace-profiles",
+    messageName: "ListAgentWorkspaceProfilesQuery",
+    handlerName: "AgentWorkspaceProfileQueryHandler",
+    serviceName: "AgentWorkspaceProfileInstallationService",
+    inputSchema: listAgentWorkspaceProfilesInputSchema,
+    serviceToken: tokens.agentWorkspaceProfileInstallationService,
+    transportAccess: { productSession: { minRole: "member" } },
+    transports: {
+      cli: "appaloft agent-workspace-profile list",
+      orpc: { method: "GET", path: "/api/agent-workspace-profiles" },
+    },
+  },
+  {
+    key: "agent-workspace-profiles.show",
+    kind: "query",
+    domain: "agent-workspace-profiles",
+    messageName: "ShowAgentWorkspaceProfileQuery",
+    handlerName: "AgentWorkspaceProfileQueryHandler",
+    serviceName: "AgentWorkspaceProfileInstallationService",
+    inputSchema: showAgentWorkspaceProfileInputSchema,
+    serviceToken: tokens.agentWorkspaceProfileInstallationService,
+    transportAccess: { productSession: { minRole: "member" } },
+    transports: {
+      cli: "appaloft agent-workspace-profile show <installationId>",
+      orpc: { method: "GET", path: "/api/agent-workspace-profiles/{installationId}" },
+    },
+  },
+  {
+    key: "agent-workspace-profiles.compile",
+    kind: "query",
+    domain: "agent-workspace-profiles",
+    messageName: "CompileAgentWorkspaceProfileQuery",
+    handlerName: "AgentWorkspaceProfileQueryHandler",
+    serviceName: "AgentWorkspaceProfileInstallationService",
+    inputSchema: compileAgentWorkspaceProfileInputSchema,
+    serviceToken: tokens.agentWorkspaceProfileInstallationService,
+    transportAccess: { productSession: { minRole: "member" } },
+    transports: {
+      cli: "appaloft agent-workspace-profile compile <installationId>",
+      orpc: {
+        method: "POST",
+        path: "/api/agent-workspace-profiles/{installationId}/compile",
+      },
+    },
+  },
+  {
+    key: "agent-workspace-profiles.disable",
+    kind: "command",
+    domain: "agent-workspace-profiles",
+    messageName: "DisableAgentWorkspaceProfileCommand",
+    handlerName: "AgentWorkspaceProfileCommandHandler",
+    serviceName: "AgentWorkspaceProfileInstallationService",
+    inputSchema: disableAgentWorkspaceProfileInputSchema,
+    serviceToken: tokens.agentWorkspaceProfileInstallationService,
+    transportAccess: { productSession: { minRole: "admin" } },
+    transports: {
+      cli: "appaloft agent-workspace-profile disable <installationId>",
+      orpc: {
+        method: "POST",
+        path: "/api/agent-workspace-profiles/{installationId}/disable",
+      },
+    },
+  },
+  {
+    key: "agent-workspace-profiles.uninstall",
+    kind: "command",
+    domain: "agent-workspace-profiles",
+    messageName: "UninstallAgentWorkspaceProfileCommand",
+    handlerName: "AgentWorkspaceProfileCommandHandler",
+    serviceName: "AgentWorkspaceProfileInstallationService",
+    inputSchema: uninstallAgentWorkspaceProfileInputSchema,
+    serviceToken: tokens.agentWorkspaceProfileInstallationService,
+    transportAccess: { productSession: { minRole: "admin" } },
+    transports: {
+      cli: "appaloft agent-workspace-profile uninstall <installationId>",
+      orpc: { method: "DELETE", path: "/api/agent-workspace-profiles/{installationId}" },
     },
   },
   {
