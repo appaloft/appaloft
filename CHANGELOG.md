@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.4.0](https://github.com/appaloft/appaloft/compare/v1.3.2...v1.4.0) (2026-07-27)
+
+
+### Features
+
+* add agent adapter manifest validation ([#826](https://github.com/appaloft/appaloft/issues/826)) ([9a8b070](https://github.com/appaloft/appaloft/commit/9a8b070924cf27a8899966707ffcf79e1acfef32))
+* add remote agent workspaces and task runs ([#807](https://github.com/appaloft/appaloft/issues/807)) ([7d6cfbf](https://github.com/appaloft/appaloft/commit/7d6cfbff7e3080b542e230af41054298b8039b9c))
+* add reusable workspace snapshot policy ([#818](https://github.com/appaloft/appaloft/issues/818)) ([d089f76](https://github.com/appaloft/appaloft/commit/d089f76ca225c0f9d40ef1fb2c05058e65d9de77))
+* add workspace collaboration ([#808](https://github.com/appaloft/appaloft/issues/808)) ([078be97](https://github.com/appaloft/appaloft/commit/078be97eb63df3ed254af8b8789b24695aa501ca))
+* **agent-adapter:** resolve credential reference bindings ([#828](https://github.com/appaloft/appaloft/issues/828)) ([a0968c3](https://github.com/appaloft/appaloft/commit/a0968c3b35a84ee2acfc4df2d7cebe7bec587c1f))
+* **cli:** support remote terminal attach ([#819](https://github.com/appaloft/appaloft/issues/819)) ([50aa967](https://github.com/appaloft/appaloft/commit/50aa9670469847bbb1ca39b5708b9eb822f05b52))
+* manage tenant-scoped Agent Adapter installations ([#827](https://github.com/appaloft/appaloft/issues/827)) ([f6ee783](https://github.com/appaloft/appaloft/commit/f6ee783a7039460d0275e2681b0a26e9492409a4))
+* **sandbox:** add hibernation and recovery ([#816](https://github.com/appaloft/appaloft/issues/816)) ([5261333](https://github.com/appaloft/appaloft/commit/5261333582a22a7ef5cd8084160942397df259a0))
+* **sandbox:** add portable workspace recovery ([#817](https://github.com/appaloft/appaloft/issues/817)) ([95e5fd0](https://github.com/appaloft/appaloft/commit/95e5fd03f8f7b4aa0951392100a8cb7b71dbf220))
+* **sandbox:** pass organization context to providers ([#810](https://github.com/appaloft/appaloft/issues/810)) ([f832c0f](https://github.com/appaloft/appaloft/commit/f832c0f36d1b627527a3448d51926b7fe45c881b))
+
+
+### Bug Fixes
+
+* **orpc:** mount agent workspace HTTP routes ([#809](https://github.com/appaloft/appaloft/issues/809)) ([75a1a6b](https://github.com/appaloft/appaloft/commit/75a1a6bb20bcd81bd0fae3c58552ce6461729d87))
+* **runtime:** classify Pi sandbox failure phases ([#813](https://github.com/appaloft/appaloft/issues/813)) ([2343bdf](https://github.com/appaloft/appaloft/commit/2343bdf057819115390c3d9ddacfaab4a8c4fe68))
+* **runtime:** emit safe Pi failure diagnostics ([#812](https://github.com/appaloft/appaloft/issues/812)) ([f828cf6](https://github.com/appaloft/appaloft/commit/f828cf64be48be6ceb460e6f017a83d2083c8699))
+* **runtime:** omit Pi root working directory ([#814](https://github.com/appaloft/appaloft/issues/814)) ([a2485c4](https://github.com/appaloft/appaloft/commit/a2485c4eaa3182f30b9706ccb2e53868040875d7))
+* **runtime:** run Pi harness non-interactively ([#811](https://github.com/appaloft/appaloft/issues/811)) ([6de2915](https://github.com/appaloft/appaloft/commit/6de2915ab36e9404e84557915547d4ada70e8086))
+* **sandbox:** support nested provider handles ([#820](https://github.com/appaloft/appaloft/issues/820)) ([17861a7](https://github.com/appaloft/appaloft/commit/17861a78db4888a1f1f19d8bba30a92b1b335dfd))
+
 ## [1.3.2](https://github.com/appaloft/appaloft/compare/v1.3.1...v1.3.2) (2026-07-23)
 
 
