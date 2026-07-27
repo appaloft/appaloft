@@ -198,6 +198,10 @@ export interface SandboxProvider {
     cwd?: string;
     initialRows: number;
     initialCols: number;
+    process?: {
+      argv: string[];
+      initialInput?: Uint8Array;
+    };
   }): Promise<SandboxTerminalProcess>;
   exec(request: {
     sandboxId: string;

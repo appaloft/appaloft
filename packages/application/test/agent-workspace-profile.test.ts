@@ -152,13 +152,32 @@ function harness() {
           },
         };
       },
-      compile: (_manifest, input) => ({
-        ok: true as const,
-        plan: compiledPlan(
+      compile: (_manifest, input) => {
+        const plan = compiledPlan(
           input.profileInstallationId,
           input.adapterInstallation.installation.installationId,
-        ),
-      }),
+        );
+        return {
+          ok: true as const,
+          plan: {
+            ...plan,
+            ...(input.credentialReferences
+              ? {
+                  credentialBindings: input.credentialReferences.map((reference) => ({
+                    requirementId: reference.requirementId,
+                    kind: "model-api" as const,
+                    purpose: "Codex model access",
+                    delivery: {
+                      kind: "process-environment" as const,
+                      variable: "OPENAI_API_KEY",
+                    },
+                    secretRef: reference.secretRef,
+                  })),
+                }
+              : {}),
+          },
+        };
+      },
     },
     harnessRegistrar: {
       register: (descriptor) => {
@@ -228,6 +247,30 @@ describe("Agent Workspace Profile installation and compilation", () => {
       },
     });
     expect(registeredHarnesses).toEqual([{ key: compiled.value.runtime.harnessKey }]);
+  });
+
+  test("[ADAPTER-CRED-006][PROFILE-PIN-010] compiles named references into the pinned plan", async () => {
+    const { adapterService, service } = harness();
+    await adapterService.install(context("org_a"), { manifest: adapterManifest() });
+    const profile = await service.install(context("org_a"), { manifest: profileManifest() });
+    expect(profile.isOk()).toBe(true);
+    if (profile.isErr()) return;
+
+    const compiled = await service.compileForNewWorkspace(
+      context("org_a"),
+      profile.value.installationId,
+      [{ requirementId: "model-api", secretRef: "secret://model/codex" }],
+    );
+
+    expect(compiled._unsafeUnwrap().credentialBindings).toEqual([
+      {
+        requirementId: "model-api",
+        kind: "model-api",
+        purpose: "Codex model access",
+        delivery: { kind: "process-environment", variable: "OPENAI_API_KEY" },
+        secretRef: "secret://model/codex",
+      },
+    ]);
   });
 
   test("[PROFILE-PIN-010][ADAPTER-DISABLE-008] disable fences new compiles and active references fence uninstall", async () => {

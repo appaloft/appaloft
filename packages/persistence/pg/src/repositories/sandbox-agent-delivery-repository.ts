@@ -1,4 +1,5 @@
 import {
+  type AgentWorkspaceCredentialBinding,
   type AgentWorkspaceProfilePin,
   type CandidatePreviewRecord,
   type RepositoryContext,
@@ -67,6 +68,7 @@ type RuntimeJson = {
   harnessTemplateId: string;
   activeRunId?: string;
   profilePin?: AgentWorkspaceProfilePin;
+  credentialBindings?: AgentWorkspaceCredentialBinding[];
 };
 function runtimeRecord(row: RuntimeRow): SandboxAgentRuntimeRecord {
   const state = json<RuntimeJson>(row.state);
@@ -85,6 +87,7 @@ function runtimeRecord(row: RuntimeRow): SandboxAgentRuntimeRecord {
     harnessKey: row.harness_key,
     idempotencyKey: row.idempotency_key,
     ...(state.profilePin ? { profilePin: state.profilePin } : {}),
+    ...(state.credentialBindings ? { credentialBindings: state.credentialBindings } : {}),
   };
 }
 
@@ -230,6 +233,7 @@ export class PgSandboxAgentDeliveryRepository implements SandboxAgentDeliveryRep
       harnessTemplateId: state.harnessTemplateId.value,
       ...(state.activeRunId ? { activeRunId: state.activeRunId.value } : {}),
       ...(record.profilePin ? { profilePin: record.profilePin } : {}),
+      ...(record.credentialBindings ? { credentialBindings: record.credentialBindings } : {}),
     };
     await executor
       .insertInto("sandbox_agent_runtimes")
@@ -309,6 +313,8 @@ export class PgSandboxAgentDeliveryRepository implements SandboxAgentDeliveryRep
         state: {
           harnessTemplateId: state.harnessTemplateId.value,
           activeRunId: requestedRunId,
+          ...(record.profilePin ? { profilePin: record.profilePin } : {}),
+          ...(record.credentialBindings ? { credentialBindings: record.credentialBindings } : {}),
         },
         updated_at: state.updatedAt?.value ?? state.createdAt.value,
       })

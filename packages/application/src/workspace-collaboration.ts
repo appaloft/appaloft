@@ -35,7 +35,10 @@ import {
   type TerminalSessionAttachmentGrant,
   type TerminalSessionGateway,
 } from "./ports";
-import { type SandboxAgentNativeAttachDescriptor } from "./sandbox-agent-runtime";
+import {
+  type SandboxAgentAttachDescriptor,
+  type SandboxAgentNativeAttachDescriptor,
+} from "./sandbox-agent-runtime";
 
 export interface WorkspaceCollaborationRepository {
   save(
@@ -136,7 +139,7 @@ export interface WorkspaceCollaborationDependencies {
     issueAttachAccess(
       context: ExecutionContext,
       input: { sandboxId: string; runtimeId: string; expiresAt: string },
-    ): Promise<Result<SandboxAgentNativeAttachDescriptor>>;
+    ): Promise<Result<SandboxAgentAttachDescriptor>>;
   };
 }
 
@@ -854,11 +857,22 @@ export class WorkspaceCollaborationService {
       expectedGeneration: input.expectedGeneration,
     });
     if (authorized.isErr()) return err(authorized.error);
-    return this.dependencies.agentAttach.issueAttachAccess(context, {
+    const attached = await this.dependencies.agentAttach.issueAttachAccess(context, {
       sandboxId: authorized.value.workspaceId,
       runtimeId: input.runtimeId,
       expiresAt: input.expiresAt,
     });
+    if (attached.isErr()) return err(attached.error);
+    if (attached.value.transport !== "native-attach") {
+      return err(
+        domainError.conflict("Workspace Collaboration Runtime does not support native attach", {
+          collaborationId: input.collaborationId,
+          laneId: input.laneId,
+          runtimeId: input.runtimeId,
+        }),
+      );
+    }
+    return ok(attached.value);
   }
 
   private async load(

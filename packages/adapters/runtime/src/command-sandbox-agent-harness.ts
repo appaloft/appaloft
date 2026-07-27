@@ -8,7 +8,7 @@ import {
   type SandboxFileDescriptor,
   type SandboxProcessDescriptor,
 } from "@appaloft/application";
-import { type Result } from "@appaloft/core";
+import { ok, type Result } from "@appaloft/core";
 
 export interface CommandSandboxAgentExecutionPort {
   exec(
@@ -238,22 +238,37 @@ export class CommandSandboxAgentHarness implements SandboxAgentHarness {
         ...safeArgv(this.descriptor.run.continueArgs, "Command Agent continue"),
       );
     }
-    const command = [
-      "sh",
-      "-c",
-      'mkdir -p "$1"; out="$2"; err="$3"; status="$4"; shift 4; "$@" >"$out" 2>"$err"; code=$?; printf "%s" "$code" >"$status"',
-      "appaloft-command-agent-run",
-      outputRoot,
-      stdoutPath,
-      stderrPath,
-      exitPath,
-      ...agentArgv,
-    ];
-    const started = await this.execution.exec(input.executionContext, input.sandboxId, {
+    const command = input.launchProcess
+      ? [
+          "sh",
+          "-c",
+          'mkdir -p "$1"; out="$2"; err="$3"; shift 3; exec "$@" >"$out" 2>"$err"',
+          "appaloft-command-agent-run",
+          outputRoot,
+          stdoutPath,
+          stderrPath,
+          ...agentArgv,
+        ]
+      : [
+          "sh",
+          "-c",
+          'mkdir -p "$1"; out="$2"; err="$3"; status="$4"; shift 4; "$@" >"$out" 2>"$err"; code=$?; printf "%s" "$code" >"$status"',
+          "appaloft-command-agent-run",
+          outputRoot,
+          stdoutPath,
+          stderrPath,
+          exitPath,
+          ...agentArgv,
+        ];
+    const process = {
       argv: command,
       ...(this.cwd ? { cwd: this.cwd } : {}),
-      background: true,
-    });
+      background: true as const,
+      ...(this.descriptor.timeoutMs ? { timeoutMs: this.descriptor.timeoutMs } : {}),
+    };
+    const started = input.launchProcess
+      ? await input.launchProcess(process)
+      : await this.execution.exec(input.executionContext, input.sandboxId, process);
     if (started.isErr() || started.value.mode !== "background") {
       throw new Error(
         started.isErr() ? started.error.message : "command_agent_run_background_required",
@@ -267,6 +282,7 @@ export class CommandSandboxAgentHarness implements SandboxAgentHarness {
     };
     this.active.set(input.runId, active);
     const deadline = Date.now() + (this.descriptor.timeoutMs ?? 30 * 60_000);
+    let completedProcess: SandboxProcessDescriptor | undefined;
     try {
       while (true) {
         if (active.cancelled) throw new Error("command_agent_run_cancelled");
@@ -278,7 +294,10 @@ export class CommandSandboxAgentHarness implements SandboxAgentHarness {
         const process = processes.value.find(
           (candidate) => candidate.processId === active.processId,
         );
-        if (!process || process.status !== "running") break;
+        if (!process || process.status !== "running") {
+          completedProcess = process;
+          break;
+        }
         if (Date.now() >= deadline) {
           await this.execution.terminateProcess(
             input.executionContext,
@@ -292,14 +311,18 @@ export class CommandSandboxAgentHarness implements SandboxAgentHarness {
       const [stdout, stderr, exit] = await Promise.all([
         this.execution.readFile(input.executionContext, input.sandboxId, { path: stdoutPath }),
         this.execution.readFile(input.executionContext, input.sandboxId, { path: stderrPath }),
-        this.execution.readFile(input.executionContext, input.sandboxId, { path: exitPath }),
+        input.launchProcess
+          ? Promise.resolve(ok(new TextEncoder().encode(String(completedProcess?.exitCode ?? ""))))
+          : this.execution.readFile(input.executionContext, input.sandboxId, { path: exitPath }),
       ]);
       if (stdout.isErr() || stderr.isErr() || exit.isErr()) {
         throw new Error("command_agent_run_result_unavailable");
       }
       const output = new TextDecoder().decode(stdout.value);
       const errorOutput = new TextDecoder().decode(stderr.value);
-      const exitCode = Number(new TextDecoder().decode(exit.value));
+      const exitText = new TextDecoder().decode(exit.value).trim();
+      if (!/^-?\d+$/u.test(exitText)) throw new Error("command_agent_run_exit_unavailable");
+      const exitCode = Number(exitText);
       if (input.emitEvent) {
         for (const line of output.split("\n")) {
           if (!line) continue;

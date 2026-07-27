@@ -19,6 +19,10 @@
   the resolved Adapter/Profile snapshot needed for recovery.
 - Resolve Profile credential bindings against the pinned Adapter manifest before Workspace or
   Sandbox effects; emit only normalized requirement/reference metadata for the runtime grant layer.
+- Carry the normalized references and immutable Profile/Adapter pin through Runtime persistence,
+  then delegate both managed-terminal and headless child creation to one neutral process credential
+  grant port. The port owns exact-scope admission, one-time launch, process-lifetime revocation, and
+  safe managed-terminal attachment; it never returns credential values to the control plane.
 - Implement Declarative Harness execution through existing Sandbox process/terminal boundaries.
 - Keep Trusted Code Adapter registration at composition time.
 - Add CLI local file/package loading; the server receives canonical content and never fetches an
@@ -30,6 +34,9 @@
 - Add application lifecycle, tenant isolation, reference fencing, operation catalog, HTTP/oRPC,
   CLI, SDK, MCP descriptor, and persistence tests.
 - Add deterministic fixture Agent integration without model credentials.
+- Add deterministic credential-grant fixtures that prove missing, duplicate, cross-tenant,
+  stale-pin, replay, completion, cancellation, Runtime termination, and Sandbox cleanup behavior
+  without an external model provider.
 - Keep real Codex/Docker/SSH smoke explicit opt-in.
 
 ## Risks

@@ -72,8 +72,34 @@ export interface AgentWorkspaceProfileCompiledPlan {
     ttlSeconds: number;
   }[];
   suggestedChecks: { name: string; argv: string[]; cwd?: string }[];
-  credentialRequirements: unknown[];
+  credentialRequirements: AgentWorkspaceCredentialRequirement[];
+  credentialBindings?: AgentWorkspaceCredentialBinding[];
   pin: AgentWorkspaceProfilePin;
+}
+
+export interface AgentWorkspaceCredentialReference {
+  requirementId: string;
+  secretRef: string;
+}
+
+export interface AgentWorkspaceCredentialRequirement {
+  id: string;
+  kind: "model-api" | "forge" | "custom";
+  required: boolean;
+  purpose: string;
+  delivery:
+    | { kind: "process-environment"; variable: string }
+    | {
+        kind: "stdin";
+      };
+}
+
+export interface AgentWorkspaceCredentialBinding {
+  requirementId: string;
+  kind: AgentWorkspaceCredentialRequirement["kind"];
+  purpose: string;
+  delivery: AgentWorkspaceCredentialRequirement["delivery"];
+  secretRef: string;
 }
 
 export interface AgentWorkspaceProfilePin {
@@ -111,6 +137,7 @@ export interface AgentWorkspaceProfileValidatorCompiler {
     input: {
       profileInstallationId: string;
       adapterInstallation: ResolvedAgentAdapterInstallation;
+      credentialReferences?: readonly AgentWorkspaceCredentialReference[];
     },
   ):
     | { ok: true; plan: AgentWorkspaceProfileCompiledPlan }
@@ -456,6 +483,7 @@ export class AgentWorkspaceProfileInstallationService {
   async compileForNewWorkspace(
     context: ExecutionContext,
     installationId: string,
+    credentialReferences?: readonly AgentWorkspaceCredentialReference[],
   ): Promise<Result<AgentWorkspaceProfileCompiledPlan>> {
     const found = await this.findWithDefinition(context, installationId);
     if (found.isErr()) return err(found.error);
@@ -471,6 +499,7 @@ export class AgentWorkspaceProfileInstallationService {
     const compiled = this.dependencies.validatorCompiler.compile(validated.value.manifest, {
       profileInstallationId: installationId,
       adapterInstallation: adapter.value,
+      ...(credentialReferences ? { credentialReferences } : {}),
     });
     if (!compiled.ok) return this.validationError(compiled.issues);
     const registered = this.dependencies.harnessRegistrar.register(

@@ -19,6 +19,7 @@ import {
   type ExecutionContext,
   type IdGenerator,
   type SandboxProviderRegistry,
+  type SandboxProcessTerminalOpenRequest,
   type SandboxRepository,
   type ServerRepository,
   type TerminalSession,
@@ -681,6 +682,40 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
     context: ExecutionContext,
     request: TerminalSessionOpenRequest,
   ): Promise<Result<TerminalSessionDescriptor>> {
+    return this.openSession(context, request);
+  }
+
+  async openSandboxProcess(
+    context: ExecutionContext,
+    request: SandboxProcessTerminalOpenRequest,
+  ): Promise<Result<TerminalSessionDescriptor>> {
+    return this.openSession(
+      context,
+      {
+        sessionId: request.sessionId,
+        scope: {
+          kind: "sandbox",
+          sandboxId: request.sandboxId,
+          ...(request.workingDirectory ? { workingDirectory: request.workingDirectory } : {}),
+        },
+        initialRows: request.initialRows,
+        initialCols: request.initialCols,
+      },
+      {
+        argv: [...request.argv],
+        ...(request.initialInput ? { initialInput: request.initialInput } : {}),
+      },
+    );
+  }
+
+  private async openSession(
+    context: ExecutionContext,
+    request: TerminalSessionOpenRequest,
+    process?: {
+      argv: string[];
+      initialInput?: Uint8Array;
+    },
+  ): Promise<Result<TerminalSessionDescriptor>> {
     if (!this.input.allowTerminalSessions) {
       return err(
         domainError.terminalSessionPolicyDenied(
@@ -748,6 +783,7 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
             : {}),
           initialRows: request.initialRows,
           initialCols: request.initialCols,
+          ...(process ? { process } : {}),
         });
         providerKey = stored.providerKey;
         workingDirectory = request.scope.workingDirectory;

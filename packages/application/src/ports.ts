@@ -4602,6 +4602,16 @@ export interface TerminalSessionOpenRequest {
   initialCols: number;
 }
 
+export interface SandboxProcessTerminalOpenRequest {
+  sessionId: string;
+  sandboxId: string;
+  workingDirectory?: string;
+  argv: readonly string[];
+  initialInput?: Uint8Array;
+  initialRows: number;
+  initialCols: number;
+}
+
 export interface TerminalSessionDescriptor {
   sessionId: string;
   scope: "server" | "resource" | "sandbox";
@@ -4709,6 +4719,10 @@ export interface TerminalSessionGateway extends TerminalSessionAttachmentGateway
   open(
     context: ExecutionContext,
     request: TerminalSessionOpenRequest,
+  ): Promise<Result<TerminalSessionDescriptor>>;
+  openSandboxProcess?(
+    context: ExecutionContext,
+    request: SandboxProcessTerminalOpenRequest,
   ): Promise<Result<TerminalSessionDescriptor>>;
   issueAttachmentAccess?(input: {
     sessionId: string;

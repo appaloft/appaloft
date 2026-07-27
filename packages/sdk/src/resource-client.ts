@@ -68,10 +68,18 @@ export interface AppaloftAgentCreateInput {
   readonly harnessTemplateId?: string;
   readonly idempotencyKey?: string;
   readonly profileInstallationId?: string;
+  readonly credentialReferences?: readonly {
+    readonly requirementId: string;
+    readonly secretRef: string;
+  }[];
 }
 
 export interface AppaloftWorkspaceCreateInput {
   readonly profileInstallationId?: string;
+  readonly credentialReferences?: readonly {
+    readonly requirementId: string;
+    readonly secretRef: string;
+  }[];
   readonly sandbox?: AppaloftSandboxCreateInput;
   readonly harness?: "pi" | "opencode";
   readonly harnessTemplateId?: string;
@@ -114,6 +122,7 @@ export interface AppaloftWorkspace {
   readonly sandbox: AppaloftSandbox;
   readonly agent: AppaloftAgent;
   readonly tasks: AppaloftWorkspaceTasks;
+  readonly terminate: <T = unknown>() => Promise<T>;
 }
 
 export interface AppaloftWorkspaceDescriptor {
@@ -346,13 +355,24 @@ export interface AppaloftAgent extends AppaloftAgentDescriptor {
   readonly stream: (
     input: AppaloftAgentStreamInput,
   ) => Promise<AppaloftRun & { readonly fullStream: AsyncIterable<AppaloftRunEventEnvelope> }>;
-  readonly attach: (input?: { readonly expiresAt?: string }) => Promise<{
-    readonly workspaceId: string;
-    readonly runtimeId: string;
-    readonly transport: "native-attach";
-    readonly access: Readonly<Record<string, unknown>>;
-    readonly clientCommand: readonly string[];
-  }>;
+  readonly attach: (input?: { readonly expiresAt?: string }) => Promise<
+    | {
+        readonly workspaceId: string;
+        readonly runtimeId: string;
+        readonly transport: "native-attach";
+        readonly access: Readonly<Record<string, unknown>>;
+        readonly clientCommand: readonly string[];
+      }
+    | {
+        readonly workspaceId: string;
+        readonly runtimeId: string;
+        readonly transport: "managed-terminal";
+        readonly sessionId: string;
+        readonly processId: string;
+        readonly access: Readonly<Record<string, unknown>>;
+      }
+  >;
+  readonly terminate: <T = unknown>() => Promise<T>;
 }
 
 export interface AppaloftSandbox extends AppaloftSandboxDescriptor {
@@ -516,6 +536,9 @@ export function createAppaloftClient(options: AppaloftSdkClientOptions): Appalof
         ? unwrapOperation<AppaloftWorkspaceProfilePlan>(
             await operations.agentWorkspaceProfiles.compile({
               installationId: input.profileInstallationId,
+              ...(input.credentialReferences
+                ? { credentialReferences: [...input.credentialReferences] }
+                : {}),
             }),
           )
         : undefined;
@@ -594,6 +617,9 @@ export function createAppaloftClient(options: AppaloftSdkClientOptions): Appalof
           ...(input.profileInstallationId
             ? { profileInstallationId: input.profileInstallationId }
             : {}),
+          ...(input.credentialReferences
+            ? { credentialReferences: [...input.credentialReferences] }
+            : {}),
         });
         return {
           workspaceId: sandbox.sandboxId,
@@ -601,6 +627,10 @@ export function createAppaloftClient(options: AppaloftSdkClientOptions): Appalof
           sandbox,
           agent,
           tasks: createAppaloftWorkspaceTasks(operations, sandbox.sandboxId, agent.runtimeId),
+          terminate: async <T>() => {
+            await agent.terminate();
+            return sandbox.terminate<T>();
+          },
         };
       } catch (error) {
         throw new AppaloftWorkspaceCreateError(sandbox.sandboxId, error);
@@ -1029,6 +1059,9 @@ function createSandboxHandle(
             ...(input.profileInstallationId
               ? { profileInstallationId: input.profileInstallationId }
               : {}),
+            ...(input.credentialReferences
+              ? { credentialReferences: [...input.credentialReferences] }
+              : {}),
           }),
         );
         return createAgentHandle(operations, sandboxId, agent);
@@ -1127,6 +1160,13 @@ function createAgentHandle(
           sandboxId,
           runtimeId,
           expiresAt: input.expiresAt ?? new Date(Date.now() + 60 * 60_000).toISOString(),
+        }),
+      ),
+    terminate: async <T>() =>
+      unwrapOperation<T>(
+        await operations.sandboxes.agents.runtimes.terminate<T>({
+          sandboxId,
+          runtimeId,
         }),
       ),
   };

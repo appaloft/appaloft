@@ -72,7 +72,11 @@ export class AgentWorkspaceProfileQueryHandler
       return this.service.show(context, query.input.installationId);
     }
     if (query instanceof CompileAgentWorkspaceProfileQuery) {
-      return this.service.compileForNewWorkspace(context, query.input.installationId);
+      return this.service.compileForNewWorkspace(
+        context,
+        query.input.installationId,
+        query.input.credentialReferences,
+      );
     }
     return Promise.resolve(err(domainError.invariant("Unknown Agent Workspace Profile query")));
   }

@@ -23,6 +23,7 @@ function fixture(
     harness?: SandboxAgentHarness;
     readProof?: () => Promise<{ verdict: "verified" | "failed" | "pending"; reasonCode?: string }>;
     workspaceProfileResolver?: SandboxAgentDeliveryDependencies["workspaceProfileResolver"];
+    processCredentialGrants?: SandboxAgentDeliveryDependencies["processCredentialGrants"];
   } = {},
 ) {
   const counters = { resources: 0, deployments: 0 };
@@ -78,6 +79,9 @@ function fixture(
     harnessRegistry: new SandboxAgentHarnessRegistry([harness]),
     ...(options.workspaceProfileResolver
       ? { workspaceProfileResolver: options.workspaceProfileResolver }
+      : {}),
+    ...(options.processCredentialGrants
+      ? { processCredentialGrants: options.processCredentialGrants }
       : {}),
     workQueue: {
       async enqueue(_context, item) {
@@ -216,6 +220,201 @@ describe("SandboxAgentDeliveryService", () => {
     expect(compileCalls).toBe(1);
     const stored = await repository.findRuntime(toRepositoryContext(context), "sar_test");
     expect(stored?.profilePin).toEqual(pin);
+  });
+
+  test("[ADAPTER-CRED-006][PROFILE-PIN-010] admits, launches and revokes the exact pinned child scope", async () => {
+    const calls: Array<{ kind: string; input: Record<string, unknown> }> = [];
+    const pin = {
+      profileInstallationId: "awpi_codex",
+      profileDefinitionDigest: `sha256:${"1".repeat(64)}`,
+      profileId: "codex-default",
+      profileVersion: "1.0.0",
+      adapterInstallationId: "aai_codex",
+      adapterDefinitionDigest: `sha256:${"2".repeat(64)}`,
+      adapterId: "codex-cli",
+      adapterVersion: "1.0.0",
+      harnessKey: "fake",
+      harnessTemplateId: "aht_fake_1",
+      sandboxTemplateId: "aht_fake_1",
+      sandboxTemplateVersion: "1.0.0",
+      sandboxTemplateDigest: `sha256:${"a".repeat(64)}`,
+      capabilities: {
+        taskMode: true,
+        interactive: true,
+        backgroundRuns: true,
+        nativeSession: false,
+        persistentPaths: ["/workspace"],
+        healthcheck: { kind: "process" as const },
+      },
+    };
+    const binding = {
+      requirementId: "model-api",
+      kind: "model-api" as const,
+      purpose: "Codex model access",
+      delivery: {
+        kind: "process-environment" as const,
+        variable: "OPENAI_API_KEY",
+      },
+      secretRef: "secret://model/codex",
+    };
+    const { service, repository } = fixture({
+      harness: {
+        key: "fake",
+        templateId: "aht_fake_1",
+        version: "1.0.0",
+        templateDigest: `sha256:${"a".repeat(64)}`,
+        interaction: {
+          transport: "managed-terminal",
+          command: ["codex"],
+          sessionRecovery: "managed-run-lineage",
+        },
+        async execute(input) {
+          const launched = await input.launchProcess?.({
+            argv: ["codex", "exec", input.task],
+            background: true,
+          });
+          if (!launched?.isOk()) throw new Error("privileged launch unavailable");
+          return { events: [], outcomeDigest: "sha256:credential-run-complete" };
+        },
+        async cancel() {},
+      },
+      workspaceProfileResolver: {
+        async compileForNewWorkspace(_context, _installationId, references) {
+          expect(references).toEqual([
+            { requirementId: "model-api", secretRef: "secret://model/codex" },
+          ]);
+          return ok({
+            sandbox: {
+              source: { kind: "template", templateId: "aht_fake_1" },
+              requestedIsolation: "container-trusted",
+              limits: {
+                cpuMillis: 1_000,
+                memoryBytes: 1_024,
+                diskBytes: 2_048,
+                maxProcesses: 16,
+              },
+              networkPolicy: { mode: "deny" },
+            },
+            initialization: [],
+            runtime: {
+              harnessKey: "fake",
+              harnessTemplateId: "aht_fake_1",
+              declarativeHarness: {},
+            },
+            defaultPorts: [],
+            suggestedChecks: [],
+            credentialRequirements: [
+              {
+                id: "model-api",
+                kind: "model-api",
+                required: true,
+                purpose: "Codex model access",
+                delivery: {
+                  kind: "process-environment",
+                  variable: "OPENAI_API_KEY",
+                },
+              },
+            ],
+            credentialBindings: [binding],
+            pin,
+          });
+        },
+      },
+      processCredentialGrants: {
+        async admit(_context, input) {
+          calls.push({ kind: "admit", input });
+          return ok(undefined);
+        },
+        async launch(_context, input) {
+          calls.push({ kind: "launch", input });
+          return ok({ mode: "background", processId: "spr_codex" });
+        },
+        async openTerminal(_context, input) {
+          calls.push({ kind: "terminal", input });
+          return ok({
+            workspaceId: input.scope.sandboxId,
+            runtimeId: input.scope.runtimeId,
+            transport: "managed-terminal",
+            sessionId: "term_codex",
+            processId: "spr_codex_tui",
+            access: {
+              kind: "websocket",
+              path: "/api/terminal-sessions/term_codex/attach",
+              expiresAt: input.expiresAt,
+            },
+          });
+        },
+        async revoke(_context, input) {
+          calls.push({ kind: "revoke", input });
+          return ok(undefined);
+        },
+      },
+    });
+
+    const runtime = await service.createRuntime(context, {
+      sandboxId: "sbx_demo",
+      harnessKey: "fake",
+      harnessTemplateId: "aht_fake_1",
+      idempotencyKey: "runtime_credential",
+      profileInstallationId: "awpi_codex",
+      credentialReferences: [{ requirementId: "model-api", secretRef: "secret://model/codex" }],
+    });
+    expect(runtime.isOk()).toBe(true);
+    const stored = await repository.findRuntime(toRepositoryContext(context), "sar_test");
+    expect(stored?.credentialBindings).toEqual([binding]);
+    const terminal = await service.issueAttachAccess(context, {
+      sandboxId: "sbx_demo",
+      runtimeId: "sar_test",
+      expiresAt: "2026-07-20T00:30:00.000Z",
+    });
+    expect(terminal._unsafeUnwrap()).toMatchObject({
+      transport: "managed-terminal",
+      sessionId: "term_codex",
+      processId: "spr_codex_tui",
+    });
+
+    const run = await service.createRun(context, {
+      sandboxId: "sbx_demo",
+      runtimeId: "sar_test",
+      task: "fix issue 834",
+      context: { mode: "fresh" },
+      idempotencyKey: "run_credential",
+    });
+    expect(run.isOk()).toBe(true);
+    const reconciled = await service.reconcileRun(context, "srun_test");
+    expect(reconciled.isOk()).toBe(true);
+    expect(calls.map((call) => call.kind)).toEqual(["admit", "terminal", "launch", "revoke"]);
+    expect(calls[2]?.input).toMatchObject({
+      scope: {
+        tenantId: "tenant_a",
+        organizationId: "org_a",
+        sandboxId: "sbx_demo",
+        profileInstallationId: "awpi_codex",
+        adapterInstallationId: "aai_codex",
+        adapterDefinitionDigest: pin.adapterDefinitionDigest,
+        runtimeId: "sar_test",
+        runId: "srun_test",
+      },
+      bindings: [binding],
+      process: {
+        argv: ["codex", "exec", "fix issue 834"],
+        background: true,
+      },
+    });
+    const terminated = await service.terminateRuntime(context, "sbx_demo", "sar_test");
+    expect(terminated.isOk()).toBe(true);
+    expect(calls.at(-1)).toMatchObject({
+      kind: "revoke",
+      input: {
+        reason: "runtime-terminated",
+        scope: {
+          tenantId: "tenant_a",
+          sandboxId: "sbx_demo",
+          runtimeId: "sar_test",
+        },
+      },
+    });
+    expect(JSON.stringify(calls)).not.toContain("sk-test-secret-value");
   });
 
   test("[AGENT-ADAPTER-018] lists neutral harness capabilities and admitted templates", async () => {
@@ -565,13 +764,68 @@ describe("SandboxAgentDeliveryService", () => {
         rejectHarness?.(new Error("cancelled"));
       },
     };
-    const { service } = fixture({ harness });
+    const revokeReasons: string[] = [];
+    const { repository, service } = fixture({
+      harness,
+      processCredentialGrants: {
+        async admit() {
+          return ok(undefined);
+        },
+        async launch() {
+          return ok({ mode: "background", processId: "spr_cancel" });
+        },
+        async openTerminal() {
+          throw new Error("not used");
+        },
+        async revoke(_context, input) {
+          revokeReasons.push(input.reason);
+          return ok(undefined);
+        },
+      },
+    });
     await service.createRuntime(context, {
       sandboxId: "sbx_demo",
       harnessKey: "fake",
       harnessTemplateId: "aht_fake_1",
       idempotencyKey: "runtime_cancel",
     });
+    const runtimeRecord = await repository.findRuntime(toRepositoryContext(context), "sar_test");
+    if (!runtimeRecord) throw new Error("Runtime was not persisted");
+    runtimeRecord.profilePin = {
+      profileInstallationId: "awpi_cancel",
+      profileDefinitionDigest: `sha256:${"1".repeat(64)}`,
+      profileId: "cancel-profile",
+      profileVersion: "1.0.0",
+      adapterInstallationId: "aai_cancel",
+      adapterDefinitionDigest: `sha256:${"2".repeat(64)}`,
+      adapterId: "cancel-agent",
+      adapterVersion: "1.0.0",
+      harnessKey: "fake",
+      harnessTemplateId: "aht_fake_1",
+      sandboxTemplateId: "aht_fake_1",
+      sandboxTemplateVersion: "1.0.0",
+      sandboxTemplateDigest: `sha256:${"a".repeat(64)}`,
+      capabilities: {
+        taskMode: true,
+        interactive: false,
+        backgroundRuns: true,
+        nativeSession: false,
+        persistentPaths: ["/workspace"],
+      },
+    };
+    runtimeRecord.credentialBindings = [
+      {
+        requirementId: "model-api",
+        kind: "model-api",
+        purpose: "Model access",
+        delivery: {
+          kind: "process-environment",
+          variable: "OPENAI_API_KEY",
+        },
+        secretRef: "secret://model/cancel",
+      },
+    ];
+    await repository.saveRuntime(toRepositoryContext(context), runtimeRecord);
     await service.createRun(context, {
       sandboxId: "sbx_demo",
       runtimeId: "sar_test",
@@ -587,6 +841,7 @@ describe("SandboxAgentDeliveryService", () => {
     expect((await service.showRun(context, "sar_test", "srun_test"))._unsafeUnwrap().status).toBe(
       "cancelled",
     );
+    expect(revokeReasons).toContain("cancelled");
   });
 
   test("[AGENT-APPROVAL-004] waits durably for an external exact-digest decision", async () => {

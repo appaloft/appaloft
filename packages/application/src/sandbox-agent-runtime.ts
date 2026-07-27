@@ -28,6 +28,8 @@ import {
   WorkspaceRevision,
 } from "@appaloft/core";
 import {
+  type AgentWorkspaceCredentialBinding,
+  type AgentWorkspaceCredentialReference,
   type AgentWorkspaceProfileCompiledPlan,
   type AgentWorkspaceProfilePin,
 } from "./agent-workspace-profile";
@@ -36,6 +38,7 @@ import {
   type RepositoryContext,
   toRepositoryContext,
 } from "./execution-context";
+import { type SandboxExecResult } from "./execution-sandbox";
 import { type ControlPlaneSecretProtector } from "./ports";
 
 export interface SandboxAgentHarnessEvent {
@@ -90,6 +93,12 @@ export interface SandboxAgentHarness {
     runId: string;
     task: string;
     context: { mode: "fresh" } | { mode: "continue"; parentRunId: string };
+    launchProcess?(input: {
+      argv: readonly string[];
+      cwd?: string;
+      background: true;
+      timeoutMs?: number;
+    }): Promise<Result<SandboxExecResult>>;
     emitEvent?(event: SandboxAgentHarnessEvent): Promise<void>;
     requestApproval(input: {
       capability: SandboxAgentApprovalCapability;
@@ -130,6 +139,76 @@ export interface SandboxAgentRuntimeRecord {
   harnessKey: string;
   idempotencyKey: string;
   profilePin?: AgentWorkspaceProfilePin;
+  credentialBindings?: readonly AgentWorkspaceCredentialBinding[];
+}
+
+export interface SandboxAgentCredentialGrantScope {
+  tenantId: string;
+  organizationId?: string;
+  sandboxId: string;
+  profileInstallationId: string;
+  adapterInstallationId: string;
+  adapterDefinitionDigest: string;
+  adapterId: string;
+  runtimeId: string;
+  runId?: string;
+}
+
+export interface SandboxAgentManagedTerminalDescriptor {
+  workspaceId: string;
+  runtimeId: string;
+  transport: "managed-terminal";
+  sessionId: string;
+  processId: string;
+  access: {
+    kind: "websocket";
+    path: string;
+    expiresAt: string;
+  };
+}
+
+export interface SandboxAgentProcessCredentialGrantPort {
+  admit(
+    context: ExecutionContext,
+    input: {
+      scope: SandboxAgentCredentialGrantScope;
+      bindings: readonly AgentWorkspaceCredentialBinding[];
+    },
+  ): Promise<Result<void>>;
+  launch(
+    context: ExecutionContext,
+    input: {
+      scope: SandboxAgentCredentialGrantScope & { runId: string };
+      bindings: readonly AgentWorkspaceCredentialBinding[];
+      process: {
+        argv: readonly string[];
+        cwd?: string;
+        background: true;
+        timeoutMs?: number;
+      };
+    },
+  ): Promise<Result<SandboxExecResult>>;
+  openTerminal(
+    context: ExecutionContext,
+    input: {
+      scope: SandboxAgentCredentialGrantScope & { runId: string };
+      bindings: readonly AgentWorkspaceCredentialBinding[];
+      process: {
+        argv: readonly string[];
+        cwd?: string;
+        initialRows: number;
+        initialCols: number;
+      };
+      expiresAt: string;
+    },
+  ): Promise<Result<SandboxAgentManagedTerminalDescriptor>>;
+  revoke(
+    context: ExecutionContext,
+    input: {
+      scope: SandboxAgentCredentialGrantScope;
+      reason: "completed" | "cancelled" | "runtime-terminated" | "workspace-cleanup" | "failed";
+    },
+  ): Promise<Result<void>>;
 }
 
 export interface SandboxAgentRunRecord {
@@ -524,8 +603,10 @@ export interface SandboxAgentDeliveryDependencies {
     compileForNewWorkspace(
       context: ExecutionContext,
       installationId: string,
+      credentialReferences?: readonly AgentWorkspaceCredentialReference[],
     ): Promise<Result<AgentWorkspaceProfileCompiledPlan>>;
   };
+  processCredentialGrants?: SandboxAgentProcessCredentialGrantPort;
   workQueue: {
     enqueue(
       context: ExecutionContext,
@@ -653,6 +734,10 @@ export interface SandboxAgentNativeAttachDescriptor {
   clientCommand: string[];
 }
 
+export type SandboxAgentAttachDescriptor =
+  | SandboxAgentNativeAttachDescriptor
+  | SandboxAgentManagedTerminalDescriptor;
+
 export interface SandboxAgentApprovalDescriptor {
   approvalId: string;
   sandboxId: string;
@@ -740,6 +825,42 @@ function runtimeDescriptor(
     createdAt: state.createdAt.value,
     ...(state.updatedAt ? { updatedAt: state.updatedAt.value } : {}),
   };
+}
+
+function credentialGrantScope(
+  context: ExecutionContext,
+  record: SandboxAgentRuntimeRecord,
+  runId?: string,
+): SandboxAgentCredentialGrantScope | undefined {
+  const pin = record.profilePin;
+  if (!pin || !record.credentialBindings?.length) return undefined;
+  return {
+    tenantId: context.tenant?.tenantId ?? "tenant_instance",
+    ...(context.tenant?.organizationId ? { organizationId: context.tenant.organizationId } : {}),
+    sandboxId: record.runtime.toState().sandboxId.value,
+    profileInstallationId: pin.profileInstallationId,
+    adapterInstallationId: pin.adapterInstallationId,
+    adapterDefinitionDigest: pin.adapterDefinitionDigest,
+    adapterId: pin.adapterId,
+    runtimeId: record.runtime.id.value,
+    ...(runId ? { runId } : {}),
+  };
+}
+
+function sameCredentialReferences(
+  bindings: readonly AgentWorkspaceCredentialBinding[] | undefined,
+  references: readonly AgentWorkspaceCredentialReference[] | undefined,
+): boolean {
+  if (!references) return true;
+  const stored = (bindings ?? [])
+    .map((binding) => `${binding.requirementId}\0${binding.secretRef}`)
+    .sort();
+  const requested = references
+    .map((reference) => `${reference.requirementId}\0${reference.secretRef}`)
+    .sort();
+  return (
+    stored.length === requested.length && stored.every((value, index) => value === requested[index])
+  );
 }
 
 function runDescriptor(record: SandboxAgentRunRecord): SandboxAgentRunDescriptor {
@@ -858,6 +979,17 @@ async function sha256(value: string): Promise<string> {
 export class SandboxAgentDeliveryService {
   constructor(private readonly dependencies: SandboxAgentDeliveryDependencies) {}
 
+  private async revokeCredentialGrants(
+    context: ExecutionContext,
+    record: SandboxAgentRuntimeRecord,
+    reason: Parameters<SandboxAgentProcessCredentialGrantPort["revoke"]>[1]["reason"],
+    runId?: string,
+  ): Promise<Result<void>> {
+    const scope = credentialGrantScope(context, record, runId);
+    if (!scope || !this.dependencies.processCredentialGrants) return ok(undefined);
+    return this.dependencies.processCredentialGrants.revoke(context, { scope, reason });
+  }
+
   listHarnesses(_context: ExecutionContext): Promise<Result<SandboxAgentHarnessDescriptor[]>> {
     return Promise.resolve(
       ok(
@@ -886,7 +1018,7 @@ export class SandboxAgentDeliveryService {
   async issueAttachAccess(
     context: ExecutionContext,
     input: { sandboxId: string; runtimeId: string; expiresAt: string },
-  ): Promise<Result<SandboxAgentNativeAttachDescriptor>> {
+  ): Promise<Result<SandboxAgentAttachDescriptor>> {
     const requestedExpiry = Date.parse(input.expiresAt);
     const now = Date.parse(this.dependencies.clock.now());
     if (
@@ -905,6 +1037,40 @@ export class SandboxAgentDeliveryService {
     if (runtime.isErr()) return err(runtime.error);
     const harness = this.dependencies.harnessRegistry.resolve(runtime.value.harnessKey);
     const interaction = harness?.interaction;
+    if (harness && interaction?.transport === "managed-terminal") {
+      const record = await this.dependencies.repository.findRuntime(
+        toRepositoryContext(context),
+        input.runtimeId,
+      );
+      const scope = record
+        ? credentialGrantScope(context, record, this.dependencies.idGenerator.next("srun_terminal"))
+        : undefined;
+      if (
+        !record ||
+        !scope?.runId ||
+        !record.credentialBindings?.length ||
+        !this.dependencies.processCredentialGrants
+      ) {
+        return err(
+          domainError.conflict(
+            "Managed-terminal Agent credentials are unavailable for this Runtime",
+            {
+              code: "agent_workspace_managed_terminal_credentials_unavailable",
+            },
+          ),
+        );
+      }
+      return this.dependencies.processCredentialGrants.openTerminal(context, {
+        scope: { ...scope, runId: scope.runId },
+        bindings: record.credentialBindings,
+        process: {
+          argv: interaction.command,
+          initialRows: 24,
+          initialCols: 80,
+        },
+        expiresAt: input.expiresAt,
+      });
+    }
     if (
       !harness ||
       interaction?.transport !== "native-attach" ||
@@ -975,6 +1141,7 @@ export class SandboxAgentDeliveryService {
       harnessTemplateId: string;
       idempotencyKey: string;
       profileInstallationId?: string;
+      credentialReferences?: readonly AgentWorkspaceCredentialReference[];
     },
   ): Promise<Result<SandboxAgentRuntimeDescriptor>> {
     const repositoryContext = toRepositoryContext(context);
@@ -984,6 +1151,14 @@ export class SandboxAgentDeliveryService {
       input.idempotencyKey,
     );
     if (existing) {
+      if (!sameCredentialReferences(existing.credentialBindings, input.credentialReferences)) {
+        return err(
+          domainError.conflict(
+            "Sandbox Agent Runtime idempotency key was already used with different credentials",
+            { code: "sandbox_agent_credential_reference_replay" },
+          ),
+        );
+      }
       return ok(
         runtimeDescriptor(
           existing,
@@ -1000,8 +1175,17 @@ export class SandboxAgentDeliveryService {
       ? await this.dependencies.workspaceProfileResolver?.compileForNewWorkspace(
           context,
           input.profileInstallationId,
+          input.credentialReferences ?? [],
         )
       : undefined;
+    if (!input.profileInstallationId && input.credentialReferences?.length) {
+      return err(
+        domainError.validation(
+          "Credential references require an installed Agent Workspace Profile",
+          { code: "sandbox_agent_credential_profile_required" },
+        ),
+      );
+    }
     if (input.profileInstallationId && !this.dependencies.workspaceProfileResolver) {
       return err(domainError.conflict("Agent Workspace Profile resolution is unavailable"));
     }
@@ -1050,7 +1234,25 @@ export class SandboxAgentDeliveryService {
       harnessKey: input.harnessKey,
       idempotencyKey: input.idempotencyKey,
       ...(resolvedProfilePlan ? { profilePin: resolvedProfilePlan.pin } : {}),
+      ...(resolvedProfilePlan?.credentialBindings?.length
+        ? { credentialBindings: resolvedProfilePlan.credentialBindings }
+        : {}),
     };
+    const credentialScope = credentialGrantScope(context, record);
+    if (credentialScope) {
+      if (!this.dependencies.processCredentialGrants) {
+        return err(
+          domainError.conflict("Process-scoped Agent credentials are not configured", {
+            code: "sandbox_agent_process_credential_grants_unavailable",
+          }),
+        );
+      }
+      const admitted = await this.dependencies.processCredentialGrants.admit(context, {
+        scope: credentialScope,
+        bindings: record.credentialBindings ?? [],
+      });
+      if (admitted.isErr()) return err(admitted.error);
+    }
     if (harness.prepareRuntime) {
       try {
         await harness.prepareRuntime({
@@ -1148,6 +1350,8 @@ export class SandboxAgentDeliveryService {
         return err(infrastructureError(error));
       }
     }
+    const revoked = await this.revokeCredentialGrants(context, record, "runtime-terminated");
+    if (revoked.isErr()) return err(revoked.error);
     const at = asUpdatedAt(this.dependencies.clock.now());
     if (at.isErr()) return err(at.error);
     const terminated = record.runtime.terminate({ at: at.value });
@@ -1455,9 +1659,30 @@ export class SandboxAgentDeliveryService {
           contextState.mode === "fresh"
             ? { mode: "fresh" }
             : { mode: "continue", parentRunId: contextState.parentRunId.value },
+        ...(runtimeRecord.credentialBindings?.length
+          ? {
+              launchProcess: async (process) => {
+                const scope = credentialGrantScope(context, runtimeRecord, runId);
+                if (!scope?.runId || !this.dependencies.processCredentialGrants) {
+                  return err(
+                    domainError.conflict("Process-scoped Agent credentials are unavailable", {
+                      code: "sandbox_agent_process_credential_grants_unavailable",
+                    }),
+                  );
+                }
+                return this.dependencies.processCredentialGrants.launch(context, {
+                  scope: { ...scope, runId: scope.runId },
+                  bindings: runtimeRecord.credentialBindings ?? [],
+                  process,
+                });
+              },
+            }
+          : {}),
         emitEvent: (event) => persistHarnessEvents([event]),
         requestApproval: (approvalInput) => this.requestRunApproval(context, record, approvalInput),
       });
+      const revoked = await this.revokeCredentialGrants(context, runtimeRecord, "completed", runId);
+      if (revoked.isErr()) return err(revoked.error);
       const currentRecord =
         (await this.dependencies.repository.findRun(repositoryContext, runId)) ?? record;
       const currentRuntimeRecord =
@@ -1494,6 +1719,8 @@ export class SandboxAgentDeliveryService {
       return ok(runDescriptor(currentRecord));
     } catch (error) {
       if (error instanceof SandboxAgentApprovalPendingError) {
+        const revoked = await this.revokeCredentialGrants(context, runtimeRecord, "failed", runId);
+        if (revoked.isErr()) return err(revoked.error);
         return err(
           domainError.conflict("Sandbox Agent Run is waiting for approval", {
             code: "sandbox_agent_approval_pending",
@@ -1509,6 +1736,13 @@ export class SandboxAgentDeliveryService {
           repositoryContext,
           currentRecord.run.toState().runtimeId.value,
         )) ?? runtimeRecord;
+      const revoked = await this.revokeCredentialGrants(
+        context,
+        currentRuntimeRecord,
+        currentRecord.run.toState().status.value === "cancelled" ? "cancelled" : "failed",
+        runId,
+      );
+      if (revoked.isErr()) return err(revoked.error);
       const failedAt = asUpdatedAt(this.dependencies.clock.now());
       if (failedAt.isErr()) return err(failedAt.error);
       if (currentRecord.run.toState().status.value === "cancelled") {
@@ -1564,6 +1798,8 @@ export class SandboxAgentDeliveryService {
         return err(infrastructureError(error));
       }
     }
+    const revoked = await this.revokeCredentialGrants(context, runtimeRecord, "cancelled", runId);
+    if (revoked.isErr()) return err(revoked.error);
     const at = asUpdatedAt(this.dependencies.clock.now());
     if (at.isErr()) return err(at.error);
     const cancelled = record.run.cancel({ at: at.value });

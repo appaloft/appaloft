@@ -435,6 +435,85 @@ describe("RuntimeTerminalSessionGateway", () => {
     await gateway.close("term_sandbox");
   });
 
+  test("[ADAPTER-CRED-006] opens an exact managed Sandbox process without exposing initial input", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const gateway = new RuntimeTerminalSessionGateway({
+      allowTerminalSessions: true,
+      sandboxRepository: {
+        async find() {
+          return {
+            tenantId: "org_a",
+            providerKey: "cloud-docker-gvisor",
+            sandbox: {
+              canUseRuntime: () => true,
+              toState: () => ({
+                status: { value: "ready" },
+                providerHandle: "appaloft-sbx_workspace",
+              }),
+            },
+          };
+        },
+      } as unknown as SandboxRepository,
+      sandboxProviderRegistry: {
+        get() {
+          return {
+            openTerminal: async (input: Record<string, unknown>) => {
+              calls.push(input);
+              return {
+                stdin: {
+                  write() {},
+                  end() {},
+                },
+                stdout: closedStream(),
+                stderr: null,
+                exited: new Promise<number>(() => {}),
+                kill() {},
+              };
+            },
+          };
+        },
+      } as unknown as SandboxProviderRegistry,
+    });
+    const initialInput = new TextEncoder().encode("ephemeral-bootstrap");
+    const result = await gateway.openSandboxProcess(
+      createExecutionContext({
+        requestId: "req_agent_terminal",
+        entrypoint: "system",
+        tenant: { tenantId: "org_a", organizationId: "org_a" },
+      }),
+      {
+        sessionId: "term_agent",
+        sandboxId: "sbx_workspace",
+        workingDirectory: ".",
+        argv: ["codex"],
+        initialInput,
+        initialRows: 24,
+        initialCols: 80,
+      },
+    );
+
+    expect(result._unsafeUnwrap()).toMatchObject({
+      sessionId: "term_agent",
+      scope: "sandbox",
+      sandboxId: "sbx_workspace",
+    });
+    expect(calls).toEqual([
+      {
+        sandboxId: "sbx_workspace",
+        providerHandle: "appaloft-sbx_workspace",
+        cwd: ".",
+        initialRows: 24,
+        initialCols: 80,
+        process: {
+          argv: ["codex"],
+          initialInput,
+        },
+      },
+    ]);
+    expect(JSON.stringify(result)).not.toContain("ephemeral-bootstrap");
+    await gateway.close("term_agent");
+  });
+
   test("[TERM-SESSION-TRANSPORT-001] [TERM-SESSION-WORKSPACE-001] opens local container terminals through docker exec", async () => {
     const spawns: Array<{ args: string[]; cwd?: string }> = [];
     const gateway = new RuntimeTerminalSessionGateway({

@@ -7,6 +7,8 @@
 - [x] `ADAPTER-INSTALL-007/008`: tenant lifecycle and reference-fencing tests.
 - [x] `PROFILE-MANIFEST-009/PROFILE-PIN-010`: Profile validation/compile/pinning tests.
 - [x] `ADAPTER-SURFACE-011`: operation/transport/SDK parity tests.
+- [x] `ADAPTER-CRED-006/PROFILE-PIN-010`: Workspace credential-reference input, pinned Runtime
+  persistence, exact-scope grant launch/revoke, and public operation/SDK parity tests.
 - [ ] `ADAPTER-CODEX-012`: deterministic fixture and opt-in Codex smoke.
 
 ## Source Of Truth
@@ -22,6 +24,8 @@
 - [x] Implement definition/installation lifecycle and persistence.
 - [x] Implement Profile validation, installation, compile, and resolved Workspace pinning.
 - [x] Implement Declarative Harness resolver from the selected Adapter interaction modes.
+- [x] Implement the neutral process credential grant port for declarative managed-terminal and
+  headless child launches, including completion/cancellation/Runtime/Sandbox cleanup revocation.
 - [ ] Implement deterministic fixture and run the real Codex adapter smoke.
 - [x] Add the Adapter installation operation catalog, CLI, HTTP/oRPC, SDK, MCP metadata, and Web
   surfaces.
@@ -36,3 +40,5 @@
 - [ ] Run local Docker conformance smoke and explicit real Codex smoke.
 - [x] Synchronize the Adapter and Profile operation catalogs, public user docs, migration, tasks,
   SDK guidance, CLI skill reference, and automated test evidence.
+- [x] Link public #834 evidence and synchronize credential-grant operation, persistence, SDK, and
+  lifecycle cleanup contracts after the implementation gate passes.
