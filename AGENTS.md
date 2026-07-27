@@ -20,6 +20,15 @@ Core documentation:
 - Testing: [docs/TESTING.md](docs/TESTING.md) and `docs/testing/**`.
 - Release workflow: [docs/RELEASE.md](docs/RELEASE.md).
 
+## Maintainer Git Identity
+
+Official maintainer commits and `gh` writes from Appaloft maintainers should use GitHub user **`appalofthq`**:
+
+- `user.name=appalofthq`
+- `user.email=309616456+appalofthq@users.noreply.github.com`
+
+When this repository is checked out as `community/appaloft` inside `appaloft-cloud`, the submodule has its own gitdir and does not inherit the Cloud root identity. Verify with `git config --get user.name` before committing. External contributors keep their own identities.
+
 ## Project Goal
 
 - model deployment as `detect -> plan -> execute -> verify -> rollback`
