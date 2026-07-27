@@ -25,6 +25,7 @@ import {
   createExecutionContext,
   DefaultOperationAuditSink,
   InstallAgentAdapterCommand,
+  InstallAgentWorkspaceProfileCommand,
   type OperationAuditRecordInput,
   type OperationAuditSink,
   operationAuditRecordFromCommand,
@@ -461,6 +462,47 @@ describe("operation audit pipeline", () => {
             {
               resourceType: "agent_adapter_definition",
               resourceId: `sha256:${"a".repeat(64)}`,
+            },
+          ],
+        },
+      },
+      {
+        command: InstallAgentWorkspaceProfileCommand.create({
+          manifest: {
+            schemaVersion: "appaloft.agent-workspace-profile/v1",
+            id: "codex-default",
+            displayName: "Codex default",
+            version: "1.0.0",
+            adapter: {
+              installationId: "aai_1",
+              definitionDigest: `sha256:${"a".repeat(64)}`,
+            },
+            interactionMode: "terminal",
+            workspace: {
+              sandboxTemplate: {
+                id: "agent-workspace",
+                version: "1.0.0",
+                digest: `sha256:${"1".repeat(64)}`,
+              },
+            },
+          },
+        })._unsafeUnwrap(),
+        result: ok({
+          installationId: "awpi_1",
+          definitionDigest: `sha256:${"b".repeat(64)}`,
+        }),
+        expected: {
+          operationKey: "agent-workspace-profiles.install",
+          domain: "agent-workspace-profiles",
+          action: "install",
+          primaryTarget: {
+            resourceType: "agent_workspace_profile_installation",
+            resourceId: "awpi_1",
+          },
+          relatedTargets: [
+            {
+              resourceType: "agent_workspace_profile_definition",
+              resourceId: `sha256:${"b".repeat(64)}`,
             },
           ],
         },

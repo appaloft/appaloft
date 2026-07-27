@@ -1246,6 +1246,7 @@ export const zhCN = {
       deliver: "提交、推送并创建 Pull Request",
       deliveryBranch: "交付分支",
       developmentPreview: "开发预览",
+      directHarness: "直接选择 Agent",
       emptyBody: "创建可供 Agent、终端和临时预览使用的持久化远程开发环境。",
       emptyTitle: "还没有 Agent 工作区",
       expiresAt: "工作区到期时间",
@@ -1262,6 +1263,7 @@ export const zhCN = {
       pageTitle: "Agent 工作区",
       pause: "暂停",
       persistentData: "断开并重新连接后，代码和 Agent 状态仍会保留。",
+      profile: "工作区配置模板",
       processFrozen: "运行环境已原地暂停，仍占用执行节点分配的计算资源。",
       previewCommand: "预览启动命令",
       previewPort: "预览端口",
@@ -1370,6 +1372,33 @@ export const zhCN = {
       agentAdapterValidatedDigest: "已校验的定义摘要",
       agentAdapterValidating: "正在校验",
       agentAdapterVersion: "版本",
+      agentWorkspaceProfileDisableAction: "禁用配置模板",
+      agentWorkspaceProfileDisableDescription:
+        "阻止新工作区使用这个配置模板，同时保留现有已固定工作区的恢复能力。",
+      agentWorkspaceProfileDisabled: "Agent 工作区配置模板已禁用",
+      agentWorkspaceProfileInstallAction: "安装配置模板",
+      agentWorkspaceProfileInstallDescription:
+        "粘贴声明式配置模板，固定一个已安装的 Adapter、Sandbox Template、资源限制、初始化、端口和检查。",
+      agentWorkspaceProfileInstalled: "Agent 工作区配置模板已安装",
+      agentWorkspaceProfileInstallTitle: "安装 Agent 工作区配置模板",
+      agentWorkspaceProfileLifecycleDescription:
+        "禁用会阻止新建工作区；只有清除所有活跃固定引用后才能卸载。",
+      agentWorkspaceProfileLifecycleTitle: "Agent 工作区配置模板生命周期",
+      agentWorkspaceProfileManifestLabel: "工作区配置 manifest JSON",
+      agentWorkspaceProfileManifestNotice:
+        "配置模板必须引用不可变的 Adapter 和 Sandbox Template 精确摘要。",
+      agentWorkspaceProfileManifestPlaceholder:
+        '{\n  "schemaVersion": "appaloft.agent-workspace-profile/v1",\n  "id": "example-workspace"\n}',
+      agentWorkspaceProfilesDescription: "为开发者发布经过批准、可复现的工作区配置。",
+      agentWorkspaceProfilesEmptyDescription:
+        "先准备配置模板所固定的 Adapter 和 Sandbox Template，再安装配置模板。",
+      agentWorkspaceProfilesEmptyTitle: "还没有安装工作区配置模板",
+      agentWorkspaceProfilesTitle: "工作区配置模板",
+      agentWorkspaceProfileUninstallAction: "卸载配置模板",
+      agentWorkspaceProfileUninstallDescription:
+        "只移除当前组织的安装。存在活跃 Workspace pin 时会阻止卸载。",
+      agentWorkspaceProfileUninstalled: "Agent 工作区配置模板已卸载",
+      agentWorkspaceProfileValidated: "Agent 工作区配置模板校验通过",
       archivedProjectsDescription: "查看已归档项目。它们不会出现在首页、项目页或侧栏项目列表。",
       archivedProjectsEmptyDescription: "归档项目会集中显示在这里，不会干扰日常工作台。",
       archivedProjectsEmptyTitle: "还没有已归档项目。",

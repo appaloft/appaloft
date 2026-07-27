@@ -1,4 +1,5 @@
 import {
+  type AgentWorkspaceProfilePin,
   type CandidatePreviewRecord,
   type RepositoryContext,
   type SandboxAgentDeliveryRepository,
@@ -62,7 +63,11 @@ const timestamp = (value: string | Date | null | undefined): string => {
   return normalized;
 };
 
-type RuntimeJson = { harnessTemplateId: string; activeRunId?: string };
+type RuntimeJson = {
+  harnessTemplateId: string;
+  activeRunId?: string;
+  profilePin?: AgentWorkspaceProfilePin;
+};
 function runtimeRecord(row: RuntimeRow): SandboxAgentRuntimeRecord {
   const state = json<RuntimeJson>(row.state);
   return {
@@ -79,6 +84,7 @@ function runtimeRecord(row: RuntimeRow): SandboxAgentRuntimeRecord {
     }),
     harnessKey: row.harness_key,
     idempotencyKey: row.idempotency_key,
+    ...(state.profilePin ? { profilePin: state.profilePin } : {}),
   };
 }
 
@@ -219,7 +225,13 @@ export class PgSandboxAgentDeliveryRepository implements SandboxAgentDeliveryRep
 
   async saveRuntime(context: RepositoryContext, record: SandboxAgentRuntimeRecord): Promise<void> {
     const state = record.runtime.toState();
-    await resolveRepositoryExecutor(this.db, context)
+    const executor = resolveRepositoryExecutor(this.db, context);
+    const serializedState = {
+      harnessTemplateId: state.harnessTemplateId.value,
+      ...(state.activeRunId ? { activeRunId: state.activeRunId.value } : {}),
+      ...(record.profilePin ? { profilePin: record.profilePin } : {}),
+    };
+    await executor
       .insertInto("sandbox_agent_runtimes")
       .values({
         tenant_id: tenantId(context),
@@ -228,24 +240,63 @@ export class PgSandboxAgentDeliveryRepository implements SandboxAgentDeliveryRep
         harness_key: record.harnessKey,
         idempotency_key: record.idempotencyKey,
         status: state.status.value,
-        state: {
-          harnessTemplateId: state.harnessTemplateId.value,
-          ...(state.activeRunId ? { activeRunId: state.activeRunId.value } : {}),
-        },
+        state: serializedState,
         created_at: state.createdAt.value,
         updated_at: state.updatedAt?.value ?? state.createdAt.value,
       })
       .onConflict((conflict) =>
         conflict.columns(["tenant_id", "id"]).doUpdateSet({
           status: state.status.value,
-          state: {
-            harnessTemplateId: state.harnessTemplateId.value,
-            ...(state.activeRunId ? { activeRunId: state.activeRunId.value } : {}),
-          },
+          state: serializedState,
           updated_at: state.updatedAt?.value ?? state.createdAt.value,
         }),
       )
       .execute();
+    const profilePin = record.profilePin;
+    if (profilePin) {
+      const active = state.status.value !== "terminated";
+      const releasedAt = active ? null : (state.updatedAt?.value ?? state.createdAt.value);
+      const serializedPin = JSON.parse(JSON.stringify(profilePin)) as Record<string, unknown>;
+      await executor
+        .insertInto("agent_adapter_workspace_references")
+        .values({
+          tenant_id: tenantId(context),
+          installation_id: profilePin.adapterInstallationId,
+          workspace_id: state.sandboxId.value,
+          active,
+          created_at: state.createdAt.value,
+          released_at: releasedAt,
+        })
+        .onConflict((conflict) =>
+          conflict.columns(["tenant_id", "workspace_id"]).doUpdateSet({
+            installation_id: profilePin.adapterInstallationId,
+            active,
+            released_at: releasedAt,
+          }),
+        )
+        .execute();
+      await executor
+        .insertInto("agent_workspace_profile_references")
+        .values({
+          tenant_id: tenantId(context),
+          installation_id: profilePin.profileInstallationId,
+          adapter_installation_id: profilePin.adapterInstallationId,
+          workspace_id: state.sandboxId.value,
+          runtime_id: state.id.value,
+          active,
+          pin: serializedPin,
+          created_at: state.createdAt.value,
+          released_at: releasedAt,
+        })
+        .onConflict((conflict) =>
+          conflict.columns(["tenant_id", "workspace_id", "runtime_id"]).doUpdateSet({
+            active,
+            pin: serializedPin,
+            released_at: releasedAt,
+          }),
+        )
+        .execute();
+    }
   }
   async claimRuntime(context: RepositoryContext, record: SandboxAgentRuntimeRecord) {
     const state = record.runtime.toState();

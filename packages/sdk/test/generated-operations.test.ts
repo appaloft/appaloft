@@ -3,6 +3,32 @@ import { describe, expect, test } from "bun:test";
 import { generatedSdkOperations } from "../src/internal";
 
 describe("generated SDK operation metadata", () => {
+  test("[PROFILE-MANIFEST-009][ADAPTER-SURFACE-011] exposes Workspace Profile lifecycle and compile metadata", () => {
+    const operations = generatedSdkOperations.filter(
+      (operation) => operation.operationGroup === "agent-workspace-profiles",
+    );
+
+    expect(operations.map((operation) => operation.operationKey).sort()).toEqual([
+      "agent-workspace-profiles.compile",
+      "agent-workspace-profiles.disable",
+      "agent-workspace-profiles.install",
+      "agent-workspace-profiles.list",
+      "agent-workspace-profiles.show",
+      "agent-workspace-profiles.uninstall",
+      "agent-workspace-profiles.validate",
+    ]);
+    expect(
+      operations.find((operation) => operation.operationKey === "agent-workspace-profiles.compile"),
+    ).toMatchObject({
+      facadePath: ["agentWorkspaceProfiles", "compile"],
+      kind: "query",
+      route: {
+        method: "POST",
+        path: "/agent-workspace-profiles/{installationId}/compile",
+      },
+    });
+  });
+
   test("[SBX-SDK-001] exposes the complete external sandbox capability surface", () => {
     const operations = generatedSdkOperations.filter(
       (operation) =>

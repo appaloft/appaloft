@@ -98,6 +98,38 @@ export const cliCommandDescriptions = {
     "Uninstall an unused Agent Adapter installation",
     "agent.adapter-installations",
   ),
+  agentWorkspaceProfile: withDocs(
+    "Manage tenant-scoped Agent Workspace Profile installations",
+    "agent.adapter-installations",
+  ),
+  agentWorkspaceProfileValidate: withDocs(
+    "Validate an Agent Workspace Profile manifest",
+    "agent.adapter-installations",
+  ),
+  agentWorkspaceProfileInstall: withDocs(
+    "Install an Agent Workspace Profile for the active tenant",
+    "agent.adapter-installations",
+  ),
+  agentWorkspaceProfileList: withDocs(
+    "List Agent Workspace Profile installations for the active tenant",
+    "agent.adapter-installations",
+  ),
+  agentWorkspaceProfileShow: withDocs(
+    "Show an Agent Workspace Profile installation",
+    "agent.adapter-installations",
+  ),
+  agentWorkspaceProfileCompile: withDocs(
+    "Compile an Agent Workspace Profile into a pinned Workspace plan",
+    "agent.adapter-installations",
+  ),
+  agentWorkspaceProfileDisable: withDocs(
+    "Disable an Agent Workspace Profile installation",
+    "agent.adapter-installations",
+  ),
+  agentWorkspaceProfileUninstall: withDocs(
+    "Uninstall an unused Agent Workspace Profile installation",
+    "agent.adapter-installations",
+  ),
   deploy: withDocs("Create a deployment", "deployment.source"),
   github: withDocs("GitHub source operations", "deployment.source"),
   githubStatus: withDocs("Show GitHub App source connection status", "deployment.source"),

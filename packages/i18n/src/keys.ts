@@ -1216,6 +1216,7 @@ export const i18nKeys = {
       deliver: "console:agentWorkspaces.deliver",
       deliveryBranch: "console:agentWorkspaces.deliveryBranch",
       developmentPreview: "console:agentWorkspaces.developmentPreview",
+      directHarness: "console:agentWorkspaces.directHarness",
       emptyBody: "console:agentWorkspaces.emptyBody",
       emptyTitle: "console:agentWorkspaces.emptyTitle",
       expiresAt: "console:agentWorkspaces.expiresAt",
@@ -1232,6 +1233,7 @@ export const i18nKeys = {
       pageTitle: "console:agentWorkspaces.pageTitle",
       pause: "console:agentWorkspaces.pause",
       persistentData: "console:agentWorkspaces.persistentData",
+      profile: "console:agentWorkspaces.profile",
       processFrozen: "console:agentWorkspaces.processFrozen",
       previewCommand: "console:agentWorkspaces.previewCommand",
       previewPort: "console:agentWorkspaces.previewPort",
@@ -1335,6 +1337,35 @@ export const i18nKeys = {
       agentAdapterValidatedDigest: "console:organization.agentAdapterValidatedDigest",
       agentAdapterValidating: "console:organization.agentAdapterValidating",
       agentAdapterVersion: "console:organization.agentAdapterVersion",
+      agentWorkspaceProfileDisableAction: "console:organization.agentWorkspaceProfileDisableAction",
+      agentWorkspaceProfileDisableDescription:
+        "console:organization.agentWorkspaceProfileDisableDescription",
+      agentWorkspaceProfileDisabled: "console:organization.agentWorkspaceProfileDisabled",
+      agentWorkspaceProfileInstallAction: "console:organization.agentWorkspaceProfileInstallAction",
+      agentWorkspaceProfileInstallDescription:
+        "console:organization.agentWorkspaceProfileInstallDescription",
+      agentWorkspaceProfileInstalled: "console:organization.agentWorkspaceProfileInstalled",
+      agentWorkspaceProfileInstallTitle: "console:organization.agentWorkspaceProfileInstallTitle",
+      agentWorkspaceProfileLifecycleDescription:
+        "console:organization.agentWorkspaceProfileLifecycleDescription",
+      agentWorkspaceProfileLifecycleTitle:
+        "console:organization.agentWorkspaceProfileLifecycleTitle",
+      agentWorkspaceProfileManifestLabel: "console:organization.agentWorkspaceProfileManifestLabel",
+      agentWorkspaceProfileManifestNotice:
+        "console:organization.agentWorkspaceProfileManifestNotice",
+      agentWorkspaceProfileManifestPlaceholder:
+        "console:organization.agentWorkspaceProfileManifestPlaceholder",
+      agentWorkspaceProfilesDescription: "console:organization.agentWorkspaceProfilesDescription",
+      agentWorkspaceProfilesEmptyDescription:
+        "console:organization.agentWorkspaceProfilesEmptyDescription",
+      agentWorkspaceProfilesEmptyTitle: "console:organization.agentWorkspaceProfilesEmptyTitle",
+      agentWorkspaceProfilesTitle: "console:organization.agentWorkspaceProfilesTitle",
+      agentWorkspaceProfileUninstallAction:
+        "console:organization.agentWorkspaceProfileUninstallAction",
+      agentWorkspaceProfileUninstallDescription:
+        "console:organization.agentWorkspaceProfileUninstallDescription",
+      agentWorkspaceProfileUninstalled: "console:organization.agentWorkspaceProfileUninstalled",
+      agentWorkspaceProfileValidated: "console:organization.agentWorkspaceProfileValidated",
       archivedProjectsDescription: "console:organization.archivedProjectsDescription",
       archivedProjectsEmptyDescription: "console:organization.archivedProjectsEmptyDescription",
       archivedProjectsEmptyTitle: "console:organization.archivedProjectsEmptyTitle",

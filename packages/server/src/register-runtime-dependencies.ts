@@ -146,6 +146,8 @@ import {
   type DatabaseConnection,
   PgAgentAdapterInstallationReferenceReader,
   PgAgentAdapterRegistryRepository,
+  PgAgentWorkspaceProfileInstallationReferenceReader,
+  PgAgentWorkspaceProfileRegistryRepository,
   PgAuditEventArchiveStore,
   PgAuditEventLegalHoldStore,
   PgAuditEventReadModel,
@@ -1219,6 +1221,16 @@ export function registerRuntimeDependencies(
   container.register(tokens.agentAdapterInstallationReferenceReader, {
     useFactory: instanceCachingFactory(
       () => new PgAgentAdapterInstallationReferenceReader(input.database.db),
+    ),
+  });
+  container.register(tokens.agentWorkspaceProfileRegistryRepository, {
+    useFactory: instanceCachingFactory(
+      () => new PgAgentWorkspaceProfileRegistryRepository(input.database.db),
+    ),
+  });
+  container.register(tokens.agentWorkspaceProfileInstallationReferenceReader, {
+    useFactory: instanceCachingFactory(
+      () => new PgAgentWorkspaceProfileInstallationReferenceReader(input.database.db),
     ),
   });
   container.register(tokens.workspaceCollaborationRepository, {

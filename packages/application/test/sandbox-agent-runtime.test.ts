@@ -5,9 +5,11 @@ import { ok } from "@appaloft/core";
 import {
   createExecutionContext,
   InMemorySandboxAgentDeliveryRepository,
+  type SandboxAgentDeliveryDependencies,
   SandboxAgentDeliveryService,
   type SandboxAgentHarness,
   SandboxAgentHarnessRegistry,
+  toRepositoryContext,
 } from "../src";
 
 const context = createExecutionContext({
@@ -20,6 +22,7 @@ function fixture(
   options: {
     harness?: SandboxAgentHarness;
     readProof?: () => Promise<{ verdict: "verified" | "failed" | "pending"; reasonCode?: string }>;
+    workspaceProfileResolver?: SandboxAgentDeliveryDependencies["workspaceProfileResolver"];
   } = {},
 ) {
   const counters = { resources: 0, deployments: 0 };
@@ -47,8 +50,9 @@ function fixture(
     async cancel() {},
   };
   const queued: Array<{ kind: string; id: string }> = [];
+  const repository = new InMemorySandboxAgentDeliveryRepository();
   const service = new SandboxAgentDeliveryService({
-    repository: new InMemorySandboxAgentDeliveryRepository(),
+    repository,
     sandboxReader: {
       async show(_context, sandboxId) {
         return {
@@ -72,6 +76,9 @@ function fixture(
       },
     },
     harnessRegistry: new SandboxAgentHarnessRegistry([harness]),
+    ...(options.workspaceProfileResolver
+      ? { workspaceProfileResolver: options.workspaceProfileResolver }
+      : {}),
     workQueue: {
       async enqueue(_context, item) {
         queued.push(item);
@@ -134,10 +141,83 @@ function fixture(
     clock: { now: () => "2026-07-20T00:00:00.000Z" },
     idGenerator: { next: (prefix) => `${prefix}_test` },
   });
-  return { service, queued, counters, exposedPorts };
+  return { service, repository, queued, counters, exposedPorts };
 }
 
 describe("SandboxAgentDeliveryService", () => {
+  test("[PROFILE-PIN-010] resolves and persists the exact Profile pin before Runtime startup", async () => {
+    let compileCalls = 0;
+    const pin = {
+      profileInstallationId: "awpi_profile",
+      profileDefinitionDigest: `sha256:${"1".repeat(64)}`,
+      profileId: "fake-default",
+      profileVersion: "1.0.0",
+      adapterInstallationId: "aai_fake",
+      adapterDefinitionDigest: `sha256:${"2".repeat(64)}`,
+      adapterId: "fake",
+      adapterVersion: "1.0.0",
+      harnessKey: "fake",
+      harnessTemplateId: "aht_fake_1",
+      sandboxTemplateId: "aht_fake_1",
+      sandboxTemplateVersion: "1.0.0",
+      sandboxTemplateDigest: `sha256:${"a".repeat(64)}`,
+      capabilities: {
+        taskMode: true,
+        interactive: false,
+        backgroundRuns: true,
+        nativeSession: false,
+        persistentPaths: ["/workspace"],
+        healthcheck: { kind: "process" as const },
+      },
+    };
+    const { service, repository } = fixture({
+      workspaceProfileResolver: {
+        async compileForNewWorkspace() {
+          compileCalls += 1;
+          return ok({
+            sandbox: {
+              source: { kind: "template", templateId: "aht_fake_1" },
+              requestedIsolation: "container-trusted",
+              limits: {
+                cpuMillis: 1_000,
+                memoryBytes: 1_024,
+                diskBytes: 2_048,
+                maxProcesses: 16,
+              },
+              networkPolicy: { mode: "deny" },
+            },
+            initialization: [],
+            runtime: {
+              harnessKey: "fake",
+              harnessTemplateId: "aht_fake_1",
+              declarativeHarness: {},
+            },
+            defaultPorts: [],
+            suggestedChecks: [],
+            credentialRequirements: [],
+            pin,
+          });
+        },
+      },
+    });
+
+    const created = await service.createRuntime(context, {
+      sandboxId: "sbx_demo",
+      harnessKey: "fake",
+      harnessTemplateId: "aht_fake_1",
+      idempotencyKey: "runtime_profile",
+      profileInstallationId: "awpi_profile",
+    });
+
+    expect(created._unsafeUnwrap()).toMatchObject({
+      harnessKey: "fake",
+      capabilities: pin.capabilities,
+    });
+    expect(compileCalls).toBe(1);
+    const stored = await repository.findRuntime(toRepositoryContext(context), "sar_test");
+    expect(stored?.profilePin).toEqual(pin);
+  });
+
   test("[AGENT-ADAPTER-018] lists neutral harness capabilities and admitted templates", async () => {
     const { service } = fixture({
       harness: {

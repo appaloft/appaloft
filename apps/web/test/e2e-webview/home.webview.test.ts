@@ -1512,6 +1512,45 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         },
       ],
     },
+    "/api/rpc/agentWorkspaceProfiles/list": {
+      json: [
+        {
+          installationId: "awpi_codex_team",
+          definitionDigest: `sha256:${"b".repeat(64)}`,
+          profileId: "codex-team",
+          profileVersion: "1.0.0",
+          displayName: "Codex team default",
+          status: "enabled",
+          installedAt: "2026-07-26T12:30:00.000Z",
+        },
+      ],
+    },
+    "/api/rpc/sandboxes/agents/harnesses/list": {
+      json: [
+        {
+          key: "opencode",
+          harnessTemplateId: "agent-workspace-opencode-v1",
+          sandboxTemplateId: "agent-workspace-base-v1",
+          version: "1.0.0",
+          capabilities: {
+            taskMode: true,
+            interactive: true,
+            nativeSession: true,
+            persistentPaths: ["/workspace", "/home/appaloft/.local/share/opencode"],
+          },
+        },
+      ],
+    },
+    "/api/rpc/sandboxTemplates/list": {
+      json: {
+        items: [
+          {
+            templateId: "agent-workspace-base-v1",
+            minimumIsolation: "container-trusted",
+          },
+        ],
+      },
+    },
     "/api/rpc/auth/bootstrapStatus": () => ({
       json: selfHostedAuthE2eBootstrapStatus(),
     }),
@@ -5633,6 +5672,51 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     expect(
       recordedApiRequests.some((request) => request.pathname === "/api/rpc/agentAdapters/list"),
+    ).toBe(true);
+  }, 45_000);
+
+  test("[PROFILE-SURFACE-012] manages Profiles and selects an approved Profile for a Workspace", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+    resetSelfHostedAuthE2eState();
+
+    {
+      await using view = createWebView({ width: 1280, height: 900 });
+      await view.navigate(`${previewUrl}/organization/agent-adapters`);
+
+      await expectElement(view, "[data-organization-agent-workspace-profiles]");
+      await expectText(view, "Codex team default");
+      await expectText(view, "awpi_codex_team");
+      expect(
+        await view.evaluate<boolean>(
+          `document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`,
+        ),
+      ).toBe(true);
+
+      resetRecordedApiRequests();
+      await view.navigate(`${previewUrl}/workspaces`);
+      await waitForRecordedRequest("/api/rpc/agentWorkspaceProfiles/list");
+      await clickButtonByAnyText(view, ["Create workspace", "创建工作区"]);
+      await expectText(view, "Codex team default");
+    }
+
+    {
+      await using view = createWebView({ width: 390, height: 820 });
+      await view.navigate(`${previewUrl}/organization/agent-adapters`);
+
+      await expectElement(view, "[data-organization-agent-workspace-profiles]");
+      await expectText(view, "Codex team default");
+      expect(
+        await view.evaluate<boolean>(
+          `document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`,
+        ),
+      ).toBe(true);
+    }
+
+    expect(
+      recordedApiRequests.some(
+        (request) => request.pathname === "/api/rpc/agentWorkspaceProfiles/list",
+      ),
     ).toBe(true);
   }, 45_000);
 

@@ -974,7 +974,7 @@ Current boundary:
 - Web Resource detail source-event diagnostics consume `source-events.list`; CLI and HTTP/oRPC
   read surfaces are active for operator diagnostics and API consumers.
 
-## Agent Adapter Installations
+## Agent Adapter And Workspace Profile Installations
 
 These operations implement ADR-100's tenant-scoped registry for declarative Agent Adapter
 definitions. Validation never loads manifest code or starts an Agent. Definitions are immutable and
@@ -995,9 +995,29 @@ disable, and uninstall. Disable is idempotent and blocks new Workspace resolutio
 existing recovery references. Uninstall is idempotent only after the active Workspace reference
 reader returns zero; otherwise it fails with a conflict and retains the installation.
 
+Workspace Profiles compose one exact Adapter definition with one exact Sandbox Template and bounded
+initialization, limits, network, port, persistence, and check defaults. Compilation is a read-only
+admission step that emits inputs for existing Sandbox/Runtime/Port operations and an immutable
+Workspace pin; it does not create a second Workspace aggregate.
+
+| Operation | Type | Message | Input | CLI | HTTP/oRPC |
+| --- | --- | --- | --- | --- | --- |
+| `agent-workspace-profiles.validate` | Query | `ValidateAgentWorkspaceProfileQuery` | Declarative Profile manifest | `appaloft agent-workspace-profile validate <manifest>` | `POST /api/agent-workspace-profiles/validate` |
+| `agent-workspace-profiles.install` | Command | `InstallAgentWorkspaceProfileCommand` | Declarative Profile manifest | `appaloft agent-workspace-profile install <manifest>` | `POST /api/agent-workspace-profiles` |
+| `agent-workspace-profiles.list` | Query | `ListAgentWorkspaceProfilesQuery` | Optional bounded limit | `appaloft agent-workspace-profile list` | `GET /api/agent-workspace-profiles` |
+| `agent-workspace-profiles.show` | Query | `ShowAgentWorkspaceProfileQuery` | Installation id | `appaloft agent-workspace-profile show <installationId>` | `GET /api/agent-workspace-profiles/{installationId}` |
+| `agent-workspace-profiles.compile` | Query | `CompileAgentWorkspaceProfileQuery` | Installation id | `appaloft agent-workspace-profile compile <installationId>` | `POST /api/agent-workspace-profiles/{installationId}/compile` |
+| `agent-workspace-profiles.disable` | Command | `DisableAgentWorkspaceProfileCommand` | Installation id | `appaloft agent-workspace-profile disable <installationId>` | `POST /api/agent-workspace-profiles/{installationId}/disable` |
+| `agent-workspace-profiles.uninstall` | Command | `UninstallAgentWorkspaceProfileCommand` | Installation id | `appaloft agent-workspace-profile uninstall <installationId>` | `DELETE /api/agent-workspace-profiles/{installationId}` |
+
+Profile reads and compilation are tenant-scoped. Disable blocks new Workspace compilation without
+altering an existing resolved pin. Uninstall is fenced while any active Workspace references the
+Profile installation. The referenced Adapter installation is independently subject to the same
+disable and uninstall safety rules.
+
 Public task guidance is available in
 [Manage Agent Adapters](../apps/docs/src/content/docs/agent/agent-adapters.md). The domain boundary,
-follow-up Profile slice, and acceptance evidence remain governed by
+Profile compiler, and acceptance evidence remain governed by
 [ADR-100](./decisions/ADR-100-agent-adapter-distribution-and-workspace-profile-boundary.md),
 [Spec 117](./specs/117-agent-adapter-sdk-and-workspace-profiles/spec.md), and the
 [Test Matrix](./testing/agent-adapter-sdk-and-workspace-profile-test-matrix.md).

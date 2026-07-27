@@ -42,6 +42,38 @@
     harnessKey: string;
     status: string;
   };
+  type WorkspaceProfileDescriptor = {
+    installationId: string;
+    profileId: string;
+    profileVersion: string;
+    displayName: string;
+    status: "disabled" | "enabled";
+  };
+  type CompiledWorkspaceProfile = {
+    sandbox: {
+      source: { kind: "template"; templateId: string };
+      requestedIsolation: "container-trusted" | "gvisor" | "kata" | "microvm";
+      limits: {
+        cpuMillis: number;
+        memoryBytes: number;
+        diskBytes: number;
+        maxProcesses: number;
+      };
+      networkPolicy:
+        | { mode: "deny" }
+        | {
+            mode: "allowlist";
+            rules: { kind: "domain"; value: string; ports: number[] }[];
+          };
+    };
+    initialization: { id: string; argv: string[]; cwd?: string }[];
+    runtime: { harnessKey: string; harnessTemplateId: string };
+    defaultPorts: {
+      port: number;
+      visibility: "private" | "organization" | "public";
+      ttlSeconds: number;
+    }[];
+  };
   type WorkspaceDescriptor = {
     sandbox: SandboxDescriptor;
     runtimes: RuntimeDescriptor[];
@@ -57,6 +89,7 @@
   let createOpen = $state(false);
   let collaborationCreateOpen = $state(false);
   let selectedHarnessKey = $state("opencode");
+  let selectedProfileInstallationId = $state("");
   let repository = $state("");
   let repositoryRef = $state("");
   let branch = $state("");
@@ -65,10 +98,13 @@
   const collaborationCreateCapability = {
     operationKey: "workspace-collaborations.create",
   } as const;
+  const workspaceCreateCapability = {
+    operationKey: "sandboxes.create",
+  } as const;
 
   $effect(() => {
     if (browser) {
-      void capabilities.fetch([collaborationCreateCapability]);
+      void capabilities.fetch([collaborationCreateCapability, workspaceCreateCapability]);
     }
   });
 
@@ -77,14 +113,18 @@
       queryKey: ["agent-workspace-catalog"],
       enabled: browser,
       queryFn: async () => {
-        const [harnesses, templates] = await Promise.all([
+        const [harnesses, templates, profiles] = await Promise.all([
           orpcClient.sandboxes.agents.harnesses.list({}),
           orpcClient.sandboxTemplates.list({ limit: 100, offset: 0 }),
+          orpcClient.agentWorkspaceProfiles.list({ limit: 100 }),
         ]);
         return {
           harnesses: harnesses as unknown as readonly HarnessDescriptor[],
           templates: (templates as unknown as { items: readonly SandboxTemplateDescriptor[] })
             .items,
+          profiles: (profiles as unknown as readonly WorkspaceProfileDescriptor[]).filter(
+            (profile) => profile.status === "enabled",
+          ),
         };
       },
     }),
@@ -129,6 +169,11 @@
 
   const selectedHarness = $derived(
     catalogQuery.data?.harnesses.find((harness) => harness.key === selectedHarnessKey),
+  );
+  const selectedProfile = $derived(
+    catalogQuery.data?.profiles.find(
+      (profile) => profile.installationId === selectedProfileInstallationId,
+    ),
   );
 
   function validateGitRef(value: string): string {
@@ -189,28 +234,61 @@
 
   const createWorkspaceMutation = createMutation(() => ({
     mutationFn: async () => {
+      const compiledProfile = selectedProfile
+        ? ((await orpcClient.agentWorkspaceProfiles.compile({
+            installationId: selectedProfile.installationId,
+          })) as unknown as CompiledWorkspaceProfile)
+        : null;
       const harness = selectedHarness;
-      if (!harness?.sandboxTemplateId) {
+      const sandboxTemplateId =
+        compiledProfile?.sandbox.source.templateId ?? harness?.sandboxTemplateId;
+      const harnessKey = compiledProfile?.runtime.harnessKey ?? harness?.key;
+      const harnessTemplateId =
+        compiledProfile?.runtime.harnessTemplateId ?? harness?.harnessTemplateId;
+      if (!sandboxTemplateId || !harnessKey || !harnessTemplateId) {
         throw new Error("agent_workspace_harness_template_unavailable");
       }
       const template = catalogQuery.data?.templates.find(
-        (candidate) => candidate.templateId === harness.sandboxTemplateId,
+        (candidate) => candidate.templateId === sandboxTemplateId,
       );
       const normalizedRepository = repository.trim();
       const normalizedRef = repositoryRef.trim() ? validateGitRef(repositoryRef) : "";
       const normalizedBranch = branch.trim() ? validateGitRef(branch) : "";
+      const profileNetworkRules =
+        compiledProfile?.sandbox.networkPolicy.mode === "allowlist"
+          ? compiledProfile.sandbox.networkPolicy.rules
+          : [];
+      const sourceNetworkRules = normalizedRepository
+        ? repositoryNetworkPolicy(normalizedRepository).rules
+        : [];
+      const networkRules = [...profileNetworkRules, ...sourceNetworkRules].filter(
+        (rule, index, all) =>
+          all.findIndex(
+            (candidate) =>
+              candidate.kind === rule.kind &&
+              candidate.value === rule.value &&
+              candidate.ports.join(",") === rule.ports.join(","),
+          ) === index,
+      );
       const sandbox = (await orpcClient.sandboxes.create({
-        source: { kind: "template", templateId: harness.sandboxTemplateId },
-        requestedIsolation: template?.minimumIsolation ?? "container-trusted",
-        limits: {
+        source: compiledProfile?.sandbox.source ?? {
+          kind: "template",
+          templateId: sandboxTemplateId,
+        },
+        requestedIsolation:
+          compiledProfile?.sandbox.requestedIsolation ??
+          template?.minimumIsolation ??
+          "container-trusted",
+        limits: compiledProfile?.sandbox.limits ?? {
           cpuMillis: 2_000,
           memoryBytes: 4 * 1024 * 1024 * 1024,
           diskBytes: 20 * 1024 * 1024 * 1024,
           maxProcesses: 256,
         },
-        networkPolicy: normalizedRepository
-          ? repositoryNetworkPolicy(normalizedRepository)
-          : { mode: "deny", rules: [] },
+        networkPolicy:
+          networkRules.length > 0
+            ? { mode: "allowlist", rules: networkRules }
+            : { mode: "deny", rules: [] },
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60_000).toISOString(),
       })) as SandboxDescriptor;
 
@@ -237,11 +315,33 @@
         }
       }
 
+      for (const step of compiledProfile?.initialization ?? []) {
+        assertSuccessfulExec(
+          await orpcClient.sandboxes.exec({
+            sandboxId: sandbox.sandboxId,
+            argv: step.argv,
+            ...(step.cwd ? { cwd: step.cwd } : {}),
+          }),
+        );
+      }
+
+      for (const port of compiledProfile?.defaultPorts ?? []) {
+        await orpcClient.sandboxes.ports.expose({
+          sandboxId: sandbox.sandboxId,
+          port: port.port,
+          visibility: port.visibility,
+          expiresAt: new Date(Date.now() + port.ttlSeconds * 1_000).toISOString(),
+        });
+      }
+
       await orpcClient.sandboxes.agents.runtimes.create({
         sandboxId: sandbox.sandboxId,
-        harnessKey: harness.key,
-        harnessTemplateId: harness.harnessTemplateId,
+        harnessKey,
+        harnessTemplateId,
         idempotencyKey: crypto.randomUUID(),
+        ...(selectedProfile
+          ? { profileInstallationId: selectedProfile.installationId }
+          : {}),
       });
       return sandbox.sandboxId;
     },
@@ -275,6 +375,16 @@
   const canCreateCollaboration = $derived(
     $capabilities.capabilities[capabilityKey(collaborationCreateCapability)]?.allowed === true,
   );
+  const canCreateWorkspace = $derived(
+    $capabilities.capabilities[capabilityKey(workspaceCreateCapability)]?.allowed === true,
+  );
+
+  $effect(() => {
+    const firstProfile = catalogQuery.data?.profiles[0];
+    if (!selectedProfileInstallationId && firstProfile) {
+      selectedProfileInstallationId = firstProfile.installationId;
+    }
+  });
 </script>
 
 <svelte:head>
@@ -441,8 +551,31 @@
       }}
     >
       <label class="grid gap-1.5 text-sm">
+        <span class="font-medium">{$t(i18nKeys.console.agentWorkspaces.profile)}</span>
+        <Select.Root bind:value={selectedProfileInstallationId} type="single">
+          <Select.Trigger class="w-full">
+            {selectedProfile?.displayName ??
+              $t(i18nKeys.console.agentWorkspaces.directHarness)}
+          </Select.Trigger>
+          <Select.Content>
+            <Select.Item value="direct">
+              {$t(i18nKeys.console.agentWorkspaces.directHarness)}
+            </Select.Item>
+            {#each catalogQuery.data?.profiles ?? [] as profile (profile.installationId)}
+              <Select.Item value={profile.installationId}>
+                {profile.displayName} · {profile.profileVersion}
+              </Select.Item>
+            {/each}
+          </Select.Content>
+        </Select.Root>
+      </label>
+      <label class="grid gap-1.5 text-sm">
         <span class="font-medium">{$t(i18nKeys.console.agentWorkspaces.harness)}</span>
-        <Select.Root bind:value={selectedHarnessKey} type="single">
+        <Select.Root
+          bind:value={selectedHarnessKey}
+          type="single"
+          disabled={Boolean(selectedProfile)}
+        >
           <Select.Trigger class="w-full">
             {selectedHarness?.key ?? selectedHarnessKey}
           </Select.Trigger>
@@ -481,7 +614,12 @@
         </p>
       {/if}
       <Dialog.Footer>
-        <Button type="submit" disabled={!selectedHarness || createWorkspaceMutation.isPending}>
+        <Button
+          type="submit"
+          disabled={(!selectedProfile && !selectedHarness) ||
+            !canCreateWorkspace ||
+            createWorkspaceMutation.isPending}
+        >
           {createWorkspaceMutation.isPending
             ? $t(i18nKeys.console.agentWorkspaces.creating)
             : $t(i18nKeys.console.agentWorkspaces.create)}

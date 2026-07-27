@@ -4,6 +4,135 @@ export * from "./quick-deploy-workflow";
 
 export const apiVersion = "v1";
 
+export interface AgentAdapterCompatibilityResponse {
+  status: "compatible" | "unchecked";
+  unavailableOptionalCapabilities: string[];
+}
+
+export interface AgentAdapterInstallationResponse {
+  installationId: string;
+  definitionDigest: string;
+  adapterId: string;
+  adapterVersion: string;
+  displayName: string;
+  status: "disabled" | "enabled";
+  compatibility: AgentAdapterCompatibilityResponse;
+  installedAt: string;
+  updatedAt?: string;
+}
+
+export interface ValidateAgentAdapterResponse {
+  manifest: unknown;
+  definitionDigest: string;
+  compatibility: AgentAdapterCompatibilityResponse;
+}
+
+export interface UninstallAgentAdapterResponse {
+  installationId: string;
+  uninstalled: boolean;
+}
+
+export interface AgentWorkspaceProfileInstallationResponse {
+  installationId: string;
+  definitionDigest: string;
+  profileId: string;
+  profileVersion: string;
+  displayName: string;
+  adapterDefinitionDigest: string;
+  status: "disabled" | "enabled";
+  installedAt: string;
+  updatedAt?: string;
+}
+
+export interface ValidateAgentWorkspaceProfileResponse {
+  manifest: unknown;
+  definitionDigest: string;
+}
+
+export interface AgentWorkspaceProfileCapabilitySnapshotResponse {
+  taskMode: boolean;
+  interactive: boolean;
+  backgroundRuns: boolean;
+  nativeSession: boolean;
+  persistentPaths: string[];
+  healthcheck?:
+    | { kind: "process" }
+    | {
+        kind: "http";
+        port: number;
+        path: string;
+      };
+}
+
+export interface CompileAgentWorkspaceProfileResponse {
+  sandbox: {
+    source: {
+      kind: "template";
+      templateId: string;
+    };
+    requestedIsolation: "container-trusted" | "gvisor" | "kata" | "microvm";
+    limits: {
+      cpuMillis: number;
+      memoryBytes: number;
+      diskBytes: number;
+      maxProcesses: number;
+    };
+    networkPolicy:
+      | { mode: "deny" }
+      | {
+          mode: "allowlist";
+          rules: Array<{
+            kind: "domain";
+            value: string;
+            ports: number[];
+          }>;
+        };
+  };
+  initialization: Array<{
+    id: string;
+    argv: string[];
+    cwd?: string;
+  }>;
+  runtime: {
+    harnessKey: string;
+    harnessTemplateId: string;
+    declarativeHarness: Record<string, unknown>;
+  };
+  defaultPorts: Array<{
+    name: string;
+    port: number;
+    visibility: "private" | "organization" | "public";
+    ttlSeconds: number;
+  }>;
+  suggestedChecks: Array<{
+    name: string;
+    argv: string[];
+    cwd?: string;
+  }>;
+  credentialRequirements: unknown[];
+  pin: {
+    profileInstallationId: string;
+    profileDefinitionDigest: string;
+    profileId: string;
+    profileVersion: string;
+    adapterInstallationId: string;
+    adapterDefinitionDigest: string;
+    adapterId: string;
+    adapterVersion: string;
+    harnessKey: string;
+    harnessTemplateId: string;
+    sandboxTemplateId: string;
+    sandboxTemplateVersion: string;
+    sandboxTemplateDigest: string;
+    capabilities: AgentWorkspaceProfileCapabilitySnapshotResponse;
+  };
+}
+
+export interface UninstallAgentWorkspaceProfileResponse {
+  installationId: string;
+  uninstalled: boolean;
+}
+
 export const dependencyResourceKinds = [
   "postgres",
   "redis",

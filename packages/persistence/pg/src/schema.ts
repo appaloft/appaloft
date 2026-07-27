@@ -1239,6 +1239,9 @@ export interface Database {
   agent_adapter_definitions: AgentAdapterDefinitionsTable;
   agent_adapter_installations: AgentAdapterInstallationsTable;
   agent_adapter_workspace_references: AgentAdapterWorkspaceReferencesTable;
+  agent_workspace_profile_definitions: AgentWorkspaceProfileDefinitionsTable;
+  agent_workspace_profile_installations: AgentWorkspaceProfileInstallationsTable;
+  agent_workspace_profile_references: AgentWorkspaceProfileReferencesTable;
   execution_sandboxes: ExecutionSandboxesTable;
   execution_sandbox_snapshots: ExecutionSandboxSnapshotsTable;
   execution_sandbox_templates: ExecutionSandboxTemplatesTable;
@@ -1474,6 +1477,39 @@ export interface AgentAdapterWorkspaceReferencesTable {
   installation_id: string;
   workspace_id: string;
   active: boolean;
+  created_at: TimestampColumn;
+  released_at: NullableUpdatableTimestampColumn;
+}
+
+export interface AgentWorkspaceProfileDefinitionsTable {
+  digest: string;
+  profile_id: string;
+  profile_version: string;
+  display_name: string;
+  canonical_manifest: string;
+  registered_at: TimestampColumn;
+}
+
+export interface AgentWorkspaceProfileInstallationsTable {
+  tenant_id: string;
+  id: string;
+  definition_digest: string;
+  profile_id: string;
+  profile_version: string;
+  status: string;
+  revision: number;
+  installed_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+}
+
+export interface AgentWorkspaceProfileReferencesTable {
+  tenant_id: string;
+  installation_id: string;
+  adapter_installation_id: string;
+  workspace_id: string;
+  runtime_id: string;
+  active: boolean;
+  pin: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
   created_at: TimestampColumn;
   released_at: NullableUpdatableTimestampColumn;
 }

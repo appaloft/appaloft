@@ -22,6 +22,7 @@ import {
 
 const auditedDomains = new Set([
   "agent-adapters",
+  "agent-workspace-profiles",
   "projects",
   "resources",
   "deployments",
@@ -48,6 +49,7 @@ const ignoredOperationKeys = new Set([
 
 const resourceTypeByDomain: Record<string, string> = {
   "agent-adapters": "agent_adapter_installation",
+  "agent-workspace-profiles": "agent_workspace_profile_installation",
   projects: "project",
   resources: "resource",
   deployments: "deployment",
@@ -62,6 +64,7 @@ const resourceTypeByDomain: Record<string, string> = {
 
 const targetFieldByDomain: Record<string, readonly string[]> = {
   "agent-adapters": ["installationId", "id"],
+  "agent-workspace-profiles": ["installationId", "id"],
   projects: ["projectId", "id"],
   resources: ["resourceId", "id"],
   deployments: ["deploymentId", "id"],
@@ -163,7 +166,7 @@ export function operationAuditRecordFromCommand(input: {
     ? (input.result.value as Record<string, unknown> | undefined)
     : undefined;
   const primaryTarget = primaryTargetFor(entry, commandObject, successValue);
-  const relatedTargets = relatedTargetsFor(commandObject, successValue, primaryTarget);
+  const relatedTargets = relatedTargetsFor(entry, commandObject, successValue, primaryTarget);
   const actor = actorFromContext(input.context);
 
   return {
@@ -213,6 +216,7 @@ function primaryTargetFor(
 }
 
 function relatedTargetsFor(
+  entry: OperationCatalogEntry,
   command: Record<string, unknown>,
   result: Record<string, unknown> | undefined,
   primaryTarget: OperationAuditTargetRef | undefined,
@@ -224,10 +228,17 @@ function relatedTargetsFor(
     if (!value) {
       continue;
     }
-    if (primaryTarget?.resourceType === resourceType && primaryTarget.resourceId === value) {
+    const resolvedResourceType =
+      field === "definitionDigest" && entry.domain === "agent-workspace-profiles"
+        ? "agent_workspace_profile_definition"
+        : resourceType;
+    if (
+      primaryTarget?.resourceType === resolvedResourceType &&
+      primaryTarget.resourceId === value
+    ) {
       continue;
     }
-    targets.push({ resourceType, resourceId: value });
+    targets.push({ resourceType: resolvedResourceType, resourceId: value });
   }
 
   return uniqueTargets(targets);

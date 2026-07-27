@@ -31,6 +31,15 @@ describe("Agent Adapter organization management", () => {
     expect(displaySurface).not.toContain("<Textarea");
     expect(pageSource).toContain("<Textarea");
     expect(pageSource).toContain("submitAgentAdapterLifecycleAction");
+    expect(pageSource).toContain("orpc.agentWorkspaceProfiles.list.queryOptions");
+    expect(pageSource).toContain("orpcClient.agentWorkspaceProfiles.validate");
+    expect(pageSource).toContain("orpcClient.agentWorkspaceProfiles.install");
+    expect(pageSource).toContain("orpcClient.agentWorkspaceProfiles.disable");
+    expect(pageSource).toContain("orpcClient.agentWorkspaceProfiles.uninstall");
+    expect(pageSource).toContain("data-organization-agent-workspace-profiles");
+    expect(pageSource).toContain("data-organization-agent-workspace-profile-install-dialog");
+    expect(pageSource).toContain("data-organization-agent-workspace-profile-lifecycle-dialog");
+    expect(pageSource).toContain("capabilityKey(agentWorkspaceProfileInstallCapability)");
     expect(pageSource).not.toContain("organizationId: currentOrganizationId,\n        manifest");
   });
 });

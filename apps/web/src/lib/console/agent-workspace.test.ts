@@ -40,6 +40,11 @@ describe("public Agent Workspace Console", () => {
     expect(listPage).toContain("sandboxTemplates.list");
     expect(listPage).toContain("sandboxes.create");
     expect(listPage).toContain("sandboxes.agents.runtimes.create");
+    expect(listPage).toContain("agentWorkspaceProfiles.list");
+    expect(listPage).toContain("agentWorkspaceProfiles.compile");
+    expect(listPage).toContain("profileInstallationId");
+    expect(listPage).toContain("sandboxes.ports.expose");
+    expect(listPage).toContain("capabilityKey(workspaceCreateCapability)");
     expect(detailPage).toContain('scope={{ kind: "sandbox", sandboxId: workspaceId }}');
     expect(detailPage).toContain("sandboxes.ports.expose");
     expect(detailPage).toContain("sandboxes.agents.runtimes.attach");
