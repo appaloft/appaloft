@@ -2102,83 +2102,6 @@
             {/each}
           </div>
         {/if}
-
-        <div class="border-t pt-5" data-organization-agent-workspace-profiles>
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div class="max-w-2xl">
-              <h3 class="text-base font-semibold">
-                {$t(i18nKeys.console.organization.agentWorkspaceProfilesTitle)}
-              </h3>
-              <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                {$t(i18nKeys.console.organization.agentWorkspaceProfilesDescription)}
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={!canInstallAgentWorkspaceProfile}
-              onclick={openAgentWorkspaceProfileInstallDialog}
-            >
-              <PackagePlus class="size-4" />
-              {$t(i18nKeys.console.organization.agentWorkspaceProfileInstallAction)}
-            </Button>
-          </div>
-
-          {#if agentWorkspaceProfiles.length === 0}
-            <div class="mt-4 rounded-lg border border-dashed p-5">
-              <p class="font-medium">
-                {$t(i18nKeys.console.organization.agentWorkspaceProfilesEmptyTitle)}
-              </p>
-              <p class="mt-1 text-sm text-muted-foreground">
-                {$t(i18nKeys.console.organization.agentWorkspaceProfilesEmptyDescription)}
-              </p>
-            </div>
-          {:else}
-            <div class="console-record-list mt-4">
-              {#each agentWorkspaceProfiles as profile (profile.installationId)}
-                <div
-                  class="console-record-row gap-4 lg:grid-cols-[minmax(0,1fr)_18rem_auto] lg:items-center"
-                >
-                  <div class="min-w-0 space-y-1">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <h4 class="truncate text-base font-semibold">{profile.displayName}</h4>
-                      <Badge variant={profile.status === "enabled" ? "outline" : "secondary"}>
-                        {profile.status === "enabled"
-                          ? $t(i18nKeys.console.organization.agentAdapterStatusEnabled)
-                          : $t(i18nKeys.console.organization.agentAdapterStatusDisabled)}
-                      </Badge>
-                    </div>
-                    <p class="text-sm text-muted-foreground">
-                      {profile.profileId} · {profile.profileVersion}
-                    </p>
-                    <p class="break-all font-mono text-xs text-muted-foreground">
-                      {profile.installationId}
-                    </p>
-                  </div>
-                  <div class="space-y-1 text-sm text-muted-foreground">
-                    <p>
-                      {$t(i18nKeys.console.organization.agentAdapterInstalledAt)} · {formatTime(
-                        profile.installedAt,
-                      )}
-                    </p>
-                    <p class="break-all font-mono text-xs">{profile.definitionDigest}</p>
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={!canDisableAgentWorkspaceProfile && !canUninstallAgentWorkspaceProfile}
-                    onclick={() =>
-                      openAgentWorkspaceProfileLifecycleDialog(profile.installationId)}
-                  >
-                    <ShieldCheck class="size-3.5" />
-                    {$t(i18nKeys.console.organization.lifecycleManageAction)}
-                  </Button>
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </div>
       </section>
       {/if}
 
@@ -2274,6 +2197,7 @@
             {/each}
           </div>
         {/if}
+
       </section>
       {/if}
 
@@ -2394,6 +2318,83 @@
             {/each}
           </div>
         {/if}
+
+        <div class="border-t pt-5" data-organization-agent-workspace-profiles>
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="max-w-2xl">
+              <h3 class="text-base font-semibold">
+                {$t(i18nKeys.console.organization.agentWorkspaceProfilesTitle)}
+              </h3>
+              <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                {$t(i18nKeys.console.organization.agentWorkspaceProfilesDescription)}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!canInstallAgentWorkspaceProfile}
+              onclick={openAgentWorkspaceProfileInstallDialog}
+            >
+              <PackagePlus class="size-4" />
+              {$t(i18nKeys.console.organization.agentWorkspaceProfileInstallAction)}
+            </Button>
+          </div>
+
+          {#if agentWorkspaceProfiles.length === 0}
+            <div class="mt-4 rounded-lg border border-dashed p-5">
+              <p class="font-medium">
+                {$t(i18nKeys.console.organization.agentWorkspaceProfilesEmptyTitle)}
+              </p>
+              <p class="mt-1 text-sm text-muted-foreground">
+                {$t(i18nKeys.console.organization.agentWorkspaceProfilesEmptyDescription)}
+              </p>
+            </div>
+          {:else}
+            <div class="console-record-list mt-4">
+              {#each agentWorkspaceProfiles as profile (profile.installationId)}
+                <div
+                  class="console-record-row gap-4 lg:grid-cols-[minmax(0,1fr)_18rem_auto] lg:items-center"
+                >
+                  <div class="min-w-0 space-y-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <h4 class="truncate text-base font-semibold">{profile.displayName}</h4>
+                      <Badge variant={profile.status === "enabled" ? "outline" : "secondary"}>
+                        {profile.status === "enabled"
+                          ? $t(i18nKeys.console.organization.agentAdapterStatusEnabled)
+                          : $t(i18nKeys.console.organization.agentAdapterStatusDisabled)}
+                      </Badge>
+                    </div>
+                    <p class="text-sm text-muted-foreground">
+                      {profile.profileId} · {profile.profileVersion}
+                    </p>
+                    <p class="break-all font-mono text-xs text-muted-foreground">
+                      {profile.installationId}
+                    </p>
+                  </div>
+                  <div class="space-y-1 text-sm text-muted-foreground">
+                    <p>
+                      {$t(i18nKeys.console.organization.agentAdapterInstalledAt)} · {formatTime(
+                        profile.installedAt,
+                      )}
+                    </p>
+                    <p class="break-all font-mono text-xs">{profile.definitionDigest}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={!canDisableAgentWorkspaceProfile && !canUninstallAgentWorkspaceProfile}
+                    onclick={() =>
+                      openAgentWorkspaceProfileLifecycleDialog(profile.installationId)}
+                  >
+                    <ShieldCheck class="size-3.5" />
+                    {$t(i18nKeys.console.organization.lifecycleManageAction)}
+                  </Button>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
       </section>
       {/if}
 
