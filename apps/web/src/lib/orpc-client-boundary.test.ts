@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { describe, expect, test } from "vitest";
 
 describe("browser ORPC client boundary", () => {
   test("does not pull the server-side application barrel into the browser module graph", () => {
