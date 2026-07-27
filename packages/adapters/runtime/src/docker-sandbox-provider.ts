@@ -707,31 +707,67 @@ export class DockerSandboxProvider implements SandboxProvider {
     cwd?: string;
     initialRows: number;
     initialCols: number;
+    process?: {
+      argv: string[];
+      initialInput?: Uint8Array;
+    };
   }): Promise<SandboxTerminalProcess> {
     await this.assertHandle(request);
     if (!this.runner.openTerminal) {
       throw new Error("Sandbox Docker command runner does not support PTY sessions");
     }
-    const cwd = request.cwd
+    const cwd = request.cwd && request.cwd !== "."
       ? await this.confinedWorkspacePath(request, request.cwd, "existing")
       : "/workspace";
-    return this.runner.openTerminal(
-      [
-        "docker",
-        "exec",
-        "-it",
-        "-w",
-        cwd,
-        request.providerHandle,
-        "sh",
-        "-lc",
-        'export HOME=/workspace; export XDG_DATA_HOME=/workspace/.local/share; if command -v bash >/dev/null 2>&1; then exec bash --noprofile --norc -i; fi; exec sh -i',
-      ],
+    const processArgv = request.process?.argv;
+    if (
+      processArgv &&
+      (processArgv.length === 0 ||
+        processArgv.length > 128 ||
+        processArgv.some((value) => !value || value.length > 8_192 || value.includes("\0")))
+    ) {
+      throw new Error("Sandbox terminal process argv is invalid");
+    }
+    const initialInput = request.process?.initialInput;
+    if (initialInput && initialInput.byteLength > 64 * 1024) {
+      throw new Error("Sandbox terminal process initial input exceeds the limit");
+    }
+    const terminal = await this.runner.openTerminal(
+      processArgv
+        ? [
+            "docker",
+            "exec",
+            "-it",
+            "-w",
+            cwd,
+            request.providerHandle,
+            "sh",
+            "-c",
+            'export HOME=/workspace; export XDG_DATA_HOME=/workspace/.local/share; stty -echo; exec sh -s -- "$@"',
+            "appaloft-managed-terminal",
+            ...processArgv,
+          ]
+        : [
+            "docker",
+            "exec",
+            "-it",
+            "-w",
+            cwd,
+            request.providerHandle,
+            "sh",
+            "-lc",
+            'export HOME=/workspace; export XDG_DATA_HOME=/workspace/.local/share; if command -v bash >/dev/null 2>&1; then exec bash --noprofile --norc -i; fi; exec sh -i',
+          ],
       {
         initialRows: request.initialRows,
         initialCols: request.initialCols,
       },
     );
+    if (initialInput?.byteLength) {
+      await terminal.stdin.write(initialInput);
+      await terminal.stdin.flush?.();
+    }
+    return terminal;
   }
 
   async listOwnedRuntimes(request: { ownerScope: string; limit: number; cursor?: string }) {
@@ -810,6 +846,7 @@ export class DockerSandboxProvider implements SandboxProvider {
     if (request.background) {
       const processId = `spr_${randomUUID().replaceAll("-", "")}`;
       const pidFile = `/workspace/.appaloft-process-${processId}.pid`;
+      const exitFile = `/workspace/.appaloft-process-${processId}.exit`;
       if (request.stdin) {
         const inputPipe = `/tmp/appaloft-process-${processId}.stdin`;
         try {
@@ -830,9 +867,10 @@ export class DockerSandboxProvider implements SandboxProvider {
             request.providerHandle,
             "sh",
             "-c",
-            'pid_file="$1"; input_pipe="$2"; shift 2; ( exec "$@" < "$input_pipe" ) & child=$!; printf "%s\\n" "$child" > "$pid_file"; wait "$child"; code=$?; rm -f -- "$pid_file" "$input_pipe"; exit "$code"',
+            'pid_file="$1"; exit_file="$2"; input_pipe="$3"; shift 3; ( exec "$@" < "$input_pipe" ) & child=$!; printf "%s\\n" "$child" > "$pid_file"; wait "$child"; code=$?; printf "%s\\n" "$code" > "$exit_file"; rm -f -- "$pid_file" "$input_pipe"; exit "$code"',
             "appaloft-background",
             pidFile,
+            exitFile,
             inputPipe,
             ...request.argv,
           ]);
@@ -859,10 +897,11 @@ export class DockerSandboxProvider implements SandboxProvider {
             request.providerHandle,
             "sh",
             "-c",
-            '[ -f "$1" ] && kill "$(cat "$1")" 2>/dev/null; rm -f -- "$1" "$2"',
+            '[ -f "$1" ] && kill "$(cat "$1")" 2>/dev/null; rm -f -- "$1" "$2" "$3"',
             "appaloft-background-cleanup",
             pidFile,
             inputPipe,
+            exitFile,
           ]);
           throw error;
         }
@@ -875,9 +914,10 @@ export class DockerSandboxProvider implements SandboxProvider {
           request.providerHandle,
           "sh",
           "-c",
-          'pid_file="$1"; shift; ( exec "$@" ) & child=$!; printf "%s\\n" "$child" > "$pid_file"; wait "$child"; code=$?; rm -f -- "$pid_file"; exit "$code"',
+          'pid_file="$1"; exit_file="$2"; shift 2; ( exec "$@" ) & child=$!; printf "%s\\n" "$child" > "$pid_file"; wait "$child"; code=$?; printf "%s\\n" "$code" > "$exit_file"; rm -f -- "$pid_file"; exit "$code"',
           "appaloft-background",
           pidFile,
+          exitFile,
           ...request.argv,
         ]);
       }
@@ -948,14 +988,34 @@ export class DockerSandboxProvider implements SandboxProvider {
       request.providerHandle,
       "sh",
       "-c",
-      "for f in /workspace/.appaloft-process-spr_*.pid; do [ -f \"$f\" ] || continue; printf '%s:%s\\n' \"${f##*-}\" \"$(cat \"$f\")\"; done",
+      "for f in /workspace/.appaloft-process-spr_*.pid; do [ -f \"$f\" ] || continue; printf 'pid:%s:%s\\n' \"${f##*-}\" \"$(cat \"$f\")\"; done; for f in /workspace/.appaloft-process-spr_*.exit; do [ -f \"$f\" ] || continue; printf 'exit:%s:%s\\n' \"${f##*-}\" \"$(cat \"$f\")\"; done",
     ]);
     const processes: SandboxProcessDescriptor[] = [];
     for (const line of text(listed.stdout).trim().split("\n")) {
       if (!line) continue;
-      const separator = line.lastIndexOf(":");
-      const processId = line.slice(0, separator).replace(/\.pid$/, "");
-      const pid = line.slice(separator + 1);
+      const [kind, fileName, value] = line.split(":");
+      if (!kind || !fileName || value === undefined) continue;
+      const processId = fileName.replace(/\.(?:pid|exit)$/u, "");
+      if (kind === "exit") {
+        const exitCode = Number(value);
+        if (Number.isInteger(exitCode)) {
+          processes.push({
+            processId,
+            status: exitCode === 0 ? "exited" : "failed",
+            exitCode,
+          });
+          await this.runner.run([
+            "docker",
+            "exec",
+            request.providerHandle,
+            "rm",
+            "-f",
+            `/workspace/.appaloft-process-${processId}.exit`,
+          ]);
+        }
+        continue;
+      }
+      const pid = value;
       const observed = await this.runner.run([
         "docker",
         "exec",
@@ -979,14 +1039,16 @@ export class DockerSandboxProvider implements SandboxProvider {
     await this.assertHandle(request);
     if (!/^spr_[A-Za-z0-9]{1,128}$/.test(request.processId)) throw new Error("Invalid process id");
     const pidFile = `/workspace/.appaloft-process-${request.processId}.pid`;
+    const exitFile = `/workspace/.appaloft-process-${request.processId}.exit`;
     await this.docker([
       "exec",
       request.providerHandle,
       "sh",
       "-c",
-      'if [ -f "$1" ]; then pid="$(cat "$1")"; kill "$pid" 2>/dev/null || true; rm -f -- "$1"; fi',
+      'if [ -f "$1" ]; then pid="$(cat "$1")"; kill "$pid" 2>/dev/null || true; fi; rm -f -- "$1" "$2"',
       "appaloft-process-terminate",
       pidFile,
+      exitFile,
     ]);
   }
 

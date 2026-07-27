@@ -17,6 +17,7 @@ class CapturingRunner implements SandboxDockerCommandRunner {
     initialRows: number;
     initialCols: number;
   }> = [];
+  readonly terminalWrites: Uint8Array[] = [];
   runtimes = '{"io.containerd.runc.v2":{"path":"runc"},"runsc":{"path":"runsc"}}';
   resolvedPath: string | undefined;
   executionFailure: SandboxDockerCommandResult["failure"];
@@ -97,7 +98,11 @@ class CapturingRunner implements SandboxDockerCommandRunner {
     });
     return {
       stdin: {
-        write() {},
+        write: (data: string | Uint8Array) => {
+          this.terminalWrites.push(
+            typeof data === "string" ? new TextEncoder().encode(data) : data.slice(),
+          );
+        },
         end() {},
       },
       stdout: null,
@@ -157,6 +162,44 @@ describe("DockerSandboxProvider", () => {
         initialCols: 120,
       },
     ]);
+  });
+
+  test("[ADAPTER-CRED-006] opens an exact terminal child from echo-disabled ephemeral input", async () => {
+    const runner = new CapturingRunner();
+    const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
+    await provider.provision(request);
+    const initialInput = new TextEncoder().encode(
+      "export OPENAI_API_KEY='model-secret-value'\nstty echo\nexec \"$@\"\n",
+    );
+
+    await provider.openTerminal({
+      sandboxId: "sbx_demo",
+      providerHandle: "appaloft-sbx_demo",
+      cwd: ".",
+      initialRows: 24,
+      initialCols: 80,
+      process: {
+        argv: ["codex", "exec"],
+        initialInput,
+      },
+    });
+
+    expect(runner.terminalCalls[0]?.argv).toEqual([
+      "docker",
+      "exec",
+      "-it",
+      "-w",
+      "/workspace",
+      "appaloft-sbx_demo",
+      "sh",
+      "-c",
+      expect.stringContaining("stty -echo"),
+      "appaloft-managed-terminal",
+      "codex",
+      "exec",
+    ]);
+    expect(JSON.stringify(runner.terminalCalls[0]?.argv)).not.toContain("model-secret-value");
+    expect(new TextDecoder().decode(runner.terminalWrites[0])).toContain("model-secret-value");
   });
 
   test("[SBX-RUNTIME-002] provisions a constrained gVisor container without shell interpolation", async () => {

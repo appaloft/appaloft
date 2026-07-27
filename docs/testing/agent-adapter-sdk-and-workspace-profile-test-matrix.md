@@ -7,7 +7,7 @@
 | ADAPTER-TRUST-003 | Contract/application | Remote manifest contains code entrypoint or unbounded command | Install rejects without module load or persistence. |
 | ADAPTER-CAP-004 | Contract/client | Required or optional capability is unavailable | Required fails closed; optional action is absent. |
 | ADAPTER-EVENT-005 | Harness/runtime | PTY, line, and structured modes emit output | Fidelity and redaction match declaration; no heuristic inference. |
-| ADAPTER-CRED-006 | Contract/runtime | Named credential requirements are bound | Resolver returns one normalized reference per required requirement; unknown, duplicate, raw-value, missing-required and ambiguous stdin bindings fail closed before runtime effects. |
+| ADAPTER-CRED-006 | Contract/runtime | Named credential requirements are bound and consumed by one child | Resolver returns one normalized reference per required requirement; unknown, duplicate, raw-value, missing-required, ambiguous stdin, cross-tenant, stale-pin and replayed bindings fail closed before child effects. TUI/headless launch records only scope/grant ids, and completion, cancellation, Runtime termination, and Sandbox cleanup revoke the exact scope. |
 | ADAPTER-INSTALL-007 | Application/persistence | Two tenants install the same definition | Definition digest dedupes while application and PGlite repository tests prove tenant-isolated installation/readback. |
 | ADAPTER-DISABLE-008 | Application/persistence | Active Workspace references installation | Aggregate, service, and PGlite reference-reader tests prove disable blocks new use while uninstall fails until references clear. |
 | PROFILE-MANIFEST-009 | Contract/application | Valid Profile references exact Adapter/Template | Compiler emits bounded existing-operation inputs, not a new aggregate. |
@@ -24,6 +24,12 @@
   active installation references.
 - `ADAPTER-CAP-004` is enforced by required capability compilation and capability-gated Web
   mutations; unavailable required capabilities fail before Sandbox creation.
+- `ADAPTER-CRED-006` is covered by operation/schema and SDK credential-reference parity,
+  Profile compilation, immutable Runtime/PGlite binding persistence, declarative Harness launch,
+  echo-disabled managed PTY bootstrap, one-time neutral child-port admission, and
+  completion/cancellation/Runtime/Workspace revocation tests from public #834. Those tests prove
+  secret values stay absent from argv, descriptors, events, logs, snapshots, audit metadata, and
+  serialized Runtime state.
 - `ADAPTER-SURFACE-011` covers both the Adapter and Profile operation families across the catalog,
   HTTP/oRPC, CLI, generated SDK metadata, and Web Console source.
 - `ADAPTER-CODEX-012` remains an explicit opt-in acceptance gate. Its local Docker and real-provider

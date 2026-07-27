@@ -13,6 +13,51 @@ const digestSchema = z
   .regex(/^sha256:[a-f0-9]{64}$/);
 const idSchema = z.string().trim().min(1).max(160);
 const commandSchema = z.array(z.string().min(1).max(16_384)).min(1).max(256);
+export const agentWorkspaceCredentialReferenceSchema = z
+  .object({
+    requirementId: z
+      .string()
+      .trim()
+      .regex(/^[a-z][a-z0-9-]{0,62}$/),
+    secretRef: z
+      .string()
+      .trim()
+      .regex(/^(?:secret|vault|supabase-vault):\/\/[a-zA-Z0-9][a-zA-Z0-9_./:#-]{1,511}$/),
+  })
+  .strict();
+const credentialRequirementSchema = z
+  .object({
+    id: z
+      .string()
+      .trim()
+      .regex(/^[a-z][a-z0-9-]{0,62}$/),
+    kind: z.enum(["model-api", "forge", "custom"]),
+    required: z.boolean(),
+    purpose: z.string().trim().min(1).max(1_000),
+    delivery: z.discriminatedUnion("kind", [
+      z
+        .object({
+          kind: z.literal("process-environment"),
+          variable: z
+            .string()
+            .trim()
+            .regex(/^[A-Z_][A-Z0-9_]{0,127}$/),
+        })
+        .strict(),
+      z.object({ kind: z.literal("stdin") }).strict(),
+    ]),
+  })
+  .strict();
+const credentialBindingSchema = credentialRequirementSchema
+  .omit({ id: true, required: true })
+  .extend({
+    requirementId: z
+      .string()
+      .trim()
+      .regex(/^[a-z][a-z0-9-]{0,62}$/),
+    secretRef: agentWorkspaceCredentialReferenceSchema.shape.secretRef,
+  })
+  .strict();
 const healthcheckSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("process") }).strict(),
   z
@@ -37,7 +82,11 @@ export const showAgentWorkspaceProfileInputSchema = z
   .strict();
 export const disableAgentWorkspaceProfileInputSchema = showAgentWorkspaceProfileInputSchema;
 export const uninstallAgentWorkspaceProfileInputSchema = showAgentWorkspaceProfileInputSchema;
-export const compileAgentWorkspaceProfileInputSchema = showAgentWorkspaceProfileInputSchema;
+export const compileAgentWorkspaceProfileInputSchema = showAgentWorkspaceProfileInputSchema
+  .extend({
+    credentialReferences: z.array(agentWorkspaceCredentialReferenceSchema).max(32).optional(),
+  })
+  .strict();
 
 export const agentWorkspaceProfileInstallationSchema = z
   .object({
@@ -151,7 +200,8 @@ export const compileAgentWorkspaceProfileResponseSchema = z
         })
         .strict(),
     ),
-    credentialRequirements: z.array(z.unknown()),
+    credentialRequirements: z.array(credentialRequirementSchema),
+    credentialBindings: z.array(credentialBindingSchema).optional(),
     pin: z
       .object({
         profileInstallationId: installationIdSchema,

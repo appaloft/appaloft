@@ -16,9 +16,23 @@ import { cliCommandDescriptions } from "./docs-help.js";
 const manifestPathArg = Args.text({ name: "manifest" });
 const installationIdArg = Args.text({ name: "installation-id" });
 const limitOption = Options.integer("limit").pipe(Options.optional);
+const credentialReferenceOption = Options.text("credential-reference").pipe(Options.repeated);
 
 function readManifest(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8")) as unknown;
+}
+
+function credentialReferences(values: readonly string[]) {
+  return values.map((value) => {
+    const separator = value.indexOf("=");
+    if (separator <= 0 || separator === value.length - 1) {
+      throw new TypeError("Credential reference must use requirement-id=secret://reference");
+    }
+    return {
+      requirementId: value.slice(0, separator),
+      secretRef: value.slice(separator + 1),
+    };
+  });
 }
 
 const validateCommand = EffectCommand.make(
@@ -51,8 +65,19 @@ const showCommand = EffectCommand.make(
 
 const compileCommand = EffectCommand.make(
   "compile",
-  { installationId: installationIdArg },
-  ({ installationId }) => runQuery(CompileAgentWorkspaceProfileQuery.create({ installationId })),
+  {
+    installationId: installationIdArg,
+    credentialReference: credentialReferenceOption,
+  },
+  ({ credentialReference, installationId }) =>
+    runQuery(
+      CompileAgentWorkspaceProfileQuery.create({
+        installationId,
+        ...(credentialReference.length
+          ? { credentialReferences: credentialReferences(credentialReference) }
+          : {}),
+      }),
+    ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.agentWorkspaceProfileCompile));
 
 const disableCommand = EffectCommand.make(

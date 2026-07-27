@@ -529,12 +529,13 @@ const nativeAttach = EffectCommand.make(
       )) as AgentRuntimeListResult;
       const runtime = runtimes.items.find(
         (candidate) =>
-          candidate.interaction?.transport === "native-attach" &&
-          Number.isInteger(candidate.interaction.serverPort),
+          candidate.interaction?.transport === "managed-terminal" ||
+          (candidate.interaction?.transport === "native-attach" &&
+            Number.isInteger(candidate.interaction.serverPort)),
       );
-      if (!runtime?.interaction?.serverPort) {
-        throw domainError.conflict("Workspace Runtime does not support scoped native attach", {
-          code: "agent_workspace_native_attach_unavailable",
+      if (!runtime?.interaction) {
+        throw domainError.conflict("Workspace Runtime does not support Agent attach", {
+          code: "agent_workspace_attach_unavailable",
           workspaceId,
         });
       }
@@ -553,7 +554,7 @@ const nativeAttach = EffectCommand.make(
     }),
 ).pipe(
   EffectCommand.withDescription(
-    "Issue short-lived private access for a native agent client when the gateway supports it",
+    "Attach through the Agent-owned managed terminal or a scoped native client",
   ),
 );
 

@@ -14,16 +14,17 @@ describe("CommandSandboxAgentHarness", () => {
     const execution: CommandSandboxAgentExecutionPort = {
       exec: async (_context, _sandboxId, input) => {
         commands.push(input.argv);
-        const outputRoot = input.argv[4];
-        const stdoutPath = input.argv[5];
-        const stderrPath = input.argv[6];
+        const privileged = input.argv[1]?.includes('exec "$@"') ?? false;
+        const outputRoot = input.argv[privileged ? 3 : 4];
+        const stdoutPath = input.argv[privileged ? 4 : 5];
+        const stderrPath = input.argv[privileged ? 5 : 6];
         const exitPath = input.argv[7];
-        if (!outputRoot || !stdoutPath || !stderrPath || !exitPath) {
+        if (!outputRoot || !stdoutPath || !stderrPath || (!privileged && !exitPath)) {
           return err(new Error("invalid command wrapper"));
         }
         files.set(stdoutPath, new TextEncoder().encode("custom agent completed\n"));
         files.set(stderrPath, new Uint8Array());
-        files.set(exitPath, new TextEncoder().encode("0"));
+        if (exitPath) files.set(exitPath, new TextEncoder().encode("0"));
         return ok({ mode: "background", processId: "spr_custom" } as SandboxExecResult);
       },
       listProcesses: async () =>
@@ -58,6 +59,7 @@ describe("CommandSandboxAgentHarness", () => {
     });
 
     const events: string[] = [];
+    const privilegedLaunches: string[][] = [];
     const result = await harness.execute({
       executionContext: createExecutionContext({ requestId: "req_custom_agent" }),
       sandboxId: "sbx_custom",
@@ -65,6 +67,14 @@ describe("CommandSandboxAgentHarness", () => {
       runId: "srun_custom",
       task: "fix the failing test",
       context: { mode: "fresh" },
+      launchProcess: async (input) => {
+        privilegedLaunches.push([...input.argv]);
+        return execution.exec(
+          createExecutionContext({ requestId: "req_custom_agent_launch" }),
+          "sbx_custom",
+          input,
+        );
+      },
       emitEvent: async (event) => {
         events.push(String(event.data.text));
       },
@@ -80,6 +90,8 @@ describe("CommandSandboxAgentHarness", () => {
       healthcheck: { kind: "process" },
     });
     expect(commands[0]).toContain("fix the failing test");
+    expect(privilegedLaunches[0]).toContain("fix the failing test");
+    expect(commands).toHaveLength(1);
     expect(events).toEqual(["custom agent completed"]);
     expect(result.outcomeDigest).toMatch(/^sha256:[a-f0-9]{64}$/);
   });

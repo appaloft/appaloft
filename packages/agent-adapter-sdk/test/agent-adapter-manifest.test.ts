@@ -115,6 +115,34 @@ function validProfile() {
 }
 
 describe("Agent Adapter manifest validation", () => {
+  test("[ADAPTER-MANIFEST-001][PROFILE-MANIFEST-009] accepts generated Sandbox Template ids", () => {
+    const sandboxTemplateId = "stp_codex_smoke_123";
+    expect(
+      validateAgentAdapterManifest({
+        ...validManifest(),
+        requirements: {
+          ...validManifest().requirements,
+          sandboxTemplate: {
+            ...validManifest().requirements.sandboxTemplate,
+            id: sandboxTemplateId,
+          },
+        },
+      }).ok,
+    ).toBe(true);
+    expect(
+      validateAgentWorkspaceProfile({
+        ...validProfile(),
+        sandbox: {
+          ...validProfile().sandbox,
+          template: {
+            ...validProfile().sandbox.template,
+            id: sandboxTemplateId,
+          },
+        },
+      }).ok,
+    ).toBe(true);
+  });
+
   test("[ADAPTER-MANIFEST-001] normalizes a manifest and produces a stable digest", () => {
     const first = validateAgentAdapterManifest(validManifest(), {
       availableCapabilities: ["credential-grants", "managed-terminal"],

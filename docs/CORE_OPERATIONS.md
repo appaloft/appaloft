@@ -1006,11 +1006,14 @@ Workspace pin; it does not create a second Workspace aggregate.
 | `agent-workspace-profiles.install` | Command | `InstallAgentWorkspaceProfileCommand` | Declarative Profile manifest | `appaloft agent-workspace-profile install <manifest>` | `POST /api/agent-workspace-profiles` |
 | `agent-workspace-profiles.list` | Query | `ListAgentWorkspaceProfilesQuery` | Optional bounded limit | `appaloft agent-workspace-profile list` | `GET /api/agent-workspace-profiles` |
 | `agent-workspace-profiles.show` | Query | `ShowAgentWorkspaceProfileQuery` | Installation id | `appaloft agent-workspace-profile show <installationId>` | `GET /api/agent-workspace-profiles/{installationId}` |
-| `agent-workspace-profiles.compile` | Query | `CompileAgentWorkspaceProfileQuery` | Installation id | `appaloft agent-workspace-profile compile <installationId>` | `POST /api/agent-workspace-profiles/{installationId}/compile` |
+| `agent-workspace-profiles.compile` | Query | `CompileAgentWorkspaceProfileQuery` | Installation id and optional named credential references | `appaloft agent-workspace-profile compile <installationId> [--credential-reference requirement=secret://ref]` | `POST /api/agent-workspace-profiles/{installationId}/compile` |
 | `agent-workspace-profiles.disable` | Command | `DisableAgentWorkspaceProfileCommand` | Installation id | `appaloft agent-workspace-profile disable <installationId>` | `POST /api/agent-workspace-profiles/{installationId}/disable` |
 | `agent-workspace-profiles.uninstall` | Command | `UninstallAgentWorkspaceProfileCommand` | Installation id | `appaloft agent-workspace-profile uninstall <installationId>` | `DELETE /api/agent-workspace-profiles/{installationId}` |
 
-Profile reads and compilation are tenant-scoped. Disable blocks new Workspace compilation without
+Profile reads and compilation are tenant-scoped. Compilation optionally accepts bounded
+`credentialReferences` (`requirementId` plus `secretRef`) so the same pinned definition can fail
+closed before Workspace effects. Its response may contain normalized binding metadata but never a
+secret value. Disable blocks new Workspace compilation without
 altering an existing resolved pin. Uninstall is fenced while any active Workspace references the
 Profile installation. The referenced Adapter installation is independently subject to the same
 disable and uninstall safety rules.
@@ -1031,7 +1034,7 @@ addressable. Pi is an adapter and therefore does not appear in operation names.
 | Operation | Type | Message | Input | CLI | HTTP/oRPC |
 | --- | --- | --- | --- | --- | --- |
 | `sandboxes.agents.harnesses.list` | Query | `ListSandboxAgentHarnessesQuery` | Empty | `appaloft workspace harness list` | `GET /api/sandbox-agent-harnesses` |
-| `sandboxes.agents.runtimes.create` | Command | `CreateSandboxAgentRuntimeCommand` | Sandbox id, harness/template keys, idempotency key | `appaloft sandbox agent runtime create <sandboxId>` | `POST /api/sandboxes/{sandboxId}/agent-runtimes` |
+| `sandboxes.agents.runtimes.create` | Command | `CreateSandboxAgentRuntimeCommand` | Sandbox id, harness/template keys, idempotency key, optional Profile installation id and named credential references | `appaloft sandbox agent runtime create <sandboxId>` | `POST /api/sandboxes/{sandboxId}/agent-runtimes` |
 | `sandboxes.agents.runtimes.attach` | Command | `IssueSandboxAgentAttachAccessCommand` | Sandbox/runtime ids, expiry no later than one hour | `appaloft workspace attach <workspaceId>` | `POST /api/sandboxes/{sandboxId}/agent-runtimes/{runtimeId}/attach` |
 | `sandboxes.agents.runtimes.list` | Query | `ListSandboxAgentRuntimesQuery` | Sandbox id | `appaloft sandbox agent runtime list <sandboxId>` | `GET /api/sandboxes/{sandboxId}/agent-runtimes` |
 | `sandboxes.agents.runtimes.show` | Query | `ShowSandboxAgentRuntimeQuery` | Sandbox id, runtime id | `appaloft sandbox agent runtime show <sandboxId> <runtimeId>` | `GET /api/sandboxes/{sandboxId}/agent-runtimes/{runtimeId}` |

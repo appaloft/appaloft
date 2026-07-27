@@ -91,12 +91,31 @@ describe("PgSandboxAgentDeliveryRepository", () => {
         runtime,
         harnessKey: "pi",
         idempotencyKey: "runtime_once",
+        credentialBindings: [
+          {
+            requirementId: "model-api",
+            kind: "model-api",
+            purpose: "Model access",
+            delivery: {
+              kind: "process-environment",
+              variable: "OPENAI_API_KEY",
+            },
+            secretRef: "secret://model/codex",
+          },
+        ],
       });
-      expect(
-        (
-          await repository.findRuntimeByIdempotencyKey(tenantA, "sbx_agent_pg", "runtime_once")
-        )?.runtime.toState().status.value,
-      ).toBe("ready");
+      const storedRuntime = await repository.findRuntimeByIdempotencyKey(
+        tenantA,
+        "sbx_agent_pg",
+        "runtime_once",
+      );
+      expect(storedRuntime?.runtime.toState().status.value).toBe("ready");
+      expect(storedRuntime?.credentialBindings).toEqual([
+        expect.objectContaining({
+          requirementId: "model-api",
+          secretRef: "secret://model/codex",
+        }),
+      ]);
       expect(await repository.findRuntime(tenantB, "sar_pg")).toBeNull();
 
       const firstClaim = await repository.findRuntime(tenantA, "sar_pg");
@@ -115,6 +134,9 @@ describe("PgSandboxAgentDeliveryRepository", () => {
         })
         ._unsafeUnwrap();
       expect((await repository.claimRuntime(tenantA, firstClaim)).claimed).toBe(true);
+      expect((await repository.findRuntime(tenantA, "sar_pg"))?.credentialBindings).toEqual(
+        firstClaim.credentialBindings,
+      );
       expect(await repository.claimRuntime(tenantA, competingClaim)).toEqual({
         claimed: false,
         activeRunId: "srun_first",

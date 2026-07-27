@@ -20,7 +20,9 @@ The returned `workspaceId` is the Sandbox id. No second Workspace record or life
    admitted Sandbox Template.
 2. `sandboxes.create` creates and reconciles one tenant-scoped Sandbox.
 3. Optional Git source and branch materialization executes with validated refs and argv arrays.
-4. `sandboxes.agents.runtimes.create` creates the harness Runtime.
+4. `sandboxes.agents.runtimes.create` creates the harness Runtime. A Profile with credential
+   requirements accepts named references only, persists them with the immutable Profile/Adapter
+   pin, and admits the exact child-process scope.
 5. If source or Runtime creation fails, the already-created Sandbox remains addressable. CLI/SDK error
    evidence includes the Sandbox id so the caller can retry Runtime creation or terminate it.
 6. Pi is ready for managed Runs and interactive use through the Sandbox terminal.
@@ -51,6 +53,13 @@ Sandbox port capability that expires no later than one hour through the configur
 substitutes that safe URL into the local attach handoff. A provider without scoped,
 expiring and revocable private access reports attach as unavailable; it must never return a raw
 provider host or long-lived SSH credential.
+
+## Declarative Agent Attach
+
+`workspace.agent.attach()` preserves the Agent's own interface. Native-server Agents return their
+scoped client command. Declarative TUI Agents return a managed-terminal session whose exact child
+is launched through the same process credential grant port as headless tasks. Appaloft streams the
+Agent-owned PTY and does not reimplement or parse the vendor TUI.
 
 ## Task Run
 

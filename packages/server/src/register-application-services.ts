@@ -11,6 +11,7 @@ import {
   agentAdapterApiVersion,
   agentAdapterHostCapabilities,
   compileAgentWorkspaceProfile,
+  resolveAgentAdapterCredentialBindings,
   validateAgentAdapterManifest,
   validateAgentWorkspaceProfile,
 } from "@appaloft/agent-adapter-sdk";
@@ -3639,9 +3640,35 @@ export function registerApplicationServices(
                 })),
               };
             }
+            const bindings = input.credentialReferences
+              ? resolveAgentAdapterCredentialBindings(
+                  input.adapterInstallation.definition.manifest,
+                  input.credentialReferences,
+                )
+              : undefined;
+            if (bindings && !bindings.ok) {
+              return {
+                ok: false,
+                issues: bindings.issues.map((issue) => ({
+                  code: issue.code,
+                  path: issue.path ?? [],
+                  message: issue.message,
+                })),
+              };
+            }
             return {
               ok: true,
-              plan: compiled.plan,
+              plan: {
+                ...compiled.plan,
+                ...(bindings?.ok
+                  ? {
+                      credentialBindings: bindings.bindings.map((binding) => ({
+                        ...binding,
+                        delivery: { ...binding.delivery },
+                      })),
+                    }
+                  : {}),
+              },
             };
           },
         },
@@ -3771,6 +3798,13 @@ export function registerApplicationServices(
           dependencyContainer.resolve<AgentWorkspaceProfileInstallationService>(
             tokens.agentWorkspaceProfileInstallationService,
           ),
+        ...(dependencyContainer.isRegistered(tokens.sandboxAgentProcessCredentialGrants, true)
+          ? {
+              processCredentialGrants: dependencyContainer.resolve(
+                tokens.sandboxAgentProcessCredentialGrants,
+              ),
+            }
+          : {}),
         taskProtector: dependencyContainer.resolve(tokens.controlPlaneSecretProtector),
         clock: dependencyContainer.resolve(tokens.clock),
         idGenerator: dependencyContainer.resolve(tokens.idGenerator),

@@ -16,6 +16,7 @@ export const agentAdapterHostCapabilities = [
 ] as const;
 
 const identifierPattern = /^[a-z][a-z0-9-]{0,62}$/;
+const sandboxTemplateIdentifierPattern = /^[a-z][a-z0-9_-]{0,127}$/;
 const digestPattern = /^sha256:[a-f0-9]{64}$/;
 const environmentVariablePattern = /^[A-Z_][A-Z0-9_]{0,127}$/;
 const secretReferencePattern =
@@ -39,6 +40,7 @@ const shellExecutables = new Set([
 ]);
 
 const identifierSchema = z.string().trim().regex(identifierPattern);
+const sandboxTemplateIdentifierSchema = z.string().trim().regex(sandboxTemplateIdentifierPattern);
 const nonEmptyTextSchema = z.string().trim().min(1).max(1_000);
 const versionSchema = z
   .string()
@@ -206,7 +208,7 @@ export const agentAdapterManifestSchema = z
         adapterApi: versionRangeSchema,
         sandboxTemplate: z
           .object({
-            id: identifierSchema,
+            id: sandboxTemplateIdentifierSchema,
             version: versionRangeSchema,
             digest: digestSchema,
           })
@@ -374,7 +376,7 @@ export const agentWorkspaceProfileSchema = z
       .object({
         template: z
           .object({
-            id: identifierSchema,
+            id: sandboxTemplateIdentifierSchema,
             version: versionSchema,
             digest: digestSchema,
           })

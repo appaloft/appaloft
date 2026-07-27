@@ -4,7 +4,7 @@
 
 | Operation | Intent | Required identity/scope | Result |
 | --- | --- | --- | --- |
-| `sandboxes.agents.runtimes.create` | Create one harness-neutral Runtime under a ready Sandbox from an admitted template. | Sandbox write | Stable Runtime descriptor. |
+| `sandboxes.agents.runtimes.create` | Create one harness-neutral Runtime under a ready Sandbox from an admitted template. Profile creation can bind named secret references to the immutable Adapter/Profile pin; only normalized bindings are persisted. | Sandbox write | Stable Runtime descriptor without credential values. |
 | `sandboxes.agents.runtimes.terminate` | Terminate one Runtime and cancel/terminate any active Run. | Sandbox write | Terminal Runtime descriptor. |
 | `sandboxes.agents.runs.create` | Submit one fresh or explicit-continuation task with idempotency key. | Runtime execute | Accepted Run descriptor or busy conflict with active Run id. |
 | `sandboxes.agents.runs.cancel` | Request cancellation of one active Run. | Runtime execute | Cancelling/terminal Run descriptor. |
@@ -13,6 +13,15 @@
 The command payload never accepts caller conversation history as Appaloft-owned state. Instructions
 are bounded task input encrypted at rest; persisted events contain only redacted observable output. Runtime-scoped
 credentials and identities cannot resolve approvals.
+
+For declarative Profiles with credential requirements, Runtime creation calls the configured
+`SandboxAgentProcessCredentialGrantPort` before any child process. The port validates the tenant,
+Sandbox, installation, definition digest and Runtime scope. Headless runs and Agent-owned managed
+terminals both launch through this port; ordinary Sandbox `exec` and generic shell terminals cannot
+inherit the grants. A managed terminal delivers its bounded bootstrap through an echo-disabled PTY
+input channel; secret values never enter Docker/SSH argv or the terminal descriptor. Completion,
+cancellation, Runtime termination and Workspace cleanup revoke the matching run or Runtime scope.
+Missing ports, stale pins, duplicate/replayed references, and cross-tenant scopes fail closed.
 
 ## Artifact And Candidate Preview
 

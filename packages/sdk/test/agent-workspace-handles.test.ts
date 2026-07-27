@@ -196,7 +196,24 @@ describe("Agent Workspace SDK handles", () => {
             },
             defaultPorts: [{ name: "web", port: 3000, visibility: "private", ttlSeconds: 3_600 }],
             suggestedChecks: [],
-            credentialRequirements: [],
+            credentialRequirements: [
+              {
+                id: "model-api",
+                kind: "model-api",
+                required: true,
+                purpose: "Codex model access",
+                delivery: { kind: "process-environment", variable: "OPENAI_API_KEY" },
+              },
+            ],
+            credentialBindings: [
+              {
+                requirementId: "model-api",
+                kind: "model-api",
+                purpose: "Codex model access",
+                delivery: { kind: "process-environment", variable: "OPENAI_API_KEY" },
+                secretRef: "secret://model/codex",
+              },
+            ],
             pin: {
               profileInstallationId: "awpi_opencode",
               profileDefinitionDigest: digest,
@@ -241,12 +258,19 @@ describe("Agent Workspace SDK handles", () => {
             status: "ready",
           });
         }
+        if (path === "/api/sandboxes/sbx_profile/agent-runtimes/sar_profile/terminate") {
+          return Response.json({ runtimeId: "sar_profile", status: "terminated" });
+        }
+        if (path === "/api/sandboxes/sbx_profile/terminate") {
+          return Response.json({ sandboxId: "sbx_profile", status: "terminated" });
+        }
         throw new Error(`Unexpected SDK request ${request.method} ${path}`);
       },
     });
 
     const workspace = await appaloft.workspaces.create({
       profileInstallationId: "awpi_opencode",
+      credentialReferences: [{ requirementId: "model-api", secretRef: "secret://model/codex" }],
       idempotencyKey: "profile-workspace-1",
     });
 
@@ -261,6 +285,9 @@ describe("Agent Workspace SDK handles", () => {
       "/api/sandboxes/sbx_profile/ports",
       "/api/sandboxes/sbx_profile/agent-runtimes",
     ]);
+    expect(await requests[0]?.json()).toEqual({
+      credentialReferences: [{ requirementId: "model-api", secretRef: "secret://model/codex" }],
+    });
     expect(await requests[1]?.json()).toEqual({
       source: { kind: "template", templateId: "sbt_opencode" },
       requestedIsolation: "gvisor",
@@ -276,7 +303,13 @@ describe("Agent Workspace SDK handles", () => {
       harnessTemplateId: "command-agent",
       idempotencyKey: "profile-workspace-1",
       profileInstallationId: "awpi_opencode",
+      credentialReferences: [{ requirementId: "model-api", secretRef: "secret://model/codex" }],
     });
+    await workspace.terminate();
+    expect(requests.slice(-2).map((request) => new URL(request.url).pathname)).toEqual([
+      "/api/sandboxes/sbx_profile/agent-runtimes/sar_profile/terminate",
+      "/api/sandboxes/sbx_profile/terminate",
+    ]);
   });
 
   test("[AGENT-WS-SDK-013] preserves the created Sandbox id when Runtime creation fails", async () => {
