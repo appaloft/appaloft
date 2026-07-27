@@ -1,9 +1,4 @@
 import {
-  type AgentAdapterInstallationResponse,
-  type UninstallAgentAdapterResponse,
-  type ValidateAgentAdapterResponse,
-} from "@appaloft/application";
-import {
   type AcceptBlueprintInstallCommandInput,
   type AcceptBlueprintInstallCommandResponse,
   type AcceptConnectorCapabilityPlanCommandInput,
@@ -274,6 +269,8 @@ import {
 import {
   type AcceptConnectorCapabilityPlanResponse,
   type AccountProfileResponse,
+  type AgentAdapterInstallationResponse,
+  type AgentWorkspaceProfileInstallationResponse,
   type ArchiveDeploymentResponse,
   type ArchiveEnvironmentResponse,
   type ArchiveProjectResponse,
@@ -293,6 +290,7 @@ import {
   type CleanupStorageVolumeRuntimeResponse,
   type CloneEnvironmentResponse,
   type CloseTerminalSessionResponse,
+  type CompileAgentWorkspaceProfileResponse,
   type CompleteConnectionCallbackResponse,
   type ConfigureDefaultAccessDomainPolicyResponse,
   type ConfigureDependencyResourceBackupPolicyResponse,
@@ -490,8 +488,12 @@ import {
   type TestServerConnectivityResponse,
   type TransferOrganizationOwnerResponse,
   type UnbindResourceDependencyResponse,
+  type UninstallAgentAdapterResponse,
+  type UninstallAgentWorkspaceProfileResponse,
   type UnlockEnvironmentResponse,
   type UnsetResourceVariableResponse,
+  type ValidateAgentAdapterResponse,
+  type ValidateAgentWorkspaceProfileResponse,
 } from "@appaloft/contracts";
 import { type AsyncIteratorClass, type Client, type ORPCError } from "@orpc/client";
 
@@ -653,6 +655,50 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       { installationId: string },
       UninstallAgentAdapterResponse,
+      AppaloftClientError
+    >;
+  };
+  agentWorkspaceProfiles: {
+    validate: Client<
+      AppaloftClientContext,
+      { manifest: unknown },
+      ValidateAgentWorkspaceProfileResponse,
+      AppaloftClientError
+    >;
+    install: Client<
+      AppaloftClientContext,
+      { manifest: unknown },
+      AgentWorkspaceProfileInstallationResponse,
+      AppaloftClientError
+    >;
+    list: Client<
+      AppaloftClientContext,
+      { limit?: number },
+      AgentWorkspaceProfileInstallationResponse[],
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      { installationId: string },
+      AgentWorkspaceProfileInstallationResponse,
+      AppaloftClientError
+    >;
+    compile: Client<
+      AppaloftClientContext,
+      { installationId: string },
+      CompileAgentWorkspaceProfileResponse,
+      AppaloftClientError
+    >;
+    disable: Client<
+      AppaloftClientContext,
+      { installationId: string },
+      AgentWorkspaceProfileInstallationResponse,
+      AppaloftClientError
+    >;
+    uninstall: Client<
+      AppaloftClientContext,
+      { installationId: string },
+      UninstallAgentWorkspaceProfileResponse,
       AppaloftClientError
     >;
   };

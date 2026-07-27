@@ -1,10 +1,10 @@
 ---
 title: "Manage Agent Adapters"
-description: "Validate, install, and manage tenant-isolated declarative Agent Adapters."
+description: "Validate, install, and manage tenant-isolated Agent Adapters and Workspace Profiles."
 docType: task
 localeState: { zh-CN: complete, en-US: complete }
 searchAliases: ["Agent Adapter", "adapter manifest", "Codex", "OpenCode", "Pi"]
-relatedOperations: [agent-adapters.validate, agent-adapters.install, agent-adapters.list, agent-adapters.show, agent-adapters.disable, agent-adapters.uninstall]
+relatedOperations: [agent-adapters.validate, agent-adapters.install, agent-adapters.list, agent-adapters.show, agent-adapters.disable, agent-adapters.uninstall, agent-workspace-profiles.validate, agent-workspace-profiles.install, agent-workspace-profiles.list, agent-workspace-profiles.show, agent-workspace-profiles.compile, agent-workspace-profiles.disable, agent-workspace-profiles.uninstall]
 sidebar: { label: "Agent Adapters", order: 1 }
 ---
 
@@ -79,6 +79,63 @@ appaloft agent-adapter show <installation-id>
 You can also paste, validate, and install a manifest from “Organization settings → Agent Adapters”
 in the Web Console.
 
+## Install a Workspace Profile
+
+A Workspace Profile composes one exact Adapter definition, Sandbox template, runtime limits,
+initialization commands, default ports, and suggested checks into a reusable entry point. It never
+runs an installer during validation and does not introduce another Workspace aggregate. Before
+Workspace creation, Appaloft compiles the Profile and pins the resolved Adapter digest, Sandbox
+template digest, Harness, and capability snapshot to the Runtime.
+
+```json
+{
+  "schemaVersion": "appaloft.agent-workspace-profile/v1",
+  "id": "codex-standard",
+  "displayName": "Codex Standard",
+  "version": "1.0.0",
+  "adapter": {
+    "id": "codex",
+    "version": "1.0.0",
+    "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "interactiveModeId": "terminal",
+    "taskModeId": "headless"
+  },
+  "harnessTemplateId": "aht_codex_declarative_v1",
+  "sandbox": {
+    "template": {
+      "id": "agent-workspace",
+      "version": "1.0.0",
+      "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "requestedIsolation": "container-trusted",
+    "limits": {
+      "cpuMillis": 2000,
+      "memoryBytes": 4294967296,
+      "diskBytes": 21474836480,
+      "maxProcesses": 128
+    },
+    "networkPolicy": { "mode": "deny" }
+  },
+  "workingDirectory": "/workspace",
+  "initialization": [{ "id": "verify-codex", "argv": ["codex", "--version"] }],
+  "defaultPorts": [],
+  "persistentPaths": ["/workspace/.codex"],
+  "suggestedChecks": []
+}
+```
+
+```bash
+appaloft agent-workspace-profile validate ./codex.profile.json
+appaloft agent-workspace-profile install ./codex.profile.json
+appaloft agent-workspace-profile list
+appaloft agent-workspace-profile compile <installation-id>
+```
+
+Organization administrators can perform the same lifecycle actions in “Organization settings →
+Workspace Profiles.” Developers select an enabled Profile on the Workspaces page before creating a
+Workspace. Unavailable capabilities keep the affected control disabled instead of silently
+degrading after creation.
+
 ## Disable and uninstall
 
 Disabling blocks new Workspaces from resolving the installation while preserving recovery references
@@ -97,3 +154,10 @@ appaloft agent-adapter uninstall <installation-id>
 
 Uninstall removes only the current organization's installation. It does not delete an immutable
 definition shared by another organization or terminate existing Sandbox or Agent processes.
+
+Workspace Profiles use the same disable and active-reference fencing semantics:
+
+```bash
+appaloft agent-workspace-profile disable <installation-id>
+appaloft agent-workspace-profile uninstall <installation-id>
+```

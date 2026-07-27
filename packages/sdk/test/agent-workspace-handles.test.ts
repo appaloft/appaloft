@@ -171,6 +171,114 @@ describe("Agent Workspace SDK handles", () => {
     });
   });
 
+  test("[PROFILE-PIN-010] creates a Workspace from one compiled Profile pin", async () => {
+    const requests: Request[] = [];
+    const digest = `sha256:${"a".repeat(64)}`;
+    const templateDigest = `sha256:${"b".repeat(64)}`;
+    const appaloft = createAppaloftClient({
+      baseUrl: "https://appaloft.example/api",
+      fetch: async (request) => {
+        requests.push(request);
+        const path = new URL(request.url).pathname;
+        if (path === "/api/agent-workspace-profiles/awpi_opencode/compile") {
+          return Response.json({
+            sandbox: {
+              source: { kind: "template", templateId: "sbt_opencode" },
+              requestedIsolation: "gvisor",
+              limits: sandboxInput.limits,
+              networkPolicy: { mode: "deny" },
+            },
+            initialization: [{ id: "install", argv: ["npm", "install"], cwd: "workspace" }],
+            runtime: {
+              harnessKey: "profile-opencode",
+              harnessTemplateId: "command-agent",
+              declarativeHarness: {},
+            },
+            defaultPorts: [{ name: "web", port: 3000, visibility: "private", ttlSeconds: 3_600 }],
+            suggestedChecks: [],
+            credentialRequirements: [],
+            pin: {
+              profileInstallationId: "awpi_opencode",
+              profileDefinitionDigest: digest,
+              profileId: "opencode-default",
+              profileVersion: "1.0.0",
+              adapterInstallationId: "aai_opencode",
+              adapterDefinitionDigest: digest,
+              adapterId: "opencode",
+              adapterVersion: "1.0.0",
+              harnessKey: "profile-opencode",
+              harnessTemplateId: "command-agent",
+              sandboxTemplateId: "sbt_opencode",
+              sandboxTemplateVersion: "1.0.0",
+              sandboxTemplateDigest: templateDigest,
+              capabilities: {
+                taskMode: true,
+                interactive: true,
+                backgroundRuns: true,
+                nativeSession: true,
+                persistentPaths: ["/workspace"],
+              },
+            },
+          });
+        }
+        if (path === "/api/sandboxes") {
+          return Response.json({ sandboxId: "sbx_profile", status: "ready" }, { status: 201 });
+        }
+        if (path === "/api/sandboxes/sbx_profile/exec") {
+          return Response.json({
+            mode: "foreground",
+            frames: [{ kind: "exit", exitCode: 0 }],
+          });
+        }
+        if (path === "/api/sandboxes/sbx_profile/ports") {
+          return Response.json({ exposureId: "spe_web", port: 3000 }, { status: 201 });
+        }
+        if (path === "/api/sandboxes/sbx_profile/agent-runtimes") {
+          return Response.json({
+            sandboxId: "sbx_profile",
+            runtimeId: "sar_profile",
+            harnessKey: "profile-opencode",
+            status: "ready",
+          });
+        }
+        throw new Error(`Unexpected SDK request ${request.method} ${path}`);
+      },
+    });
+
+    const workspace = await appaloft.workspaces.create({
+      profileInstallationId: "awpi_opencode",
+      idempotencyKey: "profile-workspace-1",
+    });
+
+    expect(workspace).toMatchObject({
+      sandboxId: "sbx_profile",
+      agent: { runtimeId: "sar_profile", harnessKey: "profile-opencode" },
+    });
+    expect(requests.map((request) => new URL(request.url).pathname)).toEqual([
+      "/api/agent-workspace-profiles/awpi_opencode/compile",
+      "/api/sandboxes",
+      "/api/sandboxes/sbx_profile/exec",
+      "/api/sandboxes/sbx_profile/ports",
+      "/api/sandboxes/sbx_profile/agent-runtimes",
+    ]);
+    expect(await requests[1]?.json()).toEqual({
+      source: { kind: "template", templateId: "sbt_opencode" },
+      requestedIsolation: "gvisor",
+      limits: sandboxInput.limits,
+      networkPolicy: { mode: "deny", rules: [] },
+    });
+    expect(await requests[2]?.json()).toEqual({
+      argv: ["npm", "install"],
+      cwd: "workspace",
+    });
+    expect(await requests[4]?.json()).toEqual({
+      harnessKey: "profile-opencode",
+      harnessTemplateId: "command-agent",
+      idempotencyKey: "profile-workspace-1",
+      profileInstallationId: "awpi_opencode",
+    });
+  });
+
   test("[AGENT-WS-SDK-013] preserves the created Sandbox id when Runtime creation fails", async () => {
     const appaloft = createAppaloftClient({
       baseUrl: "https://appaloft.example/api",

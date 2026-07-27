@@ -67,6 +67,7 @@ import {
   CloseWorkspaceCollaborationCommand,
   type Command,
   type CommandBus,
+  CompileAgentWorkspaceProfileQuery,
   CompleteConnectionCallbackCommand,
   ConfigureAuditEventLegalHoldCommand,
   ConfigureDefaultAccessDomainPolicyCommand,
@@ -142,6 +143,8 @@ import {
   cloneEnvironmentCommandInputSchema,
   closeTerminalSessionCommandInputSchema,
   closeWorkspaceCollaborationInputSchema,
+  compileAgentWorkspaceProfileInputSchema,
+  compileAgentWorkspaceProfileResponseSchema,
   completeConnectionCallbackCommandInputSchema,
   configureAuditEventLegalHoldCommandInputSchema,
   configureDefaultAccessDomainPolicyCommandInputSchema,
@@ -230,6 +233,7 @@ import {
   DiffEnvironmentProfileQuery,
   DiffEnvironmentsQuery,
   DisableAgentAdapterCommand,
+  DisableAgentWorkspaceProfileCommand,
   DoctorQuery,
   DuplicateEnvironmentProfileCommand,
   deactivateServerCommandInputSchema,
@@ -263,6 +267,8 @@ import {
   diffEnvironmentsQueryInputSchema,
   disableAgentAdapterInputSchema,
   disableAgentAdapterResponseSchema,
+  disableAgentWorkspaceProfileInputSchema,
+  disableAgentWorkspaceProfileResponseSchema,
   duplicateEnvironmentProfileCommandInputSchema,
   type EnvironmentDuplicatePlanSummary,
   type EnvironmentDuplicateProfileApplyResult,
@@ -319,6 +325,7 @@ import {
   type InspectRuntimeUsageQueryInput,
   InspectServerCapacityQuery,
   InstallAgentAdapterCommand,
+  InstallAgentWorkspaceProfileCommand,
   InviteOrganizationMemberCommand,
   IssueOrRenewCertificateCommand,
   IssueSandboxAgentAttachAccessCommand,
@@ -334,6 +341,8 @@ import {
   inspectServerCapacityQueryInputSchema,
   installAgentAdapterInputSchema,
   installAgentAdapterResponseSchema,
+  installAgentWorkspaceProfileInputSchema,
+  installAgentWorkspaceProfileResponseSchema,
   inviteOrganizationMemberCommandInputSchema,
   issueOrRenewCertificateCommandInputSchema,
   issueSandboxAgentAttachAccessInputSchema,
@@ -342,6 +351,7 @@ import {
   ListAccountSessionsQuery,
   ListAgentAdaptersQuery,
   ListAgentTaskRunsQuery,
+  ListAgentWorkspaceProfilesQuery,
   ListAuditEventArchivesQuery,
   ListAuditEventLegalHoldsQuery,
   ListAuditEventsQuery,
@@ -411,6 +421,8 @@ import {
   listAgentAdaptersInputSchema,
   listAgentAdaptersResponseSchema,
   listAgentTaskRunsInputSchema,
+  listAgentWorkspaceProfilesInputSchema,
+  listAgentWorkspaceProfilesResponseSchema,
   listAuditEventArchivesQueryInputSchema,
   listAuditEventLegalHoldsQueryInputSchema,
   listAuditEventsQueryInputSchema,
@@ -660,6 +672,7 @@ import {
   ShowAccountProfileQuery,
   ShowAgentAdapterQuery,
   ShowAgentTaskRunQuery,
+  ShowAgentWorkspaceProfileQuery,
   ShowAuditEventArchiveQuery,
   ShowAuditEventLegalHoldQuery,
   ShowAuditEventQuery,
@@ -739,6 +752,8 @@ import {
   showAgentAdapterInputSchema,
   showAgentAdapterResponseSchema,
   showAgentTaskRunInputSchema,
+  showAgentWorkspaceProfileInputSchema,
+  showAgentWorkspaceProfileResponseSchema,
   showAuditEventArchiveQueryInputSchema,
   showAuditEventLegalHoldQueryInputSchema,
   showAuditEventQueryInputSchema,
@@ -813,18 +828,24 @@ import {
   transferWorkspaceWriterLeaseInputSchema,
   UnbindResourceDependencyCommand,
   UninstallAgentAdapterCommand,
+  UninstallAgentWorkspaceProfileCommand,
   UnlockEnvironmentCommand,
   UnsetEnvironmentVariableCommand,
   UnsetResourceVariableCommand,
   unbindResourceDependencyCommandInputSchema,
   uninstallAgentAdapterInputSchema,
   uninstallAgentAdapterResponseSchema,
+  uninstallAgentWorkspaceProfileInputSchema,
+  uninstallAgentWorkspaceProfileResponseSchema,
   unlockEnvironmentCommandInputSchema,
   unsetEnvironmentVariableCommandInputSchema,
   unsetResourceVariableCommandInputSchema,
   ValidateAgentAdapterQuery,
+  ValidateAgentWorkspaceProfileQuery,
   validateAgentAdapterInputSchema,
   validateAgentAdapterResponseSchema,
+  validateAgentWorkspaceProfileInputSchema,
+  validateAgentWorkspaceProfileResponseSchema,
   WriteSandboxFileCommand,
   withExecutionAuthProviderAccessTokens,
   writeSandboxFileCommandInputSchema,
@@ -7883,6 +7904,71 @@ export const uninstallAgentAdapterProcedure = base
   .handler(async ({ input, context }) =>
     executeCommand(context, UninstallAgentAdapterCommand.create(input)),
   );
+export const validateAgentWorkspaceProfileProcedure = base
+  .route({ method: "POST", path: "/agent-workspace-profiles/validate", successStatus: 200 })
+  .input(validateAgentWorkspaceProfileInputSchema)
+  .output(validateAgentWorkspaceProfileResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ValidateAgentWorkspaceProfileQuery.create(input)),
+  );
+export const installAgentWorkspaceProfileProcedure = base
+  .route({ method: "POST", path: "/agent-workspace-profiles", successStatus: 201 })
+  .input(installAgentWorkspaceProfileInputSchema)
+  .output(installAgentWorkspaceProfileResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, InstallAgentWorkspaceProfileCommand.create(input)),
+  );
+export const listAgentWorkspaceProfilesProcedure = base
+  .route({ method: "GET", path: "/agent-workspace-profiles", successStatus: 200 })
+  .input(listAgentWorkspaceProfilesInputSchema)
+  .output(listAgentWorkspaceProfilesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListAgentWorkspaceProfilesQuery.create(input)),
+  );
+export const showAgentWorkspaceProfileProcedure = base
+  .route({
+    method: "GET",
+    path: "/agent-workspace-profiles/{installationId}",
+    successStatus: 200,
+  })
+  .input(showAgentWorkspaceProfileInputSchema)
+  .output(showAgentWorkspaceProfileResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowAgentWorkspaceProfileQuery.create(input)),
+  );
+export const compileAgentWorkspaceProfileProcedure = base
+  .route({
+    method: "POST",
+    path: "/agent-workspace-profiles/{installationId}/compile",
+    successStatus: 200,
+  })
+  .input(compileAgentWorkspaceProfileInputSchema)
+  .output(compileAgentWorkspaceProfileResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, CompileAgentWorkspaceProfileQuery.create(input)),
+  );
+export const disableAgentWorkspaceProfileProcedure = base
+  .route({
+    method: "POST",
+    path: "/agent-workspace-profiles/{installationId}/disable",
+    successStatus: 200,
+  })
+  .input(disableAgentWorkspaceProfileInputSchema)
+  .output(disableAgentWorkspaceProfileResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DisableAgentWorkspaceProfileCommand.create(input)),
+  );
+export const uninstallAgentWorkspaceProfileProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/agent-workspace-profiles/{installationId}",
+    successStatus: 200,
+  })
+  .input(uninstallAgentWorkspaceProfileInputSchema)
+  .output(uninstallAgentWorkspaceProfileResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, UninstallAgentWorkspaceProfileCommand.create(input)),
+  );
 export const createWorkspaceCollaborationProcedure = base
   .route({ method: "POST", path: "/workspace-collaborations", successStatus: 201 })
   .input(createWorkspaceCollaborationInputSchema)
@@ -8311,6 +8397,15 @@ export const appaloftOrpcRouter = {
     show: showAgentAdapterProcedure,
     disable: disableAgentAdapterProcedure,
     uninstall: uninstallAgentAdapterProcedure,
+  },
+  agentWorkspaceProfiles: {
+    validate: validateAgentWorkspaceProfileProcedure,
+    install: installAgentWorkspaceProfileProcedure,
+    list: listAgentWorkspaceProfilesProcedure,
+    show: showAgentWorkspaceProfileProcedure,
+    compile: compileAgentWorkspaceProfileProcedure,
+    disable: disableAgentWorkspaceProfileProcedure,
+    uninstall: uninstallAgentWorkspaceProfileProcedure,
   },
   workspaceCollaborations: {
     create: createWorkspaceCollaborationProcedure,
@@ -11252,6 +11347,11 @@ export function mountAppaloftOrpcRoutes(
     "/api/agent-adapters",
     "/api/agent-adapters/:installationId",
     "/api/agent-adapters/:installationId/disable",
+    "/api/agent-workspace-profiles/validate",
+    "/api/agent-workspace-profiles",
+    "/api/agent-workspace-profiles/:installationId",
+    "/api/agent-workspace-profiles/:installationId/compile",
+    "/api/agent-workspace-profiles/:installationId/disable",
     "/api/workspace-collaborations",
     "/api/workspace-collaborations/:collaborationId",
     "/api/workspace-collaborations/:collaborationId/close",

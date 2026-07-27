@@ -1,11 +1,22 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import {
   createBlueprintDeployHandoffUrl,
   createDeployButtonBadgeUrl,
   createDeployButtonMarkdown,
-} from "../src";
+} from "../src/deploy-handoff";
 
 describe("Blueprint deploy handoff URLs", () => {
+  test("keeps deploy handoff on its explicit ESM package subpath", () => {
+    const rootSource = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
+    const packageManifest = JSON.parse(
+      readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+    ) as { exports?: Record<string, string> };
+
+    expect(rootSource).not.toContain('export * from "./deploy-handoff"');
+    expect(packageManifest.exports?.["./deploy-handoff"]).toBe("./src/deploy-handoff.ts");
+  });
+
   test("creates a Cloud catalog Blueprint deploy handoff URL", () => {
     expect(
       createBlueprintDeployHandoffUrl({

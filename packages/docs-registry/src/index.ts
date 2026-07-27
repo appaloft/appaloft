@@ -140,9 +140,9 @@ export const publicDocsHelpTopics = {
   },
   "agent.adapter-installations": {
     id: "agent.adapter-installations",
-    title: "Agent Adapter installations",
+    title: "Agent Adapter and Workspace Profile installations",
     description:
-      "How organizations validate, install, inspect, disable, and safely uninstall declarative Agent Adapters.",
+      "How organizations validate, install, compile, inspect, disable, and safely uninstall declarative Agent Adapters and Workspace Profiles.",
     page: {
       "zh-CN": "agent/agent-adapters",
       "en-US": "en/agent/agent-adapters",
@@ -154,14 +154,22 @@ export const publicDocsHelpTopics = {
     },
     surfaces: ["web", "cli", "http-api", "mcp"],
     relatedOperation: "agent-adapters.install",
-    aliases: ["agent adapter", "adapter manifest", "adapter installation", "Agent 适配器"],
+    aliases: [
+      "agent adapter",
+      "adapter manifest",
+      "adapter installation",
+      "workspace profile",
+      "Agent 适配器",
+      "工作区配置",
+    ],
     specReferences: [
       "docs/decisions/ADR-100-agent-adapter-distribution-and-workspace-profile-boundary.md",
       "docs/specs/117-agent-adapter-sdk-and-workspace-profiles/spec.md",
       "docs/testing/agent-adapter-sdk-and-workspace-profile-test-matrix.md",
     ],
     webSurfaces: [
-      "apps/web/src/routes/organization/agent-adapters: tenant-scoped installation and lifecycle management",
+      "apps/web/src/routes/organization: tenant-scoped Agent Adapter and Workspace Profile installation lifecycle management",
+      "apps/web/src/routes/workspaces: approved Workspace Profile selection and immutable runtime pinning",
     ],
   },
   "agent.preview-promotion": {
@@ -3061,6 +3069,13 @@ export const publicDocsOperationCoverage = [
     "agent-adapters.show",
     "agent-adapters.disable",
     "agent-adapters.uninstall",
+    "agent-workspace-profiles.validate",
+    "agent-workspace-profiles.install",
+    "agent-workspace-profiles.list",
+    "agent-workspace-profiles.show",
+    "agent-workspace-profiles.compile",
+    "agent-workspace-profiles.disable",
+    "agent-workspace-profiles.uninstall",
   ].map((operationKey) => ({
     operationKey,
     status: "documented" as const,

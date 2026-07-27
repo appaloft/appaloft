@@ -1,4 +1,5 @@
 export * from "./agent-adapter";
+export * from "./agent-workspace-profile";
 export * from "./configuration";
 export * from "./dependency-resources";
 export * from "./execution-sandbox";

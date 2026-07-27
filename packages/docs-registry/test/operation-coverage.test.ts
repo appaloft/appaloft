@@ -63,6 +63,24 @@ describe("public docs operation coverage", () => {
     }
   });
 
+  test("[PROFILE-DOCS-011] Agent Workspace Profile operations map to the Adapter help topic", () => {
+    for (const operationKey of [
+      "agent-workspace-profiles.validate",
+      "agent-workspace-profiles.install",
+      "agent-workspace-profiles.list",
+      "agent-workspace-profiles.show",
+      "agent-workspace-profiles.compile",
+      "agent-workspace-profiles.disable",
+      "agent-workspace-profiles.uninstall",
+    ]) {
+      expect(getPublicDocsOperationCoverage(operationKey)).toMatchObject({
+        operationKey,
+        status: "documented",
+        topicId: "agent.adapter-installations",
+      });
+    }
+  });
+
   test("[PROJ-LIFE-ENTRY-004] project lifecycle operations record docs coverage", () => {
     const topic = publicDocsHelpTopics["project.lifecycle"];
 

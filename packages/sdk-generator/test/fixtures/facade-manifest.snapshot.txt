@@ -9,6 +9,13 @@ appaloft.agentAdapters.list -> agent-adapters.list GET /agent-adapters
 appaloft.agentAdapters.show -> agent-adapters.show GET /agent-adapters/{installationId}
 appaloft.agentAdapters.uninstall -> agent-adapters.uninstall DELETE /agent-adapters/{installationId}
 appaloft.agentAdapters.validate -> agent-adapters.validate POST /agent-adapters/validate
+appaloft.agentWorkspaceProfiles.compile -> agent-workspace-profiles.compile POST /agent-workspace-profiles/{installationId}/compile
+appaloft.agentWorkspaceProfiles.disable -> agent-workspace-profiles.disable POST /agent-workspace-profiles/{installationId}/disable
+appaloft.agentWorkspaceProfiles.install -> agent-workspace-profiles.install POST /agent-workspace-profiles
+appaloft.agentWorkspaceProfiles.list -> agent-workspace-profiles.list GET /agent-workspace-profiles
+appaloft.agentWorkspaceProfiles.show -> agent-workspace-profiles.show GET /agent-workspace-profiles/{installationId}
+appaloft.agentWorkspaceProfiles.uninstall -> agent-workspace-profiles.uninstall DELETE /agent-workspace-profiles/{installationId}
+appaloft.agentWorkspaceProfiles.validate -> agent-workspace-profiles.validate POST /agent-workspace-profiles/validate
 appaloft.auditEvents.archives.create -> audit-events.archives.create POST /audit-events/archives
 appaloft.auditEvents.archives.list -> audit-events.archives.list GET /audit-events/archives
 appaloft.auditEvents.archives.prune -> audit-events.archives.prune POST /audit-events/archives/prune

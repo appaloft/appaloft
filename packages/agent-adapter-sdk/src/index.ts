@@ -4,6 +4,7 @@ import { z } from "zod";
 
 export const agentAdapterSchemaVersion = "appaloft.agent-adapter/v1" as const;
 export const agentAdapterApiVersion = "1.0.0" as const;
+export const agentWorkspaceProfileSchemaVersion = "appaloft.agent-workspace-profile/v1" as const;
 
 export const agentAdapterHostCapabilities = [
   "managed-terminal",
@@ -20,6 +21,8 @@ const environmentVariablePattern = /^[A-Z_][A-Z0-9_]{0,127}$/;
 const secretReferencePattern =
   /^(?:secret|vault|supabase-vault):\/\/[a-zA-Z0-9][a-zA-Z0-9_./:#-]{1,511}$/;
 const safeHttpPathPattern = /^\/(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[^?#]*$/;
+const domainNamePattern =
+  /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const shellExecutables = new Set([
   "ash",
   "bash",
@@ -297,6 +300,153 @@ export const agentAdapterManifestSchema = z
     }
   });
 
+const sandboxLimitsSchema = z
+  .object({
+    cpuMillis: z.number().int().min(100).max(64_000),
+    memoryBytes: z.number().int().min(134_217_728).max(274_877_906_944),
+    diskBytes: z.number().int().min(1_073_741_824).max(2_199_023_255_552),
+    maxProcesses: z.number().int().min(1).max(4_096),
+  })
+  .strict();
+
+const sandboxNetworkPolicySchema = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("deny") }).strict(),
+  z
+    .object({
+      mode: z.literal("allowlist"),
+      rules: z
+        .array(
+          z
+            .object({
+              kind: z.literal("domain"),
+              value: z.string().trim().toLowerCase().regex(domainNamePattern),
+              ports: z.array(z.number().int().min(1).max(65_535)).min(1).max(32),
+            })
+            .strict()
+            .superRefine((rule, context) => {
+              addDuplicateNumberIssues(rule.ports, ["ports"], "network ports", context);
+            }),
+        )
+        .max(64),
+    })
+    .strict(),
+]);
+
+const boundedWorkspaceCommandSchema = z
+  .object({
+    id: identifierSchema,
+    argv: commandSchema,
+    workingDirectory: persistentPathSchema.optional(),
+  })
+  .strict()
+  .superRefine((command, context) => {
+    const executableName = (command.argv[0] ?? "").split("/").at(-1)?.toLowerCase() ?? "";
+    if (shellExecutables.has(executableName)) {
+      context.addIssue({
+        code: "custom",
+        message: "Profile commands must not invoke a shell interpreter",
+        path: ["argv", 0],
+      });
+    }
+  });
+
+export const agentWorkspaceProfileSchema = z
+  .object({
+    schemaVersion: z.literal(agentWorkspaceProfileSchemaVersion),
+    id: identifierSchema,
+    displayName: z.string().trim().min(1).max(120),
+    version: versionSchema,
+    description: nonEmptyTextSchema.optional(),
+    adapter: z
+      .object({
+        id: identifierSchema,
+        version: versionSchema,
+        digest: digestSchema,
+        interactiveModeId: identifierSchema.optional(),
+        taskModeId: identifierSchema,
+      })
+      .strict(),
+    harnessTemplateId: z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z][A-Za-z0-9_-]{0,127}$/),
+    sandbox: z
+      .object({
+        template: z
+          .object({
+            id: identifierSchema,
+            version: versionSchema,
+            digest: digestSchema,
+          })
+          .strict(),
+        requestedIsolation: z.enum(["container-trusted", "gvisor", "kata", "microvm"]),
+        limits: sandboxLimitsSchema,
+        networkPolicy: sandboxNetworkPolicySchema.default({ mode: "deny" }),
+      })
+      .strict(),
+    workingDirectory: persistentPathSchema.default("/workspace"),
+    initialization: z.array(boundedWorkspaceCommandSchema).max(32).default([]),
+    defaultPorts: z
+      .array(
+        z
+          .object({
+            name: identifierSchema,
+            port: z.number().int().min(1).max(65_535),
+            visibility: z.enum(["private", "organization", "public"]).default("private"),
+            ttlSeconds: z.number().int().min(60).max(604_800),
+          })
+          .strict(),
+      )
+      .max(32)
+      .default([]),
+    persistentPaths: z.array(persistentPathSchema).max(64).default([]),
+    suggestedChecks: z
+      .array(
+        z
+          .object({
+            name: z.string().trim().min(1).max(120),
+            argv: commandSchema,
+            workingDirectory: persistentPathSchema.optional(),
+          })
+          .strict()
+          .superRefine((check, context) => {
+            const executableName = (check.argv[0] ?? "").split("/").at(-1)?.toLowerCase() ?? "";
+            if (shellExecutables.has(executableName)) {
+              context.addIssue({
+                code: "custom",
+                message: "Profile checks must not invoke a shell interpreter",
+                path: ["argv", 0],
+              });
+            }
+          }),
+      )
+      .max(32)
+      .default([]),
+  })
+  .strict()
+  .superRefine((profile, context) => {
+    addDuplicateIssues(
+      profile.initialization.map((step) => step.id),
+      ["initialization"],
+      "initialization ids",
+      context,
+    );
+    addDuplicateIssues(
+      profile.defaultPorts.map((port) => port.name),
+      ["defaultPorts"],
+      "default port names",
+      context,
+    );
+    addDuplicateNumberIssues(
+      profile.defaultPorts.map((port) => port.port),
+      ["defaultPorts"],
+      "default ports",
+      context,
+      "port",
+    );
+    addDuplicateIssues(profile.persistentPaths, ["persistentPaths"], "persistent paths", context);
+  });
+
 export type AgentAdapterManifest = z.infer<typeof agentAdapterManifestSchema>;
 export type AgentAdapterHostCapability = (typeof agentAdapterHostCapabilities)[number];
 export type AgentAdapterCredentialReference = z.infer<typeof agentAdapterCredentialReferenceSchema>;
@@ -382,6 +532,140 @@ export type AgentAdapterValidationResult =
       ok: false;
       issues: AgentAdapterValidationIssue[];
     };
+
+export type AgentWorkspaceProfile = z.infer<typeof agentWorkspaceProfileSchema>;
+
+export interface ValidatedAgentWorkspaceProfileDefinition {
+  manifest: AgentWorkspaceProfile;
+  digest: `sha256:${string}`;
+  canonicalManifest: string;
+}
+
+export interface AgentWorkspaceProfileValidationIssue {
+  code: "invalid_profile";
+  path: (string | number)[];
+  message: string;
+}
+
+export type AgentWorkspaceProfileValidationResult =
+  | {
+      ok: true;
+      definition: ValidatedAgentWorkspaceProfileDefinition;
+    }
+  | {
+      ok: false;
+      issues: AgentWorkspaceProfileValidationIssue[];
+    };
+
+export type AgentWorkspaceProfileCompileIssueCode =
+  | "invalid_profile"
+  | "profile_installation_disabled"
+  | "adapter_installation_disabled"
+  | "adapter_definition_digest_mismatch"
+  | "adapter_identity_mismatch"
+  | "missing_interaction_mode"
+  | "invalid_interaction_mode"
+  | "missing_required_capability"
+  | "missing_sandbox_template"
+  | "sandbox_template_digest_mismatch"
+  | "sandbox_template_version_mismatch"
+  | "adapter_template_requirement_mismatch";
+
+export interface AgentWorkspaceProfileCompileIssue {
+  code: AgentWorkspaceProfileCompileIssueCode;
+  message: string;
+  path?: (string | number)[];
+}
+
+export interface AgentWorkspaceProfileCompileEnvironment {
+  profileInstallationId: string;
+  profileInstallationStatus?: "disabled" | "enabled";
+  adapterInstallationId: string;
+  adapterInstallationStatus?: "disabled" | "enabled";
+  adapterDefinition: ValidatedAgentAdapterDefinition;
+  availableCapabilities: readonly AgentAdapterHostCapability[];
+  sandboxTemplates: readonly {
+    id: string;
+    version: string;
+    digest: string;
+  }[];
+}
+
+export interface CompiledAgentWorkspaceProfilePlan {
+  sandbox: {
+    source: { kind: "template"; templateId: string };
+    requestedIsolation: AgentWorkspaceProfile["sandbox"]["requestedIsolation"];
+    limits: AgentWorkspaceProfile["sandbox"]["limits"];
+    networkPolicy: AgentWorkspaceProfile["sandbox"]["networkPolicy"];
+  };
+  initialization: {
+    id: string;
+    argv: string[];
+    cwd?: string;
+  }[];
+  runtime: {
+    harnessKey: string;
+    harnessTemplateId: string;
+    declarativeHarness: {
+      key: string;
+      templateId: string;
+      sandboxTemplateId: string;
+      version: string;
+      templateDigest: string;
+      cwd?: string;
+      run: {
+        argv: string[];
+        taskInput: "append-argument" | "stdin";
+      };
+      attach?: {
+        transport: "managed-terminal" | "native-attach";
+        command: string[];
+        sessionRecovery: "managed-run-lineage" | "native-session-store";
+      };
+      persistentPaths: string[];
+      healthcheck?: NonNullable<AgentAdapterManifest["healthcheck"]>;
+    };
+  };
+  defaultPorts: {
+    name: string;
+    port: number;
+    visibility: "private" | "organization" | "public";
+    ttlSeconds: number;
+  }[];
+  suggestedChecks: {
+    name: string;
+    argv: string[];
+    cwd?: string;
+  }[];
+  credentialRequirements: AgentAdapterManifest["credentials"];
+  pin: {
+    profileInstallationId: string;
+    profileDefinitionDigest: string;
+    profileId: string;
+    profileVersion: string;
+    adapterInstallationId: string;
+    adapterDefinitionDigest: string;
+    adapterId: string;
+    adapterVersion: string;
+    harnessKey: string;
+    harnessTemplateId: string;
+    sandboxTemplateId: string;
+    sandboxTemplateVersion: string;
+    sandboxTemplateDigest: string;
+    capabilities: {
+      taskMode: boolean;
+      interactive: boolean;
+      backgroundRuns: boolean;
+      nativeSession: boolean;
+      persistentPaths: string[];
+      healthcheck?: NonNullable<AgentAdapterManifest["healthcheck"]>;
+    };
+  };
+}
+
+export type AgentWorkspaceProfileCompileResult =
+  | { ok: true; plan: CompiledAgentWorkspaceProfilePlan }
+  | { ok: false; issues: AgentWorkspaceProfileCompileIssue[] };
 
 export function validateAgentAdapterManifest(
   input: unknown,
@@ -519,6 +803,279 @@ export function validateAgentAdapterManifest(
   };
 }
 
+export function validateAgentWorkspaceProfile(
+  input: unknown,
+): AgentWorkspaceProfileValidationResult {
+  const parsed = agentWorkspaceProfileSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      issues: parsed.error.issues.map((issue) => ({
+        code: "invalid_profile",
+        path: issue.path.filter(
+          (part): part is string | number => typeof part === "string" || typeof part === "number",
+        ),
+        message: issue.message,
+      })),
+    };
+  }
+  const canonicalManifest = canonicalJson(parsed.data);
+  return {
+    ok: true,
+    definition: {
+      manifest: parsed.data,
+      canonicalManifest,
+      digest: `sha256:${createHash("sha256").update(canonicalManifest).digest("hex")}`,
+    },
+  };
+}
+
+export function compileAgentWorkspaceProfile(
+  profileInput: unknown,
+  environment: AgentWorkspaceProfileCompileEnvironment,
+): AgentWorkspaceProfileCompileResult {
+  const profileValidation = validateAgentWorkspaceProfile(profileInput);
+  if (!profileValidation.ok) return profileValidation;
+  const profile = profileValidation.definition.manifest;
+  const adapter = environment.adapterDefinition;
+  const issues: AgentWorkspaceProfileCompileIssue[] = [];
+
+  if (environment.profileInstallationStatus === "disabled") {
+    issues.push({
+      code: "profile_installation_disabled",
+      message: "Agent Workspace Profile installation is disabled",
+    });
+  }
+  if (environment.adapterInstallationStatus === "disabled") {
+    issues.push({
+      code: "adapter_installation_disabled",
+      message: "Agent Adapter installation is disabled",
+    });
+  }
+  if (adapter.digest !== profile.adapter.digest) {
+    issues.push({
+      code: "adapter_definition_digest_mismatch",
+      message: "Agent Adapter definition digest does not match the Profile pin",
+      path: ["adapter", "digest"],
+    });
+  }
+  if (
+    adapter.manifest.id !== profile.adapter.id ||
+    adapter.manifest.version !== profile.adapter.version
+  ) {
+    issues.push({
+      code: "adapter_identity_mismatch",
+      message: "Agent Adapter id or version does not match the Profile pin",
+      path: ["adapter"],
+    });
+  }
+
+  const availableCapabilities = new Set(environment.availableCapabilities);
+  const missingCapabilities = adapter.manifest.requirements.capabilities.required.filter(
+    (capability) => !availableCapabilities.has(capability),
+  );
+  if (missingCapabilities.length > 0) {
+    issues.push({
+      code: "missing_required_capability",
+      message: `Host is missing required capabilities: ${missingCapabilities.join(", ")}`,
+      path: ["adapter", "capabilities"],
+    });
+  }
+
+  const template = environment.sandboxTemplates.find(
+    (candidate) => candidate.id === profile.sandbox.template.id,
+  );
+  if (!template) {
+    issues.push({
+      code: "missing_sandbox_template",
+      message: `Sandbox Template ${profile.sandbox.template.id} is unavailable`,
+      path: ["sandbox", "template", "id"],
+    });
+  } else {
+    if (template.digest !== profile.sandbox.template.digest) {
+      issues.push({
+        code: "sandbox_template_digest_mismatch",
+        message: "Sandbox Template digest does not match the Profile pin",
+        path: ["sandbox", "template", "digest"],
+      });
+    }
+    if (template.version !== profile.sandbox.template.version) {
+      issues.push({
+        code: "sandbox_template_version_mismatch",
+        message: "Sandbox Template version does not match the Profile pin",
+        path: ["sandbox", "template", "version"],
+      });
+    }
+  }
+  if (
+    adapter.manifest.requirements.sandboxTemplate.id !== profile.sandbox.template.id ||
+    adapter.manifest.requirements.sandboxTemplate.digest !== profile.sandbox.template.digest ||
+    !semverSatisfies(
+      profile.sandbox.template.version,
+      adapter.manifest.requirements.sandboxTemplate.version,
+      { includePrerelease: true },
+    )
+  ) {
+    issues.push({
+      code: "adapter_template_requirement_mismatch",
+      message: "Profile Sandbox Template does not satisfy the pinned Adapter requirement",
+      path: ["sandbox", "template"],
+    });
+  }
+
+  const taskMode = adapter.manifest.interactionModes.find(
+    (mode) => mode.id === profile.adapter.taskModeId,
+  );
+  if (!taskMode) {
+    issues.push({
+      code: "missing_interaction_mode",
+      message: `Adapter task mode ${profile.adapter.taskModeId} is unavailable`,
+      path: ["adapter", "taskModeId"],
+    });
+  } else if (taskMode.transport !== "background-task" && taskMode.transport !== "headless") {
+    issues.push({
+      code: "invalid_interaction_mode",
+      message: "Profile task mode must use background-task or headless transport",
+      path: ["adapter", "taskModeId"],
+    });
+  } else if (taskMode.taskInput !== "append-argument") {
+    issues.push({
+      code: "invalid_interaction_mode",
+      message: "V1 declarative Profile task modes require append-argument task input",
+      path: ["adapter", "taskModeId"],
+    });
+  }
+
+  const interactiveMode = profile.adapter.interactiveModeId
+    ? adapter.manifest.interactionModes.find(
+        (mode) => mode.id === profile.adapter.interactiveModeId,
+      )
+    : undefined;
+  if (profile.adapter.interactiveModeId && !interactiveMode) {
+    issues.push({
+      code: "missing_interaction_mode",
+      message: `Adapter interactive mode ${profile.adapter.interactiveModeId} is unavailable`,
+      path: ["adapter", "interactiveModeId"],
+    });
+  } else if (
+    interactiveMode &&
+    interactiveMode.transport !== "terminal" &&
+    interactiveMode.transport !== "native-attach"
+  ) {
+    issues.push({
+      code: "invalid_interaction_mode",
+      message: "Profile interactive mode must use terminal or native-attach transport",
+      path: ["adapter", "interactiveModeId"],
+    });
+  }
+  if (issues.length > 0 || !taskMode) return { ok: false, issues };
+
+  const workingDirectory = workspaceRelativePath(profile.workingDirectory);
+  const persistentPaths = [
+    ...new Set([...adapter.manifest.persistentPaths, ...profile.persistentPaths]),
+  ].sort();
+  const harnessKey = `declarative-${profile.id}-${profileValidation.definition.digest.slice(7, 19)}`;
+  const capabilities = {
+    taskMode: true,
+    interactive: interactiveMode !== undefined,
+    backgroundRuns: true,
+    nativeSession: interactiveMode?.transport === "native-attach",
+    persistentPaths,
+    ...(adapter.manifest.healthcheck ? { healthcheck: adapter.manifest.healthcheck } : {}),
+  };
+  const attach = interactiveMode
+    ? {
+        transport:
+          interactiveMode.transport === "native-attach"
+            ? ("native-attach" as const)
+            : ("managed-terminal" as const),
+        command: [...interactiveMode.command],
+        sessionRecovery:
+          interactiveMode.transport === "native-attach"
+            ? ("native-session-store" as const)
+            : ("managed-run-lineage" as const),
+      }
+    : undefined;
+
+  return {
+    ok: true,
+    plan: {
+      sandbox: {
+        source: { kind: "template", templateId: profile.sandbox.template.id },
+        requestedIsolation: profile.sandbox.requestedIsolation,
+        limits: { ...profile.sandbox.limits },
+        networkPolicy:
+          profile.sandbox.networkPolicy.mode === "deny"
+            ? { mode: "deny" }
+            : {
+                mode: "allowlist",
+                rules: profile.sandbox.networkPolicy.rules.map((rule) => ({
+                  kind: "domain" as const,
+                  value: rule.value,
+                  ports: [...rule.ports],
+                })),
+              },
+      },
+      initialization: profile.initialization.map((step) => {
+        const cwd = workspaceRelativePath(step.workingDirectory ?? profile.workingDirectory);
+        return {
+          id: step.id,
+          argv: [...step.argv],
+          ...(cwd ? { cwd } : {}),
+        };
+      }),
+      runtime: {
+        harnessKey,
+        harnessTemplateId: profile.harnessTemplateId,
+        declarativeHarness: {
+          key: harnessKey,
+          templateId: profile.harnessTemplateId,
+          sandboxTemplateId: profile.sandbox.template.id,
+          version: profile.adapter.version,
+          templateDigest: profile.sandbox.template.digest,
+          ...(workingDirectory ? { cwd: workingDirectory } : {}),
+          run: {
+            argv: [...taskMode.command],
+            taskInput: taskMode.taskInput ?? "append-argument",
+          },
+          ...(attach ? { attach } : {}),
+          persistentPaths,
+          ...(adapter.manifest.healthcheck ? { healthcheck: adapter.manifest.healthcheck } : {}),
+        },
+      },
+      defaultPorts: profile.defaultPorts.map((port) => ({ ...port })),
+      suggestedChecks: profile.suggestedChecks.map((check) => {
+        const cwd = workspaceRelativePath(check.workingDirectory ?? profile.workingDirectory);
+        return {
+          name: check.name,
+          argv: [...check.argv],
+          ...(cwd ? { cwd } : {}),
+        };
+      }),
+      credentialRequirements: adapter.manifest.credentials.map((requirement) => ({
+        ...requirement,
+        delivery: { ...requirement.delivery },
+      })),
+      pin: {
+        profileInstallationId: environment.profileInstallationId,
+        profileDefinitionDigest: profileValidation.definition.digest,
+        profileId: profile.id,
+        profileVersion: profile.version,
+        adapterInstallationId: environment.adapterInstallationId,
+        adapterDefinitionDigest: adapter.digest,
+        adapterId: adapter.manifest.id,
+        adapterVersion: adapter.manifest.version,
+        harnessKey,
+        harnessTemplateId: profile.harnessTemplateId,
+        sandboxTemplateId: profile.sandbox.template.id,
+        sandboxTemplateVersion: profile.sandbox.template.version,
+        sandboxTemplateDigest: profile.sandbox.template.digest,
+        capabilities,
+      },
+    },
+  };
+}
+
 export function resolveAgentAdapterCredentialBindings(
   manifestInput: unknown,
   referencesInput: unknown,
@@ -628,6 +1185,31 @@ function addDuplicateIssues(
       path: [...path, index],
     });
   }
+}
+
+function addDuplicateNumberIssues(
+  values: readonly number[],
+  path: (string | number)[],
+  label: string,
+  context: z.core.$RefinementCtx<unknown>,
+  field?: string,
+): void {
+  const seen = new Set<number>();
+  for (const [index, value] of values.entries()) {
+    if (!seen.has(value)) {
+      seen.add(value);
+      continue;
+    }
+    context.addIssue({
+      code: "custom",
+      message: `${label} must be unique`,
+      path: [...path, index, ...(field ? [field] : [])],
+    });
+  }
+}
+
+function workspaceRelativePath(value: string): string | undefined {
+  return value === "/workspace" ? undefined : value.slice("/workspace/".length);
 }
 
 function canonicalJson(value: unknown): string {

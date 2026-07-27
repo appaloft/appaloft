@@ -1358,6 +1358,7 @@ export const enUS = {
       deliver: "Commit, push and open pull request",
       deliveryBranch: "Delivery branch",
       developmentPreview: "Development preview",
+      directHarness: "Direct Agent selection",
       emptyBody:
         "Create a persistent remote development environment for an agent, terminal and expiring previews.",
       emptyTitle: "No agent workspaces yet",
@@ -1376,6 +1377,7 @@ export const enUS = {
       pageTitle: "Agent workspaces",
       pause: "Pause",
       persistentData: "Code and agent state persist across reconnects.",
+      profile: "Workspace Profile",
       processFrozen: "The runtime is paused in place and still holds its provider allocation.",
       previewCommand: "Preview start command",
       previewPort: "Preview port",
@@ -1492,6 +1494,34 @@ export const enUS = {
       agentAdapterValidatedDigest: "Validated definition digest",
       agentAdapterValidating: "Validating",
       agentAdapterVersion: "Version",
+      agentWorkspaceProfileDisableAction: "Disable profile",
+      agentWorkspaceProfileDisableDescription:
+        "Block this profile from new Workspaces while existing pinned Workspaces remain recoverable.",
+      agentWorkspaceProfileDisabled: "Agent Workspace Profile disabled",
+      agentWorkspaceProfileInstallAction: "Install Profile",
+      agentWorkspaceProfileInstallDescription:
+        "Paste a declarative Profile that pins one installed Adapter, Sandbox Template, limits, initialization, ports, and checks.",
+      agentWorkspaceProfileInstalled: "Agent Workspace Profile installed",
+      agentWorkspaceProfileInstallTitle: "Install Agent Workspace Profile",
+      agentWorkspaceProfileLifecycleDescription:
+        "Disable blocks new Workspace creation. Uninstall is allowed only after active pinned references are cleared.",
+      agentWorkspaceProfileLifecycleTitle: "Agent Workspace Profile lifecycle",
+      agentWorkspaceProfileManifestLabel: "Profile manifest JSON",
+      agentWorkspaceProfileManifestNotice:
+        "The Profile must reference exact immutable Adapter and Sandbox Template digests.",
+      agentWorkspaceProfileManifestPlaceholder:
+        '{\n  "schemaVersion": "appaloft.agent-workspace-profile/v1",\n  "id": "example-workspace"\n}',
+      agentWorkspaceProfilesDescription:
+        "Publish approved, reproducible Workspace configurations for developers.",
+      agentWorkspaceProfilesEmptyDescription:
+        "Install a Profile after its pinned Adapter and Sandbox Template are available.",
+      agentWorkspaceProfilesEmptyTitle: "No Workspace Profiles installed",
+      agentWorkspaceProfilesTitle: "Workspace Profiles",
+      agentWorkspaceProfileUninstallAction: "Uninstall profile",
+      agentWorkspaceProfileUninstallDescription:
+        "Remove only this organization installation. Active Workspace pins block the operation.",
+      agentWorkspaceProfileUninstalled: "Agent Workspace Profile uninstalled",
+      agentWorkspaceProfileValidated: "Agent Workspace Profile validated",
       archivedProjectsDescription:
         "Review archived projects. They stay out of Home, Projects, and the sidebar project list.",
       archivedProjectsEmptyDescription:
