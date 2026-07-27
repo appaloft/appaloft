@@ -2,8 +2,8 @@ import { expect, test } from "bun:test";
 import { join } from "node:path";
 
 const root = join(import.meta.dir, "../..");
-const reviewedDefaultImage = "traefik:v3.6.23";
-const reviewedSwarmCompatibilityImage = "traefik:v2.11.52";
+const reviewedDefaultImage = "traefik:v3.7.9";
+const reviewedSwarmCompatibilityImage = "traefik:v3.7.9";
 
 const baselineFiles = {
   installer: "install.sh",
@@ -35,6 +35,6 @@ test("[EDGE-PROXY-PROVIDER-011] keeps reviewed Traefik defaults and smoke pins s
   expect(sources.swarmSmoke).toContain(reviewedSwarmCompatibilityImage);
 
   const combined = Object.values(sources).join("\n");
-  expect(combined).not.toMatch(/traefik:v3\.6\.2(?=["'\s)])/);
+  expect(combined).not.toMatch(/traefik:v3\.6(?=["'\s.)])/);
   expect(combined).not.toMatch(/traefik:v2\.11(?=["'])/);
 });
