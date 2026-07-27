@@ -1,13 +1,4 @@
 import {
-  type AgentAdapterInstallationResponse,
-  type AgentWorkspaceProfileInstallationResponse,
-  type CompileAgentWorkspaceProfileResponse,
-  type UninstallAgentAdapterResponse,
-  type UninstallAgentWorkspaceProfileResponse,
-  type ValidateAgentAdapterResponse,
-  type ValidateAgentWorkspaceProfileResponse,
-} from "@appaloft/application";
-import {
   type AcceptBlueprintInstallCommandInput,
   type AcceptBlueprintInstallCommandResponse,
   type AcceptConnectorCapabilityPlanCommandInput,
@@ -278,6 +269,8 @@ import {
 import {
   type AcceptConnectorCapabilityPlanResponse,
   type AccountProfileResponse,
+  type AgentAdapterInstallationResponse,
+  type AgentWorkspaceProfileInstallationResponse,
   type ArchiveDeploymentResponse,
   type ArchiveEnvironmentResponse,
   type ArchiveProjectResponse,
@@ -297,6 +290,7 @@ import {
   type CleanupStorageVolumeRuntimeResponse,
   type CloneEnvironmentResponse,
   type CloseTerminalSessionResponse,
+  type CompileAgentWorkspaceProfileResponse,
   type CompleteConnectionCallbackResponse,
   type ConfigureDefaultAccessDomainPolicyResponse,
   type ConfigureDependencyResourceBackupPolicyResponse,
@@ -494,8 +488,12 @@ import {
   type TestServerConnectivityResponse,
   type TransferOrganizationOwnerResponse,
   type UnbindResourceDependencyResponse,
+  type UninstallAgentAdapterResponse,
+  type UninstallAgentWorkspaceProfileResponse,
   type UnlockEnvironmentResponse,
   type UnsetResourceVariableResponse,
+  type ValidateAgentAdapterResponse,
+  type ValidateAgentWorkspaceProfileResponse,
 } from "@appaloft/contracts";
 import { type AsyncIteratorClass, type Client, type ORPCError } from "@orpc/client";
 
