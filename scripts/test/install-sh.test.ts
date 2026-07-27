@@ -802,7 +802,7 @@ test("[INSTANCE-BOOTSTRAP-SPEC-005] install.sh configures the reviewed Traefik c
     expect(compose).toContain("appaloft-edge:");
 
     const env = await Bun.file(join(home, ".env")).text();
-    expect(env).toContain("APPALOFT_TRAEFIK_IMAGE=traefik:v3.6.23");
+    expect(env).toContain("APPALOFT_TRAEFIK_IMAGE=traefik:v3.7.9");
     expect(env).toContain("APPALOFT_HTTP_PORT=3721");
     expect(env).toContain("APPALOFT_WEB_ORIGIN=https://console.appaloft.example.test");
     expect(env).toContain("APPALOFT_CONSOLE_DOMAIN=console.appaloft.example.test");
