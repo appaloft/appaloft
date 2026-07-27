@@ -3,6 +3,11 @@
 ## [1.4.0](https://github.com/appaloft/appaloft/compare/v1.3.2...v1.4.0) (2026-07-27)
 
 
+### Security
+
+* **edge-proxy:** upgrade the reviewed Traefik baseline to v3.7.9 ([#830](https://github.com/appaloft/appaloft/issues/830)) ([e7e277a](https://github.com/appaloft/appaloft/commit/e7e277a181144b8f3c883322bd86de5256120557))
+
+
 ### Features
 
 * add agent adapter manifest validation ([#826](https://github.com/appaloft/appaloft/issues/826)) ([9a8b070](https://github.com/appaloft/appaloft/commit/9a8b070924cf27a8899966707ffcf79e1acfef32))
