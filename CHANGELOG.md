@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/appaloft/appaloft/compare/v1.4.0...v1.5.0) (2026-07-27)
+
+
+### Features
+
+* add agent workspace profile pinning ([#831](https://github.com/appaloft/appaloft/issues/831)) ([945f9d2](https://github.com/appaloft/appaloft/commit/945f9d2af3b33c7693de8cfbc86200eba8dbdf8d))
+
 ## [1.4.0](https://github.com/appaloft/appaloft/compare/v1.3.2...v1.4.0) (2026-07-27)
 
 
