@@ -508,7 +508,7 @@ function prepareSmokeEdgeProxy(input: { edgeNetworkName: string; publishedPort: 
   commandOutput([
     "docker",
     "pull",
-    Bun.env.APPALOFT_DOCKER_SWARM_TRAEFIK_IMAGE ?? "traefik:v2.11.52",
+    Bun.env.APPALOFT_DOCKER_SWARM_TRAEFIK_IMAGE ?? "traefik:v3.7.9",
   ]);
   commandOutput([
     "docker",
@@ -524,7 +524,7 @@ function prepareSmokeEdgeProxy(input: { edgeNetworkName: string; publishedPort: 
     `published=${input.publishedPort},target=80,mode=host`,
     "--mount",
     "type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock,readonly",
-    Bun.env.APPALOFT_DOCKER_SWARM_TRAEFIK_IMAGE ?? "traefik:v2.11.52",
+    Bun.env.APPALOFT_DOCKER_SWARM_TRAEFIK_IMAGE ?? "traefik:v3.7.9",
     "--providers.docker=true",
     "--providers.docker.swarmMode=true",
     "--providers.docker.exposedByDefault=false",
