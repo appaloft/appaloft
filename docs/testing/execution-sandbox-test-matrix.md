@@ -19,7 +19,7 @@ isolation claims.
 | --- | --- | --- | --- | --- | --- |
 | SBX-DOM-001 | core unit | Identity, limits, expiry and isolation | Invalid primitives fail with structured errors. | `packages/core/test/execution-sandbox.test.ts` | passed |
 | SBX-DOM-002 | core unit | Lifecycle state machine | Only valid transitions succeed and safe events are recorded. | same | passed |
-| SBX-DOM-003 | core unit | Template override policy | Callers cannot weaken template isolation, limits or network defaults. | `packages/core/test/execution-sandbox-template.test.ts` | passed |
+| SBX-DOM-003 | core unit | Template override policy | Callers cannot weaken template isolation, limits or network defaults; semantically equivalent persisted allowlists remain equal regardless of object-key, rule or port ordering. | `packages/core/test/execution-sandbox-template.test.ts` | passed |
 | SBX-DOM-004 | core unit | Snapshot capability and retention | Snapshot lifecycle remains independent of the source Sandbox. | `packages/core/test/execution-sandbox-snapshot.test.ts` | passed |
 | SBX-CMD-001 | application integration | Accepted create | Intent persists before provider mutation; external create closes first reconciliation; providers receive the opaque tenant owner scope and the authorized organization id when one exists. | `packages/application/test/execution-sandbox-operations.test.ts` | passed |
 | SBX-CMD-002 | application integration | Provider mismatch | Provider is not called when isolation or capability cannot be met. | same | passed |
