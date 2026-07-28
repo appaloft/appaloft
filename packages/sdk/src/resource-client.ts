@@ -993,7 +993,7 @@ interface WorkspaceForegroundExecResult {
   )[];
 }
 
-function requireSuccessfulExec(value: unknown, phase: string): void {
+function requireSuccessfulExec(value: unknown, phase: string): WorkspaceForegroundExecResult {
   if (!value || typeof value !== "object" || (value as { mode?: unknown }).mode !== "foreground") {
     throw new Error(`${phase} did not return a foreground result`);
   }
@@ -1009,6 +1009,7 @@ function requireSuccessfulExec(value: unknown, phase: string): void {
       .slice(0, 1_024);
     throw new Error(stderr || `${phase} failed`);
   }
+  return result;
 }
 
 async function materializeWorkspaceSource(
@@ -1018,10 +1019,55 @@ async function materializeWorkspaceSource(
   const repository = validateRepositoryLocator(input.repository);
   const ref = validateGitRef(input.ref, "source ref");
   const branch = validateGitRef(input.branch, "branch");
-  const clone = await sandbox.exec<unknown>({
-    argv: ["git", "clone", ...(ref ? ["--branch", ref] : []), "--", repository, "."],
+
+  const initialized = await sandbox.exec<unknown>({
+    argv: ["git", "init"],
   });
-  requireSuccessfulExec(clone, "Workspace repository clone");
+  requireSuccessfulExec(initialized, "Workspace repository initialization");
+
+  const remoteAdded = await sandbox.exec<unknown>({
+    argv: ["git", "remote", "add", "origin", repository],
+  });
+  requireSuccessfulExec(remoteAdded, "Workspace repository remote configuration");
+
+  const fetched = await sandbox.exec<unknown>({
+    argv: ["git", "fetch", "origin"],
+  });
+  requireSuccessfulExec(fetched, "Workspace repository fetch");
+
+  let checkoutRef = ref;
+  if (!checkoutRef) {
+    const remoteHeadSet = await sandbox.exec<unknown>({
+      argv: ["git", "remote", "set-head", "origin", "--auto"],
+    });
+    requireSuccessfulExec(remoteHeadSet, "Workspace repository default branch discovery");
+    const remoteHeadRead = await sandbox.exec<unknown>({
+      argv: ["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+    });
+    const remoteHeadOutput = requireSuccessfulExec(
+      remoteHeadRead,
+      "Workspace repository default branch readback",
+    )
+      .frames.flatMap((frame) => (frame.kind === "stdout" ? [frame.data] : []))
+      .join("")
+      .trim();
+    if (!remoteHeadOutput.startsWith("origin/")) {
+      throw new Error("Workspace repository default branch readback was invalid");
+    }
+    checkoutRef = validateGitRef(
+      remoteHeadOutput.slice("origin/".length),
+      "repository default branch",
+    );
+    if (!checkoutRef) {
+      throw new Error("Workspace repository default branch readback was empty");
+    }
+  }
+
+  const checkedOut = await sandbox.exec<unknown>({
+    argv: ["git", "checkout", checkoutRef],
+  });
+  requireSuccessfulExec(checkedOut, "Workspace repository checkout");
+
   if (branch) {
     const switched = await sandbox.exec<unknown>({
       argv: ["git", "switch", "-c", branch],

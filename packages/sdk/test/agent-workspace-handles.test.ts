@@ -344,7 +344,7 @@ describe("Agent Workspace SDK handles", () => {
     }
   });
 
-  test("[AGENT-WS-SOURCE-014] materializes a repository before Runtime creation", async () => {
+  test("[AGENT-WS-SOURCE-014] materializes a repository into a template-populated Workspace before Runtime creation", async () => {
     const requests: Request[] = [];
     const appaloft = createAppaloftClient({
       baseUrl: "https://appaloft.example/api",
@@ -386,6 +386,9 @@ describe("Agent Workspace SDK handles", () => {
       "/api/sandboxes",
       "/api/sandboxes/sbx_source/exec",
       "/api/sandboxes/sbx_source/exec",
+      "/api/sandboxes/sbx_source/exec",
+      "/api/sandboxes/sbx_source/exec",
+      "/api/sandboxes/sbx_source/exec",
       "/api/sandboxes/sbx_source/agent-runtimes",
     ]);
     const createSandboxRequest = requests[0];
@@ -398,14 +401,74 @@ describe("Agent Workspace SDK handles", () => {
       ],
     });
     expect(await requests[1]?.json()).toEqual({
-      argv: ["git", "clone", "--branch", "main", "--", "https://github.com/acme/web.git", "."],
+      argv: ["git", "init"],
     });
     expect(await requests[2]?.json()).toEqual({
+      argv: ["git", "remote", "add", "origin", "https://github.com/acme/web.git"],
+    });
+    expect(await requests[3]?.json()).toEqual({
+      argv: ["git", "fetch", "origin"],
+    });
+    expect(await requests[4]?.json()).toEqual({
+      argv: ["git", "checkout", "main"],
+    });
+    expect(await requests[5]?.json()).toEqual({
       argv: ["git", "switch", "-c", "agent/issue-123"],
     });
   });
 
-  test("[AGENT-WS-SOURCE-014] preserves recovery evidence when source materialization fails", async () => {
+  test("[AGENT-WS-SOURCE-014] discovers and checks out the remote default branch", async () => {
+    const execRequests: Request[] = [];
+    const appaloft = createAppaloftClient({
+      baseUrl: "https://appaloft.example/api",
+      fetch: async (request) => {
+        const path = new URL(request.url).pathname;
+        if (path === "/api/sandboxes") {
+          return Response.json({ sandboxId: "sbx_default_ref", status: "ready" }, { status: 201 });
+        }
+        if (path === "/api/sandboxes/sbx_default_ref/exec") {
+          execRequests.push(request);
+          const body = (await request.clone().json()) as { argv?: string[] };
+          return Response.json({
+            mode: "foreground",
+            frames: [
+              ...(body.argv?.[1] === "symbolic-ref"
+                ? [{ kind: "stdout", data: "origin/trunk\n" }]
+                : []),
+              { kind: "exit", exitCode: 0 },
+            ],
+          });
+        }
+        if (path === "/api/sandboxes/sbx_default_ref/agent-runtimes") {
+          return Response.json({
+            sandboxId: "sbx_default_ref",
+            runtimeId: "sar_default_ref",
+            harnessKey: "pi",
+            status: "ready",
+          });
+        }
+        throw new Error(`Unexpected SDK request ${request.method} ${path}`);
+      },
+    });
+
+    await appaloft.workspaces.create({
+      sandbox: sandboxInput,
+      harness: "pi",
+      source: { repository: "https://github.com/acme/web.git" },
+    });
+
+    expect(await Promise.all(execRequests.map((request) => request.json()))).toEqual([
+      { argv: ["git", "init"] },
+      { argv: ["git", "remote", "add", "origin", "https://github.com/acme/web.git"] },
+      { argv: ["git", "fetch", "origin"] },
+      { argv: ["git", "remote", "set-head", "origin", "--auto"] },
+      { argv: ["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"] },
+      { argv: ["git", "checkout", "trunk"] },
+    ]);
+  });
+
+  test("[AGENT-WS-SOURCE-014] preserves recovery evidence when checkout conflicts with template state", async () => {
+    let execCount = 0;
     const appaloft = createAppaloftClient({
       baseUrl: "https://appaloft.example/api",
       fetch: async (request) => {
@@ -417,11 +480,21 @@ describe("Agent Workspace SDK handles", () => {
           );
         }
         if (path === "/api/sandboxes/sbx_source_partial/exec") {
+          execCount += 1;
+          if (execCount < 4) {
+            return Response.json({
+              mode: "foreground",
+              frames: [{ kind: "exit", exitCode: 0 }],
+            });
+          }
           return Response.json({
             mode: "foreground",
             frames: [
-              { kind: "stderr", data: "repository unavailable" },
-              { kind: "exit", exitCode: 128 },
+              {
+                kind: "stderr",
+                data: "error: The following untracked working tree files would be overwritten by checkout",
+              },
+              { kind: "exit", exitCode: 1 },
             ],
           });
         }
@@ -440,6 +513,7 @@ describe("Agent Workspace SDK handles", () => {
       sandboxId: "sbx_source_partial",
       phase: "source-materialization",
     });
+    expect(execCount).toBe(4);
   });
 
   test("[AGENT-WS-FLOW-003] composes list/show from Sandbox and Runtime read models", async () => {
