@@ -101,6 +101,10 @@ sidebar:
 
 ## 自托管:Worker 与队列
 
+<a id="reference-durable-worker-runtime" />
+
+Durable worker runtime 配置控制已经 accepted 的长耗时工作在请求返回 id 之后如何被 claim、执行和监控。operator 也可以运行 `appaloft worker` 启动专用 worker 进程。
+
 | 变量 | 说明 |
 | --- | --- |
 | `APPALOFT_WORKER_COUNT` | 单进程内启动的 Worker 数量 |
@@ -113,7 +117,7 @@ sidebar:
 
 `appaloft doctor`、`GET /api/system/doctor` 与 Web Instance 页只展示已配置的 worker 状态；they do not start workers, tick schedulers, or run maintenance work。配置库层面默认下，certificate retry scheduler starts with the backend service，以便已接受的证书工作可以重试。其他 scheduled worker 默认关闭。
 
-除非另有说明，scheduled worker 默认关闭。
+除非另有说明，scheduled worker 默认关闭。certificate retry scheduler 是默认开启的例外，因为它只处理已经 accepted、随后进入 retry-scheduled 状态的 managed certificate work。Runtime execution、runtime prune、history retention、monitoring collection 和 preview cleanup worker 都保持默认关闭，直到 operator 显式启用对应的 `APPALOFT_*_ENABLED` 设置。
 
 | 变量 | 默认值 |
 | --- | --- |
