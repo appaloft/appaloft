@@ -58,9 +58,18 @@ appaloft resource storage attach res_web vol_uploads --destination-path /app/upl
 
 A Resource can't mount two storage volumes onto the same in-container path. Deleting a storage volume requires confirming no active mounts or backup retentions are blocking it first; deletion itself doesn't automatically unmount or clean up underlying data.
 
+Runtime volume cleanup is a separate dry-run-first operation, `storage-volumes.cleanup-runtime`. Destructive cleanup requires `--dry-run false`. Web can also run dry-run-first runtime cleanup for one storage volume on one server: it previews candidates and blockers first, then sends destructive cleanup only after confirmation.
+
+```bash
+appaloft storage volume cleanup-runtime vol_uploads --server srv_primary --before 2026-01-01T00:00:00.000Z
+appaloft storage volume cleanup-runtime vol_uploads --server srv_primary --before 2026-01-01T00:00:00.000Z --dry-run false
+```
+
 ## Scheduled tasks <a id="scheduled-task-resource-lifecycle" />
 
 A scheduled task is a recurring task definition owned by a Resource, used to run migrations, syncs, cache warming, or maintenance scripts — it never creates a Deployment and never writes to deployment history.
+
+Scheduled task execution currently covers supported Docker runtime targets: local-shell Docker, generic-SSH Docker, Docker Compose, or Docker Swarm image services. Appaloft starts a temporary execution context against the Resource's retained target; Docker Swarm image-service deployments run as a replicated job shape.
 
 ```bash
 # Create a scheduled task

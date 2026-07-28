@@ -77,9 +77,18 @@ appaloft resource storage attach res_web vol_uploads --destination-path /app/upl
 
 一个 Resource 不能在同一个容器内路径上挂载两个存储卷。删除存储卷前必须确认没有活动挂载或备份保留在阻塞；删除本身不会自动解除挂载或清理底层数据。
 
+运行时卷清理是独立的 dry-run-first 操作 `storage-volumes.cleanup-runtime`。破坏性清理必须显式传 `--dry-run false`。Web 也可以对单个存储卷、单台服务器先预览候选与阻塞项，再确认后执行 dry-run-first runtime cleanup。
+
+```bash
+appaloft storage volume cleanup-runtime vol_uploads --server srv_primary --before 2026-01-01T00:00:00.000Z
+appaloft storage volume cleanup-runtime vol_uploads --server srv_primary --before 2026-01-01T00:00:00.000Z --dry-run false
+```
+
 ## 定时任务 <a id="scheduled-task-resource-lifecycle" />
 
 定时任务是 Resource 拥有的重复任务定义，用来运行迁移、同步、缓存预热或维护脚本——它不会创建 Deployment，也不会写入部署历史。
+
+当前执行覆盖受支持的 Docker 运行时目标：local-shell Docker、generic-SSH Docker、Docker Compose，或 Docker Swarm image services。Appaloft 会基于 Resource 保留的目标启动临时执行上下文；Docker Swarm image-service 部署以 replicated job 形态运行。
 
 ```bash
 # 创建定时任务

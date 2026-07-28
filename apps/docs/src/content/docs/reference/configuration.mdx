@@ -111,6 +111,10 @@ sidebar:
 
 ## 自托管:后台调度器 <a id="maintenance-worker-activation" />
 
+`appaloft doctor`、`GET /api/system/doctor` 与 Web Instance 页只展示已配置的 worker 状态；they do not start workers, tick schedulers, or run maintenance work。配置库层面默认下，certificate retry scheduler starts with the backend service，以便已接受的证书工作可以重试。其他 scheduled worker 默认关闭。
+
+除非另有说明，scheduled worker 默认关闭。
+
 | 变量 | 默认值 |
 | --- | --- |
 | `APPALOFT_CERTIFICATE_RETRY_SCHEDULER_ENABLED` | `true` |

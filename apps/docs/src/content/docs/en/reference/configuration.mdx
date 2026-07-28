@@ -99,6 +99,10 @@ See [Database Maintenance](/docs/en/self-hosting/database/) for details.
 
 ## Self-hosting: background schedulers <a id="maintenance-worker-activation" />
 
+`appaloft doctor`, `GET /api/system/doctor`, and the Web Instance page show configured worker status only; they do not start workers, tick schedulers, or run maintenance work. By default at the configuration-library level, the certificate retry scheduler starts with the backend service so accepted certificate work can retry. Other scheduled workers are disabled by default.
+
+Scheduled workers are disabled by default unless noted otherwise.
+
 | Variable | Default |
 | --- | --- |
 | `APPALOFT_CERTIFICATE_RETRY_SCHEDULER_ENABLED` | `true` |

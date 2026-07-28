@@ -24,6 +24,7 @@
       "!**/.appaloft",
       "!**/.tmp",
       "!**/*.svelte",
+      "!**/*.astro",
       "!apps/desktop/src-tauri/tauri.conf.json"
     ]
   },
