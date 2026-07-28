@@ -72,8 +72,10 @@ function keepSatteriNativeBindingExternal(): Plugin {
 // top-level processor, so Mermaid transforms must also be attached here or
 // ```mermaid fences stay as ordinary Shiki code blocks (language chip "MERM").
 const markdownProcessor = unified({
-  remarkPlugins: [remarkMermaid],
-  rehypePlugins: [rehypeMermaid],
+  // Cast: local plugins are intentionally loosely typed so we don't depend on
+  // optional `hast`/`mdast` packages; runtime shape matches remark/rehype.
+  remarkPlugins: [remarkMermaid as never],
+  rehypePlugins: [rehypeMermaid as never],
 });
 
 const nimbusConfig = defineNimbusConfig({
