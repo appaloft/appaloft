@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.6.0](https://github.com/appaloft/appaloft/compare/v1.5.0...v1.6.0) (2026-07-28)
+
+
+### Features
+
+* scope declarative agent credentials to child processes ([#837](https://github.com/appaloft/appaloft/issues/837)) ([37904b8](https://github.com/appaloft/appaloft/commit/37904b822c298d3a3df82d6cca54910f32e93457))
+
+
+### Bug Fixes
+
+* **runtime:** separate opencode headless execution ([#839](https://github.com/appaloft/appaloft/issues/839)) ([628d11c](https://github.com/appaloft/appaloft/commit/628d11c2c85aa2ebcf1c3d3921fdf0974f34d94b))
+
+
+### Documentation
+
+* migrate public docs to Nimbus with IA v3 rewrite ([#840](https://github.com/appaloft/appaloft/issues/840)) ([d00468c](https://github.com/appaloft/appaloft/commit/d00468cbb3ac113d18cf6b16ccd3b0f5b753f487))
+
 ## [1.5.0](https://github.com/appaloft/appaloft/compare/v1.4.0...v1.5.0) (2026-07-27)
 
 
