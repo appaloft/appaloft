@@ -1,0 +1,68 @@
+---
+title: "项目"
+description: "项目如何组织资源、环境与团队协作边界。"
+docType: "concept"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "project"
+  - "项目"
+relatedOperations:
+  - "projects.create"
+  - "projects.archive"
+  - "projects.delete"
+sidebar:
+  order: 6
+---
+<a id="concept-resource" />
+
+
+## 简要定义 <a id="concept-project" />
+
+Project 是你管理一组资源、环境和部署历史的工作边界。它不是服务器，也不是源码仓库——一个 Project 下可以有多个 Resource，每个 Resource 可以部署到不同的 Server。
+
+## 为什么存在这个概念
+
+团队通常按产品线或客户划分工作，而不是按单个应用划分。Project 提供了这个更高一层的分组，让资源列表、环境变量和部署历史都有一个稳定的归属，而不是散落在各处。
+
+## 在 Web / CLI / API 中的体现
+
+```bash
+appaloft projects create --name "my-first-project"
+appaloft projects list
+appaloft projects show <projectId>
+```
+
+## 项目生命周期 <a id="project-lifecycle" />
+
+Project 可以被重命名、排序、设置描述、归档、恢复，并在满足条件后删除。
+
+- **重命名** 会根据新名称重新生成 slug；如果新 slug 已被占用，需要换一个名称。
+- **排序** 只改变项目列表的显示顺序，不影响资源、环境或运行中的部署。
+- **归档** 适用于不再接收新部署的项目。归档不会删除资源、环境、域名、证书、日志或历史部署——这些仍然可以查看和排查；它只会阻止在该项目下创建新的环境、资源或部署。
+- **恢复** 把归档项目改回 active 状态，不会自动恢复已删除的子对象、重试部署或改动域名/证书。
+- **删除** 只对已归档的项目开放，并且必须先通过删除预检（delete-check）——只要还有环境、资源、部署历史、域名、证书、日志、审计或运行时记录依赖这个项目，删除就不会启用。
+
+```bash
+appaloft projects rename <projectId> --name "new-name"
+appaloft projects archive <projectId>
+appaloft projects delete-check <projectId>
+appaloft projects delete <projectId> --confirm <projectId>
+```
+
+## 常见误区
+
+- **把归档当成删除**：归档只是停止接收新工作，所有历史数据和已运行的部署都不受影响。
+- **认为删除项目会级联清理所有子资源**：删除只在没有任何依赖记录时才会启用，Appaloft 不会为了完成删除而级联删除其他对象或抹掉保留历史。
+- **认为排序会影响运行中的服务**：项目列表排序纯粹是显示层面的操作。
+
+## 相关任务
+
+- [资源](/docs/deliver/resources/)
+- [第一次部署](/docs/start/first-deployment/)
+- [配置优先级](/docs/configuration/precedence/)
+
+## 进阶细节
+
+一个空的、没有环境变量也没有非删除资源的环境不会阻止项目删除——项目删除会先通过环境生命周期自动归档这些空环境，再把项目从普通项目列表中移除（tombstone），但不会抹掉保留下来的历史记录。

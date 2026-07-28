@@ -1,0 +1,93 @@
+---
+title: "Database Status and Migrations"
+description: "Viewing database status and performing migrations, backups, and restores."
+docType: "task"
+---
+
+## Goal
+
+Understand what the Appaloft database saves and its boundaries, and safely complete backup, migration, and restore drills.
+
+## When to use this task
+
+- You need to back up state before planning an Appaloft upgrade.
+- You need to evaluate whether the current deployment mode (local-first state vs. self-hosted database) fits your team's size.
+
+## Prerequisites
+
+- You have access and backup permissions for the database (PostgreSQL or embedded PGlite).
+
+## Inputs and defaults
+
+Appaloft can use local-first state or a self-hosted database — the database saves **control-plane state**: projects, environments, deployment records, resource status, run history, and configuration snapshots. **Application code and build artifacts shouldn't only exist in the database** — they should be able to be re-located from source, an artifact, or a runtime target.
+
+| Mode | Fits | Operational focus |
+| --- | --- | --- |
+| Local-first state (PGlite) | Single machine, local trial, portable install | Back up the local data directory, stop writes before upgrading |
+| Self-hosted database (PostgreSQL) | Shared by a team, long-running, server deployment | Monitor connections, disk, backups, migration windows, and restore drills |
+
+<Aside type="caution" title="Secrets never appear in plaintext in backups">
+Secret values shouldn't appear as plaintext in backups, diagnostic summaries, or exported state files. When checking a restore flow, verify that secret references are still valid after restoring, rather than exporting the secret itself.
+</Aside>
+
+## CLI steps: backing up before an upgrade
+
+### 1. Pre-upgrade check
+
+Confirm the current version, target version, database connection, and migration window.
+
+### 2. Complete a restorable backup
+
+The backup should cover control-plane state, deployment history, and necessary configuration snapshots, and shouldn't export plaintext secrets; pause any automation that would create new deployment records.
+
+### 3. Run the migration
+
+Run the migration within a maintenance window, and watch the migration logs and Appaloft's startup status. **Don't change the database, upgrade Appaloft, and rebuild the server all at the same time.**
+
+### 4. Verify recovery
+
+After upgrading, check the project list, recent deployments, environment variable snapshots, log entrypoints, and access URL status; pick a random recent deployment and confirm it can still show status and a diagnostic summary.
+
+## Expected output and status
+
+Keep at least one pre-upgrade backup and one recent automatic backup. A restore drill should verify that Appaloft can start, users can log in, projects can be listed, and deployment history can be opened — not just that the database file can be copied.
+
+## Verification
+
+Refer to the verification checklist in step 4 above; if any check fails, treat it as an incomplete restore, not a "partial success."
+
+## Rollback / recovery
+
+Before rolling back to a pre-upgrade version, confirm whether the database migration is reversible and whether the old version can read the current state — some migrations are one-way, and you must restore the database from the pre-upgrade backup before rolling back the version.
+
+## Troubleshooting links
+
+- [Common Failures And Recovery](/docs/en/troubleshoot/recovery/)
+- [Upgrading Appaloft](/docs/en/self-hosting/upgrades/)
+
+## Advanced: whole-instance migration <a id="advanced-control-plane-modes" />
+
+An organization owner can export the control-plane database into a password-encrypted artifact, and run a compatibility check before importing — used for migrating an entire instance to new hardware, or copying state across environments. The artifact uses AES-256-GCM encryption, an independent salt, and an authentication checksum; the passphrase is only accepted through stdin, and never appears in any query result:
+
+```bash
+appaloft instance portability export-plan
+
+printf '%s\n' "$APPALOFT_EXPORT_PASSPHRASE" | \
+  appaloft instance portability export --output ./appaloft.instance --passphrase-stdin
+
+printf '%s\n' "$APPALOFT_EXPORT_PASSPHRASE" | \
+  appaloft instance portability import-plan ./appaloft.instance --mode merge --passphrase-stdin
+```
+
+`merge` mode keeps target data and rejects incompatible conflicts; `replace` mode requires explicitly passing `--acknowledge-replace` — Appaloft creates rollback evidence first, then enters the database transaction, and leaves the target state unchanged if validation or import fails. The source and target must use the same supported schema version. View and clean up artifact metadata with:
+
+```bash
+appaloft instance portability artifact list
+appaloft instance portability artifact show <artifactId>
+appaloft instance portability artifact delete <artifactId>
+```
+
+## Related reference pages
+
+- [Upgrading Appaloft](/docs/en/self-hosting/upgrades/)
+- [Runtime Configuration Reference](/docs/en/reference/configuration/)

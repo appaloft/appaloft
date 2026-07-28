@@ -1,0 +1,84 @@
+---
+title: "Organizations and Teams"
+description: "Organization and team boundaries in a self-hosted instance."
+docType: "concept"
+---
+<a id="organization-team-management" />
+
+
+## Short definition <a id="self-hosting-organization-team-management" />
+
+The first admin becomes the owner of the initial organization. An organization is the container in self-hosted Appaloft for managing members, roles, and permission boundaries — once logged in, you can read the current organization context, switch between multiple visible organizations, view members and invitations, and manage members by role.
+
+## Why this concept exists
+
+A self-hosted instance is typically used by a whole team, not owned by a single person. An organization pulls "who can do what" out of individual resource operations and describes it uniformly with roles (`owner`, `admin`, `developer`, `billing`, `viewer`), avoiding each feature page implementing its own permission logic.
+
+## Where you see it in Web, CLI, and API
+
+### Viewing the current context
+
+```bash
+appaloft organization context
+appaloft organization switch org_second
+```
+
+Returns safe metadata for the current user, current organization, current role, selectable organizations, and available login methods — it **never includes** a session token, cookie, OAuth provider token, or invitation key's raw value. The switch command only allows selecting an organization already visible to the current session.
+
+### Viewing members and invitations
+
+```bash
+appaloft organization members list --organization-id org_self_hosted
+appaloft organization invitations list --organization-id org_self_hosted --status pending
+```
+
+### Inviting, updating roles, transferring ownership, removing members
+
+```bash
+appaloft organization member invite --organization-id org_self_hosted --email operator@example.com --role developer
+appaloft organization member role mem_operator --organization-id org_self_hosted --role admin
+appaloft organization owner transfer mem_admin mem_operator --organization-id org_self_hosted
+appaloft organization member remove mem_operator --organization-id org_self_hosted
+```
+
+Available roles: `owner`, `admin`, `developer`, `billing`, `viewer`. Owners and admins can manage members.
+
+### HTTP/API
+
+The same set of operations can also be called through HTTP/API:
+
+```http
+GET /api/organizations/current-context
+POST /api/organizations/current-context/switch
+GET /api/organizations/{organizationId}/members
+GET /api/organizations/{organizationId}/invitations
+POST /api/organizations/{organizationId}/invitations
+POST /api/organizations/{organizationId}/members/{memberId}/role
+POST /api/organizations/{organizationId}/owner-transfer
+DELETE /api/organizations/{organizationId}/members/{memberId}
+```
+
+HTTP/API and the CLI execute exactly the same set of operations — the authentication runtime is an implementation detail, and callers don't need to (and shouldn't) depend on the underlying auth route, data table, or provider payload.
+
+### Web console
+
+The Web console's **Organization** page can do everything above, and also manages creating, rotating, and revoking deploy tokens.
+
+## Common mistakes
+
+- **Assuming a generic "update role" or "remove member" can operate on the Owner**: a generic role update can only change a non-owner member to a non-owner role, and a generic removal can only remove a non-owner member — the Owner can never be demoted or removed through these two operations. Changing the Owner requires the dedicated `owner transfer` command; after a successful transfer, the target member becomes Owner and the original Owner automatically becomes Admin.
+- **Directly editing auth database tables to bypass member/role/invitation state**: this breaks audit consistency — always operate through the CLI/HTTP/API, or restore from a trusted backup.
+
+## Related tasks
+
+- [Creating The First Admin](/docs/en/self-hosting/first-admin/)
+- [Action Token](/docs/en/self-hosting/action-token/)
+
+## Advanced details
+
+The CLI reads the equivalent session input from `APPALOFT_AUTH_COOKIE` or `APPALOFT_AUTHORIZATION`; **never** write these values into shell history, CI logs, repository files, an issue, or a PR comment.
+
+When troubleshooting permission issues:
+
+- On `401 product_auth_missing` — log in again, or provide the CLI a trusted session source.
+- On `403 product_auth_forbidden` — confirm the current user belongs to the target organization; member management and deploy token management also require an Owner or Admin role.

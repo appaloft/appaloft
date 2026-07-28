@@ -1,0 +1,84 @@
+---
+/**
+ * Shared docs-entry renderer. `src/pages/[...slug].astro` uses this for
+ * every interior page; `src/pages/index.astro` and `src/pages/en/index.astro`
+ * also use it directly so the zh-CN and en-US homepages are ordinary
+ * `docs` collection MDX entries (`index.mdx` / `en/index.mdx`) rendered at
+ * the site root instead of a hand-written landing page — Astro's content
+ * glob loader assigns a root `index.mdx` the entry id `"index"` (not `""`),
+ * which is why it needs an explicit route here rather than falling out of
+ * the `[...slug]` catch-all at `/`.
+ */
+import type { CollectionEntry } from "astro:content";
+import { render } from "astro:content";
+import {
+  getBreadcrumbs,
+  getEditUrl,
+  getLastUpdated,
+  getPrevNext,
+  getRouteFlags,
+  getSidebar,
+  getTOC,
+} from "@cloudflare/nimbus-docs";
+import DocsLayout from "../layouts/DocsLayout.astro";
+import { components } from "../components";
+import { localeFromEntryId, localeSidebarTransform } from "../lib/locale";
+
+interface Props {
+  entry: CollectionEntry<"docs">;
+  /** Canonical URL path for this render, e.g. `/` or `/en`. */
+  path: string;
+}
+
+const { entry, path } = Astro.props;
+const { Content, headings } = await render(entry);
+
+const currentSlug = path.replace(/\/$/, "") || "/";
+const locale = localeFromEntryId(entry.id);
+
+const { sidebar: sidebarOn, tableOfContents: tocOn } = await getRouteFlags(entry);
+
+const sidebar = sidebarOn
+  ? await getSidebar(currentSlug, {
+      collection: entry.collection,
+      transform: localeSidebarTransform(locale),
+    })
+  : false;
+const prevNext = await getPrevNext(currentSlug, {
+  sidebarTree: sidebar === false ? [] : sidebar,
+  overrides: { prev: entry.data.prev, next: entry.data.next },
+});
+const breadcrumbs = await getBreadcrumbs(currentSlug, { collection: entry.collection });
+const editUrl = await getEditUrl(entry);
+const lastUpdated = entry.data.lastUpdated ?? (await getLastUpdated(entry));
+const tocConfig = entry.data.tableOfContents;
+const toc = tocOn && tocConfig !== false ? getTOC(headings, tocConfig) : false;
+const markdownPath = `/${entry.id}/index.md`;
+const markdownUrl = Astro.site ? new URL(markdownPath, Astro.site).href : markdownPath;
+const socialImage = entry.data.socialImage ?? `/og/${entry.id}.png`;
+---
+
+<DocsLayout
+  title={entry.data.title}
+  description={entry.data.description}
+  sidebar={sidebar}
+  headings={toc}
+  breadcrumbs={breadcrumbs}
+  prevNext={prevNext}
+  mode={entry.data.mode}
+  banner={entry.data.banner}
+  head={entry.data.head}
+  searchable={entry.data.searchable}
+  noindex={entry.data.noindex}
+  markdownUrl={markdownUrl}
+  socialImage={socialImage}
+  lastUpdated={lastUpdated}
+  editUrl={editUrl}
+  draft={entry.data.draft}
+  audience={entry.data.audience}
+  collection={entry.collection}
+  entryId={entry.id}
+  lang={locale}
+>
+  <Content components={components} />
+</DocsLayout>

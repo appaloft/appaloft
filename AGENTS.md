@@ -82,7 +82,7 @@ Replace placeholders with confirmed paths; do not execute `<workspace>` or `path
 - `packages/application` depends only on `core`
 - adapters, persistence, providers, integrations, plugins, and shell depend inward
 - `apps/web` may depend on `contracts`, `@appaloft/orpc/client`, `@tanstack/svelte-query`, and optional `ui`, never on `core` or `application`
-- `apps/docs` is the public documentation app; it may depend on documentation-site tooling such as Fumadocs/Next/Tailwind and generated public docs metadata, never on `core` or `application`
+- `apps/docs` is the public documentation app; it may depend on documentation-site tooling such as Nimbus/Astro/Tailwind (see [ADR-101](docs/decisions/ADR-101-nimbus-public-documentation-platform.md); current running code may still be Fumadocs/Next until that migration lands) and generated public docs metadata, never on `core` or `application`
 
 ## Package Boundaries
 
@@ -188,8 +188,9 @@ Replace placeholders with confirmed paths; do not execute `<workspace>` or `path
 
 ## Public Documentation Rules
 
-- public documentation is a first-class product surface governed by [ADR-030: Public Documentation Round And Platform](docs/decisions/ADR-030-public-documentation-round-and-platform.md)
+- public documentation is a first-class product surface governed by [ADR-030: Public Documentation Round And Platform](docs/decisions/ADR-030-public-documentation-round-and-platform.md) (Docs Round contract) and [ADR-101: Nimbus Public Documentation Platform](docs/decisions/ADR-101-nimbus-public-documentation-platform.md) (platform, IA v3, Markdown processor, toolchain)
 - public docs structure is governed by [docs/documentation/public-docs-structure.md](docs/documentation/public-docs-structure.md)
+- every public or Cloud code change must classify its docs outcome before merge per [skills/docs-impact-gate/SKILL.md](skills/docs-impact-gate/SKILL.md)
 - public docs coverage is governed by [docs/testing/public-documentation-test-matrix.md](docs/testing/public-documentation-test-matrix.md)
 - user-visible changes to input, output, status, recovery, workflow sequencing, or entrypoint affordances require a Docs Round outcome before the behavior is considered complete
 - Docs Round outcomes must identify the public page or stable anchor, reuse an existing anchor, mark the behavior not user-facing with a reason, or record an explicit migration gap

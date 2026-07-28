@@ -1,0 +1,127 @@
+---
+title: "Generating a Safe Diagnostic Summary"
+description: "Generating safe support diagnostics that never leak secrets."
+docType: "task"
+---
+
+## Goal
+
+Generate a diagnostic summary that's safe to share with a teammate or support contact, instead of manually assembling logs, environment variables, and server command output — manual assembly can easily include a secret by accident.
+
+## When to use this task
+
+- A deployment failed but the error message isn't clear enough.
+- The generated access URL, custom domain, or TLS status seem to contradict each other.
+- The health check and runtime logs seem to contradict each other.
+- You need to hand the problem off to a teammate or Appaloft support.
+
+## Prerequisites
+
+- You already know the Resource to troubleshoot (and optionally a specific Deployment).
+
+## Inputs and defaults
+
+| Parameter | Description | Default |
+| --- | --- | --- |
+| `--deployment` | Include information about a specific deployment | Not included |
+| `--deployment-timeline` | Include that deployment's event timeline | Off |
+| `--runtime-logs` | Include runtime logs | Off |
+| `--tail` | Number of trailing log lines | All |
+| `--summary` | Output only section status and stable error codes, not the full JSON | Off |
+
+## CLI steps
+
+<a id="diagnostic-summary-copy-support-payload" />
+
+<a id="access-failure-request-id-lookup" />
+
+```bash
+# Generate a complete safe diagnostic summary
+appaloft resource diagnose res_web \
+  --deployment dep_123 \
+  --deployment-timeline \
+  --runtime-logs \
+  --tail 50
+
+# Just view the section status and error code summary, without the full JSON
+appaloft resource diagnose res_web --summary
+```
+
+If you see an error page with a **request id** when visiting an Appaloft-generated URL or custom domain, you can use that id to directly look up short-lived safe evidence:
+
+```bash
+appaloft resource access-failure req_abc123 --resource res_web --host web.example.com --path /
+```
+
+When a deployment fails due to disk space, Docker image storage, or build cache pressure, run a read-only capacity check first (it performs no cleanup):
+
+```bash
+appaloft server capacity inspect srv_primary
+```
+
+## Expected output and status
+
+The diagnostic summary includes: stable ids like Project/Resource/Environment/Deployment, the most recent failed phase and error code, a safe summary of Source/Runtime/Health/Network, a server and proxy readiness summary, access URL/domain/certificate status, and masked secret key names (only showing whether they exist, never the value).
+
+```json title="Example safe diagnostic summary"
+{
+  "resourceId": "res_web",
+  "deploymentId": "dep_123",
+  "failedPhase": "verify",
+  "errorCode": "health_check_failed",
+  "accessFailure": {
+    "requestId": "req_abc123",
+    "code": "resource_access_upstream_timeout",
+    "affected": { "hostname": "web.example.com", "path": "/" },
+    "nextAction": "check-health"
+  },
+  "secrets": [{ "key": "DATABASE_URL", "value": "***" }],
+  "nextAction": "Check health path and runtime logs."
+}
+```
+
+## Verification
+
+Before sharing, check that the summary only contains ids, status, error codes, and safe context — it should never contain a plaintext secret, private key, or full environment variable value.
+
+## Rollback / recovery
+
+**Never** share any of the following as diagnostic evidence: an SSH private key, an API token or session token, a database connection string, the full contents of an `.env` file, a certificate private key, a complete server shell history, sensitive information in a screenshot, or a raw provider response.
+
+If the diagnostic summary indicates disk or build-cache pressure, first check capacity read-only (`server capacity inspect`), confirm the candidates match what you expect, then decide whether to run a dry-run cleanup:
+
+<a id="scheduled-runtime-prune-policy" />
+<a id="runtime-target-capacity-inspect" />
+<a id="runtime-usage-inspect" />
+
+```bash
+# Read-only capacity and runtime usage inspection
+appaloft server capacity inspect srv_primary
+appaloft server runtime usage inspect srv_primary
+
+# Preview cleanup candidates (doesn't actually delete anything)
+appaloft server capacity prune srv_primary --before 2026-01-01T00:00:00.000Z
+
+# Only after confirming the candidates match expectations, explicitly run the destructive cleanup
+appaloft server capacity prune srv_primary --before 2026-01-01T00:00:00.000Z --dry-run false
+```
+
+Capacity cleanup only operates on candidates outside of Appaloft's state directory, running runtimes, rollback candidates, deployment snapshots, audit/events, logs, and business state — it never runs a broad Docker system prune.
+
+## Runtime monitoring samples and rollups <a id="runtime-monitoring-samples-and-rollups" /><a id="runtime-monitoring-thresholds" />
+
+Appaloft keeps bounded runtime monitoring samples and rollups inside the control plane for the Web Monitor and diagnostics loop. Retention and alert thresholds are controlled by runtime configuration; raw samples outside the retention window are pruned.
+
+## External observability handoff <a id="external-observability-handoff" />
+
+In-control-plane monitoring does not replace a full external observability stack. For long-term metrics, alert routing, or cross-service correlation, connect Prometheus / PromQL, APM tracing / traces, and custom metrics to your own observability system. Appaloft only retains bounded samples needed for recovery.
+
+## Troubleshooting links
+
+- [Common Failures And Recovery](/docs/en/troubleshoot/recovery/)
+- [Access Troubleshooting](/docs/en/access/troubleshooting/)
+
+## Related reference pages
+
+- [Viewing Logs And Health Summaries](/docs/en/troubleshoot/logs-health/)
+- [Handling Secrets Safely](/docs/en/configuration/secrets/)

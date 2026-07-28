@@ -1,0 +1,176 @@
+---
+title: "Runtime Configuration Reference"
+description: "Runtime environment variables and configuration item reference."
+docType: "reference"
+---
+<a id="advanced-control-plane-modes" />
+
+
+## Stable identifier
+
+This page collects Appaloft's **runtime environment variables** — the ones you can set when starting the CLI, the Web console, or a self-hosted service. This is a different layer from `appaloft.yml` (the app deployment config file, see [Configuration File Reference](/docs/en/configuration/config-file/)): `appaloft.yml` describes "what to deploy and how," while this page describes "how Appaloft itself runs."
+
+## CLI and authentication
+
+| Variable | Description |
+| --- | --- |
+| `APPALOFT_HOME` | The storage directory for the CLI's local profile, context, and handshake info; defaults to the user's local Appaloft home |
+| `APPALOFT_TOKEN` | The scoped token used for non-interactive scenarios; takes priority over the legacy cookie in credential resolution |
+| `APPALOFT_AUTH_COOKIE` | For legacy/diagnostic compatibility on trusted local operators only — **not** the recommended authentication path for an AI agent |
+| `APPALOFT_CONTROL_PLANE_MODE` | Overrides the CLI's execution target: `none` (local), `cloud`, or `self-hosted` |
+| `APPALOFT_CONTROL_PLANE_URL` | Explicitly specifies the remote control plane address |
+
+See [CLI reference](/docs/en/reference/cli/) for details.
+
+## Documentation development and local links
+
+| Variable | Description |
+| --- | --- |
+| `APPALOFT_DEV_DOCS_HOST` | The hostname the docs server binds to during local development |
+| `APPALOFT_DEV_DOCS_PORT` | The port the docs server binds to during local development |
+| `APPALOFT_WEB_DEV_DOCS_TARGET` | Overrides the full target address for the Web dev server's `/docs/*` redirect |
+| `APPALOFT_DOCS_STATIC_DIR` | The directory for embedded docs static assets in a self-hosted deployment |
+
+## Product version
+
+| Variable | Description |
+| --- | --- |
+| `APPALOFT_APP_VERSION` | Injects the product version shown in the Web console; development environments default to reading the version from the repository root `package.json` |
+
+## Self-hosting: Web and authentication
+
+| Variable | Description |
+| --- | --- |
+| `APPALOFT_WEB_ORIGIN` | The externally reachable origin for the Web console |
+| `APPALOFT_BETTER_AUTH_URL` | The base URL of the authentication service |
+| `APPALOFT_BETTER_AUTH_COOKIE_DOMAIN` | The scope domain for the authentication cookie |
+| `APPALOFT_BETTER_AUTH_COOKIE_PREFIX` | The name prefix for the authentication cookie |
+| `APPALOFT_BETTER_AUTH_TRUSTED_PROXY_HEADERS` | Whether to trust authentication-related headers forwarded by a reverse proxy |
+
+## Self-hosting: login providers
+
+| Provider | Related variables |
+| --- | --- |
+| GitHub | `APPALOFT_GITHUB_CLIENT_ID`, `APPALOFT_GITHUB_CLIENT_SECRET`, `APPALOFT_GITHUB_REDIRECT_URI` |
+| Google | `APPALOFT_GOOGLE_CLIENT_ID`, `APPALOFT_GOOGLE_CLIENT_SECRET`, `APPALOFT_GOOGLE_REDIRECT_URI` |
+| Generic OIDC | `APPALOFT_OIDC_CLIENT_ID`, `APPALOFT_OIDC_CLIENT_SECRET`, `APPALOFT_OIDC_DISCOVERY_URL`, `APPALOFT_OIDC_REDIRECT_URI` |
+| GitHub integration (not login) | `APPALOFT_GITHUB_WEBHOOK_SECRET`, `APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN` |
+
+## Self-hosting: first admin bootstrap
+
+| Variable | Description |
+| --- | --- |
+| `APPALOFT_FIRST_ADMIN_EMAIL` | The first admin account's email |
+| `APPALOFT_FIRST_ADMIN_PASSWORD` / `APPALOFT_INITIAL_ADMIN_PASSWORD` | The first admin account's password |
+| `APPALOFT_FIRST_ADMIN_DISPLAY_NAME` | The first admin's display name |
+| `APPALOFT_FIRST_ADMIN_ORGANIZATION_NAME` / `APPALOFT_FIRST_ADMIN_ORGANIZATION_SLUG` | The first organization's name and slug |
+| `APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE` | The file path the bootstrap result (excluding the plaintext password) is written to |
+
+See [Creating The First Admin](/docs/en/self-hosting/first-admin/) for details.
+
+## Self-hosting: database and upgrades
+
+| Variable | Description |
+| --- | --- |
+| `APPALOFT_DATABASE_POOL_MAX` | The database connection pool limit |
+| `APPALOFT_INSTANCE_UPGRADE_APPLY_ENABLED` | Whether the instance is allowed to automatically apply upgrades |
+| `APPALOFT_REMOTE_PGLITE_SYNC_BACKUP_MAX_COUNT` / `APPALOFT_REMOTE_PGLITE_SYNC_BACKUP_RETENTION_DAYS` | The count and retention-day limit for remote-state sync backups |
+
+See [Database Maintenance](/docs/en/self-hosting/database/) for details.
+
+## Self-hosting: control plane encryption and tracing
+
+| Variable | Description |
+| --- | --- |
+| `APPALOFT_CONTROL_PLANE_SECRET_KEYS` | The set of keys the control plane uses for encryption/decryption |
+| `APPALOFT_CONTROL_PLANE_ACTIVE_SECRET_KEY_ID` | The currently active key id |
+| `APPALOFT_EXPORT_PASSPHRASE` | The encryption passphrase for data export |
+| `APPALOFT_TRACE_LINK_BASE_URL` | The base address of the tracing system linked from structured errors |
+
+## Self-hosting: worker and queue
+
+| Variable | Description |
+| --- | --- |
+| `APPALOFT_WORKER_COUNT` | The number of workers started within a single process |
+| `APPALOFT_WORKER_GROUP` / `APPALOFT_WORKER_OBSERVED_GROUPS` | The worker's group and the observed groups |
+| `APPALOFT_WORKER_RUNTIME_MODE` | The worker runtime mode |
+| `APPALOFT_WORKER_QUEUE_BACKEND` / `APPALOFT_WORKER_EXTERNAL_BACKEND_KIND` | The queue backend type |
+| `APPALOFT_WORKER_SLOT` | The worker slot identifier |
+
+## Self-hosting: background schedulers <a id="maintenance-worker-activation" />
+
+| Variable | Default |
+| --- | --- |
+| `APPALOFT_CERTIFICATE_RETRY_SCHEDULER_ENABLED` | `true` |
+| `APPALOFT_CERTIFICATE_RETRY_SCHEDULER_INTERVAL_SECONDS` | `30` |
+| `APPALOFT_CERTIFICATE_RETRY_DEFAULT_DELAY_SECONDS` | `60` |
+| `APPALOFT_CERTIFICATE_RETRY_SCHEDULER_BATCH_SIZE` | `50` |
+| `APPALOFT_SCHEDULED_TASK_RUNNER_ENABLED` | `false` |
+| `APPALOFT_SCHEDULED_TASK_RUNNER_INTERVAL_SECONDS` | `30` |
+| `APPALOFT_SCHEDULED_TASK_RUNNER_BATCH_SIZE` | `20` |
+| `APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_ENABLED` | `false` |
+| `APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_INTERVAL_SECONDS` | `300` |
+| `APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_BATCH_SIZE` | `20` |
+| `APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_ENABLED` | `false` |
+| `APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_INTERVAL_SECONDS` | `3600` |
+| `APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_BATCH_SIZE` | `100` |
+| `APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_ENABLED` | `false` |
+| `APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_INTERVAL_SECONDS` | `60` |
+| `APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_BATCH_SIZE` | `50` |
+| `APPALOFT_RUNTIME_MONITORING_RAW_RETENTION_HOURS` | `24` |
+| `APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_ENABLED` | `false` |
+| `APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_INTERVAL_SECONDS` | `300` |
+| `APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_BATCH_SIZE` | `20` |
+| `APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_ENABLED` | `false` |
+| `APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_INTERVAL_SECONDS` | `300` |
+| `APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_BATCH_SIZE` | `20` |
+
+These schedulers are disabled by default or require explicit enablement; a bad setting fails closed without starting the corresponding worker slice. The set includes the certificate retry scheduler, preview cleanup, preview expiry cleanup, scheduled task runner, scheduled runtime prune, scheduled history retention, and runtime monitoring collector.
+
+
+Multiple background schedulers share the same variable naming pattern: `APPALOFT_<SCHEDULER>_ENABLED` (whether it's enabled), `APPALOFT_<SCHEDULER>_BATCH_SIZE` (batch size per run), `APPALOFT_<SCHEDULER>_INTERVAL_SECONDS` (polling interval in seconds). For example, the certificate retry scheduler:
+
+```bash
+APPALOFT_CERTIFICATE_RETRY_SCHEDULER_ENABLED=true
+APPALOFT_CERTIFICATE_RETRY_SCHEDULER_BATCH_SIZE=50
+APPALOFT_CERTIFICATE_RETRY_SCHEDULER_INTERVAL_SECONDS=30
+```
+
+Other schedulers following the same pattern include:
+
+- `APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_*` (preview cleanup retry)
+- `APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_*` (preview expiry cleanup)
+- `APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_*` (runtime monitoring collection)
+- `APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_*` (scheduled dependency resource backups)
+- `APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_*` (scheduled storage volume backups)
+- `APPALOFT_SCHEDULED_TASK_RUNNER_*` (scheduled tasks)
+- `APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_*` (history retention cleanup)
+- `APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_*` (runtime pruning)
+- `APPALOFT_TUNNEL_RECONCILER_ENABLED` / `APPALOFT_TUNNEL_RECONCILE_BATCH_SIZE` / `APPALOFT_TUNNEL_RECONCILE_INTERVAL_SECONDS` (tunnel reconciliation)
+
+## Self-hosting: retention windows and proxy
+
+| Variable | Description |
+| --- | --- |
+| `APPALOFT_RUNTIME_MONITORING_RAW_RETENTION_HOURS` | Retention hours for raw runtime monitoring samples |
+| `APPALOFT_TERMINAL_SESSION_ACTIVE_TTL_SECONDS` | The TTL for an active terminal session |
+| `APPALOFT_TERMINAL_SESSION_OUTPUT_RETENTION_BYTES` | The byte limit for retained terminal session output |
+| `APPALOFT_TRAEFIK_IMAGE` | The Traefik image reference used by the self-hosted proxy |
+| `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED` / `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` | Docker Swarm execution mode and edge network |
+
+## Error codes and recovery hints
+
+If a misconfigured environment variable is preventing the service from starting, or is disabling some feature, run:
+
+```bash
+appaloft doctor
+```
+
+It checks the current instance's system capabilities and known configuration problems, and gives actionable next steps.
+
+## Related tasks
+
+- [CLI reference](/docs/en/reference/cli/)
+- [Configuration File Reference](/docs/en/configuration/config-file/)
+- [Installing Appaloft](/docs/en/self-hosting/install/)
+- [Creating The First Admin](/docs/en/self-hosting/first-admin/)

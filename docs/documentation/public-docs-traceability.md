@@ -71,3 +71,20 @@ The machine-readable source for topic ids, anchors, spec references, and Web sur
 - Keep public pages user-facing; put internal file relationships here or in the docs registry.
 - When a Web `?` target changes, update the registry topic, this file, and the relevant
   `PUB-DOCS-003` or `PUB-DOCS-010` test expectation in the same change.
+- When the platform migration in
+  [ADR-101](../decisions/ADR-101-nimbus-public-documentation-platform.md) lands, every row's
+  "Public page and anchor" column must be re-verified against the IA v3 path before the row is
+  trusted; IA v2 paths in this table become stale the moment the Nimbus/Astro rewrite ships, not
+  gradually.
+
+## Docs-Impact Registry Contract
+
+`@appaloft/docs-registry` is also the enforcement point for the Docs-Impact Gate described in
+[Docs Round](../../skills/domain-driven-develop/references/docs-round.md) and
+[Docs Impact Gate](../../skills/docs-impact-gate/SKILL.md): a code change that adds, removes, or
+changes user-visible input, output, status, recovery, workflow sequencing, or entrypoint affordances
+must either add/update a registry topic row (and, for high-confusion topics, a row in this file), or
+record one of the other Docs Round outcomes (existing anchor, not user-facing with reason, or
+explicit migration gap) in the governing spec/PR. Reviewers should treat a PR that changes public or
+Cloud operation behavior with **no** docs-registry diff and **no** stated Docs Round outcome as
+incomplete, the same way an undocumented breaking API change would be incomplete.

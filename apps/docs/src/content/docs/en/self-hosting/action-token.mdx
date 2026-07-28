@@ -1,0 +1,93 @@
+---
+title: "Action Token"
+description: "Issuance and permission scope for the Action Token used in automation."
+docType: "reference"
+---
+<a id="action-deploy-token-auth" />
+
+
+## Stable identifier <a id="self-hosting-action-deploy-token-auth" />
+
+A self-hosted Server API mode rejects any GitHub Action mutating request that doesn't carry an Action Token (that is, a deploy token). This is **a machine credential for automation** — it's not a Web console login session, and shouldn't be written into repository config, a workflow file body, a URL query string, or logs.
+
+## Input fields, defaults, and validation
+
+An ordinary SSH install doesn't automatically create an Action Token. To wire up GitHub Action Server API mode right away, add `--bootstrap-deploy-token` at install time — the installer prints a bootstrap JSON once, after the container becomes healthy:
+
+```json
+{
+  "schemaVersion": "deploy-token.bootstrap/v1",
+  "created": true,
+  "organizationId": "org_self_hosted",
+  "actionSecretName": "APPALOFT_TOKEN",
+  "tokenId": "dpt_...",
+  "secretSuffix": "abcd1234",
+  "token": "aplt_dt_..."
+}
+```
+
+The `token` field **only appears on first creation** — save its value to a GitHub Repository or Organization Secret named `APPALOFT_TOKEN`. If you re-run the installer while a valid token already exists, the output only contains safe metadata and never shows the raw token again.
+
+A deploy token can be scoped to workflow commands, Project, Environment, Resource, Server, and repository. When a token uniquely identifies these targets, an ordinary self-hosted Action deployment can omit the corresponding id parameters — the Server resolves the target from the token's scope, the source link, and repository facts.
+
+## Output fields and status values
+
+Admins can manage deploy tokens through the CLI or an HTTP/API entrypoint protected by a product session:
+
+```bash
+appaloft deploy-token create --organization-id org_self_hosted --display-name "GitHub Action" \
+  --workflow-commands source-link-deploy,server-config-deploy,preview-cleanup
+appaloft deploy-token list --organization-id org_self_hosted
+appaloft deploy-token show <tokenId> --organization-id org_self_hosted
+```
+
+```http
+POST /api/deploy-tokens
+GET /api/deploy-tokens?organizationId=...
+GET /api/deploy-tokens/{tokenId}?organizationId=...
+```
+
+In the creation endpoint's response, the raw token is **shown only once**; the list and detail endpoints only return safe metadata.
+
+## Usage example
+
+```yaml
+- uses: appaloft/deploy-action@v1
+  with:
+    control-plane-mode: self-hosted
+    control-plane-url: https://console.example.com
+    appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
+```
+
+## Error codes and recovery hints
+
+| Code | Meaning | How to handle it |
+| --- | --- | --- |
+| `401 action_auth_missing` | The Action didn't send a bearer token | Check whether the workflow passes `appaloft-token`, and that the secret name is correct |
+| `401 action_auth_invalid` | The token is malformed, unknown, expired, or revoked | When re-copying the GitHub Secret, copy only the `aplt_dt_...` token value, not the entire bootstrap JSON |
+| `403 action_auth_forbidden` | The token is valid, but its scope doesn't allow the current request | Check whether the repository, Project, Environment, Resource, Server, or workflow command matches the token's scope |
+
+## Rotation and revocation
+
+The raw token is only shown once — don't put it in an issue, PR comment, workflow log, or deployment output. If a token leaks:
+
+1. First delete or replace `APPALOFT_TOKEN` in GitHub Secrets, pausing any workflow that uses that secret.
+2. Rotate or revoke it using an admin session:
+
+```bash
+appaloft deploy-token rotate <tokenId> --organization-id org_self_hosted --confirm <tokenId>
+appaloft deploy-token revoke <tokenId> --organization-id org_self_hosted --confirm <tokenId>
+```
+
+```http
+POST /api/deploy-tokens/{tokenId}/rotate
+POST /api/deploy-tokens/{tokenId}/revoke
+```
+
+Rotating generates a new raw token (also shown only once); after revocation, subsequent requests with the old token are rejected as invalid credentials.
+
+## Related tasks
+
+- [Organizations And Teams](/docs/en/self-hosting/org-team/)
+- [Agent Deploy Subprotocol](/docs/en/agents/deploy-skill/)
+- [Configuring Deployment Sources](/docs/en/deliver/sources/)

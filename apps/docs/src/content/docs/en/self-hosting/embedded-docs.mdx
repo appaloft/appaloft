@@ -1,0 +1,44 @@
+---
+title: "Embedded Documentation Assets"
+description: "How documentation static assets are bundled with and served by a self-hosted instance."
+docType: "concept"
+---
+
+## Short definition
+
+Appaloft's binary package embeds Web console static assets and public documentation static assets **separately** — the two are packaged and overridden independently, and documentation is served at `/docs/*` by default:
+
+```files
+appaloft-static
+├── web
+│   ├── index.html
+│   └── assets
+└── docs
+    ├── index.html
+    ├── api
+    │   └── search
+    ├── llms.txt
+    └── _next
+```
+
+## Why this concept exists
+
+This design lets a self-hosted instance open complete help documentation even without public internet access, without a Node.js runtime, and without being able to pull source from GitHub. The Web console continues shipping as a console asset, while documentation ships as an independent public documentation bundle — replacing only the documentation doesn't require repackaging or replacing the Web console.
+
+## Where you see it in Web, CLI, and API
+
+If `APPALOFT_DOCS_STATIC_DIR` is set, Appaloft serves documentation from that directory while the Web console keeps using its own static asset source — see [Runtime Configuration Reference](/docs/en/reference/configuration/) for the full description of this variable and the rest of the runtime variable list. The override directory must be an **already-built static site**, not a source directory.
+
+## Common mistakes
+
+- **Treating a source directory as the override directory**: `APPALOFT_DOCS_STATIC_DIR` must point to build output (containing files like `index.html`, `_next/`, `api/search`, `llms.txt`) — pointing it directly at a documentation source directory won't work.
+- **Assuming replacing documentation requires repackaging all of Appaloft**: documentation and Web console static assets are overridden independently — replacing documentation doesn't affect the Web console.
+
+## Related tasks
+
+- [Overriding Static Assets](/docs/en/self-hosting/static-assets/)
+- [Runtime Configuration Reference](/docs/en/reference/configuration/)
+
+## Advanced details
+
+If deploying at a path other than `/docs/*`, build the documentation site with a matching documentation base path, or in-site links and the search index will point to the wrong location.

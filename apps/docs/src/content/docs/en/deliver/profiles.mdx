@@ -1,0 +1,105 @@
+---
+title: "Runtime, Health, and Network Profiles"
+description: "Fields and defaults for runtime, health-check, and network profiles."
+docType: "reference"
+---
+<a id="resource-source-profile" />
+
+
+## Stable identifier
+
+A Resource owns three kinds of persistent profiles: Runtime Profile, Health Profile, and Network Profile. They all belong to the Resource itself, not to any single deployment's temporary parameters — saving a profile does not immediately restart a running workload, it only affects the planning input used by future deployments.
+
+## Runtime Profile <a id="resource-runtime-profile" />
+
+Describes how to build and start the app.
+
+| Field | Description | Default |
+| --- | --- | --- |
+| `strategy` | `auto` / `static` / Docker/OCI, and other runtime strategies | Attempts auto-detection |
+| Install / Build commands | Dependency install and build commands | Derived from detection, or must be provided explicitly |
+| Start command / image entrypoint | Process or container entrypoint to start | Derived from detection, or must be provided explicitly |
+| Publish directory | Static site publish directory | No default; required under the static strategy |
+
+```bash
+appaloft resource configure-runtime res_web \
+  --strategy static \
+  --build-command "bun run build" \
+  --publish-directory dist
+```
+
+## Health Profile <a id="resource-health-profile" />
+
+Decides how the Verify phase determines whether the app is usable — it should match the real access path, not just check whether a process exists.
+
+| Field | Description | Default |
+| --- | --- | --- |
+| Check type | Mainly HTTP today | Falls back to a weaker process-liveness check when unconfigured |
+| Path | For example `/health` | No default |
+| Expected status code | For example `200` | `200` |
+| interval / timeout / retries / start period | Check frequency and tolerance window | See the example defaults below |
+
+```bash
+appaloft resource configure-health res_web \
+  --path /health \
+  --method GET \
+  --expected-status 200 \
+  --interval 5 \
+  --timeout 5 \
+  --retries 10 \
+  --start-period 15
+
+# Reset to no custom health policy (doesn't affect runtime commands or network config)
+appaloft resource reset-health res_web
+```
+
+## Network Profile <a id="resource-network-profile" />
+
+Describes the app's listening port, protocol, and proxy target — answering "where should the proxy forward requests." Binding a custom domain is a separate [Access](/docs/en/access/overview/) configuration and is not part of this profile.
+
+| Field | Description | Default |
+| --- | --- | --- |
+| Internal listening port | The port the app actually listens on inside the container | Fixed at `80` for static deployments; must be configured explicitly for SSR/HTTP services |
+| Protocol | Mainly HTTP today | `http` |
+| Exposure mode | Whether it needs a reverse proxy to be reached externally | `reverse-proxy` |
+
+```bash
+appaloft resource configure-network res_web \
+  --internal-port 3000 \
+  --upstream-protocol http \
+  --exposure-mode reverse-proxy
+```
+
+## Error and recovery hints: Profile drift <a id="resource-profile-drift" />
+
+Profile drift means the Profile currently saved on the Resource, the Profile in the repository's config file, and the Profile in the most recent deployment snapshot disagree with each other — typically it happens after a resource already exists and part of it gets edited separately from repository config, a GitHub Action, CLI arguments, or the Web console.
+
+Troubleshooting steps:
+
+1. Run `appaloft resource show res_web --json` to view the structured diagnostics and identify which section (source / runtime / network / health / access) is inconsistent.
+2. Follow the diagnostics to run the matching `configure-source` / `configure-runtime` / `configure-network` / `configure-health` command.
+3. Trigger a new deployment after updating — historical deployment snapshots are never retroactively modified.
+
+Secrets and configuration values are always masked in diagnostics and logs; when troubleshooting, rely only on the key, scope, and suggested command — never try to recover the plaintext value.
+
+## Example
+
+A full health-check configuration response looks like:
+
+```json title="GET /api/resources/res_web/health-profile"
+{
+  "type": "http",
+  "path": "/health",
+  "expectedStatus": 200,
+  "intervalSeconds": 5,
+  "timeoutSeconds": 5,
+  "retries": 10,
+  "startPeriodSeconds": 15
+}
+```
+
+## Related tasks
+
+- [Configuring Deployment Sources](/docs/en/deliver/sources/)
+- [Generated Access URLs](/docs/en/access/generated-routes/)
+- [Viewing Logs And Health Summaries](/docs/en/troubleshoot/logs-health/)

@@ -1,0 +1,144 @@
+---
+title: "错误码与状态"
+description: "用户可见错误、阶段和状态说明。"
+docType: "reference"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "error"
+  - "status"
+  - "phase"
+  - "错误"
+relatedOperations:
+  - "operator-work.list"
+  - "operator-work.show"
+  - "audit-events.list"
+  - "audit-events.export"
+sidebar:
+  order: 3
+---
+
+## 标识
+
+Appaloft 的用户可见错误不是一段自然语言消息——它是一个包含稳定 `code`、`category`、`phase`、`retryable` 字段和安全 details 的结构。Web、CLI、HTTP/API 和 MCP 工具都按这些字段渲染错误,**不依赖 message 文本判断错误类型**。
+
+## 错误知识契约 <a id="error-knowledge-contract" />
+
+已知错误会额外附带:
+
+| 字段 | 说明 |
+| --- | --- |
+| `responsibility` | 这次失败主要需要用户、运营方、系统还是 Provider 处理 |
+| `actionability` | 调用方应该修正输入、等待重试、运行诊断、交给自动恢复,还是无需动作 |
+| `links` | 人类可读的公共文档、Agent/LLM 可读指南、相关 Spec/Runbook |
+| `remedies` | 可以安全展示或自动建议的恢复动作 |
+
+## Agent 应该如何读取错误
+
+AI Agent 处理部署失败时,应优先读取稳定的 `code`、`category`、`phase`、`retryable`、安全 details、文档链接和 remedies,**不应该从自然语言 message 里猜测失败原因**,也不应该要求用户直接修改数据库、远端 Docker 状态或密钥文件。
+
+如果错误没有明确的恢复动作,应该先运行安全诊断:
+
+```bash
+appaloft resource diagnose <resourceId>
+```
+
+再根据恢复就绪状态决定重试、重新部署还是回滚——详见[常见故障与恢复](/docs/troubleshoot/recovery/)。
+
+## 后台工作台账 <a id="operator-work-ledger" />
+
+当部署、代理引导、证书签发或远端状态维护这类后台工作没有按预期完成时,先查看工作台账,而不是猜测该运行哪个恢复命令:
+
+```bash
+appaloft work list
+appaloft work show <workId>
+```
+
+这是一个**只读**入口,汇总尝试类型、状态、阶段、关联对象 id、稳定错误 code/category、是否可重试,以及安全的 `nextActions`:
+
+| `nextActions` 值 | 含义 |
+| --- | --- |
+| `diagnostic` | 下一步应该先运行诊断 |
+| `manual-review` | 需要人工确认 |
+| `retry` | 未来的恢复命令可以考虑重试(不会在查询时自动执行) |
+| `no-action` | 当前条目不需要用户动作 |
+
+这个入口**不会**重试、取消、恢复或删除任何内容——恢复、清理和重试能力通过独立的显式命令暴露,避免查看状态时意外改变运行时或远端 SSH 状态。
+
+## 审计事件 <a id="operator-audit-events" />
+
+按对象 id 查看保留的审计事件:
+
+```bash
+appaloft audit-event list --aggregate <aggregateId>
+appaloft audit-event show <auditEventId> --aggregate <aggregateId>
+```
+
+详情会返回经过安全处理的 payload,并用 `redactedFields` 标出被遮蔽的字段——私钥、Token、密钥、环境变量值、证书材料、签名等敏感内容不会原样出现在输出里。
+
+```bash
+# 导出单个对象的经过遮蔽的审计事件
+appaloft audit-event export --aggregate <aggregateId> --limit 100
+
+# 跨对象的 incident triage 导出,必须提供有界时间窗口
+appaloft audit-event export-global --from 2026-01-01T00:00:00.000Z --to 2026-01-02T00:00:00.000Z --limit 100
+```
+
+全局导出仍然是有界、经过遮蔽的只读导出,**不是**法律保全存档、不可变归档或计划保留策略。查看或导出审计事件不会删除历史、清理运行时或触发重试。
+
+需要在 Support 或合规复查期间保留旧的审计行时,可以配置法律保全:
+
+```bash
+appaloft audit-event legal-hold configure --aggregate <aggregateId> --reason "support review"
+appaloft audit-event legal-hold list --status active
+appaloft audit-event legal-hold release <holdId> --reason "review complete"
+```
+
+法律保全只是一个保留阻断器,不是不可变归档——`appaloft audit-event prune` 会报告被 hold 的行并直接跳过,直到匹配的 hold 全部释放。
+
+## 常见 SSH 基础设施错误
+
+### `infra_error` + `remote-state-resolution`
+
+表示 Appaloft 已经到达 SSH 目标机,但在部署身份解析之前,无法准备这台服务器拥有的状态根。常见原因包括磁盘/inode 容量不足、文件系统只读、配置的运行时根目录没有写权限,或升级前的旧版本状态目录不兼容。
+
+处理顺序:
+
+1. 查看 CLI 打印的错误 details,尤其是 `stateBackend`、`host`、`port`、`exitCode`、`reason` 和 `stderr`。
+2. 如果 `stderr` 提到容量不足、只读文件系统或权限被拒绝,先修复目标机上配置运行时根目录的容量/权限。
+3. 怀疑是容量问题时,先运行 `appaloft server capacity inspect` 或等价的 SSH 诊断命令确认。
+4. 目标机能够创建并写入 Appaloft 状态目录后,再重新执行部署。
+
+### `infra_error` + `remote-state-lock` <a id="remote-state-lock" />
+
+表示远程状态根正在被另一个 Appaloft 进程保护,或前一次被取消的进程留下了未过期的锁——这通常是可诊断的基础设施问题,不代表部署请求本身无效。
+
+处理顺序:
+
+1. 查看错误 details 里的 `lockOwner`、`correlationId`、`lockHeartbeatAt`、`staleAfterSeconds`、`waitedSeconds`。
+2. 部署和清理命令本身会做有界等待;heartbeat 超过 stale 窗口时会自动走 stale-only 锁恢复。
+3. 如果 heartbeat 仍在更新,等待当前部署完成或稍后重试。
+4. 如果错误持续出现,只读查看远端锁归属信息:
+
+```bash
+appaloft remote-state lock inspect --server-host <host>
+```
+
+5. 只有诊断确认 heartbeat 已超过 stale 窗口后,才运行:
+
+```bash
+appaloft remote-state lock recover-stale --server-host <host>
+```
+
+这个命令会归档 stale 锁元数据,**不会强行删除活跃锁**。不要直接删除远端锁目录,除非诊断确认没有活跃进程。
+
+## 状态形状 <a id="operator-provider-job-logs" /><a id="operator-domain-events" /><a id="operator-retention-defaults" />
+
+Appaloft 的状态模型区分资源、部署、运行时、代理、访问地址和证书这几类不同的就绪状态——详见[排障总览](/docs/troubleshoot/overview/)和[理解状态与事件](/docs/troubleshoot/status-events/)。
+
+## 相关任务
+
+- [常见故障与恢复](/docs/troubleshoot/recovery/)
+- [生成安全诊断信息](/docs/troubleshoot/diagnostics/)
+- [HTTP API reference](/docs/reference/http-api/)

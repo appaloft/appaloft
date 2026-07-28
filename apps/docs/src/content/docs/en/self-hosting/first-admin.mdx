@@ -1,0 +1,114 @@
+---
+title: "Creating the First Admin"
+description: "Creating an admin account right after the first install."
+docType: "task"
+---
+<a id="first-admin-bootstrap" />
+
+
+## Goal <a id="self-hosting-first-admin-bootstrap" />
+
+Create a local admin account after a self-hosted Appaloft instance first starts, and use it to log in to the Web console and complete follow-up organization configuration.
+
+## When to use this task
+
+- You just finished [installing](/docs/en/self-hosting/install/) and need to create the first account you can log in with.
+
+## Prerequisites
+
+- The Appaloft instance is installed and running normally.
+
+## Web steps
+
+Open the console URL printed by the installer. The console checks bootstrap status and routes first-time visitors to `/bootstrap/auth/first-admin` — you can also open this setup path directly. If an admin already exists on the instance, this page routes you to `/login` instead, and won't create another account.
+
+## CLI steps
+
+You can pass admin info directly at install time:
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- \
+  --first-admin-email admin@example.com \
+  --first-admin-name "Admin"
+```
+
+If you don't pass `--first-admin-password`, the installer generates a one-time password and prints it **once**, right after the Appaloft container becomes healthy — save it immediately. Re-running the installer safely skips this step if an admin or organization owner already exists, and never shows the password again.
+
+You can also supply the initial password yourself:
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- \
+  --first-admin-email admin@example.com \
+  --first-admin-password "$APPALOFT_INITIAL_ADMIN_PASSWORD"
+```
+
+A container or self-hosted runtime can also automatically create the first admin at startup through environment variables:
+
+```bash
+APPALOFT_FIRST_ADMIN_EMAIL=admin@example.com
+APPALOFT_FIRST_ADMIN_DISPLAY_NAME=Admin
+APPALOFT_FIRST_ADMIN_ORGANIZATION_NAME="Self-hosted Appaloft"
+APPALOFT_FIRST_ADMIN_ORGANIZATION_SLUG=self-hosted-appaloft
+APPALOFT_FIRST_ADMIN_PASSWORD="$APPALOFT_INITIAL_ADMIN_PASSWORD"
+```
+
+Startup bootstrap only runs automatically when both an email and a password are configured; if no password is provided, you must configure `APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE` so the generated one-time password has a trusted output location.
+
+You can also bootstrap through the command line:
+
+```bash
+appaloft auth bootstrap-status
+appaloft auth bootstrap-first-admin --email admin@example.com --display-name "Admin"
+```
+
+## HTTP/API steps
+
+```http
+GET /api/bootstrap/auth/status
+POST /api/bootstrap/auth/first-admin
+```
+
+The bootstrap status endpoint is intentionally public; the creation endpoint is only usable while initial setup hasn't completed. Once an admin or organization owner already exists, this endpoint returns `404 first_admin_bootstrap_disabled` and never creates a new admin or returns a password.
+
+## Expected output and status
+
+After logging in, Appaloft recognizes you with a user session, and protects product-level mutating operations based on organization role. A mutating request without a session returns `401 product_auth_missing`; a logged-in request from a user who doesn't belong to the target organization or lacks sufficient role returns `403 product_auth_forbidden`.
+
+## Verification
+
+Log in to the console with the configured email and password, and confirm you can see the organization home page. To end the current browser session, use **Log out** in the console's top bar.
+
+## Rollback / recovery
+
+If you forget the generated one-time password, re-running the installer **won't** show the old password again — prefer using an already-logged-in admin session, or restore from a trusted backup. **Don't directly edit database user or organization records to bypass login.**
+
+If you can't log in after installing, troubleshoot in this order:
+
+1. Confirm you're using the console URL printed by the installer, not the domain of a project resource.
+2. Check that the first admin email matches the install input.
+3. Check whether the installer output showed that bootstrap was skipped — if so, an admin or owner already exists on the instance.
+4. On `401 product_auth_missing`, log in again; on `403 product_auth_forbidden`, confirm the current user belongs to the target organization and has an admin or owner role.
+
+## OAuth is optional
+
+Google, GitHub, or generic OIDC login can be configured later — without the related config, OAuth login should stay disabled, but it **should never block local admin login**.
+
+Complete the first login with the local admin, confirm the console works, then add these as needed:
+
+| Provider | Required configuration |
+| --- | --- |
+| GitHub | `APPALOFT_GITHUB_CLIENT_ID`, `APPALOFT_GITHUB_CLIENT_SECRET`, `APPALOFT_GITHUB_REDIRECT_URI` |
+| Google | `APPALOFT_GOOGLE_CLIENT_ID`, `APPALOFT_GOOGLE_CLIENT_SECRET`, `APPALOFT_GOOGLE_REDIRECT_URI` |
+| Generic OIDC | `APPALOFT_OIDC_CLIENT_ID`, `APPALOFT_OIDC_CLIENT_SECRET`, `APPALOFT_OIDC_DISCOVERY_URL`, `APPALOFT_OIDC_REDIRECT_URI` |
+
+The browser console origin must be configured as a trusted source via `APPALOFT_WEB_ORIGIN`. See [Runtime Configuration Reference](/docs/en/reference/configuration/) for the full variable description.
+
+## Troubleshooting links
+
+- [Organizations And Teams](/docs/en/self-hosting/org-team/)
+- [Common Failures And Recovery](/docs/en/troubleshoot/recovery/)
+
+## Related reference pages
+
+- [Installing Appaloft](/docs/en/self-hosting/install/)
+- [Organizations And Teams](/docs/en/self-hosting/org-team/)

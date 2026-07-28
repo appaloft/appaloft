@@ -1,0 +1,73 @@
+---
+title: "HTTP API reference"
+description: "HTTP/oRPC 操作、输入 schema、输出状态和错误恢复说明的公开入口。"
+docType: "reference"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "api"
+  - "http"
+  - "orpc"
+  - "openapi"
+relatedOperations:
+  - "projects.create"
+  - "resources.create"
+  - "deployments.create"
+sidebar:
+  order: 2
+---
+<a id="api-openapi-reference" />
+
+
+## 标识
+
+Appaloft 的 HTTP API 基于 oRPC 构建,输入输出直接复用和 CLI、Web、SDK 相同的业务操作 Schema——文档描述的是字段含义,而不是为 HTTP 单独发明的另一套业务语义。
+
+## 交互式文档入口
+
+后端默认在以下地址提供机器可读和交互式文档:
+
+| 地址 | 说明 |
+| --- | --- |
+| `/api/openapi.json` | OpenAPI 3.1 规范文档 |
+| `/api/reference` | 基于 Scalar 的交互式 API Reference,可以直接在浏览器里试调用 |
+| `/docs/reference/openapi/` | 公共文档站点生成的 OpenAPI Reference 入口,每个操作展开为独立页面 |
+
+OpenAPI 操作会按 Appaloft 业务领域打上标签,因此 Scalar 和生成的文档不会退化成一个平铺的路由列表。这些入口由内置的 OpenAPI Reference 系统插件注册;如果需要把同一套文档嵌入到其他 Bun/Elysia 服务,可以 import `@appaloft/openapi` 并挂载它导出的 Response handler。
+
+## 认证
+
+| 场景 | 凭据类型 |
+| --- | --- |
+| 交互式产品操作(Web 会话) | 产品会话 Cookie |
+| 机器自动化 / CI / Agent | Deploy Token(Bearer) |
+
+```bash
+curl https://appaloft.example/api/projects \
+  -H "Authorization: Bearer $APPALOFT_TOKEN"
+```
+
+不要把 Deploy Token 写入仓库配置文件;在 CI 中应通过受信任的 Secret 或环境变量注入。
+
+## 生命周期状态
+
+部署、资源、证书等异步操作的状态应该通过公开的查询操作或读模型观察,而不是检查数据库或内部运行时对象:
+
+```bash
+curl https://appaloft.example/api/deployments/dep_123
+```
+
+## 错误与恢复
+
+错误响应包含稳定的 `code`、`category`、是否 `retryable`,以及相关的排障页面链接——完整字段说明见[错误码与状态](/docs/reference/errors-statuses/)。
+
+## 文档链接约定
+
+OpenAPI、oRPC 和未来的工具描述都应该指向公共文档的稳定锚点,而不是内部 spec 文件路径,这样无论是从 Scalar、CLI `--help` 还是外部书签跳转,最终都会落到同一个可读页面。
+
+## 相关任务
+
+- [错误码与状态](/docs/reference/errors-statuses/)
+- [TypeScript SDK](/docs/reference/typescript-sdk/)
+- [OpenAPI](/docs/reference/openapi/)

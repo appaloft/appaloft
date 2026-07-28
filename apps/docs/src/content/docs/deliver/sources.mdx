@@ -1,0 +1,152 @@
+---
+title: "配置部署来源"
+description: "配置 Git 仓库、镜像或其它来源作为部署输入。"
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "source"
+  - "repository"
+  - "docker image"
+  - "static site"
+  - "zero configuration"
+  - "来源"
+  - "零配置"
+relatedOperations:
+  - "deployments.create"
+  - "resources.configure-source"
+  - "source-links.relink"
+sidebar:
+  order: 2
+---
+<a id="source-auto-deploy-setup" />
+<a id="source-auto-deploy-signatures" />
+<a id="source-auto-deploy-dedupe" />
+<a id="source-auto-deploy-ignored-events" />
+<a id="source-auto-deploy-recovery" />
+<a id="source-auto-deploy-retention" />
+
+
+## 目标 <a id="deployment-source" />
+
+告诉 Appaloft "要部署什么"：本地目录、Git 仓库、容器镜像、Compose 清单，还是已经构建好的静态目录。
+
+## 适用场景
+
+- 第一次为一个资源配置部署来源。
+- 仓库迁移、目录重组或镜像地址变化后，需要把资源重新指向新的来源。
+- 排查"Appaloft 读取的代码不是我期望的版本"。
+
+## 前置条件
+
+- 已经创建 Project 和 Resource（见[项目](/docs/deliver/projects/)、[资源](/docs/deliver/resources/)）。
+- 如果来源是私有 Git 仓库，已经完成 [GitHub 与集成](/docs/deliver/integrations/)中的仓库授权。
+
+## 输入与默认值
+
+| 来源类型 | 适合场景 | 需要确认的输入 |
+| --- | --- | --- |
+| 本地目录 | CLI 本地部署、快速试验 | 当前目录、忽略文件、构建输出 |
+| Git 仓库 | 可重复部署、CI、Preview | 仓库 URL、ref、子目录、访问权限 |
+| Docker / OCI 镜像 | 已有构建产物 | 镜像地址、tag、运行端口 |
+| Compose 清单 | 多容器或已有 Compose 配置 | Compose 文件路径、服务名、暴露端口 |
+| 静态站点 | 前端静态构建产物 | 构建命令和 publish directory |
+
+来源不承担 Project、Server、Environment 或域名的职责——这些是独立的输入，见[产品心智模型](/docs/start/concepts/)。
+
+### 零配置检测的诚实覆盖范围
+
+"零配置"是指 Appaloft 能检查已选定的应用目录，自动推导构建/启动方式，而不需要你手工填写 Runtime Profile。以下按诚实的成熟度标注（不是营销口径）：
+
+| 来源或应用形态 | 状态 |
+| --- | --- |
+| 本地单应用根目录：Next.js / Vite / React / Vue / Svelte / Astro static / Nuxt generate 等主流前端框架 | **已支持** |
+| 本地单应用根目录：Express、Fastify、NestJS、Hono、Koa、通用 Node 生产脚本 | **已支持** |
+| 本地单应用根目录：FastAPI、Django、Flask、Poetry Web 应用 | **已支持** |
+| 本地单应用根目录：Spring Boot、Quarkus（JVM 模式） | **已支持** |
+| 显式 Dockerfile / Compose / 预构建镜像 / 显式 install-build-start 命令 | **已支持**（属于显式 fallback，不算零配置检测） |
+| 本地 Rails、Laravel、Symfony、Phoenix | **Preview** — 检测/规划已实现，尚未通过完整真实构建验证 |
+| 公网远程 Git + 自动 framework 检测 | **不支持** — 不会为了框架识别去克隆远程仓库，需要先本地克隆 |
+| 公网远程 Git + 显式 Dockerfile/Compose/预构建镜像/命令 Profile | **Preview** |
+| Monorepo 中限定范围的本地目录发现（唯一候选或显式 `baseDirectory`） | **Preview** |
+| Monorepo 根目录存在多个候选应用且未选择 | **不支持** — 会阻塞并列出候选，直到显式传入 `baseDirectory` |
+| 通用 workload 归档包（`.zip` 等）依赖自动检测 | **不支持** |
+
+Appaloft 在无法安全生成完整计划时会 **fail closed**（停止并说明原因），不会猜测——这是设计选择，不是缺陷。
+
+## CLI 操作步骤
+
+<a id="resource-source-profile" />
+
+```bash
+# 从当前目录发起零配置部署
+appaloft deploy .
+
+# 本地目录，显式指定静态发布方式
+appaloft deploy ./apps/web --method static --publish-dir build
+
+# 已经构建好的静态输出目录，跳过构建
+appaloft deploy ./dist --as static-site
+
+# Git 仓库作为来源
+appaloft deploy https://github.com/example/web \
+  --method static \
+  --publish-dir dist \
+  --resource-name web
+
+# 为已存在的资源配置/更新 Git source profile
+appaloft resource configure-source res_web \
+  --kind git-repository \
+  --locator https://github.com/example/web \
+  --git-ref main \
+  --base-directory apps/web
+
+# 部署前先只看计划，不创建部署尝试
+appaloft deployments plan --project prj_prod --environment env_prod --resource res_web --server srv_prod
+```
+
+## HTTP/API 操作步骤
+
+```http
+POST /api/deployments
+Content-Type: application/json
+
+{
+  "projectId": "prj_example",
+  "environmentId": "env_production",
+  "serverId": "srv_primary",
+  "resourceId": "res_web",
+  "source": {
+    "kind": "git-repository",
+    "locator": "https://github.com/example/web",
+    "gitRef": "main",
+    "baseDirectory": "."
+  }
+}
+```
+
+## 预期输出与状态
+
+`appaloft deployments plan` 会返回：选中的应用根目录、检测到的 framework/runtime、使用的 planner、推导出的 install/build/start 命令、监听端口、健康检查、以及告警或阻塞原因。计划还会附带 `planVersion` 和一个稳定的 `sha256:` 指纹，方便你确认两次计划是否等价。
+
+## 验证
+
+- 运行 `appaloft resource show res_web --json`，确认 source 摘要（仓库、ref、目录或镜像 tag）符合预期。
+- 触发一次部署，确认 `deployments plan` 阶段没有被阻塞。
+
+## 回滚 / 恢复
+
+- 来源不再可访问或需要切换到新仓库/镜像时，这是显式的 **来源重新关联**（source relink）动作，不是普通重试。执行前确认目标资源、当前来源、新来源和预期环境；执行后通过下一次部署或资源详情确认 Appaloft 读取的是新来源。
+- 用 `appaloft source-links list` / `show` 查看当前仓库到 Project/Environment/Resource 的安全映射，用 `relink` 显式改变映射，用 `delete` 只移除映射（不会删除资源或部署历史）。
+
+## 故障排查链接
+
+- [排障总览](/docs/troubleshoot/overview/)
+- [回滚与恢复](/docs/deliver/recovery/)
+
+## 相关参考页面
+
+- [部署生命周期](/docs/deliver/lifecycle/)
+- [运行时 / 健康 / 网络 Profile](/docs/deliver/profiles/)
+- [GitHub 与集成](/docs/deliver/integrations/)

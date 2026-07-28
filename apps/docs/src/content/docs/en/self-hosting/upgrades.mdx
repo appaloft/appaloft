@@ -1,0 +1,70 @@
+---
+title: "Upgrading Appaloft"
+description: "Steps for safely upgrading a self-hosted Appaloft instance."
+docType: "task"
+---
+
+## Goal <a id="self-hosting-upgrade-check" />
+
+Safely upgrade a self-hosted Appaloft instance to a new version, and confirm every capability works correctly afterward.
+
+## When to use this task
+
+- You need new features or a security fix.
+- The Web console's Instance page shows a new version is available.
+
+## Prerequisites
+
+- You've already completed a pre-upgrade backup — see [Database Status And Migrations](/docs/en/self-hosting/database/).
+
+## Inputs and defaults
+
+**Upgrade order**: back up state first, then upgrade the binary or image, and finally confirm the Web console, `/docs/*`, database state, and provider/plugin status are all normal.
+
+## CLI steps
+
+### Checking for updates
+
+```bash
+appaloft upgrade check
+```
+
+The Web console's Instance page also shows the current version, latest version, target version, and a directly copyable SSH update command.
+
+### Applying the update
+
+A standard self-hosted install can just re-run the installer directly — it reuses `/opt/appaloft/.env` and the existing data volume:
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh
+```
+
+Re-running also aligns the Traefik proxy Appaloft manages to the current release's reviewed default image. If `APPALOFT_TRAEFIK_IMAGE` is explicitly set, or an external proxy is being reused, that image remains the operator's own responsibility to review and upgrade.
+
+You can also target a specific version:
+
+```bash
+appaloft upgrade apply --version 0.2.1 --confirm
+```
+
+## Expected output and status
+
+The Web console's "Update now" button **is only enabled when the host-side process explicitly sets** `APPALOFT_INSTANCE_UPGRADE_APPLY_ENABLED=1` — a default containerized deployment doesn't allow the Web process to directly modify the host machine's Docker install; this is an intentional safety boundary.
+
+## Verification
+
+Refer to the verification checklist in [Database Status And Migrations](/docs/en/self-hosting/database/): check the project list, recent deployments, environment variable snapshots, log entrypoints, and access URL status.
+
+## Rollback / recovery
+
+Before rolling back, confirm whether the database migration is reversible and whether the old version can read the current state — some schema migrations are one-way, and you must restore the database from the pre-upgrade backup before rolling back the version, rather than simply redeploying the old binary.
+
+## Troubleshooting links
+
+- [Common Failures And Recovery](/docs/en/troubleshoot/recovery/)
+- [Database Status And Migrations](/docs/en/self-hosting/database/)
+
+## Related reference pages
+
+- [Installing Appaloft](/docs/en/self-hosting/install/)
+- [Runtime Configuration Reference](/docs/en/reference/configuration/)

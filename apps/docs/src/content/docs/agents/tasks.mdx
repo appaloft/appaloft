@@ -1,0 +1,105 @@
+---
+title: "Workspace 协作与休眠恢复"
+description: "多方协作 Workspace 及其休眠 / 恢复行为。"
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "collaboration"
+  - "lane"
+  - "writer lease"
+  - "pause"
+  - "resume"
+  - "协作"
+  - "休眠"
+  - "恢复"
+relatedOperations:
+  - "sandboxes.agent-tasks.create"
+  - "terminal-sessions.open"
+sidebar:
+  order: 6
+---
+
+<Aside type="caution" title="成熟度：Public alpha">
+Workspace 协作与休眠/恢复能力属于公开 Appaloft 能力；具体网关和多人接入体验取决于部署方的运营配置。
+</Aside>
+
+## 目标 <a id="agent-workspace-collaboration" />
+
+让多个团队成员或多个 Agent 安全地在同一批 Workspace 上协作，并在暂时不需要使用时休眠 Workspace 以节省资源，需要时再恢复。
+
+## 适用场景
+
+- 一个人负责编写代码、另一个人（或另一个 Agent）负责审查同一份工作。
+- 短期不需要使用某个 Workspace，但又不想丢失其中的文件和进程状态。
+- 客户端意外断线后，需要重新接管一个仍在运行的 Terminal Session。
+
+## 前置条件
+
+- 已经创建至少一个 [Agent Workspace](/docs/agents/workspaces/)。
+
+## 输入与默认值
+
+| 输入 | 说明 |
+| --- | --- |
+| Collaboration | 把已有的 Workspace/Sandbox 组织成独立的 Lane，不接管它们各自的生命周期 |
+| Lane | Collaboration 内的一条独立工作分支 |
+| Writer lease | 同一时刻，一条 Lane 只有一个持有租约的写入者 |
+
+## CLI 操作步骤
+
+### 多方协作
+
+```bash
+# 创建一次协作会话
+appaloft workspace collaboration create
+
+# 添加参与者（可以是团队成员，也可以是 Pi / OpenCode 等 Agent Runtime）
+appaloft workspace collaboration participant add <collaborationId>
+
+# 添加一条独立工作 Lane
+appaloft workspace collaboration lane add <collaborationId>
+
+# 获取某条 Lane 的写入权
+appaloft workspace collaboration writer acquire <collaborationId> <laneId>
+```
+
+同一时刻，每条 Lane 只有一个持有租约的写入者；其他参与者可以通过带时效、可撤销的访问描述符旁观同一个真实 PTY 的输出，但不能发送输入。写入权转交会增加一个 fencing generation，旧客户端即使仍然连着也无法继续写入——这避免了两个参与者同时向同一个终端发送冲突指令。
+
+Web 控制台和 CLI 只负责管理连接、权限、重连和交接，不会重新实现 Agent 自己的 TUI；支持原生 attach 的 Agent 会获得原生客户端连接命令，其他交互式 Agent 继续使用它们自身 TUI 所在的受管 PTY。
+
+### 休眠与恢复
+
+```bash
+# 暂停 Workspace（保留 Sandbox 身份，释放占用的计算资源）
+appaloft workspace pause <workspaceId>
+
+# 恢复一个已暂停的 Workspace
+appaloft workspace resume <workspaceId>
+
+# 彻底终止（不可逆，会清理 Sandbox 及其所有 Runtime 状态）
+appaloft workspace terminate <workspaceId>
+```
+
+## 预期输出与状态
+
+`pause` 和 `resume` **保留 Sandbox 身份**——文件、进程状态和历史 Terminal Session 记录不会丢失；只有 `terminate` 会真正清理 Sandbox 及其拥有的全部 Runtime 状态。
+
+## 验证
+
+恢复后，运行 `appaloft workspace show <workspaceId>` 确认状态已经变回 active，再用 `appaloft workspace connect <workspaceId>` 重新接入。
+
+## 回滚 / 恢复
+
+- 如果断线是意外发生的（而不是主动 pause），不需要执行任何恢复动作——直接用同一个 `terminalSessionId` 重连即可继续同一个进程，见 [Agent Workspace](/docs/agents/workspaces/)中的断线重连。
+- 如果两个参与者同时申请同一条 Lane 的写入权，后申请者会成功获得租约，前一个持有者的旧客户端会立即失效——这是设计行为，不是故障。
+
+## 故障排查链接
+
+- [排障总览](/docs/troubleshoot/overview/)
+
+## 相关参考页面
+
+- [Agent Workspace](/docs/agents/workspaces/)
+- [Sandbox 模型](/docs/agents/sandboxes/)

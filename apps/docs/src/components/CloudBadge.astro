@@ -1,0 +1,37 @@
+---
+/**
+ * Visible "Cloud" marker for pages under the Cloud IA v3 group.
+ *
+ * ADR-101 "Cloud-Only Content" requires every Cloud-injected page to carry
+ * a visible Cloud badge so a reader of the official site can tell
+ * Cloud-only content apart from Community content without inspecting the
+ * URL. Open-source placeholder pages (this repo) use the same badge so the
+ * placeholder and the eventual injected page look consistent.
+ */
+import { Badge } from "./ui/badge";
+
+interface Props {
+  /** Set by the official docs.appaloft.com build once a real Cloud page is injected. */
+  injected?: boolean;
+  locale?: "zh-CN" | "en-US";
+}
+
+const { injected = false, locale = "zh-CN" } = Astro.props;
+---
+
+<div class="mb-4 flex items-center gap-2 flex-wrap">
+  <Badge text="Cloud" variant="info" size="medium" />
+  {!injected && locale === "en-US" && (
+    <span class="text-sm text-muted-foreground">
+      Full content is only available on
+      {" "}<a href="https://docs.appaloft.com/cloud/" target="_blank" rel="noopener">docs.appaloft.com/cloud</a>.
+    </span>
+  )}
+  {!injected && locale === "zh-CN" && (
+    <span class="text-sm text-muted-foreground">
+      仅在
+      {" "}<a href="https://docs.appaloft.com/cloud/" target="_blank" rel="noopener">docs.appaloft.com/cloud</a>{" "}
+      提供完整内容。
+    </span>
+  )}
+</div>

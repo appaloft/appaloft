@@ -1,0 +1,83 @@
+---
+title: "Generated Access Routes"
+description: "Auto-generated access URLs and the default access policy."
+docType: "concept"
+sidebar:
+  order: 2
+---
+
+## Short definition <a id="access-generated-route" />
+
+A generated access URL is a reachable URL Appaloft automatically creates for a resource when no custom domain is configured. It's used to verify for the first time that a deployment can actually be opened from a browser, and it's the first stop for troubleshooting "the app started but external users can't reach it."
+
+## Why this concept exists
+
+A custom domain needs DNS propagation and certificate issuance, which can take anywhere from minutes to tens of minutes. A generated access URL doesn't depend on any user configuration, so it can immediately tell you "is the app itself plus the proxy layer actually working," completely ruling out domain-layer problems.
+
+## What it depends on to become ready
+
+A generated access URL's "ready" status depends on:
+
+- the resource's [Network Profile](/docs/en/deliver/profiles/) — whether the listening port and protocol are configured correctly;
+- whether the target server has a public entrypoint, and whether the [proxy is ready](/docs/en/servers/proxy-and-terminal/);
+- whether the most recent deployment has reached a verifiable stage;
+- whether the health check passes (if a mandatory health check is configured).
+
+If a resource has no explicitly declared listening port, or the proxy isn't ready yet, Appaloft still shows resource and deployment status, but it **won't** show the generated access URL as ready.
+
+## Where you see it in Web, CLI, and API
+
+<a id="default-access-policy" />
+
+```bash
+# View a resource summary, including the current generated access URL
+appaloft resource show res_web
+
+# View the system-level default access policy
+appaloft default-access show --scope system
+
+# View whether a specific server overrides the system default policy
+appaloft default-access show --scope deployment-target --server srv_primary
+
+# List all saved default access policies
+appaloft default-access list
+```
+
+```http
+GET /api/resources/res_web/health?checks=true&publicAccessProbe=true
+```
+
+```json title="Example response"
+{
+  "resourceId": "res_web",
+  "runtime": "ready",
+  "health": "passing",
+  "proxy": "ready",
+  "generatedAccess": {
+    "url": "https://res-web.203-0-113-10.sslip.io",
+    "readiness": "ready"
+  }
+}
+```
+
+In local/self-hosted scenarios, the common default access provider is `sslip` — it automatically generates a reachable hostname based on the server's public address, without requiring you to own any domain.
+
+## Resource-level access configuration <a id="resource-access-profile" />
+
+Each resource can independently configure whether it participates in generated access URLs:
+
+- **Inherit** (default) — keeps using the system- or server-level default access policy.
+- **Disabled** — this resource no longer plans a generated access URL (custom domain binding is unaffected and follows its own lifecycle).
+
+Changing this configuration **doesn't** rewrite an already-saved historical deployment snapshot — it only affects future deployments.
+
+## Common mistakes
+
+- **Treating a generated access URL as a permanent production domain**: its main purpose is verification and troubleshooting; production scenarios should typically configure a [Custom Domain](/docs/en/access/custom-domains/).
+- **Assuming changing the default access policy affects historical deployments**: a policy change only affects access URLs resolved afterward — historical URLs already written into a deployment snapshot are never rewritten.
+
+## Related tasks
+
+- [Binding A Custom Domain](/docs/en/access/custom-domains/)
+- [Proxy Readiness And Terminal Sessions](/docs/en/servers/proxy-and-terminal/)
+- [Access Troubleshooting](/docs/en/access/troubleshooting/)

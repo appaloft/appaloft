@@ -1,0 +1,70 @@
+---
+title: "Access Troubleshooting"
+description: "Diagnosing access failures related to DNS, certificates, and routing."
+docType: "troubleshooting"
+sidebar:
+  order: 5
+---
+
+## Symptom
+
+The app won't open, the domain is unreachable, or HTTPS reports a certificate error.
+
+## Likely causes
+
+Don't fixate on a single URL or a single log line — troubleshoot in the fixed order below, because the fix is completely different for each layer's failure:
+
+1. **Resource runtime status** — did the app process actually start.
+2. **Proxy readiness** — does the proxy already know where to forward requests.
+3. **Domain ownership** — is the DNS record correct and has it propagated.
+4. **Certificate readiness** — was the HTTPS certificate issued successfully and loaded.
+
+## How to inspect status, logs, events, or diagnostics
+
+```bash
+# 1. View resource details: the currently selected access URL, and whether a generated URL/custom domain/server route all exist at once
+appaloft resource show res_web
+
+# 2. Check runtime, health check, proxy, and public access consistency in one shot (returns a stable blocking reason)
+appaloft resource health res_web --checks --public-access-probe
+
+# 3. Check whether the proxy plan/rendered config contains the expected host/path/target
+appaloft resource proxy-config res_web
+
+# 4. View the app's own stdout/stderr
+appaloft resource logs res_web
+
+# 5. View the execution log for a specific deployment attempt (this is a historical record, not the current routing state)
+appaloft deployments timeline <deploymentId>
+
+# 6. Generate a safe diagnostic summary covering access/proxy/health/logs/recommended actions
+appaloft resource diagnose res_web
+```
+
+The corresponding HTTP API: `GET /api/resources/{id}`, `GET /api/resources/{id}/health`, `GET /api/resources/{id}/proxy-configuration`, `GET /api/resources/{id}/runtime-logs`, `GET /api/resources/{id}/diagnostic-summary`, `GET /api/deployments/{id}/logs`.
+
+## Safe recovery steps
+
+| Finding | Recovery direction |
+| --- | --- |
+| App process didn't start or crashed | Review [Runtime/Health/Network Profiles](/docs/en/deliver/profiles/) and fix the start command or dependencies |
+| Proxy not ready | See [Proxy Readiness And Terminal Sessions](/docs/en/servers/proxy-and-terminal/) |
+| DNS record missing or mismatched | See the ownership verification section in [Binding A Custom Domain](/docs/en/access/custom-domains/), fix the record, and retry verification |
+| Certificate not ready or expired | See [Certificates](/docs/en/access/certificates/), check certificate material and renewal status |
+
+## When to retry
+
+A `pending` status right after a DNS change is normal — wait for the TTL propagation window first, then retrigger verification, rather than treating it as a failure immediately.
+
+## When to roll back
+
+If the problem started right after a recent deployment (rather than at the domain/certificate layer), prefer rolling back to a known-good historical deployment following [Rollback And Recovery](/docs/en/deliver/recovery/), then troubleshoot the configuration issue offline.
+
+## Support payload to copy
+
+When the summary from `appaloft resource diagnose res_web` still doesn't make the issue clear, or you need to ask your team or support for help, share that summary directly — it already masks secrets and sensitive fields. Don't additionally attach full log files, `.env` files, or private key content — see [Generating A Safe Diagnostic Summary](/docs/en/troubleshoot/diagnostics/).
+
+## Related reference pages
+
+- [Access Overview](/docs/en/access/overview/)
+- [Troubleshoot Overview](/docs/en/troubleshoot/overview/)

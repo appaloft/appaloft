@@ -1,0 +1,112 @@
+---
+title: "CLI reference"
+description: "CLI 命令、参数、交互提示和文档链接的公开入口。"
+docType: "reference"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "cli"
+  - "command"
+  - "terminal"
+  - "命令行"
+relatedOperations:
+  - "projects.create"
+  - "servers.register"
+  - "resources.create"
+  - "deployments.create"
+sidebar:
+  order: 1
+---
+
+## 标识
+
+`appaloft` 是 Appaloft 的官方命令行工具。它是一等入口——所有命令都收集用户输入后通过共享业务操作执行，不会绕过应用层，也不维护另一套业务语义。
+
+## 常用命令速查
+
+```bash
+appaloft init                                 # 在当前目录初始化 appaloft.yml
+appaloft deploy .                             # 部署当前目录
+appaloft login                                # 登录 Appaloft Cloud 或自托管实例
+appaloft context list                         # 查看本机已保存的 profile/context
+
+appaloft projects list                        # 列出项目
+appaloft servers register --host <host>       # 注册服务器
+appaloft resources create --project <id>      # 创建资源
+
+appaloft deployments timeline <deploymentId>  # 查看部署时间线
+appaloft resource diagnose <resourceId>       # 生成安全诊断摘要
+appaloft deployments recovery-readiness <deploymentId>  # 查询恢复就绪状态
+```
+
+每个命令都支持 `--help` 查看完整参数列表；交互式提示和错误恢复建议会尽量链接到本文档站点的稳定页面。
+
+## 登录与 CLI Profile <a id="cli-remote-control-plane-login" />
+
+```bash
+appaloft login
+appaloft login --url https://appaloft.internal.example.com
+```
+
+`appaloft login` 和 `appaloft auth login` 默认连接 Appaloft Cloud（`https://app.appaloft.com`）。要连接自托管 Appaloft 或其他受信任端点，需要显式传入 `--url <url>`。登录成功后，CLI 会把端点、Profile 名称、认证引用和握手摘要保存到本机 CLI Profile——这个 Profile 位于 `APPALOFT_HOME` 或用户本机 Appaloft home 目录，**不属于仓库配置**，不会被提交到 `appaloft.yml`。
+
+登录不是部署接管，也不会创建 Project、Resource、Deployment、Source Link 或域名绑定,更不会把控制面配置塞进部署请求或把 Token/Cookie 写进已提交的配置文件。
+
+```bash
+appaloft auth status
+appaloft logout
+appaloft context list
+appaloft context show
+appaloft context use <profile>
+```
+
+以上命令只管理本机 Profile/Context,不会修改任何服务端状态。
+
+## 非交互认证(AI Agent / CI)
+
+交互式登录使用浏览器验证码流程,适合人类操作者。**AI Agent 和 CI/自动化不应该使用浏览器/验证码流程作为默认认证路径**,应该优先使用作用域受限、可过期的 Token:
+
+```bash
+# 一次性非交互命令
+APPALOFT_TOKEN=<scoped-token> appaloft deploy .
+
+# 从标准输入读取 Token,验证后写入本机 Profile
+appaloft auth token login --stdin
+
+# 从受控密钥文件读取(Agent 不应打开或打印该文件内容)
+appaloft auth token login --token-file <path>
+```
+
+不要把明文 Token 作为命令行参数传入,也不要把 Session Cookie、Bearer Token、Deploy Token 或密钥文件内容粘贴到对话、日志、截图或已提交的配置文件中。
+
+## 远程 Appaloft 调度 <a id="cli-remote-control-plane-dispatch" />
+
+有已登录的 Profile,或显式传入 `--control-plane-mode cloud|self-hosted`、`--control-plane-url <url>` 时,普通业务命令会先解析执行目标:
+
+```bash
+appaloft deploy . --control-plane-mode self-hosted --control-plane-url https://console.example.com
+```
+
+`controlPlane.mode: none`(默认)继续使用本地 CLI/SSH 运行时。远程目标会在业务请求前执行兼容性/认证握手,再通过和 Web/API/SDK 完全相同的类型化契约调度操作——**CLI 不维护另一份业务 Schema**。
+
+没有 Profile、URL、Token 或其他受信任远程来源时,`auto` 和默认行为会回落到本地模式,不会联系公共 Cloud,也不会扫描网络。
+
+`server terminal`、`resource terminal` 在远程目标下会先通过类型化 API 打开 Session;加 `--attach` 后 CLI 直接连接控制面 WebSocket 转发本地终端的输入、resize、输出和关闭帧,不会初始化本地状态,也不会读取目标服务器的 SSH 凭据。
+
+部分命令(`serve`、`db`、`remote-state`、`init`、顶层快速 `deploy`、Source Package 等)目前仍只支持本地执行;在显式远程模式下调用会返回 `control_plane_unsupported`,不会静默改走本地执行。
+
+## 本地文档链接
+
+当 Appaloft 本地服务正在运行时,CLI 打印的文档链接会优先指向本地 `/docs/*`,方便离线自托管用户无需访问外部站点。
+
+## 自动化建议
+
+编写自动化脚本时,优先使用明确的 flag 或配置文件字段,避免依赖无法重放的交互式输入(例如确认提示)。
+
+## 相关任务
+
+- [第一次部署](/docs/start/first-deployment/)
+- [注册与连接服务器](/docs/servers/register-connect/)
+- [生成安全诊断信息](/docs/troubleshoot/diagnostics/)
+- [运行时配置参考](/docs/reference/configuration/)

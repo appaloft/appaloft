@@ -1,0 +1,106 @@
+---
+title: "组织与团队"
+description: "自托管实例中的组织与团队边界。"
+docType: "concept"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "organization"
+  - "team"
+  - "members"
+  - "invitations"
+  - "roles"
+  - "组织"
+  - "成员"
+  - "邀请"
+  - "角色"
+relatedOperations:
+  - "organizations.current-context"
+  - "organizations.list-members"
+  - "organizations.invite-member"
+  - "organizations.change-member-role"
+  - "organizations.transfer-owner"
+  - "organizations.remove-member"
+sidebar:
+  order: 3
+---
+<a id="organization-team-management" />
+
+
+## 简要定义 <a id="self-hosting-organization-team-management" />
+
+首个管理员会成为初始组织的 Owner。组织是自托管 Appaloft 中管理成员、角色和权限边界的容器——登录后可以读取当前组织上下文、在多个可见组织之间切换、查看成员和邀请,并按角色管理成员。
+
+## 为什么存在这个概念
+
+自托管实例通常由一个团队共同使用,而不是单人独占。组织把"谁能做什么"从具体资源操作中抽离出来,统一用角色(`owner`、`admin`、`developer`、`billing`、`viewer`)描述,避免每个功能页面各自实现一套权限判断。
+
+## 在 Web / CLI / API 中的体现
+
+### 查看当前上下文
+
+```bash
+appaloft organization context
+appaloft organization switch org_second
+```
+
+返回当前用户、当前组织、当前角色、可选组织和可用登录方式的安全元数据——**不包含**会话 Token、Cookie、OAuth Provider Token 或邀请密钥原始值。切换命令只允许选择当前会话已可见的组织。
+
+### 查看成员和邀请
+
+```bash
+appaloft organization members list --organization-id org_self_hosted
+appaloft organization invitations list --organization-id org_self_hosted --status pending
+```
+
+### 邀请、更新角色、移交 Owner、移除成员
+
+```bash
+appaloft organization member invite --organization-id org_self_hosted --email operator@example.com --role developer
+appaloft organization member role mem_operator --organization-id org_self_hosted --role admin
+appaloft organization owner transfer mem_admin mem_operator --organization-id org_self_hosted
+appaloft organization member remove mem_operator --organization-id org_self_hosted
+```
+
+可用角色:`owner`、`admin`、`developer`、`billing`、`viewer`。Owner 和 Admin 可以管理成员。
+
+### HTTP/API
+
+同一套操作也可以通过 HTTP/API 调用:
+
+```http
+GET /api/organizations/current-context
+POST /api/organizations/current-context/switch
+GET /api/organizations/{organizationId}/members
+GET /api/organizations/{organizationId}/invitations
+POST /api/organizations/{organizationId}/invitations
+POST /api/organizations/{organizationId}/members/{memberId}/role
+POST /api/organizations/{organizationId}/owner-transfer
+DELETE /api/organizations/{organizationId}/members/{memberId}
+```
+
+HTTP/API 和 CLI 执行的是完全相同的一组操作——认证运行时是实现细节,调用方不需要也不应该依赖底层认证路由、数据表或 Provider payload。
+
+### Web 控制台
+
+Web 控制台的 **组织** 页面可以完成上述全部操作,并管理 Deploy Token 的创建、轮换和撤销。
+
+## 常见误区
+
+- **认为通用的"更新角色"或"移除成员"能操作 Owner**:通用角色更新只能把非 Owner 成员改成非 Owner 角色,通用移除也只能移除非 Owner 成员——Owner 不能通过这两个操作被降级或移除,需要改变 Owner 时必须使用专门的 `owner transfer` 命令,移交成功后目标成员成为 Owner,原 Owner 自动变为 Admin。
+- **直接编辑认证数据库表来绕过成员/角色/邀请状态**:这会破坏审计一致性,应该始终通过 CLI/HTTP/API 操作,或从受信任备份恢复。
+
+## 相关任务
+
+- [创建首个管理员账号](/docs/self-hosting/first-admin/)
+- [Action Token](/docs/self-hosting/action-token/)
+
+## 进阶细节
+
+CLI 会从 `APPALOFT_AUTH_COOKIE` 或 `APPALOFT_AUTHORIZATION` 读取等价的会话输入;**不要**把这些值写入 Shell 历史、CI 日志、仓库文件、Issue 或 PR 评论。
+
+排查权限问题时:
+
+- 看到 `401 product_auth_missing`——重新登录,或为 CLI 提供受信任的会话来源。
+- 看到 `403 product_auth_forbidden`——确认当前用户属于目标组织;成员管理和 Deploy Token 管理还需要 Owner 或 Admin 角色。

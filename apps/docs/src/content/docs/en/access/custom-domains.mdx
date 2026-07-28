@@ -1,0 +1,94 @@
+---
+title: "Binding a Custom Domain"
+description: "Binding a custom domain to a resource and completing ownership verification."
+docType: "task"
+sidebar:
+  order: 3
+---
+
+## Goal <a id="domain-binding-purpose" />
+
+Bind a domain you own (like `app.example.com`) to a resource and complete ownership verification, so external users can reach the app through that domain.
+
+## When to use this task
+
+- Pointing a production domain at a resource that's already running stably.
+- Configuring an independent hostname for a staging, preview, or customer environment.
+
+## Prerequisites
+
+- The resource's [Generated Access URL](/docs/en/access/generated-routes/) is already ready — confirm there's no problem at the app/proxy layer first, before troubleshooting the domain layer.
+- You have DNS control over the target domain (you can add/modify DNS records).
+
+## Inputs and defaults
+
+| Input | Description |
+| --- | --- |
+| Resource | Which resource the domain should ultimately point to |
+| Environment | Which environment the binding takes effect under, for example production or staging |
+| Hostname | A full, multi-label, public domain you control, for example `app.example.com`. A single-label internal server name is **not accepted** — that's a server connection identity and can't complete public DNS ownership verification or managed TLS |
+| Certificate policy | Auto-issue, import a certificate, or defer TLS handling for later |
+
+## Web steps
+
+1. Open **Networking > Custom domains** on the resource.
+2. Enter the hostname and choose a certificate policy.
+3. Appaloft detects the base domain and current DNS provider. If it detects a provider that supports auto-configuration, like Cloudflare, it prompts **Connect Cloudflare DNS** and takes you to the provider's authorization page for a one-time Domain Connect authorization.
+4. When auto-connect isn't supported, the page shows a **Manual DNS** table — add the records to your own DNS console manually.
+
+## CLI steps
+
+<a id="domain-binding-ownership-check" />
+
+```bash
+# View an existing domain binding
+appaloft domain-binding show <domainBindingId>
+
+# Switch between serving traffic directly and redirecting to a canonical binding
+appaloft domain-binding configure-route <domainBindingId> --mode direct
+
+# Retrigger ownership verification when it's stuck
+appaloft domain-binding retry-verification <domainBindingId>
+
+# Run a pre-delete safety check to confirm there's nothing blocking, before deleting
+appaloft domain-binding delete-check <domainBindingId>
+appaloft domain-binding delete <domainBindingId> --confirm <domainBindingId>
+```
+
+## Expected output and status
+
+After creation, a binding moves through these states:
+
+| Status | Meaning |
+| --- | --- |
+| `pending_ownership` | Waiting for the DNS record to take effect, or waiting for the ownership check to pass |
+| `pending_certificate` | Domain ownership confirmed, but the certificate isn't ready yet |
+| `ready` | Both the domain and the certificate are usable |
+| `failed` | The DNS record, certificate material, or proxy entrypoint needs correcting |
+
+The ownership check's DNS record instructions include the record type (`CNAME` / `A` / `AAAA` / `TXT`), hostname, target value, and a suggested wait time — just copy the values Appaloft gives you exactly; don't guess them from logs or elsewhere.
+
+## Verification
+
+Right after a DNS change, a `pending` status doesn't necessarily mean misconfiguration — wait for the TTL propagation window first, then retrigger verification:
+
+```bash
+appaloft domain-binding retry-verification <domainBindingId>
+```
+
+After the status becomes `ready`, open the domain directly in a browser to verify HTTPS access.
+
+## Rollback / recovery
+
+- If the domain still points to an old server/proxy entrypoint, has the wrong record type, or has a typo'd hostname (for example the root domain instead of a subdomain by mistake), you need to **fix DNS and then retry verification** — not repeatedly click retry.
+- Deleting a binding only removes the routing intent — it **doesn't** revoke the certificate, delete the generated access URL, or rewrite a historical deployment snapshot. If the binding still has an active certificate attached, deletion is blocked until you handle the certificate's lifecycle first.
+
+## Troubleshooting links
+
+- [Access Troubleshooting](/docs/en/access/troubleshooting/)
+- [Certificates](/docs/en/access/certificates/)
+
+## Related reference pages
+
+- [Access Overview](/docs/en/access/overview/)
+- [Generated Access URLs](/docs/en/access/generated-routes/)

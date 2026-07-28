@@ -1,0 +1,64 @@
+---
+title: "排障总览"
+description: "状态、日志与诊断信息如何共同定位问题根因。"
+docType: "concept"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "logs"
+  - "health"
+  - "diagnostic"
+  - "troubleshooting"
+  - "status"
+  - "日志"
+  - "诊断"
+  - "故障排查"
+relatedOperations:
+  - "resources.health"
+  - "resources.runtime-logs"
+  - "resources.diagnostic-summary"
+sidebar:
+  order: 1
+---
+
+## 简要定义
+
+排查问题时，Appaloft 把信息分成四层：**状态**（现在能不能用）、**事件**（为什么变成这样）、**日志**（应用自己说了什么）、**诊断摘要**（打包好、可以安全分享的排查证据）。分别理解这四层，才能不被"访问失败"这种笼统信息误导。
+
+```mermaid
+flowchart LR
+    S["状态\n现在能不能用"] --> E["事件\n为什么变成这样"]
+    E --> L["日志\n应用自己说了什么"]
+    L --> D["诊断摘要\n可安全分享的证据"]
+    D --> A["下一步：重试 / 修复 / 回滚"]
+```
+
+## 为什么存在这个分组
+
+"部署失败了"这句话本身没有信息量。是应用代码报错？端口配置错了？代理没转发对？域名没解析？证书没签发？每一种原因需要完全不同的修复动作。把排查过程拆分成状态、事件、日志、诊断四个独立可读的层次，是为了让每一次排查都有明确的下一步，而不是靠猜测重试。
+
+## 在 Web / CLI / API 中的体现
+
+```bash
+appaloft resource show res_web
+appaloft resource health res_web --checks --public-access-probe
+appaloft resource logs res_web --tail 100
+appaloft resource diagnose res_web
+```
+
+## 常见误区
+
+- **只根据一个失败提示判断整个部署失败**：先分别确认资源、部署、运行时、代理和访问地址各自的状态。
+- **优先选择破坏性操作**：安全排查应该优先选择只读检查和可重试操作，只有在明确需要人工处理时才修改服务器、凭据、代理或域名配置。
+
+## 相关任务
+
+- [状态与事件](/docs/troubleshoot/status-events/)
+- [查看日志与健康摘要](/docs/troubleshoot/logs-health/)
+- [生成安全诊断信息](/docs/troubleshoot/diagnostics/)
+- [常见故障与恢复](/docs/troubleshoot/recovery/)
+
+## 进阶细节
+
+不要在不确定当前状态的情况下同时重试部署、手动改服务器配置、改 DNS 和替换密钥——一次只处理一个变量，恢复路径才是可验证的。

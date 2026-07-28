@@ -1,0 +1,52 @@
+---
+title: "Status and Events"
+description: "Deployment status values and their corresponding event timeline."
+docType: "concept"
+---
+
+## Short definition
+
+**Status** answers "can it be used right now"; **Events** answer "why it got this way." Reading them together during troubleshooting is what lets you tell apart input errors, execution failures, health check failures, and an access layer that just isn't ready yet — four completely different situations.
+
+## Why this concept exists
+
+Looking only at the current status can't tell you "did this just start degrading, or has it been stuck like this for a while." The event timeline provides the causal chain of change, and reading it alongside the current status is what lets you decide whether to keep waiting, retry directly, or roll back.
+
+## Common signals reference
+
+| Signal you're seeing | Check first |
+| --- | --- |
+| Deployment failed but the old version is still reachable | The new deployment's events, build logs, health check |
+| Runtime healthy but the domain is unreachable | Proxy status, DNS, TLS certificate, routing rules |
+| Preview page doesn't exist | Pull request status, preview cleanup events, deployment artifacts |
+| Status stuck at pending for a long time | Running tasks, server connectivity, timestamp of the most recent event |
+
+> If status and events look contradictory, use the event timeline to confirm exactly what the last change actually changed, then decide whether to wait, retry, or roll back.
+
+## Where you see it in Web, CLI, and API
+
+```bash
+# View a deployment's current status
+appaloft deployments show <deploymentId>
+
+# Follow the live event timeline
+appaloft deployments timeline <deploymentId> --follow --json
+```
+
+## Troubleshooting order
+
+1. **Find the current object** — first confirm whether you're looking at a project, environment, resource, deployment, or preview environment. Different objects can have different statuses — don't mistake a preview failure for a production failure.
+2. **Read the most recent change** — check the latest event's phase, timestamp, and error code. If the last event is just "request received," the task may still be running; if the last event is already a failure, move into the recovery flow.
+3. **Cross-check against the health summary** — events explain history, the [health summary](/docs/en/troubleshoot/logs-health/) explains the current observed result, and you should read both together.
+4. **Record recovery evidence** — before retrying or rolling back, record the failure status, error code, related logs, and access URL, then use the same set of information after recovery to confirm the status actually changed.
+
+## Common mistakes
+
+- **Treating `pending` as stuck**: a brief `pending` state right after a DNS change or a deployment submission is normal — check the timestamp of the most recent event before judging.
+- **Ignoring the difference between preview and production environments**: a preview environment failure doesn't mean production has a problem, and vice versa.
+
+## Related tasks
+
+- [Viewing Logs And Health Summaries](/docs/en/troubleshoot/logs-health/)
+- [Deployment Lifecycle](/docs/en/deliver/lifecycle/)
+- [Common Failures And Recovery](/docs/en/troubleshoot/recovery/)

@@ -1,0 +1,55 @@
+---
+title: "内嵌文档资产"
+description: "文档静态资产如何随自托管实例一起打包与提供服务。"
+docType: "concept"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "static assets"
+  - "docs static"
+  - "web console"
+  - "静态资源"
+relatedOperations: []
+sidebar:
+  order: 5
+---
+
+## 简要定义
+
+Appaloft 的二进制包会**分开**内嵌 Web 控制台静态资源和公共文档静态资源——两者独立打包、独立覆盖,文档默认服务在 `/docs/*`:
+
+```files
+appaloft-static
+├── web
+│   ├── index.html
+│   └── assets
+└── docs
+    ├── index.html
+    ├── api
+    │   └── search
+    ├── llms.txt
+    └── _next
+```
+
+## 为什么存在这个概念
+
+这种设计让自托管实例在没有公网访问、没有 Node.js 运行时、也无法从 GitHub 拉取源码的情况下,仍然可以打开完整的帮助文档。Web 控制台继续作为控制台资源发布,文档则作为独立的公共文档包发布——只替换文档时,不需要重新打包或替换 Web 控制台。
+
+## 在 Web / CLI / API 中的体现
+
+如果设置了 `APPALOFT_DOCS_STATIC_DIR`,Appaloft 会从该目录提供文档,而 Web 控制台继续使用自己的静态资源来源——这个变量的完整说明和其他运行时变量列表见[运行时配置参考](/docs/reference/configuration/)。覆盖目录必须是**已经构建好的静态站点**,而不是源码目录。
+
+## 常见误区
+
+- **把源码目录当作覆盖目录**:`APPALOFT_DOCS_STATIC_DIR` 必须指向构建产物(包含 `index.html`、`_next/`、`api/search`、`llms.txt` 等文件),直接指向文档源码目录不会生效。
+- **认为替换文档需要重新打包整个 Appaloft**:文档和 Web 控制台静态资源是分开覆盖的,替换文档不影响 Web 控制台。
+
+## 相关任务
+
+- [覆盖静态资源](/docs/self-hosting/static-assets/)
+- [运行时配置参考](/docs/reference/configuration/)
+
+## 进阶细节
+
+如果部署在 `/docs/*` 之外的路径,构建文档站点时需要使用匹配的文档 Base 路径,否则站内链接和搜索索引会指向错误的位置。

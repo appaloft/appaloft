@@ -1,0 +1,80 @@
+---
+title: "Previews and Cleanup"
+description: "Managing preview deployments and cleaning them up safely."
+docType: "task"
+---
+
+## Goal <a id="product-grade-preview-deployments" />
+
+Create an independent preview deployment for a pull request, branch, or temporary source, and clean it up safely once it's no longer needed, without touching your production deployment.
+
+## When to use this task
+
+- Your team wants every pull request to get a reachable preview URL for review.
+- You need to verify a change's real runtime behavior before merging.
+
+## Prerequisites
+
+- You've already completed [Your First Deployment](/docs/en/start/first-deployment/), so the resource's Source/Runtime/Network profiles are usable.
+- You've completed repository authorization in [GitHub And Integrations](/docs/en/deliver/integrations/) (if the preview comes from a GitHub pull request).
+
+## Inputs and defaults
+
+| Input | Description |
+| --- | --- |
+| `--preview` | Preview type, for example `pull-request` |
+| `--preview-id` | A stable id for the preview, for example `pr-123` — the same PR should always use the same id |
+| `--preview-domain-template` | Optional preview access domain template |
+| `--require-preview-url` | Optional — require Appaloft to be able to produce a reachable preview URL, or fail the command |
+
+## CLI steps <a id="deployment-pr-preview-action-workflow" />
+
+From a GitHub Actions workflow (or any CI), trigger a preview deployment on pull request events:
+
+```bash
+appaloft deploy . \
+  --config appaloft.preview.yml \
+  --preview pull-request \
+  --preview-id "pr-${PR_NUMBER}" \
+  --preview-domain-template "pr-${PR_NUMBER}.preview.example.com" \
+  --require-preview-url
+```
+
+Run cleanup when the pull request closes (a dedicated `pull_request.closed` workflow is recommended):
+
+```bash
+appaloft preview cleanup . \
+  --config appaloft.preview.yml \
+  --preview pull-request \
+  --preview-id "pr-${PR_NUMBER}"
+```
+
+## Web steps
+
+The Preview section on the resource detail page lists the resource's current pull request previews, their expiry time, and cleanup status; you can trigger cleanup manually here without waiting for a CI workflow.
+
+## Expected output and status
+
+A preview URL can come from a generated access URL, or from a custom preview domain template (which requires wildcard DNS already pointing at the target server). With `--require-preview-url`, the command fails outright if Appaloft can't currently produce a publicly reachable preview route, instead of "looking successful but not opening."
+
+## Verification
+
+- Open the preview URL returned by the command or the Web UI and confirm the app is reachable.
+- Confirm the preview environment uses an independent domain/route and hasn't overwritten your production configuration.
+
+## Rollback / recovery <a id="deployment-preview-cleanup" />
+
+Cleanup is **idempotent**: running the cleanup command repeatedly doesn't error and doesn't affect production deployments or ordinary deployment history. Cleanup stops the preview-only runtime, removes the preview route, and unbinds the preview source — it never touches production deployments under the same resource.
+
+## Troubleshooting links
+
+- **No preview URL**: confirm the generated access URL is ready, or whether the preview domain's wildcard DNS has propagated, then decide whether to expose the failure directly with `--require-preview-url`.
+- **Cleanup has no effect**: confirm cleanup used exactly the same `--preview` type and `--preview-id` as when the preview was created.
+- **A pull request from a fork was skipped**: this is intentional default safety behavior — deployment credentials should not be exposed to untrusted fork pull requests unless you've explicitly designed a reduced-privilege credential strategy.
+
+## Related reference pages
+
+- [Deployment Lifecycle](/docs/en/deliver/lifecycle/)
+- [Rollback And Recovery](/docs/en/deliver/recovery/)
+- [GitHub And Integrations](/docs/en/deliver/integrations/)
+- [Agent Previews And Promotion](/docs/en/agents/preview-promote/)

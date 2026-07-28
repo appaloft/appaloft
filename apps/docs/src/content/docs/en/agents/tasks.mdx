@@ -1,0 +1,88 @@
+---
+title: "Workspace Collaboration and Pause/Resume"
+description: "Multi-party collaboration Workspaces and their pause/resume behavior."
+docType: "task"
+---
+
+<Aside type="caution" title="Maturity: Public alpha">
+Workspace collaboration and pause/resume capabilities are a public Appaloft capability; the specific gateway and multi-user access experience depends on the operator's runtime configuration.
+</Aside>
+
+## Goal <a id="agent-workspace-collaboration" />
+
+Let multiple team members or multiple agents safely collaborate on the same batch of Workspaces, and pause a Workspace to save resources when it's not needed temporarily, then resume it when needed again.
+
+## When to use this task
+
+- One person writes code while another person (or another agent) reviews the same work.
+- You don't need a Workspace for a while but don't want to lose the files and process state inside it.
+- After an unexpected client disconnect, you need to re-take over a still-running terminal session.
+
+## Prerequisites
+
+- At least one [Agent Workspace](/docs/en/agents/workspaces/) already exists.
+
+## Inputs and defaults
+
+| Input | Description |
+| --- | --- |
+| Collaboration | Organizes existing Workspaces/Sandboxes into independent Lanes, without taking over their individual lifecycles |
+| Lane | An independent line of work within a Collaboration |
+| Writer lease | At any given moment, only one writer holds the lease on a Lane |
+
+## CLI steps
+
+### Multi-party collaboration
+
+```bash
+# Create a collaboration session
+appaloft workspace collaboration create
+
+# Add a participant (can be a team member, or an agent runtime like Pi / OpenCode)
+appaloft workspace collaboration participant add <collaborationId>
+
+# Add an independent work Lane
+appaloft workspace collaboration lane add <collaborationId>
+
+# Acquire write access for a Lane
+appaloft workspace collaboration writer acquire <collaborationId> <laneId>
+```
+
+At any given moment, each Lane has only one writer holding the lease; other participants can watch the output of the same real PTY through a time-bound, revocable access descriptor, but can't send input. Transferring write access increments a fencing generation, so the old client can no longer write even while still connected — this prevents two participants from sending conflicting commands to the same terminal at once.
+
+The Web console and CLI are only responsible for managing connection, permissions, reconnection, and handoff — they don't reimplement the agent's own TUI; agents that support native attach get a native client connection command, while other interactive agents continue using the managed PTY their own TUI runs in.
+
+### Pause and resume
+
+```bash
+# Pause a Workspace (preserves the Sandbox identity, frees the compute it was using)
+appaloft workspace pause <workspaceId>
+
+# Resume a paused Workspace
+appaloft workspace resume <workspaceId>
+
+# Terminate completely (irreversible — cleans up the Sandbox and all its runtime state)
+appaloft workspace terminate <workspaceId>
+```
+
+## Expected output and status
+
+`pause` and `resume` **preserve the Sandbox identity** — files, process state, and historical terminal session records aren't lost; only `terminate` actually cleans up the Sandbox and all runtime state it owns.
+
+## Verification
+
+After resuming, run `appaloft workspace show <workspaceId>` to confirm the status is back to active, then reconnect with `appaloft workspace connect <workspaceId>`.
+
+## Rollback / recovery
+
+- If the disconnect happened unexpectedly (rather than an intentional pause), you don't need any recovery action — just reconnect with the same `terminalSessionId` to continue the same process, see the reconnection section in [Agent Workspace](/docs/en/agents/workspaces/).
+- If two participants request write access to the same Lane at the same time, whoever requests later successfully gets the lease, and the previous holder's old client is invalidated immediately — this is designed behavior, not a bug.
+
+## Troubleshooting links
+
+- [Troubleshoot Overview](/docs/en/troubleshoot/overview/)
+
+## Related reference pages
+
+- [Agent Workspace](/docs/en/agents/workspaces/)
+- [Sandbox Model](/docs/en/agents/sandboxes/)

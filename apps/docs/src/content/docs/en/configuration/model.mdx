@@ -1,0 +1,73 @@
+---
+title: "Configuration Model"
+description: "The role of environment variables and snapshots in the configuration model."
+docType: "concept"
+---
+
+## Short definition <a id="concept-environment" />
+
+An Environment is a boundary around a set of deploy-time configuration, for example development, staging, or production. A resource can be deployed under different environments; each deployment reads the target environment's configuration at that moment and saves it as an immutable snapshot.
+
+## Why this concept exists
+
+Without an Environment, staging's experimental configuration could pollute production at any time — and conversely, an urgent production config fix couldn't be made without also affecting staging. An Environment gives "which layer of reality does this configuration belong to" a clear boundary.
+
+## Environment lifecycle <a id="environment-lifecycle" />
+
+| Operation | Effect |
+| --- | --- |
+| Rename | Only changes the name — doesn't affect the environment id, variables, resources, deployments, domains, or certificates |
+| Lock | Keeps all data, but blocks new variable writes, promotions, new resource creation, and new deployment admission |
+| Unlock | Returns to active, so writes and deployments can continue |
+| Archive | Keeps all history, is a retirement state, and cannot be restored by unlocking |
+| Clone | Creates a new environment in the same project and copies variables — does not copy resources, deployments, or runtime state |
+
+```bash
+appaloft env lock env_staging
+appaloft env unlock env_staging
+appaloft env clone env_staging --name env_staging_2
+```
+
+Clone, lock, unlock, and archive **never** stop a runtime, delete a resource, clean up domains, or remove certificates — use each object's own lifecycle command when you need to clean those up.
+
+## Copying an environment (Copy)
+
+Copying an environment is more complete than cloning: by default it copies the shape of service/resource configuration and redeploys under the new environment, while keeping the data plane isolated. The Web console's "Copy environment" defaults to a safe policy:
+
+| Dimension | Default policy |
+| --- | --- |
+| Services | Copy and redeploy |
+| Network | Create a new, isolated network |
+| Dependencies | Create new, independent managed dependencies (don't share source data) |
+| Secrets | Regenerate references for the target environment — never copies or displays the source plaintext |
+| Database | Create an empty database, then seed / migrate / restore as needed |
+| Domains | Generate new routes — doesn't copy production custom domains |
+| Storage | Create empty volumes |
+
+```bash
+appaloft env copy local staging \
+  --dependencies create-new \
+  --secrets regenerate \
+  --data empty \
+  --domains generated \
+  --storage empty \
+  --network isolated
+
+# When you need to reuse source data or migrate data, declare the advanced policy explicitly
+appaloft env copy production staging --database restore:backup_123
+appaloft env copy production staging --reuse-source db --acknowledge-shared-source
+```
+
+`--reuse-source` makes the target environment share the same database or dependency resource as the source environment and must be explicitly confirmed, because it means the two environments will share data.
+
+## Common mistakes
+
+- **Treating archive as delete**: archive is only a retirement state — all history is retained, it just can't be unlocked back to active.
+- **Assuming clone copies resources and deployments**: clone only copies variables — resources, deployment history, and runtime state are never copied.
+- **Reusing a source dependency without confirmation**: `--reuse-source` makes multiple environments share the same data and must include an explicit `--acknowledge-shared-source`.
+
+## Related tasks
+
+- [Configuration Precedence](/docs/en/configuration/precedence/)
+- [Configuration Diff And Promote](/docs/en/configuration/diff-promote/)
+- [Projects](/docs/en/deliver/projects/)

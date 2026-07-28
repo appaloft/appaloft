@@ -1,0 +1,129 @@
+---
+title: "Error Codes and Statuses"
+description: "User-visible errors, phases, and status descriptions."
+docType: "reference"
+---
+
+## Stable identifier
+
+Appaloft's user-visible errors aren't a natural-language message — each is a structure with a stable `code`, `category`, `phase`, `retryable` field, and safe details. Web, CLI, HTTP/API, and MCP tools all render errors from these fields, **never relying on the message text to determine the error type**.
+
+## The error knowledge contract <a id="error-knowledge-contract" />
+
+Known errors additionally carry:
+
+| Field | Description |
+| --- | --- |
+| `responsibility` | Whether this failure mainly needs to be handled by the user, the operator, the system, or the provider |
+| `actionability` | Whether the caller should fix the input, wait and retry, run diagnostics, hand it to automatic recovery, or take no action |
+| `links` | Human-readable public docs, an agent/LLM-readable guide, and related specs/runbooks |
+| `remedies` | Recovery actions that are safe to display or suggest automatically |
+
+## How an agent should read errors
+
+When an AI agent handles a deployment failure, it should prioritize reading the stable `code`, `category`, `phase`, `retryable`, safe details, doc links, and remedies — it **shouldn't guess** the failure reason from the natural-language message, and shouldn't ask the user to directly modify the database, remote Docker state, or a secret file.
+
+If an error has no clear recovery action, run a safe diagnostic first:
+
+```bash
+appaloft resource diagnose <resourceId>
+```
+
+then decide whether to retry, redeploy, or roll back based on recovery-readiness status — see [Common Failures And Recovery](/docs/en/troubleshoot/recovery/) for details.
+
+## Background work ledger <a id="operator-work-ledger" />
+
+When background work like a deployment, proxy bootstrap, certificate issuance, or remote-state maintenance doesn't complete as expected, check the work ledger first, rather than guessing which recovery command to run:
+
+```bash
+appaloft work list
+appaloft work show <workId>
+```
+
+This is a **read-only** entrypoint that aggregates attempt type, status, phase, related object ids, stable error code/category, whether it's retryable, and a safe `nextActions`:
+
+| `nextActions` value | Meaning |
+| --- | --- |
+| `diagnostic` | Run diagnostics first as the next step |
+| `manual-review` | Needs human confirmation |
+| `retry` | A future recovery command could consider retrying (this is never auto-executed by the query itself) |
+| `no-action` | This entry needs no user action right now |
+
+This entrypoint **never** retries, cancels, recovers, or deletes anything — recovery, cleanup, and retry capabilities are exposed through their own explicit commands, so checking status never accidentally changes runtime or remote SSH state.
+
+## Audit events <a id="operator-audit-events" />
+
+View retained audit events by object id:
+
+```bash
+appaloft audit-event list --aggregate <aggregateId>
+appaloft audit-event show <auditEventId> --aggregate <aggregateId>
+```
+
+The detail response returns a safely processed payload and marks masked fields with `redactedFields` — private keys, tokens, secrets, environment variable values, certificate material, signatures, and other sensitive content never appear as-is in the output.
+
+```bash
+# Export the masked audit events for a single object
+appaloft audit-event export --aggregate <aggregateId> --limit 100
+
+# Cross-object incident triage export — a bounded time window is required
+appaloft audit-event export-global --from 2026-01-01T00:00:00.000Z --to 2026-01-02T00:00:00.000Z --limit 100
+```
+
+A global export is still a bounded, masked, read-only export — it is **not** a legal-hold archive, an immutable archive, or a scheduled retention policy. Viewing or exporting audit events never deletes history, cleans up runtime state, or triggers a retry.
+
+To preserve older audit rows during a support or compliance review, configure a legal hold:
+
+```bash
+appaloft audit-event legal-hold configure --aggregate <aggregateId> --reason "support review"
+appaloft audit-event legal-hold list --status active
+appaloft audit-event legal-hold release <holdId> --reason "review complete"
+```
+
+A legal hold is only a retention blocker, not an immutable archive — `appaloft audit-event prune` reports the rows under hold and skips them directly, until every matching hold is released.
+
+## Common SSH infrastructure errors
+
+### `infra_error` + `remote-state-resolution`
+
+Indicates Appaloft reached the SSH target machine, but couldn't prepare the state root the server owns before resolving the deployment identity. Common causes include insufficient disk/inode capacity, a read-only filesystem, no write permission on the configured runtime root directory, or an incompatible legacy state directory from before an upgrade.
+
+Order of operations:
+
+1. Check the error details printed by the CLI, especially `stateBackend`, `host`, `port`, `exitCode`, `reason`, and `stderr`.
+2. If `stderr` mentions insufficient capacity, a read-only filesystem, or a permission denial, fix the capacity/permissions of the configured runtime root directory on the target machine first.
+3. If you suspect a capacity issue, confirm with `appaloft server capacity inspect` or an equivalent SSH diagnostic command first.
+4. Once the target machine can create and write to the Appaloft state directory, re-run the deployment.
+
+### `infra_error` + `remote-state-lock` <a id="remote-state-lock" />
+
+Indicates the remote state root is currently protected by another Appaloft process, or a previously cancelled process left behind an unexpired lock — this is usually a diagnosable infrastructure issue, not an indication that the deployment request itself is invalid.
+
+Order of operations:
+
+1. Check `lockOwner`, `correlationId`, `lockHeartbeatAt`, `staleAfterSeconds`, and `waitedSeconds` in the error details.
+2. Deploy and cleanup commands themselves perform a bounded wait; once the heartbeat exceeds the stale window, they automatically move to stale-only lock recovery.
+3. If the heartbeat is still updating, wait for the current deployment to finish, or retry later.
+4. If the error persists, view the remote lock ownership info read-only:
+
+```bash
+appaloft remote-state lock inspect --server-host <host>
+```
+
+5. Only after diagnosis confirms the heartbeat has exceeded the stale window, run:
+
+```bash
+appaloft remote-state lock recover-stale --server-host <host>
+```
+
+This command archives stale lock metadata — **it never force-deletes an active lock**. Don't delete the remote lock directory directly unless diagnosis has confirmed there's no active process.
+
+## Status shapes <a id="operator-provider-job-logs" /><a id="operator-domain-events" /><a id="operator-retention-defaults" />
+
+Appaloft's state model distinguishes several independent readiness states across resources, deployments, runtime, proxy, access URLs, and certificates — see [Troubleshoot Overview](/docs/en/troubleshoot/overview/) and [Status And Events](/docs/en/troubleshoot/status-events/) for details.
+
+## Related tasks
+
+- [Common Failures And Recovery](/docs/en/troubleshoot/recovery/)
+- [Generating A Safe Diagnostic Summary](/docs/en/troubleshoot/diagnostics/)
+- [HTTP API reference](/docs/en/reference/http-api/)

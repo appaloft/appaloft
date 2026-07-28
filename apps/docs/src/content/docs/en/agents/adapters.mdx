@@ -1,0 +1,138 @@
+---
+title: "Agent Adapters"
+description: "How to install and choose an agent adapter."
+docType: "reference"
+---
+
+## Stable identifier <a id="agent-adapter-installations" />
+
+An Agent Adapter is a declarative, immutable agent integration definition — it describes the required Sandbox template, runtime, capabilities, interaction modes, persistence paths, and credential types. **Appaloft never loads code from a manifest, and never accepts arbitrary shell command strings.**
+
+Every install belongs to the current organization: two organizations can install a definition with the same digest, but can't see or operate each other's installations. Organization members can view installations; organization admins can validate, install, disable, and uninstall.
+
+## Input fields and validation
+
+A minimal Codex terminal/headless adapter manifest example (replace the template id, version, digest, and runtime version range with values already admitted on your current Appaloft instance):
+
+```json title="codex.agent-adapter.json"
+{
+  "schemaVersion": "appaloft.agent-adapter/v1",
+  "id": "codex",
+  "displayName": "Codex",
+  "version": "1.0.0",
+  "kind": "declarative",
+  "requirements": {
+    "adapterApi": "^1.0.0",
+    "sandboxTemplate": {
+      "id": "agent-workspace",
+      "version": "^1.0.0",
+      "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "runtimes": [{ "id": "codex", "version": "^1.0.0" }],
+    "capabilities": { "required": ["managed-terminal", "headless"], "optional": [] }
+  },
+  "interactionModes": [
+    {
+      "id": "terminal",
+      "transport": "terminal",
+      "command": ["codex"],
+      "eventFidelity": "raw-pty",
+      "sessionRecovery": "process-lifetime"
+    },
+    {
+      "id": "headless",
+      "transport": "headless",
+      "command": ["codex", "exec"],
+      "taskInput": "append-argument",
+      "eventFidelity": "line-events",
+      "sessionRecovery": "managed-run-lineage"
+    }
+  ],
+  "persistentPaths": ["/workspace/.codex"],
+  "healthcheck": { "kind": "process" },
+  "credentials": []
+}
+```
+
+## Command / interface examples
+
+```bash
+# Validation only returns the normalized digest and compatibility result — it never persists data or starts an agent
+appaloft agent-adapter validate ./codex.agent-adapter.json
+appaloft agent-adapter install ./codex.agent-adapter.json
+appaloft agent-adapter list
+appaloft agent-adapter show <installation-id>
+```
+
+You can also paste a manifest into the Web console's **Organization Settings → Agent Adapter** page to validate then install.
+
+### Workspace configuration templates
+
+A Workspace configuration template combines a specific adapter definition, Sandbox template, run limits, initialization commands, default ports, and check commands into a reusable creation entrypoint. It **doesn't execute any install script**, and doesn't create a new Workspace aggregate — before creating a Workspace, Appaloft compiles the template and pins the resolved adapter digest, Sandbox template digest, harness, and capability snapshot onto the runtime.
+
+```json title="codex.profile.json"
+{
+  "schemaVersion": "appaloft.agent-workspace-profile/v1",
+  "id": "codex-standard",
+  "displayName": "Codex Standard",
+  "version": "1.0.0",
+  "adapter": {
+    "id": "codex",
+    "version": "1.0.0",
+    "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "interactiveModeId": "terminal",
+    "taskModeId": "headless"
+  },
+  "harnessTemplateId": "aht_codex_declarative_v1",
+  "sandbox": {
+    "template": {
+      "id": "agent-workspace",
+      "version": "1.0.0",
+      "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "requestedIsolation": "container-trusted",
+    "limits": { "cpuMillis": 2000, "memoryBytes": 4294967296, "diskBytes": 21474836480, "maxProcesses": 128 },
+    "networkPolicy": { "mode": "deny" }
+  },
+  "workingDirectory": "/workspace",
+  "initialization": [{ "id": "verify-codex", "argv": ["codex", "--version"] }],
+  "defaultPorts": [],
+  "persistentPaths": ["/workspace/.codex"],
+  "suggestedChecks": []
+}
+```
+
+```bash
+appaloft agent-workspace-profile validate ./codex.profile.json
+appaloft agent-workspace-profile install ./codex.profile.json
+appaloft agent-workspace-profile list
+appaloft agent-workspace-profile compile <installation-id>
+```
+
+Organization admins can do the same in **Organization Settings → Workspace Configuration Templates**. Developers pick an enabled template on the Workspaces page to create a Workspace; an unavailable capability keeps the corresponding button disabled, rather than silently degrading after creation.
+
+## Error codes and recovery hints
+
+Disabling blocks **new** Workspaces from resolving that installation, but doesn't break the recovery references of existing Workspaces:
+
+```bash
+appaloft agent-adapter disable <installation-id>
+```
+
+Uninstalling is only allowed when no active Workspace still references the installation; if a reference exists, the server returns a conflict and keeps the installation record:
+
+```bash
+appaloft agent-adapter uninstall <installation-id>
+```
+
+Uninstalling only deletes the installation record for the **current organization** — it doesn't delete the immutable definition itself, which may be shared by other organizations, and doesn't terminate any existing Sandbox or agent process. Workspace configuration templates use exactly the same disable and reference-protection semantics:
+
+```bash
+appaloft agent-workspace-profile disable <installation-id>
+appaloft agent-workspace-profile uninstall <installation-id>
+```
+
+## Related tasks
+
+- [Agent Workspace](/docs/en/agents/workspaces/)
+- [Sandbox Model](/docs/en/agents/sandboxes/)

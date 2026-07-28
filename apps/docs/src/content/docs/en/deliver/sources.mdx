@@ -1,0 +1,135 @@
+---
+title: "Configuring Deployment Sources"
+description: "Configuring a Git repository, image, or other input as a deployment source."
+docType: "task"
+---
+<a id="source-auto-deploy-setup" />
+<a id="source-auto-deploy-signatures" />
+<a id="source-auto-deploy-dedupe" />
+<a id="source-auto-deploy-ignored-events" />
+<a id="source-auto-deploy-recovery" />
+<a id="source-auto-deploy-retention" />
+
+
+## Goal <a id="deployment-source" />
+
+Tell Appaloft "what to deploy": a local directory, a Git repository, a container image, a Compose manifest, or an already-built static directory.
+
+## When to use this task
+
+- Configuring a deployment source for a resource for the first time.
+- Re-pointing a resource at a new source after a repository migration, directory reorganization, or image address change.
+- Troubleshooting "the code Appaloft is reading isn't the version I expected."
+
+## Prerequisites
+
+- A Project and Resource already exist (see [Projects](/docs/en/deliver/projects/), [Resources](/docs/en/deliver/resources/)).
+- If the source is a private Git repository, you've completed the repository authorization step in [GitHub And Integrations](/docs/en/deliver/integrations/).
+
+## Inputs and defaults
+
+| Source type | Good for | Inputs to confirm |
+| --- | --- | --- |
+| Local directory | CLI local deploys, quick experiments | Current directory, ignore rules, build output |
+| Git repository | Repeatable deploys, CI, previews | Repository URL, ref, subdirectory, access permissions |
+| Docker / OCI image | Existing build artifacts | Image reference, tag, listening port |
+| Compose manifest | Multi-container or existing Compose configs | Compose file path, service name, exposed ports |
+| Static site | Frontend static build output | Build command and publish directory |
+
+A source is not responsible for Project, Server, Environment, or domain concerns — those are independent inputs, see [Product Mental Model](/docs/en/start/concepts/).
+
+### Honest coverage of zero-configuration detection
+
+"Zero-configuration" means Appaloft can inspect the selected app directory and derive how to build and start it, without you filling in a Runtime Profile by hand. The table below is labeled with honest maturity, not marketing language:
+
+| Source or app shape | Status |
+| --- | --- |
+| Local single-app root: Next.js / Vite / React / Vue / Svelte / Astro static / Nuxt generate and other mainstream frontend frameworks | **Supported** |
+| Local single-app root: Express, Fastify, NestJS, Hono, Koa, and general Node production scripts | **Supported** |
+| Local single-app root: FastAPI, Django, Flask, Poetry web apps | **Supported** |
+| Local single-app root: Spring Boot, Quarkus (JVM mode) | **Supported** |
+| Explicit Dockerfile / Compose / prebuilt image / explicit install-build-start commands | **Supported** (an explicit fallback, not zero-configuration detection) |
+| Local Rails, Laravel, Symfony, Phoenix | **Preview** — detection/planning implemented, not yet verified against a full real build |
+| Public remote Git + automatic framework detection | **Not supported** — Appaloft won't clone a remote repository just to identify a framework; clone locally first |
+| Public remote Git + explicit Dockerfile/Compose/prebuilt image/command profile | **Preview** |
+| Scoped local-directory discovery in a monorepo (single candidate or explicit `baseDirectory`) | **Preview** |
+| Multiple candidate apps in a monorepo root with none selected | **Not supported** — blocks and lists candidates until `baseDirectory` is passed explicitly |
+| Generic workload archive bundles (`.zip`, etc.) relying on auto-detection | **Not supported** |
+
+Appaloft **fails closed** (stops and explains why) rather than guessing when it can't safely produce a complete plan — that's a design choice, not a defect.
+
+## CLI steps
+
+<a id="resource-source-profile" />
+
+```bash
+# Zero-configuration deploy from the current directory
+appaloft deploy .
+
+# Local directory, explicit static publish
+appaloft deploy ./apps/web --method static --publish-dir build
+
+# Already-built static output directory, skip the build
+appaloft deploy ./dist --as static-site
+
+# Git repository as the source
+appaloft deploy https://github.com/example/web \
+  --method static \
+  --publish-dir dist \
+  --resource-name web
+
+# Configure/update the Git source profile for an existing resource
+appaloft resource configure-source res_web \
+  --kind git-repository \
+  --locator https://github.com/example/web \
+  --git-ref main \
+  --base-directory apps/web
+
+# Preview the plan before creating a deployment attempt
+appaloft deployments plan --project prj_prod --environment env_prod --resource res_web --server srv_prod
+```
+
+## HTTP/API steps
+
+```http
+POST /api/deployments
+Content-Type: application/json
+
+{
+  "projectId": "prj_example",
+  "environmentId": "env_production",
+  "serverId": "srv_primary",
+  "resourceId": "res_web",
+  "source": {
+    "kind": "git-repository",
+    "locator": "https://github.com/example/web",
+    "gitRef": "main",
+    "baseDirectory": "."
+  }
+}
+```
+
+## Expected output and status
+
+`appaloft deployments plan` returns: the selected app root directory, the detected framework/runtime, the planner used, the derived install/build/start commands, the listening port, the health check, and any warnings or blocking reasons. The plan also carries a `planVersion` and a stable `sha256:` fingerprint so you can confirm whether two plans are equivalent.
+
+## Verification
+
+- Run `appaloft resource show res_web --json` and confirm the source summary (repository, ref, directory, or image tag) matches what you expect.
+- Trigger a deployment and confirm the `deployments plan` phase isn't blocked.
+
+## Rollback / recovery
+
+- If a source becomes unreachable or you need to point at a new repository/directory/image (rather than retrying the same source), that's an explicit **source relink** action, not an ordinary retry. Before running it, confirm the target resource, current source, new source, and expected environment; after running it, confirm through the next deployment or the resource detail page that Appaloft is now reading the new source.
+- Use `appaloft source-links list` / `show` to view the current safe mapping from a repository to a Project/Environment/Resource, `relink` to explicitly change that mapping, and `delete` to remove the mapping only (it doesn't delete the resource or its deployment history).
+
+## Troubleshooting links
+
+- [Troubleshoot Overview](/docs/en/troubleshoot/overview/)
+- [Rollback And Recovery](/docs/en/deliver/recovery/)
+
+## Related reference pages
+
+- [Deployment Lifecycle](/docs/en/deliver/lifecycle/)
+- [Runtime, Health, And Network Profiles](/docs/en/deliver/profiles/)
+- [GitHub And Integrations](/docs/en/deliver/integrations/)

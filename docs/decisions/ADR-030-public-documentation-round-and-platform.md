@@ -4,6 +4,11 @@
 
 Accepted
 
+> **Platform choice superseded.** [ADR-101: Nimbus Public Documentation Platform](./ADR-101-nimbus-public-documentation-platform.md)
+> replaces the Fumadocs/Next platform selection, the IA v2 group table, and the Sätteri-default
+> Markdown processor described below. The **Docs Round** contract, the help-anchor registry
+> contract, and the packaging/binary contract in this ADR remain in force and are not superseded.
+
 ## Context
 
 Appaloft exposes one deployment product through multiple first-class entrypoints:

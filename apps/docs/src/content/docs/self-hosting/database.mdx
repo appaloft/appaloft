@@ -1,0 +1,106 @@
+---
+title: "数据库状态与迁移"
+description: "查看数据库状态并执行迁移、备份与恢复。"
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "database"
+  - "pglite"
+  - "postgres"
+  - "数据库"
+  - "备份"
+  - "迁移"
+relatedOperations: []
+sidebar:
+  order: 7
+---
+
+## 目标
+
+理解 Appaloft 数据库保存的内容和边界,并安全完成备份、迁移和恢复演练。
+
+## 适用场景
+
+- 计划升级 Appaloft 前需要先备份状态。
+- 需要评估当前部署模式(本地优先状态 vs. 自托管数据库)是否适合团队规模。
+
+## 前置条件
+
+- 对数据库(PostgreSQL 或内嵌 PGlite)有访问和备份权限。
+
+## 输入与默认值
+
+Appaloft 可以使用本地优先状态或自托管数据库,数据库保存的是**控制面状态**:项目、环境、部署记录、资源状态、运行历史和配置快照。**应用代码和构建产物不应该只存在于数据库里**——它们应该能从来源、Artifact 或运行时目标重新定位。
+
+| 模式 | 适用场景 | 运维重点 |
+| --- | --- | --- |
+| 本地优先状态(PGlite) | 单机、本地试用、便携安装 | 备份本地数据目录,升级前停止写入 |
+| 自托管数据库(PostgreSQL) | 团队共享、长期运行、服务器部署 | 监控连接、磁盘、备份、迁移窗口和恢复演练 |
+
+<Aside type="caution" title="Secret 不进备份明文">
+Secret 值不应该以明文出现在备份、诊断摘要或导出的状态文件中。检查恢复流程时,要验证恢复后 Secret 引用仍然有效,而不是导出 Secret 本身。
+</Aside>
+
+## CLI 操作步骤:升级前备份
+
+### 1. 升级前检查
+
+确认当前版本、目标版本、数据库连接和迁移窗口。
+
+### 2. 完成一次可恢复备份
+
+备份应覆盖控制面状态、部署历史和必要的配置快照,不应导出明文 Secret;暂停会产生新部署记录的自动化。
+
+### 3. 执行迁移
+
+在维护窗口内运行迁移,观察迁移日志和 Appaloft 启动状态。**不要同时更换数据库、升级 Appaloft 和重建服务器**。
+
+### 4. 验证恢复
+
+升级后检查项目列表、最近部署、环境变量快照、日志入口和访问地址状态,随机抽取一个最近部署,确认它仍然能展示状态和诊断摘要。
+
+## 预期输出与状态
+
+至少保留一份升级前备份和一份最近的自动备份。恢复演练应该验证 Appaloft 能启动、用户能登录、项目能列出、部署历史能打开——而不仅仅是数据库文件可以复制。
+
+## 验证
+
+参考上面第 4 步的验证清单;如果任何一项检查失败,应该视为恢复未完成,而不是"部分成功"。
+
+## 回滚 / 恢复
+
+回退到升级前版本前,先确认数据库迁移是否可逆,以及旧版本是否能读取当前状态——某些迁移是单向的,回退版本前必须先从升级前备份恢复数据库。
+
+## 故障排查链接
+
+- [常见故障与恢复](/docs/troubleshoot/recovery/)
+- [升级 Appaloft](/docs/self-hosting/upgrades/)
+
+## 进阶:整实例迁移 <a id="advanced-control-plane-modes" />
+
+组织 Owner 可以把控制面数据库导出成一个经密码加密的 Artifact,并在导入前完成兼容性校验——用于整实例迁移到新硬件,或跨环境复制状态。Artifact 使用 AES-256-GCM 加密、独立 Salt 和认证校验和;密码只从标准输入接收,不会出现在任何查询结果中:
+
+```bash
+appaloft instance portability export-plan
+
+printf '%s\n' "$APPALOFT_EXPORT_PASSPHRASE" | \
+  appaloft instance portability export --output ./appaloft.instance --passphrase-stdin
+
+printf '%s\n' "$APPALOFT_EXPORT_PASSPHRASE" | \
+  appaloft instance portability import-plan ./appaloft.instance --mode merge --passphrase-stdin
+```
+
+`merge` 模式保留目标数据,并拒绝不兼容的冲突;`replace` 模式必须显式传入 `--acknowledge-replace`,Appaloft 会先创建回滚证据,再进入数据库事务,校验或导入失败时目标状态保持不变。源和目标必须使用相同的受支持 Schema 版本。用以下命令查看和清理 Artifact 元数据:
+
+```bash
+appaloft instance portability artifact list
+appaloft instance portability artifact show <artifactId>
+appaloft instance portability artifact delete <artifactId>
+```
+
+## 相关参考页面
+
+- [升级 Appaloft](/docs/self-hosting/upgrades/)
+- [运行时配置参考](/docs/reference/configuration/)

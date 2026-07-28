@@ -1,0 +1,20 @@
+---
+import { getEntry } from "astro:content";
+import DocPage from "../../components/DocPage.astro";
+
+export const prerender = true;
+
+// Astro's glob loader folds a nested `index.mdx` into its parent
+// directory's id, so `src/content/docs/en/index.mdx` has entry id `"en"`,
+// not `"en/index"` (see `src/pages/[...slug].astro` for the root-vs-nested
+// distinction).
+const entry = await getEntry("docs", "en");
+
+if (!entry) {
+  throw new Error(
+    "Missing required src/content/docs/en/index.mdx entry — it renders the en-US homepage at \"/en\".",
+  );
+}
+---
+
+<DocPage entry={entry} path="/en" />

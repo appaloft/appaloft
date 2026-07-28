@@ -1,0 +1,50 @@
+---
+title: "Appaloft 文档"
+description: "Appaloft 部署平台的用户文档首页。"
+docType: "index"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "docs"
+  - "documentation"
+  - "帮助"
+  - "文档"
+  - "部署"
+  - "自托管"
+relatedOperations: []
+---
+
+## 用 Appaloft 部署和管理你的应用
+
+从第一次部署到服务器、域名、环境变量和故障排查，文档按你想完成的事情组织，而不是按内部实现分组。
+
+- [完成第一次部署 →](/docs/start/first-deployment/)
+- [查看常见故障排查](/docs/troubleshoot/diagnostics/)
+
+Appaloft 把应用部署到你自己选择的服务器上（BYOS，Bring Your Own Server），并把访问地址、配置、运行状态和恢复动作统一放在一处管理。你不需要先学习一套新概念——从下面挑一件你现在想做的事情开始。
+
+## 从你的目标开始
+
+- **我想先跑起来** — 从[第一次部署](/docs/start/first-deployment/)开始，用最短路径把一个应用部署出来并拿到访问地址。
+- **我需要接入服务器** — 阅读[注册并连接服务器](/docs/servers/register-connect/)，确认 SSH 凭据和连通性检查是否通过。
+- **我想让别人能访问我的应用** — 阅读[生成的访问地址](/docs/access/generated-routes/)和[绑定自定义域名](/docs/access/custom-domains/)。
+- **我需要配置环境变量或密钥** — 阅读[配置优先级](/docs/configuration/precedence/)和[安全处理密钥](/docs/configuration/secrets/)。
+- **我遇到了问题** — 从[查看日志与健康摘要](/docs/troubleshoot/logs-health/)或[生成安全诊断信息](/docs/troubleshoot/diagnostics/)开始定位原因。
+- **我在用 AI Agent 操作 Appaloft** — 阅读 [Agent 与 Sandbox 总览](/docs/agents/overview/)。
+
+## 建议阅读路径
+
+1. 新用户先读[第一次部署](/docs/start/first-deployment/)，完成一次从输入到可访问地址的部署。
+2. 配置应用时读[项目](/docs/deliver/projects/)、[资源](/docs/deliver/resources/)与[配置优先级](/docs/configuration/precedence/)。
+3. 配置访问时读[访问总览](/docs/access/overview/)、[绑定自定义域名](/docs/access/custom-domains/)和[证书](/docs/access/certificates/)。
+4. 运维和自动化时读 [CLI 参考](/docs/reference/cli/)、[HTTP API 参考](/docs/reference/http-api/)与[安装 Appaloft](/docs/self-hosting/install/)。
+5. 用 AI Agent 自动化交付时读[完整 Appaloft Skill](/docs/agents/skill/)与 [Agent 部署子协议](/docs/agents/deploy-skill/)。
+
+## 在 Appaloft 里打开帮助
+
+Web 控制台中带 `?` 的字段会打开相关文档页面。自托管和二进制版本也会随 Appaloft 一起打包文档静态资源，所以服务器环境不能访问公网时仍可以查看帮助。需要替换本地文档站内容时，请看[覆盖静态资源](/docs/self-hosting/static-assets/)。
+
+## 面向 AI Agent
+
+本文档同时面向自动化和 AI Agent：每个页面都提供 Markdown 版本，站点根路径下提供 `/llms.txt` 和 `/llms-full.txt` 索引。如果你在配置一个会操作 Appaloft 的 Agent，从[完整 Appaloft Skill](/docs/agents/skill/)开始。

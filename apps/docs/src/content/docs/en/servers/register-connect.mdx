@@ -1,0 +1,120 @@
+---
+title: "Register and Connect a Server"
+description: "Registering a new server and completing the first connectivity test."
+docType: "task"
+---
+
+<a id="docker-swarm-runtime-target" />
+
+
+## Goal <a id="server-deployment-target" />
+
+Register a Linux server you own as an Appaloft deployment target, and confirm Appaloft can reach it securely over SSH.
+
+## When to use this task
+
+- Onboarding a new server for the first time.
+- Migrating to a new machine, or temporarily troubleshooting a server's connectivity.
+
+## Prerequisites
+
+- A Linux server reachable over SSH, that you have root or sudo access to.
+- An SSH key (a dedicated deploy key is recommended, rather than your personal login key).
+
+## Inputs and defaults
+
+| Input | Description | Default |
+| --- | --- | --- |
+| `host` | An explicit hostname, IPv4, or IPv6 address | None, required; CIDR, URLs, and `host:port` forms are not accepted |
+| `port` | SSH port | `22` |
+| `user` | The system user used to connect | None, required |
+| Credential | SSH key path / a saved credential / one-time input | None, required |
+| Display name / label | Helps you tell servers apart in the list | Optional |
+
+Server registration input should **not** include resource, environment, or domain-related fields — those are independent configuration layers.
+
+## Web steps
+
+1. Go to **Servers**, click **Register server**.
+2. Fill in the host, port, user, and SSH credential (you can paste the private key content, or choose a saved credential).
+3. After submitting, Appaloft immediately runs a connectivity test and shows the result.
+
+## CLI steps
+
+<a id="server-connectivity-test" />
+
+```bash
+# Register an IPv4 server
+appaloft server register \
+  --name primary \
+  --host 203.0.113.10 \
+  --port 22 \
+  --provider generic-ssh \
+  --target-kind single-server
+
+# Register an IPv6-only server
+appaloft server register \
+  --name ipv6-primary \
+  --host 2001:db8::1 \
+  --port 22 \
+  --provider generic-ssh
+
+# Manually rerun the connectivity test
+appaloft server test srv_primary
+
+# View server details (does not trigger a new connectivity test)
+appaloft server show srv_primary
+
+# Rename (only affects the display name)
+appaloft server rename srv_primary --name "Primary SSH server"
+```
+
+Cluster targets like Docker Swarm need to explicitly declare their shape:
+
+```bash
+appaloft server register \
+  --name swarm-cluster \
+  --host 203.0.113.20 \
+  --provider docker-swarm \
+  --target-kind orchestrator-cluster
+```
+
+## Expected output and status
+
+The connectivity test checks: whether DNS/IP and the port are reachable, whether SSH credentials work, whether the target user has the permissions needed to deploy, whether the base runtime environment meets requirements, and where necessary returns proxy- or Docker-related diagnostics. The result distinguishes hostname resolution failures, network/host unreachable, authentication failures, and host-key verification failures instead of a single generic error.
+
+## Verification
+
+- The command or Web UI shows the connectivity test passing.
+- Run `appaloft server show srv_primary` and confirm status, provider, and summary information match what you expect.
+
+## Rollback / recovery
+
+| Symptom | Recovery |
+| --- | --- |
+| Connection timeout | Check host, port, firewall, and network path |
+| Authentication failure | Check the SSH key, user, and `authorized_keys` on the server |
+| Insufficient permissions | Confirm the target user can execute the commands deployment requires |
+| Missing runtime environment | Install or switch to a supported provider/runtime per the diagnostics |
+
+After the connectivity test passes, continue on to [Managing SSH Credentials](/docs/en/servers/ssh-keys/) and [Proxy Readiness And Terminal Sessions](/docs/en/servers/proxy-and-terminal/).
+
+When you no longer need a server, deactivate it before deleting it:
+
+```bash
+appaloft server deactivate srv_primary
+appaloft server delete-check srv_primary
+appaloft server delete srv_primary --confirm srv_primary
+```
+
+The pre-delete safety check blocks deleting a server that's still active, or still has deployment history, resources, domains, certificates, or retained audit records; deletion itself doesn't automatically clean these up either.
+
+## Troubleshooting links
+
+- [Troubleshoot Overview](/docs/en/troubleshoot/overview/)
+- [Proxy Readiness And Terminal Sessions](/docs/en/servers/proxy-and-terminal/)
+
+## Related reference pages
+
+- [Managing SSH Credentials](/docs/en/servers/ssh-keys/)
+- [Your First Deployment](/docs/en/start/first-deployment/)

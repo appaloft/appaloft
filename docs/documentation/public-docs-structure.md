@@ -2,9 +2,16 @@
 
 > GOVERNING DOCUMENT
 >
-> This file defines how Appaloft public user documentation is organized. It governs the future
-> `apps/docs` site, Web `?` help links, CLI documentation links, HTTP/API descriptions, and future
-> MCP/tool documentation surfaces.
+> This file defines how Appaloft public user documentation is organized. It governs the `apps/docs`
+> site, Web `?` help links, CLI documentation links, HTTP/API descriptions, and future MCP/tool
+> documentation surfaces.
+>
+> This is **IA v3**. The platform, Markdown processor, and toolchain that render this IA are
+> governed by [ADR-101: Nimbus Public Documentation Platform](../decisions/ADR-101-nimbus-public-documentation-platform.md).
+> The Docs Round contract, help-anchor registry contract, and packaging contract remain governed by
+> [ADR-030](../decisions/ADR-030-public-documentation-round-and-platform.md). IA v3 replaces IA v2's
+> superseded eleven-group table; see `Current Implementation Notes And Migration Gaps` for cutover
+> status.
 
 ## Normative Contract
 
@@ -50,31 +57,78 @@ a Spec Round. Do not silently change implementation to match stale public docs.
 
 The public docs structure must have at least two levels: a user task or product-area group, then
 pages that own stable help anchors. Public docs pages must live under the canonical product-area
-groups once IA v2 exists; top-level pages are limited to locale landing pages such as `index.md`.
+groups; top-level pages are limited to locale landing pages such as `index.md`.
 
-The canonical IA v2 groups are:
+IA v3 regroups IA v2's eleven product-area groups around ten pain-point-oriented groups. Two changes
+motivated the redesign: `Deploy`, `Projects And Resources`, and `Integrations` overlapped heavily in
+practice (a user configuring a source and a runtime profile was already mid-deployment), and Agent
+Workspace/Sandbox content existed as real pages without a home in the governing group description.
+IA v3 folds day-to-day delivery concerns into one group and makes Agent Workspace/Sandbox explicit
+members of the Agent group instead of orphaned pages.
 
-| Group | Required pages | Purpose | Primary audience |
-| --- | --- | --- | --- |
-| Start Here | First deployment, product mental model, local serve path. | First successful path and entrypoint choice. | New users |
-| Deploy | Source inputs, lifecycle, preview cleanup, rollback and recovery. | Explain how Appaloft turns input into a deployment. | Operators and developers |
-| Projects And Resources | Projects, resources, source/runtime/health/network profiles, lifecycle. | Explain what users configure before or during deployment. | Operators |
-| Servers And Credentials | Register servers, SSH credentials, connectivity tests, proxy readiness, terminal sessions. | Explain deployment targets and safe server access. | Operators |
-| Environments And Configuration | Environments, variables, secrets, precedence, snapshots, diff/promote, config file reference. | Explain deploy-time configuration and safe secret handling. | Operators and developers |
-| Access, Domains And TLS | Generated access URLs, default access policy, custom domains, ownership, certificates, DNS troubleshooting. | Explain how deployed resources become reachable. | Operators |
-| Observe And Troubleshoot | Status, logs, health summaries, diagnostics, common failures, safe support payloads. | Explain what happened and how to recover safely. | Operators and support |
-| Integrations | GitHub repositories, providers, plugins. | Explain external systems and extension points. | Integrators and advanced operators |
-| Agent Workflows | Full Appaloft skill, agent deploy subprotocol, and future tool/skill protocols. | Explain how AI agents should use existing Appaloft entrypoints safely. | Agent authors and automation users |
-| Reference | CLI, HTTP API, Web console, errors, statuses, configuration reference. | Provide exact commands, routes, fields, and status contracts. | Automation authors and integrators |
-| Self-Hosting And Operations | Binary bundle, Docker image, static asset overrides, database status/migration, backup/restore, upgrade. | Explain operating Appaloft itself. | Self-hosters and platform operators |
+The canonical IA v3 groups are:
+
+| # | Group | Required pages | Purpose | Primary audience |
+| --- | --- | --- | --- | --- |
+| 1 | 开始 · Start | First deployment, product mental model, local serve path, choosing an entrypoint. | First successful path and entrypoint choice. | New users |
+| 2 | 日常交付 · Deliver | Source inputs, deployment lifecycle, preview cleanup, rollback/recovery, projects, resources, source/runtime/health/network profiles, GitHub repositories, providers, plugins. | Explain how Appaloft turns input into a running, redeployable, recoverable deployment, including the resources and integrations that shape it. | Operators and developers |
+| 3 | 目标机器 · Servers | Register servers, SSH credentials, connectivity tests, proxy readiness, terminal sessions. | Explain deployment targets and safe server access. | Operators |
+| 4 | 配置与环境 · Configuration | Environments, variables, secrets, precedence, snapshots, diff/promote, config file reference. | Explain deploy-time configuration and safe secret handling. | Operators and developers |
+| 5 | 域名与访问 · Access | Generated access URLs, default access policy, custom domains, ownership, certificates, DNS troubleshooting. | Explain how deployed resources become reachable. | Operators |
+| 6 | 排障 · Troubleshoot | Status, logs, health summaries, diagnostics, common failures, safe support payloads. | Explain what happened and how to recover safely. | Operators and support |
+| 7 | Agent 与 Sandbox · Agents | Full Appaloft skill, agent deploy subprotocol, Agent Workspace lifecycle, Sandbox model, Workspace Collaboration, terminal/TUI attach, and future tool/skill protocols. | Explain how AI agents and agent-hosting Workspaces use existing Appaloft entrypoints safely. | Agent authors, automation users, and Agent Workspace operators |
+| 8 | 参考 · Reference | CLI, HTTP API, Web console, errors, statuses, configuration reference. | Provide exact commands, routes, fields, and status contracts. | Automation authors and integrators |
+| 9 | 自托管 · Self-Hosting | Binary bundle, Docker image, static asset overrides, database status/migration, backup/restore, upgrade. | Explain operating Appaloft itself. | Self-hosters and platform operators |
+| 10 | Cloud | Cloud-only reference pages (permissions/RBAC, managed Sandbox, billing, hosted-only operations). Placeholder pages in open-source builds; real pages injected only in the official build. | Explain Cloud-exclusive behavior without pretending it exists in self-hosted builds, and without hiding that it exists. | Cloud users; self-hosters evaluating Cloud |
 
 Each group may keep an overview page as an orientation entry, but the overview must not be the only
-page after IA v2 cutover. Groups that own user input, recovery, or reference semantics must split
-those concerns into nested task, concept, troubleshooting, or reference pages. Product help links
-must target the most specific nested page available, not the group overview.
+page. Groups that own user input, recovery, or reference semantics must split those concerns into
+nested task, concept, troubleshooting, or reference pages. Product help links must target the most
+specific nested page available, not the group overview.
 
-Legacy top-level seed pages are not retained after IA v2 cutover. New public docs work must add
-pages under the canonical groups instead of adding top-level topic pages.
+Group 7 (Agent 与 Sandbox) must document Agent Workspace and Sandbox as first-class task/concept
+pages, not as an implicit consequence of the Appaloft skill page. At minimum it must cover: what an
+Agent Workspace is and how it relates to a Sandbox; how to create, connect to, and clean up a
+Workspace; how Workspace Collaboration and hibernation/recovery behave; and how agent adapters are
+installed and selected. This closes the IA v2 gap where `agent/workspaces.md` and
+`agent/sandboxes.md` existed as content but were absent from the governing group description.
+
+Legacy top-level seed pages and IA v2 group/page paths are not retained after IA v3 cutover. New
+public docs work must add pages under the IA v3 groups instead of adding top-level topic pages or
+resurrecting IA v2 paths. Per [ADR-101](../decisions/ADR-101-nimbus-public-documentation-platform.md),
+the IA v3 cutover is a big-bang replacement together with the platform swap: there is no dual-IA or
+dual-URL transition period, and content should be rewritten for the new grouping rather than ported
+verbatim from IA v2 pages.
+
+## Cloud-Only Content
+
+The Cloud group (IA v3 group 10) is visible in every build, including open-source self-hosted
+builds. Its content differs by build:
+
+- **Open-source build**: every page in the Cloud group that has no Cloud-injected replacement
+  renders a placeholder stating the feature is available only on the official Cloud docs, with a
+  link to `https://docs.appaloft.com/cloud/`. The placeholder page and the Cloud nav-group entry are
+  ordinary public-repository content, authored and versioned like any other page.
+- **Official build** (`docs.appaloft.com`): the Appaloft Cloud private repository injects real
+  Cloud-only page content into the same Cloud group content-collection paths before the site is
+  built, using the pattern already established by `docs/cloud/public-docs/**` in `appaloft-cloud`
+  and `scripts/inject-cloud-docs.mjs`. Injected pages are not committed to this public repository;
+  only the placeholder, the nav scaffold, and the injection target contract are.
+
+The injection contract that Cloud-owned pages must satisfy:
+
+- target a specific content-collection path under the Cloud group for each locale (for example a
+  `zh-CN` and an `en-US` sibling per page, matching this repository's other locale collections);
+- carry the same frontmatter shape as other reference pages (`title`, `description`, `docType`,
+  `localeState`, `searchAliases`, `relatedOperations`, `sidebar`);
+- render a visible "Cloud" badge at the top of the page so readers can tell Cloud-only content apart
+  from Community content without inspecting the URL;
+- be idempotently removable: the injection tooling must refuse to delete a target file that does not
+  carry its generated-content marker, so a manual edit is never silently destroyed.
+
+Cloud-only pages must never be required reading for a self-hosted user to complete a Community task;
+if a Community task's only documentation lives behind a Cloud-only page, that is a Docs Round defect,
+not an acceptable Cloud/Community boundary.
 
 ## Page Types
 
@@ -156,6 +210,16 @@ Required sections:
 
 Troubleshooting pages must treat secret masking and safe diagnostic sharing as first-class.
 
+### Diagrams
+
+Any diagram that describes current architecture, workflow sequencing, deployment lifecycle, or
+Agent/Sandbox state must be authored as a fenced ```` ```mermaid ```` block, not a checked-in static
+image. [ADR-101](../decisions/ADR-101-nimbus-public-documentation-platform.md) sets the Markdown
+processor specifically so Mermaid renders correctly; pages should use that capability instead of
+drawing an SVG that will drift from the process it describes. Hand-drawn or exported images remain
+acceptable only for content that is not derived from a described process, such as marketing
+artwork, screenshots of real UI, or photography.
+
 ## Stable Help Anchors
 
 Every page section targeted by product help must use an explicit stable anchor. The anchor must be
@@ -209,6 +273,12 @@ The canonical machine-readable source is `@appaloft/docs-registry`. Human-readab
 notes live in [Public Docs Traceability](./public-docs-traceability.md). These records should use
 public topic ids and file paths, not internal DDD vocabulary in user-facing pages.
 
+Every public or Cloud code change must classify its docs outcome before merge — see
+[Docs Round](../../skills/domain-driven-develop/references/docs-round.md) for the general checklist
+and [Docs Impact Gate](../../skills/docs-impact-gate/SKILL.md) for the actionable, repository-specific
+version. A change is not ready to merge with an undeclared docs outcome, even when the eventual
+outcome is "not user-facing."
+
 ## Localization
 
 The initial public docs locales are:
@@ -225,9 +295,19 @@ page must declare its locale state:
 - `deferred`.
 
 Locale gaps are allowed before first formal release when they are explicit. Help anchors and topic
-ids must remain stable across locales.
+ids must remain stable across locales. Both `zh-CN` and `en-US` must reach `complete` locale state
+for a page before its owning Docs Round is considered closed; `stub`/`needs-update`/`deferred` are
+allowed only as a recorded interim state, not a permanent one.
 
 Translated pages must not localize URL anchor ids used by product help.
+
+Public docs, `apps/www`, and the Cloud console share one locale preference through the
+`appaloft.locale` cookie (set with `PUBLIC_APPALOFT_LOCALE_COOKIE_DOMAIN` scoped to the shared parent
+domain). A locale choice made on any one of the three surfaces must be honored by the other two;
+`apps/docs` must read and write this exact cookie name rather than introducing a docs-only locale
+preference. Content collections remain the mechanism for locale separation (a `zh-CN` collection and
+an `en-US` sibling collection per page), matching how versioning would also be modeled if Appaloft
+ever needs multi-version public docs.
 
 ## Search And Discovery
 
@@ -257,6 +337,11 @@ The target contract is:
 Agent-readable docs must not expose secrets, internal-only migration notes, or implementation details
 that are not already appropriate for public advanced reference.
 
+The Nimbus platform ships a Markdown twin per page, `/llms.txt`, `/llms-full.txt`, and per-page
+structured data by default, which satisfies most of this contract out of the box. Docs Round for a
+new page still owns curating what appears in the curated `/llms.txt` index and confirming secrets or
+Cloud-injection internals are not leaked through the generated Markdown twin.
+
 ## Packaging
 
 Public docs are part of Appaloft's self-hosted product experience.
@@ -273,14 +358,27 @@ Docs static assets must be packaged separately from Web console assets.
 
 ## Current Implementation Notes And Migration Gaps
 
-`apps/docs` exists as a Fumadocs/Next static documentation application.
+**This section describes the running implementation, which has not yet caught up to IA v3.** The
+normative target is Nimbus/Astro serving IA v3, per
+[ADR-101](../decisions/ADR-101-nimbus-public-documentation-platform.md). As of this revision,
+`apps/docs` still runs the IA v2 implementation described below, unchanged. The Nimbus/Astro
+rewrite, IA v3 content, and Cloud-injection generalization are tracked by
+`docs/specs/049-nimbus-docs-platform-migration/` in `appaloft-cloud` (Cloud-side composition and
+official-build injection) and by the public tracking issue for the `apps/docs` rewrite. Do not infer
+from the presence of this ADR that the migration has landed; check `apps/docs/package.json` for
+`fumadocs-*`/`next` versus `@cloudflare/nimbus-docs`/`astro` to know which platform is live in the
+current worktree.
 
-IA v2 pages now exist in `zh-CN` and `en-US` under nested grouped paths such as `deploy/sources`,
+`apps/docs` exists as a Fumadocs/Next static documentation application, IA v2 shape.
+
+IA v2 pages exist in `zh-CN` and `en-US` under nested grouped paths such as `deploy/sources`,
 `deploy/lifecycle`, `resources/profiles/*`, `servers/credentials/*`,
 `environments/variables/*`, `access/domains/*`, `observe/*`, `integrations/*`,
-`reference/*`, and `self-hosting/*`. They declare locale state in frontmatter and include stable
-explicit anchors for first-pass help-link targets. Legacy top-level seed pages are intentionally
-removed, and product help surfaces now target specific nested pages instead of group overviews.
+`agent/*` (including `agent/workspaces.md` and `agent/sandboxes.md`, which are real content not yet
+reflected in this file's group description prior to the IA v3 rewrite above), `reference/*`, and
+`self-hosting/*`. They declare locale state in frontmatter and include stable explicit anchors for
+first-pass help-link targets. Legacy top-level seed pages are intentionally removed, and product help
+surfaces now target specific nested pages instead of group overviews.
 
 `@appaloft/design` now owns product-facing design tokens and the design-language contract. Web
 imports `@appaloft/design/styles/web.css` and remains the reference implementation. Docs imports
@@ -318,11 +416,21 @@ Registry anchor-source coverage, operation coverage, and packaging coverage exis
 slices.
 
 OpenAPI reference pages are generated through `fumadocs-openapi` inside the docs app. The stable
-public path remains `/docs/reference/openapi/`.
+public path remains `/docs/reference/openapi/`; the Nimbus/Astro rewrite must preserve this exact
+path even though the generator changes.
+
+There is no Cloud nav group and no placeholder-page contract in the current IA v2 implementation.
+The single existing Cloud-injected page, `docs/cloud/public-docs/permissions.mdx`, is injected today
+into a Fumadocs `cloud/` content path with no open-source placeholder sibling; IA v3's Cloud-group
+placeholder contract does not exist yet in code.
 
 ## Open Questions
 
 - Whether the first hosted public docs domain should use a dedicated docs subdomain or be served
   from the main product domain under `/docs`.
 - Whether multi-version public docs are required before the first formal release or can wait until
-  after the binary/self-hosted packaging loop is stable.
+  after the binary/self-hosted packaging loop is stable. Nimbus's content-collection versioning
+  primitive (Decision item 17's shared collection shape) makes this cheaper than it was under
+  Fumadocs if the answer becomes yes.
+- Whether Sätteri should be revisited once its native plugin ecosystem covers Mermaid/remark-directive
+  parity (see ADR-101 Decision item 8); until then `unified(...)` stays the required processor.

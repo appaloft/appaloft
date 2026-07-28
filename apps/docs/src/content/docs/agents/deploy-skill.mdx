@@ -1,0 +1,96 @@
+---
+title: "Agent 部署子协议"
+description: "Agent 通过既有入口触发部署的子协议。"
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "agent deploy"
+  - "AI deploy"
+  - "skill"
+  - "AI 部署"
+relatedOperations:
+  - "projects.create"
+  - "servers.register"
+  - "resources.create"
+  - "deployments.create"
+sidebar:
+  order: 3
+---
+
+## 目标 <a id="agent-deploy-skill" />
+
+让 AI Agent 安全地通过 Appaloft 既有入口（CLI / HTTP API / Web / MCP）完成一次部署，而不是绕过应用层直接操作基础设施。
+
+## 适用场景
+
+- 用户要求 Agent"帮我把这个项目部署到 Appaloft"。
+- CI/GitHub Actions 中需要由 Agent 或自动化脚本触发部署。
+
+## 前置条件
+
+- 已经安装[完整 Appaloft Skill](/docs/agents/skill/)。
+- 目标环境（Cloud 或自托管）已经有可用的认证方式（见 Skill 页面的认证边界）。
+
+## 输入与默认值
+
+Agent 部署子协议是完整 Skill 内部的一套流程约定，**不是新的业务操作**，也不是 MCP 的替代实现。
+
+## 推荐流程
+
+1. **安全检查来源** — 只读取项目结构、构建脚本、监听端口、镜像引用、Docker/Compose 配置、静态输出目录和 Appaloft 配置文件，不执行项目代码。
+2. **选择最小入口** — 优先遵循 Appaloft 配置文件；否则根据证据选择预构建镜像、Compose、Dockerfile、静态输出目录或工作区命令，参考[配置部署来源](/docs/deliver/sources/)的零配置支持范围。
+3. **使用既有操作** — 在当前可用的表面中创建或选择 Project、Server、Environment 和 Resource，再发起部署——Shell 场景使用 CLI，Web/HTTP 场景使用等价的操作。
+4. **输出结果** — 优先返回访问 URL，其次是 Deployment id、Resource id、日志命令、诊断命令和恢复就绪命令。
+
+## CLI 操作步骤
+
+```bash
+appaloft deploy .
+appaloft deployments timeline <deploymentId> --follow --json
+```
+
+## GitHub Action 部署模式
+
+| 模式 | Agent 应该怎么做 |
+| --- | --- |
+| Pure SSH Action | 默认 `control-plane-mode: none`，安装/运行 CLI，通过 SSH 部署；不要求 Appaloft 控制台、Deploy Token 或任何 id |
+| Self-hosted Server Action | 只调用由 `control-plane-url` 显式选择的 Server API，必须使用 `appaloft-token`，不运行 CLI、不打开 SSH；优先使用 `server-config-deploy: true` 让 Server 读取仓库配置并应用 Profile |
+| Product-grade Preview | 由 Appaloft Cloud 或自托管控制面拥有完整预览策略、Webhook、评论/检查和清理重试 |
+
+如果缺少来源链接或仓库绑定，Agent 应该提示用户建立绑定，或使用一次性的可信 Bootstrap 上下文——Project/Resource/Server id 只适合首次引导、高级覆盖或调试场景，不是普通用户默认需要提供的输入。
+
+## 预期输出与状态
+
+一次成功的 Agent 部署应该返回一份简短结果：
+
+- 访问 URL（如果暂时不可用，需要明确说明原因）；
+- Deployment id 和 Resource id；
+- 当前生命周期状态；
+- 后续检查命令：`appaloft deployments timeline <deploymentId>`、`appaloft resource diagnose <resourceId>`、`appaloft deployments recovery-readiness <deploymentId>`。
+
+## 验证
+
+Agent 不应该在返回结果前假设部署成功——应该先确认部署状态已经进入可验证阶段（见[部署生命周期](/docs/deliver/lifecycle/)），再给出访问地址。
+
+## 回滚 / 恢复
+
+如果部署失败，Agent 应该**先读取**结构化错误、日志、诊断摘要和恢复就绪状态，再决定下一步操作，**不应该在失败后立即自动重试**。只有当恢复就绪状态明确允许时，才建议重试、重新部署或回滚——详见[回滚与恢复](/docs/deliver/recovery/)。
+
+## 故障排查链接
+
+- [常见故障与恢复](/docs/troubleshoot/recovery/)
+- [生成安全诊断信息](/docs/troubleshoot/diagnostics/)
+
+## 相关参考页面
+
+- [完整 Appaloft Skill](/docs/agents/skill/)
+- [第一次部署](/docs/start/first-deployment/)
+
+## 安全边界
+
+- 不读取 `.env`、私钥、Token 文件或云厂商凭据文件。
+- 不把密钥明文写进日志、Pull Request 描述或对话回复。
+- 不绕过 Appaloft 直接操作 Docker、SSH、数据库或 Provider SDK。
+- 不把 Source/Runtime/Network 字段直接塞进部署请求——这些属于 Resource Profile 和部署快照，应该通过对应的配置操作单独设置。

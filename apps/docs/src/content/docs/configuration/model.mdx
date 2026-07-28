@@ -1,0 +1,88 @@
+---
+title: "配置模型"
+description: "环境变量与快照在配置模型中的角色。"
+docType: "concept"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "environment"
+  - "stage"
+  - "production"
+  - "环境"
+relatedOperations:
+  - "environments.create"
+  - "environments.clone"
+  - "environments.lock"
+  - "environments.archive"
+sidebar:
+  order: 2
+---
+
+## 简要定义 <a id="concept-environment" />
+
+Environment 是一组部署时配置的边界，例如 development、staging 或 production。资源可以在不同环境下部署；每次部署会读取目标环境当时的配置并保存为不可变快照。
+
+## 为什么存在这个概念
+
+如果没有 Environment，staging 的实验性配置随时可能污染 production——反过来，修复 production 的紧急配置也无法在不影响 staging 的情况下单独进行。Environment 让"这份配置属于哪一层现实"有明确边界。
+
+## 环境生命周期 <a id="environment-lifecycle" />
+
+| 操作 | 效果 |
+| --- | --- |
+| 重命名 | 只改变名称，不影响环境 ID、变量、资源、部署、域名或证书 |
+| 锁定 | 保留所有数据，但阻止新的变量写入、提升、新资源创建和新部署准入 |
+| 解锁 | 恢复到 active，可以继续写入和部署 |
+| 归档 | 保留所有历史记录，是退役状态，不能通过解锁恢复 |
+| 克隆 | 在同一项目中创建新环境并复制变量，不复制资源、部署或运行时状态 |
+
+```bash
+appaloft env lock env_staging
+appaloft env unlock env_staging
+appaloft env clone env_staging --name env_staging_2
+```
+
+克隆、锁定、解锁和归档都**不会**停止运行时、删除资源、清理域名或移除证书——需要清理这些对象时应使用它们各自的生命周期命令。
+
+## 复制环境（Copy）
+
+复制环境比克隆更完整：默认会复制服务/资源配置形状、在新环境中重新部署，同时让数据面保持隔离。Web 控制台的"复制环境"默认使用安全策略：
+
+| 维度 | 默认策略 |
+| --- | --- |
+| 服务 | 复制并重新部署 |
+| 网络 | 新建隔离网络 |
+| 依赖 | 新建独立的托管依赖（不共享来源数据） |
+| Secret | 重新生成目标环境引用，不复制或展示来源明文 |
+| 数据库 | 创建空数据库，之后再按需 seed / 迁移 / 恢复 |
+| 域名 | 生成新路由，不复制生产自定义域名 |
+| 存储 | 创建空卷 |
+
+```bash
+appaloft env copy local staging \
+  --dependencies create-new \
+  --secrets regenerate \
+  --data empty \
+  --domains generated \
+  --storage empty \
+  --network isolated
+
+# 需要复用来源数据或迁移数据时，显式声明高级策略
+appaloft env copy production staging --database restore:backup_123
+appaloft env copy production staging --reuse-source db --acknowledge-shared-source
+```
+
+`--reuse-source` 会让目标环境和来源环境共用同一个数据库或依赖资源，必须显式确认，因为这意味着两个环境之间会共享数据。
+
+## 常见误区
+
+- **把归档当成删除**：归档只是退役状态，所有历史记录仍然保留，只是不能再解锁恢复为 active。
+- **认为克隆会复制资源和部署**：克隆只复制变量，资源、部署历史和运行时状态都不会被复制。
+- **在没有确认的情况下复用来源依赖**：`--reuse-source` 会让多个环境共享同一份数据，必须显式加上 `--acknowledge-shared-source`。
+
+## 相关任务
+
+- [配置优先级](/docs/configuration/precedence/)
+- [配置差异与提升](/docs/configuration/diff-promote/)
+- [项目](/docs/deliver/projects/)

@@ -1,0 +1,133 @@
+---
+title: "TypeScript SDK"
+description: "The public entrypoint for TypeScript SDK installation, authentication, operation calls, errors, and streaming events."
+docType: "reference"
+---
+
+## Stable identifier <a id="typescript-sdk-operation-client" />
+
+`@appaloft/sdk` is an operation client aimed at automation and integration — it calls Appaloft's HTTP/oRPC API, doesn't embed an application runtime, and doesn't expose internal implementation details. SDK methods map directly to the business operations in the OpenAPI contract; there are no separately added, SDK-exclusive methods that fall outside the business operation catalog.
+
+## Installation and configuration
+
+```ts
+import { createAppaloftClient } from "@appaloft/sdk";
+
+const appaloft = createAppaloftClient({
+  baseUrl: "https://appaloft.example/api",
+});
+```
+
+`baseUrl` should point to the `/api` root of the same Appaloft instance. Self-hosted environments should prefer the console/API address printed by the install script.
+
+## Authentication
+
+| Scenario | Credential type |
+| --- | --- |
+| Interactive product operations | Product session cookie |
+| Machine automation (CI, scripts) | Deploy token (Bearer) |
+
+```ts
+const productClient = createAppaloftClient({
+  baseUrl: "https://appaloft.example/api",
+  auth: { kind: "product-session", cookie: "better-auth.session_token=..." },
+});
+
+const actionClient = createAppaloftClient({
+  baseUrl: "https://appaloft.example/api",
+  auth: { kind: "deploy-token", token: process.env.APPALOFT_TOKEN ?? "" },
+});
+```
+
+Never write a deploy token into a repository config file; inject it in CI through a trusted secret manager or environment variable. Organization scope is passed through a specific operation's path/query/body field (for example `organizationId`) — switching the current organization should call the public organization-switch operation, rather than maintaining hidden state inside the SDK.
+
+## Operation examples
+
+Every SDK call corresponds to an operation key, with input fields coming from the same Command/Query schema:
+
+```ts
+const created = await appaloft.projects.create({ name: "Demo" });
+const listed = await appaloft.projects.list({ limit: 20 });
+const shown = await appaloft.projects.show({ projectId: "prj_123" });
+
+if (!created.ok) {
+  // created.error is a structured Appaloft error
+  throw new Error(created.error.code);
+}
+```
+
+Facade method names are generated from the operation key: kebab-case becomes camelCase, and dots become nested groups. For example `dependency-resources.provisioning.plan` generates `dependencyResources.provisioning.plan`.
+
+Path parameters can be passed as top-level fields; remaining fields default into the query for `GET`, `DELETE`, and streaming operations, and into the JSON body for other operations. When you need precise control over the split, pass `pathParams`, `query`, or `body` explicitly.
+
+## Sandbox resource handles
+
+The Sandbox ownership chain uses resource handles, so callers don't need to repeatedly pass parent ids:
+
+```ts
+const sandbox = await appaloft.sandboxes.create(sandboxInput);
+
+try {
+  const agent = await sandbox.agents.create({ harness: "pi" });
+  const run = await agent.stream({ prompt: "Analyze and update the workspace" });
+
+  for await (const envelope of run.fullStream) {
+    if (envelope.kind === "event") console.log(envelope.eventType, envelope.data);
+    if (envelope.kind === "error") throw new Error(envelope.code);
+  }
+} finally {
+  await sandbox.terminate();
+}
+```
+
+`Agent` is an SDK alias for the Sandbox Agent Runtime; `agent.stream({ task })` creates a Run and returns persisted events as `fullStream`; `prompt` is a convenience alias for `task` to ease migration from the AI SDK. Appaloft doesn't take over the chat session — the caller is still responsible for saving messages and deciding when to start fresh context or continue via `parentRunId`.
+
+When you need to create a Sandbox and a Runtime in one call, use the public Workspace entrypoint:
+
+```ts
+const workspace = await appaloft.workspaces.create({ sandbox: sandboxInput, harness: "opencode" });
+```
+
+`workspaceId` equals `sandboxId`; if runtime creation fails, `AppaloftWorkspaceCreateError` still carries the already-created id, making it easy to retry or clean up. See [Sandbox Model](/docs/en/agents/sandboxes/) for details.
+
+Resource methods return a descriptor directly and throw `AppaloftSdkRequestError` on failure; when you need the full, non-throwing `{ ok, status, data/error }` facade, use `appaloft.operations`, for example `appaloft.operations.sandboxes.create(input)`.
+
+## Structured errors
+
+Generated operations return a stable, structured error with `code`, `category`, `message`, `retryable`, and optional `details`; resource handles expose the same safe fields on `AppaloftSdkRequestError`. Automation should branch on `code`, `category`, or `retryable` — **never parse the human-readable `message`**.
+
+Common authentication errors:
+
+| Code | Meaning |
+| --- | --- |
+| `product_auth_missing` / `product_auth_invalid` | The product session is missing, expired, or can't be verified |
+| `product_auth_forbidden` | The current user doesn't belong to the target organization, or lacks sufficient role |
+| `action_auth_missing` / `action_auth_invalid` | The deploy token credential is missing or invalid |
+| `action_auth_forbidden` | The deploy token is valid, but its scope doesn't cover the current request |
+
+See [Error Codes And Statuses](/docs/en/reference/errors-statuses/) for the full error model.
+
+## Streaming events
+
+Only operations flagged as streamable in the OpenAPI metadata can use the SDK's streaming helper. Callers should pass an `AbortSignal` to cancel long-lived connections, and handle heartbeats, events, gaps, close, and errors according to the structured envelope:
+
+```ts
+const controller = new AbortController();
+
+for await (const envelope of appaloft.deployments.streamEvents({
+  deploymentId: "dep_123",
+  signal: controller.signal,
+})) {
+  if (envelope && typeof envelope === "object" && "kind" in envelope) {
+    // handle event, heartbeat, gap, closed, or error envelopes
+  }
+}
+```
+
+When a stream returns `closed`, or the caller cancels the `AbortSignal`, automation should stop reading and reopen the stream as needed. Streaming facade methods return an `AsyncIterable` — this doesn't change the whole SDK to a throw-only model; ordinary request facades still return `{ ok, status, data }` or `{ ok, status, error }`.
+
+## Related tasks
+
+- [HTTP API reference](/docs/en/reference/http-api/)
+- [Sandbox Model](/docs/en/agents/sandboxes/)
+- [Error Codes And Statuses](/docs/en/reference/errors-statuses/)

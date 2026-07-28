@@ -93,8 +93,8 @@ export const publicDocsHelpTopics = {
     description:
       "How applications create Sandbox Agent Runtimes, submit and observe Runs, and resolve approval requests.",
     page: {
-      "zh-CN": "agent/run-agents",
-      "en-US": "en/agent/run-agents",
+      "zh-CN": "agents/sandboxes",
+      "en-US": "en/agents/sandboxes",
     },
     anchor: "sandbox-agent-runtime",
     localeCoverage: {
@@ -115,8 +115,8 @@ export const publicDocsHelpTopics = {
     description:
       "How to create, reconnect to, preview, and run durable tasks in a Pi or OpenCode remote development environment.",
     page: {
-      "zh-CN": "agent/workspaces",
-      "en-US": "en/agent/workspaces",
+      "zh-CN": "agents/workspaces",
+      "en-US": "en/agents/workspaces",
     },
     anchor: "agent-workspace",
     localeCoverage: {
@@ -144,8 +144,8 @@ export const publicDocsHelpTopics = {
     description:
       "How organizations validate, install, compile, inspect, disable, and safely uninstall declarative Agent Adapters and Workspace Profiles.",
     page: {
-      "zh-CN": "agent/agent-adapters",
-      "en-US": "en/agent/agent-adapters",
+      "zh-CN": "agents/adapters",
+      "en-US": "en/agents/adapters",
     },
     anchor: "agent-adapter-installations",
     localeCoverage: {
@@ -178,8 +178,8 @@ export const publicDocsHelpTopics = {
     description:
       "How an immutable Sandbox Source Artifact becomes a verified candidate and an explicitly accepted production promotion.",
     page: {
-      "zh-CN": "agent/preview-promote",
-      "en-US": "en/agent/preview-promote",
+      "zh-CN": "agents/preview-promote",
+      "en-US": "en/agents/preview-promote",
     },
     anchor: "sandbox-preview-promotion",
     localeCoverage: {
@@ -317,8 +317,8 @@ export const publicDocsHelpTopics = {
     title: "Project",
     description: "How projects group resources, environments, and deployment history.",
     page: {
-      "zh-CN": "resources/projects",
-      "en-US": "en/resources/projects",
+      "zh-CN": "deliver/projects",
+      "en-US": "en/deliver/projects",
     },
     anchor: "concept-project",
     localeCoverage: {
@@ -334,8 +334,8 @@ export const publicDocsHelpTopics = {
     title: "Resource",
     description: "What an Appaloft resource represents from the user's perspective.",
     page: {
-      "zh-CN": "resources/projects",
-      "en-US": "en/resources/projects",
+      "zh-CN": "deliver/projects",
+      "en-US": "en/deliver/projects",
     },
     anchor: "concept-resource",
     localeCoverage: {
@@ -358,8 +358,8 @@ export const publicDocsHelpTopics = {
     description:
       "How to read, rename, describe, archive, restore, check delete safety, and delete projects without turning deployments or runtime state into project-owned actions.",
     page: {
-      "zh-CN": "resources/projects",
-      "en-US": "en/resources/projects",
+      "zh-CN": "deliver/projects",
+      "en-US": "en/deliver/projects",
     },
     anchor: "project-lifecycle",
     localeCoverage: {
@@ -455,8 +455,8 @@ export const publicDocsHelpTopics = {
     description:
       "How Blueprint catalog discovery, install planning, install acceptance, installation readback, and README deploy buttons hand users into the same Blueprint deployment flow.",
     page: {
-      "zh-CN": "deploy/one-click",
-      "en-US": "en/deploy/one-click",
+      "zh-CN": "deliver/overview",
+      "en-US": "en/deliver/overview",
     },
     anchor: "deploy-handoff-url",
     localeCoverage: {
@@ -521,8 +521,8 @@ export const publicDocsHelpTopics = {
     title: "Deployment lifecycle",
     description: "Detect, plan, execute, verify, and rollback deployment stages.",
     page: {
-      "zh-CN": "deploy/lifecycle",
-      "en-US": "en/deploy/lifecycle",
+      "zh-CN": "deliver/lifecycle",
+      "en-US": "en/deliver/lifecycle",
     },
     anchor: "deployment-lifecycle",
     localeCoverage: {
@@ -549,8 +549,8 @@ export const publicDocsHelpTopics = {
     description:
       "How deployment intent is reconciled with artifact, workload, configuration, health, access, and recovery readback.",
     page: {
-      "zh-CN": "deploy/lifecycle",
-      "en-US": "en/deploy/lifecycle",
+      "zh-CN": "deliver/lifecycle",
+      "en-US": "en/deliver/lifecycle",
     },
     anchor: "deployment-proof",
     localeCoverage: {
@@ -573,8 +573,8 @@ export const publicDocsHelpTopics = {
     description:
       "How local folders, Git repositories, container images, and static sites become deployment input.",
     page: {
-      "zh-CN": "deploy/sources",
-      "en-US": "en/deploy/sources",
+      "zh-CN": "deliver/sources",
+      "en-US": "en/deliver/sources",
     },
     anchor: "deployment-source",
     localeCoverage: {
@@ -591,8 +591,8 @@ export const publicDocsHelpTopics = {
     description:
       "How Appaloft connects source, DNS, infrastructure, notification, and future provider capabilities.",
     page: {
-      "zh-CN": "integrations/connections",
-      "en-US": "en/integrations/connections",
+      "zh-CN": "deliver/integrations",
+      "en-US": "en/deliver/integrations",
     },
     anchor: "connections-model",
     localeCoverage: {
@@ -610,8 +610,8 @@ export const publicDocsHelpTopics = {
     description:
       "How AI agents safely deploy Appaloft workloads without bypassing existing operations.",
     page: {
-      "zh-CN": "agent/deploy-skill",
-      "en-US": "en/agent/deploy-skill",
+      "zh-CN": "agents/deploy-skill",
+      "en-US": "en/agents/deploy-skill",
     },
     anchor: "agent-deploy-skill",
     localeCoverage: {
@@ -647,8 +647,8 @@ export const publicDocsHelpTopics = {
     description:
       "How AI agents use the full Appaloft operation catalog as a first-class AI-facing entrypoint.",
     page: {
-      "zh-CN": "agent/appaloft-skill",
-      "en-US": "en/agent/appaloft-skill",
+      "zh-CN": "agents/skill",
+      "en-US": "en/agents/skill",
     },
     anchor: "appaloft-skill",
     localeCoverage: {
@@ -685,8 +685,8 @@ export const publicDocsHelpTopics = {
     description:
       "How MCP clients call Appaloft operation-catalog tools, resources, and prompts safely.",
     page: {
-      "zh-CN": "agent/mcp-server",
-      "en-US": "en/agent/mcp-server",
+      "zh-CN": "agents/mcp",
+      "en-US": "en/agents/mcp",
     },
     anchor: "appaloft-mcp-server",
     localeCoverage: {
@@ -711,7 +711,7 @@ export const publicDocsHelpTopics = {
       "skills/appaloft/references/mcp-tools.md",
     ],
     webSurfaces: [
-      "apps/docs/src/content/docs/agent/mcp-server.md",
+      "apps/docs/src/content/docs/agent/appaloft-mcp-server.md",
       "apps/web Home AI integration section",
     ],
   },
@@ -721,8 +721,8 @@ export const publicDocsHelpTopics = {
     description:
       "How a Resource-owned auto-deploy policy turns verified source events into ordinary deployment requests.",
     page: {
-      "zh-CN": "deploy/sources",
-      "en-US": "en/deploy/sources",
+      "zh-CN": "deliver/sources",
+      "en-US": "en/deliver/sources",
     },
     anchor: "source-auto-deploy-setup",
     localeCoverage: {
@@ -753,8 +753,8 @@ export const publicDocsHelpTopics = {
     description:
       "How verified provider webhooks and generic signed webhooks handle secrets safely.",
     page: {
-      "zh-CN": "deploy/sources",
-      "en-US": "en/deploy/sources",
+      "zh-CN": "deliver/sources",
+      "en-US": "en/deliver/sources",
     },
     anchor: "source-auto-deploy-signatures",
     localeCoverage: {
@@ -783,8 +783,8 @@ export const publicDocsHelpTopics = {
     description:
       "How duplicate source event delivery is recorded without creating duplicate deployments.",
     page: {
-      "zh-CN": "deploy/sources",
-      "en-US": "en/deploy/sources",
+      "zh-CN": "deliver/sources",
+      "en-US": "en/deliver/sources",
     },
     anchor: "source-auto-deploy-dedupe",
     localeCoverage: {
@@ -815,8 +815,8 @@ export const publicDocsHelpTopics = {
     description:
       "How to read source events that were verified but ignored, blocked, or failed dispatch.",
     page: {
-      "zh-CN": "deploy/sources",
-      "en-US": "en/deploy/sources",
+      "zh-CN": "deliver/sources",
+      "en-US": "en/deliver/sources",
     },
     anchor: "source-auto-deploy-ignored-events",
     localeCoverage: {
@@ -847,8 +847,8 @@ export const publicDocsHelpTopics = {
     description:
       "How to recover from failed source event dispatch without replaying unsafe webhook payloads.",
     page: {
-      "zh-CN": "deploy/sources",
-      "en-US": "en/deploy/sources",
+      "zh-CN": "deliver/sources",
+      "en-US": "en/deliver/sources",
     },
     anchor: "source-auto-deploy-recovery",
     localeCoverage: {
@@ -882,8 +882,8 @@ export const publicDocsHelpTopics = {
     description:
       "How to dry-run and prune retained safe source event deliveries without replaying raw webhook payloads.",
     page: {
-      "zh-CN": "deploy/sources",
-      "en-US": "en/deploy/sources",
+      "zh-CN": "deliver/sources",
+      "en-US": "en/deliver/sources",
     },
     anchor: "source-auto-deploy-retention",
     localeCoverage: {
@@ -910,8 +910,8 @@ export const publicDocsHelpTopics = {
     title: "Source relink",
     description: "How to recover by attaching a resource to a new deployment source.",
     page: {
-      "zh-CN": "deploy/recovery",
-      "en-US": "en/deploy/recovery",
+      "zh-CN": "deliver/recovery",
+      "en-US": "en/deliver/recovery",
     },
     anchor: "deployment-source-relink",
     localeCoverage: {
@@ -928,8 +928,8 @@ export const publicDocsHelpTopics = {
     description:
       "How to inspect detected framework and buildpack accelerator evidence, planner selection, support tier, commands, network, health, access routing, and unsupported reasons before execution.",
     page: {
-      "zh-CN": "deploy/lifecycle",
-      "en-US": "en/deploy/lifecycle",
+      "zh-CN": "deliver/lifecycle",
+      "en-US": "en/deliver/lifecycle",
     },
     anchor: "deployment-plan-preview",
     localeCoverage: {
@@ -954,8 +954,8 @@ export const publicDocsHelpTopics = {
     description:
       "How to inspect retry, redeploy, cancel, rollback, and rollback candidate readiness before running recovery actions.",
     page: {
-      "zh-CN": "deploy/recovery",
-      "en-US": "en/deploy/recovery",
+      "zh-CN": "deliver/recovery",
+      "en-US": "en/deliver/recovery",
     },
     anchor: "deployment-recovery-readiness",
     localeCoverage: {
@@ -1002,8 +1002,8 @@ export const publicDocsHelpTopics = {
     title: "Preview cleanup",
     description: "How to remove temporary preview deployments without touching production.",
     page: {
-      "zh-CN": "deploy/recovery",
-      "en-US": "en/deploy/recovery",
+      "zh-CN": "deliver/recovery",
+      "en-US": "en/deliver/recovery",
     },
     anchor: "deployment-preview-cleanup",
     localeCoverage: {
@@ -1025,8 +1025,8 @@ export const publicDocsHelpTopics = {
     description:
       "How to run pull request previews from a user-authored GitHub Actions workflow without changing deployment admission.",
     page: {
-      "zh-CN": "deploy/previews",
-      "en-US": "en/deploy/previews",
+      "zh-CN": "deliver/previews",
+      "en-US": "en/deliver/previews",
     },
     anchor: "deployment-pr-preview-action-workflow",
     localeCoverage: {
@@ -1063,8 +1063,8 @@ export const publicDocsHelpTopics = {
     description:
       "How product-grade GitHub App and control-plane preview deployments differ from Action-only previews.",
     page: {
-      "zh-CN": "deploy/previews",
-      "en-US": "en/deploy/previews",
+      "zh-CN": "deliver/previews",
+      "en-US": "en/deliver/previews",
     },
     anchor: "product-grade-preview-deployments",
     localeCoverage: {
@@ -1098,8 +1098,8 @@ export const publicDocsHelpTopics = {
     title: "Resource source profile",
     description: "How source settings are attached to a resource before deployment.",
     page: {
-      "zh-CN": "resources/profiles/source-runtime",
-      "en-US": "en/resources/profiles/source-runtime",
+      "zh-CN": "deliver/profiles",
+      "en-US": "en/deliver/profiles",
     },
     anchor: "resource-source-profile",
     localeCoverage: {
@@ -1133,8 +1133,8 @@ export const publicDocsHelpTopics = {
     title: "Resource runtime profile",
     description: "How runtime settings describe the process Appaloft should run.",
     page: {
-      "zh-CN": "resources/profiles/source-runtime",
-      "en-US": "en/resources/profiles/source-runtime",
+      "zh-CN": "deliver/profiles",
+      "en-US": "en/deliver/profiles",
     },
     anchor: "resource-runtime-profile",
     localeCoverage: {
@@ -1169,8 +1169,8 @@ export const publicDocsHelpTopics = {
     description:
       "How to read and fix differences between the current Resource profile, entry config, and deployment snapshots.",
     page: {
-      "zh-CN": "resources/profiles/source-runtime",
-      "en-US": "en/resources/profiles/source-runtime",
+      "zh-CN": "deliver/profiles",
+      "en-US": "en/deliver/profiles",
     },
     anchor: "resource-profile-drift",
     localeCoverage: {
@@ -1204,8 +1204,8 @@ export const publicDocsHelpTopics = {
     title: "Resource health profile",
     description: "How readiness and health checks affect deployment verification.",
     page: {
-      "zh-CN": "resources/profiles/health-network",
-      "en-US": "en/resources/profiles/health-network",
+      "zh-CN": "deliver/profiles",
+      "en-US": "en/deliver/profiles",
     },
     anchor: "resource-health-profile",
     localeCoverage: {
@@ -1235,8 +1235,8 @@ export const publicDocsHelpTopics = {
     title: "Resource network profile",
     description: "How ports and routing inputs shape resource access.",
     page: {
-      "zh-CN": "resources/profiles/health-network",
-      "en-US": "en/resources/profiles/health-network",
+      "zh-CN": "deliver/profiles",
+      "en-US": "en/deliver/profiles",
     },
     anchor: "resource-network-profile",
     localeCoverage: {
@@ -1307,8 +1307,8 @@ export const publicDocsHelpTopics = {
     description:
       "How durable storage volumes and resource storage attachments are validated and managed.",
     page: {
-      "zh-CN": "resources/storage-volumes",
-      "en-US": "en/resources/storage-volumes",
+      "zh-CN": "deliver/resources",
+      "en-US": "en/deliver/resources",
     },
     anchor: "storage-volume-lifecycle",
     localeCoverage: {
@@ -1362,8 +1362,8 @@ export const publicDocsHelpTopics = {
     description:
       "How mounted application data uses StorageVolume backup source adapters, target providers, retention blockers, and restore-to-new-volume safety.",
     page: {
-      "zh-CN": "resources/storage-volumes",
-      "en-US": "en/resources/storage-volumes",
+      "zh-CN": "deliver/resources",
+      "en-US": "en/deliver/resources",
     },
     anchor: "storage-volume-backup-restore",
     localeCoverage: {
@@ -1406,8 +1406,8 @@ export const publicDocsHelpTopics = {
     description:
       "How Postgres and Redis dependency resources, Resource bindings, runtime injection readiness, secret rotation, backup, restore, and delete safety work.",
     page: {
-      "zh-CN": "resources/dependencies",
-      "en-US": "en/resources/dependencies",
+      "zh-CN": "deliver/resources",
+      "en-US": "en/deliver/resources",
     },
     anchor: "dependency-resource-lifecycle",
     localeCoverage: {
@@ -1468,8 +1468,8 @@ export const publicDocsHelpTopics = {
     description:
       "How dependency resource backup restore points, in-place restore acknowledgements, provider-safe artifacts, and delete safety work.",
     page: {
-      "zh-CN": "resources/dependencies",
-      "en-US": "en/resources/dependencies",
+      "zh-CN": "deliver/resources",
+      "en-US": "en/deliver/resources",
     },
     anchor: "dependency-backup-restore",
     localeCoverage: {
@@ -1514,8 +1514,8 @@ export const publicDocsHelpTopics = {
     description:
       "How neutral Blueprint catalog entries are listed, inspected, planned, installed, and read back as application bundles without becoming Cloud marketplace policy.",
     page: {
-      "zh-CN": "resources/dependencies",
-      "en-US": "en/resources/dependencies",
+      "zh-CN": "deliver/resources",
+      "en-US": "en/deliver/resources",
     },
     anchor: "blueprint-catalog-installation",
     localeCoverage: {
@@ -1551,8 +1551,8 @@ export const publicDocsHelpTopics = {
     description:
       "How bound Postgres and imported Redis dependencies are delivered to deployments, and how plan/show report blocked runtime injection readiness.",
     page: {
-      "zh-CN": "resources/dependencies",
-      "en-US": "en/resources/dependencies",
+      "zh-CN": "deliver/resources",
+      "en-US": "en/deliver/resources",
     },
     anchor: "dependency-runtime-injection",
     localeCoverage: {
@@ -1590,8 +1590,8 @@ export const publicDocsHelpTopics = {
     description:
       "How Resource-owned scheduled tasks, immediate runs, run history, and task logs work.",
     page: {
-      "zh-CN": "resources/scheduled-tasks",
-      "en-US": "en/resources/scheduled-tasks",
+      "zh-CN": "deliver/resources",
+      "en-US": "en/deliver/resources",
     },
     anchor: "scheduled-task-resource-lifecycle",
     localeCoverage: {
@@ -1625,8 +1625,8 @@ export const publicDocsHelpTopics = {
     title: "SSH credential",
     description: "How Appaloft uses SSH credentials for server connectivity and deployment.",
     page: {
-      "zh-CN": "servers/credentials/ssh-keys",
-      "en-US": "en/servers/credentials/ssh-keys",
+      "zh-CN": "servers/ssh-keys",
+      "en-US": "en/servers/ssh-keys",
     },
     anchor: "server-ssh-credential-path",
     localeCoverage: {
@@ -1679,8 +1679,8 @@ export const publicDocsHelpTopics = {
     title: "Proxy readiness",
     description: "How the edge proxy affects default access and resource routing.",
     page: {
-      "zh-CN": "servers/operations/proxy-and-terminal",
-      "en-US": "en/servers/operations/proxy-and-terminal",
+      "zh-CN": "servers/proxy-and-terminal",
+      "en-US": "en/servers/proxy-and-terminal",
     },
     anchor: "server-proxy-readiness",
     localeCoverage: {
@@ -1747,8 +1747,8 @@ export const publicDocsHelpTopics = {
     description:
       "How to open, list, show, close, and expire terminal sessions for controlled server or resource troubleshooting.",
     page: {
-      "zh-CN": "servers/operations/proxy-and-terminal",
-      "en-US": "en/servers/operations/proxy-and-terminal",
+      "zh-CN": "servers/proxy-and-terminal",
+      "en-US": "en/servers/proxy-and-terminal",
     },
     anchor: "server-terminal-session",
     localeCoverage: {
@@ -1777,8 +1777,8 @@ export const publicDocsHelpTopics = {
     title: "Environment",
     description: "How environments separate deploy-time configuration sets.",
     page: {
-      "zh-CN": "environments/model",
-      "en-US": "en/environments/model",
+      "zh-CN": "configuration/model",
+      "en-US": "en/configuration/model",
     },
     anchor: "concept-environment",
     localeCoverage: {
@@ -1795,8 +1795,8 @@ export const publicDocsHelpTopics = {
     description:
       "How active, locked, and archived environments affect configuration and deployment admission.",
     page: {
-      "zh-CN": "environments/model",
-      "en-US": "en/environments/model",
+      "zh-CN": "configuration/model",
+      "en-US": "en/configuration/model",
     },
     anchor: "environment-lifecycle",
     localeCoverage: {
@@ -1843,8 +1843,8 @@ export const publicDocsHelpTopics = {
     title: "Variable precedence",
     description: "How Appaloft resolves environment variables and deployment snapshots.",
     page: {
-      "zh-CN": "environments/variables/precedence",
-      "en-US": "en/environments/variables/precedence",
+      "zh-CN": "configuration/precedence",
+      "en-US": "en/configuration/precedence",
     },
     anchor: "environment-variable-precedence",
     localeCoverage: {
@@ -1879,8 +1879,8 @@ export const publicDocsHelpTopics = {
     title: "Secret values",
     description: "How to create, rotate, inspect, and pass Resource secrets safely.",
     page: {
-      "zh-CN": "environments/variables/secrets",
-      "en-US": "en/environments/variables/secrets",
+      "zh-CN": "configuration/secrets",
+      "en-US": "en/configuration/secrets",
     },
     anchor: "environment-secret-values",
     localeCoverage: {
@@ -1907,8 +1907,8 @@ export const publicDocsHelpTopics = {
     title: "Environment diff and promote",
     description: "How to compare configuration sets and promote one environment into another.",
     page: {
-      "zh-CN": "environments/changes/diff-promote",
-      "en-US": "en/environments/changes/diff-promote",
+      "zh-CN": "configuration/diff-promote",
+      "en-US": "en/configuration/diff-promote",
     },
     anchor: "environment-diff",
     localeCoverage: {
@@ -1952,8 +1952,8 @@ export const publicDocsHelpTopics = {
     title: "Custom domain binding",
     description: "How a custom domain is attached to a resource.",
     page: {
-      "zh-CN": "access/domains/custom-domains",
-      "en-US": "en/access/domains/custom-domains",
+      "zh-CN": "access/custom-domains",
+      "en-US": "en/access/custom-domains",
     },
     anchor: "domain-binding-purpose",
     localeCoverage: {
@@ -1977,8 +1977,8 @@ export const publicDocsHelpTopics = {
     title: "Domain ownership check",
     description: "How Appaloft verifies that a user controls a custom domain.",
     page: {
-      "zh-CN": "access/domains/ownership",
-      "en-US": "en/access/domains/ownership",
+      "zh-CN": "access/custom-domains",
+      "en-US": "en/access/custom-domains",
     },
     anchor: "domain-binding-ownership-check",
     localeCoverage: {
@@ -2002,8 +2002,8 @@ export const publicDocsHelpTopics = {
     title: "Certificate readiness",
     description: "How imported or issued certificates make custom domains ready.",
     page: {
-      "zh-CN": "access/tls/certificates",
-      "en-US": "en/access/tls/certificates",
+      "zh-CN": "access/certificates",
+      "en-US": "en/access/certificates",
     },
     anchor: "certificate-readiness",
     localeCoverage: {
@@ -2020,8 +2020,8 @@ export const publicDocsHelpTopics = {
     description:
       "How to inspect runtime logs and deployment timeline entries, capture redacted runtime log archive snapshots, and prune retained archive snapshots from user-facing entrypoints.",
     page: {
-      "zh-CN": "observe/logs-health",
-      "en-US": "en/observe/logs-health",
+      "zh-CN": "troubleshoot/logs-health",
+      "en-US": "en/troubleshoot/logs-health",
     },
     anchor: "observe-runtime-logs",
     localeCoverage: {
@@ -2048,8 +2048,8 @@ export const publicDocsHelpTopics = {
     title: "Health summary",
     description: "How to read health status and troubleshoot readiness failures.",
     page: {
-      "zh-CN": "observe/logs-health",
-      "en-US": "en/observe/logs-health",
+      "zh-CN": "troubleshoot/logs-health",
+      "en-US": "en/troubleshoot/logs-health",
     },
     anchor: "observe-health-summary",
     localeCoverage: {
@@ -2066,8 +2066,8 @@ export const publicDocsHelpTopics = {
     description:
       "How planned stop, start, and restart controls affect current runtime state without creating a deployment.",
     page: {
-      "zh-CN": "observe/logs-health",
-      "en-US": "en/observe/logs-health",
+      "zh-CN": "troubleshoot/logs-health",
+      "en-US": "en/troubleshoot/logs-health",
     },
     anchor: "resource-runtime-controls",
     localeCoverage: {
@@ -2094,8 +2094,8 @@ export const publicDocsHelpTopics = {
     title: "Restart versus redeploy",
     description: "Why runtime restart does not apply source, config, secret, or profile changes.",
     page: {
-      "zh-CN": "observe/logs-health",
-      "en-US": "en/observe/logs-health",
+      "zh-CN": "troubleshoot/logs-health",
+      "en-US": "en/troubleshoot/logs-health",
     },
     anchor: "runtime-restart-vs-redeploy",
     localeCoverage: {
@@ -2121,8 +2121,8 @@ export const publicDocsHelpTopics = {
     title: "Blocked runtime start",
     description: "How to recover when a runtime start is blocked by unsafe retained metadata.",
     page: {
-      "zh-CN": "observe/logs-health",
-      "en-US": "en/observe/logs-health",
+      "zh-CN": "troubleshoot/logs-health",
+      "en-US": "en/troubleshoot/logs-health",
     },
     anchor: "runtime-control-blocked-start",
     localeCoverage: {
@@ -2147,8 +2147,8 @@ export const publicDocsHelpTopics = {
     title: "Safe diagnostic summary",
     description: "What to copy for troubleshooting without exposing secret values.",
     page: {
-      "zh-CN": "observe/diagnostics",
-      "en-US": "en/observe/diagnostics",
+      "zh-CN": "troubleshoot/diagnostics",
+      "en-US": "en/troubleshoot/diagnostics",
     },
     anchor: "diagnostic-summary-copy-support-payload",
     localeCoverage: {
@@ -2175,8 +2175,8 @@ export const publicDocsHelpTopics = {
     description:
       "How to look up short-retention, support-safe access failure evidence by request id.",
     page: {
-      "zh-CN": "observe/diagnostics",
-      "en-US": "en/observe/diagnostics",
+      "zh-CN": "troubleshoot/diagnostics",
+      "en-US": "en/troubleshoot/diagnostics",
     },
     anchor: "access-failure-request-id-lookup",
     localeCoverage: {
@@ -2205,8 +2205,8 @@ export const publicDocsHelpTopics = {
     description:
       "How to inspect disk, inode, Docker, and Appaloft runtime usage, then dry-run or prune safe target-owned artifacts.",
     page: {
-      "zh-CN": "observe/diagnostics",
-      "en-US": "en/observe/diagnostics",
+      "zh-CN": "troubleshoot/diagnostics",
+      "en-US": "en/troubleshoot/diagnostics",
     },
     anchor: "runtime-target-capacity-inspect",
     localeCoverage: {
@@ -2223,8 +2223,8 @@ export const publicDocsHelpTopics = {
     description:
       "How to inspect safe point-in-time runtime usage attribution without cleanup, sample persistence, quota, or threshold enforcement.",
     page: {
-      "zh-CN": "observe/diagnostics",
-      "en-US": "en/observe/diagnostics",
+      "zh-CN": "troubleshoot/diagnostics",
+      "en-US": "en/troubleshoot/diagnostics",
     },
     anchor: "runtime-usage-inspect",
     localeCoverage: {
@@ -2253,8 +2253,8 @@ export const publicDocsHelpTopics = {
     description:
       "How to read retained runtime monitoring samples, rollups, and deployment markers without collecting fresh data or mutating runtime targets.",
     page: {
-      "zh-CN": "observe/diagnostics",
-      "en-US": "en/observe/diagnostics",
+      "zh-CN": "troubleshoot/diagnostics",
+      "en-US": "en/troubleshoot/diagnostics",
     },
     anchor: "runtime-monitoring-samples-and-rollups",
     localeCoverage: {
@@ -2287,8 +2287,8 @@ export const publicDocsHelpTopics = {
     description:
       "How exact-scope runtime monitoring thresholds produce non-enforcing warning and critical readback.",
     page: {
-      "zh-CN": "observe/diagnostics",
-      "en-US": "en/observe/diagnostics",
+      "zh-CN": "troubleshoot/diagnostics",
+      "en-US": "en/troubleshoot/diagnostics",
     },
     anchor: "runtime-monitoring-thresholds",
     localeCoverage: {
@@ -2319,8 +2319,8 @@ export const publicDocsHelpTopics = {
     description:
       "How to configure and read back scheduled runtime prune policies for safe target-owned cleanup.",
     page: {
-      "zh-CN": "observe/diagnostics",
-      "en-US": "en/observe/diagnostics",
+      "zh-CN": "troubleshoot/diagnostics",
+      "en-US": "en/troubleshoot/diagnostics",
     },
     anchor: "scheduled-runtime-prune-policy",
     localeCoverage: {
@@ -2537,8 +2537,8 @@ export const publicDocsHelpTopics = {
     title: "Control-plane modes",
     description: "How local control-plane and database operations fit self-hosted usage.",
     page: {
-      "zh-CN": "self-hosting/advanced",
-      "en-US": "en/self-hosting/advanced",
+      "zh-CN": "reference/configuration",
+      "en-US": "en/reference/configuration",
     },
     anchor: "advanced-control-plane-modes",
     localeCoverage: {
@@ -2555,8 +2555,8 @@ export const publicDocsHelpTopics = {
     description:
       "How to read configured maintenance worker activation, the certificate retry exception, and which scheduled workers are disabled by default without starting or ticking them.",
     page: {
-      "zh-CN": "self-hosting/advanced",
-      "en-US": "en/self-hosting/advanced",
+      "zh-CN": "reference/configuration",
+      "en-US": "en/reference/configuration",
     },
     anchor: "maintenance-worker-activation",
     localeCoverage: {
@@ -2567,8 +2567,8 @@ export const publicDocsHelpTopics = {
     relatedOperation: "system.doctor",
     specReferences: [
       "docs/testing/system-diagnostics-test-matrix.md",
-      "apps/docs/src/content/docs/en/reference/configuration.md",
-      "apps/docs/src/content/docs/reference/configuration.md",
+      "apps/docs/src/content/docs/en/reference/configuration.mdx",
+      "apps/docs/src/content/docs/reference/configuration.mdx",
     ],
     aliases: [
       "maintenance worker",
@@ -2605,8 +2605,8 @@ export const publicDocsHelpTopics = {
     description:
       "How self-hosted GitHub Actions use Appaloft deploy tokens, GitHub Secrets, scopes, and 401/403 recovery.",
     page: {
-      "zh-CN": "self-hosting/action-deploy-token-auth",
-      "en-US": "en/self-hosting/action-deploy-token-auth",
+      "zh-CN": "self-hosting/action-token",
+      "en-US": "en/self-hosting/action-token",
     },
     anchor: "self-hosting-action-deploy-token-auth",
     localeCoverage: {
@@ -2643,8 +2643,8 @@ export const publicDocsHelpTopics = {
     description:
       "How self-hosted installs create the first local admin, log in without OAuth, use bootstrap status/setup endpoints, and recover safely.",
     page: {
-      "zh-CN": "self-hosting/first-admin-bootstrap",
-      "en-US": "en/self-hosting/first-admin-bootstrap",
+      "zh-CN": "self-hosting/first-admin",
+      "en-US": "en/self-hosting/first-admin",
     },
     anchor: "self-hosting-first-admin-bootstrap",
     localeCoverage: {
@@ -2682,8 +2682,8 @@ export const publicDocsHelpTopics = {
     description:
       "How self-hosted operators inspect organization context, list members and invitations, invite operators, update non-owner roles, transfer ownership, remove non-owner members safely, and manage deploy tokens from the organization surface.",
     page: {
-      "zh-CN": "self-hosting/organization-team-management",
-      "en-US": "en/self-hosting/organization-team-management",
+      "zh-CN": "self-hosting/org-team",
+      "en-US": "en/self-hosting/org-team",
     },
     anchor: "self-hosting-organization-team-management",
     localeCoverage: {
@@ -2723,8 +2723,8 @@ export const publicDocsHelpTopics = {
     description:
       "How providers expose safe capability details and configuration diagnostics without leaking provider-specific details.",
     page: {
-      "zh-CN": "integrations/providers",
-      "en-US": "en/integrations/providers",
+      "zh-CN": "deliver/integrations",
+      "en-US": "en/deliver/integrations",
     },
     anchor: "advanced-provider-boundary",
     localeCoverage: {
@@ -2747,8 +2747,8 @@ export const publicDocsHelpTopics = {
     title: "Plugin boundary",
     description: "How plugin discovery and compatibility fit Appaloft extension points.",
     page: {
-      "zh-CN": "integrations/plugins",
-      "en-US": "en/integrations/plugins",
+      "zh-CN": "deliver/integrations",
+      "en-US": "en/deliver/integrations",
     },
     anchor: "advanced-plugin-boundary",
     localeCoverage: {
@@ -2766,8 +2766,8 @@ export const publicDocsHelpTopics = {
     description:
       "How integrators create and extend an Appaloft server composition through the public server package.",
     page: {
-      "zh-CN": "integrations/plugins",
-      "en-US": "en/integrations/plugins",
+      "zh-CN": "deliver/integrations",
+      "en-US": "en/deliver/integrations",
     },
     anchor: "server-composition-extensions",
     localeCoverage: {
@@ -3186,7 +3186,7 @@ export const publicDocsOperationCoverage = [
   ].map((operationKey) => ({
     operationKey,
     status: "migration-gap" as const,
-    reason: "Execution Sandbox public guide has not yet been published.",
+    reason: "Execution Sandbox public guide is published under agents/sandboxes.",
     targetPage: "/resources/execution-sandboxes",
   })),
   { operationKey: "projects.create", status: "documented", topicId: "project.concept" },

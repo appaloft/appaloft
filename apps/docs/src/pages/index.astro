@@ -1,0 +1,16 @@
+---
+import { getEntry } from "astro:content";
+import DocPage from "../components/DocPage.astro";
+
+export const prerender = true;
+
+const entry = await getEntry("docs", "index");
+
+if (!entry) {
+  throw new Error(
+    "Missing required src/content/docs/index.mdx entry — it renders the zh-CN homepage at \"/\".",
+  );
+}
+---
+
+<DocPage entry={entry} path="/" />

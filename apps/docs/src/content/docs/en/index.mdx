@@ -1,0 +1,39 @@
+---
+title: "Appaloft Docs"
+description: "The user documentation home for the Appaloft deployment platform."
+docType: "index"
+---
+
+## Deploy and manage your applications with Appaloft
+
+Docs are organized around what you're trying to do, not around internal implementation — from your first deployment to servers, domains, environment variables, and troubleshooting.
+
+- [Complete your first deployment →](/docs/en/start/first-deployment/)
+- [Browse common troubleshooting](/docs/en/troubleshoot/diagnostics/)
+
+Appaloft deploys applications to servers you choose (BYOS — Bring Your Own Server), and brings access URLs, configuration, runtime status, and recovery actions together in one place. You don't need to learn a new set of concepts first — pick something you want to do right now from the list below.
+
+## Start from your goal
+
+- **I want to get something running** — start with [First Deployment](/docs/en/start/first-deployment/) to deploy an app and get an access URL with the shortest possible path.
+- **I need to connect a server** — read [Register And Connect A Server](/docs/en/servers/register-connect/) and confirm your SSH credentials and connectivity check pass.
+- **I want other people to reach my app** — read [Generated Access URLs](/docs/en/access/generated-routes/) and [Binding A Custom Domain](/docs/en/access/custom-domains/).
+- **I need to configure environment variables or secrets** — read [Configuration Precedence](/docs/en/configuration/precedence/) and [Handling Secrets Safely](/docs/en/configuration/secrets/).
+- **I ran into a problem** — start with [Viewing Logs And Health Summaries](/docs/en/troubleshoot/logs-health/) or [Generating A Safe Diagnostic Summary](/docs/en/troubleshoot/diagnostics/) to find the cause.
+- **I'm operating Appaloft with an AI agent** — read the [Agents & Sandboxes Overview](/docs/en/agents/overview/).
+
+## Suggested reading path
+
+1. New users should first read [First Deployment](/docs/en/start/first-deployment/) to complete one deployment from input to a reachable URL.
+2. When configuring an app, read [Projects](/docs/en/deliver/projects/), [Resources](/docs/en/deliver/resources/), and [Configuration Precedence](/docs/en/configuration/precedence/).
+3. When configuring access, read [Access Overview](/docs/en/access/overview/), [Binding A Custom Domain](/docs/en/access/custom-domains/), and [Certificates](/docs/en/access/certificates/).
+4. For operations and automation, read the [CLI Reference](/docs/en/reference/cli/), [HTTP API Reference](/docs/en/reference/http-api/), and [Installing Appaloft](/docs/en/self-hosting/install/).
+5. To automate delivery with an AI agent, read the [Full Appaloft Skill](/docs/en/agents/skill/) and the [Agent Deploy Subprotocol](/docs/en/agents/deploy-skill/).
+
+## Opening help inside Appaloft
+
+Fields marked with a `?` in the Web console open the related docs page. Self-hosted and binary builds bundle the docs static assets with Appaloft, so help stays reachable even when the server has no public internet access. If you need to replace the local docs site content, see [Overriding Static Assets](/docs/en/self-hosting/static-assets/).
+
+## For AI agents
+
+These docs are built for automation and AI agents as well as humans: every page has a Markdown twin, and `/llms.txt` and `/llms-full.txt` indexes are available at the site root. If you're configuring an agent that will operate Appaloft, start with the [Full Appaloft Skill](/docs/en/agents/skill/).

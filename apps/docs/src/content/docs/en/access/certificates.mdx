@@ -1,0 +1,50 @@
+---
+title: "Certificates"
+description: "TLS certificate issuance, renewal, and status."
+docType: "concept"
+sidebar:
+  order: 4
+---
+
+## Short definition <a id="certificate-readiness" />
+
+Certificate readiness describes "whether HTTPS is available." It is a completely independent dimension from app runtime status and domain ownership status — a resource can be successfully deployed with the health check fully passing, yet the certificate still not ready; conversely, a ready certificate doesn't mean the app is necessarily healthy.
+
+## Why this concept exists
+
+If certificate status is reported mixed together with deployment status, users can't tell whether they should redeploy the app or just wait for certificate issuance. Splitting certificate readiness into an independent, observable state lets "HTTPS won't open" be pinpointed precisely to one specific thing: the chain, private key mismatch, hostname coverage, or expiration.
+
+Certificate readiness needs to answer three questions at once: does Appaloft have usable certificate material for this hostname? Does the certificate cover the current hostname and remain unexpired? Is the proxy actually using this certificate to serve HTTPS externally?
+
+## Where you see it in Web, CLI, and API
+
+Appaloft supports two certificate sources:
+
+- **Auto-issue or renew** — you provide the hostname and proof of ownership, and Appaloft handles the issuance flow.
+- **Import a certificate** — you provide the chain, private key, and related metadata; the private key is a Secret, and no UI, log, or diagnostic information ever echoes the full content.
+
+```bash
+# View certificate status and issuance history (never returns the certificate PEM or private key)
+appaloft certificate show <certificateId>
+
+# Retry a certificate that failed issuance/renewal (only retries the certificate step, doesn't retrigger domain ownership verification)
+appaloft certificate retry <certificateId>
+
+# Revoke a certificate that's no longer in use
+appaloft certificate revoke <certificateId>
+```
+
+## Common mistakes
+
+- **Treating a certificate failure as a deployment failure**: confirm the app's runtime status and generated access URL are fine first, then troubleshoot the certificate separately.
+- **Assuming deleting a domain binding automatically revokes the certificate**: the two have independent lifecycles — deleting a binding doesn't automatically revoke or delete a certificate, and vice versa.
+- **Redeploying the app right after a renewal failure**: renewal failures are usually related to domain ownership, DNS pointing, or certificate material — not the app itself.
+
+## Related tasks
+
+- [Binding A Custom Domain](/docs/en/access/custom-domains/)
+- [Access Troubleshooting](/docs/en/access/troubleshooting/)
+
+## Advanced details
+
+Troubleshooting order for renewal failures: confirm domain ownership is still valid → confirm DNS still points to the current proxy entrypoint → confirm certificate material isn't expired/has a broken chain/has a mismatched private key → confirm the proxy successfully loaded the new certificate. `certificate delete` only moves a non-active certificate out of the visible active lifecycle while keeping necessary audit history — it doesn't affect a certificate still in use.

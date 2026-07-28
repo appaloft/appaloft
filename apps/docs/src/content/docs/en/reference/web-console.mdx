@@ -1,0 +1,40 @@
+---
+title: "Web console guide"
+description: "Web console pages, form inputs, question-mark help, and status observation."
+docType: "reference"
+---
+
+## Stable identifier
+
+The Web console is Appaloft's graphical entrypoint — it's only responsible for collecting input, showing status, and calling the exact same HTTP/oRPC contract as the CLI/API. It never implements a separate set of deployment rules or lifecycle interpretation at the Web layer.
+
+## Question-mark help
+
+Fields in a form that are easy to misunderstand have a `?` help icon next to them; clicking it jumps to a stable anchor on this documentation site — not an id generated on the fly from the current translated title — so help links don't break when the UI copy changes.
+
+## Resource-scoped operations
+
+Operations related to a specific resource show up first on that resource's detail page, rather than being scattered across a global menu — for example:
+
+- starting a new deployment;
+- viewing runtime logs and health status;
+- configuring the proxy and domain.
+
+## No hidden business logic
+
+The Web console **only** collects input, shows status, and calls the HTTP/oRPC contract — business explanations like deployment rules and what a lifecycle phase means always come from the shared business semantics and this documentation site; the UI copy never redefines a different set of explanations.
+
+## Local documentation links (self-hosted)
+
+In a self-hosted deployment, the Web console's `?` links preferentially open local `/docs/*`, keeping it fully usable offline.
+
+When running the Web dev server standalone, `/docs/*` redirects to the local docs dev server. The root `bun dev` also starts the docs service; to adjust the local docs address, set `APPALOFT_DEV_DOCS_HOST` / `APPALOFT_DEV_DOCS_PORT`, or override the full target with `APPALOFT_WEB_DEV_DOCS_TARGET` — see [Runtime Configuration Reference](/docs/en/reference/configuration/) for the full variable list.
+
+## Product version
+
+The Web console shows the Appaloft product version returned by the backend's `/api/version`. Official releases and binary builds inject the version through `APPALOFT_APP_VERSION`; development environments default to the version in the repository root `package.json`.
+
+## Related tasks
+
+- [Choosing an Entrypoint](/docs/en/start/entrypoints/)
+- [Runtime Configuration Reference](/docs/en/reference/configuration/)

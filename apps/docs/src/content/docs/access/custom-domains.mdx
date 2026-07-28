@@ -1,0 +1,109 @@
+---
+title: "绑定自定义域名"
+description: "为资源绑定自定义域名并完成所有权验证。"
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "custom domain"
+  - "domain binding"
+  - "hostname"
+  - "ownership"
+  - "dns verification"
+  - "自定义域名"
+  - "所有权验证"
+relatedOperations:
+  - "domain-bindings.create"
+  - "domain-bindings.confirm-ownership"
+  - "domain-bindings.delete"
+sidebar:
+  order: 3
+---
+
+## 目标 <a id="domain-binding-purpose" />
+
+把你自己拥有的域名（如 `app.example.com`）绑定到一个资源，并完成所有权验证，让外部用户可以通过这个域名访问应用。
+
+## 适用场景
+
+- 把生产域名指向一个已经稳定运行的资源。
+- 为 staging、预览或客户环境配置独立的 hostname。
+
+## 前置条件
+
+- 资源的[生成访问地址](/docs/access/generated-routes/)已经处于 ready 状态——先确认应用/代理层没问题，再排查域名层。
+- 你对目标域名有 DNS 控制权（能添加/修改 DNS 记录）。
+
+## 输入与默认值
+
+| 输入 | 说明 |
+| --- | --- |
+| 资源 | 域名最终应该访问哪个资源 |
+| 环境 | 绑定在哪个环境下生效，例如 production 或 staging |
+| Hostname | 你控制的完整多标签公网域名，例如 `app.example.com`。**不接受**单标签内部服务器名称——那是服务器连接身份，无法完成公网 DNS 所有权校验和托管 TLS |
+| 证书策略 | 自动签发、导入证书，或稍后再处理 TLS |
+
+## Web 操作步骤
+
+1. 打开资源的 **Networking > Custom domains**。
+2. 输入 hostname，选择证书策略。
+3. Appaloft 会检测 base domain 和当前 DNS Provider。如果检测到 Cloudflare 等支持自动配置的 Provider，会提示 **Connect Cloudflare DNS**，跳转到 Provider 授权页完成一次性 Domain Connect 授权。
+4. 不支持自动连接时，页面会显示 **Manual DNS** 表格，把记录手动添加到你的 DNS 控制台。
+
+## CLI 操作步骤
+
+<a id="domain-binding-ownership-check" />
+
+```bash
+# 查看已创建的域名绑定
+appaloft domain-binding show <domainBindingId>
+
+# 在直接服务流量和重定向到 canonical 绑定之间切换
+appaloft domain-binding configure-route <domainBindingId> --mode direct
+
+# 修复态验证卡住时，重新触发一次所有权验证
+appaloft domain-binding retry-verification <domainBindingId>
+
+# 删除前先做安全检查，确认没有阻塞项
+appaloft domain-binding delete-check <domainBindingId>
+appaloft domain-binding delete <domainBindingId> --confirm <domainBindingId>
+```
+
+## 预期输出与状态
+
+绑定创建后会经历以下状态：
+
+| 状态 | 含义 |
+| --- | --- |
+| `pending_ownership` | 等待 DNS 记录生效，或等待所有权检查通过 |
+| `pending_certificate` | 域名所有权已确认，但证书还没就绪 |
+| `ready` | 域名和证书都可用 |
+| `failed` | 需要修正 DNS 记录、证书材料或代理入口 |
+
+所有权检查的 DNS 记录说明会包含记录类型（`CNAME` / `A` / `AAAA` / `TXT`）、主机名、目标值和建议等待时间——只需要照抄 Appaloft 给出的值，不要从日志或其他地方猜测。
+
+## 验证
+
+DNS 刚修改后，`pending` 状态不一定代表配置错误，先等待 TTL 生效窗口，再重新触发验证：
+
+```bash
+appaloft domain-binding retry-verification <domainBindingId>
+```
+
+确认状态变为 `ready` 后，用浏览器直接打开该域名验证 HTTPS 访问。
+
+## 回滚 / 恢复
+
+- 域名仍指向旧服务器/代理入口、记录类型不对、或主机名写错（例如误填成根域而不是子域）时，需要**修复 DNS 后再重试验证**，而不是反复点击重试。
+- 删除绑定只会移除路由意图，**不会**撤销证书、删除生成访问地址或改写历史部署快照。如果该绑定上还挂着一个 active 证书，删除会被阻止，需要先处理证书生命周期。
+
+## 故障排查链接
+
+- [访问故障排查](/docs/access/troubleshooting/)
+- [证书](/docs/access/certificates/)
+
+## 相关参考页面
+
+- [访问总览](/docs/access/overview/)
+- [生成的访问地址](/docs/access/generated-routes/)

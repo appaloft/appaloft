@@ -1,0 +1,154 @@
+---
+title: "Agent 适配器"
+description: "如何安装与选择 Agent 适配器。"
+docType: "reference"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "agent adapter"
+  - "adapter manifest"
+  - "codex"
+  - "opencode"
+  - "pi"
+  - "适配器"
+relatedOperations:
+  - "agent-adapters.validate"
+  - "agent-adapters.install"
+  - "agent-workspace-profiles.install"
+sidebar:
+  order: 7
+---
+
+## 标识 <a id="agent-adapter-installations" />
+
+Agent 适配器（Agent Adapter）是一个声明式、不可变的 Agent 集成定义——它描述所需的 Sandbox 模板、运行时、能力、交互模式、持久化路径和凭据类型。**Appaloft 不会从 manifest 加载代码，也不接受任意 shell 命令字符串**。
+
+每次安装都属于当前组织：两个组织可以安装相同 digest 的定义，但不能看到或操作彼此的安装。组织成员可以查看安装，组织管理员可以校验、安装、停用和卸载。
+
+## 输入字段与校验
+
+最小的 Codex terminal/headless 适配 manifest 示例（需要把 template id、版本、digest 和运行时版本范围替换成当前 Appaloft 实例已经准入的值）：
+
+```json title="codex.agent-adapter.json"
+{
+  "schemaVersion": "appaloft.agent-adapter/v1",
+  "id": "codex",
+  "displayName": "Codex",
+  "version": "1.0.0",
+  "kind": "declarative",
+  "requirements": {
+    "adapterApi": "^1.0.0",
+    "sandboxTemplate": {
+      "id": "agent-workspace",
+      "version": "^1.0.0",
+      "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "runtimes": [{ "id": "codex", "version": "^1.0.0" }],
+    "capabilities": { "required": ["managed-terminal", "headless"], "optional": [] }
+  },
+  "interactionModes": [
+    {
+      "id": "terminal",
+      "transport": "terminal",
+      "command": ["codex"],
+      "eventFidelity": "raw-pty",
+      "sessionRecovery": "process-lifetime"
+    },
+    {
+      "id": "headless",
+      "transport": "headless",
+      "command": ["codex", "exec"],
+      "taskInput": "append-argument",
+      "eventFidelity": "line-events",
+      "sessionRecovery": "managed-run-lineage"
+    }
+  ],
+  "persistentPaths": ["/workspace/.codex"],
+  "healthcheck": { "kind": "process" },
+  "credentials": []
+}
+```
+
+## 命令 / 接口示例
+
+```bash
+# 校验只返回规范化后的 digest 和兼容性结果，不会持久化数据或启动 Agent
+appaloft agent-adapter validate ./codex.agent-adapter.json
+appaloft agent-adapter install ./codex.agent-adapter.json
+appaloft agent-adapter list
+appaloft agent-adapter show <installation-id>
+```
+
+也可以在 Web 控制台的 **组织设置 → Agent Adapter** 页面粘贴 manifest，先校验再安装。
+
+### Workspace 配置模板
+
+Workspace 配置模板把一个精确的适配器定义、Sandbox 模板、运行限制、初始化命令、默认端口和检查命令组合成一个可复用的创建入口。它**不会执行安装脚本**，也不会创建新的 Workspace 聚合——创建 Workspace 前，Appaloft 会编译模板，并把解析出的适配器 digest、Sandbox 模板 digest、Harness 和能力快照固定到 Runtime 上。
+
+```json title="codex.profile.json"
+{
+  "schemaVersion": "appaloft.agent-workspace-profile/v1",
+  "id": "codex-standard",
+  "displayName": "Codex Standard",
+  "version": "1.0.0",
+  "adapter": {
+    "id": "codex",
+    "version": "1.0.0",
+    "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "interactiveModeId": "terminal",
+    "taskModeId": "headless"
+  },
+  "harnessTemplateId": "aht_codex_declarative_v1",
+  "sandbox": {
+    "template": {
+      "id": "agent-workspace",
+      "version": "1.0.0",
+      "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "requestedIsolation": "container-trusted",
+    "limits": { "cpuMillis": 2000, "memoryBytes": 4294967296, "diskBytes": 21474836480, "maxProcesses": 128 },
+    "networkPolicy": { "mode": "deny" }
+  },
+  "workingDirectory": "/workspace",
+  "initialization": [{ "id": "verify-codex", "argv": ["codex", "--version"] }],
+  "defaultPorts": [],
+  "persistentPaths": ["/workspace/.codex"],
+  "suggestedChecks": []
+}
+```
+
+```bash
+appaloft agent-workspace-profile validate ./codex.profile.json
+appaloft agent-workspace-profile install ./codex.profile.json
+appaloft agent-workspace-profile list
+appaloft agent-workspace-profile compile <installation-id>
+```
+
+组织管理员可以在 **组织设置 → Workspace 配置模板** 完成相同操作。开发者在 Workspaces 页面选择一个已启用的模板后创建 Workspace；不可用的能力会让对应按钮保持禁用状态，而不是在创建之后才静默降级。
+
+## 错误码与恢复提示
+
+停用会阻止**新** Workspace 解析该安装，但不会破坏已有 Workspace 的恢复引用：
+
+```bash
+appaloft agent-adapter disable <installation-id>
+```
+
+只有在没有任何活跃 Workspace 引用时才能卸载；存在引用时，服务端会返回冲突并保留该安装记录：
+
+```bash
+appaloft agent-adapter uninstall <installation-id>
+```
+
+卸载只删除**当前组织**的安装记录，不会删除可能被其他组织共享的不可变定义本身，也不会终止已有的 Sandbox 或 Agent 进程。Workspace 配置模板使用完全相同的停用和引用保护语义：
+
+```bash
+appaloft agent-workspace-profile disable <installation-id>
+appaloft agent-workspace-profile uninstall <installation-id>
+```
+
+## 相关任务
+
+- [Agent Workspace](/docs/agents/workspaces/)
+- [Sandbox 模型](/docs/agents/sandboxes/)

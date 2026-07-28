@@ -1,0 +1,112 @@
+---
+title: "Rollback and Recovery"
+description: "Safely rolling back or recovering to a known-good state after a failed deployment."
+docType: "troubleshooting"
+---
+<a id="deployment-preview-cleanup" />
+
+
+## Symptom
+
+A deployment failed, was canceled, or its observation stream (timeline) got interrupted, and you need to decide whether to retry, fix configuration, or roll back to a historical version.
+
+## Likely causes
+
+| Symptom | Most likely cause |
+| --- | --- |
+| Source unreadable | Repository/image address invalid, credentials expired, ref does not exist |
+| Runtime/Profile mismatch | Source type conflicts with Runtime Profile configuration |
+| SSH or server execution failure | Server connectivity, credentials, or insufficient resources |
+| App starts but the health check fails | Health check path/port configuration doesn't match actual app behavior |
+| Default access URL fails | Proxy readiness or network profile configuration issue |
+| Custom domain fails | DNS/TLS configuration issue (confirm the default access URL works first) |
+
+## How to inspect status, logs, events, or diagnostics <a id="deployment-recovery-readiness" />
+
+Before taking any recovery action, do a read-only check of recovery readiness first:
+
+```bash
+appaloft deployments recovery-readiness <deploymentId>
+```
+
+This query is read-only and returns:
+
+- machine-readable fields such as `recoverable`, `retryable`, `redeployable`, `rollbackReady`;
+- blocking reasons for each of `retry`, `redeploy`, and `rollback`;
+- available rollback candidates (historical successful deployments), and whether a candidate is missing required artifacts or snapshots;
+- a suggested next step, such as checking logs, the event stream, or a diagnostic summary first.
+
+## Safe recovery steps
+
+Choose an action based on the readiness recommendation:
+
+```bash
+# Retry: create a new deployment attempt based on the failed deployment's snapshot
+appaloft deployments retry <deploymentId>
+
+# Redeploy: redeploy using the current Resource Profile (reads the latest config, doesn't reuse an old snapshot)
+appaloft deployments redeploy <resourceId>
+
+# Force redeploy: like redeploy, but force-refresh runtime artifacts (skip build cache / force image pull)
+appaloft deployments force-redeploy <resourceId>
+
+# Rollback: create a new rollback attempt based on a historical successful deployment's snapshot and artifacts
+appaloft deployments rollback <deploymentId> --candidate <candidateDeploymentId>
+
+# Cancel: stop a deployment attempt that hasn't finished yet (doesn't delete history)
+appaloft deployments cancel <deploymentId> --confirm <deploymentId>
+```
+
+- **Retry** doesn't replay old events, and doesn't continue executing the failed phase inside the old attempt — it creates a brand-new attempt from the failed deployment's immutable input snapshot.
+- **Redeploy** reads the current Resource Profile; if that profile is missing or has noticeable drift, `recovery-readiness` will mark redeploy as blocked.
+- **Rollback** does not re-plan from the current Resource Profile, and does not restore the state of a database, volume, or external dependency — it only rolls back the application runtime itself.
+- **Cancel**'s `--confirm` must exactly match the deployment id; an attempt already in a terminal state (succeeded/failed/canceled/rolled back) is rejected.
+
+## When to retry
+
+Input validation failures should be fixed before retrying; transient failures during execution (like network jitter) can usually be retried directly.
+
+## When to roll back
+
+When a Verify-phase failure will take time to fix, roll back to a known-good historical version first and diagnose the root cause offline afterward, rather than leaving users facing an unhealthy deployment for a long time.
+
+## Long-inactive deployments
+
+When a deployment sits in `created`, `planning`, `planned`, `running`, or `cancel-requested` for a long time:
+
+```bash
+# Read-only query: find long-inactive attempts
+appaloft deployments stale --stale-after-seconds 900
+
+# After confirming execution ownership is really lost, reconcile explicitly with the returned stateVersion
+appaloft deployments reconcile-stale <deploymentId> \
+  --state-version <stateVersion> \
+  --stale-after-seconds 900 \
+  --confirm <deploymentId>
+```
+
+After a successful reconciliation, the old attempt becomes `interrupted`; history and recovery evidence are preserved, and you can run `recovery-readiness` again to choose retry or redeploy.
+
+## Source relink <a id="deployment-source-relink" />
+
+If you need to point a resource at a new repository, directory, or image (rather than just retrying the same source), use source relink, described in [Configuring Deployment Sources](/docs/en/deliver/sources/). This is an explicit action and should never be treated as an ordinary retry.
+
+## Archiving and pruning history
+
+```bash
+# Hide a terminal-state deployment from the default history list (doesn't delete logs, events, or audit records)
+appaloft deployments archive <deploymentId> --confirm <deploymentId>
+
+# Preview-only by default: clean up terminal, archived, unreferenced deployments before a given time
+appaloft deployments prune --before <iso>
+```
+
+## When to copy diagnostic information for help
+
+If `recovery-readiness` shows every action blocked, or the same failure keeps recurring after fixing configuration, run the commands in [Generating A Safe Diagnostic Summary](/docs/en/troubleshoot/diagnostics/) to produce a secret-free diagnostic summary before asking for support.
+
+## Related reference pages
+
+- [Deployment Lifecycle](/docs/en/deliver/lifecycle/)
+- [Common Failures And Recovery](/docs/en/troubleshoot/recovery/)
+- [Viewing Logs And Health Summaries](/docs/en/troubleshoot/logs-health/)

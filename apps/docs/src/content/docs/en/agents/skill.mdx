@@ -1,0 +1,79 @@
+---
+title: "Full Appaloft Skill"
+description: "The complete Appaloft Skill documentation for AI agents to use."
+docType: "reference"
+---
+
+## Stable identifier <a id="appaloft-skill" /><a id="appaloft-skill-evals" />
+
+Packaged skill evals: `skills/appaloft/evals/evals.json`.
+
+
+The Appaloft Skill is the complete product entrypoint for AI agents — like the CLI, HTTP API, Web console, and MCP tools, it maps to the same set of Appaloft business operations (the operation catalog). The only difference is that the user is an AI, not a human. It is **not** a new business operation, and **not** a wrapper around `appaloft deploy`.
+
+## Installation
+
+```bash
+# Codex
+npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
+
+# Claude Code
+npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
+```
+
+The install command **only copies Skill files** — it doesn't deploy an app, create a resource, or call any API. After installing, run `npx skills list --global --agent codex` (or `claude-code`) to confirm Appaloft appears in the list and that the corresponding `SKILL.md` exists, then start a new agent session so the host reloads the Skill directory.
+
+## Capability scope
+
+This includes saving/registering and managing servers, creating resources, and deploying.
+
+
+The full Skill covers nearly every entrypoint in the Appaloft business operation catalog, including:
+
+- the lifecycle of projects, servers, environments, and resources;
+- Source / Runtime / Network / Health / Access / variable and other profile configuration;
+- deployments, preview cleanup, plans, logs, events, retry, redeploy, rollback;
+- domain bindings, certificates, default access;
+- dependency resources, backup and restore, dependency bindings;
+- storage volumes, scheduled tasks, runtime control, terminal sessions;
+- organizations, authentication, deploy tokens, providers, plugins, upgrades, database maintenance.
+
+The full CLI mapping ships with the install package in the Skill's `references/cli-entrypoints.md`.
+
+## Output fields and status values
+
+The Skill follows a progressive-disclosure principle: `SKILL.md` stays short, and long command tables, the deploy protocol, and MCP guidance live in separate `references/` files, avoiding loading too much context into an agent at once.
+
+## Three modes in the GitHub Action scenario
+
+| Mode | Description |
+| --- | --- |
+| Pure SSH Action | The default BYOS SSH path — needs no Appaloft console or any id |
+| Self-hosted Server Action | Calls an existing self-hosted Server API via `control-plane-url` and `appaloft-token`; doesn't run the CLI, doesn't use SSH |
+| Product-grade Preview | Appaloft Cloud or a self-hosted control plane owns the full preview policy, webhooks, comments/checks, cleanup retry, quotas, and audit |
+
+An agent must first determine which mode it's in — don't mix all three into one configuration template.
+
+## Authentication boundary
+
+When connecting to a managed Cloud or self-hosted Appaloft instance is needed, an agent should first check `appaloft auth status`, `appaloft context show`, and the `APPALOFT_TOKEN` environment variable. **Without a logged-in profile or token, an agent should not default to opening a browser, copying a verification code, or reading a cookie** — instead, the user should provide a scoped, expirable token through a trusted UI, secret manager, environment variable, or CLI-approved flow, and the CLI should verify it itself and write it to a local profile via `APPALOFT_TOKEN=<token>` or `appaloft auth token login --stdin`.
+
+## Error codes and safety boundaries
+
+The Skill explicitly forbids the following:
+
+- Reading `.env` file contents, private keys, token file contents, cloud provider credentials, deploy tokens, SSH material, cookies, or any unmasked secret.
+- Having the user paste a session cookie, bearer token, deploy token, or token file content into the conversation — tokens can only be passed through trusted channels like the CLI, environment variables, or a secret manager.
+- Bypassing Appaloft to operate Docker, SSH, the database, the proxy, or a provider SDK directly.
+- Inventing "agent-exclusive operations" that only an agent can call — every behavior must map to an existing CLI/API/Web/MCP operation.
+- Assuming artifacts get uploaded to a managed cloud — the default deployment target is still the BYOS server the user chose.
+
+## Related tasks
+
+- [Agent Deploy Subprotocol](/docs/en/agents/deploy-skill/)
+- [MCP And Tool Protocols](/docs/en/agents/mcp/)
+- [Agent Workspace](/docs/en/agents/workspaces/)
+
+## Example
+
+Once MCP is configured, each Skill capability corresponds to an MCP tool, named from the operation key — for example `deployments.create` maps to `deployments_create`, with an input schema identical to CLI/API. See [MCP And Tool Protocols](/docs/en/agents/mcp/) for details.

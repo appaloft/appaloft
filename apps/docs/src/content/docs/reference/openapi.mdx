@@ -1,0 +1,41 @@
+---
+title: "OpenAPI"
+description: "按业务操作生成的 OpenAPI reference 入口。"
+docType: "reference"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "openapi"
+  - "api reference"
+  - "http api"
+relatedOperations:
+  - "projects.create"
+  - "resources.create"
+  - "deployments.create"
+sidebar:
+  order: 5
+---
+
+## 标识
+
+Appaloft 的 OpenAPI 3.1 规范由 `@appaloft/openapi` 生成,operation 名称、输入 Schema、输出形状和错误描述都直接来自和 CLI/Web/SDK 共享的业务操作契约——不存在单独维护的 OpenAPI 专属业务逻辑。
+
+## 入口地址 <a id="api-openapi-reference" />
+
+| 地址 | 说明 |
+| --- | --- |
+| `/api/openapi.json` | 原始 OpenAPI 3.1 JSON 文档 |
+| `/api/reference` | 基于 Scalar 的交互式 API Reference |
+| `/docs/reference/openapi/*` | 公共文档站点生成的逐操作 Reference 页面 |
+
+`/docs/reference/openapi/` 是一个稳定入口,方便 Web 帮助链接、CLI `--help` 输出和外部书签统一指向同一个位置。
+
+## 契约来源
+
+如果 API 行为发生变化,应该同时更新业务操作目录、公开文档记录,以及对应的 API/CLI 帮助链接,保持三者一致——不要只改其中一处。
+
+## 相关任务
+
+- [HTTP API reference](/docs/reference/http-api/)
+- [TypeScript SDK](/docs/reference/typescript-sdk/)

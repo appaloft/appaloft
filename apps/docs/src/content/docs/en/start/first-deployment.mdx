@@ -1,0 +1,143 @@
+---
+title: "Your First Deployment"
+description: "The complete path to your first successful Appaloft deployment."
+docType: "task"
+---
+
+## Goal
+
+Starting from an empty Appaloft instance, complete a minimal deployment: create a project, register a server, create a resource, start a deployment, and get back an access URL you can open in a browser.
+
+## When to use this task
+
+- You just installed or logged in to Appaloft for the first time and want to verify the whole chain works.
+- You have an app that already runs locally (a Git repository, a container image, or a built static bundle) and want to deploy it to your own server.
+
+If you just want to understand Appaloft's core concepts first, read [Product Mental Model](/docs/en/start/concepts/); if you're not sure whether to use Web, CLI, or the API, read [Choosing an Entrypoint](/docs/en/start/entrypoints/).
+
+## Prerequisites
+
+- A Linux server you have root or sudo access to, reachable over SSH (Appaloft is BYOS — it does not host servers for you).
+- A Git repository URL, a container image reference, or an already-built static directory.
+- You've completed [Installing Appaloft](/docs/en/self-hosting/install/) and [Creating The First Admin](/docs/en/self-hosting/first-admin/) (self-hosted scenario), or you already have an Appaloft Cloud account.
+
+## Inputs and defaults
+
+A minimal deployment needs the following inputs:
+
+| Input | Description | Default |
+| --- | --- | --- |
+| Project | The organizing boundary for resources, environments, and deployment history | None — must be explicitly created or selected |
+| Server | The deployment target machine (must be reachable over SSH) | None — must be registered first |
+| Deployment source | A Git repository, container image, or local static directory | None — must be explicitly provided |
+| Runtime profile | Start command, port, health check path | Attempts zero-configuration detection; falls back to explicit input on failure |
+
+Zero-configuration auto-detection coverage varies by source type — this page labels it honestly:
+
+| Source type | Detection status |
+| --- | --- |
+| Local single-app root directory (CLI pointed straight at a project directory) | Best-verified coverage |
+| Public Git repository with automatic framework detection | Not supported — runtime must be declared explicitly |
+| Native containers (Dockerfile / prebuilt image) | Supported |
+| Remote Git + explicit command profile | Preview — verify locally first |
+| Scoped local-directory discovery inside a monorepo | Preview |
+| Generic workload archive bundle | Not supported |
+
+When a monorepo root has multiple candidate apps, the deployment is blocked until you pass `baseDirectory` explicitly.
+
+## Web steps
+
+1. Sign in to the Web console and create or select a Project.
+2. Go to **Servers**, click **Register server**, fill in the host address and SSH credentials, and wait for the connectivity check to pass.
+3. Go to **Resources**, click **Create resource**, choose your deployment source (Git repository / container image / uploaded static directory) and the server you just registered.
+4. Confirm the runtime profile (start command, port, health check) and click **Deploy**.
+5. The deployment panel shows the current lifecycle status; on success it displays an automatically generated access URL.
+
+## CLI steps
+
+```bash
+# 1. Log in (connects to Appaloft Cloud by default; self-hosted requires an explicit --url)
+appaloft login --url https://your-appaloft-host
+
+# 2. Create a project (if you don't have one yet)
+appaloft projects create --name "my-first-project"
+
+# 3. Register a server and wait for the connectivity check
+appaloft server register --host 203.0.113.10 --ssh-user deploy --ssh-key ~/.ssh/id_ed25519
+appaloft server capacity inspect --server-id <serverId>
+
+# 4. Start a deployment from the current directory (zero-configuration detection)
+appaloft deploy
+
+# 5. Or explicitly point at a config file / profile
+appaloft deploy --config appaloft.yml --config-profile staging
+
+# 6. Already have a built static directory? Skip the build step and publish directly
+appaloft deploy ./dist --as static-site
+
+# 7. Watch deployment status and timeline
+appaloft deployments timeline <deploymentId> --follow --json
+```
+
+## HTTP/API steps
+
+Automation systems should call through the same business operations rather than reinventing a separate set of input semantics:
+
+```bash
+curl -X POST https://your-appaloft-host/api/deployments \
+  -H "Authorization: Bearer $APPALOFT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resourceId": "res_xxx",
+    "source": { "type": "git", "url": "https://github.com/you/app" }
+  }'
+```
+
+Full routes and input/output shapes are in the [HTTP API reference](/docs/en/reference/http-api/); you can also inspect the running instance's `/api/openapi.json` or `/api/reference` (Scalar) directly.
+
+## Expected output and status
+
+A successful deployment moves through lifecycle states such as `pending → planning → building → deploying → verifying → healthy` (the exact values are governed by [Status And Events](/docs/en/troubleshoot/status-events/)) and ultimately returns:
+
+- the resource and target server the deployment belongs to;
+- the source commit / image digest, runtime, and network configuration used;
+- a reachable, generated access URL;
+- a reference to a diagnostic summary you can use for troubleshooting.
+
+## Verification
+
+- Open the returned access URL and confirm the app responds correctly.
+- Run `appaloft resource health <resourceId> --checks --public-access-probe` to confirm the health check and the public access probe both pass.
+- Run `appaloft resource show <resourceId> --json` to confirm the resource is healthy and points to the expected deployment.
+
+## Rollback / recovery
+
+If the deployment fails or the health check doesn't pass:
+
+```bash
+# See the failure reason and available recovery options
+appaloft deployments recovery-readiness <deploymentId>
+
+# Retry the same deployment
+appaloft deployments retry <deploymentId>
+
+# Roll back to a known-good historical deployment
+appaloft deployments rollback <deploymentId> --candidate <candidateDeploymentId>
+```
+
+See [Rollback And Recovery](/docs/en/deliver/recovery/) for the full recovery flow.
+
+## Troubleshooting links
+
+- [Troubleshoot Overview](/docs/en/troubleshoot/overview/)
+- [Generating A Safe Diagnostic Summary](/docs/en/troubleshoot/diagnostics/)
+- [Common Failures And Recovery](/docs/en/troubleshoot/recovery/)
+
+## Related reference pages
+
+- [Deployment Lifecycle](/docs/en/deliver/lifecycle/)
+- [Configuring Deployment Sources](/docs/en/deliver/sources/)
+- [Register And Connect A Server](/docs/en/servers/register-connect/)
+- [CLI Reference](/docs/en/reference/cli/)
+
+If an AI agent is running this flow, install the [Full Appaloft Skill](/docs/en/agents/skill/) first, then follow the [Agent Deploy Subprotocol](/docs/en/agents/deploy-skill/) to call the entrypoints above — rather than bypassing them to operate the database or the server directly.

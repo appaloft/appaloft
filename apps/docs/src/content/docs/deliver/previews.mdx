@@ -1,0 +1,94 @@
+---
+title: "预览与清理"
+description: "管理预览部署并在完成后安全清理。"
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "pull request preview"
+  - "PR preview"
+  - "preview environment"
+  - "预览部署"
+relatedOperations:
+  - "deployments.create"
+  - "deployments.cleanup-preview"
+  - "preview-environments.list"
+sidebar:
+  order: 4
+---
+
+## 目标 <a id="product-grade-preview-deployments" />
+
+为一个 Pull Request、分支或临时来源创建独立的预览部署，并在不再需要时安全清理，不影响生产部署。
+
+## 适用场景
+
+- 团队希望每个 Pull Request 都能有一个可访问的预览地址供评审。
+- 需要在合并前验证一次变更的真实运行效果。
+
+## 前置条件
+
+- 已经完成一次[第一次部署](/docs/start/first-deployment/)，Resource 的 Source/Runtime/Network Profile 已经可用。
+- 已经完成 [GitHub 与集成](/docs/deliver/integrations/)中的仓库授权（如果预览来自 GitHub Pull Request）。
+
+## 输入与默认值
+
+| 输入 | 说明 |
+| --- | --- |
+| `--preview` | 预览类型，例如 `pull-request` |
+| `--preview-id` | 预览的稳定标识，例如 `pr-123`，同一个 PR 应该始终使用同一个 id |
+| `--preview-domain-template` | 可选，预览访问域名模板 |
+| `--require-preview-url` | 可选，要求 Appaloft 必须能给出可访问的预览地址，否则让命令失败 |
+
+## CLI 操作步骤 <a id="deployment-pr-preview-action-workflow" />
+
+在 GitHub Actions workflow（或任何 CI）中，针对 Pull Request 事件触发预览部署：
+
+```bash
+appaloft deploy . \
+  --config appaloft.preview.yml \
+  --preview pull-request \
+  --preview-id "pr-${PR_NUMBER}" \
+  --preview-domain-template "pr-${PR_NUMBER}.preview.example.com" \
+  --require-preview-url
+```
+
+Pull Request 关闭时运行清理（推荐配一个单独的 `pull_request.closed` workflow）：
+
+```bash
+appaloft preview cleanup . \
+  --config appaloft.preview.yml \
+  --preview pull-request \
+  --preview-id "pr-${PR_NUMBER}"
+```
+
+## Web 操作步骤
+
+Resource 详情页的 Preview 区域会列出该资源当前的 Pull Request 预览、过期时间和清理状态；可以在这里手动触发清理，不需要等待 CI workflow。
+
+## 预期输出与状态
+
+预览地址可以来自自动生成的访问地址，也可以来自自定义预览域名模板（需要通配符 DNS 已经指向目标服务器）。使用 `--require-preview-url` 时，如果 Appaloft 暂时无法给出可公开访问的预览路由，命令会直接失败，而不是"看起来成功但打不开"。
+
+## 验证
+
+- 打开命令或 Web 界面返回的预览地址，确认应用可访问。
+- 确认预览环境使用了独立的域名/路由，没有覆盖生产环境的配置。
+
+## 回滚 / 恢复 <a id="deployment-preview-cleanup" />
+
+清理是**幂等**的：重复运行清理命令不会报错，也不会影响生产部署和普通部署历史。清理会停止预览专属的运行时、删除预览路由、解除预览来源绑定；不会触碰同一资源下的生产部署。
+
+## 故障排查链接
+
+- **没有预览地址**：确认生成访问地址是否就绪，或者预览域名的通配符 DNS 是否已生效，再决定是否应该用 `--require-preview-url` 直接暴露失败。
+- **清理没有效果**：确认清理命令使用了和创建预览时完全相同的 `--preview` 类型和 `--preview-id`。
+- **来自 Fork 的 Pull Request 被跳过**：这是刻意的默认安全行为——不应该把部署凭据暴露给不可信的 Fork Pull Request，除非你已经设计了降权凭据策略。
+
+## 相关参考页面
+
+- [部署生命周期](/docs/deliver/lifecycle/)
+- [回滚与恢复](/docs/deliver/recovery/)
+- [GitHub 与集成](/docs/deliver/integrations/)
+- [Agent 预览与提升](/docs/agents/preview-promote/)

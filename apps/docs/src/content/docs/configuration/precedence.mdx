@@ -1,0 +1,81 @@
+---
+title: "配置优先级"
+description: "多个配置来源之间的合并与覆盖顺序。"
+docType: "reference"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "env"
+  - "variables"
+  - "snapshot"
+  - "precedence"
+  - "环境变量"
+  - "优先级"
+relatedOperations:
+  - "environments.set-variable"
+  - "environments.effective-precedence"
+  - "resources.effective-config"
+sidebar:
+  order: 3
+---
+
+## 标识 <a id="environment-variable-precedence" />
+
+Appaloft 的配置合并顺序（从低到高）：`defaults -> system -> organization -> project -> environment -> resource -> deployment snapshot`。
+
+## 输入字段与校验
+
+| 规则 | 说明 |
+| --- | --- |
+| 越靠近具体部署，优先级越高 | 资源级变量 > 环境级变量 > 项目/系统默认值 |
+| 同名覆盖需要 `key + exposure` 都相同 | 只有作用域和暴露方式一致时才会互相覆盖 |
+| 部署创建时冻结快照 | 部署完成后再修改变量，不会改变那次已完成的部署 |
+
+### 构建时变量 vs 运行时变量
+
+| 类型 | 何时使用 | 能否标记为 Secret |
+| --- | --- | --- |
+| 构建时变量 | 前端构建、静态产物生成等 build 阶段 | **不可以**——会进入构建产物，可能暴露给浏览器 |
+| 运行时变量 | 应用启动和运行时读取 | 可以——读模型和日志必须屏蔽真实值 |
+
+如果一个变量会被浏览器看到（例如带 `PUBLIC_` 或 `VITE_` 前缀），就不应该标记或当作 Secret 使用；反过来，带 Secret 特征名称（如 `*_TOKEN`、`*_PASSWORD`）的构建时变量会被直接拒绝，而不是被静默降级。
+
+## 输出字段与状态值
+
+- `environments.effective-precedence`：查看某个环境在资源覆盖之前会贡献的有效变量。
+- `resources.effective-config`：查看资源级变量覆盖环境级变量之后，最终会进入部署的配置视图，并附带安全的来源/覆盖摘要。
+
+## 命令 / 接口示例
+
+```bash
+# 设置环境级变量
+appaloft env set-variable env_prod APP_URL "https://app.example.com"
+
+# 设置资源级覆盖（优先级高于同名环境变量）
+appaloft resource set-variable res_web LOG_LEVEL debug
+
+# 查看某环境的有效变量
+appaloft env effective-precedence env_prod
+
+# 查看某资源最终会进入部署的配置视图
+appaloft resource effective-config res_web
+
+# 从粘贴的 .env 内容批量导入（重复 key 以最后一行为准）
+appaloft resource import-variables res_web --file .env.production
+```
+
+## 错误码与恢复提示
+
+如果部署没有读到预期的新变量：
+
+1. 确认变量设置在正确的环境或资源上，而不是设在了另一个同名环境。
+2. 确认这个变量应该是构建时还是运行时变量。
+3. 如果目标是**运行中的实例**，必须触发一次新部署才能读取新的部署快照——修改变量本身不会热更新正在运行的进程。
+4. 如果是**构建时**变量，需要重新构建并部署，才能让新值进入产物。
+
+## 相关任务
+
+- [安全处理密钥](/docs/configuration/secrets/)
+- [配置差异与提升](/docs/configuration/diff-promote/)
+- [配置文件参考](/docs/configuration/config-file/)

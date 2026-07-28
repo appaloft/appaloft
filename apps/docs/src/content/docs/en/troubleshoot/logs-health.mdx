@@ -1,0 +1,88 @@
+---
+title: "Viewing Logs and Health Summaries"
+description: "Reading runtime logs and interpreting health summaries."
+docType: "task"
+---
+
+## Goal
+
+Read an app's runtime logs, and use the health summary to understand the combined status of deployment, runtime, proxy, and access URL in one call.
+
+## When to use this task
+
+- The app failed to start or is behaving unexpectedly, and you need to see what it printed itself.
+- You need to decide "should I retry, fix configuration, or roll back next."
+
+## Prerequisites
+
+- At least one deployment attempt exists (successful or failed).
+
+## Inputs and defaults
+
+| Input | Description | Default |
+| --- | --- | --- |
+| `--tail` | Only show the last N log lines | All (explicitly specifying is recommended to avoid excessively long output) |
+| `--checks` | Include detailed check items with the health check | Off |
+| `--public-access-probe` | Include a public access probe with the health check | Off |
+
+## CLI steps
+
+<a id="observe-runtime-logs" />
+
+<a id="observe-health-summary" />
+
+```bash
+# Read the last 100 lines of runtime logs
+appaloft resource logs res_web --tail 100
+
+# Read the health summary, with detailed check items and a public access probe
+appaloft resource health res_web --checks --public-access-probe
+```
+
+## HTTP/API steps
+
+```http
+GET /api/resources/res_web/runtime-logs?tailLines=100
+GET /api/resources/res_web/health?checks=true&publicAccessProbe=true
+```
+
+## Expected output and status
+
+**Runtime logs** come from the app process's stdout/stderr, and are good for answering: did the app start, did the start command execute, is the listening port correct, are config/environment variables missing, did the app code throw a runtime exception. Logs are **not** good for judging domain ownership or certificate readiness — check the related [Access](/docs/en/access/overview/) status for those instead.
+
+**The health summary** merges the following into a single call: the most recent deployment status and failed phase, the runtime process state, the health check policy and most recent check result, the network profile and proxy target, generated access URL status, and a custom domain/TLS readiness summary.
+
+## Verification
+
+Match against this table to identify the root cause:
+
+| Symptom | Recovery direction |
+| --- | --- |
+| Logs show a port conflict | Fix the [Network Profile](/docs/en/deliver/profiles/) or the start command |
+| Logs show a missing environment variable | Fix the variable set under [Configuration Precedence](/docs/en/configuration/precedence/), then redeploy |
+| Health check times out | Adjust the health check path, timeout, retry count, or startup grace period |
+| App healthy but the generated access URL fails | Check [Proxy Readiness](/docs/en/servers/proxy-and-terminal/) and [Access](/docs/en/access/overview/) status |
+
+## Rollback / recovery <a id="resource-runtime-controls" /><a id="runtime-restart-vs-redeploy" /><a id="runtime-control-blocked-start" />
+
+If you just want to restart the current runtime (this **won't** rebuild, and **won't** refresh config/secrets/dependency bindings), use runtime control:
+
+```bash
+appaloft resource runtime restart res_web
+```
+
+**Restart is not the same as Redeploy** — if you've changed source code, environment variables, secrets, the Runtime/Network/Health Profile, storage mounts, or dependency bindings, you must use Redeploy, Retry, or Rollback (see [Rollback And Recovery](/docs/en/deliver/recovery/)); Restart doesn't apply those changes.
+
+If Start is blocked (for example runtime metadata is missing or stale, the resource is archived, or a concurrent deployment exists), the health summary gives the blocking reason; in that case switch to Redeploy so the latest configuration forms a new deployment, instead of repeatedly retrying Start.
+
+## Troubleshooting links
+
+- [Common Failures And Recovery](/docs/en/troubleshoot/recovery/)
+- [Generating A Safe Diagnostic Summary](/docs/en/troubleshoot/diagnostics/)
+
+## Related reference pages
+
+- [Status And Events](/docs/en/troubleshoot/status-events/)
+- [Runtime / Health / Network Profiles](/docs/en/deliver/profiles/)
+
+If an AI agent is doing follow-up checks after completing a deployment, prefer returning `appaloft deployments timeline <deploymentId>`, `appaloft resource diagnose <resourceId>`, and `appaloft deployments recovery-readiness <deploymentId>` in that order, rather than sending the user to dig through raw logs on the server themselves.

@@ -1,0 +1,121 @@
+---
+title: "运行时 / 健康 / 网络 Profile"
+description: "运行时、健康检查与网络 Profile 的字段与默认值。"
+docType: "reference"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "runtime profile"
+  - "health check"
+  - "network profile"
+  - "start command"
+  - "运行时"
+  - "健康检查"
+relatedOperations:
+  - "resources.configure-runtime"
+  - "resources.configure-health"
+  - "resources.configure-network"
+sidebar:
+  order: 8
+---
+<a id="resource-source-profile" />
+
+
+## 标识
+
+一个 Resource 拥有三类持久化 Profile：Runtime Profile、Health Profile、Network Profile。它们都属于 Resource 本身，不是某一次部署的临时参数——保存 Profile 不会立即重启运行中的工作负载，只影响后续部署使用的规划输入。
+
+## Runtime Profile <a id="resource-runtime-profile" />
+
+描述如何构建和启动应用。
+
+| 字段 | 说明 | 默认值 |
+| --- | --- | --- |
+| `strategy` | `auto` / `static` / Docker/OCI 等运行策略 | 尝试自动检测 |
+| Install / Build 命令 | 依赖安装与构建命令 | 由检测结果推导，或需显式提供 |
+| Start 命令 / 镜像入口 | 启动进程或容器入口 | 由检测结果推导，或需显式提供 |
+| Publish directory | 静态站点发布目录 | 无默认值，静态策略下必填 |
+
+```bash
+appaloft resource configure-runtime res_web \
+  --strategy static \
+  --build-command "bun run build" \
+  --publish-directory dist
+```
+
+## Health Profile <a id="resource-health-profile" />
+
+决定 Verify 阶段如何判断应用是否可用，应该和真实访问路径保持一致，而不只是检查进程是否存在。
+
+| 字段 | 说明 | 默认值 |
+| --- | --- | --- |
+| 检查类型 | 目前主要为 HTTP | 未配置时退回较弱的进程存活判断 |
+| 路径 | 例如 `/health` | 无默认值 |
+| 期望状态码 | 例如 `200` | `200` |
+| interval / timeout / retries / start period | 检查频率与容忍窗口 | 见下方示例默认值 |
+
+```bash
+appaloft resource configure-health res_web \
+  --path /health \
+  --method GET \
+  --expected-status 200 \
+  --interval 5 \
+  --timeout 5 \
+  --retries 10 \
+  --start-period 15
+
+# 重置为无自定义健康策略（不影响运行时命令或网络配置）
+appaloft resource reset-health res_web
+```
+
+## Network Profile <a id="resource-network-profile" />
+
+描述应用监听端口、协议和代理目标——回答"代理应该把请求转发到哪里"。绑定自定义域名是独立的[访问](/docs/access/overview/)配置，不属于这里。
+
+| 字段 | 说明 | 默认值 |
+| --- | --- | --- |
+| 内部监听端口 | 应用容器内实际监听的端口 | 静态部署固定为 `80`；SSR/HTTP 服务需显式配置 |
+| 协议 | 目前主要为 HTTP | `http` |
+| 暴露方式 | 是否需要反向代理对外 | `reverse-proxy` |
+
+```bash
+appaloft resource configure-network res_web \
+  --internal-port 3000 \
+  --upstream-protocol http \
+  --exposure-mode reverse-proxy
+```
+
+## 错误与恢复提示：Profile 漂移 <a id="resource-profile-drift" />
+
+Profile drift 表示 Resource 当前保存的 Profile、仓库配置文件中的 Profile，或最近一次部署快照中的 Profile 三者不一致，通常发生在资源已存在后，又从仓库配置、GitHub Action、CLI 参数或 Web 控制台单独修改了某一部分。
+
+排查步骤：
+
+1. `appaloft resource show res_web --json` 查看结构化 diagnostics，确认哪个 section（source / runtime / network / health / access）不一致。
+2. 按 diagnostics 指向运行对应的 `configure-source` / `configure-runtime` / `configure-network` / `configure-health` 命令。
+3. 更新后重新触发部署——历史部署快照不会被追溯修改。
+
+Secret 和配置值在 diagnostics、日志中始终保持屏蔽；排查时只依赖 key、scope 和建议命令，不要试图还原明文。
+
+## 示例
+
+完整的健康检查配置返回示例：
+
+```json title="GET /api/resources/res_web/health-profile"
+{
+  "type": "http",
+  "path": "/health",
+  "expectedStatus": 200,
+  "intervalSeconds": 5,
+  "timeoutSeconds": 5,
+  "retries": 10,
+  "startPeriodSeconds": 15
+}
+```
+
+## 相关任务
+
+- [配置部署来源](/docs/deliver/sources/)
+- [生成的访问地址](/docs/access/generated-routes/)
+- [查看日志与健康摘要](/docs/troubleshoot/logs-health/)
