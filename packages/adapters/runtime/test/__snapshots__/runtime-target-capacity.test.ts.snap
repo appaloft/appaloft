@@ -11,7 +11,7 @@ if command -v docker >/dev/null 2>&1; then
   APPALOFT_DOCKER_AVAILABLE=1
   docker ps -aq --filter label=appaloft.managed=true 2>/dev/null | while read -r container_id; do
     [ -n "$container_id" ] || continue
-    docker inspect --size --format 'CAPACITY_APPALOFT_CONTAINER\\t{{.Id}}\\t{{.Name}}\\t{{.State.Running}}\\t{{.State.Status}}\\t{{.SizeRw}}\\t{{ index .Config.Labels "appaloft.deployment-id" }}\\t{{ index .Config.Labels "appaloft.project-id" }}\\t{{ index .Config.Labels "appaloft.environment-id" }}\\t{{ index .Config.Labels "appaloft.resource-id" }}\\t{{ index .Config.Labels "appaloft.server-id" }}\\t{{ index .Config.Labels "appaloft.destination-id" }}\\t{{ index .Config.Labels "appaloft.artifact-kind" }}' "$container_id" 2>/dev/null
+    docker inspect --size --format 'CAPACITY_APPALOFT_CONTAINER	{{.Id}}	{{.Name}}	{{.State.Running}}	{{.State.Status}}	{{.SizeRw}}	{{ index .Config.Labels "appaloft.deployment-id" }}	{{ index .Config.Labels "appaloft.project-id" }}	{{ index .Config.Labels "appaloft.environment-id" }}	{{ index .Config.Labels "appaloft.resource-id" }}	{{ index .Config.Labels "appaloft.server-id" }}	{{ index .Config.Labels "appaloft.destination-id" }}	{{ index .Config.Labels "appaloft.artifact-kind" }}' "$container_id" 2>/dev/null
   done
 else
   APPALOFT_DOCKER_AVAILABLE=0
@@ -98,7 +98,7 @@ if command -v docker >/dev/null 2>&1; then
   APPALOFT_DOCKER_AVAILABLE=1
   docker ps -aq --filter label=appaloft.managed=true 2>/dev/null | while read -r container_id; do
     [ -n "$container_id" ] || continue
-    docker inspect --size --format 'CAPACITY_APPALOFT_CONTAINER\\t{{.Id}}\\t{{.Name}}\\t{{.State.Running}}\\t{{.State.Status}}\\t{{.SizeRw}}\\t{{ index .Config.Labels "appaloft.deployment-id" }}\\t{{ index .Config.Labels "appaloft.project-id" }}\\t{{ index .Config.Labels "appaloft.environment-id" }}\\t{{ index .Config.Labels "appaloft.resource-id" }}\\t{{ index .Config.Labels "appaloft.server-id" }}\\t{{ index .Config.Labels "appaloft.destination-id" }}\\t{{ index .Config.Labels "appaloft.artifact-kind" }}' "$container_id" 2>/dev/null
+    docker inspect --size --format 'CAPACITY_APPALOFT_CONTAINER	{{.Id}}	{{.Name}}	{{.State.Running}}	{{.State.Status}}	{{.SizeRw}}	{{ index .Config.Labels "appaloft.deployment-id" }}	{{ index .Config.Labels "appaloft.project-id" }}	{{ index .Config.Labels "appaloft.environment-id" }}	{{ index .Config.Labels "appaloft.resource-id" }}	{{ index .Config.Labels "appaloft.server-id" }}	{{ index .Config.Labels "appaloft.destination-id" }}	{{ index .Config.Labels "appaloft.artifact-kind" }}' "$container_id" 2>/dev/null
   done
 else
   APPALOFT_DOCKER_AVAILABLE=0

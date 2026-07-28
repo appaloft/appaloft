@@ -245,11 +245,20 @@ export function dockerRemoveResourceContainersCommand(input: {
   return input.deploymentIds
     .map((deploymentId) => {
       const deploymentLabelFilter = input.quote(`label=appaloft.deployment-id=${deploymentId}`);
+      const listExactContainers = `docker ps -aq --filter ${resourceLabelFilter} --filter ${deploymentLabelFilter}`;
       return [
-        `docker ps -aq --filter ${resourceLabelFilter} --filter ${deploymentLabelFilter}`,
-        "| while read -r container_id; do",
-        'docker rm -f "$container_id";',
-        "done",
+        "appaloft_cleanup_attempt=1;",
+        'while [ "$appaloft_cleanup_attempt" -le 3 ]; do',
+        `appaloft_cleanup_remaining="$(${listExactContainers})" || exit 1;`,
+        '[ -z "$appaloft_cleanup_remaining" ] && break;',
+        'printf \'%s\\n\' "$appaloft_cleanup_remaining" | while read -r container_id; do',
+        'docker rm -f "$container_id" || exit 1;',
+        "done || exit 1;",
+        "appaloft_cleanup_attempt=$((appaloft_cleanup_attempt + 1));",
+        'if [ "$appaloft_cleanup_attempt" -le 3 ]; then sleep 1; fi;',
+        "done;",
+        `appaloft_cleanup_remaining="$(${listExactContainers})" || exit 1;`,
+        '[ -z "$appaloft_cleanup_remaining" ]',
       ].join(" ");
     })
     .join(" && ");

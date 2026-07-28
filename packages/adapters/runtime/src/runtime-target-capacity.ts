@@ -100,7 +100,7 @@ export function renderRuntimeTargetCapacityScript(input: {
     '{{ index .Config.Labels "appaloft.server-id" }}',
     '{{ index .Config.Labels "appaloft.destination-id" }}',
     '{{ index .Config.Labels "appaloft.artifact-kind" }}',
-  ].join("\\t");
+  ].join("\t");
   const sizeBytesOrEmpty = ash.raw("${size_bytes:-}");
   const coresOrEmpty = ash.raw("${cores:-}");
 
@@ -275,6 +275,17 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
       [ -n "$candidate_time" ] || return 1
       [ "$candidate_time" \< "$APPALOFT_PRUNE_BEFORE" ]
     }
+    remove_exact_container() {
+      exact_container_id="$1"
+      cleanup_attempt=1
+      while [ "$cleanup_attempt" -le 3 ]; do
+        docker inspect "$exact_container_id" >/dev/null 2>&1 || return 0
+        docker rm -f "$exact_container_id" >/dev/null 2>&1
+        cleanup_attempt=$((cleanup_attempt + 1))
+        if [ "$cleanup_attempt" -le 3 ]; then sleep 1; fi
+      done
+      ! docker inspect "$exact_container_id" >/dev/null 2>&1
+    }
     emit_candidate() {
       category="$1"; id="$2"; target="$3"; updated_at="$4"; size_bytes="$5"; action="$6"; reason="$7"
       matches_prune_target "$id" "$target" || return 0
@@ -319,9 +330,7 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
                 if [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
                   emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" matched ""
                 else
-                  docker stop "$cid" >/dev/null 2>&1
-                  docker rm "$cid" >/dev/null 2>&1
-                  if [ "$?" = "0" ]; then emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" pruned ""; else emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped safety-evidence-missing; fi
+                  if remove_exact_container "$cid"; then emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" pruned ""; else emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped exact-readback-failed; fi
                 fi
               else
                 emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped active-runtime
@@ -332,8 +341,7 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
                 if [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
                   emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" matched ""
                 else
-                  docker rm "$cid" >/dev/null 2>&1
-                  if [ "$?" = "0" ]; then emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" pruned ""; else emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped safety-evidence-missing; fi
+                  if remove_exact_container "$cid"; then emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" pruned ""; else emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped exact-readback-failed; fi
                 fi
               else
                 emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped cutoff-not-reached

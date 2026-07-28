@@ -50,7 +50,7 @@ describe("docker container command helpers", () => {
     expect(dockerPublishedPortFlag({ containerPort: 3000 })).toBe("-p 127.0.0.1::3000");
   });
 
-  test("scopes cleanup to containers for the same resource", () => {
+  test("[DEP-RUNTIME-002][DEP-RUNTIME-004][DEP-RUNTIME-010] scopes, retries, and reads back cleanup", () => {
     const command = dockerRemoveResourceContainersCommand({
       resourceId: "res_first",
       deploymentIds: ["dep_previous"],
@@ -59,7 +59,12 @@ describe("docker container command helpers", () => {
 
     expect(command).toContain("--filter 'label=appaloft.resource-id=res_first'");
     expect(command).toContain("--filter 'label=appaloft.deployment-id=dep_previous'");
+    expect(command).toContain('while [ "$appaloft_cleanup_attempt" -le 3 ]');
+    expect(command.match(/docker ps -aq/g)).toHaveLength(2);
+    expect(command).toContain('[ -z "$appaloft_cleanup_remaining" ]');
     expect(command).not.toContain("publish=3000");
+    expect(command).not.toContain("docker system prune");
+    expect(command).not.toContain("docker volume prune");
   });
 
   test("[DEP-CREATE-ASYNC-009A] scopes Compose verification to the deployment target service", () => {

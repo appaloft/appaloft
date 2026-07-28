@@ -4334,27 +4334,47 @@ export class SshExecutionBackend implements ExecutionBackend {
       deploymentId: state.id.value,
       metadata: state.runtimePlan.execution.metadata,
     });
-    const containerName = metadata.containerName ?? runtimeInstanceNames.containerName;
     const remoteRoot = this.remoteRuntimeDirectory(state.id.value);
     const remoteWorkdir = metadata.remoteWorkdir ?? remoteSourceWorkdir(remoteRoot, state.runtimePlan.source.metadata);
     const timeline: DeploymentTimelineJournalEntry[] = [];
 
     try {
-      if (state.runtimePlan.execution.kind === "docker-container") {
-        await this.runRemoteCommand({
-          target,
-          command: `docker rm -f ${ash.quote(containerName)} >/dev/null 2>&1 || true`,
-          cwd: runtimeDir,
-          env,
-          redactions,
-        });
-      } else if (state.runtimePlan.execution.kind === "docker-compose-stack") {
+      const containerCleanup = await this.runRemoteCommand({
+        target,
+        command: dockerRemoveResourceContainersCommand({
+          resourceId: state.resourceId.value,
+          deploymentIds: [state.id.value],
+          quote: ash.quote,
+        }),
+        cwd: runtimeDir,
+        env,
+        redactions,
+      });
+      if (containerCleanup.failed) {
+        return err(
+          domainError.provider(
+            "Deployment runtime cleanup did not converge",
+            {
+              phase: "runtime-cleanup",
+              cleanupStage: "container-cleanup",
+              deploymentId: state.id.value,
+              resourceId: state.resourceId.value,
+            },
+            true,
+          ),
+        );
+      }
+      timeline.push(
+        phaseLog("deploy", `Verified deployment containers absent for ${state.id.value}`),
+      );
+
+      if (state.runtimePlan.execution.kind === "docker-compose-stack") {
         const composeFile = metadata.composeFile ?? state.runtimePlan.execution.composeFile;
         if (composeFile) {
           const remoteComposeFile = composeFile.startsWith("/")
             ? composeFile
             : `${remoteWorkdir}/${composeFile}`;
-          await this.runRemoteCommand({
+          const composeCleanup = await this.runRemoteCommand({
             target,
             command: withOptionalRemoteRuntimeEnvironmentFile({
               envFile: `${remoteWorkdir}/.appaloft/runtime.env`,
@@ -4366,6 +4386,26 @@ export class SshExecutionBackend implements ExecutionBackend {
             env,
             redactions,
           });
+          if (composeCleanup.failed) {
+            return err(
+              domainError.provider(
+                "Deployment Compose project cleanup did not converge",
+                {
+                  phase: "runtime-cleanup",
+                  cleanupStage: "compose-project-cleanup",
+                  deploymentId: state.id.value,
+                  resourceId: state.resourceId.value,
+                },
+                true,
+              ),
+            );
+          }
+          timeline.push(
+            phaseLog(
+              "deploy",
+              `Verified Compose project cleanup for ${runtimeInstanceNames.composeProjectName}`,
+            ),
+          );
         }
       }
       const artifactCleanup = createPreviewRuntimeArtifactCleanupPlan({
@@ -4450,7 +4490,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       phaseLog(
         "deploy",
         state.runtimePlan.execution.kind === "docker-container"
-          ? `Removed SSH container ${containerName}`
+          ? `Verified SSH deployment containers absent for ${state.id.value}`
           : state.runtimePlan.execution.kind === "docker-compose-stack" && composeFile
             ? `Stopped SSH compose stack ${composeFile}`
             : "No SSH cancellation cleanup required",

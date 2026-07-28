@@ -239,6 +239,9 @@ Runtime monitoring operations:
 - `servers.capacity.prune` is a runtime target maintenance mutation. It dry-runs by default,
   requires a cutoff, and may delete only safe target-owned stopped containers or materialized
   workspace candidates whose ownership, age, active-runtime, and rollback-safety evidence passes.
+  Historical succeeded runtimes are active only while their Resource still exists in active desired
+  state; missing or archived Resources release that current-runtime-owner protection while
+  in-flight attempts and explicit rollback candidates remain fenced.
   Docker build-cache, unused-image, and remote-state marker pruning require explicit category
   opt-in; Docker categories use filtered Docker prune commands, while remote-state marker cleanup is
   limited to old journals, backup archives, recovery markers, and recovered-lock archives under

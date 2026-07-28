@@ -281,8 +281,10 @@ describe("runtime target capacity prune adapter", () => {
     expect(rendered).toContain("ownership-unproven");
     expect(rendered).toContain("protected_deployment_reason");
     expect(rendered.indexOf("protected_deployment_reason \"$cdeployment\"")).toBeLessThan(
-      rendered.indexOf('docker rm "$cid"'),
+      rendered.indexOf('if remove_exact_container "$cid"'),
     );
+    expect(rendered).toContain('docker rm -f "$exact_container_id"');
+    expect(rendered).toContain("exact-readback-failed");
   });
 
   test("[RT-CAP-PRUNE-010] rendered prune script keeps remote-state marker cleanup opt-in and state-root preserving", () => {
