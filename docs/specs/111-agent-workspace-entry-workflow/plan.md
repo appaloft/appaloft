@@ -13,7 +13,10 @@
 - Extend the harness-neutral Runtime port with optional prepare/terminate lifecycle hooks.
 - Add a public OpenCode runtime adapter that starts `opencode serve` only inside the Sandbox
   provider's private network namespace without publishing a host port, persists its process marker
-  below `/workspace`, and executes managed Runs through `opencode run --attach`.
+  below `/workspace`, and keeps native TUI attach separate from managed headless Runs. Each
+  headless Run receives a run-scoped model capability through stdin/process environment, executes
+  non-attached `opencode run --format json`, and revokes that exact capability on every terminal
+  path. This avoids treating native attach stdout as a durable event stream.
 - Add Public CLI and SDK convenience composition. Do not add a parallel operation family.
 - Add optional safe HTTPS Git materialization before Runtime creation and return partial-creation
   evidence. Docker providers use a provider egress policy adapter on the internal network instead
@@ -34,8 +37,8 @@
 ## Testing Strategy
 
 - Matrix ids: `AGENT-WS-*` and `AGENT-OPENCODE-*`.
-- Adapter contract covers version admission, server lifecycle, JSON event translation,
-  continuation and cancellation.
+- Adapter contract covers version admission, native server lifecycle, independently scoped
+  headless JSON event translation, continuation, cancellation and exact capability revocation.
 - CLI captures the exact canonical command/query messages dispatched by the workflow.
 - SDK tests verify request sequence, parent-id propagation and partial-create recovery evidence.
 - Existing Sandbox, Agent Runtime and Terminal matrices continue to prove lifecycle/isolation.

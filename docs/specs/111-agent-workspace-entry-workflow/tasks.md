@@ -3,6 +3,7 @@
 ## Test-First
 
 - [x] `AGENT-OPENCODE-011`: add OpenCode adapter contract tests.
+- [x] Public #838 separates native attach from run-scoped headless JSON execution and revocation.
 - [x] `AGENT-WS-CLI-012`: add public Workspace CLI composition tests.
 - [x] `AGENT-WS-SDK-013`: add public Workspace SDK composition tests.
 - [x] `AGENT-WS-SOURCE-014`: add repository materialization and partial-failure tests.
