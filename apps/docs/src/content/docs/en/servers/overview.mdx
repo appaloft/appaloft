@@ -1,12 +1,26 @@
 ---
 title: "Servers Overview"
-description: "How deployment target registration, credentials, and connectivity checks fit together."
+description: "How deployment target registration, workload roles, credentials, and connectivity checks fit together."
 docType: "concept"
+localeState:
+  zh-CN: complete
+  en-US: complete
+searchAliases:
+  - "server"
+  - "ssh"
+  - "credential"
+  - "deployment target"
+  - "workload role"
+  - "general purpose server"
+relatedOperations:
+  - "servers.register"
+  - "servers.configure-workload-roles"
+  - "servers.test-connectivity"
 ---
 
 ## Short definition
 
-A Server is a target machine Appaloft can connect to, inspect, and deploy applications on. Appaloft is a BYOS (Bring Your Own Server) model — you register your own servers, and Appaloft handles connecting, orchestrating, and routing; it doesn't provide hosted compute.
+A Server is a target machine Appaloft can connect to, inspect, and deploy applications on. Appaloft is a BYOS (Bring Your Own Server) model — you register your own servers, and Appaloft handles connecting, orchestrating, and routing; it doesn't provide hosted compute. [Workload roles](/docs/en/servers/register-connect/#server-workload-roles) declare which categories of new workload the server is intended to accept. An empty role set is general-purpose for all workload types.
 
 ```mermaid
 flowchart LR
@@ -27,15 +41,16 @@ A single server can host multiple resources; whether a particular resource is ac
 
 ## Where you see it in Web, CLI, and API
 
-- **Web** — the Servers list shows host, connection status, and proxy readiness; the detail page can run connectivity tests, change the proxy type, deactivate, or delete.
-- **CLI** — `appaloft server register` / `test` / `show` / `rename` / `deactivate` / `delete`.
-- **HTTP/API** — `POST /api/servers`, `GET /api/servers/{id}` reuse the same fields.
+- **Web** — the Servers list shows workload roles, host, connection status, and proxy readiness; the detail page can replace roles, run connectivity tests, change the proxy type, deactivate, or delete.
+- **CLI** — `appaloft server register` / `configure-workload-roles` / `test` / `show` / `rename` / `deactivate` / `delete`.
+- **HTTP/API** — `POST /api/servers`, `POST /api/servers/{serverId}/workload-roles`, and `GET /api/servers/{id}` reuse the same fields and role semantics.
 
 ## Common mistakes
 
 - **Assuming servers are hosted by Appaloft**: by default a server is your own machine; the hosted form only exists in Appaloft Cloud's Sandbox scenario, see [Managed Sandbox](/docs/en/cloud/sandbox-managed/).
 - **Treating a connectivity test failure as a deployment failure**: a connectivity test failure only blocks **new** deployments that depend on that server — it doesn't affect workloads already running.
 - **Assuming deactivation stops existing running tasks**: deactivation only blocks the server from being chosen as a target for new deployments/scheduling/proxy configuration — it doesn't stop existing running tasks, and doesn't delete deployment history, domains, certificates, or credentials.
+- **Treating roles as capabilities or health**: roles are placement intent only. Lifecycle, connectivity, readiness, capacity, tenant, and provider checks remain independent.
 
 ## Related tasks
 

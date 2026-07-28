@@ -87,6 +87,7 @@ import {
   ConfigureScheduledTaskCommand,
   ConfigureServerCredentialCommand,
   ConfigureServerEdgeProxyCommand,
+  ConfigureServerWorkloadRolesCommand,
   ConfigureStorageVolumeBackupPolicyCommand,
   ConfirmActionPreviewRouteCommand,
   ConfirmDomainBindingOwnershipCommand,
@@ -164,6 +165,7 @@ import {
   configureScheduledTaskCommandInputSchema,
   configureServerCredentialCommandInputSchema,
   configureServerEdgeProxyCommandInputSchema,
+  configureServerWorkloadRolesCommandInputSchema,
   configureStorageVolumeBackupPolicyCommandInputSchema,
   confirmDomainBindingOwnershipCommandInputSchema,
   connectorCapabilityPlanInputSchema,
@@ -896,6 +898,7 @@ import {
   configureRuntimeMonitoringThresholdsResponseSchema,
   configureScheduledRuntimePrunePolicyResponseSchema,
   configureServerEdgeProxyResponseSchema,
+  configureServerWorkloadRolesResponseSchema,
   configureStorageVolumeBackupPolicyResponseSchema,
   confirmDomainBindingOwnershipResponseSchema,
   connectorCapabilityApplyResponseSchema,
@@ -4355,6 +4358,18 @@ export const configureServerEdgeProxyProcedure = base
   .output(configureServerEdgeProxyResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, ConfigureServerEdgeProxyCommand.create(input)),
+  );
+
+export const configureServerWorkloadRolesProcedure = base
+  .route({
+    method: "POST",
+    path: "/servers/{serverId}/workload-roles",
+    successStatus: 200,
+  })
+  .input(configureServerWorkloadRolesCommandInputSchema)
+  .output(configureServerWorkloadRolesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureServerWorkloadRolesCommand.create(input)),
   );
 
 export const deactivateServerProcedure = base
@@ -8524,6 +8539,7 @@ export const appaloftOrpcRouter = {
     rename: renameServerProcedure,
     reorder: reorderServersProcedure,
     configureEdgeProxy: configureServerEdgeProxyProcedure,
+    configureWorkloadRoles: configureServerWorkloadRolesProcedure,
     deactivate: deactivateServerProcedure,
     deleteCheck: checkServerDeleteSafetyProcedure,
     delete: deleteServerProcedure,
@@ -11376,6 +11392,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/servers/:serverId/rename",
     "/api/servers/reorder",
     "/api/servers/:serverId/edge-proxy/configuration",
+    "/api/servers/:serverId/workload-roles",
     "/api/servers/:serverId/deactivate",
     "/api/servers/:serverId/delete-check",
     "/api/servers/connectivity-tests",

@@ -51,6 +51,7 @@ import {
   DeploymentTargetName,
   DeploymentTargetUsername,
   DeploymentTargetVariant,
+  DeploymentTargetWorkloadRoles,
   DeploymentTimelineJournalEntry,
   type DeploymentTimelineJournalEntry as DeploymentTimelineJournalEntryType,
   type DeploymentTimelineJournalSource,
@@ -1146,6 +1147,9 @@ export function rehydrateDeploymentTarget(row: Selectable<Database["servers"]>) 
     providerKey: ProviderKey.rehydrate(row.provider_key),
     targetKind: TargetKindValue.rehydrate(
       row.target_kind as "single-server" | "orchestrator-cluster",
+    ),
+    workloadRoles: DeploymentTargetWorkloadRoles.rehydrate(
+      row.workload_roles as Parameters<typeof DeploymentTargetWorkloadRoles.rehydrate>[0],
     ),
     lifecycleStatus: DeploymentTargetLifecycleStatusValue.rehydrate(
       row.lifecycle_status as "active" | "inactive" | "deleted",

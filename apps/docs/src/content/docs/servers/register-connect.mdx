@@ -1,10 +1,10 @@
 ---
 title: "注册并连接服务器"
-description: "注册新服务器并完成首次连接性测试。"
+description: "注册服务器、分类新工作负载放置，并完成首次连接性测试。"
 docType: "task"
 localeState:
   zh-CN: complete
-  en-US: needs-update
+  en-US: complete
 searchAliases:
   - "server"
   - "connectivity"
@@ -12,8 +12,11 @@ searchAliases:
   - "docker swarm"
   - "服务器"
   - "连接测试"
+  - "工作负载角色"
+  - "通用服务器"
 relatedOperations:
   - "servers.register"
+  - "servers.configure-workload-roles"
   - "servers.test-connectivity"
   - "servers.rename"
   - "servers.deactivate"
@@ -48,14 +51,53 @@ sidebar:
 | `user` | 用于连接的系统用户 | 无，必填 |
 | 凭据 | SSH key 路径 / 已保存凭据 / 一次性输入 | 无，必填 |
 | 显示名称 / 标签 | 帮助你在列表中区分服务器 | 可选 |
+| 工作负载角色 | 新工作负载类别的放置意图 | 空集合：通用，可接收所有工作负载类型 |
 
 服务器注册输入里**不应该**出现资源、环境或域名相关字段——那些是独立的配置层。
+
+## 工作负载角色 <a id="server-workload-roles" />
+
+工作负载角色声明服务器打算接收哪些类别的**新工作负载**。它表达放置意图，不证明服务器健康、就绪或具备技术能力。可以组合选择以下规范值：
+
+- `deployment-runtime`：可以接收新的应用运行时放置。
+- `artifact-builder`：记录将来在受治理的 builder 放置路径存在时接收构件构建执行的意图。它不表示当前已提供或已准备好远程构建执行。
+- `sandbox-worker`：可以接收新的 Sandbox 放置，但隔离和 provider 能力检查仍须独立通过。
+
+不声明任何角色表示 **General purpose (all workload types)**（通用，可接收所有工作负载类型）。API 和结构化 CLI 输出将此状态保留为 `workloadRoles: []`；list/show 输出不会隐藏空数组，也不会把它解释为没有能力。
+
+角色变更只影响新的放置。它不会 drain、停止、移动、取消或重新解释当前工作负载和历史放置记录。生命周期、连接、就绪、容量、tenant 和 provider 检查仍须独立通过。未知或重复角色会被拒绝。
+
+注册分类服务器时，可重复传入 `--workload-role`：
+
+```bash
+appaloft server register \
+  --name primary \
+  --host 203.0.113.10 \
+  --workload-role deployment-runtime \
+  --workload-role artifact-builder
+```
+
+注册后，使用专用命令完整替换角色集合：
+
+```bash
+appaloft server configure-workload-roles srv_primary \
+  --workload-role deployment-runtime \
+  --workload-role sandbox-worker
+```
+
+不传任何角色选项可恢复通用放置：
+
+```bash
+appaloft server configure-workload-roles srv_primary
+```
+
+注册或配置后，可用 `appaloft server list` 或 `appaloft server show <serverId>` 读取规范化角色数组。如果新部署因为所选服务器不允许 `deployment-runtime` 而失败，可以改选合适的服务器、为目标配置该角色，或恢复为空集合的通用服务器。修改角色不会修复运行时就绪状态，也不会增加远程构建或 Sandbox 能力。
 
 ## Web 操作步骤
 
 1. 进入 **Servers**，点击 **Register server**。
-2. 填写 host、port、user 和 SSH 凭据（可以粘贴私钥内容，或选择已保存的凭据）。
-3. 提交后 Appaloft 会立即运行连接测试，并展示结果。
+2. 填写 host、port、user、SSH 凭据和可选工作负载角色。
+3. 提交后，检查规范化角色集合和连接测试结果。
 
 ## CLI 操作步骤
 
@@ -87,6 +129,16 @@ appaloft server show srv_primary
 appaloft server rename srv_primary --name "Primary SSH server"
 ```
 
+```bash
+# 完整替换工作负载角色集合
+appaloft server configure-workload-roles srv_primary \
+  --workload-role deployment-runtime \
+  --workload-role sandbox-worker
+
+# 恢复通用放置
+appaloft server configure-workload-roles srv_primary
+```
+
 Docker Swarm 等集群目标需要显式声明形态：
 
 ```bash
@@ -104,7 +156,7 @@ appaloft server register \
 ## 验证
 
 - 命令或 Web 界面显示连接测试通过。
-- 运行 `appaloft server show srv_primary`，确认状态、Provider 和摘要信息符合预期。
+- 运行 `appaloft server show srv_primary`，确认状态、Provider 和 `workloadRoles` 符合预期。
 
 ## 回滚 / 恢复
 

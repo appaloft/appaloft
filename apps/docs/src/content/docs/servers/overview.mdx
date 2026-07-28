@@ -1,10 +1,10 @@
 ---
 title: "服务器总览"
-description: "部署目标机器的注册、凭据与连接性检查如何组合。"
+description: "部署目标机器的注册、工作负载角色、凭据与连接性检查如何组合。"
 docType: "concept"
 localeState:
   zh-CN: complete
-  en-US: needs-update
+  en-US: complete
 searchAliases:
   - "server"
   - "ssh"
@@ -12,8 +12,11 @@ searchAliases:
   - "deployment target"
   - "服务器"
   - "凭据"
+  - "工作负载角色"
+  - "通用服务器"
 relatedOperations:
   - "servers.register"
+  - "servers.configure-workload-roles"
   - "servers.test-connectivity"
 sidebar:
   order: 1
@@ -21,7 +24,7 @@ sidebar:
 
 ## 简要定义
 
-Server 是 Appaloft 可以连接、检查和部署应用的目标机器。Appaloft 是 BYOS（Bring Your Own Server）模型——你注册自己的服务器，Appaloft 负责连接、编排和路由，不提供托管计算资源。
+Server 是 Appaloft 可以连接、检查和部署应用的目标机器。Appaloft 是 BYOS（Bring Your Own Server）模型——你注册自己的服务器，Appaloft 负责连接、编排和路由，不提供托管计算资源。[工作负载角色](/docs/servers/register-connect/#server-workload-roles)声明服务器打算接收哪些类别的新工作负载；空角色集合表示通用服务器，可接收所有工作负载类型。
 
 ```mermaid
 flowchart LR
@@ -42,15 +45,16 @@ flowchart LR
 
 ## 在 Web / CLI / API 中的体现
 
-- **Web** — Servers 列表展示 host、连接状态和代理就绪状态；详情页可以运行连接测试、修改代理类型、停用或删除。
-- **CLI** — `appaloft server register` / `test` / `show` / `rename` / `deactivate` / `delete`。
-- **HTTP/API** — `POST /api/servers`、`GET /api/servers/{id}` 复用相同字段。
+- **Web** — Servers 列表展示工作负载角色、host、连接状态和代理就绪状态；详情页可以替换角色、运行连接测试、修改代理类型、停用或删除。
+- **CLI** — `appaloft server register` / `configure-workload-roles` / `test` / `show` / `rename` / `deactivate` / `delete`。
+- **HTTP/API** — `POST /api/servers`、`POST /api/servers/{serverId}/workload-roles`、`GET /api/servers/{id}` 复用相同字段和角色语义。
 
 ## 常见误区
 
 - **认为服务器由 Appaloft 托管**：默认情况下服务器是你自己的机器；托管形态只存在于 Appaloft Cloud 的 Sandbox 场景，见[托管 Sandbox](/docs/cloud/sandbox-managed/)。
 - **把连接测试失败当成部署失败**：连接测试只会阻止依赖该服务器的**新**部署，不影响已经在运行的工作负载。
 - **认为停用会停止已有运行任务**：停用只阻止服务器被选为新的部署/调度/代理配置目标，不会停止已有运行任务，也不会删除部署历史、域名、证书或凭据。
+- **把角色当作能力或健康证明**：角色只表达放置意图；生命周期、连接、就绪、容量、tenant 和 provider 检查仍须独立通过。
 
 ## 相关任务
 

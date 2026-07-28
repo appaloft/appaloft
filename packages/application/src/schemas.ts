@@ -272,6 +272,7 @@ export {
 } from "./operations/servers/configure-scheduled-runtime-prune-policy.command";
 export * from "./operations/servers/configure-server-credential.schema";
 export * from "./operations/servers/configure-server-edge-proxy.schema";
+export * from "./operations/servers/configure-server-workload-roles.schema";
 export * from "./operations/servers/count-servers.query";
 export * from "./operations/servers/create-ssh-credential.schema";
 export * from "./operations/servers/deactivate-server.schema";

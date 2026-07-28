@@ -1,7 +1,24 @@
 ---
 title: "Register and Connect a Server"
-description: "Registering a new server and completing the first connectivity test."
+description: "Register a server, classify new workload placement, and complete the first connectivity test."
 docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: complete
+searchAliases:
+  - "server"
+  - "connectivity"
+  - "ssh test"
+  - "workload role"
+  - "general purpose server"
+  - "docker swarm"
+relatedOperations:
+  - "servers.register"
+  - "servers.configure-workload-roles"
+  - "servers.test-connectivity"
+  - "servers.rename"
+  - "servers.deactivate"
+  - "servers.delete"
 ---
 
 <a id="docker-swarm-runtime-target" />
@@ -30,14 +47,53 @@ Register a Linux server you own as an Appaloft deployment target, and confirm Ap
 | `user` | The system user used to connect | None, required |
 | Credential | SSH key path / a saved credential / one-time input | None, required |
 | Display name / label | Helps you tell servers apart in the list | Optional |
+| Workload roles | Placement intent for new workload categories | Empty: general purpose for all workload types |
 
 Server registration input should **not** include resource, environment, or domain-related fields — those are independent configuration layers.
+
+## Workload roles <a id="server-workload-roles" />
+
+Workload roles declare which categories of **new** workload a server is intended to accept. They are placement intent, not proof that the server is healthy, ready, or technically capable. Choose any combination of these canonical values:
+
+- `deployment-runtime`: may accept new application runtime placement.
+- `artifact-builder`: records intent to accept artifact build execution when a governed builder-placement path exists. It does not mean remote build execution is currently available or ready.
+- `sandbox-worker`: may accept new Sandbox placement, but isolation and provider capability checks still apply independently.
+
+No roles means **General purpose (all workload types)**. API and structured CLI output preserve this as `workloadRoles: []`; list and show output do not hide the empty array or interpret it as incapable.
+
+Role changes affect new placement only. They do not drain, stop, move, cancel, or reinterpret existing workloads or historical placement records. Lifecycle, connectivity, readiness, capacity, tenant, and provider checks remain independent. Unknown or duplicate roles are rejected.
+
+Register a classified server with repeatable `--workload-role` options:
+
+```bash
+appaloft server register \
+  --name primary \
+  --host 203.0.113.10 \
+  --workload-role deployment-runtime \
+  --workload-role artifact-builder
+```
+
+Replace the complete role set after registration:
+
+```bash
+appaloft server configure-workload-roles srv_primary \
+  --workload-role deployment-runtime \
+  --workload-role sandbox-worker
+```
+
+Restore general-purpose placement by passing no role options:
+
+```bash
+appaloft server configure-workload-roles srv_primary
+```
+
+Use `appaloft server list` or `appaloft server show <serverId>` to read the normalized role array. If a deployment is rejected because the selected server does not allow `deployment-runtime`, select an eligible server, configure that role, or restore the empty general-purpose set. Changing roles does not repair runtime readiness or add remote build or Sandbox capability.
 
 ## Web steps
 
 1. Go to **Servers**, click **Register server**.
-2. Fill in the host, port, user, and SSH credential (you can paste the private key content, or choose a saved credential).
-3. After submitting, Appaloft immediately runs a connectivity test and shows the result.
+2. Fill in the host, port, user, SSH credential, and optional workload roles.
+3. Submit the form, then inspect the normalized role set and connectivity result.
 
 ## CLI steps
 
@@ -69,6 +125,16 @@ appaloft server show srv_primary
 appaloft server rename srv_primary --name "Primary SSH server"
 ```
 
+```bash
+# Replace the complete workload role set
+appaloft server configure-workload-roles srv_primary \
+  --workload-role deployment-runtime \
+  --workload-role sandbox-worker
+
+# Restore general-purpose placement
+appaloft server configure-workload-roles srv_primary
+```
+
 Cluster targets like Docker Swarm need to explicitly declare their shape:
 
 ```bash
@@ -86,7 +152,7 @@ The connectivity test checks: whether DNS/IP and the port are reachable, whether
 ## Verification
 
 - The command or Web UI shows the connectivity test passing.
-- Run `appaloft server show srv_primary` and confirm status, provider, and summary information match what you expect.
+- Run `appaloft server show srv_primary` and confirm status, provider, and `workloadRoles` match what you expect.
 
 ## Rollback / recovery
 

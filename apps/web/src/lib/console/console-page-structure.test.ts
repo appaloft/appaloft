@@ -2086,6 +2086,9 @@ describe("console page structure", () => {
     expect(serversDisplaySurface).toContain("data-server-list");
     expect(serversDisplaySurface).toContain("data-server-row");
     expect(serversDisplaySurface).toContain("data-server-row-lifecycle");
+    expect(serversDisplaySurface).toContain("data-server-row-workload-roles");
+    expect(serversDisplaySurface).toContain("server.workloadRoles");
+    expect(serversDisplaySurface).toContain("workloadRolesGeneralPurpose");
     expect(serverRowHeaderSource.indexOf("<h3")).toBeGreaterThanOrEqual(0);
     expect(serverRowHeaderSource.indexOf("data-server-row-lifecycle")).toBeGreaterThan(
       serverRowHeaderSource.indexOf("<h3"),
@@ -2191,6 +2194,9 @@ describe("console page structure", () => {
     expect(serverOverviewSource).toContain('serverTabHref("deployments")');
     expect(serverOverviewSource).toContain('href={serverTabHref("connectivity")}');
     expect(serverHeaderSource).toContain("</section>");
+    expect(serverHeaderSource).toContain("data-server-detail-workload-roles");
+    expect(serverHeaderSource).toContain("server.workloadRoles");
+    expect(serverHeaderSource).toContain("workloadRolesGeneralPurpose");
     expect(serverHeaderSource).not.toContain("<nav");
     expect(serverHeaderSource).not.toContain("console-detail-tabs");
     expect(serverHeaderSource).not.toContain("<Tabs.Content");
@@ -2240,6 +2246,17 @@ describe("console page structure", () => {
     expect(serverDetailPageSource).not.toContain(
       'class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,22rem)_auto]"',
     );
+  });
+
+  test("[SRV-ROLE-WEB-001] exposes normalized role readback and atomic replacement settings", () => {
+    expect(serverDetailPageSource).toContain("data-server-detail-workload-roles");
+    expect(serverDetailPageSource).toContain("data-server-workload-role-settings");
+    expect(serverDetailPageSource).toContain("data-server-workload-roles-dialog");
+    expect(serverDetailPageSource).toContain("openWorkloadRolesDialog");
+    expect(serverDetailPageSource).toContain("orpcClient.servers.configureWorkloadRoles");
+    expect(serverDetailPageSource).toContain("workloadRoles: serverWorkloadRoles");
+    expect(serverDetailPageSource).toContain("workloadRolesNewPlacementOnly");
+    expect(serverDetailPageSource).toContain("workloadRolesGeneralPurpose");
   });
 
   test("[SERVER-DETAIL-IA-002B] keeps settings display surfaces free of intent forms", () => {

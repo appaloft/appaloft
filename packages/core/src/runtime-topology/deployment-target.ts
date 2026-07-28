@@ -27,6 +27,10 @@ import {
   type SshPrivateKeyText,
   type SshPublicKeyText,
 } from "../shared/text-values";
+import {
+  DeploymentTargetWorkloadRoles,
+  type ServerWorkloadRoleValue,
+} from "./server-workload-role";
 
 const deploymentTargetDisplayOrderBrand: unique symbol = Symbol("DeploymentTargetDisplayOrder");
 export class DeploymentTargetDisplayOrder {
@@ -75,6 +79,7 @@ export interface DeploymentTargetState {
   port: PortNumber;
   providerKey: ProviderKey;
   targetKind: TargetKindValue;
+  workloadRoles: DeploymentTargetWorkloadRoles;
   lifecycleStatus: DeploymentTargetLifecycleStatusValue;
   deactivatedAt?: DeactivatedAt;
   deletedAt?: DeletedAt;
@@ -97,12 +102,22 @@ export type DeploymentTargetEdgeProxyRouteSelection =
 
 export type DeploymentTargetRehydrateState = Omit<
   DeploymentTargetState,
-  "deactivatedAt" | "deletedAt" | "deactivationReason" | "displayOrder" | "lifecycleStatus"
+  | "deactivatedAt"
+  | "deletedAt"
+  | "deactivationReason"
+  | "displayOrder"
+  | "lifecycleStatus"
+  | "workloadRoles"
 > &
   Partial<
     Pick<
       DeploymentTargetState,
-      "deactivatedAt" | "deletedAt" | "deactivationReason" | "displayOrder" | "lifecycleStatus"
+      | "deactivatedAt"
+      | "deletedAt"
+      | "deactivationReason"
+      | "displayOrder"
+      | "lifecycleStatus"
+      | "workloadRoles"
     >
   >;
 
@@ -122,6 +137,7 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
     port: PortNumber;
     providerKey: ProviderKey;
     targetKind?: TargetKindValue;
+    workloadRoles?: DeploymentTargetWorkloadRoles;
     edgeProxyKind?: EdgeProxyKindValue;
     createdAt: CreatedAt;
   }): Result<DeploymentTarget> {
@@ -133,6 +149,7 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
       port: input.port,
       providerKey: input.providerKey,
       targetKind: input.targetKind ?? TargetKindValue.rehydrate("single-server"),
+      workloadRoles: input.workloadRoles ?? DeploymentTargetWorkloadRoles.unrestricted(),
       lifecycleStatus: DeploymentTargetLifecycleStatusValue.active(),
       ...(edgeProxyKind
         ? {
@@ -149,6 +166,7 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
     deploymentTarget.recordDomainEvent("deployment_target.registered", input.createdAt, {
       providerKey: input.providerKey.value,
       targetKind: deploymentTarget.state.targetKind.value,
+      workloadRoles: deploymentTarget.state.workloadRoles.toJSON(),
     });
 
     return ok(deploymentTarget);
@@ -168,6 +186,22 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
     });
 
     return ok(undefined);
+  }
+
+  configureWorkloadRoles(input: {
+    workloadRoles: DeploymentTargetWorkloadRoles;
+    configuredAt: UpdatedAt;
+  }): Result<{ changed: boolean }> {
+    if (this.state.workloadRoles.equals(input.workloadRoles)) {
+      return ok({ changed: false });
+    }
+
+    this.state.workloadRoles = input.workloadRoles;
+    this.recordDomainEvent("deployment_target.workload_roles_configured", input.configuredAt, {
+      workloadRoles: input.workloadRoles.toJSON(),
+    });
+
+    return ok({ changed: true });
   }
 
   deactivate(input: {
@@ -332,7 +366,10 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
     return ok({ changed: true });
   }
 
-  ensureCanAcceptNewWork(commandName: string): Result<void> {
+  ensureCanAcceptNewWork(
+    commandName: string,
+    input?: { requiredRole?: ServerWorkloadRoleValue },
+  ): Result<void> {
     if (!this.state.lifecycleStatus.isActive()) {
       return err(
         domainError.serverInactive("Inactive servers cannot accept new work", {
@@ -342,6 +379,22 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
           lifecycleStatus: this.state.lifecycleStatus.value,
           ...(this.state.deactivatedAt ? { deactivatedAt: this.state.deactivatedAt.value } : {}),
         }),
+      );
+    }
+
+    const requiredRole = input?.requiredRole;
+    if (requiredRole && !this.state.workloadRoles.allows(requiredRole)) {
+      return err(
+        domainError.serverWorkloadRoleMismatch(
+          "Server is not intended for the required workload role",
+          {
+            commandName,
+            phase: "server-workload-role-guard",
+            serverId: this.state.id.value,
+            requiredRole: requiredRole.value,
+            workloadRoles: this.state.workloadRoles.toJSON(),
+          },
+        ),
       );
     }
 
@@ -490,6 +543,7 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
       ...state,
       lifecycleStatus: state.lifecycleStatus ?? DeploymentTargetLifecycleStatusValue.active(),
       displayOrder: state.displayOrder ?? DeploymentTargetDisplayOrder.rehydrate(0),
+      workloadRoles: state.workloadRoles ?? DeploymentTargetWorkloadRoles.unrestricted(),
     });
   }
 

@@ -294,6 +294,7 @@ export interface DeploymentServerDraft {
   host?: string;
   providerKey?: string;
   targetKind?: RegisterServerCommandInput["targetKind"];
+  workloadRoles?: RegisterServerCommandInput["workloadRoles"];
   port?: number;
   proxyKind?: RegisterServerCommandInput["proxyKind"];
   credential?: ConfigureServerCredentialCommandInput["credential"];
@@ -1649,8 +1650,7 @@ function runtimeMonitoringThresholdsMatchConfig(input: {
 }): boolean {
   const current = input.current;
   if (
-    !current ||
-    current.scope.kind !== "resource" ||
+    current?.scope.kind !== "resource" ||
     current.scope.resourceId !== input.resourceId ||
     current.enabled !== input.desired.enabled ||
     current.rules.length !== input.desired.rules.length
@@ -1674,8 +1674,7 @@ function previewPolicyMatchesConfig(input: {
 }): boolean {
   const current = input.current;
   if (
-    !current ||
-    current.source !== "configured" ||
+    current?.source !== "configured" ||
     current.scope.kind !== "resource" ||
     current.scope.projectId !== input.projectId ||
     current.scope.resourceId !== input.resourceId
@@ -3626,7 +3625,7 @@ function autoDeployPolicyMatchesConfig(
   if (!desired.enabled) {
     return !current || current.status === "disabled";
   }
-  if (!current || current.status !== "enabled" || !desired.refs) {
+  if (current?.status !== "enabled" || !desired.refs) {
     return false;
   }
 
@@ -4098,6 +4097,7 @@ function resolveServer(input: {
             host: host.trim(),
             providerKey: providerKey.trim(),
             targetKind: input.seed.server?.targetKind ?? "single-server",
+            workloadRoles: input.seed.server?.workloadRoles ?? [],
             port,
             proxyKind: input.seed.server?.proxyKind ?? "traefik",
           },

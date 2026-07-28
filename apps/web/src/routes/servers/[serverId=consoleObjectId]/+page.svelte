@@ -22,6 +22,7 @@
     XCircle,
   } from "@lucide/svelte";
   import type {
+    ConfigureServerWorkloadRolesInput,
     DeactivateServerInput,
     DeleteServerInput,
     InspectServerCapacityResponse,
@@ -71,7 +72,11 @@
     type RuntimeMonitoringTimeRangeId,
     runtimeUsageQueryOptions,
   } from "$lib/console/runtime-usage-query";
-  import { serverProviderDisplayLabel } from "$lib/console/server-registration";
+  import {
+    serverProviderDisplayLabel,
+    serverWorkloadRoleOptions,
+    type ServerWorkloadRole,
+  } from "$lib/console/server-registration";
   import {
     formatRuntimeUsageBytes,
     runtimeMonitoringDeploymentInObservationWindow,
@@ -272,6 +277,13 @@
   let serverFormServerId = $state("");
   let serverName = $state("");
   let serverRenameDialogOpen = $state(false);
+  let workloadRolesDialogOpen = $state(false);
+  let serverWorkloadRoles = $state<ServerWorkloadRole[]>([]);
+  let workloadRolesFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
   let serverLifecycleDialogOpen = $state(false);
   let selectedServerLifecycleAction = $state<ServerLifecycleAction | null>(null);
   let serverLifecycleConfirmation = $state("");
@@ -319,6 +331,9 @@
   } | null>(null);
   const canRenameServer = $derived(
     Boolean(server) && serverName.trim().length > 0 && serverName.trim() !== server?.name,
+  );
+  const workloadRolesChanged = $derived(
+    Boolean(server) && serverWorkloadRoles.join("|") !== server?.workloadRoles.join("|"),
   );
   const canSelectServerDelete = $derived(
     Boolean(server) && Boolean(serverDeleteSafety?.eligible) && !serverDeleteSafetyQuery.isPending,
@@ -377,6 +392,29 @@
       settingsFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.servers.renameFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const configureWorkloadRolesMutation = createMutation(() => ({
+    mutationFn: (input: ConfigureServerWorkloadRolesInput) =>
+      orpcClient.servers.configureWorkloadRoles(input),
+    onSuccess: (result) => {
+      serverWorkloadRoles = [...result.workloadRoles];
+      workloadRolesFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.servers.workloadRolesSaveSucceeded),
+        detail: result.changed
+          ? $t(i18nKeys.console.servers.workloadRolesSaveChanged)
+          : $t(i18nKeys.console.servers.workloadRolesSaveUnchanged),
+      };
+      workloadRolesDialogOpen = false;
+      void queryClient.invalidateQueries({ queryKey: orpc.servers.key({ type: "query" }) });
+    },
+    onError: (error) => {
+      workloadRolesFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.servers.workloadRolesSaveFailed),
         detail: readErrorMessage(error),
       };
     },
@@ -457,8 +495,10 @@
     }
 
     serverFormServerId = server.id;
-    serverName = server.name;
+    serverWorkloadRoles = [...server.workloadRoles];
+    workloadRolesFeedback = null;
     serverRenameDialogOpen = false;
+    workloadRolesDialogOpen = false;
     settingsFeedback = null;
     serverDeactivateFeedback = null;
     selectedServerLifecycleAction = null;
@@ -512,6 +552,69 @@
     renameServerMutation.mutate({
       serverId: server.id,
       name: serverName.trim(),
+    });
+  }
+
+  function workloadRoleLabel(role: ServerWorkloadRole): string {
+    switch (role) {
+      case "deployment-runtime":
+        return $t(i18nKeys.console.servers.workloadRoleDeploymentRuntime);
+      case "artifact-builder":
+        return $t(i18nKeys.console.servers.workloadRoleArtifactBuilder);
+      case "sandbox-worker":
+        return $t(i18nKeys.console.servers.workloadRoleSandboxWorker);
+    }
+  }
+
+  function workloadRoleDescription(role: ServerWorkloadRole): string {
+    switch (role) {
+      case "deployment-runtime":
+        return $t(i18nKeys.console.servers.workloadRoleDeploymentRuntimeDescription);
+      case "artifact-builder":
+        return $t(i18nKeys.console.servers.workloadRoleArtifactBuilderDescription);
+      case "sandbox-worker":
+        return $t(i18nKeys.console.servers.workloadRoleSandboxWorkerDescription);
+    }
+  }
+
+  function toggleServerWorkloadRole(role: ServerWorkloadRole, event: Event): void {
+    const checked =
+      event.currentTarget instanceof HTMLInputElement ? event.currentTarget.checked : false;
+    serverWorkloadRoles = checked
+      ? serverWorkloadRoleOptions.filter(
+          (option) => serverWorkloadRoles.includes(option) || option === role,
+        )
+      : serverWorkloadRoles.filter((option) => option !== role);
+    workloadRolesFeedback = null;
+  }
+
+  function openWorkloadRolesDialog(): void {
+    if (!server) {
+      return;
+    }
+
+    serverWorkloadRoles = [...server.workloadRoles];
+    workloadRolesDialogOpen = true;
+  }
+
+  function closeWorkloadRolesDialog(): void {
+    if (configureWorkloadRolesMutation.isPending) {
+      return;
+    }
+
+    workloadRolesDialogOpen = false;
+  }
+
+  function configureServerWorkloadRoles(event: SubmitEvent): void {
+    event.preventDefault();
+    if (!server || !workloadRolesChanged || configureWorkloadRolesMutation.isPending) {
+      return;
+    }
+
+    workloadRolesFeedback = null;
+    configureWorkloadRolesMutation.mutate({
+      serverId: server.id,
+      workloadRoles: serverWorkloadRoles,
     });
   }
 
@@ -1008,6 +1111,21 @@
               <Badge variant={serverLifecycleVariant(server.lifecycleStatus)}>
                 {serverLifecycleLabel(server.lifecycleStatus)}
               </Badge>
+            </div>
+            <div
+              class="flex flex-wrap items-center gap-2"
+              aria-label={$t(i18nKeys.console.servers.workloadRolesTitle)}
+              data-server-detail-workload-roles
+            >
+              {#if server.workloadRoles.length === 0}
+                <span class="text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.servers.workloadRolesGeneralPurpose)}
+                </span>
+              {:else}
+                {#each server.workloadRoles as role (role)}
+                  <Badge variant="outline">{workloadRoleLabel(role)}</Badge>
+                {/each}
+              {/if}
             </div>
             <div class="space-y-2">
               <h1 class="text-2xl font-semibold md:text-3xl">{server.name}</h1>
@@ -1849,6 +1967,47 @@
             </div>
           {/if}
         </div>
+
+        <div class="console-panel p-4" data-server-workload-role-settings>
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="min-w-0 space-y-1">
+              <h2 class="text-sm font-semibold">
+                {$t(i18nKeys.console.servers.workloadRolesTitle)}
+              </h2>
+              <p class="max-w-3xl text-sm leading-6 text-muted-foreground">
+                {$t(i18nKeys.console.servers.workloadRolesSettingsDescription)}
+              </p>
+              <p class="max-w-3xl text-xs leading-5 text-muted-foreground">
+                {$t(i18nKeys.console.servers.workloadRolesNewPlacementOnly)}
+              </p>
+            </div>
+            <Button type="button" variant="outline" onclick={openWorkloadRolesDialog}>
+              {$t(i18nKeys.common.actions.edit)}
+            </Button>
+          </div>
+
+          <div class="mt-4 flex flex-wrap items-center gap-2">
+            {#if server.workloadRoles.length === 0}
+              <span class="text-sm text-muted-foreground">
+                {$t(i18nKeys.console.servers.workloadRolesGeneralPurpose)}
+              </span>
+            {:else}
+              {#each server.workloadRoles as role (role)}
+                <Badge variant="outline">{workloadRoleLabel(role)}</Badge>
+              {/each}
+            {/if}
+          </div>
+
+          {#if workloadRolesFeedback}
+            <div
+              class={`mt-4 rounded-md border p-3 text-sm ${workloadRolesFeedback.kind === "error" ? "border-destructive/30 text-destructive" : "border-border text-foreground"}`}
+              role={workloadRolesFeedback.kind === "error" ? "alert" : "status"}
+            >
+              <p class="font-medium">{workloadRolesFeedback.title}</p>
+              <p class="mt-1 text-muted-foreground">{workloadRolesFeedback.detail}</p>
+            </div>
+          {/if}
+        </div>
         {:else if activeSettingsSection === "danger"}
         <div class="space-y-4" data-server-settings-danger-display-surface>
         <div class="console-panel p-4">
@@ -2348,6 +2507,93 @@
           >
             <Trash2 class="size-4" />
             {$t(i18nKeys.console.servers.capacityApplyAction)}
+          </Button>
+        </Dialog.Footer>
+      </form>
+    </Dialog.Content>
+  {/if}
+</Dialog.Root>
+
+<Dialog.Root bind:open={workloadRolesDialogOpen} onOpenChange={(open) => {
+  if (open) {
+    openWorkloadRolesDialog();
+  } else {
+    closeWorkloadRolesDialog();
+  }
+}}>
+  {#if server}
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-4xl">
+      <form
+        id="server-workload-roles-dialog-form"
+        onsubmit={configureServerWorkloadRoles}
+        data-server-workload-roles-dialog
+      >
+        <Dialog.Header>
+          <Dialog.Title>{$t(i18nKeys.console.servers.workloadRolesTitle)}</Dialog.Title>
+          <Dialog.Description>
+            {$t(i18nKeys.console.servers.workloadRolesSettingsDescription)}
+          </Dialog.Description>
+        </Dialog.Header>
+
+        <fieldset
+          class="space-y-4 px-5 py-4"
+          disabled={configureWorkloadRolesMutation.isPending}
+        >
+          <legend class="sr-only">
+            {$t(i18nKeys.console.servers.workloadRolesTitle)}
+          </legend>
+          <p class="text-xs leading-5 text-muted-foreground">
+            {$t(i18nKeys.console.servers.workloadRolesNewPlacementOnly)}
+          </p>
+
+          <div class="grid gap-2 lg:grid-cols-3">
+            {#each serverWorkloadRoleOptions as role (role)}
+              <label
+                class="flex min-w-0 cursor-pointer items-start gap-3 rounded-md border border-input bg-card p-3 transition-colors hover:bg-primary/5 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 data-[selected=true]:bg-primary/5"
+                data-selected={serverWorkloadRoles.includes(role)}
+                data-server-role-option={role}
+              >
+                <input
+                  type="checkbox"
+                  class="mt-1 size-4 shrink-0 accent-primary"
+                  checked={serverWorkloadRoles.includes(role)}
+                  onchange={(event) => toggleServerWorkloadRole(role, event)}
+                />
+                <span class="min-w-0">
+                  <span class="block text-sm font-medium">{workloadRoleLabel(role)}</span>
+                  <span class="mt-1 block text-xs leading-5 text-muted-foreground">
+                    {workloadRoleDescription(role)}
+                  </span>
+                </span>
+              </label>
+            {/each}
+          </div>
+
+          {#if serverWorkloadRoles.length === 0}
+            <p class="text-sm font-medium">
+              {$t(i18nKeys.console.servers.workloadRolesGeneralPurpose)}
+            </p>
+          {/if}
+
+          {#if workloadRolesFeedback?.kind === "error"}
+            <div class="rounded-md border border-destructive/30 p-3 text-sm text-destructive" role="alert">
+              <p class="font-medium">{workloadRolesFeedback.title}</p>
+              <p class="mt-1">{workloadRolesFeedback.detail}</p>
+            </div>
+          {/if}
+        </fieldset>
+
+        <Dialog.Footer class="border-t p-5">
+          <Button type="button" variant="outline" onclick={closeWorkloadRolesDialog}>
+            {$t(i18nKeys.common.actions.cancel)}
+          </Button>
+          <Button
+            type="submit"
+            disabled={!workloadRolesChanged || configureWorkloadRolesMutation.isPending}
+          >
+            {configureWorkloadRolesMutation.isPending
+              ? $t(i18nKeys.common.actions.saving)
+              : $t(i18nKeys.common.actions.save)}
           </Button>
         </Dialog.Footer>
       </form>

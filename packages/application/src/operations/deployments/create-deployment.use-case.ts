@@ -751,6 +751,7 @@ export class CreateDeploymentUseCase {
       triggerKind: DeploymentTriggerKindValue;
       sourceDeploymentId?: string;
       ownerLabel: "deployments.create" | "deployments.redeploy" | "deployments.force-redeploy";
+      enforceWorkloadRole?: boolean;
     },
   ): Promise<Result<{ id: string }>> {
     const {
@@ -818,12 +819,18 @@ export class CreateDeploymentUseCase {
       const effectiveInputResult = await deploymentContextBootstrapService.bootstrap(
         context,
         input,
+        recovery?.enforceWorkloadRole === undefined
+          ? {}
+          : { enforceWorkloadRole: recovery.enforceWorkloadRole },
       );
       const effectiveInput = yield* effectiveInputResult;
 
       const resolvedContextResult = await deploymentContextResolver.resolve(
         context,
         effectiveInput,
+        recovery?.enforceWorkloadRole === undefined
+          ? {}
+          : { enforceWorkloadRole: recovery.enforceWorkloadRole },
       );
       const { project, server, destination, environment, resource } = yield* resolvedContextResult;
       const projectState = project.toState();

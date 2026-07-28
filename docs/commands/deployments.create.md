@@ -38,6 +38,10 @@ This command inherits the shared platform contracts:
 - [Runtime Plan Resolution Unsupported/Override Contract](../specs/018-runtime-plan-resolution-unsupported-override-contract/spec.md)
 - [Dependency Binding Runtime Injection](../specs/047-dependency-binding-runtime-injection/spec.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
+- [ADR-101: Server Workload Role Admission](../decisions/ADR-101-server-workload-role-admission.md)
+- [Server Workload Roles Spec](../specs/118-server-workload-roles/spec.md)
+- [Server Workload Role Test Matrix](../testing/server-workload-role-test-matrix.md)
+- [deployments.create Error Spec](../errors/deployments.create.md)
 - [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
@@ -141,38 +145,48 @@ The command must perform or delegate these admission steps before returning acce
 4. Reject inconsistent context, including cross-project/environment/resource/destination mismatches.
 5. Reject archived resources with `resource_archived`.
 6. Reject inactive servers with `server_inactive`.
-7. Resolve operation coordination for the command's `resource-runtime` scope.
-7. Wait bounded time for the coordination scope or reject with a retriable coordination timeout.
-8. If the latest same-resource deployment is active, resolve the supersede branch:
+7. Require `deployment-runtime` through the selected server's lifecycle-plus-role new-work guard.
+   A server with `workloadRoles = []` is general-purpose/unrestricted by role; a non-empty set must
+   include `deployment-runtime`. On mismatch, fail closed without selecting or falling back to the
+   same mismatched server.
+8. Resolve operation coordination for the command's `resource-runtime` scope.
+9. Wait bounded time for the coordination scope or reject with a retriable coordination timeout.
+10. If the latest same-resource deployment is active, resolve the supersede branch:
    - `created`, `planning`, and `planned` attempts are canceled immediately and record
      `supersededByDeploymentId`;
    - `running` attempts enter `cancel-requested`, must be canceled through the runtime backend, and
      then are marked `canceled` with `supersededByDeploymentId`;
    - if supersede cannot complete safely, reject the later request with a deployment-specific
      conflict branch.
-9. The write side must still enforce the single active same-resource invariant atomically when
+11. The write side must still enforce the single active same-resource invariant atomically when
    durable deployment state is created so a concurrent submit cannot bypass the guard through a
    read/write race.
-10. Resolve the source descriptor from `ResourceSourceBinding`.
-11. Resolve runtime plan configuration from `ResourceRuntimeProfile`, including reusable runtime
+12. Resolve the source descriptor from `ResourceSourceBinding`.
+13. Resolve runtime plan configuration from `ResourceRuntimeProfile`, including reusable runtime
     naming intent when present.
-12. Resolve network endpoint configuration from `ResourceNetworkProfile`.
-13. Create an immutable environment snapshot.
-13. After the dependency binding runtime injection Code Round, materialize active ready dependency
+14. Resolve network endpoint configuration from `ResourceNetworkProfile`.
+15. Create an immutable environment snapshot.
+16. After the dependency binding runtime injection Code Round, materialize active ready dependency
     bindings into an immutable safe runtime injection snapshot and reject active non-injectable
     bindings before acceptance.
-14. Resolve default generated and durable access route snapshots from resource/domain/server/policy state when the resource requires public reverse-proxy access.
-15. Resolve the runtime plan, Docker/OCI artifact requirements, and network/access snapshots.
-16. Resolve that the selected deployment target/destination has a runtime target backend with the
+17. Resolve default generated and durable access route snapshots from resource/domain/server/policy state when the resource requires public reverse-proxy access.
+18. Resolve the runtime plan, Docker/OCI artifact requirements, and network/access snapshots.
+19. Resolve that the selected deployment target/destination has a runtime target backend with the
     required capabilities.
-17. Create durable deployment state.
+20. Create durable deployment state.
     When a previous same-resource runtime-owning deployment exists, the new deployment state must
     record the explicit superseded deployment id that cleanup and replacement logic may touch.
     When execution is detached, the durable work handoff must capture the resolved Project
     `organizationId` as its tenant owner. An ambient or default request tenant must not replace the
     authoritative Project owner used when the worker restores execution context.
-18. Publish or record `deployment-requested`.
-19. Return `ok({ id })`.
+21. Publish or record `deployment-requested`.
+22. Return `ok({ id })`.
+
+Role admission must complete before operation coordination, active-attempt supersede/cancellation,
+environment or dependency snapshot creation, runtime-plan/backend resolution, durable Deployment
+creation, event publication, build/run/verify work, route/proxy realization, or any other effect.
+Passing the role guard does not bypass lifecycle, readiness, capability, provider, health, capacity,
+isolation, context, coordination, or private-policy admission.
 
 Build, rollout, verify, failure recording, and retry progression belong to the async workflow owner, process manager, event handler, worker, or runtime adapter boundary. They must not be hidden inside Web/CLI/API entry logic.
 
@@ -222,6 +236,7 @@ All errors use the shared shape and category rules in [Error Model](../errors/mo
 | `not_found` | `context-resolution` | No | Referenced project, environment, server, destination, or resource is missing or inaccessible. |
 | `resource_archived` | `resource-lifecycle-guard` | No | Referenced resource is archived and cannot accept new deployment attempts. |
 | `server_inactive` | `server-lifecycle-guard` | No | Referenced server is inactive and cannot accept new deployment attempts. |
+| `server_workload_role_mismatch` | `server-workload-role-guard` | No | The selected server has a non-empty normalized role set that does not include `deployment-runtime`. The command rejects before accepting a Deployment attempt or producing effects. |
 | `coordination_timeout` | `operation-coordination` | Yes | The command could not acquire its logical resource-runtime coordination scope within the bounded wait window before admission. |
 | `deployment_not_redeployable` | `redeploy-guard` | No | Latest deployment for the same resource is non-terminal. |
 | `conflict` | `admission-conflict` | No | A deployment-specific admission conflict not covered by redeployability. |
@@ -234,9 +249,33 @@ All errors use the shared shape and category rules in [Error Model](../errors/mo
 | `proxy_route_realization_failed` | `proxy-route-realization`, `public-route-verification` | Yes | Runtime adapter failed to materialize or verify the resolved route after acceptance; represented as workflow failure. |
 | `unsupported_config_field` | `config-capability-resolution` | No | A repository config file requested a known future capability, such as CPU/memory/replicas/restart policy, that is not backed by accepted resource/runtime-target specs and runtime enforcement. This is an entry-workflow rejection before `deployments.create`. |
 
+`server_workload_role_mismatch` safe details are:
+
+```ts
+{
+  commandName: "deployments.create";
+  phase: "server-workload-role-guard";
+  serverId: string;
+  requiredRole: "deployment-runtime";
+  workloadRoles: ServerWorkloadRole[];
+}
+```
+
+`workloadRoles` is the server's normalized complete set and contains no secrets, provider payloads,
+current workload inventory, or private policy. Recovery is to choose or configure a server whose
+set is `[]` (general-purpose/unrestricted by role) or includes `deployment-runtime`, then retry the
+unchanged ids-only command. There is no role override or fallback to the mismatched server.
+`server_inactive` remains a distinct lifecycle rejection and must not be reused for this mismatch.
+
 Missing or explicitly disabled edge proxy intent makes generated default access unavailable rather than required. The command may continue without a generated route, and it must not publish a direct host-port fallback.
 
 Runtime/build/deploy/verify failures after acceptance are workflow failures and must be represented by deployment state plus `deployment-failed`.
+
+Role narrowing is prospective. Removing `deployment-runtime` does not cancel, invalidate, rewrite,
+or relocate an already accepted/running/historical Deployment or its immutable target/runtime-plan
+snapshots; it rejects only later new placement. `artifact-builder` remains intent only until a
+neutral builder executor exists, and Sandbox role enforcement remains blocked until the neutral
+Server-aware placement contract carries Server identity.
 
 Unsupported, ambiguous, and missing runtime-plan evidence that can be known before safe acceptance
 is an admission failure. It must reject with `validation_error` in `runtime-plan-resolution` or the

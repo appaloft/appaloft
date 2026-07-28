@@ -11,6 +11,7 @@ The active operations in this lifecycle slice are:
 - `servers.show`;
 - `servers.rename`;
 - `servers.configure-edge-proxy`;
+- `servers.configure-workload-roles`;
 - `servers.deactivate`;
 - `servers.delete-check`;
 - guarded `servers.delete`.
@@ -22,6 +23,9 @@ Generic `servers.update` remains forbidden by ADR-026.
 - [ADR-004: Server Readiness State Storage](../decisions/ADR-004-server-readiness-state-storage.md)
 - [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
 - [ADR-026: Aggregate Mutation Command Boundary](../decisions/ADR-026-aggregate-mutation-command-boundary.md)
+- [ADR-101: Server Workload Role Admission](../decisions/ADR-101-server-workload-role-admission.md)
+- [Server Workload Roles Spec](../specs/118-server-workload-roles/spec.md)
+- [Server Workload Role Test Matrix](../testing/server-workload-role-test-matrix.md)
 - [servers.show Query Spec](../queries/servers.show.md)
 - [servers.rename Command Spec](../commands/servers.rename.md)
 - [servers.configure-edge-proxy Command Spec](../commands/servers.configure-edge-proxy.md)
@@ -71,6 +75,14 @@ synchronously bootstrap, repair, stop, delete, or reload proxy infrastructure. A
 target configuration work. Deleted server tombstones are immutable through the ordinary configure
 entrypoint; normal command admission returns `not_found` for deleted servers.
 
+`servers.configure-workload-roles` atomically replaces the registered server's complete normalized
+role set. The only values are `deployment-runtime`, `artifact-builder`, and `sandbox-worker`;
+missing registration input or `[]` means general-purpose/unrestricted by role. Unknown or duplicate
+input fails validation, while reordered equivalent input is an idempotent no-op. The mutation
+changes only prospective new-placement intent. It must preserve lifecycle, readiness, credentials,
+proxy state, target kind, provider metadata, destinations, accepted snapshots, workload-owner
+bindings, and historical references, and it performs no drain or workload effects.
+
 `servers.deactivate` changes only the deployment target lifecycle state from active to inactive.
 It must not stop workloads, cancel deployments, remove routes, revoke certificates, detach
 credentials, close terminal sessions, or delete retained support state. Once inactive, the server
@@ -102,16 +114,21 @@ blocker rules for at least:
 Actual server deletion must not perform implicit cleanup. If blockers exist, users must resolve
 them through explicit future cleanup or lifecycle commands before deletion can pass.
 
+Workload roles never replace lifecycle or readiness. New deployment plan/create admission first
+requires an active target and then requires `deployment-runtime`; independent capability and
+provider gates still apply. `artifact-builder` is intent only, and `sandbox-worker` does not admit
+registered-Server Sandbox placement until the neutral placement contract carries Server identity.
+
 ## Entrypoint Surface Decisions
 
 | Surface | Decision |
 | --- | --- |
-| CLI | Expose `server show <serverId>`, `server rename <serverId> --name <name>`, `server deactivate <serverId>`, `server delete-check <serverId>`, and `server delete <serverId> --confirm <serverId>` with positional ids and explicit confirmation where destructive. Routine CLI flows use the configured default proxy provider and do not expose provider selection. |
-| HTTP/oRPC | Expose `GET /api/servers/{serverId}`, `POST /api/servers/{serverId}/rename`, `POST /api/servers/{serverId}/edge-proxy/configuration`, `POST /api/servers/{serverId}/deactivate`, `GET /api/servers/{serverId}/delete-check`, and `DELETE /api/servers/{serverId}` using operation schemas; no `PATCH /api/servers/{id}` is allowed. |
-| Web | Server detail reads `servers.show` for identity, proxy status, credential summary, rollups, and lifecycle status; exposes a display-name rename text input/action for active and inactive servers; shows proxy state as read-only; exposes typed-confirmation deactivate action for active servers; shows read-only deactivate state for inactive/deleted servers; reads `servers.delete-check`; and enables destructive delete only when delete safety is eligible and the operator types the exact server id confirmation. |
+| CLI | Expose `server show <serverId>`, `server rename <serverId> --name <name>`, `server configure-workload-roles <serverId>`, `server deactivate <serverId>`, `server delete-check <serverId>`, and `server delete <serverId> --confirm <serverId>` with positional ids and explicit confirmation where destructive. Registration accepts optional repeatable canonical role values; configuration submits the complete desired set; list/show read normalized roles. Routine CLI flows use the configured default proxy provider and do not expose provider selection. |
+| HTTP/oRPC | Expose `GET /api/servers/{serverId}`, `POST /api/servers/{serverId}/rename`, `POST /api/servers/{serverId}/edge-proxy/configuration`, `POST /api/servers/{serverId}/workload-roles`, `POST /api/servers/{serverId}/deactivate`, `GET /api/servers/{serverId}/delete-check`, and `DELETE /api/servers/{serverId}` using operation schemas; no `PATCH /api/servers/{id}` is allowed. Registration accepts optional `workloadRoles`; the role route replaces the complete set; list/show expose normalized readback. |
+| Web | Server detail reads `servers.show` for server identity, workload roles, proxy status, credential summary, rollups, and lifecycle status; registration and detail use the same optional multi-valued role intent; list/detail render `[]` explicitly as general-purpose and explain that edits affect new placement only. Existing rename, proxy, deactivate, delete-check, and typed destructive delete actions remain separate operations. |
 | Repository config | Not applicable. Repository config must not select server identity. |
 | Future MCP/tools | Generate command/query tools from the operation catalog entries. |
-| Public docs | Existing `server.deployment-target` anchor explains server identity preservation, display-name, detail, deactivation, and delete-safety semantics. Existing `server.proxy-readiness` anchor explains edge proxy intent, readiness, and repair semantics. |
+| Public docs | Existing `server.deployment-target` anchor explains server identity preservation, display-name, detail, deactivation, and delete-safety semantics. Existing `server.proxy-readiness` anchor explains edge proxy intent, readiness, and repair semantics. `server.workload-roles` explains normalized optional roles, unrestricted `[]`, and prospective complete-set replacement. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -130,6 +147,11 @@ operation. The edge-proxy configuration Code Round promotes intent-only proxy ki
 active operation. Web server detail now closes rename, edge-proxy configuration, typed
 deactivation, delete-safety readback, and typed destructive delete over the shared command/query
 schemas. Reactivation and broad credential usage visibility remain future work.
+
+Server Workload Roles are implemented across registration, the dedicated complete-set mutation,
+normalized list/show readback, and deployment plan/create admission. Role changes preserve existing
+deployment snapshots and do not claim builder execution, registered-Server Sandbox placement, or
+drain behavior.
 
 ## Open Questions
 

@@ -8,6 +8,7 @@ import {
   type DeploymentTargetByIdSpec,
   type DeploymentTargetByProviderAndHostSpec,
   type DeploymentTargetSelectionSpecVisitor,
+  DeploymentTargetWorkloadRoles,
   type NonDeletedDeploymentTargetByEndpointSpec,
 } from "@appaloft/core";
 import { type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
@@ -71,6 +72,9 @@ function toServerSummary(
     port: row.port,
     providerKey: row.provider_key,
     targetKind: row.target_kind as "single-server" | "orchestrator-cluster",
+    workloadRoles: DeploymentTargetWorkloadRoles.rehydrate(
+      row.workload_roles as Parameters<typeof DeploymentTargetWorkloadRoles.rehydrate>[0],
+    ).toJSON(),
     lifecycleStatus: row.lifecycle_status as "active" | "inactive",
     ...(row.deactivated_at
       ? { deactivatedAt: normalizeTimestamp(row.deactivated_at) ?? row.deactivated_at }

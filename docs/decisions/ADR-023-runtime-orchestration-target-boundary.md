@@ -18,6 +18,13 @@ verified, routed, cleaned up, and later used for rollback candidates. Runtime ta
 not a public deployment command. It is an internal capability used by `deployments.create` after
 the command has selected an existing `DeploymentTarget` and `Destination`.
 
+Before runtime target planning or backend resolution, the selected target must pass the orthogonal
+new-work admission rule from
+[ADR-101: Server Workload Role Admission](./ADR-101-server-workload-role-admission.md).
+Deployment planning and creation first apply active-lifecycle admission, then require
+`deployment-runtime`. A role match does not replace readiness, capability, provider, destination,
+or other target checks.
+
 The accepted target model is:
 
 | Target model | Public operation state | Meaning |
@@ -97,6 +104,11 @@ The code-level abstraction must have three layers:
    normalized result/read-model shapes, not Docker SDK, SSH command strings, Kubernetes client
    types, Helm APIs, or provider SDK response types.
 
+New-work admission is an application/domain seam before these three adapter-facing layers. Server
+Workload Roles do not select a backend and are independent of target kind, provider key, and
+backend capabilities. Adapters receive an already admitted placement and must not inspect mutable
+role policy.
+
 `DeploymentTarget.targetKind` should describe the target shape, not the vendor. The canonical
 target-kind vocabulary for future Code Rounds is:
 
@@ -114,6 +126,11 @@ Runtime target backends must be selected through a registry or equivalent depend
 router keyed by target kind, provider key, and capabilities. Hardcoded provider switches may remain
 as an implementation gap for the current local/generic-SSH backend, but they are not the target
 architecture.
+
+Deployment plan and create must use the same lifecycle-then-role guard before accepting a new
+attempt or producing runtime-plan/backend effects. `[]` is unrestricted by role; a non-empty set
+without `deployment-runtime` fails closed with `server_workload_role_mismatch` at phase
+`server-workload-role-guard`. Explicit selection does not fall back to the mismatched target.
 
 Runtime target backends also own rollout-strategy-aware cleanup. Reverse-proxy or route-mediated
 backends must distinguish a replacement candidate from the previous successful same-resource
@@ -154,6 +171,10 @@ The public business surface remains stable:
 - Resource source/runtime/network profiles remain provider-neutral.
 - Runtime logs, health, proxy configuration, and diagnostics remain normalized resource/deployment
   read/query surfaces.
+- Server Workload Role configuration remains a separate prospective Server mutation; it is not a
+  deployment field, runtime target capability, or adapter concern.
+- Accepted `RuntimePlanSnapshot` state does not copy mutable role policy and remains authoritative
+  after later role changes.
 
 Implementation work should move toward:
 
@@ -183,6 +204,9 @@ Implementation work should move toward:
 - [ADR-019: Edge Proxy Provider And Observable Configuration](./ADR-019-edge-proxy-provider-and-observable-configuration.md)
 - [ADR-020: Resource Health Observation](./ADR-020-resource-health-observation.md)
 - [ADR-021: Docker/OCI Workload Substrate](./ADR-021-docker-oci-workload-substrate.md)
+- [ADR-101: Server Workload Role Admission](./ADR-101-server-workload-role-admission.md)
+- [Server Workload Roles Spec](../specs/118-server-workload-roles/spec.md)
+- [Server Workload Role Test Matrix](../testing/server-workload-role-test-matrix.md)
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -190,6 +214,11 @@ Current runtime execution covers single-server Docker/Compose plus Docker Swarm 
 `DefaultRuntimePlanResolver` produces provider-neutral workload snapshots, and
 `RoutingExecutionBackend` selects registered target backends by target kind, provider key, and
 required capabilities before falling back to the in-memory compatibility backend.
+
+Current deployment plan/create context resolution applies active lifecycle and
+`deployment-runtime` admission before runtime-plan resolution. Role mismatch uses the stable
+`server_workload_role_mismatch` error at `server-workload-role-guard`; accepted snapshots remain
+unchanged when the selected Server's roles are later replaced.
 
 Current core target kinds use the canonical ADR-023 values `single-server` and
 `orchestrator-cluster`. Docker Swarm target metadata can now be registered as a cluster-shaped

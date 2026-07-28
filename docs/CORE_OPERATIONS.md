@@ -144,6 +144,7 @@ Implemented operations:
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
 | Register deployment target | Command | `servers.register` | `RegisterServerCommand` | `RegisterServerCommandInput` | `appaloft server register` | `POST /api/servers` |
+| Configure Server Workload Roles | Command | `servers.configure-workload-roles` | `ConfigureServerWorkloadRolesCommand` | `ConfigureServerWorkloadRolesCommandInput` | `appaloft server configure-workload-roles <serverId> [--workload-role <deployment-runtime|artifact-builder|sandbox-worker>]...` | `POST /api/servers/{serverId}/workload-roles` |
 | Configure deployment target credential | Command | `servers.configure-credential` | `ConfigureServerCredentialCommand` | `ConfigureServerCredentialCommandInput` | `appaloft server credential <serverId>` | `POST /api/servers/{serverId}/credentials` |
 | List deployment targets | Product-session member query | `servers.list` | `ListServersQuery` | `ListServersQueryInput` | `appaloft server list` | `GET /api/servers` |
 | Count deployment targets | Product-session member query | `servers.count` | `CountServersQuery` | `CountServersQueryInput` | `appaloft server count` | `GET /api/servers/count` |
@@ -175,6 +176,17 @@ Implemented operations:
 | Show scheduled runtime prune policy | Query | `scheduled-runtime-prune-policies.show` | `ShowScheduledRuntimePrunePolicyQuery` | `ShowScheduledRuntimePrunePolicyQueryInput` | `appaloft server capacity policy show <policyId>` | `GET /api/servers/capacity/policies/{policyId}` |
 | List runtime monitoring samples | Query | `runtime-monitoring.samples.list` | `ListRuntimeMonitoringSamplesQuery` | `ListRuntimeMonitoringSamplesQueryInput` | `appaloft runtime-monitoring samples <scope> --from <iso> --to <iso>` | `GET /api/runtime-monitoring/samples` |
 | Read runtime monitoring rollup | Query | `runtime-monitoring.rollup` | `RuntimeMonitoringRollupQuery` | `RuntimeMonitoringRollupQueryInput` | `appaloft runtime-monitoring rollup <scope> --from <iso> --to <iso> --bucket <bucket>` | `GET /api/runtime-monitoring/rollup` |
+- `servers.register`, `servers.configure-workload-roles`, `servers.list`, and `servers.show` share
+  the canonical `deployment-runtime`, `artifact-builder`, and `sandbox-worker` vocabulary. Registration
+  may omit roles; configuration atomically replaces the complete set; list/show return the normalized
+  set; and `[]` means general-purpose/unrestricted by role.
+- Server Workload Roles express new-placement intent independently of target kind, lifecycle,
+  connectivity, readiness, provider capability, isolation, capacity, and private policy. Role
+  changes do not drain, stop, move, cancel, or reinterpret existing workload bindings or accepted
+  Runtime Plan snapshots.
+- `artifact-builder` is stored and readable intent only; no remote builder executor, logs,
+  cancellation, cache ownership, or artifact provenance is claimed. `sandbox-worker` admission on a
+  registered Server and drain/evacuation remain separately governed follow-ups.
 - server registration may carry edge proxy intent/provider selection; when omitted, the deployment
   target records the configured default edge proxy intent and an asynchronous lifecycle path
   attempts proxy bootstrap
@@ -1182,12 +1194,20 @@ Current boundary:
   tier, Docker/OCI artifact intent, sanitized command specs, network, health, access summary,
   dependency binding snapshot-reference readiness, warnings, and unsupported reasons, and stops
   before deployment attempt creation or runtime execution.
+- `deployments.plan` and `deployments.create` both require the selected server to admit
+  `deployment-runtime` before plan acceptance, Deployment attempt acceptance, or runtime effects.
+  A non-empty mismatched set reports `server_workload_role_mismatch` at
+  `server-workload-role-guard`; an empty role set remains general-purpose/unrestricted, and passing
+  this guard does not bypass lifecycle, readiness, capability, provider, or private policy gates.
 - `deployments.plan` exposes the same runtime plan resolution contract that `deployments.create`
   uses before execution. Unsupported frameworks, unsupported runtime families, ambiguous framework
   or build-tool evidence, missing build/start/internal-port/source-root/artifact output,
   unsupported runtime target, and unsupported container-native profile cases return a blocked
   preview with stable phase, reason code, safe evidence, fix path, override path, and affected
   resource profile field when applicable.
+- Later Server Workload Role changes are prospective. They do not reinterpret accepted Runtime Plan
+  snapshots or existing Deployment lifecycle, recovery, or history; only later new placement is
+  evaluated against the current role set.
 - the Phase 5 supported catalog is closed by a zero-to-SSH acceptance harness over the existing
   operation set. The harness proves supported fixture descriptors can move from shared resource
   profile draft through `deployments.plan/v1`, ids-only `deployments.create`, runtime target

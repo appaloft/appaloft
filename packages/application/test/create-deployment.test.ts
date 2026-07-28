@@ -26,6 +26,7 @@ import {
   DeploymentTargetDescriptor,
   DeploymentTargetId,
   DeploymentTargetName,
+  DeploymentTargetWorkloadRoles,
   DeploymentTimelineJournalEntry,
   Destination,
   DestinationId,
@@ -243,7 +244,9 @@ import {
   DeploymentFactory,
   DeploymentLifecycleService,
   DeploymentSnapshotFactory,
+  ForceRedeployDeploymentUseCase,
   ProvisionDependencyResourceUseCase,
+  RedeployDeploymentUseCase,
   RestoreDependencyResourceBackupUseCase,
   RuntimePlanResolutionInputBuilder,
 } from "../src/use-cases";
@@ -993,6 +996,7 @@ async function createDeploymentFixture(
     edgeProxyKind?: "traefik" | "caddy";
     serverProviderKey?: string;
     serverTargetKind?: "single-server" | "orchestrator-cluster";
+    serverWorkloadRoles?: Parameters<typeof DeploymentTargetWorkloadRoles.rehydrate>[0];
     domainRouteBindingReader?: DomainRouteBindingReader;
     serverAppliedRouteDesiredStateReader?: ServerAppliedRouteDesiredStateReader;
     deploymentConfigReader?: DeploymentConfigReader;
@@ -1041,6 +1045,9 @@ async function createDeploymentFixture(
     port: PortNumber.rehydrate(22),
     providerKey: ProviderKey.rehydrate(options.serverProviderKey ?? "generic-ssh"),
     targetKind: TargetKindValue.rehydrate(options.serverTargetKind ?? "single-server"),
+    ...(options.serverWorkloadRoles
+      ? { workloadRoles: DeploymentTargetWorkloadRoles.rehydrate(options.serverWorkloadRoles) }
+      : {}),
     ...(options.edgeProxyKind
       ? { edgeProxyKind: EdgeProxyKindValue.rehydrate(options.edgeProxyKind) }
       : {}),
@@ -1195,6 +1202,7 @@ async function createDeploymentFixture(
     dependencyResources,
     deployments,
     environment,
+    destinations,
     environments,
     eventBus,
     managedDependencyProvider,
@@ -3306,7 +3314,253 @@ describe("CreateDeploymentUseCase", () => {
     expect(eventBus.events).toHaveLength(0);
   });
 
-  test("[SRV-LIFE-DEACT-004] rejects deployment creation for inactive servers", async () => {
+  test("[SRV-ROLE-007] admits general-purpose and deployment-runtime servers to deployment creation", async () => {
+    const generalPurpose = await createDeploymentFixture();
+    const deploymentRuntime = await createDeploymentFixture(undefined, {
+      serverWorkloadRoles: ["deployment-runtime"],
+    });
+
+    const generalPurposeResult = await generalPurpose.createDeploymentUseCase.execute(
+      generalPurpose.context,
+      generalPurpose.createDeploymentInput,
+    );
+    const deploymentRuntimeResult = await deploymentRuntime.createDeploymentUseCase.execute(
+      deploymentRuntime.context,
+      deploymentRuntime.createDeploymentInput,
+    );
+
+    expect(generalPurposeResult.isOk()).toBe(true);
+    expect(deploymentRuntimeResult.isOk()).toBe(true);
+    expect(generalPurpose.deployments.items.size).toBe(1);
+    expect(deploymentRuntime.deployments.items.size).toBe(1);
+  });
+
+  test("[SRV-ROLE-006] rejects deployment creation before effects when the selected server lacks deployment-runtime", async () => {
+    const fixture = await createDeploymentFixture(undefined, {
+      serverWorkloadRoles: ["artifact-builder"],
+    });
+
+    fixture.destinations.items.clear();
+    const result = await fixture.createDeploymentUseCase.execute(fixture.context, {
+      projectId: "prj_demo",
+      serverId: "srv_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "server_workload_role_mismatch",
+      details: {
+        commandName: "deployments.create",
+        phase: "server-workload-role-guard",
+        serverId: "srv_demo",
+        requiredRole: "deployment-runtime",
+        workloadRoles: ["artifact-builder"],
+      },
+    });
+    expect(fixture.deployments.items.size).toBe(0);
+    expect(fixture.eventBus.events).toHaveLength(0);
+    expect(fixture.projects.items.size).toBe(1);
+    expect(fixture.servers.items.size).toBe(1);
+    expect(fixture.environments.items.size).toBe(1);
+    expect(fixture.resources.items.size).toBe(1);
+    expect(fixture.destinations.items.size).toBe(0);
+  });
+
+  test("[SRV-ROLE-006] rejects a config-selected existing server before bootstrap persistence or events", async () => {
+    const projects = new MemoryProjectRepository();
+    const servers = new MemoryServerRepository();
+    const destinations = new MemoryDestinationRepository();
+    const environments = new MemoryEnvironmentRepository();
+    const resources = new MemoryResourceRepository();
+    const policyRepository = new MemoryScheduledRuntimePrunePolicyRepository();
+    const clock = new FixedClock("2026-01-01T00:00:00.000Z");
+    const idGenerator = new SequenceIdGenerator();
+    const eventBus = new CapturedEventBus();
+    const logger = new NoopLogger();
+    const context = createTestContext();
+    const repositoryContext = toRepositoryContext(context);
+    const selectedServer = DeploymentTarget.register({
+      id: DeploymentTargetId.rehydrate("srv_existing"),
+      name: DeploymentTargetName.rehydrate("existing-builder"),
+      host: HostAddress.rehydrate("203.0.113.10"),
+      port: PortNumber.rehydrate(22),
+      providerKey: ProviderKey.rehydrate("generic-ssh"),
+      targetKind: TargetKindValue.rehydrate("single-server"),
+      workloadRoles: DeploymentTargetWorkloadRoles.rehydrate(["artifact-builder"]),
+      createdAt: CreatedAt.rehydrate(clock.now()),
+    })._unsafeUnwrap();
+    await servers.upsert(
+      repositoryContext,
+      selectedServer,
+      UpsertDeploymentTargetSpec.fromDeploymentTarget(selectedServer),
+    );
+    const bootstrap = new DeploymentContextBootstrapService(
+      new StaticDeploymentConfigReader({
+        configFilePath: "appaloft.yml",
+        project: { name: "Configured App" },
+        environment: { name: "production", kind: "production" },
+        resource: { name: "web", kind: "application" },
+        targets: [
+          {
+            key: "existing-builder",
+            name: "Existing Builder",
+            providerKey: "generic-ssh",
+            host: "203.0.113.10",
+            port: 22,
+            destination: { name: "configured", kind: "generic" },
+          },
+          {
+            key: "new-local",
+            name: "New Local",
+            providerKey: "local-shell",
+            host: "127.0.0.1",
+            port: 22,
+          },
+        ],
+        deployment: {
+          targetKey: "existing-builder",
+          method: "workspace-commands",
+          startCommand: "node dist/server.js",
+          port: 3000,
+        },
+        retention: {
+          runtimePrune: {
+            retentionDays: 14,
+            destructive: true,
+            categories: ["stopped-containers"],
+            retryOnFailure: false,
+            enabled: true,
+          },
+        },
+      }),
+      projects,
+      servers,
+      destinations,
+      environments,
+      resources,
+      new StaticProviderRegistry(),
+      new ExplicitContextRequiredPolicy(),
+      new DeploymentContextDefaultsFactory(clock, idGenerator),
+      clock,
+      idGenerator,
+      eventBus,
+      logger,
+      policyRepository,
+    );
+
+    const result = await bootstrap.bootstrap(context, { sourceLocator: "." } as never);
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "server_workload_role_mismatch",
+      details: {
+        commandName: "deployments.create",
+        phase: "server-workload-role-guard",
+        serverId: "srv_existing",
+        requiredRole: "deployment-runtime",
+        workloadRoles: ["artifact-builder"],
+      },
+    });
+    expect(projects.items.size).toBe(0);
+    expect(servers.items.size).toBe(1);
+    expect(destinations.items.size).toBe(0);
+    expect(environments.items.size).toBe(0);
+    expect(resources.items.size).toBe(0);
+    expect(policyRepository.items.size).toBe(0);
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[SRV-ROLE-008] preserves historical deployment snapshots after deployment-runtime is removed", async () => {
+    const fixture = await createDeploymentFixture(undefined, {
+      serverWorkloadRoles: ["deployment-runtime"],
+    });
+    const historical = createHistoricalDeployment({
+      id: "dep_historical",
+      createdAt: "2025-12-31T23:00:00.000Z",
+      status: "succeeded",
+    });
+    const admitResult = await fixture.deployments.insertOne(
+      fixture.repositoryContext,
+      historical,
+      UpsertDeploymentSpec.fromDeployment(historical),
+    );
+    expect(admitResult.isOk()).toBe(true);
+    const server = await fixture.servers.findOne(
+      fixture.repositoryContext,
+      DeploymentTargetByIdSpec.create(DeploymentTargetId.rehydrate("srv_demo")),
+    );
+    if (!server) {
+      throw new Error("Expected server fixture");
+    }
+    server
+      .configureWorkloadRoles({
+        workloadRoles: DeploymentTargetWorkloadRoles.rehydrate(["artifact-builder"]),
+        configuredAt: UpdatedAt.rehydrate("2026-01-01T00:00:05.000Z"),
+      })
+      ._unsafeUnwrap();
+    await fixture.servers.upsert(
+      fixture.repositoryContext,
+      server,
+      UpsertDeploymentTargetSpec.fromDeploymentTarget(server),
+    );
+
+    const result = await fixture.createDeploymentUseCase.execute(
+      fixture.context,
+      fixture.createDeploymentInput,
+    );
+    const preserved = await fixture.deployments.findOne(
+      fixture.repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate("dep_historical")),
+    );
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().code).toBe("server_workload_role_mismatch");
+    expect(preserved?.toState()).toMatchObject({
+      id: { value: "dep_historical" },
+      status: { value: "succeeded" },
+      serverId: { value: "srv_demo" },
+    });
+    expect(fixture.deployments.items.size).toBe(1);
+  });
+
+  test("[SRV-ROLE-008] keeps source-backed redeploy and force-redeploy recoverable after role removal", async () => {
+    for (const recoveryKind of ["redeploy", "force-redeploy"] as const) {
+      const fixture = await createDeploymentFixture(undefined, {
+        serverWorkloadRoles: ["artifact-builder"],
+      });
+      const source = createHistoricalDeployment({
+        id: "dep_source",
+        createdAt: "2025-12-31T23:00:00.000Z",
+        status: "failed",
+      });
+      const inserted = await fixture.deployments.insertOne(
+        fixture.repositoryContext,
+        source,
+        UpsertDeploymentSpec.fromDeployment(source),
+      );
+      expect(inserted.isOk()).toBe(true);
+      const recovery =
+        recoveryKind === "redeploy"
+          ? new RedeployDeploymentUseCase(fixture.deployments, fixture.createDeploymentUseCase)
+          : new ForceRedeployDeploymentUseCase(
+              fixture.deployments,
+              fixture.createDeploymentUseCase,
+            );
+
+      const result = await recovery.execute(fixture.context, {
+        resourceId: "res_demo",
+        sourceDeploymentId: "dep_source",
+      });
+
+      expect(result.isOk()).toBe(true);
+      expect(result._unsafeUnwrap().id).not.toBe("dep_source");
+      expect(fixture.deployments.items.size).toBe(2);
+    }
+  });
+
+  test("[SRV-ROLE-007][SRV-LIFE-DEACT-004] preserves inactive lifecycle rejection precedence over role mismatch", async () => {
     const {
       context,
       createDeploymentInput,
@@ -3314,7 +3568,9 @@ describe("CreateDeploymentUseCase", () => {
       eventBus,
       repositoryContext,
       servers,
-    } = await createDeploymentFixture();
+    } = await createDeploymentFixture(undefined, {
+      serverWorkloadRoles: ["artifact-builder"],
+    });
     const server = await servers.findOne(
       repositoryContext,
       DeploymentTargetByIdSpec.create(DeploymentTargetId.rehydrate("srv_demo")),
@@ -3345,6 +3601,65 @@ describe("CreateDeploymentUseCase", () => {
       },
     });
     expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[SRV-ROLE-008][SRV-LIFE-DEACT-004] source-backed recovery preserves inactive lifecycle admission", async () => {
+    for (const recoveryKind of ["redeploy", "force-redeploy"] as const) {
+      const fixture = await createDeploymentFixture(undefined, {
+        serverWorkloadRoles: ["artifact-builder"],
+      });
+      const source = createHistoricalDeployment({
+        id: "dep_source",
+        createdAt: "2025-12-31T23:00:00.000Z",
+        status: "failed",
+      });
+      const inserted = await fixture.deployments.insertOne(
+        fixture.repositoryContext,
+        source,
+        UpsertDeploymentSpec.fromDeployment(source),
+      );
+      expect(inserted.isOk()).toBe(true);
+      const server = await fixture.servers.findOne(
+        fixture.repositoryContext,
+        DeploymentTargetByIdSpec.create(DeploymentTargetId.rehydrate("srv_demo")),
+      );
+      if (!server) {
+        throw new Error("Expected server fixture");
+      }
+      server
+        .deactivate({
+          deactivatedAt: DeactivatedAt.rehydrate("2026-01-01T00:00:05.000Z"),
+        })
+        ._unsafeUnwrap();
+      await fixture.servers.upsert(
+        fixture.repositoryContext,
+        server,
+        UpsertDeploymentTargetSpec.fromDeploymentTarget(server),
+      );
+      const recovery =
+        recoveryKind === "redeploy"
+          ? new RedeployDeploymentUseCase(fixture.deployments, fixture.createDeploymentUseCase)
+          : new ForceRedeployDeploymentUseCase(
+              fixture.deployments,
+              fixture.createDeploymentUseCase,
+            );
+
+      const result = await recovery.execute(fixture.context, {
+        resourceId: "res_demo",
+        sourceDeploymentId: "dep_source",
+      });
+
+      expect(result.isErr()).toBe(true);
+      expect(result._unsafeUnwrapErr()).toMatchObject({
+        code: "server_inactive",
+        details: {
+          phase: "server-lifecycle-guard",
+          serverId: "srv_demo",
+          commandName: "deployments.create",
+        },
+      });
+      expect(fixture.deployments.items.size).toBe(1);
+    }
   });
 
   test("[DEP-CREATE-ADM-023] supersedes the previous active deployment before admitting a new one", async () => {
