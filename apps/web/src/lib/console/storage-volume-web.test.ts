@@ -123,7 +123,7 @@ describe("storage volume Web console surface", () => {
 
   test("[STOR-WEB-001] points resource storage help at the public storage volume anchor", () => {
     expect(webDocsHrefs.storageVolumeLifecycle).toBe(
-      "/docs/resources/storage-volumes/#storage-volume-lifecycle",
+      "/docs/deliver/resources/#storage-volume-lifecycle",
     );
   });
 });

@@ -162,7 +162,7 @@ describe("organization auth management console surface", () => {
 
   test("[ORG-TEAM-WEB-003] points Web help at the organization/team public docs anchor", () => {
     expect(webDocsHrefs.organizationTeamManagement).toBe(
-      "/docs/self-hosting/organization-team-management/#self-hosting-organization-team-management",
+      "/docs/self-hosting/org-team/#self-hosting-organization-team-management",
     );
   });
 

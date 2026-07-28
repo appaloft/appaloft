@@ -332,13 +332,13 @@ describe("dependency resource Web console surface", () => {
 
   test("[DEP-RES-WEB-001] points dependency help at public lifecycle anchors", () => {
     expect(webDocsHrefs.dependencyResourceLifecycle).toBe(
-      "/docs/resources/dependencies/#dependency-resource-lifecycle",
+      "/docs/deliver/resources/#dependency-resource-lifecycle",
     );
     expect(webDocsHrefs.dependencyRuntimeInjection).toBe(
-      "/docs/resources/dependencies/#dependency-runtime-injection",
+      "/docs/deliver/resources/#dependency-runtime-injection",
     );
     expect(webDocsHrefs.dependencyBackupRestore).toBe(
-      "/docs/resources/dependencies/#dependency-backup-restore",
+      "/docs/deliver/resources/#dependency-backup-restore",
     );
   });
 });

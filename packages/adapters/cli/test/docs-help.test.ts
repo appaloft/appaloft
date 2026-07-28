@@ -8,7 +8,7 @@ describe("CLI docs help links", () => {
       "../src/commands/deployment"
     );
 
-    expect(deployCommandDocsHref).toBe("/docs/deploy/sources/#deployment-source");
+    expect(deployCommandDocsHref).toBe("/docs/deliver/sources/#deployment-source");
     expect(deployCommandDescription).toContain(deployCommandDocsHref);
   });
 
@@ -16,41 +16,41 @@ describe("CLI docs help links", () => {
     const { cliCommandDescriptions, cliDocsHrefs } = await import("../src/commands/docs-help");
 
     expect(cliDocsHrefs.serverSshCredential).toBe(
-      "/docs/servers/credentials/ssh-keys/#server-ssh-credential-path",
+      "/docs/servers/ssh-keys/#server-ssh-credential-path",
     );
     expect(cliDocsHrefs.environmentVariablePrecedence).toBe(
-      "/docs/environments/variables/precedence/#environment-variable-precedence",
+      "/docs/configuration/precedence/#environment-variable-precedence",
     );
     expect(cliDocsHrefs.environmentLifecycle).toBe(
-      "/docs/environments/model/#environment-lifecycle",
+      "/docs/configuration/model/#environment-lifecycle",
     );
     expect(cliDocsHrefs.resourceRuntimeProfile).toBe(
-      "/docs/resources/profiles/source-runtime/#resource-runtime-profile",
+      "/docs/deliver/profiles/#resource-runtime-profile",
     );
     expect(cliDocsHrefs.resourceProfileDrift).toBe(
-      "/docs/resources/profiles/source-runtime/#resource-profile-drift",
+      "/docs/deliver/profiles/#resource-profile-drift",
     );
     expect(cliDocsHrefs.resourceAccessProfile).toBe(
       "/docs/access/generated-routes/#resource-access-profile",
     );
     expect(cliDocsHrefs.domainCustomBinding).toBe(
-      "/docs/access/domains/custom-domains/#domain-binding-purpose",
+      "/docs/access/custom-domains/#domain-binding-purpose",
     );
     expect(cliDocsHrefs.certificateReadiness).toBe(
-      "/docs/access/tls/certificates/#certificate-readiness",
+      "/docs/access/certificates/#certificate-readiness",
     );
     expect(cliDocsHrefs.deploymentPreviewCleanup).toBe(
-      "/docs/deploy/recovery/#deployment-preview-cleanup",
+      "/docs/deliver/recovery/#deployment-preview-cleanup",
     );
     expect(cliDocsHrefs.deploymentSourceRelink).toBe(
-      "/docs/deploy/recovery/#deployment-source-relink",
+      "/docs/deliver/recovery/#deployment-source-relink",
     );
     expect(cliDocsHrefs.deploymentPlanPreview).toBe(
-      "/docs/deploy/lifecycle/#deployment-plan-preview",
+      "/docs/deliver/lifecycle/#deployment-plan-preview",
     );
-    expect(cliDocsHrefs.deploymentProof).toBe("/docs/deploy/lifecycle/#deployment-proof");
+    expect(cliDocsHrefs.deploymentProof).toBe("/docs/deliver/lifecycle/#deployment-proof");
     expect(cliDocsHrefs.serverTerminalSession).toBe(
-      "/docs/servers/operations/proxy-and-terminal/#server-terminal-session",
+      "/docs/servers/proxy-and-terminal/#server-terminal-session",
     );
     expect(cliDocsHrefs.serverDockerSwarmTarget).toBe(
       "/docs/servers/register-connect/#docker-swarm-runtime-target",
@@ -60,37 +60,37 @@ describe("CLI docs help links", () => {
       "/docs/reference/errors-statuses/#operator-work-ledger",
     );
     expect(cliDocsHrefs.sourceAutoDeploySetup).toBe(
-      "/docs/deploy/sources/#source-auto-deploy-setup",
+      "/docs/deliver/sources/#source-auto-deploy-setup",
     );
     expect(cliDocsHrefs.sourceAutoDeploySignatures).toBe(
-      "/docs/deploy/sources/#source-auto-deploy-signatures",
+      "/docs/deliver/sources/#source-auto-deploy-signatures",
     );
     expect(cliDocsHrefs.sourceAutoDeployDedupe).toBe(
-      "/docs/deploy/sources/#source-auto-deploy-dedupe",
+      "/docs/deliver/sources/#source-auto-deploy-dedupe",
     );
     expect(cliDocsHrefs.sourceAutoDeployIgnoredEvents).toBe(
-      "/docs/deploy/sources/#source-auto-deploy-ignored-events",
+      "/docs/deliver/sources/#source-auto-deploy-ignored-events",
     );
     expect(cliDocsHrefs.sourceAutoDeployRecovery).toBe(
-      "/docs/deploy/sources/#source-auto-deploy-recovery",
+      "/docs/deliver/sources/#source-auto-deploy-recovery",
     );
     expect(cliDocsHrefs.scheduledTaskLifecycle).toBe(
-      "/docs/resources/scheduled-tasks/#scheduled-task-resource-lifecycle",
+      "/docs/deliver/resources/#scheduled-task-resource-lifecycle",
     );
     expect(cliDocsHrefs.dependencyResourceLifecycle).toBe(
-      "/docs/resources/dependencies/#dependency-resource-lifecycle",
+      "/docs/deliver/resources/#dependency-resource-lifecycle",
     );
     expect(cliDocsHrefs.dependencyRuntimeInjection).toBe(
-      "/docs/resources/dependencies/#dependency-runtime-injection",
+      "/docs/deliver/resources/#dependency-runtime-injection",
     );
     expect(cliDocsHrefs.selfHostedOrganizationTeam).toBe(
-      "/docs/self-hosting/organization-team-management/#self-hosting-organization-team-management",
+      "/docs/self-hosting/org-team/#self-hosting-organization-team-management",
     );
     expect(cliDocsHrefs.selfHostedFirstAdmin).toBe(
-      "/docs/self-hosting/first-admin-bootstrap/#self-hosting-first-admin-bootstrap",
+      "/docs/self-hosting/first-admin/#self-hosting-first-admin-bootstrap",
     );
     expect(cliDocsHrefs.selfHostedActionDeployToken).toBe(
-      "/docs/self-hosting/action-deploy-token-auth/#self-hosting-action-deploy-token-auth",
+      "/docs/self-hosting/action-token/#self-hosting-action-deploy-token-auth",
     );
 
     expect(cliCommandDescriptions.serverCredential).toContain(cliDocsHrefs.serverSshCredential);

@@ -29,7 +29,7 @@ describe("shell domain error formatting", () => {
         links: [
           {
             rel: "human-doc",
-            href: "/docs/observe/diagnostics/#runtime-target-capacity-inspect",
+            href: "/docs/troubleshoot/diagnostics/#runtime-target-capacity-inspect",
           },
           {
             rel: "llm-guide",
@@ -57,7 +57,7 @@ describe("shell domain error formatting", () => {
       "stderr=mkdir: cannot create directory '/var/lib/appaloft/runtime/state': No space left on device",
     );
     expect(output).toContain(
-      "human-doc: /docs/observe/diagnostics/#runtime-target-capacity-inspect",
+      "human-doc: /docs/troubleshoot/diagnostics/#runtime-target-capacity-inspect",
     );
     expect(output).toContain(
       "llm-guide: /docs/.well-known/appaloft/errors/infra_error.remote-state-resolution.json",
