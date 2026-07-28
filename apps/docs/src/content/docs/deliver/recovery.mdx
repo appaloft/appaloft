@@ -1,0 +1,129 @@
+---
+title: "回滚与恢复"
+description: "在部署失败或异常时安全回滚或恢复到已知良好状态。"
+docType: "troubleshooting"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "relink"
+  - "retry"
+  - "rollback"
+  - "cancel"
+  - "恢复"
+  - "回滚"
+relatedOperations:
+  - "deployments.recovery-readiness"
+  - "deployments.retry"
+  - "deployments.rollback"
+  - "deployments.cancel"
+sidebar:
+  order: 5
+---
+<a id="deployment-preview-cleanup" />
+
+
+## 症状
+
+部署失败、被取消，或者观察流（timeline）中断，你需要判断接下来应该重试、修复配置，还是回滚到历史版本。
+
+## 可能原因
+
+| 现象 | 最可能的原因 |
+| --- | --- |
+| Source 无法读取 | 仓库/镜像地址失效、凭据过期、ref 不存在 |
+| Runtime/Profile 不匹配 | Source 类型与 Runtime Profile 配置冲突 |
+| SSH 或服务器执行失败 | 服务器连通性、凭据或资源不足 |
+| 应用启动但健康检查失败 | 健康检查路径/端口配置与应用实际行为不一致 |
+| 默认访问地址失败 | 代理就绪或网络 Profile 配置问题 |
+| 自定义域名失败 | DNS/TLS 配置问题（先确认默认访问地址正常） |
+
+## 如何检查状态、日志、事件或诊断 <a id="deployment-recovery-readiness" />
+
+在采取任何恢复动作之前，先只读检查恢复就绪状态：
+
+```bash
+appaloft deployments recovery-readiness <deploymentId>
+```
+
+这个查询是只读的，会返回：
+
+- `recoverable`、`retryable`、`redeployable`、`rollbackReady` 等机器可读字段；
+- `retry`、`redeploy`、`rollback` 各自的阻塞原因；
+- 可用的回滚候选（历史成功部署），以及候选是否缺少必要的产物或快照；
+- 建议的下一步，例如先看日志、事件流或诊断摘要。
+
+## 安全恢复步骤
+
+根据 readiness 的建议选择动作：
+
+```bash
+# Retry：基于失败部署的快照，创建一个新的部署尝试
+appaloft deployments retry <deploymentId>
+
+# Redeploy：使用当前 Resource Profile 重新部署（会读取最新配置，不复用旧快照）
+appaloft deployments redeploy <resourceId>
+
+# Force redeploy：像 redeploy 一样，但强制刷新运行时产物（跳过构建缓存 / 强制拉取镜像）
+appaloft deployments force-redeploy <resourceId>
+
+# Rollback：基于历史成功部署的快照和产物，创建新的回滚尝试
+appaloft deployments rollback <deploymentId> --candidate <candidateDeploymentId>
+
+# Cancel：停止一个尚未完成的部署尝试（不会删除历史记录）
+appaloft deployments cancel <deploymentId> --confirm <deploymentId>
+```
+
+- **Retry** 不是重放旧事件，也不会在旧尝试里继续执行失败阶段——它基于失败部署不可变的输入快照创建一次全新尝试。
+- **Redeploy** 会读取当前 Resource Profile；如果当前 Profile 缺失或有明显漂移，`recovery-readiness` 会把 redeploy 标记为阻塞。
+- **Rollback** 不会从当前 Resource Profile 重新规划，也不会恢复数据库、卷或外部依赖的状态——它只回滚应用运行时本身。
+- **Cancel** 的 `--confirm` 必须和部署 id 完全一致；已经处于终态（成功/失败/取消/回滚）的尝试会被拒绝。
+
+## 何时重试
+
+输入校验失败应该先修正输入再重试；执行阶段的临时失败（例如网络抖动）通常可以直接重试。
+
+## 何时回滚
+
+Verify 阶段失败、且修复配置需要时间时，优先回滚到已知良好的历史版本，再离线排查根因，而不是让用户长时间面对一个不健康的部署。
+
+## 长时间无活动的部署
+
+部署长时间停在 `created`、`planning`、`planned`、`running` 或 `cancel-requested` 状态时：
+
+```bash
+# 只读查询：找出长时间无活动的尝试
+appaloft deployments stale --stale-after-seconds 900
+
+# 确认确实失去执行所有权后，用返回的 stateVersion 显式协调
+appaloft deployments reconcile-stale <deploymentId> \
+  --state-version <stateVersion> \
+  --stale-after-seconds 900 \
+  --confirm <deploymentId>
+```
+
+协调成功后，旧尝试会变为 `interrupted`；历史和恢复证据仍然保留，之后可以再走一次 `recovery-readiness` 选择 retry 或 redeploy。
+
+## 来源重新关联 <a id="deployment-source-relink" />
+
+如果需要把资源指向一个新的仓库、目录或镜像（而不只是重试同一个来源），使用来源重新关联，详见[配置部署来源](/docs/deliver/sources/)。这是一个显式动作，不应该被当成普通重试。
+
+## 归档和清理历史
+
+```bash
+# 把一个终态部署从默认历史列表中隐藏（不删除日志、事件或审计记录）
+appaloft deployments archive <deploymentId> --confirm <deploymentId>
+
+# 默认只是预览：清理早于某个时间点、已归档、且没有被引用的终态部署
+appaloft deployments prune --before <iso>
+```
+
+## 什么时候需要复制诊断信息求助
+
+如果 `recovery-readiness` 显示所有动作都被阻塞，或者同一个失败在修复配置后仍然反复出现，运行[生成安全诊断信息](/docs/troubleshoot/diagnostics/)中的命令，生成一份不含密钥的诊断摘要再寻求支持。
+
+## 相关参考页面
+
+- [部署生命周期](/docs/deliver/lifecycle/)
+- [常见故障与恢复](/docs/troubleshoot/recovery/)
+- [查看日志与健康摘要](/docs/troubleshoot/logs-health/)

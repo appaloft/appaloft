@@ -1,0 +1,109 @@
+---
+import { Icon } from "astro-icon/components";
+import { Button } from "./ui/button";
+import { LinkButton } from "./ui/link-button";
+import { ThemeToggle } from "./ui/theme-toggle";
+import { SearchTrigger } from "./ui/search";
+import { config } from "virtual:nimbus/config";
+import { getSidebarSections } from "@cloudflare/nimbus-docs";
+import { localeFromEntryId } from "@/lib/locale";
+import { docsPathForLocale } from "@/lib/locale-preference";
+
+interface Props {
+  /** Astro collection id for the current page, forwarded from DocsLayout. */
+  collection?: string;
+  /** Astro entry id for the current page, forwarded from DocsLayout. */
+  entryId?: string;
+  /**
+   * Whether the page has a sidebar to open. When `false`, the mobile
+   * menu button is hidden — pages that opted out via `sidebar: false`
+   * shouldn't show a button that opens an empty dialog. Default `true`.
+   */
+  showSidebar?: boolean;
+}
+
+const { collection, entryId, showSidebar = true } = Astro.props;
+
+// Normalize trailing slash so isActive matches sidebar hrefs.
+const currentSlug = Astro.url.pathname.replace(/\/$/, "") || "/";
+const sections = await getSidebarSections(currentSlug, { collection });
+const showSections = sections.length >= 2;
+
+const locale = entryId ? localeFromEntryId(entryId) : "zh-CN";
+const homeHref = locale === "en-US" ? "/en" : "/";
+const otherLocale = locale === "en-US" ? "zh-CN" : "en-US";
+const otherLocaleHref = docsPathForLocale({
+  docsBase: import.meta.env.BASE_URL,
+  locale: otherLocale,
+  pathname: Astro.url.pathname,
+});
+const otherLocaleLabel = otherLocale === "en-US" ? "EN" : "中文";
+---
+
+<header class="sticky top-0 z-30 border-b border-border bg-card/80 backdrop-blur-lg">
+  <div class="mx-auto flex items-center justify-between h-14 px-4 lg:px-6">
+    <div class="flex items-center gap-3">
+      <a href={homeHref} class="group">
+        <span class="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
+          {config.title}
+        </span>
+      </a>
+
+      {showSections && (
+        <nav aria-label="Sections" class="hidden md:flex items-center gap-1 ml-4 pl-4 border-l border-border h-6">
+          {sections.map((section) => (
+            <a
+              href={section.href}
+              aria-current={section.isActive ? "page" : undefined}
+              class:list={[
+                "px-2 py-1 rounded-md text-[0.8125rem] font-medium no-underline transition-colors",
+                section.isActive
+                  ? "text-foreground bg-accent"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent/60",
+              ]}
+            >
+              {section.label}
+            </a>
+          ))}
+        </nav>
+      )}
+    </div>
+
+    <div class="flex items-center gap-2">
+      <a
+        href={otherLocaleHref}
+        class="px-2 py-1 rounded-md text-[0.8125rem] font-medium text-muted-foreground no-underline transition-colors hover:text-foreground hover:bg-accent/60"
+        aria-label={`Switch to ${otherLocale}`}
+      >
+        {otherLocaleLabel}
+      </a>
+      {config.search !== false && <SearchTrigger />}
+      {config.github && (
+        <LinkButton
+          href={config.github}
+          variant="minimal"
+          shape="square"
+          size="sm"
+          aria-label="GitHub"
+          target="_blank"
+          rel="noopener"
+          class="text-muted-foreground"
+        >
+          <Icon name="ph:github-logo" class="w-4 h-4" />
+        </LinkButton>
+      )}
+      <ThemeToggle />
+      {showSidebar && (
+        <Button
+          variant="ghost"
+          shape="square"
+          size="sm"
+          icon="ph:list"
+          aria-label="Open navigation"
+          data-menu-btn
+          class="lg:hidden text-muted-foreground"
+        />
+      )}
+    </div>
+  </div>
+</header>

@@ -1,32 +1,16 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "astro/tsconfigs/strict",
   "compilerOptions": {
-    "allowJs": true,
-    "incremental": true,
-    "isolatedModules": true,
-    "jsx": "preserve",
-    "lib": ["DOM", "DOM.Iterable", "ES2023"],
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "baseUrl": ".",
+    // `astro/tsconfigs/strict` doesn't set `types`, so without this,
+    // `bun:test` (used by `src/lib/locale-preference.test.ts`) isn't
+    // resolvable — `bun-types` isn't under `node_modules/@types/`, so
+    // TypeScript won't auto-include it.
+    "types": ["bun-types"],
     "paths": {
-      "@/*": ["./src/*"],
-      "@appaloft/design": ["../../packages/design/src/index.ts"],
-      "@appaloft/openapi": ["../../packages/openapi/src/index.ts"],
-      "fumadocs-mdx:collections/*": ["./.source/*"]
-    },
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ]
+      "@/*": ["src/*"]
+    }
   },
-  "include": [
-    "next-env.d.ts",
-    "source.config.ts",
-    ".next/types/**/*.ts",
-    ".source/**/*.ts",
-    "src/**/*.ts",
-    "src/**/*.tsx"
-  ],
-  "exclude": ["node_modules"]
+  "include": [".astro/types.d.ts", "**/*"],
+  "exclude": ["dist"]
 }

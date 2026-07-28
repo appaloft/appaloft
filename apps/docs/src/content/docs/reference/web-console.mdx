@@ -1,0 +1,55 @@
+---
+title: "Web console guide"
+description: "Web console 页面、表单输入、问号帮助和状态观察说明。"
+docType: "reference"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "web"
+  - "console"
+  - "question mark"
+  - "ui"
+  - "控制台"
+  - "问号"
+relatedOperations:
+  - "resources.create"
+  - "deployments.create"
+sidebar:
+  order: 7
+---
+
+## 标识
+
+Web 控制台是 Appaloft 的图形化入口——它只负责收集输入、显示状态并调用和 CLI/API 完全相同的 HTTP/oRPC 契约,不会在 Web 层单独实现部署规则或生命周期解释。
+
+## 问号帮助
+
+表单中容易被误解的字段旁边会有一个 `?` 帮助图标,点击后跳转到本文档站点的稳定锚点——而不是根据当前翻译标题临时生成的 id,这样帮助链接不会因为界面文案调整而失效。
+
+## 资源视角操作
+
+和某个资源相关的操作会优先出现在该资源的详情页,而不是散落在全局菜单里,例如:
+
+- 发起新部署;
+- 查看运行时日志和健康状态;
+- 配置代理和域名。
+
+## 不隐藏业务逻辑
+
+Web 控制台**只**收集输入、显示状态并调用 HTTP/oRPC 契约——部署规则、生命周期阶段的含义等业务解释,始终来自共享的业务语义和本文档站点,不会在界面文案里重新定义一套不同的说法。
+
+## 本地文档链接(自托管)
+
+自托管部署时,Web 控制台的 `?` 链接会优先打开本地 `/docs/*`,保持完全离线可用。
+
+单独运行 Web 开发服务器时,`/docs/*` 会重定向到本地文档开发服务器。根目录的 `bun dev` 会同时启动文档服务;如果需要调整本地文档地址,可以设置 `APPALOFT_DEV_DOCS_HOST` / `APPALOFT_DEV_DOCS_PORT`,或用 `APPALOFT_WEB_DEV_DOCS_TARGET` 覆盖完整目标——完整变量列表见[运行时配置参考](/docs/reference/configuration/)。
+
+## 产品版本
+
+Web 控制台会显示后端 `/api/version` 返回的 Appaloft 产品版本。正式发布和二进制打包会通过 `APPALOFT_APP_VERSION` 注入版本号;开发环境默认使用仓库根 `package.json` 中的版本。
+
+## 相关任务
+
+- [选择入口](/docs/start/entrypoints/)
+- [运行时配置参考](/docs/reference/configuration/)

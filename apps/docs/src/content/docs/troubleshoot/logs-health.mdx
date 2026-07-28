@@ -1,0 +1,104 @@
+---
+title: "查看日志与健康摘要"
+description: "读取运行时日志并解读健康摘要。"
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "logs"
+  - "health"
+  - "readiness"
+  - "restart"
+  - "日志"
+  - "健康摘要"
+relatedOperations:
+  - "resources.runtime-logs"
+  - "resources.health"
+  - "resources.runtime.restart"
+sidebar:
+  order: 3
+---
+
+## 目标
+
+读取应用的运行时日志，并通过健康摘要一次性了解部署、运行时、代理和访问地址的综合状态。
+
+## 适用场景
+
+- 应用启动失败或行为异常，需要看它自己打印了什么。
+- 需要判断"接下来该重试、修复配置还是回滚"。
+
+## 前置条件
+
+- 至少有一次部署尝试（成功或失败均可）。
+
+## 输入与默认值
+
+| 输入 | 说明 | 默认值 |
+| --- | --- | --- |
+| `--tail` | 只看最近 N 行日志 | 全部（建议显式指定，避免输出过长） |
+| `--checks` | 健康检查时附带详细检查项 | 关闭 |
+| `--public-access-probe` | 健康检查时附带一次公网访问探测 | 关闭 |
+
+## CLI 操作步骤
+
+<a id="observe-runtime-logs" />
+
+<a id="observe-health-summary" />
+
+```bash
+# 读取最近 100 行运行时日志
+appaloft resource logs res_web --tail 100
+
+# 读取健康摘要，附带详细检查项和公网访问探测
+appaloft resource health res_web --checks --public-access-probe
+```
+
+## HTTP/API 操作步骤
+
+```http
+GET /api/resources/res_web/runtime-logs?tailLines=100
+GET /api/resources/res_web/health?checks=true&publicAccessProbe=true
+```
+
+## 预期输出与状态
+
+**运行时日志**来自应用进程的 stdout/stderr，适合回答：应用是否启动、启动命令是否执行、监听端口是否正确、配置/环境变量是否缺失、应用代码是否抛出运行时异常。日志**不适合**判断域名所有权或证书就绪——那些应该看[访问](/docs/access/overview/)相关状态。
+
+**健康摘要**把以下信息合并在一次调用中返回：最近部署状态和失败阶段、运行时进程状态、健康检查策略和最近检查结果、网络 Profile 和代理目标、生成访问地址状态、自定义域名和 TLS 就绪摘要。
+
+## 验证
+
+对照下表判断根因：
+
+| 现象 | 恢复方向 |
+| --- | --- |
+| 日志显示端口冲突 | 修正[网络 Profile](/docs/deliver/profiles/)或启动命令 |
+| 日志显示缺少环境变量 | 修正[配置优先级](/docs/configuration/precedence/)中设置的变量后重新部署 |
+| 健康检查超时 | 调整健康检查路径、超时时间、重试次数或启动等待期 |
+| 应用健康但生成访问地址失败 | 查看[代理就绪](/docs/servers/proxy-and-terminal/)和[访问](/docs/access/overview/)状态 |
+
+## 回滚 / 恢复 <a id="resource-runtime-controls" /><a id="runtime-restart-vs-redeploy" /><a id="runtime-control-blocked-start" />
+
+如果只是想让当前运行时重启一下（**不会**重新构建、不会刷新配置/密钥/依赖绑定），使用运行时控制：
+
+```bash
+appaloft resource runtime restart res_web
+```
+
+**Restart 不等于 Redeploy**——如果你修改了源码、环境变量、密钥、Runtime/Network/Health Profile、存储挂载或依赖绑定，必须使用 Redeploy、Retry 或 Rollback（见[回滚与恢复](/docs/deliver/recovery/)），Restart 不会应用这些变更。
+
+如果 Start 操作被阻塞（例如运行时元数据缺失或过期、资源已归档、存在并发部署），健康摘要会给出被阻塞的原因；此时应该改用 Redeploy 让最新配置形成一次新部署，而不是反复重试 Start。
+
+## 故障排查链接
+
+- [常见故障与恢复](/docs/troubleshoot/recovery/)
+- [生成安全诊断信息](/docs/troubleshoot/diagnostics/)
+
+## 相关参考页面
+
+- [状态与事件](/docs/troubleshoot/status-events/)
+- [运行时 / 健康 / 网络 Profile](/docs/deliver/profiles/)
+
+如果是 AI Agent 在完成部署后做后续检查，推荐依次返回 `appaloft deployments timeline <deploymentId>`、`appaloft resource diagnose <resourceId>`、`appaloft deployments recovery-readiness <deploymentId>`，而不是让用户自己去服务器上找原始日志。

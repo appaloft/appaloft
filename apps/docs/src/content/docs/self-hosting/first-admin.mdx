@@ -1,0 +1,129 @@
+---
+title: "创建首个管理员"
+description: "首次安装后创建管理员账户。"
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "first admin"
+  - "bootstrap"
+  - "local admin"
+  - "OAuth"
+  - "首次管理员"
+  - "本地管理员"
+relatedOperations:
+  - "auth.bootstrap-status"
+  - "auth.bootstrap-first-admin"
+sidebar:
+  order: 2
+---
+<a id="first-admin-bootstrap" />
+
+
+## 目标 <a id="self-hosting-first-admin-bootstrap" />
+
+自托管 Appaloft 首次启动后创建本地管理员账号,用它登录 Web 控制台并完成后续组织配置。
+
+## 适用场景
+
+- 刚完成[安装](/docs/self-hosting/install/),需要创建第一个可登录的管理员。
+
+## 前置条件
+
+- Appaloft 实例已经安装完成并正常运行。
+
+## Web 操作步骤
+
+打开安装器打印的控制台 URL。控制台会检查引导状态,并把首次访问者引导到 `/bootstrap/auth/first-admin`——也可以直接打开这个设置路径。如果实例中已经存在管理员,该页面会引导你转到 `/login` 登录,而不会再次创建账号。
+
+## CLI 操作步骤
+
+安装时可以直接传入管理员信息:
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- \
+  --first-admin-email admin@example.com \
+  --first-admin-name "Admin"
+```
+
+如果没有传 `--first-admin-password`,安装器会生成一次性密码,并在 Appaloft 容器健康后打印**一次**——请立即保存。重新运行安装器时,如果已存在管理员或组织 Owner,引导会安全跳过,不会再次显示密码。
+
+也可以自己提供初始密码:
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- \
+  --first-admin-email admin@example.com \
+  --first-admin-password "$APPALOFT_INITIAL_ADMIN_PASSWORD"
+```
+
+容器或自托管运行时也可以通过环境变量在启动时自动创建首次管理员:
+
+```bash
+APPALOFT_FIRST_ADMIN_EMAIL=admin@example.com
+APPALOFT_FIRST_ADMIN_DISPLAY_NAME=Admin
+APPALOFT_FIRST_ADMIN_ORGANIZATION_NAME="Self-hosted Appaloft"
+APPALOFT_FIRST_ADMIN_ORGANIZATION_SLUG=self-hosted-appaloft
+APPALOFT_FIRST_ADMIN_PASSWORD="$APPALOFT_INITIAL_ADMIN_PASSWORD"
+```
+
+启动时引导只会在同时配置邮箱和密码时自动执行;如果没有提供密码,必须配置 `APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE`,让生成的一次性密码有受信任的输出位置。
+
+也可以走命令行引导:
+
+```bash
+appaloft auth bootstrap-status
+appaloft auth bootstrap-first-admin --email admin@example.com --display-name "Admin"
+```
+
+## HTTP/API 操作步骤
+
+```http
+GET /api/bootstrap/auth/status
+POST /api/bootstrap/auth/first-admin
+```
+
+引导状态接口是刻意公开的;创建接口只在首次配置未完成时可用。一旦已存在管理员或组织 Owner,该接口会返回 `404 first_admin_bootstrap_disabled`,不会创建新管理员或返回密码。
+
+## 预期输出与状态
+
+登录后,Appaloft 会把你识别为用户会话,并按组织角色保护产品级修改操作。没有会话的修改请求会返回 `401 product_auth_missing`;已登录但不属于目标组织或角色不足时,会返回 `403 product_auth_forbidden`。
+
+## 验证
+
+用配置的邮箱和密码登录控制台,确认能看到组织首页。需要结束当前浏览器会话时,使用控制台顶部栏的 **退出登录**。
+
+## 回滚 / 恢复
+
+如果忘记生成的一次性密码,重新运行安装器**不会**再次显示旧密码——应该优先使用已登录的管理员会话,或从受信任备份恢复。**不要直接编辑数据库用户或组织记录来绕过登录**。
+
+如果安装后无法登录,按以下顺序排查:
+
+1. 确认使用的是安装器打印的控制台 URL,而不是某个项目资源的域名。
+2. 检查首次管理员邮箱是否和安装输入一致。
+3. 查看安装器输出是否显示引导已跳过——如果已跳过,说明实例里已经存在管理员或 Owner。
+4. 看到 `401 product_auth_missing` 时重新登录;看到 `403 product_auth_forbidden` 时确认当前用户属于目标组织且拥有 admin 或 owner 角色。
+
+## OAuth 是可选项
+
+Google、GitHub 或通用 OIDC 登录可以稍后再配置——缺少相关配置时,OAuth 登录应该保持关闭,但**不应该阻塞本地管理员登录**。
+
+先用本地管理员完成首次登录,确认控制台可用后,再按需添加:
+
+| Provider | 必需配置 |
+| --- | --- |
+| GitHub | `APPALOFT_GITHUB_CLIENT_ID`、`APPALOFT_GITHUB_CLIENT_SECRET`、`APPALOFT_GITHUB_REDIRECT_URI` |
+| Google | `APPALOFT_GOOGLE_CLIENT_ID`、`APPALOFT_GOOGLE_CLIENT_SECRET`、`APPALOFT_GOOGLE_REDIRECT_URI` |
+| 通用 OIDC | `APPALOFT_OIDC_CLIENT_ID`、`APPALOFT_OIDC_CLIENT_SECRET`、`APPALOFT_OIDC_DISCOVERY_URL`、`APPALOFT_OIDC_REDIRECT_URI` |
+
+浏览器控制台源地址必须通过 `APPALOFT_WEB_ORIGIN` 配置为受信任源。完整变量说明见[运行时配置参考](/docs/reference/configuration/)。
+
+## 故障排查链接
+
+- [组织与团队](/docs/self-hosting/org-team/)
+- [常见故障与恢复](/docs/troubleshoot/recovery/)
+
+## 相关参考页面
+
+- [安装 Appaloft](/docs/self-hosting/install/)
+- [组织与团队](/docs/self-hosting/org-team/)

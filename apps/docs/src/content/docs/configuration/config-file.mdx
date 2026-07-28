@@ -1,0 +1,84 @@
+---
+title: "配置文件参考"
+description: "仓库内配置文件的字段、校验与优先级。"
+docType: "reference"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "config file"
+  - "appaloft config"
+  - "repository config"
+  - "appaloft.yml"
+  - "配置文件"
+relatedOperations: []
+sidebar:
+  order: 6
+---
+
+## 标识
+
+`appaloft.yml`（或 `appaloft.yaml`）是保存在仓库中的可审查配置文件，用来声明 Project、Resource、Environment 和部署的默认值。**Secret 值不应该直接写入仓库配置文件**——只应该声明"这个值应该从哪里获取"。
+
+## 输入字段与校验
+
+### `env` 与 `secrets`
+
+```yaml
+env:
+  APP_URL: "http://{pr_number}.preview.example.com"
+secrets:
+  APP_SECRET:
+    from: ci-env:APP_SECRET
+    required: true
+```
+
+- `env` 用来写非敏感值。Pull Request 预览部署中，`env` 的值可以使用 `{pr_number}` 和 `{preview_id}` 占位符。
+- `secrets` 只声明**引用**（例如 `ci-env:APP_SECRET` 表示从 CI 环境变量读取），真实值必须保存在 GitHub Secrets、其他 CI Secret Store，或 Appaloft 管理的密钥中，不会出现在这个文件里。
+
+### `controlPlane`
+
+```yaml
+controlPlane:
+  mode: none
+```
+
+`controlPlane.mode` 声明部署所有权的默认值：
+
+| 值 | 含义 |
+| --- | --- |
+| `none` | 纯 CLI 或 Action + SSH 部署，不依赖远程控制面 |
+| `self-hosted` | 由自托管 Appaloft Server 拥有部署状态，Action 调用 Server API 而不是直接操作 SSH |
+
+`controlPlane.url` 不是 Secret，但必须是不带凭据、路径、query 或 fragment 的纯 `http(s)` origin。**Token、SSH key、仓库身份、组织/租户/Provider 账号身份、数据库 URL 和其他 Secret 值都不应该写进仓库配置。**
+
+```yaml
+controlPlane:
+  mode: self-hosted
+  url: https://console.example.com
+  deploymentContext:
+    projectId: prj_www
+    environmentId: env_prod
+    resourceId: res_www
+    serverId: srv_prod
+```
+
+`controlPlane.deploymentContext` 是一个**窄范围的高级字段**，只应该用于一次性 bootstrap、重新关联或支持/调试场景，把仓库显式绑定到已存在的 Project/Environment/Resource/Server。普通自托管部署不需要在配置文件中写这些 id——Server 应该优先从来源链接状态、Deploy Token 作用域或可信的仓库/ref 上下文自动解析目标。
+
+## 输出字段与状态值
+
+配置文件本身不产生运行时输出；它作为部署输入的一部分参与 [部署生命周期](/docs/deliver/lifecycle/)的 detect/plan 阶段，最终值会体现在部署的 Profile 摘要中。
+
+## 错误码与恢复提示
+
+| 症状 | 可能原因 |
+| --- | --- |
+| 部署时报告"字段不应写入配置" | 配置文件中出现了 Token、SSH key 或数据库 URL 等敏感字段——应该改为 `secrets` 引用或使用 Web/CLI 单独配置 |
+| `controlPlane.url` 校验失败 | URL 带有凭据、路径、query 或 fragment；请只保留纯 origin |
+| Preview 部署没有读到 `{pr_number}` | 确认这次部署确实带上了 `--preview` 相关标志，见[预览与清理](/docs/deliver/previews/) |
+
+## 相关任务
+
+- [配置部署来源](/docs/deliver/sources/)
+- [安全处理密钥](/docs/configuration/secrets/)
+- [预览与清理](/docs/deliver/previews/)

@@ -1,0 +1,63 @@
+---
+title: "服务器总览"
+description: "部署目标机器的注册、凭据与连接性检查如何组合。"
+docType: "concept"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "server"
+  - "ssh"
+  - "credential"
+  - "deployment target"
+  - "服务器"
+  - "凭据"
+relatedOperations:
+  - "servers.register"
+  - "servers.test-connectivity"
+sidebar:
+  order: 1
+---
+
+## 简要定义
+
+Server 是 Appaloft 可以连接、检查和部署应用的目标机器。Appaloft 是 BYOS（Bring Your Own Server）模型——你注册自己的服务器，Appaloft 负责连接、编排和路由，不提供托管计算资源。
+
+```mermaid
+flowchart LR
+    A[注册服务器] --> B[配置 SSH 凭据]
+    B --> C[运行连接测试]
+    C --> D{通过?}
+    D -- 是 --> E[代理就绪检查]
+    D -- 否 --> F[按诊断修复凭据/网络]
+    F --> C
+    E --> G[可作为部署目标]
+```
+
+## 为什么存在这个概念
+
+部署目标和部署来源、部署配置是三个独立的问题：来源回答"部署什么"，配置回答"用什么参数运行"，而服务器回答"代码最终跑在哪里"。把服务器独立建模，是为了让同一个来源和配置可以复用到不同机器（例如从测试机迁移到生产机）而不需要重新定义部署本身。
+
+一台服务器可以承载多个资源；某个资源是否真正可访问，还取决于它自己的[网络 Profile](/docs/deliver/profiles/)和服务器的代理就绪状态。
+
+## 在 Web / CLI / API 中的体现
+
+- **Web** — Servers 列表展示 host、连接状态和代理就绪状态；详情页可以运行连接测试、修改代理类型、停用或删除。
+- **CLI** — `appaloft server register` / `test` / `show` / `rename` / `deactivate` / `delete`。
+- **HTTP/API** — `POST /api/servers`、`GET /api/servers/{id}` 复用相同字段。
+
+## 常见误区
+
+- **认为服务器由 Appaloft 托管**：默认情况下服务器是你自己的机器；托管形态只存在于 Appaloft Cloud 的 Sandbox 场景，见[托管 Sandbox](/docs/cloud/sandbox-managed/)。
+- **把连接测试失败当成部署失败**：连接测试只会阻止依赖该服务器的**新**部署，不影响已经在运行的工作负载。
+- **认为停用会停止已有运行任务**：停用只阻止服务器被选为新的部署/调度/代理配置目标，不会停止已有运行任务，也不会删除部署历史、域名、证书或凭据。
+
+## 相关任务
+
+- [注册并连接服务器](/docs/servers/register-connect/)
+- [SSH 凭据管理](/docs/servers/ssh-keys/)
+- [代理就绪与终端会话](/docs/servers/proxy-and-terminal/)
+
+## 进阶细节
+
+服务器可以注册为单机（`single-server`）或集群形态的部署目标（`orchestrator-cluster`，例如 Docker Swarm manager）。集群形态目前需要显式选择对应 Provider，且是否真正可用还取决于已注册的运行时后端能力和连接检查结果，而不是注册本身。

@@ -1,0 +1,27 @@
+---
+/**
+ * Links to the generated OpenAPI document (`scripts/generate-openapi.mjs`
+ * writes `public/openapi.json` at dev/build time from `@appaloft/openapi`).
+ * v1 keeps this to a plain link/iframe per the migration's Approach step
+ * 11 — a richer embedded Scalar/Swagger viewer is a follow-up, not a
+ * blocker for the Nimbus/Astro cutover.
+ */
+interface Props {
+  locale?: "zh-CN" | "en-US";
+}
+
+const { locale = "zh-CN" } = Astro.props;
+const href = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/openapi.json`;
+---
+
+<div class="not-prose my-4 rounded-lg border border-border bg-card p-4">
+  <p class="text-sm text-muted-foreground m-0">
+    {locale === "en-US" ? "Generated OpenAPI document:" : "生成的 OpenAPI 文档："}
+    {" "}<a href={href} target="_blank" rel="noopener">{href}</a>
+  </p>
+  <iframe
+    src={href}
+    title="Appaloft OpenAPI document"
+    class="mt-3 h-64 w-full rounded-md border border-border bg-background"
+  ></iframe>
+</div>

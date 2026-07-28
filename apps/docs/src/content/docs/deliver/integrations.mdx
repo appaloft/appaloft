@@ -1,0 +1,116 @@
+---
+title: "GitHub 与集成"
+description: "GitHub 仓库授权、Provider 与插件集成如何接入交付流程。"
+docType: "concept"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "github"
+  - "provider"
+  - "plugin"
+  - "connection"
+  - "connector"
+  - "仓库"
+  - "插件"
+  - "集成"
+relatedOperations:
+  - "system.github-repositories.list"
+  - "system.providers.list"
+  - "system.plugins.list"
+sidebar:
+  order: 9
+---
+<a id="integration-connections" />
+<a id="provider-boundary" />
+<a id="plugin-boundary" />
+
+
+## 简要定义
+
+"集成"覆盖三类外部连接：GitHub 仓库授权（作为部署来源）、Provider（基础设施/DNS/通知等能力提供方）、Plugin（扩展 Appaloft 自身行为）。它们都通过统一的 Connection 模型管理授权和撤销。
+
+## 为什么存在这个概念
+
+部署来源、DNS 自动配置、通知推送和自定义扩展点，本质上都是"Appaloft 代表你使用一个外部系统的能力"。把它们放在同一套 Connection/Connector 模型下，是为了让授权、撤销、审计和安全边界只需要实现一次。
+
+## GitHub 仓库 <a id="source-auto-deploy-setup" /><a id="source-auto-deploy-signatures" /><a id="source-auto-deploy-dedupe" /><a id="source-auto-deploy-ignored-events" /><a id="source-auto-deploy-recovery" /><a id="source-auto-deploy-retention" />
+
+GitHub 仓库把一次部署和一段可追溯的源码绑定起来：仓库、ref、工作目录和部署身份需要一起记录，这样重试、回滚和预览才能回到同一组输入。
+
+```bash
+# 查看当前 workspace 的 GitHub App 安装状态
+appaloft github status
+
+# 浏览已授权访问的仓库
+appaloft github repositories --search web
+```
+
+配置一个 GitHub 来源至少需要确认：仓库（owner/repo）、Ref（分支/tag/commit SHA，生产环境用稳定分支，预览用 Pull Request 的 commit SHA）、目录（monorepo 中不要假设仓库根目录就是应用目录）、触发方式（手动/推送自动/Pull Request 预览）。
+
+> Pull Request 预览应该使用提交的 commit SHA，而不是会移动的分支名，这样预览页面、日志和后续清理都能对应同一个提交。
+
+## Provider <a id="advanced-provider-boundary" />
+
+Provider 负责基础设施、DNS 等外部能力。公开文档只解释你能配置和观察什么，不会暴露内部 Provider SDK 类型。
+
+```bash
+appaloft providers list
+```
+
+每个 Provider 会返回安全的诊断信息：稳定的能力标记、启用状态、`configured` / `not configured` / `partial` 等配置状态。诊断信息只服务于可见性判断，不会包含云 SDK 对象、原始响应、access token 或私钥。
+
+## Plugin <a id="advanced-plugin-boundary" /><a id="server-composition-extensions" />
+
+Plugin 扩展 Appaloft 自身的能力，必须显式声明兼容性、权限和沙箱假设。
+
+```bash
+appaloft plugins list
+```
+
+不兼容的插件会保持"可见但不可激活"，方便你区分"这个扩展点存在但暂时不可用"和"完全不存在的插件"。插件诊断不会暴露实现内部、Provider SDK 对象或密钥引用。
+
+集成方需要用额外运行时行为组合 Appaloft 时，应导入公开的 server 工厂而不是内部源码路径：
+
+```ts
+import { createAppaloftServer } from "@appaloft/server";
+
+const server = await createAppaloftServer({
+  extensions: [
+    {
+      name: "health-extension",
+      http: {
+        routes: [{ method: "GET", path: "/extension/health", handle: () => new Response("ok") }],
+      },
+    },
+  ],
+});
+```
+
+## Connection 与 Connector <a id="connections-model" />
+
+Connection 是 Appaloft 代表你保存的一次授权关系（例如 GitHub App 安装、DNS Provider 授权、Slack Webhook）。ConnectorDefinition 是目录中具体可连接的项（例如 `github-source`、`cloudflare-dns`），你安装、授权、撤销和审计的对象始终是具体 Connector，而不是抽象分类。
+
+```bash
+appaloft connectors catalog
+appaloft connectors list
+appaloft connectors connect <connector>
+appaloft connectors revoke <connectionId>
+
+# 按能力分类的快捷命令（底层仍是同一套 Connection 模型）
+appaloft dns plan <domain> --hostname <host> --target <target> --connector cloudflare-dns
+```
+
+DNS 类连接需要经过三层校验才能自动配置：公开 DNS 发现（不需要授权，只是根据域名推断可能的托管商）、Connector 授权（证明你能访问某个 Provider 账号）、Zone 归属匹配（授权账号里必须真的存在覆盖该域名的 Zone）。三层都满足后，Appaloft 才会生成并应用 DNS 变更计划；任何一层不满足都会 fail closed 并提示手动配置。
+
+## 常见误区
+
+- **把 GitHub 登录当成仓库访问授权**：登录只代表身份，浏览仓库、接收 Webhook 或回写部署状态需要单独完成 GitHub 集成授权。
+- **认为 Provider/Plugin 诊断会暴露密钥**：诊断信息按设计只包含安全的能力和状态标记。
+- **把"DNS"当成一个可安装的东西**：`dns` 是能力分类，真正被安装和撤销的是具体 Connector（如 `cloudflare-dns`）。
+
+## 相关任务
+
+- [配置部署来源](/docs/deliver/sources/)
+- [绑定自定义域名](/docs/access/custom-domains/)
+- [Agent 适配器](/docs/agents/adapters/)

@@ -1,0 +1,93 @@
+---
+title: "完整 Appaloft Skill"
+description: "供 AI Agent 使用的完整 Appaloft Skill 说明。"
+docType: "reference"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "appaloft skill"
+  - "AI entrypoint"
+  - "AI 入口"
+  - "完整 skill"
+relatedOperations:
+  - "deployments.create"
+  - "resources.create"
+  - "servers.register"
+sidebar:
+  order: 2
+---
+
+## 标识 <a id="appaloft-skill" /><a id="appaloft-skill-evals" />
+
+Packaged skill evals: `skills/appaloft/evals/evals.json`.
+
+
+Appaloft Skill 是面向 AI Agent 的完整产品入口，与 CLI、HTTP API、Web 控制台、MCP 工具一样，都映射到同一套 Appaloft 业务操作（operation catalog）——区别只是使用者是 AI，而不是人类。它**不是**新的业务操作，也不是 `appaloft deploy` 的包装器。
+
+## 安装
+
+```bash
+# Codex
+npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
+
+# Claude Code
+npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
+```
+
+安装命令**只复制 Skill 文件**——不会部署应用、创建资源或调用 API。安装后运行 `npx skills list --global --agent codex`（或 `claude-code`）确认列表中包含 Appaloft，并确认对应的 `SKILL.md` 已经存在，然后新开一个 Agent 会话让宿主重新加载 Skill 目录。
+
+## 能力范围
+
+其中包括保存/注册并管理 server、创建资源与部署。
+
+
+完整 Skill 覆盖 Appaloft 业务操作目录中的几乎所有入口，包括：
+
+- 项目、服务器、环境和资源的生命周期；
+- Source / Runtime / Network / Health / Access / 变量等各类 Profile 配置；
+- 部署、预览清理、计划、日志、事件、重试、重新部署、回滚；
+- 域名绑定、证书、默认访问；
+- 依赖资源、备份恢复、依赖绑定；
+- 存储卷、定时任务、运行时控制、终端会话；
+- 组织、认证、Deploy Token、Provider、Plugin、升级、数据库维护。
+
+完整的 CLI 映射随安装包一起发布在 Skill 的 `references/cli-entrypoints.md` 中。
+
+## 输出字段与状态值
+
+Skill 遵循渐进式披露原则：`SKILL.md` 保持简短，长命令表、部署协议和 MCP 指引放在单独的 `references/` 文件中，避免 Agent 一次性加载过多上下文。
+
+## GitHub Action 场景中的三种模式
+
+| 模式 | 说明 |
+| --- | --- |
+| Pure SSH Action | 默认 BYOS SSH 路径，不需要 Appaloft 控制台或任何 id |
+| Self-hosted Server Action | 通过 `control-plane-url` 和 `appaloft-token` 调用已有的自托管 Server API，不运行 CLI、不使用 SSH |
+| Product-grade Preview | 由 Appaloft Cloud 或自托管控制面拥有完整预览策略、Webhook、评论/检查、清理重试、配额和审计 |
+
+Agent 必须先判断当前处于哪种模式，不要把三者混成一个配置模板。
+
+## 认证边界
+
+需要连接托管 Cloud 或自托管 Appaloft 时，Agent 应先检查 `appaloft auth status`、`appaloft context show` 和 `APPALOFT_TOKEN` 环境变量。**没有已登录的 Profile 或 Token 时，不应该默认让 Agent 打开浏览器、复制验证码或读取 Cookie**——应该让用户通过可信的 UI、Secret Manager、环境变量或 CLI 批准的方式提供一个作用域受限、可过期的 Token，再用 `APPALOFT_TOKEN=<token>` 或 `appaloft auth token login --stdin` 让 CLI 自己验证并写入本机 Profile。
+
+## 错误码与安全边界
+
+Skill 明确禁止以下行为：
+
+- 读取 `.env`、私钥、Token 文件内容、云厂商凭据、Deploy Token、SSH 材料、Cookie 或任何未脱敏的密钥。
+- 让用户把 Session Cookie、Bearer Token、Deploy Token 或 Token 文件内容粘贴进对话——Token 只能通过 CLI/环境变量/Secret Manager 等可信方式传递。
+- 绕过 Appaloft 直接操作 Docker、SSH、数据库、代理或 Provider SDK。
+- 创造只有 Agent 才能调用的"专属操作"——所有行为必须映射到既有 CLI/API/Web/MCP 操作。
+- 假设产物会被上传到托管云——默认部署目标仍然是用户选择的 BYOS 服务器。
+
+## 相关任务
+
+- [Agent 部署子协议](/docs/agents/deploy-skill/)
+- [MCP 与工具协议](/docs/agents/mcp/)
+- [Agent Workspace](/docs/agents/workspaces/)
+
+## 示例
+
+MCP 配置好后，每个 Skill 能力都会对应一个 MCP 工具，命名来自 operation key，例如 `deployments.create` 对应 `deployments_create`，输入 schema 与 CLI/API 完全一致。详见 [MCP 与工具协议](/docs/agents/mcp/)。

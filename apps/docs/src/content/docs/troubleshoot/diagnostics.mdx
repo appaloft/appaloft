@@ -1,0 +1,142 @@
+---
+title: "生成安全诊断信息"
+description: "生成不泄露密钥的安全支持诊断信息。"
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "diagnostic"
+  - "support payload"
+  - "secret masking"
+  - "诊断"
+  - "安全屏蔽"
+relatedOperations:
+  - "resources.diagnostic-summary"
+  - "resources.access-failure-evidence.lookup"
+  - "servers.capacity.inspect"
+sidebar:
+  order: 4
+---
+
+## 目标
+
+生成一份可以安全分享给团队成员或支持人员的诊断摘要，而不是手动拼凑日志、环境变量和服务器命令输出——手动拼凑很容易不小心带上密钥。
+
+## 适用场景
+
+- 部署失败但错误提示不够明确。
+- 生成访问地址、自定义域名或 TLS 状态互相矛盾。
+- 健康检查和运行时日志看起来互相矛盾。
+- 需要把问题交给团队成员或 Appaloft 支持人员。
+
+## 前置条件
+
+- 已经知道要排查的 Resource（以及可选的具体 Deployment）。
+
+## 输入与默认值
+
+| 参数 | 说明 | 默认值 |
+| --- | --- | --- |
+| `--deployment` | 附带某次具体部署的信息 | 不附带 |
+| `--deployment-timeline` | 附带该部署的事件时间线 | 关闭 |
+| `--runtime-logs` | 附带运行时日志 | 关闭 |
+| `--tail` | 日志尾部行数 | 全部 |
+| `--summary` | 只输出分区状态和稳定错误码，不输出完整 JSON | 关闭 |
+
+## CLI 操作步骤
+
+<a id="diagnostic-summary-copy-support-payload" />
+
+<a id="access-failure-request-id-lookup" />
+
+```bash
+# 生成完整的安全诊断摘要
+appaloft resource diagnose res_web \
+  --deployment dep_123 \
+  --deployment-timeline \
+  --runtime-logs \
+  --tail 50
+
+# 只看分区状态和错误码摘要，不要完整 JSON
+appaloft resource diagnose res_web --summary
+```
+
+如果访问 Appaloft 生成的 URL 或自定义域名时看到一个带 **request id** 的错误页，可以用这个 id 直接查询短期保留的安全证据：
+
+```bash
+appaloft resource access-failure req_abc123 --resource res_web --host web.example.com --path /
+```
+
+当部署因为磁盘空间、Docker 镜像存储或构建缓存压力失败时，先运行只读容量诊断（不会执行任何清理）：
+
+```bash
+appaloft server capacity inspect srv_primary
+```
+
+## 预期输出与状态
+
+诊断摘要包含：Project/Resource/Environment/Deployment 等稳定 id、最近失败阶段和错误码、Source/Runtime/Health/Network 的安全摘要、服务器和代理就绪摘要、访问地址/域名/证书状态、已屏蔽的密钥键名（只显示是否存在，不显示值）。
+
+```json title="安全诊断摘要示例"
+{
+  "resourceId": "res_web",
+  "deploymentId": "dep_123",
+  "failedPhase": "verify",
+  "errorCode": "health_check_failed",
+  "accessFailure": {
+    "requestId": "req_abc123",
+    "code": "resource_access_upstream_timeout",
+    "affected": { "hostname": "web.example.com", "path": "/" },
+    "nextAction": "check-health"
+  },
+  "secrets": [{ "key": "DATABASE_URL", "value": "***" }],
+  "nextAction": "Check health path and runtime logs."
+}
+```
+
+## 验证
+
+分享前检查摘要中是否只包含 id、状态、错误码和安全上下文——不应该出现任何明文密钥、私钥或完整环境变量值。
+
+## 回滚 / 恢复
+
+**绝对不要**分享以下内容作为诊断证据：SSH 私钥、API token 或 Session token、数据库连接串、`.env` 文件全文、证书私钥、完整服务器 shell 历史、截图中的敏感信息、原始 Provider 响应。
+
+如果诊断摘要提示磁盘或构建缓存压力，先只读检查容量（`server capacity inspect`），确认候选项后再决定是否运行 dry-run 清理：
+
+<a id="scheduled-runtime-prune-policy" />
+<a id="runtime-target-capacity-inspect" />
+<a id="runtime-usage-inspect" />
+
+```bash
+# 只读检查服务器容量与运行时占用
+appaloft server capacity inspect srv_primary
+appaloft server runtime usage inspect srv_primary
+
+# 预览清理候选项（不会真正删除任何内容）
+appaloft server capacity prune srv_primary --before 2026-01-01T00:00:00.000Z
+
+# 确认候选项符合预期后，才显式执行破坏性清理
+appaloft server capacity prune srv_primary --before 2026-01-01T00:00:00.000Z --dry-run false
+```
+
+容量清理只会保留在 Appaloft 状态目录、运行中的运行时、回滚候选、部署快照、审计/事件、日志和业务状态之外的候选项进行操作，不会执行大范围的 Docker 系统清理。
+
+## 运行时监控采样与阈值 <a id="runtime-monitoring-samples-and-rollups" /><a id="runtime-monitoring-thresholds" />
+
+Appaloft 会在控制面内保留有界的运行时监控采样与汇总，用于 Web Monitor 与诊断闭环。阈值与告警门槛通过运行时配置控制；超出保留窗口的原始样本会被清理。
+
+## 外部可观测性交接 <a id="external-observability-handoff" />
+
+控制面内的监控不替代完整的外部可观测性栈。需要长期指标、告警路由或跨服务关联时，应把 Prometheus / PromQL、APM tracing / trace，以及自定义指标（custom metrics）接到你自己的观测系统；Appaloft 只保留排障所需的有界样本。
+
+## 故障排查链接
+
+- [常见故障与恢复](/docs/troubleshoot/recovery/)
+- [访问故障排查](/docs/access/troubleshooting/)
+
+## 相关参考页面
+
+- [查看日志与健康摘要](/docs/troubleshoot/logs-health/)
+- [安全处理密钥](/docs/configuration/secrets/)

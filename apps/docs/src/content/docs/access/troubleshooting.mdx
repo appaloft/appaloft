@@ -1,0 +1,81 @@
+---
+title: "访问故障排查"
+description: "诊断域名解析、证书与路由相关的访问失败。"
+docType: "troubleshooting"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "dns"
+  - "tls error"
+  - "domain failed"
+  - "访问失败"
+relatedOperations:
+  - "domain-bindings.create"
+  - "certificates.issue-or-renew"
+sidebar:
+  order: 5
+---
+
+## 症状
+
+应用打不开、域名无法访问，或者 HTTPS 报证书错误。
+
+## 可能原因
+
+不要只盯着一个 URL 或一段日志——按下面的固定顺序排查，因为每一层失败的修复方式完全不同：
+
+1. **资源运行状态** — 应用进程是否真的启动了。
+2. **代理就绪状态** — 代理是否已经知道要把请求转发到哪里。
+3. **域名所有权** — DNS 记录是否正确、是否已经生效。
+4. **证书就绪状态** — HTTPS 证书是否签发成功并已加载。
+
+## 如何检查状态、日志、事件或诊断
+
+```bash
+# 1. 查看资源详情：当前选择的访问地址，以及生成地址/自定义域名/服务器路由是否同时存在
+appaloft resource show res_web
+
+# 2. 一次性检查运行时、健康检查、代理和公网访问是否一致（返回稳定的 blocking reason）
+appaloft resource health res_web --checks --public-access-probe
+
+# 3. 查看代理计划/已渲染配置里是否有对应的 host/path/target
+appaloft resource proxy-config res_web
+
+# 4. 查看应用自身的 stdout/stderr
+appaloft resource logs res_web
+
+# 5. 查看某次具体部署尝试的执行日志（这是历史记录，不等于当前路由状态）
+appaloft deployments timeline <deploymentId>
+
+# 6. 生成一份包含 access/proxy/health/日志/推荐动作的安全诊断摘要
+appaloft resource diagnose res_web
+```
+
+对应的 HTTP API：`GET /api/resources/{id}`、`GET /api/resources/{id}/health`、`GET /api/resources/{id}/proxy-configuration`、`GET /api/resources/{id}/runtime-logs`、`GET /api/resources/{id}/diagnostic-summary`、`GET /api/deployments/{id}/logs`。
+
+## 安全恢复步骤
+
+| 排查发现 | 恢复方向 |
+| --- | --- |
+| 应用进程未启动或崩溃 | 查看[运行时/健康/网络 Profile](/docs/deliver/profiles/)，修正启动命令或依赖 |
+| 代理未就绪 | 参考[代理就绪与终端会话](/docs/servers/proxy-and-terminal/) |
+| DNS 记录缺失或不匹配 | 参考[绑定自定义域名](/docs/access/custom-domains/)中的所有权验证部分，修正记录后重试验证 |
+| 证书未就绪或已过期 | 参考[证书](/docs/access/certificates/)，检查证书材料和续期状态 |
+
+## 何时重试
+
+DNS 刚修改后出现 `pending` 状态是正常的——先等待 TTL 生效窗口，再重新触发验证，而不是立即当作失败处理。
+
+## 何时回滚
+
+如果问题出现在最近一次部署之后（而不是域名/证书层面），优先考虑按[回滚与恢复](/docs/deliver/recovery/)回滚到已知良好的历史部署，再离线排查配置问题。
+
+## 什么时候需要复制诊断信息求助
+
+当 `appaloft resource diagnose res_web` 生成的摘要中问题仍不明确，或者需要向团队/支持人员求助时，直接分享这份摘要——它已经屏蔽了密钥和敏感字段。不要额外附上完整日志文件、`.env` 文件或私钥内容，详见[生成安全诊断信息](/docs/troubleshoot/diagnostics/)。
+
+## 相关参考页面
+
+- [访问总览](/docs/access/overview/)
+- [排障总览](/docs/troubleshoot/overview/)

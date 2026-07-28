@@ -1,0 +1,138 @@
+---
+title: "注册并连接服务器"
+description: "注册新服务器并完成首次连接性测试。"
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "server"
+  - "connectivity"
+  - "ssh test"
+  - "docker swarm"
+  - "服务器"
+  - "连接测试"
+relatedOperations:
+  - "servers.register"
+  - "servers.test-connectivity"
+  - "servers.rename"
+  - "servers.deactivate"
+  - "servers.delete"
+sidebar:
+  order: 2
+---
+
+<a id="docker-swarm-runtime-target" />
+
+
+## 目标 <a id="server-deployment-target" />
+
+把一台你拥有的 Linux 服务器注册为 Appaloft 的部署目标，并确认 Appaloft 能通过 SSH 安全连接它。
+
+## 适用场景
+
+- 第一次接入一台新服务器。
+- 需要迁移到新机器，或者临时排查某台服务器的连通性问题。
+
+## 前置条件
+
+- 一台可以通过 SSH 访问、你拥有 root 或 sudo 权限的 Linux 服务器。
+- 一个 SSH key（推荐使用专用的部署 key，而不是你的个人登录 key）。
+
+## 输入与默认值
+
+| 输入 | 说明 | 默认值 |
+| --- | --- | --- |
+| `host` | 明确的 hostname、IPv4 或 IPv6 地址 | 无，必填；不接受 CIDR、URL 或 `host:port` 形式 |
+| `port` | SSH 端口 | `22` |
+| `user` | 用于连接的系统用户 | 无，必填 |
+| 凭据 | SSH key 路径 / 已保存凭据 / 一次性输入 | 无，必填 |
+| 显示名称 / 标签 | 帮助你在列表中区分服务器 | 可选 |
+
+服务器注册输入里**不应该**出现资源、环境或域名相关字段——那些是独立的配置层。
+
+## Web 操作步骤
+
+1. 进入 **Servers**，点击 **Register server**。
+2. 填写 host、port、user 和 SSH 凭据（可以粘贴私钥内容，或选择已保存的凭据）。
+3. 提交后 Appaloft 会立即运行连接测试，并展示结果。
+
+## CLI 操作步骤
+
+<a id="server-connectivity-test" />
+
+```bash
+# 注册一台 IPv4 服务器
+appaloft server register \
+  --name primary \
+  --host 203.0.113.10 \
+  --port 22 \
+  --provider generic-ssh \
+  --target-kind single-server
+
+# 注册一台仅 IPv6 的服务器
+appaloft server register \
+  --name ipv6-primary \
+  --host 2001:db8::1 \
+  --port 22 \
+  --provider generic-ssh
+
+# 手动重新运行连接测试
+appaloft server test srv_primary
+
+# 查看服务器详情（不会触发新的连接测试）
+appaloft server show srv_primary
+
+# 重命名（只影响显示名称）
+appaloft server rename srv_primary --name "Primary SSH server"
+```
+
+Docker Swarm 等集群目标需要显式声明形态：
+
+```bash
+appaloft server register \
+  --name swarm-cluster \
+  --host 203.0.113.20 \
+  --provider docker-swarm \
+  --target-kind orchestrator-cluster
+```
+
+## 预期输出与状态
+
+连接测试会检查：DNS/IP 与端口是否可达、SSH 凭据是否可用、目标用户是否有部署所需权限、基础运行环境是否满足要求，必要时还会返回代理或 Docker 相关诊断。测试结果会区分主机名解析失败、网络/主机不可达、认证失败和 host-key 验证失败几类原因，而不是笼统报错。
+
+## 验证
+
+- 命令或 Web 界面显示连接测试通过。
+- 运行 `appaloft server show srv_primary`，确认状态、Provider 和摘要信息符合预期。
+
+## 回滚 / 恢复
+
+| 现象 | 恢复方式 |
+| --- | --- |
+| 连接超时 | 检查 host、port、防火墙和网络路径 |
+| 认证失败 | 检查 SSH key、user 和服务器上的 authorized_keys |
+| 权限不足 | 确认目标用户能执行部署所需命令 |
+| 运行环境缺失 | 按诊断提示安装或切换到受支持的 Provider/运行时 |
+
+连接测试通过后，继续配置 [SSH 凭据管理](/docs/servers/ssh-keys/)和[代理就绪与终端会话](/docs/servers/proxy-and-terminal/)。
+
+不再需要某台服务器时，先停用再删除：
+
+```bash
+appaloft server deactivate srv_primary
+appaloft server delete-check srv_primary
+appaloft server delete srv_primary --confirm srv_primary
+```
+
+删除前的安全检查会阻止删除仍处于活跃状态、仍有部署历史、资源、域名、证书或审计保留记录的服务器；删除本身也不会自动清理这些记录。
+
+## 故障排查链接
+
+- [排障总览](/docs/troubleshoot/overview/)
+- [代理就绪与终端会话](/docs/servers/proxy-and-terminal/)
+
+## 相关参考页面
+
+- [SSH 凭据管理](/docs/servers/ssh-keys/)
+- [第一次部署](/docs/start/first-deployment/)

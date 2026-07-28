@@ -1,0 +1,148 @@
+---
+title: "TypeScript SDK"
+description: "TypeScript SDK 安装、认证、操作调用、错误和流式事件的公开入口。"
+docType: "reference"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "sdk"
+  - "typescript"
+  - "client"
+  - "automation"
+  - "streaming"
+relatedOperations:
+  - "projects.create"
+  - "organizations.current-context"
+  - "deployments.timeline.stream"
+sidebar:
+  order: 6
+---
+
+## 标识 <a id="typescript-sdk-operation-client" />
+
+`@appaloft/sdk` 是面向自动化和集成的操作客户端——它调用 Appaloft 的 HTTP/oRPC API,不嵌入应用运行时,也不暴露内部实现细节。SDK 方法直接对应 OpenAPI 契约中的业务操作;不存在单独添加的、脱离业务操作目录的 SDK 专属方法。
+
+## 安装与配置
+
+```ts
+import { createAppaloftClient } from "@appaloft/sdk";
+
+const appaloft = createAppaloftClient({
+  baseUrl: "https://appaloft.example/api",
+});
+```
+
+`baseUrl` 应指向同一个 Appaloft 实例的 `/api` 根路径。自托管环境应优先使用安装脚本打印的控制台/API 地址。
+
+## 认证
+
+| 场景 | 凭据类型 |
+| --- | --- |
+| 交互式产品操作 | 产品会话 Cookie |
+| 机器自动化(CI、脚本) | Deploy Token(Bearer) |
+
+```ts
+const productClient = createAppaloftClient({
+  baseUrl: "https://appaloft.example/api",
+  auth: { kind: "product-session", cookie: "better-auth.session_token=..." },
+});
+
+const actionClient = createAppaloftClient({
+  baseUrl: "https://appaloft.example/api",
+  auth: { kind: "deploy-token", token: process.env.APPALOFT_TOKEN ?? "" },
+});
+```
+
+不要把 Deploy Token 写入仓库配置文件;在 CI 中应通过受信任的密钥管理或环境变量注入。组织范围通过具体操作的 path/query/body 字段传递(例如 `organizationId`),切换当前组织应调用公开的组织切换操作,而不是在 SDK 内维护隐藏状态。
+
+## 操作示例
+
+每个 SDK 调用对应一个操作 key,输入字段来自同一套 Command/Query Schema:
+
+```ts
+const created = await appaloft.projects.create({ name: "Demo" });
+const listed = await appaloft.projects.list({ limit: 20 });
+const shown = await appaloft.projects.show({ projectId: "prj_123" });
+
+if (!created.ok) {
+  // created.error 是结构化 Appaloft 错误
+  throw new Error(created.error.code);
+}
+```
+
+Facade 方法名从操作 key 生成:kebab-case 转为 camelCase,点号转为嵌套分组。例如 `dependency-resources.provisioning.plan` 会生成 `dependencyResources.provisioning.plan`。
+
+Path 参数可以作为顶层字段传入;剩余字段在 `GET`、`DELETE` 和流式操作中默认进入 query,在其他操作中默认进入 JSON body。需要精确控制拆分时,可以显式传入 `pathParams`、`query` 或 `body`。
+
+## Sandbox 资源句柄
+
+Sandbox 所有权链使用资源句柄,调用方不需要重复传递父级 id:
+
+```ts
+const sandbox = await appaloft.sandboxes.create(sandboxInput);
+
+try {
+  const agent = await sandbox.agents.create({ harness: "pi" });
+  const run = await agent.stream({ prompt: "Analyze and update the workspace" });
+
+  for await (const envelope of run.fullStream) {
+    if (envelope.kind === "event") console.log(envelope.eventType, envelope.data);
+    if (envelope.kind === "error") throw new Error(envelope.code);
+  }
+} finally {
+  await sandbox.terminate();
+}
+```
+
+`Agent` 是 Sandbox Agent Runtime 的 SDK 别名,`agent.stream({ task })` 会创建一个 Run 并把持久化事件作为 `fullStream` 返回;`prompt` 是方便从 AI SDK 迁移的 `task` 别名。Appaloft 不接管聊天会话——调用方仍负责保存消息并决定何时使用全新上下文或 `parentRunId` 续接。
+
+需要一次创建 Sandbox 和 Runtime 时,可以使用公共 Workspace 入口:
+
+```ts
+const workspace = await appaloft.workspaces.create({ sandbox: sandboxInput, harness: "opencode" });
+```
+
+`workspaceId` 等于 `sandboxId`;如果 Runtime 创建失败,`AppaloftWorkspaceCreateError` 仍会携带已创建的 id,便于重试或清理。详见 [Sandbox 模型](/docs/agents/sandboxes/)。
+
+资源方法直接返回 descriptor,失败时抛出 `AppaloftSdkRequestError`;需要完整且不抛异常的 `{ ok, status, data/error }` facade 时使用 `appaloft.operations`,例如 `appaloft.operations.sandboxes.create(input)`。
+
+## 结构化错误
+
+生成的操作返回稳定的结构化错误字段:`code`、`category`、`message`、`retryable` 和可选 `details`;资源句柄会把相同的安全字段暴露在 `AppaloftSdkRequestError` 上。自动化应该判断 `code`、`category` 或 `retryable`,**不要解析人类可读的 `message`**。
+
+常见认证错误:
+
+| Code | 含义 |
+| --- | --- |
+| `product_auth_missing` / `product_auth_invalid` | 产品会话缺失、过期或不可验证 |
+| `product_auth_forbidden` | 当前用户不属于目标组织,或角色不足 |
+| `action_auth_missing` / `action_auth_invalid` | Deploy Token 凭据缺失或无效 |
+| `action_auth_forbidden` | Deploy Token 有效,但作用域不覆盖当前请求 |
+
+完整错误模型见[错误码与状态](/docs/reference/errors-statuses/)。
+
+## 流式事件
+
+只有 OpenAPI 元数据标记为可流式的操作才能使用 SDK 的流式 Helper。调用方应该传入 `AbortSignal` 来取消长连接,并按结构化 envelope 处理心跳、事件、缺口(gap)、关闭和错误:
+
+```ts
+const controller = new AbortController();
+
+for await (const envelope of appaloft.deployments.streamEvents({
+  deploymentId: "dep_123",
+  signal: controller.signal,
+})) {
+  if (envelope && typeof envelope === "object" && "kind" in envelope) {
+    // 处理 event、heartbeat、gap、closed 或 error envelope
+  }
+}
+```
+
+当流返回 `closed` 或调用方取消 `AbortSignal` 后,自动化应该停止读取并按需重新打开流。流式 Facade 方法返回 `AsyncIterable`,不会把整个 SDK 改成 throw-only 模式——普通请求 Facade 仍返回 `{ ok, status, data }` 或 `{ ok, status, error }`。
+
+## 相关任务
+
+- [HTTP API reference](/docs/reference/http-api/)
+- [Sandbox 模型](/docs/agents/sandboxes/)
+- [错误码与状态](/docs/reference/errors-statuses/)

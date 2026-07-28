@@ -1,0 +1,76 @@
+---
+title: "常见故障与恢复"
+description: "常见失败模式及其安全恢复路径。"
+docType: "troubleshooting"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "recovery"
+  - "retry"
+  - "rollback"
+  - "恢复"
+  - "常见故障"
+relatedOperations:
+  - "deployments.create"
+sidebar:
+  order: 5
+---
+
+## 症状
+
+部署失败、应用行为异常，或者不确定接下来该重试、修复配置还是回滚。
+
+## 可能原因
+
+| 信号 | 推荐动作 |
+| --- | --- |
+| 出现明确的 `retryable` 错误，或健康检查偶发失败 | 直接重试，观察是否进入同一失败点 |
+| 输入缺失、路径不存在、构建命令错误 | 先修复部署输入，再重新部署 |
+| 凭据、SSH、镜像仓库、DNS 或证书相关错误 | 先修复外部配置，再重新验证连接 |
+| 新版本已经接管流量但明显不可用 | 先回滚到最后一个可用版本，再离线排查失败原因 |
+
+## 如何检查状态、日志、事件或诊断
+
+1. **读取当前状态** — 打开资源状态、最近部署状态、[事件时间线](/docs/troubleshoot/status-events/)和[健康摘要](/docs/troubleshoot/logs-health/)。记录最后一个失败阶段、错误码、是否给出重试建议，以及访问地址是否已经切换。
+2. **判断是否可重试** — 临时网络问题、镜像拉取失败、命令超时、健康检查偶发失败通常可以直接重试；缺少密钥、无效域名、SSH 不可用、证书材料错误、输入配置错误通常需要先修复。
+3. **生成安全诊断摘要** — 如果原因仍不明确，运行[生成安全诊断信息](/docs/troubleshoot/diagnostics/)中的命令，得到一份不含密钥的排查证据。
+
+## 安全恢复步骤
+
+```bash
+# 只读检查恢复就绪状态，不会产生任何副作用
+appaloft deployments recovery-readiness <deploymentId>
+```
+
+**只修改和错误码直接相关的最小输入**——例如一个密钥、一条 DNS 记录、一把 SSH key，或者一个构建目录，而不是同时改多个变量。修复后保留原失败记录，方便对比下一次结果。
+
+```bash
+appaloft deployments retry <deploymentId>
+appaloft deployments redeploy <resourceId>
+appaloft deployments rollback <deploymentId> --candidate <candidateDeploymentId>
+```
+
+完整的重试/重新部署/回滚语义说明见[回滚与恢复](/docs/deliver/recovery/)。
+
+## 何时重试
+
+信号明确标记为 `retryable`，或者失败原因是网络抖动、镜像拉取超时这类瞬时问题时，可以直接重试。
+
+## 何时回滚
+
+如果新部署已经影响生产访问地址或运行时状态，且短时间内无法修复根因，优先回滚到最后一个已验证版本，保证服务可用，再离线排查失败原因。回滚后仍要保留失败部署的日志和诊断摘要，方便后续修复。
+
+## 什么时候需要复制诊断信息求助
+
+当反复修复后同一个失败仍然出现，或者需要团队协作排查时，生成并分享安全诊断摘要（见[生成安全诊断信息](/docs/troubleshoot/diagnostics/)），而不是分享原始日志、截图或环境变量文件。
+
+## 重要提醒
+
+不要在不确定当前状态的情况下同时重试部署、手动修改服务器、修改 DNS 和替换密钥——一次只改一个变量，才能验证每一步是否真的解决了问题。
+
+## 相关参考页面
+
+- [排障总览](/docs/troubleshoot/overview/)
+- [部署生命周期](/docs/deliver/lifecycle/)
+- [回滚与恢复](/docs/deliver/recovery/)

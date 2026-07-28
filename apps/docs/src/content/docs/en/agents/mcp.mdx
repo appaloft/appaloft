@@ -1,0 +1,91 @@
+---
+title: "MCP and Tool Protocols"
+description: "The current state and direction of MCP / tool protocol integration."
+docType: "reference"
+---
+
+## Stable identifier <a id="appaloft-mcp-server" />
+
+The Appaloft MCP Server is a callable tool entrypoint — it exposes the existing business operation catalog to MCP clients, and **doesn't create a new AI-only business model**. The [Full Appaloft Skill](/docs/en/agents/skill/) is responsible for deciding "what to do"; MCP is responsible for precisely executing the "command/query call" step once tools are configured.
+
+## Starting it
+
+```bash
+# Start over stdio (the default connection method for most agent hosts)
+appaloft mcp stdio
+
+# A local HTTP JSON-RPC endpoint, bound to localhost only by default
+appaloft mcp serve --host 127.0.0.1 --port 3939
+
+# Standalone launcher, delegates to the same Appaloft runtime
+npx appaloft-mcp
+npx appaloft-mcp serve --host 127.0.0.1 --port 3939
+```
+
+Starting the server itself **doesn't** deploy an app, create a resource, or modify any state — only when an MCP client actually calls a tool does it enter Appaloft's command/query bus. Only change `--host` away from `127.0.0.1` when a trusted reverse proxy or private network already provides a security boundary.
+
+## Input fields and validation: the tool model
+
+Every tool corresponds to a business operation key, with `.` replaced by `_` in the naming:
+
+| Operation key | Tool name |
+| --- | --- |
+| `deployments.create` | `deployments_create` |
+| `deployments.plan` | `deployments_plan` |
+| `resources.configure-source` | `resources_configure_source` |
+| `system.doctor` | `system_doctor` |
+
+A tool's input JSON schema comes directly from the same Command/Query schema as the CLI/API; command calls go through the command bus and query calls go through the query bus, both tagged with `entrypoint: "mcp"` so audit records can distinguish the call source.
+
+**There is no agent-exclusive tool that only an agent can call.** If a behavior isn't in the public business operation catalog, it isn't a legitimate Appaloft MCP operation.
+
+## Output fields and status values
+
+Tool descriptions carry MCP annotations marking whether a query is read-only, whether a command is destructive, whether a query is idempotent, and whether a deployment-type operation might reach an external system. Responses return both JSON text and structured content, staying compatible with older MCP clients while supporting hosts that understand structured results.
+
+### Read-only resources
+
+```text
+appaloft://operation-catalog
+appaloft://tools/high-value
+appaloft://skill/appaloft
+appaloft://skill/deploy-protocol
+appaloft://tools/mcp-guide
+appaloft://docs/agent
+```
+
+### Prompts
+
+```text
+appaloft-first-deploy
+appaloft-recover-deployment
+appaloft-configure-resource
+appaloft-observe-runtime
+appaloft-publish-static-artifact
+```
+
+Resources and Prompts only provide context and workflow starting points — they **don't own** write-side policy, tenant selection, background tasks, or hidden state.
+
+## Error codes and safety boundaries
+
+- Never bypass Appaloft to call the repository, use cases, a provider SDK, Docker, SSH, the proxy, or the database directly.
+- Never read or output `.env`, private keys, tokens, cookies, database URLs, cloud provider credentials, or unmasked logs.
+- Authentication, tenant context, operation guards, confirmation fields, secret masking, and structured errors all stay within the existing runtime boundary — the MCP layer never bypasses them.
+- Deletion and other destructive operations still must use the delete-safety checks and exact confirmation fields from the corresponding schema (for example requiring the full id to be typed to confirm a deletion).
+
+## Relationship with the Skill
+
+When a user tells an MCP-capable agent host "help me deploy this repository," the host first loads the [Full Appaloft Skill](/docs/en/agents/skill/) to determine intent, then decides — based on whether Appaloft MCP is configured for the current session — whether to use an MCP tool call, the CLI, HTTP/API, or Web. All four ultimately resolve to the same set of business operations.
+
+## Example
+
+```bash
+# Provide MCP tools to a local agent host via stdio
+appaloft mcp stdio
+```
+
+## Related tasks
+
+- [Full Appaloft Skill](/docs/en/agents/skill/)
+- [Agent Deploy Subprotocol](/docs/en/agents/deploy-skill/)
+- [Choosing an Entrypoint](/docs/en/start/entrypoints/)

@@ -1,0 +1,61 @@
+---
+title: "Configuration Diff and Promote"
+description: "Comparing configuration snapshot diffs and promoting changes to a target environment."
+docType: "task"
+---
+
+## Goal <a id="environment-diff" />
+
+Understand the configuration difference between two environments (missing variables, different values, secret status differences), and safely promote verified configuration to a target environment, instead of directly overwriting historical deployments.
+
+## When to use this task
+
+- Confirming staging and production configuration line up before shipping.
+- Promoting a set of new variables to production after verifying them on staging.
+
+## Prerequisites
+
+- Both the source and target environments already exist, and neither is locked.
+
+## Inputs and defaults
+
+| Input | Description |
+| --- | --- |
+| Source environment | The environment providing the reference configuration, for example staging |
+| Target environment | The environment receiving the change, for example production |
+| Secret handling | How secrets from the source environment are handled during promotion (never exposes plaintext by default) |
+
+## CLI steps
+
+```bash
+# Compare configuration differences between two environments
+appaloft env diff env_staging env_prod
+
+# Promote configuration to the target environment (creates a new configuration state, doesn't overwrite historical deployments directly)
+appaloft env promote env_staging env_prod
+```
+
+## Expected output and status
+
+`diff` lists: variables missing from the target environment, variables with different values, and secret status differences (whether it exists, whether it was recently updated) — but never the secret plaintext itself. `promote` creates a new configuration state on the target environment; this is not the same as an immediate redeploy — an already-running instance is never automatically restarted by a promote.
+
+## Verification
+
+After promoting, check whether the target environment's variable list matches expectations, then decide whether you need to trigger a new deployment so the running instance reads the new configuration.
+
+## Rollback / recovery
+
+Promote never overwrites a historical deployment snapshot — if the new deployment after a promotion has problems, you can still roll back to the pre-promotion deployment following [Rollback And Recovery](/docs/en/deliver/recovery/).
+
+## Troubleshooting links
+
+- [Configuration Precedence](/docs/en/configuration/precedence/)
+
+## Related reference pages
+
+- [Configuration Model](/docs/en/configuration/model/)
+- [Handling Secrets Safely](/docs/en/configuration/secrets/)
+
+## Notes
+
+Before promoting, confirm: is the target environment correct, should secrets be regenerated or reused by reference, and do you need to trigger a new deployment immediately after the promote completes.

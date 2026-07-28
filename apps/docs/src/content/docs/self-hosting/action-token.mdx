@@ -1,0 +1,108 @@
+---
+title: "Action Token"
+description: "用于自动化的 Action Token 的签发与权限范围。"
+docType: "reference"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "deploy token"
+  - "appaloft-token"
+  - "GitHub Action"
+  - "自托管认证"
+relatedOperations:
+  - "deploy-tokens.create"
+  - "deploy-tokens.list"
+  - "deploy-tokens.rotate"
+  - "deploy-tokens.revoke"
+sidebar:
+  order: 4
+---
+<a id="action-deploy-token-auth" />
+
+
+## 标识 <a id="self-hosting-action-deploy-token-auth" />
+
+自托管的 Server API 模式会拒绝没有 Action Token(即 Deploy Token)的 GitHub Action 修改请求。这是**给自动化使用的机器凭据**,不是 Web 控制台的登录会话,不应该写进仓库配置、Workflow 文件正文、URL 查询字符串或日志。
+
+## 输入字段、默认值与校验
+
+普通的 SSH 安装不会自动创建 Action Token。需要立即接入 GitHub Action Server API 模式时,安装时加上 `--bootstrap-deploy-token`,安装器会在容器健康后打印一次 Bootstrap JSON:
+
+```json
+{
+  "schemaVersion": "deploy-token.bootstrap/v1",
+  "created": true,
+  "organizationId": "org_self_hosted",
+  "actionSecretName": "APPALOFT_TOKEN",
+  "tokenId": "dpt_...",
+  "secretSuffix": "abcd1234",
+  "token": "aplt_dt_..."
+}
+```
+
+`token` 字段**只在首次创建时出现**——把它的值保存到 GitHub Repository 或 Organization Secret,名称使用 `APPALOFT_TOKEN`。重新运行安装器时,如果已经存在有效 Token,输出只包含安全元数据,不会再次显示原始 Token。
+
+Deploy Token 可以限制到工作流命令、Project、Environment、Resource、Server 和仓库范围。当 Token 唯一指定这些目标时,普通的自托管 Action 部署可以省略对应的 id 参数,由 Server 结合 Token 范围、Source Link 和仓库事实自动解析目标。
+
+## 输出字段与状态值
+
+管理员可以通过 CLI 或受产品会话保护的 HTTP/API 入口管理 Deploy Token:
+
+```bash
+appaloft deploy-token create --organization-id org_self_hosted --display-name "GitHub Action" \
+  --workflow-commands source-link-deploy,server-config-deploy,preview-cleanup
+appaloft deploy-token list --organization-id org_self_hosted
+appaloft deploy-token show <tokenId> --organization-id org_self_hosted
+```
+
+```http
+POST /api/deploy-tokens
+GET /api/deploy-tokens?organizationId=...
+GET /api/deploy-tokens/{tokenId}?organizationId=...
+```
+
+创建接口的响应中,原始 Token **只显示一次**;列表和详情接口只返回安全元数据。
+
+## 使用示例
+
+```yaml
+- uses: appaloft/deploy-action@v1
+  with:
+    control-plane-mode: self-hosted
+    control-plane-url: https://console.example.com
+    appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
+```
+
+## 错误码与恢复提示
+
+| Code | 含义 | 处理方式 |
+| --- | --- | --- |
+| `401 action_auth_missing` | Action 没有发送 Bearer Token | 检查 Workflow 是否传了 `appaloft-token`,以及 Secret 名称是否正确 |
+| `401 action_auth_invalid` | Token 格式错误、未知、过期或已撤销 | 重新复制 GitHub Secret 时只复制 `aplt_dt_...` Token 值,不要复制整个 Bootstrap JSON |
+| `403 action_auth_forbidden` | Token 有效,但作用域不允许当前请求 | 检查仓库、Project、Environment、Resource、Server 或 Workflow 命令是否匹配 Token 范围 |
+
+## 轮换和撤销
+
+原始 Token 只显示一次,不要把它放在 Issue、PR 评论、Workflow 日志或部署输出里。如果 Token 泄露:
+
+1. 先从 GitHub Secrets 删除或替换 `APPALOFT_TOKEN`,暂停使用该 Secret 的 Workflow。
+2. 用管理员会话轮换或撤销:
+
+```bash
+appaloft deploy-token rotate <tokenId> --organization-id org_self_hosted --confirm <tokenId>
+appaloft deploy-token revoke <tokenId> --organization-id org_self_hosted --confirm <tokenId>
+```
+
+```http
+POST /api/deploy-tokens/{tokenId}/rotate
+POST /api/deploy-tokens/{tokenId}/revoke
+```
+
+轮换会生成新的原始 Token(同样只显示一次);撤销后,旧 Token 的后续请求会按无效凭据被拒绝。
+
+## 相关任务
+
+- [组织与团队](/docs/self-hosting/org-team/)
+- [Agent 部署子协议](/docs/agents/deploy-skill/)
+- [配置来源](/docs/deliver/sources/)

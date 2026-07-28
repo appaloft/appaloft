@@ -1,0 +1,103 @@
+---
+title: "SSH 凭据管理"
+description: "创建、轮换与撤销用于服务器访问的 SSH 凭据。"
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "ssh"
+  - "credential"
+  - "private key"
+  - "凭据"
+  - "轮换"
+relatedOperations:
+  - "servers.configure-credential"
+  - "credentials.create-ssh"
+  - "credentials.rotate-ssh"
+sidebar:
+  order: 3
+---
+<a id="server-ssh-credential" />
+
+
+## 目标
+
+安全地创建、验证、轮换和删除用于连接部署目标服务器的 SSH 凭据。
+
+## 适用场景
+
+- 第一次为服务器配置 SSH 访问方式。
+- 定期轮换凭据，或怀疑某个私钥已经泄露。
+- 服务器不再使用后，清理不再需要的已保存凭据。
+
+## 前置条件
+
+- 已经完成[注册并连接服务器](/docs/servers/register-connect/)。
+- 一个新的 SSH 私钥（轮换场景）。
+
+## 输入与默认值
+
+凭据可以是三种形式之一：
+
+| 形式 | 适用场景 | 说明 |
+| --- | --- | --- |
+| 本机密钥路径 | 仅 CLI 本地执行 | 只有 CLI 能读取本机文件系统 |
+| 私钥内容 | 一次性输入 | 属于敏感 Secret，提交后不会回显 |
+| 已保存凭据 | Web / API / 复用场景 | Appaloft 存储的可复用凭据引用 |
+
+凭据是安全边界：Web、CLI、API、日志和诊断摘要都**不会**显示明文私钥、口令或 token。
+
+## CLI 操作步骤
+
+<a id="server-ssh-credential-path" />
+
+```bash
+# 注册服务器时直接提供本机密钥路径
+appaloft server register --host 203.0.113.10 --user deploy --ssh-key ~/.ssh/id_ed25519
+
+# 轮换一个已保存的可复用凭据（原地轮换，保留 credential id 和已有服务器引用）
+appaloft server credential-rotate <credentialId> \
+  --private-key-file ~/.ssh/appaloft-new \
+  --confirm <credentialId> \
+  --acknowledge-server-usage
+
+# 删除不再被任何服务器引用的已保存凭据
+appaloft server credential-delete <credentialId> --confirm <credentialId>
+```
+
+`--acknowledge-server-usage` 只有在这个凭据当前被 0 台服务器使用时才可以省略；一旦有服务器在用，必须显式确认你了解这些服务器会切换到轮换后的新密钥材料。
+
+## HTTP/API 操作步骤
+
+```http
+POST /api/credentials/ssh/{credentialId}/rotate
+DELETE /api/credentials/ssh/{credentialId}
+```
+
+## 预期输出与状态
+
+轮换成功只表示 Appaloft 已经保存了新的密钥材料，**不代表新密钥已经能连通服务器**。删除请求如果目标凭据仍被至少一台服务器引用，会以 `credential_in_use` 拒绝。
+
+## 验证
+
+轮换后，务必在所有引用了该凭据的服务器上重新运行连接测试：
+
+```bash
+appaloft server test srv_primary
+```
+
+## 回滚 / 恢复
+
+- 如果想创建一个全新的 credential id 而不是原地轮换，可以：添加新凭据 → 把服务器切换到新凭据 → 运行连接测试确认 → 删除旧凭据。
+- 如果轮换后连接测试失败，先确认新私钥对应的公钥已经加入服务器的 `authorized_keys`，再重试连接测试；旧凭据在轮换完成前不会被自动删除。
+
+## 故障排查链接
+
+- [注册并连接服务器](/docs/servers/register-connect/)
+- [排障总览](/docs/troubleshoot/overview/)
+
+## 相关参考页面
+
+- [服务器总览](/docs/servers/overview/)
+- [安全处理密钥](/docs/configuration/secrets/)

@@ -1,0 +1,81 @@
+---
+title: "Agent Deploy Subprotocol"
+description: "The subprotocol an agent uses to trigger deployments through existing entrypoints."
+docType: "task"
+---
+
+## Goal <a id="agent-deploy-skill" />
+
+Let an AI agent safely complete a deployment through Appaloft's existing entrypoints (CLI / HTTP API / Web / MCP), rather than bypassing the application layer to operate infrastructure directly.
+
+## When to use this task
+
+- A user asks an agent to "help me deploy this project to Appaloft."
+- CI/GitHub Actions needs a deployment triggered by an agent or automation script.
+
+## Prerequisites
+
+- The [Full Appaloft Skill](/docs/en/agents/skill/) is already installed.
+- The target environment (Cloud or self-hosted) already has a usable authentication method (see the authentication boundary section on the Skill page).
+
+## Inputs and defaults
+
+The Agent Deploy Subprotocol is a set of process conventions internal to the full Skill — it is **not a new business operation**, and not an alternative implementation of MCP.
+
+## Recommended flow
+
+1. **Safely inspect the source** — only read project structure, build scripts, listening ports, image references, Docker/Compose config, static output directories, and the Appaloft config file; never execute project code.
+2. **Choose the minimal entrypoint** — prefer the Appaloft config file first; otherwise, choose a prebuilt image, Compose, Dockerfile, static output directory, or workspace command based on evidence, referencing the zero-configuration coverage in [Configuring Deployment Sources](/docs/en/deliver/sources/).
+3. **Use existing operations** — create or select a Project, Server, Environment, and Resource within currently available surfaces, then start the deployment — use the CLI for shell scenarios, and the equivalent operations for Web/HTTP scenarios.
+4. **Output the result** — return the access URL first, then the deployment id, resource id, log command, diagnostic command, and recovery-readiness command.
+
+## CLI steps
+
+```bash
+appaloft deploy .
+appaloft deployments timeline <deploymentId> --follow --json
+```
+
+## GitHub Action deployment modes
+
+| Mode | What the agent should do |
+| --- | --- |
+| Pure SSH Action | Default `control-plane-mode: none`, install/run the CLI, deploy over SSH; doesn't require an Appaloft console, deploy token, or any id |
+| Self-hosted Server Action | Only calls the Server API explicitly selected via `control-plane-url`, must use `appaloft-token`, never runs the CLI or opens SSH; prefer `server-config-deploy: true` so the Server reads repository config and applies the profile |
+| Product-grade Preview | Appaloft Cloud or a self-hosted control plane owns the full preview policy, webhooks, comments/checks, and cleanup retry |
+
+If a source link or repository binding is missing, the agent should prompt the user to establish the binding, or use a one-time trusted bootstrap context — Project/Resource/Server ids are only suitable for first-time bootstrap, advanced overrides, or debugging scenarios, not a default input an ordinary user needs to provide.
+
+## Expected output and status
+
+A successful agent deployment should return a short result:
+
+- the access URL (if temporarily unavailable, explain why);
+- the deployment id and resource id;
+- the current lifecycle status;
+- follow-up check commands: `appaloft deployments timeline <deploymentId>`, `appaloft resource diagnose <resourceId>`, `appaloft deployments recovery-readiness <deploymentId>`.
+
+## Verification
+
+An agent shouldn't assume the deployment succeeded before returning a result — it should confirm the deployment status has already reached a verifiable stage (see [Deployment Lifecycle](/docs/en/deliver/lifecycle/)) before giving out the access URL.
+
+## Rollback / recovery
+
+If a deployment fails, the agent should **read first** — structured errors, logs, the diagnostic summary, and recovery-readiness status — before deciding the next step. It **shouldn't automatically retry immediately after a failure**. Only suggest retry, redeploy, or rollback when recovery-readiness status explicitly allows it — see [Rollback And Recovery](/docs/en/deliver/recovery/) for details.
+
+## Troubleshooting links
+
+- [Common Failures And Recovery](/docs/en/troubleshoot/recovery/)
+- [Generating A Safe Diagnostic Summary](/docs/en/troubleshoot/diagnostics/)
+
+## Related reference pages
+
+- [Full Appaloft Skill](/docs/en/agents/skill/)
+- [Your First Deployment](/docs/en/start/first-deployment/)
+
+## Safety boundaries
+
+- Never read `.env`, private keys, token files, or cloud provider credential files.
+- Never write plaintext secrets into logs, pull request descriptions, or conversation replies.
+- Never bypass Appaloft to operate Docker, SSH, the database, or a provider SDK directly.
+- Never stuff Source/Runtime/Network fields directly into a deployment request — these belong to the Resource Profile and deployment snapshot, and should be set separately through the corresponding configuration operations.

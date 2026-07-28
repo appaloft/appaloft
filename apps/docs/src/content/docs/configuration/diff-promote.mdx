@@ -1,0 +1,75 @@
+---
+title: "配置差异与提升"
+description: "比较配置快照差异并将变更提升到目标环境。"
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "diff"
+  - "promote"
+  - "compare env"
+  - "环境对比"
+  - "提升"
+relatedOperations:
+  - "environments.diff"
+  - "environments.promote"
+sidebar:
+  order: 5
+---
+
+## 目标 <a id="environment-diff" />
+
+理解两个环境之间的配置差异（缺失变量、不同值、Secret 状态差异），并把验证过的配置安全提升到目标环境，而不是直接覆盖历史部署。
+
+## 适用场景
+
+- 上线前确认 staging 和 production 的配置是否一致。
+- 在 staging 验证过一组新变量后，把它们提升到 production。
+
+## 前置条件
+
+- 来源环境和目标环境都已存在，且都不处于锁定状态。
+
+## 输入与默认值
+
+| 输入 | 说明 |
+| --- | --- |
+| 来源环境 | 提供参考配置的环境，例如 staging |
+| 目标环境 | 接收变更的环境，例如 production |
+| Secret 处理方式 | 提升时如何处理来源环境的 Secret（默认不会暴露明文） |
+
+## CLI 操作步骤
+
+```bash
+# 比较两个环境的配置差异
+appaloft env diff env_staging env_prod
+
+# 提升配置到目标环境（会创建新的配置状态，不直接覆盖历史部署）
+appaloft env promote env_staging env_prod
+```
+
+## 预期输出与状态
+
+`diff` 会列出：目标环境缺失的变量、值不同的变量，以及 Secret 状态的差异（是否存在、是否近期更新），但不会显示 Secret 明文本身。`promote` 会在目标环境创建一份新的配置状态；这不等于立即重新部署——已经在运行的实例不会因为 promote 而自动重启。
+
+## 验证
+
+Promote 之后，检查目标环境的变量列表是否符合预期，再决定是否需要触发一次新部署让运行中的实例读取新配置。
+
+## 回滚 / 恢复
+
+Promote 不会覆盖历史部署快照——如果提升后的新部署出现问题，仍然可以按[回滚与恢复](/docs/deliver/recovery/)中的步骤回滚到提升前的部署。
+
+## 故障排查链接
+
+- [配置优先级](/docs/configuration/precedence/)
+
+## 相关参考页面
+
+- [配置模型](/docs/configuration/model/)
+- [安全处理密钥](/docs/configuration/secrets/)
+
+## 注意事项
+
+Promote 前应该先确认：目标环境是否正确、Secret 应该重新生成还是复用引用、以及是否需要在 promote 完成后立即触发一次新部署。

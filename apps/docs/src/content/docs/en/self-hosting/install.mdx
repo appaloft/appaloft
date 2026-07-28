@@ -1,0 +1,113 @@
+---
+title: "Installing Appaloft"
+description: "Installing Appaloft from a binary package or Docker image."
+docType: "task"
+---
+
+## Goal
+
+Install and run a complete Appaloft instance (including the Web console and public documentation) on your own server.
+
+## When to use this task
+
+- You need full control over data ownership and don't want to use managed Appaloft Cloud.
+- You're deploying Appaloft in an internal network or an environment without public internet access.
+
+## Prerequisites
+
+- A Linux server that can run Docker (recommended), or a downloaded binary package for your platform.
+- If you're going to bind a domain, point DNS at this server ahead of time and open ports `80`/`443`.
+
+## Inputs and defaults
+
+`appaloft serve`'s root path serves the Web console, and `/docs/*` serves public documentation — the binary package embeds the static assets for both, so help documentation opens even in an offline, single-machine environment.
+
+## CLI steps
+
+### Simplest install (recommended)
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh
+```
+
+`install.sh` installs Appaloft as a Docker Compose stack using PostgreSQL by default, suited to production self-hosting.
+
+### Using an embedded database (single-machine scenario)
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --database pglite
+```
+
+A portable single-machine console can keep using embedded PGlite; in this mode, Appaloft state is saved in a persistent Docker volume mounted at `/appaloft-data`.
+
+### Binding a domain
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --domain console.example.com
+```
+
+Without a configured domain, the console is reachable through the server's `3721` port. This domain is the **Appaloft instance's own console entrypoint** — it isn't a custom domain for a project resource, and it doesn't create a deployment snapshot or domain binding. Only use `--proxy none` when an external reverse proxy already handles the public entrypoint.
+
+### Offline / internal network install
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --image <registry>/appaloft:<tag> --skip-image-pull
+```
+
+`--image` specifies a preloaded Appaloft image; only add `--skip-image-pull` when the image already exists in the local Docker daemon.
+
+### Docker Swarm <a id="docker-swarm-runtime-target" />
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --database pglite --orchestrator swarm --stack-name appaloft
+```
+
+Only add `--swarm-init` when you explicitly want the installer to initialize a single-node Swarm manager.
+
+## Expected output and status
+
+The install script automatically applies pending database migrations before the Appaloft HTTP service starts. Once complete, it prints the console URL; by default it also starts a Traefik edge proxy managed by Appaloft itself.
+
+The installer generates and reuses a stable key for product login sessions, saved in the install directory's `.env` — **don't delete this value during an upgrade or repair**, or all existing login sessions become invalid.
+
+## Verification
+
+Open the console URL printed by the installer and confirm the page loads correctly; then follow [Creating The First Admin](/docs/en/self-hosting/first-admin/) to create the initial account and log in.
+
+## Rollback / recovery
+
+If a migration fails, the container fails its health check, and the installer reports an error suggesting you check the container logs; after fixing the database or image issue, re-run the same install command (the installer is idempotent and reuses existing config and data volumes).
+
+Don't write database passwords, GitHub tokens, SSH keys, or deployment identity values into repository config — these values belong in host environment variables, a CI secret store, or inside the installed Appaloft instance itself.
+
+## Advanced: tracing
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --trace jaeger
+```
+
+The installer starts a Jaeger all-in-one container, points Appaloft's OTLP endpoint at the internal collector, and writes trace links back to the Jaeger UI (bound to `127.0.0.1:16686` by default). If Jaeger is exposed through another domain, set `APPALOFT_TRACE_LINK_BASE_URL` to that external URL — see [Runtime Configuration Reference](/docs/en/reference/configuration/) for details.
+
+## Advanced: temporary public access <a id="advanced-tunnels" />
+
+An installed Appaloft can start a time-boxed temporary public tunnel (Cloudflare Quick Tunnel or ngrok) for a local or private-network HTTP origin, useful for quickly giving an external visitor a temporary address:
+
+```bash
+appaloft tunnel start --provider cloudflare-quick --origin http://127.0.0.1:3000 --duration-minutes 60
+appaloft tunnel list
+appaloft tunnel show <tunnelId>
+appaloft tunnel revoke <tunnelId>
+```
+
+Provider credentials are only read from the corresponding provider's environment variable (for example ngrok uses `NGROK_AUTHTOKEN`), and are never persisted or echoed back in a query result. A public source address, a URL with embedded credentials, or a non-HTTP scheme is rejected outright.
+
+## Troubleshooting links
+
+- [Common Failures And Recovery](/docs/en/troubleshoot/recovery/)
+- [Runtime Configuration Reference](/docs/en/reference/configuration/)
+
+## Related reference pages
+
+- [Creating The First Admin](/docs/en/self-hosting/first-admin/)
+- [Embedded Documentation Assets](/docs/en/self-hosting/embedded-docs/)
+- [Upgrading Appaloft](/docs/en/self-hosting/upgrades/)

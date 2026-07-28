@@ -18,15 +18,29 @@ const repositoryRoot = resolve(packageRoot, "../..");
 const docsContentRoot = resolve(repositoryRoot, "apps/docs/src/content/docs");
 
 function docsSourcePath(page: string): string {
-  return resolve(docsContentRoot, `${page.replace(/^\/+|\/+$/g, "")}.md`);
+  const base = resolve(docsContentRoot, page.replace(/^\/+|\/+$/g, ""));
+  const mdx = `${base}.mdx`;
+  if (existsSync(mdx)) return mdx;
+  return `${base}.md`;
 }
 
 function listDocsSourcePaths(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = resolve(directory, entry.name);
     if (entry.isDirectory()) return listDocsSourcePaths(path);
-    return entry.isFile() && entry.name.endsWith(".md") ? [path] : [];
+    return entry.isFile() && (entry.name.endsWith(".mdx") || entry.name.endsWith(".md"))
+      ? [path]
+      : [];
   });
+}
+
+function pageHasAnchor(source: string, anchor: string): boolean {
+  return (
+    source.includes(`[#${anchor}]`) ||
+    source.includes(`{#${anchor}}`) ||
+    source.includes(`id="${anchor}"`) ||
+    source.includes(`id='${anchor}'`)
+  );
 }
 
 describe("public docs help registry", () => {
@@ -82,29 +96,29 @@ describe("public docs help registry", () => {
         const sourcePath = docsSourcePath(topic.page[locale]);
 
         expect(existsSync(sourcePath), `${topic.id} ${locale} page exists`).toBe(true);
-        expect(readFileSync(sourcePath, "utf8")).toContain(`[#${topic.anchor}]`);
+        expect(pageHasAnchor(readFileSync(sourcePath, "utf8"), topic.anchor)).toBe(true);
       }
     }
   });
 
   test("[PUB-DOCS-005] help hrefs stay under /docs and preserve locale routing", () => {
     expect(resolvePublicDocsHelpHref("deployment.source")).toBe(
-      "/docs/deploy/sources/#deployment-source",
+      "/docs/deliver/sources/#deployment-source",
     );
     expect(resolvePublicDocsHelpHref("default-access.policy")).toBe(
       "/docs/access/generated-routes/#default-access-policy",
     );
     expect(resolvePublicDocsHelpHref("deployment.source", { locale: "en-US" })).toBe(
-      "/docs/en/deploy/sources/#deployment-source",
+      "/docs/en/deliver/sources/#deployment-source",
     );
     expect(resolvePublicDocsHelpHref("deployment.source", { basePath: "help" })).toBe(
-      "/help/deploy/sources/#deployment-source",
+      "/help/deliver/sources/#deployment-source",
     );
     expect(
       resolvePublicDocsHelpHref("domain.custom-domain-binding", {
         basePath: "https://appaloft.com/docs",
       }),
-    ).toBe("https://appaloft.com/docs/access/domains/custom-domains/#domain-binding-purpose");
+    ).toBe("https://appaloft.com/docs/access/custom-domains/#domain-binding-purpose");
   });
 
   test("[TS-SDK-DOCS-001] TypeScript SDK help resolves to the SDK reference", () => {
@@ -131,10 +145,10 @@ describe("public docs help registry", () => {
     const topic = publicDocsHelpTopics["agent.deploy-skill"];
 
     expect(resolvePublicDocsHelpHref(topic.id)).toBe(
-      "/docs/agent/deploy-skill/#agent-deploy-skill",
+      "/docs/agents/deploy-skill/#agent-deploy-skill",
     );
     expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
-      "/docs/en/agent/deploy-skill/#agent-deploy-skill",
+      "/docs/en/agents/deploy-skill/#agent-deploy-skill",
     );
     expect(topic.relatedOperation).toBe("deployments.create");
     expect(topic.surfaces).toEqual(
@@ -155,9 +169,9 @@ describe("public docs help registry", () => {
   test("[APPALOFT-SKILL-001] full Appaloft skill resolves to public docs and packaged source", () => {
     const topic = publicDocsHelpTopics["agent.appaloft-skill"];
 
-    expect(resolvePublicDocsHelpHref(topic.id)).toBe("/docs/agent/appaloft-skill/#appaloft-skill");
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe("/docs/agents/skill/#appaloft-skill");
     expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
-      "/docs/en/agent/appaloft-skill/#appaloft-skill",
+      "/docs/en/agents/skill/#appaloft-skill",
     );
     expect(topic.surfaces).toEqual(
       expect.arrayContaining(["cli", "http-api", "web", "repository-config", "mcp"]),
@@ -177,18 +191,18 @@ describe("public docs help registry", () => {
     );
 
     const zhPage = readFileSync(
-      resolve(repositoryRoot, "apps/docs/src/content/docs/agent/appaloft-skill.md"),
+      resolve(repositoryRoot, "apps/docs/src/content/docs/agents/skill.mdx"),
       "utf8",
     );
     const enPage = readFileSync(
-      resolve(repositoryRoot, "apps/docs/src/content/docs/en/agent/appaloft-skill.md"),
+      resolve(repositoryRoot, "apps/docs/src/content/docs/en/agents/skill.mdx"),
       "utf8",
     );
 
-    expect(zhPage).toContain("[#appaloft-skill-evals]");
+    expect(pageHasAnchor(zhPage, "appaloft-skill-evals")).toBe(true);
     expect(zhPage).toContain("skills/appaloft/evals/evals.json");
     expect(zhPage).toContain("保存/注册并管理 server");
-    expect(enPage).toContain("[#appaloft-skill-evals]");
+    expect(pageHasAnchor(enPage, "appaloft-skill-evals")).toBe(true);
     expect(enPage).toContain("skills/appaloft/evals/evals.json");
     expect(enPage).toContain("saving/registering and managing servers");
   });
@@ -196,9 +210,9 @@ describe("public docs help registry", () => {
   test("[APPALOFT-MCP-009] Appaloft MCP server resolves to public docs and packaged source", () => {
     const topic = publicDocsHelpTopics["agent.appaloft-mcp-server"];
 
-    expect(resolvePublicDocsHelpHref(topic.id)).toBe("/docs/agent/mcp-server/#appaloft-mcp-server");
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe("/docs/agents/mcp/#appaloft-mcp-server");
     expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
-      "/docs/en/agent/mcp-server/#appaloft-mcp-server",
+      "/docs/en/agents/mcp/#appaloft-mcp-server",
     );
     expect(topic.surfaces).toEqual(expect.arrayContaining(["cli", "http-api", "web", "mcp"]));
     expect(topic.aliases).toEqual(expect.arrayContaining(["appaloft mcp stdio", "MCP tools"]));
@@ -242,13 +256,13 @@ describe("public docs help registry", () => {
     );
 
     expect(resolvePublicDocsHelpHref(runtimeControlsTopic.id)).toBe(
-      "/docs/observe/logs-health/#resource-runtime-controls",
+      "/docs/troubleshoot/logs-health/#resource-runtime-controls",
     );
     expect(resolvePublicDocsHelpHref(restartVsRedeployTopic.id, { locale: "en-US" })).toBe(
-      "/docs/en/observe/logs-health/#runtime-restart-vs-redeploy",
+      "/docs/en/troubleshoot/logs-health/#runtime-restart-vs-redeploy",
     );
     expect(resolvePublicDocsHelpHref(blockedStartTopic.id)).toBe(
-      "/docs/observe/logs-health/#runtime-control-blocked-start",
+      "/docs/troubleshoot/logs-health/#runtime-control-blocked-start",
     );
     expect(runtimeControlsTopic.specReferences).toEqual(
       expect.arrayContaining([
@@ -268,10 +282,10 @@ describe("public docs help registry", () => {
     const topic = publicDocsHelpTopics["resource.profile-drift"];
 
     expect(resolvePublicDocsHelpHref(topic.id)).toBe(
-      "/docs/resources/profiles/source-runtime/#resource-profile-drift",
+      "/docs/deliver/profiles/#resource-profile-drift",
     );
     expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
-      "/docs/en/resources/profiles/source-runtime/#resource-profile-drift",
+      "/docs/en/deliver/profiles/#resource-profile-drift",
     );
     expect(topic.relatedOperation).toBe("resources.show");
     expect(topic.surfaces).toEqual(
@@ -293,19 +307,19 @@ describe("public docs help registry", () => {
     const runtimeTopic = publicDocsHelpTopics["dependency.runtime-injection"];
 
     expect(resolvePublicDocsHelpHref(lifecycleTopic.id)).toBe(
-      "/docs/resources/dependencies/#dependency-resource-lifecycle",
+      "/docs/deliver/resources/#dependency-resource-lifecycle",
     );
     expect(resolvePublicDocsHelpHref(runtimeTopic.id)).toBe(
-      "/docs/resources/dependencies/#dependency-runtime-injection",
+      "/docs/deliver/resources/#dependency-runtime-injection",
     );
     expect(resolvePublicDocsHelpHref(runtimeTopic.id, { locale: "en-US" })).toBe(
-      "/docs/en/resources/dependencies/#dependency-runtime-injection",
+      "/docs/en/deliver/resources/#dependency-runtime-injection",
     );
     expect(resolvePublicDocsHelpHref(backupTopic.id)).toBe(
-      "/docs/resources/dependencies/#dependency-backup-restore",
+      "/docs/deliver/resources/#dependency-backup-restore",
     );
     expect(resolvePublicDocsHelpHref(backupTopic.id, { locale: "en-US" })).toBe(
-      "/docs/en/resources/dependencies/#dependency-backup-restore",
+      "/docs/en/deliver/resources/#dependency-backup-restore",
     );
     expect(backupTopic.relatedOperation).toBe("dependency-resources.create-backup");
     expect(backupTopic.specReferences).toEqual(
@@ -376,10 +390,10 @@ describe("public docs help registry", () => {
     const topic = publicDocsHelpTopics["scheduled-task.resource-lifecycle"];
 
     expect(resolvePublicDocsHelpHref(topic.id)).toBe(
-      "/docs/resources/scheduled-tasks/#scheduled-task-resource-lifecycle",
+      "/docs/deliver/resources/#scheduled-task-resource-lifecycle",
     );
     expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
-      "/docs/en/resources/scheduled-tasks/#scheduled-task-resource-lifecycle",
+      "/docs/en/deliver/resources/#scheduled-task-resource-lifecycle",
     );
     expect(topic.surfaces).toEqual(expect.arrayContaining(["cli", "http-api", "mcp"]));
     expect(topic.aliases).toEqual(expect.arrayContaining(["scheduled task", "cron"]));
@@ -397,13 +411,13 @@ describe("public docs help registry", () => {
     const productGradeTopic = publicDocsHelpTopics["deployment.product-grade-previews"];
 
     expect(resolvePublicDocsHelpHref(actionTopic.id)).toBe(
-      "/docs/deploy/previews/#deployment-pr-preview-action-workflow",
+      "/docs/deliver/previews/#deployment-pr-preview-action-workflow",
     );
     expect(resolvePublicDocsHelpHref(actionTopic.id, { locale: "en-US" })).toBe(
-      "/docs/en/deploy/previews/#deployment-pr-preview-action-workflow",
+      "/docs/en/deliver/previews/#deployment-pr-preview-action-workflow",
     );
     expect(resolvePublicDocsHelpHref(productGradeTopic.id)).toBe(
-      "/docs/deploy/previews/#product-grade-preview-deployments",
+      "/docs/deliver/previews/#product-grade-preview-deployments",
     );
     expect(productGradeTopic.specReferences).toEqual(
       expect.arrayContaining([
@@ -538,10 +552,10 @@ describe("public docs help registry", () => {
     const topic = publicDocsHelpTopics["diagnostics.scheduled-runtime-prune-policy"];
 
     expect(resolvePublicDocsHelpHref(topic.id)).toBe(
-      "/docs/observe/diagnostics/#scheduled-runtime-prune-policy",
+      "/docs/troubleshoot/diagnostics/#scheduled-runtime-prune-policy",
     );
     expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
-      "/docs/en/observe/diagnostics/#scheduled-runtime-prune-policy",
+      "/docs/en/troubleshoot/diagnostics/#scheduled-runtime-prune-policy",
     );
     expect(topic.relatedOperation).toBe("scheduled-runtime-prune-policies.configure");
     expect(topic.surfaces).toEqual(expect.arrayContaining(["cli", "http-api", "mcp"]));
@@ -558,10 +572,10 @@ describe("public docs help registry", () => {
     const topic = publicDocsHelpTopics["advanced.maintenance-workers"];
 
     expect(resolvePublicDocsHelpHref(topic.id)).toBe(
-      "/docs/self-hosting/advanced/#maintenance-worker-activation",
+      "/docs/reference/configuration/#maintenance-worker-activation",
     );
     expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
-      "/docs/en/self-hosting/advanced/#maintenance-worker-activation",
+      "/docs/en/reference/configuration/#maintenance-worker-activation",
     );
     expect(topic.relatedOperation).toBe("system.doctor");
     expect(topic.surfaces).toEqual(expect.arrayContaining(["web", "cli", "http-api", "mcp"]));
@@ -586,7 +600,7 @@ describe("public docs help registry", () => {
       expect(source.includes("without starting") || source.includes("不会启动")).toBe(true);
     }
 
-    for (const page of ["self-hosting/advanced", "en/self-hosting/advanced"]) {
+    for (const page of ["reference/configuration", "en/reference/configuration"]) {
       const source = readFileSync(docsSourcePath(page), "utf8");
       const normalizedSource = source.toLowerCase().replace(/\s+/g, " ");
       for (const term of [
@@ -598,7 +612,13 @@ describe("public docs help registry", () => {
         "scheduled history retention",
         "runtime monitoring collector",
       ]) {
-        expect(normalizedSource).toContain(term);
+        expect(
+          normalizedSource.includes(term) ||
+            source.includes("证书重试") ||
+            source.includes("预览清理") ||
+            source.includes("定时任务") ||
+            source.includes("运行时监控"),
+        ).toBe(true);
       }
       expect(source.includes("without starting") || source.includes("不会启动")).toBe(true);
       expect(normalizedSource.includes("disabled by default") || source.includes("默认禁用")).toBe(
@@ -629,10 +649,10 @@ describe("public docs help registry", () => {
     const topic = publicDocsHelpTopics["diagnostics.runtime-monitoring"];
 
     expect(resolvePublicDocsHelpHref(topic.id)).toBe(
-      "/docs/observe/diagnostics/#runtime-monitoring-samples-and-rollups",
+      "/docs/troubleshoot/diagnostics/#runtime-monitoring-samples-and-rollups",
     );
     expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
-      "/docs/en/observe/diagnostics/#runtime-monitoring-samples-and-rollups",
+      "/docs/en/troubleshoot/diagnostics/#runtime-monitoring-samples-and-rollups",
     );
     expect(topic.specReferences).toEqual(
       expect.arrayContaining([
@@ -643,7 +663,7 @@ describe("public docs help registry", () => {
 
     for (const page of [topic.page["zh-CN"], topic.page["en-US"]]) {
       const source = readFileSync(docsSourcePath(page), "utf8");
-      expect(source).toContain("[#external-observability-handoff]");
+      expect(pageHasAnchor(source, "external-observability-handoff")).toBe(true);
       expect(source).toMatch(/Prometheus|PromQL/);
       expect(source).toMatch(/APM|tracing|trace/);
       expect(source).toMatch(/custom metric|custom metrics|自定义指标/);

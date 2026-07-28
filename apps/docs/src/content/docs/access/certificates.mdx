@@ -1,0 +1,63 @@
+---
+title: "证书"
+description: "TLS 证书的签发、续期与状态。"
+docType: "concept"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "certificate"
+  - "tls"
+  - "https"
+  - "证书"
+  - "续期"
+relatedOperations:
+  - "certificates.issue-or-renew"
+  - "certificates.import"
+  - "certificates.revoke"
+sidebar:
+  order: 4
+---
+
+## 简要定义 <a id="certificate-readiness" />
+
+证书就绪状态描述"HTTPS 是否可用"，它和应用运行状态、域名所有权状态是完全独立的维度——一个资源可以已经成功部署、健康检查全部通过，但证书还没就绪；反过来证书就绪也不代表应用一定健康。
+
+## 为什么存在这个概念
+
+如果证书状态和部署状态混在一起报告，用户没法判断到底该重新部署应用，还是该等待证书签发。把证书就绪拆成独立、可观察的状态，能让"HTTPS 打不开"这个问题精确定位到证书链、私钥匹配、Hostname 覆盖范围或过期时间中的具体一项。
+
+证书就绪需要同时回答三个问题：Appaloft 是否有可用于这个 hostname 的证书材料？证书是否覆盖当前 hostname 且未过期？代理是否已经在用这份证书对外提供 HTTPS？
+
+## 在 Web / CLI / API 中的体现
+
+Appaloft 支持两种证书来源：
+
+- **自动签发或续期** — 提供 hostname 和所有权证明，由 Appaloft 负责签发流程。
+- **导入证书** — 提供证书链、私钥和相关元数据；私钥是 Secret，任何界面、日志或诊断信息都不会回显完整内容。
+
+```bash
+# 查看证书状态和签发历史（不会返回证书 PEM 或私钥）
+appaloft certificate show <certificateId>
+
+# 对签发/续期失败的证书重试（只重试证书环节，不会重新触发域名所有权验证）
+appaloft certificate retry <certificateId>
+
+# 撤销一个不再使用的证书
+appaloft certificate revoke <certificateId>
+```
+
+## 常见误区
+
+- **把证书失败当成部署失败**：应先确认应用运行状态和生成访问地址是否正常，再单独排查证书。
+- **认为删除域名绑定会自动撤销证书**：两者是独立的生命周期，删除绑定不会自动 revoke 或 delete 证书，反之亦然。
+- **在续期失败后直接重新部署应用**：续期失败通常和域名所有权、DNS 指向或证书材料有关，与应用本身无关。
+
+## 相关任务
+
+- [绑定自定义域名](/docs/access/custom-domains/)
+- [访问故障排查](/docs/access/troubleshooting/)
+
+## 进阶细节
+
+续期失败时的排查顺序：确认域名所有权是否仍然有效 → 确认 DNS 是否仍指向当前代理入口 → 确认证书材料是否过期/链不完整/私钥不匹配 → 确认代理是否成功加载了新证书。`certificate delete` 只会把非 active 证书移出可见的活跃生命周期，并保留必要的审计历史，不会影响仍在使用中的证书。

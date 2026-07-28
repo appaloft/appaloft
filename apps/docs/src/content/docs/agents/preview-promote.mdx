@@ -1,0 +1,112 @@
+---
+title: "Agent 预览与提升"
+description: "Agent 驱动的预览部署与提升到生产环境流程。"
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "source artifact"
+  - "candidate preview"
+  - "sandbox promotion"
+  - "预览"
+  - "提升"
+relatedOperations:
+  - "sandboxes.sourceArtifacts.create"
+  - "sandboxes.candidatePreviews.create"
+  - "sandboxes.promotions.plan"
+  - "sandboxes.promotions.accept"
+sidebar:
+  order: 8
+---
+
+<Aside type="caution" title="成熟度：Private preview">
+不可变捕获、精确 digest 候选与持久化提升流程已经实现；Candidate Preview 目前只覆盖可静态发布的产物。
+</Aside>
+
+## 目标 <a id="sandbox-preview-promotion" />
+
+把一个 Agent 在 Sandbox 里完成的工作，从"可变的工作区状态"冻结成一个不可变的 Source Artifact，生成候选预览，再经过外部确认，显式提升为正式的 Project/Resource 部署。
+
+## 适用场景
+
+- 用户让 Agent 在 Sandbox 里生成或修改一个应用，需要先预览效果再决定是否上线。
+- 需要保证"预览看到的内容"和"最终部署的内容"逐字节一致，不允许中途被悄悄替换。
+
+## 前置条件
+
+- Sandbox 处于 `ready` 状态，且**没有**正在执行的 Run——Capture 只在这个条件下才被允许。
+- 已知目标 Project、Environment 和 Destination。
+
+## 输入与默认值
+
+| 输入 | 说明 |
+| --- | --- |
+| `sourceRoot` | Sandbox 内要捕获的相对路径 |
+| `expectedArtifactDigest` | 调用方期望的 Artifact 内容摘要，用于防止中途被替换 |
+| `target` | 提升的目标：Project id、Environment id、Destination id、Resource 名称 |
+
+## CLI / SDK 操作步骤
+
+```ts
+// 1. 捕获：验证相对路径、文件数量和总大小，为每个文件计算 digest，
+//    并用有序安全 manifest 计算出一个 Source Artifact digest
+const artifact = await appaloft.sandboxes.sourceArtifacts.create({ sandboxId, sourceRoot: "app" });
+
+// 2. 生成候选预览：后续预览只读取 Artifact Store，不会再读取可变的 live workspace
+const preview = await appaloft.sandboxes.candidatePreviews.create({ artifactId: artifact.data.artifactId });
+
+// 3. 生成提升计划：绑定 artifact digest、已验证的候选、目标和过期时间
+const plan = await appaloft.sandboxes.promotions.plan({
+  sandboxId,
+  artifactId: artifact.data.artifactId,
+  expectedArtifactDigest: artifact.data.digest,
+  candidatePreviewId: preview.data.previewId,
+  target: { projectId, environmentId, destinationId, resourceName: "Generated app" },
+});
+
+// 4. 接受提升：这是外部控制面动作，Sandbox 内的 Runtime/Harness 身份不能自我批准
+await appaloft.sandboxes.promotions.accept({
+  promotionId: plan.data.promotionId,
+  expectedArtifactDigest: artifact.data.digest,
+  idempotencyKey: crypto.randomUUID(),
+});
+```
+
+## 预期输出与状态
+
+产品集成应该默认停在 `plan` 这一步：先把候选 URL 和精确 digest 展示给用户，**只有外部控制面的显式确认动作才能调用 `accept`**：
+
+```ts
+if (preview.data.artifactDigest !== artifact.data.digest) {
+  throw new Error("digest mismatch");
+}
+
+if (userConfirmedPromotion) {
+  await appaloft.sandboxes.promotions.accept({
+    promotionId: plan.data.promotionId,
+    expectedArtifactDigest: artifact.data.digest,
+    idempotencyKey: crypto.randomUUID(),
+  });
+}
+```
+
+## 验证
+
+Accept 成功后会创建 Resource 和首次 Deployment；持久化的工作流会保存这两者的 Checkpoint，即使中途重启也不会重复创建已经记录的 Resource。接下来可以按[部署生命周期](/docs/deliver/lifecycle/)的验证方式确认部署已经就绪。
+
+## 回滚 / 恢复
+
+如果两次读取到的 Artifact digest 不一致（`digest mismatch`），说明工作区内容在捕获后被改变过——应该重新执行捕获流程，而不是强行继续提升一个可能不一致的候选。
+
+## 故障排查链接
+
+- [交付证据](/docs/agents/delivery-evidence/)
+- [常见故障与恢复](/docs/troubleshoot/recovery/)
+
+## 相关参考页面
+
+- [Sandbox 模型](/docs/agents/sandboxes/)
+- [Agent Workspace](/docs/agents/workspaces/)
+
+完整的 digest 校验和显式确认门禁（opt-in accept gate）示例见官方 [Preview-to-Promotion 示例](https://github.com/appaloft/examples/blob/main/sandbox-agent/src/preview-promote.ts)。

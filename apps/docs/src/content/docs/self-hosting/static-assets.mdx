@@ -1,0 +1,79 @@
+---
+title: "覆盖静态资源"
+description: "使用 APPALOFT_DOCS_STATIC_DIR 等变量覆盖 Web / 文档静态资源。"
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "APPALOFT_DOCS_STATIC_DIR"
+  - "静态资源覆盖"
+relatedOperations: []
+sidebar:
+  order: 6
+---
+
+## 目标
+
+用自己构建的文档静态站点替换自托管实例内嵌的公共文档,例如接入企业内部品牌、补充私有说明,或提前验证新版本文档。
+
+## 适用场景
+
+- 需要在正式发布前预览新的文档构建产物。
+- 需要为内网环境提供定制过的帮助文档。
+
+## 前置条件
+
+- 已经有一份构建完成的文档静态站点。
+- 对 Appaloft 服务器有配置环境变量和重启服务的权限。
+
+## 输入与默认值
+
+| 输入 | 说明 |
+| --- | --- |
+| `APPALOFT_DOCS_STATIC_DIR` | 指向已构建文档站点的目录;不设置时使用内嵌的默认文档 |
+
+## CLI 操作步骤
+
+### 1. 准备静态目录
+
+构建文档站点,保留 `index.html`、`_next/`、`api/search`、`llms.txt` 和 `llms-full.txt`。如果部署路径不是默认的 `/docs/*`,构建时需要使用匹配的文档 Base 路径。
+
+### 2. 上传到服务器
+
+把构建产物上传到一个只由 Appaloft 读取的目录。**不要**把源码、`.env`、私钥或 CI 工作目录一起上传。
+
+### 3. 指向覆盖目录
+
+```bash
+export APPALOFT_DOCS_STATIC_DIR=/opt/appaloft/docs-override
+```
+
+设置后重启 Appaloft 服务。
+
+## 预期输出与状态
+
+Appaloft 会从 `APPALOFT_DOCS_STATIC_DIR` 指向的目录提供文档,Web 控制台继续使用自己独立的静态资源来源,不受影响。
+
+## 验证
+
+依次打开以下地址,确认页面、搜索和 LLM 入口都来自新的构建产物:
+
+```text
+/docs/
+/docs/api/search
+/docs/llms.txt
+```
+
+## 回滚 / 恢复
+
+如果新文档无法访问,移除 `APPALOFT_DOCS_STATIC_DIR` 环境变量,或者把它指回上一个已知可用的目录,再重启服务——Web 控制台静态资源不受这个操作影响。
+
+## 故障排查链接
+
+- [常见故障与恢复](/docs/troubleshoot/recovery/)
+
+## 相关参考页面
+
+- [内嵌文档资产](/docs/self-hosting/embedded-docs/)
+- [运行时配置参考](/docs/reference/configuration/)

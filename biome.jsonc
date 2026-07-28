@@ -24,6 +24,7 @@
       "!**/.appaloft",
       "!**/.tmp",
       "!**/*.svelte",
+      "!**/*.astro",
       "!apps/desktop/src-tauri/tauri.conf.json"
     ]
   },
@@ -77,6 +78,17 @@
     }
   },
   "overrides": [
+    {
+      "includes": ["apps/docs/src/components/ui/**"],
+      "linter": {
+        "rules": {
+          "style": { "noNonNullAssertion": "off" },
+          "complexity": { "useOptionalChain": "off" },
+          "suspicious": { "useIterableCallbackReturn": "off" }
+        }
+      }
+    },
+
     {
       "includes": ["packages/core/**/*.ts"],
       "linter": {

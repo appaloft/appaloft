@@ -1,0 +1,99 @@
+---
+title: "Agent Previews and Promotion"
+description: "Agent-driven preview deployment and production promotion flow."
+docType: "task"
+---
+
+<Aside type="caution" title="Maturity: Private preview">
+Immutable capture, exact-digest candidates, and the persistent promotion workflow are implemented; Candidate Preview currently only covers statically publishable artifacts.
+</Aside>
+
+## Goal <a id="sandbox-preview-promotion" />
+
+Freeze work an agent completed in a Sandbox — from "mutable workspace state" — into an immutable Source Artifact, generate a candidate preview, and after external confirmation, explicitly promote it to a real Project/Resource deployment.
+
+## When to use this task
+
+- A user asks an agent to generate or modify an app in a Sandbox, and needs to preview it before deciding whether to ship it.
+- You need to guarantee that "what the preview showed" and "what actually got deployed" are byte-for-byte identical, with no silent substitution in between.
+
+## Prerequisites
+
+- The Sandbox is in the `ready` state, with **no** Run currently executing — Capture is only allowed under this condition.
+- The target Project, Environment, and Destination are known.
+
+## Inputs and defaults
+
+| Input | Description |
+| --- | --- |
+| `sourceRoot` | The relative path inside the Sandbox to capture |
+| `expectedArtifactDigest` | The artifact content digest the caller expects, used to prevent mid-flight substitution |
+| `target` | The promotion target: Project id, Environment id, Destination id, Resource name |
+
+## CLI / SDK steps
+
+```ts
+// 1. Capture: validates the relative path, file count, and total size, computes a digest
+//    for each file, and computes a Source Artifact digest from an ordered, safe manifest
+const artifact = await appaloft.sandboxes.sourceArtifacts.create({ sandboxId, sourceRoot: "app" });
+
+// 2. Generate a candidate preview: subsequent previews only read the Artifact Store,
+//    never the mutable live workspace again
+const preview = await appaloft.sandboxes.candidatePreviews.create({ artifactId: artifact.data.artifactId });
+
+// 3. Generate a promotion plan: binds the artifact digest, the verified candidate,
+//    the target, and an expiration
+const plan = await appaloft.sandboxes.promotions.plan({
+  sandboxId,
+  artifactId: artifact.data.artifactId,
+  expectedArtifactDigest: artifact.data.digest,
+  candidatePreviewId: preview.data.previewId,
+  target: { projectId, environmentId, destinationId, resourceName: "Generated app" },
+});
+
+// 4. Accept the promotion: this is an external control-plane action — a Runtime/Harness
+//    identity inside the Sandbox can never approve its own promotion
+await appaloft.sandboxes.promotions.accept({
+  promotionId: plan.data.promotionId,
+  expectedArtifactDigest: artifact.data.digest,
+  idempotencyKey: crypto.randomUUID(),
+});
+```
+
+## Expected output and status
+
+A product integration should stop by default at the `plan` step — show the candidate URL and exact digest to the user first, and **only an explicit confirmation action from an external control plane should call `accept`**:
+
+```ts
+if (preview.data.artifactDigest !== artifact.data.digest) {
+  throw new Error("digest mismatch");
+}
+
+if (userConfirmedPromotion) {
+  await appaloft.sandboxes.promotions.accept({
+    promotionId: plan.data.promotionId,
+    expectedArtifactDigest: artifact.data.digest,
+    idempotencyKey: crypto.randomUUID(),
+  });
+}
+```
+
+## Verification
+
+After a successful accept, a Resource and its first Deployment are created; the persistent workflow saves checkpoints for both, so even a mid-flight restart won't recreate an already-recorded Resource. From there, follow [Deployment Lifecycle](/docs/en/deliver/lifecycle/) to verify the deployment is ready.
+
+## Rollback / recovery
+
+If two reads of the Artifact digest don't match (`digest mismatch`), the workspace content was changed after capture — you should redo the capture flow rather than forcing the promotion of a possibly inconsistent candidate.
+
+## Troubleshooting links
+
+- [Delivery Evidence](/docs/en/agents/delivery-evidence/)
+- [Common Failures And Recovery](/docs/en/troubleshoot/recovery/)
+
+## Related reference pages
+
+- [Sandbox Model](/docs/en/agents/sandboxes/)
+- [Agent Workspace](/docs/en/agents/workspaces/)
+
+A complete digest-verification and explicit-confirmation opt-in accept gate example is in the official [Preview-to-Promotion example](https://github.com/appaloft/examples/blob/main/sandbox-agent/src/preview-promote.ts).

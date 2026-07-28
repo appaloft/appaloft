@@ -1,0 +1,46 @@
+---
+title: "Troubleshoot Overview"
+description: "How status, logs, and diagnostic information together pinpoint root causes."
+docType: "concept"
+---
+
+## Short definition
+
+When troubleshooting, Appaloft splits information into four layers: **Status** (can it be used right now), **Events** (why it got this way), **Logs** (what the app itself said), and **Diagnostic summary** (packaged, safe-to-share troubleshooting evidence). Understanding these four layers separately keeps you from being misled by a generic message like "access failed."
+
+```mermaid
+flowchart LR
+    S["Status\ncan it be used right now"] --> E["Events\nwhy it got this way"]
+    E --> L["Logs\nwhat the app itself said"]
+    L --> D["Diagnostic summary\nsafe-to-share evidence"]
+    D --> A["Next: retry / fix / roll back"]
+```
+
+## Why this group exists
+
+"The deployment failed" carries no information by itself. Did the app code throw an error? Was the port misconfigured? Is the proxy not forwarding correctly? Did the domain fail to resolve? Was the certificate not issued? Each cause needs a completely different fix. Splitting troubleshooting into four independently readable layers — status, events, logs, and diagnostics — gives every troubleshooting session a clear next step, instead of retrying by guesswork.
+
+## Where you see it in Web, CLI, and API
+
+```bash
+appaloft resource show res_web
+appaloft resource health res_web --checks --public-access-probe
+appaloft resource logs res_web --tail 100
+appaloft resource diagnose res_web
+```
+
+## Common mistakes
+
+- **Judging the whole deployment as failed from a single failure hint**: confirm the resource, deployment, runtime, proxy, and access URL states separately first.
+- **Reaching for destructive operations first**: safe troubleshooting should prefer read-only checks and retryable operations first, and only modify server, credential, proxy, or domain configuration when manual intervention is clearly needed.
+
+## Related tasks
+
+- [Status And Events](/docs/en/troubleshoot/status-events/)
+- [Viewing Logs And Health Summaries](/docs/en/troubleshoot/logs-health/)
+- [Generating A Safe Diagnostic Summary](/docs/en/troubleshoot/diagnostics/)
+- [Common Failures And Recovery](/docs/en/troubleshoot/recovery/)
+
+## Advanced details
+
+Don't retry a deployment, manually change server configuration, change DNS, and rotate keys all at the same time while unsure of the current state — change one variable at a time, so the recovery path stays verifiable.

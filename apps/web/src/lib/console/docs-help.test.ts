@@ -11,7 +11,7 @@ import {
 
 describe("console docs help links", () => {
   test("[PUB-DOCS-010] quick deploy source help uses the public docs registry anchor", () => {
-    expect(quickDeploySourceHelpHref).toBe("/docs/deploy/sources/#deployment-source");
+    expect(quickDeploySourceHelpHref).toBe("/docs/deliver/sources/#deployment-source");
   });
 
   test("[PUB-DOCS-010] Web help hrefs cover high-confusion console surfaces", () => {
@@ -23,7 +23,7 @@ describe("console docs help links", () => {
       "/docs/servers/register-connect/#server-deployment-target",
     );
     expect(webDocsHrefs.serverSshCredential).toBe(
-      "/docs/servers/credentials/ssh-keys/#server-ssh-credential-path",
+      "/docs/servers/ssh-keys/#server-ssh-credential-path",
     );
     expect(webDocsHrefs.serverConnectivityTest).toBe(
       "/docs/servers/register-connect/#server-connectivity-test",
@@ -32,94 +32,94 @@ describe("console docs help links", () => {
       "/docs/servers/register-connect/#docker-swarm-runtime-target",
     );
     expect(webDocsHrefs.environmentVariablePrecedence).toBe(
-      "/docs/environments/variables/precedence/#environment-variable-precedence",
+      "/docs/configuration/precedence/#environment-variable-precedence",
     );
     expect(webDocsHrefs.environmentLifecycle).toBe(
-      "/docs/environments/model/#environment-lifecycle",
+      "/docs/configuration/model/#environment-lifecycle",
     );
     expect(webDocsHrefs.resourceRuntimeProfile).toBe(
-      "/docs/resources/profiles/source-runtime/#resource-runtime-profile",
+      "/docs/deliver/profiles/#resource-runtime-profile",
     );
     expect(webDocsHrefs.resourceProfileDrift).toBe(
-      "/docs/resources/profiles/source-runtime/#resource-profile-drift",
+      "/docs/deliver/profiles/#resource-profile-drift",
     );
     expect(webDocsHrefs.resourceHealthProfile).toBe(
-      "/docs/resources/profiles/health-network/#resource-health-profile",
+      "/docs/deliver/profiles/#resource-health-profile",
     );
     expect(webDocsHrefs.resourceNetworkProfile).toBe(
-      "/docs/resources/profiles/health-network/#resource-network-profile",
+      "/docs/deliver/profiles/#resource-network-profile",
     );
     expect(webDocsHrefs.dependencyResourceLifecycle).toBe(
-      "/docs/resources/dependencies/#dependency-resource-lifecycle",
+      "/docs/deliver/resources/#dependency-resource-lifecycle",
     );
     expect(webDocsHrefs.dependencyBackupRestore).toBe(
-      "/docs/resources/dependencies/#dependency-backup-restore",
+      "/docs/deliver/resources/#dependency-backup-restore",
     );
     expect(webDocsHrefs.dependencyRuntimeInjection).toBe(
-      "/docs/resources/dependencies/#dependency-runtime-injection",
+      "/docs/deliver/resources/#dependency-runtime-injection",
     );
   });
 
   test("[PUB-DOCS-010] Web help hrefs cover owner-scoped console surfaces", () => {
-    expect(webDocsHrefs.deploymentLifecycle).toBe("/docs/deploy/lifecycle/#deployment-lifecycle");
+    expect(webDocsHrefs.deploymentLifecycle).toBe("/docs/deliver/lifecycle/#deployment-lifecycle");
     expect(webDocsHrefs.deploymentPlanPreview).toBe(
-      "/docs/deploy/lifecycle/#deployment-plan-preview",
+      "/docs/deliver/lifecycle/#deployment-plan-preview",
     );
     expect(webDocsHrefs.productGradePreviews).toBe(
-      "/docs/deploy/previews/#product-grade-preview-deployments",
+      "/docs/deliver/previews/#product-grade-preview-deployments",
     );
-    expect(webDocsHrefs.appaloftSkill).toBe("/docs/agent/appaloft-skill/#appaloft-skill");
-    expect(webDocsHrefs.appaloftMcpServer).toBe("/docs/agent/mcp-server/#appaloft-mcp-server");
+    expect(webDocsHrefs.appaloftSkill).toBe("/docs/agents/skill/#appaloft-skill");
+    expect(webDocsHrefs.appaloftMcpServer).toBe("/docs/agents/mcp/#appaloft-mcp-server");
     expect(webDocsHrefs.serverProxyReadiness).toBe(
-      "/docs/servers/operations/proxy-and-terminal/#server-proxy-readiness",
+      "/docs/servers/proxy-and-terminal/#server-proxy-readiness",
     );
     expect(webDocsHrefs.serverTerminalSession).toBe(
-      "/docs/servers/operations/proxy-and-terminal/#server-terminal-session",
+      "/docs/servers/proxy-and-terminal/#server-terminal-session",
     );
     expect(webDocsHrefs.maintenanceWorkerActivation).toBe(
-      "/docs/self-hosting/advanced/#maintenance-worker-activation",
+      "/docs/reference/configuration/#maintenance-worker-activation",
     );
     expect(webDocsHrefs.domainGeneratedAccessRoute).toBe(
       "/docs/access/generated-routes/#access-generated-route",
     );
     expect(webDocsHrefs.domainCustomDomainBinding).toBe(
-      "/docs/access/domains/custom-domains/#domain-binding-purpose",
+      "/docs/access/custom-domains/#domain-binding-purpose",
     );
     expect(webDocsHrefs.certificateReadiness).toBe(
-      "/docs/access/tls/certificates/#certificate-readiness",
+      "/docs/access/certificates/#certificate-readiness",
     );
     expect(webDocsHrefs.observabilityRuntimeLogs).toBe(
-      "/docs/observe/logs-health/#observe-runtime-logs",
+      "/docs/troubleshoot/logs-health/#observe-runtime-logs",
     );
     expect(webDocsHrefs.observabilityHealthSummary).toBe(
-      "/docs/observe/logs-health/#observe-health-summary",
+      "/docs/troubleshoot/logs-health/#observe-health-summary",
     );
     expect(webDocsHrefs.diagnosticsSafeSupportPayload).toBe(
-      "/docs/observe/diagnostics/#diagnostic-summary-copy-support-payload",
+      "/docs/troubleshoot/diagnostics/#diagnostic-summary-copy-support-payload",
     );
     expect(webDocsHrefs.runtimeUsageInspect).toBe(
-      "/docs/observe/diagnostics/#runtime-usage-inspect",
+      "/docs/troubleshoot/diagnostics/#runtime-usage-inspect",
     );
     expect(webDocsHrefs.runtimeTargetCapacity).toBe(
-      "/docs/observe/diagnostics/#runtime-target-capacity-inspect",
+      "/docs/troubleshoot/diagnostics/#runtime-target-capacity-inspect",
     );
     expect(webDocsHrefs.sourceAutoDeploySetup).toBe(
-      "/docs/deploy/sources/#source-auto-deploy-setup",
+      "/docs/deliver/sources/#source-auto-deploy-setup",
     );
     expect(webDocsHrefs.sourceAutoDeploySignatures).toBe(
-      "/docs/deploy/sources/#source-auto-deploy-signatures",
+      "/docs/deliver/sources/#source-auto-deploy-signatures",
     );
     expect(webDocsHrefs.sourceAutoDeployDedupe).toBe(
-      "/docs/deploy/sources/#source-auto-deploy-dedupe",
+      "/docs/deliver/sources/#source-auto-deploy-dedupe",
     );
     expect(webDocsHrefs.sourceAutoDeployIgnoredEvents).toBe(
-      "/docs/deploy/sources/#source-auto-deploy-ignored-events",
+      "/docs/deliver/sources/#source-auto-deploy-ignored-events",
     );
     expect(webDocsHrefs.sourceAutoDeployRecovery).toBe(
-      "/docs/deploy/sources/#source-auto-deploy-recovery",
+      "/docs/deliver/sources/#source-auto-deploy-recovery",
     );
     expect(webDocsHrefs.scheduledTaskLifecycle).toBe(
-      "/docs/resources/scheduled-tasks/#scheduled-task-resource-lifecycle",
+      "/docs/deliver/resources/#scheduled-task-resource-lifecycle",
     );
   });
 

@@ -1,0 +1,97 @@
+---
+title: "CLI reference"
+description: "The public entrypoint for CLI commands, arguments, interactive prompts, and doc links."
+docType: "reference"
+---
+
+## Stable identifier
+
+`appaloft` is Appaloft's official command-line tool. It's a first-class entrypoint — every command collects user input and executes it through the shared business operations, never bypassing the application layer or maintaining a separate set of business semantics.
+
+## Common commands at a glance
+
+```bash
+appaloft init                                 # Initialize appaloft.yml in the current directory
+appaloft deploy .                             # Deploy the current directory
+appaloft login                                # Log in to Appaloft Cloud or a self-hosted instance
+appaloft context list                         # View saved local profiles/contexts
+
+appaloft projects list                        # List projects
+appaloft servers register --host <host>       # Register a server
+appaloft resources create --project <id>      # Create a resource
+
+appaloft deployments timeline <deploymentId>  # View the deployment timeline
+appaloft resource diagnose <resourceId>       # Generate a safe diagnostic summary
+appaloft deployments recovery-readiness <deploymentId>  # Query recovery-readiness status
+```
+
+Every command supports `--help` for the full argument list; interactive prompts and error recovery suggestions link to this documentation site's stable pages wherever possible.
+
+## Login and CLI profiles <a id="cli-remote-control-plane-login" />
+
+```bash
+appaloft login
+appaloft login --url https://appaloft.internal.example.com
+```
+
+`appaloft login` and `appaloft auth login` connect to Appaloft Cloud (`https://app.appaloft.com`) by default. To connect to a self-hosted Appaloft instance or another trusted endpoint, pass `--url <url>` explicitly. After a successful login, the CLI saves the endpoint, profile name, auth reference, and handshake digest to a local CLI profile — this profile lives under `APPALOFT_HOME` or the user's local Appaloft home directory, **it is not repository config**, and it's never committed to `appaloft.yml`.
+
+Logging in doesn't take over deployment, and doesn't create a Project, Resource, Deployment, Source Link, or domain binding — nor does it stuff control-plane configuration into a deployment request or write a token/cookie into a committed config file.
+
+```bash
+appaloft auth status
+appaloft logout
+appaloft context list
+appaloft context show
+appaloft context use <profile>
+```
+
+The commands above only manage the local profile/context — they never modify any server-side state.
+
+## Non-interactive authentication (AI agents / CI)
+
+Interactive login uses a browser verification-code flow, suited to human operators. **AI agents and CI/automation should not use the browser/verification-code flow as their default authentication path** — they should prefer a scoped, expirable token instead:
+
+```bash
+# A one-off non-interactive command
+APPALOFT_TOKEN=<scoped-token> appaloft deploy .
+
+# Read a token from stdin, verify it, and write it to the local profile
+appaloft auth token login --stdin
+
+# Read from a controlled secret file (an agent should never open or print this file's contents)
+appaloft auth token login --token-file <path>
+```
+
+Never pass a plaintext token as a command-line argument, and never paste a session cookie, bearer token, deploy token, or secret file content into a conversation, log, screenshot, or committed config file.
+
+## Remote Appaloft dispatch <a id="cli-remote-control-plane-dispatch" />
+
+With a logged-in profile, or when `--control-plane-mode cloud|self-hosted` or `--control-plane-url <url>` is passed explicitly, ordinary business commands first resolve the execution target:
+
+```bash
+appaloft deploy . --control-plane-mode self-hosted --control-plane-url https://console.example.com
+```
+
+`controlPlane.mode: none` (the default) keeps using the local CLI/SSH runtime. A remote target performs a compatibility/authentication handshake before the business request, then dispatches the operation through the exact same typed contract as Web/API/SDK — **the CLI never maintains a separate business schema**.
+
+Without a profile, URL, token, or another trusted remote source, `auto` and the default behavior fall back to local mode — it never contacts a public Cloud, and never scans the network.
+
+`server terminal` and `resource terminal` open a session through the typed API first when targeting a remote; with `--attach`, the CLI connects directly to the control plane's WebSocket to forward local terminal input, resize, output, and close frames — it doesn't initialize local state, and doesn't read the target server's SSH credentials.
+
+Some commands (`serve`, `db`, `remote-state`, `init`, the top-level quick `deploy`, source package commands, and a few others) currently only support local execution; calling them under an explicit remote mode returns `control_plane_unsupported` rather than silently falling back to local execution.
+
+## Local documentation links
+
+While a local Appaloft service is running, doc links printed by the CLI preferentially point to local `/docs/*`, so offline self-hosted users don't need to reach an external site.
+
+## Automation recommendations
+
+When writing automation scripts, prefer explicit flags or config file fields, and avoid depending on interactive input that can't be replayed (like a confirmation prompt).
+
+## Related tasks
+
+- [Your First Deployment](/docs/en/start/first-deployment/)
+- [Register And Connect A Server](/docs/en/servers/register-connect/)
+- [Generating A Safe Diagnostic Summary](/docs/en/troubleshoot/diagnostics/)
+- [Runtime Configuration Reference](/docs/en/reference/configuration/)

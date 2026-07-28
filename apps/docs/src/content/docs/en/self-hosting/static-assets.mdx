@@ -1,0 +1,70 @@
+---
+title: "Overriding Static Assets"
+description: "Overriding Web / documentation static assets with APPALOFT_DOCS_STATIC_DIR and related variables."
+docType: "task"
+---
+
+## Goal
+
+Replace the public documentation embedded in a self-hosted instance with your own built documentation static site — for example to add enterprise internal branding, supplement private notes, or preview a new documentation version ahead of time.
+
+## When to use this task
+
+- You need to preview a new documentation build before an official release.
+- You need to provide customized help documentation for an internal network environment.
+
+## Prerequisites
+
+- You already have a built documentation static site.
+- You have permission to configure environment variables and restart the service on the Appaloft server.
+
+## Inputs and defaults
+
+| Input | Description |
+| --- | --- |
+| `APPALOFT_DOCS_STATIC_DIR` | Points to the built documentation site directory; without it set, the embedded default documentation is used |
+
+## CLI steps
+
+### 1. Prepare the static directory
+
+Build the documentation site, keeping `index.html`, `_next/`, `api/search`, `llms.txt`, and `llms-full.txt`. If the deploy path isn't the default `/docs/*`, build with a matching documentation base path.
+
+### 2. Upload to the server
+
+Upload the build output to a directory only Appaloft reads from. **Don't** upload source code, `.env`, private keys, or the CI working directory along with it.
+
+### 3. Point at the override directory
+
+```bash
+export APPALOFT_DOCS_STATIC_DIR=/opt/appaloft/docs-override
+```
+
+Restart the Appaloft service after setting this.
+
+## Expected output and status
+
+Appaloft serves documentation from the directory `APPALOFT_DOCS_STATIC_DIR` points to; the Web console keeps using its own independent static asset source, unaffected.
+
+## Verification
+
+Open the following addresses in order and confirm the page, search, and LLM entrypoints all come from the new build:
+
+```text
+/docs/
+/docs/api/search
+/docs/llms.txt
+```
+
+## Rollback / recovery
+
+If the new documentation isn't reachable, remove the `APPALOFT_DOCS_STATIC_DIR` environment variable, or point it back at the last known-good directory, then restart the service — the Web console's static assets are unaffected by this operation.
+
+## Troubleshooting links
+
+- [Common Failures And Recovery](/docs/en/troubleshoot/recovery/)
+
+## Related reference pages
+
+- [Embedded Documentation Assets](/docs/en/self-hosting/embedded-docs/)
+- [Runtime Configuration Reference](/docs/en/reference/configuration/)

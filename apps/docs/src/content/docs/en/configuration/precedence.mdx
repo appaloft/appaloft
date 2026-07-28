@@ -1,0 +1,65 @@
+---
+title: "Configuration Precedence"
+description: "The merge and override order across multiple configuration sources."
+docType: "reference"
+---
+
+## Stable identifier <a id="environment-variable-precedence" />
+
+Appaloft's configuration merge order, from lowest to highest priority: `defaults -> system -> organization -> project -> environment -> resource -> deployment snapshot`.
+
+## Input fields and validation
+
+| Rule | Description |
+| --- | --- |
+| The closer to the actual deployment, the higher the precedence | Resource-level variables > environment-level variables > project/system defaults |
+| Overriding the same name requires matching `key + exposure` | Only entries with the same scope and exposure mode override each other |
+| The snapshot freezes at deployment creation time | Editing a variable after a deployment has completed never changes that already-completed deployment |
+
+### Build-time vs. runtime variables
+
+| Type | When it's used | Can it be a Secret? |
+| --- | --- | --- |
+| Build-time variable | Frontend build, static artifact generation, and other build-phase steps | **No** — it ends up in the build artifact, potentially exposed to the browser |
+| Runtime variable | Read at app startup and runtime | **Yes** — read models and logs must mask the real value |
+
+If a variable will be seen by the browser (for example prefixed `PUBLIC_` or `VITE_`), it should never be marked or used as a Secret; conversely, a build-time variable with a secret-shaped name (like `*_TOKEN` or `*_PASSWORD`) is rejected outright, not silently downgraded.
+
+## Output fields and status values
+
+- `environments.effective-precedence`: shows the effective variables an environment contributes before resource-level overrides.
+- `resources.effective-config`: shows the final configuration view that will enter a deployment after resource-level variables override environment-level ones, along with a safe source/override summary.
+
+## Command / interface examples
+
+```bash
+# Set an environment-level variable
+appaloft env set-variable env_prod APP_URL "https://app.example.com"
+
+# Set a resource-level override (takes precedence over an environment variable with the same name)
+appaloft resource set-variable res_web LOG_LEVEL debug
+
+# View the effective variables for an environment
+appaloft env effective-precedence env_prod
+
+# View the final configuration view a resource will contribute to a deployment
+appaloft resource effective-config res_web
+
+# Bulk-import from pasted .env content (duplicate keys are resolved by the last line)
+appaloft resource import-variables res_web --file .env.production
+```
+
+## Error codes and recovery hints
+
+If a deployment isn't reading an expected new variable:
+
+1. Confirm the variable was set on the correct environment or resource, and not on a different environment with the same name.
+2. Confirm whether this variable should be a build-time or runtime variable.
+3. If the target is a **running instance**, a new deployment must be triggered to read the new deployment snapshot — editing the variable itself never hot-updates a running process.
+4. If it's a **build-time** variable, you need to rebuild and redeploy for the new value to enter the artifact.
+
+## Related tasks
+
+- [Handling Secrets Safely](/docs/en/configuration/secrets/)
+- [Configuration Diff And Promote](/docs/en/configuration/diff-promote/)
+- [Configuration File Reference](/docs/en/configuration/config-file/)

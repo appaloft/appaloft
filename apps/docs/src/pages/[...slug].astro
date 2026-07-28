@@ -1,0 +1,27 @@
+---
+import type { CollectionEntry } from "astro:content";
+import type { GetStaticPaths } from "astro";
+import { getDocsStaticPaths } from "@cloudflare/nimbus-docs";
+import DocPage from "../components/DocPage.astro";
+
+export const prerender = true;
+
+// The root `index.mdx` / `en/index.mdx` entries are rendered at `/` and
+// `/en` by `src/pages/index.astro` / `src/pages/en/index.astro` instead.
+// Astro's content glob loader gives a root-level `index.mdx` the entry id
+// `"index"` (there's no parent directory to fold into), but for a *nested*
+// `index.mdx` it strips the trailing `/index` and folds it into the parent
+// directory's id instead — so `en/index.mdx`'s id is `"en"`, not
+// `"en/index"`. Filter both so the catch-all doesn't also publish them a
+// second time at `/index` / `/en`.
+export const getStaticPaths: GetStaticPaths = async (context) => {
+  const paths = await getDocsStaticPaths(context);
+
+  return paths.filter((path) => path.params.slug !== "index" && path.params.slug !== "en");
+};
+
+const { entry } = Astro.props as { entry: CollectionEntry<"docs"> };
+const currentSlug = Astro.url.pathname.replace(/\/$/, "") || "/";
+---
+
+<DocPage entry={entry} path={currentSlug} />

@@ -1,0 +1,72 @@
+---
+title: "Configuration File Reference"
+description: "Fields, validation, and precedence for the in-repository configuration file."
+docType: "reference"
+---
+
+## Stable identifier
+
+`appaloft.yml` (or `appaloft.yaml`) is a reviewable configuration file kept inside the repository, used to declare defaults for Project, Resource, Environment, and deployments. **Secret values should never be written directly into the repository config file** — it should only declare where a value should come from.
+
+## Input fields and validation
+
+### `env` and `secrets`
+
+```yaml
+env:
+  APP_URL: "http://{pr_number}.preview.example.com"
+secrets:
+  APP_SECRET:
+    from: ci-env:APP_SECRET
+    required: true
+```
+
+- `env` is for non-sensitive values. In pull-request preview deployments, `env` values can use the `{pr_number}` and `{preview_id}` placeholders.
+- `secrets` only declares a **reference** (for example `ci-env:APP_SECRET` means "read from the CI environment variable"). The real value must live in GitHub Secrets, another CI secret store, or an Appaloft-managed secret — never in this file.
+
+### `controlPlane`
+
+```yaml
+controlPlane:
+  mode: none
+```
+
+`controlPlane.mode` declares the default deployment ownership:
+
+| Value | Meaning |
+| --- | --- |
+| `none` | Pure CLI or Action + SSH deployment, with no dependency on a remote control plane |
+| `self-hosted` | A self-hosted Appaloft Server owns deployment state; the Action calls the Server API instead of operating SSH directly |
+
+`controlPlane.url` is not a Secret, but it must be a plain `http(s)` origin with no credentials, path, query, or fragment. **Tokens, SSH keys, repository identity, organization/tenant/provider account identity, database URLs, and other secret values must never be written into repository config.**
+
+```yaml
+controlPlane:
+  mode: self-hosted
+  url: https://console.example.com
+  deploymentContext:
+    projectId: prj_www
+    environmentId: env_prod
+    resourceId: res_www
+    serverId: srv_prod
+```
+
+`controlPlane.deploymentContext` is a **narrow, advanced field** that should only be used for one-time bootstrap, relinking, or support/debugging scenarios where you're explicitly binding a repository to an existing Project/Environment/Resource/Server. Ordinary self-hosted deployments don't need these ids in config — the Server should resolve the target from source-link state, Deploy Token scope, or trusted repository/ref context first.
+
+## Output fields and status values
+
+The config file itself doesn't produce runtime output; it participates in the detect/plan phases of [Deployment Lifecycle](/docs/en/deliver/lifecycle/) as one of the deployment inputs, and the final values show up in the deployment's Profile summary.
+
+## Error codes and recovery hints
+
+| Symptom | Likely cause |
+| --- | --- |
+| Deployment reports "this field should not be written to config" | The config file contains a token, SSH key, database URL, or other sensitive field — switch to a `secrets` reference or configure it separately through Web/CLI |
+| `controlPlane.url` validation fails | The URL carries credentials, a path, a query, or a fragment — keep only the plain origin |
+| A preview deployment isn't reading `{pr_number}` | Confirm the deployment actually carries the related `--preview` flags, see [Previews And Cleanup](/docs/en/deliver/previews/) |
+
+## Related tasks
+
+- [Configuring Deployment Sources](/docs/en/deliver/sources/)
+- [Handling Secrets Safely](/docs/en/configuration/secrets/)
+- [Previews And Cleanup](/docs/en/deliver/previews/)

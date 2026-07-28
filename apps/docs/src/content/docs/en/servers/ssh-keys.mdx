@@ -1,0 +1,88 @@
+---
+title: "Managing SSH Credentials"
+description: "Creating, rotating, and revoking SSH credentials used for server access."
+docType: "task"
+---
+<a id="server-ssh-credential" />
+
+
+## Goal
+
+Safely create, verify, rotate, and delete the SSH credentials used to connect to target deployment servers.
+
+## When to use this task
+
+- Configuring SSH access for a server for the first time.
+- Rotating credentials periodically, or when you suspect a private key may have leaked.
+- Cleaning up a saved credential you no longer need after decommissioning a server.
+
+## Prerequisites
+
+- You've completed [Register And Connect A Server](/docs/en/servers/register-connect/).
+- A new SSH private key is ready (rotation scenario).
+
+## Inputs and defaults
+
+A credential can take one of three forms:
+
+| Form | Good for | Description |
+| --- | --- | --- |
+| Local key path | CLI local execution only | Only the CLI can read the local file system |
+| Private key content | One-time input | Treated as a sensitive secret — never echoed after submission |
+| Saved credential | Web / API / reuse scenarios | An Appaloft-stored, reusable credential reference |
+
+Credentials are a security boundary: Web, CLI, API, logs, and diagnostic summaries **never** show a plaintext private key, passphrase, or token.
+
+## CLI steps
+
+<a id="server-ssh-credential-path" />
+
+```bash
+# Provide a local key path directly when registering a server
+appaloft server register --host 203.0.113.10 --user deploy --ssh-key ~/.ssh/id_ed25519
+
+# Rotate a saved, reusable credential (in-place rotation, keeps the credential id and existing server references)
+appaloft server credential-rotate <credentialId> \
+  --private-key-file ~/.ssh/appaloft-new \
+  --confirm <credentialId> \
+  --acknowledge-server-usage
+
+# Delete a saved credential that's no longer referenced by any server
+appaloft server credential-delete <credentialId> --confirm <credentialId>
+```
+
+`--acknowledge-server-usage` can only be omitted when the credential is currently used by 0 servers; once any server is using it, you must explicitly confirm you understand those servers will switch to the rotated key material.
+
+## HTTP/API steps
+
+```http
+POST /api/credentials/ssh/{credentialId}/rotate
+DELETE /api/credentials/ssh/{credentialId}
+```
+
+## Expected output and status
+
+Successful rotation only means Appaloft has saved new key material — **it does not mean the new key can already reach the server**. A delete request is rejected with `credential_in_use` if the target credential is still referenced by at least one server.
+
+## Verification
+
+After rotating, make sure to rerun the connectivity test on every server that references the credential:
+
+```bash
+appaloft server test srv_primary
+```
+
+## Rollback / recovery
+
+- If you'd rather create a brand-new credential id instead of rotating in place: add the new credential → switch the server(s) to it → run the connectivity test to confirm → then delete the old credential.
+- If the connectivity test fails after rotation, first confirm the new private key's matching public key has been added to the server's `authorized_keys`, then retry the connectivity test — the old credential is not automatically deleted until rotation is complete.
+
+## Troubleshooting links
+
+- [Register And Connect A Server](/docs/en/servers/register-connect/)
+- [Troubleshoot Overview](/docs/en/troubleshoot/overview/)
+
+## Related reference pages
+
+- [Servers Overview](/docs/en/servers/overview/)
+- [Handling Secrets Safely](/docs/en/configuration/secrets/)

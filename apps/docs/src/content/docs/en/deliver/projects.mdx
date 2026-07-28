@@ -1,0 +1,56 @@
+---
+title: "Projects"
+description: "How a project organizes resources, environments, and team collaboration boundaries."
+docType: "concept"
+---
+<a id="concept-resource" />
+
+
+## Short definition <a id="concept-project" />
+
+A Project is the working boundary in which you manage a group of resources, environments, and deployment history. It is neither a server nor a source repository — a single Project can hold many Resources, and each Resource can deploy to a different Server.
+
+## Why this concept exists
+
+Teams usually organize work by product line or by customer, not by individual app. A Project provides that higher-level grouping, so resource lists, environment variables, and deployment history all have a stable owner instead of being scattered around.
+
+## Where you see it in Web, CLI, and API
+
+```bash
+appaloft projects create --name "my-first-project"
+appaloft projects list
+appaloft projects show <projectId>
+```
+
+## Project lifecycle <a id="project-lifecycle" />
+
+A Project can be renamed, reordered, given a description, archived, restored, and — once conditions are met — deleted.
+
+- **Rename** regenerates the slug based on the new name; if the new slug is already taken, choose a different name.
+- **Reorder** only changes display order in the project list; it does not affect resources, environments, or running deployments.
+- **Archive** is for a project that should stop accepting new deployments. Archiving does not delete resources, environments, domains, certificates, logs, or deployment history — these remain viewable and diagnosable; it only blocks creating new environments, resources, or deployments under that project.
+- **Restore** turns an archived project back to active — it does not automatically restore already-deleted child objects, retry deployments, or change domains/certificates.
+- **Delete** is only available for already-archived projects, and only after passing a delete precheck — as long as any environment, resource, deployment history, domain, certificate, log, audit, or runtime record still depends on the project, deletion is not enabled.
+
+```bash
+appaloft projects rename <projectId> --name "new-name"
+appaloft projects archive <projectId>
+appaloft projects delete-check <projectId>
+appaloft projects delete <projectId> --confirm <projectId>
+```
+
+## Common mistakes
+
+- **Treating archive as delete**: archiving only stops accepting new work; all historical data and already-running deployments are unaffected.
+- **Assuming deleting a project cascades to clean up all child resources**: deletion is only enabled when there are no dependent records at all — Appaloft never cascades deletes across other objects or erases retained history just to complete a deletion.
+- **Assuming reordering affects running services**: project list ordering is purely a display-layer operation.
+
+## Related tasks
+
+- [Resources](/docs/en/deliver/resources/)
+- [Your First Deployment](/docs/en/start/first-deployment/)
+- [Configuration Precedence](/docs/en/configuration/precedence/)
+
+## Advanced details
+
+An empty environment with no environment variables and no non-deleted resources does not block project deletion — project deletion first auto-archives such empty environments through the environment lifecycle, then removes the project from the ordinary project list (tombstone), without erasing retained historical records.

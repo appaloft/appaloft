@@ -1,0 +1,63 @@
+---
+title: "Common Failures and Recovery"
+description: "Common failure patterns and their safe recovery paths."
+docType: "troubleshooting"
+---
+
+## Symptom
+
+A deployment failed, the app is behaving unexpectedly, or you're not sure whether to retry, fix configuration, or roll back next.
+
+## Likely causes
+
+| Signal | Recommended action |
+| --- | --- |
+| An explicit `retryable` error appears, or the health check fails intermittently | Retry directly, and watch whether it hits the same failure point |
+| Missing input, a nonexistent path, or a wrong build command | Fix the deployment input first, then redeploy |
+| Credential, SSH, image registry, DNS, or certificate-related error | Fix the external configuration first, then re-verify connectivity |
+| A new version has already taken over traffic but is clearly unusable | Roll back to the last usable version first, then troubleshoot the root cause offline |
+
+## How to inspect status, logs, events, or diagnostics
+
+1. **Read the current status** — open the resource status, most recent deployment status, [event timeline](/docs/en/troubleshoot/status-events/), and [health summary](/docs/en/troubleshoot/logs-health/). Record the last failed phase, error code, whether a retry is suggested, and whether the access URL has already switched over.
+2. **Decide whether it's retryable** — transient network issues, image pull failures, command timeouts, and intermittent health check failures can usually be retried directly; missing secrets, an invalid domain, unreachable SSH, bad certificate material, or misconfigured input usually needs a fix first.
+3. **Generate a safe diagnostic summary** — if the cause is still unclear, run the commands in [Generating A Safe Diagnostic Summary](/docs/en/troubleshoot/diagnostics/) to get troubleshooting evidence with no secrets in it.
+
+## Safe recovery steps
+
+```bash
+# Read-only check of recovery readiness, with no side effects
+appaloft deployments recovery-readiness <deploymentId>
+```
+
+**Only change the minimal input directly related to the error code** — for example one secret, one DNS record, one SSH key, or one build directory — rather than changing several variables at once. Keep the original failure record after fixing, so you can compare against the next result.
+
+```bash
+appaloft deployments retry <deploymentId>
+appaloft deployments redeploy <resourceId>
+appaloft deployments rollback <deploymentId> --candidate <candidateDeploymentId>
+```
+
+Full retry/redeploy/rollback semantics are in [Rollback And Recovery](/docs/en/deliver/recovery/).
+
+## When to retry
+
+When a signal is explicitly marked `retryable`, or the failure cause is a transient issue like network jitter or an image pull timeout, you can retry directly.
+
+## When to roll back
+
+If a new deployment has already affected the production access URL or runtime status, and the root cause can't be fixed quickly, prioritize rolling back to the last verified version to keep the service available, then troubleshoot the root cause offline. After rolling back, keep the failed deployment's logs and diagnostic summary for the later fix.
+
+## Support payload to copy
+
+When the same failure keeps recurring after repeated fixes, or you need team collaboration to troubleshoot, generate and share a safe diagnostic summary (see [Generating A Safe Diagnostic Summary](/docs/en/troubleshoot/diagnostics/)) instead of sharing raw logs, screenshots, or an environment variable file.
+
+## Important reminder
+
+Don't retry a deployment, manually modify a server, change DNS, and rotate keys all at once while unsure of the current state — change one variable at a time, so you can verify whether each step actually fixed the problem.
+
+## Related reference pages
+
+- [Troubleshoot Overview](/docs/en/troubleshoot/overview/)
+- [Deployment Lifecycle](/docs/en/deliver/lifecycle/)
+- [Rollback And Recovery](/docs/en/deliver/recovery/)

@@ -1,0 +1,95 @@
+---
+title: "生成的访问地址"
+description: "Appaloft 自动生成的访问 URL 与默认访问策略。"
+docType: "concept"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "access route"
+  - "default url"
+  - "generated domain"
+  - "sslip"
+  - "访问地址"
+relatedOperations:
+  - "default-access-domain-policies.configure"
+  - "resources.configure-access"
+sidebar:
+  order: 2
+---
+
+## 简要定义 <a id="access-generated-route" />
+
+生成的访问地址是 Appaloft 在没有配置自定义域名时，自动为资源生成的一个可访问 URL。它用于第一次验证部署是否真的能从浏览器打开，也是排查"应用已启动但外部打不开"的第一站。
+
+## 为什么存在这个概念
+
+自定义域名需要 DNS 传播和证书签发，可能需要几分钟到几十分钟。生成访问地址不依赖任何用户配置，能立刻告诉你"应用本身+代理这一层是不是通的"，把域名层的问题彻底排除在外。
+
+## 依赖哪些条件才能就绪
+
+生成访问地址的"就绪"（ready）状态依赖：
+
+- 资源的[网络 Profile](/docs/deliver/profiles/)——监听端口和协议是否正确配置；
+- 目标服务器是否有公共入口，以及[代理是否已就绪](/docs/servers/proxy-and-terminal/)；
+- 最近一次部署是否已经执行到可验证阶段；
+- 健康检查是否通过（如果配置了强制健康检查）。
+
+如果资源没有明确监听端口，或者代理还没准备好，Appaloft 会展示资源和部署状态，但**不会**把生成访问地址显示为 ready。
+
+## 在 Web / CLI / API 中的体现
+
+<a id="default-access-policy" />
+
+```bash
+# 查看资源摘要，包含当前生成访问地址
+appaloft resource show res_web
+
+# 查看系统级默认访问策略
+appaloft default-access show --scope system
+
+# 查看某台服务器是否覆盖了系统默认策略
+appaloft default-access show --scope deployment-target --server srv_primary
+
+# 列出所有已保存的默认访问策略
+appaloft default-access list
+```
+
+```http
+GET /api/resources/res_web/health?checks=true&publicAccessProbe=true
+```
+
+```json title="示例响应"
+{
+  "resourceId": "res_web",
+  "runtime": "ready",
+  "health": "passing",
+  "proxy": "ready",
+  "generatedAccess": {
+    "url": "https://res-web.203-0-113-10.sslip.io",
+    "readiness": "ready"
+  }
+}
+```
+
+在本地/自托管场景中，常见的默认访问 Provider 是 `sslip`——根据服务器的公共地址自动生成一个可访问的 hostname，不需要你拥有任何域名。
+
+## 资源级访问配置 <a id="resource-access-profile" />
+
+每个资源可以单独配置是否参与生成访问地址：
+
+- **Inherit**（默认）——继续使用系统或服务器级的默认访问策略。
+- **Disabled**——这个资源不再规划生成访问地址（自定义域名绑定不受影响，按自己的生命周期处理）。
+
+修改这个配置**不会**回写已经保存的历史部署快照，只影响未来的部署。
+
+## 常见误区
+
+- **把生成访问地址当成永久生产域名**：它的主要用途是验证和排障，生产场景通常应该配置[自定义域名](/docs/access/custom-domains/)。
+- **认为修改默认访问策略会影响历史部署**：策略变更只影响之后新解析出来的访问地址，已经写入部署快照的历史地址不会被回写。
+
+## 相关任务
+
+- [绑定自定义域名](/docs/access/custom-domains/)
+- [代理就绪与终端会话](/docs/servers/proxy-and-terminal/)
+- [访问故障排查](/docs/access/troubleshooting/)

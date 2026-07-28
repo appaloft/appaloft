@@ -11,34 +11,34 @@ import {
 
 describe("HTTP API docs help links", () => {
   test("[PUB-DOCS-012] create deployment description points at the public docs registry anchor", () => {
-    expect(createDeploymentDocsHref).toBe("/docs/deploy/sources/#deployment-source");
+    expect(createDeploymentDocsHref).toBe("/docs/deliver/sources/#deployment-source");
     expect(createDeploymentRouteDescription).toContain(createDeploymentDocsHref);
   });
 
   test("[PUB-DOCS-012] high-confusion HTTP route descriptions point at stable docs anchors", () => {
     expect(apiDocsHrefs.serverCredential).toBe(
-      "/docs/servers/credentials/ssh-keys/#server-ssh-credential-path",
+      "/docs/servers/ssh-keys/#server-ssh-credential-path",
     );
     expect(apiDocsHrefs.environmentVariablePrecedence).toBe(
-      "/docs/environments/variables/precedence/#environment-variable-precedence",
+      "/docs/configuration/precedence/#environment-variable-precedence",
     );
     expect(apiDocsHrefs.environmentLifecycle).toBe(
-      "/docs/environments/model/#environment-lifecycle",
+      "/docs/configuration/model/#environment-lifecycle",
     );
     expect(apiDocsHrefs.resourceHealthProfile).toBe(
-      "/docs/resources/profiles/health-network/#resource-health-profile",
+      "/docs/deliver/profiles/#resource-health-profile",
     );
     expect(apiDocsHrefs.resourceProfileDrift).toBe(
-      "/docs/resources/profiles/source-runtime/#resource-profile-drift",
+      "/docs/deliver/profiles/#resource-profile-drift",
     );
     expect(apiDocsHrefs.resourceAccessProfile).toBe(
       "/docs/access/generated-routes/#resource-access-profile",
     );
     expect(apiDocsHrefs.domainOwnershipCheck).toBe(
-      "/docs/access/domains/ownership/#domain-binding-ownership-check",
+      "/docs/access/custom-domains/#domain-binding-ownership-check",
     );
     expect(apiDocsHrefs.terminalSession).toBe(
-      "/docs/servers/operations/proxy-and-terminal/#server-terminal-session",
+      "/docs/servers/proxy-and-terminal/#server-terminal-session",
     );
     expect(apiDocsHrefs.serverDockerSwarmTarget).toBe(
       "/docs/servers/register-connect/#docker-swarm-runtime-target",
@@ -46,36 +46,36 @@ describe("HTTP API docs help links", () => {
     expect(apiDocsHrefs.operatorWorkLedger).toBe(
       "/docs/reference/errors-statuses/#operator-work-ledger",
     );
-    expect(apiDocsHrefs.deploymentPlan).toBe("/docs/deploy/lifecycle/#deployment-plan-preview");
+    expect(apiDocsHrefs.deploymentPlan).toBe("/docs/deliver/lifecycle/#deployment-plan-preview");
     expect(apiDocsHrefs.sourceAutoDeploySetup).toBe(
-      "/docs/deploy/sources/#source-auto-deploy-setup",
+      "/docs/deliver/sources/#source-auto-deploy-setup",
     );
     expect(apiDocsHrefs.sourceAutoDeploySignatures).toBe(
-      "/docs/deploy/sources/#source-auto-deploy-signatures",
+      "/docs/deliver/sources/#source-auto-deploy-signatures",
     );
     expect(apiDocsHrefs.sourceAutoDeployDedupe).toBe(
-      "/docs/deploy/sources/#source-auto-deploy-dedupe",
+      "/docs/deliver/sources/#source-auto-deploy-dedupe",
     );
     expect(apiDocsHrefs.sourceAutoDeployIgnoredEvents).toBe(
-      "/docs/deploy/sources/#source-auto-deploy-ignored-events",
+      "/docs/deliver/sources/#source-auto-deploy-ignored-events",
     );
     expect(apiDocsHrefs.sourceAutoDeployRecovery).toBe(
-      "/docs/deploy/sources/#source-auto-deploy-recovery",
+      "/docs/deliver/sources/#source-auto-deploy-recovery",
     );
     expect(apiDocsHrefs.scheduledTaskLifecycle).toBe(
-      "/docs/resources/scheduled-tasks/#scheduled-task-resource-lifecycle",
+      "/docs/deliver/resources/#scheduled-task-resource-lifecycle",
     );
     expect(apiDocsHrefs.dependencyResourceLifecycle).toBe(
-      "/docs/resources/dependencies/#dependency-resource-lifecycle",
+      "/docs/deliver/resources/#dependency-resource-lifecycle",
     );
     expect(apiDocsHrefs.dependencyRuntimeInjection).toBe(
-      "/docs/resources/dependencies/#dependency-runtime-injection",
+      "/docs/deliver/resources/#dependency-runtime-injection",
     );
     expect(apiDocsHrefs.productGradePreviews).toBe(
-      "/docs/deploy/previews/#product-grade-preview-deployments",
+      "/docs/deliver/previews/#product-grade-preview-deployments",
     );
     expect(apiDocsHrefs.scheduledRuntimePrunePolicy).toBe(
-      "/docs/observe/diagnostics/#scheduled-runtime-prune-policy",
+      "/docs/troubleshoot/diagnostics/#scheduled-runtime-prune-policy",
     );
     expect(apiDocsHrefs.operatorAuditEvents).toBe(
       "/docs/reference/errors-statuses/#operator-audit-events",

@@ -113,7 +113,7 @@ describe("generated SDK operation metadata", () => {
         method: "GET",
         path: "/runtime-monitoring/samples",
       },
-      docsHref: "/docs/observe/diagnostics/#runtime-monitoring-samples-and-rollups",
+      docsHref: "/docs/troubleshoot/diagnostics/#runtime-monitoring-samples-and-rollups",
     });
 
     expect(
@@ -128,7 +128,7 @@ describe("generated SDK operation metadata", () => {
         method: "GET",
         path: "/runtime-monitoring/rollup",
       },
-      docsHref: "/docs/observe/diagnostics/#runtime-monitoring-samples-and-rollups",
+      docsHref: "/docs/troubleshoot/diagnostics/#runtime-monitoring-samples-and-rollups",
     });
   });
 
@@ -145,7 +145,7 @@ describe("generated SDK operation metadata", () => {
         method: "GET",
         path: "/resources/{resourceId}/health-history",
       },
-      docsHref: "/docs/observe/logs-health/#observe-health-summary",
+      docsHref: "/docs/troubleshoot/logs-health/#observe-health-summary",
     });
   });
 
@@ -162,7 +162,7 @@ describe("generated SDK operation metadata", () => {
         method: "GET",
         path: "/resources/{resourceId}/delete-check",
       },
-      docsHref: "/docs/resources/projects/#concept-resource",
+      docsHref: "/docs/deliver/projects/#concept-resource",
     });
   });
 
@@ -177,7 +177,7 @@ describe("generated SDK operation metadata", () => {
         method: "POST",
         path: "/projects/{projectId}/restore",
       },
-      docsHref: "/docs/resources/projects/#project-lifecycle",
+      docsHref: "/docs/deliver/projects/#project-lifecycle",
     });
   });
 
@@ -192,7 +192,7 @@ describe("generated SDK operation metadata", () => {
         method: "POST",
         path: "/projects/reorder",
       },
-      docsHref: "/docs/resources/projects/#project-lifecycle",
+      docsHref: "/docs/deliver/projects/#project-lifecycle",
     });
   });
 
@@ -209,7 +209,7 @@ describe("generated SDK operation metadata", () => {
         method: "GET",
         path: "/projects/{projectId}/delete-check",
       },
-      docsHref: "/docs/resources/projects/#project-lifecycle",
+      docsHref: "/docs/deliver/projects/#project-lifecycle",
     });
 
     expect(
@@ -222,7 +222,7 @@ describe("generated SDK operation metadata", () => {
         method: "DELETE",
         path: "/projects/{projectId}",
       },
-      docsHref: "/docs/resources/projects/#project-lifecycle",
+      docsHref: "/docs/deliver/projects/#project-lifecycle",
     });
   });
 
@@ -252,7 +252,7 @@ describe("generated SDK operation metadata", () => {
         method: "POST",
         path: "/deployments/{deploymentId}/cancel",
       },
-      docsHref: "/docs/deploy/recovery/#deployment-recovery-readiness",
+      docsHref: "/docs/deliver/recovery/#deployment-recovery-readiness",
     });
   });
 
@@ -267,7 +267,7 @@ describe("generated SDK operation metadata", () => {
         method: "POST",
         path: "/deployments/{deploymentId}/archive",
       },
-      docsHref: "/docs/deploy/recovery/#deployment-recovery-readiness",
+      docsHref: "/docs/deliver/recovery/#deployment-recovery-readiness",
     });
     expect(
       generatedSdkOperations.find((operation) => operation.operationKey === "deployments.prune"),
@@ -279,7 +279,7 @@ describe("generated SDK operation metadata", () => {
         method: "POST",
         path: "/deployments/prune",
       },
-      docsHref: "/docs/deploy/recovery/#deployment-recovery-readiness",
+      docsHref: "/docs/deliver/recovery/#deployment-recovery-readiness",
     });
   });
 
@@ -294,7 +294,7 @@ describe("generated SDK operation metadata", () => {
         method: "POST",
         path: "/source-events/prune",
       },
-      docsHref: "/docs/deploy/sources/#source-auto-deploy-retention",
+      docsHref: "/docs/deliver/sources/#source-auto-deploy-retention",
     });
   });
 
@@ -311,7 +311,7 @@ describe("generated SDK operation metadata", () => {
         method: "GET",
         path: "/integrations",
       },
-      docsHref: "/docs/deploy/sources/#deployment-source",
+      docsHref: "/docs/deliver/sources/#deployment-source",
     });
   });
 
@@ -326,7 +326,7 @@ describe("generated SDK operation metadata", () => {
         method: "GET",
         path: "/system/doctor",
       },
-      docsHref: "/docs/self-hosting/advanced/#maintenance-worker-activation",
+      docsHref: "/docs/reference/configuration/#maintenance-worker-activation",
     });
   });
 
@@ -343,7 +343,7 @@ describe("generated SDK operation metadata", () => {
         method: "POST",
         path: "/storage-volumes/{storageVolumeId}/runtime-cleanup",
       },
-      docsHref: "/docs/resources/storage-volumes/#storage-volume-lifecycle",
+      docsHref: "/docs/deliver/resources/#storage-volume-lifecycle",
     });
   });
 });

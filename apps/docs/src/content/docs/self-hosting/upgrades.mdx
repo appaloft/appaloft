@@ -1,0 +1,83 @@
+---
+title: "升级 Appaloft"
+description: "安全升级自托管 Appaloft 实例的步骤。"
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "upgrade"
+  - "release"
+  - "backup"
+  - "升级"
+relatedOperations:
+  - "system.instance-upgrade.check"
+  - "system.instance-upgrade.apply"
+sidebar:
+  order: 8
+---
+
+## 目标 <a id="self-hosting-upgrade-check" />
+
+安全地把自托管 Appaloft 实例升级到新版本,并确认升级后各项能力正常。
+
+## 适用场景
+
+- 需要获取新功能或安全修复。
+- Web 控制台的 Instance 页面提示有新版本可用。
+
+## 前置条件
+
+- 已经完成一次升级前备份,详见[数据库状态与迁移](/docs/self-hosting/database/)。
+
+## 输入与默认值
+
+**升级顺序**:先备份状态,再升级二进制或镜像,最后确认 Web 控制台、`/docs/*`、数据库状态和 Provider/Plugin 状态都正常。
+
+## CLI 操作步骤
+
+### 检查更新
+
+```bash
+appaloft upgrade check
+```
+
+Web 控制台的 Instance 页面也会显示当前版本、最新版本、目标版本,以及可以直接复制的 SSH 更新命令。
+
+### 执行更新
+
+标准自托管安装可以直接重复运行安装器,它会复用 `/opt/appaloft/.env` 和现有数据卷:
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh
+```
+
+重复运行时也会把 Appaloft 管理的常驻 Traefik 代理对齐到当前发行版审查过的默认镜像。如果显式设置了 `APPALOFT_TRAEFIK_IMAGE`,或者复用了外部代理,则该镜像仍由运营方自行审查和升级。
+
+也可以指定具体版本:
+
+```bash
+appaloft upgrade apply --version 0.2.1 --confirm
+```
+
+## 预期输出与状态
+
+Web 控制台的"立即更新"按钮**只会在宿主侧进程显式设置** `APPALOFT_INSTANCE_UPGRADE_APPLY_ENABLED=1` **时启用**——默认的容器化部署不允许 Web 进程直接修改宿主机的 Docker 安装,这是刻意的安全边界。
+
+## 验证
+
+参考[数据库状态与迁移](/docs/self-hosting/database/)中的验证清单:检查项目列表、最近部署、环境变量快照、日志入口和访问地址状态。
+
+## 回滚 / 恢复
+
+回退前先确认数据库迁移是否可逆,以及旧版本是否能读取当前状态——某些 Schema 迁移是单向的,回退版本前必须先从升级前备份恢复数据库,而不是简单地重新部署旧版本二进制。
+
+## 故障排查链接
+
+- [常见故障与恢复](/docs/troubleshoot/recovery/)
+- [数据库状态与迁移](/docs/self-hosting/database/)
+
+## 相关参考页面
+
+- [安装 Appaloft](/docs/self-hosting/install/)
+- [运行时配置参考](/docs/reference/configuration/)

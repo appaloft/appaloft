@@ -1,0 +1,158 @@
+---
+title: "第一次部署"
+description: "从零开始完成第一次 Appaloft 部署的完整路径。"
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "quick start"
+  - "getting started"
+  - "首次部署"
+  - "快速开始"
+relatedOperations:
+  - "projects.create"
+  - "servers.register"
+  - "resources.create"
+  - "deployments.create"
+sidebar:
+  order: 1
+---
+
+## 目标
+
+从一个空的 Appaloft 实例开始，完成一次最小部署：创建项目、注册服务器、创建资源、发起部署，并拿到一个可以打开的访问地址。
+
+## 适用场景
+
+- 你刚安装或第一次登录 Appaloft，想验证整条链路是否打通。
+- 你要把一个已经能在本地跑起来的应用（Git 仓库、容器镜像或静态构建产物）部署到自己的服务器上。
+
+如果你只是想了解 Appaloft 的核心概念，先看[产品心智模型](/docs/start/concepts/)；如果你不确定该用 Web、CLI 还是 API，先看[选择入口](/docs/start/entrypoints/)。
+
+## 前置条件
+
+- 一台你拥有 root 或 sudo 权限的 Linux 服务器，并且可以通过 SSH 访问（Appaloft 是 BYOS 模型，不会替你托管服务器）。
+- 一个 Git 仓库地址、容器镜像地址，或者一份已经构建好的静态目录。
+- 已经完成[安装 Appaloft](/docs/self-hosting/install/)并[创建首个管理员](/docs/self-hosting/first-admin/)（自托管场景），或者已经拥有 Appaloft Cloud 账号。
+
+## 输入与默认值
+
+一次最小部署需要以下输入：
+
+| 输入 | 说明 | 默认值 |
+| --- | --- | --- |
+| Project | 资源、环境和部署历史的组织边界 | 无，必须显式创建或选择 |
+| Server | 部署目标机器（SSH 可达） | 无，必须先注册 |
+| 部署来源 | Git 仓库、容器镜像或本地静态目录 | 无，必须显式提供 |
+| 运行时 Profile | 启动命令、端口、健康检查路径 | 尝试零配置检测，检测失败需要显式指定 |
+
+零配置自动检测的覆盖范围因来源类型而异，本页面按诚实的成熟度标注：
+
+| 来源类型 | 检测状态 |
+| --- | --- |
+| 本地单应用根目录（CLI 直接指向一个项目目录） | 已验证覆盖最完整 |
+| 公网 Git 仓库自动 framework 检测 | 不支持，需要显式声明 runtime |
+| 容器原生（Dockerfile / 已构建镜像） | 已支持 |
+| 远程 Git + 显式 command profile | Preview，建议先在本地验证 |
+| Monorepo 中限定范围的本地目录发现 | Preview |
+| 通用 workload 归档包 | 不支持 |
+
+Monorepo 根目录下存在多个候选应用时，部署会被阻塞，直到你显式传入 `baseDirectory`。
+
+## Web 操作步骤
+
+1. 登录 Web 控制台，创建或选择一个 Project。
+2. 进入 **Servers**，点击 **Register server**，填写主机地址和 SSH 凭据，等待连通性检查通过。
+3. 进入 **Resources**，点击 **Create resource**，选择部署来源（Git 仓库 / 容器镜像 / 上传静态目录）和刚注册的服务器。
+4. 确认运行时 Profile（启动命令、端口、健康检查）后点击 **Deploy**。
+5. 部署面板会展示当前生命周期状态；成功后会显示自动生成的访问地址。
+
+## CLI 操作步骤
+
+```bash
+# 1. 登录（默认连接 Appaloft Cloud，自托管请显式传 --url）
+appaloft login --url https://your-appaloft-host
+
+# 2. 创建项目（如果还没有）
+appaloft projects create --name "my-first-project"
+
+# 3. 注册服务器并等待连通性检查
+appaloft server register --host 203.0.113.10 --ssh-user deploy --ssh-key ~/.ssh/id_ed25519
+appaloft server capacity inspect --server-id <serverId>
+
+# 4. 从当前目录发起部署（零配置检测）
+appaloft deploy
+
+# 5. 或者显式指定配置文件 / profile
+appaloft deploy --config appaloft.yml --config-profile staging
+
+# 6. 已经构建好的静态目录，跳过构建步骤直接发布
+appaloft deploy ./dist --as static-site
+
+# 7. 查看部署状态与时间线
+appaloft deployments timeline <deploymentId> --follow --json
+```
+
+## HTTP/API 操作步骤
+
+自动化系统应通过同一套业务操作调用，而不是重新定义一套输入语义：
+
+```bash
+curl -X POST https://your-appaloft-host/api/deployments \
+  -H "Authorization: Bearer $APPALOFT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resourceId": "res_xxx",
+    "source": { "type": "git", "url": "https://github.com/you/app" }
+  }'
+```
+
+完整路由和输入输出结构见 [HTTP API 参考](/docs/reference/http-api/)；也可以直接查看运行时的 `/api/openapi.json` 或 `/api/reference`（Scalar）。
+
+## 预期输出与状态
+
+一次成功的部署会依次经过 `pending → planning → building → deploying → verifying → healthy` 等生命周期状态（具体取值以[状态与事件](/docs/troubleshoot/status-events/)为准），最终返回：
+
+- 部署所属的资源和目标服务器；
+- 使用的源代码提交 / 镜像摘要、运行时和网络配置；
+- 一个可访问的生成访问地址；
+- 一份可用于排查的诊断摘要引用。
+
+## 验证
+
+- 打开返回的访问地址，确认应用正常响应。
+- 运行 `appaloft resource health <resourceId> --checks --public-access-probe`，确认健康检查和公网访问探测都通过。
+- 运行 `appaloft resource show <resourceId> --json`，确认资源状态为健康且指向预期的部署。
+
+## 回滚 / 恢复
+
+如果部署失败或健康检查不通过：
+
+```bash
+# 查看失败原因和可恢复线索
+appaloft deployments recovery-readiness <deploymentId>
+
+# 重试同一次部署
+appaloft deployments retry <deploymentId>
+
+# 回滚到某个已知良好的历史部署
+appaloft deployments rollback <deploymentId> --candidate <candidateDeploymentId>
+```
+
+更完整的恢复流程见[回滚与恢复](/docs/deliver/recovery/)。
+
+## 故障排查链接
+
+- [排障总览](/docs/troubleshoot/overview/)
+- [生成安全诊断信息](/docs/troubleshoot/diagnostics/)
+- [常见故障与恢复](/docs/troubleshoot/recovery/)
+
+## 相关参考页面
+
+- [部署生命周期](/docs/deliver/lifecycle/)
+- [配置部署来源](/docs/deliver/sources/)
+- [注册并连接服务器](/docs/servers/register-connect/)
+- [CLI 参考](/docs/reference/cli/)
+
+如果是 AI Agent 在执行这个流程，请优先安装[完整 Appaloft Skill](/docs/agents/skill/)，再按 [Agent 部署子协议](/docs/agents/deploy-skill/)调用上面这些既有入口，而不是绕过它们直接操作数据库或服务器。

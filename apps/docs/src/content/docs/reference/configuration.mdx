@@ -1,0 +1,196 @@
+---
+title: "运行时配置参考"
+description: "运行时环境变量与配置项参考。"
+docType: "reference"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "环境变量"
+  - "environment variable"
+  - "runtime config"
+  - "APPALOFT_HOME"
+relatedOperations:
+  - "system.doctor"
+sidebar:
+  order: 4
+---
+<a id="advanced-control-plane-modes" />
+
+
+## 标识
+
+本页汇总 Appaloft **运行时环境变量**——即启动 CLI、Web 控制台或自托管服务时可以设置的变量。它和 `appaloft.yml`(应用部署配置文件,见[配置文件参考](/docs/configuration/config-file/))是两个不同的层次:`appaloft.yml` 描述"要部署什么、如何部署",本页描述"Appaloft 自身如何运行"。
+
+## CLI 与认证
+
+| 变量 | 说明 |
+| --- | --- |
+| `APPALOFT_HOME` | CLI 本机 Profile、Context 和握手信息的存储目录,默认是用户本机 Appaloft home |
+| `APPALOFT_TOKEN` | 非交互场景使用的作用域受限 Token,在凭据解析中优先于旧版 Cookie |
+| `APPALOFT_AUTH_COOKIE` | 仅供本机受信任操作者的旧版/诊断兼容用途,**不是** AI Agent 的推荐认证路径 |
+| `APPALOFT_CONTROL_PLANE_MODE` | 覆盖 CLI 的执行目标:`none`(本地)、`cloud` 或 `self-hosted` |
+| `APPALOFT_CONTROL_PLANE_URL` | 显式指定远程控制面地址 |
+
+详见 [CLI reference](/docs/reference/cli/)。
+
+## 文档开发与本地链接
+
+| 变量 | 说明 |
+| --- | --- |
+| `APPALOFT_DEV_DOCS_HOST` | 本地开发时文档服务器绑定的主机名 |
+| `APPALOFT_DEV_DOCS_PORT` | 本地开发时文档服务器绑定的端口 |
+| `APPALOFT_WEB_DEV_DOCS_TARGET` | 覆盖 Web 开发服务器 `/docs/*` 重定向的完整目标地址 |
+| `APPALOFT_DOCS_STATIC_DIR` | 自托管部署中内嵌文档静态资源的目录 |
+
+## 产品版本
+
+| 变量 | 说明 |
+| --- | --- |
+| `APPALOFT_APP_VERSION` | 注入 Web 控制台显示的产品版本号;开发环境默认读取仓库根 `package.json` 的版本 |
+
+## 自托管:Web 与认证
+
+| 变量 | 说明 |
+| --- | --- |
+| `APPALOFT_WEB_ORIGIN` | Web 控制台对外可访问的源地址 |
+| `APPALOFT_BETTER_AUTH_URL` | 认证服务的基础 URL |
+| `APPALOFT_BETTER_AUTH_COOKIE_DOMAIN` | 认证 Cookie 的作用域名 |
+| `APPALOFT_BETTER_AUTH_COOKIE_PREFIX` | 认证 Cookie 的名称前缀 |
+| `APPALOFT_BETTER_AUTH_TRUSTED_PROXY_HEADERS` | 是否信任反向代理转发的认证相关请求头 |
+
+## 自托管:登录方式(Provider)
+
+| Provider | 相关变量 |
+| --- | --- |
+| GitHub | `APPALOFT_GITHUB_CLIENT_ID`、`APPALOFT_GITHUB_CLIENT_SECRET`、`APPALOFT_GITHUB_REDIRECT_URI` |
+| Google | `APPALOFT_GOOGLE_CLIENT_ID`、`APPALOFT_GOOGLE_CLIENT_SECRET`、`APPALOFT_GOOGLE_REDIRECT_URI` |
+| 通用 OIDC | `APPALOFT_OIDC_CLIENT_ID`、`APPALOFT_OIDC_CLIENT_SECRET`、`APPALOFT_OIDC_DISCOVERY_URL`、`APPALOFT_OIDC_REDIRECT_URI` |
+| GitHub 集成(非登录) | `APPALOFT_GITHUB_WEBHOOK_SECRET`、`APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN` |
+
+## 自托管:首个管理员引导
+
+| 变量 | 说明 |
+| --- | --- |
+| `APPALOFT_FIRST_ADMIN_EMAIL` | 首个管理员账号邮箱 |
+| `APPALOFT_FIRST_ADMIN_PASSWORD` / `APPALOFT_INITIAL_ADMIN_PASSWORD` | 首个管理员账号密码 |
+| `APPALOFT_FIRST_ADMIN_DISPLAY_NAME` | 首个管理员显示名称 |
+| `APPALOFT_FIRST_ADMIN_ORGANIZATION_NAME` / `APPALOFT_FIRST_ADMIN_ORGANIZATION_SLUG` | 首个组织的名称与 slug |
+| `APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE` | 引导结果(不含明文密码)写入的文件路径 |
+
+详见[创建首个管理员账号](/docs/self-hosting/first-admin/)。
+
+## 自托管:数据库与升级
+
+| 变量 | 说明 |
+| --- | --- |
+| `APPALOFT_DATABASE_POOL_MAX` | 数据库连接池上限 |
+| `APPALOFT_INSTANCE_UPGRADE_APPLY_ENABLED` | 是否允许实例自动应用升级 |
+| `APPALOFT_REMOTE_PGLITE_SYNC_BACKUP_MAX_COUNT` / `APPALOFT_REMOTE_PGLITE_SYNC_BACKUP_RETENTION_DAYS` | 远端状态同步备份的数量与保留天数上限 |
+
+详见[数据库维护](/docs/self-hosting/database/)。
+
+## 自托管:控制面加密与追踪
+
+| 变量 | 说明 |
+| --- | --- |
+| `APPALOFT_CONTROL_PLANE_SECRET_KEYS` | 控制面用于加解密的密钥集合 |
+| `APPALOFT_CONTROL_PLANE_ACTIVE_SECRET_KEY_ID` | 当前生效的密钥 id |
+| `APPALOFT_EXPORT_PASSPHRASE` | 数据导出加密口令 |
+| `APPALOFT_TRACE_LINK_BASE_URL` | 结构化错误中关联的追踪系统基础地址 |
+
+## 自托管:Worker 与队列
+
+<a id="reference-durable-worker-runtime" />
+
+Durable worker runtime 配置控制已经 accepted 的长耗时工作在请求返回 id 之后如何被 claim、执行和监控。operator 也可以运行 `appaloft worker` 启动专用 worker 进程。
+
+| 变量 | 说明 |
+| --- | --- |
+| `APPALOFT_WORKER_COUNT` | 单进程内启动的 Worker 数量 |
+| `APPALOFT_WORKER_GROUP` / `APPALOFT_WORKER_OBSERVED_GROUPS` | Worker 所属分组与观测分组 |
+| `APPALOFT_WORKER_RUNTIME_MODE` | Worker 运行时模式 |
+| `APPALOFT_WORKER_QUEUE_BACKEND` / `APPALOFT_WORKER_EXTERNAL_BACKEND_KIND` | 队列后端类型 |
+| `APPALOFT_WORKER_SLOT` | Worker 槽位标识 |
+
+## 自托管:后台调度器 <a id="maintenance-worker-activation" />
+
+`appaloft doctor`、`GET /api/system/doctor` 与 Web Instance 页只展示已配置的 worker 状态；they do not start workers, tick schedulers, or run maintenance work。配置库层面默认下，certificate retry scheduler starts with the backend service，以便已接受的证书工作可以重试。其他 scheduled worker 默认关闭。
+
+除非另有说明，scheduled worker 默认关闭。certificate retry scheduler 是默认开启的例外，因为它只处理已经 accepted、随后进入 retry-scheduled 状态的 managed certificate work。Runtime execution、runtime prune、history retention、monitoring collection 和 preview cleanup worker 都保持默认关闭，直到 operator 显式启用对应的 `APPALOFT_*_ENABLED` 设置。
+
+| 变量 | 默认值 |
+| --- | --- |
+| `APPALOFT_CERTIFICATE_RETRY_SCHEDULER_ENABLED` | `true` |
+| `APPALOFT_CERTIFICATE_RETRY_SCHEDULER_INTERVAL_SECONDS` | `30` |
+| `APPALOFT_CERTIFICATE_RETRY_DEFAULT_DELAY_SECONDS` | `60` |
+| `APPALOFT_CERTIFICATE_RETRY_SCHEDULER_BATCH_SIZE` | `50` |
+| `APPALOFT_SCHEDULED_TASK_RUNNER_ENABLED` | `false` |
+| `APPALOFT_SCHEDULED_TASK_RUNNER_INTERVAL_SECONDS` | `30` |
+| `APPALOFT_SCHEDULED_TASK_RUNNER_BATCH_SIZE` | `20` |
+| `APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_ENABLED` | `false` |
+| `APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_INTERVAL_SECONDS` | `300` |
+| `APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_BATCH_SIZE` | `20` |
+| `APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_ENABLED` | `false` |
+| `APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_INTERVAL_SECONDS` | `3600` |
+| `APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_BATCH_SIZE` | `100` |
+| `APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_ENABLED` | `false` |
+| `APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_INTERVAL_SECONDS` | `60` |
+| `APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_BATCH_SIZE` | `50` |
+| `APPALOFT_RUNTIME_MONITORING_RAW_RETENTION_HOURS` | `24` |
+| `APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_ENABLED` | `false` |
+| `APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_INTERVAL_SECONDS` | `300` |
+| `APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_BATCH_SIZE` | `20` |
+| `APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_ENABLED` | `false` |
+| `APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_INTERVAL_SECONDS` | `300` |
+| `APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_BATCH_SIZE` | `20` |
+
+这些调度器默认禁用或需要显式启用；设置错误时不会启动对应 worker slice（without starting）。certificate retry scheduler、preview cleanup、preview expiry cleanup、scheduled task runner、scheduled runtime prune、scheduled history retention、runtime monitoring collector 都属于这一组，且多数默认禁用（disabled by default）。
+
+
+多个后台调度器共享同一组变量命名模式:`APPALOFT_<SCHEDULER>_ENABLED`(是否启用)、`APPALOFT_<SCHEDULER>_BATCH_SIZE`(单次处理批量大小)、`APPALOFT_<SCHEDULER>_INTERVAL_SECONDS`(轮询间隔秒数)。例如证书重试调度器:
+
+```bash
+APPALOFT_CERTIFICATE_RETRY_SCHEDULER_ENABLED=true
+APPALOFT_CERTIFICATE_RETRY_SCHEDULER_BATCH_SIZE=50
+APPALOFT_CERTIFICATE_RETRY_SCHEDULER_INTERVAL_SECONDS=30
+```
+
+遵循同样模式的调度器还包括:
+
+- `APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_*`(预览清理重试)
+- `APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_*`(预览到期清理)
+- `APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_*`(运行时监控采集)
+- `APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_*`(依赖资源定时备份)
+- `APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_*`(存储卷定时备份)
+- `APPALOFT_SCHEDULED_TASK_RUNNER_*`(定时任务)
+- `APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_*`(历史保留清理)
+- `APPALOFT_SCHEDULED_RUNTIME_PRUNE_RUNNER_*`(运行时清理)
+- `APPALOFT_TUNNEL_RECONCILER_ENABLED` / `APPALOFT_TUNNEL_RECONCILE_BATCH_SIZE` / `APPALOFT_TUNNEL_RECONCILE_INTERVAL_SECONDS`(隧道调谐)
+
+## 自托管:保留窗口与代理
+
+| 变量 | 说明 |
+| --- | --- |
+| `APPALOFT_RUNTIME_MONITORING_RAW_RETENTION_HOURS` | 原始运行时监控样本的保留小时数 |
+| `APPALOFT_TERMINAL_SESSION_ACTIVE_TTL_SECONDS` | 活跃终端会话的存活时间 |
+| `APPALOFT_TERMINAL_SESSION_OUTPUT_RETENTION_BYTES` | 终端会话输出的保留字节上限 |
+| `APPALOFT_TRAEFIK_IMAGE` | 自托管代理使用的 Traefik 镜像引用 |
+| `APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED` / `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` | Docker Swarm 执行模式与边缘网络 |
+
+## 错误码与恢复提示
+
+如果某个环境变量配置错误导致服务无法启动或某项功能不可用,运行:
+
+```bash
+appaloft doctor
+```
+
+它会检查当前实例的系统能力和已知配置问题,并给出可执行的下一步建议。
+
+## 相关任务
+
+- [CLI reference](/docs/reference/cli/)
+- [配置文件参考](/docs/configuration/config-file/)
+- [自托管安装](/docs/self-hosting/install/)
+- [创建首个管理员账号](/docs/self-hosting/first-admin/)

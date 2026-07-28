@@ -487,11 +487,11 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
 
   test("[SCHED-MAINT-WORKER-001] public docs identify the default-on worker exception", () => {
     const englishDocs = readFileSync(
-      join(repositoryRoot, "apps/docs/src/content/docs/en/reference/configuration.md"),
+      join(repositoryRoot, "apps/docs/src/content/docs/en/reference/configuration.mdx"),
       "utf8",
     );
     const defaultDocs = readFileSync(
-      join(repositoryRoot, "apps/docs/src/content/docs/reference/configuration.md"),
+      join(repositoryRoot, "apps/docs/src/content/docs/reference/configuration.mdx"),
       "utf8",
     );
 

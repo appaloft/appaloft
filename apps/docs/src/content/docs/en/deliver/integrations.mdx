@@ -1,0 +1,98 @@
+---
+title: "GitHub and Integrations"
+description: "How GitHub repository authorization, providers, and plugins plug into delivery."
+docType: "concept"
+---
+<a id="integration-connections" />
+<a id="provider-boundary" />
+<a id="plugin-boundary" />
+
+
+## Short definition
+
+"Integrations" covers three kinds of external connections: GitHub repository authorization (as a deployment source), Providers (infrastructure/DNS/notification and other capability providers), and Plugins (extending Appaloft's own behavior). All three are managed through a unified Connection model for authorization and revocation.
+
+## Why this concept exists
+
+Deployment sources, DNS auto-configuration, notification delivery, and custom extension points are all fundamentally the same thing: "Appaloft uses an external system's capability on your behalf." Putting them under one Connection/Connector model means authorization, revocation, auditing, and security boundaries only need to be implemented once.
+
+## GitHub repositories <a id="source-auto-deploy-setup" /><a id="source-auto-deploy-signatures" /><a id="source-auto-deploy-dedupe" /><a id="source-auto-deploy-ignored-events" /><a id="source-auto-deploy-recovery" /><a id="source-auto-deploy-retention" />
+
+A GitHub repository ties a deployment to a traceable piece of source code: the repository, ref, working directory, and deployment identity need to be recorded together so retries, rollbacks, and previews can all come back to the same set of inputs.
+
+```bash
+# Check the current workspace's GitHub App installation status
+appaloft github status
+
+# Browse authorized repositories
+appaloft github repositories --search web
+```
+
+Configuring a GitHub source requires confirming at least: the repository (owner/repo), the ref (branch/tag/commit SHA — production should use a stable branch, previews should use a pull request's commit SHA), the directory (in a monorepo, don't assume the repository root is the app directory), and the trigger method (manual / push-triggered / pull-request preview).
+
+> A pull request preview should use the commit SHA, not a moving branch name, so the preview page, logs, and later cleanup all correspond to the same commit.
+
+## Providers <a id="advanced-provider-boundary" />
+
+A Provider handles infrastructure, DNS, and other external capabilities. Public docs only explain what you can configure and observe — they never expose internal Provider SDK types.
+
+```bash
+appaloft providers list
+```
+
+Each Provider returns safe diagnostics: stable capability flags, enabled state, and a `configured` / `not configured` / `partial` configuration status. Diagnostics exist purely for visibility — they never include cloud SDK objects, raw responses, access tokens, or private keys.
+
+## Plugins <a id="advanced-plugin-boundary" /><a id="server-composition-extensions" />
+
+A Plugin extends Appaloft's own capabilities and must explicitly declare compatibility, permissions, and sandbox assumptions.
+
+```bash
+appaloft plugins list
+```
+
+An incompatible plugin stays "visible but not activatable," so you can tell "this extension point exists but is temporarily unavailable" apart from "this plugin doesn't exist at all." Plugin diagnostics never expose implementation internals, Provider SDK objects, or secret references.
+
+Integrators that need to compose Appaloft with extra runtime behavior should import the public server factory instead of an internal source path:
+
+```ts
+import { createAppaloftServer } from "@appaloft/server";
+
+const server = await createAppaloftServer({
+  extensions: [
+    {
+      name: "health-extension",
+      http: {
+        routes: [{ method: "GET", path: "/extension/health", handle: () => new Response("ok") }],
+      },
+    },
+  ],
+});
+```
+
+## Connection and Connector <a id="connections-model" />
+
+A Connection is an authorization relationship Appaloft saves on your behalf (for example, a GitHub App installation, a DNS Provider authorization, or a Slack webhook). A ConnectorDefinition is a concrete connectable catalog entry (for example `github-source` or `cloudflare-dns`) — what you install, authorize, revoke, and audit is always a concrete Connector, never an abstract category.
+
+```bash
+appaloft connectors catalog
+appaloft connectors list
+appaloft connectors connect <connector>
+appaloft connectors revoke <connectionId>
+
+# Capability-scoped shortcuts (still the same underlying Connection model)
+appaloft dns plan <domain> --hostname <host> --target <target> --connector cloudflare-dns
+```
+
+DNS-type connections require passing three layers of validation before automatic configuration is possible: public DNS discovery (no authorization needed — it just infers a likely host provider from the domain), Connector authorization (proves you can access a particular Provider account), and Zone ownership matching (the authorized account must actually own a Zone covering that domain). Only once all three layers pass will Appaloft generate and apply a DNS change plan; failing any layer fails closed and points you to manual configuration.
+
+## Common mistakes
+
+- **Treating a GitHub login as repository access authorization**: login only represents identity — browsing repositories, receiving webhooks, or writing back deployment status all require completing GitHub integration authorization separately.
+- **Assuming Provider/Plugin diagnostics leak secrets**: diagnostics are designed to only ever contain safe capability and status flags.
+- **Treating "DNS" as an installable thing**: `dns` is a capability category — what's actually installed and revoked is a concrete Connector (like `cloudflare-dns`).
+
+## Related tasks
+
+- [Configuring Deployment Sources](/docs/en/deliver/sources/)
+- [Binding A Custom Domain](/docs/en/access/custom-domains/)
+- [Agent Adapters](/docs/en/agents/adapters/)

@@ -560,7 +560,7 @@ describe("public docs operation coverage", () => {
       "docs/commands/storage-volumes.cleanup-runtime.md",
     ).text();
     const publicDocs = await repositoryFile(
-      "apps/docs/src/content/docs/en/resources/storage-volumes.md",
+      "apps/docs/src/content/docs/en/deliver/resources.mdx",
     ).text();
     const roadmap = await repositoryFile("docs/PRODUCT_ROADMAP.md").text();
 
@@ -872,13 +872,13 @@ describe("public docs operation coverage", () => {
       "docs/testing/system-diagnostics-test-matrix.md",
     ).text();
     const advancedDocs = await repositoryFile(
-      "apps/docs/src/content/docs/en/self-hosting/advanced.md",
+      "apps/docs/src/content/docs/en/reference/configuration.mdx",
     ).text();
     const configDocs = await repositoryFile(
-      "apps/docs/src/content/docs/en/reference/configuration.md",
+      "apps/docs/src/content/docs/en/reference/configuration.mdx",
     ).text();
     const zhConfigDocs = await repositoryFile(
-      "apps/docs/src/content/docs/reference/configuration.md",
+      "apps/docs/src/content/docs/reference/configuration.mdx",
     ).text();
     const maintenanceWorkerStatusReader = await repositoryFile(
       "apps/shell/src/maintenance-worker-status-reader.ts",
@@ -921,8 +921,8 @@ describe("public docs operation coverage", () => {
     expect(maintenanceTopic.specReferences).toEqual(
       expect.arrayContaining([
         "docs/testing/system-diagnostics-test-matrix.md",
-        "apps/docs/src/content/docs/en/reference/configuration.md",
-        "apps/docs/src/content/docs/reference/configuration.md",
+        "apps/docs/src/content/docs/en/reference/configuration.mdx",
+        "apps/docs/src/content/docs/reference/configuration.mdx",
       ]),
     );
     expect(diagnosticsMatrix).toContain("without starting or ticking workers");
@@ -2020,7 +2020,7 @@ describe("public docs operation coverage", () => {
 
     const operationMap = await repositoryFile("docs/BUSINESS_OPERATION_MAP.md").text();
     const scheduledTaskDocs = await repositoryFile(
-      "apps/docs/src/content/docs/en/resources/scheduled-tasks.md",
+      "apps/docs/src/content/docs/en/deliver/resources.mdx",
     ).text();
     const scheduledTaskRow = operationMap
       .split("\n")
