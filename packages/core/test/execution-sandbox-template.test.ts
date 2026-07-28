@@ -54,4 +54,51 @@ describe("SandboxTemplate", () => {
       template.resolveCreatePolicy({ requestedIsolation: SandboxIsolationLevel.microvm() }).isOk(),
     ).toBe(true);
   });
+
+  test("[SBX-DOM-003] accepts an equivalent persisted allowlist", () => {
+    const limits = SandboxResourceLimits.create({
+      cpuMillis: 1_000,
+      memoryBytes: 512 * 1024 * 1024,
+      diskBytes: 2 * 1024 * 1024 * 1024,
+      maxProcesses: 32,
+    })._unsafeUnwrap();
+    const template = SandboxTemplate.create({
+      id: SandboxTemplateId.rehydrate("sbt_git_workspace"),
+      name: SandboxTemplateName.create("Git Workspace")._unsafeUnwrap(),
+      image: "workspace@sha256:abc123",
+      minimumIsolation: SandboxIsolationLevel.containerTrusted(),
+      limits,
+      networkPolicy: SandboxNetworkPolicy.create({
+        mode: "allowlist",
+        rules: [
+          { kind: "domain", value: "github.com", ports: [22, 443] },
+          { kind: "domain", value: "api.github.com", ports: [443] },
+        ],
+      })._unsafeUnwrap(),
+      overridePolicy: {
+        isolation: "strengthen-only",
+        limits: "decrease-only",
+        network: "immutable",
+      },
+      createdAt: CreatedAt.rehydrate("2026-07-28T00:00:00.000Z"),
+    })._unsafeUnwrap();
+
+    const persistedPolicy = SandboxNetworkPolicy.rehydrate({
+      mode: "allowlist",
+      rules: [
+        { value: "api.github.com", ports: [443], kind: "domain" },
+        { ports: [443, 22], value: "github.com", kind: "domain" },
+      ],
+    });
+
+    expect(
+      template
+        .resolveCreatePolicy({
+          requestedIsolation: SandboxIsolationLevel.containerTrusted(),
+          limits,
+          networkPolicy: persistedPolicy,
+        })
+        .isOk(),
+    ).toBe(true);
+  });
 });

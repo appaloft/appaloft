@@ -58,12 +58,36 @@ function normalizeCidr(value: string): Result<string> {
   return ok(normalized);
 }
 
+function networkPolicyFingerprint(state: SandboxNetworkPolicyState): string {
+  return JSON.stringify({
+    mode: state.mode,
+    rules: state.rules
+      .map((rule) => ({
+        kind: rule.kind,
+        value: rule.value,
+        ports: [...rule.ports].sort((left, right) => left - right),
+      }))
+      .sort((left, right) =>
+        `${left.kind}:${left.value}:${left.ports.join(",")}`.localeCompare(
+          `${right.kind}:${right.value}:${right.ports.join(",")}`,
+        ),
+      ),
+  });
+}
+
 export class SandboxNetworkPolicy extends ValueObject<SandboxNetworkPolicyState> {
   private constructor(state: SandboxNetworkPolicyState) {
     super({
       mode: state.mode,
-      rules: state.rules.map((rule) => ({ ...rule, ports: [...rule.ports] })),
+      rules: state.rules.map((rule) => ({
+        kind: rule.kind,
+        value: rule.value,
+        ports: [...rule.ports],
+      })),
     });
+  }
+  override equals(other: SandboxNetworkPolicy): boolean {
+    return networkPolicyFingerprint(this.state) === networkPolicyFingerprint(other.state);
   }
   static defaultDeny(): SandboxNetworkPolicy {
     return new SandboxNetworkPolicy({ mode: "deny", rules: [] });
