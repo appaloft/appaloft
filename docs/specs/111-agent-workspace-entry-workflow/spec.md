@@ -78,3 +78,11 @@ without learning the lower-level Sandbox operation sequence.
 ## Open Questions
 
 None.
+
+## Profile-Aware Open Extension
+
+[Spec 119](../119-profile-aware-workspace-open-and-attach/spec.md) and
+[ADR-102](../../decisions/ADR-102-profile-aware-workspace-open-and-attach.md) extend this workflow
+with Repository Binding, Project default Profile, immutable local-Git source pins, atomic
+create-or-resume and capability-driven auto attach. They preserve this Spec's central invariant:
+`workspaceId = sandboxId` and no second Workspace aggregate exists.

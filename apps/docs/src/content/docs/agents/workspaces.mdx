@@ -4,7 +4,7 @@ description: "Agent Workspace 是什么、与 Sandbox 的关系，以及创建�
 docType: "concept"
 localeState:
   zh-CN: complete
-  en-US: needs-update
+  en-US: complete
 searchAliases:
   - "远程开发"
   - "OpenCode"
@@ -12,6 +12,7 @@ searchAliases:
   - "workspace"
   - "sandbox"
 relatedOperations:
+  - "workspaces.open"
   - "sandboxes.create"
   - "sandboxes.agents.runtimes.create"
   - "sandboxes.agent-tasks.create"
@@ -39,56 +40,99 @@ flowchart LR
 
 Sandbox 本身只是一个受控执行环境，不预设"应该跑什么"。Workspace 把 Sandbox 和一个具体的 Agent Runtime、仓库源码、Terminal Session 组合起来，变成一个用户可以直接远程开发、随时断线重连的环境——这是大多数"让 AI Agent 帮我改代码"场景真正需要的抽象层级。
 
-## 创建一个 Workspace
+## 从本地仓库打开 Workspace <a id="agent-workspace-open" />
+
+完成 Repository Binding、Project 默认 Agent Profile、Server Pool 和 Profile Credential
+Connection 配置后，在 clean 且已经 push 的 Git branch 中运行：
+
+```bash
+appaloft workspace open .
+```
+
+CLI 只用 `.` 查找 Git root、upstream remote、branch 和 HEAD SHA，不会上传本地目录或未提交
+文件。它会把 remote 规范化为 Repository identity，通过 Repository Binding 找到 Project，
+选择显式 `--profile` 或 Project 默认 Profile，然后创建或恢复远端 Workspace。默认会直接进入
+Agent 自己的界面：
+
+- managed-terminal Adapter 启动或重用 Agent TUI 的 Terminal Session，并立即连接；
+- native-attach Adapter 获取短期可撤销 capability，并按 Adapter 声明执行或展示本地 client
+  handoff；
+- 不支持 attach 的 Adapter 明确失败，不伪造连接信息。
+
+attach 行为只读取 Adapter capability，不根据 Pi、OpenCode 或其他 Agent 名称分支。
+
+再次运行同一命令会恢复相同来源 SHA 的 preferred Workspace。需要新隔离环境时使用：
+
+```bash
+appaloft workspace open . --new
+```
+
+只创建/恢复并输出 descriptor，不进入 Agent 界面：
+
+```bash
+appaloft workspace open . --no-attach
+```
+
+如果 worktree 有 staged、unstaged 或 untracked 文件，或当前 branch 没有 upstream、HEAD 未
+push、remote branch tip 与 HEAD 不一致，CLI 会在任何远端创建前失败，显示将使用的 HEAD SHA
+和安全的 clean/push 提示。V1 不做隐式 sync 或 patch upload。
+
+## 使用 Profile 显式创建
+
+需要在没有本地 Git context 的自动化中创建新 Workspace 时，使用 credential-free HTTPS
+repository 和显式 Profile：
 
 ```bash
 appaloft workspace create \
-  --harness opencode \
-  --sandbox-template sbt_opencode \
+  --profile opencode-default \
   --repo https://github.com/acme/web.git \
+  --ref refs/heads/feature/login \
   --branch feature/login \
-  --isolation gvisor \
-  --cpu-millis 2000 \
-  --memory-bytes 2147483648 \
-  --disk-bytes 10737418240 \
-  --max-processes 128
+  --attach
 ```
 
-把 `--harness opencode` 换成 `--harness pi` 即可创建 Pi Workspace。用 `appaloft workspace harness list` 可以查看当前部署实际注册的适配器、Sandbox 模板、交互方式、Session 恢复能力和任务能力——Web 控制台的创建入口读取的是同一份目录，不会为某个 Agent 名称写死按钮。
+`--profile` 接受安装 id、Profile id 或唯一显示名。Appaloft 会先编译 Profile 并解析 Sandbox
+Template、隔离级别、资源/网络策略、初始化步骤、默认端口、Adapter capability 和安装时配置的
+named Credential Connections，再创建 Sandbox。缺失、disabled、stale、ambiguous 或无权限的
+Profile/Credential/Template/capability，以及 placement 无容量，都在 Sandbox 创建前失败。
+API Key、Token 和 Secret 不允许出现在 argv。
 
 SDK 提供等价的组合式创建：
 
 ```ts
-const workspace = await appaloft.workspaces.create({
-  sandbox: sandboxInput,
-  harness: "opencode",
+const workspace = await appaloft.workspaces.open({
+  repository: "https://github.com/acme/web.git",
+  repositoryIdentity: "github.com/acme/web",
+  ref: "refs/heads/feature/login",
+  branch: "feature/login",
+  commitSha: "0123456789abcdef0123456789abcdef01234567",
+  profile: "opencode-default",
 });
 
 console.log(workspace.workspaceId, workspace.agent.runtimeId);
 ```
 
-如果 Runtime 创建这一步失败，SDK 会抛出 `AppaloftWorkspaceCreateError`，其中仍包含已经创建的 `workspaceId`（即 `sandboxId`），调用方可以重试 Runtime 创建，也可以显式终止这个 Sandbox。
-
-该入口当前只接受不含用户名、密码或 token 的 HTTPS 仓库地址；私有仓库凭据不能嵌入 URL，需要由部署方的可信 Source 集成或模板提前准备好。
+如果 Sandbox identity 产生后的步骤失败，错误会包含精确 phase、已有的
+`workspaceId`/`runtimeId`、是否可重试以及恢复/终止入口；再次 open 会协调同一个部分创建身份，
+不会静默创建重复 Sandbox。
 
 ## 断线重连
 
-Terminal Session 由 Appaloft 托管的 PTY 支撑——客户端断线只是"detach"，只要 Session 的存活时间和 Sandbox 仍然有效，用同一个 `terminalSessionId` 重连就能重放有限的历史输出并继续同一个进程：
+Terminal Session 由 Appaloft 托管的 PTY 支撑——客户端断线只是"detach"，只要 Session 的存活时间和 Sandbox 仍然有效，再次运行 `workspace open` 就会重用 Session、重放有限历史输出并继续同一个 Agent 进程：
+
+```bash
+appaloft workspace open .
+```
+
+底层排障命令仍然保留：
 
 ```bash
 appaloft workspace connect <workspaceId>
-appaloft workspace connect <workspaceId> --session-id <terminalSessionId>
-```
-
-Web 控制台重新打开 Workspace 详情页时，也会自动查找并重连最新的活跃 Sandbox Session。
-
-对于 OpenCode Runtime，还可以直接刷新远端服务并获得一次原生 attach：
-
-```bash
 appaloft workspace attach <workspaceId>
 ```
 
-这个命令只签发一个最长一小时、可撤销的私有访问描述符，返回本地 `opencode attach` 的接入信息；不支持安全网关的 Provider 会明确返回"不可用"，而不是暴露未受保护的端口。
+native attach 只签发短期、可撤销的私有访问 capability；返回值不会包含原始服务器地址、
+SSH Key 或长期凭据。
 
 ## 临时开发预览
 
@@ -139,6 +183,9 @@ Task Run 由服务端持久化——客户端断开连接**不会取消 Agent �
 - **把 Workspace 当成独立于 Sandbox 的资源**：`workspaceId` 和 `sandboxId` 是同一个 id，理解 Sandbox 的隔离和生命周期模型（见 [Sandbox 模型](/docs/agents/sandboxes/)）就理解了 Workspace 的底层行为。
 - **认为客户端断线会取消正在运行的 Task**：Task Run 由服务端持久化和恢复，断线只影响观察，不影响执行。
 - **把开发预览当成生产访问地址**：开发预览是临时、可过期的实时预览，和[生成的访问地址](/docs/access/generated-routes/)是完全不同的机制。
+- **把 `.` 当成上传目录**：它只用于解析 Git context；未提交文件从不隐式上传。
+- **在 HEAD 未 push 时继续创建**：Workspace 的来源必须是远端可解析的精确 SHA；先 push，
+  或明确选择正确的 upstream，再重试。
 
 ## 相关任务
 
