@@ -10,6 +10,7 @@
 
 ### Bug Fixes
 
+* **deployment:** reconcile superseded and orphan runtime ownership ([#843](https://github.com/appaloft/appaloft/issues/843)) ([b0ed04f](https://github.com/appaloft/appaloft/commit/b0ed04fb2e6608928bc851928d3e642232a37571))
 * **runtime:** separate opencode headless execution ([#839](https://github.com/appaloft/appaloft/issues/839)) ([628d11c](https://github.com/appaloft/appaloft/commit/628d11c2c85aa2ebcf1c3d3921fdf0974f34d94b))
 
 
