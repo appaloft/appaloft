@@ -128,6 +128,7 @@ export class ForceRedeployDeploymentUseCase {
         {
           triggerKind: DeploymentTriggerKindValue.forceRedeploy(),
           ...(sourceState ? { sourceDeploymentId: sourceState.id.value } : {}),
+          ...(sourceState ? { enforceWorkloadRole: false } : {}),
           ownerLabel: "deployments.force-redeploy",
         },
       );

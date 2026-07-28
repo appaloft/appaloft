@@ -18,6 +18,11 @@ describe("Console selectable object list structure", () => {
     expect(serverRegistrationFormSource).toContain("rounded-md border border-input bg-card p-2");
     expect(serverRegistrationFormSource).toContain("hover:bg-primary/5");
     expect(serverRegistrationFormSource).toContain("data-[selected=true]:bg-primary/5");
+    expect(serverRegistrationFormSource).toContain("data-server-workload-role-selector");
+    expect(serverRegistrationFormSource).toContain("data-server-role-option");
+    expect(serverRegistrationFormSource).toContain('type="checkbox"');
+    expect(serverRegistrationFormSource).toContain("focus-within:ring-2");
+    expect(serverRegistrationFormSource).toContain("lg:grid-cols-3");
     expect(serverRegistrationFormSource).not.toContain("console-choice-list");
     expect(serverRegistrationFormSource).not.toContain("console-choice-item");
   });

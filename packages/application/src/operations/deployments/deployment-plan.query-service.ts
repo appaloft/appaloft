@@ -3,9 +3,11 @@ import { createHash } from "node:crypto";
 import {
   type DomainError,
   domainError,
+  err,
   ok,
   type Resource,
   type Result,
+  ServerWorkloadRoleValue,
   SourceDescriptor,
   safeTry,
 } from "@appaloft/core";
@@ -45,6 +47,8 @@ import { type DeploymentContextResolver } from "./deployment-context.resolver";
 import { type DeploymentPlanQuery } from "./deployment-plan.query";
 import { type DeploymentSnapshotFactory } from "./deployment-snapshot.factory";
 import { type RuntimePlanResolutionInputBuilder } from "./runtime-plan-resolution-input.builder";
+
+const deploymentRuntimeRole = ServerWorkloadRoleValue.rehydrate("deployment-runtime");
 
 function createResourceSourceDescriptor(
   resource: Resource,
@@ -392,6 +396,9 @@ function reason(input: {
 }
 
 function knownReasonCode(value: string | undefined): DeploymentPlanReasonCode | undefined {
+  if (value === "server_workload_role_mismatch") {
+    return "server-workload-role-mismatch";
+  }
   switch (value) {
     case "resource-source-missing":
     case "resource-source-unnormalized":
@@ -439,7 +446,7 @@ function knownReasonCode(value: string | undefined): DeploymentPlanReasonCode | 
 
 function sharedPlanReasonCode(error: DomainError): DeploymentPlanReasonCode {
   const detailReason =
-    typeof error.details?.reasonCode === "string" ? error.details.reasonCode : undefined;
+    typeof error.details?.reasonCode === "string" ? error.details.reasonCode : error.code;
   const direct = knownReasonCode(detailReason);
   if (direct) {
     switch (direct) {
@@ -527,6 +534,32 @@ function blockedReasonFromError(error: DomainError): DeploymentPlanReason {
   const reasonCode = sharedPlanReasonCode(error);
   const phase =
     typeof error.details?.phase === "string" ? error.details.phase : "runtime-plan-resolution";
+  if (reasonCode === "server-workload-role-mismatch") {
+    return reason({
+      code: reasonCode,
+      phase,
+      message: error.message,
+      recommendation: "Configure the selected server with the deployment-runtime workload role.",
+      evidence: Object.entries(error.details ?? {})
+        .filter(([key]) => key !== "phase" && key !== "reasonCode")
+        .map(([key, value]) => ({
+          kind: key,
+          label: key,
+          value: Array.isArray(value) ? value.join(",") : String(value),
+          source: "server-workload-role-guard",
+        })),
+      fixPath: [
+        {
+          kind: "command",
+          targetOperation: "servers.configure-workload-roles",
+          label: "Configure server workload roles",
+          safeByDefault: true,
+        },
+      ],
+      overridePath: [],
+    });
+  }
+
   const profileField = affectedProfileField(reasonCode);
   const targetOperation = fixOperation(reasonCode);
   const fixPath = [
@@ -643,14 +676,43 @@ export class DeploymentPlanQueryService {
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
-      const resolvedContext = yield* await deploymentContextResolver.resolve(context, {
-        projectId: query.projectId,
-        environmentId: query.environmentId,
-        resourceId: query.resourceId,
-        serverId: query.serverId,
-        ...(query.destinationId ? { destinationId: query.destinationId } : {}),
-      });
+      const resolvedContext = yield* await deploymentContextResolver.resolve(
+        context,
+        {
+          projectId: query.projectId,
+          environmentId: query.environmentId,
+          resourceId: query.resourceId,
+          serverId: query.serverId,
+          ...(query.destinationId ? { destinationId: query.destinationId } : {}),
+        },
+        { enforceWorkloadRole: false },
+      );
       const { project, environment, resource, server, destination } = resolvedContext;
+      const roleAdmissionResult = server.ensureCanAcceptNewWork("deployments.create", {
+        requiredRole: deploymentRuntimeRole,
+      });
+      const sourceBinding = resource.toState().sourceBinding;
+      if (roleAdmissionResult.isErr()) {
+        if (roleAdmissionResult.error.code !== "server_workload_role_mismatch") {
+          return err(roleAdmissionResult.error);
+        }
+        return ok(
+          blockedDeploymentPlanPreview({
+            destination,
+            environment,
+            error: roleAdmissionResult.error,
+            project,
+            resource,
+            server,
+            ...(sourceBinding
+              ? {
+                  source: SourceDescriptor.rehydrate(sourceBinding),
+                  sourceReasoning: [],
+                }
+              : {}),
+          }),
+        );
+      }
       const pendingProfileDecisions = environmentProfileDecisionReadModel
         ? await listPendingEnvironmentProfileDecisions(
             environmentProfileDecisionReadModel,
@@ -913,7 +975,7 @@ function environmentProfileDecisionPendingReason(
 function dependencyRuntimeInjectionBlockedReason(
   dependencyBindings: DeploymentPlanPreview["dependencyBindings"] | undefined,
 ): DeploymentPlanReason | undefined {
-  if (!dependencyBindings || dependencyBindings.runtimeInjection.status !== "blocked") {
+  if (dependencyBindings?.runtimeInjection.status !== "blocked") {
     return undefined;
   }
 
@@ -947,8 +1009,8 @@ function blockedDeploymentPlanPreview(input: {
   resource: Resource;
   server: Parameters<RuntimePlanResolutionInputBuilder["build"]>[0]["server"];
   destination: import("@appaloft/core").Destination;
-  source: SourceDescriptor;
-  sourceReasoning: string[];
+  source?: SourceDescriptor;
+  sourceReasoning?: string[];
   dependencyBindings?: DeploymentPlanPreview["dependencyBindings"];
   unsupportedReasons?: DeploymentPlanReason[];
   error: DomainError;
@@ -958,8 +1020,8 @@ function blockedDeploymentPlanPreview(input: {
   const resourceState = input.resource.toState();
   const serverState = input.server.toState();
   const destinationState = input.destination.toState();
-  const sourceState = input.source.toState();
-  const sourceInspection = sourceState.inspection;
+  const sourceState = input.source?.toState();
+  const sourceInspection = sourceState?.inspection;
   const unsupportedReason = blockedReasonFromError(input.error);
   const unsupportedReasons = [...(input.unsupportedReasons ?? []), unsupportedReason];
   const runtimeStrategy = resourceState.runtimeProfile?.strategy.value;
@@ -982,36 +1044,42 @@ function blockedDeploymentPlanPreview(input: {
       ready: false,
       reasonCodes: unsupportedReasons.map((reason) => reason.code),
     },
-    source: {
-      kind: sourceState.kind.value,
-      displayName: sourceState.displayName.value,
-      locator: sourceState.locator.value,
-      ...(sourceInspection?.runtimeFamily ? { runtimeFamily: sourceInspection.runtimeFamily } : {}),
-      ...(sourceInspection?.framework ? { framework: sourceInspection.framework } : {}),
-      ...(sourceInspection?.packageManager
-        ? { packageManager: sourceInspection.packageManager }
-        : {}),
-      ...(sourceInspection?.applicationShape
-        ? { applicationShape: sourceInspection.applicationShape }
-        : {}),
-      ...(sourceInspection?.runtimeVersion
-        ? { runtimeVersion: sourceInspection.runtimeVersion }
-        : {}),
-      ...(sourceInspection?.projectName ? { projectName: sourceInspection.projectName } : {}),
-      ...(input.source.metadata?.detectedSourceRoot
-        ? { selectedRoot: input.source.metadata.detectedSourceRoot }
-        : {}),
-      detectedFiles: sourceInspection?.detectedFiles ?? [],
-      detectedScripts: sourceInspection?.detectedScripts ?? [],
-      ...(sourceInspection?.dockerfilePath
-        ? { dockerfilePath: sourceInspection.dockerfilePath }
-        : {}),
-      ...(sourceInspection?.composeFilePath
-        ? { composeFilePath: sourceInspection.composeFilePath }
-        : {}),
-      ...(sourceInspection?.jarPath ? { jarPath: sourceInspection.jarPath } : {}),
-      reasoning: input.sourceReasoning,
-    },
+    ...(sourceState
+      ? {
+          source: {
+            kind: sourceState.kind.value,
+            displayName: sourceState.displayName.value,
+            locator: sourceState.locator.value,
+            ...(sourceInspection?.runtimeFamily
+              ? { runtimeFamily: sourceInspection.runtimeFamily }
+              : {}),
+            ...(sourceInspection?.framework ? { framework: sourceInspection.framework } : {}),
+            ...(sourceInspection?.packageManager
+              ? { packageManager: sourceInspection.packageManager }
+              : {}),
+            ...(sourceInspection?.applicationShape
+              ? { applicationShape: sourceInspection.applicationShape }
+              : {}),
+            ...(sourceInspection?.runtimeVersion
+              ? { runtimeVersion: sourceInspection.runtimeVersion }
+              : {}),
+            ...(sourceInspection?.projectName ? { projectName: sourceInspection.projectName } : {}),
+            ...(input.source?.metadata?.detectedSourceRoot
+              ? { selectedRoot: input.source.metadata.detectedSourceRoot }
+              : {}),
+            detectedFiles: sourceInspection?.detectedFiles ?? [],
+            detectedScripts: sourceInspection?.detectedScripts ?? [],
+            ...(sourceInspection?.dockerfilePath
+              ? { dockerfilePath: sourceInspection.dockerfilePath }
+              : {}),
+            ...(sourceInspection?.composeFilePath
+              ? { composeFilePath: sourceInspection.composeFilePath }
+              : {}),
+            ...(sourceInspection?.jarPath ? { jarPath: sourceInspection.jarPath } : {}),
+            reasoning: input.sourceReasoning ?? [],
+          },
+        }
+      : {}),
     planner: {
       plannerKey: "unsupported",
       supportTier:

@@ -47,6 +47,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       "environments.sync-profile",
       "environments.promote",
       "servers.register",
+      "servers.configure-workload-roles",
       "servers.configure-credential",
       "credentials.create-ssh",
       "credentials.list-ssh",
@@ -374,6 +375,33 @@ describe("operation catalog aggregate mutation boundary", () => {
       },
     });
     expect(entry?.inputSchema).toBeDefined();
+  });
+
+  test("[SRV-ROLE-ENTRY-001] workload role configuration is exposed through governed transports", () => {
+    const entry = operationCatalog.find(
+      (candidate) => candidate.key === "servers.configure-workload-roles",
+    );
+
+    expect(entry).toMatchObject({
+      kind: "command",
+      domain: "servers",
+      messageName: "ConfigureServerWorkloadRolesCommand",
+      handlerName: "ConfigureServerWorkloadRolesCommandHandler",
+      serviceName: "ConfigureServerWorkloadRolesUseCase",
+      transports: {
+        cli: "appaloft server configure-workload-roles <serverId> --workload-role <role>",
+        orpc: { method: "POST", path: "/api/servers/{serverId}/workload-roles" },
+      },
+    });
+    expect(
+      entry?.inputSchema?.parse({
+        serverId: "srv_primary",
+        workloadRoles: ["deployment-runtime", "sandbox-worker"],
+      }),
+    ).toEqual({
+      serverId: "srv_primary",
+      workloadRoles: ["deployment-runtime", "sandbox-worker"],
+    });
   });
 
   test("[RUNTIME-CAPACITY-INSPECT-001] server capacity inspect is exposed as a read-only query", () => {

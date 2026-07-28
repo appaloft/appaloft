@@ -156,6 +156,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft blueprint install` - `blueprints.install`
 - `appaloft blueprint installation show` - `blueprints.installation.show`
 - `appaloft server register` - `servers.register`
+- `appaloft server configure-workload-roles <serverId> --workload-role <role>` - `servers.configure-workload-roles`
 - `appaloft server credential <serverId>` - `servers.configure-credential`
 - `appaloft server credential-create` - `credentials.create-ssh`
 - `appaloft server credential-list` - `credentials.list-ssh`

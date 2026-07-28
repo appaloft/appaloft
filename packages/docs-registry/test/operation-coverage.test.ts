@@ -122,6 +122,33 @@ describe("public docs operation coverage", () => {
     );
   });
 
+  test("[SRV-ROLE-ENTRY-005] workload role configuration maps to public role guidance", async () => {
+    const topic = publicDocsHelpTopics["server.workload-roles"];
+    const englishPage = await repositoryFile(
+      "apps/docs/src/content/docs/en/servers/register-connect.md",
+    ).text();
+    const chinesePage = await repositoryFile(
+      "apps/docs/src/content/docs/servers/register-connect.md",
+    ).text();
+
+    expect(getPublicDocsOperationCoverage("servers.configure-workload-roles")).toMatchObject({
+      operationKey: "servers.configure-workload-roles",
+      status: "documented",
+      topicId: "server.workload-roles",
+    });
+    expect(topic.localeCoverage).toEqual({ "zh-CN": "complete", "en-US": "complete" });
+    for (const page of [englishPage, chinesePage]) {
+      expect(page).toContain("[#server-workload-roles]");
+      expect(page).toContain("deployment-runtime");
+      expect(page).toContain("artifact-builder");
+      expect(page).toContain("sandbox-worker");
+      expect(page).toContain("workloadRoles: []");
+      expect(page).toContain("configure-workload-roles");
+    }
+    expect(englishPage).toContain("new placement only");
+    expect(englishPage).toContain("does not mean remote build execution");
+  });
+
   test("[SRV-LIFE-ENTRY-012-WEB] server detail lifecycle actions record Web docs coverage", async () => {
     const topic = publicDocsHelpTopics["server.deployment-target"];
     const proxyTopic = publicDocsHelpTopics["server.proxy-readiness"];

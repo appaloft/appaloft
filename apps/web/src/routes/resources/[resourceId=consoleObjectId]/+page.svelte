@@ -12123,12 +12123,13 @@
                         <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
                           <div class="min-w-0">
                             <p class="truncate text-sm font-medium">
-                              {deploymentPlanPreview.source.framework ??
-                                deploymentPlanPreview.source.runtimeFamily ??
-                                deploymentPlanPreview.source.kind}
+                              {deploymentPlanPreview.source?.framework ??
+                                deploymentPlanPreview.source?.runtimeFamily ??
+                                deploymentPlanPreview.source?.kind ??
+                                $t(i18nKeys.console.projects.createResourceSourceTitle)}
                             </p>
                             <p class="mt-1 truncate text-xs text-muted-foreground">
-                              {deploymentPlanPreview.source.displayName}
+                              {deploymentPlanPreview.source?.displayName ?? "—"}
                             </p>
                           </div>
                           <Badge variant={deploymentPlanPreview.readiness.ready ? "secondary" : "outline"}>

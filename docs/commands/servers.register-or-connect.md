@@ -34,6 +34,10 @@ This command family inherits:
 - [ADR-004: Server Readiness State Storage](../decisions/ADR-004-server-readiness-state-storage.md)
 - [ADR-090: Server Host Identity](../decisions/ADR-090-server-host-identity.md)
 - [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
+- [ADR-101: Server Workload Role Admission](../decisions/ADR-101-server-workload-role-admission.md)
+- [Server Workload Roles Spec](../specs/118-server-workload-roles/spec.md)
+- [Server Workload Role Test Matrix](../testing/server-workload-role-test-matrix.md)
+- [Deployment Target Lifecycle Error Spec](../errors/servers.lifecycle.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -66,6 +70,7 @@ If only one public command exists in a transitional implementation, the source-o
 | `edgeProxyMode` | Optional | `disabled` or `provider`. Defaults to configured platform policy. |
 | `edgeProxyProviderKey` | Conditional | Required when `edgeProxyMode = provider` and no server/default provider can be resolved. Opaque provider registry key. |
 | credential input | Optional workflow input | Credential creation/configuration belongs to credential commands unless the register schema is explicitly expanded. |
+| `workloadRoles` | Optional, defaults to `[]` | Complete initial Server Workload Role set. Values are exactly `deployment-runtime`, `artifact-builder`, and `sandbox-worker`. `[]` means general-purpose/unrestricted by role for every defined workload category. |
 
 ### `servers.connect`
 
@@ -100,7 +105,15 @@ If only one public command exists in a transitional implementation, the source-o
 - provider key format and support at the application boundary;
 - port validity;
 - edge proxy mode/provider support;
+- `workloadRoles` contains only `deployment-runtime`, `artifact-builder`, and `sandbox-worker`;
+- `workloadRoles` contains no duplicates; omitted input and `[]` both normalize to the empty unrestricted set;
 - duplicate server registration by canonical provider/host/port within the organization; a non-deleted duplicate returns `conflict`.
+
+Valid roles are stored and returned in canonical order: `deployment-runtime`, `artifact-builder`,
+then `sandbox-worker`, with absent values omitted. Roles are independent of `targetKind`, lifecycle,
+connectivity, readiness, provider capability, isolation, health, capacity, credentials, and edge
+proxy state. In particular, `artifact-builder` records intent only and does not prove that a remote
+artifact builder exists or is ready.
 
 `servers.connect` must synchronously validate:
 
@@ -154,7 +167,6 @@ Proxy bootstrap failure persists `edgeProxy.status = failed`, publishes `proxy-i
 
 ## Result Contracts
 
-```ts
 type RegisterServerResult = Result<{ id: string }, DomainError>;
 
 type ConnectServerResult = Result<{ id: string }, DomainError>;
@@ -178,6 +190,11 @@ type PrepareServerRuntimeResult = Result<
   DomainError
 >;
 ```
+
+On successful registration, `workloadRoles` is the normalized persisted complete set. The command
+returns the accepted server id; callers read the persisted role set through `servers.list` or
+`servers.show`. Those queries must interpret `[]` as general-purpose/unrestricted, not as missing
+data or inability to accept workloads.
 
 Lifecycle failures after async acceptance are represented in server/proxy state and events according to the shared async lifecycle contract.
 
@@ -227,6 +244,10 @@ Server/proxy-specific dedupe keys:
 - events: exact event id when available, otherwise semantic keys from the event specs.
 
 Duplicate registration returns a stable `conflict` and publishes no duplicate registration event.
+
+Registration dedupe compares the canonical provider/host/port identity. Invalid duplicate/unknown
+role input fails before persistence. A successful retry must not publish a duplicate registration
+event; callers confirm the persisted normalized role set through `servers.list` or `servers.show`.
 
 Duplicate connectivity or proxy events must not repeat side effects when state is already `connected`, `ready`, or terminal failed for the same attempt.
 
@@ -284,6 +305,10 @@ provider/host/port endpoints, stores canonical target kind
 `single-server` or `orchestrator-cluster`, and emits `deployment_target.registered`. When
 `targetKind` is omitted, it defaults to `single-server`. When `proxyKind` is omitted, it defaults to
 `traefik`.
+Current Server Workload Role behavior accepts optional `workloadRoles`, defaults omitted input to
+`[]`, rejects duplicate or unknown values, persists canonical order, and exposes the normalized set
+through registration and server list/show read models. Role declaration does not alter target kind,
+lifecycle, runtime readiness, provider, credential, or proxy defaults.
 
 Current proxy bootstrap is driven by `BootstrapServerEdgeProxyOnTargetRegisteredHandler`, which consumes `deployment_target.registered`. It marks edge proxy status `starting`, calls the runtime bootstrapper, then marks proxy `ready` or `failed`.
 

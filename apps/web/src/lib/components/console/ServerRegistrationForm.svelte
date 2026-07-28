@@ -18,6 +18,8 @@
     type DraftServerConnectivityInput,
     type ServerCredentialKind,
     type ServerRegistrationDraft,
+    type ServerWorkloadRole,
+    serverWorkloadRoleOptions,
   } from "$lib/console/server-registration";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { i18nKeys, t } from "$lib/i18n";
@@ -113,6 +115,38 @@
       case "skipped":
         return "outline";
     }
+  }
+
+  function workloadRoleLabel(role: ServerWorkloadRole): string {
+    switch (role) {
+      case "deployment-runtime":
+        return $t(i18nKeys.console.serverForm.workloadRoleDeploymentRuntime);
+      case "artifact-builder":
+        return $t(i18nKeys.console.serverForm.workloadRoleArtifactBuilder);
+      case "sandbox-worker":
+        return $t(i18nKeys.console.serverForm.workloadRoleSandboxWorker);
+    }
+  }
+
+  function workloadRoleDescription(role: ServerWorkloadRole): string {
+    switch (role) {
+      case "deployment-runtime":
+        return $t(i18nKeys.console.serverForm.workloadRoleDeploymentRuntimeDescription);
+      case "artifact-builder":
+        return $t(i18nKeys.console.serverForm.workloadRoleArtifactBuilderDescription);
+      case "sandbox-worker":
+        return $t(i18nKeys.console.serverForm.workloadRoleSandboxWorkerDescription);
+    }
+  }
+
+  function toggleWorkloadRole(role: ServerWorkloadRole, event: Event): void {
+    const checked =
+      event.currentTarget instanceof HTMLInputElement ? event.currentTarget.checked : false;
+    draft.workloadRoles = checked
+      ? serverWorkloadRoleOptions.filter(
+          (option) => draft.workloadRoles.includes(option) || option === role,
+        )
+      : draft.workloadRoles.filter((option) => option !== role);
   }
 
   async function importPrivateKeyFile(event: Event): Promise<void> {
@@ -249,6 +283,48 @@
           </div>
         </div>
       </div>
+    </section>
+
+    <section class="border-t p-4 md:p-5" data-server-workload-role-selector>
+      <fieldset class="grid gap-4" disabled={disabled}>
+        <legend class="text-base font-semibold">
+          {$t(i18nKeys.console.serverForm.workloadRolesTitle)}
+        </legend>
+        <div class="max-w-2xl">
+          <p class="text-sm leading-6 text-muted-foreground">
+            {$t(i18nKeys.console.serverForm.workloadRolesDescription)}
+          </p>
+        </div>
+
+        <div class="grid gap-2 lg:grid-cols-3">
+          {#each serverWorkloadRoleOptions as role (role)}
+            <label
+              class="flex min-w-0 cursor-pointer items-start gap-3 rounded-md border border-input bg-card p-3 transition-colors hover:bg-primary/5 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 data-[selected=true]:bg-primary/5"
+              data-selected={draft.workloadRoles.includes(role)}
+              data-server-role-option={role}
+            >
+              <input
+                type="checkbox"
+                class="mt-1 size-4 shrink-0 accent-primary"
+                checked={draft.workloadRoles.includes(role)}
+                onchange={(event) => toggleWorkloadRole(role, event)}
+              />
+              <span class="min-w-0">
+                <span class="block text-sm font-medium">{workloadRoleLabel(role)}</span>
+                <span class="mt-1 block text-xs leading-5 text-muted-foreground">
+                  {workloadRoleDescription(role)}
+                </span>
+              </span>
+            </label>
+          {/each}
+        </div>
+
+        {#if draft.workloadRoles.length === 0}
+          <p class="text-sm font-medium" data-server-workload-role-general-purpose>
+            {$t(i18nKeys.console.serverForm.workloadRolesGeneralPurpose)}
+          </p>
+        {/if}
+      </fieldset>
     </section>
 
     <section class="border-t p-4 md:p-5">

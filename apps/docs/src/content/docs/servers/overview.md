@@ -14,6 +14,7 @@ searchAliases:
   - "凭据"
 relatedOperations:
   - servers.register
+  - servers.configure-workload-roles
   - servers.configure-credential
   - credentials.create-ssh
   - servers.test-connectivity
@@ -26,6 +27,8 @@ sidebar:
 ## 服务器是什么 [#server-deployment-target]
 
 服务器是 Appaloft 可以连接、检查和部署应用的目标。用户看到的是 SSH 地址、凭据、连接状态和代理准备状态。
+
+通过[服务器工作负载角色](/docs/servers/register-connect/#server-workload-roles)声明服务器打算接收哪些类别的新工作负载。空角色集合表示通用服务器，可接收所有工作负载类型。
 
 ## SSH 凭据 [#server-ssh-credential-path]
 

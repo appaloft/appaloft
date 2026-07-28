@@ -97,7 +97,15 @@ describe("CLI docs help links", () => {
     expect(cliCommandDescriptions.github).toContain(cliDocsHrefs.deploymentSource);
     expect(cliCommandDescriptions.githubStatus).toContain(cliDocsHrefs.deploymentSource);
     expect(cliCommandDescriptions.githubRepositories).toContain(cliDocsHrefs.deploymentSource);
-    expect(cliCommandDescriptions.serverRegister).toContain(cliDocsHrefs.serverDockerSwarmTarget);
+    expect(cliCommandDescriptions.serverRegister).toContain(cliDocsHrefs.serverWorkloadRoles);
+    expect(cliCommandDescriptions.serverList).toContain(cliDocsHrefs.serverWorkloadRoles);
+    expect(cliCommandDescriptions.serverShow).toContain(cliDocsHrefs.serverWorkloadRoles);
+    expect(cliCommandDescriptions.serverConfigureWorkloadRoles).toContain(
+      cliDocsHrefs.serverWorkloadRoles,
+    );
+    expect(cliCommandDescriptions.serverConfigureWorkloadRoles).toContain("deployment-runtime");
+    expect(cliCommandDescriptions.serverConfigureWorkloadRoles).toContain("artifact-builder");
+    expect(cliCommandDescriptions.serverConfigureWorkloadRoles).toContain("sandbox-worker");
     expect(cliCommandDescriptions.serverCredentialRotate).toContain(
       cliDocsHrefs.serverSshCredential,
     );

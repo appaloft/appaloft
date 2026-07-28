@@ -7,6 +7,7 @@ import {
   DeploymentTargetDisplayOrder,
   DeploymentTargetId,
   DeploymentTargetName,
+  DeploymentTargetWorkloadRoles,
   EdgeProxyKindValue,
   EdgeProxyStatusValue,
   ErrorCodeText,
@@ -14,6 +15,7 @@ import {
   MessageText,
   PortNumber,
   ProviderKey,
+  ServerWorkloadRoleValue,
   TargetKindValue,
   UpdatedAt,
 } from "../src";
@@ -45,6 +47,91 @@ function target(input?: {
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
   });
 }
+
+describe("DeploymentTarget workload roles", () => {
+  test("[SRV-ROLE-DOM-001] validates and canonicalizes workload role sets", () => {
+    const roles = DeploymentTargetWorkloadRoles.create([
+      "sandbox-worker",
+      "deployment-runtime",
+    ])._unsafeUnwrap();
+
+    expect(roles.values.map((role) => role.value)).toEqual([
+      "deployment-runtime",
+      "sandbox-worker",
+    ]);
+    expect(roles.allows(ServerWorkloadRoleValue.rehydrate("deployment-runtime"))).toBe(true);
+    expect(roles.allows(ServerWorkloadRoleValue.rehydrate("artifact-builder"))).toBe(false);
+    expect(DeploymentTargetWorkloadRoles.create([])._unsafeUnwrap().isUnrestricted()).toBe(true);
+    expect(
+      DeploymentTargetWorkloadRoles.create(["artifact-builder", "artifact-builder"]).isErr(),
+    ).toBe(true);
+    expect(DeploymentTargetWorkloadRoles.create(["unknown-role"]).isErr()).toBe(true);
+  });
+
+  test("[SRV-ROLE-001/005] defaults to unrestricted and treats reordered configuration as no change", () => {
+    const deploymentTarget = target();
+    const configuredAt = UpdatedAt.rehydrate("2026-07-28T00:00:00.000Z");
+
+    expect(deploymentTarget.toState().workloadRoles.isUnrestricted()).toBe(true);
+
+    expect(
+      deploymentTarget
+        .configureWorkloadRoles({
+          workloadRoles: DeploymentTargetWorkloadRoles.create([
+            "deployment-runtime",
+            "sandbox-worker",
+          ])._unsafeUnwrap(),
+          configuredAt,
+        })
+        ._unsafeUnwrap().changed,
+    ).toBe(true);
+    deploymentTarget.pullDomainEvents();
+
+    expect(
+      deploymentTarget
+        .configureWorkloadRoles({
+          workloadRoles: DeploymentTargetWorkloadRoles.create([
+            "sandbox-worker",
+            "deployment-runtime",
+          ])._unsafeUnwrap(),
+          configuredAt,
+        })
+        ._unsafeUnwrap().changed,
+    ).toBe(false);
+    expect(deploymentTarget.pullDomainEvents()).toEqual([]);
+  });
+
+  test("[SRV-ROLE-DOM-002] combines lifecycle and role admission without treating role as capability", () => {
+    const deploymentTarget = target();
+    deploymentTarget
+      .configureWorkloadRoles({
+        workloadRoles: DeploymentTargetWorkloadRoles.create(["sandbox-worker"])._unsafeUnwrap(),
+        configuredAt: UpdatedAt.rehydrate("2026-07-28T00:00:00.000Z"),
+      })
+      ._unsafeUnwrap();
+
+    expect(
+      deploymentTarget
+        .ensureCanAcceptNewWork("deployments.create", {
+          requiredRole: ServerWorkloadRoleValue.rehydrate("sandbox-worker"),
+        })
+        .isOk(),
+    ).toBe(true);
+
+    const mismatch = deploymentTarget.ensureCanAcceptNewWork("deployments.create", {
+      requiredRole: ServerWorkloadRoleValue.rehydrate("deployment-runtime"),
+    });
+    expect(mismatch.isErr()).toBe(true);
+    if (mismatch.isErr()) {
+      expect(mismatch.error.code).toBe("server_workload_role_mismatch");
+      expect(mismatch.error.details).toMatchObject({
+        phase: "server-workload-role-guard",
+        requiredRole: "deployment-runtime",
+        workloadRoles: ["sandbox-worker"],
+      });
+    }
+  });
+});
 
 describe("DeploymentTarget", () => {
   test("[DMBH-TARGET-001] answers route proxy selection without caller-owned primitive checks", () => {

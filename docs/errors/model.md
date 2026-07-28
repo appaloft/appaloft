@@ -40,7 +40,10 @@ type ErrorDetails = {
   coordinationMode?: string;
   waitedSeconds?: number;
   retryAfterSeconds?: number;
-  [key: string]: string | number | boolean | null | undefined;
+  serverId?: string;
+  requiredRole?: string;
+  workloadRoles?: readonly string[];
+  [key: string]: string | number | boolean | null | undefined | readonly string[];
 };
 
 type ErrorKnowledge = {
@@ -136,6 +139,8 @@ Codes must be stable identifiers, not localized text. Examples:
 | `invariant_violation` | `domain` | current state and attempted transition |
 | `not_found` | `not-found` | entity type and id |
 | `conflict` | `conflict` | conflict subject and state |
+| `server_inactive` | `conflict` | phase `server-lifecycle-guard`; server id, lifecycle status, deactivation time when available |
+| `server_workload_role_mismatch` | `application` | phase `server-workload-role-guard`; command name, server id, required role, normalized workload-role set |
 | `action_deployment_target_unresolved` | `validation` | phase `source-link-resolution`; source fingerprint; safe next actions |
 | `action_deployment_target_conflict` | `conflict` | phase `source-link-resolution`; source fingerprint and safe conflict subject |
 | `deployment_not_retryable` | `application` or `conflict` | phase `recovery-admission`; deployment id, resource id, current status, blocked reason code, readiness generated time |
@@ -168,6 +173,18 @@ Codes must be stable identifiers, not localized text. Examples:
 | `resource_access_upstream_tls_failed` | `integration` | request id, provider key and route metadata when safe, phase `upstream-connection` |
 | `resource_access_edge_error` | `infra` | request id, phase `diagnostic-page-render` |
 | `resource_access_unknown` | `infra` | request id, phase `diagnostic-page-render`, safe provider classification metadata when available |
+
+`server_workload_role_mismatch` is a prospective new-placement admission result. It is stable and
+non-retriable. An empty server role set means unrestricted by role; a non-empty set must contain the
+required canonical role. Safe details may contain only the operation name, server id, required
+role, and normalized role values. They must not contain credentials, tenant/private policy,
+provider output, capacity data, current workload data, or secrets.
+
+Consumers must not collapse `server_workload_role_mismatch` into `server_inactive`. A role mismatch
+can be recovered by selecting a server with an empty or matching role set, or by replacing the
+server's complete workload-role set through `servers.configure-workload-roles`. An inactive server
+requires lifecycle recovery. Passing either check never bypasses readiness, capability, provider,
+target-kind, or private-policy admission.
 
 When introducing a new code, the command/event/workflow spec that owns the branch must define its category, phase, retriable behavior, and consumer mapping.
 
@@ -222,7 +239,9 @@ Web UI must:
 - show retry affordances only when `retriable = true` and a retry command exists;
 - show deployment recovery affordances only from `deployments.recovery-readiness`; terminal error
   `retriable` flags are hints, not command-admission proof;
-- avoid branching on raw `message`.
+- avoid branching on raw `message`;
+- render `server_workload_role_mismatch` at `server-workload-role-guard` from stable details and
+  offer server selection or complete-set role configuration; never suggest automatic retry.
 
 ### CLI
 
@@ -234,7 +253,10 @@ CLI must:
 - for failed or interrupted deployments, prefer `deployments.recovery-readiness` before suggesting
   retry, redeploy, or rollback; if readiness is unavailable, suggest read-only detail/log/event
   inspection instead of guessing recovery commands;
-- avoid treating translated text as a machine contract.
+- avoid treating translated text as a machine contract;
+- preserve `server_workload_role_mismatch`, `server-workload-role-guard`, `serverId`,
+  `requiredRole`, and normalized `workloadRoles` in structured output, and suggest a new preview or
+  create request only after server selection or role configuration changes.
 
 ### HTTP API
 
@@ -252,6 +274,9 @@ HTTP adapters must map errors predictably:
 | `integration` | 502 or 503 when retriable |
 | `timeout` | 504 or 503 when async retry is scheduled |
 | `async-processing` | Expose through status/read-model endpoints; do not remap the original accepted command response |
+
+For `server_workload_role_mismatch`, HTTP and oRPC responses preserve the structured application
+error and safe details. Clients must not infer mismatch from status code or message text.
 
 ### Background Worker / Job Logs
 

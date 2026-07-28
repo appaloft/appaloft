@@ -10,10 +10,13 @@ searchAliases:
   - "connectivity"
   - "ssh test"
   - "服务器"
+  - "工作负载角色"
+  - "通用服务器"
   - "docker swarm"
   - "orchestrator cluster"
 relatedOperations:
   - servers.register
+  - servers.configure-workload-roles
   - servers.show
   - servers.rename
   - servers.configure-edge-proxy
@@ -75,6 +78,44 @@ sidebar:
 - `user`：用于连接的系统用户。
 - credential：SSH key 路径、已保存凭据或一次性 secret 输入。
 - display name / labels：帮助用户区分服务器。
+
+## 工作负载角色 [#server-workload-roles]
+
+工作负载角色声明服务器打算接收哪些类别的**新工作负载**。它表达放置意图，不证明服务器健康、就绪或具备技术能力。可以组合选择以下规范值：
+
+- `deployment-runtime`：可以接收新的应用运行时放置。
+- `artifact-builder`：记录将来在受治理的 builder 放置路径存在时接收构件构建执行的意图。它不表示当前已提供或已准备好远程构建执行。
+- `sandbox-worker`：可以接收新的 Sandbox 放置，但隔离和 provider 能力检查仍须独立通过。
+
+不声明任何角色表示 **General purpose (all workload types)**（通用，可接收所有工作负载类型）。API 和结构化 CLI 输出会把这个状态保留为 `workloadRoles: []`；list/show 输出不得隐藏空数组，也不能把它解释为没有能力。
+
+注册分类服务器时，可重复传入 `--workload-role`：
+
+```bash title="注册用于部署运行时并表达 artifact-builder 意图的服务器"
+appaloft server register \
+  --name primary \
+  --host 203.0.113.10 \
+  --workload-role deployment-runtime \
+  --workload-role artifact-builder
+```
+
+注册后，使用专用命令完整替换角色集合：
+
+```bash title="替换工作负载角色"
+appaloft server configure-workload-roles srv_primary \
+  --workload-role deployment-runtime \
+  --workload-role sandbox-worker
+```
+
+要恢复通用放置，不传任何角色选项：
+
+```bash title="恢复通用放置"
+appaloft server configure-workload-roles srv_primary
+```
+
+角色变更只影响新的放置。它不会 drain、停止、移动、取消或重新解释当前工作负载和历史放置记录。生命周期、连接、就绪、容量、tenant 和 provider 检查仍须独立通过。注册或配置后，可用 `appaloft server list` 或 `appaloft server show <serverId>` 读取规范化角色数组。
+
+未知或重复角色会被拒绝。如果新部署因为所选服务器不允许 `deployment-runtime` 而失败，可以改选包含 `deployment-runtime` 的服务器、为目标服务器配置该角色，或显式恢复为空集合的通用服务器。修改角色不会修复运行时就绪状态，也不会增加远程构建或 Sandbox 能力。
 
 ## 入口说明 [#server-registration-surfaces]
 

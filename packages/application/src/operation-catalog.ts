@@ -269,6 +269,7 @@ import { checkServerDeleteSafetyQueryInputSchema } from "./operations/servers/ch
 import { configureScheduledRuntimePrunePolicyCommandInputSchema } from "./operations/servers/configure-scheduled-runtime-prune-policy.command";
 import { configureServerCredentialCommandInputSchema } from "./operations/servers/configure-server-credential.command";
 import { configureServerEdgeProxyCommandInputSchema } from "./operations/servers/configure-server-edge-proxy.command";
+import { configureServerWorkloadRolesCommandInputSchema } from "./operations/servers/configure-server-workload-roles.command";
 import { countServersQueryInputSchema } from "./operations/servers/count-servers.query";
 import { createSshCredentialCommandInputSchema } from "./operations/servers/create-ssh-credential.command";
 import { deactivateServerCommandInputSchema } from "./operations/servers/deactivate-server.command";
@@ -1307,6 +1308,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft server register",
       orpc: { method: "POST", path: "/api/servers" },
+    },
+  },
+  {
+    key: "servers.configure-workload-roles",
+    kind: "command",
+    domain: "servers",
+    messageName: "ConfigureServerWorkloadRolesCommand",
+    handlerName: "ConfigureServerWorkloadRolesCommandHandler",
+    serviceName: "ConfigureServerWorkloadRolesUseCase",
+    inputSchema: configureServerWorkloadRolesCommandInputSchema,
+    serviceToken: tokens.configureServerWorkloadRolesUseCase,
+    transports: {
+      cli: "appaloft server configure-workload-roles <serverId> --workload-role <role>",
+      orpc: { method: "POST", path: "/api/servers/{serverId}/workload-roles" },
     },
   },
   {

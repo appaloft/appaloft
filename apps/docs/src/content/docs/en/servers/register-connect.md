@@ -9,10 +9,13 @@ searchAliases:
   - "server"
   - "connectivity"
   - "ssh test"
+  - "workload role"
+  - "general purpose server"
   - "docker swarm"
   - "orchestrator cluster"
 relatedOperations:
   - servers.register
+  - servers.configure-workload-roles
   - servers.show
   - servers.rename
   - servers.configure-edge-proxy
@@ -74,6 +77,44 @@ Common inputs:
 - `user`: system user.
 - credential: SSH key path, saved credential, or one-time secret input.
 - display name / labels: helps users identify the server.
+
+## Workload roles [#server-workload-roles]
+
+Workload roles declare which categories of **new** workload a server is intended to accept. They are placement intent, not proof that the server is healthy, ready, or technically capable. Choose any combination of these canonical values:
+
+- `deployment-runtime`: may accept new application runtime placement.
+- `artifact-builder`: records intent to accept artifact build execution when a governed builder-placement path exists. It does not mean remote build execution is currently available or ready.
+- `sandbox-worker`: may accept new Sandbox placement, but isolation and provider capability checks still apply independently.
+
+No roles means **General purpose (all workload types)**. The API and structured CLI output preserve that state as `workloadRoles: []`; list and show output must not hide the empty array or describe it as incapable.
+
+Use repeatable `--workload-role` options while registering a classified server:
+
+```bash title="Register a server for deployment runtime and artifact-builder intent"
+appaloft server register \
+  --name primary \
+  --host 203.0.113.10 \
+  --workload-role deployment-runtime \
+  --workload-role artifact-builder
+```
+
+After registration, replace the complete role set with the dedicated command:
+
+```bash title="Replace workload roles"
+appaloft server configure-workload-roles srv_primary \
+  --workload-role deployment-runtime \
+  --workload-role sandbox-worker
+```
+
+To restore general-purpose placement, omit all role options:
+
+```bash title="Restore general-purpose placement"
+appaloft server configure-workload-roles srv_primary
+```
+
+Role changes affect new placement only. They do not drain, stop, move, cancel, or reinterpret current workloads or historical placement records. Independent lifecycle, connectivity, readiness, capacity, tenant, and provider checks remain required. Use `appaloft server list` or `appaloft server show <serverId>` to read the normalized role array after registration or configuration.
+
+Unknown or duplicate role values are rejected. If a new deployment is rejected because the selected server does not allow `deployment-runtime`, either select a server whose role set includes `deployment-runtime`, configure that role on the intended server, or explicitly restore the server to the empty general-purpose set. A role change does not repair runtime readiness or add remote build or Sandbox capability.
 
 ## Entrypoints [#server-registration-surfaces]
 

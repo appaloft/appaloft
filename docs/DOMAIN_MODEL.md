@@ -64,6 +64,9 @@ and
 - release and deployment are different concepts
 - source version is a core value-object concept, not a Cloud extension; source profiles carry
   typed version references and deployment runtime plan snapshots carry fixed versions or `unknown`
+- Server Workload Roles are normalized optional placement intent owned by `DeploymentTarget`; the
+  canonical values are `deployment-runtime`, `artifact-builder`, and `sandbox-worker`, and `[]`
+  means general-purpose/unrestricted by role
 - environment is a first-class domain object
 - resource binding must remain an explicit domain concept
 - storage volumes and resource storage attachments are explicit domain concepts; provider-native
@@ -212,12 +215,15 @@ Owns:
 - deployment placement / isolation boundaries on a target
 - runtime orchestration target shape and provider capability selection
 - SSH-server Appaloft state placement for pure CLI/GitHub Actions deployments
+- normalized Server Workload Role intent and new-work role admission
 
 Implemented now:
 - `DeploymentTarget`
 - optional deployment target credential state for local SSH agent or SSH private key access
 - server-level edge proxy intent and bootstrap status for disabled or provider-backed edge proxy
   modes
+- normalized `DeploymentTargetWorkloadRoles`, optional at registration and replaceable only through
+  `servers.configure-workload-roles`
 - `Destination`
 - runtime-plan access routes with proxy route intent and provider-facing route metadata
 - durable `DomainBinding` state for resource-scoped public domain ownership and pending
@@ -228,6 +234,22 @@ Implemented now:
   the selected Appaloft state backend rather than as committed repository config
 
 Accepted target model:
+- workload roles are a zero-to-three-member set in canonical order. Unknown or duplicate input is
+  invalid, and reordered equivalent input is a no-op
+- roles are independent of target kind, lifecycle, connectivity, readiness, credentials, provider
+  capabilities, isolation, health, capacity, and private policy. A matching role is necessary but
+  never sufficient for placement
+- `DeploymentTarget` evaluates active lifecycle before role admission. New deployment planning and
+  creation require `deployment-runtime` before runtime-plan or backend effects; `[]` admits every
+  defined workload category by role
+- role replacement is prospective configuration only. It does not drain, move, stop, cancel,
+  delete, or reinterpret existing workload-owner bindings or accepted snapshots
+- `artifact-builder` is stored intent only until a neutral builder-executor seam is governed;
+  registered-Server `sandbox-worker` admission remains blocked until the neutral Sandbox placement
+  contract carries Server identity
+- governing sources: [ADR-101](./decisions/ADR-101-server-workload-role-admission.md),
+  [Spec 118](./specs/118-server-workload-roles/spec.md), and the
+  [Server Workload Role Test Matrix](./testing/server-workload-role-test-matrix.md)
 - `SandboxAgentHarnessRegistry` exposes a neutral adapter catalog with admitted Sandbox Template,
   interaction, session recovery, persistent-path, healthcheck and task capabilities. Pi, OpenCode
   and custom command harnesses are adapter registrations, not domain enum values.
@@ -261,6 +283,9 @@ Transport compatibility note:
 - `DeploymentTarget.targetKind` describes the target shape, such as `single-server` or the future
   `orchestrator-cluster`; concrete runtime providers are selected by provider key and capabilities
   rather than provider-specific fields on deployment commands
+- `DeploymentTarget.workloadRoles` describes intended categories of new workload, not target shape
+  or technical capability. CLI and HTTP use the same canonical values and the dedicated
+  `servers.configure-workload-roles` complete-set mutation
 - access routes express public-domain intent, including provider-neutral canonical redirect aliases;
   provider-specific labels, files, commands, redirect middleware, and route manifests are rendered
   by concrete edge proxy providers, not core aggregates
@@ -811,6 +836,11 @@ Boundary rule:
   destination, provider key, and backend capabilities. Single-server Docker/Compose is the active
   v1 single-server backend, Docker Swarm is the active v1 cluster backend, and Kubernetes remains a
   future orchestration backend behind the same `deployments.create` command.
+- deployment plan and create admission first require the selected target to be active, then require
+  `deployment-runtime`; backend capability and provider checks remain independent later gates
+- mutable Server Workload Roles are not copied into `RuntimePlanSnapshot`. Removing a role rejects
+  later new placement without changing accepted, running, or historical deployment snapshots or
+  their lifecycle and recovery semantics
 - deployment runtime command steps should be represented as typed specs when they are persisted or
   handed between planning and execution. Shell command text is allowed only as a user-authored
   shell-script leaf or as an adapter-rendered execution/display value.
@@ -995,6 +1025,12 @@ Rules:
 - runtime target provider capabilities decide whether the target can execute single-server
   Docker/Compose, active cluster orchestration such as Docker Swarm, or future cluster
   orchestration such as Kubernetes
+- workload roles are normalized optional new-placement intent with canonical values
+  `deployment-runtime`, `artifact-builder`, and `sandbox-worker`; `[]` is unrestricted by role
+- role admission follows lifecycle admission and remains independent of target kind, connectivity,
+  readiness, credentials, provider capability, isolation, health, capacity, and private policy
+- `servers.configure-workload-roles` replaces the complete set prospectively without changing
+  accepted snapshots or existing workload-owner bindings
 - pure CLI SSH state is target-local Appaloft metadata/state, not user workload data, and must be
   migrated or adopted explicitly when moving the same server to a hosted/self-hosted control plane
 
@@ -1011,6 +1047,10 @@ Current scope:
   `servers.configure-edge-proxy`; they must not change server identity, host, provider,
   credential, lifecycle state, historical deployment/domain/route/audit references, or
   provider-owned runtime artifacts
+- owns current normalized `DeploymentTargetWorkloadRoles`; deployment plan/create require
+  `deployment-runtime` after active lifecycle admission, before runtime-plan or backend effects
+- does not infer roles from providers or running work; `artifact-builder` is intent only, and
+  registered-Server `sandbox-worker` enforcement awaits a Server-aware neutral placement seam
 - may host the default `ssh-pglite` Appaloft state backend for CLI/GitHub Actions deployments,
   while PostgreSQL/PGlite selected backends persist source link state and server-applied proxy route
   desired/applied state through dedicated application persistence adapters

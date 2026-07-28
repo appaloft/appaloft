@@ -3668,12 +3668,13 @@
                         <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
                           <div class="min-w-0">
                             <p class="truncate text-sm font-medium">
-                              {projectResourceDeploymentPlanPreview.source.framework ??
-                                projectResourceDeploymentPlanPreview.source.runtimeFamily ??
-                                projectResourceDeploymentPlanPreview.source.kind}
+                              {projectResourceDeploymentPlanPreview.source?.framework ??
+                                projectResourceDeploymentPlanPreview.source?.runtimeFamily ??
+                                projectResourceDeploymentPlanPreview.source?.kind ??
+                                $t(i18nKeys.console.projects.createResourceSourceTitle)}
                             </p>
                             <p class="mt-1 truncate text-xs text-muted-foreground">
-                              {projectResourceDeploymentPlanPreview.source.displayName}
+                              {projectResourceDeploymentPlanPreview.source?.displayName ?? "—"}
                             </p>
                           </div>
                           <Badge

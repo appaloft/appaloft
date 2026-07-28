@@ -309,6 +309,7 @@ appaloft.servers.capacity.inspect -> servers.capacity.inspect GET /servers/{serv
 appaloft.servers.capacity.prune -> servers.capacity.prune POST /servers/{serverId}/capacity/prune
 appaloft.servers.configureCredential -> servers.configure-credential POST /servers/{serverId}/credentials
 appaloft.servers.configureEdgeProxy -> servers.configure-edge-proxy POST /servers/{serverId}/edge-proxy/configuration
+appaloft.servers.configureWorkloadRoles -> servers.configure-workload-roles POST /servers/{serverId}/workload-roles
 appaloft.servers.count -> servers.count GET /servers/count
 appaloft.servers.deactivate -> servers.deactivate POST /servers/{serverId}/deactivate
 appaloft.servers.delete -> servers.delete DELETE /servers/{serverId}

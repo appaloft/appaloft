@@ -8,6 +8,12 @@ import {
 
 export type ServerCredentialKind = "local-ssh-agent" | "ssh-private-key";
 export type ServerPrivateKeyInputMode = "saved" | "file" | "paste";
+export type ServerWorkloadRole = RegisterServerInput["workloadRoles"][number];
+export const serverWorkloadRoleOptions = [
+  "deployment-runtime",
+  "artifact-builder",
+  "sandbox-worker",
+] as const satisfies readonly ServerWorkloadRole[];
 export const sshServerProviderKey = "generic-ssh";
 export const defaultServerCredentialKindOptions = [
   "ssh-private-key",
@@ -24,6 +30,7 @@ export type ServerRegistrationDraft = {
   port: string;
   providerKey: string;
   targetKind: RegisterServerInput["targetKind"];
+  workloadRoles: ServerWorkloadRole[];
   credentialKind: ServerCredentialKind;
   credentialUsername: string;
   credentialPublicKey: string;
@@ -50,6 +57,8 @@ export function createServerRegistrationDraft(
 ): ServerRegistrationDraft {
   const safeOverrides = { ...overrides };
   delete safeOverrides.providerKey;
+  const workloadRoles = [...(safeOverrides.workloadRoles ?? [])];
+  delete safeOverrides.workloadRoles;
 
   return {
     name: "local-machine",
@@ -57,6 +66,7 @@ export function createServerRegistrationDraft(
     port: "22",
     targetKind: "single-server",
     credentialKind: "ssh-private-key",
+    workloadRoles,
     credentialUsername: "",
     credentialPublicKey: "",
     credentialPrivateKey: "",
@@ -195,6 +205,7 @@ export function createRegisterServerInput(
     host,
     providerKey: sshServerProviderKey,
     targetKind: draft.targetKind,
+    workloadRoles: [...draft.workloadRoles],
     proxyKind: "traefik",
     port,
   };

@@ -12,6 +12,7 @@ searchAliases:
   - "deployment target"
 relatedOperations:
   - servers.register
+  - servers.configure-workload-roles
   - servers.configure-credential
   - credentials.create-ssh
   - servers.test-connectivity
@@ -24,6 +25,8 @@ sidebar:
 ## What a server means [#server-deployment-target]
 
 A server is a target Appaloft can connect to, inspect, and deploy onto.
+
+Use [server workload roles](/docs/en/servers/register-connect/#server-workload-roles) to declare which categories of new workload a server is intended to accept. An empty role set is general-purpose for all workload types.
 
 ## SSH credentials [#server-ssh-credential-path]
 

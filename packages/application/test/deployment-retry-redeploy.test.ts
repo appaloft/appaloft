@@ -465,6 +465,30 @@ describe("RedeployDeploymentUseCase", () => {
     });
   });
 
+  test("[SRV-ROLE-008] marks source-backed redeploy as existing-work continuity", async () => {
+    const repository = new MemoryDeploymentRepository();
+    repository.items.set("dep_source", sourceDeployment("failed"));
+    const createDeploymentUseCase = new RecordingCreateDeploymentUseCase();
+    const useCase = new RedeployDeploymentUseCase(
+      repository,
+      createDeploymentUseCase as unknown as CreateDeploymentUseCase,
+    );
+
+    const result = await useCase.execute(
+      createExecutionContext({ requestId: "req_redeploy_role_continuity", entrypoint: "system" }),
+      {
+        resourceId: "res_demo",
+        sourceDeploymentId: "dep_source",
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(createDeploymentUseCase.calls[0]?.recovery).toMatchObject({
+      sourceDeploymentId: "dep_source",
+      enforceWorkloadRole: false,
+    });
+  });
+
   test("[DEP-REDEPLOY-003] rejects invalid current profile without falling back to retry", async () => {
     const repository = new MemoryDeploymentRepository();
     repository.items.set("dep_source", sourceDeployment("failed"));
@@ -593,6 +617,33 @@ describe("ForceRedeployDeploymentUseCase", () => {
     expect(createDeploymentUseCase.calls[0]?.recovery).toMatchObject({
       sourceDeploymentId: "dep_source",
       ownerLabel: "deployments.force-redeploy",
+    });
+  });
+
+  test("[SRV-ROLE-008] marks source-backed force redeploy as existing-work continuity", async () => {
+    const repository = new MemoryDeploymentRepository();
+    repository.items.set("dep_source", sourceDeployment("failed"));
+    const createDeploymentUseCase = new RecordingCreateDeploymentUseCase();
+    const useCase = new ForceRedeployDeploymentUseCase(
+      repository,
+      createDeploymentUseCase as unknown as CreateDeploymentUseCase,
+    );
+
+    const result = await useCase.execute(
+      createExecutionContext({
+        requestId: "req_force_redeploy_role_continuity",
+        entrypoint: "system",
+      }),
+      {
+        resourceId: "res_demo",
+        sourceDeploymentId: "dep_source",
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(createDeploymentUseCase.calls[0]?.recovery).toMatchObject({
+      sourceDeploymentId: "dep_source",
+      enforceWorkloadRole: false,
     });
   });
 });

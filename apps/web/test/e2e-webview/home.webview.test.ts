@@ -32,6 +32,7 @@ type ServerFixture = {
   targetKind: "single-server";
   lifecycleStatus: "active";
   createdAt: string;
+  workloadRoles: ("deployment-runtime" | "artifact-builder" | "sandbox-worker")[];
 };
 type DependencyResourceFixtureKind = "postgres" | "redis";
 type DependencyProvisioningPlanFixtureInput = {
@@ -343,6 +344,7 @@ function serverFixture(index: number): ServerFixture {
     providerKey: "generic-ssh",
     targetKind: "single-server",
     lifecycleStatus: "active",
+    workloadRoles: index === 1 ? ["deployment-runtime", "artifact-builder"] : [],
     createdAt: `2026-01-${padded}T00:00:00.000Z`,
   };
 }
@@ -868,6 +870,7 @@ function serverDetailFixture(
     credential?: ServerCredentialFixture;
     lifecycleStatus?: "active" | "inactive";
     name?: string;
+    workloadRoles?: ("deployment-runtime" | "artifact-builder" | "sandbox-worker")[];
   } = {},
 ) {
   const isStaticServer = serverId === "srv_static";
@@ -882,6 +885,7 @@ function serverDetailFixture(
       providerKey: "generic-ssh",
       targetKind: "single-server",
       lifecycleStatus: input.lifecycleStatus ?? "active",
+      workloadRoles: input.workloadRoles ?? ["deployment-runtime", "artifact-builder"],
       edgeProxy: {
         kind: input.edgeProxyKind ?? "traefik",
         status: input.edgeProxyStatus ?? "ready",
@@ -1851,6 +1855,19 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
       return {
         json: {
           id: input?.serverId ?? "srv_demo",
+        },
+      };
+    },
+    "/api/rpc/servers/configureWorkloadRoles": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as {
+        serverId?: string;
+        workloadRoles?: ("deployment-runtime" | "artifact-builder" | "sandbox-worker")[];
+      } | null;
+      return {
+        json: {
+          serverId: input?.serverId ?? "srv_demo",
+          workloadRoles: input?.workloadRoles ?? [],
+          changed: true,
         },
       };
     },
@@ -8855,6 +8872,114 @@ describe.serial("console e2e with Bun.WebView", () => {
     expect(
       recordedApiRequests.some((request) => request.pathname === "/api/rpc/servers/list"),
     ).toBe(false);
+  }, 30_000);
+
+  test("[SRV-ROLE-ENTRY-004] reads and atomically replaces server workload roles", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousShowRoute = apiResponses.dashboard["/api/rpc/servers/show"];
+    const previousConfigureRoute =
+      apiResponses.dashboard["/api/rpc/servers/configureWorkloadRoles"];
+    let currentWorkloadRoles: ("deployment-runtime" | "artifact-builder" | "sandbox-worker")[] = [
+      "deployment-runtime",
+      "artifact-builder",
+    ];
+
+    apiResponses.dashboard["/api/rpc/servers/show"] = (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { serverId?: string } | null;
+      return {
+        json: serverDetailFixture(input?.serverId ?? "srv_demo", {
+          workloadRoles: currentWorkloadRoles,
+        }),
+      };
+    };
+    apiResponses.dashboard["/api/rpc/servers/configureWorkloadRoles"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as {
+        serverId?: string;
+        workloadRoles?: ("deployment-runtime" | "artifact-builder" | "sandbox-worker")[];
+      } | null;
+      currentWorkloadRoles = input?.workloadRoles ?? [];
+      return {
+        json: {
+          serverId: input?.serverId ?? "srv_demo",
+          workloadRoles: currentWorkloadRoles,
+          changed: true,
+        },
+      };
+    };
+
+    try {
+      await using view = createWebView({ width: 1280, height: 900 });
+      await view.navigate(`${previewUrl}/servers/srv_demo?tab=settings&section=general`);
+      await expectAnyText(view, ["Deployment runtime", "部署运行时"]);
+      await expectAnyText(view, ["Artifact builder", "产物构建器"]);
+
+      const opened = await waitFor(
+        () =>
+          view.evaluate<boolean>(`(() => {
+            const surface = document.querySelector("[data-server-workload-role-settings]");
+            const button = surface?.querySelector("button");
+            if (!(button instanceof HTMLButtonElement) || button.disabled) {
+              return false;
+            }
+            button.click();
+            return true;
+          })()`),
+        Boolean,
+        "Expected workload-role edit action",
+      );
+      expect(opened).toBe(true);
+
+      const toggled = await waitFor(
+        () =>
+          view.evaluate<boolean>(`(() => {
+            const input = document.querySelector(
+              '[data-server-role-option="deployment-runtime"] input[type="checkbox"]'
+            );
+            if (!(input instanceof HTMLInputElement) || !input.checked) {
+              return false;
+            }
+            input.click();
+            return true;
+          })()`),
+        Boolean,
+        "Expected deployment-runtime role checkbox",
+      );
+      expect(toggled).toBe(true);
+      await clickFormSubmit(view, "#server-workload-roles-dialog-form");
+
+      const configureRequest = await waitForRecordedRequest(
+        "/api/rpc/servers/configureWorkloadRoles",
+      );
+      expect(configureRequest.method).toBe("POST");
+      expect(readOrpcJsonPayload(configureRequest.body)).toEqual({
+        serverId: "srv_demo",
+        workloadRoles: ["artifact-builder"],
+      });
+      await expectAnyText(view, ["Workload roles saved", "工作负载角色已保存"]);
+      await waitFor(
+        () =>
+          view.evaluate<string>(
+            `document.querySelector('[data-server-workload-role-settings]')?.textContent ?? ''`,
+          ),
+        (text) => text.includes("Artifact builder") || text.includes("产物构建器"),
+        "Expected updated workload-role readback",
+      );
+      await using mobileView = createWebView({ width: 390, height: 844 });
+      await mobileView.navigate(`${previewUrl}/servers/srv_demo?tab=settings&section=general`);
+      await expectAnyText(mobileView, ["Artifact builder", "产物构建器"]);
+      const mobileOverflows = await mobileView.evaluate<boolean>(
+        "document.documentElement.scrollWidth > window.innerWidth + 1",
+      );
+      expect(mobileOverflows).toBe(false);
+    } finally {
+      apiResponses.dashboard["/api/rpc/servers/show"] = previousShowRoute;
+      apiResponses.dashboard["/api/rpc/servers/configureWorkloadRoles"] = previousConfigureRoute;
+    }
   }, 30_000);
 
   test("[RT-CAP-INSPECT-001][RT-CAP-PRUNE-001] previews server capacity prune from Web", async () => {

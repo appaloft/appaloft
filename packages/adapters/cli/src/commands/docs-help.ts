@@ -15,6 +15,7 @@ export const cliDocsHrefs = {
   projectLifecycle: resolvePublicDocsHelpHref("project.lifecycle"),
   serverDeploymentTarget: resolvePublicDocsHelpHref("server.deployment-target"),
   serverDockerSwarmTarget: resolvePublicDocsHelpHref("server.docker-swarm-target"),
+  serverWorkloadRoles: resolvePublicDocsHelpHref("server.workload-roles"),
   serverSshCredential: resolvePublicDocsHelpHref("server.ssh-credential"),
   serverConnectivityTest: resolvePublicDocsHelpHref("server.connectivity-test"),
   serverProxyReadiness: resolvePublicDocsHelpHref("server.proxy-readiness"),
@@ -390,11 +391,21 @@ export const cliCommandDescriptions = {
   ),
   server: withDocs("Server operations", "server.deployment-target"),
   serverRegister: withDocs(
-    "Register a single-server or Docker Swarm deployment target",
-    "server.docker-swarm-target",
+    "Register a deployment target with optional repeatable canonical workload roles",
+    "server.workload-roles",
   ),
-  serverList: withDocs("List servers", "server.deployment-target"),
-  serverShow: withDocs("Show server detail", "server.deployment-target"),
+  serverList: withDocs(
+    "List servers with canonical workload roles and explicit General purpose meaning",
+    "server.workload-roles",
+  ),
+  serverShow: withDocs(
+    "Show server detail with canonical workload roles and explicit General purpose meaning",
+    "server.workload-roles",
+  ),
+  serverConfigureWorkloadRoles: withDocs(
+    "Replace the complete server workload role set for new placement; repeat --workload-role with deployment-runtime, artifact-builder, or sandbox-worker, or omit it for General purpose (all workload types)",
+    "server.workload-roles",
+  ),
   serverRename: withDocs("Rename a server deployment target", "server.deployment-target"),
   serverReorder: withDocs("Reorder servers for server list display", "server.deployment-target"),
   serverDeactivate: withDocs("Deactivate a server deployment target", "server.deployment-target"),

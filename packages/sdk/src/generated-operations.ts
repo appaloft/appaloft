@@ -104,6 +104,7 @@ export const generatedSdkOperations = [
       method: "POST",
       path: "/agent-adapters/{installationId}/disable",
     },
+    docsHref: "/docs/agent/agent-adapters/#agent-adapter-installations",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -122,6 +123,7 @@ export const generatedSdkOperations = [
       method: "POST",
       path: "/agent-adapters",
     },
+    docsHref: "/docs/agent/agent-adapters/#agent-adapter-installations",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -140,6 +142,7 @@ export const generatedSdkOperations = [
       method: "GET",
       path: "/agent-adapters",
     },
+    docsHref: "/docs/agent/agent-adapters/#agent-adapter-installations",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -158,6 +161,7 @@ export const generatedSdkOperations = [
       method: "GET",
       path: "/agent-adapters/{installationId}",
     },
+    docsHref: "/docs/agent/agent-adapters/#agent-adapter-installations",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -176,6 +180,7 @@ export const generatedSdkOperations = [
       method: "DELETE",
       path: "/agent-adapters/{installationId}",
     },
+    docsHref: "/docs/agent/agent-adapters/#agent-adapter-installations",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -194,6 +199,7 @@ export const generatedSdkOperations = [
       method: "POST",
       path: "/agent-adapters/validate",
     },
+    docsHref: "/docs/agent/agent-adapters/#agent-adapter-installations",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -5938,6 +5944,25 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "servers.configure-workload-roles",
+    operationGroup: "servers",
+    operationMethod: "configureWorkloadRoles",
+    facadePath: ["servers", "configureWorkloadRoles"],
+    operationId: "servers.configureWorkloadRoles",
+    kind: "command",
+    domain: "servers",
+    messageName: "ConfigureServerWorkloadRolesCommand",
+    route: {
+      method: "POST",
+      path: "/servers/{serverId}/workload-roles",
+    },
+    docsHref: "/docs/servers/register-connect/#server-workload-roles",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "servers.count",
     operationGroup: "servers",
     operationMethod: "count",
@@ -7864,6 +7889,7 @@ export interface GeneratedAppaloftClient {
     };
     readonly configureCredential: AppaloftSdkFacadeMethod;
     readonly configureEdgeProxy: AppaloftSdkFacadeMethod;
+    readonly configureWorkloadRoles: AppaloftSdkFacadeMethod;
     readonly count: AppaloftSdkFacadeMethod;
     readonly deactivate: AppaloftSdkFacadeMethod;
     readonly delete: AppaloftSdkFacadeMethod;

@@ -441,6 +441,39 @@ export const publicDocsHelpTopics = {
       "apps/web server list/detail and registration surfaces, including server list card reorder, server detail rename, runtime preparation/readiness, edge proxy configuration, typed deactivate, delete safety, and typed delete confirmation",
     ],
   },
+  "server.workload-roles": {
+    id: "server.workload-roles",
+    title: "Server workload roles",
+    description:
+      "Declare which categories of new workload a server is intended to accept without changing current workloads.",
+    page: {
+      "zh-CN": "servers/register-connect",
+      "en-US": "en/servers/register-connect",
+    },
+    anchor: "server-workload-roles",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "servers.configure-workload-roles",
+    aliases: [
+      "server workload role",
+      "workload roles",
+      "general purpose server",
+      "deployment-runtime",
+      "artifact-builder",
+      "sandbox-worker",
+      "服务器工作负载角色",
+      "通用服务器",
+    ],
+    specReferences: [
+      "docs/specs/118-server-workload-roles/spec.md",
+      "docs/decisions/ADR-101-server-workload-role-admission.md",
+      "docs/testing/server-workload-role-test-matrix.md",
+    ],
+    webSurfaces: ["apps/web server registration, list, and detail workload-role surfaces"],
+  },
   "blueprint.deploy-handoff": {
     id: "blueprint.deploy-handoff",
     title: "Blueprint deploy handoff",
@@ -3186,6 +3219,11 @@ export const publicDocsOperationCoverage = [
   { operationKey: "projects.delete-check", status: "documented", topicId: "project.lifecycle" },
   { operationKey: "projects.delete", status: "documented", topicId: "project.lifecycle" },
   { operationKey: "servers.register", status: "documented", topicId: "server.deployment-target" },
+  {
+    operationKey: "servers.configure-workload-roles",
+    status: "documented",
+    topicId: "server.workload-roles",
+  },
   {
     operationKey: "servers.configure-credential",
     status: "documented",

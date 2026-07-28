@@ -7,6 +7,7 @@ import {
   type Command,
   type CommandBus,
   ConfigureServerEdgeProxyCommand,
+  ConfigureServerWorkloadRolesCommand,
   createExecutionContext,
   DeactivateServerCommand,
   DeleteServerCommand,
@@ -91,6 +92,7 @@ function serverDetail(): ServerDetail {
       port: 22,
       providerKey: "generic-ssh",
       targetKind: "single-server",
+      workloadRoles: ["deployment-runtime", "artifact-builder"],
       lifecycleStatus: "active",
       edgeProxy: {
         kind: "traefik",
@@ -146,6 +148,7 @@ describe("server show HTTP route", () => {
       schemaVersion: "servers.show/v1",
       server: {
         id: "srv_primary",
+        workloadRoles: ["deployment-runtime", "artifact-builder"],
       },
       rollups: {
         resources: {
@@ -500,6 +503,43 @@ describe("server show HTTP route", () => {
     expect(capturedCommand).toMatchObject({
       serverId: "srv_primary",
       proxyKind: "caddy",
+    });
+  });
+
+  test("[SRV-ROLE-ENTRY-002] dispatches workload role replacement through HTTP", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({
+          workloadRoles: ["deployment-runtime", "sandbox-worker"],
+          changed: true,
+        } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountServerShowRoutes({ commandBus, queryBus });
+
+    const response = await app.handle(
+      serverShowRequest("http://localhost/api/servers/srv_primary/workload-roles", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ workloadRoles: ["sandbox-worker", "deployment-runtime"] }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      workloadRoles: ["deployment-runtime", "sandbox-worker"],
+      changed: true,
+    });
+    expect(capturedCommand).toBeInstanceOf(ConfigureServerWorkloadRolesCommand);
+    expect(capturedCommand).toMatchObject({
+      serverId: "srv_primary",
+      workloadRoles: ["sandbox-worker", "deployment-runtime"],
     });
   });
 

@@ -10,6 +10,10 @@ admission, the deployment workflow must resolve the accepted `RuntimePlanSnapsho
 `DeploymentTarget`/`Destination` into a runtime target backend that can render, apply, observe,
 verify, diagnose, and clean up the deployment.
 
+Before this adapter-facing workflow begins, deployment plan/create must apply the selected target's
+active-lifecycle guard and then require the `deployment-runtime` Server Workload Role. Role intent
+does not participate in backend selection.
+
 The workflow must preserve the separation required by
 [ADR-021](../decisions/ADR-021-docker-oci-workload-substrate.md) and
 [ADR-023](../decisions/ADR-023-runtime-orchestration-target-boundary.md):
@@ -34,6 +38,9 @@ This workflow inherits:
 - [ADR-020: Resource Health Observation](../decisions/ADR-020-resource-health-observation.md)
 - [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
+- [ADR-101: Server Workload Role Admission](../decisions/ADR-101-server-workload-role-admission.md)
+- [Server Workload Roles Spec](../specs/118-server-workload-roles/spec.md)
+- [Server Workload Role Test Matrix](../testing/server-workload-role-test-matrix.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [deployments.create Workflow Spec](./deployments.create.md)
 - [deployments.create Error Spec](../errors/deployments.create.md)
@@ -43,7 +50,9 @@ This workflow inherits:
 ## Workflow Position
 
 ```text
-deployments.create admission
+deployment plan/create context admission
+  -> require active DeploymentTarget lifecycle
+  -> require deployment-runtime role ([] remains unrestricted by role)
   -> resolve resource source/runtime/network/access snapshots
   -> plan workload artifact and runtime command specs
   -> select runtime target backend from DeploymentTarget, Destination, provider key, and capabilities
@@ -60,7 +69,7 @@ deployments.create admission
 | Layer | Owns | Must not own |
 | --- | --- | --- |
 | Workload planning | Source inspection, `RuntimePlanStrategy`, OCI image or Compose artifact intent, typed runtime command specs, resource workload endpoint semantics. | Target provider SDKs, Kubernetes manifests, SSH command execution, Docker daemon calls, Web/CLI/API input. |
-| Runtime target planning | Mapping workload artifact, target, destination, environment snapshot, and access routes to target-specific execution intent. | Command admission, aggregate invariants, provider client handles, user-facing input schemas. |
+| Runtime target planning | Mapping already-admitted workload artifact, target, destination, environment snapshot, and access routes to target-specific execution intent. | Command admission, Server Workload Role interpretation, aggregate invariants, provider client handles, user-facing input schemas. |
 | Runtime target execution | Applying rendered intent, verifying rollout, reading runtime state, collecting sanitized diagnostics, preserving rollback candidates, cleanup. | Business command dispatch, transport-specific errors, reusable resource configuration ownership. |
 | Runtime target observation | Normalized runtime logs, resource health, proxy configuration previews, diagnostic summaries. | Returning raw Docker, Swarm, or Kubernetes API objects as business query contracts. |
 
@@ -68,6 +77,10 @@ deployments.create admission
 
 Target backend selection must use the selected deployment target, destination, provider key, target
 kind, and registered capabilities.
+
+Selection receives an already admitted target. Workload roles are prospective aggregate policy,
+not provider/runtime capability: adapters and backend registries must not inspect them or use them
+as a routing key.
 
 The target architecture is a registry or equivalent dependency-injected router:
 
@@ -278,7 +291,24 @@ Real local Docker and generic-SSH execution are governed by the test matrix and 
 shared GitHub Actions smoke workflows for nightly/release confidence; local developer runs remain
 explicitly gated because they mutate Docker or SSH targets.
 
+## New-Work Admission
+
+Deployment plan and create use the same lifecycle-then-role guard before runtime-plan resolution,
+backend selection, acceptance, or effects. `[]` passes every defined role category. A selected
+non-empty role set without `deployment-runtime` fails closed with
+`server_workload_role_mismatch` at `server-workload-role-guard`; explicit selection does not fall
+back. Passing this guard only continues to independent readiness, capability, destination, provider,
+and private-policy gates.
+
+Mutable role policy is not copied into `RuntimePlanSnapshot`. Accepted, running, and historical
+snapshots retain their target/placement facts and lifecycle semantics after later role replacement.
+`artifact-builder` remains intent only, and registered-Server Sandbox placement remains a governed
+follow-up until its neutral placement contract carries Server identity.
+
 ## Failure Semantics
+
+Lifecycle or role rejection occurs before this workflow and before safe deployment acceptance. A
+role mismatch uses `server_workload_role_mismatch` in phase `server-workload-role-guard`.
 
 Target backend selection failure before safe deployment acceptance is an admission error in phase
 `runtime-target-resolution`.
@@ -318,6 +348,9 @@ Current implementation covers single-server Docker/Compose and Docker Swarm:
   registry unless explicitly opted out.
 - `RoutingExecutionBackend` selects the execution backend through the registry, with the in-memory
   backend retained as a compatibility fallback for unknown providers.
+- Deployment context resolution applies active lifecycle followed by `deployment-runtime` before
+  runtime plan input reaches `DefaultRuntimePlanResolver`; plan preview and create therefore share
+  the same role blocker and produce no runtime effects on mismatch.
 - Local and SSH Docker/Compose code already lives in `packages/adapters/runtime`.
 - Runtime execution uses the registry for single-server and Swarm targets; runtime logs and health
   can read Swarm-backed deployments through the resolved Swarm manager over SSH when target

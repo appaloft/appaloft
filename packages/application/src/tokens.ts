@@ -346,6 +346,9 @@ export const tokens = {
   ),
   registerServerUseCase: Symbol.for("appaloft.register_server_use_case"),
   configureServerCredentialUseCase: Symbol.for("appaloft.configure_server_credential_use_case"),
+  configureServerWorkloadRolesUseCase: Symbol.for(
+    "appaloft.configure_server_workload_roles_use_case",
+  ),
   createSshCredentialUseCase: Symbol.for("appaloft.create_ssh_credential_use_case"),
   countServersQueryService: Symbol.for("appaloft.count_servers_query_service"),
   reorderServersUseCase: Symbol.for("appaloft.reorder_servers_use_case"),

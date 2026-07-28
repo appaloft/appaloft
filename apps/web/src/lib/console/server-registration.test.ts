@@ -2,6 +2,8 @@ import { type SystemPluginWebExtension } from "@appaloft/contracts";
 import { describe, expect, test } from "vitest";
 
 import {
+  createRegisterServerInput,
+  createServerRegistrationDraft,
   defaultServerCredentialKindOptions,
   serverCredentialKindOptionsFromWebExtensions,
 } from "./server-registration";
@@ -49,5 +51,21 @@ describe("server registration runtime options", () => {
         }),
       ]),
     ).toEqual(defaultServerCredentialKindOptions);
+  });
+});
+
+describe("server registration workload roles", () => {
+  test("SRV-ROLE-001 sends an empty role set for a general-purpose server", () => {
+    expect(createRegisterServerInput(createServerRegistrationDraft())?.workloadRoles).toEqual([]);
+  });
+
+  test("SRV-ROLE-002 sends every selected role", () => {
+    const input = createRegisterServerInput(
+      createServerRegistrationDraft({
+        workloadRoles: ["deployment-runtime", "artifact-builder"],
+      }),
+    );
+
+    expect(input?.workloadRoles).toEqual(["deployment-runtime", "artifact-builder"]);
   });
 });

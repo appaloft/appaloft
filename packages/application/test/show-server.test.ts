@@ -118,6 +118,7 @@ function serverSummary(overrides?: Partial<ServerSummary>): ServerSummary {
     port: 22,
     providerKey: "generic-ssh",
     targetKind: "single-server",
+    workloadRoles: [],
     lifecycleStatus: "active",
     edgeProxy: {
       kind: "traefik",
@@ -234,6 +235,24 @@ describe("ShowServerQueryService", () => {
       },
       generatedAt: "2026-01-01T00:00:10.000Z",
     });
+  });
+
+  test("[SRV-ROLE-012] servers.show exposes canonical workload roles and explicit empty set", async () => {
+    const classified = createService({
+      servers: [serverSummary({ workloadRoles: ["deployment-runtime", "artifact-builder"] })],
+    });
+    const classifiedResult = await classified.service.execute(createTestContext(), createQuery());
+    expect(classifiedResult._unsafeUnwrap().server.workloadRoles).toEqual([
+      "deployment-runtime",
+      "artifact-builder",
+    ]);
+
+    const unrestricted = createService({ servers: [serverSummary({ workloadRoles: [] })] });
+    const unrestrictedResult = await unrestricted.service.execute(
+      createTestContext(),
+      createQuery(),
+    );
+    expect(unrestrictedResult._unsafeUnwrap().server.workloadRoles).toEqual([]);
   });
 
   test("[SRV-LIFE-SHOW-002] servers.show returns not_found for a missing server", async () => {

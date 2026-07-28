@@ -1,8 +1,10 @@
 import {
+  type Query as AppQuery,
   BootstrapServerProxyCommand,
   CheckServerDeleteSafetyQuery,
   ConfigureScheduledRuntimePrunePolicyCommand,
   ConfigureServerCredentialCommand,
+  ConfigureServerWorkloadRolesCommand,
   CreateSshCredentialCommand,
   DeactivateServerCommand,
   DeleteServerCommand,
@@ -26,11 +28,25 @@ import {
   scheduledRuntimePrunePolicyScopeSchema,
   TestServerConnectivityCommand,
 } from "@appaloft/application";
-import { deploymentTargetCredentialKinds, targetKinds } from "@appaloft/core";
+import {
+  type DomainError,
+  deploymentTargetCredentialKinds,
+  type Result,
+  serverWorkloadRoles,
+  targetKinds,
+} from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
 
-import { optionalValue, runCommand, runQuery, runTerminalCommand } from "../runtime.js";
+import {
+  CliRuntime,
+  optionalValue,
+  print,
+  resultToEffect,
+  runCommand,
+  runQuery,
+  runTerminalCommand,
+} from "../runtime.js";
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const nameOption = Options.text("name");
@@ -42,6 +58,9 @@ const targetKindOption = Options.choice("target-kind", targetKinds).pipe(
 );
 const credentialKindOption = Options.choice("kind", deploymentTargetCredentialKinds).pipe(
   Options.withDefault("local-ssh-agent"),
+);
+const workloadRoleOption = Options.choice("workload-role", serverWorkloadRoles).pipe(
+  Options.repeated,
 );
 const usernameOption = Options.text("username").pipe(Options.optional);
 const publicKeyOption = Options.text("public-key").pipe(Options.optional);
@@ -75,6 +94,47 @@ const optionalServerIdOption = Options.text("server-id").pipe(Options.optional);
 const serverIdsOption = Options.text("server-ids");
 const startOffsetOption = Options.integer("start-offset").pipe(Options.optional);
 
+const generalPurposeWorkloadRoleMeaning = "General purpose (all workload types)";
+
+function renderServerWorkloadRoles(value: unknown): unknown {
+  if (!value || typeof value !== "object") return value;
+
+  const record = value as Record<string, unknown>;
+  if (Array.isArray(record.items)) {
+    return {
+      ...record,
+      items: record.items.map(renderServerWorkloadRoles),
+    };
+  }
+  if (record.server && typeof record.server === "object") {
+    return {
+      ...record,
+      server: renderServerWorkloadRoles(record.server),
+    };
+  }
+  if (!Array.isArray(record.workloadRoles)) return value;
+
+  return {
+    ...record,
+    workloadRoles: record.workloadRoles,
+    workloadRoleMeaning:
+      record.workloadRoles.length === 0
+        ? generalPurposeWorkloadRoleMeaning
+        : record.workloadRoles.join(", "),
+  };
+}
+
+const runServerRead = <T>(
+  message: Result<AppQuery<T>>,
+): Effect.Effect<void, DomainError, CliRuntime> =>
+  Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const query = yield* resultToEffect(message);
+    const result = yield* Effect.promise(() => cli.executeQuery(query));
+    const output = yield* resultToEffect(result);
+    yield* print(renderServerWorkloadRoles(output));
+  });
+
 const registerCommand = EffectCommand.make(
   "register",
   {
@@ -83,8 +143,9 @@ const registerCommand = EffectCommand.make(
     port: portOption,
     provider: providerOption,
     targetKind: targetKindOption,
+    workloadRoles: workloadRoleOption,
   },
-  ({ host, name, port, provider, targetKind }) =>
+  ({ host, name, port, provider, targetKind, workloadRoles }) =>
     runCommand(
       RegisterServerCommand.create({
         name,
@@ -93,13 +154,14 @@ const registerCommand = EffectCommand.make(
         providerKey: provider,
         proxyKind: "traefik",
         targetKind,
+        workloadRoles,
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverRegister));
 
-const listCommand = EffectCommand.make("list", {}, () => runQuery(ListServersQuery.create())).pipe(
-  EffectCommand.withDescription(cliCommandDescriptions.serverList),
-);
+const listCommand = EffectCommand.make("list", {}, () =>
+  runServerRead(ListServersQuery.create()),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverList));
 
 const showCommand = EffectCommand.make(
   "show",
@@ -107,12 +169,27 @@ const showCommand = EffectCommand.make(
     serverId: serverIdArg,
   },
   ({ serverId }) =>
-    runQuery(
+    runServerRead(
       ShowServerQuery.create({
         serverId,
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverShow));
+
+const configureWorkloadRolesCommand = EffectCommand.make(
+  "configure-workload-roles",
+  {
+    serverId: serverIdArg,
+    workloadRoles: workloadRoleOption,
+  },
+  ({ serverId, workloadRoles }) =>
+    runCommand(
+      ConfigureServerWorkloadRolesCommand.create({
+        serverId,
+        workloadRoles,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverConfigureWorkloadRoles));
 
 const renameCommand = EffectCommand.make(
   "rename",
@@ -551,6 +628,7 @@ export const serverCommand = EffectCommand.make("server").pipe(
     registerCommand,
     listCommand,
     showCommand,
+    configureWorkloadRolesCommand,
     renameCommand,
     reorderCommand,
     deactivateCommand,

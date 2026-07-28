@@ -43,6 +43,7 @@ import {
   type ConfigureScheduledTaskCommandInput,
   type ConfigureServerCredentialCommandInput,
   type ConfigureServerEdgeProxyCommandInput,
+  type ConfigureServerWorkloadRolesCommandInput,
   type ConfigureStorageVolumeBackupPolicyCommandInput,
   type ConfigureStorageVolumeBackupPolicyResponse,
   type ConfirmDomainBindingOwnershipCommandInput,
@@ -307,6 +308,7 @@ import {
   type ConfigureRuntimeMonitoringThresholdsResponse,
   type ConfigureScheduledRuntimePrunePolicyResponse,
   type ConfigureServerEdgeProxyResponse,
+  type ConfigureServerWorkloadRolesResponse,
   type ConfirmDomainBindingOwnershipResponse,
   type ConnectorCapabilityApplyResponse,
   type ConnectorCapabilityPlanResponse,
@@ -1356,6 +1358,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ConfigureServerEdgeProxyCommandInput,
       ConfigureServerEdgeProxyResponse,
+      AppaloftClientError
+    >;
+    configureWorkloadRoles: Client<
+      AppaloftClientContext,
+      ConfigureServerWorkloadRolesCommandInput,
+      ConfigureServerWorkloadRolesResponse,
       AppaloftClientError
     >;
     deactivate: Client<

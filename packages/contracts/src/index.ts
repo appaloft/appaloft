@@ -634,6 +634,12 @@ export const deleteProjectResponseSchema = z.object({
   id: z.string(),
 });
 
+export const serverWorkloadRoleSchema = z.enum([
+  "deployment-runtime",
+  "artifact-builder",
+  "sandbox-worker",
+]);
+
 export const serverSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -641,6 +647,7 @@ export const serverSummarySchema = z.object({
   port: z.number(),
   providerKey: z.string(),
   targetKind: z.enum(["single-server", "orchestrator-cluster"]),
+  workloadRoles: z.array(serverWorkloadRoleSchema),
   lifecycleStatus: z.enum(["active", "inactive"]),
   deactivatedAt: z.string().optional(),
   deactivationReason: z.string().optional(),
@@ -680,6 +687,18 @@ export const registerServerInputSchema = z.object({
   host: z.string().min(1),
   port: z.number().int().positive().optional(),
   providerKey: z.string().min(1),
+  workloadRoles: z
+    .array(serverWorkloadRoleSchema)
+    .superRefine((roles, context) => {
+      if (new Set(roles).size !== roles.length) {
+        context.addIssue({
+          code: "custom",
+          message: "Server workload roles must not contain duplicates",
+        });
+      }
+    })
+    .optional()
+    .default([]),
   targetKind: z.enum(["single-server", "orchestrator-cluster"]).optional().default("single-server"),
   proxyKind: z.enum(["none", "traefik", "caddy"]).default("traefik"),
 });
@@ -726,6 +745,23 @@ export const configureServerEdgeProxyResponseSchema = z.object({
     kind: z.enum(["none", "traefik", "caddy"]),
     status: z.enum(["pending", "starting", "ready", "failed", "disabled"]),
   }),
+});
+
+export const configureServerWorkloadRolesInputSchema = z.object({
+  serverId: z.string().min(1),
+  workloadRoles: z.array(serverWorkloadRoleSchema).superRefine((roles, context) => {
+    if (new Set(roles).size !== roles.length) {
+      context.addIssue({
+        code: "custom",
+        message: "Server workload roles must not contain duplicates",
+      });
+    }
+  }),
+});
+
+export const configureServerWorkloadRolesResponseSchema = z.object({
+  workloadRoles: z.array(serverWorkloadRoleSchema),
+  changed: z.boolean(),
 });
 
 export const deactivateServerInputSchema = z.object({
@@ -901,6 +937,7 @@ export const showSshCredentialResponseSchema = sshCredentialDetailSchema;
 
 export const registerServerResponseSchema = z.object({
   id: z.string(),
+  workloadRoles: z.array(serverWorkloadRoleSchema),
 });
 
 export const listServersResponseSchema = z.object({
@@ -5846,6 +5883,7 @@ export const deploymentPlanReasonCodeSchema = z.enum([
   "buildpack-preview-limited",
   "dependency-runtime-injection-blocked",
   "environment-profile-decision-pending",
+  "server-workload-role-mismatch",
 ]);
 
 const deploymentPlanReasonPathSchema = z.object({
@@ -5902,23 +5940,25 @@ export const deploymentPlanResponseSchema = z.object({
     ready: z.boolean(),
     reasonCodes: z.array(deploymentPlanReasonCodeSchema),
   }),
-  source: z.object({
-    kind: runtimePlanSchema.shape.source.shape.kind,
-    displayName: z.string(),
-    locator: z.string(),
-    runtimeFamily: z.string().optional(),
-    framework: z.string().optional(),
-    packageManager: z.string().optional(),
-    applicationShape: z.string().optional(),
-    runtimeVersion: z.string().optional(),
-    projectName: z.string().optional(),
-    detectedFiles: z.array(z.string()),
-    detectedScripts: z.array(z.string()),
-    dockerfilePath: z.string().optional(),
-    composeFilePath: z.string().optional(),
-    jarPath: z.string().optional(),
-    reasoning: z.array(z.string()),
-  }),
+  source: z
+    .object({
+      kind: runtimePlanSchema.shape.source.shape.kind,
+      displayName: z.string(),
+      locator: z.string(),
+      runtimeFamily: z.string().optional(),
+      framework: z.string().optional(),
+      packageManager: z.string().optional(),
+      applicationShape: z.string().optional(),
+      runtimeVersion: z.string().optional(),
+      projectName: z.string().optional(),
+      detectedFiles: z.array(z.string()),
+      detectedScripts: z.array(z.string()),
+      dockerfilePath: z.string().optional(),
+      composeFilePath: z.string().optional(),
+      jarPath: z.string().optional(),
+      reasoning: z.array(z.string()),
+    })
+    .optional(),
   planner: z.object({
     plannerKey: z.string(),
     supportTier: z.enum([
@@ -7565,6 +7605,9 @@ export type ShowServerInput = z.infer<typeof showServerInputSchema>;
 export type RenameServerInput = z.infer<typeof renameServerInputSchema>;
 export type ReorderServersInput = z.infer<typeof reorderServersInputSchema>;
 export type ConfigureServerEdgeProxyInput = z.infer<typeof configureServerEdgeProxyInputSchema>;
+export type ConfigureServerWorkloadRolesInput = z.infer<
+  typeof configureServerWorkloadRolesInputSchema
+>;
 export type DeactivateServerInput = z.infer<typeof deactivateServerInputSchema>;
 export type DeleteServerInput = z.infer<typeof deleteServerInputSchema>;
 export type CheckServerDeleteSafetyInput = z.infer<typeof checkServerDeleteSafetyInputSchema>;
@@ -7665,6 +7708,9 @@ export type ShowRetentionDefaultResponse = z.infer<typeof showRetentionDefaultRe
 export type RenameServerResponse = z.infer<typeof renameServerResponseSchema>;
 export type ConfigureServerEdgeProxyResponse = z.infer<
   typeof configureServerEdgeProxyResponseSchema
+>;
+export type ConfigureServerWorkloadRolesResponse = z.infer<
+  typeof configureServerWorkloadRolesResponseSchema
 >;
 export type DeactivateServerResponse = z.infer<typeof deactivateServerResponseSchema>;
 export type DeleteServerResponse = z.infer<typeof deleteServerResponseSchema>;

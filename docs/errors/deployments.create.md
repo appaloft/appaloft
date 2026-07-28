@@ -50,6 +50,7 @@ type DeploymentCreateErrorDetails = {
     | "config-capability-resolution"
     | "context-resolution"
     | "server-lifecycle-guard"
+    | "server-workload-role-guard"
     | "operation-coordination"
     | "redeploy-guard"
     | "admission-conflict"
@@ -87,6 +88,8 @@ type DeploymentCreateErrorDetails = {
   resourceId?: string;
   serverId?: string;
   destinationId?: string;
+  requiredRole?: "deployment-runtime" | "artifact-builder" | "sandbox-worker";
+  workloadRoles?: Array<"deployment-runtime" | "artifact-builder" | "sandbox-worker">;
   resourceSourceKind?: string;
   runtimePlanStrategy?: string;
   runtimeFamily?: string;
@@ -152,6 +155,7 @@ Admission errors reject the command and return `err(DomainError)`.
 | `unsupported_config_field` | `config-capability-resolution` | No | Repository config requested a known future capability that Appaloft cannot enforce yet, such as CPU, memory, replicas, restart policy, rollout overlap, or rollout drain. |
 | `not_found` | `context-resolution` | No | Entity type, entity id, `commandName`, `phase`. |
 | `server_inactive` | `server-lifecycle-guard` | No | Server id, lifecycle status, `commandName`, `phase`, and deactivation timestamp when available. |
+| `server_workload_role_mismatch` | `server-workload-role-guard` | No | `commandName`, `serverId`, `requiredRole = "deployment-runtime"`, and the server's normalized `workloadRoles`. An empty set is unrestricted and does not produce this error. |
 | `coordination_timeout` | `operation-coordination` | Yes | Bounded waiting for the logical `resource-runtime` coordination scope elapsed before admission could proceed. Details should include `coordinationScopeKind`, safe `coordinationScope`, `coordinationMode`, `waitedSeconds`, and retry hint fields when available. |
 | `deployment_not_redeployable` | `redeploy-guard` | No | Existing or concurrently-admitted deployment id when available, resource id, current deployment status, and safe cause metadata when a concurrent submit lost the atomic active-attempt race or another request won the supersede race first. |
 | `conflict` | `supersede-previous-deployment` | No | The later request could not safely cancel the previous active deployment before taking ownership. |
@@ -163,6 +167,13 @@ Admission errors reject the command and return `err(DomainError)`.
 | `runtime_target_resource_exhausted` | `image-build`, `runtime-target-apply`, `runtime-target-observation` | Yes after cleanup, prune, or target resize | Capacity resource such as disk, inode, memory, CPU, or build cache; safe target/destination/path, available capacity, and Docker/build-cache reclaimable capacity when available. |
 | `provider_error` | `runtime-target-resolution`, `runtime-target-render`, `runtime-target-apply`, `runtime-target-observation` | Conditional | Runtime target backend key, provider key, operation, missing capability, and sanitized cause. |
 | `default_access_route_unavailable` | `default-access-policy-resolution`, `default-access-domain-generation`, `proxy-readiness`, `route-snapshot-resolution` | Conditional | Generated default access route is required but cannot be resolved before safe acceptance. |
+
+`server_inactive` and `server_workload_role_mismatch` are distinct admission failures. Lifecycle is
+checked independently and an inactive server returns `server_inactive` even when its roles include
+`deployment-runtime`. An active server whose non-empty set omits `deployment-runtime` returns
+`server_workload_role_mismatch` before a Deployment attempt is created, an event is published, or
+runtime, artifact, proxy, or provider effects begin. Passing role admission does not bypass later
+readiness, capability, provider, target-kind, or private-policy checks.
 
 If the selected target has no edge proxy intent, or explicitly disables the proxy, generated default access is optional and the deployment may proceed without `default_access_route_unavailable`. That path must not create a direct host-port fallback.
 
@@ -238,7 +249,13 @@ UI, CLI, HTTP API, background workers, and event consumers must use the shared m
 - display the deployment id when present;
 - distinguish admission failure from accepted deployment failure;
 - expose latest deployment terminal state and retry eligibility from durable state/read models;
-- avoid using progress stream messages as the error contract.
+- avoid using progress stream messages as the error contract;
+- map `server_workload_role_mismatch` at `server-workload-role-guard` without parsing `message`;
+- recover by selecting a server with `[]` or `deployment-runtime`, or by replacing the selected
+  server's workload-role set through `servers.configure-workload-roles`, then submit a new create
+  request;
+- do not suggest automatic retry for a non-retriable mismatch or describe `artifact-builder` as
+  remote build readiness.
 
 ## Test Assertions
 

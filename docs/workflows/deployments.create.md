@@ -18,6 +18,9 @@ This workflow inherits:
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
+- [ADR-101: Server Workload Role Admission](../decisions/ADR-101-server-workload-role-admission.md)
+- [Server Workload Roles Spec](../specs/118-server-workload-roles/spec.md)
+- [Server Workload Role Test Matrix](../testing/server-workload-role-test-matrix.md)
 - [ADR-028: Command Coordination Scope And Mutation Admission](../decisions/ADR-028-command-coordination-scope-and-mutation-admission.md)
 - [Workload Framework Detection And Planning](./workload-framework-detection-and-planning.md)
 - [Repository Deployment Config File Bootstrap](./deployment-config-file-bootstrap.md)
@@ -36,7 +39,8 @@ user intent
   -> optional repository config file discovery and profile normalization by local entry workflows
   -> explicit project/environment/server/resource selection or creation
   -> explicit deployments.create command input with ids only
-  -> command admission
+  -> command admission resolves the selected server and applies active lifecycle admission
+  -> require deployment-runtime role ([] remains unrestricted by role)
   -> resolve resource network/access snapshots from resource, server, domain, and default access policy state
   -> copy active Resource dependency binding safe references into the deployment attempt snapshot
   -> deployment-requested
@@ -60,6 +64,13 @@ persists that commit with the deployment attempt. Web and CLI read surfaces must
 commit so a redeploy of a moving branch can be distinguished from the previous attempt.
 
 Retry is an explicit retry command or job that creates a new deployment attempt.
+
+Deployment plan preview and creation must share the same lifecycle-then-role admission. A selected
+non-empty role set without `deployment-runtime` makes preview expose a structured blocker and makes
+create fail with `server_workload_role_mismatch` at phase `server-workload-role-guard`, before an
+attempt is accepted, a runtime plan is resolved, or any backend effect occurs. Explicit selection
+must not fall back to that mismatched server. A role match or `[]` only passes the role gate;
+readiness, capability, provider, destination, and other admission rules remain mandatory.
 
 Write-side admission must preserve one active deployment attempt per resource as an atomic durable
 invariant. Entry workflows may pre-read latest deployment state to give fast feedback, but durable
@@ -202,6 +213,10 @@ The workflow must select a runtime target backend from the deployment target, de
 key, target kind, and required capabilities. Entry workflows must not collect orchestrator-specific
 fields for `deployments.create`.
 
+Server Workload Roles are not backend capabilities or routing keys. The application passes only an
+already admitted placement across the adapter seam; runtime target backends must not inspect mutable
+role policy.
+
 Allowed target backend progression:
 
 - v1 active: single-server Docker/Compose through local shell or generic SSH.
@@ -319,6 +334,10 @@ The accepted deployment state should include:
 - when applicable, the explicit `supersedesDeploymentId` for the previous same-resource
   runtime-owning deployment that may be cleaned up after terminal success.
 
+The snapshot does not copy the selected Server's mutable workload-role policy. Later role
+replacement affects only new placement: accepted, running, and historical snapshots remain valid
+and continue under their existing lifecycle and recovery contracts.
+
 ## Current Implementation Notes And Governed Follow-Ups
 
 Current implementation already routes API and CLI through the shared command.
@@ -348,6 +367,13 @@ Governed follow-ups:
 - runtime target execution selection now uses the target kind/provider/capability registry for
   local-shell, generic-SSH, and Docker Swarm backends; admission-time unsupported-target checks
   reject unregistered or future backends such as Kubernetes before acceptance.
+- deployment plan preview and create now apply the same active-lifecycle then
+  `deployment-runtime` guard before runtime-plan/backend effects; mismatch is reported as
+  `server_workload_role_mismatch` at `server-workload-role-guard`, and existing snapshots are not
+  reinterpreted after role changes.
+- `artifact-builder` is persisted intent only; this deployment workflow does not claim a separate
+  builder execution path. Registered-Server Sandbox placement remains blocked on its neutral
+  Server-aware placement contract, and role configuration owns no drain behavior.
 - repository config file support now has a profile-only parser/schema, YAML discovery, CLI
   `--config`, profile-only `appaloft init`, targeted rejection coverage for identity, secret, and
   unsupported fields, and ids-only `deployments.create` admission. Existing-resource profile drift

@@ -3030,6 +3030,18 @@ export const i18nKeys = {
       sshPublicKeyHint: "console:serverForm.sshPublicKeyHint",
       sshUsername: "console:serverForm.sshUsername",
       sshUsernameHint: "console:serverForm.sshUsernameHint",
+      workloadRoleArtifactBuilder: "console:serverForm.workloadRoleArtifactBuilder",
+      workloadRoleArtifactBuilderDescription:
+        "console:serverForm.workloadRoleArtifactBuilderDescription",
+      workloadRoleDeploymentRuntime: "console:serverForm.workloadRoleDeploymentRuntime",
+      workloadRoleDeploymentRuntimeDescription:
+        "console:serverForm.workloadRoleDeploymentRuntimeDescription",
+      workloadRoleSandboxWorker: "console:serverForm.workloadRoleSandboxWorker",
+      workloadRoleSandboxWorkerDescription:
+        "console:serverForm.workloadRoleSandboxWorkerDescription",
+      workloadRolesDescription: "console:serverForm.workloadRolesDescription",
+      workloadRolesGeneralPurpose: "console:serverForm.workloadRolesGeneralPurpose",
+      workloadRolesTitle: "console:serverForm.workloadRolesTitle",
     },
     servers: {
       capacityApplyAction: "console:servers.capacityApplyAction",
@@ -3236,6 +3248,22 @@ export const i18nKeys = {
       savedCredentialLibraryEmptyBody: "console:servers.savedCredentialLibraryEmptyBody",
       savedCredentialLibraryEmptyTitle: "console:servers.savedCredentialLibraryEmptyTitle",
       savedCredentialLibraryTitle: "console:servers.savedCredentialLibraryTitle",
+      workloadRoleArtifactBuilder: "console:servers.workloadRoleArtifactBuilder",
+      workloadRoleArtifactBuilderDescription:
+        "console:servers.workloadRoleArtifactBuilderDescription",
+      workloadRoleDeploymentRuntime: "console:servers.workloadRoleDeploymentRuntime",
+      workloadRoleDeploymentRuntimeDescription:
+        "console:servers.workloadRoleDeploymentRuntimeDescription",
+      workloadRoleSandboxWorker: "console:servers.workloadRoleSandboxWorker",
+      workloadRoleSandboxWorkerDescription: "console:servers.workloadRoleSandboxWorkerDescription",
+      workloadRolesGeneralPurpose: "console:servers.workloadRolesGeneralPurpose",
+      workloadRolesNewPlacementOnly: "console:servers.workloadRolesNewPlacementOnly",
+      workloadRolesSaveChanged: "console:servers.workloadRolesSaveChanged",
+      workloadRolesSaveFailed: "console:servers.workloadRolesSaveFailed",
+      workloadRolesSaveSucceeded: "console:servers.workloadRolesSaveSucceeded",
+      workloadRolesSaveUnchanged: "console:servers.workloadRolesSaveUnchanged",
+      workloadRolesSettingsDescription: "console:servers.workloadRolesSettingsDescription",
+      workloadRolesTitle: "console:servers.workloadRolesTitle",
     },
     shell: {
       connections: "console:shell.connections",

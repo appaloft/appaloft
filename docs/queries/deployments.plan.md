@@ -28,6 +28,10 @@ deployment lifecycle events, or execute build/run/verify/proxy work.
 - [Buildpack Accelerator Contract And Preview Guardrails](../specs/017-buildpack-accelerator-contract-and-preview-guardrails/spec.md)
 - [Runtime Plan Resolution Unsupported/Override Contract](../specs/018-runtime-plan-resolution-unsupported-override-contract/spec.md)
 - [Deployment Runtime Substrate Plan](../implementation/deployment-runtime-substrate-plan.md)
+- [ADR-101: Server Workload Role Admission](../decisions/ADR-101-server-workload-role-admission.md)
+- [Server Workload Roles Spec](../specs/118-server-workload-roles/spec.md)
+- [Server Workload Role Test Matrix](../testing/server-workload-role-test-matrix.md)
+- [Deployment Plan Preview Error Spec](../errors/deployments.plan.md)
 - ADR-010, ADR-012, ADR-014, ADR-016, ADR-021, ADR-023
 - [Error Model](../errors/model.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -93,7 +97,8 @@ type DeploymentPlanBlockedReason = {
     | "runtime-plan-resolution"
     | "runtime-artifact-resolution"
     | "resource-network-resolution"
-    | "runtime-target-resolution";
+    | "runtime-target-resolution"
+    | "server-workload-role-guard";
   reasonCode: string;
   message: string;
   evidence: unknown[];
@@ -111,6 +116,36 @@ type DeploymentPlanBlockedReason = {
 codes may appear in evidence/details only when the shared code is also present for parity across
 CLI, API, Web, and future MCP/tool metadata.
 
+A selected server with a non-empty `workloadRoles` set that lacks `deployment-runtime` is a known
+planning blocker, not an infrastructure failure. The query must return `ok(...)` with
+`readiness.status = "blocked"` and a structured role reason before runtime-plan resolution or any
+effect:
+
+```ts
+{
+  phase: "server-workload-role-guard",
+  reasonCode: "server_workload_role_mismatch",
+  message: string,
+  evidence: [
+    {
+      commandName: "deployments.create",
+      serverId: string,
+      requiredRole: "deployment-runtime",
+      workloadRoles: ServerWorkloadRole[]
+    }
+  ],
+  fixPath: DeploymentPlanNextAction[],
+  overridePath: []
+}
+```
+
+The safe details are the selected `serverId`, required role, and normalized configured set. The
+fix path tells the caller to choose or configure a server whose set is `[]` (general-purpose and
+unrestricted by role) or includes `deployment-runtime`, then rerun the preview. There is no preview
+override or fallback to the mismatched server. Role admission never bypasses the independent server
+lifecycle, readiness, runtime capability, provider, isolation, health, capacity, or private-policy
+gates.
+
 ## Failure Semantics
 
 Whole-query `err` results are reserved for invalid input, missing/invisible context, permission
@@ -124,6 +159,12 @@ Dependency binding not-ready or missing-reference diagnostics do not block this 
 `deployments.plan` because runtime env injection remains deferred. The query may return a blocked
 dependency binding snapshot readiness inside the dependency binding section while the overall plan
 remains governed by source/runtime/network/target readiness.
+
+The role mismatch is the specified blocked-preview exception to whole-query error handling. It uses
+the same stable code and phase as `deployments.create`, while preview remains read-only: it creates
+no Deployment attempt or snapshot, publishes no event, calls no runtime-plan/backend effect, and
+does not mutate the selected server. `server_inactive` remains a distinct lifecycle failure and
+must not be reused for role mismatch.
 
 ## Entrypoints
 
@@ -140,6 +181,11 @@ remains governed by source/runtime/network/target readiness.
   docs/help, and targeted contract coverage.
 - The query shares the runtime planning boundary with `deployments.create` and stops before attempt
   creation, event publication, or runtime execution.
+- The accepted preview contract requires a mismatched selected server to produce the specified
+  blocked preview with `server_workload_role_mismatch` at `server-workload-role-guard`; `[]` and
+  sets containing `deployment-runtime` proceed to all later independent planning gates.
+- `artifact-builder` remains declaration intent only, and `sandbox-worker` enforcement remains
+  blocked until the neutral Server-aware Sandbox placement contract exists.
 - The preview contract has catalog parity rows for ready and blocked JavaScript/TypeScript planner
   output and ready and blocked Python planner output, including ASGI/WSGI app-target remediation
   reason codes.

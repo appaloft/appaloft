@@ -98,6 +98,7 @@ import {
   type Server,
   type ServerMutationSpec,
   type ServerSelectionSpec,
+  type ServerWorkloadRole,
   type SourceDescriptor,
   type SourceKind,
   type SourceRepositoryAccessSnapshot,
@@ -1671,6 +1672,7 @@ export interface ServerSummary {
   port: number;
   providerKey: string;
   targetKind: TargetKind;
+  workloadRoles: ServerWorkloadRole[];
   lifecycleStatus: "active" | "inactive";
   deactivatedAt?: string;
   deactivationReason?: string;
@@ -5618,7 +5620,8 @@ export type DeploymentPlanReasonCode =
   | "buildpack-start-intent-missing"
   | "buildpack-preview-limited"
   | "dependency-runtime-injection-blocked"
-  | "environment-profile-decision-pending";
+  | "environment-profile-decision-pending"
+  | "server-workload-role-mismatch";
 
 export interface DeploymentPlanReason {
   code: DeploymentPlanReasonCode;
@@ -5675,7 +5678,7 @@ export interface DeploymentPlanPreview {
     ready: boolean;
     reasonCodes: DeploymentPlanReasonCode[];
   };
-  source: {
+  source?: {
     kind: SourceKind;
     displayName: string;
     locator: string;

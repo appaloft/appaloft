@@ -4,12 +4,14 @@ import { describe, expect, test } from "bun:test";
 import {
   BuildStrategyKindValue,
   CreatedAt,
+  DeactivatedAt,
   DependencyResourceSecretRef,
   DependencyResourceSourceModeValue,
   DeploymentTarget,
   DeploymentTargetDescriptor,
   DeploymentTargetId,
   DeploymentTargetName,
+  DeploymentTargetWorkloadRoles,
   Destination,
   DestinationId,
   DestinationKindValue,
@@ -227,6 +229,9 @@ async function createHarness(input?: {
   pendingProfileDecision?: boolean;
   disabledGeneratedAccess?: boolean;
   domainBindings?: DomainRouteBindingCandidate[];
+  serverWorkloadRoles?: Parameters<typeof DeploymentTargetWorkloadRoles.rehydrate>[0];
+  inactiveServer?: boolean;
+  withoutSourceBinding?: boolean;
 }) {
   const testContext = context();
   const repositoryContext = toRepositoryContext(testContext);
@@ -261,8 +266,16 @@ async function createHarness(input?: {
     host: HostAddress.rehydrate("127.0.0.1"),
     port: PortNumber.rehydrate(22),
     providerKey: ProviderKey.rehydrate("generic-ssh"),
+    ...(input?.serverWorkloadRoles
+      ? { workloadRoles: DeploymentTargetWorkloadRoles.rehydrate(input.serverWorkloadRoles) }
+      : {}),
     createdAt,
   })._unsafeUnwrap();
+  if (input?.inactiveServer) {
+    server
+      .deactivate({ deactivatedAt: DeactivatedAt.rehydrate("2026-01-01T00:00:05.000Z") })
+      ._unsafeUnwrap();
+  }
   const destination = Destination.register({
     id: DestinationId.rehydrate("dst_demo"),
     serverId: DeploymentTargetId.rehydrate("srv_demo"),
@@ -284,11 +297,15 @@ async function createHarness(input?: {
     destinationId: DestinationId.rehydrate("dst_demo"),
     name: ResourceName.rehydrate("web"),
     kind: ResourceKindValue.rehydrate("application"),
-    sourceBinding: {
-      kind: SourceKindValue.rehydrate("local-folder"),
-      locator: SourceLocator.rehydrate("."),
-      displayName: DisplayNameText.rehydrate("workspace"),
-    },
+    ...(input?.withoutSourceBinding
+      ? {}
+      : {
+          sourceBinding: {
+            kind: SourceKindValue.rehydrate("local-folder"),
+            locator: SourceLocator.rehydrate("."),
+            displayName: DisplayNameText.rehydrate("workspace"),
+          },
+        }),
     runtimeProfile: {
       strategy: RuntimePlanStrategyValue.rehydrate("auto"),
       runtimeName: RuntimeNameText.rehydrate("www"),
@@ -442,6 +459,88 @@ function unwrap(
 }
 
 describe("DeploymentPlanQueryService", () => {
+  test("[SRV-ROLE-007] admits general-purpose and deployment-runtime servers to plan preview", async () => {
+    const generalPurpose = await createHarness();
+    const deploymentRuntime = await createHarness({
+      serverWorkloadRoles: ["deployment-runtime"],
+    });
+
+    expect(
+      (await generalPurpose.service.execute(generalPurpose.context, generalPurpose.query)).isOk(),
+    ).toBe(true);
+    expect(
+      (
+        await deploymentRuntime.service.execute(deploymentRuntime.context, deploymentRuntime.query)
+      ).isOk(),
+    ).toBe(true);
+    expect(generalPurpose.runtimePlanResolver.input).toBeDefined();
+    expect(deploymentRuntime.runtimePlanResolver.input).toBeDefined();
+  });
+
+  test("[SRV-ROLE-006][SRV-ROLE-007] returns a blocked plan preview when the selected server lacks deployment-runtime", async () => {
+    const harness = await createHarness({ serverWorkloadRoles: ["artifact-builder"] });
+
+    const result = await harness.service.execute(harness.context, harness.query);
+
+    expect(result.isOk()).toBe(true);
+    const preview = unwrap(result);
+    expect(preview.readiness).toEqual({
+      status: "blocked",
+      ready: false,
+      reasonCodes: ["server-workload-role-mismatch"],
+    });
+    expect(preview.unsupportedReasons).toContainEqual(
+      expect.objectContaining({
+        code: "server-workload-role-mismatch",
+        reasonCode: "server-workload-role-mismatch",
+        phase: "server-workload-role-guard",
+        fixPath: [
+          expect.objectContaining({
+            kind: "command",
+            targetOperation: "servers.configure-workload-roles",
+          }),
+        ],
+        overridePath: [],
+      }),
+    );
+    expect(harness.runtimePlanResolver.input).toBeUndefined();
+  });
+
+  test("[SRV-ROLE-006][SRV-ROLE-007] returns the role blocker before source resolution", async () => {
+    const harness = await createHarness({
+      serverWorkloadRoles: ["artifact-builder"],
+      withoutSourceBinding: true,
+    });
+
+    const result = await harness.service.execute(harness.context, harness.query);
+
+    expect(result.isOk()).toBe(true);
+    const preview = unwrap(result);
+    expect(preview.readiness.reasonCodes).toEqual(["server-workload-role-mismatch"]);
+    expect(preview.source).toBeUndefined();
+    expect(harness.runtimePlanResolver.input).toBeUndefined();
+  });
+
+  test("[SRV-ROLE-007][SRV-LIFE-DEACT-004] propagates inactive server rejection instead of returning a blocked preview", async () => {
+    const harness = await createHarness({
+      inactiveServer: true,
+      serverWorkloadRoles: ["artifact-builder"],
+    });
+
+    const result = await harness.service.execute(harness.context, harness.query);
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "server_inactive",
+      details: {
+        commandName: "deployments.create",
+        phase: "server-lifecycle-guard",
+        serverId: "srv_demo",
+      },
+    });
+    expect(harness.runtimePlanResolver.input).toBeUndefined();
+  });
+
   test("[RES-PROFILE-ACCESS-001] previews durable domains when generated access is disabled", async () => {
     const harness = await createHarness({
       disabledGeneratedAccess: true,

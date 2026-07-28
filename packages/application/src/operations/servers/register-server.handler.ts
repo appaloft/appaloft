@@ -4,12 +4,13 @@ import { CommandHandler, type CommandHandlerContract } from "../../cqrs";
 import { type ExecutionContext } from "../../execution-context";
 import { tokens } from "../../tokens";
 import { RegisterServerCommand } from "./register-server.command";
+import { type RegisterServerResult } from "./register-server.schema";
 import { type RegisterServerUseCase } from "./register-server.use-case";
 
 @CommandHandler(RegisterServerCommand)
 @injectable()
 export class RegisterServerCommandHandler
-  implements CommandHandlerContract<RegisterServerCommand, { id: string }>
+  implements CommandHandlerContract<RegisterServerCommand, RegisterServerResult>
 {
   constructor(
     @inject(tokens.registerServerUseCase)
@@ -21,6 +22,7 @@ export class RegisterServerCommandHandler
       name: command.name,
       host: command.host,
       providerKey: command.providerKey,
+      workloadRoles: command.workloadRoles,
       targetKind: command.targetKind,
       ...(typeof command.port === "number" ? { port: command.port } : {}),
       proxyKind: command.proxyKind,
