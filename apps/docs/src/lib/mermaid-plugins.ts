@@ -7,9 +7,6 @@
  * a separate instance — so we attach the same transforms here explicitly.
  */
 
-import { type Element, type Root as HastRoot } from "hast";
-import { type Root as MdastRoot } from "mdast";
-import { type Plugin } from "unified";
 import { visit } from "unist-util-visit";
 
 function escapeHtml(text: string): string {
@@ -29,31 +26,48 @@ function escapeHtml(text: string): string {
   });
 }
 
-/** Remark: ```mermaid → raw <pre class="mermaid"> HTML node. */
-export const remarkMermaid: Plugin<[], MdastRoot> = () => {
-  return (tree) => {
-    visit(tree, "code", (node, index, parent) => {
-      if (node.lang !== "mermaid" || parent == null || typeof index !== "number") {
-        return;
-      }
-
-      parent.children[index] = {
-        type: "html",
-        value: `<pre class="mermaid">${escapeHtml(node.value)}</pre>`,
-      };
-    });
-  };
+type TreeNode = {
+  type: string;
+  lang?: string;
+  value?: string;
+  tagName?: string;
+  children?: TreeNode[];
+  properties?: Record<string, unknown>;
 };
 
+type TreeParent = {
+  children: TreeNode[];
+};
+
+/** Remark: ```mermaid → raw <pre class="mermaid"> HTML node. */
+export function remarkMermaid() {
+  return (tree: TreeNode) => {
+    visit(
+      tree as never,
+      "code",
+      (node: TreeNode, index: number | undefined, parent: TreeParent | undefined) => {
+        if (node.lang !== "mermaid" || parent == null || typeof index !== "number") {
+          return;
+        }
+
+        parent.children[index] = {
+          type: "html",
+          value: `<pre class="mermaid">${escapeHtml(node.value ?? "")}</pre>`,
+        };
+      },
+    );
+  };
+}
+
 /** Rehype fallback: <pre><code class="language-mermaid"> → <pre class="mermaid">. */
-export const rehypeMermaid: Plugin<[], HastRoot> = () => {
-  return (tree) => {
-    visit(tree, "element", (node) => {
+export function rehypeMermaid() {
+  return (tree: TreeNode) => {
+    visit(tree as never, "element", (node: TreeNode) => {
       if (node.tagName !== "pre" || node.children?.length !== 1) {
         return;
       }
 
-      const codeNode = node.children[0] as Element | undefined;
+      const codeNode = node.children[0];
       if (!codeNode || codeNode.tagName !== "code") {
         return;
       }
@@ -70,7 +84,7 @@ export const rehypeMermaid: Plugin<[], HastRoot> = () => {
       }
 
       const text = (codeNode.children ?? [])
-        .map((child) => ("value" in child ? String(child.value ?? "") : ""))
+        .map((child) => (typeof child.value === "string" ? child.value : ""))
         .join("");
 
       node.properties = {
@@ -85,4 +99,4 @@ export const rehypeMermaid: Plugin<[], HastRoot> = () => {
       ];
     });
   };
-};
+}
