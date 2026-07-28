@@ -83,6 +83,10 @@ export interface OpenCodeSandboxAgentHarnessOptions {
   modelAccess?: OpenCodeSandboxModelAccessProvider;
 }
 
+type OpenCodeSandboxModelCapability = Awaited<
+  ReturnType<OpenCodeSandboxModelAccessProvider["issue"]>
+>;
+
 async function sha256(value: string): Promise<string> {
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return `sha256:${[...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
@@ -136,6 +140,53 @@ function normalizedCwd(value: string | undefined): string {
     throw new Error("OpenCode Sandbox cwd must remain below the workspace root");
   }
   return cwd || ".";
+}
+
+function validModelCapability(
+  capability: OpenCodeSandboxModelCapability,
+  minimumLifetimeMs: number,
+): boolean {
+  let modelGateway: URL | undefined;
+  try {
+    modelGateway = new URL(capability.baseUrl);
+  } catch {
+    modelGateway = undefined;
+  }
+  const capabilityExpiry = Date.parse(capability.expiresAt);
+  return Boolean(
+    /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,159}$/u.test(capability.capabilityId) &&
+      capability.accessToken &&
+      !/[\r\n\0]/u.test(capability.accessToken) &&
+      /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/u.test(capability.provider) &&
+      /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,159}$/u.test(capability.model) &&
+      modelGateway &&
+      ["http:", "https:"].includes(modelGateway.protocol) &&
+      modelGateway.hostname &&
+      !modelGateway.username &&
+      !modelGateway.password &&
+      !["localhost", "127.0.0.1", "::1"].includes(modelGateway.hostname.toLowerCase()) &&
+      Number.isFinite(capabilityExpiry) &&
+      capabilityExpiry > Date.now() + minimumLifetimeMs,
+  );
+}
+
+function modelConfig(capability: OpenCodeSandboxModelCapability): string {
+  return JSON.stringify({
+    model: `${capability.provider}/${capability.model}`,
+    provider: {
+      [capability.provider]: {
+        npm: "@ai-sdk/openai-compatible",
+        name: "Appaloft scoped model gateway",
+        options: {
+          baseURL: capability.baseUrl,
+          apiKey: "{env:APPALOFT_MODEL_ACCESS_TOKEN}",
+        },
+        models: {
+          [capability.model]: { name: capability.model },
+        },
+      },
+    },
+  });
 }
 
 export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
@@ -282,28 +333,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       ...input,
       runId: input.runtimeId,
     });
-    let modelGateway: URL | undefined;
-    try {
-      modelGateway = new URL(capability.baseUrl);
-    } catch {
-      modelGateway = undefined;
-    }
-    const capabilityExpiry = Date.parse(capability.expiresAt);
-    if (
-      !/^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,159}$/u.test(capability.capabilityId) ||
-      !capability.accessToken ||
-      /[\r\n\0]/u.test(capability.accessToken) ||
-      !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/u.test(capability.provider) ||
-      !/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,159}$/u.test(capability.model) ||
-      !modelGateway ||
-      !["http:", "https:"].includes(modelGateway.protocol) ||
-      !modelGateway.hostname ||
-      modelGateway.username ||
-      modelGateway.password ||
-      ["localhost", "127.0.0.1", "::1"].includes(modelGateway.hostname.toLowerCase()) ||
-      !Number.isFinite(capabilityExpiry) ||
-      capabilityExpiry <= Date.now() + (this.options.timeoutMs ?? 30 * 60_000)
-    ) {
+    if (!validModelCapability(capability, this.options.timeoutMs ?? 30 * 60_000)) {
       await modelAccess.revoke({
         ...input,
         runId: input.runtimeId,
@@ -311,22 +341,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       });
       throw new Error("opencode_model_access_invalid");
     }
-    const config = JSON.stringify({
-      model: `${capability.provider}/${capability.model}`,
-      provider: {
-        [capability.provider]: {
-          npm: "@ai-sdk/openai-compatible",
-          name: "Appaloft scoped model gateway",
-          options: {
-            baseURL: capability.baseUrl,
-            apiKey: "{env:APPALOFT_MODEL_ACCESS_TOKEN}",
-          },
-          models: {
-            [capability.model]: { name: capability.model },
-          },
-        },
-      },
-    });
+    const config = modelConfig(capability);
     const started = await this.execution.exec(input.executionContext, input.sandboxId, {
       argv: [
         "sh",
@@ -433,14 +448,25 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
 
   async execute(input: Parameters<SandboxAgentHarness["execute"]>[0]) {
     await this.prepareRuntime(input);
-    const marker = await this.execution.readFile(input.executionContext, input.sandboxId, {
-      path: this.serverMarkerPath(input.runtimeId),
+    const modelAccess = this.options.modelAccess;
+    if (!modelAccess) throw new Error("opencode_model_access_unavailable");
+    const capability = await modelAccess.issue({
+      executionContext: input.executionContext,
+      sandboxId: input.sandboxId,
+      runtimeId: input.runtimeId,
+      runId: input.runId,
     });
-    if (marker.isErr()) throw new Error(marker.error.message);
-    const server = this.parseServerMarker(new TextDecoder().decode(marker.value));
-    if (!server?.provider || !server.model) {
-      throw new Error("opencode_model_identity_unavailable");
+    if (!validModelCapability(capability, this.options.timeoutMs ?? 30 * 60_000)) {
+      await modelAccess.revoke({
+        executionContext: input.executionContext,
+        sandboxId: input.sandboxId,
+        runtimeId: input.runtimeId,
+        runId: input.runId,
+        capabilityId: capability.capabilityId,
+      });
+      throw new Error("opencode_model_access_invalid");
     }
+    const config = modelConfig(capability);
     const outputRoot = `.appaloft-agent/${input.runId}`;
     const stdoutPath = `${outputRoot}/stdout.jsonl`;
     const stderrPath = `${outputRoot}/stderr.log`;
@@ -451,7 +477,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
     const argv = [
       "sh",
       "-c",
-      'mkdir -p "$1"; out="$2"; err="$3"; status="$4"; shift 4; "$@" >"$out" 2>"$err"; code=$?; printf "%s" "$code" >"$status"',
+      'IFS= read -r config; IFS= read -r token; export OPENCODE_CONFIG_CONTENT="$config"; export APPALOFT_MODEL_ACCESS_TOKEN="$token"; mkdir -p "$1"; out="$2"; err="$3"; status="$4"; shift 4; "$@" >"$out" 2>"$err"; code=$?; printf "%s" "$code" >"$status"',
       "appaloft-opencode-run",
       outputRoot,
       stdoutPath,
@@ -462,12 +488,10 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       "XDG_DATA_HOME=/workspace/.local/share",
       this.executable,
       "run",
-      "--attach",
-      `http://127.0.0.1:${this.port}`,
       "--dir",
       this.cwd === "." ? "/workspace" : `/workspace/${this.cwd}`,
       "--model",
-      `${server.provider}/${server.model}`,
+      `${capability.provider}/${capability.model}`,
       "--format",
       "json",
       "--auto",
@@ -478,9 +502,26 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       argv,
       ...(this.cwd === "." ? {} : { cwd: this.cwd }),
       background: true,
+      stdin: new TextEncoder().encode(`${config}\n${capability.accessToken}\n`),
     });
-    if (result.isErr()) throw new Error(result.error.message);
+    if (result.isErr()) {
+      await modelAccess.revoke({
+        executionContext: input.executionContext,
+        sandboxId: input.sandboxId,
+        runtimeId: input.runtimeId,
+        runId: input.runId,
+        capabilityId: capability.capabilityId,
+      });
+      throw new Error(result.error.message);
+    }
     if (result.value.mode !== "background") {
+      await modelAccess.revoke({
+        executionContext: input.executionContext,
+        sandboxId: input.sandboxId,
+        runtimeId: input.runtimeId,
+        runId: input.runId,
+        capabilityId: capability.capabilityId,
+      });
       throw new Error("OpenCode harness requires a cancellable background process");
     }
     const active = {
@@ -556,6 +597,13 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       };
     } finally {
       this.active.delete(input.runId);
+      await modelAccess.revoke({
+        executionContext: input.executionContext,
+        sandboxId: input.sandboxId,
+        runtimeId: input.runtimeId,
+        runId: input.runId,
+        capabilityId: capability.capabilityId,
+      });
     }
   }
 
