@@ -6,6 +6,7 @@ import icon from "astro-icon";
 import mermaid from "astro-mermaid";
 import { type EnvironmentOptions, type Plugin } from "vite";
 import { docsBase, docsSite } from "./src/lib/config";
+import { rehypeMermaid, remarkMermaid } from "./src/lib/mermaid-plugins";
 import { sidebarItems } from "./src/lib/sidebar-config";
 
 /**
@@ -62,11 +63,18 @@ function keepSatteriNativeBindingExternal(): Plugin {
 }
 
 // ADR-101 Decision item 6/7: `unified(...)` from `@astrojs/markdown-remark`
-// replaces Nimbus's default Sätteri processor so `astro-mermaid` can render
-// through the standard remark/rehype ecosystem instead of a Sätteri-specific
-// Mermaid port. Do not switch back to Sätteri without first confirming an
-// equivalent Mermaid/remark-directive story exists there (see the ADR).
-const markdownProcessor = unified();
+// replaces Nimbus's default Sätteri processor so Mermaid fences can render
+// through the standard remark/rehype ecosystem.
+//
+// Important: Nimbus compiles MDX through the processor passed to
+// `nimbus(..., { markdown.processor })`, which is a *separate* instance from
+// Astro's top-level `markdown.processor`. `astro-mermaid` only patches Astro's
+// top-level processor, so Mermaid transforms must also be attached here or
+// ```mermaid fences stay as ordinary Shiki code blocks (language chip "MERM").
+const markdownProcessor = unified({
+  remarkPlugins: [remarkMermaid],
+  rehypePlugins: [rehypeMermaid],
+});
 
 const nimbusConfig = defineNimbusConfig({
   site: docsSite,
