@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.1](https://github.com/appaloft/appaloft/compare/v1.6.0...v1.6.1) (2026-07-28)
+
+
+### Bug Fixes
+
+* **sandbox:** compare allowlists semantically ([#853](https://github.com/appaloft/appaloft/issues/853)) ([24fc55b](https://github.com/appaloft/appaloft/commit/24fc55ba018668651bfb9fbc341d7284ba1204f3))
+
 ## [1.6.0](https://github.com/appaloft/appaloft/compare/v1.5.0...v1.6.0) (2026-07-28)
 
 
