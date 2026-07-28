@@ -15,6 +15,7 @@ import {
   parseDockerSizeToBytes,
   parseRuntimeTargetCapacityOutput,
   renderRuntimeTargetCapacityScript,
+  renderRuntimeTargetCapacityPruneScript,
   runtimeTargetCapacitySshConnectTimeoutSeconds,
   runtimeTargetCapacitySshProcessTimeoutMs,
 } from "../src/runtime-target-capacity";
@@ -44,6 +45,7 @@ describe("runtime target capacity diagnostics", () => {
     expect(rendered).toContain("docker system df");
     expect(rendered).toContain("docker inspect --size");
     expect(rendered).toContain("appaloft.managed=true");
+    expect(rendered).toContain("CAPACITY_APPALOFT_CONTAINER\t{{.Id}}\t{{.Name}}");
     expect(rendered).toContain("CAPACITY_APPALOFT_WORKSPACE");
     expect(rendered).toContain(".appaloft-rollback-candidate");
     expect(rendered).toContain("du -sk");
@@ -54,6 +56,30 @@ describe("runtime target capacity diagnostics", () => {
     expect(rendered).not.toContain("docker volume prune");
     expect(rendered).not.toContain(" rm ");
     expect(rendered).not.toContain("rm -rf");
+  });
+
+  test("[DEP-RUNTIME-004][DEP-RUNTIME-010] retries exact capacity cleanup and reads absence back", () => {
+    const rendered = ash.render(
+      renderRuntimeTargetCapacityPruneScript({
+        runtimeRoot: "/var/lib/appaloft/runtime",
+        before: "2026-01-01T00:00:00.000Z",
+        categories: ["stopped-containers"],
+        target: "appaloft-dep_previous",
+        dryRun: false,
+        includeOrphanRunning: true,
+        runtimeProtection: {
+          activeDeploymentIds: ["dep_current"],
+          rollbackCandidateDeploymentIds: ["dep_rollback"],
+        },
+      }),
+    );
+
+    expect(rendered).toContain('while [ "$cleanup_attempt" -le 3 ]');
+    expect(rendered).toContain('docker inspect "$exact_container_id"');
+    expect(rendered).toContain('docker rm -f "$exact_container_id"');
+    expect(rendered).toContain("exact-readback-failed");
+    expect(rendered).not.toContain("docker system prune");
+    expect(rendered).not.toContain("docker volume prune");
   });
 
   test("[RT-USAGE-002][RT-USAGE-004] renders a bounded attribution profile before expensive capacity checks", () => {

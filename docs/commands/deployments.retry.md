@@ -55,6 +55,11 @@ the value returned by `deployments.recovery-readiness` so the command can reject
 - Reject non-terminal or not-recoverable statuses with `deployment_not_retryable`.
 - Reject missing snapshot/runtime inputs with `deployment_not_retryable`.
 - Coordinate on `resource-runtime` so retry cannot race with create/redeploy/rollback.
+- Before admitting the new attempt, idempotently compensate the source attempt's exact runtime.
+  A retryable cleanup failure blocks admission; repeating `deployments.retry` retries the same
+  cleanup target without touching the previous succeeded runtime owner.
+- Resolve `supersedesDeploymentId` from the latest runtime-owning attempt, not merely the latest
+  terminal attempt.
 
 ## Accepted Result
 
@@ -72,3 +77,9 @@ The new attempt emits the normal deployment lifecycle events and may include:
 
 - `triggerKind: "retry"`;
 - `sourceDeploymentId` referencing the source failed/interrupted/canceled/superseded attempt.
+- `supersedesDeploymentId` referencing the previous runtime-owning attempt when one exists.
+
+Runtime ownership and compensation are governed by
+[Deployment Runtime Ownership Reconciliation](../specs/118-deployment-runtime-ownership-reconciliation/spec.md)
+and its
+[Test Matrix](../testing/deployment-runtime-ownership-reconciliation-test-matrix.md).

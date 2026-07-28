@@ -6,6 +6,7 @@ import {
   domainError,
   err,
   LatestDeploymentSpec,
+  LatestRuntimeOwningDeploymentSpec,
   ok,
   type Result,
   safeTry,
@@ -250,10 +251,17 @@ export class RetryDeploymentUseCase {
               );
             }
 
+            yield* await executionBackend.cancel(context, sourceDeployment);
+
+            const latestRuntimeOwningDeployment = await deploymentRepository.findOne(
+              repositoryContext,
+              LatestRuntimeOwningDeploymentSpec.forResource(sourceState.resourceId),
+            );
+
             const deployment = yield* deploymentFactory.createRetry({
               deployment: sourceDeployment,
-              ...(latestDeployment
-                ? { supersedesDeploymentId: latestDeployment.toState().id }
+              ...(latestRuntimeOwningDeployment
+                ? { supersedesDeploymentId: latestRuntimeOwningDeployment.toState().id }
                 : {}),
             });
             yield* deploymentLifecycleService.prepareForExecution(deployment);

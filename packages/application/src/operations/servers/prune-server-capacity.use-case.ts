@@ -146,15 +146,15 @@ export class PruneServerCapacityUseCase {
         includeArchived: true,
       });
       if (deployments.length === count && confirmedCount === count) {
-        const archivedResourceIds = await this.loadArchivedResourceIds(context, deployments);
-        return runtimeProtectionFromDeployments(deployments, archivedResourceIds);
+        const activeResourceIds = await this.loadActiveResourceIds(context, deployments);
+        return runtimeProtectionFromDeployments(deployments, activeResourceIds);
       }
     }
 
     throw new Error("Server deployment protection view changed while capacity prune was assembled");
   }
 
-  private async loadArchivedResourceIds(
+  private async loadActiveResourceIds(
     context: ReturnType<typeof toRepositoryContext>,
     deployments: readonly DeploymentSummary[],
   ): Promise<ReadonlySet<string>> {
@@ -164,7 +164,7 @@ export class PruneServerCapacityUseCase {
     const resources = await this.resourceReadModel.list(context, {
       resourceIds,
       includePreviewResources: true,
-      lifecycleStatus: "archived",
+      lifecycleStatus: "active",
       limit: resourceIds.length,
     });
 
@@ -224,7 +224,7 @@ const activeDeploymentStatuses = new Set<DeploymentSummary["status"]>([
 
 export function runtimeProtectionFromDeployments(
   deployments: readonly DeploymentSummary[],
-  archivedResourceIds: ReadonlySet<string> = new Set(),
+  activeResourceIds?: ReadonlySet<string>,
 ): {
   activeDeploymentIds: string[];
   rollbackCandidateDeploymentIds: string[];
@@ -245,7 +245,7 @@ export function runtimeProtectionFromDeployments(
 
     if (
       !resourcesWithRuntimeOwner.has(deployment.resourceId) &&
-      !archivedResourceIds.has(deployment.resourceId) &&
+      (activeResourceIds === undefined || activeResourceIds.has(deployment.resourceId)) &&
       (deployment.status === "succeeded" || deployment.status === "rolled-back")
     ) {
       resourcesWithRuntimeOwner.add(deployment.resourceId);

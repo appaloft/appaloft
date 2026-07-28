@@ -117,6 +117,28 @@ class FailingExecutionBackend implements ExecutionBackend {
   }
 }
 
+class RetryableCleanupExecutionBackend extends SuccessfulExecutionBackend {
+  cancelCalls = 0;
+
+  override async cancel(): ReturnType<ExecutionBackend["cancel"]> {
+    this.cancelCalls += 1;
+    if (this.cancelCalls === 1) {
+      return err(
+        domainError.provider(
+          "Exact failed-attempt cleanup did not converge",
+          {
+            phase: "runtime-cleanup",
+            cleanupStage: "candidate-compensation",
+          },
+          true,
+        ),
+      );
+    }
+
+    return ok({ timeline: [] });
+  }
+}
+
 class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
   readonly records: ProcessAttemptRecord[] = [];
 
@@ -249,6 +271,54 @@ function createUseCase(input?: {
 }
 
 describe("RetryDeploymentUseCase", () => {
+  test("[DEP-CREATE-ASYNC-012A] retry supersedes the previous runtime-owning attempt", async () => {
+    const { context, repository, useCase } = createUseCase();
+    const runtimeOwner = Deployment.rehydrate({
+      ...sourceDeployment("succeeded").toState(),
+      id: DeploymentId.rehydrate("dep_runtime_owner"),
+      createdAt: CreatedAt.rehydrate("2025-12-31T23:59:00.000Z"),
+      finishedAt: FinishedAt.rehydrate("2025-12-31T23:59:10.000Z"),
+    });
+    repository.items.set("dep_runtime_owner", runtimeOwner);
+
+    const result = await useCase.execute(context, {
+      deploymentId: "dep_source",
+      readinessGeneratedAt: "2026-01-01T00:00:12.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const retryDeployment = repository.items.get(result._unsafeUnwrap().id);
+    expect(retryDeployment?.toState().supersedesDeploymentId).toEqual(
+      DeploymentId.rehydrate("dep_runtime_owner"),
+    );
+  });
+
+  test("[DEP-RUNTIME-003][DEP-RUNTIME-004] retries failed-attempt compensation before admission", async () => {
+    const executionBackend = new RetryableCleanupExecutionBackend();
+    const { context, repository, useCase } = createUseCase({ executionBackend });
+
+    const first = await useCase.execute(context, {
+      deploymentId: "dep_source",
+      readinessGeneratedAt: "2026-01-01T00:00:12.000Z",
+    });
+    expect(first.isErr()).toBe(true);
+    expect(first._unsafeUnwrapErr()).toMatchObject({
+      code: "provider_error",
+      retryable: true,
+      details: {
+        cleanupStage: "candidate-compensation",
+      },
+    });
+    expect([...repository.items.keys()]).toEqual(["dep_source"]);
+
+    const second = await useCase.execute(context, {
+      deploymentId: "dep_source",
+      readinessGeneratedAt: "2026-01-01T00:00:12.000Z",
+    });
+    expect(second.isOk()).toBe(true);
+    expect(executionBackend.cancelCalls).toBe(2);
+  });
+
   test("[DEP-RETRY-001] PROC-DELIVERY-001 creates a new retry attempt from retained snapshot intent", async () => {
     const { context, processAttemptRecorder, repository, useCase } = createUseCase();
 

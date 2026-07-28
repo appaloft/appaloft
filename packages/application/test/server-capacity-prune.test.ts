@@ -408,7 +408,7 @@ describe("servers.capacity.prune", () => {
       {
         resourceIds: ["res_archived", "res_active"],
         includePreviewResources: true,
-        lifecycleStatus: "archived",
+        lifecycleStatus: "active",
         limit: 2,
       },
     ]);
@@ -416,6 +416,41 @@ describe("servers.capacity.prune", () => {
     expect(pruner.inputs[0]?.runtimeProtection).toEqual({
       activeDeploymentIds: ["dep_archived_in_flight", "dep_active_current"],
       rollbackCandidateDeploymentIds: ["dep_retained_rollback"],
+    });
+  });
+
+  test("[DEP-RUNTIME-006] missing Resource releases current-runtime-owner protection", async () => {
+    const pruner = new FakeCapacityPruner();
+    const resourceReadModel = new StaticResourceReadModel([]);
+    const useCase = createUseCase({
+      pruner,
+      resourceReadModel,
+      deployments: [
+        deploymentSummary({
+          id: "dep_orphan",
+          resourceId: "res_missing",
+          status: "succeeded",
+        }),
+      ],
+    });
+
+    const result = await useCase.execute(
+      createExecutionContext({ requestId: "req_missing_resource_prune", entrypoint: "system" }),
+      unwrap(
+        PruneServerCapacityCommand.create({
+          serverId: "srv_primary",
+          before: "2026-01-01T00:05:00.000Z",
+          categories: ["stopped-containers"],
+          target: "appaloft-dep_orphan",
+          includeOrphanRunning: true,
+        }),
+      ).input,
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(pruner.inputs[0]?.runtimeProtection).toEqual({
+      activeDeploymentIds: [],
+      rollbackCandidateDeploymentIds: [],
     });
   });
 
