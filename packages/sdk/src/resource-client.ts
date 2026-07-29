@@ -636,7 +636,7 @@ export function createAppaloftClient(options: AppaloftClientOptions): AppaloftCl
             networkPolicy: {
               mode: "allowlist" as const,
               rules: mergeNetworkRules(
-                resolvedSandbox.networkPolicy.mode === "allowlist"
+                resolvedSandbox.networkPolicy?.mode === "allowlist"
                   ? resolvedSandbox.networkPolicy.rules
                   : [],
                 repositoryNetworkRules(source.repository),
