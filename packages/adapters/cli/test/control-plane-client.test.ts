@@ -1739,6 +1739,32 @@ describe("CLI remote control-plane client", () => {
     });
   });
 
+  test("[WS-OPEN-REMOTE-018][CONTROL-PLANE-CLI-006] Profile-aware Workspace commands are remote-capable", async () => {
+    for (const argv of [
+      ["node", "appaloft", "workspace", "open", "."],
+      [
+        "node",
+        "appaloft",
+        "agent-workspace-profile",
+        "credential-connection",
+        "set",
+        "awpi_default",
+      ],
+      ["node", "appaloft", "repository-binding", "show"],
+    ]) {
+      expect(
+        (await resolveCliExecutionTarget({ argv, store: activeStore() }))._unsafeUnwrap(),
+      ).toMatchObject({
+        kind: "remote",
+        diagnostics: { effectiveMode: "self-hosted" },
+      });
+    }
+    expect(findControlPlaneOperation("workspaces.open")._unsafeUnwrap()).toMatchObject({
+      kind: "command",
+      route: { method: "POST", path: "/workspaces/open" },
+    });
+  });
+
   test("[CONTROL-PLANE-CLI-019] unknown top-level commands fail before runtime initialization", async () => {
     const argv = ["node", "appaloft", "deployment", "proof", "dep_123"];
     const results = await Promise.all([

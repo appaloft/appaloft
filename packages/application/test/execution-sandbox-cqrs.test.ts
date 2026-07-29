@@ -13,6 +13,8 @@ import {
   SandboxCommandHandler,
   SandboxQueryHandler,
   ShowSandboxProcessQuery,
+  TerminateSandboxCommand,
+  type WorkspaceOpenEntryRepository,
   WriteSandboxFileCommand,
 } from "../src";
 
@@ -54,6 +56,10 @@ function sandboxService() {
     async updateNetworkPolicy(_context: unknown, sandboxId: string, input: unknown) {
       calls.push({ operation: "updateNetworkPolicy", input: { sandboxId, input } });
       return ok({ sandboxId, networkPolicy: (input as { networkPolicy: unknown }).networkPolicy });
+    },
+    async terminate(_context: unknown, sandboxId: string) {
+      calls.push({ operation: "terminate", input: { sandboxId } });
+      return ok({ sandboxId, status: "terminated" });
     },
   } as unknown as ExecutionSandboxService;
   return { calls, service };
@@ -150,5 +156,23 @@ describe("execution sandbox CQRS boundary", () => {
       "showProcess",
       "updateNetworkPolicy",
     ]);
+  });
+
+  test("[WS-OPEN-CLEANUP-020] advances the preferred Workspace after Sandbox termination", async () => {
+    const fake = sandboxService();
+    const advanced: string[] = [];
+    const entries = {
+      async markWorkspaceTerminated(_context: unknown, sandboxId: string) {
+        advanced.push(sandboxId);
+        return ok({ advanced: true });
+      },
+    } as unknown as WorkspaceOpenEntryRepository;
+    const command = TerminateSandboxCommand.create({ sandboxId: "sbx_workspace" })._unsafeUnwrap();
+
+    const result = await new SandboxCommandHandler(fake.service, entries).handle(context, command);
+
+    expect(result.isOk()).toBe(true);
+    expect(fake.calls).toEqual([{ operation: "terminate", input: { sandboxId: "sbx_workspace" } }]);
+    expect(advanced).toEqual(["sbx_workspace"]);
   });
 });

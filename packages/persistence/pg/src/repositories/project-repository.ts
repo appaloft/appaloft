@@ -55,6 +55,8 @@ class KyselyProjectMutationVisitor
         archive_reason: spec.state.archiveReason?.value ?? null,
         deleted_at: spec.state.deletedAt?.value ?? null,
         display_order: spec.state.displayOrder.value,
+        default_workspace_profile_installation_id:
+          spec.state.defaultWorkspaceProfileInstallationId?.value ?? null,
         created_at: spec.state.createdAt.value,
       },
     };
@@ -95,6 +97,8 @@ export class PgProjectRepository implements ProjectRepository {
               archive_reason: mutation.values.archive_reason,
               deleted_at: mutation.values.deleted_at,
               display_order: mutation.values.display_order,
+              default_workspace_profile_installation_id:
+                mutation.values.default_workspace_profile_installation_id,
             }),
           )
           .execute();

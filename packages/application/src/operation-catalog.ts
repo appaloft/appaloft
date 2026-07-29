@@ -20,8 +20,10 @@ import {
   steerAgentTaskRunInputSchema,
   stopAgentTaskRunInputSchema,
 } from "./agent-task-run-messages";
+import { openAgentWorkspaceInputSchema } from "./agent-workspace-open-messages";
 import {
   compileAgentWorkspaceProfileInputSchema,
+  configureAgentWorkspaceProfileCredentialConnectionsInputSchema,
   disableAgentWorkspaceProfileInputSchema,
   installAgentWorkspaceProfileInputSchema,
   listAgentWorkspaceProfilesInputSchema,
@@ -209,6 +211,7 @@ import { showPreviewEnvironmentQueryInputSchema } from "./operations/preview-dep
 import { showPreviewPolicyQueryInputSchema } from "./operations/preview-deployments/show-preview-policy.query";
 import { archiveProjectCommandInputSchema } from "./operations/projects/archive-project.command";
 import { checkProjectDeleteSafetyQueryInputSchema } from "./operations/projects/check-project-delete-safety.query";
+import { configureProjectWorkspaceProfileCommandInputSchema } from "./operations/projects/configure-project-workspace-profile.command";
 import { countProjectsQueryInputSchema } from "./operations/projects/count-projects.query";
 import { createProjectCommandInputSchema } from "./operations/projects/create-project.command";
 import { deleteProjectCommandInputSchema } from "./operations/projects/delete-project.command";
@@ -377,6 +380,11 @@ import {
 } from "./operations/tunnels/tunnel-session";
 import { type ProductOrganizationRole } from "./ports";
 import {
+  bindProjectRepositoryInputSchema,
+  showRepositoryBindingInputSchema,
+  unbindRepositoryInputSchema,
+} from "./repository-binding-messages";
+import {
   acceptSandboxPromotionInputSchema,
   cancelSandboxAgentRunInputSchema,
   createSandboxAgentRunInputSchema,
@@ -470,6 +478,8 @@ type OperationDomain =
   | "agent-adapters"
   | "agent-workspace-profiles"
   | "github-agent"
+  | "repository-bindings"
+  | "workspaces"
   | "workspace-collaborations";
 
 export interface OperationCatalogEntry {
@@ -1256,6 +1266,24 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft project set-description <projectId>",
       orpc: { method: "POST", path: "/api/projects/{projectId}/description" },
+    },
+  },
+  {
+    key: "projects.configure-workspace-profile",
+    kind: "command",
+    domain: "projects",
+    messageName: "ConfigureProjectWorkspaceProfileCommand",
+    handlerName: "ConfigureProjectWorkspaceProfileCommandHandler",
+    serviceName: "ConfigureProjectWorkspaceProfileUseCase",
+    inputSchema: configureProjectWorkspaceProfileCommandInputSchema,
+    serviceToken: tokens.configureProjectWorkspaceProfileUseCase,
+    transportAccess: { productSession: { minRole: "admin" } },
+    transports: {
+      cli: "appaloft project configure-workspace-profile <projectId>",
+      orpc: {
+        method: "POST",
+        path: "/api/projects/{projectId}/workspace-profile",
+      },
     },
   },
   {
@@ -3739,6 +3767,53 @@ export const operationCatalog = [
     },
   },
   {
+    key: "repository-bindings.bind",
+    kind: "command",
+    domain: "repository-bindings",
+    messageName: "BindProjectRepositoryCommand",
+    handlerName: "BindProjectRepositoryCommandHandler",
+    serviceName: "RepositoryBindingService",
+    inputSchema: bindProjectRepositoryInputSchema,
+    serviceToken: tokens.repositoryBindingService,
+    transportAccess: { productSession: { minRole: "admin" } },
+    transports: {
+      cli: "appaloft repository-binding bind",
+      orpc: { method: "POST", path: "/api/repository-bindings" },
+    },
+  },
+  {
+    key: "repository-bindings.show",
+    kind: "query",
+    domain: "repository-bindings",
+    messageName: "ShowRepositoryBindingQuery",
+    handlerName: "ShowRepositoryBindingQueryHandler",
+    serviceName: "RepositoryBindingService",
+    inputSchema: showRepositoryBindingInputSchema,
+    serviceToken: tokens.repositoryBindingService,
+    transports: {
+      cli: "appaloft repository-binding show",
+      orpc: { method: "GET", path: "/api/repository-bindings/{repositoryIdentity}" },
+    },
+  },
+  {
+    key: "repository-bindings.unbind",
+    kind: "command",
+    domain: "repository-bindings",
+    messageName: "UnbindRepositoryCommand",
+    handlerName: "UnbindRepositoryCommandHandler",
+    serviceName: "RepositoryBindingService",
+    inputSchema: unbindRepositoryInputSchema,
+    serviceToken: tokens.repositoryBindingService,
+    transportAccess: { productSession: { minRole: "admin" } },
+    transports: {
+      cli: "appaloft repository-binding unbind",
+      orpc: {
+        method: "DELETE",
+        path: "/api/repository-bindings/{repositoryIdentity}",
+      },
+    },
+  },
+  {
     key: "source-links.list",
     kind: "query",
     domain: "source-links",
@@ -5114,6 +5189,24 @@ export const operationCatalog = [
     },
   },
   {
+    key: "agent-workspace-profiles.configure-credential-connections",
+    kind: "command",
+    domain: "agent-workspace-profiles",
+    messageName: "ConfigureAgentWorkspaceProfileCredentialConnectionsCommand",
+    handlerName: "AgentWorkspaceProfileCommandHandler",
+    serviceName: "AgentWorkspaceProfileInstallationService",
+    inputSchema: configureAgentWorkspaceProfileCredentialConnectionsInputSchema,
+    serviceToken: tokens.agentWorkspaceProfileInstallationService,
+    transportAccess: { productSession: { minRole: "admin" } },
+    transports: {
+      cli: "appaloft agent-workspace-profile credential-connection set <installationId>",
+      orpc: {
+        method: "POST",
+        path: "/api/agent-workspace-profiles/{installationId}/credential-connections",
+      },
+    },
+  },
+  {
     key: "agent-workspace-profiles.uninstall",
     kind: "command",
     domain: "agent-workspace-profiles",
@@ -5126,6 +5219,21 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft agent-workspace-profile uninstall <installationId>",
       orpc: { method: "DELETE", path: "/api/agent-workspace-profiles/{installationId}" },
+    },
+  },
+  {
+    key: "workspaces.open",
+    kind: "command",
+    domain: "workspaces",
+    messageName: "OpenAgentWorkspaceCommand",
+    handlerName: "AgentWorkspaceOpenCommandHandler",
+    serviceName: "AgentWorkspaceOpenService",
+    inputSchema: openAgentWorkspaceInputSchema,
+    serviceToken: tokens.agentWorkspaceOpenService,
+    transportAccess: { productSession: { minRole: "member" } },
+    transports: {
+      cli: "appaloft workspace open [path]",
+      orpc: { method: "POST", path: "/api/workspaces/open" },
     },
   },
   {

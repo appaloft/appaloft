@@ -233,6 +233,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
         workspaceDirectory,
       ]),
       sessionRecovery: "native-session-store" as const,
+      clientHandoff: "local-client-exec" as const,
       serverPort: this.port,
     });
     this.capabilities = Object.freeze({

@@ -60,6 +60,7 @@ export interface SandboxProviderRequest {
   sandboxId: string;
   ownerScope: string;
   ownerOrganizationId?: string;
+  placementReservationId?: string;
   source:
     | { kind: "image"; image: string }
     | {
@@ -1123,6 +1124,7 @@ export class ExecutionSandboxService {
       networkPolicy: SandboxNetworkPolicyState;
       expiresAt?: string;
       providerKey?: string;
+      placementReservationId?: string;
     },
   ): Promise<Result<SandboxDescriptor>> {
     const isolation = SandboxIsolationLevel.create(input.requestedIsolation);
@@ -1260,7 +1262,11 @@ export class ExecutionSandboxService {
   ): Promise<Result<SandboxDescriptor>> {
     const accepted = await this.create(context, input);
     if (accepted.isErr()) return err(accepted.error);
-    return this.reconcile(context, accepted.value.sandboxId);
+    return this.reconcile(context, accepted.value.sandboxId, {
+      ...(input.placementReservationId
+        ? { placementReservationId: input.placementReservationId }
+        : {}),
+    });
   }
 
   async list(
@@ -1329,6 +1335,7 @@ export class ExecutionSandboxService {
   async reconcile(
     context: ExecutionContext,
     sandboxId: string,
+    input: { placementReservationId?: string } = {},
   ): Promise<Result<SandboxDescriptor>> {
     const stored = await this.repository.find(toRepositoryContext(context), sandboxId);
     if (!stored) return err(domainError.notFound("Sandbox", sandboxId));
@@ -1394,6 +1401,9 @@ export class ExecutionSandboxService {
         sandboxId,
         ownerScope: tenantId(repositoryContext),
         ...(ownerOrganizationId ? { ownerOrganizationId } : {}),
+        ...(input.placementReservationId
+          ? { placementReservationId: input.placementReservationId }
+          : {}),
         source: providerSource,
         requestedIsolation: state.requestedIsolation.value,
         limits: state.limits.toState(),

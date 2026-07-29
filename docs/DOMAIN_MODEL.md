@@ -460,11 +460,20 @@ Cloud and third-party products may add placement, entitlement, metering, managed
 identity-aware attach gateways and preview-domain adapters. Those overlays consume the public
 workflow and do not redefine its operation language.
 
+`workspaces.open` is the public application workflow for Profile-aware create-or-resume. A durable
+Workspace-entry projection may coordinate the preferred `SandboxId` for tenant + subject + Project
++ Repository Identity + branch and retain its immutable source pin. The projection does not own
+lifecycle state and is not a repository-backed Workspace aggregate. A mismatched source pin fails
+closed and requires explicit `--new`.
+
 Governing artifacts:
 - [ADR-094](./decisions/ADR-094-agent-workspace-entry-workflow.md)
+- [ADR-102](./decisions/ADR-102-profile-aware-workspace-open-and-attach.md)
 - [Spec 111](./specs/111-agent-workspace-entry-workflow/spec.md)
+- [Spec 119](./specs/119-profile-aware-workspace-open-and-attach/spec.md)
 - [Agent Workspace Workflow](./workflows/agent-workspace.md)
 - [Agent Workspace Test Matrix](./testing/agent-workspace-test-matrix.md)
+- [Profile-Aware Workspace Open Test Matrix](./testing/profile-aware-workspace-open-test-matrix.md)
 
 ### Agent Adapter And Workspace Profile Distribution
 
@@ -987,12 +996,34 @@ Meaning:
 Rules:
 - slug must be derivable and stable
 - archived projects must not accept new mutable child records
+- the optional default Agent Workspace Profile references one exact tenant-visible Profile
+  installation; disabled, stale or unauthorized installations cannot be selected for new Workspaces
 
 Current scope:
 - metadata and ownership
 - does not yet own persisted source bindings
+- owns the optional default Agent Workspace Profile installation reference
 - may be bootstrapped from a local deployment config or inferred local source metadata, but that
   config remains an adapter/application input and is not persisted as project source binding
+
+### RepositoryBinding
+
+Meaning:
+- tenant-scoped association from one connector-neutral Repository Identity to one Project
+
+Rules:
+- SSH scp syntax, `ssh://`, and credential-free HTTPS locators normalize to the same host/path
+  identity when they name the same repository
+- host case, default ports, trailing slash, and `.git` are normalized; repository path case is
+  preserved
+- credentials, query strings, fragments, ambiguous paths, and organization guessing are rejected
+- one tenant can bind a Repository Identity to at most one active Project
+- Repository Binding is distinct from deployment `SourceLink` and owns no Workspace lifecycle
+
+Current scope:
+- bind, show, and unbind lifecycle
+- lookup by exact normalized Repository Identity for `workspaces.open`
+- no forge-specific organization or repository aggregate
 
 ### Environment
 

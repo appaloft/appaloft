@@ -1092,12 +1092,14 @@ governing specs.
 
 ## Agent Workspace Entry Workflow
 
-`Agent Workspace` is a public convenience workflow and does not add operation keys. Its CLI and SDK
-surfaces dispatch the canonical operations below:
+`Agent Workspace` remains a public convenience workflow over Sandbox and Agent Runtime.
+`workspaces.open` is the atomic application operation for Profile-aware create-or-resume; it is not
+an aggregate command and its `workspaceId` remains the Sandbox id.
 
 | Workspace action | Canonical operations | CLI / SDK |
 | --- | --- | --- |
-| Create | `sandboxes.create` -> `sandboxes.agents.runtimes.create` | `appaloft workspace create`; `appaloft.workspaces.create(...)` |
+| Open/create-or-resume | `workspaces.open` | `appaloft workspace open [path]`; `appaloft.workspaces.open(...)` |
+| Profile-aware create | `workspaces.open(forceNew=true)` | `appaloft workspace create --profile ...`; `appaloft.workspaces.create(...)` |
 | Adapter catalog | `sandboxes.agents.harnesses.list` | `appaloft workspace harness list`; Console capability-driven creation |
 | List/show | `sandboxes.list/show` + `sandboxes.agents.runtimes.list` | `appaloft workspace list/show`; `appaloft.workspaces.list/show` |
 | Pause/resume/terminate | `sandboxes.pause/resume/terminate` | `appaloft workspace pause/resume/terminate` |
@@ -1119,9 +1121,26 @@ surfaces dispatch the canonical operations below:
 | `github-agent.agent-profiles.list` | Query | `ListAgentProfilesQuery` | `appaloft github-agent profile list` | `GET /api/github-agent/agent-profiles` |
 | `github-agent.agent-profiles.disable` | Command | `DisableAgentProfileCommand` | `appaloft github-agent profile disable <profileId>` | `POST /api/github-agent/agent-profiles/{profileId}/disable` |
 
-The convenience `workspaceId` is the Sandbox id. Pi and OpenCode remain harness adapter keys and do
-not create provider-specific operation names. See
+Local Git inspection is CLI-only and precedes dispatch. Repository Binding, Project default
+Profile, named Credential Connections, immutable source resolution, authorization and
+admission/placement reservation fail before Sandbox effects. Managed-terminal and native attach
+are selected from the pinned Adapter capability snapshot.
+
+Supporting configuration operations are:
+
+| Capability | Kind | Operation Key | Message |
+| --- | --- | --- | --- |
+| Bind Repository to Project | Command | `repository-bindings.bind` | `BindRepositoryCommand` |
+| Show Repository Binding | Query | `repository-bindings.show` | `ShowRepositoryBindingQuery` |
+| Unbind Repository | Command | `repository-bindings.unbind` | `UnbindRepositoryCommand` |
+| Configure Project default Workspace Profile | Command | `projects.configure-workspace-profile` | `ConfigureProjectWorkspaceProfileCommand` |
+| Configure Profile Credential Connections | Command | `agent-workspace-profiles.configure-credential-connections` | `ConfigureAgentWorkspaceProfileCredentialConnectionsCommand` |
+
+The convenience `workspaceId` is the Sandbox id. Pi and OpenCode remain Adapter keys and do not
+create provider-specific operation names. See
 [ADR-094](./decisions/ADR-094-agent-workspace-entry-workflow.md) and
+[ADR-102](./decisions/ADR-102-profile-aware-workspace-open-and-attach.md),
+[Spec 119](./specs/119-profile-aware-workspace-open-and-attach/spec.md), and
 [Agent Workspace Workflow](./workflows/agent-workspace.md).
 
 ## Workspace Collaboration

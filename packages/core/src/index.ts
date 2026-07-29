@@ -7,6 +7,7 @@ export * from "./extensibility";
 export * from "./github-agent-automation";
 export * from "./identity-governance";
 export * from "./release-orchestration";
+export * from "./repository-binding";
 export * from "./runtime-topology";
 export * from "./sandbox-agent-runtime";
 export * from "./shared/entity";

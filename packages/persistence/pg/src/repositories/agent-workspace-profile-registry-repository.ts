@@ -60,6 +60,17 @@ function installationFromRow(row: InstallationRow): AgentWorkspaceProfileInstall
     status: AgentWorkspaceProfileInstallationStatus.rehydrate(row.status as "disabled" | "enabled"),
     revision: AgentWorkspaceProfileInstallationRevision.rehydrate(row.revision),
     installedAt: CreatedAt.rehydrate(installedAt),
+    credentialConnections: row.credential_connections.flatMap((connection) =>
+      typeof connection.requirementId === "string" &&
+      typeof connection.connectionReference === "string"
+        ? [
+            {
+              requirementId: connection.requirementId,
+              connectionReference: connection.connectionReference,
+            },
+          ]
+        : [],
+    ),
     ...(updatedAt !== installedAt ? { updatedAt: UpdatedAt.rehydrate(updatedAt) } : {}),
   });
 }
@@ -136,6 +147,9 @@ export class PgAgentWorkspaceProfileRegistryRepository
           revision: state.revision.value,
           installed_at: state.installedAt.value,
           updated_at: state.updatedAt?.value ?? state.installedAt.value,
+          credential_connections: state.credentialConnections.map((connection) => ({
+            ...connection,
+          })),
         })
         .onConflict((conflict) => conflict.columns(["tenant_id", "definition_digest"]).doNothing())
         .executeTakeFirst();
@@ -154,6 +168,9 @@ export class PgAgentWorkspaceProfileRegistryRepository
         status: state.status.value,
         revision: state.revision.value,
         updated_at: state.updatedAt?.value ?? state.installedAt.value,
+        credential_connections: state.credentialConnections.map((connection) => ({
+          ...connection,
+        })),
       })
       .where("tenant_id", "=", tenantId(context))
       .where("id", "=", state.id.value)
