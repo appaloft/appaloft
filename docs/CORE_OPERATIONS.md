@@ -1079,6 +1079,8 @@ addressable. Pi is an adapter and therefore does not appear in operation names.
 | `sandboxes.agent-tasks.list` | Query | `ListAgentTaskRunsQuery` | Workspace/runtime ids | `appaloft workspace task list <workspaceId>` | `GET /api/sandboxes/{workspaceId}/agent-task-runs` |
 | `sandboxes.agent-tasks.show` | Query | `ShowAgentTaskRunQuery` | Workspace/task Run ids | `appaloft workspace task show <workspaceId> <taskRunId>` | `GET /api/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}` |
 | `sandboxes.agent-tasks.resume` | Command | `ResumeAgentTaskRunCommand` | Workspace/task Run ids | `appaloft workspace task resume <workspaceId> <taskRunId>` | `POST /api/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/resume` |
+| `sandboxes.agent-tasks.stop` | Command | `StopAgentTaskRunCommand` | Workspace/task Run ids | `appaloft workspace task stop <workspaceId> <taskRunId>` | `POST /api/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/stop` |
+| `sandboxes.agent-tasks.steer` | Command | `SteerAgentTaskRunCommand` | Workspace/task Run ids, bounded non-secret instruction | `appaloft workspace task steer <workspaceId> <taskRunId>` | `POST /api/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/steer` |
 | `sandboxes.agent-tasks.cancel` | Command | `CancelAgentTaskRunCommand` | Workspace/task Run ids | `appaloft workspace task cancel <workspaceId> <taskRunId>` | `POST /api/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/cancel` |
 | `sandboxes.agent-tasks.approve` | Command | `ApproveAgentTaskRunCommand` | Workspace/task Run ids, external actor context | `appaloft workspace task approve <workspaceId> <taskRunId>` | `POST /api/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/approve` |
 | `sandboxes.agent-tasks.deliver` | Command | `DeliverAgentTaskRunCommand` | Workspace/task Run ids, structured branch/commit/remote/PR intent | `appaloft workspace task deliver <workspaceId> <taskRunId>` | `POST /api/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/deliver` |
@@ -1102,7 +1104,20 @@ surfaces dispatch the canonical operations below:
 | Terminal | `terminal-sessions.open(scope=sandbox)` | `appaloft workspace terminal <workspaceId> [--attach]` |
 | Native attach | `sandboxes.agents.runtimes.attach` | `appaloft workspace attach <workspaceId>`; `workspace.agent.attach()`; Console Attach |
 | Development preview | `sandbox-ports.expose/list/revoke` | `appaloft workspace preview <workspaceId> <port>` |
-| Task Run | `sandboxes.agent-tasks.create/list/show/resume/cancel/approve/deliver` | `appaloft workspace task ...`; `workspace.tasks.*`; Console Task panel |
+| Task Run | `sandboxes.agent-tasks.create/list/show/resume/stop/steer/cancel/approve/deliver` | `appaloft workspace task ...`; `workspace.tasks.*`; Console Task panel |
+
+## GitHub Agent Task Configuration
+
+| Operation key | Kind | Message | CLI | HTTP/oRPC |
+| --- | --- | --- | --- | --- |
+| `github-agent.repository-bindings.create` | Command | `BindRepositoryCommand` | `appaloft github-agent repository bind` | `POST /api/github-agent/repository-bindings` |
+| `github-agent.repository-bindings.list` | Query | `ListRepositoryBindingsQuery` | `appaloft github-agent repository list` | `GET /api/github-agent/repository-bindings` |
+| `github-agent.automation-rules.create` | Command | `CreateAutomationRuleCommand` | `appaloft github-agent rule create` | `POST /api/github-agent/automation-rules` |
+| `github-agent.automation-rules.list` | Query | `ListAutomationRulesQuery` | `appaloft github-agent rule list` | `GET /api/github-agent/automation-rules` |
+| `github-agent.automation-rules.disable` | Command | `DisableAutomationRuleCommand` | `appaloft github-agent rule disable <ruleId>` | `POST /api/github-agent/automation-rules/{ruleId}/disable` |
+| `github-agent.agent-profiles.create` | Command | `CreateAgentProfileCommand` | `appaloft github-agent profile create` | `POST /api/github-agent/agent-profiles` |
+| `github-agent.agent-profiles.list` | Query | `ListAgentProfilesQuery` | `appaloft github-agent profile list` | `GET /api/github-agent/agent-profiles` |
+| `github-agent.agent-profiles.disable` | Command | `DisableAgentProfileCommand` | `appaloft github-agent profile disable <profileId>` | `POST /api/github-agent/agent-profiles/{profileId}/disable` |
 
 The convenience `workspaceId` is the Sandbox id. Pi and OpenCode remain harness adapter keys and do
 not create provider-specific operation names. See

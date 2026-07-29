@@ -12,6 +12,7 @@ import { findOperationCatalogEntryByKey } from "../../operation-catalog";
 import { checkOperationGuards } from "../../operation-guard";
 import {
   AllowAllOperationGuardPort,
+  type AutoDeploySourceEventKind,
   type Clock,
   type IdGenerator,
   type IngestSourceEventResult,
@@ -114,30 +115,31 @@ export class IngestSourceEventUseCase {
     }
 
     const sourceEventId = this.idGenerator.next("sevt");
-    const outcome = this.sourceEventPolicyReader
-      ? await evaluateSourceEventPolicyMatch(
-          repositoryContext,
-          this.sourceEventPolicyReader,
-          input.sourceKind,
-          sourceIdentity,
-          input.eventKind,
-          input.ref,
-          input.scopeResourceId,
-          {
-            executionContext: context,
-            ...(this.sourceEventChangedPathResolver
-              ? { changedPathResolver: this.sourceEventChangedPathResolver }
-              : {}),
-            revision: input.revision,
-            ...(input.beforeRevision ? { beforeRevision: input.beforeRevision } : {}),
-            refChangeKind: input.refChangeKind ?? "updated",
-            forced: input.forced ?? false,
-            ...(input.providerConnectionId
-              ? { providerConnectionId: input.providerConnectionId }
-              : {}),
-          },
-        )
-      : emptySourceEventOutcome();
+    const outcome =
+      this.sourceEventPolicyReader && isDeploymentSourceEventKind(input.eventKind)
+        ? await evaluateSourceEventPolicyMatch(
+            repositoryContext,
+            this.sourceEventPolicyReader,
+            input.sourceKind,
+            sourceIdentity,
+            input.eventKind,
+            input.ref,
+            input.scopeResourceId,
+            {
+              executionContext: context,
+              ...(this.sourceEventChangedPathResolver
+                ? { changedPathResolver: this.sourceEventChangedPathResolver }
+                : {}),
+              revision: input.revision,
+              ...(input.beforeRevision ? { beforeRevision: input.beforeRevision } : {}),
+              refChangeKind: input.refChangeKind ?? "updated",
+              forced: input.forced ?? false,
+              ...(input.providerConnectionId
+                ? { providerConnectionId: input.providerConnectionId }
+                : {}),
+            },
+          )
+        : emptySourceEventOutcome();
 
     const record: SourceEventRecord = {
       sourceEventId,
@@ -198,6 +200,12 @@ export class IngestSourceEventUseCase {
 
     return ok(resultFromRecord(stored));
   }
+}
+
+function isDeploymentSourceEventKind(
+  eventKind: IngestSourceEventCommandPayload["eventKind"],
+): eventKind is AutoDeploySourceEventKind {
+  return eventKind === "push" || eventKind === "tag";
 }
 
 function sourceEventProcessStatus(record: SourceEventRecord): "running" | "succeeded" | "failed" {
@@ -321,7 +329,7 @@ export async function evaluateSourceEventPolicyMatch(
   sourceEventPolicyReader: SourceEventPolicyReader,
   sourceKind: IngestSourceEventCommandPayload["sourceKind"],
   sourceIdentity: SourceEventIdentity,
-  eventKind: IngestSourceEventCommandPayload["eventKind"],
+  eventKind: AutoDeploySourceEventKind,
   ref: string,
   scopeResourceId: string | undefined,
   changeInput: {

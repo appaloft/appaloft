@@ -35,6 +35,8 @@ import {
   ShowSandboxQuery,
   ShowTerminalSessionQuery,
   ShowWorkspaceCollaborationQuery,
+  SteerAgentTaskRunCommand,
+  StopAgentTaskRunCommand,
   TerminateSandboxAgentRuntimeCommand,
   TerminateSandboxCommand,
   TransferWorkspaceWriterLeaseCommand,
@@ -668,6 +670,24 @@ const taskResume = EffectCommand.make(
     runCommand(ResumeAgentTaskRunCommand.create({ workspaceId, taskRunId })),
 );
 
+const taskStop = EffectCommand.make(
+  "stop",
+  { workspaceId, taskRunId },
+  ({ taskRunId, workspaceId }) =>
+    runCommand(StopAgentTaskRunCommand.create({ workspaceId, taskRunId })),
+);
+
+const taskSteer = EffectCommand.make(
+  "steer",
+  {
+    workspaceId,
+    taskRunId,
+    instruction: Options.text("instruction"),
+  },
+  ({ instruction, taskRunId, workspaceId }) =>
+    runCommand(SteerAgentTaskRunCommand.create({ workspaceId, taskRunId, instruction })),
+);
+
 const taskCancel = EffectCommand.make(
   "cancel",
   { workspaceId, taskRunId },
@@ -734,6 +754,8 @@ const task = EffectCommand.make("task").pipe(
     taskList,
     taskShow,
     taskResume,
+    taskStop,
+    taskSteer,
     taskCancel,
     taskApprove,
     taskDeliver,

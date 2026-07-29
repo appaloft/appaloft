@@ -138,6 +138,38 @@ export const publicDocsHelpTopics = {
       "apps/web/src/routes/workspaces and workspace-collaborations: create, reconnect, collaborate, preview, review, and deliver",
     ],
   },
+  "agent.github-tasks": {
+    id: "agent.github-tasks",
+    title: "GitHub-driven Agent Tasks",
+    description:
+      "How to bind repositories, configure automation rules and agent profiles, and control durable Workspace Tasks triggered from GitHub.",
+    page: {
+      "zh-CN": "agents/github-agent-tasks",
+      "en-US": "en/agents/github-agent-tasks",
+    },
+    anchor: "github-agent-tasks",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "github-agent.repository-bindings.create",
+    aliases: [
+      "github agent",
+      "repository binding",
+      "automation rule",
+      "agent profile",
+      "GitHub Agent Task",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-102-github-agent-task-trigger-and-composition-boundary.md",
+      "docs/specs/119-github-agent-sandbox-task/spec.md",
+      "docs/testing/github-agent-sandbox-task-test-matrix.md",
+    ],
+    webSurfaces: [
+      "apps/web/src/lib/components/console/WorkspaceTaskPanel.svelte: inspect events, session recovery, stop, and steer an existing Agent Task",
+    ],
+  },
   "agent.adapter-installations": {
     id: "agent.adapter-installations",
     title: "Agent Adapter and Workspace Profile installations",
@@ -3121,6 +3153,8 @@ export const publicDocsOperationCoverage = [
     "sandboxes.agent-tasks.list",
     "sandboxes.agent-tasks.show",
     "sandboxes.agent-tasks.resume",
+    "sandboxes.agent-tasks.stop",
+    "sandboxes.agent-tasks.steer",
     "sandboxes.agent-tasks.cancel",
     "sandboxes.agent-tasks.approve",
     "sandboxes.agent-tasks.deliver",
@@ -3146,6 +3180,20 @@ export const publicDocsOperationCoverage = [
     operationKey,
     status: "documented" as const,
     topicId: "agent.workspace" as const,
+  })),
+  ...[
+    "github-agent.repository-bindings.create",
+    "github-agent.repository-bindings.list",
+    "github-agent.automation-rules.create",
+    "github-agent.automation-rules.list",
+    "github-agent.automation-rules.disable",
+    "github-agent.agent-profiles.create",
+    "github-agent.agent-profiles.list",
+    "github-agent.agent-profiles.disable",
+  ].map((operationKey) => ({
+    operationKey,
+    status: "documented" as const,
+    topicId: "agent.github-tasks" as const,
   })),
   ...[
     "sandboxes.agents.runtimes.create",

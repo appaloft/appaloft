@@ -3373,7 +3373,7 @@ export interface ResourceDetailAutoDeployPolicy {
   status: "enabled" | "disabled" | "blocked";
   triggerKind: "git-push" | "generic-signed-webhook";
   refs: string[];
-  eventKinds: SourceEventKind[];
+  eventKinds: AutoDeploySourceEventKind[];
   sourceBindingFingerprint: string;
   blockedReason?: "source-binding-changed";
   genericWebhookSecretRef?: string;
@@ -6820,7 +6820,17 @@ export interface CertificateSummary {
 }
 
 export type SourceEventSourceKind = "github" | "gitlab" | "generic-signed";
-export type SourceEventKind = "push" | "tag";
+export type SourceEventKind =
+  | "push"
+  | "tag"
+  | "issue_comment.created"
+  | "pull_request_review_comment.created"
+  | "issues.labeled"
+  | "pull_request.labeled"
+  | "pull_request.ready_for_review"
+  | "pull_request.synchronize"
+  | "pull_request.closed";
+export type AutoDeploySourceEventKind = Extract<SourceEventKind, "push" | "tag">;
 export type SourceEventStatus =
   | "accepted"
   | "deduped"
@@ -8902,7 +8912,7 @@ export interface SourceEventPolicyCandidate {
   sourceBindingFingerprint?: string;
   status: "enabled" | "disabled" | "blocked";
   refs: string[];
-  eventKinds: SourceEventKind[];
+  eventKinds: AutoDeploySourceEventKind[];
   includePaths?: string[];
   excludePaths?: string[];
   sourceBinding: SourceEventIdentity;

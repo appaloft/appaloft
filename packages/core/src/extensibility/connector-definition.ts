@@ -9,6 +9,7 @@ export type ConnectionCategoryKey =
   | "notification"
   | "billing"
   | "identity"
+  | "agent"
   | "observability"
   | "storage";
 
@@ -456,6 +457,7 @@ export const connectionCategoryKeys = [
   "notification",
   "billing",
   "identity",
+  "agent",
   "observability",
   "storage",
 ] as const satisfies readonly ConnectionCategoryKey[];
@@ -505,6 +507,12 @@ export const connectionCategoryDefinitions: readonly ConnectionCategoryDefinitio
     key: "identity",
     title: "Identity",
     description: "Sign-in and organization identity provider configuration.",
+  },
+  {
+    key: "agent",
+    title: "Agent",
+    description:
+      "Agent-native account, API-key, or isolated existing-server configuration references.",
   },
   {
     key: "observability",

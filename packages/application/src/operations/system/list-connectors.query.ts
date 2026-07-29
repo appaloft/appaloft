@@ -21,6 +21,7 @@ export const listConnectorsQueryInputSchema = z.object({
       "identity",
       "observability",
       "storage",
+      "agent",
     ])
     .optional(),
   includeUnavailable: z.boolean().optional(),

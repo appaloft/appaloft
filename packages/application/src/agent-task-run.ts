@@ -81,6 +81,7 @@ export interface AgentTaskDeliveryResult {
 export type AgentTaskRunStatus =
   | "running"
   | "finalizing"
+  | "stopped"
   | "checks-failed"
   | "awaiting-approval"
   | "approved"
@@ -88,6 +89,15 @@ export type AgentTaskRunStatus =
   | "delivered"
   | "failed"
   | "cancelled";
+
+export interface AgentTaskRunLineageEntry {
+  runId: string;
+  parentRunId?: string;
+  recovery: "fresh" | "native" | "fallback";
+  status: string;
+  startedAt: string;
+  completedAt?: string;
+}
 
 export interface AgentTaskRunDescriptor {
   schemaVersion: "agent-task-run/v1";
@@ -103,6 +113,16 @@ export interface AgentTaskRunDescriptor {
     sourceRoot: string;
   };
   agentRun: SandboxAgentRunDescriptor;
+  activeRunId: string;
+  runLineage: AgentTaskRunLineageEntry[];
+  sessionRecovery: "new" | "native" | "fallback";
+  nativeSessionCapable: boolean;
+  nativeAgentSessionRef?: string;
+  steerHistory: Array<{
+    instruction: string;
+    requestedAt: string;
+    runId: string;
+  }>;
   checks: AgentTaskCheckResult[];
   changes?: AgentTaskChanges;
   developmentPreview?: SandboxPortExposure;
@@ -295,6 +315,44 @@ function requireArgv(argv: string[], label: string): Result<string[]> {
   return ok([...argv]);
 }
 
+function validateSteerInstruction(value: string): Result<string> {
+  const normalized = value.trim();
+  if (!normalized || normalized.length > 8_000) {
+    return err(
+      domainError.validation("Agent Task steer instruction is required and must be bounded"),
+    );
+  }
+  if (
+    secretLine.test(normalized) ||
+    privateKeyLine.test(normalized) ||
+    /\b(?:credential|connection|secret|environment|env)[_-]?id\s*[:=]?\s*\S+/iu.test(normalized)
+  ) {
+    return err(
+      domainError.validation(
+        "Agent Task steer instruction cannot contain credentials or secret references",
+      ),
+    );
+  }
+  return ok(normalized);
+}
+
+function updateRunLineage(
+  lineage: readonly AgentTaskRunLineageEntry[],
+  runId: string,
+  status: string,
+  completedAt?: string,
+): AgentTaskRunLineageEntry[] {
+  return lineage.map((entry) =>
+    entry.runId === runId
+      ? {
+          ...entry,
+          status,
+          ...(completedAt ? { completedAt } : {}),
+        }
+      : { ...entry },
+  );
+}
+
 function updateTask(
   current: AgentTaskRunDescriptor,
   patch: {
@@ -306,8 +364,7 @@ function updateTask(
     ...current,
     ...patch,
     schemaVersion: "agent-task-run/v1",
-    taskRunId: current.runId,
-    runId: current.runId,
+    taskRunId: current.taskRunId,
     updatedAt: now,
   } as AgentTaskRunDescriptor;
   for (const [key, value] of Object.entries(patch)) {
@@ -386,11 +443,25 @@ export class AgentTaskRunService {
         result.schemaVersion !== "agent-task-run/v1" ||
         result.taskRunId !== input.taskRunId ||
         result.workspaceId !== input.workspaceId ||
-        result.runId !== input.taskRunId
+        typeof result.runId !== "string"
       ) {
         return err(domainError.invariant("Agent Task state identity is invalid"));
       }
-      return ok(result);
+      return ok({
+        ...result,
+        activeRunId: result.activeRunId ?? result.runId,
+        runLineage: result.runLineage ?? [
+          {
+            runId: result.runId,
+            recovery: "fresh",
+            status: result.agentRun.status,
+            startedAt: result.createdAt,
+          },
+        ],
+        sessionRecovery: result.sessionRecovery ?? "new",
+        nativeSessionCapable: result.nativeSessionCapable ?? false,
+        steerHistory: result.steerHistory ?? [],
+      });
     } catch (error) {
       return err(
         domainError.invariant("Agent Task state is unreadable", {
@@ -412,6 +483,8 @@ export class AgentTaskRunService {
       preview?: Omit<AgentTaskPreviewInput, "expiresAt"> & { expiresAt?: string };
       immutableReview: boolean;
       sourceRoot: string;
+      nativeSessionCapable?: boolean;
+      nativeAgentSessionRef?: string;
     },
   ): Promise<Result<AgentTaskRunDescriptor>> {
     const run = await this.dependencies.agents.createRun(context, {
@@ -458,6 +531,21 @@ export class AgentTaskRunService {
         sourceRoot: input.sourceRoot,
       },
       agentRun: run.value,
+      activeRunId: run.value.runId,
+      runLineage: [
+        {
+          runId: run.value.runId,
+          recovery: "fresh",
+          status: run.value.status,
+          startedAt: now,
+        },
+      ],
+      sessionRecovery: "new",
+      nativeSessionCapable: input.nativeSessionCapable ?? false,
+      ...(input.nativeAgentSessionRef
+        ? { nativeAgentSessionRef: input.nativeAgentSessionRef }
+        : {}),
+      steerHistory: [],
       checks: [],
       createdAt: now,
       updatedAt: now,
@@ -515,6 +603,12 @@ export class AgentTaskRunService {
   ): Promise<Result<AgentTaskRunDescriptor>> {
     const task = await this.read(context, { workspaceId, taskRunId });
     if (task.isErr()) return task;
+    if (task.value.status === "stopped") {
+      return this.continueTask(context, task.value, {
+        instruction: "Resume the current Agent Task.",
+        reason: "resume",
+      });
+    }
     if (["running", "finalizing"].includes(task.value.status)) {
       try {
         await this.dependencies.workQueue.enqueue(context, {
@@ -531,6 +625,193 @@ export class AgentTaskRunService {
       }
     }
     return task;
+  }
+
+  async steer(
+    context: ExecutionContext,
+    workspaceId: string,
+    taskRunId: string,
+    instruction: string,
+  ): Promise<Result<AgentTaskRunDescriptor>> {
+    const safeInstruction = validateSteerInstruction(instruction);
+    if (safeInstruction.isErr()) return err(safeInstruction.error);
+    let task = await this.read(context, { workspaceId, taskRunId });
+    if (task.isErr()) return task;
+    if (["delivering", "delivered", "cancelled"].includes(task.value.status)) {
+      return err(domainError.conflict(`Agent Task cannot be steered from ${task.value.status}`));
+    }
+    if (["running", "finalizing"].includes(task.value.status)) {
+      const stopped = await this.stop(context, workspaceId, taskRunId);
+      if (stopped.isErr()) return stopped;
+      task = stopped;
+    }
+    return this.continueTask(context, task.value, {
+      instruction: safeInstruction.value,
+      reason: "steer",
+    });
+  }
+
+  async stop(
+    context: ExecutionContext,
+    workspaceId: string,
+    taskRunId: string,
+  ): Promise<Result<AgentTaskRunDescriptor>> {
+    const task = await this.read(context, { workspaceId, taskRunId });
+    if (task.isErr()) return task;
+    if (task.value.status === "stopped") return task;
+    if (!["running", "finalizing"].includes(task.value.status)) {
+      return err(domainError.conflict(`Agent Task cannot be stopped from ${task.value.status}`));
+    }
+    const run = await this.dependencies.agents.cancelRun(
+      context,
+      task.value.runtimeId,
+      task.value.activeRunId,
+    );
+    if (run.isErr()) return err(run.error);
+    const cleanup = await this.cleanupDevelopmentPreview(context, task.value);
+    if (cleanup.isErr()) return err(cleanup.error);
+    const at = this.dependencies.clock.now();
+    return this.persist(
+      context,
+      updateTask(
+        task.value,
+        {
+          agentRun: run.value,
+          status: "stopped",
+          developmentPreview: undefined,
+          previewProcessId: undefined,
+          runLineage: updateRunLineage(
+            task.value.runLineage,
+            task.value.activeRunId,
+            run.value.status,
+            at,
+          ),
+        },
+        at,
+      ),
+    );
+  }
+
+  private async continueTask(
+    context: ExecutionContext,
+    task: AgentTaskRunDescriptor,
+    input: { instruction: string; reason: "steer" | "resume" },
+  ): Promise<Result<AgentTaskRunDescriptor>> {
+    const recovery =
+      task.nativeSessionCapable && task.nativeAgentSessionRef ? "native" : "fallback";
+    const fallbackContext =
+      recovery === "fallback"
+        ? [
+            "The Agent adapter cannot prove native session resume. Continue as a new session.",
+            `Previous task status: ${task.status}.`,
+            task.changes?.stat ? `Previous Git diff summary:\n${task.changes.stat}` : "",
+            task.checks.length > 0
+              ? `Previous checks:\n${task.checks
+                  .map((check) => `${check.name}: ${check.status}`)
+                  .join("\n")}`
+              : "",
+            task.failure ? `Previous failure: ${task.failure.message}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n\n")
+        : "Resume the native Agent session associated with the parent run.";
+    const prompt = bounded(
+      redact(`${fallbackContext}\n\nUser instruction:\n${input.instruction}`).value,
+      taskOutputLimit,
+    ).value;
+    const run = await this.dependencies.agents.createRun(context, {
+      sandboxId: task.workspaceId,
+      runtimeId: task.runtimeId,
+      task: prompt,
+      context: { mode: "continue", parentRunId: task.activeRunId },
+      idempotencyKey: `agent-task-${input.reason}:${task.taskRunId}:${task.runLineage.length + 1}`,
+    });
+    if (run.isErr()) return err(run.error);
+    const at = this.dependencies.clock.now();
+    const next = updateTask(
+      task,
+      {
+        runId: run.value.runId,
+        activeRunId: run.value.runId,
+        agentRun: run.value,
+        status: "running",
+        sessionRecovery: recovery,
+        runLineage: [
+          ...updateRunLineage(task.runLineage, task.activeRunId, task.agentRun.status, at),
+          {
+            runId: run.value.runId,
+            parentRunId: task.activeRunId,
+            recovery,
+            status: run.value.status,
+            startedAt: at,
+          },
+        ],
+        ...(input.reason === "steer"
+          ? {
+              steerHistory: [
+                ...task.steerHistory,
+                {
+                  instruction: input.instruction,
+                  requestedAt: at,
+                  runId: run.value.runId,
+                },
+              ],
+            }
+          : {}),
+        checks: [],
+        changes: undefined,
+        developmentPreview: undefined,
+        previewProcessId: undefined,
+        sourceArtifact: undefined,
+        candidatePreview: undefined,
+        approval: undefined,
+        delivery: undefined,
+        failure: undefined,
+      },
+      at,
+    );
+    const persisted = await this.persist(context, next);
+    if (persisted.isErr()) {
+      await this.dependencies.agents.cancelRun(context, task.runtimeId, run.value.runId);
+      return persisted;
+    }
+    try {
+      await this.dependencies.workQueue.enqueue(context, {
+        kind: "agent-task-run",
+        id: task.taskRunId,
+        workspaceId: task.workspaceId,
+      });
+    } catch (error) {
+      return err(
+        domainError.infra("Agent Task durable work enqueue failed", {
+          cause: safeFailureMessage(error),
+        }),
+      );
+    }
+    return persisted;
+  }
+
+  private async cleanupDevelopmentPreview(
+    context: ExecutionContext,
+    task: AgentTaskRunDescriptor,
+  ): Promise<Result<void>> {
+    if (task.developmentPreview) {
+      const revoked = await this.dependencies.sandbox.revokePort(
+        context,
+        task.workspaceId,
+        task.developmentPreview.exposureId,
+      );
+      if (revoked.isErr()) return err(revoked.error);
+    }
+    if (task.previewProcessId) {
+      const terminated = await this.dependencies.sandbox.terminateProcess(
+        context,
+        task.workspaceId,
+        task.previewProcessId,
+      );
+      if (terminated.isErr()) return err(terminated.error);
+    }
+    return ok(undefined);
   }
 
   async cancel(
@@ -550,22 +831,8 @@ export class AgentTaskRunService {
       task.value.runId,
     );
     if (run.isErr()) return err(run.error);
-    if (task.value.developmentPreview) {
-      const revoked = await this.dependencies.sandbox.revokePort(
-        context,
-        workspaceId,
-        task.value.developmentPreview.exposureId,
-      );
-      if (revoked.isErr()) return err(revoked.error);
-    }
-    if (task.value.previewProcessId) {
-      const terminated = await this.dependencies.sandbox.terminateProcess(
-        context,
-        workspaceId,
-        task.value.previewProcessId,
-      );
-      if (terminated.isErr()) return err(terminated.error);
-    }
+    const cleanup = await this.cleanupDevelopmentPreview(context, task.value);
+    if (cleanup.isErr()) return err(cleanup.error);
     return this.persist(
       context,
       updateTask(
@@ -685,6 +952,7 @@ export class AgentTaskRunService {
         "delivering",
         "delivered",
         "failed",
+        "stopped",
         "cancelled",
       ].includes(task.value.status)
     ) {
@@ -693,7 +961,7 @@ export class AgentTaskRunService {
     const run = await this.dependencies.agents.showRun(
       context,
       task.value.runtimeId,
-      task.value.runId,
+      task.value.activeRunId,
     );
     if (run.isErr()) return err(run.error);
     if (!["completed", "failed", "cancelled"].includes(run.value.status)) {
@@ -1073,6 +1341,21 @@ export class AgentTaskRunService {
       if (existing.isErr()) return err(existing.error);
       if (existing.value.exitCode === 0 && /^https:\/\/\S+$/u.test(existing.value.stdout.trim())) {
         pullRequestUrl = existing.value.stdout.trim();
+        const updated = await run(
+          [
+            "gh",
+            "pr",
+            "edit",
+            input.branch,
+            "--title",
+            input.pullRequest.title,
+            ...(input.pullRequest.body ? ["--body", input.pullRequest.body] : []),
+            ...(input.pullRequest.base ? ["--base", input.pullRequest.base] : []),
+          ],
+          "Agent Task pull request update",
+          { githubCredential: true },
+        );
+        if (updated.isErr()) return err(updated.error);
       } else {
         const created = await run(
           [

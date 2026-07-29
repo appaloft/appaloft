@@ -144,6 +144,14 @@ appaloft.environments.show -> environments.show GET /environments/{environmentId
 appaloft.environments.syncProfile -> environments.sync-profile POST /environments/{environmentId}/sync-profile/{targetEnvironmentId}
 appaloft.environments.unlock -> environments.unlock POST /environments/{environmentId}/unlock
 appaloft.environments.unsetVariable -> environments.unset-variable DELETE /environments/{environmentId}/variables/{key}
+appaloft.githubAgent.agentProfiles.create -> github-agent.agent-profiles.create POST /github-agent/agent-profiles
+appaloft.githubAgent.agentProfiles.disable -> github-agent.agent-profiles.disable POST /github-agent/agent-profiles/{profileId}/disable
+appaloft.githubAgent.agentProfiles.list -> github-agent.agent-profiles.list GET /github-agent/agent-profiles
+appaloft.githubAgent.automationRules.create -> github-agent.automation-rules.create POST /github-agent/automation-rules
+appaloft.githubAgent.automationRules.disable -> github-agent.automation-rules.disable POST /github-agent/automation-rules/{ruleId}/disable
+appaloft.githubAgent.automationRules.list -> github-agent.automation-rules.list GET /github-agent/automation-rules
+appaloft.githubAgent.repositoryBindings.create -> github-agent.repository-bindings.create POST /github-agent/repository-bindings
+appaloft.githubAgent.repositoryBindings.list -> github-agent.repository-bindings.list GET /github-agent/repository-bindings
 appaloft.operatorWork.cancel -> operator-work.cancel POST /operator-work/{workId}/cancel
 appaloft.operatorWork.deadLetter -> operator-work.dead-letter POST /operator-work/{workId}/dead-letter
 appaloft.operatorWork.list -> operator-work.list GET /operator-work
@@ -263,6 +271,8 @@ appaloft.sandboxes.agentTasks.deliver -> sandboxes.agent-tasks.deliver POST /san
 appaloft.sandboxes.agentTasks.list -> sandboxes.agent-tasks.list GET /sandboxes/{workspaceId}/agent-task-runs
 appaloft.sandboxes.agentTasks.resume -> sandboxes.agent-tasks.resume POST /sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/resume
 appaloft.sandboxes.agentTasks.show -> sandboxes.agent-tasks.show GET /sandboxes/{workspaceId}/agent-task-runs/{taskRunId}
+appaloft.sandboxes.agentTasks.steer -> sandboxes.agent-tasks.steer POST /sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/steer
+appaloft.sandboxes.agentTasks.stop -> sandboxes.agent-tasks.stop POST /sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/stop
 appaloft.sandboxes.agents.approvals.list -> sandboxes.agents.approvals.list GET /sandbox-agent-runs/{runId}/approvals
 appaloft.sandboxes.agents.approvals.resolve -> sandboxes.agents.approvals.resolve POST /sandbox-agent-approvals/{approvalId}/resolve
 appaloft.sandboxes.agents.approvals.show -> sandboxes.agents.approvals.show GET /sandbox-agent-approvals/{approvalId}

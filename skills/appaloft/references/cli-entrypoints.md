@@ -91,9 +91,19 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft workspace task list <workspaceId>` - `sandboxes.agent-tasks.list`
 - `appaloft workspace task show <workspaceId> <taskRunId>` - `sandboxes.agent-tasks.show`
 - `appaloft workspace task resume <workspaceId> <taskRunId>` - `sandboxes.agent-tasks.resume`
+- `appaloft workspace task stop <workspaceId> <taskRunId>` - `sandboxes.agent-tasks.stop`
+- `appaloft workspace task steer <workspaceId> <taskRunId>` - `sandboxes.agent-tasks.steer`
 - `appaloft workspace task cancel <workspaceId> <taskRunId>` - `sandboxes.agent-tasks.cancel`
 - `appaloft workspace task approve <workspaceId> <taskRunId>` - `sandboxes.agent-tasks.approve`
 - `appaloft workspace task deliver <workspaceId> <taskRunId>` - `sandboxes.agent-tasks.deliver`
+- `appaloft github-agent repository bind` - `github-agent.repository-bindings.create`
+- `appaloft github-agent repository list` - `github-agent.repository-bindings.list`
+- `appaloft github-agent rule create` - `github-agent.automation-rules.create`
+- `appaloft github-agent rule list` - `github-agent.automation-rules.list`
+- `appaloft github-agent rule disable <ruleId>` - `github-agent.automation-rules.disable`
+- `appaloft github-agent profile create` - `github-agent.agent-profiles.create`
+- `appaloft github-agent profile list` - `github-agent.agent-profiles.list`
+- `appaloft github-agent profile disable <profileId>` - `github-agent.agent-profiles.disable`
 - `appaloft sandbox agent runtime create <sandboxId>` - `sandboxes.agents.runtimes.create`
 - `appaloft sandbox agent runtime list <sandboxId>` - `sandboxes.agents.runtimes.list`
 - `appaloft sandbox agent runtime show <sandboxId> <runtimeId>` - `sandboxes.agents.runtimes.show`

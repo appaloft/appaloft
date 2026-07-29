@@ -29,6 +29,7 @@
   let commitMessage = $state("");
   let pullRequestTitle = $state("");
   let selectedTaskRunId = $state("");
+  let steerInstruction = $state("");
 
   const taskListQuery = createQuery(() =>
     queryOptions({
@@ -108,12 +109,21 @@
   }));
 
   const actionMutation = createMutation(() => ({
-    mutationFn: async (input: { action: "resume" | "cancel" | "approve"; taskRunId: string }) => {
+    mutationFn: async (input: { action: "resume" | "stop" | "cancel" | "approve"; taskRunId: string }) => {
       if (input.action === "resume") return tasks.resume(input.taskRunId);
+      if (input.action === "stop") return tasks.stop(input.taskRunId);
       if (input.action === "cancel") return tasks.cancel(input.taskRunId);
       return tasks.approve(input.taskRunId);
     },
     onSuccess: refresh,
+  }));
+
+  const steerMutation = createMutation(() => ({
+    mutationFn: (taskRunId: string) => tasks.steer(taskRunId, steerInstruction),
+    onSuccess: async () => {
+      steerInstruction = "";
+      await refresh();
+    },
   }));
 
   const deliverMutation = createMutation(() => ({
@@ -209,6 +219,7 @@
         <div class="min-w-0 space-y-4">
           <div class="flex flex-wrap gap-2">
             <Badge>{selectedTask.status}</Badge>
+            <Badge variant="outline">session: {selectedTask.sessionRecovery}</Badge>
             <Button
               size="sm"
               variant="outline"
@@ -227,12 +238,12 @@
                 variant="outline"
                 onclick={() =>
                   actionMutation.mutate({
-                    action: "cancel",
-                    taskRunId: selectedTask.taskRunId,
+                  action: "stop",
+                  taskRunId: selectedTask.taskRunId,
                   })}
               >
                 <Square class="size-4" />
-                {$t(i18nKeys.console.agentWorkspaces.cancel)}
+                Stop
               </Button>
             {/if}
             {#if selectedTask.status === "awaiting-approval"}
@@ -249,6 +260,36 @@
               </Button>
             {/if}
           </div>
+
+          <div class="grid gap-2 rounded-md border p-3">
+            <label class="text-sm font-medium" for="agent-task-steer">Steer current Task</label>
+            <textarea
+              id="agent-task-steer"
+              class="min-h-20 rounded-md border bg-background p-2 text-sm"
+              bind:value={steerInstruction}
+              placeholder="Keep the existing API compatible"
+            ></textarea>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={steerMutation.isPending || !steerInstruction.trim()}
+              onclick={() => steerMutation.mutate(selectedTask.taskRunId)}
+            >
+              Steer
+            </Button>
+          </div>
+
+          <details class="rounded-md border p-3" open>
+            <summary class="cursor-pointer text-sm font-semibold">Session and Run lineage</summary>
+            <ol class="mt-3 space-y-2 text-xs">
+              {#each selectedTask.runLineage as run (run.runId)}
+                <li class="rounded border p-2">
+                  <span class="font-mono">{run.runId}</span>
+                  <span class="ml-2">{run.recovery} · {run.status}</span>
+                </li>
+              {/each}
+            </ol>
+          </details>
 
           <div class="space-y-2">
             <h3 class="text-sm font-semibold">
@@ -368,9 +409,9 @@
             </a>
           {/if}
 
-          {#if actionMutation.error || deliverMutation.error}
+          {#if actionMutation.error || steerMutation.error || deliverMutation.error}
             <p class="text-sm text-destructive">
-              {readErrorMessage(actionMutation.error ?? deliverMutation.error)}
+              {readErrorMessage(actionMutation.error ?? steerMutation.error ?? deliverMutation.error)}
             </p>
           {/if}
         </div>

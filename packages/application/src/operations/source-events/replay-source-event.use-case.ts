@@ -74,6 +74,15 @@ export class ReplaySourceEventUseCase {
         }),
       );
     }
+    if (sourceEvent.eventKind !== "push" && sourceEvent.eventKind !== "tag") {
+      return err(
+        domainError.conflict("This SourceEvent kind is not a deployment replay event", {
+          phase: "source-event-replay",
+          sourceEventId: sourceEvent.sourceEventId,
+          eventKind: sourceEvent.eventKind,
+        }),
+      );
+    }
 
     const outcome = await evaluateSourceEventPolicyMatch(
       repositoryContext,

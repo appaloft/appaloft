@@ -4,6 +4,7 @@ export * from "./configuration";
 export * from "./dependency-resources";
 export * from "./execution-sandbox";
 export * from "./extensibility";
+export * from "./github-agent-automation";
 export * from "./identity-governance";
 export * from "./release-orchestration";
 export * from "./runtime-topology";

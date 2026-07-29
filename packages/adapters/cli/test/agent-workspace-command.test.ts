@@ -29,6 +29,8 @@ import {
   ShowAgentTaskRunQuery,
   ShowSandboxQuery,
   ShowWorkspaceCollaborationQuery,
+  SteerAgentTaskRunCommand,
+  StopAgentTaskRunCommand,
   TerminateSandboxAgentRuntimeCommand,
   TerminateSandboxCommand,
 } from "@appaloft/application";
@@ -527,7 +529,7 @@ describe("Agent Workspace CLI", () => {
     }
   });
 
-  test("[AGENT-TASK-RUN-001][AGENT-TASK-RESUME-002][AGENT-TASK-CHECK-003][AGENT-TASK-DIFF-004][AGENT-TASK-PREVIEW-005][AGENT-TASK-ARTIFACT-006][AGENT-TASK-APPROVE-007][AGENT-TASK-PR-008][AGENT-TASK-CANCEL-009] dispatches the complete Task workflow through canonical operations", async () => {
+  test("[AGENT-TASK-RUN-001][AGENT-TASK-RESUME-002][AGENT-TASK-CHECK-003][AGENT-TASK-DIFF-004][AGENT-TASK-PREVIEW-005][AGENT-TASK-ARTIFACT-006][AGENT-TASK-APPROVE-007][AGENT-TASK-PR-008][AGENT-TASK-CANCEL-009][GH-AUTO-CONTROL-010][GH-AUTO-SURFACE-019] dispatches the complete Task workflow through canonical operations", async () => {
     const commands: Command<unknown>[] = [];
     const queries: Query<unknown>[] = [];
     const task = {
@@ -548,6 +550,12 @@ describe("Agent Workspace CLI", () => {
         commands.push(command as Command<unknown>);
         if (command instanceof ResumeAgentTaskRunCommand) {
           return ok({ ...task, status: "awaiting-approval" } as T);
+        }
+        if (command instanceof StopAgentTaskRunCommand) {
+          return ok({ ...task, status: "stopped" } as T);
+        }
+        if (command instanceof SteerAgentTaskRunCommand) {
+          return ok(task as T);
         }
         if (command instanceof ApproveAgentTaskRunCommand) {
           return ok({ ...task, status: "approved" } as T);
@@ -659,6 +667,26 @@ describe("Agent Workspace CLI", () => {
         "appaloft",
         "workspace",
         "task",
+        "stop",
+        "sbx_task_cli",
+        "srun_task_cli",
+      ]);
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "workspace",
+        "task",
+        "steer",
+        "sbx_task_cli",
+        "srun_task_cli",
+        "--instruction",
+        "Keep the existing API compatible",
+      ]);
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "workspace",
+        "task",
         "approve",
         "sbx_task_cli",
         "srun_task_cli",
@@ -714,6 +742,14 @@ describe("Agent Workspace CLI", () => {
     expect(queries.some((query) => query instanceof ListAgentTaskRunsQuery)).toBeTrue();
     expect(queries.some((query) => query instanceof ShowAgentTaskRunQuery)).toBeTrue();
     expect(commands.some((command) => command instanceof ResumeAgentTaskRunCommand)).toBeTrue();
+    expect(commands.some((command) => command instanceof StopAgentTaskRunCommand)).toBeTrue();
+    expect(
+      commands.find((command) => command instanceof SteerAgentTaskRunCommand)?.input,
+    ).toMatchObject({
+      instruction: "Keep the existing API compatible",
+      taskRunId: "srun_task_cli",
+      workspaceId: "sbx_task_cli",
+    });
     expect(commands.some((command) => command instanceof ApproveAgentTaskRunCommand)).toBeTrue();
     expect(commands.some((command) => command instanceof CancelAgentTaskRunCommand)).toBeTrue();
     const delivery = commands.find(
