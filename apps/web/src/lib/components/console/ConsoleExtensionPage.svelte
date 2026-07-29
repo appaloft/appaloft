@@ -219,7 +219,48 @@
     options: ConsolePagePanelFieldOption[];
   };
 
-  type ConsolePagePanelField = ConsolePageNumericPanelField | ConsolePageSelectPanelField;
+  type ConsolePageTextPanelField = {
+    name: string;
+    label: string;
+    type: "password" | "text" | "textarea";
+    value?: string;
+    placeholder?: string;
+    required?: boolean;
+    minLength?: number;
+    maxLength?: number;
+    pattern?: string;
+    rows?: number;
+    autocomplete?: "current-password" | "new-password" | "off";
+  };
+
+  type ConsolePageBooleanPanelField = {
+    name: string;
+    label: string;
+    type: "checkbox";
+    value: boolean;
+    description?: string;
+  };
+
+  type ConsolePageStringListPanelField = {
+    name: string;
+    label: string;
+    type: "string-list";
+    value?: string[];
+    placeholder?: string;
+    required?: boolean;
+    minItems?: number;
+    maxItems?: number;
+    itemMaxLength?: number;
+    rows?: number;
+  };
+
+  type ConsolePagePanelField =
+    | ConsolePageNumericPanelField
+    | ConsolePageSelectPanelField
+    | ConsolePageTextPanelField
+    | ConsolePageBooleanPanelField
+    | ConsolePageStringListPanelField;
+  type ConsolePagePanelFieldValue = boolean | number | string | string[];
 
   type ConsolePageRequestAction = {
     label: string;
@@ -440,7 +481,7 @@
     item?: ConsolePagePanelItem;
   } | null>(null);
   let confirmationOpen = $state(false);
-  let panelFieldValues = $state<Record<string, number | string>>({});
+  let panelFieldValues = $state<Record<string, ConsolePagePanelFieldValue>>({});
   let selectedPanelGridSection = $state<ConsolePageDialogPanelGridSection | null>(null);
   let panelGridDialogOpen = $state(false);
   let selectedIntegrationDetails = $state<ConsolePageIntegrationDetails | null>(null);
@@ -793,16 +834,34 @@
   function panelFieldValue(
     item: ConsolePagePanelItem,
     field: ConsolePagePanelField,
-  ): number | string {
+  ): ConsolePagePanelFieldValue {
     const stored = panelFieldValues[panelFieldKey(item, field)];
     if (field.type === "select") {
       return typeof stored === "string" ? stored : field.value;
     }
-    const value = typeof stored === "number" ? stored : field.value;
-    return clampPanelFieldValue(value, field);
+    if (field.type === "password") {
+      return typeof stored === "string" ? stored : "";
+    }
+    if (field.type === "text" || field.type === "textarea") {
+      return typeof stored === "string" ? stored : (field.value ?? "");
+    }
+    if (field.type === "checkbox") {
+      return typeof stored === "boolean" ? stored : field.value;
+    }
+    if (field.type === "string-list") {
+      return Array.isArray(stored) ? stored : (field.value ?? []);
+    }
+    if (field.type === "number" || field.type === "range" || field.type === "range-number") {
+      const value = typeof stored === "number" ? stored : field.value;
+      return clampPanelFieldValue(value, field);
+    }
+    return "";
   }
 
-  function panelFieldValueByName(item: ConsolePagePanelItem, fieldName: string): number | string | null {
+  function panelFieldValueByName(
+    item: ConsolePagePanelItem,
+    fieldName: string,
+  ): ConsolePagePanelFieldValue | null {
     const field = item.fields?.find((candidate) => candidate.name === fieldName);
     return field ? panelFieldValue(item, field) : null;
   }
@@ -822,6 +881,120 @@
       ...panelFieldValues,
       [panelFieldKey(item, field)]: value,
     };
+  }
+
+  function setPanelTextFieldValue(
+    item: ConsolePagePanelItem,
+    field: ConsolePageTextPanelField,
+    value: string,
+  ): void {
+    panelFieldValues = {
+      ...panelFieldValues,
+      [panelFieldKey(item, field)]:
+        typeof field.maxLength === "number" ? value.slice(0, field.maxLength) : value,
+    };
+  }
+
+  function setPanelBooleanFieldValue(
+    item: ConsolePagePanelItem,
+    field: ConsolePageBooleanPanelField,
+    value: boolean,
+  ): void {
+    panelFieldValues = {
+      ...panelFieldValues,
+      [panelFieldKey(item, field)]: value,
+    };
+  }
+
+  function normalizeStringList(value: string): string[] {
+    return [
+      ...new Set(
+        value
+          .split(/\r?\n|,/u)
+          .map((item) => item.trim())
+          .filter(Boolean),
+      ),
+    ];
+  }
+
+  function setPanelStringListFieldValue(
+    item: ConsolePagePanelItem,
+    field: ConsolePageStringListPanelField,
+    value: string,
+  ): void {
+    panelFieldValues = {
+      ...panelFieldValues,
+      [panelFieldKey(item, field)]: normalizeStringList(value),
+    };
+  }
+
+  function panelFieldValidationMessage(
+    item: ConsolePagePanelItem,
+    field: ConsolePagePanelField,
+  ): string {
+    const value = panelFieldValue(item, field);
+    if (field.type === "text" || field.type === "password" || field.type === "textarea") {
+      const text = String(value);
+      if (field.required && !text.trim()) return `${field.label} is required.`;
+      if (text && typeof field.minLength === "number" && text.length < field.minLength) {
+        return `${field.label} must contain at least ${field.minLength} characters.`;
+      }
+      if (typeof field.maxLength === "number" && text.length > field.maxLength) {
+        return `${field.label} must contain at most ${field.maxLength} characters.`;
+      }
+      if (field.pattern && text) {
+        try {
+          if (!new RegExp(field.pattern, "u").test(text)) {
+            return `${field.label} has an invalid format.`;
+          }
+        } catch {
+          return `${field.label} has an invalid validation pattern.`;
+        }
+      }
+    }
+    if (field.type === "string-list") {
+      const items = Array.isArray(value) ? value : [];
+      if (field.required && items.length === 0) return `${field.label} is required.`;
+      if (typeof field.minItems === "number" && items.length < field.minItems) {
+        return `${field.label} requires at least ${field.minItems} values.`;
+      }
+      if (typeof field.maxItems === "number" && items.length > field.maxItems) {
+        return `${field.label} accepts at most ${field.maxItems} values.`;
+      }
+      const itemMaxLength = field.itemMaxLength;
+      if (
+        typeof itemMaxLength === "number" &&
+        items.some((item) => item.length > itemMaxLength)
+      ) {
+        return `${field.label} values must contain at most ${itemMaxLength} characters.`;
+      }
+    }
+    return "";
+  }
+
+  function requestActionValidationMessage(
+    action: ConsolePageRequestAction,
+    item?: ConsolePagePanelItem,
+  ): string {
+    if (!item || !action.fieldBindings) return "";
+    for (const fieldName of Object.values(action.fieldBindings)) {
+      const field = item.fields?.find((candidate) => candidate.name === fieldName);
+      if (!field) continue;
+      const message = panelFieldValidationMessage(item, field);
+      if (message) return message;
+    }
+    return "";
+  }
+
+  function clearSensitivePanelFields(item?: ConsolePagePanelItem): void {
+    if (!item) return;
+    const passwordFields = item.fields?.filter((field) => field.type === "password") ?? [];
+    if (passwordFields.length === 0) return;
+    const nextValues = { ...panelFieldValues };
+    for (const field of passwordFields) {
+      delete nextValues[panelFieldKey(item, field)];
+    }
+    panelFieldValues = nextValues;
   }
 
   function panelFieldDisplayDivisor(field: ConsolePageNumericPanelField): number {
@@ -994,6 +1167,11 @@
       actionErrorMessage = action.disabledReason ?? "";
       return;
     }
+    const validationMessage = requestActionValidationMessage(action, item);
+    if (validationMessage) {
+      actionErrorMessage = validationMessage;
+      return;
+    }
     if (action.confirmation && !options.confirmed) {
       confirmationAction = { action, item };
       confirmationOpen = true;
@@ -1024,10 +1202,13 @@
         return;
       }
 
-      actionErrorMessage = $t(i18nKeys.errors.web.unknownRequestFailure);
+      await pageDocumentQuery.refetch();
+      panelGridDialogOpen = false;
+      selectedPanelGridSection = null;
     } catch (error) {
       actionErrorMessage = readErrorMessage(error);
     } finally {
+      clearSensitivePanelFields(item);
       pendingActionKey = null;
     }
   }
@@ -1083,6 +1264,76 @@
                       </Select.Content>
                     </Select.Root>
                   {/if}
+                  {#if field.type === "text" || field.type === "password"}
+                    <input
+                      class="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                      type={field.type}
+                      value={String(panelFieldValue(item, field))}
+                      placeholder={field.placeholder}
+                      required={field.required}
+                      minlength={field.minLength}
+                      maxlength={field.maxLength}
+                      pattern={field.pattern}
+                      autocomplete={field.autocomplete ??
+                        (field.type === "password" ? "new-password" : "off")}
+                      oninput={(event) =>
+                        setPanelTextFieldValue(
+                          item,
+                          field,
+                          (event.currentTarget as HTMLInputElement).value,
+                        )}
+                    />
+                  {/if}
+                  {#if field.type === "textarea"}
+                    <textarea
+                      class="min-h-24 min-w-0 flex-1 resize-y rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                      value={String(panelFieldValue(item, field))}
+                      placeholder={field.placeholder}
+                      required={field.required}
+                      minlength={field.minLength}
+                      maxlength={field.maxLength}
+                      rows={field.rows ?? 4}
+                      autocomplete={field.autocomplete ?? "off"}
+                      oninput={(event) =>
+                        setPanelTextFieldValue(
+                          item,
+                          field,
+                          (event.currentTarget as HTMLTextAreaElement).value,
+                        )}
+                    ></textarea>
+                  {/if}
+                  {#if field.type === "string-list"}
+                    <textarea
+                      class="min-h-24 min-w-0 flex-1 resize-y rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                      value={(panelFieldValue(item, field) as string[]).join("\n")}
+                      placeholder={field.placeholder}
+                      required={field.required}
+                      rows={field.rows ?? 4}
+                      autocomplete="off"
+                      oninput={(event) =>
+                        setPanelStringListFieldValue(
+                          item,
+                          field,
+                          (event.currentTarget as HTMLTextAreaElement).value,
+                        )}
+                    ></textarea>
+                  {/if}
+                  {#if field.type === "checkbox"}
+                    <input
+                      class="size-4 shrink-0 rounded border-input accent-primary"
+                      type="checkbox"
+                      checked={Boolean(panelFieldValue(item, field))}
+                      onchange={(event) =>
+                        setPanelBooleanFieldValue(
+                          item,
+                          field,
+                          (event.currentTarget as HTMLInputElement).checked,
+                        )}
+                    />
+                    {#if field.description}
+                      <span class="text-sm text-muted-foreground">{field.description}</span>
+                    {/if}
+                  {/if}
                   {#if field.type === "range" || field.type === "range-number"}
                     <input
                       class="h-2 min-w-0 flex-1 cursor-pointer appearance-none rounded-full bg-muted accent-primary"
@@ -1099,7 +1350,10 @@
                         )}
                     />
                   {/if}
-                  {#if field.type !== "select" && field.prefix}
+                  {#if (field.type === "number" ||
+                      field.type === "range" ||
+                      field.type === "range-number") &&
+                    field.prefix}
                     <span class="shrink-0 text-sm font-medium text-muted-foreground">
                       {field.prefix}
                     </span>
@@ -1120,10 +1374,18 @@
                         )}
                     />
                   {/if}
-                  {#if field.type !== "select" && field.suffix}
+                  {#if (field.type === "number" ||
+                      field.type === "range" ||
+                      field.type === "range-number") &&
+                    field.suffix}
                     <span class="shrink-0 text-sm text-muted-foreground">{field.suffix}</span>
                   {/if}
                 </div>
+                {#if panelFieldValidationMessage(item, field)}
+                  <span class="block text-xs text-destructive">
+                    {panelFieldValidationMessage(item, field)}
+                  </span>
+                {/if}
               </label>
             {/each}
           </div>
@@ -1147,6 +1409,7 @@
                 type="button"
                 variant={action.variant === "primary" ? "default" : "outline"}
                 disabled={Boolean(action.disabled) ||
+                  Boolean(requestActionValidationMessage(action, item)) ||
                   pendingActionKey === requestActionKey(action, item)}
                 onclick={() => runRequestAction(action, item)}
               >
@@ -1233,6 +1496,7 @@
                       type="button"
                       variant={action.variant === "primary" ? "default" : "outline"}
                       disabled={Boolean(action.disabled) ||
+                        Boolean(requestActionValidationMessage(action, item)) ||
                         pendingActionKey === requestActionKey(action, item)}
                       title={action.disabled && action.disabledReason
                         ? action.disabledReason
