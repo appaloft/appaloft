@@ -271,6 +271,7 @@ import {
   type AcceptConnectorCapabilityPlanResponse,
   type AccountProfileResponse,
   type AgentAdapterInstallationResponse,
+  type AgentWorkspaceCredentialReference,
   type AgentWorkspaceProfileInstallationResponse,
   type ArchiveDeploymentResponse,
   type ArchiveEnvironmentResponse,
@@ -297,6 +298,7 @@ import {
   type ConfigureDependencyResourceBackupPolicyResponse,
   type ConfigureDomainBindingRouteResponse,
   type ConfigurePreviewPolicyResponse,
+  type ConfigureProjectWorkspaceProfileCommandInput,
   type ConfigureResourceAccessResponse,
   type ConfigureResourceAutoDeployResponse,
   type ConfigureResourceHealthResponse,
@@ -422,6 +424,7 @@ import {
   type ReorderProjectsResponse,
   type ReorderServersResponse,
   type ReplaySourceEventResponse,
+  type RepositoryBindingReadModel,
   type ResetResourceHealthResponse,
   type ResourceAccessFailureEvidenceLookup,
   type ResourceDetail,
@@ -496,6 +499,8 @@ import {
   type UnsetResourceVariableResponse,
   type ValidateAgentAdapterResponse,
   type ValidateAgentWorkspaceProfileResponse,
+  type WorkspaceOpenInput,
+  type WorkspaceOpenResult,
 } from "@appaloft/contracts";
 import { type AsyncIteratorClass, type Client, type ORPCError } from "@orpc/client";
 
@@ -622,6 +627,34 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientError
     >;
   };
+  workspaces: {
+    open: Client<
+      AppaloftClientContext,
+      WorkspaceOpenInput,
+      WorkspaceOpenResult,
+      AppaloftClientError
+    >;
+  };
+  repositoryBindings: {
+    bind: Client<
+      AppaloftClientContext,
+      { repositoryIdentity: string; projectId: string },
+      RepositoryBindingReadModel,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      { repositoryIdentity: string },
+      RepositoryBindingReadModel,
+      AppaloftClientError
+    >;
+    unbind: Client<
+      AppaloftClientContext,
+      { repositoryIdentity: string },
+      RepositoryBindingReadModel,
+      AppaloftClientError
+    >;
+  };
   agentAdapters: {
     validate: Client<
       AppaloftClientContext,
@@ -689,6 +722,15 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       { installationId: string },
       CompileAgentWorkspaceProfileResponse,
+      AppaloftClientError
+    >;
+    configureCredentialConnections: Client<
+      AppaloftClientContext,
+      {
+        installationId: string;
+        connections: AgentWorkspaceCredentialReference[];
+      },
+      AgentWorkspaceProfileInstallationResponse,
       AppaloftClientError
     >;
     disable: Client<
@@ -1288,6 +1330,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       SetProjectDescriptionCommandInput,
       SetProjectDescriptionResponse,
+      AppaloftClientError
+    >;
+    configureWorkspaceProfile: Client<
+      AppaloftClientContext,
+      ConfigureProjectWorkspaceProfileCommandInput,
+      { projectId: string; profileInstallationId: string },
       AppaloftClientError
     >;
     archive: Client<

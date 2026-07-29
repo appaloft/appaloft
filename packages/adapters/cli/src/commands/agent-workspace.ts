@@ -1,3 +1,5 @@
+import { spawn } from "node:child_process";
+
 import {
   AcquireWorkspaceWriterLeaseCommand,
   AddWorkspaceCollaborationLaneCommand,
@@ -8,11 +10,8 @@ import {
   ChangeWorkspaceCollaborationParticipantRoleCommand,
   CloseWorkspaceCollaborationCommand,
   CreateAgentTaskRunCommand,
-  CreateSandboxAgentRuntimeCommand,
-  CreateSandboxCommand,
   CreateWorkspaceCollaborationCommand,
   DeliverAgentTaskRunCommand,
-  ExecuteSandboxCommand,
   ExposeSandboxPortCommand,
   IssueSandboxAgentAttachAccessCommand,
   IssueWorkspaceCollaborationNativeAttachCommand,
@@ -23,6 +22,7 @@ import {
   ListSandboxesQuery,
   ListWorkspaceCollaborationsQuery,
   OfferWorkspaceCollaborationHandoffCommand,
+  OpenAgentWorkspaceCommand,
   OpenTerminalSessionCommand,
   PauseSandboxCommand,
   ReleaseWorkspaceWriterLeaseCommand,
@@ -40,11 +40,15 @@ import {
   TerminateSandboxAgentRuntimeCommand,
   TerminateSandboxCommand,
   TransferWorkspaceWriterLeaseCommand,
+  type WorkspaceOpenResult,
 } from "@appaloft/application";
-import { domainError } from "@appaloft/core";
+import { type DomainError, domainError } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
-
+import {
+  resolveLocalGitWorkspaceContext,
+  resolveRemoteGitWorkspaceRef,
+} from "../local-git-workspace-context.js";
 import {
   attachTerminalSession,
   CliRuntime,
@@ -63,9 +67,6 @@ const terminalRows = Options.text("rows").pipe(Options.withDefault("24"));
 const terminalCols = Options.text("cols").pipe(Options.withDefault("80"));
 const attachTerminal = Options.boolean("attach").pipe(Options.withDefault(false));
 const terminalSessionId = Options.text("session-id").pipe(Options.optional);
-const repository = Options.text("repo").pipe(Options.optional);
-const repositoryRef = Options.text("ref").pipe(Options.optional);
-const workspaceBranch = Options.text("branch").pipe(Options.optional);
 const collaborationId = Args.text({ name: "collaborationId" });
 const collaborationLaneId = Options.text("lane-id");
 const collaborationRole = Options.choice("role", [
@@ -107,248 +108,180 @@ interface AgentRuntimeListResult {
   readonly items: readonly AgentRuntimeResult[];
 }
 
-function requireWorkspaceId(value: unknown): string {
-  if (typeof value === "string" && value.trim()) return value;
-  throw domainError.infra("Workspace creation returned no Sandbox id", {
-    code: "agent_workspace_sandbox_id_missing",
-  });
-}
-
-function validateRepositoryLocator(value: string): string {
-  const normalized = value.trim();
-  if (
-    !normalized ||
-    normalized.length > 2_048 ||
-    normalized.includes("\0") ||
-    normalized.startsWith("-") ||
-    /[\r\n]/u.test(normalized)
-  ) {
-    throw domainError.validation("Workspace repository locator is invalid");
-  }
-  let repository: URL;
-  try {
-    repository = new URL(normalized);
-  } catch {
-    throw domainError.validation("Workspace repository must use HTTPS");
-  }
-  if (
-    repository.protocol !== "https:" ||
-    !repository.hostname ||
-    repository.username ||
-    repository.password ||
-    repository.port ||
-    repository.pathname === "/" ||
-    repository.search ||
-    repository.hash
-  ) {
-    throw domainError.validation("Workspace repository must use credential-free HTTPS");
-  }
-  return normalized;
-}
-
-function validateGitRef(value: string | undefined, label: string): string | undefined {
-  const normalized = value?.trim();
-  if (!normalized) return undefined;
-  if (
-    normalized.length > 512 ||
-    normalized.startsWith("-") ||
-    normalized.includes("\0") ||
-    /[\s~^:?*[\\]/u.test(normalized) ||
-    normalized.includes("..") ||
-    normalized.endsWith(".") ||
-    normalized.endsWith("/")
-  ) {
-    throw domainError.validation(`Workspace ${label} is invalid`);
-  }
-  return normalized;
-}
-
 function requireOption(value: string | undefined, label: string): string {
   if (value?.trim()) return value.trim();
   throw domainError.validation(`${label} is required`);
 }
 
-function repositoryNetworkRules(locator: string): Array<{
-  kind: "domain";
-  value: string;
-  ports: number[];
-}> {
-  const host = new URL(locator).hostname.toLowerCase();
-  return [
-    { kind: "domain", value: host, ports: [443] },
-    ...(host === "github.com"
-      ? [{ kind: "domain" as const, value: "api.github.com", ports: [443] }]
-      : []),
-  ];
+function workspaceCliError(error: unknown, phase: string): DomainError {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    "category" in error &&
+    "message" in error &&
+    "retryable" in error
+  ) {
+    return error as DomainError;
+  }
+  return domainError.infra("Workspace CLI operation failed", {
+    phase,
+    message: error instanceof Error ? error.message : String(error),
+  });
 }
 
-function requireSuccessfulForegroundExecution(value: unknown, phase: string): void {
-  if (!value || typeof value !== "object" || (value as { mode?: unknown }).mode !== "foreground") {
-    throw domainError.infra(`${phase} returned no foreground result`);
+function launchNativeWorkspaceClient(argv: readonly string[]): Promise<void> {
+  if (
+    argv.length === 0 ||
+    argv.length > 64 ||
+    argv.some(
+      (argument) =>
+        !argument || argument.length > 2_048 || argument.includes("\0") || /[\r\n]/u.test(argument),
+    )
+  ) {
+    return Promise.reject(
+      domainError.conflict("Adapter returned an invalid native attach handoff", {
+        code: "agent_workspace_native_attach_handoff_invalid",
+      }),
+    );
   }
-  const frames = (value as { frames?: unknown }).frames;
-  if (!Array.isArray(frames)) throw domainError.infra(`${phase} returned invalid frames`);
-  const exit = frames.find(
-    (frame) => frame && typeof frame === "object" && (frame as { kind?: unknown }).kind === "exit",
-  ) as { exitCode?: unknown } | undefined;
-  if (exit?.exitCode !== 0) {
-    const stderr = frames
-      .filter(
-        (frame) =>
-          frame && typeof frame === "object" && (frame as { kind?: unknown }).kind === "stderr",
-      )
-      .map((frame) => String((frame as { data?: unknown }).data ?? ""))
-      .join("")
-      .slice(0, 1_024);
-    throw domainError.infra(stderr || `${phase} failed`, {
-      code: "agent_workspace_source_materialization_failed",
-      phase,
+  return new Promise((resolve, reject) => {
+    const child = spawn(argv[0] as string, argv.slice(1), {
+      stdio: "inherit",
+      shell: false,
+    });
+    child.once("error", (error) => reject(error));
+    child.once("exit", (code, signal) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(
+        domainError.conflict("Native Agent client exited before attach completed", {
+          code: "agent_workspace_native_attach_client_failed",
+          exitCode: code ?? -1,
+          signal: signal ?? "unknown",
+        }),
+      );
+    });
+  });
+}
+
+function completeWorkspaceOpen(
+  result: WorkspaceOpenResult,
+  attach: boolean,
+  launchNativeClient: (argv: readonly string[]) => Promise<void> = launchNativeWorkspaceClient,
+) {
+  if (!attach) return print(result);
+  if (!result.attach) {
+    return Effect.fail(
+      domainError.conflict("Workspace Agent does not declare a supported attach capability", {
+        code: "agent_workspace_attach_unsupported",
+        workspaceId: result.workspaceId,
+      }),
+    );
+  }
+  if (result.attach.transport === "managed-terminal") {
+    return attachTerminalSession(
+      ShowTerminalSessionQuery.create({ sessionId: result.attach.sessionId }),
+      {
+        initialRows: 24,
+        initialCols: 80,
+      },
+    );
+  }
+  if (result.attach.clientHandoff === "display-only") {
+    return print({
+      ...result,
+      handoff: {
+        mode: "display-only",
+        clientCommand: result.attach.clientCommand,
+      },
     });
   }
+  const clientCommand = result.attach.clientCommand;
+  return Effect.tryPromise({
+    try: () => launchNativeClient(clientCommand),
+    catch: (error) => workspaceCliError(error, "workspace-native-client-handoff"),
+  });
 }
 
 const create = EffectCommand.make(
   "create",
   {
-    harness: Options.choice("harness", ["pi", "opencode"] as const).pipe(Options.withDefault("pi")),
-    sandboxTemplate: Options.text("sandbox-template"),
-    harnessTemplate: Options.text("harness-template").pipe(Options.optional),
-    isolation: Options.choice("isolation", [
-      "container-trusted",
-      "gvisor",
-      "kata",
-      "microvm",
-    ] as const),
-    cpuMillis: Options.integer("cpu-millis"),
-    memoryBytes: Options.integer("memory-bytes"),
-    diskBytes: Options.integer("disk-bytes"),
-    maxProcesses: Options.integer("max-processes"),
-    expiresAt: Options.text("expires-at").pipe(Options.optional),
-    provider: Options.text("provider").pipe(Options.optional),
-    idempotencyKey: Options.text("idempotency-key").pipe(Options.optional),
-    repository,
-    repositoryRef,
-    workspaceBranch,
+    profile: Options.text("profile"),
+    repository: Options.text("repo"),
+    ref: Options.text("ref"),
+    branch: Options.text("branch"),
+    attach: Options.boolean("attach").pipe(Options.withDefault(false)),
   },
-  ({
-    cpuMillis,
-    diskBytes,
-    expiresAt,
-    harness,
-    harnessTemplate,
-    idempotencyKey,
-    isolation,
-    maxProcesses,
-    memoryBytes,
-    provider,
-    repository,
-    repositoryRef,
-    sandboxTemplate,
-    workspaceBranch,
-  }) =>
+  ({ attach, branch, profile, ref, repository }) =>
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
-      const selectedRepository = optionalValue(repository);
-      const validatedRepository = selectedRepository
-        ? validateRepositoryLocator(selectedRepository)
-        : undefined;
-      const sandboxCommand = yield* resultToEffect(
-        CreateSandboxCommand.create({
-          source: { kind: "template", templateId: sandboxTemplate },
-          requestedIsolation: isolation,
-          limits: { cpuMillis, memoryBytes, diskBytes, maxProcesses },
-          networkPolicy: validatedRepository
-            ? { mode: "allowlist", rules: repositoryNetworkRules(validatedRepository) }
-            : { mode: "deny", rules: [] },
-          ...(optionalValue(expiresAt) ? { expiresAt: optionalValue(expiresAt) } : {}),
-          ...(optionalValue(provider) ? { providerKey: optionalValue(provider) } : {}),
-        }),
-      );
-      const sandbox = yield* resultToEffect(
-        yield* Effect.promise(() => cli.executeCommand(sandboxCommand)),
-      );
-      const sandboxDescriptor = sandbox as SandboxResult;
-      const sandboxId = requireWorkspaceId(sandboxDescriptor.sandboxId);
-      if (validatedRepository) {
-        const ref = validateGitRef(optionalValue(repositoryRef), "source ref");
-        const branch = validateGitRef(optionalValue(workspaceBranch), "branch");
-        const cloneCommand = yield* resultToEffect(
-          ExecuteSandboxCommand.create({
-            sandboxId,
-            argv: [
-              "git",
-              "clone",
-              ...(ref ? ["--branch", ref] : []),
-              "--",
-              validatedRepository,
-              ".",
-            ],
-          }),
-        );
-        const clone = yield* resultToEffect(
-          yield* Effect.promise(() => cli.executeCommand(cloneCommand)),
-        ).pipe(
-          Effect.mapError((error) => ({
-            ...error,
-            message: `Agent Workspace source materialization failed after Sandbox ${sandboxId} was created`,
-            details: {
-              ...error.details,
-              phase: "agent-workspace-source-materialization",
-              workspaceId: sandboxId,
-              sandboxId,
-            },
-          })),
-        );
-        requireSuccessfulForegroundExecution(clone, "agent-workspace-source-materialization");
-        if (branch) {
-          const branchCommand = yield* resultToEffect(
-            ExecuteSandboxCommand.create({
-              sandboxId,
-              argv: ["git", "switch", "-c", branch],
-            }),
-          );
-          const switched = yield* resultToEffect(
-            yield* Effect.promise(() => cli.executeCommand(branchCommand)),
-          );
-          requireSuccessfulForegroundExecution(switched, "agent-workspace-branch-create");
-        }
-      }
-      const selectedHarnessTemplate =
-        optionalValue(harnessTemplate) ??
-        (harness === "pi" ? "aht_pi_managed_v1" : "aht_opencode_managed_v1");
-      const runtimeCommand = yield* resultToEffect(
-        CreateSandboxAgentRuntimeCommand.create({
-          sandboxId,
-          harnessKey: harness,
-          harnessTemplateId: selectedHarnessTemplate,
-          idempotencyKey: optionalValue(idempotencyKey) ?? crypto.randomUUID(),
-        }),
-      );
-      const runtime = yield* resultToEffect(
-        yield* Effect.promise(() => cli.executeCommand(runtimeCommand)),
-      ).pipe(
-        Effect.mapError((error) => ({
-          ...error,
-          message: `Agent Workspace Runtime creation failed after Sandbox ${sandboxId} was created`,
-          details: {
-            ...error.details,
-            phase: "agent-workspace-runtime-create",
-            workspaceId: sandboxId,
-            sandboxId,
-            harness,
-          },
-        })),
-      );
-
-      yield* print({
-        workspaceId: sandboxId,
-        sandbox: sandboxDescriptor,
-        agent: runtime,
+      const source = yield* Effect.tryPromise({
+        try: () =>
+          (cli.resolveRemoteWorkspaceGitRef ?? resolveRemoteGitWorkspaceRef)(repository, ref),
+        catch: (error) => workspaceCliError(error, "workspace-create-git-ref"),
       });
+      const command = yield* resultToEffect(
+        OpenAgentWorkspaceCommand.create({
+          repository: source.credentialFreeHttpsRepository,
+          repositoryIdentity: source.repositoryIdentity,
+          ref: source.ref,
+          branch,
+          commitSha: source.commitSha,
+          profile,
+          forceNew: true,
+          attach,
+        }),
+      );
+      const result = yield* resultToEffect(
+        yield* Effect.promise(() => cli.executeCommand(command)),
+      );
+      yield* completeWorkspaceOpen(result, attach, cli.launchNativeWorkspaceClient);
     }),
 ).pipe(
   EffectCommand.withDescription(
-    "Create a public Agent Workspace backed by a Sandbox and Pi or OpenCode",
+    "Create a Profile-aware Agent Workspace from an exact remote Git ref",
+  ),
+);
+
+const open = EffectCommand.make(
+  "open",
+  {
+    path: Args.text({ name: "path" }).pipe(Args.withDefault(".")),
+    profile: Options.text("profile").pipe(Options.optional),
+    forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
+    noAttach: Options.boolean("no-attach").pipe(Options.withDefault(false)),
+  },
+  ({ forceNew, noAttach, path, profile }) =>
+    Effect.gen(function* () {
+      const cli = yield* CliRuntime;
+      const source = yield* Effect.tryPromise({
+        try: () => (cli.resolveLocalWorkspaceGitContext ?? resolveLocalGitWorkspaceContext)(path),
+        catch: (error) => workspaceCliError(error, "workspace-open-git-context"),
+      });
+      const attach = !noAttach;
+      const command = yield* resultToEffect(
+        OpenAgentWorkspaceCommand.create({
+          repository: source.credentialFreeHttpsRepository,
+          repositoryIdentity: source.repositoryIdentity,
+          ref: source.ref,
+          branch: source.branch,
+          commitSha: source.headSha,
+          ...(optionalValue(profile) ? { profile: optionalValue(profile) } : {}),
+          forceNew,
+          attach,
+        }),
+      );
+      const result = yield* resultToEffect(
+        yield* Effect.promise(() => cli.executeCommand(command)),
+      );
+      yield* completeWorkspaceOpen(result, attach, cli.launchNativeWorkspaceClient);
+    }),
+).pipe(
+  EffectCommand.withDescription(
+    "Create or resume a Profile-aware Workspace from clean, pushed local Git context",
   ),
 );
 
@@ -1099,8 +1032,9 @@ const collaboration = EffectCommand.make("collaboration").pipe(
 );
 
 export const agentWorkspaceCommand = EffectCommand.make("workspace").pipe(
-  EffectCommand.withDescription("Create and operate public Agent Workspaces with Pi or OpenCode"),
+  EffectCommand.withDescription("Open and operate Profile-aware Agent Workspaces"),
   EffectCommand.withSubcommands([
+    open,
     create,
     list,
     show,

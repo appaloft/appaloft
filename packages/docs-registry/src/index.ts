@@ -3150,6 +3150,7 @@ export const publicDocsOperationCoverage = [
     "agent-workspace-profiles.list",
     "agent-workspace-profiles.show",
     "agent-workspace-profiles.compile",
+    "agent-workspace-profiles.configure-credential-connections",
     "agent-workspace-profiles.disable",
     "agent-workspace-profiles.uninstall",
   ].map((operationKey) => ({
@@ -3187,6 +3188,10 @@ export const publicDocsOperationCoverage = [
     "workspace-collaborations.lanes.terminal-access.issue",
     "workspace-collaborations.lanes.native-attach.issue",
     "workspace-collaborations.close",
+    "workspaces.open",
+    "repository-bindings.bind",
+    "repository-bindings.show",
+    "repository-bindings.unbind",
   ].map((operationKey) => ({
     operationKey,
     status: "documented" as const,
@@ -3285,6 +3290,11 @@ export const publicDocsOperationCoverage = [
   { operationKey: "projects.list", status: "documented", topicId: "project.concept" },
   { operationKey: "projects.count", status: "documented", topicId: "project.concept" },
   { operationKey: "projects.show", status: "documented", topicId: "project.lifecycle" },
+  {
+    operationKey: "projects.configure-workspace-profile",
+    status: "documented",
+    topicId: "agent.workspace",
+  },
   { operationKey: "projects.rename", status: "documented", topicId: "project.lifecycle" },
   { operationKey: "projects.reorder", status: "documented", topicId: "project.lifecycle" },
   { operationKey: "projects.set-description", status: "documented", topicId: "project.lifecycle" },

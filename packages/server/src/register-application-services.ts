@@ -30,6 +30,9 @@ import {
   type AgentTaskRunDependencies,
   AgentTaskRunQueryHandler,
   AgentTaskRunService,
+  AgentWorkspaceOpenCommandHandler,
+  AgentWorkspaceOpenPreflightService,
+  AgentWorkspaceOpenService,
   AgentWorkspaceProfileCommandHandler,
   type AgentWorkspaceProfileInstallationReferenceReader,
   AgentWorkspaceProfileInstallationService,
@@ -54,6 +57,7 @@ import {
   AttachResourceStorageCommandHandler,
   AttachResourceStorageUseCase,
   AutomaticRouteContextLookupService,
+  BindRepositoryCommandHandler,
   BindResourceDependencyCommandHandler,
   BindResourceDependencyUseCase,
   BlueprintCatalogQueryService,
@@ -90,6 +94,7 @@ import {
   CleanupPreviewUseCase,
   CleanupStorageVolumeRuntimeCommandHandler,
   CleanupStorageVolumeRuntimeUseCase,
+  type Clock,
   CloneEnvironmentCommandHandler,
   CloneEnvironmentUseCase,
   CloseTerminalSessionCommandHandler,
@@ -105,6 +110,8 @@ import {
   ConfigureDomainBindingRouteUseCase,
   ConfigurePreviewPolicyCommandHandler,
   ConfigurePreviewPolicyUseCase,
+  ConfigureProjectWorkspaceProfileCommandHandler,
+  ConfigureProjectWorkspaceProfileUseCase,
   ConfigureResourceAccessCommandHandler,
   ConfigureResourceAccessUseCase,
   ConfigureResourceAutoDeployCommandHandler,
@@ -265,6 +272,7 @@ import {
   ExportControlPlaneCommandHandler,
   ExportGlobalAuditEventsQueryHandler,
   ExportGlobalAuditEventsQueryService,
+  FailClosedWorkspaceOpenCredentialAdmission,
   ForceRedeployDeploymentCommandHandler,
   ForceRedeployDeploymentUseCase,
   GenericSignedSourceEventVerifier,
@@ -289,6 +297,7 @@ import {
   IngestSourceEventCommandHandler,
   IngestSourceEventUseCase,
   InMemoryDependencyResourceProvisioningPlanStore,
+  InMemoryWorkspaceOpenPlacementPort,
   InspectDependencyResourceQueryHandler,
   InspectDependencyResourceQueryService,
   InspectDomainBindingDnsReadinessQueryHandler,
@@ -494,6 +503,8 @@ import {
   ReorderServersUseCase,
   ReplaySourceEventCommandHandler,
   ReplaySourceEventUseCase,
+  type RepositoryBindingRepository,
+  RepositoryBindingService,
   ResetResourceHealthCommandHandler,
   ResetResourceHealthUseCase,
   ResolveActionServerConfigDeploymentTargetCommandHandler,
@@ -631,6 +642,7 @@ import {
   ShowPreviewPolicyQueryService,
   ShowProjectQueryHandler,
   ShowProjectQueryService,
+  ShowRepositoryBindingQueryHandler,
   ShowResourceDependencyBindingQueryHandler,
   ShowResourceDependencyBindingQueryService,
   ShowResourceQueryHandler,
@@ -684,6 +696,7 @@ import {
   TunnelSessionService,
   tokens,
   toRepositoryContext,
+  UnbindRepositoryCommandHandler,
   UnbindResourceDependencyCommandHandler,
   UnbindResourceDependencyUseCase,
   UnlockEnvironmentCommandHandler,
@@ -698,6 +711,9 @@ import {
   WorkspaceCollaborationQueryHandler,
   type WorkspaceCollaborationRepository,
   WorkspaceCollaborationService,
+  type WorkspaceOpenCredentialAdmissionPort,
+  type WorkspaceOpenEntryRepository,
+  type WorkspaceOpenPlacementPort,
 } from "@appaloft/application";
 import { type AshScript, ash } from "@appaloft/ash";
 import {
@@ -3121,6 +3137,7 @@ export function registerApplicationServices(
   container.registerSingleton(RotateSshCredentialCommandHandler);
   container.registerSingleton(RenameServerCommandHandler);
   container.registerSingleton(SetProjectDescriptionCommandHandler);
+  container.registerSingleton(ConfigureProjectWorkspaceProfileCommandHandler);
   container.registerSingleton(ShowResourceQueryHandler);
   container.registerSingleton(ListResourceSecretReferencesQueryHandler);
   container.registerSingleton(ShowResourceSecretReferenceQueryHandler);
@@ -3307,6 +3324,10 @@ export function registerApplicationServices(
   container.registerSingleton(AgentAdapterQueryHandler);
   container.registerSingleton(AgentWorkspaceProfileCommandHandler);
   container.registerSingleton(AgentWorkspaceProfileQueryHandler);
+  container.registerSingleton(AgentWorkspaceOpenCommandHandler);
+  container.registerSingleton(BindRepositoryCommandHandler);
+  container.registerSingleton(ShowRepositoryBindingQueryHandler);
+  container.registerSingleton(UnbindRepositoryCommandHandler);
   container.registerSingleton(WorkspaceCollaborationCommandHandler);
   container.registerSingleton(WorkspaceCollaborationQueryHandler);
   container.registerSingleton(RevokeDeployTokenCommandHandler);
@@ -3818,6 +3839,123 @@ export function registerApplicationServices(
       } satisfies SandboxAgentDeliveryDependencies);
     }),
   });
+  if (!container.isRegistered(tokens.workspaceOpenCredentialAdmission, true)) {
+    container.register(tokens.workspaceOpenCredentialAdmission, {
+      useValue: new FailClosedWorkspaceOpenCredentialAdmission(),
+    });
+  }
+  if (!container.isRegistered(tokens.workspaceOpenPlacement, true)) {
+    container.register(tokens.workspaceOpenPlacement, {
+      useValue: new InMemoryWorkspaceOpenPlacementPort(),
+    });
+  }
+  container.register(tokens.repositoryBindingService, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new RepositoryBindingService({
+          repository: dependencyContainer.resolve<RepositoryBindingRepository>(
+            tokens.repositoryBindingRepository,
+          ),
+          projects: dependencyContainer.resolve(tokens.projectRepository),
+          clock: dependencyContainer.resolve(tokens.clock),
+          idGenerator: dependencyContainer.resolve(tokens.idGenerator),
+        }),
+    ),
+  });
+  container.register(tokens.agentWorkspaceOpenPreflightService, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new AgentWorkspaceOpenPreflightService({
+          repositoryBindings: dependencyContainer.resolve<RepositoryBindingRepository>(
+            tokens.repositoryBindingRepository,
+          ),
+          projects: dependencyContainer.resolve(tokens.projectRepository),
+          profiles: dependencyContainer.resolve(tokens.agentWorkspaceProfileRegistryRepository),
+          profileCompiler: dependencyContainer.resolve<AgentWorkspaceProfileInstallationService>(
+            tokens.agentWorkspaceProfileInstallationService,
+          ),
+          credentialAdmission: dependencyContainer.resolve<WorkspaceOpenCredentialAdmissionPort>(
+            tokens.workspaceOpenCredentialAdmission,
+          ),
+          placement: dependencyContainer.resolve<WorkspaceOpenPlacementPort>(
+            tokens.workspaceOpenPlacement,
+          ),
+        }),
+    ),
+  });
+  container.register(tokens.agentWorkspaceOpenService, {
+    useFactory: instanceCachingFactory((dependencyContainer) => {
+      const sandboxService = dependencyContainer.resolve<ExecutionSandboxService>(
+        tokens.executionSandboxService,
+      );
+      const agentService = dependencyContainer.resolve<SandboxAgentDeliveryService>(
+        tokens.sandboxAgentDeliveryService,
+      );
+      const placement = dependencyContainer.resolve<WorkspaceOpenPlacementPort>(
+        tokens.workspaceOpenPlacement,
+      );
+      return new AgentWorkspaceOpenService({
+        preflight: dependencyContainer.resolve<AgentWorkspaceOpenPreflightService>(
+          tokens.agentWorkspaceOpenPreflightService,
+        ),
+        entries: dependencyContainer.resolve<WorkspaceOpenEntryRepository>(
+          tokens.workspaceOpenEntryRepository,
+        ),
+        sandboxes: {
+          async create(context, input) {
+            const created = await sandboxService.createAndReconcile(context, {
+              source: input.source,
+              requestedIsolation: input.requestedIsolation,
+              limits: input.limits,
+              networkPolicy:
+                input.networkPolicy.mode === "deny"
+                  ? { mode: "deny", rules: [] }
+                  : input.networkPolicy,
+            });
+            return created.map((sandbox) => ({
+              sandboxId: sandbox.sandboxId,
+              status: sandbox.status,
+            }));
+          },
+          async resume(context, workspaceId) {
+            const shown = await sandboxService.show(context, workspaceId);
+            if (shown.isErr()) return shown;
+            const resumed =
+              shown.value.status === "paused"
+                ? await sandboxService.resume(context, workspaceId)
+                : shown;
+            return resumed.map((sandbox) => ({
+              sandboxId: sandbox.sandboxId,
+              status: sandbox.status,
+            }));
+          },
+          async exec(context, workspaceId, input) {
+            const executed = await sandboxService.exec(context, workspaceId, {
+              argv: [...input.argv],
+              ...(input.cwd ? { cwd: input.cwd } : {}),
+            });
+            if (executed.isErr()) return err(executed.error);
+            if (executed.value.mode !== "foreground") {
+              return err(domainError.invariant("Workspace initialization must run in foreground"));
+            }
+            return ok(executed.value);
+          },
+          async exposePort(context, workspaceId, input) {
+            const exposed = await sandboxService.exposePort(context, workspaceId, input);
+            return exposed.isErr() ? err(exposed.error) : ok(undefined);
+          },
+        },
+        agents: {
+          showRuntime: (context, input) =>
+            agentService.showRuntime(context, input.sandboxId, input.runtimeId),
+          createRuntime: (context, input) => agentService.createRuntime(context, input),
+          attach: (context, input) => agentService.issueAttachAccess(context, input),
+        },
+        reservations: placement,
+        now: () => dependencyContainer.resolve<Clock>(tokens.clock).now(),
+      });
+    }),
+  });
   container.register(tokens.agentTaskRunService, {
     useFactory: instanceCachingFactory((dependencyContainer) => {
       const sandboxService = dependencyContainer.resolve<ExecutionSandboxService>(
@@ -3926,6 +4064,10 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.renameProjectUseCase, RenameProjectUseCase);
   container.registerSingleton(tokens.reorderProjectsUseCase, ReorderProjectsUseCase);
   container.registerSingleton(tokens.setProjectDescriptionUseCase, SetProjectDescriptionUseCase);
+  container.registerSingleton(
+    tokens.configureProjectWorkspaceProfileUseCase,
+    ConfigureProjectWorkspaceProfileUseCase,
+  );
   container.registerSingleton(tokens.showProjectQueryService, ShowProjectQueryService);
   container.registerSingleton(
     tokens.configureDefaultAccessDomainPolicyUseCase,

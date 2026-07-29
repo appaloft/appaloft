@@ -19,8 +19,7 @@ const identifierPattern = /^[a-z][a-z0-9-]{0,62}$/;
 const sandboxTemplateIdentifierPattern = /^[a-z][a-z0-9_-]{0,127}$/;
 const digestPattern = /^sha256:[a-f0-9]{64}$/;
 const environmentVariablePattern = /^[A-Z_][A-Z0-9_]{0,127}$/;
-const secretReferencePattern =
-  /^(?:secret|vault|supabase-vault):\/\/[a-zA-Z0-9][a-zA-Z0-9_./:#-]{1,511}$/;
+const connectionReferencePattern = /^[A-Za-z][A-Za-z0-9_.:-]{0,159}$/;
 const safeHttpPathPattern = /^\/(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[^?#]*$/;
 const domainNamePattern =
   /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
@@ -86,6 +85,7 @@ const interactionModeSchema = z
     eventFidelity: z.enum(["raw-pty", "line-events", "structured-events"]),
     structuredEventSchemaVersion: z.literal("appaloft.agent-event/v1").optional(),
     sessionRecovery: z.enum(["process-lifetime", "managed-run-lineage", "native-session-store"]),
+    clientHandoff: z.enum(["local-client-exec", "display-only"]).optional(),
   })
   .strict()
   .superRefine((mode, context) => {
@@ -117,6 +117,13 @@ const interactionModeSchema = z
         code: "custom",
         message: "interactive modes do not accept managed task input",
         path: ["taskInput"],
+      });
+    }
+    if (mode.transport !== "native-attach" && mode.clientHandoff) {
+      context.addIssue({
+        code: "custom",
+        message: "client handoff is only valid for native-attach modes",
+        path: ["clientHandoff"],
       });
     }
     if (mode.eventFidelity === "structured-events" && !mode.structuredEventSchemaVersion) {
@@ -173,7 +180,7 @@ const credentialRequirementSchema = z
 export const agentAdapterCredentialReferenceSchema = z
   .object({
     requirementId: identifierSchema,
-    secretRef: z.string().trim().regex(secretReferencePattern),
+    connectionReference: z.string().trim().regex(connectionReferencePattern),
   })
   .strict();
 
@@ -457,7 +464,7 @@ export interface ResolvedAgentAdapterCredentialBinding {
   kind: AgentAdapterManifest["credentials"][number]["kind"];
   purpose: string;
   delivery: AgentAdapterManifest["credentials"][number]["delivery"];
-  secretRef: string;
+  connectionReference: string;
 }
 
 export type AgentAdapterCredentialBindingIssueCode =
@@ -623,6 +630,7 @@ export interface CompiledAgentWorkspaceProfilePlan {
         transport: "managed-terminal" | "native-attach";
         command: string[];
         sessionRecovery: "managed-run-lineage" | "native-session-store";
+        clientHandoff: "local-client-exec" | "display-only";
       };
       persistentPaths: string[];
       healthcheck?: NonNullable<AgentAdapterManifest["healthcheck"]>;
@@ -996,6 +1004,10 @@ export function compileAgentWorkspaceProfile(
           interactiveMode.transport === "native-attach"
             ? ("native-session-store" as const)
             : ("managed-run-lineage" as const),
+        clientHandoff:
+          interactiveMode.transport === "native-attach"
+            ? (interactiveMode.clientHandoff ?? "display-only")
+            : ("display-only" as const),
       }
     : undefined;
 
@@ -1140,7 +1152,7 @@ export function resolveAgentAdapterCredentialBindings(
     if (requirement.required && !referencesByRequirement.has(requirement.id)) {
       issues.push({
         code: "missing_required_credential",
-        message: `Credential requirement ${requirement.id} requires a secret reference`,
+        message: `Credential requirement ${requirement.id} requires a Connection reference`,
         requirementId: requirement.id,
       });
     }
@@ -1155,7 +1167,7 @@ export function resolveAgentAdapterCredentialBindings(
             kind: requirement.kind,
             purpose: requirement.purpose,
             delivery: requirement.delivery,
-            secretRef: reference.secretRef,
+            connectionReference: reference.connectionReference,
           },
         ]
       : [];

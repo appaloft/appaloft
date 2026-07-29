@@ -19,6 +19,11 @@ export interface ProjectsTable {
   archive_reason: ColumnType<string | null, string | null | undefined, string | null>;
   deleted_at: ColumnType<string | null, string | null | undefined, string | null>;
   display_order: ColumnType<number, number | undefined, number>;
+  default_workspace_profile_installation_id: ColumnType<
+    string | null,
+    string | null | undefined,
+    string | null
+  >;
   created_at: TimestampColumn;
 }
 
@@ -1299,6 +1304,8 @@ export interface Database {
   agent_workspace_profile_definitions: AgentWorkspaceProfileDefinitionsTable;
   agent_workspace_profile_installations: AgentWorkspaceProfileInstallationsTable;
   agent_workspace_profile_references: AgentWorkspaceProfileReferencesTable;
+  repository_bindings: RepositoryBindingsTable;
+  workspace_open_entries: WorkspaceOpenEntriesTable;
   execution_sandboxes: ExecutionSandboxesTable;
   execution_sandbox_snapshots: ExecutionSandboxSnapshotsTable;
   execution_sandbox_templates: ExecutionSandboxTemplatesTable;
@@ -1561,6 +1568,40 @@ export interface AgentWorkspaceProfileInstallationsTable {
   status: string;
   revision: number;
   installed_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+  credential_connections: ColumnType<
+    Record<string, unknown>[],
+    Record<string, unknown>[] | undefined,
+    Record<string, unknown>[]
+  >;
+}
+
+export interface RepositoryBindingsTable {
+  tenant_id: string;
+  id: string;
+  repository_identity: string;
+  project_id: string;
+  status: string;
+  created_at: TimestampColumn;
+  unbound_at: NullableUpdatableTimestampColumn;
+}
+
+export interface WorkspaceOpenEntriesTable {
+  tenant_id: string;
+  subject_id: string;
+  project_id: string;
+  repository_identity: string;
+  branch: string;
+  generation: number;
+  commit_sha: string;
+  profile_installation_id: string;
+  workspace_id: string | null;
+  runtime_id: string | null;
+  status: string;
+  phase: string;
+  error_code: string | null;
+  preferred: boolean;
+  created_at: TimestampColumn;
   updated_at: UpdatableTimestampColumn;
 }
 

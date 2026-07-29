@@ -149,7 +149,7 @@ function fixture(
 }
 
 describe("SandboxAgentDeliveryService", () => {
-  test("[PROFILE-PIN-010] resolves and persists the exact Profile pin before Runtime startup", async () => {
+  test("[PROFILE-PIN-010][WS-OPEN-ADMIT-008] persists a precompiled Profile pin without recompiling after Sandbox creation", async () => {
     let compileCalls = 0;
     const pin = {
       profileInstallationId: "awpi_profile",
@@ -174,33 +174,34 @@ describe("SandboxAgentDeliveryService", () => {
         healthcheck: { kind: "process" as const },
       },
     };
+    const profilePlan = {
+      sandbox: {
+        source: { kind: "template" as const, templateId: "aht_fake_1" },
+        requestedIsolation: "container-trusted" as const,
+        limits: {
+          cpuMillis: 1_000,
+          memoryBytes: 1_024,
+          diskBytes: 2_048,
+          maxProcesses: 16,
+        },
+        networkPolicy: { mode: "deny" as const },
+      },
+      initialization: [],
+      runtime: {
+        harnessKey: "fake",
+        harnessTemplateId: "aht_fake_1",
+        declarativeHarness: {},
+      },
+      defaultPorts: [],
+      suggestedChecks: [],
+      credentialRequirements: [],
+      pin,
+    };
     const { service, repository } = fixture({
       workspaceProfileResolver: {
         async compileForNewWorkspace() {
           compileCalls += 1;
-          return ok({
-            sandbox: {
-              source: { kind: "template", templateId: "aht_fake_1" },
-              requestedIsolation: "container-trusted",
-              limits: {
-                cpuMillis: 1_000,
-                memoryBytes: 1_024,
-                diskBytes: 2_048,
-                maxProcesses: 16,
-              },
-              networkPolicy: { mode: "deny" },
-            },
-            initialization: [],
-            runtime: {
-              harnessKey: "fake",
-              harnessTemplateId: "aht_fake_1",
-              declarativeHarness: {},
-            },
-            defaultPorts: [],
-            suggestedChecks: [],
-            credentialRequirements: [],
-            pin,
-          });
+          return ok(profilePlan);
         },
       },
     });
@@ -211,13 +212,14 @@ describe("SandboxAgentDeliveryService", () => {
       harnessTemplateId: "aht_fake_1",
       idempotencyKey: "runtime_profile",
       profileInstallationId: "awpi_profile",
+      profilePlan,
     });
 
     expect(created._unsafeUnwrap()).toMatchObject({
       harnessKey: "fake",
       capabilities: pin.capabilities,
     });
-    expect(compileCalls).toBe(1);
+    expect(compileCalls).toBe(0);
     const stored = await repository.findRuntime(toRepositoryContext(context), "sar_test");
     expect(stored?.profilePin).toEqual(pin);
   });
@@ -255,7 +257,7 @@ describe("SandboxAgentDeliveryService", () => {
         kind: "process-environment" as const,
         variable: "OPENAI_API_KEY",
       },
-      secretRef: "secret://model/codex",
+      connectionReference: "model-default",
     };
     const { service, repository } = fixture({
       harness: {
@@ -279,10 +281,7 @@ describe("SandboxAgentDeliveryService", () => {
         async cancel() {},
       },
       workspaceProfileResolver: {
-        async compileForNewWorkspace(_context, _installationId, references) {
-          expect(references).toEqual([
-            { requirementId: "model-api", secretRef: "secret://model/codex" },
-          ]);
+        async compileForNewWorkspace() {
           return ok({
             sandbox: {
               source: { kind: "template", templateId: "aht_fake_1" },
@@ -357,7 +356,6 @@ describe("SandboxAgentDeliveryService", () => {
       harnessTemplateId: "aht_fake_1",
       idempotencyKey: "runtime_credential",
       profileInstallationId: "awpi_codex",
-      credentialReferences: [{ requirementId: "model-api", secretRef: "secret://model/codex" }],
     });
     expect(runtime.isOk()).toBe(true);
     const stored = await repository.findRuntime(toRepositoryContext(context), "sar_test");
@@ -456,7 +454,7 @@ describe("SandboxAgentDeliveryService", () => {
     ]);
   });
 
-  test("[AGENT-WS-ATTACH-016] refreshes the native runtime and issues scoped attach access", async () => {
+  test("[AGENT-WS-ATTACH-016][WS-ATTACH-NATIVE-015] refreshes the native runtime and issues scoped attach access", async () => {
     let prepareCalls = 0;
     const { service, exposedPorts } = fixture({
       harness: {
@@ -521,7 +519,31 @@ describe("SandboxAgentDeliveryService", () => {
         "--dir",
         "/workspace",
       ],
+      clientHandoff: "display-only",
     });
+  });
+
+  test("[WS-ATTACH-UNSUPPORTED-016] fails closed when the Adapter declares no attach transport", async () => {
+    const { service } = fixture();
+    const runtime = (
+      await service.createRuntime(context, {
+        sandboxId: "sbx_unsupported",
+        harnessKey: "fake",
+        harnessTemplateId: "aht_fake_1",
+        idempotencyKey: "runtime_unsupported_attach",
+      })
+    )._unsafeUnwrap();
+
+    const attached = await service.issueAttachAccess(context, {
+      sandboxId: "sbx_unsupported",
+      runtimeId: runtime.runtimeId,
+      expiresAt: "2026-07-20T01:00:00.000Z",
+    });
+
+    expect(attached.isErr()).toBe(true);
+    expect(attached._unsafeUnwrapErr().details?.code).toBe(
+      "agent_workspace_native_attach_unavailable",
+    );
   });
 
   test("[AGENT-WS-START-009] persists failed startup and invokes harness termination", async () => {
@@ -822,7 +844,7 @@ describe("SandboxAgentDeliveryService", () => {
           kind: "process-environment",
           variable: "OPENAI_API_KEY",
         },
-        secretRef: "secret://model/cancel",
+        connectionReference: "model-cancel",
       },
     ];
     await repository.saveRuntime(toRepositoryContext(context), runtimeRecord);

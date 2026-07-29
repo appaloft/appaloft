@@ -1,6 +1,7 @@
 import {
   ArchiveProjectCommand,
   CheckProjectDeleteSafetyQuery,
+  ConfigureProjectWorkspaceProfileCommand,
   CreateProjectCommand,
   DeleteProjectCommand,
   ListProjectsQuery,
@@ -28,6 +29,7 @@ const limitOption = Options.integer("limit").pipe(Options.optional);
 const offsetOption = Options.integer("offset").pipe(Options.optional);
 const projectIdsOption = Options.text("project-ids");
 const startOffsetOption = Options.integer("start-offset").pipe(Options.optional);
+const profileOption = Options.text("profile");
 
 const createCommand = EffectCommand.make(
   "create",
@@ -107,6 +109,21 @@ const setDescriptionCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.projectSetDescription));
 
+const configureWorkspaceProfileCommand = EffectCommand.make(
+  "configure-workspace-profile",
+  {
+    projectId: projectIdArg,
+    profile: profileOption,
+  },
+  ({ profile, projectId }) =>
+    runCommand(
+      ConfigureProjectWorkspaceProfileCommand.create({
+        projectId,
+        profileInstallationId: profile,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.projectConfigureWorkspaceProfile));
+
 const archiveCommand = EffectCommand.make(
   "archive",
   {
@@ -162,6 +179,7 @@ export const projectCommand = EffectCommand.make("project").pipe(
     renameCommand,
     reorderCommand,
     setDescriptionCommand,
+    configureWorkspaceProfileCommand,
     archiveCommand,
     restoreCommand,
     deleteCheckCommand,

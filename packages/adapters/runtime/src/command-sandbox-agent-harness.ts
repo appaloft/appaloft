@@ -64,6 +64,7 @@ export interface CommandSandboxAgentDescriptor {
     transport: "managed-terminal" | "native-attach";
     command: readonly string[];
     sessionRecovery: "managed-run-lineage" | "native-session-store";
+    clientHandoff?: "local-client-exec" | "display-only";
     serverPort?: number;
   };
   persistentPaths?: readonly string[];

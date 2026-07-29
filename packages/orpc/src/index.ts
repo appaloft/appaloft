@@ -72,11 +72,13 @@ import {
   type CommandBus,
   CompileAgentWorkspaceProfileQuery,
   CompleteConnectionCallbackCommand,
+  ConfigureAgentWorkspaceProfileCredentialConnectionsCommand,
   ConfigureAuditEventLegalHoldCommand,
   ConfigureDefaultAccessDomainPolicyCommand,
   ConfigureDependencyResourceBackupPolicyCommand,
   ConfigureDomainBindingRouteCommand,
   ConfigurePreviewPolicyCommand,
+  ConfigureProjectWorkspaceProfileCommand,
   ConfigureResourceAccessCommand,
   ConfigureResourceAutoDeployCommand,
   ConfigureResourceHealthCommand,
@@ -152,11 +154,14 @@ import {
   compileAgentWorkspaceProfileInputSchema,
   compileAgentWorkspaceProfileResponseSchema,
   completeConnectionCallbackCommandInputSchema,
+  configureAgentWorkspaceProfileCredentialConnectionsInputSchema,
+  configureAgentWorkspaceProfileCredentialConnectionsResponseSchema,
   configureAuditEventLegalHoldCommandInputSchema,
   configureDefaultAccessDomainPolicyCommandInputSchema,
   configureDependencyResourceBackupPolicyCommandInputSchema,
   configureDomainBindingRouteCommandInputSchema,
   configurePreviewPolicyCommandInputSchema,
+  configureProjectWorkspaceProfileCommandInputSchema,
   configureResourceAccessCommandInputSchema,
   configureResourceAutoDeployCommandInputSchema,
   configureResourceHealthCommandInputSchema,
@@ -514,9 +519,11 @@ import {
   MarkOperatorWorkRecoveredCommand,
   markOperatorWorkRecoveredCommandInputSchema,
   OfferWorkspaceCollaborationHandoffCommand,
+  OpenAgentWorkspaceCommand,
   OpenTerminalSessionCommand,
   type OperatorWorkEventStreamEnvelope,
   offerWorkspaceCollaborationHandoffInputSchema,
+  openAgentWorkspaceInputSchema,
   openTerminalSessionCommandInputSchema,
   operationCatalog,
   PauseSandboxCommand,
@@ -721,6 +728,7 @@ import {
   ShowPreviewEnvironmentQuery,
   ShowPreviewPolicyQuery,
   ShowProjectQuery,
+  ShowRepositoryBindingQuery,
   ShowResourceDependencyBindingQuery,
   ShowResourceQuery,
   ShowResourceRuntimeLogArchiveQuery,
@@ -804,6 +812,7 @@ import {
   showPreviewEnvironmentQueryInputSchema,
   showPreviewPolicyQueryInputSchema,
   showProjectQueryInputSchema,
+  showRepositoryBindingInputSchema,
   showResourceDependencyBindingQueryInputSchema,
   showResourceQueryInputSchema,
   showResourceRuntimeLogArchiveQueryInputSchema,
@@ -856,12 +865,14 @@ import {
   testRegisteredServerConnectivityCommandInputSchema,
   transferOrganizationOwnerCommandInputSchema,
   transferWorkspaceWriterLeaseInputSchema,
+  UnbindRepositoryCommand,
   UnbindResourceDependencyCommand,
   UninstallAgentAdapterCommand,
   UninstallAgentWorkspaceProfileCommand,
   UnlockEnvironmentCommand,
   UnsetEnvironmentVariableCommand,
   UnsetResourceVariableCommand,
+  unbindRepositoryInputSchema,
   unbindResourceDependencyCommandInputSchema,
   uninstallAgentAdapterInputSchema,
   uninstallAgentAdapterResponseSchema,
@@ -4084,6 +4095,23 @@ export const setProjectDescriptionProcedure = base
   .output(setProjectDescriptionResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, SetProjectDescriptionCommand.create(input)),
+  );
+
+export const configureProjectWorkspaceProfileProcedure = base
+  .route({
+    method: "POST",
+    path: "/projects/{projectId}/workspace-profile",
+    successStatus: 200,
+  })
+  .input(configureProjectWorkspaceProfileCommandInputSchema)
+  .output(
+    z.object({
+      projectId: z.string(),
+      profileInstallationId: z.string(),
+    }),
+  )
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureProjectWorkspaceProfileCommand.create(input)),
   );
 
 export const archiveProjectProcedure = base
@@ -8076,6 +8104,20 @@ export const compileAgentWorkspaceProfileProcedure = base
   .handler(async ({ input, context }) =>
     executeQuery(context, CompileAgentWorkspaceProfileQuery.create(input)),
   );
+export const configureAgentWorkspaceProfileCredentialConnectionsProcedure = base
+  .route({
+    method: "POST",
+    path: "/agent-workspace-profiles/{installationId}/credential-connections",
+    successStatus: 200,
+  })
+  .input(configureAgentWorkspaceProfileCredentialConnectionsInputSchema)
+  .output(configureAgentWorkspaceProfileCredentialConnectionsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(
+      context,
+      ConfigureAgentWorkspaceProfileCredentialConnectionsCommand.create(input),
+    ),
+  );
 export const disableAgentWorkspaceProfileProcedure = base
   .route({
     method: "POST",
@@ -8414,6 +8456,48 @@ export const retrySandboxPromotionProcedure = base
     executeCommand(context, RetrySandboxPromotionCommand.create(input)),
   );
 
+export const openAgentWorkspaceProcedure = base
+  .route({ method: "POST", path: "/workspaces/open", successStatus: 202 })
+  .input(openAgentWorkspaceInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, OpenAgentWorkspaceCommand.create(input)),
+  );
+
+const repositoryBindingResponseSchema = z.unknown();
+
+export const bindRepositoryProcedure = base
+  .route({ method: "POST", path: "/repository-bindings", successStatus: 200 })
+  .input(bindRepositoryInputSchema)
+  .output(repositoryBindingResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, BindRepositoryCommand.create(input)),
+  );
+
+export const showRepositoryBindingProcedure = base
+  .route({
+    method: "GET",
+    path: "/repository-bindings/{repositoryIdentity}",
+    successStatus: 200,
+  })
+  .input(showRepositoryBindingInputSchema)
+  .output(repositoryBindingResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowRepositoryBindingQuery.create(input)),
+  );
+
+export const unbindRepositoryProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/repository-bindings/{repositoryIdentity}",
+    successStatus: 200,
+  })
+  .input(unbindRepositoryInputSchema)
+  .output(repositoryBindingResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, UnbindRepositoryCommand.create(input)),
+  );
+
 export const appaloftOrpcRouter = {
   auth: {
     bootstrapStatus: authBootstrapStatusProcedure,
@@ -8424,6 +8508,14 @@ export const appaloftOrpcRouter = {
   },
   entitlements: {
     query: queryEntitlementsProcedure,
+  },
+  workspaces: {
+    open: openAgentWorkspaceProcedure,
+  },
+  repositoryBindings: {
+    bind: bindRepositoryProcedure,
+    show: showRepositoryBindingProcedure,
+    unbind: unbindRepositoryProcedure,
   },
   usageIntents: {
     record: recordUsageIntentProcedure,
@@ -8551,6 +8643,7 @@ export const appaloftOrpcRouter = {
     list: listAgentWorkspaceProfilesProcedure,
     show: showAgentWorkspaceProfileProcedure,
     compile: compileAgentWorkspaceProfileProcedure,
+    configureCredentialConnections: configureAgentWorkspaceProfileCredentialConnectionsProcedure,
     disable: disableAgentWorkspaceProfileProcedure,
     uninstall: uninstallAgentWorkspaceProfileProcedure,
   },
@@ -8641,6 +8734,7 @@ export const appaloftOrpcRouter = {
     rename: renameProjectProcedure,
     reorder: reorderProjectsProcedure,
     setDescription: setProjectDescriptionProcedure,
+    configureWorkspaceProfile: configureProjectWorkspaceProfileProcedure,
     archive: archiveProjectProcedure,
     restore: restoreProjectProcedure,
     deleteCheck: checkProjectDeleteSafetyProcedure,
@@ -11423,6 +11517,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/projects/:projectId",
     "/api/projects/:projectId/rename",
     "/api/projects/:projectId/description",
+    "/api/projects/:projectId/workspace-profile",
     "/api/projects/:projectId/archive",
     "/api/projects/:projectId/restore",
     "/api/projects/:projectId/delete-check",
@@ -11476,6 +11571,9 @@ export function mountAppaloftOrpcRoutes(
     "/api/sandbox-agent-runtimes/:runtimeId/runs",
     "/api/sandbox-agent-runtimes/:runtimeId/runs/:runId",
     "/api/sandbox-agent-runtimes/:runtimeId/runs/:runId/cancel",
+    "/api/workspaces/open",
+    "/api/repository-bindings",
+    "/api/repository-bindings/:repositoryIdentity",
     "/api/sandbox-agent-runs/:runId/events",
     "/api/sandbox-agent-runs/:runId/events/stream",
     "/api/sandbox-agent-runs/:runId/approvals",
@@ -11506,6 +11604,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/agent-workspace-profiles",
     "/api/agent-workspace-profiles/:installationId",
     "/api/agent-workspace-profiles/:installationId/compile",
+    "/api/agent-workspace-profiles/:installationId/credential-connections",
     "/api/agent-workspace-profiles/:installationId/disable",
     "/api/workspace-collaborations",
     "/api/workspace-collaborations/:collaborationId",

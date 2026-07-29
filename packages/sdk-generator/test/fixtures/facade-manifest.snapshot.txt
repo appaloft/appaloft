@@ -10,6 +10,7 @@ appaloft.agentAdapters.show -> agent-adapters.show GET /agent-adapters/{installa
 appaloft.agentAdapters.uninstall -> agent-adapters.uninstall DELETE /agent-adapters/{installationId}
 appaloft.agentAdapters.validate -> agent-adapters.validate POST /agent-adapters/validate
 appaloft.agentWorkspaceProfiles.compile -> agent-workspace-profiles.compile POST /agent-workspace-profiles/{installationId}/compile
+appaloft.agentWorkspaceProfiles.configureCredentialConnections -> agent-workspace-profiles.configure-credential-connections POST /agent-workspace-profiles/{installationId}/credential-connections
 appaloft.agentWorkspaceProfiles.disable -> agent-workspace-profiles.disable POST /agent-workspace-profiles/{installationId}/disable
 appaloft.agentWorkspaceProfiles.install -> agent-workspace-profiles.install POST /agent-workspace-profiles
 appaloft.agentWorkspaceProfiles.list -> agent-workspace-profiles.list GET /agent-workspace-profiles
@@ -178,6 +179,7 @@ appaloft.previewEnvironments.show -> preview-environments.show GET /preview-envi
 appaloft.previewPolicies.configure -> preview-policies.configure POST /preview-policies
 appaloft.previewPolicies.show -> preview-policies.show POST /preview-policies/show
 appaloft.projects.archive -> projects.archive POST /projects/{projectId}/archive
+appaloft.projects.configureWorkspaceProfile -> projects.configure-workspace-profile POST /projects/{projectId}/workspace-profile
 appaloft.projects.count -> projects.count GET /projects/count
 appaloft.projects.create -> projects.create POST /projects
 appaloft.projects.delete -> projects.delete DELETE /projects/{projectId}
@@ -189,6 +191,9 @@ appaloft.projects.restore -> projects.restore POST /projects/{projectId}/restore
 appaloft.projects.setDescription -> projects.set-description POST /projects/{projectId}/description
 appaloft.projects.show -> projects.show GET /projects/{projectId}
 appaloft.providerJobLogs.prune -> provider-job-logs.prune POST /provider-job-logs/prune
+appaloft.repositoryBindings.bind -> repository-bindings.bind POST /repository-bindings
+appaloft.repositoryBindings.show -> repository-bindings.show GET /repository-bindings/{repositoryIdentity}
+appaloft.repositoryBindings.unbind -> repository-bindings.unbind DELETE /repository-bindings/{repositoryIdentity}
 appaloft.resources.accessFailureEvidence.lookup -> resources.access-failure-evidence.lookup GET /resource-access-failures/{requestId}
 appaloft.resources.archive -> resources.archive POST /resources/{resourceId}/archive
 appaloft.resources.attachStorage -> resources.attach-storage POST /resources/{resourceId}/storage-attachments
@@ -403,3 +408,4 @@ appaloft.workspaceCollaborations.writerLeases.acquire -> workspace-collaboration
 appaloft.workspaceCollaborations.writerLeases.release -> workspace-collaborations.writer-leases.release POST /workspace-collaborations/{collaborationId}/lanes/{laneId}/writer-lease/release
 appaloft.workspaceCollaborations.writerLeases.renew -> workspace-collaborations.writer-leases.renew POST /workspace-collaborations/{collaborationId}/lanes/{laneId}/writer-lease/renew
 appaloft.workspaceCollaborations.writerLeases.transfer -> workspace-collaborations.writer-leases.transfer POST /workspace-collaborations/{collaborationId}/lanes/{laneId}/writer-lease/transfer
+appaloft.workspaces.open -> workspaces.open POST /workspaces/open

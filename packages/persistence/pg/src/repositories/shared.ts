@@ -1,6 +1,7 @@
 import { type RepositoryContext } from "@appaloft/application";
 import {
   AccessRoute,
+  AgentWorkspaceProfileInstallationId,
   ArchivedAt,
   ArchiveReason,
   BuildStrategyKindValue,
@@ -1133,6 +1134,13 @@ export function rehydrateProject(row: Selectable<Database["projects"]>) {
       ? { deletedAt: DeletedAt.rehydrate(normalizeTimestamp(row.deleted_at) ?? row.deleted_at) }
       : {}),
     displayOrder: ProjectDisplayOrder.rehydrate(row.display_order ?? 0),
+    ...(row.default_workspace_profile_installation_id
+      ? {
+          defaultWorkspaceProfileInstallationId: AgentWorkspaceProfileInstallationId.rehydrate(
+            row.default_workspace_profile_installation_id,
+          ),
+        }
+      : {}),
     createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
     ...(row.description ? { description: DescriptionText.rehydrate(row.description) } : {}),
   };

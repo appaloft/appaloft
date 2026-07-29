@@ -34,7 +34,7 @@ const modelAccess = {
 };
 
 describe("OpenCodeSandboxAgentHarness", () => {
-  test("[AGENT-OPENCODE-011] keeps one native server and translates independently scoped JSON runs", async () => {
+  test("[AGENT-OPENCODE-011][WS-ATTACH-NATIVE-015] keeps one native server and translates independently scoped JSON runs", async () => {
     const files = new Map<string, Uint8Array>();
     const calls: Parameters<OpenCodeSandboxExecutionPort["exec"]>[2][] = [];
     const issued: string[] = [];
@@ -136,6 +136,7 @@ describe("OpenCodeSandboxAgentHarness", () => {
       transport: "native-attach",
       command: ["opencode", "attach", "http://127.0.0.1:4096", "--dir", "/workspace/app"],
       sessionRecovery: "native-session-store",
+      clientHandoff: "local-client-exec",
       serverPort: 4096,
     });
 

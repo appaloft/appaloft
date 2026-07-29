@@ -126,6 +126,7 @@ function harness() {
             expiresAt: input.expiresAt,
           },
           clientCommand: ["opencode", "attach", "https://attach.example.test"],
+          clientHandoff: "local-client-exec",
         });
       },
     },

@@ -33,6 +33,7 @@ import { organizationCommand } from "./organization.js";
 import { projectCommand } from "./project.js";
 import { providerJobLogCommand } from "./provider-job-log.js";
 import { remoteStateCommand } from "./remote-state.js";
+import { repositoryBindingCommand } from "./repository-binding.js";
 import { resourceCommand } from "./resource.js";
 import { retentionDefaultCommand } from "./retention-default.js";
 import { runtimeMonitoringCommand } from "./runtime-monitoring.js";
@@ -64,6 +65,7 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
     blueprintCommand,
     defaultAccessCommand,
     projectCommand,
+    repositoryBindingCommand,
     resourceCommand,
     dependencyCommand,
     deployTokenCommand,

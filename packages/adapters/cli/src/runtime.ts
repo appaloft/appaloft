@@ -29,6 +29,10 @@ import {
   type SourceLinkTarget,
 } from "./commands/deployment-remote-state.js";
 import { type DeploymentStateBackendDecision } from "./commands/deployment-state.js";
+import {
+  type LocalGitWorkspaceContext,
+  type RemoteGitWorkspaceRef,
+} from "./local-git-workspace-context.js";
 
 export interface CliSourceLinkStore {
   read(sourceFingerprint: string): Promise<Result<SourceLinkRecord | null>>;
@@ -81,6 +85,12 @@ export interface CliProgramInput {
   ) => Promise<Result<RemoteStateSession>>;
   sourceLinkStore?: CliSourceLinkStore;
   serverAppliedRouteStore?: ServerAppliedRouteDesiredStateStore;
+  resolveLocalWorkspaceGitContext?: (path: string) => Promise<LocalGitWorkspaceContext>;
+  resolveRemoteWorkspaceGitRef?: (
+    repository: string,
+    ref: string,
+  ) => Promise<RemoteGitWorkspaceRef>;
+  launchNativeWorkspaceClient?: (argv: readonly string[]) => Promise<void>;
 }
 
 export interface CliTerminalReadable {
@@ -143,6 +153,12 @@ export class CliRuntime extends Context.Tag("CliRuntime")<
     ) => Promise<Result<RemoteStateSession>>;
     readonly sourceLinkStore?: CliSourceLinkStore;
     readonly serverAppliedRouteStore?: ServerAppliedRouteDesiredStateStore;
+    readonly resolveLocalWorkspaceGitContext?: (path: string) => Promise<LocalGitWorkspaceContext>;
+    readonly resolveRemoteWorkspaceGitRef?: (
+      repository: string,
+      ref: string,
+    ) => Promise<RemoteGitWorkspaceRef>;
+    readonly launchNativeWorkspaceClient?: (argv: readonly string[]) => Promise<void>;
   }
 >() {}
 
@@ -213,6 +229,15 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
     ...(input.sourceLinkStore ? { sourceLinkStore: input.sourceLinkStore } : {}),
     ...(input.serverAppliedRouteStore
       ? { serverAppliedRouteStore: input.serverAppliedRouteStore }
+      : {}),
+    ...(input.resolveLocalWorkspaceGitContext
+      ? { resolveLocalWorkspaceGitContext: input.resolveLocalWorkspaceGitContext }
+      : {}),
+    ...(input.resolveRemoteWorkspaceGitRef
+      ? { resolveRemoteWorkspaceGitRef: input.resolveRemoteWorkspaceGitRef }
+      : {}),
+    ...(input.launchNativeWorkspaceClient
+      ? { launchNativeWorkspaceClient: input.launchNativeWorkspaceClient }
       : {}),
   });
 
