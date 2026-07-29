@@ -1218,7 +1218,16 @@ describe("release build workflow", () => {
     expect(output).not.toContain("Roadmap gate rejects release 1.0.0");
   });
 
-  test("[RELEASE-HARDENING-008] allows stable post-GA releases in the governed major line", () => {
+  test("[RELEASE-HARDENING-008] allows stable post-GA releases in the governed major line", async () => {
+    const roadmap = await readText("docs/PRODUCT_ROADMAP.md");
+    expect(roadmap).toContain("Deferred workload-role follow-ups:");
+    expect(roadmap).toContain(
+      "- [ ] Add a neutral remote artifact-builder executor with separately governed readiness",
+    );
+    expect(roadmap).toContain(
+      "they are post-`1.0.0`, separately governed work\nrather than retroactive Phase 4 release blockers",
+    );
+
     const result = Bun.spawnSync(
       [
         "bun",
