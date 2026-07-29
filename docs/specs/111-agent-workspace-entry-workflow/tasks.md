@@ -7,6 +7,7 @@
 - [x] `AGENT-WS-CLI-012`: add public Workspace CLI composition tests.
 - [x] `AGENT-WS-SDK-013`: add public Workspace SDK composition tests.
 - [x] `AGENT-WS-SOURCE-014`: add repository materialization and partial-failure tests.
+- [x] `AGENT-WS-SOURCE-015`: add trusted transient private-source credential composition and secret-boundary tests.
 - [x] `AGENT-WS-CONNECT-015`: add reconnect alias and managed-terminal tests.
 - [x] `AGENT-WS-ATTACH-016`: add scoped attach capability tests.
 - [x] `AGENT-WS-WEB-017`: add Public Console Workspace structure tests.

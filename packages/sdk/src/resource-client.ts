@@ -91,6 +91,26 @@ export interface AppaloftWorkspaceCreateInput {
   };
 }
 
+export interface AppaloftWorkspaceSourceHttpBasicCredential {
+  readonly kind: "http-basic";
+  readonly username: string;
+  readonly password: string;
+}
+
+export type AppaloftWorkspaceSourceCredentialProvider = (input: {
+  readonly repository: string;
+}) => Promise<AppaloftWorkspaceSourceHttpBasicCredential | null>;
+
+export interface AppaloftClientOptions extends AppaloftSdkClientOptions {
+  /**
+   * Trusted composition hook for transient private-source credentials.
+   *
+   * Credential material is delivered to the Git process through Sandbox stdin and is never
+   * embedded in the repository locator or process argv.
+   */
+  readonly workspaceSourceCredentialProvider?: AppaloftWorkspaceSourceCredentialProvider;
+}
+
 interface AppaloftWorkspaceProfilePlan {
   readonly sandbox: {
     readonly source: AppaloftSandboxCreateInput["source"];
@@ -516,7 +536,7 @@ export type AppaloftClient = Omit<
   };
 };
 
-export function createAppaloftClient(options: AppaloftSdkClientOptions): AppaloftClient {
+export function createAppaloftClient(options: AppaloftClientOptions): AppaloftClient {
   const operations = createAppaloftFacadeClient(
     createAppaloftSdkClient(options),
     generatedSdkOperations,
@@ -582,7 +602,11 @@ export function createAppaloftClient(options: AppaloftSdkClientOptions): Appalof
       const sandbox = await sandboxes.create(sandboxInput);
       if (source) {
         try {
-          await materializeWorkspaceSource(sandbox, source);
+          await materializeWorkspaceSource(
+            sandbox,
+            source,
+            options.workspaceSourceCredentialProvider,
+          );
         } catch (error) {
           throw new AppaloftWorkspaceCreateError(
             sandbox.sandboxId,
@@ -1015,35 +1039,38 @@ function requireSuccessfulExec(value: unknown, phase: string): WorkspaceForegrou
 async function materializeWorkspaceSource(
   sandbox: AppaloftSandbox,
   input: NonNullable<AppaloftWorkspaceCreateInput["source"]>,
+  credentialProvider?: AppaloftWorkspaceSourceCredentialProvider,
 ): Promise<void> {
   const repository = validateRepositoryLocator(input.repository);
   const ref = validateGitRef(input.ref, "source ref");
   const branch = validateGitRef(input.branch, "branch");
+  const credential = credentialProvider
+    ? validateWorkspaceSourceCredential(await credentialProvider({ repository }))
+    : null;
+  const execGit = (argv: readonly string[], authenticated = false) =>
+    credential && authenticated
+      ? sandbox.exec<unknown>(authenticatedWorkspaceSourceGitExec(repository, credential, argv))
+      : sandbox.exec<unknown>({ argv });
 
-  const initialized = await sandbox.exec<unknown>({
-    argv: ["git", "init"],
-  });
+  const initialized = await execGit(["git", "init"]);
   requireSuccessfulExec(initialized, "Workspace repository initialization");
 
-  const remoteAdded = await sandbox.exec<unknown>({
-    argv: ["git", "remote", "add", "origin", repository],
-  });
+  const remoteAdded = await execGit(["git", "remote", "add", "origin", repository]);
   requireSuccessfulExec(remoteAdded, "Workspace repository remote configuration");
 
-  const fetched = await sandbox.exec<unknown>({
-    argv: ["git", "fetch", "origin"],
-  });
+  const fetched = await execGit(["git", "fetch", "origin"], true);
   requireSuccessfulExec(fetched, "Workspace repository fetch");
 
   let checkoutRef = ref;
   if (!checkoutRef) {
-    const remoteHeadSet = await sandbox.exec<unknown>({
-      argv: ["git", "remote", "set-head", "origin", "--auto"],
-    });
+    const remoteHeadSet = await execGit(["git", "remote", "set-head", "origin", "--auto"], true);
     requireSuccessfulExec(remoteHeadSet, "Workspace repository default branch discovery");
-    const remoteHeadRead = await sandbox.exec<unknown>({
-      argv: ["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
-    });
+    const remoteHeadRead = await execGit([
+      "git",
+      "symbolic-ref",
+      "--short",
+      "refs/remotes/origin/HEAD",
+    ]);
     const remoteHeadOutput = requireSuccessfulExec(
       remoteHeadRead,
       "Workspace repository default branch readback",
@@ -1063,17 +1090,74 @@ async function materializeWorkspaceSource(
     }
   }
 
-  const checkedOut = await sandbox.exec<unknown>({
-    argv: ["git", "checkout", checkoutRef],
-  });
+  const checkedOut = await execGit(["git", "checkout", checkoutRef]);
   requireSuccessfulExec(checkedOut, "Workspace repository checkout");
 
   if (branch) {
-    const switched = await sandbox.exec<unknown>({
-      argv: ["git", "switch", "-c", branch],
-    });
+    const switched = await execGit(["git", "switch", "-c", branch]);
     requireSuccessfulExec(switched, "Workspace branch creation");
   }
+}
+
+function validateWorkspaceSourceCredential(
+  credential: AppaloftWorkspaceSourceHttpBasicCredential | null,
+): AppaloftWorkspaceSourceHttpBasicCredential | null {
+  if (!credential) return null;
+  if (credential.kind !== "http-basic") {
+    throw new TypeError("Workspace source credential kind is unsupported");
+  }
+  if (
+    !credential.username ||
+    credential.username.length > 256 ||
+    /[:\r\n\0]/u.test(credential.username)
+  ) {
+    throw new TypeError("Workspace source credential username is invalid");
+  }
+  if (
+    !credential.password ||
+    credential.password.length > 4_096 ||
+    /[\r\n\0]/u.test(credential.password)
+  ) {
+    throw new TypeError("Workspace source credential password is invalid");
+  }
+  return credential;
+}
+
+function authenticatedWorkspaceSourceGitExec(
+  repository: string,
+  credential: AppaloftWorkspaceSourceHttpBasicCredential,
+  argv: readonly string[],
+): AppaloftSandboxExecInput {
+  if (argv[0] !== "git") {
+    throw new TypeError("Authenticated Workspace source execution only supports Git");
+  }
+  const origin = new URL(repository).origin;
+  const authorization = Buffer.from(
+    `${credential.username}:${credential.password}`,
+    "utf8",
+  ).toString("base64");
+  return {
+    argv: [
+      "sh",
+      "-c",
+      [
+        "IFS= read -r APPALOFT_GIT_AUTHORIZATION || exit 90",
+        '[ -n "$APPALOFT_GIT_AUTHORIZATION" ] || exit 90',
+        'export GIT_CONFIG_COUNT="1"',
+        'export GIT_CONFIG_KEY_0="$1"',
+        'export GIT_CONFIG_VALUE_0="Authorization: Basic $APPALOFT_GIT_AUTHORIZATION"',
+        'export GIT_TERMINAL_PROMPT="0"',
+        'export GIT_TRACE_CURL="0"',
+        'export GIT_CURL_VERBOSE="0"',
+        "shift",
+        'exec git "$@"',
+      ].join("; "),
+      "appaloft-workspace-source-auth",
+      `http.${origin}/.extraHeader`,
+      ...argv.slice(1),
+    ],
+    stdinBase64: Buffer.from(`${authorization}\n`, "utf8").toString("base64"),
+  };
 }
 
 function createSandboxHandle(
