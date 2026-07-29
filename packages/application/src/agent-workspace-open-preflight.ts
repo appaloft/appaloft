@@ -10,6 +10,7 @@ import {
 import {
   type WorkspaceOpenContext,
   type WorkspaceOpenInput,
+  type WorkspaceOpenOptions,
   type WorkspaceOpenPreflight,
   type WorkspaceOpenReservation,
 } from "./agent-workspace-open";
@@ -29,6 +30,7 @@ export interface WorkspaceOpenCredentialAdmissionPort {
       readonly projectId: string;
       readonly profileInstallationId: string;
       readonly bindings: readonly AgentWorkspaceCredentialBinding[];
+      readonly scope?: NonNullable<WorkspaceOpenOptions["credentialAdmissionScope"]>;
     },
   ): Promise<Result<void>>;
 }
@@ -40,6 +42,7 @@ export interface WorkspaceOpenPlacementPort {
       readonly projectId: string;
       readonly profileInstallationId: string;
       readonly sandbox: WorkspaceOpenPreflight["plan"]["sandbox"];
+      readonly providerKey?: string;
     },
   ): Promise<Result<WorkspaceOpenReservation>>;
   consume(context: ExecutionContext, reservation: WorkspaceOpenReservation): Promise<Result<void>>;
@@ -187,22 +190,57 @@ export class AgentWorkspaceOpenPreflightService {
   async admit(
     context: ExecutionContext,
     resolved: WorkspaceOpenContext,
+    options: Pick<
+      WorkspaceOpenOptions,
+      | "credentialReferences"
+      | "precompiledProfilePlan"
+      | "credentialAdmissionScope"
+      | "placementProviderKey"
+    > = {},
   ): Promise<Result<WorkspaceOpenPreflight>> {
-    const plan = await this.dependencies.profileCompiler.compileForNewWorkspace(
-      context,
-      resolved.profileInstallationId,
-    );
+    if (options.precompiledProfilePlan && options.credentialReferences) {
+      return err(
+        domainError.validation(
+          "Workspace open accepts either a precompiled Profile plan or credential references",
+        ),
+      );
+    }
+    if (
+      options.precompiledProfilePlan &&
+      options.precompiledProfilePlan.pin.profileInstallationId !== resolved.profileInstallationId
+    ) {
+      return err(
+        domainError.conflict("Precompiled Workspace Profile plan does not match the resolution", {
+          code: "workspace_open_precompiled_profile_mismatch",
+          requestedProfileInstallationId: resolved.profileInstallationId,
+          planProfileInstallationId: options.precompiledProfilePlan.pin.profileInstallationId,
+        }),
+      );
+    }
+    const plan = options.precompiledProfilePlan
+      ? ok(options.precompiledProfilePlan)
+      : await this.dependencies.profileCompiler.compileForNewWorkspace(
+          context,
+          resolved.profileInstallationId,
+          {
+            ...(options.credentialReferences
+              ? { credentialReferences: options.credentialReferences }
+              : {}),
+          },
+        );
     if (plan.isErr()) return err(plan.error);
     const admitted = await this.dependencies.credentialAdmission.admit(context, {
       projectId: resolved.projectId,
       profileInstallationId: resolved.profileInstallationId,
       bindings: plan.value.credentialBindings ?? [],
+      ...(options.credentialAdmissionScope ? { scope: options.credentialAdmissionScope } : {}),
     });
     if (admitted.isErr()) return err(admitted.error);
     const reservation = await this.dependencies.placement.reserve(context, {
       projectId: resolved.projectId,
       profileInstallationId: resolved.profileInstallationId,
       sandbox: plan.value.sandbox,
+      ...(options.placementProviderKey ? { providerKey: options.placementProviderKey } : {}),
     });
     if (reservation.isErr()) return err(reservation.error);
     return ok({

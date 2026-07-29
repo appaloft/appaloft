@@ -3914,6 +3914,8 @@ export function registerApplicationServices(
               ...(input.placementReservationId
                 ? { placementReservationId: input.placementReservationId }
                 : {}),
+              ...(input.providerKey ? { providerKey: input.providerKey } : {}),
+              ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
             });
             return created.map((sandbox) => ({
               sandboxId: sandbox.sandboxId,
