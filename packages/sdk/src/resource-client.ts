@@ -134,6 +134,13 @@ interface AppaloftWorkspaceProfilePlan {
     readonly visibility: "private" | "organization" | "public";
     readonly ttlSeconds: number;
   }[];
+  readonly preview?: {
+    readonly startArgv: readonly string[];
+    readonly cwd?: string;
+    readonly port: number;
+    readonly visibility: "private" | "organization" | "public";
+    readonly ttlSeconds: number;
+  };
 }
 
 export interface AppaloftWorkspace {

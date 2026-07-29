@@ -71,3 +71,9 @@ Agent Adapters.
 The owner confirmed the decision log one item at a time and confirmed the complete shared
 understanding on 2026-07-28. Spec and Ticket rounds are authorized. Code remains gated on complete
 artifacts and ready tickets.
+
+On 2026-07-29 a read-only public/private boundary audit found that the hosted draft had introduced
+a second delivery/review/thread-task store and repeated public credential metadata. The owner
+confirmed the correction round: public Appaloft must expose the neutral composition seams first;
+hosted code must then reuse them and delete its parallel state. A dedicated Public/Private Boundary
+Review Round becomes a durable downstream-Code and merge gate.

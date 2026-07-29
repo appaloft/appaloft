@@ -31,6 +31,10 @@
    generated SDK, CLI, MCP metadata where applicable, and public Web.
 9. Add provider-neutral GitHub feedback ports and GitHub adapters that upsert reaction/comment,
    Check, Review, PR, and annotations using persisted external ids and stable idempotency keys.
+10. Register the public `GitHubAgentAutomationStore` in the public server composition and expose
+    neutral seams for generic GitHub signature verification, immutable accepted execution context,
+    repository materialization, Workspace Profile preview plans, and bounded Task/Review/PR
+    projection. Hosted runtimes resolve and compose these seams instead of reimplementing them.
 
 ## Migration
 
@@ -41,6 +45,8 @@
 - Keep secret material outside migrations; credential state stores only references and safe
   metadata.
 - Make older SourceEvent kinds and source deployment dispatch behavior unchanged.
+- Downstream/hosted migrations must not add delivery-outcome, review-execution, thread-task,
+  Workspace, Task, Preview, Deployment, or Agent-session truth already owned by public persistence.
 
 ## Test Strategy
 
@@ -50,6 +56,9 @@
 - Add Task lineage, native resume/fallback, Workspace composition, feedback, Git delivery, Preview,
   retention, and provider-readback cleanup tests.
 - Prove transport parity across catalog, HTTP/oRPC, SDK, CLI, and Web.
+- Add `GH-AUTO-BOUNDARY-021` contract/composition tests for dependency registration, immutable
+  accepted execution context, neutral materialization/projection seams, and absence of private
+  imports or parallel hosted persistence.
 - Run public lint, typecheck, test, and build before public delivery.
 
 ## Risks
@@ -69,3 +78,5 @@
 3. Commit, push, open, review, and merge the public PR.
 4. Resolve the final public `main` SHA.
 5. Pin that SHA in Cloud and implement hosted composition.
+6. Run a read-only Public/Private Boundary Review Round; hosted Code or merge remains blocked until
+   its evidence-based gate is `PASS`.

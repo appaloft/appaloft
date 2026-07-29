@@ -187,6 +187,7 @@ import {
   PgEnvironmentReadModel,
   PgEnvironmentRepository,
   PgExecutionSandboxRepository,
+  PgGitHubAgentAutomationStore,
   PgGitHubAgentConfigurationRepository,
   PgGitHubAppInstallationRepository,
   PgMutationCoordinator,
@@ -1223,6 +1224,9 @@ export function registerRuntimeDependencies(
     useFactory: instanceCachingFactory(
       () => new PgGitHubAgentConfigurationRepository(input.database.db),
     ),
+  });
+  container.register(tokens.githubAgentAutomationStore, {
+    useFactory: instanceCachingFactory(() => new PgGitHubAgentAutomationStore(input.database.db)),
   });
   container.register(tokens.agentAdapterInstallationReferenceReader, {
     useFactory: instanceCachingFactory(

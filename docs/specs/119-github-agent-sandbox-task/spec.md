@@ -2,8 +2,10 @@
 
 ## Status
 
-Accepted for Code Round. Public tracking #845 and implementation issues #846-#849 are complete,
-actor-visible, and labelled `ready-for-agent`; hosted composition remains in Cloud #722-#727.
+Accepted for boundary-correction Code Round. Public tracking #845 and implementation issues
+#846-#849 are complete. Public #876 governs the additional composition slice required by the
+2026-07-29 boundary audit before hosted Code resumes; hosted composition remains in Cloud
+#722-#727.
 
 ## Goal
 
@@ -37,6 +39,7 @@ Sandbox cleanup.
 | GH-AUTO-CLEANUP-018 | Hibernate and exact cleanup | A Task stops/completes, TTL expires, or PR closes | Retention executes | Existing pause/terminate/Preview cleanup operations revoke processes, ports, routes, domains, networks, volumes, worktree, and session material according to policy and verify provider readback idempotently. |
 | GH-AUTO-SURFACE-019 | Public surface parity | Bindings, rules, profiles, connections, and tasks are managed | API/SDK/CLI/Web clients operate | The operation catalog drives the neutral transport and UI surfaces, including events/output/checks/diff/preview/session/audit and stop/resume/cleanup controls. |
 | GH-AUTO-CAPABILITY-020 | Adapter-neutral execution | Codex, OpenCode, and Pi installations declare different capabilities | A Task composes execution | Capability gates select native session or fallback behavior without vendor-specific Workspace/Task models or a universal model protocol. |
+| GH-AUTO-BOUNDARY-021 | Single authoritative composition | A hosted or self-hosted runtime composes GitHub Agent automation | Runtime dependencies and delivery/finalization adapters are wired | SourceEvent owns delivery outcomes, the public automation store owns review/thread linkage, public credential metadata is reused, accepted execution intent/snapshot is immutable, repository materialization and bounded delivery projection use public seams, and no downstream runtime creates parallel Workspace/Task/Preview/Deployment/session/idempotency contracts or persistence. |
 
 ## Supported GitHub Inputs
 
@@ -68,6 +71,10 @@ Existing `AgentTaskRunService` callers retain their first-run `taskRunId`, exist
 descriptors remain readable, and existing Workspace, Sandbox, Preview, SourceEvent, Connection,
 Adapter, Profile, and Git delivery operations remain authoritative. New fields and operations are
 additive or versioned with deterministic migration.
+
+The public server composition registers the authoritative GitHub Agent automation store as a
+dependency. Hosted compositions resolve that dependency rather than constructing their own
+delivery, review-execution, or thread-task persistence.
 
 ## Non-goals
 

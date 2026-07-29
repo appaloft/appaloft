@@ -31,6 +31,7 @@ export const tokens = {
     "appaloft.agent_workspace_profile_harness_registrar",
   ),
   agentTaskRunService: Symbol.for("appaloft.agent_task_run_service"),
+  githubAgentAutomationStore: Symbol.for("appaloft.github_agent_automation_store"),
   githubAgentConfigurationRepository: Symbol.for("appaloft.github_agent_configuration_repository"),
   githubAgentConfigurationService: Symbol.for("appaloft.github_agent_configuration_service"),
   workspaceCollaborationRepository: Symbol.for("appaloft.workspace_collaboration_repository"),

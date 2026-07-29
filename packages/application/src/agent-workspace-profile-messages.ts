@@ -191,6 +191,16 @@ export const compileAgentWorkspaceProfileResponseSchema = z
         })
         .strict(),
     ),
+    preview: z
+      .object({
+        startArgv: commandSchema,
+        cwd: z.string().optional(),
+        port: z.number().int().min(1).max(65_535),
+        visibility: z.enum(["private", "organization", "public"]),
+        ttlSeconds: z.number().int().min(60),
+      })
+      .strict()
+      .optional(),
     suggestedChecks: z.array(
       z
         .object({
