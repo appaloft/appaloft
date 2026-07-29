@@ -10,6 +10,8 @@
 - [x] Create and link public boundary-composition issue #876 under #845.
 - [x] Create and link public Workspace/enrollment boundary correction issue #888.
 - [x] Create and link public Repository Binding / Workspace-open convergence issue #890.
+- [x] Create and link public secure neutral Console form issue #892 after composed hosted
+  acceptance exposed the missing actionable input surface.
 
 ## Public Composition Boundary Slice
 
@@ -46,6 +48,9 @@
 - [x] Extend SourceEvent kinds and atomic delivery idempotency.
 - [x] Add review execution-key uniqueness and stale-head behavior.
 - [x] Add operation catalog, transport, SDK, CLI, and Web management surfaces.
+- [x] Extend the neutral Console extension page with bounded text, password, boolean, and
+  string-list fields; validate bound fields, clear password state after every submission attempt,
+  and refetch the document after successful non-redirect actions.
 
 ## Profile And Credential Slice
 
@@ -84,6 +89,7 @@
 - [x] Run focused tests for every implemented public Test Matrix id.
 - [x] Run public `lint`, `typecheck`, and `build`; run the full test gate and document the isolated
   pass for its unrelated concurrent PGlite timeout.
+- [x] Run focused Console renderer tests and Svelte diagnostics for #892.
 - [x] Synchronize Domain Model, Business Operation Map, operation catalog, SDK/CLI/Web docs, and
   Test Matrix evidence.
 - [ ] Commit and push public changes with a neutral message.

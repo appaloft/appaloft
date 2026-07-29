@@ -342,7 +342,19 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain("<Select.Root");
     expect(rendererSource).toContain("setPanelSelectFieldValue(item, field, value)");
     expect(rendererSource).toContain("panelSelectFieldLabel(item, field)");
-    expect(rendererSource).toContain("number | string");
+    expect(rendererSource).toContain(
+      "type ConsolePagePanelFieldValue = boolean | number | string | string[]",
+    );
+    expect(rendererSource).toContain('type: "password" | "text" | "textarea"');
+    expect(rendererSource).toContain('type: "checkbox"');
+    expect(rendererSource).toContain('type: "string-list"');
+    expect(rendererSource).toContain('field.type === "password" ? "new-password" : "off"');
+    expect(rendererSource).toContain("normalizeStringList(value)");
+    expect(rendererSource).toContain("requestActionValidationMessage(action, item)");
+    expect(rendererSource).toContain("clearSensitivePanelFields(item)");
+    expect(rendererSource).toContain("delete nextValues[panelFieldKey(item, field)]");
+    expect(rendererSource).toContain("await pageDocumentQuery.refetch()");
+    expect(rendererSource).toContain("panelGridDialogOpen = false");
     expect(rendererSource).toContain("autoRun?: boolean");
     expect(rendererSource).toContain("confirmation?:");
     expect(rendererSource).toContain("confirmationOpen = true");
