@@ -414,6 +414,10 @@ export const cliCommandDescriptions = {
   projectRename: withDocs("Rename a project", "project.lifecycle"),
   projectReorder: withDocs("Reorder projects for project list display", "project.lifecycle"),
   projectSetDescription: withDocs("Set or clear a project description", "project.lifecycle"),
+  projectConfigureWorkspaceProfile: withDocs(
+    "Set the default Agent Workspace Profile installation",
+    "project.lifecycle",
+  ),
   projectArchive: withDocs("Archive a project", "project.lifecycle"),
   projectRestore: withDocs("Restore an archived project", "project.lifecycle"),
   projectDeleteCheck: withDocs("Preview project delete safety", "project.lifecycle"),
@@ -421,6 +425,13 @@ export const cliCommandDescriptions = {
     "Delete an archived project after blockers are clear",
     "project.lifecycle",
   ),
+  repositoryBinding: withDocs(
+    "Bind normalized Git Repository identities to Projects",
+    "agent.workspace",
+  ),
+  repositoryBindingBind: withDocs("Bind a Repository identity to a Project", "agent.workspace"),
+  repositoryBindingShow: withDocs("Show a Repository Binding", "agent.workspace"),
+  repositoryBindingUnbind: withDocs("Remove a Repository Binding", "agent.workspace"),
   server: withDocs("Server operations", "server.deployment-target"),
   serverRegister: withDocs(
     "Register a deployment target with optional repeatable canonical workload roles",

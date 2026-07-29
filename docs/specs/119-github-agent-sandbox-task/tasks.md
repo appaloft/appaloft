@@ -36,6 +36,8 @@
 
 - [x] Persist and upsert acknowledgement reaction, status comment, Check, Review, and PR ids.
 - [x] Implement bounded/redacted Task event summaries and Check annotations.
+- [x] Render checks, bounded Diff, Preview, delivery, failure, and retention in the same GitHub
+  comment and Check without exposing secret-like content or sensitive URLs.
 - [x] Implement write branch/PR delivery with head reconciliation and no force-push/merge.
 - [x] Implement read-only Review delivery and finding/head/content dedupe.
 - [x] Implement label, ready-for-review, synchronize, and PR-close dispatch.

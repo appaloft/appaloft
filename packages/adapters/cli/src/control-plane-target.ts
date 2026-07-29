@@ -70,6 +70,8 @@ interface ControlPlaneConfigSelection {
 }
 
 const remoteCapableTopLevelCommands = new Set([
+  "agent-adapter",
+  "agent-workspace-profile",
   "auth",
   "audit-event",
   "blueprint",
@@ -94,6 +96,7 @@ const remoteCapableTopLevelCommands = new Set([
   "plugins",
   "preview",
   "project",
+  "repository-binding",
   "provider-job-log",
   "providers",
   "resource",
@@ -111,6 +114,7 @@ const remoteCapableTopLevelCommands = new Set([
   "tunnel",
   "upgrade",
   "work",
+  "workspace",
 ]);
 
 const localOnlyTopLevelCommands = new Set(["db", "init", "mcp", "remote-state", "serve", "worker"]);

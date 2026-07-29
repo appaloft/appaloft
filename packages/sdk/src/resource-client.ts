@@ -68,26 +68,20 @@ export interface AppaloftAgentCreateInput {
   readonly harnessTemplateId?: string;
   readonly idempotencyKey?: string;
   readonly profileInstallationId?: string;
-  readonly credentialReferences?: readonly {
-    readonly requirementId: string;
-    readonly secretRef: string;
-  }[];
 }
 
 export interface AppaloftWorkspaceCreateInput {
   readonly profileInstallationId?: string;
-  readonly credentialReferences?: readonly {
-    readonly requirementId: string;
-    readonly secretRef: string;
-  }[];
   readonly sandbox?: AppaloftSandboxCreateInput;
   readonly harness?: "pi" | "opencode";
   readonly harnessTemplateId?: string;
   readonly idempotencyKey?: string;
   readonly source?: {
     readonly repository: string;
+    readonly repositoryIdentity?: string;
     readonly ref?: string;
     readonly branch?: string;
+    readonly commitSha?: string;
   };
 }
 
@@ -136,12 +130,25 @@ interface AppaloftWorkspaceProfilePlan {
   }[];
 }
 
+export interface AppaloftWorkspaceOpenInput {
+  readonly repository: string;
+  readonly repositoryIdentity: string;
+  readonly ref: string;
+  readonly branch: string;
+  readonly commitSha: string;
+  readonly profile?: string;
+  readonly forceNew?: boolean;
+  readonly attach?: boolean;
+}
+
 export interface AppaloftWorkspace {
   readonly workspaceId: string;
   readonly sandboxId: string;
   readonly sandbox: AppaloftSandbox;
   readonly agent: AppaloftAgent;
   readonly tasks: AppaloftWorkspaceTasks;
+  readonly resumed?: boolean;
+  readonly attach?: Readonly<Record<string, unknown>>;
   readonly terminate: <T = unknown>() => Promise<T>;
 }
 
@@ -513,13 +520,14 @@ type GeneratedSandboxes = GeneratedAppaloftClient["sandboxes"];
 
 export type AppaloftClient = Omit<
   GeneratedAppaloftClient,
-  "sandboxes" | "workspaceCollaborations"
+  "sandboxes" | "workspaceCollaborations" | "workspaces"
 > & {
   readonly operations: GeneratedAppaloftClient;
   readonly sandboxes: Omit<GeneratedSandboxes, "create"> & {
     readonly create: (input: AppaloftSandboxCreateInput) => Promise<AppaloftSandbox>;
   };
   readonly workspaces: {
+    readonly open: (input: AppaloftWorkspaceOpenInput) => Promise<AppaloftWorkspace>;
     readonly create: (input: AppaloftWorkspaceCreateInput) => Promise<AppaloftWorkspace>;
     readonly list: (input?: AppaloftWorkspaceListInput) => Promise<AppaloftWorkspaceList>;
     readonly show: (workspaceId: string) => Promise<AppaloftWorkspaceDescriptor>;
@@ -550,21 +558,59 @@ export function createAppaloftClient(options: AppaloftClientOptions): AppaloftCl
       return createSandboxHandle(operations, descriptor);
     },
   };
+  const openWorkspace = async (input: AppaloftWorkspaceOpenInput): Promise<AppaloftWorkspace> => {
+    const result = unwrapOperation<{
+      readonly workspaceId: string;
+      readonly resumed: boolean;
+      readonly sandbox: AppaloftSandboxDescriptor;
+      readonly agent: AppaloftAgentDescriptor;
+      readonly attach?: Readonly<Record<string, unknown>>;
+    }>(
+      await operations.workspaces.open({
+        ...input,
+        repository: validateRepositoryLocator(input.repository),
+      }),
+    );
+    const sandbox = createSandboxHandle(operations, result.sandbox);
+    const agent = createAgentHandle(operations, result.workspaceId, result.agent);
+    return {
+      workspaceId: result.workspaceId,
+      sandboxId: result.workspaceId,
+      sandbox,
+      agent,
+      tasks: createAppaloftWorkspaceTasks(operations, result.workspaceId, agent.runtimeId),
+      resumed: result.resumed,
+      ...(result.attach ? { attach: result.attach } : {}),
+      terminate: async <T>() => {
+        await agent.terminate();
+        return sandbox.terminate<T>();
+      },
+    };
+  };
   const workspaces = {
+    open: openWorkspace,
     create: async (input: AppaloftWorkspaceCreateInput): Promise<AppaloftWorkspace> => {
-      const profilePlan = input.profileInstallationId
-        ? unwrapOperation<AppaloftWorkspaceProfilePlan>(
-            await operations.agentWorkspaceProfiles.compile({
-              installationId: input.profileInstallationId,
-              ...(input.credentialReferences
-                ? { credentialReferences: [...input.credentialReferences] }
-                : {}),
-            }),
-          )
-        : undefined;
-      if (!profilePlan && (!input.sandbox || !input.harness)) {
+      if (input.profileInstallationId) {
+        const source = input.source;
+        if (!source?.repositoryIdentity || !source.ref || !source.branch || !source.commitSha) {
+          throw new TypeError(
+            "Profile-aware workspaces.create requires an exact Repository identity, ref, branch, and commit SHA",
+          );
+        }
+        return openWorkspace({
+          repository: source.repository,
+          repositoryIdentity: source.repositoryIdentity,
+          ref: source.ref,
+          branch: source.branch,
+          commitSha: source.commitSha,
+          profile: input.profileInstallationId,
+          forceNew: true,
+          attach: false,
+        });
+      }
+      if (!input.sandbox || !input.harness) {
         throw new TypeError(
-          "workspaces.create requires profileInstallationId or both sandbox and harness",
+          "workspaces.create requires a Profile with exact source context or both sandbox and harness",
         );
       }
       const source = input.source
@@ -573,15 +619,7 @@ export function createAppaloftClient(options: AppaloftClientOptions): AppaloftCl
             repository: validateRepositoryLocator(input.source.repository),
           }
         : undefined;
-      const resolvedSandbox = profilePlan
-        ? {
-            ...profilePlan.sandbox,
-            networkPolicy:
-              profilePlan.sandbox.networkPolicy.mode === "deny"
-                ? ({ mode: "deny", rules: [] } as const)
-                : profilePlan.sandbox.networkPolicy,
-          }
-        : input.sandbox;
+      const resolvedSandbox = input.sandbox;
       if (!resolvedSandbox) {
         throw new TypeError("Agent Workspace Sandbox plan is unavailable");
       }
@@ -616,34 +654,11 @@ export function createAppaloftClient(options: AppaloftClientOptions): AppaloftCl
         }
       }
       try {
-        for (const step of profilePlan?.initialization ?? []) {
-          requireSuccessfulExec(
-            await sandbox.exec({
-              argv: step.argv,
-              ...(step.cwd ? { cwd: step.cwd } : {}),
-            }),
-            `Workspace initialization ${step.id}`,
-          );
-        }
-        for (const port of profilePlan?.defaultPorts ?? []) {
-          await operations.sandboxPorts.expose({
-            sandboxId: sandbox.sandboxId,
-            port: port.port,
-            visibility: port.visibility,
-            expiresAt: new Date(Date.now() + port.ttlSeconds * 1_000).toISOString(),
-          });
-        }
-        const harnessTemplateId = profilePlan?.runtime.harnessTemplateId ?? input.harnessTemplateId;
+        const harnessTemplateId = input.harnessTemplateId;
         const agent = await sandbox.agents.create({
-          harness: profilePlan?.runtime.harnessKey ?? input.harness ?? "",
+          harness: input.harness,
           ...(harnessTemplateId ? { harnessTemplateId } : {}),
           ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
-          ...(input.profileInstallationId
-            ? { profileInstallationId: input.profileInstallationId }
-            : {}),
-          ...(input.credentialReferences
-            ? { credentialReferences: [...input.credentialReferences] }
-            : {}),
         });
         return {
           workspaceId: sandbox.sandboxId,
@@ -1188,9 +1203,6 @@ function createSandboxHandle(
             idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
             ...(input.profileInstallationId
               ? { profileInstallationId: input.profileInstallationId }
-              : {}),
-            ...(input.credentialReferences
-              ? { credentialReferences: [...input.credentialReferences] }
               : {}),
           }),
         );

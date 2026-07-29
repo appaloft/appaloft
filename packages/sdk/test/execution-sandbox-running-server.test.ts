@@ -145,7 +145,7 @@ describe("external application sandbox SDK", () => {
       },
       networkPolicy: { mode: "deny", rules: [] },
     });
-    expect(template.ok).toBe(true);
+    expect(template).toMatchObject({ ok: true });
     if (!template.ok) return;
     const templateId = (template.data as { templateId: string }).templateId;
 

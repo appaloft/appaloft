@@ -62,3 +62,10 @@ Blueprint language.
 
 Governed by
 [Agent Adapter SDK And Workspace Profiles Test Matrix](../testing/agent-adapter-sdk-and-workspace-profile-test-matrix.md).
+
+## Profile-Aware Open Extension
+
+[ADR-102](./ADR-102-profile-aware-workspace-open-and-attach.md) assigns named Credential Connection
+references to tenant Profile installation configuration and makes attach selection depend on the
+pinned Adapter capability snapshot. It does not move tenant data or credentials into portable
+definitions.

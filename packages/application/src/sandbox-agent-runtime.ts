@@ -29,7 +29,6 @@ import {
 } from "@appaloft/core";
 import {
   type AgentWorkspaceCredentialBinding,
-  type AgentWorkspaceCredentialReference,
   type AgentWorkspaceProfileCompiledPlan,
   type AgentWorkspaceProfilePin,
 } from "./agent-workspace-profile";
@@ -50,6 +49,7 @@ export interface SandboxAgentHarnessInteraction {
   transport: "managed-terminal" | "native-attach";
   command: readonly string[];
   sessionRecovery: "managed-run-lineage" | "native-session-store";
+  clientHandoff?: "local-client-exec" | "display-only";
   serverPort?: number;
 }
 
@@ -138,6 +138,7 @@ export interface SandboxAgentRuntimeRecord {
   runtime: SandboxAgentRuntime;
   harnessKey: string;
   idempotencyKey: string;
+  projectId?: string;
   profilePin?: AgentWorkspaceProfilePin;
   credentialBindings?: readonly AgentWorkspaceCredentialBinding[];
 }
@@ -146,6 +147,7 @@ export interface SandboxAgentCredentialGrantScope {
   tenantId: string;
   organizationId?: string;
   sandboxId: string;
+  projectId?: string;
   profileInstallationId: string;
   adapterInstallationId: string;
   adapterDefinitionDigest: string;
@@ -603,7 +605,6 @@ export interface SandboxAgentDeliveryDependencies {
     compileForNewWorkspace(
       context: ExecutionContext,
       installationId: string,
-      credentialReferences?: readonly AgentWorkspaceCredentialReference[],
     ): Promise<Result<AgentWorkspaceProfileCompiledPlan>>;
   };
   processCredentialGrants?: SandboxAgentProcessCredentialGrantPort;
@@ -732,6 +733,7 @@ export interface SandboxAgentNativeAttachDescriptor {
     expiresAt: string;
   };
   clientCommand: string[];
+  clientHandoff: "local-client-exec" | "display-only";
 }
 
 export type SandboxAgentAttachDescriptor =
@@ -838,6 +840,7 @@ function credentialGrantScope(
     tenantId: context.tenant?.tenantId ?? "tenant_instance",
     ...(context.tenant?.organizationId ? { organizationId: context.tenant.organizationId } : {}),
     sandboxId: record.runtime.toState().sandboxId.value,
+    ...(record.projectId ? { projectId: record.projectId } : {}),
     profileInstallationId: pin.profileInstallationId,
     adapterInstallationId: pin.adapterInstallationId,
     adapterDefinitionDigest: pin.adapterDefinitionDigest,
@@ -845,22 +848,6 @@ function credentialGrantScope(
     runtimeId: record.runtime.id.value,
     ...(runId ? { runId } : {}),
   };
-}
-
-function sameCredentialReferences(
-  bindings: readonly AgentWorkspaceCredentialBinding[] | undefined,
-  references: readonly AgentWorkspaceCredentialReference[] | undefined,
-): boolean {
-  if (!references) return true;
-  const stored = (bindings ?? [])
-    .map((binding) => `${binding.requirementId}\0${binding.secretRef}`)
-    .sort();
-  const requested = references
-    .map((reference) => `${reference.requirementId}\0${reference.secretRef}`)
-    .sort();
-  return (
-    stored.length === requested.length && stored.every((value, index) => value === requested[index])
-  );
 }
 
 function runDescriptor(record: SandboxAgentRunRecord): SandboxAgentRunDescriptor {
@@ -1043,7 +1030,7 @@ export class SandboxAgentDeliveryService {
         input.runtimeId,
       );
       const scope = record
-        ? credentialGrantScope(context, record, this.dependencies.idGenerator.next("srun_terminal"))
+        ? credentialGrantScope(context, record, `srun_terminal_${input.runtimeId}`)
         : undefined;
       if (
         !record ||
@@ -1130,6 +1117,7 @@ export class SandboxAgentDeliveryService {
           ? access.value.url
           : argument,
       ),
+      clientHandoff: interaction.clientHandoff ?? "display-only",
     });
   }
 
@@ -1140,8 +1128,9 @@ export class SandboxAgentDeliveryService {
       harnessKey: string;
       harnessTemplateId: string;
       idempotencyKey: string;
+      projectId?: string;
       profileInstallationId?: string;
-      credentialReferences?: readonly AgentWorkspaceCredentialReference[];
+      profilePlan?: AgentWorkspaceProfileCompiledPlan;
     },
   ): Promise<Result<SandboxAgentRuntimeDescriptor>> {
     const repositoryContext = toRepositoryContext(context);
@@ -1151,11 +1140,14 @@ export class SandboxAgentDeliveryService {
       input.idempotencyKey,
     );
     if (existing) {
-      if (!sameCredentialReferences(existing.credentialBindings, input.credentialReferences)) {
+      if (
+        input.profileInstallationId &&
+        existing.profilePin?.profileInstallationId !== input.profileInstallationId
+      ) {
         return err(
           domainError.conflict(
-            "Sandbox Agent Runtime idempotency key was already used with different credentials",
-            { code: "sandbox_agent_credential_reference_replay" },
+            "Sandbox Agent Runtime idempotency key was already used with another Profile",
+            { code: "sandbox_agent_profile_installation_replay" },
           ),
         );
       }
@@ -1171,21 +1163,24 @@ export class SandboxAgentDeliveryService {
     if (sandbox.status !== "ready") {
       return err(domainError.conflict("Sandbox must be ready before Runtime creation"));
     }
-    const profilePlan = input.profileInstallationId
-      ? await this.dependencies.workspaceProfileResolver?.compileForNewWorkspace(
-          context,
-          input.profileInstallationId,
-          input.credentialReferences ?? [],
-        )
-      : undefined;
-    if (!input.profileInstallationId && input.credentialReferences?.length) {
+    if (
+      input.profilePlan &&
+      input.profilePlan.pin.profileInstallationId !== input.profileInstallationId
+    ) {
       return err(
-        domainError.validation(
-          "Credential references require an installed Agent Workspace Profile",
-          { code: "sandbox_agent_credential_profile_required" },
-        ),
+        domainError.conflict("Compiled Agent Workspace Profile installation pin does not match", {
+          code: "sandbox_agent_profile_installation_pin_mismatch",
+        }),
       );
     }
+    const profilePlan = input.profilePlan
+      ? ok(input.profilePlan)
+      : input.profileInstallationId
+        ? await this.dependencies.workspaceProfileResolver?.compileForNewWorkspace(
+            context,
+            input.profileInstallationId,
+          )
+        : undefined;
     if (input.profileInstallationId && !this.dependencies.workspaceProfileResolver) {
       return err(domainError.conflict("Agent Workspace Profile resolution is unavailable"));
     }
@@ -1233,6 +1228,7 @@ export class SandboxAgentDeliveryService {
       runtime: runtime.value,
       harnessKey: input.harnessKey,
       idempotencyKey: input.idempotencyKey,
+      ...(input.projectId ? { projectId: input.projectId } : {}),
       ...(resolvedProfilePlan ? { profilePin: resolvedProfilePlan.pin } : {}),
       ...(resolvedProfilePlan?.credentialBindings?.length
         ? { credentialBindings: resolvedProfilePlan.credentialBindings }

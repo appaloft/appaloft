@@ -10,6 +10,7 @@ describe("generated SDK operation metadata", () => {
 
     expect(operations.map((operation) => operation.operationKey).sort()).toEqual([
       "agent-workspace-profiles.compile",
+      "agent-workspace-profiles.configure-credential-connections",
       "agent-workspace-profiles.disable",
       "agent-workspace-profiles.install",
       "agent-workspace-profiles.list",

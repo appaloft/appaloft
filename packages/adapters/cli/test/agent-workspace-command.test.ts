@@ -10,8 +10,6 @@ import {
   type Command,
   type CommandBus,
   CreateAgentTaskRunCommand,
-  CreateSandboxAgentRuntimeCommand,
-  CreateSandboxCommand,
   CreateWorkspaceCollaborationCommand,
   createExecutionContext,
   DeliverAgentTaskRunCommand,
@@ -23,32 +21,33 @@ import {
   ListSandboxAgentRuntimesQuery,
   ListSandboxesQuery,
   ListWorkspaceCollaborationsQuery,
+  OpenAgentWorkspaceCommand,
   type Query,
   type QueryBus,
   ResumeAgentTaskRunCommand,
   ShowAgentTaskRunQuery,
   ShowSandboxQuery,
+  ShowTerminalSessionQuery,
   ShowWorkspaceCollaborationQuery,
   SteerAgentTaskRunCommand,
   StopAgentTaskRunCommand,
+  type TerminalSession,
+  type TerminalSessionAttachmentGateway,
+  type TerminalSessionFrame,
   TerminateSandboxAgentRuntimeCommand,
   TerminateSandboxCommand,
 } from "@appaloft/application";
 import { err, ok } from "@appaloft/core";
 
 describe("Agent Workspace CLI", () => {
-  test("[AGENT-WS-CLI-012] creates Pi and OpenCode Workspaces through canonical public commands", async () => {
+  test("[WS-CREATE-PROFILE-009][WS-OPEN-PROFILE-006][WS-OPEN-SURFACE-019] creates Profile-aware Workspaces without Agent-name branching", async () => {
     const commands: Command<unknown>[] = [];
     const commandBus = {
       execute: async <T>(_context: unknown, command: Command<T>) => {
         commands.push(command as Command<unknown>);
-        if (command instanceof CreateSandboxCommand) {
-          return ok({ sandboxId: `sbx_ws_${commands.length}`, status: "ready" } as T);
-        }
         return ok({
-          sandboxId: `sbx_ws_${commands.length - 1}`,
-          runtimeId: `sar_ws_${commands.length}`,
-          status: "ready",
+          workspaceId: `sbx_ws_${commands.length}`,
+          resumed: false,
         } as T);
       },
     } as unknown as CommandBus;
@@ -65,54 +64,268 @@ describe("Agent Workspace CLI", () => {
       commandBus,
       queryBus,
       executionContextFactory,
+      resolveRemoteWorkspaceGitRef: async (repository, ref) => ({
+        repositoryIdentity: "github.com/Acme/Web",
+        credentialFreeHttpsRepository: repository,
+        ref,
+        commitSha: "0123456789abcdef0123456789abcdef01234567",
+      }),
     });
     const write = process.stdout.write;
     process.stdout.write = (() => true) as typeof process.stdout.write;
     try {
-      for (const harness of ["pi", "opencode"] as const) {
+      for (const profile of ["pi-default", "opencode-default"] as const) {
         await program.parseAsync([
           "node",
           "appaloft",
           "workspace",
           "create",
-          "--harness",
-          harness,
-          "--sandbox-template",
-          `sbt_${harness}`,
-          "--isolation",
-          "gvisor",
-          "--cpu-millis",
-          "1000",
-          "--memory-bytes",
-          "536870912",
-          "--disk-bytes",
-          "2147483648",
-          "--max-processes",
-          "32",
+          "--profile",
+          profile,
+          "--repo",
+          "https://github.com/Acme/Web.git",
+          "--ref",
+          "refs/heads/main",
+          "--branch",
+          "main",
         ]);
       }
     } finally {
       process.stdout.write = write;
     }
 
-    expect(commands[0]).toBeInstanceOf(CreateSandboxCommand);
-    expect(commands[1]).toBeInstanceOf(CreateSandboxAgentRuntimeCommand);
+    expect(commands).toHaveLength(2);
+    expect(commands[0]).toBeInstanceOf(OpenAgentWorkspaceCommand);
+    expect(commands[0]).toMatchObject({
+      input: {
+        profile: "pi-default",
+        repositoryIdentity: "github.com/Acme/Web",
+        commitSha: "0123456789abcdef0123456789abcdef01234567",
+        forceNew: true,
+      },
+    });
+    expect(commands[1]).toBeInstanceOf(OpenAgentWorkspaceCommand);
     expect(commands[1]).toMatchObject({
       input: {
-        sandboxId: "sbx_ws_1",
-        harnessKey: "pi",
-        harnessTemplateId: "aht_pi_managed_v1",
+        profile: "opencode-default",
       },
     });
-    expect(commands[2]).toBeInstanceOf(CreateSandboxCommand);
-    expect(commands[3]).toBeInstanceOf(CreateSandboxAgentRuntimeCommand);
-    expect(commands[3]).toMatchObject({
+  });
+
+  test("[WS-OPEN-GIT-001][WS-OPEN-SURFACE-019] opens from local Git context through one application command", async () => {
+    const commands: Command<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: Command<T>) => {
+        commands.push(command as Command<unknown>);
+        return ok({ workspaceId: "sbx_local", resumed: true } as T);
+      },
+    } as unknown as CommandBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) => createExecutionContext({ ...input, requestId: "req_workspace_open_cli" }),
+    };
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus: { execute: async () => ok({}) } as unknown as QueryBus,
+      executionContextFactory,
+      resolveLocalWorkspaceGitContext: async (path) => ({
+        root: "/work/repository",
+        remoteName: "origin",
+        remote: "git@github.com:Acme/Web.git",
+        repositoryIdentity: "github.com/Acme/Web",
+        credentialFreeHttpsRepository: "https://github.com/Acme/Web.git",
+        branch: "feature/open",
+        ref: "refs/heads/feature/open",
+        headSha: "0123456789abcdef0123456789abcdef01234567",
+        ...(path === "." ? {} : { root: path }),
+      }),
+    });
+    const write = process.stdout.write;
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    try {
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "workspace",
+        "open",
+        ".",
+        "--profile",
+        "opencode-default",
+        "--new",
+        "--no-attach",
+      ]);
+    } finally {
+      process.stdout.write = write;
+    }
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(OpenAgentWorkspaceCommand);
+    expect(commands[0]).toMatchObject({
       input: {
-        sandboxId: "sbx_ws_3",
-        harnessKey: "opencode",
-        harnessTemplateId: "aht_opencode_managed_v1",
+        repository: "https://github.com/Acme/Web.git",
+        repositoryIdentity: "github.com/Acme/Web",
+        branch: "feature/open",
+        commitSha: "0123456789abcdef0123456789abcdef01234567",
+        profile: "opencode-default",
+        forceNew: true,
+        attach: false,
       },
     });
+  });
+
+  test("[WS-ATTACH-MANAGED-014] automatically connects a managed-terminal attach descriptor", async () => {
+    const attached: string[] = [];
+    const output: string[] = [];
+    const frames: TerminalSessionFrame[] = [
+      { kind: "ready", sessionId: "term_pi" },
+      { kind: "output", stream: "stdout", data: "Pi ready\n" },
+      { kind: "closed", reason: "source-ended", exitCode: 0 },
+    ];
+    const session: TerminalSession = {
+      write: async () => {},
+      resize: async () => {},
+      detach: async () => {},
+      close: async () => {},
+      async *[Symbol.asyncIterator]() {
+        for (const frame of frames) yield frame;
+      },
+    };
+    const gateway: TerminalSessionAttachmentGateway = {
+      attach: (sessionId) => {
+        attached.push(sessionId);
+        return ok(session);
+      },
+    };
+    const commandBus = {
+      execute: async <T>() =>
+        ok({
+          workspaceId: "sbx_pi",
+          resumed: false,
+          attach: {
+            transport: "managed-terminal",
+            sessionId: "term_pi",
+          },
+        } as T),
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: Query<T>) => {
+        expect(query).toBeInstanceOf(ShowTerminalSessionQuery);
+        return ok({
+          schemaVersion: "terminal-sessions.show/v1",
+          item: {
+            sessionId: "term_pi",
+            scope: "sandbox",
+            sandboxId: "sbx_pi",
+            transport: {
+              kind: "websocket",
+              path: "/api/terminal-sessions/term_pi/attach",
+            },
+            providerKey: "managed-agent",
+            createdAt: "2026-07-28T00:00:00.000Z",
+            status: "active",
+          },
+        } as T);
+      },
+    } as unknown as QueryBus;
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_workspace_managed_attach_cli" }),
+      },
+      terminalSessionGateway: gateway,
+      terminalIO: {
+        stdin: {
+          isTTY: false,
+          on: () => {},
+          removeListener: () => {},
+        },
+        stdout: { write: (data) => output.push(String(data)) },
+        stderr: { write: () => {} },
+      },
+      resolveLocalWorkspaceGitContext: async () => ({
+        root: "/work/repository",
+        remoteName: "origin",
+        remote: "git@github.com:Acme/Web.git",
+        repositoryIdentity: "github.com/Acme/Web",
+        credentialFreeHttpsRepository: "https://github.com/Acme/Web.git",
+        branch: "main",
+        ref: "refs/heads/main",
+        headSha: "0123456789abcdef0123456789abcdef01234567",
+      }),
+    });
+
+    await program.parseAsync(["node", "appaloft", "workspace", "open", "."]);
+
+    expect(attached).toEqual(["term_pi"]);
+    expect(output.join("")).toBe("Pi ready\n");
+  });
+
+  test("[WS-ATTACH-NATIVE-015] executes the Adapter-declared native client handoff without a shell", async () => {
+    const launched: string[][] = [];
+    const commandBus = {
+      execute: async <T>() =>
+        ok({
+          workspaceId: "sbx_opencode",
+          resumed: false,
+          attach: {
+            workspaceId: "sbx_opencode",
+            runtimeId: "sar_opencode",
+            transport: "native-attach",
+            access: {
+              exposureId: "sbp_opencode",
+              port: 4096,
+              visibility: "private",
+              url: "https://attach.example.test/capability",
+              expiresAt: "2026-07-28T01:00:00.000Z",
+            },
+            clientCommand: [
+              "opencode",
+              "attach",
+              "https://attach.example.test/capability",
+              "--dir",
+              "/workspace",
+            ],
+            clientHandoff: "local-client-exec",
+          },
+        } as T),
+    } as unknown as CommandBus;
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus: { execute: async () => ok({}) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_workspace_native_attach_cli" }),
+      },
+      resolveLocalWorkspaceGitContext: async () => ({
+        root: "/work/repository",
+        remoteName: "origin",
+        remote: "git@github.com:Acme/Web.git",
+        repositoryIdentity: "github.com/Acme/Web",
+        credentialFreeHttpsRepository: "https://github.com/Acme/Web.git",
+        branch: "main",
+        ref: "refs/heads/main",
+        headSha: "0123456789abcdef0123456789abcdef01234567",
+      }),
+      launchNativeWorkspaceClient: async (argv) => {
+        launched.push([...argv]);
+      },
+    });
+
+    await program.parseAsync(["node", "appaloft", "workspace", "open", "."]);
+
+    expect(launched).toEqual([
+      ["opencode", "attach", "https://attach.example.test/capability", "--dir", "/workspace"],
+    ]);
   });
 
   test("[COLLAB-SURFACE-013] exposes collaboration creation, membership, lanes and access grants", async () => {
@@ -371,24 +584,14 @@ describe("Agent Workspace CLI", () => {
     expect(commands[1]).toBeInstanceOf(TerminateSandboxCommand);
   });
 
-  test("[AGENT-WS-SOURCE-014] materializes repository and branch before Runtime creation", async () => {
+  test("[WS-OPEN-CREATE-009] dispatches an exact remote source pin to the application workflow", async () => {
     const commands: Command<unknown>[] = [];
     const commandBus = {
       execute: async <T>(_context: unknown, command: Command<T>) => {
         commands.push(command as Command<unknown>);
-        if (command instanceof CreateSandboxCommand) {
-          return ok({ sandboxId: "sbx_source_cli", status: "ready" } as T);
-        }
-        if (command instanceof ExecuteSandboxCommand) {
-          return ok({
-            mode: "foreground",
-            frames: [{ kind: "exit", exitCode: 0 }],
-          } as T);
-        }
         return ok({
-          sandboxId: "sbx_source_cli",
-          runtimeId: "sar_source_cli",
-          status: "ready",
+          workspaceId: "sbx_source_cli",
+          resumed: false,
         } as T);
       },
     } as unknown as CommandBus;
@@ -403,6 +606,12 @@ describe("Agent Workspace CLI", () => {
       commandBus,
       queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
       executionContextFactory,
+      resolveRemoteWorkspaceGitRef: async () => ({
+        repositoryIdentity: "github.com/acme/web",
+        credentialFreeHttpsRepository: "https://github.com/acme/web.git",
+        ref: "refs/heads/main",
+        commitSha: "0123456789abcdef0123456789abcdef01234567",
+      }),
     });
     const write = process.stdout.write;
     process.stdout.write = (() => true) as typeof process.stdout.write;
@@ -412,24 +621,12 @@ describe("Agent Workspace CLI", () => {
         "appaloft",
         "workspace",
         "create",
-        "--harness",
-        "opencode",
-        "--sandbox-template",
-        "sbt_opencode",
-        "--isolation",
-        "gvisor",
-        "--cpu-millis",
-        "1000",
-        "--memory-bytes",
-        "536870912",
-        "--disk-bytes",
-        "2147483648",
-        "--max-processes",
-        "32",
+        "--profile",
+        "opencode-default",
         "--repo",
         "https://github.com/acme/web.git",
         "--ref",
-        "main",
+        "refs/heads/main",
         "--branch",
         "agent/issue-123",
       ]);
@@ -437,45 +634,37 @@ describe("Agent Workspace CLI", () => {
       process.stdout.write = write;
     }
 
-    expect(commands[0]).toBeInstanceOf(CreateSandboxCommand);
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(OpenAgentWorkspaceCommand);
     expect(commands[0]).toMatchObject({
       input: {
-        networkPolicy: {
-          mode: "allowlist",
-          rules: [
-            { kind: "domain", value: "github.com", ports: [443] },
-            { kind: "domain", value: "api.github.com", ports: [443] },
-          ],
-        },
+        repository: "https://github.com/acme/web.git",
+        repositoryIdentity: "github.com/acme/web",
+        ref: "refs/heads/main",
+        branch: "agent/issue-123",
+        commitSha: "0123456789abcdef0123456789abcdef01234567",
+        profile: "opencode-default",
+        forceNew: true,
       },
     });
-    expect(commands[1]).toMatchObject({
-      input: {
-        sandboxId: "sbx_source_cli",
-        argv: ["git", "clone", "--branch", "main", "--", "https://github.com/acme/web.git", "."],
-      },
-    });
-    expect(commands[2]).toMatchObject({
-      input: {
-        sandboxId: "sbx_source_cli",
-        argv: ["git", "switch", "-c", "agent/issue-123"],
-      },
-    });
-    expect(commands[3]).toBeInstanceOf(CreateSandboxAgentRuntimeCommand);
   });
 
-  test("[AGENT-WS-CLI-012] preserves partial Workspace recovery evidence", async () => {
+  test("[WS-OPEN-PARTIAL-012] preserves partial Workspace recovery evidence", async () => {
     const commandBus = {
-      execute: async <T>(_context: unknown, command: Command<T>) => {
-        if (command instanceof CreateSandboxCommand) {
-          return ok({ sandboxId: "sbx_partial", status: "ready" } as T);
-        }
+      execute: async <T>(_context: unknown, _command: Command<T>) => {
         return err({
           code: "sandbox_agent_harness_unavailable",
           category: "user",
           message: "OpenCode harness is not configured",
           retryable: false,
-          details: {},
+          details: {
+            phase: "workspace-open-runtime-create",
+            workspaceId: "sbx_partial",
+            sandboxId: "sbx_partial",
+            runtimeId: "sar_partial",
+            recovery: "appaloft workspace open . --no-attach",
+            terminate: "appaloft workspace terminate sbx_partial",
+          },
         });
       },
     } as unknown as CommandBus;
@@ -489,6 +678,12 @@ describe("Agent Workspace CLI", () => {
       commandBus,
       queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
       executionContextFactory,
+      resolveRemoteWorkspaceGitRef: async () => ({
+        repositoryIdentity: "github.com/acme/web",
+        credentialFreeHttpsRepository: "https://github.com/acme/web.git",
+        ref: "refs/heads/main",
+        commitSha: "0123456789abcdef0123456789abcdef01234567",
+      }),
     });
 
     const originalExitCode = process.exitCode;
@@ -500,29 +695,23 @@ describe("Agent Workspace CLI", () => {
         "appaloft",
         "workspace",
         "create",
-        "--harness",
-        "opencode",
-        "--sandbox-template",
-        "sbt_opencode",
-        "--isolation",
-        "gvisor",
-        "--cpu-millis",
-        "1000",
-        "--memory-bytes",
-        "536870912",
-        "--disk-bytes",
-        "2147483648",
-        "--max-processes",
-        "32",
+        "--profile",
+        "opencode-default",
+        "--repo",
+        "https://github.com/acme/web.git",
+        "--ref",
+        "refs/heads/main",
+        "--branch",
+        "main",
       ]);
       throw new Error("Expected partial Workspace creation to fail");
     } catch (error) {
       const errorText = String(error);
       expect(errorText).toContain('"code":"sandbox_agent_harness_unavailable"');
-      expect(errorText).toContain('"phase":"agent-workspace-runtime-create"');
+      expect(errorText).toContain('"phase":"workspace-open-runtime-create"');
       expect(errorText).toContain('"workspaceId":"sbx_partial"');
       expect(errorText).toContain('"sandboxId":"sbx_partial"');
-      expect(errorText).toContain('"harness":"opencode"');
+      expect(errorText).toContain('"runtimeId":"sar_partial"');
     } finally {
       process.stderr.write = write;
       process.exitCode = originalExitCode ?? 0;

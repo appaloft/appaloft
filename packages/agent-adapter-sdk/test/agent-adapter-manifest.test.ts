@@ -360,7 +360,7 @@ describe("Agent Adapter manifest validation", () => {
     const resolved = resolveAgentAdapterCredentialBindings(validManifest(), [
       {
         requirementId: "model-api",
-        secretRef: "vault://agents/codex#openai-api-key",
+        connectionReference: "model-default",
       },
     ]);
 
@@ -375,7 +375,7 @@ describe("Agent Adapter manifest validation", () => {
             kind: "process-environment",
             variable: "OPENAI_API_KEY",
           },
-          secretRef: "vault://agents/codex#openai-api-key",
+          connectionReference: "model-default",
         },
       ],
     });
@@ -388,7 +388,7 @@ describe("Agent Adapter manifest validation", () => {
       issues: [{ code: "missing_required_credential", requirementId: "model-api" }],
     });
     const unknown = resolveAgentAdapterCredentialBindings(validManifest(), [
-      { requirementId: "unknown", secretRef: "vault://agents/unknown#token" },
+      { requirementId: "unknown", connectionReference: "unknown-default" },
     ]);
     expect(unknown.ok).toBe(false);
     if (!unknown.ok) {
@@ -398,8 +398,8 @@ describe("Agent Adapter manifest validation", () => {
       ]);
     }
     const duplicate = resolveAgentAdapterCredentialBindings(validManifest(), [
-      { requirementId: "model-api", secretRef: "vault://agents/codex#first" },
-      { requirementId: "model-api", secretRef: "vault://agents/codex#second" },
+      { requirementId: "model-api", connectionReference: "model-first" },
+      { requirementId: "model-api", connectionReference: "model-second" },
     ]);
     expect(duplicate.ok).toBe(false);
     if (!duplicate.ok) {
@@ -409,11 +409,11 @@ describe("Agent Adapter manifest validation", () => {
     }
     expect(
       resolveAgentAdapterCredentialBindings(validManifest(), [
-        { requirementId: "model-api", secretRef: "raw-model-api-key" },
+        { requirementId: "model-api", connectionReference: "not/a/connection" },
       ]),
     ).toMatchObject({
       ok: false,
-      issues: [{ code: "invalid_credential_binding", path: [0, "secretRef"] }],
+      issues: [{ code: "invalid_credential_binding", path: [0, "connectionReference"] }],
     });
 
     const stdinManifest = {
@@ -437,8 +437,8 @@ describe("Agent Adapter manifest validation", () => {
     } as const;
     expect(
       resolveAgentAdapterCredentialBindings(stdinManifest, [
-        { requirementId: "first", secretRef: "secret://agents/first" },
-        { requirementId: "second", secretRef: "secret://agents/second" },
+        { requirementId: "first", connectionReference: "first-default" },
+        { requirementId: "second", connectionReference: "second-default" },
       ]),
     ).toMatchObject({
       ok: false,

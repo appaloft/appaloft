@@ -73,6 +73,17 @@ export {
   parseCliControlPlaneGlobalOptions,
   resolveCliExecutionTarget,
 } from "./control-plane-target.js";
+export {
+  type LocalGitWorkspaceContext,
+  type NormalizedWorkspaceRepositoryRemote,
+  normalizeWorkspaceRepositoryRemote,
+  type RemoteGitWorkspaceRef,
+  resolveLocalGitWorkspaceContext,
+  resolveRemoteGitWorkspaceRef,
+  type WorkspaceGitCommandInput,
+  type WorkspaceGitCommandOutput,
+  type WorkspaceGitCommandRunner,
+} from "./local-git-workspace-context.js";
 export { createRemoteCliProgram } from "./remote-cli-program.js";
 export {
   createRemoteTerminalSessionAttachmentGateway,

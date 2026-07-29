@@ -125,6 +125,27 @@ const createInput = {
 };
 
 describe("ExecutionSandboxService provider reconciliation", () => {
+  test("[WS-OPEN-ADMIT-008] carries an opaque placement reservation only into initial provision", async () => {
+    const adapter = provider();
+    let observedReservationId: string | undefined;
+    const provision = adapter.provision;
+    adapter.provision = async (request) => {
+      observedReservationId = request.placementReservationId;
+      return provision(request);
+    };
+    const app = service(adapter);
+
+    expect(
+      (
+        await app.service.createAndReconcile(context, {
+          ...createInput,
+          placementReservationId: "wres_exact",
+        })
+      ).isOk(),
+    ).toBe(true);
+    expect(observedReservationId).toBe("wres_exact");
+  });
+
   test("[SBX-RECONCILE-001] removes only provider-owned runtimes absent from tenant persistence", async () => {
     const adapter = provider();
     const app = service(adapter);
