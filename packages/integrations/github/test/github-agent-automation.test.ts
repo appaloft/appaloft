@@ -1,7 +1,9 @@
 import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
+import { createExecutionContext } from "@appaloft/application";
 
 import {
+  GitHubAgentTriggerSourceResolverAdapter,
   GitHubApiRepositoryPermissionReader,
   githubAgentSourceEventInput,
   githubAgentTriggerFromSourceEvent,
@@ -121,7 +123,10 @@ describe("GitHub Agent automation webhook", () => {
       action: "created",
       pull_request: {
         number: 42,
-        head: { sha: "abcdef123456", repo: { id: 123456, full_name: repository().full_name } },
+        head: {
+          sha: "abcdef123456abcdef123456abcdef123456abcd",
+          repo: { id: 123456, full_name: repository().full_name },
+        },
         base: { ref: "main" },
       },
       comment: {
@@ -148,7 +153,7 @@ describe("GitHub Agent automation webhook", () => {
       thread: { kind: "pull-request", number: 42 },
       pullRequest: {
         number: 42,
-        headSha: "abcdef123456",
+        headSha: "abcdef123456abcdef123456abcdef123456abcd",
         baseRef: "main",
         fork: false,
       },
@@ -193,7 +198,10 @@ describe("GitHub Agent automation webhook", () => {
       number: 42,
       pull_request: {
         number: 42,
-        head: { sha: "abcdef123456", repo: { id: 123456, full_name: repository().full_name } },
+        head: {
+          sha: "abcdef123456abcdef123456abcdef123456abcd",
+          repo: { id: 123456, full_name: repository().full_name },
+        },
         base: { ref: "main" },
       },
     });
@@ -208,7 +216,7 @@ describe("GitHub Agent automation webhook", () => {
       event: "pull_request",
       action: "ready_for_review",
       thread: { kind: "pull-request", number: 42 },
-      pullRequest: { headSha: "abcdef123456", fork: false },
+      pullRequest: { headSha: "abcdef123456abcdef123456abcdef123456abcd", fork: false },
     });
 
     const topLevelPullRequestComment = await normalize("issue_comment", {
@@ -228,7 +236,10 @@ describe("GitHub Agent automation webhook", () => {
         number: 42,
         pull_request: {
           number: 42,
-          head: { sha: "abcdef123456", repo: { id: 123456, full_name: repository().full_name } },
+          head: {
+            sha: "abcdef123456abcdef123456abcdef123456abcd",
+            repo: { id: 123456, full_name: repository().full_name },
+          },
           base: { ref: "main" },
         },
         ...(action === "labeled" ? { label: { id: 78, name: "appaloft:review" } } : {}),
@@ -237,9 +248,81 @@ describe("GitHub Agent automation webhook", () => {
         event: "pull_request",
         action,
         thread: { kind: "pull-request", number: 42 },
-        pullRequest: { headSha: "abcdef123456", fork: false },
+        pullRequest: { headSha: "abcdef123456abcdef123456abcdef123456abcd", fork: false },
       });
     }
+  });
+
+  test("[GH-AUTO-BOUNDARY-021][GH-AUTO-AUTHZ-005] resolves exact issue and PR source pins before authorization", async () => {
+    const resolver = new GitHubAgentTriggerSourceResolverAdapter(
+      async () => "installation-token",
+      (async (input: URL | RequestInfo) => {
+        const url = String(input);
+        if (url.endsWith("/commits/main")) {
+          return Response.json({ sha: "a".repeat(40) });
+        }
+        if (url.endsWith("/pulls/42")) {
+          return Response.json({
+            number: 42,
+            head: {
+              sha: "b".repeat(40),
+              repo: { id: 999999, full_name: "outside/fork" },
+            },
+            base: { ref: "main" },
+          });
+        }
+        return new Response(null, { status: 404 });
+      }) as typeof fetch,
+      "https://api.github.test",
+    );
+    const issue = githubAgentTriggerFromSourceEvent(
+      (
+        await normalize("issue_comment", {
+          action: "created",
+          issue: { number: 41 },
+          comment: { id: 501, body: "@appaloft fix" },
+        })
+      )._unsafeUnwrap(),
+      "sevt_issue",
+    );
+    const pullRequest = githubAgentTriggerFromSourceEvent(
+      (
+        await normalize("issue_comment", {
+          action: "created",
+          issue: { number: 42, pull_request: { url: "https://api.github.test/pulls/42" } },
+          comment: { id: 502, body: "@appaloft review" },
+        })
+      )._unsafeUnwrap(),
+      "sevt_pr",
+    );
+
+    const context = createExecutionContext({
+      entrypoint: "worker",
+      requestId: "req_source_pin",
+    });
+    const issueResolved = await resolver.resolve(context, {
+      trigger: issue,
+      intent: { action: "fix", source: "manual", mode: "write" },
+    });
+    const pullRequestResolved = await resolver.resolve(context, {
+      trigger: pullRequest,
+      intent: { action: "review", source: "manual", mode: "review-only" },
+    });
+
+    expect(issueResolved._unsafeUnwrap()).toMatchObject({
+      repository: { defaultBranch: "main" },
+      source: { ref: "main", headSha: "a".repeat(40) },
+    });
+    expect(pullRequestResolved._unsafeUnwrap()).toMatchObject({
+      pullRequest: {
+        number: 42,
+        headSha: "b".repeat(40),
+        headRepositoryId: "999999",
+        headRepositoryFullName: "outside/fork",
+        fork: true,
+      },
+      source: { ref: "b".repeat(40), headSha: "b".repeat(40) },
+    });
   });
 
   test("[GH-AUTO-WEBHOOK-001] rejects an invalid signature, unsupported action, fork ambiguity, or missing numeric ids", async () => {

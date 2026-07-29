@@ -7,7 +7,10 @@ import {
   type Result,
 } from "@appaloft/core";
 
-import { type AgentWorkspaceProfileCompiledPlan } from "./agent-workspace-profile";
+import {
+  type AgentWorkspaceCredentialReference,
+  type AgentWorkspaceProfileCompiledPlan,
+} from "./agent-workspace-profile";
 import { type ExecutionContext } from "./execution-context";
 import {
   type SandboxAgentAttachDescriptor,
@@ -23,6 +26,31 @@ export interface WorkspaceOpenInput {
   readonly profile?: string;
   readonly forceNew?: boolean;
   readonly attach?: boolean;
+}
+
+export interface WorkspaceOpenSourceMaterializerPort {
+  materialize(
+    context: ExecutionContext,
+    input: {
+      readonly workspaceId: string;
+      readonly source: WorkspaceOpenInput;
+    },
+  ): Promise<Result<void>>;
+}
+
+export interface WorkspaceOpenOptions {
+  readonly credentialReferences?: readonly AgentWorkspaceCredentialReference[];
+  readonly precompiledProfilePlan?: AgentWorkspaceProfileCompiledPlan;
+  readonly credentialAdmissionScope?: {
+    readonly owner: { readonly kind: "user" | "organization"; readonly id: string };
+    readonly agentProfileId: string;
+    readonly use: "interactive" | "automation";
+    readonly untrustedCode: boolean;
+    readonly serverPoolId: string;
+  };
+  readonly placementProviderKey?: string;
+  readonly expiresAt?: string;
+  readonly sourceMaterializer?: WorkspaceOpenSourceMaterializerPort;
 }
 
 export interface WorkspaceOpenReservation {
@@ -134,6 +162,13 @@ export interface WorkspaceOpenDependencies {
     admit(
       context: ExecutionContext,
       resolved: WorkspaceOpenContext,
+      options?: Pick<
+        WorkspaceOpenOptions,
+        | "credentialReferences"
+        | "precompiledProfilePlan"
+        | "credentialAdmissionScope"
+        | "placementProviderKey"
+      >,
     ): Promise<Result<WorkspaceOpenPreflight>>;
   };
   readonly entries: WorkspaceOpenEntryRepository;
@@ -142,6 +177,8 @@ export interface WorkspaceOpenDependencies {
       context: ExecutionContext,
       input: AgentWorkspaceProfileCompiledPlan["sandbox"] & {
         readonly placementReservationId?: string;
+        readonly providerKey?: string;
+        readonly expiresAt?: string;
       },
     ): Promise<Result<SandboxOpenDescriptor>>;
     resume(context: ExecutionContext, workspaceId: string): Promise<Result<SandboxOpenDescriptor>>;
@@ -254,6 +291,7 @@ export class AgentWorkspaceOpenService {
   async open(
     context: ExecutionContext,
     input: WorkspaceOpenInput,
+    options: WorkspaceOpenOptions = {},
   ): Promise<Result<WorkspaceOpenResult>> {
     const resolved = await this.dependencies.preflight.resolveContext(context, input);
     if (resolved.isErr()) return err(resolved.error);
@@ -344,7 +382,20 @@ export class AgentWorkspaceOpenService {
       );
     }
 
-    const preflight = await this.dependencies.preflight.admit(context, resolved.value);
+    const preflight = await this.dependencies.preflight.admit(context, resolved.value, {
+      ...(options.credentialReferences
+        ? { credentialReferences: options.credentialReferences }
+        : {}),
+      ...(options.precompiledProfilePlan
+        ? { precompiledProfilePlan: options.precompiledProfilePlan }
+        : {}),
+      ...(options.credentialAdmissionScope
+        ? { credentialAdmissionScope: options.credentialAdmissionScope }
+        : {}),
+      ...(options.placementProviderKey
+        ? { placementProviderKey: options.placementProviderKey }
+        : {}),
+    });
     if (preflight.isErr()) return err(preflight.error);
     const begun = await this.dependencies.entries.begin(context, key, {
       commitSha: input.commitSha,
@@ -380,6 +431,8 @@ export class AgentWorkspaceOpenService {
       const sandbox = await this.dependencies.sandboxes.create(context, {
         ...preflight.value.plan.sandbox,
         placementReservationId: preflight.value.reservation.reservationId,
+        ...(options.placementProviderKey ? { providerKey: options.placementProviderKey } : {}),
+        ...(options.expiresAt ? { expiresAt: options.expiresAt } : {}),
       });
       if (sandbox.isErr()) {
         await this.dependencies.reservations.release(context, preflight.value.reservation);
@@ -389,26 +442,34 @@ export class AgentWorkspaceOpenService {
       await this.dependencies.reservations.release(context, preflight.value.reservation);
 
       phase = "workspace-open-source-materialization";
-      const sourceCommands: readonly { argv: readonly string[]; cwd?: string }[] = [
-        {
-          argv: ["git", "clone", "--no-checkout", "--", input.repository, "."],
-        },
-        {
-          argv: ["git", "checkout", "--detach", input.commitSha],
-        },
-        {
-          argv: ["git", "switch", "-c", input.branch],
-        },
-      ];
-      for (const command of sourceCommands) {
-        const executed = await this.dependencies.sandboxes.exec(context, workspaceId, command);
-        if (executed.isErr() || !executionSucceeded(executed.value)) {
-          const failure = executed.isErr()
-            ? executed.error
-            : domainError.conflict("Workspace source materialization failed", {
-                code: "workspace_open_source_materialization_failed",
-              });
-          throw failure;
+      if (options.sourceMaterializer) {
+        const materialized = await options.sourceMaterializer.materialize(context, {
+          workspaceId,
+          source: input,
+        });
+        if (materialized.isErr()) throw materialized.error;
+      } else {
+        const sourceCommands: readonly { argv: readonly string[]; cwd?: string }[] = [
+          {
+            argv: ["git", "clone", "--no-checkout", "--", input.repository, "."],
+          },
+          {
+            argv: ["git", "checkout", "--detach", input.commitSha],
+          },
+          {
+            argv: ["git", "switch", "-c", input.branch],
+          },
+        ];
+        for (const command of sourceCommands) {
+          const executed = await this.dependencies.sandboxes.exec(context, workspaceId, command);
+          if (executed.isErr() || !executionSucceeded(executed.value)) {
+            const failure = executed.isErr()
+              ? executed.error
+              : domainError.conflict("Workspace source materialization failed", {
+                  code: "workspace_open_source_materialization_failed",
+                });
+            throw failure;
+          }
         }
       }
       for (const initialization of preflight.value.plan.initialization) {

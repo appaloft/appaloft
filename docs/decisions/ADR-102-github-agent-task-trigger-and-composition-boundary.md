@@ -45,15 +45,31 @@ fork code can exfiltrate credentials.
 13. The public server composition registers the authoritative `GitHubAgentAutomationStore`.
     Downstream runtimes resolve it and must not persist a second delivery outcome, review execution,
     or GitHub thread-to-Task pointer.
-14. A successful automation outcome carries the normalized intent and complete immutable allowed
-    execution snapshot required by durable finalization. Downstream runtimes must not reparse the
-    trigger or reconstruct authorization from mutable Rule/Profile state.
+14. A successful automation outcome carries the normalized intent, the hydrated trigger/source
+    snapshot, and complete immutable allowed execution snapshot required by durable finalization.
+    Downstream runtimes must not reparse or rehydrate the trigger or reconstruct authorization from
+    mutable Rule/Profile state.
 15. GitHub signature verification, Repository-to-Workspace materialization, Workspace Profile
     Preview plans, and bounded Task/Review/PR projection are neutral public seams. Hosted
     composition supplies installation credentials, tenancy, custody, authorization, durable
     scheduling, and audit only.
 16. A dedicated read-only Public/Private Boundary Review Round blocks downstream Code and merge
     when lifecycle truth, idempotency truth, neutral contracts, or persistence are duplicated.
+17. Task-scoped credential references, requested placement, Workspace expiry, and a neutral source
+    materializer are inputs to the public Workspace open operation. Credential admission also
+    receives an explicit owner, Agent Profile, interactive/automation use, untrusted-code flag, and
+    Server-pool scope so hosted custody can validate the lease without bypassing public preflight. A caller may
+    pass one immutable plan already produced by the public Profile compiler; open validates its
+    installation pin and remains the owner of admission and all runtime effects. These inputs do not
+    authorize a hosted runtime to recreate reservation, Sandbox, initialization, runtime, recovery,
+    or preferred Workspace lifecycle logic.
+18. Native Agent enrollment has one public `AgentCredentialEnrollmentPort`. Hosted implementations
+    may provide tenant authorization and encrypted custody, but must implement that port rather than
+    publish a parallel enrollment lifecycle.
+19. Compute-starting GitHub intents resolve an exact provider source pin before authorization.
+    PR-top-level comments are hydrated to a numeric head repository and fork decision before any
+    credential lease or compute; Issue tasks resolve the repository default branch to an exact
+    commit. Checkout fails closed when that resolved pin is absent and never falls back to `HEAD`.
 
 ## Consequences
 

@@ -165,10 +165,18 @@ async function fixture(
     })._unsafeUnwrap(),
   );
   const compiled: string[] = [];
+  const compiledCredentialReferences: Array<
+    readonly { requirementId: string; connectionReference: string }[] | undefined
+  > = [];
   const reserved: string[] = [];
+  const reservedProviderKeys: (string | undefined)[] = [];
+  const admittedScopes: Array<
+    Parameters<WorkspaceOpenCredentialAdmissionPort["admit"]>[1]["scope"]
+  > = [];
   const placement: WorkspaceOpenPlacementPort = {
     reserve: async (_context, value) => {
       reserved.push(value.profileInstallationId);
+      reservedProviderKeys.push(value.providerKey);
       return ok({ reservationId: "wres_1" });
     },
     consume: async () => ok(undefined),
@@ -179,8 +187,9 @@ async function fixture(
     projects,
     profiles,
     profileCompiler: {
-      compileForNewWorkspace: async (_context, installationId) => {
+      compileForNewWorkspace: async (_context, installationId, compileInput) => {
         compiled.push(installationId);
+        compiledCredentialReferences.push(compileInput?.credentialReferences);
         if (options.staleProfile) {
           return err(
             domainError.conflict("Workspace Profile installation is stale", {
@@ -197,11 +206,23 @@ async function fixture(
     credentialAdmission:
       options.admission ??
       ({
-        admit: async () => ok(undefined),
+        admit: async (_context, admission) => {
+          admittedScopes.push(admission.scope);
+          return ok(undefined);
+        },
       } satisfies WorkspaceOpenCredentialAdmissionPort),
     placement,
   });
-  return { compiled, installation, profiles, reserved, service };
+  return {
+    compiled,
+    compiledCredentialReferences,
+    admittedScopes,
+    installation,
+    profiles,
+    reserved,
+    reservedProviderKeys,
+    service,
+  };
 }
 
 describe("Agent Workspace open preflight", () => {
@@ -242,6 +263,69 @@ describe("Agent Workspace open preflight", () => {
     });
     expect(result.isErr()).toBe(true);
     expect(reserved).toEqual([]);
+  });
+
+  test("[GH-AUTO-BOUNDARY-021][GH-AUTO-CREDENTIAL-006][GH-AUTO-TASK-009] admits task-scoped credentials and requested placement through the authoritative preflight", async () => {
+    const { admittedScopes, compiledCredentialReferences, reservedProviderKeys, service } =
+      await fixture();
+    const resolved = await service.resolveContext(context, input);
+    expect(resolved.isOk()).toBe(true);
+    const admitted = await service.admit(context, resolved._unsafeUnwrap(), {
+      credentialReferences: [
+        {
+          requirementId: "model-api",
+          connectionReference: "agent-credential://tenant_1/agentcred_1",
+        },
+      ],
+      credentialAdmissionScope: {
+        owner: { kind: "organization", id: "org_1" },
+        agentProfileId: "agp_1",
+        use: "automation",
+        untrustedCode: false,
+        serverPoolId: "server-pool-1",
+      },
+      placementProviderKey: "server-pool-1",
+    });
+
+    expect(admitted.isOk()).toBe(true);
+    expect(compiledCredentialReferences).toEqual([
+      [
+        {
+          requirementId: "model-api",
+          connectionReference: "agent-credential://tenant_1/agentcred_1",
+        },
+      ],
+    ]);
+    expect(admittedScopes).toEqual([
+      {
+        owner: { kind: "organization", id: "org_1" },
+        agentProfileId: "agp_1",
+        use: "automation",
+        untrustedCode: false,
+        serverPoolId: "server-pool-1",
+      },
+    ]);
+    expect(reservedProviderKeys).toEqual(["server-pool-1"]);
+  });
+
+  test("[GH-AUTO-BOUNDARY-021] admits one immutable precompiled Profile plan without recompiling it", async () => {
+    const { compiled, reservedProviderKeys, service } = await fixture();
+    const resolved = await service.resolveContext(context, input);
+    const admitted = await service.admit(context, resolved._unsafeUnwrap(), {
+      precompiledProfilePlan: plan,
+      credentialAdmissionScope: {
+        owner: { kind: "user", id: "usr_1" },
+        agentProfileId: "agp_1",
+        use: "interactive",
+        untrustedCode: false,
+        serverPoolId: "server-pool-1",
+      },
+      placementProviderKey: "server-pool-1",
+    });
+
+    expect(admitted._unsafeUnwrap().plan).toEqual(plan);
+    expect(compiled).toEqual([]);
+    expect(reservedProviderKeys).toEqual(["server-pool-1"]);
   });
 
   test("[WS-OPEN-BIND-005] rejects a source that does not match the bound Repository identity", async () => {

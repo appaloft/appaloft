@@ -8,18 +8,29 @@
 - [x] Mark implementation issues `ready-for-agent` after ticket review.
 - [x] Record the 2026-07-29 boundary audit and owner-confirmed correction in Discovery/ADR/Spec.
 - [x] Create and link public boundary-composition issue #876 under #845.
+- [x] Create and link public Workspace/enrollment boundary correction issue #888.
 
 ## Public Composition Boundary Slice
 
 - [x] GH-AUTO-BOUNDARY-021: register `GitHubAgentAutomationStore` in public server composition.
 - [x] GH-AUTO-BOUNDARY-021: expose one public GitHub signature verification seam.
 - [x] GH-AUTO-BOUNDARY-021: return normalized intent and the complete immutable allowed execution
-  snapshot in accepted automation outcomes.
+  plus hydrated trigger/source snapshot in accepted automation outcomes.
 - [x] GH-AUTO-BOUNDARY-021: expose neutral repository materialization, Workspace Profile preview
   plan, and bounded Task/Review/PR projection seams.
 - [x] GH-AUTO-BOUNDARY-021: model lifecycle cleanup authorization without fake Agent
   Profile/credential references and make Task controls reference-based.
 - [x] GH-AUTO-BOUNDARY-021: add public composition and downstream-boundary contract tests.
+- [x] GH-AUTO-BOUNDARY-021: make task-scoped credential references, requested placement, expiry,
+  and source materialization inputs of the authoritative `AgentWorkspaceOpenService` workflow.
+- [x] GH-AUTO-BOUNDARY-021: pass explicit owner/Agent-Profile/use/untrusted/server-pool scope through public
+  credential admission so hosted custody can fail closed before placement or Sandbox effects.
+- [x] GH-AUTO-BOUNDARY-021: accept one immutable public-compiled Profile plan, validate its
+  installation pin, and keep admission plus all Workspace runtime effects in public open.
+- [x] GH-AUTO-BOUNDARY-021: keep one public `AgentCredentialEnrollmentPort` for native enrollment
+  begin/refresh/revoke composition; downstream runtimes must not define a parallel enrollment port.
+- [x] GH-AUTO-BOUNDARY-021: resolve exact Issue/PR source pins and PR fork identity through the
+  public GitHub adapter before authorization; checkout must not fall back to ambient `HEAD`.
 - [ ] Run the dedicated read-only Public/Private Boundary Review Round and require `PASS` before
   hosted Code resumes.
 

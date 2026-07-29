@@ -25,7 +25,11 @@ export interface GitHubAgentTrigger {
   action: "created" | "labeled" | "ready_for_review" | "synchronize" | "closed";
   deliveryId: string;
   installationId: string;
-  repository: { id: string; fullName: string };
+  repository: {
+    id: string;
+    fullName: string;
+    defaultBranch?: string;
+  };
   sender: { id: string; loginSnapshot?: string; typeSnapshot?: string };
   thread: { kind: "issue" | "pull-request"; number: number };
   commentId?: string;
@@ -38,6 +42,10 @@ export interface GitHubAgentTrigger {
     headRepositoryId: string;
     headRepositoryFullName: string;
     fork: boolean;
+  };
+  source?: {
+    ref: string;
+    headSha: string;
   };
   receivedAt?: string;
 }
@@ -119,6 +127,16 @@ export interface GitHubAgentAuthorizationPort {
     context: ExecutionContext,
     input: { trigger: GitHubAgentTrigger; intent: GitHubAgentIntent },
   ): Promise<Result<GitHubAgentAuthorizationDecision>>;
+}
+
+export interface GitHubAgentTriggerSourceResolverPort {
+  resolve(
+    context: ExecutionContext,
+    input: {
+      trigger: GitHubAgentTrigger;
+      intent: GitHubAgentIntent;
+    },
+  ): Promise<Result<GitHubAgentTrigger>>;
 }
 
 export type GitHubAgentTaskStatus =
@@ -298,6 +316,10 @@ export interface AgentCredentialEnrollmentPort {
       agent: AgentAdapterKind;
       authMode: Extract<AgentCredentialAuthMode, "agent-native-account" | "agent-native-api-key">;
       returnUrl: string;
+      allowedProjectIds: readonly string[];
+      allowedProfileIds: readonly string[];
+      serverPoolId: string;
+      unattendedUse: "denied" | "personal-owner-opt-in" | "organization-automation";
     },
   ): Promise<
     Result<{
@@ -347,6 +369,7 @@ export interface GitHubAgentAutomationOutcome {
   intent?: GitHubAgentIntent;
   actorSnapshot?: GitHubAgentActorSnapshot;
   authorization?: GitHubAgentAllowedAuthorizationDecision;
+  trigger?: GitHubAgentTrigger;
 }
 
 export interface GitHubAgentAutomationStore {
@@ -429,6 +452,7 @@ export interface GitHubAgentAutomationDependencies {
   authorization: GitHubAgentAuthorizationPort;
   tasks: GitHubAgentTaskPort;
   feedback: GitHubAgentFeedbackPort;
+  sourceResolver?: GitHubAgentTriggerSourceResolverPort;
 }
 
 export class GitHubAgentAutomationService {
@@ -475,6 +499,17 @@ export class GitHubAgentAutomationService {
         reasonCode: "github_agent_trigger_not_matched",
         message: "The GitHub event does not match an Appaloft command or automation trigger.",
       });
+    }
+
+    if (this.dependencies.sourceResolver) {
+      const resolved = await this.dependencies.sourceResolver.resolve(context, {
+        trigger,
+        intent,
+      });
+      if (resolved.isErr()) return err(resolved.error);
+      trigger = resolved.value;
+      const resolvedTriggerSafe = assertGitHubAgentTriggerSafe(trigger);
+      if (resolvedTriggerSafe.isErr()) return err(resolvedTriggerSafe.error);
     }
 
     if (trigger.pullRequest?.fork) {
@@ -717,6 +752,7 @@ export class GitHubAgentAutomationService {
       intent: cloneIntent(intent),
       actorSnapshot: { ...authorization.actorSnapshot },
       authorization: cloneAllowedAuthorization(authorization),
+      trigger: cloneTrigger(trigger),
     });
   }
 
@@ -808,11 +844,25 @@ function cloneOutcome(outcome: GitHubAgentAutomationOutcome): GitHubAgentAutomat
     ...(outcome.authorization
       ? { authorization: cloneAllowedAuthorization(outcome.authorization) }
       : {}),
+    ...(outcome.trigger ? { trigger: cloneTrigger(outcome.trigger) } : {}),
   };
 }
 
 function cloneIntent(intent: GitHubAgentIntent): GitHubAgentIntent {
   return { ...intent };
+}
+
+function cloneTrigger(trigger: GitHubAgentTrigger): GitHubAgentTrigger {
+  return {
+    ...trigger,
+    repository: { ...trigger.repository },
+    sender: { ...trigger.sender },
+    thread: { ...trigger.thread },
+    ...(trigger.command ? { command: { ...trigger.command } } : {}),
+    ...(trigger.label ? { label: { ...trigger.label } } : {}),
+    ...(trigger.pullRequest ? { pullRequest: { ...trigger.pullRequest } } : {}),
+    ...(trigger.source ? { source: { ...trigger.source } } : {}),
+  };
 }
 
 function cloneAllowedAuthorization(
@@ -833,6 +883,9 @@ export function assertGitHubAgentTriggerSafe(input: GitHubAgentTrigger): Result<
     !input.deliveryId.trim()
   ) {
     return err(domainError.validation("GitHub Agent trigger numeric identity is invalid"));
+  }
+  if (input.source && !/^[0-9a-f]{40}$/u.test(input.source.headSha)) {
+    return err(domainError.validation("GitHub Agent trigger source head SHA is invalid"));
   }
   return ok(undefined);
 }

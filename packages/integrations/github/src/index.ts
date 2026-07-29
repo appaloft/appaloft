@@ -10,6 +10,7 @@ import {
   type GitHubAgentReviewDeliveryResult,
   type GitHubAgentTaskSummary,
   type GitHubAgentTrigger,
+  type GitHubAgentTriggerSourceResolverPort,
   type GitHubAppInstallationReadback,
   type GitHubAppInstallationToken,
   type GitHubAppRuntime,
@@ -1914,6 +1915,7 @@ export function githubAgentTriggerFromSourceEvent(
     repository: {
       id: event.repository.id,
       fullName: event.repository.fullName,
+      ...(event.repository.defaultBranch ? { defaultBranch: event.repository.defaultBranch } : {}),
     },
     sender: { ...event.sender },
     thread: { ...event.thread },
@@ -1921,8 +1923,132 @@ export function githubAgentTriggerFromSourceEvent(
     ...(event.comment?.command ? { command: event.comment.command } : {}),
     ...(event.label ? { label: { ...event.label } } : {}),
     ...(event.pullRequest ? { pullRequest: { ...event.pullRequest } } : {}),
+    ...(event.pullRequest
+      ? {
+          source: {
+            ref: event.pullRequest.headSha,
+            headSha: event.pullRequest.headSha,
+          },
+        }
+      : {}),
     ...(event.receivedAt ? { receivedAt: event.receivedAt } : {}),
   };
+}
+
+export class GitHubAgentTriggerSourceResolverAdapter
+  implements GitHubAgentTriggerSourceResolverPort
+{
+  constructor(
+    private readonly installationToken: (installationId: string) => Promise<string | null>,
+    private readonly fetcher: typeof fetch = fetch,
+    private readonly apiBaseUrl = "https://api.github.com",
+  ) {}
+
+  async resolve(
+    _context: ExecutionContext,
+    input: Parameters<GitHubAgentTriggerSourceResolverPort["resolve"]>[1],
+  ): Promise<Result<GitHubAgentTrigger>> {
+    if (!["fix", "review", "preview", "new"].includes(input.intent.action)) {
+      return ok(input.trigger);
+    }
+    if (input.trigger.source) {
+      return ok(input.trigger);
+    }
+
+    const repository = parseRepositoryFullName(input.trigger.repository.fullName);
+    if (!repository) {
+      return err(domainError.validation("GitHub repository full name is invalid"));
+    }
+    const token = await this.installationToken(input.trigger.installationId);
+    if (!token || token.length > 4_096 || /[\r\n\0]/u.test(token)) {
+      return err(
+        domainError.conflict("GitHub installation credential is unavailable for source pinning", {
+          code: "github_agent_source_pin_credential_missing",
+        }),
+      );
+    }
+    const headers = {
+      accept: "application/vnd.github+json",
+      authorization: `Bearer ${token}`,
+      "user-agent": "appaloft-control-plane",
+      "x-github-api-version": "2022-11-28",
+    };
+
+    if (input.trigger.thread.kind === "pull-request") {
+      const response = await this.fetcher(
+        gitHubApiUrl(
+          this.apiBaseUrl,
+          `/repos/${repository.owner}/${repository.name}/pulls/${input.trigger.thread.number}`,
+        ),
+        { headers },
+      );
+      if (!response.ok) {
+        return err(
+          domainError.infra("GitHub pull request source pin could not be resolved", {
+            code: "github_agent_pull_request_source_pin_unavailable",
+            status: response.status,
+          }),
+        );
+      }
+      const payload = objectRecord(await response.json());
+      if (!payload) {
+        return err(domainError.validation("GitHub pull request source response is invalid"));
+      }
+      const pullRequest = githubAgentPullRequest(
+        "pull_request",
+        { pull_request: payload, number: input.trigger.thread.number },
+        input.trigger.repository.id,
+        input.trigger.repository.fullName,
+      );
+      if (pullRequest.isErr() || !pullRequest.value) {
+        return pullRequest.isErr()
+          ? err(pullRequest.error)
+          : err(domainError.validation("GitHub pull request source response is incomplete"));
+      }
+      return ok({
+        ...input.trigger,
+        pullRequest: pullRequest.value,
+        source: {
+          ref: pullRequest.value.headSha,
+          headSha: pullRequest.value.headSha,
+        },
+      });
+    }
+
+    const ref = input.trigger.repository.defaultBranch;
+    if (!ref) {
+      return err(
+        domainError.validation("GitHub repository default branch is required for source pinning"),
+      );
+    }
+    const response = await this.fetcher(
+      gitHubApiUrl(
+        this.apiBaseUrl,
+        `/repos/${repository.owner}/${repository.name}/commits/${encodeURIComponent(ref)}`,
+      ),
+      { headers },
+    );
+    if (!response.ok) {
+      return err(
+        domainError.infra("GitHub repository source pin could not be resolved", {
+          code: "github_agent_repository_source_pin_unavailable",
+          status: response.status,
+        }),
+      );
+    }
+    const payload = objectRecord(await response.json());
+    const headSha = boundedText(payload?.sha, 64);
+    if (!headSha || !/^[0-9a-f]{40}$/u.test(headSha)) {
+      return err(domainError.validation("GitHub repository source head SHA is invalid"));
+    }
+    return ok({
+      ...input.trigger,
+      source: {
+        ref,
+        headSha,
+      },
+    });
+  }
 }
 
 export class GitHubRepositoryWorkspaceMaterializerAdapter
@@ -1937,6 +2063,14 @@ export class GitHubRepositoryWorkspaceMaterializerAdapter
     context: ExecutionContext,
     input: Parameters<GitHubRepositoryWorkspaceMaterializerPort["materialize"]>[1],
   ): Promise<Result<void>> {
+    const revision = input.trigger.source?.headSha ?? input.trigger.pullRequest?.headSha;
+    if (!revision || !/^[0-9a-f]{40}$/u.test(revision)) {
+      return err(
+        domainError.conflict("GitHub source pin is unavailable for checkout", {
+          code: "github_agent_checkout_source_pin_missing",
+        }),
+      );
+    }
     const token = await this.installationToken(input.trigger.installationId);
     if (!token || token.length > 4_096 || /[\r\n\0]/u.test(token)) {
       return err(
@@ -2004,12 +2138,9 @@ export class GitHubRepositoryWorkspaceMaterializerAdapter
       const hooksDisabled = await execute(["git", "config", "core.hooksPath", "/dev/null"]);
       if (hooksDisabled.isErr()) return hooksDisabled;
 
-      const revision = input.trigger.pullRequest?.headSha;
-      if (revision) {
-        const fetched = await execute(["git", "fetch", "--no-tags", "origin", revision]);
-        if (fetched.isErr()) return fetched;
-      }
-      return execute(["git", "checkout", "--detach", revision ?? "HEAD"]);
+      const fetched = await execute(["git", "fetch", "--no-tags", "origin", revision]);
+      if (fetched.isErr()) return fetched;
+      return execute(["git", "checkout", "--detach", revision]);
     } finally {
       await this.sandboxes.exec(context, input.workspaceId, {
         argv: ["rm", "-f", tokenPath, askpassPath],

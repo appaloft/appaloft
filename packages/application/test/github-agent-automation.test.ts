@@ -184,6 +184,13 @@ describe("GitHub Agent automation service", () => {
     const service = new GitHubAgentAutomationService({
       store,
       authorization: allowedAuthorization(),
+      sourceResolver: {
+        resolve: async (_context, value) =>
+          ok({
+            ...value.trigger,
+            source: { ref: "main", headSha: "a".repeat(40) },
+          }),
+      },
       tasks: tasks.port,
       feedback: feedback.port,
     });
@@ -206,6 +213,10 @@ describe("GitHub Agent automation service", () => {
         pullRequestDeliveryPolicy: "create-or-update",
       },
       task: { taskId: "task_1", workspaceId: "workspace_1" },
+      trigger: {
+        deliveryId: "delivery_1",
+        source: { ref: "main", headSha: "a".repeat(40) },
+      },
     });
     expect(duplicate._unsafeUnwrap()).toEqual({
       ...first._unsafeUnwrap(),
@@ -272,6 +283,58 @@ describe("GitHub Agent automation service", () => {
       "reject:agent_credential_missing",
       "reject:github_fork_pull_request_denied",
     ]);
+  });
+
+  test("[GH-AUTO-BOUNDARY-021][GH-AUTO-AUTHZ-008] resolves PR identity and source before authorization or compute", async () => {
+    const store = new InMemoryGitHubAgentAutomationStore();
+    const tasks = taskPort();
+    const feedback = feedbackPort();
+    let authorizationCalls = 0;
+    const service = new GitHubAgentAutomationService({
+      store,
+      authorization: {
+        authorize: async () => {
+          authorizationCalls += 1;
+          return allowedAuthorization().authorize(context, {
+            trigger: trigger({ deliveryId: "unused" }),
+            intent: { action: "review", source: "manual", mode: "review-only" },
+          });
+        },
+      },
+      sourceResolver: {
+        resolve: async (_context, input) =>
+          ok({
+            ...input.trigger,
+            pullRequest: {
+              number: 42,
+              headSha: "a".repeat(40),
+              baseRef: "main",
+              headRepositoryId: "999999",
+              headRepositoryFullName: "outside/fork",
+              fork: true,
+            },
+            source: { ref: "a".repeat(40), headSha: "a".repeat(40) },
+          }),
+      },
+      tasks: tasks.port,
+      feedback: feedback.port,
+    });
+
+    const result = await service.handle(
+      context,
+      trigger({
+        deliveryId: "delivery_hydrated_fork",
+        thread: { kind: "pull-request", number: 42 },
+        command: { kind: "review" },
+      }),
+    );
+
+    expect(result._unsafeUnwrap()).toMatchObject({
+      status: "denied",
+      reasonCode: "github_fork_pull_request_denied",
+    });
+    expect(authorizationCalls).toBe(0);
+    expect(tasks.calls).toEqual([]);
   });
 
   test("[GH-AUTO-REVIEW-015] automatic review executes once per repository, PR, head, and rule", async () => {

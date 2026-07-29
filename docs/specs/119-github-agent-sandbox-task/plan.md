@@ -32,9 +32,21 @@
 9. Add provider-neutral GitHub feedback ports and GitHub adapters that upsert reaction/comment,
    Check, Review, PR, and annotations using persisted external ids and stable idempotency keys.
 10. Register the public `GitHubAgentAutomationStore` in the public server composition and expose
-    neutral seams for generic GitHub signature verification, immutable accepted execution context,
+    neutral seams for generic GitHub signature verification, immutable accepted hydrated
+    trigger/execution context,
     repository materialization, Workspace Profile preview plans, and bounded Task/Review/PR
     projection. Hosted runtimes resolve and compose these seams instead of reimplementing them.
+11. Keep reservation, Sandbox creation, source materialization, initialization, runtime creation,
+    recovery evidence, and preferred-Workspace state inside `AgentWorkspaceOpenService`. Per-task
+    credentials plus their explicit owner/Agent-Profile/use/untrusted/server-pool admission scope, requested
+    placement, expiry, an optional immutable public-compiled Profile plan, and source materializers
+    are operation inputs, not a reason for downstream runtimes to recreate the lifecycle.
+12. Use `AgentCredentialEnrollmentPort` as the single neutral native enrollment contract. Hosted
+    composition may supply authorization and encrypted custody, but must not introduce a second
+    begin/complete/cancel port.
+13. Resolve an exact GitHub source pin through the public integration before authorization for
+    compute-starting intents. Hydrate PR-top-level comments before fork policy and require the
+    resolved SHA during repository materialization; never use ambient `HEAD` as lifecycle truth.
 
 ## Migration
 
@@ -59,6 +71,12 @@
 - Add `GH-AUTO-BOUNDARY-021` contract/composition tests for dependency registration, immutable
   accepted execution context, neutral materialization/projection seams, and absence of private
   imports or parallel hosted persistence.
+- Add Workspace open tests proving task-scoped credential references and a supplied source
+  materializer still pass through public preflight, placement, open-entry, recovery, and runtime
+  ownership without duplicate effects.
+- Add source-resolution tests proving Issue default-branch pins and PR-top-level fork identity are
+  resolved before authorization, and that checkout refuses an absent exact pin before credential
+  materialization.
 - Run public lint, typecheck, test, and build before public delivery.
 
 ## Risks

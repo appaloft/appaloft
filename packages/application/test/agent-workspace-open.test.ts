@@ -24,6 +24,13 @@ describe("Agent Workspace open application workflow", () => {
     let failSandboxCreate = false;
     let releasedReservations = 0;
     const placementReservationIds: (string | undefined)[] = [];
+    const sandboxPlacement: Array<{ providerKey?: string; expiresAt?: string }> = [];
+    const admittedCredentials: Array<
+      readonly { requirementId: string; connectionReference: string }[] | undefined
+    > = [];
+    const admittedScopes: Array<Parameters<WorkspaceOpenDependencies["preflight"]["admit"]>[2]> =
+      [];
+    const materializedSources: string[] = [];
     const failedEntries: Array<{ workspaceId?: string; phase: string; code: string }> = [];
     let preferred:
       | {
@@ -43,8 +50,10 @@ describe("Agent Workspace open application workflow", () => {
             profileInstallationId: "awpi_default",
           });
         },
-        admit: async () => {
+        admit: async (_context, _resolved, options) => {
           phases.push("preflight");
+          admittedCredentials.push(options?.credentialReferences);
+          admittedScopes.push(options);
           return ok({
             projectId: "prj_web",
             profileInstallationId: "awpi_default",
@@ -125,6 +134,10 @@ describe("Agent Workspace open application workflow", () => {
       sandboxes: {
         create: async (_context, sandboxInput) => {
           placementReservationIds.push(sandboxInput.placementReservationId);
+          sandboxPlacement.push({
+            ...(sandboxInput.providerKey ? { providerKey: sandboxInput.providerKey } : {}),
+            ...(sandboxInput.expiresAt ? { expiresAt: sandboxInput.expiresAt } : {}),
+          });
           phases.push("sandbox-create");
           if (failSandboxCreate) {
             return err(
@@ -218,7 +231,29 @@ describe("Agent Workspace open application workflow", () => {
       tenant: { tenantId: "ten_1" },
     });
 
-    const created = await service.open(context, input);
+    const created = await service.open(context, input, {
+      credentialReferences: [
+        {
+          requirementId: "model-api",
+          connectionReference: "agent-credential://tenant_1/agentcred_1",
+        },
+      ],
+      credentialAdmissionScope: {
+        owner: { kind: "organization", id: "org_1" },
+        agentProfileId: "agp_1",
+        use: "automation",
+        untrustedCode: false,
+        serverPoolId: "server-pool-1",
+      },
+      placementProviderKey: "server-pool-1",
+      expiresAt: "2026-07-28T02:00:00.000Z",
+      sourceMaterializer: {
+        materialize: async (_context, value) => {
+          materializedSources.push(`${value.workspaceId}:${value.source.repositoryIdentity}`);
+          return ok(undefined);
+        },
+      },
+    });
     const mismatched = await service.open(context, {
       ...input,
       commitSha: "f".repeat(40),
@@ -241,6 +276,27 @@ describe("Agent Workspace open application workflow", () => {
       agent: { runtimeId: "sar_1" },
     });
     expect(placementReservationIds).toEqual(["res_1", "res_1"]);
+    expect(sandboxPlacement).toEqual([
+      {
+        providerKey: "server-pool-1",
+        expiresAt: "2026-07-28T02:00:00.000Z",
+      },
+      {},
+    ]);
+    expect(admittedCredentials[0]).toEqual([
+      {
+        requirementId: "model-api",
+        connectionReference: "agent-credential://tenant_1/agentcred_1",
+      },
+    ]);
+    expect(admittedScopes[0]?.credentialAdmissionScope).toEqual({
+      owner: { kind: "organization", id: "org_1" },
+      agentProfileId: "agp_1",
+      use: "automation",
+      untrustedCode: false,
+      serverPoolId: "server-pool-1",
+    });
+    expect(materializedSources).toEqual(["sbx_1:github.com/Acme/Web"]);
     expect(mismatched._unsafeUnwrapErr().details?.code).toBe("workspace_open_source_pin_mismatch");
     expect(mismatched._unsafeUnwrapErr().details?.guidance).toContain("--new");
     expect(providerFailure.isErr()).toBe(true);
