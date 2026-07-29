@@ -31,6 +31,7 @@ export type {
   AppaloftAgentTaskResult,
   AppaloftAgentTaskRunInput,
   AppaloftClient,
+  AppaloftClientOptions,
   AppaloftRun,
   AppaloftRunCreateInput,
   AppaloftRunDescriptor,
@@ -49,6 +50,8 @@ export type {
   AppaloftWorkspaceDescriptor,
   AppaloftWorkspaceList,
   AppaloftWorkspaceListInput,
+  AppaloftWorkspaceSourceCredentialProvider,
+  AppaloftWorkspaceSourceHttpBasicCredential,
   AppaloftWorkspaceTasks,
 } from "./resource-client.js";
 export {

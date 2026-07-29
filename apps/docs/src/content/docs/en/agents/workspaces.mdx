@@ -53,7 +53,25 @@ console.log(workspace.workspaceId, workspace.agent.runtimeId);
 
 If the runtime creation step fails, the SDK throws `AppaloftWorkspaceCreateError`, which still carries the already-created `workspaceId` (that is, `sandboxId`) — the caller can retry runtime creation, or explicitly terminate the Sandbox.
 
-This entrypoint currently only accepts an HTTPS repository address with no username, password, or token embedded; private repository credentials can't be embedded in the URL and must be prepared ahead of time by a trusted operator source integration or template.
+This entrypoint only accepts an HTTPS repository address with no username, password, token, query, or fragment embedded. A trusted server-side composition can resolve transient private-source credentials without adding them to the Workspace input:
+
+```ts
+const appaloft = createAppaloftClient({
+  baseUrl,
+  workspaceSourceCredentialProvider: async ({ repository }) => {
+    const credential = await trustedSourceIntegration.resolve(repository);
+    return credential
+      ? {
+          kind: "http-basic",
+          username: credential.username,
+          password: credential.password,
+        }
+      : null;
+  },
+});
+```
+
+Use this provider only in a trusted backend or operator process, not in a browser bundle. The SDK validates the returned material and delivers its derived authorization header to network Git commands through Sandbox stdin and process-scoped Git configuration; it does not place credentials in the repository URL or process argv. A template may still prepare private-source access when the operator owns that lifecycle.
 
 ## Reconnecting after disconnect
 

@@ -417,10 +417,128 @@ describe("Agent Workspace SDK handles", () => {
     });
   });
 
-  test("[AGENT-WS-SOURCE-014] discovers and checks out the remote default branch", async () => {
+  test("[AGENT-WS-SOURCE-015] keeps trusted private-source credentials out of locator and argv", async () => {
+    const secret = "github-installation-token-secret";
     const execRequests: Request[] = [];
+    const credentialRequests: string[] = [];
     const appaloft = createAppaloftClient({
       baseUrl: "https://appaloft.example/api",
+      workspaceSourceCredentialProvider: async ({ repository }) => {
+        credentialRequests.push(repository);
+        return {
+          kind: "http-basic",
+          username: "x-access-token",
+          password: secret,
+        };
+      },
+      fetch: async (request) => {
+        const path = new URL(request.url).pathname;
+        if (path === "/api/sandboxes") {
+          return Response.json(
+            { sandboxId: "sbx_private_source", status: "ready" },
+            { status: 201 },
+          );
+        }
+        if (path === "/api/sandboxes/sbx_private_source/exec") {
+          execRequests.push(request);
+          const body = (await request.clone().json()) as { argv?: string[] };
+          return Response.json({
+            mode: "foreground",
+            frames: [
+              ...(body.argv?.includes("symbolic-ref")
+                ? [{ kind: "stdout", data: "origin/main\n" }]
+                : []),
+              { kind: "exit", exitCode: 0 },
+            ],
+          });
+        }
+        if (path === "/api/sandboxes/sbx_private_source/agent-runtimes") {
+          return Response.json({
+            sandboxId: "sbx_private_source",
+            runtimeId: "sar_private_source",
+            harnessKey: "pi",
+            status: "ready",
+          });
+        }
+        throw new Error(`Unexpected SDK request ${request.method} ${path}`);
+      },
+    });
+
+    await appaloft.workspaces.create({
+      sandbox: sandboxInput,
+      harness: "pi",
+      source: { repository: "https://github.com/acme/private.git" },
+    });
+
+    expect(credentialRequests).toEqual(["https://github.com/acme/private.git"]);
+    const bodies = await Promise.all(
+      execRequests.map(
+        async (request) => (await request.json()) as { argv: string[]; stdinBase64?: string },
+      ),
+    );
+    const authenticated = bodies.filter((body) => body.stdinBase64);
+    expect(authenticated).toHaveLength(2);
+    expect(
+      authenticated.map((body) => Buffer.from(body.stdinBase64 ?? "", "base64").toString("utf8")),
+    ).toEqual([
+      `${Buffer.from(`x-access-token:${secret}`).toString("base64")}\n`,
+      `${Buffer.from(`x-access-token:${secret}`).toString("base64")}\n`,
+    ]);
+    for (const body of bodies) {
+      expect(body.argv.join(" ")).not.toContain(secret);
+      expect(body.argv.join(" ")).not.toContain("x-access-token:");
+      expect(JSON.stringify(body.argv)).not.toContain(Buffer.from(secret).toString("base64"));
+      expect(JSON.stringify(body)).not.toContain(secret);
+    }
+    expect(JSON.stringify(bodies.map(({ argv }) => argv))).not.toContain(secret);
+  });
+
+  test("[AGENT-WS-SOURCE-015] rejects malformed trusted credentials before Git execution", async () => {
+    let execCount = 0;
+    const appaloft = createAppaloftClient({
+      baseUrl: "https://appaloft.example/api",
+      workspaceSourceCredentialProvider: async () => ({
+        kind: "http-basic",
+        username: "x-access-token",
+        password: "secret\ninjected-command",
+      }),
+      fetch: async (request) => {
+        const path = new URL(request.url).pathname;
+        if (path === "/api/sandboxes") {
+          return Response.json(
+            { sandboxId: "sbx_invalid_credential", status: "ready" },
+            { status: 201 },
+          );
+        }
+        if (path === "/api/sandboxes/sbx_invalid_credential/exec") {
+          execCount += 1;
+        }
+        throw new Error(`Unexpected SDK request ${request.method} ${path}`);
+      },
+    });
+
+    await expect(
+      appaloft.workspaces.create({
+        sandbox: sandboxInput,
+        harness: "pi",
+        source: { repository: "https://github.com/acme/private.git" },
+      }),
+    ).rejects.toMatchObject({
+      workspaceId: "sbx_invalid_credential",
+      phase: "source-materialization",
+    });
+    expect(execCount).toBe(0);
+  });
+
+  test("[AGENT-WS-SOURCE-014] discovers and checks out the remote default branch", async () => {
+    const execRequests: Request[] = [];
+    let credentialRequests = 0;
+    const appaloft = createAppaloftClient({
+      baseUrl: "https://appaloft.example/api",
+      workspaceSourceCredentialProvider: async () => {
+        credentialRequests += 1;
+        return null;
+      },
       fetch: async (request) => {
         const path = new URL(request.url).pathname;
         if (path === "/api/sandboxes") {
@@ -457,6 +575,7 @@ describe("Agent Workspace SDK handles", () => {
       source: { repository: "https://github.com/acme/web.git" },
     });
 
+    expect(credentialRequests).toBe(1);
     expect(await Promise.all(execRequests.map((request) => request.json()))).toEqual([
       { argv: ["git", "init"] },
       { argv: ["git", "remote", "add", "origin", "https://github.com/acme/web.git"] },
