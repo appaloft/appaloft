@@ -216,6 +216,11 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
   const activeDeploymentIds = input.runtimeProtection?.activeDeploymentIds.join(",") ?? "";
   const rollbackCandidateDeploymentIds =
     input.runtimeProtection?.rollbackCandidateDeploymentIds.join(",") ?? "";
+  const beforeEpochMilliseconds = Date.parse(input.before);
+  if (!Number.isFinite(beforeEpochMilliseconds)) {
+    throw new Error("Runtime target capacity prune requires a valid before timestamp");
+  }
+  const beforeEpochSeconds = Math.floor(beforeEpochMilliseconds / 1_000);
 
   return ash`
     set +e
@@ -223,6 +228,7 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
     ${ash.env("APPALOFT_STATE_ROOT", stateRoot)}
     ${ash.env("APPALOFT_SOURCE_WORKSPACE_ROOT", sourceWorkspaceRoot)}
     ${ash.env("APPALOFT_PRUNE_BEFORE", input.before)}
+    ${ash.env("APPALOFT_PRUNE_BEFORE_EPOCH_SECONDS", String(beforeEpochSeconds))}
     ${ash.env("APPALOFT_PRUNE_CATEGORIES", categories)}
     ${ash.env("APPALOFT_PRUNE_TARGET_FILTER", input.target ?? "")}
     ${ash.env("APPALOFT_PRUNE_DRY_RUN", input.dryRun ? "1" : "0")}
@@ -274,6 +280,18 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
       candidate_time="$1"
       [ -n "$candidate_time" ] || return 1
       [ "$candidate_time" \< "$APPALOFT_PRUNE_BEFORE" ]
+    }
+    buildx_until_duration() {
+      case "$APPALOFT_PRUNE_BEFORE_EPOCH_SECONDS" in
+        ''|*[!0-9]*) return 1 ;;
+      esac
+      buildx_now_epoch=$(date +%s 2>/dev/null)
+      case "$buildx_now_epoch" in
+        ''|*[!0-9]*) return 1 ;;
+      esac
+      buildx_until_seconds=$((buildx_now_epoch - APPALOFT_PRUNE_BEFORE_EPOCH_SECONDS))
+      [ "$buildx_until_seconds" -gt 0 ] || return 1
+      printf '%ss' "$buildx_until_seconds"
     }
     remove_exact_container() {
       exact_container_id="$1"
@@ -360,8 +378,13 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
         elif [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
           emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" matched ""
         else
-          docker builder prune --force --filter "until=$APPALOFT_PRUNE_BEFORE" >/dev/null 2>&1
-          if [ "$?" = "0" ]; then emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" pruned ""; else emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" skipped safety-evidence-missing; fi
+          buildx_until=$(buildx_until_duration)
+          if [ "$?" != "0" ]; then
+            emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" skipped cutoff-not-reached
+          else
+            docker builder prune --force --filter "until=$buildx_until" >/dev/null 2>&1
+            if [ "$?" = "0" ]; then emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" pruned ""; else emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" skipped safety-evidence-missing; fi
+          fi
         fi
       else
         printf 'CAPACITY_WARNING\tdocker-unavailable\tdocker command is unavailable\n'
@@ -374,7 +397,7 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
         elif [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
           emit_candidate unused-images docker-unused-images docker-unused-images "$APPALOFT_PRUNE_BEFORE" "0" matched ""
         else
-          docker image prune --force --filter "until=$APPALOFT_PRUNE_BEFORE" >/dev/null 2>&1
+          docker image prune --all --force --filter "until=$APPALOFT_PRUNE_BEFORE" >/dev/null 2>&1
           if [ "$?" = "0" ]; then emit_candidate unused-images docker-unused-images docker-unused-images "$APPALOFT_PRUNE_BEFORE" "0" pruned ""; else emit_candidate unused-images docker-unused-images docker-unused-images "$APPALOFT_PRUNE_BEFORE" "0" skipped safety-evidence-missing; fi
         fi
       else

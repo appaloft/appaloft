@@ -86,7 +86,9 @@ The command must:
   rollback-candidate protection sets. Missing labels or incomplete deployment evidence fail closed.
 - Docker volumes and Appaloft state roots are excluded by default and must not be deleted.
 - `docker-build-cache` and `unused-images` must be explicitly selected and must use Docker filtered
-  prune commands with `until=<before>`.
+  prune commands. Image prune receives the absolute `until=<before>` cutoff. Buildx prune receives a
+  positive duration derived on the target from that same absolute cutoff because Buildx accepts
+  duration selectors rather than RFC3339 timestamps.
 - `remote-state-markers` must be explicitly selected and may remove only old files or directories
   under `state/journals/*.json`, `state/backups/*`, `state/recovery/*.json`, and
   `state/locks/recovered/*`.
@@ -102,8 +104,12 @@ The command must:
   configured recovery window and bounded sync-backup count before explicit marker cleanup can remove
   older remaining archives.
 - The adapter must never run broad `docker system prune`.
-- Unused image pruning must rely on Docker image prune safety rather than direct image id, tag, or
-  digest removal.
+- Unused image pruning must use `docker image prune --all` so tagged and dangling images share the
+  category semantics reported by capacity inspection. Docker's container-reference safety and the
+  exact cutoff filter remain authoritative; the adapter must not remove direct image ids, tags, or
+  digests.
+- Buildx duration conversion must fail closed when the absolute cutoff is invalid, future, or equal
+  to the target clock. It must not substitute a default duration or widen the requested window.
 - Remote `ssh-pglite` state roots, live lock state, and live PGlite data are excluded.
 - The adapter must skip rather than delete when labels, paths, timestamps, active-runtime state, or
   rollback-safety evidence are incomplete.
@@ -164,7 +170,7 @@ At minimum, Code Round coverage must prove:
 ## Current Implementation Notes And Governed Follow-Ups
 
 The implementation covers local-shell and generic-SSH target adapters for stopped Appaloft-managed
-containers, materialized workspace candidates, explicit Docker build-cache prune, explicit
-unused-image prune, explicit remote-state marker prune, CLI, HTTP/oRPC, and server Web
+containers, materialized workspace candidates, explicit duration-filtered Docker build-cache prune,
+explicit all-unused-image prune, explicit remote-state marker prune, CLI, HTTP/oRPC, and server Web
 dry-run-first dispatch. Docker volume prune, live remote-state repair/restore, event-stream/outbox
 publication, and broad retention automation remain future governed slices.
