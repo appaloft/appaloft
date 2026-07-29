@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { ash } from "@appaloft/ash";
@@ -230,7 +238,7 @@ describe("runtime target capacity prune adapter", () => {
     });
   });
 
-  test("[RT-CAP-PRUNE-007] rendered prune script keeps Docker cache and image prune explicit and filtered", () => {
+  test("[RT-CAP-PRUNE-007] rendered prune script keeps Docker cache and all unused image prune explicit and filtered", () => {
     const script = renderRuntimeTargetCapacityPruneScript({
       runtimeRoot: "/var/lib/appaloft/runtime",
       before: "2026-01-01T00:05:00.000Z",
@@ -241,14 +249,149 @@ describe("runtime target capacity prune adapter", () => {
 
     expect(rendered).toMatchSnapshot();
     expect(rendered).toContain("APPALOFT_CAPACITY_PRUNE_V1");
+    expect(rendered).toContain("APPALOFT_PRUNE_BEFORE_EPOCH_SECONDS='1767225900'");
+    expect(rendered).toContain("buildx_until_duration");
     expect(rendered).toContain("docker builder prune --force --filter");
-    expect(rendered).toContain("docker image prune --force --filter");
-    expect(rendered).toContain("until=$APPALOFT_PRUNE_BEFORE");
+    expect(rendered).toContain('until=$buildx_until');
+    expect(rendered).toContain("docker image prune --all --force --filter");
+    expect(rendered).toContain('until=$APPALOFT_PRUNE_BEFORE');
     expect(rendered).toContain("state-root-excluded");
     expect(rendered).toContain("volume-excluded");
     expect(rendered).not.toContain("docker volume prune");
     expect(rendered).not.toContain("docker system prune");
     expect(rendered).not.toContain("docker rmi");
+  });
+
+  test("[RT-CAP-PRUNE-015] Docker aggregate prune uses a Buildx duration and all-unused image semantics", () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), "appaloft-capacity-prune-docker-"));
+    const fakeBin = join(runtimeRoot, "bin");
+    const dockerLog = join(runtimeRoot, "docker.log");
+    const dockerExecutable = join(fakeBin, "docker");
+    mkdirSync(fakeBin, { recursive: true });
+    writeFileSync(
+      dockerExecutable,
+      [
+        "#!/bin/sh",
+        'printf "%s\\n" "$*" >> "$APPALOFT_TEST_DOCKER_LOG"',
+        "exit 0",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(dockerExecutable, 0o755);
+
+    try {
+      const script = renderRuntimeTargetCapacityPruneScript({
+        runtimeRoot,
+        before: "2026-01-01T00:05:00.000Z",
+        categories: ["docker-build-cache", "unused-images"],
+        dryRun: false,
+      });
+      const output = Bun.spawnSync(["sh", "-c", ash.render(script)], {
+        env: {
+          ...process.env,
+          APPALOFT_TEST_DOCKER_LOG: dockerLog,
+          PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+          TMPDIR: runtimeRoot,
+        },
+        stderr: "pipe",
+        stdout: "pipe",
+      });
+
+      expect(output.exitCode).toBe(0);
+      expect((output.stderr ?? new Uint8Array()).toString()).toBe("");
+      const commands = readFileSync(dockerLog, "utf8").trim().split("\n");
+      expect(commands).toHaveLength(2);
+      expect(commands[0]).toMatch(/^builder prune --force --filter until=[1-9][0-9]*s$/);
+      expect(commands[1]).toBe(
+        "image prune --all --force --filter until=2026-01-01T00:05:00.000Z",
+      );
+
+      const parsed = parseRuntimeTargetCapacityPruneOutput({
+        stdout: (output.stdout ?? new Uint8Array()).toString(),
+        stderr: (output.stderr ?? new Uint8Array()).toString(),
+        server: serverState(),
+        before: "2026-01-01T00:05:00.000Z",
+        categories: ["docker-build-cache", "unused-images"],
+        dryRun: false,
+        prunedAt: "2026-01-01T00:10:00.000Z",
+      });
+      expect(parsed.isOk()).toBe(true);
+      expect(parsed._unsafeUnwrap()).toMatchObject({
+        summary: {
+          prunedCount: 2,
+          skippedCount: 0,
+        },
+      });
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[RT-CAP-PRUNE-016] future Buildx cutoffs fail closed before invoking Docker", () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), "appaloft-capacity-prune-future-"));
+    const fakeBin = join(runtimeRoot, "bin");
+    const dockerLog = join(runtimeRoot, "docker.log");
+    const dockerExecutable = join(fakeBin, "docker");
+    mkdirSync(fakeBin, { recursive: true });
+    writeFileSync(
+      dockerExecutable,
+      [
+        "#!/bin/sh",
+        'printf "%s\\n" "$*" >> "$APPALOFT_TEST_DOCKER_LOG"',
+        "exit 0",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(dockerExecutable, 0o755);
+
+    try {
+      const script = renderRuntimeTargetCapacityPruneScript({
+        runtimeRoot,
+        before: "2099-01-01T00:00:00.000Z",
+        categories: ["docker-build-cache"],
+        dryRun: false,
+      });
+      const output = Bun.spawnSync(["sh", "-c", ash.render(script)], {
+        env: {
+          ...process.env,
+          APPALOFT_TEST_DOCKER_LOG: dockerLog,
+          PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+          TMPDIR: runtimeRoot,
+        },
+        stderr: "pipe",
+        stdout: "pipe",
+      });
+
+      expect(output.exitCode).toBe(0);
+      expect(existsSync(dockerLog)).toBe(false);
+      const parsed = parseRuntimeTargetCapacityPruneOutput({
+        stdout: (output.stdout ?? new Uint8Array()).toString(),
+        stderr: (output.stderr ?? new Uint8Array()).toString(),
+        server: serverState(),
+        before: "2099-01-01T00:00:00.000Z",
+        categories: ["docker-build-cache"],
+        dryRun: false,
+        prunedAt: "2026-01-01T00:10:00.000Z",
+      });
+      expect(parsed.isOk()).toBe(true);
+      expect(parsed._unsafeUnwrap()).toMatchObject({
+        summary: {
+          prunedCount: 0,
+          skippedCount: 1,
+        },
+        candidates: [
+          expect.objectContaining({
+            id: "docker-build-cache",
+            action: "skipped",
+            skippedReason: "cutoff-not-reached",
+          }),
+          expect.objectContaining({ id: "state-root", action: "excluded" }),
+          expect.objectContaining({ id: "volumes", action: "excluded" }),
+        ],
+      });
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
   });
 
   test("[RT-CAP-PRUNE-013] rendered stopped-container prune fails closed around protected deployment ids", () => {

@@ -1,11 +1,12 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
-exports[`runtime target capacity prune adapter [RT-CAP-PRUNE-007] rendered prune script keeps Docker cache and image prune explicit and filtered 1`] = `
+exports[`runtime target capacity prune adapter [RT-CAP-PRUNE-007] rendered prune script keeps Docker cache and all unused image prune explicit and filtered 1`] = `
 "set +e
 APPALOFT_RUNTIME_ROOT='/var/lib/appaloft/runtime'
 APPALOFT_STATE_ROOT='/var/lib/appaloft/runtime/state'
 APPALOFT_SOURCE_WORKSPACE_ROOT='/var/lib/appaloft/runtime/ssh-deployments'
 APPALOFT_PRUNE_BEFORE='2026-01-01T00:05:00.000Z'
+APPALOFT_PRUNE_BEFORE_EPOCH_SECONDS='1767225900'
 APPALOFT_PRUNE_CATEGORIES='docker-build-cache,unused-images'
 APPALOFT_PRUNE_TARGET_FILTER=''
 APPALOFT_PRUNE_DRY_RUN='1'
@@ -54,6 +55,18 @@ older_than_cutoff() {
   candidate_time="$1"
   [ -n "$candidate_time" ] || return 1
   [ "$candidate_time" \\< "$APPALOFT_PRUNE_BEFORE" ]
+}
+buildx_until_duration() {
+  case "$APPALOFT_PRUNE_BEFORE_EPOCH_SECONDS" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  buildx_now_epoch=$(date +%s 2>/dev/null)
+  case "$buildx_now_epoch" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  buildx_until_seconds=$((buildx_now_epoch - APPALOFT_PRUNE_BEFORE_EPOCH_SECONDS))
+  [ "$buildx_until_seconds" -gt 0 ] || return 1
+  printf '%ss' "$buildx_until_seconds"
 }
 remove_exact_container() {
   exact_container_id="$1"
@@ -140,8 +153,13 @@ if has_category docker-build-cache; then
     elif [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
       emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" matched ""
     else
-      docker builder prune --force --filter "until=$APPALOFT_PRUNE_BEFORE" >/dev/null 2>&1
-      if [ "$?" = "0" ]; then emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" pruned ""; else emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" skipped safety-evidence-missing; fi
+      buildx_until=$(buildx_until_duration)
+      if [ "$?" != "0" ]; then
+        emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" skipped cutoff-not-reached
+      else
+        docker builder prune --force --filter "until=$buildx_until" >/dev/null 2>&1
+        if [ "$?" = "0" ]; then emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" pruned ""; else emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" skipped safety-evidence-missing; fi
+      fi
     fi
   else
     printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker command is unavailable\\n'
@@ -154,7 +172,7 @@ if has_category unused-images; then
     elif [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
       emit_candidate unused-images docker-unused-images docker-unused-images "$APPALOFT_PRUNE_BEFORE" "0" matched ""
     else
-      docker image prune --force --filter "until=$APPALOFT_PRUNE_BEFORE" >/dev/null 2>&1
+      docker image prune --all --force --filter "until=$APPALOFT_PRUNE_BEFORE" >/dev/null 2>&1
       if [ "$?" = "0" ]; then emit_candidate unused-images docker-unused-images docker-unused-images "$APPALOFT_PRUNE_BEFORE" "0" pruned ""; else emit_candidate unused-images docker-unused-images docker-unused-images "$APPALOFT_PRUNE_BEFORE" "0" skipped safety-evidence-missing; fi
     fi
   else
@@ -241,6 +259,7 @@ APPALOFT_RUNTIME_ROOT='/var/lib/appaloft/runtime'
 APPALOFT_STATE_ROOT='/var/lib/appaloft/runtime/state'
 APPALOFT_SOURCE_WORKSPACE_ROOT='/var/lib/appaloft/runtime/ssh-deployments'
 APPALOFT_PRUNE_BEFORE='2026-01-01T00:05:00.000Z'
+APPALOFT_PRUNE_BEFORE_EPOCH_SECONDS='1767225900'
 APPALOFT_PRUNE_CATEGORIES='remote-state-markers'
 APPALOFT_PRUNE_TARGET_FILTER=''
 APPALOFT_PRUNE_DRY_RUN='0'
@@ -289,6 +308,18 @@ older_than_cutoff() {
   candidate_time="$1"
   [ -n "$candidate_time" ] || return 1
   [ "$candidate_time" \\< "$APPALOFT_PRUNE_BEFORE" ]
+}
+buildx_until_duration() {
+  case "$APPALOFT_PRUNE_BEFORE_EPOCH_SECONDS" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  buildx_now_epoch=$(date +%s 2>/dev/null)
+  case "$buildx_now_epoch" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  buildx_until_seconds=$((buildx_now_epoch - APPALOFT_PRUNE_BEFORE_EPOCH_SECONDS))
+  [ "$buildx_until_seconds" -gt 0 ] || return 1
+  printf '%ss' "$buildx_until_seconds"
 }
 remove_exact_container() {
   exact_container_id="$1"
@@ -375,8 +406,13 @@ if has_category docker-build-cache; then
     elif [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
       emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" matched ""
     else
-      docker builder prune --force --filter "until=$APPALOFT_PRUNE_BEFORE" >/dev/null 2>&1
-      if [ "$?" = "0" ]; then emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" pruned ""; else emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" skipped safety-evidence-missing; fi
+      buildx_until=$(buildx_until_duration)
+      if [ "$?" != "0" ]; then
+        emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" skipped cutoff-not-reached
+      else
+        docker builder prune --force --filter "until=$buildx_until" >/dev/null 2>&1
+        if [ "$?" = "0" ]; then emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" pruned ""; else emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" skipped safety-evidence-missing; fi
+      fi
     fi
   else
     printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker command is unavailable\\n'
@@ -389,7 +425,7 @@ if has_category unused-images; then
     elif [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
       emit_candidate unused-images docker-unused-images docker-unused-images "$APPALOFT_PRUNE_BEFORE" "0" matched ""
     else
-      docker image prune --force --filter "until=$APPALOFT_PRUNE_BEFORE" >/dev/null 2>&1
+      docker image prune --all --force --filter "until=$APPALOFT_PRUNE_BEFORE" >/dev/null 2>&1
       if [ "$?" = "0" ]; then emit_candidate unused-images docker-unused-images docker-unused-images "$APPALOFT_PRUNE_BEFORE" "0" pruned ""; else emit_candidate unused-images docker-unused-images docker-unused-images "$APPALOFT_PRUNE_BEFORE" "0" skipped safety-evidence-missing; fi
     fi
   else
