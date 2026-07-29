@@ -928,6 +928,7 @@ export class DockerSandboxProvider implements SandboxProvider {
     const result = await this.docker(
       [
         "exec",
+        ...(request.stdin ? ["-i"] : []),
         "-w",
         cwd,
         request.providerHandle,

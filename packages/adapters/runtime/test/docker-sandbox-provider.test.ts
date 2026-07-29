@@ -77,7 +77,7 @@ class CapturingRunner implements SandboxDockerCommandRunner {
     )
       return this.result(`${this.snapshotImageIdentity}\n`);
     if (command.includes("image inspect")) return this.result("4096\n");
-    if (command.includes("exec -w") && !command.includes(" -d "))
+    if (argv[1] === "exec" && argv.includes("-w") && !argv.includes("-d"))
       return {
         exitCode: 7,
         stdout: new TextEncoder().encode("out\n"),
@@ -480,7 +480,7 @@ describe("DockerSandboxProvider", () => {
     ]);
   });
 
-  test("[SBX-PROC-001] returns ordered stdout/stderr/exit frames from direct argv execution", async () => {
+  test("[SBX-PROC-001] [SBX-EXEC-STDIN-001] attaches foreground stdin without placing it in argv", async () => {
     const runner = new CapturingRunner();
     const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
     await provider.provision(request);
@@ -500,10 +500,12 @@ describe("DockerSandboxProvider", () => {
         { kind: "exit", sequence: 3, exitCode: 7 },
       ],
     });
-    expect(runner.calls.at(-1)?.argv).toEqual(
+    const foreground = runner.calls.at(-1);
+    expect(foreground?.argv).toEqual(
       expect.arrayContaining([
         "docker",
         "exec",
+        "-i",
         "-w",
         "/workspace/src",
         "appaloft-sbx_demo",
@@ -513,7 +515,8 @@ describe("DockerSandboxProvider", () => {
         "print('hello')",
       ]),
     );
-    expect(runner.calls.at(-1)?.stdin).toEqual(new TextEncoder().encode("input\n"));
+    expect(foreground?.stdin).toEqual(new TextEncoder().encode("input\n"));
+    expect(foreground?.argv.join(" ")).not.toContain("input");
 
     runner.executionFailure = "timeout";
     const timedOut = await provider.exec({
@@ -536,6 +539,7 @@ describe("DockerSandboxProvider", () => {
       providerHandle: "appaloft-sbx_demo",
       argv: ["yes"],
     });
+    expect(runner.calls.at(-1)?.argv).not.toContain("-i");
     expect(bounded.mode).toBe("foreground");
     if (bounded.mode === "foreground") {
       expect(bounded.frames.at(-1)).toMatchObject({
