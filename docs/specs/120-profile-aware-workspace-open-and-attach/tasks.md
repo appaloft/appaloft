@@ -16,7 +16,7 @@
 ## Source Of Truth
 
 - [x] Complete Discovery and owner decisions.
-- [x] Add Spec 119, ADR-102, plan, tasks, workflow, and Test Matrix.
+- [x] Add Spec 120, ADR-103, plan, tasks, workflow, and Test Matrix.
 - [x] Synchronize Domain Model, Business Operation Map, Core Operations, roadmap, public docs, and
   migration notes.
 

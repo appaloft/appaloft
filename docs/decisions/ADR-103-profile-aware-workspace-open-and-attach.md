@@ -1,4 +1,4 @@
-# ADR-102: Profile-Aware Workspace Open And Attach
+# ADR-103: Profile-Aware Workspace Open And Attach
 
 Status: Accepted
 

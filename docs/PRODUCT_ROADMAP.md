@@ -148,8 +148,8 @@ Product constraints:
   drain/evacuation, and private Cloud/Enterprise eligibility policy as separately governed
   follow-ups. Configuring `artifact-builder` or `sandbox-worker` does not complete those capabilities.
 - [ ] Deliver Profile-aware Workspace open and attach under
-  [ADR-102](./decisions/ADR-102-profile-aware-workspace-open-and-attach.md) and
-  [Spec 119](./specs/119-profile-aware-workspace-open-and-attach/spec.md): local Git validation,
+  [ADR-103](./decisions/ADR-103-profile-aware-workspace-open-and-attach.md) and
+  [Spec 120](./specs/120-profile-aware-workspace-open-and-attach/spec.md): local Git validation,
   Repository Binding, Project default Profile, atomic create-or-resume, immutable source pins,
   named Credential Connections, capability-driven managed-terminal/native attach and exact
   cleanup without adding a Workspace aggregate.

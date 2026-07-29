@@ -1139,8 +1139,8 @@ Supporting configuration operations are:
 The convenience `workspaceId` is the Sandbox id. Pi and OpenCode remain Adapter keys and do not
 create provider-specific operation names. See
 [ADR-094](./decisions/ADR-094-agent-workspace-entry-workflow.md) and
-[ADR-102](./decisions/ADR-102-profile-aware-workspace-open-and-attach.md),
-[Spec 119](./specs/119-profile-aware-workspace-open-and-attach/spec.md), and
+[ADR-103](./decisions/ADR-103-profile-aware-workspace-open-and-attach.md),
+[Spec 120](./specs/120-profile-aware-workspace-open-and-attach/spec.md), and
 [Agent Workspace Workflow](./workflows/agent-workspace.md).
 
 ## Workspace Collaboration

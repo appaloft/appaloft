@@ -2,7 +2,7 @@
 
 ## Governing Sources
 
-- ADR-094, ADR-100, ADR-102
+- ADR-094, ADR-100, ADR-103
 - Spec 111 and Spec 117
 - `docs/workflows/agent-workspace.md`
 - `docs/testing/profile-aware-workspace-open-test-matrix.md`

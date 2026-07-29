@@ -43,6 +43,6 @@ existing Runtime pins and grants remain immutable.
 ## References
 
 - [ADR-100](../decisions/ADR-100-agent-adapter-distribution-and-workspace-profile-boundary.md)
-- [ADR-102](../decisions/ADR-102-profile-aware-workspace-open-and-attach.md)
-- [Spec 119](../specs/119-profile-aware-workspace-open-and-attach/spec.md)
+- [ADR-103](../decisions/ADR-103-profile-aware-workspace-open-and-attach.md)
+- [Spec 120](../specs/120-profile-aware-workspace-open-and-attach/spec.md)
 - [Test Matrix](../testing/profile-aware-workspace-open-test-matrix.md)

@@ -7,7 +7,7 @@
 - Owner: `RepositoryBinding`
 - Status: active public command/query family
 - Governing decision:
-  [ADR-102](../decisions/ADR-102-profile-aware-workspace-open-and-attach.md)
+  [ADR-103](../decisions/ADR-103-profile-aware-workspace-open-and-attach.md)
 
 ## Contract
 

@@ -468,9 +468,9 @@ closed and requires explicit `--new`.
 
 Governing artifacts:
 - [ADR-094](./decisions/ADR-094-agent-workspace-entry-workflow.md)
-- [ADR-102](./decisions/ADR-102-profile-aware-workspace-open-and-attach.md)
+- [ADR-103](./decisions/ADR-103-profile-aware-workspace-open-and-attach.md)
 - [Spec 111](./specs/111-agent-workspace-entry-workflow/spec.md)
-- [Spec 119](./specs/119-profile-aware-workspace-open-and-attach/spec.md)
+- [Spec 120](./specs/120-profile-aware-workspace-open-and-attach/spec.md)
 - [Agent Workspace Workflow](./workflows/agent-workspace.md)
 - [Agent Workspace Test Matrix](./testing/agent-workspace-test-matrix.md)
 - [Profile-Aware Workspace Open Test Matrix](./testing/profile-aware-workspace-open-test-matrix.md)
