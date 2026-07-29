@@ -3911,6 +3911,9 @@ export function registerApplicationServices(
                 input.networkPolicy.mode === "deny"
                   ? { mode: "deny", rules: [] }
                   : input.networkPolicy,
+              ...(input.placementReservationId
+                ? { placementReservationId: input.placementReservationId }
+                : {}),
             });
             return created.map((sandbox) => ({
               sandboxId: sandbox.sandboxId,

@@ -140,7 +140,9 @@ export interface WorkspaceOpenDependencies {
   readonly sandboxes: {
     create(
       context: ExecutionContext,
-      input: AgentWorkspaceProfileCompiledPlan["sandbox"],
+      input: AgentWorkspaceProfileCompiledPlan["sandbox"] & {
+        readonly placementReservationId?: string;
+      },
     ): Promise<Result<SandboxOpenDescriptor>>;
     resume(context: ExecutionContext, workspaceId: string): Promise<Result<SandboxOpenDescriptor>>;
     exec(
@@ -375,10 +377,10 @@ export class AgentWorkspaceOpenService {
     let runtimeId: string | undefined;
     let phase = "workspace-open-sandbox-create";
     try {
-      const sandbox = await this.dependencies.sandboxes.create(
-        context,
-        preflight.value.plan.sandbox,
-      );
+      const sandbox = await this.dependencies.sandboxes.create(context, {
+        ...preflight.value.plan.sandbox,
+        placementReservationId: preflight.value.reservation.reservationId,
+      });
       if (sandbox.isErr()) {
         await this.dependencies.reservations.release(context, preflight.value.reservation);
         throw sandbox.error;

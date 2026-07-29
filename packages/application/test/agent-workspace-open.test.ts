@@ -23,6 +23,7 @@ describe("Agent Workspace open application workflow", () => {
     const phases: string[] = [];
     let failSandboxCreate = false;
     let releasedReservations = 0;
+    const placementReservationIds: (string | undefined)[] = [];
     const failedEntries: Array<{ workspaceId?: string; phase: string; code: string }> = [];
     let preferred:
       | {
@@ -122,7 +123,8 @@ describe("Agent Workspace open application workflow", () => {
         markWorkspaceTerminated: async () => ok({ advanced: true }),
       },
       sandboxes: {
-        create: async () => {
+        create: async (_context, sandboxInput) => {
+          placementReservationIds.push(sandboxInput.placementReservationId);
           phases.push("sandbox-create");
           if (failSandboxCreate) {
             return err(
@@ -238,6 +240,7 @@ describe("Agent Workspace open application workflow", () => {
       resumed: true,
       agent: { runtimeId: "sar_1" },
     });
+    expect(placementReservationIds).toEqual(["res_1", "res_1"]);
     expect(mismatched._unsafeUnwrapErr().details?.code).toBe("workspace_open_source_pin_mismatch");
     expect(mismatched._unsafeUnwrapErr().details?.guidance).toContain("--new");
     expect(providerFailure.isErr()).toBe(true);
