@@ -2109,13 +2109,92 @@ export function createGitHubAgentReviewDeliveryAdapter(
 }
 
 function githubAgentStatusBody(task: GitHubAgentTaskSummary): string {
-  return [
+  const details = task.feedback;
+  const lines = [
     "<!-- appaloft-agent-task-status -->",
     `Appaloft Agent Task: **${task.status}**`,
     "",
-    `[Open Task](${task.taskUrl})`,
+    `[Open Task](${safeFeedbackUrl(task.taskUrl) ?? "#"})`,
     `Session recovery: \`${task.sessionRecovery}\``,
-  ].join("\n");
+  ];
+  if (details?.phase) {
+    lines.push("", `Current phase: **${safeFeedbackInline(details.phase, 160)}**`);
+  }
+  if (details?.checks?.length) {
+    lines.push("", "### Checks");
+    for (const check of details.checks.slice(0, 12)) {
+      const icon = check.status === "passed" ? "✅" : check.status === "failed" ? "❌" : "⏭️";
+      lines.push(`- ${icon} ${safeFeedbackInline(check.name, 200)}`);
+      if (check.summary) {
+        lines.push(`  ${safeFeedbackText(check.summary, 800).replaceAll("\n", "\n  ")}`);
+      }
+    }
+    if (details.checks.length > 12) {
+      lines.push(
+        `- ${details.checks.length - 12} additional checks are available in Task details.`,
+      );
+    }
+  }
+  if (details?.diff) {
+    lines.push("", "### Diff", safeFeedbackText(details.diff.stat, 2_000));
+    if (details.diff.redacted) {
+      lines.push(
+        "Sensitive-looking diff content was redacted. Open Task details for safe evidence.",
+      );
+    } else if (details.diff.patch) {
+      const patch = escapeHtml(safeFeedbackText(details.diff.patch, 8_000));
+      lines.push(
+        "<details><summary>Bounded patch</summary>",
+        "",
+        `<pre>${patch}</pre>`,
+        "</details>",
+      );
+    }
+    if (details.diff.truncated) {
+      lines.push("Diff output is truncated; open Task details for the complete artifact.");
+    }
+  }
+  if (details?.preview) {
+    const previewUrl = safeFeedbackUrl(details.preview.url);
+    lines.push(
+      "",
+      "### Preview",
+      previewUrl
+        ? `[Open ${details.preview.visibility} Preview](${previewUrl})`
+        : `${details.preview.visibility} Preview is available from Task details.`,
+      `Expires: ${safeFeedbackInline(details.preview.expiresAt, 80)}`,
+    );
+  }
+  if (details?.delivery) {
+    const deliveryUrl = details.delivery.url ? safeFeedbackUrl(details.delivery.url) : undefined;
+    lines.push(
+      "",
+      "### Delivery",
+      `${safeFeedbackInline(details.delivery.kind, 80)}: **${details.delivery.status}**${
+        deliveryUrl ? ` ([open](${deliveryUrl}))` : ""
+      }`,
+    );
+  }
+  if (details?.failure) {
+    lines.push(
+      "",
+      "### Failure",
+      safeFeedbackText(details.failure.summary, 1_200),
+      ...(details.failure.code
+        ? [`Code: \`${safeFeedbackInline(details.failure.code, 160)}\``]
+        : []),
+      `Retryable: ${details.failure.retryable ? "yes" : "no"}`,
+    );
+  }
+  if (details?.cleanup) {
+    lines.push(
+      "",
+      "### Retention",
+      `Workspace: **${details.cleanup.workspace}**`,
+      ...(details.cleanup.preview ? [`Preview: **${details.cleanup.preview}**`] : []),
+    );
+  }
+  return boundedFeedbackMarkdown(lines.join("\n"), 24_000);
 }
 
 function githubAgentCheckRun(
@@ -2310,6 +2389,63 @@ function boundedText(value: unknown, maxLength: number): string | null {
   if (typeof value !== "string") return null;
   const normalized = value.trim();
   return normalized && normalized.length <= maxLength ? normalized : null;
+}
+
+const feedbackSecretLine =
+  /(?:api[_-]?key|authorization|credential|password|private[_-]?key|secret|token)\s*[:=]/iu;
+const feedbackSecretValue =
+  /(?:gh[opsu]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{12,}|-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----)/u;
+
+function safeFeedbackText(value: string, maxLength: number): string {
+  const redacted = value
+    .replaceAll("\0", "")
+    .split("\n")
+    .map((line) =>
+      feedbackSecretLine.test(line) || feedbackSecretValue.test(line)
+        ? "[REDACTED SECRET-LIKE OUTPUT]"
+        : line,
+    )
+    .join("\n")
+    .trim();
+  if (!redacted) return "No details recorded.";
+  return redacted.length <= maxLength
+    ? redacted
+    : `${redacted.slice(0, Math.max(0, maxLength - 14))}\n[TRUNCATED]`;
+}
+
+function safeFeedbackInline(value: string, maxLength: number): string {
+  return safeFeedbackText(value, maxLength)
+    .replaceAll("\n", " ")
+    .replace(/([\\`*_[\]<>])/gu, "\\$1");
+}
+
+function safeFeedbackUrl(value: string): string | undefined {
+  try {
+    const url = new URL(value);
+    if (
+      !["http:", "https:"].includes(url.protocol) ||
+      url.username ||
+      url.password ||
+      [...url.searchParams.keys()].some((key) =>
+        /(?:token|secret|credential|api[_-]?key|signature)/iu.test(key),
+      )
+    ) {
+      return undefined;
+    }
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function escapeHtml(value: string): string {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}
+
+function boundedFeedbackMarkdown(value: string, maxLength: number): string {
+  return value.length <= maxLength
+    ? value
+    : `${value.slice(0, Math.max(0, maxLength - 14))}\n[TRUNCATED]`;
 }
 
 interface GitHubPushPayloadFacts {

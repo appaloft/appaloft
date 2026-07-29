@@ -130,7 +130,39 @@ describe("GitHub Agent Task feedback adapter", () => {
 
     const updated = await adapter.update(context, {
       trigger,
-      task: { ...queued, status: "completed", sessionRecovery: "native" },
+      task: {
+        ...queued,
+        status: "completed",
+        sessionRecovery: "native",
+        feedback: {
+          phase: "delivery",
+          checks: [
+            { name: "unit tests", status: "passed", summary: "18 tests passed" },
+            {
+              name: "integration tests",
+              status: "failed",
+              summary: "token=github_pat_this-must-never-be-rendered",
+            },
+          ],
+          diff: {
+            stat: "2 files changed, 8 insertions(+), 1 deletion(-)",
+            patch: "diff --git a/src/a.ts b/src/a.ts\n+export const compatible = true;",
+            truncated: false,
+            redacted: false,
+          },
+          preview: {
+            url: "https://preview.appaloft.test/task-1",
+            visibility: "private",
+            expiresAt: "2026-07-30T00:00:00.000Z",
+          },
+          delivery: {
+            kind: "pull-request",
+            status: "delivered",
+            url: "https://github.test/appaloft/repository/pull/43?token=delivery-secret",
+          },
+          cleanup: { workspace: "sleeping", preview: "active" },
+        },
+      },
       existing: {
         reactionId: "101",
         statusCommentId: "102",
@@ -157,6 +189,17 @@ describe("GitHub Agent Task feedback adapter", () => {
       status: "completed",
       conclusion: "success",
     });
+    const rendered = JSON.stringify(requests.map((request) => request.body));
+    expect(rendered).toContain("### Checks");
+    expect(rendered).toContain("18 tests passed");
+    expect(rendered).toContain("### Diff");
+    expect(rendered).toContain("### Preview");
+    expect(rendered).toContain("### Delivery");
+    expect(rendered).toContain("### Retention");
+    expect(rendered).toContain("[REDACTED SECRET-LIKE OUTPUT]");
+    expect(rendered).not.toContain("github_pat_this-must-never-be-rendered");
+    expect(rendered).not.toContain("delivery-secret");
+    expect(rendered.length).toBeLessThan(50_000);
   });
 
   test("[GH-AUTO-AUTHZ-008] denial exposes only an actionable reason and optional Connect Agent URL", async () => {

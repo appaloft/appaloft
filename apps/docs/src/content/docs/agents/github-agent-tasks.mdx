@@ -4,7 +4,7 @@ description: "绑定 Repository，配置 Automation Rule 与 Agent Profile，并
 docType: "task"
 localeState:
   zh-CN: complete
-  en-US: needs-update
+  en-US: complete
 searchAliases:
   - "github agent"
   - "automation rule"
@@ -56,6 +56,10 @@ appaloft github-agent rule create automation-rule.json
 ## Task 控制与反馈
 
 GitHub acknowledgement、状态评论与 Check Run 都采用 bounded update；同一 Task 不会持续刷屏。
+同一条状态评论与 Check Run 会按阶段更新检查结果、经过脱敏和截断的 Diff、Preview 的访问范围与
+TTL、PR/Review 交付以及 Workspace/Preview 的保留状态。完整输出仍留在 Task 页面；包含
+secret-like 内容的行和带敏感查询参数的 URL 不会写入 GitHub。
+
 `steer` 与 `resume` 保持稳定 Task ID，并追加新的 Run lineage。只有 Agent Adapter 明确支持且
 存在 opaque native session reference 时才显示 native resume；否则会明确显示 fallback，并把
 之前的摘要、Diff、检查结果与 steer 指令注入新 Session。

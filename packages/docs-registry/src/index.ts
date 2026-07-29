@@ -142,7 +142,7 @@ export const publicDocsHelpTopics = {
     id: "agent.github-tasks",
     title: "GitHub-driven Agent Tasks",
     description:
-      "How to bind repositories, configure automation rules and agent profiles, and control durable Workspace Tasks triggered from GitHub.",
+      "How to bind repositories, configure automation rules and agent profiles, control durable Workspace Tasks, and read bounded GitHub checks, diffs, previews, delivery, and retention feedback.",
     page: {
       "zh-CN": "agents/github-agent-tasks",
       "en-US": "en/agents/github-agent-tasks",
@@ -160,6 +160,8 @@ export const publicDocsHelpTopics = {
       "automation rule",
       "agent profile",
       "GitHub Agent Task",
+      "GitHub Task feedback",
+      "GitHub Check Run",
     ],
     specReferences: [
       "docs/decisions/ADR-102-github-agent-task-trigger-and-composition-boundary.md",
