@@ -1304,7 +1304,7 @@ export interface Database {
   agent_workspace_profile_definitions: AgentWorkspaceProfileDefinitionsTable;
   agent_workspace_profile_installations: AgentWorkspaceProfileInstallationsTable;
   agent_workspace_profile_references: AgentWorkspaceProfileReferencesTable;
-  repository_bindings: RepositoryBindingsTable;
+  project_repository_bindings: ProjectRepositoryBindingsTable;
   workspace_open_entries: WorkspaceOpenEntriesTable;
   execution_sandboxes: ExecutionSandboxesTable;
   execution_sandbox_snapshots: ExecutionSandboxSnapshotsTable;
@@ -1576,7 +1576,7 @@ export interface AgentWorkspaceProfileInstallationsTable {
   >;
 }
 
-export interface RepositoryBindingsTable {
+export interface ProjectRepositoryBindingsTable {
   tenant_id: string;
   id: string;
   repository_identity: string;

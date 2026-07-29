@@ -7,8 +7,8 @@ import {
   CreatedAt,
   ok,
   ProjectId,
-  RepositoryBinding,
-  RepositoryBindingId,
+  ProjectRepositoryBinding,
+  ProjectRepositoryBindingId,
   RepositoryIdentity,
   type Result,
   UpdatedAt,
@@ -18,18 +18,18 @@ import { type Kysely, type Selectable } from "kysely";
 import { type Database } from "../schema";
 import { normalizeTimestamp, resolveRepositoryExecutor } from "./shared";
 
-type RepositoryBindingRow = Selectable<Database["repository_bindings"]>;
+type RepositoryBindingRow = Selectable<Database["project_repository_bindings"]>;
 
 function tenantId(context: RepositoryContext): string {
   return context.tenant?.tenantId ?? "tenant_instance";
 }
 
-function rehydrate(row: RepositoryBindingRow): RepositoryBinding {
+function rehydrate(row: RepositoryBindingRow): ProjectRepositoryBinding {
   const createdAt = normalizeTimestamp(row.created_at);
   const unboundAt = normalizeTimestamp(row.unbound_at);
   if (!createdAt) throw new Error("Repository Binding created_at is missing");
-  return RepositoryBinding.rehydrate({
-    id: RepositoryBindingId.rehydrate(row.id),
+  return ProjectRepositoryBinding.rehydrate({
+    id: ProjectRepositoryBindingId.rehydrate(row.id),
     repositoryIdentity: RepositoryIdentity.rehydrate(row.repository_identity),
     projectId: ProjectId.rehydrate(row.project_id),
     status: row.status as "active" | "unbound",
@@ -46,7 +46,7 @@ export class PgRepositoryBindingRepository implements RepositoryBindingRepositor
     repositoryIdentity: string,
   ): Promise<RepositoryBindingRecord | null> {
     const row = await resolveRepositoryExecutor(this.db, context)
-      .selectFrom("repository_bindings")
+      .selectFrom("project_repository_bindings")
       .selectAll()
       .where("tenant_id", "=", tenantId(context))
       .where("repository_identity", "=", repositoryIdentity)
@@ -54,10 +54,10 @@ export class PgRepositoryBindingRepository implements RepositoryBindingRepositor
     return row ? { binding: rehydrate(row) } : null;
   }
 
-  async save(context: RepositoryContext, binding: RepositoryBinding): Promise<Result<void>> {
+  async save(context: RepositoryContext, binding: ProjectRepositoryBinding): Promise<Result<void>> {
     const state = binding.toState();
     await resolveRepositoryExecutor(this.db, context)
-      .insertInto("repository_bindings")
+      .insertInto("project_repository_bindings")
       .values({
         tenant_id: tenantId(context),
         id: state.id.value,

@@ -27,7 +27,12 @@
   [#858](https://github.com/appaloft/appaloft/issues/858),
   [#859](https://github.com/appaloft/appaloft/issues/859), and
   [#861](https://github.com/appaloft/appaloft/issues/861) with `ready-for-agent`.
-- [ ] Link the private hosted-composition tracking issue and final public merged commit.
+- [x] Link private hosted-composition tracking
+  [#748](https://github.com/appaloft/appaloft-cloud/issues/748) and actor-visible slices
+  [#749](https://github.com/appaloft/appaloft-cloud/issues/749),
+  [#750](https://github.com/appaloft/appaloft-cloud/issues/750), and
+  [#751](https://github.com/appaloft/appaloft-cloud/issues/751).
+- [ ] Link the final public merged commit.
 
 ## Implementation
 

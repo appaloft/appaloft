@@ -17,8 +17,8 @@ import {
   Project,
   ProjectId,
   ProjectName,
-  RepositoryBinding,
-  RepositoryBindingId,
+  ProjectRepositoryBinding,
+  ProjectRepositoryBindingId,
   RepositoryIdentity,
   UpdatedAt,
 } from "@appaloft/core";
@@ -157,8 +157,8 @@ async function fixture(
   const repositoryBindings = new InMemoryRepositoryBindingRepository();
   await repositoryBindings.save(
     toRepositoryContext(context),
-    RepositoryBinding.bind({
-      id: RepositoryBindingId.rehydrate("rbd_web"),
+    ProjectRepositoryBinding.bind({
+      id: ProjectRepositoryBindingId.rehydrate("rbd_web"),
       repositoryIdentity: RepositoryIdentity.rehydrate("github.com/Acme/Web"),
       projectId: ProjectId.rehydrate("prj_web"),
       createdAt: CreatedAt.rehydrate("2026-07-28T00:00:00.000Z"),

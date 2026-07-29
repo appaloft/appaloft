@@ -57,7 +57,7 @@ import {
   AttachResourceStorageCommandHandler,
   AttachResourceStorageUseCase,
   AutomaticRouteContextLookupService,
-  BindRepositoryCommandHandler,
+  BindProjectRepositoryCommandHandler,
   BindResourceDependencyCommandHandler,
   BindResourceDependencyUseCase,
   BlueprintCatalogQueryService,
@@ -3325,7 +3325,7 @@ export function registerApplicationServices(
   container.registerSingleton(AgentWorkspaceProfileCommandHandler);
   container.registerSingleton(AgentWorkspaceProfileQueryHandler);
   container.registerSingleton(AgentWorkspaceOpenCommandHandler);
-  container.registerSingleton(BindRepositoryCommandHandler);
+  container.registerSingleton(BindProjectRepositoryCommandHandler);
   container.registerSingleton(ShowRepositoryBindingQueryHandler);
   container.registerSingleton(UnbindRepositoryCommandHandler);
   container.registerSingleton(WorkspaceCollaborationCommandHandler);

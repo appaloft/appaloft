@@ -380,7 +380,7 @@ import {
 } from "./operations/tunnels/tunnel-session";
 import { type ProductOrganizationRole } from "./ports";
 import {
-  bindRepositoryInputSchema,
+  bindProjectRepositoryInputSchema,
   showRepositoryBindingInputSchema,
   unbindRepositoryInputSchema,
 } from "./repository-binding-messages";
@@ -3770,10 +3770,10 @@ export const operationCatalog = [
     key: "repository-bindings.bind",
     kind: "command",
     domain: "repository-bindings",
-    messageName: "BindRepositoryCommand",
-    handlerName: "BindRepositoryCommandHandler",
+    messageName: "BindProjectRepositoryCommand",
+    handlerName: "BindProjectRepositoryCommandHandler",
     serviceName: "RepositoryBindingService",
-    inputSchema: bindRepositoryInputSchema,
+    inputSchema: bindProjectRepositoryInputSchema,
     serviceToken: tokens.repositoryBindingService,
     transportAccess: { productSession: { minRole: "admin" } },
     transports: {

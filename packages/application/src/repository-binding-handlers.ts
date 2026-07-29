@@ -12,23 +12,23 @@ import {
   type RepositoryBindingService,
 } from "./repository-binding";
 import {
-  BindRepositoryCommand,
+  BindProjectRepositoryCommand,
   ShowRepositoryBindingQuery,
   UnbindRepositoryCommand,
 } from "./repository-binding-messages";
 import { tokens } from "./tokens";
 
-@CommandHandler(BindRepositoryCommand)
+@CommandHandler(BindProjectRepositoryCommand)
 @injectable()
-export class BindRepositoryCommandHandler
-  implements CommandHandlerContract<BindRepositoryCommand, RepositoryBindingReadModel>
+export class BindProjectRepositoryCommandHandler
+  implements CommandHandlerContract<BindProjectRepositoryCommand, RepositoryBindingReadModel>
 {
   constructor(
     @inject(tokens.repositoryBindingService)
     private readonly service: RepositoryBindingService,
   ) {}
 
-  handle(context: ExecutionContext, command: BindRepositoryCommand) {
+  handle(context: ExecutionContext, command: BindProjectRepositoryCommand) {
     return this.service.bind(context, command.input);
   }
 }

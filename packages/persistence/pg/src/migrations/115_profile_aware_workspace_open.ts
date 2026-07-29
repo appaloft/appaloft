@@ -1,4 +1,4 @@
-import { sql, type Kysely } from "kysely";
+import { type Kysely, sql } from "kysely";
 import { type Database } from "../schema";
 
 export const profileAwareWorkspaceOpenMigration = {
@@ -9,7 +9,7 @@ export const profileAwareWorkspaceOpenMigration = {
       ADD COLUMN IF NOT EXISTS credential_connections JSONB NOT NULL DEFAULT '[]'::jsonb`.execute(
       db,
     );
-    await sql`CREATE TABLE IF NOT EXISTS repository_bindings (
+    await sql`CREATE TABLE IF NOT EXISTS project_repository_bindings (
       tenant_id TEXT NOT NULL,
       id TEXT NOT NULL,
       repository_identity TEXT NOT NULL,
@@ -20,8 +20,8 @@ export const profileAwareWorkspaceOpenMigration = {
       PRIMARY KEY (tenant_id, id),
       UNIQUE (tenant_id, repository_identity)
     )`.execute(db);
-    await sql`CREATE INDEX IF NOT EXISTS repository_bindings_project_idx
-      ON repository_bindings (tenant_id, project_id, status)`.execute(db);
+    await sql`CREATE INDEX IF NOT EXISTS project_repository_bindings_project_idx
+      ON project_repository_bindings (tenant_id, project_id, status)`.execute(db);
     await sql`CREATE TABLE IF NOT EXISTS workspace_open_entries (
       tenant_id TEXT NOT NULL,
       subject_id TEXT NOT NULL,
@@ -63,7 +63,7 @@ export const profileAwareWorkspaceOpenMigration = {
   },
   async down(db: Kysely<Database>): Promise<void> {
     await sql`DROP TABLE IF EXISTS workspace_open_entries`.execute(db);
-    await sql`DROP TABLE IF EXISTS repository_bindings`.execute(db);
+    await sql`DROP TABLE IF EXISTS project_repository_bindings`.execute(db);
     await sql`ALTER TABLE agent_workspace_profile_installations
       DROP COLUMN IF EXISTS credential_connections`.execute(db);
     await sql`ALTER TABLE projects

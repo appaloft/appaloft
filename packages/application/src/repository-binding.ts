@@ -5,8 +5,8 @@ import {
   ok,
   ProjectByIdSpec,
   ProjectId,
-  RepositoryBinding,
-  RepositoryBindingId,
+  ProjectRepositoryBinding,
+  ProjectRepositoryBindingId,
   RepositoryIdentity,
   type Result,
   UpdatedAt,
@@ -20,7 +20,7 @@ import {
 import { type Clock, type IdGenerator, type ProjectRepository } from "./ports";
 
 export interface RepositoryBindingRecord {
-  readonly binding: RepositoryBinding;
+  readonly binding: ProjectRepositoryBinding;
 }
 
 export interface RepositoryBindingRepository {
@@ -28,19 +28,19 @@ export interface RepositoryBindingRepository {
     context: RepositoryContext,
     repositoryIdentity: string,
   ): Promise<RepositoryBindingRecord | null>;
-  save(context: RepositoryContext, binding: RepositoryBinding): Promise<Result<void>>;
+  save(context: RepositoryContext, binding: ProjectRepositoryBinding): Promise<Result<void>>;
 }
 
 function tenantKey(context: RepositoryContext): string {
   return context.tenant?.tenantId ?? "tenant_instance";
 }
 
-function clone(binding: RepositoryBinding): RepositoryBinding {
-  return RepositoryBinding.rehydrate(binding.toState());
+function clone(binding: ProjectRepositoryBinding): ProjectRepositoryBinding {
+  return ProjectRepositoryBinding.rehydrate(binding.toState());
 }
 
 export class InMemoryRepositoryBindingRepository implements RepositoryBindingRepository {
-  private readonly bindings = new Map<string, RepositoryBinding>();
+  private readonly bindings = new Map<string, ProjectRepositoryBinding>();
 
   async findByIdentity(
     context: RepositoryContext,
@@ -50,7 +50,7 @@ export class InMemoryRepositoryBindingRepository implements RepositoryBindingRep
     return binding ? { binding: clone(binding) } : null;
   }
 
-  async save(context: RepositoryContext, binding: RepositoryBinding): Promise<Result<void>> {
+  async save(context: RepositoryContext, binding: ProjectRepositoryBinding): Promise<Result<void>> {
     this.bindings.set(
       `${tenantKey(context)}:${binding.toState().repositoryIdentity.value}`,
       clone(binding),
@@ -68,7 +68,7 @@ export interface RepositoryBindingReadModel {
   readonly unboundAt?: string;
 }
 
-function readModel(binding: RepositoryBinding): RepositoryBindingReadModel {
+function readModel(binding: ProjectRepositoryBinding): RepositoryBindingReadModel {
   const state = binding.toState();
   return {
     bindingId: state.id.value,
@@ -123,11 +123,11 @@ export class RepositoryBindingService {
     if (existing?.binding.toState().status === "active") {
       return ok(readModel(existing.binding));
     }
-    const id = RepositoryBindingId.create(this.dependencies.idGenerator.next("rbd"));
+    const id = ProjectRepositoryBindingId.create(this.dependencies.idGenerator.next("rbd"));
     if (id.isErr()) return err(id.error);
     const createdAt = CreatedAt.create(this.dependencies.clock.now());
     if (createdAt.isErr()) return err(createdAt.error);
-    const binding = RepositoryBinding.bind({
+    const binding = ProjectRepositoryBinding.bind({
       id: id.value,
       repositoryIdentity: identity.value,
       projectId: projectId.value,

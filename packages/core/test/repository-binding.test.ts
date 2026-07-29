@@ -3,16 +3,16 @@ import { describe, expect, test } from "bun:test";
 import {
   CreatedAt,
   ProjectId,
-  RepositoryBinding,
-  RepositoryBindingId,
+  ProjectRepositoryBinding,
+  ProjectRepositoryBindingId,
   RepositoryIdentity,
   UpdatedAt,
 } from "../src";
 
 describe("RepositoryBinding", () => {
   test("[WS-OPEN-BIND-005] binds one canonical repository identity to one Project", () => {
-    const binding = RepositoryBinding.bind({
-      id: RepositoryBindingId.rehydrate("rbd_acme_web"),
+    const binding = ProjectRepositoryBinding.bind({
+      id: ProjectRepositoryBindingId.rehydrate("rbd_acme_web"),
       repositoryIdentity: RepositoryIdentity.rehydrate("github.com/Acme/Web"),
       projectId: ProjectId.rehydrate("prj_web"),
       createdAt: CreatedAt.rehydrate("2026-07-28T00:00:00.000Z"),

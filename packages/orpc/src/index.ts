@@ -40,11 +40,13 @@ import {
   archiveWorkspaceCollaborationLaneInputSchema,
   attachResourceStorageCommandInputSchema,
   authorizeWorkspaceCollaborationLaneAccessInputSchema,
+  BindProjectRepositoryCommand,
   BindRepositoryCommand,
   BindResourceDependencyCommand,
   BootstrapFirstAdminCommand,
   BootstrapServerProxyCommand,
   BrokerSandboxCredentialRequestCommand,
+  bindProjectRepositoryInputSchema,
   bindRepositoryInputSchema,
   bindRepositoryResponseSchema,
   bindResourceDependencyCommandInputSchema,
@@ -8466,12 +8468,12 @@ export const openAgentWorkspaceProcedure = base
 
 const repositoryBindingResponseSchema = z.unknown();
 
-export const bindRepositoryProcedure = base
+export const bindProjectRepositoryProcedure = base
   .route({ method: "POST", path: "/repository-bindings", successStatus: 200 })
-  .input(bindRepositoryInputSchema)
+  .input(bindProjectRepositoryInputSchema)
   .output(repositoryBindingResponseSchema)
   .handler(async ({ input, context }) =>
-    executeCommand(context, BindRepositoryCommand.create(input)),
+    executeCommand(context, BindProjectRepositoryCommand.create(input)),
   );
 
 export const showRepositoryBindingProcedure = base
@@ -8513,7 +8515,7 @@ export const appaloftOrpcRouter = {
     open: openAgentWorkspaceProcedure,
   },
   repositoryBindings: {
-    bind: bindRepositoryProcedure,
+    bind: bindProjectRepositoryProcedure,
     show: showRepositoryBindingProcedure,
     unbind: unbindRepositoryProcedure,
   },

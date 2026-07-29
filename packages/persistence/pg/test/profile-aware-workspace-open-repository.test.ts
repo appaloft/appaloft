@@ -10,8 +10,8 @@ import {
   Project,
   ProjectId,
   ProjectName,
-  RepositoryBinding,
-  RepositoryBindingId,
+  ProjectRepositoryBinding,
+  ProjectRepositoryBindingId,
   RepositoryIdentity,
   UpsertProjectSpec,
 } from "@appaloft/core";
@@ -66,8 +66,8 @@ describe("Profile-aware Workspace open persistence", () => {
       );
 
       const bindings = new PgRepositoryBindingRepository(database.db);
-      const binding = RepositoryBinding.bind({
-        id: RepositoryBindingId.rehydrate("rbd_web"),
+      const binding = ProjectRepositoryBinding.bind({
+        id: ProjectRepositoryBindingId.rehydrate("rbd_web"),
         repositoryIdentity: RepositoryIdentity.rehydrate("github.com/Acme/Web"),
         projectId: ProjectId.rehydrate("prj_workspace_open"),
         createdAt: CreatedAt.rehydrate("2026-07-28T00:00:01.000Z"),

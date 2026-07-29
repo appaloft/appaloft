@@ -2,7 +2,7 @@ import "../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
 import {
-  BindRepositoryCommand,
+  BindProjectRepositoryCommand,
   type Command,
   type CommandBus,
   ConfigureAgentWorkspaceProfileCredentialConnectionsCommand,
@@ -155,7 +155,7 @@ describe("Profile-aware Workspace HTTP routes", () => {
         (command) => command instanceof ConfigureAgentWorkspaceProfileCredentialConnectionsCommand,
       ),
     ).toBe(true);
-    expect(commands.some((command) => command instanceof BindRepositoryCommand)).toBe(true);
+    expect(commands.some((command) => command instanceof BindProjectRepositoryCommand)).toBe(true);
     expect(commands.some((command) => command instanceof UnbindRepositoryCommand)).toBe(true);
     expect(queries.some((query) => query instanceof ShowRepositoryBindingQuery)).toBe(true);
   });

@@ -8,17 +8,21 @@ import { type RepositoryBindingReadModel } from "./repository-binding";
 const repositoryIdentity = z.string().trim().min(3).max(2_048);
 const projectId = z.string().trim().min(1).max(160);
 
-export const bindRepositoryInputSchema = z.object({ repositoryIdentity, projectId }).strict();
+export const bindProjectRepositoryInputSchema = z
+  .object({ repositoryIdentity, projectId })
+  .strict();
 export const showRepositoryBindingInputSchema = z.object({ repositoryIdentity }).strict();
 export const unbindRepositoryInputSchema = showRepositoryBindingInputSchema;
 
-export class BindRepositoryCommand extends Command<RepositoryBindingReadModel> {
-  constructor(readonly input: z.output<typeof bindRepositoryInputSchema>) {
+export class BindProjectRepositoryCommand extends Command<RepositoryBindingReadModel> {
+  constructor(readonly input: z.output<typeof bindProjectRepositoryInputSchema>) {
     super();
   }
 
-  static create(input: unknown): Result<BindRepositoryCommand> {
-    return parseOperationInput(bindRepositoryInputSchema, input).map((parsed) => new this(parsed));
+  static create(input: unknown): Result<BindProjectRepositoryCommand> {
+    return parseOperationInput(bindProjectRepositoryInputSchema, input).map(
+      (parsed) => new this(parsed),
+    );
   }
 }
 

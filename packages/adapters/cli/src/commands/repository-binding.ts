@@ -1,5 +1,5 @@
 import {
-  BindRepositoryCommand,
+  BindProjectRepositoryCommand,
   ShowRepositoryBindingQuery,
   UnbindRepositoryCommand,
 } from "@appaloft/application";
@@ -16,7 +16,7 @@ const bindCommand = EffectCommand.make(
   { repository: repositoryOption, project: projectOption },
   ({ project, repository }) =>
     runCommand(
-      BindRepositoryCommand.create({
+      BindProjectRepositoryCommand.create({
         repositoryIdentity: repository,
         projectId: project,
       }),
