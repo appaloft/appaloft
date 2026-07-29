@@ -56,6 +56,7 @@ export * from "./github-agent-configuration";
 export * from "./github-agent-configuration-handlers";
 export * from "./github-agent-configuration-messages";
 export * from "./github-agent-delivery-projection";
+export * from "./github-repository-binding-workspace-projection";
 export * from "./operation-audit";
 export * from "./operation-audit-domain-event-projector";
 export * from "./operation-catalog";

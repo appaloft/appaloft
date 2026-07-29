@@ -4,6 +4,8 @@
 
 - [x] Add `WS-OPEN-GIT-001..004` local Git resolver and remote normalization/preflight tests.
 - [x] Add `WS-OPEN-BIND-005` Repository Binding lifecycle and tenant-isolation tests.
+- [x] Add `WS-OPEN-BIND-005` GitHub App binding projection and conflicting-Project fail-closed
+  regression coverage under public issue #890.
 - [x] Add `WS-OPEN-PROFILE-006/WS-OPEN-CRED-007` Profile name/id/default and named Connection tests.
 - [x] Add `WS-OPEN-ADMIT-008/WS-OPEN-PARTIAL-017` pre-effect ordering, reservation, and partial
   evidence tests.

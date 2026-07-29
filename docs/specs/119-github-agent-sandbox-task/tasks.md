@@ -9,6 +9,7 @@
 - [x] Record the 2026-07-29 boundary audit and owner-confirmed correction in Discovery/ADR/Spec.
 - [x] Create and link public boundary-composition issue #876 under #845.
 - [x] Create and link public Workspace/enrollment boundary correction issue #888.
+- [x] Create and link public Repository Binding / Workspace-open convergence issue #890.
 
 ## Public Composition Boundary Slice
 
@@ -31,6 +32,9 @@
   begin/refresh/revoke composition; downstream runtimes must not define a parallel enrollment port.
 - [x] GH-AUTO-BOUNDARY-021: resolve exact Issue/PR source pins and PR fork identity through the
   public GitHub adapter before authorization; checkout must not fall back to ambient `HEAD`.
+- [x] GH-AUTO-BINDING-003/WS-OPEN-BIND-005: project an active GitHub App Repository Binding
+  through the connector-neutral Workspace-open binding port, preserve an explicit unbind, and fail
+  closed on conflicting Project ownership.
 - [ ] Run the dedicated read-only Public/Private Boundary Review Round and require `PASS` before
   hosted Code resumes.
 

@@ -287,6 +287,7 @@ import {
   GitHubAppConnectionQueryHandler,
   GitHubAppConnectionQueryService,
   GitHubAppSourceConnectionProjectionSource,
+  GitHubRepositoryBindingWorkspaceProjection,
   ImportCertificateCommandHandler,
   ImportCertificateUseCase,
   ImportControlPlaneCommandHandler,
@@ -3863,25 +3864,30 @@ export function registerApplicationServices(
     ),
   });
   container.register(tokens.agentWorkspaceOpenPreflightService, {
-    useFactory: instanceCachingFactory(
-      (dependencyContainer) =>
-        new AgentWorkspaceOpenPreflightService({
-          repositoryBindings: dependencyContainer.resolve<RepositoryBindingRepository>(
-            tokens.repositoryBindingRepository,
+    useFactory: instanceCachingFactory((dependencyContainer) => {
+      const repositoryBindings = dependencyContainer.resolve<RepositoryBindingRepository>(
+        tokens.repositoryBindingRepository,
+      );
+      return new AgentWorkspaceOpenPreflightService({
+        repositoryBindings: new GitHubRepositoryBindingWorkspaceProjection(
+          repositoryBindings,
+          dependencyContainer.resolve<GitHubAgentConfigurationRepository>(
+            tokens.githubAgentConfigurationRepository,
           ),
-          projects: dependencyContainer.resolve(tokens.projectRepository),
-          profiles: dependencyContainer.resolve(tokens.agentWorkspaceProfileRegistryRepository),
-          profileCompiler: dependencyContainer.resolve<AgentWorkspaceProfileInstallationService>(
-            tokens.agentWorkspaceProfileInstallationService,
-          ),
-          credentialAdmission: dependencyContainer.resolve<WorkspaceOpenCredentialAdmissionPort>(
-            tokens.workspaceOpenCredentialAdmission,
-          ),
-          placement: dependencyContainer.resolve<WorkspaceOpenPlacementPort>(
-            tokens.workspaceOpenPlacement,
-          ),
-        }),
-    ),
+        ),
+        projects: dependencyContainer.resolve(tokens.projectRepository),
+        profiles: dependencyContainer.resolve(tokens.agentWorkspaceProfileRegistryRepository),
+        profileCompiler: dependencyContainer.resolve<AgentWorkspaceProfileInstallationService>(
+          tokens.agentWorkspaceProfileInstallationService,
+        ),
+        credentialAdmission: dependencyContainer.resolve<WorkspaceOpenCredentialAdmissionPort>(
+          tokens.workspaceOpenCredentialAdmission,
+        ),
+        placement: dependencyContainer.resolve<WorkspaceOpenPlacementPort>(
+          tokens.workspaceOpenPlacement,
+        ),
+      });
+    }),
   });
   container.register(tokens.agentWorkspaceOpenService, {
     useFactory: instanceCachingFactory((dependencyContainer) => {
