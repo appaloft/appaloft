@@ -72,6 +72,8 @@
 
 - [x] Persist and upsert acknowledgement reaction, status comment, Check, Review, and PR ids.
 - [x] Implement bounded/redacted Task event summaries and Check annotations.
+- [x] Publish Issue comment/label Task Checks against the hydrated exact source SHA; omit the Check
+  only when no exact source SHA is available (#895).
 - [x] Render checks, bounded Diff, Preview, delivery, failure, and retention in the same GitHub
   comment and Check without exposing secret-like content or sensitive URLs.
 - [x] Implement write branch/PR delivery with head reconciliation and no force-push/merge.
@@ -90,6 +92,9 @@
 - [x] Run public `lint`, `typecheck`, and `build`; run the full test gate and document the isolated
   pass for its unrelated concurrent PGlite timeout.
 - [x] Run focused Console renderer tests and Svelte diagnostics for #892.
+- [x] Docs outcome for #895: existing complete zh-CN/en-US
+  `agents/github-agent-tasks#github-agent-tasks` already defines bounded status comment and Check
+  Run updates; no registry or new-page change is required.
 - [x] Synchronize Domain Model, Business Operation Map, operation catalog, SDK/CLI/Web docs, and
   Test Matrix evidence.
 - [ ] Commit and push public changes with a neutral message.
