@@ -421,6 +421,39 @@ async function hmacSha256Hex(secretValue: string, body: string): Promise<string>
 }
 
 describe("source event application baseline", () => {
+  test("[GH-AUTO-DELIVERY-007] persists a verified GitHub Agent delivery in the shared inbox without deployment dispatch", async () => {
+    const { context, ingest, sourceEvents } = createHarness();
+    const result = await ingest.execute(context, {
+      sourceKind: "github",
+      eventKind: "issue_comment.created",
+      sourceIdentity: {
+        locator: "https://github.com/appaloft/agent-sandbox-smoke",
+        providerRepositoryId: "123456",
+        repositoryFullName: "appaloft/agent-sandbox-smoke",
+      },
+      ref: "refs/issues/41",
+      revision: "501",
+      deliveryId: "delivery_issue_comment_501",
+      idempotencyKey: "github-delivery:delivery_issue_comment_501",
+      verification: {
+        status: "verified",
+        method: "provider-signature",
+      },
+    });
+
+    expect(result._unsafeUnwrap()).toMatchObject({
+      sourceEventId: "sevt_1",
+      status: "accepted",
+      createdDeploymentIds: [],
+    });
+    expect(sourceEvents.records).toHaveLength(1);
+    expect(sourceEvents.records[0]).toMatchObject({
+      eventKind: "issue_comment.created",
+      deliveryId: "delivery_issue_comment_501",
+      verification: { status: "verified", method: "provider-signature" },
+    });
+  });
+
   test("[SRC-AUTO-EVENT-004] rejects invalid generic signed source event signatures", async () => {
     const { context } = createHarness();
     const verifier = new GenericSignedSourceEventVerifier();

@@ -17,6 +17,8 @@ import {
   listAgentTaskRunsInputSchema,
   resumeAgentTaskRunInputSchema,
   showAgentTaskRunInputSchema,
+  steerAgentTaskRunInputSchema,
+  stopAgentTaskRunInputSchema,
 } from "./agent-task-run-messages";
 import {
   compileAgentWorkspaceProfileInputSchema,
@@ -58,6 +60,16 @@ import {
   terminateSandboxProcessCommandInputSchema,
   writeSandboxFileCommandInputSchema,
 } from "./execution-sandbox-messages";
+import {
+  bindRepositoryInputSchema,
+  createAgentProfileInputSchema,
+  createAutomationRuleInputSchema,
+  disableAgentProfileInputSchema,
+  disableAutomationRuleInputSchema,
+  listAgentProfilesInputSchema,
+  listAutomationRulesInputSchema,
+  listRepositoryBindingsInputSchema,
+} from "./github-agent-configuration-messages";
 import { changeAccountProfileCommandInputSchema } from "./operations/account-settings/change-account-profile.command";
 import { deleteAccountCommandInputSchema } from "./operations/account-settings/delete-account.command";
 import { listAccountSessionsQueryInputSchema } from "./operations/account-settings/list-account-sessions.query";
@@ -457,6 +469,7 @@ type OperationDomain =
   | "sandboxes"
   | "agent-adapters"
   | "agent-workspace-profiles"
+  | "github-agent"
   | "workspace-collaborations";
 
 export interface OperationCatalogEntry {
@@ -5202,6 +5215,24 @@ export const operationCatalog = [
         "appaloft workspace task resume <workspaceId> <taskRunId>",
       ],
       [
+        "sandboxes.agent-tasks.stop",
+        "StopAgentTaskRunCommand",
+        "AgentTaskRunCommandHandler",
+        stopAgentTaskRunInputSchema,
+        "POST",
+        "/api/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/stop",
+        "appaloft workspace task stop <workspaceId> <taskRunId>",
+      ],
+      [
+        "sandboxes.agent-tasks.steer",
+        "SteerAgentTaskRunCommand",
+        "AgentTaskRunCommandHandler",
+        steerAgentTaskRunInputSchema,
+        "POST",
+        "/api/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/steer",
+        "appaloft workspace task steer <workspaceId> <taskRunId>",
+      ],
+      [
         "sandboxes.agent-tasks.cancel",
         "CancelAgentTaskRunCommand",
         "AgentTaskRunCommandHandler",
@@ -5238,6 +5269,87 @@ export const operationCatalog = [
     serviceName: "AgentTaskRunService",
     inputSchema,
     serviceToken: tokens.agentTaskRunService,
+    transportAccess: { productSession: { minRole: "member" as const } },
+    transports: { cli, orpc: { method, path } },
+  })),
+  ...(
+    [
+      [
+        "github-agent.repository-bindings.create",
+        "BindRepositoryCommand",
+        bindRepositoryInputSchema,
+        "POST",
+        "/api/github-agent/repository-bindings",
+        "appaloft github-agent repository bind",
+      ],
+      [
+        "github-agent.repository-bindings.list",
+        "ListRepositoryBindingsQuery",
+        listRepositoryBindingsInputSchema,
+        "GET",
+        "/api/github-agent/repository-bindings",
+        "appaloft github-agent repository list",
+      ],
+      [
+        "github-agent.automation-rules.create",
+        "CreateAutomationRuleCommand",
+        createAutomationRuleInputSchema,
+        "POST",
+        "/api/github-agent/automation-rules",
+        "appaloft github-agent rule create",
+      ],
+      [
+        "github-agent.automation-rules.list",
+        "ListAutomationRulesQuery",
+        listAutomationRulesInputSchema,
+        "GET",
+        "/api/github-agent/automation-rules",
+        "appaloft github-agent rule list",
+      ],
+      [
+        "github-agent.automation-rules.disable",
+        "DisableAutomationRuleCommand",
+        disableAutomationRuleInputSchema,
+        "POST",
+        "/api/github-agent/automation-rules/{ruleId}/disable",
+        "appaloft github-agent rule disable <ruleId>",
+      ],
+      [
+        "github-agent.agent-profiles.create",
+        "CreateAgentProfileCommand",
+        createAgentProfileInputSchema,
+        "POST",
+        "/api/github-agent/agent-profiles",
+        "appaloft github-agent profile create",
+      ],
+      [
+        "github-agent.agent-profiles.list",
+        "ListAgentProfilesQuery",
+        listAgentProfilesInputSchema,
+        "GET",
+        "/api/github-agent/agent-profiles",
+        "appaloft github-agent profile list",
+      ],
+      [
+        "github-agent.agent-profiles.disable",
+        "DisableAgentProfileCommand",
+        disableAgentProfileInputSchema,
+        "POST",
+        "/api/github-agent/agent-profiles/{profileId}/disable",
+        "appaloft github-agent profile disable <profileId>",
+      ],
+    ] as const
+  ).map(([key, messageName, inputSchema, method, path, cli]) => ({
+    key,
+    kind: messageName.startsWith("List") ? ("query" as const) : ("command" as const),
+    domain: "github-agent" as const,
+    messageName,
+    handlerName: messageName.startsWith("List")
+      ? "GitHubAgentConfigurationQueryHandler"
+      : "GitHubAgentConfigurationCommandHandler",
+    serviceName: "GitHubAgentConfigurationService",
+    inputSchema,
+    serviceToken: tokens.githubAgentConfigurationService,
     transportAccess: { productSession: { minRole: "member" as const } },
     transports: { cli, orpc: { method, path } },
   })),

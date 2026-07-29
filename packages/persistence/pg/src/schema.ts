@@ -696,6 +696,12 @@ export interface SourceEventsTable {
   ignored_reasons: ColumnType<string[], string[] | undefined, string[]>;
   policy_results: ColumnType<JsonRecord[], JsonRecord[] | undefined, JsonRecord[]>;
   created_deployment_ids: ColumnType<string[], string[] | undefined, string[]>;
+  agent_automation_claimed_at: ColumnType<string | null, string | null | undefined, string | null>;
+  agent_automation_outcome: ColumnType<
+    JsonRecord | null,
+    JsonRecord | null | undefined,
+    JsonRecord | null
+  >;
   received_at: string;
 }
 
@@ -1135,6 +1141,56 @@ export interface GitHubAppInstallationsTable {
   updated_at: string;
 }
 
+export interface GitHubAgentReviewExecutionsTable {
+  tenant_id: string;
+  execution_key: string;
+  claimed_at: TimestampColumn;
+}
+
+export interface GitHubAgentThreadTasksTable {
+  tenant_id: string;
+  thread_key: string;
+  task: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+  updated_at: UpdatableTimestampColumn;
+}
+
+export interface RepositoryBindingsTable {
+  tenant_id: string;
+  id: string;
+  project_id: string;
+  provider: string;
+  installation_connection_id: string;
+  provider_repository_id: string;
+  state: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+  status: string;
+  created_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+}
+
+export interface ProjectAutomationRulesTable {
+  tenant_id: string;
+  id: string;
+  project_id: string;
+  repository_binding_id: string;
+  state: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+  status: string;
+  revision: number;
+  created_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+}
+
+export interface AgentProfilesTable {
+  tenant_id: string;
+  id: string;
+  state: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+  adapter: string;
+  credential_connection_id: string;
+  status: string;
+  revision: number;
+  created_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+}
+
 export interface DurableWorkItemsTable {
   id: string;
   kind: string;
@@ -1316,6 +1372,11 @@ export interface Database {
   connector_connections: ConnectorConnectionsTable;
   connector_authorization_attempts: ConnectorAuthorizationAttemptsTable;
   github_app_installations: GitHubAppInstallationsTable;
+  github_agent_review_executions: GitHubAgentReviewExecutionsTable;
+  github_agent_thread_tasks: GitHubAgentThreadTasksTable;
+  repository_bindings: RepositoryBindingsTable;
+  project_automation_rules: ProjectAutomationRulesTable;
+  agent_profiles: AgentProfilesTable;
   deploy_tokens: DeployTokensTable;
   invitation: BetterAuthInvitationsTable;
   member: BetterAuthMembersTable;

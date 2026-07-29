@@ -1,0 +1,70 @@
+---
+title: "GitHub 驱动的 Agent Task"
+description: "绑定 Repository，配置 Automation Rule 与 Agent Profile，并安全地触发 Workspace Task。"
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: needs-update
+searchAliases:
+  - "github agent"
+  - "automation rule"
+  - "agent profile"
+  - "repository binding"
+relatedOperations:
+  - "github-agent.repository-bindings.create"
+  - "github-agent.repository-bindings.list"
+  - "github-agent.automation-rules.create"
+  - "github-agent.automation-rules.list"
+  - "github-agent.automation-rules.disable"
+  - "github-agent.agent-profiles.create"
+  - "github-agent.agent-profiles.list"
+  - "github-agent.agent-profiles.disable"
+sidebar:
+  order: 7
+---
+
+## GitHub 驱动的 Agent Task <a id="github-agent-tasks" />
+
+GitHub 是 trigger 与 feedback adapter；业务执行对象仍是 Agent Task，隔离环境仍是
+Workspace/Sandbox。该能力不会创建第二套 Task、Preview 或 Deployment 模型。
+
+## 配置顺序
+
+1. 安装 GitHub App，并把 GitHub numeric repository ID 绑定到 Appaloft Project。
+2. 创建 Agent Profile，精确引用已安装的 Agent Adapter、Workspace Profile、Sandbox
+   Template 与 Credential Connection。
+3. 创建 Automation Rule，明确 event/action、actor policy、Server pool、运行上限、Preview
+   policy 与 PR delivery policy。
+
+CLI 的 create/bind 命令接受一个 JSON input file；文件只能包含非敏感配置引用，不能包含
+API Key、环境变量或原始凭据。
+
+```bash
+appaloft github-agent repository bind repository-binding.json
+appaloft github-agent profile create agent-profile.json
+appaloft github-agent rule create automation-rule.json
+```
+
+## 安全边界
+
+- 稳定身份使用 GitHub numeric IDs，不以 username 作为授权主键。
+- fork PR、外部 collaborator、未绑定身份、权限不足或不可用 Credential 一律 fail closed。
+- 拒绝发生在创建 Workspace 与注入 Secret 之前。
+- 自动规则使用显式的 Project Automation Identity。
+- Review 对同一 repository/PR/head SHA/rule 只执行一次。
+
+## Task 控制与反馈
+
+GitHub acknowledgement、状态评论与 Check Run 都采用 bounded update；同一 Task 不会持续刷屏。
+`steer` 与 `resume` 保持稳定 Task ID，并追加新的 Run lineage。只有 Agent Adapter 明确支持且
+存在 opaque native session reference 时才显示 native resume；否则会明确显示 fallback，并把
+之前的摘要、Diff、检查结果与 steer 指令注入新 Session。
+
+```bash
+appaloft workspace task stop <workspaceId> <taskRunId>
+appaloft workspace task steer <workspaceId> <taskRunId> --instruction "keep the API compatible"
+appaloft workspace task resume <workspaceId> <taskRunId>
+```
+
+Credential Connection 的原始 secret 不会进入 GitHub comment、日志、数据库明文或 Agent
+进程以外的测试/Preview 进程。`existing-server-config` 仅允许 owner-scoped HOME。

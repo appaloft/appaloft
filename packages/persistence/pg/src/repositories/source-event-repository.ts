@@ -398,7 +398,7 @@ function isAutoDeployTriggerKind(
   return value === "git-push" || value === "generic-signed-webhook";
 }
 
-function isSourceEventKind(value: unknown): value is SourceEventKind {
+function isSourceEventKind(value: unknown): value is "push" | "tag" {
   return value === "push" || value === "tag";
 }
 

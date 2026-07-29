@@ -272,6 +272,10 @@ import {
   GetAuthBootstrapStatusQueryService,
   GetCurrentOrganizationContextQueryHandler,
   GetCurrentOrganizationContextQueryService,
+  GitHubAgentConfigurationCommandHandler,
+  GitHubAgentConfigurationQueryHandler,
+  type GitHubAgentConfigurationRepository,
+  GitHubAgentConfigurationService,
   GitHubAppConnectionQueryHandler,
   GitHubAppConnectionQueryService,
   GitHubAppSourceConnectionProjectionSource,
@@ -3297,6 +3301,8 @@ export function registerApplicationServices(
   container.registerSingleton(SandboxAgentQueryHandler);
   container.registerSingleton(AgentTaskRunCommandHandler);
   container.registerSingleton(AgentTaskRunQueryHandler);
+  container.registerSingleton(GitHubAgentConfigurationCommandHandler);
+  container.registerSingleton(GitHubAgentConfigurationQueryHandler);
   container.registerSingleton(AgentAdapterCommandHandler);
   container.registerSingleton(AgentAdapterQueryHandler);
   container.registerSingleton(AgentWorkspaceProfileCommandHandler);
@@ -3829,6 +3835,18 @@ export function registerApplicationServices(
         clock: dependencyContainer.resolve(tokens.clock),
       } satisfies AgentTaskRunDependencies);
     }),
+  });
+  container.register(tokens.githubAgentConfigurationService, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new GitHubAgentConfigurationService({
+          repository: dependencyContainer.resolve<GitHubAgentConfigurationRepository>(
+            tokens.githubAgentConfigurationRepository,
+          ),
+          clock: dependencyContainer.resolve(tokens.clock),
+          idGenerator: dependencyContainer.resolve(tokens.idGenerator),
+        }),
+    ),
   });
   container.register(tokens.workspaceCollaborationService, {
     useFactory: instanceCachingFactory((dependencyContainer) => {

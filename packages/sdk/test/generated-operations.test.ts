@@ -35,7 +35,7 @@ describe("generated SDK operation metadata", () => {
         operation.operationGroup === "sandboxes" || operation.operationGroup.startsWith("sandbox-"),
     );
 
-    expect(operations).toHaveLength(65);
+    expect(operations).toHaveLength(67);
     expect(
       operations.find((operation) => operation.operationKey === "sandboxes.create"),
     ).toMatchObject({
@@ -77,6 +77,18 @@ describe("generated SDK operation metadata", () => {
       operations.find((operation) => operation.operationKey === "sandboxes.promotions.accept"),
     ).toMatchObject({
       facadePath: ["sandboxes", "promotions", "accept"],
+      kind: "command",
+    });
+    expect(
+      operations.find((operation) => operation.operationKey === "sandboxes.agent-tasks.stop"),
+    ).toMatchObject({
+      facadePath: ["sandboxes", "agentTasks", "stop"],
+      kind: "command",
+    });
+    expect(
+      operations.find((operation) => operation.operationKey === "sandboxes.agent-tasks.steer"),
+    ).toMatchObject({
+      facadePath: ["sandboxes", "agentTasks", "steer"],
       kind: "command",
     });
     expect(

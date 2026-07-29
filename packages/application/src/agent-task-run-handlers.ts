@@ -14,6 +14,8 @@ import { tokens } from "./tokens";
 type AgentTaskCommand =
   | messages.CreateAgentTaskRunCommand
   | messages.ResumeAgentTaskRunCommand
+  | messages.StopAgentTaskRunCommand
+  | messages.SteerAgentTaskRunCommand
   | messages.CancelAgentTaskRunCommand
   | messages.ApproveAgentTaskRunCommand
   | messages.DeliverAgentTaskRunCommand;
@@ -37,6 +39,17 @@ export class AgentTaskRunCommandHandler
     }
     if (command instanceof messages.ResumeAgentTaskRunCommand) {
       return this.service.resume(context, text(input, "workspaceId"), text(input, "taskRunId"));
+    }
+    if (command instanceof messages.StopAgentTaskRunCommand) {
+      return this.service.stop(context, text(input, "workspaceId"), text(input, "taskRunId"));
+    }
+    if (command instanceof messages.SteerAgentTaskRunCommand) {
+      return this.service.steer(
+        context,
+        text(input, "workspaceId"),
+        text(input, "taskRunId"),
+        text(input, "instruction"),
+      );
     }
     if (command instanceof messages.CancelAgentTaskRunCommand) {
       return this.service.cancel(context, text(input, "workspaceId"), text(input, "taskRunId"));
@@ -81,6 +94,8 @@ export class AgentTaskRunQueryHandler implements QueryHandlerContract<AgentTaskQ
 for (const command of [
   messages.CreateAgentTaskRunCommand,
   messages.ResumeAgentTaskRunCommand,
+  messages.StopAgentTaskRunCommand,
+  messages.SteerAgentTaskRunCommand,
   messages.CancelAgentTaskRunCommand,
   messages.ApproveAgentTaskRunCommand,
   messages.DeliverAgentTaskRunCommand,

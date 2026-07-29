@@ -56,12 +56,20 @@ export const createAgentTaskRunInputSchema = z
       .optional(),
     immutableReview: z.boolean().default(false),
     sourceRoot: z.string().trim().min(1).max(1_024).default("."),
+    nativeSessionCapable: z.boolean().default(false),
+    nativeAgentSessionRef: id.optional(),
   })
   .strict();
 
 export const showAgentTaskRunInputSchema = z.object({ workspaceId: id, taskRunId: id }).strict();
 export const listAgentTaskRunsInputSchema = z.object({ workspaceId: id, runtimeId: id }).strict();
 export const resumeAgentTaskRunInputSchema = showAgentTaskRunInputSchema;
+export const stopAgentTaskRunInputSchema = showAgentTaskRunInputSchema;
+export const steerAgentTaskRunInputSchema = showAgentTaskRunInputSchema
+  .extend({
+    instruction: z.string().trim().min(1).max(8_000),
+  })
+  .strict();
 export const cancelAgentTaskRunInputSchema = showAgentTaskRunInputSchema;
 export const approveAgentTaskRunInputSchema = showAgentTaskRunInputSchema;
 export const deliverAgentTaskRunInputSchema = showAgentTaskRunInputSchema
@@ -124,6 +132,18 @@ export class CreateAgentTaskRunCommand extends AgentTaskCommand {
 export class ResumeAgentTaskRunCommand extends AgentTaskCommand {
   static create(input: unknown) {
     return command(resumeAgentTaskRunInputSchema, input, (value) => new this(value));
+  }
+}
+
+export class StopAgentTaskRunCommand extends AgentTaskCommand {
+  static create(input: unknown) {
+    return command(stopAgentTaskRunInputSchema, input, (value) => new this(value));
+  }
+}
+
+export class SteerAgentTaskRunCommand extends AgentTaskCommand {
+  static create(input: unknown) {
+    return command(steerAgentTaskRunInputSchema, input, (value) => new this(value));
   }
 }
 

@@ -2788,6 +2788,158 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "github-agent.agent-profiles.create",
+    operationGroup: "github-agent",
+    operationMethod: "agentProfilesCreate",
+    facadePath: ["githubAgent", "agentProfiles", "create"],
+    operationId: "githubAgent.agentProfiles.create",
+    kind: "command",
+    domain: "github-agent",
+    messageName: "CreateAgentProfileCommand",
+    route: {
+      method: "POST",
+      path: "/github-agent/agent-profiles",
+    },
+    docsHref: "/docs/agents/github-agent-tasks/#github-agent-tasks",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "github-agent.agent-profiles.disable",
+    operationGroup: "github-agent",
+    operationMethod: "agentProfilesDisable",
+    facadePath: ["githubAgent", "agentProfiles", "disable"],
+    operationId: "githubAgent.agentProfiles.disable",
+    kind: "command",
+    domain: "github-agent",
+    messageName: "DisableAgentProfileCommand",
+    route: {
+      method: "POST",
+      path: "/github-agent/agent-profiles/{profileId}/disable",
+    },
+    docsHref: "/docs/agents/github-agent-tasks/#github-agent-tasks",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "github-agent.agent-profiles.list",
+    operationGroup: "github-agent",
+    operationMethod: "agentProfilesList",
+    facadePath: ["githubAgent", "agentProfiles", "list"],
+    operationId: "githubAgent.agentProfiles.list",
+    kind: "query",
+    domain: "github-agent",
+    messageName: "ListAgentProfilesQuery",
+    route: {
+      method: "GET",
+      path: "/github-agent/agent-profiles",
+    },
+    docsHref: "/docs/agents/github-agent-tasks/#github-agent-tasks",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "github-agent.automation-rules.create",
+    operationGroup: "github-agent",
+    operationMethod: "automationRulesCreate",
+    facadePath: ["githubAgent", "automationRules", "create"],
+    operationId: "githubAgent.automationRules.create",
+    kind: "command",
+    domain: "github-agent",
+    messageName: "CreateAutomationRuleCommand",
+    route: {
+      method: "POST",
+      path: "/github-agent/automation-rules",
+    },
+    docsHref: "/docs/agents/github-agent-tasks/#github-agent-tasks",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "github-agent.automation-rules.disable",
+    operationGroup: "github-agent",
+    operationMethod: "automationRulesDisable",
+    facadePath: ["githubAgent", "automationRules", "disable"],
+    operationId: "githubAgent.automationRules.disable",
+    kind: "command",
+    domain: "github-agent",
+    messageName: "DisableAutomationRuleCommand",
+    route: {
+      method: "POST",
+      path: "/github-agent/automation-rules/{ruleId}/disable",
+    },
+    docsHref: "/docs/agents/github-agent-tasks/#github-agent-tasks",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "github-agent.automation-rules.list",
+    operationGroup: "github-agent",
+    operationMethod: "automationRulesList",
+    facadePath: ["githubAgent", "automationRules", "list"],
+    operationId: "githubAgent.automationRules.list",
+    kind: "query",
+    domain: "github-agent",
+    messageName: "ListAutomationRulesQuery",
+    route: {
+      method: "GET",
+      path: "/github-agent/automation-rules",
+    },
+    docsHref: "/docs/agents/github-agent-tasks/#github-agent-tasks",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "github-agent.repository-bindings.create",
+    operationGroup: "github-agent",
+    operationMethod: "repositoryBindingsCreate",
+    facadePath: ["githubAgent", "repositoryBindings", "create"],
+    operationId: "githubAgent.repositoryBindings.create",
+    kind: "command",
+    domain: "github-agent",
+    messageName: "BindRepositoryCommand",
+    route: {
+      method: "POST",
+      path: "/github-agent/repository-bindings",
+    },
+    docsHref: "/docs/agents/github-agent-tasks/#github-agent-tasks",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "github-agent.repository-bindings.list",
+    operationGroup: "github-agent",
+    operationMethod: "repositoryBindingsList",
+    facadePath: ["githubAgent", "repositoryBindings", "list"],
+    operationId: "githubAgent.repositoryBindings.list",
+    kind: "query",
+    domain: "github-agent",
+    messageName: "ListRepositoryBindingsQuery",
+    route: {
+      method: "GET",
+      path: "/github-agent/repository-bindings",
+    },
+    docsHref: "/docs/agents/github-agent-tasks/#github-agent-tasks",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "operator-work.cancel",
     operationGroup: "operator-work",
     operationMethod: "cancel",
@@ -5057,6 +5209,44 @@ export const generatedSdkOperations = [
     route: {
       method: "GET",
       path: "/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}",
+    },
+    docsHref: "/docs/agents/workspaces/#agent-workspace",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agent-tasks.steer",
+    operationGroup: "sandboxes",
+    operationMethod: "agentTasksSteer",
+    facadePath: ["sandboxes", "agentTasks", "steer"],
+    operationId: "sandboxes.agentTasks.steer",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "SteerAgentTaskRunCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/steer",
+    },
+    docsHref: "/docs/agents/workspaces/#agent-workspace",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agent-tasks.stop",
+    operationGroup: "sandboxes",
+    operationMethod: "agentTasksStop",
+    facadePath: ["sandboxes", "agentTasks", "stop"],
+    operationId: "sandboxes.agentTasks.stop",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "StopAgentTaskRunCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/stop",
     },
     docsHref: "/docs/agents/workspaces/#agent-workspace",
     authPolicy: "product-session",
@@ -7760,6 +7950,22 @@ export interface GeneratedAppaloftClient {
     readonly unlock: AppaloftSdkFacadeMethod;
     readonly unsetVariable: AppaloftSdkFacadeMethod;
   };
+  readonly githubAgent: {
+    readonly agentProfiles: {
+      readonly create: AppaloftSdkFacadeMethod;
+      readonly disable: AppaloftSdkFacadeMethod;
+      readonly list: AppaloftSdkFacadeMethod;
+    };
+    readonly automationRules: {
+      readonly create: AppaloftSdkFacadeMethod;
+      readonly disable: AppaloftSdkFacadeMethod;
+      readonly list: AppaloftSdkFacadeMethod;
+    };
+    readonly repositoryBindings: {
+      readonly create: AppaloftSdkFacadeMethod;
+      readonly list: AppaloftSdkFacadeMethod;
+    };
+  };
   readonly operatorWork: {
     readonly cancel: AppaloftSdkFacadeMethod;
     readonly deadLetter: AppaloftSdkFacadeMethod;
@@ -7930,6 +8136,8 @@ export interface GeneratedAppaloftClient {
       readonly list: AppaloftSdkFacadeMethod;
       readonly resume: AppaloftSdkFacadeMethod;
       readonly show: AppaloftSdkFacadeMethod;
+      readonly steer: AppaloftSdkFacadeMethod;
+      readonly stop: AppaloftSdkFacadeMethod;
     };
     readonly candidatePreviews: {
       readonly create: AppaloftSdkFacadeMethod;

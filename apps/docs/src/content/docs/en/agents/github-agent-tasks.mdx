@@ -1,0 +1,73 @@
+---
+title: "GitHub-driven Agent Tasks"
+description: "Bind repositories, configure Automation Rules and Agent Profiles, and safely trigger Workspace Tasks."
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: complete
+searchAliases:
+  - "github agent"
+  - "automation rule"
+  - "agent profile"
+  - "repository binding"
+relatedOperations:
+  - "github-agent.repository-bindings.create"
+  - "github-agent.repository-bindings.list"
+  - "github-agent.automation-rules.create"
+  - "github-agent.automation-rules.list"
+  - "github-agent.automation-rules.disable"
+  - "github-agent.agent-profiles.create"
+  - "github-agent.agent-profiles.list"
+  - "github-agent.agent-profiles.disable"
+sidebar:
+  order: 7
+---
+
+## GitHub-driven Agent Tasks <a id="github-agent-tasks" />
+
+GitHub is the trigger and feedback adapter. The business execution object remains an Agent Task,
+and its isolated environment remains a Workspace/Sandbox. This capability does not create a second
+Task, Preview, or Deployment model.
+
+## Configuration order
+
+1. Install the GitHub App and bind the numeric GitHub repository ID to an Appaloft Project.
+2. Create an Agent Profile that references an installed Agent Adapter, Workspace Profile, Sandbox
+   Template, and Credential Connection.
+3. Create an Automation Rule with explicit event/action, actor policy, server pool, execution
+   limits, Preview policy, and pull request delivery policy.
+
+The CLI create and bind commands accept JSON input files containing non-sensitive references only.
+Do not place API keys, environment variables, or raw credentials in these files.
+
+```bash
+appaloft github-agent repository bind repository-binding.json
+appaloft github-agent profile create agent-profile.json
+appaloft github-agent rule create automation-rule.json
+```
+
+## Security boundary
+
+- Authorization keys use numeric GitHub IDs, never usernames.
+- Fork pull requests, external collaborators, unlinked identities, insufficient permissions, and
+  unavailable credentials fail closed.
+- Rejection happens before Workspace creation or secret injection.
+- Unattended rules use an explicit Project Automation Identity.
+- Review runs execute at most once per repository, pull request, head SHA, and rule.
+
+## Task control and feedback
+
+Acknowledgements, status comments, and Check Runs use bounded updates. `steer` and `resume` retain
+the stable Task ID and append a new Run lineage. Native resume is reported only when the installed
+adapter supports it and an opaque native session reference exists; otherwise Appaloft reports the
+fallback and provides the previous summary, diff, check results, and steering instruction to a new
+session.
+
+```bash
+appaloft workspace task stop <workspaceId> <taskRunId>
+appaloft workspace task steer <workspaceId> <taskRunId> --instruction "keep the API compatible"
+appaloft workspace task resume <workspaceId> <taskRunId>
+```
+
+Raw Credential Connection secrets are not exposed in GitHub comments, logs, database plaintext, or
+test/Preview processes. `existing-server-config` requires an owner-scoped home directory.

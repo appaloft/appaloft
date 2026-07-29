@@ -862,6 +862,8 @@ export type AppaloftOrpcClientContract = {
           };
           immutableReview: boolean;
           sourceRoot: string;
+          nativeSessionCapable?: boolean;
+          nativeAgentSessionRef?: string;
         },
         SandboxOperationResponse,
         AppaloftClientError
@@ -881,6 +883,18 @@ export type AppaloftOrpcClientContract = {
       resume: Client<
         AppaloftClientContext,
         SandboxAgentTaskInput,
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+      stop: Client<
+        AppaloftClientContext,
+        SandboxAgentTaskInput,
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+      steer: Client<
+        AppaloftClientContext,
+        SandboxAgentTaskInput & { instruction: string },
         SandboxOperationResponse,
         AppaloftClientError
       >;

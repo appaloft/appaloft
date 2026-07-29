@@ -17,6 +17,7 @@ import { dnsCommand } from "./dns.js";
 import { domainBindingCommand } from "./domain-binding.js";
 import { domainEventCommand } from "./domain-event.js";
 import { envCommand } from "./environment.js";
+import { githubAgentCommand } from "./github-agent.js";
 import { infrastructureCommand } from "./infrastructure.js";
 import { instanceCommand } from "./instance.js";
 import { githubCommand, pluginsCommand, providersCommand } from "./integrations.js";
@@ -102,5 +103,6 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
     pluginsCommand,
     providersCommand,
     githubCommand,
+    githubAgentCommand,
   ]),
 );

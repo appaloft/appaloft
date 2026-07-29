@@ -14,13 +14,17 @@ const runtimeId = "sar_task";
 const taskRunId = "srun_task";
 const now = "2026-07-23T00:00:00.000Z";
 
-function runDescriptor(status: string): SandboxAgentRunDescriptor {
+function runDescriptor(
+  status: string,
+  runId = taskRunId,
+  context: SandboxAgentRunDescriptor["context"] = { mode: "fresh" },
+): SandboxAgentRunDescriptor {
   return {
-    runId: taskRunId,
+    runId,
     runtimeId,
     sandboxId: workspaceId,
     status,
-    context: { mode: "fresh" },
+    context,
     createdAt: now,
   };
 }
@@ -40,22 +44,45 @@ function foreground(
 }
 
 function createHarness(
-  input: { stateProtector?: AgentTaskRunDependencies["stateProtector"] } = {},
+  options: {
+    stateProtector?: AgentTaskRunDependencies["stateProtector"];
+    existingPullRequest?: boolean;
+  } = {},
 ) {
   const files = new Map<string, Uint8Array>();
   const queued: Array<{ kind: string; id: string; workspaceId: string }> = [];
   const commands: string[][] = [];
+  const createdRunInputs: Array<{
+    task: string;
+    context: { mode: "fresh" } | { mode: "continue"; parentRunId: string };
+    idempotencyKey: string;
+  }> = [];
   let runStatus = "running";
+  let activeRunId = taskRunId;
+  let activeRunContext: SandboxAgentRunDescriptor["context"] = { mode: "fresh" };
+  let runSequence = 0;
   let exposureRevoked = false;
   let processTerminated = false;
   const service = new AgentTaskRunService({
     agents: {
-      createRun: async () => ok(runDescriptor(runStatus)),
-      listRuns: async () => ok({ items: [runDescriptor(runStatus)] }),
-      showRun: async () => ok(runDescriptor(runStatus)),
+      createRun: async (_context, runInput) => {
+        createdRunInputs.push({
+          task: runInput.task,
+          context: runInput.context,
+          idempotencyKey: runInput.idempotencyKey,
+        });
+        activeRunId = runSequence === 0 ? taskRunId : `${taskRunId}_${runSequence + 1}`;
+        runSequence += 1;
+        activeRunContext = runInput.context;
+        runStatus = "running";
+        return ok(runDescriptor(runStatus, activeRunId, activeRunContext));
+      },
+      listRuns: async () =>
+        ok({ items: [runDescriptor(runStatus, activeRunId, activeRunContext)] }),
+      showRun: async () => ok(runDescriptor(runStatus, activeRunId, activeRunContext)),
       cancelRun: async () => {
         runStatus = "cancelled";
-        return ok(runDescriptor(runStatus));
+        return ok(runDescriptor(runStatus, activeRunId, activeRunContext));
       },
       createSourceArtifact: async () =>
         ok({
@@ -113,7 +140,9 @@ function createHarness(
           return ok(foreground(0, { stdout: `${"b".repeat(40)}\n` }));
         }
         if (command.includes("gh pr view")) {
-          return ok(foreground(1, { stderr: "no pull request" }));
+          return options.existingPullRequest
+            ? ok(foreground(0, { stdout: "https://github.com/acme/web/pull/42\n" }))
+            : ok(foreground(1, { stderr: "no pull request" }));
         }
         if (command.includes("gh pr create")) {
           return ok(foreground(0, { stdout: "https://github.com/acme/web/pull/42\n" }));
@@ -154,7 +183,7 @@ function createHarness(
     integrationAuth: {
       getProviderAccessToken: async () => "github-scoped-test-token",
     },
-    stateProtector: input.stateProtector ?? new TestControlPlaneSecretProtector(),
+    stateProtector: options.stateProtector ?? new TestControlPlaneSecretProtector(),
     clock: { now: () => now },
   });
   return {
@@ -162,6 +191,7 @@ function createHarness(
     files,
     queued,
     commands,
+    createdRunInputs,
     setRunStatus: (status: string) => {
       runStatus = status;
     },
@@ -351,6 +381,38 @@ describe("Agent Task Run application workflow", () => {
     });
   });
 
+  test("[AGENT-TASK-PR-008][GH-AUTO-FIX-014] updates a Task-owned pull request when the delivery branch already has one", async () => {
+    const harness = createHarness({ existingPullRequest: true });
+    await harness.service.create(cliContext, {
+      workspaceId,
+      runtimeId,
+      task: "Implement issue #123",
+      runContext: { mode: "fresh" },
+      idempotencyKey: "task-create-existing-pr",
+      checks: [],
+      immutableReview: false,
+      sourceRoot: ".",
+    });
+    harness.setRunStatus("completed");
+    await harness.service.reconcile(cliContext, workspaceId, taskRunId);
+    await harness.service.approve(userContext, workspaceId, taskRunId);
+    const delivered = await harness.service.deliver(userContext, workspaceId, taskRunId, {
+      branch: "agent/issue-123",
+      commitMessage: "fix: implement issue 123",
+      remote: "origin",
+      pullRequest: {
+        provider: "github",
+        title: "Fix issue #123",
+        body: "Updated checks and preview evidence.",
+        base: "main",
+      },
+    });
+
+    expect(delivered.isOk()).toBe(true);
+    expect(harness.commands.some((argv) => argv.includes("edit"))).toBe(true);
+    expect(harness.commands.some((argv) => argv.includes("create"))).toBe(false);
+  });
+
   test("[AGENT-TASK-CANCEL-009] cancels the active Agent Run and exact preview resources", async () => {
     const harness = createHarness();
     await harness.service.create(cliContext, {
@@ -367,6 +429,90 @@ describe("Agent Task Run application workflow", () => {
     expect(cancelled.isOk() && cancelled.value.status).toBe("cancelled");
     expect(harness.wasExposureRevoked()).toBe(false);
     expect(harness.wasProcessTerminated()).toBe(false);
+  });
+
+  test("[GH-AUTO-CONTROL-010][GH-AUTO-SESSION-011] stop and native resume preserve the Task and append a Run", async () => {
+    const harness = createHarness();
+    const created = await harness.service.create(cliContext, {
+      workspaceId,
+      runtimeId,
+      task: "Implement issue #123",
+      runContext: { mode: "fresh" },
+      idempotencyKey: "task-native-resume",
+      checks: [],
+      immutableReview: false,
+      sourceRoot: ".",
+      nativeSessionCapable: true,
+      nativeAgentSessionRef: "native-session-opaque",
+    });
+    expect(created._unsafeUnwrap()).toMatchObject({
+      taskRunId,
+      activeRunId: taskRunId,
+      sessionRecovery: "new",
+    });
+
+    const stopped = await harness.service.stop(cliContext, workspaceId, taskRunId);
+    expect(stopped._unsafeUnwrap()).toMatchObject({
+      taskRunId,
+      activeRunId: taskRunId,
+      status: "stopped",
+    });
+
+    const resumed = await harness.service.resume(cliContext, workspaceId, taskRunId);
+    expect(resumed._unsafeUnwrap()).toMatchObject({
+      taskRunId,
+      activeRunId: `${taskRunId}_2`,
+      runId: `${taskRunId}_2`,
+      status: "running",
+      sessionRecovery: "native",
+    });
+    expect(resumed._unsafeUnwrap().runLineage).toHaveLength(2);
+    expect(harness.createdRunInputs[1]).toMatchObject({
+      context: { mode: "continue", parentRunId: taskRunId },
+    });
+  });
+
+  test("[GH-AUTO-SESSION-011] fallback steer injects bounded evidence and rejects credential references", async () => {
+    const harness = createHarness();
+    await harness.service.create(cliContext, {
+      workspaceId,
+      runtimeId,
+      task: "Implement issue #123",
+      runContext: { mode: "fresh" },
+      idempotencyKey: "task-fallback-steer",
+      checks: [],
+      immutableReview: false,
+      sourceRoot: ".",
+    });
+
+    const steered = await harness.service.steer(
+      cliContext,
+      workspaceId,
+      taskRunId,
+      "keep the existing API compatible",
+    );
+    expect(steered._unsafeUnwrap()).toMatchObject({
+      taskRunId,
+      activeRunId: `${taskRunId}_2`,
+      sessionRecovery: "fallback",
+      steerHistory: [
+        {
+          instruction: "keep the existing API compatible",
+          runId: `${taskRunId}_2`,
+        },
+      ],
+    });
+    expect(harness.createdRunInputs[1]?.task).toContain("cannot prove native session resume");
+    expect(harness.createdRunInputs[1]?.task).toContain("keep the existing API compatible");
+
+    const rejected = await harness.service.steer(
+      cliContext,
+      workspaceId,
+      taskRunId,
+      "use credentialId=conn_private",
+    );
+    expect(rejected.isErr()).toBe(true);
+    expect(harness.createdRunInputs).toHaveLength(2);
   });
 
   test("[AGENT-TASK-RUN-001] cancels the Agent Run when initial protected state cannot persist", async () => {

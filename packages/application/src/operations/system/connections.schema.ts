@@ -48,6 +48,7 @@ export const listConnectionsQueryInputSchema = z
         "identity",
         "observability",
         "storage",
+        "agent",
       ])
       .optional(),
   })

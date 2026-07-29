@@ -3,6 +3,12 @@ import {
   appaloftTraceAttributes,
   createAdapterSpanName,
   type ExecutionContext,
+  type GitHubAgentFeedbackPort,
+  type GitHubAgentFeedbackState,
+  type GitHubAgentReviewDeliveryPort,
+  type GitHubAgentReviewDeliveryResult,
+  type GitHubAgentTaskSummary,
+  type GitHubAgentTrigger,
   type GitHubAppInstallationReadback,
   type GitHubAppInstallationToken,
   type GitHubAppRuntime,
@@ -22,6 +28,7 @@ import {
   type SourceEventChangedPathResolution,
   type SourceEventChangedPathResolver,
   type SourceEventChangedPathResolverInput,
+  type VerifiedSourceEventInput,
 } from "@appaloft/application";
 import { domainError, err, ok, type Result } from "@appaloft/core";
 
@@ -1467,6 +1474,842 @@ export function createGitHubPreviewFeedbackWriter(
   apiBaseUrl?: string,
 ): PreviewFeedbackWriter {
   return new GitHubPreviewCompositeFeedbackWriter(accessToken, fetcher, apiBaseUrl);
+}
+
+export type AppaloftGitHubCommand =
+  | { kind: "fix"; instruction?: string }
+  | { kind: "review"; instruction?: string }
+  | { kind: "status" }
+  | { kind: "steer"; instruction: string }
+  | { kind: "stop" }
+  | { kind: "resume" }
+  | { kind: "new"; profile: string };
+
+export type GitHubAgentEventName =
+  | "issue_comment"
+  | "pull_request_review_comment"
+  | "issues"
+  | "pull_request";
+
+export type GitHubAgentEventAction =
+  | "created"
+  | "labeled"
+  | "ready_for_review"
+  | "synchronize"
+  | "closed";
+
+export interface GitHubAgentWebhookInput {
+  eventName: string;
+  deliveryId: string;
+  rawBody: string;
+  signature: string;
+  secretValue: string;
+  receivedAt?: string;
+}
+
+export interface NormalizedGitHubAgentEvent {
+  provider: "github";
+  event: GitHubAgentEventName;
+  action: GitHubAgentEventAction;
+  deliveryId: string;
+  installationId: string;
+  repository: {
+    id: string;
+    fullName: string;
+    ownerId?: string;
+    private?: boolean;
+    defaultBranch?: string;
+  };
+  sender: {
+    id: string;
+    loginSnapshot?: string;
+    typeSnapshot?: string;
+  };
+  thread: {
+    kind: "issue" | "pull-request";
+    number: number;
+  };
+  comment?: {
+    id: string;
+    command?: AppaloftGitHubCommand;
+    path?: string;
+    line?: number;
+  };
+  label?: {
+    id?: string;
+    name: string;
+  };
+  pullRequest?: {
+    number: number;
+    headSha: string;
+    baseRef: string;
+    headRepositoryId: string;
+    headRepositoryFullName: string;
+    fork: boolean;
+  };
+  receivedAt?: string;
+}
+
+const appaloftCommandPrefix = "@appaloft";
+const appaloftCommandInstructionLimit = 4_096;
+const githubCommentBodyLimit = 65_536;
+const sensitiveCommandText =
+  /(?:\b(?:api[_-]?key|password|private[_-]?key|secret|token|credential(?:connection)?id)\b\s*[:=]|\b[A-Z][A-Z0-9_]{2,}\s*=|\b(?:ghp_|github_pat_|xox[baprs]-|sk-[A-Za-z0-9_-]{12,}))/iu;
+const credentialSelectionText =
+  /(?:--(?:credential|api-key|env|environment|model)\b|\b(?:credential|connection)[_-]?(?:id|ref)\b)/iu;
+const profileSlug = /^[a-z0-9](?:[a-z0-9.-]{0,78}[a-z0-9])?$/u;
+
+export function parseAppaloftGitHubCommand(body: string): Result<AppaloftGitHubCommand> {
+  if (body.length > githubCommentBodyLimit) {
+    return err(domainError.validation("GitHub command body is too long"));
+  }
+
+  const withoutFencedCode = body.replace(/```[\s\S]*?```/gu, "");
+  const commandLines = withoutFencedCode
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line.toLowerCase().startsWith(`${appaloftCommandPrefix} `));
+
+  if (commandLines.length !== 1) {
+    return err(
+      domainError.validation(
+        commandLines.length === 0
+          ? "GitHub comment does not contain one Appaloft command"
+          : "GitHub comment must contain exactly one Appaloft command",
+      ),
+    );
+  }
+
+  const commandLine = commandLines[0] ?? "";
+  if (sensitiveCommandText.test(commandLine) || credentialSelectionText.test(commandLine)) {
+    return err(
+      domainError.validation(
+        "GitHub commands cannot contain credentials, secret material, or environment assignments",
+      ),
+    );
+  }
+
+  const commandText = commandLine.slice(appaloftCommandPrefix.length).trim();
+  const separator = commandText.search(/\s/u);
+  const verb = (separator === -1 ? commandText : commandText.slice(0, separator)).toLowerCase();
+  const rest = separator === -1 ? "" : commandText.slice(separator).trim();
+  if (rest.length > appaloftCommandInstructionLimit) {
+    return err(domainError.validation("GitHub command instruction is too long"));
+  }
+
+  switch (verb) {
+    case "fix":
+    case "review":
+      if (rest.startsWith("--")) {
+        return err(domainError.validation(`@appaloft ${verb} does not accept flags`));
+      }
+      return ok(rest ? { kind: verb, instruction: rest } : { kind: verb });
+    case "steer":
+      return rest
+        ? ok({ kind: "steer", instruction: rest })
+        : err(domainError.validation("@appaloft steer requires an instruction"));
+    case "status":
+    case "stop":
+    case "resume":
+      return rest
+        ? err(domainError.validation(`@appaloft ${verb} does not accept arguments`))
+        : ok({ kind: verb });
+    case "new": {
+      const match = /^--profile\s+([a-z0-9.-]+)$/u.exec(rest);
+      if (!match?.[1] || !profileSlug.test(match[1])) {
+        return err(
+          domainError.validation("@appaloft new requires exactly --profile <allowed-profile-slug>"),
+        );
+      }
+      return ok({ kind: "new", profile: match[1] });
+    }
+    default:
+      return err(
+        domainError.validation(`Unsupported Appaloft GitHub command ${verb || "(empty)"}`),
+      );
+  }
+}
+
+export async function verifyAndNormalizeGitHubAgentWebhook(
+  input: GitHubAgentWebhookInput,
+): Promise<Result<NormalizedGitHubAgentEvent>> {
+  const expectedSignature = await hmacSha256Hex(input.secretValue, input.rawBody);
+  const suppliedSignature = normalizeSha256Signature(input.signature);
+  if (!suppliedSignature || !constantTimeEqualHex(expectedSignature, suppliedSignature)) {
+    return err(
+      domainError.sourceEventSignatureInvalid("GitHub Agent webhook signature is invalid", {
+        phase: "github-agent-webhook-verification",
+        sourceKind: "github",
+        eventKind: input.eventName,
+        deliveryId: input.deliveryId,
+      }),
+    );
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(input.rawBody);
+  } catch {
+    return err(domainError.validation("GitHub Agent webhook body must be valid JSON"));
+  }
+
+  const payload = objectRecord(parsed);
+  if (!payload) {
+    return err(domainError.validation("GitHub Agent webhook body must be an object"));
+  }
+
+  const event = githubAgentEventName(input.eventName);
+  const action = githubAgentEventAction(event, payload.action);
+  const deliveryId = boundedText(input.deliveryId, 256);
+  const installation = objectRecord(payload.installation);
+  const repository = objectRecord(payload.repository);
+  const sender = objectRecord(payload.sender);
+  const installationId = positiveNumericId(installation?.id);
+  const repositoryId = positiveNumericId(repository?.id);
+  const repositoryFullName = boundedText(repository?.full_name, 512);
+  const senderId = positiveNumericId(sender?.id);
+
+  if (
+    !event ||
+    !action ||
+    !deliveryId ||
+    !repository ||
+    !sender ||
+    !installationId ||
+    !repositoryId ||
+    !repositoryFullName ||
+    !senderId
+  ) {
+    return err(
+      domainError.validation(
+        "GitHub Agent webhook is missing a supported action or required numeric identity",
+      ),
+    );
+  }
+  const repositoryPayload = repository;
+  const senderPayload = sender;
+
+  const thread = githubAgentThread(event, payload);
+  if (!thread) {
+    return err(domainError.validation("GitHub Agent webhook thread is invalid"));
+  }
+
+  const pullRequest = githubAgentPullRequest(event, payload, repositoryId, repositoryFullName);
+  if (pullRequest.isErr()) {
+    return err(pullRequest.error);
+  }
+
+  const comment = githubAgentComment(event, payload);
+  if (comment.isErr()) {
+    return err(comment.error);
+  }
+
+  const label = githubAgentLabel(event, payload);
+  if (label.isErr()) {
+    return err(label.error);
+  }
+
+  const owner = objectRecord(repositoryPayload.owner);
+  const ownerId = positiveNumericId(owner?.id);
+  const defaultBranch = boundedText(repositoryPayload.default_branch, 512);
+  const loginSnapshot = boundedText(senderPayload.login, 160);
+  const typeSnapshot = boundedText(senderPayload.type, 80);
+  return ok({
+    provider: "github",
+    event,
+    action,
+    deliveryId,
+    installationId,
+    repository: {
+      id: repositoryId,
+      fullName: repositoryFullName,
+      ...(ownerId ? { ownerId } : {}),
+      ...(typeof repositoryPayload.private === "boolean"
+        ? { private: repositoryPayload.private }
+        : {}),
+      ...(defaultBranch ? { defaultBranch } : {}),
+    },
+    sender: {
+      id: senderId,
+      ...(loginSnapshot ? { loginSnapshot } : {}),
+      ...(typeSnapshot ? { typeSnapshot } : {}),
+    },
+    thread,
+    ...(comment.value ? { comment: comment.value } : {}),
+    ...(label.value ? { label: label.value } : {}),
+    ...(pullRequest.value ? { pullRequest: pullRequest.value } : {}),
+    ...(input.receivedAt ? { receivedAt: input.receivedAt } : {}),
+  });
+}
+
+export function githubAgentSourceEventInput(
+  event: NormalizedGitHubAgentEvent,
+): VerifiedSourceEventInput {
+  const eventKind = `${event.event}.${event.action}` as VerifiedSourceEventInput["eventKind"];
+  const ref =
+    event.thread.kind === "pull-request"
+      ? `refs/pull/${event.thread.number}/head`
+      : `refs/issues/${event.thread.number}`;
+  const revision =
+    event.pullRequest?.headSha ??
+    event.comment?.id ??
+    event.label?.id ??
+    `${event.event}:${event.action}:${event.thread.number}`;
+  return {
+    sourceKind: "github",
+    eventKind,
+    sourceIdentity: {
+      locator: `https://github.com/${event.repository.fullName}`,
+      providerRepositoryId: event.repository.id,
+      repositoryFullName: event.repository.fullName,
+    },
+    ref,
+    revision,
+    deliveryId: event.deliveryId,
+    idempotencyKey: `github-delivery:${event.deliveryId}`,
+    verification: {
+      status: "verified",
+      method: "provider-signature",
+    },
+    ...(event.receivedAt ? { receivedAt: event.receivedAt } : {}),
+  };
+}
+
+export function githubAgentTriggerFromSourceEvent(
+  event: NormalizedGitHubAgentEvent,
+  sourceEventId: string,
+): GitHubAgentTrigger {
+  return {
+    provider: "github",
+    sourceEventId,
+    event: event.event,
+    action: event.action,
+    deliveryId: event.deliveryId,
+    installationId: event.installationId,
+    repository: {
+      id: event.repository.id,
+      fullName: event.repository.fullName,
+    },
+    sender: { ...event.sender },
+    thread: { ...event.thread },
+    ...(event.comment?.id ? { commentId: event.comment.id } : {}),
+    ...(event.comment?.command ? { command: event.comment.command } : {}),
+    ...(event.label ? { label: { ...event.label } } : {}),
+    ...(event.pullRequest ? { pullRequest: { ...event.pullRequest } } : {}),
+    ...(event.receivedAt ? { receivedAt: event.receivedAt } : {}),
+  };
+}
+
+export class GitHubAgentTaskFeedbackAdapter implements GitHubAgentFeedbackPort {
+  constructor(
+    private readonly accessToken: string,
+    private readonly fetcher: typeof fetch = fetch,
+    private readonly apiBaseUrl = "https://api.github.com",
+  ) {}
+
+  async acknowledge(
+    _context: ExecutionContext,
+    input: { trigger: GitHubAgentTrigger; existing?: GitHubAgentFeedbackState },
+  ): Promise<Result<GitHubAgentFeedbackState>> {
+    if (input.existing?.reactionId || !input.trigger.commentId) {
+      return ok({ ...(input.existing ?? {}) });
+    }
+    const id = await this.requestId(
+      input.trigger,
+      `/issues/comments/${encodeURIComponent(input.trigger.commentId)}/reactions`,
+      "POST",
+      { content: "eyes" },
+      "GitHub Agent acknowledgement",
+    );
+    return id.isErr() ? err(id.error) : ok({ ...(input.existing ?? {}), reactionId: id.value });
+  }
+
+  async update(
+    _context: ExecutionContext,
+    input: {
+      trigger: GitHubAgentTrigger;
+      task: GitHubAgentTaskSummary;
+      existing?: GitHubAgentFeedbackState;
+    },
+  ): Promise<Result<GitHubAgentFeedbackState>> {
+    const existing = input.existing ?? {};
+    const commentId = await this.requestId(
+      input.trigger,
+      existing.statusCommentId
+        ? `/issues/comments/${encodeURIComponent(existing.statusCommentId)}`
+        : `/issues/${input.trigger.thread.number}/comments`,
+      existing.statusCommentId ? "PATCH" : "POST",
+      { body: githubAgentStatusBody(input.task) },
+      "GitHub Agent status comment",
+      existing.statusCommentId,
+    );
+    if (commentId.isErr()) return err(commentId.error);
+
+    let checkRunId = existing.checkRunId;
+    if (input.trigger.pullRequest) {
+      const check = githubAgentCheckRun(input.task, input.trigger.pullRequest.headSha);
+      const { head_sha: _headSha, ...checkUpdate } = check;
+      const checkId = await this.requestId(
+        input.trigger,
+        existing.checkRunId
+          ? `/check-runs/${encodeURIComponent(existing.checkRunId)}`
+          : "/check-runs",
+        existing.checkRunId ? "PATCH" : "POST",
+        existing.checkRunId ? checkUpdate : check,
+        "GitHub Agent Check Run",
+        existing.checkRunId,
+      );
+      if (checkId.isErr()) return err(checkId.error);
+      checkRunId = checkId.value;
+    }
+    return ok({
+      ...existing,
+      statusCommentId: commentId.value,
+      ...(checkRunId ? { checkRunId } : {}),
+    });
+  }
+
+  async reject(
+    _context: ExecutionContext,
+    input: {
+      trigger: GitHubAgentTrigger;
+      reasonCode: string;
+      message: string;
+      connectAgentUrl?: string;
+      existing?: GitHubAgentFeedbackState;
+    },
+  ): Promise<Result<GitHubAgentFeedbackState>> {
+    const existing = input.existing ?? {};
+    const action = input.connectAgentUrl ? `\n\n[Connect Agent](${input.connectAgentUrl})` : "";
+    const body = boundedText(
+      `Appaloft did not start a Task.\n\nReason: ${input.message}\n\nCode: \`${input.reasonCode}\`${action}`,
+      8_000,
+    );
+    if (!body) return err(domainError.validation("GitHub Agent rejection body is invalid"));
+    const commentId = await this.requestId(
+      input.trigger,
+      existing.statusCommentId
+        ? `/issues/comments/${encodeURIComponent(existing.statusCommentId)}`
+        : `/issues/${input.trigger.thread.number}/comments`,
+      existing.statusCommentId ? "PATCH" : "POST",
+      { body },
+      "GitHub Agent rejection comment",
+      existing.statusCommentId,
+    );
+    return commentId.isErr()
+      ? err(commentId.error)
+      : ok({ ...existing, statusCommentId: commentId.value });
+  }
+
+  private async requestId(
+    trigger: GitHubAgentTrigger,
+    repositoryPath: string,
+    method: "POST" | "PATCH",
+    body: Record<string, unknown>,
+    operation: string,
+    fallbackId?: string,
+  ): Promise<Result<string>> {
+    const repository = parseRepositoryFullName(trigger.repository.fullName);
+    if (!repository) return err(domainError.validation("GitHub repository full name is invalid"));
+    const response = await this.fetcher(
+      gitHubApiUrl(
+        this.apiBaseUrl,
+        `/repos/${repository.owner}/${repository.name}${repositoryPath}`,
+      ),
+      {
+        method,
+        headers: githubJsonHeaders(this.accessToken),
+        body: JSON.stringify(body),
+      },
+    );
+    if (!response.ok) {
+      return err(
+        domainError.provider(
+          `${operation} request failed`,
+          {
+            phase: "github-agent-feedback",
+            provider: "github",
+            statusCode: response.status,
+          },
+          isRetryableGitHubStatus(response.status),
+        ),
+      );
+    }
+    const payload = objectRecord(await response.json().catch(() => null));
+    const id =
+      typeof payload?.id === "number" || typeof payload?.id === "string"
+        ? String(payload.id)
+        : fallbackId;
+    return id
+      ? ok(id)
+      : err(
+          domainError.provider(`${operation} response did not include an id`, {
+            phase: "github-agent-feedback",
+            provider: "github",
+          }),
+        );
+  }
+}
+
+export class GitHubAgentReviewDeliveryAdapter implements GitHubAgentReviewDeliveryPort {
+  constructor(
+    private readonly accessToken: string,
+    private readonly fetcher: typeof fetch = fetch,
+    private readonly apiBaseUrl = "https://api.github.com",
+  ) {}
+
+  async submit(
+    _context: ExecutionContext,
+    input: Parameters<GitHubAgentReviewDeliveryPort["submit"]>[1],
+  ): Promise<Result<GitHubAgentReviewDeliveryResult>> {
+    const repository = parseRepositoryFullName(input.trigger.repository.fullName);
+    const pullRequest = input.trigger.pullRequest;
+    if (!repository || !pullRequest || input.trigger.thread.kind !== "pull-request") {
+      return err(domainError.validation("GitHub Review delivery requires a pull request trigger"));
+    }
+    if (
+      !/^[A-Za-z0-9._:-]{8,128}$/u.test(input.contentDigest) ||
+      input.expectedHeadSha !== pullRequest.headSha ||
+      input.findings.length > 50
+    ) {
+      return err(domainError.validation("GitHub Review delivery input is invalid or stale"));
+    }
+    const summary = boundedText(input.summary, 32_000);
+    if (!summary || sensitiveCommandText.test(summary)) {
+      return err(domainError.validation("GitHub Review summary is invalid or contains secrets"));
+    }
+    const comments: Array<Record<string, unknown>> = [];
+    for (const finding of input.findings) {
+      const path = boundedText(finding.path, 1_024);
+      const body = boundedText(finding.body, 4_000);
+      if (
+        !path ||
+        path.startsWith("/") ||
+        path.split("/").includes("..") ||
+        !body ||
+        sensitiveCommandText.test(body) ||
+        !Number.isSafeInteger(finding.line) ||
+        finding.line < 1
+      ) {
+        return err(domainError.validation("GitHub Review finding is invalid or contains secrets"));
+      }
+      comments.push({
+        path,
+        line: finding.line,
+        side: "RIGHT",
+        body: `[${finding.severity}] ${body}`,
+      });
+    }
+
+    const basePath = `/repos/${repository.owner}/${repository.name}`;
+    const current = await this.request(
+      `${basePath}/pulls/${pullRequest.number}`,
+      "GET",
+      undefined,
+      "GitHub pull request head readback",
+    );
+    if (current.isErr()) return err(current.error);
+    const currentHead = objectRecord(objectRecord(current.value)?.head)?.sha;
+    if (currentHead !== input.expectedHeadSha) {
+      return err(
+        domainError.conflict("GitHub pull request head changed before Review delivery", {
+          phase: "github-agent-review-head-reconciliation",
+          expectedHeadSha: input.expectedHeadSha,
+          observedHeadSha: typeof currentHead === "string" ? currentHead : "unavailable",
+        }),
+      );
+    }
+
+    const marker = `<!-- appaloft-agent-review:${input.contentDigest} -->`;
+    const reviews = await this.request(
+      `${basePath}/pulls/${pullRequest.number}/reviews?per_page=100`,
+      "GET",
+      undefined,
+      "GitHub Review dedupe readback",
+    );
+    if (reviews.isErr()) return err(reviews.error);
+    if (Array.isArray(reviews.value)) {
+      for (const value of reviews.value) {
+        const review = objectRecord(value);
+        if (
+          review?.commit_id === input.expectedHeadSha &&
+          typeof review.body === "string" &&
+          review.body.includes(marker)
+        ) {
+          const reviewId = review.id;
+          if (typeof reviewId === "string" || typeof reviewId === "number") {
+            return ok({
+              reviewId: String(reviewId),
+              ...(typeof review.html_url === "string" ? { reviewUrl: review.html_url } : {}),
+              duplicate: true,
+            });
+          }
+        }
+      }
+    }
+
+    const created = await this.request(
+      `${basePath}/pulls/${pullRequest.number}/reviews`,
+      "POST",
+      {
+        commit_id: input.expectedHeadSha,
+        event: "COMMENT",
+        body: `${marker}\n${summary}`,
+        comments,
+      },
+      "GitHub Review delivery",
+    );
+    if (created.isErr()) return err(created.error);
+    const payload = objectRecord(created.value);
+    const reviewId = payload?.id;
+    if (typeof reviewId !== "string" && typeof reviewId !== "number") {
+      return err(domainError.provider("GitHub Review response did not include an id"));
+    }
+    return ok({
+      reviewId: String(reviewId),
+      ...(typeof payload?.html_url === "string" ? { reviewUrl: payload.html_url } : {}),
+      duplicate: false,
+    });
+  }
+
+  private async request(
+    path: string,
+    method: "GET" | "POST",
+    body: Record<string, unknown> | undefined,
+    operation: string,
+  ): Promise<Result<unknown>> {
+    const response = await this.fetcher(gitHubApiUrl(this.apiBaseUrl, path), {
+      method,
+      headers: githubJsonHeaders(this.accessToken),
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    if (!response.ok) {
+      return err(
+        domainError.provider(
+          `${operation} request failed`,
+          {
+            phase: "github-agent-review-delivery",
+            provider: "github",
+            statusCode: response.status,
+          },
+          isRetryableGitHubStatus(response.status),
+        ),
+      );
+    }
+    return ok(await response.json().catch(() => null));
+  }
+}
+
+export function createGitHubAgentReviewDeliveryAdapter(
+  accessToken: string,
+  fetcher: typeof fetch = fetch,
+  apiBaseUrl = "https://api.github.com",
+): GitHubAgentReviewDeliveryAdapter {
+  return new GitHubAgentReviewDeliveryAdapter(accessToken, fetcher, apiBaseUrl);
+}
+
+function githubAgentStatusBody(task: GitHubAgentTaskSummary): string {
+  return [
+    "<!-- appaloft-agent-task-status -->",
+    `Appaloft Agent Task: **${task.status}**`,
+    "",
+    `[Open Task](${task.taskUrl})`,
+    `Session recovery: \`${task.sessionRecovery}\``,
+  ].join("\n");
+}
+
+function githubAgentCheckRun(
+  task: GitHubAgentTaskSummary,
+  headSha: string,
+): Record<string, unknown> {
+  if (task.status === "queued") {
+    return {
+      name: "Appaloft Agent Task",
+      head_sha: headSha,
+      status: "queued",
+      details_url: task.taskUrl,
+      output: { title: "Task queued", summary: githubAgentStatusBody(task) },
+    };
+  }
+  if (task.status === "running") {
+    return {
+      name: "Appaloft Agent Task",
+      head_sha: headSha,
+      status: "in_progress",
+      details_url: task.taskUrl,
+      output: { title: "Task running", summary: githubAgentStatusBody(task) },
+    };
+  }
+  const conclusion =
+    task.status === "completed"
+      ? "success"
+      : task.status === "failed"
+        ? "failure"
+        : task.status === "needs-reconciliation"
+          ? "action_required"
+          : "neutral";
+  return {
+    name: "Appaloft Agent Task",
+    head_sha: headSha,
+    status: "completed",
+    conclusion,
+    details_url: task.taskUrl,
+    output: { title: `Task ${task.status}`, summary: githubAgentStatusBody(task) },
+  };
+}
+
+export function createGitHubAgentTaskFeedbackAdapter(
+  accessToken: string,
+  fetcher: typeof fetch = fetch,
+  apiBaseUrl = "https://api.github.com",
+): GitHubAgentTaskFeedbackAdapter {
+  return new GitHubAgentTaskFeedbackAdapter(accessToken, fetcher, apiBaseUrl);
+}
+
+function githubAgentEventName(value: string): GitHubAgentEventName | null {
+  return value === "issue_comment" ||
+    value === "pull_request_review_comment" ||
+    value === "issues" ||
+    value === "pull_request"
+    ? value
+    : null;
+}
+
+function githubAgentEventAction(
+  event: GitHubAgentEventName | null,
+  value: unknown,
+): GitHubAgentEventAction | null {
+  if (!event || typeof value !== "string") return null;
+  if (
+    (event === "issue_comment" || event === "pull_request_review_comment") &&
+    value === "created"
+  ) {
+    return value;
+  }
+  if ((event === "issues" || event === "pull_request") && value === "labeled") return value;
+  if (
+    event === "pull_request" &&
+    (value === "ready_for_review" || value === "synchronize" || value === "closed")
+  ) {
+    return value;
+  }
+  return null;
+}
+
+function githubAgentThread(
+  event: GitHubAgentEventName,
+  payload: Record<string, unknown>,
+): NormalizedGitHubAgentEvent["thread"] | null {
+  if (event === "pull_request" || event === "pull_request_review_comment") {
+    const pullRequest = objectRecord(payload.pull_request);
+    const number = positiveInteger(pullRequest?.number ?? payload.number);
+    return number === null ? null : { kind: "pull-request", number };
+  }
+  const issue = objectRecord(payload.issue);
+  const number = positiveInteger(issue?.number);
+  if (number === null) return null;
+  return {
+    kind: objectRecord(issue?.pull_request) ? "pull-request" : "issue",
+    number,
+  };
+}
+
+function githubAgentPullRequest(
+  event: GitHubAgentEventName,
+  payload: Record<string, unknown>,
+  repositoryId: string,
+  repositoryFullName: string,
+): Result<NormalizedGitHubAgentEvent["pullRequest"] | undefined> {
+  if (event !== "pull_request" && event !== "pull_request_review_comment") {
+    return ok(undefined);
+  }
+  const pullRequest = objectRecord(payload.pull_request);
+  const head = objectRecord(pullRequest?.head);
+  const base = objectRecord(pullRequest?.base);
+  const headRepository = objectRecord(head?.repo);
+  const number = positiveInteger(pullRequest?.number ?? payload.number);
+  const headSha = boundedText(head?.sha, 160);
+  const baseRef = boundedText(base?.ref, 512);
+  const headRepositoryId = positiveNumericId(headRepository?.id);
+  const headRepositoryFullName = boundedText(headRepository?.full_name, 512);
+  if (number === null || !headSha || !baseRef || !headRepositoryId || !headRepositoryFullName) {
+    return err(
+      domainError.validation(
+        "GitHub Agent pull request must include an unambiguous numeric head repository",
+      ),
+    );
+  }
+  return ok({
+    number,
+    headSha,
+    baseRef,
+    headRepositoryId,
+    headRepositoryFullName,
+    fork:
+      headRepositoryId !== repositoryId ||
+      headRepositoryFullName.toLowerCase() !== repositoryFullName.toLowerCase(),
+  });
+}
+
+function githubAgentComment(
+  event: GitHubAgentEventName,
+  payload: Record<string, unknown>,
+): Result<NormalizedGitHubAgentEvent["comment"] | undefined> {
+  if (event !== "issue_comment" && event !== "pull_request_review_comment") {
+    return ok(undefined);
+  }
+  const comment = objectRecord(payload.comment);
+  const id = positiveNumericId(comment?.id);
+  const body = typeof comment?.body === "string" ? comment.body : null;
+  if (!comment || !id || body === null || body.length > githubCommentBodyLimit) {
+    return err(domainError.validation("GitHub Agent comment is invalid"));
+  }
+  const commentPayload = comment;
+
+  const hasCommand = body
+    .replace(/```[\s\S]*?```/gu, "")
+    .split(/\r?\n/u)
+    .some((line) => line.trim().toLowerCase().startsWith(`${appaloftCommandPrefix} `));
+  const command = hasCommand ? parseAppaloftGitHubCommand(body) : ok(undefined);
+  if (command.isErr()) return err(command.error);
+  const line = positiveInteger(commentPayload.line);
+  const path = boundedText(commentPayload.path, 1_024);
+  return ok({
+    id,
+    ...(command.value ? { command: command.value } : {}),
+    ...(path ? { path } : {}),
+    ...(line !== null ? { line } : {}),
+  });
+}
+
+function githubAgentLabel(
+  event: GitHubAgentEventName,
+  payload: Record<string, unknown>,
+): Result<NormalizedGitHubAgentEvent["label"] | undefined> {
+  if (!((event === "issues" || event === "pull_request") && payload.action === "labeled")) {
+    return ok(undefined);
+  }
+  const label = objectRecord(payload.label);
+  const name = boundedText(label?.name, 160);
+  if (!name) return err(domainError.validation("GitHub Agent label is invalid"));
+  const id = positiveNumericId(label?.id);
+  return ok({ ...(id ? { id } : {}), name });
+}
+
+function positiveNumericId(value: unknown): string | null {
+  if (typeof value === "number" && Number.isSafeInteger(value) && value > 0) {
+    return String(value);
+  }
+  if (typeof value === "string" && /^[1-9]\d*$/u.test(value.trim())) {
+    return value.trim();
+  }
+  return null;
+}
+
+function boundedText(value: unknown, maxLength: number): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  return normalized && normalized.length <= maxLength ? normalized : null;
 }
 
 interface GitHubPushPayloadFacts {

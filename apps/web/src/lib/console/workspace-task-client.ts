@@ -7,6 +7,19 @@ export type BrowserAgentTaskResult = {
   runtimeId: string;
   workspaceId: string;
   status: string;
+  activeRunId: string;
+  sessionRecovery: "new" | "native" | "fallback";
+  nativeSessionCapable: boolean;
+  nativeAgentSessionRef?: string;
+  runLineage: {
+    runId: string;
+    parentRunId?: string;
+    recovery: "fresh" | "native" | "fallback";
+    status: string;
+    startedAt: string;
+    completedAt?: string;
+  }[];
+  steerHistory: { instruction: string; requestedAt: string; runId: string }[];
   checks: {
     name: string;
     required: boolean;
@@ -65,6 +78,8 @@ export type BrowserWorkspaceTasks = {
   list(): Promise<{ readonly items: readonly BrowserAgentTaskResult[] }>;
   show(taskRunId: string): Promise<BrowserAgentTaskResult>;
   resume(taskRunId: string): Promise<BrowserAgentTaskResult>;
+  stop(taskRunId: string): Promise<BrowserAgentTaskResult>;
+  steer(taskRunId: string, instruction: string): Promise<BrowserAgentTaskResult>;
   cancel(taskRunId: string): Promise<BrowserAgentTaskResult>;
   approve(taskRunId: string): Promise<BrowserAgentTaskResult>;
   events(
@@ -130,6 +145,17 @@ export function createBrowserWorkspaceTasks(
       orpcClient.sandboxes.agentTasks.resume({
         workspaceId,
         taskRunId,
+      }) as Promise<BrowserAgentTaskResult>,
+    stop: (taskRunId) =>
+      orpcClient.sandboxes.agentTasks.stop({
+        workspaceId,
+        taskRunId,
+      }) as Promise<BrowserAgentTaskResult>,
+    steer: (taskRunId, instruction) =>
+      orpcClient.sandboxes.agentTasks.steer({
+        workspaceId,
+        taskRunId,
+        instruction,
       }) as Promise<BrowserAgentTaskResult>,
     cancel: (taskRunId) =>
       orpcClient.sandboxes.agentTasks.cancel({

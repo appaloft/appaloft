@@ -1,0 +1,57 @@
+# Tasks: GitHub-Driven Agent Sandbox Tasks
+
+## Workflow
+
+- [x] Complete owner Grill and shared-understanding confirmation.
+- [x] Complete Discovery, ADR-102, Spec 119, Plan, Tasks, and public Test Matrix.
+- [x] Create and link public tracking #845 and actor-visible vertical slices #846-#849.
+- [x] Mark implementation issues `ready-for-agent` after ticket review.
+
+## Event And Policy Slice
+
+- [x] Add supported GitHub webhook signature/action/payload normalization tests.
+- [x] Add strict command parser and sensitive-input rejection tests.
+- [x] Implement Repository Binding and Project Automation Rule aggregates and persistence.
+- [x] Extend SourceEvent kinds and atomic delivery idempotency.
+- [x] Add review execution-key uniqueness and stale-head behavior.
+- [x] Add operation catalog, transport, SDK, CLI, and Web management surfaces.
+
+## Profile And Credential Slice
+
+- [x] Add Agent Profile aggregate and exact Adapter/Workspace Profile resolution.
+- [x] Extend Connection with `agent` category and typed auth-mode metadata.
+- [x] Add native account enrollment and credential resolver ports without provider login protocol.
+- [ ] Prove missing/revoked/expired/cross-scope and existing-server-config failures precede compute.
+- [ ] Prove Agent credentials never enter argv, Git evidence, tests, Preview, events, or snapshots.
+
+## Task And Session Slice
+
+- [x] Add stable Task id, active Run, bounded Run lineage, and old-state migration tests.
+- [x] Add current thread Task pointer and historical read model.
+- [x] Implement recoverable stop, steer, resume, and explicit native-session fallback.
+- [ ] Compose existing Workspace create/recover, Agent Task, durable work, checks, Diff, and Preview.
+- [ ] Enforce cumulative runtime, automatic retry classes, and Task control permission.
+
+## GitHub Feedback And Delivery Slice
+
+- [x] Persist and upsert acknowledgement reaction, status comment, Check, Review, and PR ids.
+- [x] Implement bounded/redacted Task event summaries and Check annotations.
+- [x] Implement write branch/PR delivery with head reconciliation and no force-push/merge.
+- [x] Implement read-only Review delivery and finding/head/content dedupe.
+- [x] Implement label, ready-for-review, synchronize, and PR-close dispatch.
+
+## Retention And Cleanup Slice
+
+- [ ] Implement idle hibernation, stopped recovery window, Preview TTL, and PR-close cleanup.
+- [ ] Prove exact process/port/domain/route/network/volume/worktree/session cleanup.
+- [ ] Persist cleanup failure/retry state and require provider readback before success.
+
+## Verification And Sync
+
+- [x] Run focused tests for every implemented public Test Matrix id.
+- [x] Run public `lint`, `typecheck`, and `build`; run the full test gate and document the isolated
+  pass for its unrelated concurrent PGlite timeout.
+- [x] Synchronize Domain Model, Business Operation Map, operation catalog, SDK/CLI/Web docs, and
+  Test Matrix evidence.
+- [ ] Commit and push public changes with a neutral message.
+- [ ] Open the public PR with a neutral title, pass checks, merge, and record final public main SHA.

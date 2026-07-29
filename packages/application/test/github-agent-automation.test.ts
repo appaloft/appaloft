@@ -1,0 +1,396 @@
+import "reflect-metadata";
+import { describe, expect, test } from "bun:test";
+import { ok } from "@appaloft/core";
+
+import {
+  createExecutionContext,
+  type GitHubAgentAuthorizationPort,
+  GitHubAgentAutomationService,
+  type GitHubAgentFeedbackPort,
+  type GitHubAgentTaskPort,
+  type GitHubAgentTrigger,
+  InMemoryGitHubAgentAutomationStore,
+} from "../src";
+
+function trigger(
+  input: Partial<GitHubAgentTrigger> & Pick<GitHubAgentTrigger, "deliveryId">,
+  includeDefaultCommand = true,
+): GitHubAgentTrigger {
+  const { deliveryId, ...overrides } = input;
+  return {
+    provider: "github",
+    sourceEventId: `sevt_${deliveryId}`,
+    event: "issue_comment",
+    action: "created",
+    deliveryId,
+    installationId: "98765",
+    repository: { id: "123456", fullName: "appaloft/agent-sandbox-smoke" },
+    sender: { id: "303", loginSnapshot: "octocat", typeSnapshot: "User" },
+    thread: { kind: "issue", number: 41 },
+    ...(includeDefaultCommand
+      ? { command: { kind: "fix", instruction: "this and create a preview" } as const }
+      : {}),
+    ...overrides,
+  };
+}
+
+function allowedAuthorization(): GitHubAgentAuthorizationPort {
+  return {
+    authorize: async (_context, input) =>
+      ok({
+        allowed: true,
+        actorSnapshot: {
+          githubUserId: input.trigger.sender.id,
+          appaloftUserId: "user_303",
+          organizationId: "org_test",
+          membershipRole: "member",
+          repositoryPermission: input.intent.mode === "write" ? "push" : "pull",
+          externalCollaborator: false,
+        },
+        repositoryBindingId: "grb_test",
+        projectId: "project_test",
+        ...(input.intent.source === "automation" ? { ruleId: "gar_test" } : {}),
+        agentProfileId: input.intent.profile ?? "agp_opencode",
+        workspaceProfileInstallationId: "awpi_opencode",
+        sandboxTemplateId: "sbt_opencode",
+        serverPoolId: "pool_test",
+        credentialConnectionId: "conn_agent",
+        mode: input.intent.mode,
+        maximumRuntimeSeconds: 3_600,
+        maximumRetries: 2,
+        previewPolicy: input.intent.action === "fix" ? "private" : "disabled",
+        pullRequestDeliveryPolicy:
+          input.intent.action === "review" ? "review-only" : "create-or-update",
+        authorizationReason: "authorized",
+      }),
+  };
+}
+
+function taskPort() {
+  const calls: string[] = [];
+  const port: GitHubAgentTaskPort = {
+    startOrResume: async (_context, input) => {
+      calls.push(`start:${input.intent.action}:${input.trigger.thread.number}`);
+      return ok({
+        taskId: "task_1",
+        workspaceId: "workspace_1",
+        activeRunId: "run_1",
+        status: "queued",
+        taskUrl: "https://appaloft.test/tasks/task_1",
+        sessionRecovery: "native",
+      });
+    },
+    status: async () =>
+      ok({
+        taskId: "task_1",
+        workspaceId: "workspace_1",
+        activeRunId: "run_1",
+        status: "running",
+        taskUrl: "https://appaloft.test/tasks/task_1",
+        sessionRecovery: "native",
+      }),
+    steer: async (_context, input) => {
+      calls.push(`steer:${input.taskId}:${input.instruction}`);
+      return ok({
+        taskId: input.taskId,
+        workspaceId: input.workspaceId,
+        activeRunId: "run_2",
+        status: "running",
+        taskUrl: "https://appaloft.test/tasks/task_1",
+        sessionRecovery: "native",
+      });
+    },
+    stop: async (_context, input) => {
+      calls.push(`stop:${input.taskId}`);
+      return ok({
+        taskId: input.taskId,
+        workspaceId: input.workspaceId,
+        activeRunId: "run_1",
+        status: "stopped",
+        taskUrl: "https://appaloft.test/tasks/task_1",
+        sessionRecovery: "native",
+      });
+    },
+    resume: async (_context, input) => {
+      calls.push(`resume:${input.taskId}`);
+      return ok({
+        taskId: input.taskId,
+        workspaceId: input.workspaceId,
+        activeRunId: "run_2",
+        status: "running",
+        taskUrl: "https://appaloft.test/tasks/task_1",
+        sessionRecovery: "fallback",
+      });
+    },
+    replace: async (_context, input) => {
+      calls.push(`replace:${input.current.taskId}:${input.profile}`);
+      return ok({
+        taskId: "task_2",
+        workspaceId: "workspace_2",
+        activeRunId: "run_3",
+        status: "queued",
+        taskUrl: "https://appaloft.test/tasks/task_2",
+        sessionRecovery: "new",
+      });
+    },
+    cleanup: async (_context, input) => {
+      calls.push(`cleanup:${input.taskId}`);
+      return ok({
+        taskId: input.taskId,
+        workspaceId: input.workspaceId,
+        status: "cleaned",
+        taskUrl: "https://appaloft.test/tasks/task_1",
+        sessionRecovery: "none",
+      });
+    },
+  };
+  return { port, calls };
+}
+
+function feedbackPort() {
+  const calls: string[] = [];
+  const port: GitHubAgentFeedbackPort = {
+    acknowledge: async (_context, input) => {
+      calls.push(`ack:${input.trigger.deliveryId}`);
+      return ok({ reactionId: "reaction_1" });
+    },
+    update: async (_context, input) => {
+      calls.push(`update:${input.task.taskId}:${input.task.status}`);
+      return ok({
+        reactionId: "reaction_1",
+        statusCommentId: "comment_1",
+        checkRunId: "check_1",
+      });
+    },
+    reject: async (_context, input) => {
+      calls.push(`reject:${input.reasonCode}`);
+      return ok({ statusCommentId: "comment_denied" });
+    },
+  };
+  return { port, calls };
+}
+
+const context = createExecutionContext({
+  entrypoint: "http",
+  requestId: "req_github_agent_automation",
+});
+
+describe("GitHub Agent automation service", () => {
+  test("[GH-AUTO-DELIVERY-007][GH-AUTO-TASK-009] duplicate delivery returns the first task without duplicate compute or feedback", async () => {
+    const store = new InMemoryGitHubAgentAutomationStore();
+    const tasks = taskPort();
+    const feedback = feedbackPort();
+    const service = new GitHubAgentAutomationService({
+      store,
+      authorization: allowedAuthorization(),
+      tasks: tasks.port,
+      feedback: feedback.port,
+    });
+    const input = trigger({ deliveryId: "delivery_1" });
+
+    const first = await service.handle(context, input);
+    const duplicate = await service.handle(context, input);
+
+    expect(first._unsafeUnwrap()).toMatchObject({
+      status: "accepted",
+      task: { taskId: "task_1", workspaceId: "workspace_1" },
+    });
+    expect(duplicate._unsafeUnwrap()).toEqual({
+      ...first._unsafeUnwrap(),
+      duplicate: true,
+    });
+    expect(tasks.calls).toEqual(["start:fix:41"]);
+    expect(feedback.calls).toEqual(["ack:delivery_1", "update:task_1:queued"]);
+  });
+
+  test("[GH-AUTO-AUTHZ-008] a denied fork or missing credential records an actionable denial with zero compute", async () => {
+    const store = new InMemoryGitHubAgentAutomationStore();
+    const tasks = taskPort();
+    const feedback = feedbackPort();
+    const deniedAuthorization: GitHubAgentAuthorizationPort = {
+      authorize: async () =>
+        ok({
+          allowed: false,
+          reasonCode: "agent_credential_missing",
+          message: "Connect an Agent credential before starting this task.",
+          connectAgentUrl: "https://appaloft.test/settings/agent-credentials",
+          actorSnapshot: {
+            githubUserId: "303",
+            organizationId: "org_test",
+            externalCollaborator: false,
+          },
+        }),
+    };
+    const service = new GitHubAgentAutomationService({
+      store,
+      authorization: deniedAuthorization,
+      tasks: tasks.port,
+      feedback: feedback.port,
+    });
+
+    const denied = await service.handle(context, trigger({ deliveryId: "delivery_denied" }));
+    const fork = await service.handle(
+      context,
+      trigger({
+        deliveryId: "delivery_fork",
+        thread: { kind: "pull-request", number: 42 },
+        pullRequest: {
+          number: 42,
+          headSha: "abcdef",
+          baseRef: "main",
+          headRepositoryId: "999999",
+          headRepositoryFullName: "fork-user/repo",
+          fork: true,
+        },
+        command: { kind: "review" },
+      }),
+    );
+
+    expect(denied._unsafeUnwrap()).toMatchObject({
+      status: "denied",
+      reasonCode: "agent_credential_missing",
+      connectAgentUrl: "https://appaloft.test/settings/agent-credentials",
+    });
+    expect(fork._unsafeUnwrap()).toMatchObject({
+      status: "denied",
+      reasonCode: "github_fork_pull_request_denied",
+    });
+    expect(tasks.calls).toEqual([]);
+    expect(feedback.calls).toEqual([
+      "reject:agent_credential_missing",
+      "reject:github_fork_pull_request_denied",
+    ]);
+  });
+
+  test("[GH-AUTO-REVIEW-015] automatic review executes once per repository, PR, head, and rule", async () => {
+    const store = new InMemoryGitHubAgentAutomationStore();
+    const tasks = taskPort();
+    const feedback = feedbackPort();
+    const service = new GitHubAgentAutomationService({
+      store,
+      authorization: allowedAuthorization(),
+      tasks: tasks.port,
+      feedback: feedback.port,
+    });
+    const ready = trigger(
+      {
+        deliveryId: "delivery_ready",
+        event: "pull_request",
+        action: "ready_for_review",
+        thread: { kind: "pull-request", number: 42 },
+        pullRequest: {
+          number: 42,
+          headSha: "abcdef",
+          baseRef: "main",
+          headRepositoryId: "123456",
+          headRepositoryFullName: "appaloft/agent-sandbox-smoke",
+          fork: false,
+        },
+      },
+      false,
+    );
+    const synchronize = { ...ready, deliveryId: "delivery_sync", action: "synchronize" as const };
+
+    const first = await service.handle(context, ready);
+    const second = await service.handle(context, synchronize);
+
+    expect(first._unsafeUnwrap().status).toBe("accepted");
+    expect(second._unsafeUnwrap()).toMatchObject({
+      status: "ignored",
+      reasonCode: "github_review_execution_duplicate",
+    });
+    expect(tasks.calls).toEqual(["start:review:42"]);
+  });
+
+  test("[GH-AUTO-CONTROL-010][GH-AUTO-SESSION-011] steer and resume target the same current Task and report fallback truthfully", async () => {
+    const store = new InMemoryGitHubAgentAutomationStore();
+    const tasks = taskPort();
+    const feedback = feedbackPort();
+    const service = new GitHubAgentAutomationService({
+      store,
+      authorization: allowedAuthorization(),
+      tasks: tasks.port,
+      feedback: feedback.port,
+    });
+    await service.handle(context, trigger({ deliveryId: "delivery_fix" }));
+
+    const steered = await service.handle(
+      context,
+      trigger({
+        deliveryId: "delivery_steer",
+        command: { kind: "steer", instruction: "keep the existing API compatible" },
+      }),
+    );
+    const resumed = await service.handle(
+      context,
+      trigger({ deliveryId: "delivery_resume", command: { kind: "resume" } }),
+    );
+
+    expect(steered._unsafeUnwrap()).toMatchObject({
+      task: { taskId: "task_1", workspaceId: "workspace_1", activeRunId: "run_2" },
+    });
+    expect(resumed._unsafeUnwrap()).toMatchObject({
+      task: {
+        taskId: "task_1",
+        workspaceId: "workspace_1",
+        sessionRecovery: "fallback",
+      },
+    });
+    expect(tasks.calls).toContain("steer:task_1:keep the existing API compatible");
+    expect(tasks.calls).toContain("resume:task_1");
+  });
+
+  test("[GH-AUTO-CLEANUP-018] pull request close cleans only the linked current Task", async () => {
+    const store = new InMemoryGitHubAgentAutomationStore();
+    const tasks = taskPort();
+    const feedback = feedbackPort();
+    const service = new GitHubAgentAutomationService({
+      store,
+      authorization: allowedAuthorization(),
+      tasks: tasks.port,
+      feedback: feedback.port,
+    });
+    await service.handle(
+      context,
+      trigger({
+        deliveryId: "delivery_pr_fix",
+        thread: { kind: "pull-request", number: 42 },
+        pullRequest: {
+          number: 42,
+          headSha: "abcdef",
+          baseRef: "main",
+          headRepositoryId: "123456",
+          headRepositoryFullName: "appaloft/agent-sandbox-smoke",
+          fork: false,
+        },
+      }),
+    );
+
+    const cleaned = await service.handle(
+      context,
+      trigger(
+        {
+          deliveryId: "delivery_pr_closed",
+          event: "pull_request",
+          action: "closed",
+          thread: { kind: "pull-request", number: 42 },
+          pullRequest: {
+            number: 42,
+            headSha: "abcdef",
+            baseRef: "main",
+            headRepositoryId: "123456",
+            headRepositoryFullName: "appaloft/agent-sandbox-smoke",
+            fork: false,
+          },
+        },
+        false,
+      ),
+    );
+
+    expect(cleaned._unsafeUnwrap()).toMatchObject({
+      status: "accepted",
+      task: { taskId: "task_1", status: "cleaned" },
+    });
+    expect(tasks.calls).toContain("cleanup:task_1");
+  });
+});

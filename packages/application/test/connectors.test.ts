@@ -41,6 +41,7 @@ describe("connector catalog", () => {
       "notification",
       "billing",
       "identity",
+      "agent",
       "observability",
       "storage",
     ]);

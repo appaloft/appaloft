@@ -3,7 +3,17 @@ import { z } from "zod";
 import { nonEmptyTrimmedString } from "../shared-schema";
 
 export const sourceEventSourceKindSchema = z.enum(["github", "gitlab", "generic-signed"]);
-export const sourceEventKindSchema = z.enum(["push", "tag"]);
+export const sourceEventKindSchema = z.enum([
+  "push",
+  "tag",
+  "issue_comment.created",
+  "pull_request_review_comment.created",
+  "issues.labeled",
+  "pull_request.labeled",
+  "pull_request.ready_for_review",
+  "pull_request.synchronize",
+  "pull_request.closed",
+]);
 export const sourceEventStatusSchema = z.enum([
   "accepted",
   "deduped",

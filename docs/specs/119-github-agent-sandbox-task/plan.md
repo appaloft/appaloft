@@ -1,0 +1,71 @@
+# Plan: GitHub-Driven Agent Sandbox Tasks
+
+## Governing Sources
+
+- `docs/DOMAIN_MODEL.md`
+- `docs/BUSINESS_OPERATION_MAP.md`
+- ADR-091, ADR-094, ADR-095, ADR-097, ADR-100, and ADR-102
+- `docs/specs/119-github-agent-sandbox-task/spec.md`
+- `docs/testing/github-agent-sandbox-task-test-matrix.md`
+
+## Public Architecture
+
+1. Extend GitHub verification/normalization for the supported events using numeric provider ids,
+   strict action schemas, bounded comment content, and an explicit safe command grammar.
+2. Extend SourceEvent kinds and the existing atomic dedupe inbox instead of adding a GitHub-only
+   delivery store.
+3. Add `RepositoryBinding` and `ProjectAutomationRule` aggregates with selection/mutation specs,
+   repositories, read models, operations, events, and persistence.
+4. Add `AgentProfile` as a tenant configuration aggregate that references exact existing Adapter
+   and Agent Workspace Profile installations. Extend `Connection` with the `agent` category and
+   typed non-secret credential metadata/auth modes.
+5. Add neutral ports for numeric actor identity, ordered authorization resolution, repository
+   permission, native credential enrollment/resolution, GitHub feedback/delivery, and Task-thread
+   process state.
+6. Evolve Agent Task persistence from one Run to a stable Task id plus `activeRunId` and bounded
+   ordered lineage. Add recoverable stop, steer, resume, native session reference, truthful
+   fallback context, and cleanup readback.
+7. Compose GitHub triggers into existing Workspace create/recover, Agent Task, Preview, Git
+   delivery, durable work, and retention operations. No new Workspace/Preview/Deployment model.
+8. Expose all management and Task-detail operations through the operation catalog, HTTP/oRPC,
+   generated SDK, CLI, MCP metadata where applicable, and public Web.
+9. Add provider-neutral GitHub feedback ports and GitHub adapters that upsert reaction/comment,
+   Check, Review, PR, and annotations using persisted external ids and stable idempotency keys.
+
+## Migration
+
+- Preserve existing one-run Agent Task state by interpreting the old run as the first and active
+  lineage entry.
+- Add database tables/columns with tenant scope and unique constraints for repository binding,
+  rule execution key, SourceEvent delivery dedupe, thread current-task pointer, and Task lineage.
+- Keep secret material outside migrations; credential state stores only references and safe
+  metadata.
+- Make older SourceEvent kinds and source deployment dispatch behavior unchanged.
+
+## Test Strategy
+
+- Begin with signature, event schema, command grammar, domain invariant, and secret rejection tests.
+- Add concurrent delivery and head/rule uniqueness persistence tests.
+- Add actor/permission/fork/credential fail-closed contract tests with zero-effect spies.
+- Add Task lineage, native resume/fallback, Workspace composition, feedback, Git delivery, Preview,
+  retention, and provider-readback cleanup tests.
+- Prove transport parity across catalog, HTTP/oRPC, SDK, CLI, and Web.
+- Run public lint, typecheck, test, and build before public delivery.
+
+## Risks
+
+- Webhook redelivery races require database uniqueness and atomic claim, not an in-memory check.
+- Comment text is untrusted prompt input and must never influence credential selection.
+- Native credential material requires process-specific injection and must not leak into tests,
+  Preview, output, Git evidence, or snapshots.
+- GitHub line annotations can become invalid when the head changes; delivery must re-read head SHA.
+- Existing Task state is compatibility-sensitive; migration and recovery tests must cover old state.
+- Cleanup success requires provider readback and durable retry, not optimistic state mutation.
+
+## Delivery Order
+
+1. Complete public artifacts and public tickets.
+2. Implement and verify public vertical slices.
+3. Commit, push, open, review, and merge the public PR.
+4. Resolve the final public `main` SHA.
+5. Pin that SHA in Cloud and implement hosted composition.

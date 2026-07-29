@@ -40,10 +40,13 @@ import {
   archiveWorkspaceCollaborationLaneInputSchema,
   attachResourceStorageCommandInputSchema,
   authorizeWorkspaceCollaborationLaneAccessInputSchema,
+  BindRepositoryCommand,
   BindResourceDependencyCommand,
   BootstrapFirstAdminCommand,
   BootstrapServerProxyCommand,
   BrokerSandboxCredentialRequestCommand,
+  bindRepositoryInputSchema,
+  bindRepositoryResponseSchema,
   bindResourceDependencyCommandInputSchema,
   bootstrapFirstAdminCommandInputSchema,
   bootstrapServerProxyCommandInputSchema,
@@ -100,8 +103,10 @@ import {
   CountResourcesQuery,
   CountServersQuery,
   CreateActionSourceLinkDeploymentCommand,
+  CreateAgentProfileCommand,
   CreateAgentTaskRunCommand,
   CreateAuditEventArchiveCommand,
+  CreateAutomationRuleCommand,
   CreateBlueprintInstallPlanQuery,
   CreateDependencyResourceBackupCommand,
   CreateDependencyResourceProvisioningPlanCommand,
@@ -177,8 +182,12 @@ import {
   countProjectsQueryInputSchema,
   countResourcesQueryInputSchema,
   countServersQueryInputSchema,
+  createAgentProfileInputSchema,
+  createAgentProfileResponseSchema,
   createAgentTaskRunInputSchema,
   createAuditEventArchiveCommandInputSchema,
+  createAutomationRuleInputSchema,
+  createAutomationRuleResponseSchema,
   createBlueprintInstallPlanQueryInputSchema,
   createDependencyResourceBackupCommandInputSchema,
   createDependencyResourceProvisioningPlanInputSchema,
@@ -235,7 +244,9 @@ import {
   DiffEnvironmentProfileQuery,
   DiffEnvironmentsQuery,
   DisableAgentAdapterCommand,
+  DisableAgentProfileCommand,
   DisableAgentWorkspaceProfileCommand,
+  DisableAutomationRuleCommand,
   DoctorQuery,
   DuplicateEnvironmentProfileCommand,
   deactivateServerCommandInputSchema,
@@ -269,8 +280,12 @@ import {
   diffEnvironmentsQueryInputSchema,
   disableAgentAdapterInputSchema,
   disableAgentAdapterResponseSchema,
+  disableAgentProfileInputSchema,
+  disableAgentProfileResponseSchema,
   disableAgentWorkspaceProfileInputSchema,
   disableAgentWorkspaceProfileResponseSchema,
+  disableAutomationRuleInputSchema,
+  disableAutomationRuleResponseSchema,
   duplicateEnvironmentProfileCommandInputSchema,
   type EnvironmentDuplicatePlanSummary,
   type EnvironmentDuplicateProfileApplyResult,
@@ -352,11 +367,13 @@ import {
   issueWorkspaceCollaborationTerminalAccessInputSchema,
   ListAccountSessionsQuery,
   ListAgentAdaptersQuery,
+  ListAgentProfilesQuery,
   ListAgentTaskRunsQuery,
   ListAgentWorkspaceProfilesQuery,
   ListAuditEventArchivesQuery,
   ListAuditEventLegalHoldsQuery,
   ListAuditEventsQuery,
+  ListAutomationRulesQuery,
   ListBlueprintsQuery,
   ListCertificatesQuery,
   ListConnectionsQuery,
@@ -381,6 +398,7 @@ import {
   ListPreviewEnvironmentsQuery,
   ListProjectsQuery,
   ListProvidersQuery,
+  ListRepositoryBindingsQuery,
   ListResourceDependencyBindingsQuery,
   ListResourceRuntimeLogArchivesQuery,
   ListResourceSecretReferencesQuery,
@@ -422,12 +440,16 @@ import {
   listAccountSessionsQueryInputSchema,
   listAgentAdaptersInputSchema,
   listAgentAdaptersResponseSchema,
+  listAgentProfilesInputSchema,
+  listAgentProfilesResponseSchema,
   listAgentTaskRunsInputSchema,
   listAgentWorkspaceProfilesInputSchema,
   listAgentWorkspaceProfilesResponseSchema,
   listAuditEventArchivesQueryInputSchema,
   listAuditEventLegalHoldsQueryInputSchema,
   listAuditEventsQueryInputSchema,
+  listAutomationRulesInputSchema,
+  listAutomationRulesResponseSchema,
   listCertificatesQueryInputSchema,
   listConnectionsQueryInputSchema,
   listConnectorsQueryInputSchema,
@@ -448,6 +470,8 @@ import {
   listOrganizationMembersQueryInputSchema,
   listPreviewEnvironmentsQueryInputSchema,
   listProjectsQueryInputSchema,
+  listRepositoryBindingsInputSchema,
+  listRepositoryBindingsResponseSchema,
   listResourceDependencyBindingsQueryInputSchema,
   listResourceRuntimeLogArchivesQueryInputSchema,
   listResourceSecretReferencesQueryInputSchema,
@@ -731,6 +755,8 @@ import {
   StartResourceRuntimeCommand,
   StartTunnelCommand,
   type StaticArtifactPublicationSummary,
+  SteerAgentTaskRunCommand,
+  StopAgentTaskRunCommand,
   StopResourceRuntimeCommand,
   StreamDeploymentTimelineQuery,
   type StreamDeploymentTimelineQueryInput,
@@ -809,6 +835,8 @@ import {
   showWorkspaceCollaborationInputSchema,
   startConnectionCommandInputSchema,
   startTunnelCommandInputSchema,
+  steerAgentTaskRunInputSchema,
+  stopAgentTaskRunInputSchema,
   streamDeploymentTimelineQueryInputSchema,
   streamOperatorWorkEventsQueryInputSchema,
   streamSandboxAgentRunEventsInputSchema,
@@ -7840,6 +7868,28 @@ export const resumeAgentTaskRunProcedure = base
   .handler(async ({ input, context }) =>
     executeCommand(context, ResumeAgentTaskRunCommand.create(input)),
   );
+export const stopAgentTaskRunProcedure = base
+  .route({
+    method: "POST",
+    path: "/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/stop",
+    successStatus: 200,
+  })
+  .input(stopAgentTaskRunInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, StopAgentTaskRunCommand.create(input)),
+  );
+export const steerAgentTaskRunProcedure = base
+  .route({
+    method: "POST",
+    path: "/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/steer",
+    successStatus: 202,
+  })
+  .input(steerAgentTaskRunInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, SteerAgentTaskRunCommand.create(input)),
+  );
 export const cancelAgentTaskRunProcedure = base
   .route({
     method: "POST",
@@ -7872,6 +7922,70 @@ export const deliverAgentTaskRunProcedure = base
   .output(sandboxOperationResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, DeliverAgentTaskRunCommand.create(input)),
+  );
+export const bindRepositoryProcedure = base
+  .route({ method: "POST", path: "/github-agent/repository-bindings", successStatus: 201 })
+  .input(bindRepositoryInputSchema)
+  .output(bindRepositoryResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, BindRepositoryCommand.create(input)),
+  );
+export const listRepositoryBindingsProcedure = base
+  .route({ method: "GET", path: "/github-agent/repository-bindings", successStatus: 200 })
+  .input(listRepositoryBindingsInputSchema)
+  .output(listRepositoryBindingsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListRepositoryBindingsQuery.create(input)),
+  );
+export const createAutomationRuleProcedure = base
+  .route({ method: "POST", path: "/github-agent/automation-rules", successStatus: 201 })
+  .input(createAutomationRuleInputSchema)
+  .output(createAutomationRuleResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateAutomationRuleCommand.create(input)),
+  );
+export const listAutomationRulesProcedure = base
+  .route({ method: "GET", path: "/github-agent/automation-rules", successStatus: 200 })
+  .input(listAutomationRulesInputSchema)
+  .output(listAutomationRulesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListAutomationRulesQuery.create(input)),
+  );
+export const disableAutomationRuleProcedure = base
+  .route({
+    method: "POST",
+    path: "/github-agent/automation-rules/{ruleId}/disable",
+    successStatus: 200,
+  })
+  .input(disableAutomationRuleInputSchema)
+  .output(disableAutomationRuleResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DisableAutomationRuleCommand.create(input)),
+  );
+export const createAgentProfileProcedure = base
+  .route({ method: "POST", path: "/github-agent/agent-profiles", successStatus: 201 })
+  .input(createAgentProfileInputSchema)
+  .output(createAgentProfileResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateAgentProfileCommand.create(input)),
+  );
+export const listAgentProfilesProcedure = base
+  .route({ method: "GET", path: "/github-agent/agent-profiles", successStatus: 200 })
+  .input(listAgentProfilesInputSchema)
+  .output(listAgentProfilesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListAgentProfilesQuery.create(input)),
+  );
+export const disableAgentProfileProcedure = base
+  .route({
+    method: "POST",
+    path: "/github-agent/agent-profiles/{profileId}/disable",
+    successStatus: 200,
+  })
+  .input(disableAgentProfileInputSchema)
+  .output(disableAgentProfileResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DisableAgentProfileCommand.create(input)),
   );
 export const validateAgentAdapterProcedure = base
   .route({ method: "POST", path: "/agent-adapters/validate", successStatus: 200 })
@@ -8315,6 +8429,22 @@ export const appaloftOrpcRouter = {
     record: recordUsageIntentProcedure,
     list: listUsageIntentRecordsProcedure,
   },
+  githubAgent: {
+    repositoryBindings: {
+      create: bindRepositoryProcedure,
+      list: listRepositoryBindingsProcedure,
+    },
+    automationRules: {
+      create: createAutomationRuleProcedure,
+      list: listAutomationRulesProcedure,
+      disable: disableAutomationRuleProcedure,
+    },
+    agentProfiles: {
+      create: createAgentProfileProcedure,
+      list: listAgentProfilesProcedure,
+      disable: disableAgentProfileProcedure,
+    },
+  },
   sandboxes: {
     create: createSandboxProcedure,
     list: listSandboxesProcedure,
@@ -8382,6 +8512,8 @@ export const appaloftOrpcRouter = {
       list: listAgentTaskRunsProcedure,
       show: showAgentTaskRunProcedure,
       resume: resumeAgentTaskRunProcedure,
+      stop: stopAgentTaskRunProcedure,
+      steer: steerAgentTaskRunProcedure,
       cancel: cancelAgentTaskRunProcedure,
       approve: approveAgentTaskRunProcedure,
       deliver: deliverAgentTaskRunProcedure,
@@ -11309,6 +11441,11 @@ export function mountAppaloftOrpcRoutes(
     "/api/runtime-monitoring/samples",
     "/api/runtime-monitoring/rollup",
     "/api/runtime-monitoring/thresholds",
+    "/api/github-agent/repository-bindings",
+    "/api/github-agent/automation-rules",
+    "/api/github-agent/automation-rules/:ruleId/disable",
+    "/api/github-agent/agent-profiles",
+    "/api/github-agent/agent-profiles/:profileId/disable",
     "/api/sandboxes",
     "/api/sandboxes/:sandboxId",
     "/api/sandboxes/:sandboxId/events/stream",
@@ -11347,6 +11484,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/sandboxes/:sandboxId/agent-task-runs",
     "/api/sandboxes/:sandboxId/agent-task-runs/:taskRunId",
     "/api/sandboxes/:sandboxId/agent-task-runs/:taskRunId/resume",
+    "/api/sandboxes/:sandboxId/agent-task-runs/:taskRunId/stop",
+    "/api/sandboxes/:sandboxId/agent-task-runs/:taskRunId/steer",
     "/api/sandboxes/:sandboxId/agent-task-runs/:taskRunId/cancel",
     "/api/sandboxes/:sandboxId/agent-task-runs/:taskRunId/approve",
     "/api/sandboxes/:sandboxId/agent-task-runs/:taskRunId/deliver",
