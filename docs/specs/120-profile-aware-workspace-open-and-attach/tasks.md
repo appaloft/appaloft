@@ -52,7 +52,13 @@
 - [x] Run public lint, typecheck, test, build, `check:ash`, and docs registry gates.
 - [x] Run Cloud focused authz/audit/credential/placement/composition tests and full gates.
 - [x] Run public frozen install gate.
-- [ ] Run explicit real Pi/OpenCode opt-in smoke and exact cleanup readback.
+- [x] Record reusable registered-Server Pi/OpenCode substrate evidence from Cloud run
+  [30433192272](https://github.com/appaloft/appaloft-cloud/actions/runs/30433192272): real-provider
+  model replies, managed-terminal/native attach, reconnectable state, hibernation and exact fixture
+  cleanup passed.
+- [ ] Run explicit Profile-aware `workspace open` Pi/OpenCode opt-in smoke with Repository Binding,
+  installed Profile/Connection pins, repeated-open identity, terminate and exact provider orphan
+  readback.
 
 ## Sync
 

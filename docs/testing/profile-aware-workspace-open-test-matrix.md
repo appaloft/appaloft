@@ -23,8 +23,12 @@
 | WS-OPEN-SURFACE-019 | contract/SDK/CLI/Web | Cross-surface parity | Same workflow schemas and descriptor semantics; no duplicated Profile compilation. | `packages/orpc/test/profile-aware-workspace.http.test.ts`; `packages/sdk/test/agent-workspace-handles.test.ts`; `apps/web/src/lib/console/agent-workspace.test.ts` | automated |
 | WS-OPEN-CLEANUP-020 | application/PGlite/Cloud/e2e | Terminate exact cleanup | Runtime, grants, attach access, reservation, Sandbox and preference clean exactly; bindings/defaults/other Workspaces remain. | `packages/application/test/execution-sandbox-cqrs.test.ts`; `packages/application/test/sandbox-agent-runtime.test.ts`; `packages/persistence/pg/test/profile-aware-workspace-open-repository.test.ts`; hosted companion matrix | automated |
 
-Real Pi/OpenCode smoke remains pending because no registered Server or smoke credential environment
-is configured in the verification workspace. It is explicit opt-in. Evidence must name target,
-Profile pins, credential
-boundary, attach mode, reconnect behavior, exact created ids, cleanup operations, and provider
-orphan readback.
+Cloud registered-Server run
+[30433192272](https://github.com/appaloft/appaloft-cloud/actions/runs/30433192272)
+proved the reusable Hostinger substrate with a real model provider: Pi and OpenCode Runtime
+creation, managed-terminal/native attach, reconnectable state, model replies, hibernation and exact
+fixture cleanup passed. That lower-level SDK/runtime smoke does not by itself satisfy the
+Profile-aware `workspace open` acceptance gate. The remaining explicit opt-in run must exercise
+Repository Binding, installed Profile pins and named Credential Connections through
+`workspaces.open`, then record attach mode, repeated-open identity, exact created ids, terminate
+operations and provider orphan readback.
