@@ -79,6 +79,9 @@
 - [x] Implement write branch/PR delivery with head reconciliation and no force-push/merge.
 - [x] Implement read-only Review delivery and finding/head/content dedupe.
 - [x] Implement label, ready-for-review, synchronize, and PR-close dispatch.
+- [x] Link an Issue Task's generated PR through the existing public process store so PR close
+  resolves exact cleanup without making the related write Task current for normal PR commands
+  (#898).
 
 ## Retention And Cleanup Slice
 
@@ -95,6 +98,9 @@
 - [x] Docs outcome for #895: existing complete zh-CN/en-US
   `agents/github-agent-tasks#github-agent-tasks` already defines bounded status comment and Check
   Run updates; no registry or new-page change is required.
+- [x] Docs outcome for #898: existing complete zh-CN/en-US
+  `agents/github-agent-tasks#github-agent-tasks` already defines PR-close cleanup; no registry or
+  new-page change is required.
 - [x] Synchronize Domain Model, Business Operation Map, operation catalog, SDK/CLI/Web docs, and
   Test Matrix evidence.
 - [ ] Commit and push public changes with a neutral message.

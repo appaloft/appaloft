@@ -391,6 +391,18 @@ export interface GitHubAgentAutomationStore {
     threadKey: string,
     task: GitHubAgentTaskSummary,
   ): Promise<void>;
+  relatedPullRequestTask(
+    context: ExecutionContext,
+    input: { repositoryId: string; pullRequestNumber: number },
+  ): Promise<GitHubAgentTaskSummary | undefined>;
+  linkPullRequestTask(
+    context: ExecutionContext,
+    input: {
+      repositoryId: string;
+      pullRequestNumber: number;
+      task: GitHubAgentTaskSummary;
+    },
+  ): Promise<boolean>;
 }
 
 export class InMemoryGitHubAgentAutomationStore implements GitHubAgentAutomationStore {
@@ -444,6 +456,34 @@ export class InMemoryGitHubAgentAutomationStore implements GitHubAgentAutomation
     task: GitHubAgentTaskSummary,
   ): Promise<void> {
     this.currentTasks.set(threadKey, { ...task });
+  }
+
+  async relatedPullRequestTask(
+    _context: ExecutionContext,
+    input: { repositoryId: string; pullRequestNumber: number },
+  ): Promise<GitHubAgentTaskSummary | undefined> {
+    const task = this.currentTasks.get(githubAgentRelatedPullRequestKey(input));
+    return task ? { ...task } : undefined;
+  }
+
+  async linkPullRequestTask(
+    _context: ExecutionContext,
+    input: {
+      repositoryId: string;
+      pullRequestNumber: number;
+      task: GitHubAgentTaskSummary;
+    },
+  ): Promise<boolean> {
+    const key = githubAgentRelatedPullRequestKey(input);
+    const current = this.currentTasks.get(key);
+    if (
+      current &&
+      (current.taskId !== input.task.taskId || current.workspaceId !== input.task.workspaceId)
+    ) {
+      return false;
+    }
+    this.currentTasks.set(key, { ...input.task });
+    return true;
   }
 }
 
@@ -541,6 +581,13 @@ export class GitHubAgentAutomationService {
     const allowed = authorization.value;
     const threadKey = githubAgentThreadKey(trigger);
     const current = await this.dependencies.store.currentTask(context, threadKey);
+    const related =
+      intent.action === "cleanup" && trigger.thread.kind === "pull-request"
+        ? await this.dependencies.store.relatedPullRequestTask(context, {
+            repositoryId: trigger.repository.id,
+            pullRequestNumber: trigger.thread.number,
+          })
+        : undefined;
 
     if (
       intent.action === "review" &&
@@ -570,7 +617,8 @@ export class GitHubAgentAutomationService {
     }
 
     if (intent.action === "cleanup") {
-      if (!current) {
+      const targets = uniqueTasks([current, related]);
+      if (targets.length === 0) {
         return this.finish(context, {
           status: "ignored",
           sourceEventId: trigger.sourceEventId,
@@ -582,10 +630,39 @@ export class GitHubAgentAutomationService {
           authorization: cloneAllowedAuthorization(allowed),
         });
       }
-      const task = await this.dependencies.tasks.cleanup(context, current);
-      if (task.isErr()) return err(task.error);
-      await this.dependencies.store.setCurrentTask(context, threadKey, task.value);
-      return this.updateAndFinish(context, trigger, intent, allowed, task.value);
+      const cleanedTasks: GitHubAgentTaskSummary[] = [];
+      for (const target of targets) {
+        const task = await this.dependencies.tasks.cleanup(context, target);
+        if (task.isErr()) return err(task.error);
+        cleanedTasks.push(task.value);
+        if (current?.taskId === target.taskId && current.workspaceId === target.workspaceId) {
+          await this.dependencies.store.setCurrentTask(context, threadKey, task.value);
+        }
+        if (
+          related?.taskId === target.taskId &&
+          related.workspaceId === target.workspaceId &&
+          trigger.thread.kind === "pull-request"
+        ) {
+          const linked = await this.dependencies.store.linkPullRequestTask(context, {
+            repositoryId: trigger.repository.id,
+            pullRequestNumber: trigger.thread.number,
+            task: task.value,
+          });
+          if (!linked) {
+            return err(
+              domainError.conflict("GitHub pull request is linked to a different Agent Task"),
+            );
+          }
+        }
+      }
+      const primary =
+        cleanedTasks.find(
+          (task) => task.taskId === related?.taskId && task.workspaceId === related.workspaceId,
+        ) ?? cleanedTasks[0];
+      if (!primary) {
+        return err(domainError.invariant("GitHub Agent cleanup produced no Task result"));
+      }
+      return this.updateAndFinish(context, trigger, intent, allowed, primary);
     }
 
     if (allowed.authorizationKind !== "task-execution") {
@@ -832,6 +909,23 @@ function githubAgentThreadKey(trigger: GitHubAgentTrigger): string {
     trigger.thread.kind,
     String(trigger.thread.number),
   ].join(":");
+}
+
+function githubAgentRelatedPullRequestKey(input: {
+  repositoryId: string;
+  pullRequestNumber: number;
+}): string {
+  return ["github-related-pull-request", input.repositoryId, String(input.pullRequestNumber)].join(
+    ":",
+  );
+}
+
+function uniqueTasks(tasks: Array<GitHubAgentTaskSummary | undefined>): GitHubAgentTaskSummary[] {
+  const unique = new Map<string, GitHubAgentTaskSummary>();
+  for (const task of tasks) {
+    if (task) unique.set(`${task.workspaceId}:${task.taskId}`, task);
+  }
+  return [...unique.values()];
 }
 
 function cloneOutcome(outcome: GitHubAgentAutomationOutcome): GitHubAgentAutomationOutcome {

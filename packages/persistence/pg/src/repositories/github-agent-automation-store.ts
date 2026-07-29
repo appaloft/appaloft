@@ -123,6 +123,69 @@ export class PgGitHubAgentAutomationStore implements GitHubAgentAutomationStore 
       )
       .execute();
   }
+
+  async relatedPullRequestTask(
+    context: ExecutionContext,
+    input: { repositoryId: string; pullRequestNumber: number },
+  ): Promise<GitHubAgentTaskSummary | undefined> {
+    const row = await resolveRepositoryExecutor(this.db, toRepositoryContext(context))
+      .selectFrom("github_agent_thread_tasks")
+      .select("task")
+      .where("tenant_id", "=", tenantId(context))
+      .where("thread_key", "=", relatedPullRequestKey(input))
+      .executeTakeFirst();
+    return row ? taskFromJson(row.task) : undefined;
+  }
+
+  async linkPullRequestTask(
+    context: ExecutionContext,
+    input: {
+      repositoryId: string;
+      pullRequestNumber: number;
+      task: GitHubAgentTaskSummary;
+    },
+  ): Promise<boolean> {
+    const executor = resolveRepositoryExecutor(this.db, toRepositoryContext(context));
+    const key = relatedPullRequestKey(input);
+    const inserted = await executor
+      .insertInto("github_agent_thread_tasks")
+      .values({
+        tenant_id: tenantId(context),
+        thread_key: key,
+        task: input.task as unknown as Record<string, unknown>,
+        updated_at: now(),
+      })
+      .onConflict((conflict) => conflict.columns(["tenant_id", "thread_key"]).doNothing())
+      .returning("thread_key")
+      .executeTakeFirst();
+    if (inserted) return true;
+    const existing = await executor
+      .selectFrom("github_agent_thread_tasks")
+      .select("task")
+      .where("tenant_id", "=", tenantId(context))
+      .where("thread_key", "=", key)
+      .executeTakeFirst();
+    const task = existing ? taskFromJson(existing.task) : undefined;
+    if (task?.taskId !== input.task.taskId || task.workspaceId !== input.task.workspaceId) {
+      return false;
+    }
+    await executor
+      .updateTable("github_agent_thread_tasks")
+      .set({
+        task: input.task as unknown as Record<string, unknown>,
+        updated_at: now(),
+      })
+      .where("tenant_id", "=", tenantId(context))
+      .where("thread_key", "=", key)
+      .execute();
+    return true;
+  }
+}
+
+function relatedPullRequestKey(input: { repositoryId: string; pullRequestNumber: number }): string {
+  return ["github-related-pull-request", input.repositoryId, String(input.pullRequestNumber)].join(
+    ":",
+  );
 }
 
 function outcomeFromJson(value: Record<string, unknown>): GitHubAgentAutomationOutcome | undefined {

@@ -153,6 +153,75 @@ describe("Postgres GitHub Agent automation store", () => {
       expect(
         await secondStore.currentTask(tenantB, "github-thread:123456:pull-request:42"),
       ).toBeUndefined();
+
+      const task =
+        outcome.task ??
+        (() => {
+          throw new Error("Expected task outcome");
+        })();
+      expect(
+        await firstStore.linkPullRequestTask(tenantA, {
+          repositoryId: "123456",
+          pullRequestNumber: 84,
+          task,
+        }),
+      ).toBe(true);
+      expect(
+        await secondStore.linkPullRequestTask(tenantA, {
+          repositoryId: "123456",
+          pullRequestNumber: 84,
+          task: { ...task, status: "completed" },
+        }),
+      ).toBe(true);
+      expect(
+        await secondStore.linkPullRequestTask(tenantA, {
+          repositoryId: "123456",
+          pullRequestNumber: 84,
+          task: {
+            ...task,
+            taskId: "task_conflict",
+            workspaceId: "workspace_conflict",
+          },
+        }),
+      ).toBe(false);
+      expect(
+        await secondStore.relatedPullRequestTask(tenantA, {
+          repositoryId: "123456",
+          pullRequestNumber: 84,
+        }),
+      ).toEqual({ ...task, status: "completed" });
+      expect(
+        await secondStore.relatedPullRequestTask(tenantB, {
+          repositoryId: "123456",
+          pullRequestNumber: 84,
+        }),
+      ).toBeUndefined();
+
+      const conflictingTasks = [
+        task,
+        {
+          ...task,
+          taskId: "task_concurrent_conflict",
+          workspaceId: "workspace_concurrent_conflict",
+        },
+      ];
+      const relationClaims = await Promise.all(
+        conflictingTasks.map((candidate, index) =>
+          (index === 0 ? firstStore : secondStore).linkPullRequestTask(tenantA, {
+            repositoryId: "123456",
+            pullRequestNumber: 85,
+            task: candidate,
+          }),
+        ),
+      );
+      expect(relationClaims.filter(Boolean)).toHaveLength(1);
+      const linkedConcurrentTask = await secondStore.relatedPullRequestTask(tenantA, {
+        repositoryId: "123456",
+        pullRequestNumber: 85,
+      });
+      expect(
+        conflictingTasks.some((candidate) => candidate.taskId === linkedConcurrentTask?.taskId),
+      ).toBe(true);
     } finally {
       await database.close();
       rmSync(dataDir, { recursive: true, force: true });
