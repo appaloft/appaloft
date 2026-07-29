@@ -32,7 +32,8 @@ Declarative commands are argv arrays whose executable must match a declared runt
 Shell interpreters and control-plane module entrypoints are rejected. Credentials are requirements
 with process-scoped delivery metadata; manifest fields never contain secret values.
 
-Bind an approved Profile or Workspace to named secret references before runtime effects:
+Bind an approved Profile or Workspace to opaque, provider-neutral Connection references before
+runtime effects:
 
 ```ts
 import { resolveAgentAdapterCredentialBindings } from "@appaloft/agent-adapter-sdk";
@@ -40,14 +41,15 @@ import { resolveAgentAdapterCredentialBindings } from "@appaloft/agent-adapter-s
 const bindings = resolveAgentAdapterCredentialBindings(manifest, [
   {
     requirementId: "model-api",
-    secretRef: "vault://agents/codex#model-api-key",
+    connectionReference: "model-default",
   },
 ]);
 ```
 
 The resolver requires every required credential exactly once and rejects unknown, duplicate,
-raw-value, or ambiguous stdin bindings. Its successful result contains reference and delivery
-metadata only; resolving the referenced value remains a runtime grant concern.
+raw-value, or ambiguous stdin bindings. Its successful result contains Connection reference and
+delivery metadata only; hosted or self-hosted credential custody resolves that opaque reference at
+the runtime grant boundary.
 
 Compile an immutable Workspace Profile only after the exact Adapter installation and Sandbox
 Template are admitted:
