@@ -113,6 +113,40 @@ export type GitHubAgentTaskStatus =
   | "needs-reconciliation"
   | "cleaned";
 
+export interface GitHubAgentTaskFeedbackDetails {
+  phase?: string;
+  checks?: Array<{
+    name: string;
+    status: "passed" | "failed" | "skipped";
+    summary?: string;
+  }>;
+  diff?: {
+    stat: string;
+    patch?: string;
+    truncated: boolean;
+    redacted: boolean;
+  };
+  preview?: {
+    url: string;
+    visibility: "private" | "organization" | "public";
+    expiresAt: string;
+  };
+  delivery?: {
+    kind: "pull-request" | "review" | "none";
+    status: "pending" | "delivered" | "failed";
+    url?: string;
+  };
+  cleanup?: {
+    workspace: "active" | "sleeping" | "cleaned";
+    preview?: "active" | "expired" | "cleaned";
+  };
+  failure?: {
+    code?: string;
+    summary: string;
+    retryable: boolean;
+  };
+}
+
 export interface GitHubAgentTaskSummary {
   taskId: string;
   workspaceId: string;
@@ -120,6 +154,7 @@ export interface GitHubAgentTaskSummary {
   status: GitHubAgentTaskStatus;
   taskUrl: string;
   sessionRecovery: "new" | "native" | "fallback" | "none";
+  feedback?: GitHubAgentTaskFeedbackDetails;
 }
 
 export interface GitHubAgentTaskPort {

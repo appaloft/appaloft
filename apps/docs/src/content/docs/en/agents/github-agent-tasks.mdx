@@ -57,11 +57,16 @@ appaloft github-agent rule create automation-rule.json
 
 ## Task control and feedback
 
-Acknowledgements, status comments, and Check Runs use bounded updates. `steer` and `resume` retain
-the stable Task ID and append a new Run lineage. Native resume is reported only when the installed
-adapter supports it and an opaque native session reference exists; otherwise Appaloft reports the
-fallback and provides the previous summary, diff, check results, and steering instruction to a new
-session.
+Acknowledgements, status comments, and Check Runs use bounded updates. The same status comment and
+Check Run are updated with check results, a redacted and bounded diff,
+Preview access scope and TTL, pull request or Review delivery, and Workspace/Preview retention
+state. Complete output remains on the Task page. Secret-like lines and URLs with sensitive query
+parameters are never written to GitHub.
+
+`steer` and `resume` retain the stable Task ID and append a new Run lineage. Native resume is
+reported only when the installed adapter supports it and an opaque native session reference exists;
+otherwise Appaloft reports the fallback and provides the previous summary, diff, check results, and
+steering instruction to a new session.
 
 ```bash
 appaloft workspace task stop <workspaceId> <taskRunId>

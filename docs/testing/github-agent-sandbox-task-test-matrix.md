@@ -14,7 +14,7 @@
 | GH-AUTO-CONTROL-010 | Application | steer, stop, resume, new and terminal Task | Same Workspace is controlled; stop is recoverable; new switches pointer without ambiguity. | public automated pass |
 | GH-AUTO-SESSION-011 | Runtime | Adapter with and without native resume | Native ref is restored, or a labelled fallback Run receives bounded prior context. | public automated pass |
 | GH-AUTO-LINEAGE-012 | Persistence | Old one-Run state, retry, cumulative budget | Migration is lossless; ordered lineage and limits survive restart. | public automated pass |
-| GH-AUTO-FEEDBACK-013 | Integration | Repeated phase events and oversized output | One reaction/comment/Check is upserted; content and annotations are bounded/redacted. | public automated pass |
+| GH-AUTO-FEEDBACK-013 | Integration | Repeated phase events, checks, Diff, Preview, delivery, retention, sensitive URLs, and oversized/secret-like output | One reaction/comment/Check is upserted; the same bounded summary shows safe evidence while secret-like content and sensitive URLs are omitted. | public automated pass |
 | GH-AUTO-FIX-014 | Git adapter | Fix success, repeated delivery, changed head, unauthorized write | One branch/PR is created or updated; no merge/default branch/force push. | public adapter pass; hosted acceptance pending |
 | GH-AUTO-REVIEW-015 | Git adapter | Review findings and identical repo/PR/head/rule replay | No push; valid annotations and exactly-once review/content fingerprints. | public automated pass |
 | GH-AUTO-HEAD-016 | Durable workflow | PR synchronize while review/fix runs | Stale review is superseded and unsafe fix enters reconciliation. | review guard pass; hosted fix reconciliation pending |
