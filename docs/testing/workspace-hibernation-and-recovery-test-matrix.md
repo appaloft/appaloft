@@ -8,6 +8,7 @@
 | HIB-APP-002 | Application | Resume recreates the same Sandbox | Original limits/isolation/network intent is supplied and a new live handle is persisted. |
 | HIB-APP-003 | Application | Resume fails | Sandbox remains paused and source recovery metadata is retained for retry. |
 | HIB-APP-004 | Application | Idle maintenance encounters compute-released, process-frozen and active-terminal Sandboxes | Only the eligible unprotected idle Sandbox is auto-suspended. |
+| HIB-APP-005 | Application | Concurrent or completed resume is retried | Retries share one provider operation and return the same ready Sandbox identity. |
 | HIB-QUOTA-001 | Application | Requested limits exceed static tenant quota | Typed conflict occurs before repository save or provider provision. |
 | HIB-QUOTA-002 | Application | Existing active usage plus request reaches but does not exceed quota | Creation is admitted exactly at the boundary. |
 | HIB-PLACE-001 | Application | Placement policy selects one compatible provider | Persisted provider key equals the admitted selection. |

@@ -879,6 +879,7 @@ export class ExecutionSandboxService {
   private readonly quotaPolicy: SandboxQuotaPolicy | undefined;
   private readonly placementPolicy: SandboxPlacementPolicy | undefined;
   private readonly snapshotLifecyclePolicy: SandboxSnapshotLifecyclePolicy | undefined;
+  private readonly resumeOperations = new Map<string, Promise<Result<SandboxDescriptor>>>();
   constructor(input: {
     repository: SandboxRepository;
     providerRegistry: SandboxProviderRegistry;
@@ -2391,10 +2392,32 @@ export class ExecutionSandboxService {
     sandboxId: string,
     input: { providerKey?: string } = {},
   ): Promise<Result<SandboxDescriptor>> {
+    const operationKey = `${tenantId(toRepositoryContext(context))}:${sandboxId}`;
+    const active = this.resumeOperations.get(operationKey);
+    if (active) return active;
+    const operation = this.resumeOnce(context, sandboxId, input);
+    this.resumeOperations.set(operationKey, operation);
+    try {
+      return await operation;
+    } finally {
+      if (this.resumeOperations.get(operationKey) === operation) {
+        this.resumeOperations.delete(operationKey);
+      }
+    }
+  }
+
+  private async resumeOnce(
+    context: ExecutionContext,
+    sandboxId: string,
+    input: { providerKey?: string },
+  ): Promise<Result<SandboxDescriptor>> {
     const repositoryContext = toRepositoryContext(context);
     const stored = await this.repository.find(repositoryContext, sandboxId);
     if (!stored) return err(domainError.notFound("Sandbox", sandboxId));
     const state = stored.sandbox.toState();
+    if (state.status.value === "ready") {
+      return ok(descriptor(stored));
+    }
     if (state.status.value !== "paused" || !state.providerHandle || !state.suspension) {
       return err(domainError.conflict("Sandbox is not paused"));
     }

@@ -679,6 +679,47 @@ describe("ExecutionSandboxService", () => {
     });
   });
 
+  test("[WS-OPEN-RESUME-011][HIB-APP-005] coalesces concurrent and completed resume retries", async () => {
+    const fake = provider();
+    const originalResume = fake.adapter.resume.bind(fake.adapter);
+    let releaseResume!: () => void;
+    let markResumeEntered!: () => void;
+    const resumeGate = new Promise<void>((resolve) => {
+      releaseResume = resolve;
+    });
+    const resumeEntered = new Promise<void>((resolve) => {
+      markResumeEntered = resolve;
+    });
+    fake.adapter.resume = async (request) => {
+      markResumeEntered();
+      await resumeGate;
+      return originalResume(request);
+    };
+    const app = service(fake.adapter);
+    await app.createAndReconcile(context, createInput);
+    await app.pause(context, "sbx_test");
+
+    const first = app.resume(context, "sbx_test");
+    await resumeEntered;
+    const concurrent = app.resume(context, "sbx_test");
+    releaseResume();
+
+    const [firstResult, concurrentResult] = await Promise.all([first, concurrent]);
+    expect(firstResult._unsafeUnwrap()).toMatchObject({
+      sandboxId: "sbx_test",
+      status: "ready",
+    });
+    expect(concurrentResult._unsafeUnwrap()).toMatchObject({
+      sandboxId: "sbx_test",
+      status: "ready",
+    });
+    expect((await app.resume(context, "sbx_test"))._unsafeUnwrap()).toMatchObject({
+      sandboxId: "sbx_test",
+      status: "ready",
+    });
+    expect(fake.resumeCalls()).toBe(1);
+  });
+
   test("[HIB-APP-004] auto-suspends only idle compute-released Sandboxes", async () => {
     let current = "2026-07-20T00:00:00.000Z";
     const released = provider();
