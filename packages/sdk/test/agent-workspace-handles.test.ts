@@ -342,6 +342,59 @@ describe("Agent Workspace SDK handles", () => {
     });
   });
 
+  test("[AGENT-WS-SOURCE-014] safely derives repository egress for legacy Sandbox input without a network policy", async () => {
+    const requests: Request[] = [];
+    const { networkPolicy: _networkPolicy, ...sandboxWithoutNetworkPolicy } = sandboxInput;
+    const appaloft = createAppaloftClient({
+      baseUrl: "https://appaloft.example/api",
+      fetch: async (request) => {
+        requests.push(request);
+        const path = new URL(request.url).pathname;
+        if (path === "/api/sandboxes") {
+          return Response.json(
+            { sandboxId: "sbx_source_legacy", status: "ready" },
+            { status: 201 },
+          );
+        }
+        if (path === "/api/sandboxes/sbx_source_legacy/exec") {
+          return Response.json({
+            mode: "foreground",
+            frames: [{ kind: "exit", exitCode: 0 }],
+          });
+        }
+        if (path === "/api/sandboxes/sbx_source_legacy/agent-runtimes") {
+          return Response.json({
+            sandboxId: "sbx_source_legacy",
+            runtimeId: "sar_source_legacy",
+            harnessKey: "opencode",
+            status: "ready",
+          });
+        }
+        throw new Error(`Unexpected SDK request ${request.method} ${path}`);
+      },
+    });
+
+    await appaloft.workspaces.create({
+      sandbox: sandboxWithoutNetworkPolicy as unknown as typeof sandboxInput,
+      harness: "opencode",
+      source: {
+        repository: "https://github.com/acme/web.git",
+        ref: "main",
+        branch: "agent/issue-123",
+      },
+    });
+
+    const createSandboxRequest = requests[0];
+    if (!createSandboxRequest) throw new Error("Expected Sandbox create request");
+    expect((await createSandboxRequest.json()).networkPolicy).toEqual({
+      mode: "allowlist",
+      rules: [
+        { kind: "domain", value: "github.com", ports: [443] },
+        { kind: "domain", value: "api.github.com", ports: [443] },
+      ],
+    });
+  });
+
   test("[AGENT-WS-SOURCE-015] keeps trusted private-source credentials out of locator and argv", async () => {
     const secret = "github-installation-token-secret";
     const execRequests: Request[] = [];
