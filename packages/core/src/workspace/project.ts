@@ -1,3 +1,4 @@
+import { type AgentWorkspaceProfileInstallationId } from "../agent-workspace-profile";
 import { AggregateRoot } from "../shared/entity";
 import { domainError } from "../shared/errors";
 import { OrganizationId, type ProjectId } from "../shared/identifiers";
@@ -50,6 +51,7 @@ export interface ProjectState {
   archiveReason?: ArchiveReason;
   deletedAt?: DeletedAt;
   displayOrder: ProjectDisplayOrder;
+  defaultWorkspaceProfileInstallationId?: AgentWorkspaceProfileInstallationId;
   createdAt: CreatedAt;
 }
 
@@ -119,6 +121,11 @@ export class Project extends AggregateRoot<ProjectState> {
       ...(state.archivedAt ? { archivedAt: state.archivedAt } : {}),
       ...(state.archiveReason ? { archiveReason: state.archiveReason } : {}),
       ...(state.deletedAt ? { deletedAt: state.deletedAt } : {}),
+      ...(state.defaultWorkspaceProfileInstallationId
+        ? {
+            defaultWorkspaceProfileInstallationId: state.defaultWorkspaceProfileInstallationId,
+          }
+        : {}),
     });
   }
 
@@ -146,6 +153,25 @@ export class Project extends AggregateRoot<ProjectState> {
       reorderedAt: input.reorderedAt.value,
     });
 
+    return ok({ changed: true });
+  }
+
+  configureWorkspaceProfile(input: {
+    profileInstallationId: AgentWorkspaceProfileInstallationId;
+    configuredAt: UpdatedAt;
+  }): Result<{ changed: boolean }> {
+    const lifecycleGuard = this.ensureCanAcceptMutation("projects.configure-workspace-profile");
+    if (lifecycleGuard.isErr()) return err(lifecycleGuard.error);
+    if (this.state.defaultWorkspaceProfileInstallationId?.equals(input.profileInstallationId)) {
+      return ok({ changed: false });
+    }
+    const previous = this.state.defaultWorkspaceProfileInstallationId;
+    this.state.defaultWorkspaceProfileInstallationId = input.profileInstallationId;
+    this.recordDomainEvent("project.workspace_profile_configured", input.configuredAt, {
+      projectId: this.state.id.value,
+      profileInstallationId: input.profileInstallationId.value,
+      ...(previous ? { previousProfileInstallationId: previous.value } : {}),
+    });
     return ok({ changed: true });
   }
 

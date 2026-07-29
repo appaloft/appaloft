@@ -86,7 +86,7 @@ export interface AgentWorkspaceProfileCompiledPlan {
 
 export interface AgentWorkspaceCredentialReference {
   requirementId: string;
-  secretRef: string;
+  connectionReference: string;
 }
 
 export interface AgentWorkspaceCredentialRequirement {
@@ -106,7 +106,7 @@ export interface AgentWorkspaceCredentialBinding {
   kind: AgentWorkspaceCredentialRequirement["kind"];
   purpose: string;
   delivery: AgentWorkspaceCredentialRequirement["delivery"];
-  secretRef: string;
+  connectionReference: string;
 }
 
 export interface AgentWorkspaceProfilePin {
@@ -165,6 +165,7 @@ export interface AgentWorkspaceProfileInstallationReadModel {
   status: "disabled" | "enabled";
   installedAt: string;
   updatedAt?: string;
+  credentialConnections: readonly AgentWorkspaceCredentialReference[];
 }
 
 export interface AgentWorkspaceProfileRegistryRepository {
@@ -460,6 +461,49 @@ export class AgentWorkspaceProfileInstallationService {
     return this.readModel(found.value.installation, found.value.definition);
   }
 
+  async configureCredentialConnections(
+    context: ExecutionContext,
+    input: {
+      installationId: string;
+      connections: readonly AgentWorkspaceCredentialReference[];
+    },
+  ): Promise<Result<AgentWorkspaceProfileInstallationReadModel>> {
+    const found = await this.findWithDefinition(context, input.installationId);
+    if (found.isErr()) return err(found.error);
+    const available = found.value.installation.assertAvailableForNewWorkspace();
+    if (available.isErr()) return err(available.error);
+    const validated = this.validateStored(found.value.definition, input.installationId);
+    if (validated.isErr()) return err(validated.error);
+    const adapter = await this.dependencies.adapterService.resolveDefinitionForNewWorkspace(
+      context,
+      validated.value.adapterDefinitionDigest,
+    );
+    if (adapter.isErr()) return err(adapter.error);
+    const compiled = this.dependencies.validatorCompiler.compile(validated.value.manifest, {
+      profileInstallationId: input.installationId,
+      adapterInstallation: adapter.value,
+      credentialReferences: input.connections,
+    });
+    if (!compiled.ok) return this.validationError(compiled.issues);
+    const expectedRevision = found.value.installation.toState().revision.value;
+    const at = UpdatedAt.create(this.dependencies.clock.now());
+    if (at.isErr()) return err(at.error);
+    const configured = found.value.installation.configureCredentialConnections(
+      input.connections,
+      at.value,
+    );
+    if (configured.isErr()) return err(configured.error);
+    if (configured.value.changed) {
+      const saved = await this.dependencies.repository.saveInstallation(
+        toRepositoryContext(context),
+        found.value.installation,
+        expectedRevision,
+      );
+      if (saved.isErr()) return err(saved.error);
+    }
+    return this.readModel(found.value.installation, found.value.definition);
+  }
+
   async uninstall(
     context: ExecutionContext,
     installationId: string,
@@ -490,7 +534,6 @@ export class AgentWorkspaceProfileInstallationService {
   async compileForNewWorkspace(
     context: ExecutionContext,
     installationId: string,
-    credentialReferences?: readonly AgentWorkspaceCredentialReference[],
   ): Promise<Result<AgentWorkspaceProfileCompiledPlan>> {
     const found = await this.findWithDefinition(context, installationId);
     if (found.isErr()) return err(found.error);
@@ -506,7 +549,7 @@ export class AgentWorkspaceProfileInstallationService {
     const compiled = this.dependencies.validatorCompiler.compile(validated.value.manifest, {
       profileInstallationId: installationId,
       adapterInstallation: adapter.value,
-      ...(credentialReferences ? { credentialReferences } : {}),
+      credentialReferences: found.value.installation.toState().credentialConnections,
     });
     if (!compiled.ok) return this.validationError(compiled.issues);
     const registered = this.dependencies.harnessRegistrar.register(
@@ -592,6 +635,7 @@ export class AgentWorkspaceProfileInstallationService {
       adapterDefinitionDigest: validated.value.adapterDefinitionDigest,
       status: state.status.value,
       installedAt: state.installedAt.value,
+      credentialConnections: state.credentialConnections.map((connection) => ({ ...connection })),
       ...(state.updatedAt ? { updatedAt: state.updatedAt.value } : {}),
     });
   }

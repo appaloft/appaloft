@@ -34,16 +34,16 @@ const terminalPanel = await readFile(
 );
 
 describe("public Agent Workspace Console", () => {
-  test("[AGENT-WS-WEB-017] uses the public adapter catalog and canonical Workspace operations", () => {
+  test("[AGENT-WS-WEB-017][WS-OPEN-SURFACE-019] uses the public adapter catalog and canonical Workspace operations", () => {
     expect(shell).toContain('href: "/workspaces"');
     expect(listPage).toContain("sandboxes.agents.harnesses.list");
     expect(listPage).toContain("sandboxTemplates.list");
+    expect(listPage).toContain("workspaces.open");
     expect(listPage).toContain("sandboxes.create");
     expect(listPage).toContain("sandboxes.agents.runtimes.create");
     expect(listPage).toContain("agentWorkspaceProfiles.list");
-    expect(listPage).toContain("agentWorkspaceProfiles.compile");
-    expect(listPage).toContain("profileInstallationId");
-    expect(listPage).toContain("sandboxes.ports.expose");
+    expect(listPage).toContain("selectedProfile.installationId");
+    expect(listPage).toContain("commitSha");
     expect(listPage).toContain("capabilityKey(workspaceCreateCapability)");
     expect(detailPage).toContain('scope={{ kind: "sandbox", sandboxId: workspaceId }}');
     expect(detailPage).toContain("sandboxes.ports.expose");

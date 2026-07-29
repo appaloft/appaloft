@@ -3,6 +3,7 @@ import { inject, injectable } from "tsyringe";
 import { type AgentWorkspaceProfileInstallationService } from "./agent-workspace-profile";
 import {
   CompileAgentWorkspaceProfileQuery,
+  ConfigureAgentWorkspaceProfileCredentialConnectionsCommand,
   DisableAgentWorkspaceProfileCommand,
   InstallAgentWorkspaceProfileCommand,
   ListAgentWorkspaceProfilesQuery,
@@ -21,6 +22,7 @@ import { tokens } from "./tokens";
 
 type ProfileCommand =
   | InstallAgentWorkspaceProfileCommand
+  | ConfigureAgentWorkspaceProfileCredentialConnectionsCommand
   | DisableAgentWorkspaceProfileCommand
   | UninstallAgentWorkspaceProfileCommand;
 type ProfileQuery =
@@ -44,6 +46,9 @@ export class AgentWorkspaceProfileCommandHandler
     }
     if (command instanceof DisableAgentWorkspaceProfileCommand) {
       return this.service.disable(context, command.input.installationId);
+    }
+    if (command instanceof ConfigureAgentWorkspaceProfileCredentialConnectionsCommand) {
+      return this.service.configureCredentialConnections(context, command.input);
     }
     if (command instanceof UninstallAgentWorkspaceProfileCommand) {
       return this.service.uninstall(context, command.input.installationId);
@@ -72,17 +77,16 @@ export class AgentWorkspaceProfileQueryHandler
       return this.service.show(context, query.input.installationId);
     }
     if (query instanceof CompileAgentWorkspaceProfileQuery) {
-      return this.service.compileForNewWorkspace(
-        context,
-        query.input.installationId,
-        query.input.credentialReferences,
-      );
+      return this.service.compileForNewWorkspace(context, query.input.installationId);
     }
     return Promise.resolve(err(domainError.invariant("Unknown Agent Workspace Profile query")));
   }
 }
 
 CommandHandler(InstallAgentWorkspaceProfileCommand)(AgentWorkspaceProfileCommandHandler);
+CommandHandler(ConfigureAgentWorkspaceProfileCredentialConnectionsCommand)(
+  AgentWorkspaceProfileCommandHandler,
+);
 CommandHandler(DisableAgentWorkspaceProfileCommand)(AgentWorkspaceProfileCommandHandler);
 CommandHandler(UninstallAgentWorkspaceProfileCommand)(AgentWorkspaceProfileCommandHandler);
 

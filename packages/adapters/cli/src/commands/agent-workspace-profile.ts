@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import {
   CompileAgentWorkspaceProfileQuery,
+  ConfigureAgentWorkspaceProfileCredentialConnectionsCommand,
   DisableAgentWorkspaceProfileCommand,
   InstallAgentWorkspaceProfileCommand,
   ListAgentWorkspaceProfilesQuery,
@@ -16,21 +17,21 @@ import { cliCommandDescriptions } from "./docs-help.js";
 const manifestPathArg = Args.text({ name: "manifest" });
 const installationIdArg = Args.text({ name: "installation-id" });
 const limitOption = Options.integer("limit").pipe(Options.optional);
-const credentialReferenceOption = Options.text("credential-reference").pipe(Options.repeated);
+const credentialConnectionOption = Options.text("connection").pipe(Options.repeated);
 
 function readManifest(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8")) as unknown;
 }
 
-function credentialReferences(values: readonly string[]) {
+function credentialConnections(values: readonly string[]) {
   return values.map((value) => {
     const separator = value.indexOf("=");
     if (separator <= 0 || separator === value.length - 1) {
-      throw new TypeError("Credential reference must use requirement-id=secret://reference");
+      throw new TypeError("Credential Connection must use requirement-id=connection-reference");
     }
     return {
       requirementId: value.slice(0, separator),
-      secretRef: value.slice(separator + 1),
+      connectionReference: value.slice(separator + 1),
     };
   });
 }
@@ -65,20 +66,35 @@ const showCommand = EffectCommand.make(
 
 const compileCommand = EffectCommand.make(
   "compile",
+  { installationId: installationIdArg },
+  ({ installationId }) => runQuery(CompileAgentWorkspaceProfileQuery.create({ installationId })),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.agentWorkspaceProfileCompile));
+
+const credentialConnectionSetCommand = EffectCommand.make(
+  "set",
   {
     installationId: installationIdArg,
-    credentialReference: credentialReferenceOption,
+    connection: credentialConnectionOption,
   },
-  ({ credentialReference, installationId }) =>
-    runQuery(
-      CompileAgentWorkspaceProfileQuery.create({
+  ({ connection, installationId }) =>
+    runCommand(
+      ConfigureAgentWorkspaceProfileCredentialConnectionsCommand.create({
         installationId,
-        ...(credentialReference.length
-          ? { credentialReferences: credentialReferences(credentialReference) }
-          : {}),
+        connections: credentialConnections(connection),
       }),
     ),
-).pipe(EffectCommand.withDescription(cliCommandDescriptions.agentWorkspaceProfileCompile));
+).pipe(
+  EffectCommand.withDescription(
+    "Map Profile credential requirements to named Credential Connections",
+  ),
+);
+
+const credentialConnectionCommand = EffectCommand.make("credential-connection").pipe(
+  EffectCommand.withDescription(
+    "Configure tenant-scoped named Credential Connections without secret values",
+  ),
+  EffectCommand.withSubcommands([credentialConnectionSetCommand]),
+);
 
 const disableCommand = EffectCommand.make(
   "disable",
@@ -102,6 +118,7 @@ export const agentWorkspaceProfileCommand = EffectCommand.make("agent-workspace-
     listCommand,
     showCommand,
     compileCommand,
+    credentialConnectionCommand,
     disableCommand,
     uninstallCommand,
   ]),

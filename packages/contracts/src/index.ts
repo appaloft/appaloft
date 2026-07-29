@@ -140,6 +140,121 @@ export interface UninstallAgentWorkspaceProfileResponse {
   uninstalled: boolean;
 }
 
+export interface AgentWorkspaceCredentialReference {
+  requirementId: string;
+  connectionReference: string;
+}
+
+export interface ConfigureProjectWorkspaceProfileCommandInput {
+  projectId: string;
+  profileInstallationId: string;
+}
+
+export interface RepositoryBindingReadModel {
+  bindingId: string;
+  repositoryIdentity: string;
+  projectId: string;
+  status: "active" | "unbound";
+  createdAt: string;
+  unboundAt?: string;
+}
+
+export interface WorkspaceOpenInput {
+  repository: string;
+  repositoryIdentity: string;
+  ref: string;
+  branch: string;
+  commitSha: string;
+  profile?: string;
+  forceNew?: boolean;
+  attach?: boolean;
+}
+
+export interface WorkspaceProfilePinResponse {
+  profileInstallationId: string;
+  profileDefinitionDigest: string;
+  profileId: string;
+  profileVersion: string;
+  adapterInstallationId: string;
+  adapterDefinitionDigest: string;
+  adapterId: string;
+  adapterVersion: string;
+  harnessKey: string;
+  harnessTemplateId: string;
+  sandboxTemplateId: string;
+  sandboxTemplateVersion: string;
+  sandboxTemplateDigest: string;
+  capabilities: AgentWorkspaceProfileCapabilitySnapshotResponse;
+}
+
+export interface WorkspaceAgentRuntimeResponse {
+  runtimeId: string;
+  sandboxId: string;
+  harnessKey: string;
+  harnessTemplateId: string;
+  status: string;
+  interaction?: {
+    transport: "managed-terminal" | "native-attach";
+    command: readonly string[];
+    sessionRecovery: "managed-run-lineage" | "native-session-store";
+    clientHandoff?: "local-client-exec" | "display-only";
+    serverPort?: number;
+  };
+  capabilities: AgentWorkspaceProfileCapabilitySnapshotResponse;
+  profilePin?: WorkspaceProfilePinResponse;
+  activeRunId?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type WorkspaceAgentAttachResponse =
+  | {
+      workspaceId: string;
+      runtimeId: string;
+      transport: "managed-terminal";
+      sessionId: string;
+      processId: string;
+      access: {
+        kind: "websocket";
+        path: string;
+        expiresAt: string;
+      };
+    }
+  | {
+      workspaceId: string;
+      runtimeId: string;
+      transport: "native-attach";
+      access: {
+        exposureId: string;
+        port: number;
+        visibility: "private" | "organization" | "public";
+        url: string;
+        expiresAt: string;
+      };
+      clientCommand: string[];
+      clientHandoff: "local-client-exec" | "display-only";
+    };
+
+export interface WorkspaceOpenResult {
+  workspaceId: string;
+  resumed: boolean;
+  projectId: string;
+  source: {
+    repositoryIdentity: string;
+    repository: string;
+    ref: string;
+    branch: string;
+    commitSha: string;
+  };
+  profilePin: WorkspaceProfilePinResponse;
+  sandbox: {
+    sandboxId: string;
+    status: string;
+  };
+  agent: WorkspaceAgentRuntimeResponse;
+  attach?: WorkspaceAgentAttachResponse;
+}
+
 export const dependencyResourceKinds = [
   "postgres",
   "redis",

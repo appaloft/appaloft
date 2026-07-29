@@ -1,5 +1,6 @@
 import { domainError, err, ok, type Result } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
+import { type WorkspaceOpenEntryRepository } from "./agent-workspace-open";
 import {
   CommandHandler,
   type CommandHandlerContract,
@@ -105,6 +106,8 @@ export class SandboxCommandHandler implements CommandHandlerContract<SandboxComm
   constructor(
     @inject(tokens.executionSandboxService)
     private readonly service: ExecutionSandboxService,
+    @inject(tokens.workspaceOpenEntryRepository, { isOptional: true })
+    private readonly workspaceOpenEntries?: WorkspaceOpenEntryRepository,
   ) {}
 
   async handle(context: ExecutionContext, command: SandboxCommand): Promise<Result<unknown>> {
@@ -121,8 +124,13 @@ export class SandboxCommandHandler implements CommandHandlerContract<SandboxComm
       return this.service.resume(context, text(input, "sandboxId"), {
         ...(typeof input.providerKey === "string" ? { providerKey: input.providerKey } : {}),
       });
-    if (command instanceof TerminateSandboxCommand)
-      return this.service.terminate(context, text(input, "sandboxId"));
+    if (command instanceof TerminateSandboxCommand) {
+      const sandboxId = text(input, "sandboxId");
+      const terminated = await this.service.terminate(context, sandboxId);
+      if (terminated.isErr() || !this.workspaceOpenEntries) return terminated;
+      const advanced = await this.workspaceOpenEntries.markWorkspaceTerminated(context, sandboxId);
+      return advanced.isErr() ? err(advanced.error) : terminated;
+    }
     if (command instanceof ExecuteSandboxCommand) {
       const stdinValue = input.stdinBase64;
       let stdin: Uint8Array | undefined;

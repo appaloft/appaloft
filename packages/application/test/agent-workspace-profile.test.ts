@@ -171,7 +171,7 @@ function harness() {
                       kind: "process-environment" as const,
                       variable: "OPENAI_API_KEY",
                     },
-                    secretRef: reference.secretRef,
+                    connectionReference: reference.connectionReference,
                   })),
                 }
               : {}),
@@ -256,10 +256,14 @@ describe("Agent Workspace Profile installation and compilation", () => {
     expect(profile.isOk()).toBe(true);
     if (profile.isErr()) return;
 
+    const configured = await service.configureCredentialConnections(context("org_a"), {
+      installationId: profile.value.installationId,
+      connections: [{ requirementId: "model-api", connectionReference: "model-default" }],
+    });
+    expect(configured.isOk()).toBe(true);
     const compiled = await service.compileForNewWorkspace(
       context("org_a"),
       profile.value.installationId,
-      [{ requirementId: "model-api", secretRef: "secret://model/codex" }],
     );
 
     expect(compiled._unsafeUnwrap().credentialBindings).toEqual([
@@ -268,7 +272,7 @@ describe("Agent Workspace Profile installation and compilation", () => {
         kind: "model-api",
         purpose: "Codex model access",
         delivery: { kind: "process-environment", variable: "OPENAI_API_KEY" },
-        secretRef: "secret://model/codex",
+        connectionReference: "model-default",
       },
     ]);
   });

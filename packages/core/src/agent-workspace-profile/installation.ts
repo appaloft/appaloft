@@ -21,6 +21,12 @@ export interface AgentWorkspaceProfileInstallationState {
   revision: AgentWorkspaceProfileInstallationRevision;
   installedAt: CreatedAt;
   updatedAt?: UpdatedAt;
+  credentialConnections: readonly AgentWorkspaceProfileCredentialConnection[];
+}
+
+export interface AgentWorkspaceProfileCredentialConnection {
+  readonly requirementId: string;
+  readonly connectionReference: string;
 }
 
 export class AgentWorkspaceProfileInstallation extends AggregateRoot<
@@ -32,12 +38,16 @@ export class AgentWorkspaceProfileInstallation extends AggregateRoot<
   }
 
   static install(
-    input: Omit<AgentWorkspaceProfileInstallationState, "revision" | "status">,
+    input: Omit<
+      AgentWorkspaceProfileInstallationState,
+      "credentialConnections" | "revision" | "status"
+    >,
   ): Result<AgentWorkspaceProfileInstallation> {
     const installation = new AgentWorkspaceProfileInstallation({
       ...input,
       status: AgentWorkspaceProfileInstallationStatus.enabled(),
       revision: AgentWorkspaceProfileInstallationRevision.initial(),
+      credentialConnections: [],
     });
     installation.recordDomainEvent(
       "agent_workspace_profile_installation.installed",
@@ -54,7 +64,10 @@ export class AgentWorkspaceProfileInstallation extends AggregateRoot<
   static rehydrate(
     state: AgentWorkspaceProfileInstallationState,
   ): AgentWorkspaceProfileInstallation {
-    return new AgentWorkspaceProfileInstallation(state);
+    return new AgentWorkspaceProfileInstallation({
+      ...state,
+      credentialConnections: [...(state.credentialConnections ?? [])],
+    });
   }
 
   assertAvailableForNewWorkspace(): Result<void> {
@@ -79,6 +92,54 @@ export class AgentWorkspaceProfileInstallation extends AggregateRoot<
     return ok(undefined);
   }
 
+  configureCredentialConnections(
+    connections: readonly AgentWorkspaceProfileCredentialConnection[],
+    at: UpdatedAt,
+  ): Result<{ changed: boolean }> {
+    const normalized = [...connections]
+      .map((connection) => ({
+        requirementId: connection.requirementId.trim(),
+        connectionReference: connection.connectionReference.trim(),
+      }))
+      .sort((left, right) => left.requirementId.localeCompare(right.requirementId));
+    if (
+      normalized.some(
+        (connection, index) =>
+          !/^[a-z][a-z0-9-]{0,62}$/u.test(connection.requirementId) ||
+          !/^[A-Za-z][A-Za-z0-9_.:-]{0,159}$/u.test(connection.connectionReference) ||
+          normalized[index - 1]?.requirementId === connection.requirementId,
+      )
+    ) {
+      return err(
+        domainError.validation("Agent Workspace Profile Credential Connections are invalid"),
+      );
+    }
+    const current = [...this.state.credentialConnections].sort((left, right) =>
+      left.requirementId.localeCompare(right.requirementId),
+    );
+    if (
+      current.length === normalized.length &&
+      current.every(
+        (connection, index) =>
+          connection.requirementId === normalized[index]?.requirementId &&
+          connection.connectionReference === normalized[index]?.connectionReference,
+      )
+    ) {
+      return ok({ changed: false });
+    }
+    this.state.credentialConnections = normalized;
+    this.state.revision = this.state.revision.next();
+    this.state.updatedAt = at;
+    this.recordDomainEvent(
+      "agent_workspace_profile_installation.credential_connections_configured",
+      at,
+      {
+        requirementIds: normalized.map((connection) => connection.requirementId),
+      },
+    );
+    return ok({ changed: true });
+  }
+
   assertCanUninstall(activeReferences: ActiveAgentWorkspaceReferenceCount): Result<void> {
     if (activeReferences.hasActiveReferences()) {
       return err(
@@ -95,6 +156,11 @@ export class AgentWorkspaceProfileInstallation extends AggregateRoot<
   }
 
   toState(): AgentWorkspaceProfileInstallationState {
-    return { ...this.state };
+    return {
+      ...this.state,
+      credentialConnections: this.state.credentialConnections.map((connection) => ({
+        ...connection,
+      })),
+    };
   }
 }

@@ -19,10 +19,10 @@ export const agentWorkspaceCredentialReferenceSchema = z
       .string()
       .trim()
       .regex(/^[a-z][a-z0-9-]{0,62}$/),
-    secretRef: z
+    connectionReference: z
       .string()
       .trim()
-      .regex(/^(?:secret|vault|supabase-vault):\/\/[a-zA-Z0-9][a-zA-Z0-9_./:#-]{1,511}$/),
+      .regex(/^[A-Za-z][A-Za-z0-9_.:-]{0,159}$/),
   })
   .strict();
 const credentialRequirementSchema = z
@@ -55,7 +55,7 @@ const credentialBindingSchema = credentialRequirementSchema
       .string()
       .trim()
       .regex(/^[a-z][a-z0-9-]{0,62}$/),
-    secretRef: agentWorkspaceCredentialReferenceSchema.shape.secretRef,
+    connectionReference: agentWorkspaceCredentialReferenceSchema.shape.connectionReference,
   })
   .strict();
 const healthcheckSchema = z.discriminatedUnion("kind", [
@@ -83,10 +83,14 @@ export const showAgentWorkspaceProfileInputSchema = z
 export const disableAgentWorkspaceProfileInputSchema = showAgentWorkspaceProfileInputSchema;
 export const uninstallAgentWorkspaceProfileInputSchema = showAgentWorkspaceProfileInputSchema;
 export const compileAgentWorkspaceProfileInputSchema = showAgentWorkspaceProfileInputSchema
-  .extend({
-    credentialReferences: z.array(agentWorkspaceCredentialReferenceSchema).max(32).optional(),
-  })
+  .extend({})
   .strict();
+export const configureAgentWorkspaceProfileCredentialConnectionsInputSchema =
+  showAgentWorkspaceProfileInputSchema
+    .extend({
+      connections: z.array(agentWorkspaceCredentialReferenceSchema).max(32),
+    })
+    .strict();
 
 export const agentWorkspaceProfileInstallationSchema = z
   .object({
@@ -99,6 +103,7 @@ export const agentWorkspaceProfileInstallationSchema = z
     status: z.enum(["disabled", "enabled"]),
     installedAt: z.string().datetime(),
     updatedAt: z.string().datetime().optional(),
+    credentialConnections: z.array(agentWorkspaceCredentialReferenceSchema),
   })
   .strict();
 
@@ -114,6 +119,8 @@ export const listAgentWorkspaceProfilesResponseSchema = z.array(
 );
 export const showAgentWorkspaceProfileResponseSchema = agentWorkspaceProfileInstallationSchema;
 export const disableAgentWorkspaceProfileResponseSchema = agentWorkspaceProfileInstallationSchema;
+export const configureAgentWorkspaceProfileCredentialConnectionsResponseSchema =
+  agentWorkspaceProfileInstallationSchema;
 export const uninstallAgentWorkspaceProfileResponseSchema = z
   .object({
     installationId: installationIdSchema,
@@ -242,6 +249,9 @@ export type AgentWorkspaceProfileInstallationResponse = z.output<
 export type CompileAgentWorkspaceProfileResponse = z.output<
   typeof compileAgentWorkspaceProfileResponseSchema
 >;
+export type ConfigureAgentWorkspaceProfileCredentialConnectionsResponse = z.output<
+  typeof configureAgentWorkspaceProfileCredentialConnectionsResponseSchema
+>;
 export type UninstallAgentWorkspaceProfileResponse = z.output<
   typeof uninstallAgentWorkspaceProfileResponseSchema
 >;
@@ -319,6 +329,28 @@ export class DisableAgentWorkspaceProfileCommand extends Command<
 
   static create(input: unknown): Result<DisableAgentWorkspaceProfileCommand> {
     return command(disableAgentWorkspaceProfileInputSchema, input, (parsed) => new this(parsed));
+  }
+}
+
+export class ConfigureAgentWorkspaceProfileCredentialConnectionsCommand extends Command<
+  z.output<typeof configureAgentWorkspaceProfileCredentialConnectionsResponseSchema>
+> {
+  constructor(
+    public readonly input: z.output<
+      typeof configureAgentWorkspaceProfileCredentialConnectionsInputSchema
+    >,
+  ) {
+    super();
+  }
+
+  static create(
+    input: unknown,
+  ): Result<ConfigureAgentWorkspaceProfileCredentialConnectionsCommand> {
+    return command(
+      configureAgentWorkspaceProfileCredentialConnectionsInputSchema,
+      input,
+      (parsed) => new this(parsed),
+    );
   }
 }
 

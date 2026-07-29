@@ -193,6 +193,8 @@ Usage:
   appaloft auth token login [--stdin | --token-file <path>] [--url <url>] [--profile <name>]
   appaloft auth status
   appaloft context show
+  appaloft workspace open [path] [--profile <name-or-id>] [--new] [--no-attach]
+  appaloft workspace create --profile <name-or-id> --repo <https-url> --ref <git-ref> --branch <branch> [--attach]
   appaloft server list
   appaloft deploy <path>
 

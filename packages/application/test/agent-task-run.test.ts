@@ -47,6 +47,7 @@ function createHarness(
   options: {
     stateProtector?: AgentTaskRunDependencies["stateProtector"];
     existingPullRequest?: boolean;
+    unrelatedStagedChanges?: boolean;
   } = {},
 ) {
   const files = new Map<string, Uint8Array>();
@@ -135,6 +136,9 @@ function createHarness(
         }
         if (command.startsWith("git diff --cached --quiet -- .")) {
           return ok(foreground(1));
+        }
+        if (command === "git diff --cached --quiet") {
+          return ok(foreground(options.unrelatedStagedChanges ? 1 : 0));
         }
         if (command === "git rev-parse HEAD") {
           return ok(foreground(0, { stdout: `${"b".repeat(40)}\n` }));
@@ -341,18 +345,43 @@ describe("Agent Task Run application workflow", () => {
       "commit",
       "-m",
       "fix: implement issue 123",
-      "--",
-      ".",
-      ":(exclude).appaloft/**",
-      ":(exclude).appaloft-agent/**",
-      ":(exclude).appaloft-process-*.pid",
-      ":(exclude).config/**",
-      ":(exclude).local/**",
     ]);
+    expect(harness.commands).toContainEqual(["git", "diff", "--cached", "--quiet"]);
     expect(
       harness.commands.find((argv) => argv[0] === "git" && argv[1] === "add" && argv[2] === "-A"),
     ).toEqual(expect.arrayContaining([".", ":(exclude).appaloft/**"]));
     expect(harness.commands.flat().join(" ")).not.toContain("github-scoped-test-token");
+  });
+
+  test("[AGENT-TASK-PR-008] rejects unrelated staged content before task delivery", async () => {
+    const harness = createHarness({ unrelatedStagedChanges: true });
+    await harness.service.create(cliContext, {
+      workspaceId,
+      runtimeId,
+      task: "Implement issue #123",
+      runContext: { mode: "fresh" },
+      idempotencyKey: "task-create-dirty-index",
+      checks: [],
+      immutableReview: false,
+      sourceRoot: ".",
+    });
+    harness.setRunStatus("completed");
+    await harness.service.reconcile(cliContext, workspaceId, taskRunId);
+    await harness.service.approve(userContext, workspaceId, taskRunId);
+
+    const delivered = await harness.service.deliver(userContext, workspaceId, taskRunId, {
+      branch: "agent/issue-123",
+      commitMessage: "fix: implement issue 123",
+      remote: "origin",
+    });
+
+    expect(delivered.isErr() && delivered.error.message).toBe(
+      "Agent Task delivery requires a clean staged index",
+    );
+    expect(
+      harness.commands.some((argv) => argv[0] === "git" && argv[1] === "add" && argv[2] === "-A"),
+    ).toBe(false);
+    expect(harness.commands.some((argv) => argv.includes("commit"))).toBe(false);
   });
 
   test("[AGENT-TASK-RESUME-002] persists a retryable finalization failure", async () => {

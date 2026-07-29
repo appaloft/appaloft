@@ -120,6 +120,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-098: Portable Workspace Recovery And Placement Reconciliation](./ADR-098-portable-workspace-recovery-and-placement-reconciliation.md) | Accepted | Defines integrity-checked shared recovery packages, explicit recovery-family compatibility and provider-neutral maintenance relocation without exposing topology or adding a Cloud-only migration aggregate. |
 | [ADR-099: Reusable Workspace Snapshot Policy](./ADR-099-reusable-workspace-snapshot-policy.md) | Accepted | Defines policy-driven reusable Snapshot capture, retention, destructive cleanup gates and portable one-to-many restore without claiming process continuity. |
 | [ADR-100: Agent Adapter Distribution And Workspace Profile Boundary](./ADR-100-agent-adapter-distribution-and-workspace-profile-boundary.md) | Accepted | Defines portable declarative Adapter/Profile manifests, trusted-code composition, digest-addressed definitions, tenant installations, capability negotiation and safe Workspace pinning without uploaded control-plane execution. |
+| [ADR-102: Profile-Aware Workspace Open And Attach](./ADR-102-profile-aware-workspace-open-and-attach.md) | Accepted | Defines Repository Binding, Project default Profile, atomic create-or-resume, immutable source pins, named Credential Connections and capability-driven attach without a second Workspace aggregate. |
 
 ## Authoring Rules
 

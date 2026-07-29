@@ -38,9 +38,11 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `--preview <previewEnvironmentId>` on logs, health, diagnostics, effective config, runtime
   control, and terminal commands when the user is operating a preview rather than its parent
   resource.
-- `appaloft workspace create/list/show/pause/resume/terminate/terminal/preview` is a public
-  convenience workflow over the Sandbox, Agent Runtime, Terminal Session, and Sandbox Port
-  operations below. Its `workspaceId` is the underlying `sandboxId`; do not invent a Workspace
+- `appaloft workspace open [path]` is the primary Profile-aware entrypoint. It resolves clean,
+  pushed Git context, creates or resumes the underlying Sandbox, and attaches through the
+  Adapter-declared capability. `workspace create/list/show/pause/resume/terminate/connect/attach/
+  task/preview` remain lower-level workflows over Sandbox, Agent Runtime, Terminal Session, and
+  Sandbox Port operations. `workspaceId` is the underlying `sandboxId`; do not invent a Workspace
   aggregate or Cloud-only operation.
 
 ## Catalog
@@ -56,8 +58,14 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft agent-workspace-profile list` - `agent-workspace-profiles.list`
 - `appaloft agent-workspace-profile show <installationId>` - `agent-workspace-profiles.show`
 - `appaloft agent-workspace-profile compile <installationId>` - `agent-workspace-profiles.compile`
+- `appaloft agent-workspace-profile credential-connection set <installationId>` - `agent-workspace-profiles.configure-credential-connections`
 - `appaloft agent-workspace-profile disable <installationId>` - `agent-workspace-profiles.disable`
 - `appaloft agent-workspace-profile uninstall <installationId>` - `agent-workspace-profiles.uninstall`
+- `appaloft project configure-workspace-profile <projectId>` - `projects.configure-workspace-profile`
+- `appaloft repository-binding bind` - `repository-bindings.bind`
+- `appaloft repository-binding show` - `repository-bindings.show`
+- `appaloft repository-binding unbind` - `repository-bindings.unbind`
+- `appaloft workspace open [path]` - `workspaces.open`
 - `appaloft sandbox create` - `sandboxes.create`
 - `appaloft sandbox list` - `sandboxes.list`
 - `appaloft sandbox show <sandboxId>` - `sandboxes.show`

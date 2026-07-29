@@ -1289,6 +1289,22 @@ export class AgentTaskRunService {
       "Agent Task branch switch",
     );
     if (switched.isErr()) return err(switched.error);
+    const stagedBeforeDelivery = await run(
+      ["git", "diff", "--cached", "--quiet"],
+      "Agent Task staged index lookup",
+      { allowNonZero: true },
+    );
+    if (stagedBeforeDelivery.isErr()) return err(stagedBeforeDelivery.error);
+    if (stagedBeforeDelivery.value.exitCode === 1) {
+      return err(
+        domainError.conflict("Agent Task delivery requires a clean staged index", {
+          phase: "agent-task-delivery-staged-index",
+        }),
+      );
+    }
+    if (stagedBeforeDelivery.value.exitCode !== 0) {
+      return err(domainError.conflict("Agent Task staged index lookup failed"));
+    }
     const added = await run(["git", "add", "-A", "--", ...taskGitPathspec], "Agent Task Git add");
     if (added.isErr()) return err(added.error);
     const staged = await this.dependencies.sandbox.exec(context, task.workspaceId, {
@@ -1308,8 +1324,6 @@ export class AgentTaskRunService {
           "commit",
           "-m",
           input.commitMessage,
-          "--",
-          ...taskGitPathspec,
         ],
         "Agent Task Git commit",
       );

@@ -100,7 +100,7 @@ describe("PgSandboxAgentDeliveryRepository", () => {
               kind: "process-environment",
               variable: "OPENAI_API_KEY",
             },
-            secretRef: "secret://model/codex",
+            connectionReference: "model-default",
           },
         ],
       });
@@ -113,7 +113,7 @@ describe("PgSandboxAgentDeliveryRepository", () => {
       expect(storedRuntime?.credentialBindings).toEqual([
         expect.objectContaining({
           requirementId: "model-api",
-          secretRef: "secret://model/codex",
+          connectionReference: "model-default",
         }),
       ]);
       expect(await repository.findRuntime(tenantB, "sar_pg")).toBeNull();

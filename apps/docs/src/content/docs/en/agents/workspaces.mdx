@@ -2,6 +2,22 @@
 title: "Agent Workspace"
 description: "What Agent Workspace is, its relationship to Sandbox, and how to create, connect, and clean it up."
 docType: "concept"
+localeState:
+  zh-CN: complete
+  en-US: complete
+searchAliases:
+  - "remote development"
+  - "workspace open"
+  - "OpenCode"
+  - "Pi"
+  - "sandbox"
+relatedOperations:
+  - "workspaces.open"
+  - "sandboxes.create"
+  - "sandboxes.agents.runtimes.create"
+  - "terminal-sessions.open"
+sidebar:
+  order: 5
 ---
 
 <Aside type="caution" title="Maturity: Public alpha">
@@ -23,29 +39,71 @@ flowchart LR
 
 A Sandbox by itself is just a controlled execution environment — it doesn't presuppose "what should run in it." Workspace combines a Sandbox with a specific agent runtime, repository source, and terminal session into an environment the user can develop in remotely and reconnect to anytime after disconnecting — this is the abstraction level most "let an AI agent help me change code" scenarios actually need.
 
-## Creating a Workspace
+## Open a Workspace from a local repository <a id="agent-workspace-open" />
+
+After configuring the Repository Binding, Project default Agent Profile, Server Pool, and Profile
+Credential Connections, run this from a clean, pushed Git branch:
+
+```bash
+appaloft workspace open .
+```
+
+The CLI uses `.` only to find the Git root, upstream remote, branch, and HEAD SHA. It does not
+upload the local directory or uncommitted files. It normalizes the remote to a Repository identity,
+finds the Project through its Repository Binding, selects `--profile` or the Project default
+Profile, then creates or resumes the remote Workspace. By default it enters the Agent-owned
+interface:
+
+- a managed-terminal Adapter launches or reuses the Agent TUI Terminal Session and connects;
+- a native-attach Adapter obtains a short-lived revocable capability and executes or displays its
+  declared local-client handoff;
+- an Adapter without attach support returns an explicit capability error.
+
+Attach behavior comes only from Adapter capabilities, never Pi, OpenCode, or another Agent name.
+
+The same command resumes the preferred Workspace when its source SHA still matches. Use `--new` for
+a new isolated Workspace, or `--no-attach` to return only the descriptor:
+
+```bash
+appaloft workspace open . --new
+appaloft workspace open . --no-attach
+```
+
+Staged, unstaged, or untracked files; no upstream; an unpushed HEAD; or a remote branch tip that
+differs from HEAD all fail before any remote creation. The error shows the exact HEAD SHA and safe
+clean/push guidance. V1 never performs implicit sync or patch upload.
+
+## Explicit Profile-aware creation
+
+For automation without local Git context, use a credential-free HTTPS repository and an explicit
+Profile:
 
 ```bash
 appaloft workspace create \
-  --harness opencode \
-  --sandbox-template sbt_opencode \
+  --profile opencode-default \
   --repo https://github.com/acme/web.git \
+  --ref refs/heads/feature/login \
   --branch feature/login \
-  --isolation gvisor \
-  --cpu-millis 2000 \
-  --memory-bytes 2147483648 \
-  --disk-bytes 10737418240 \
-  --max-processes 128
+  --attach
 ```
 
-Swap `--harness opencode` for `--harness pi` to create a Pi Workspace instead. Use `appaloft workspace harness list` to see the adapters, sandbox templates, interaction modes, session recovery capabilities, and task capabilities actually registered on the current deployment — the Web console's creation entrypoint reads the same catalog, and doesn't hardcode a button for any particular agent name.
+`--profile` accepts an installation id, Profile id, or unique display name. Appaloft compiles the
+Profile and resolves its Sandbox Template, isolation, resource/network policy, initialization,
+default ports, Adapter capabilities, and installation-configured named Credential Connections
+before creating a Sandbox. Missing, disabled, stale, ambiguous, or unauthorized
+Profile/Credential/Template/capability state and placement capacity fail before effects. API keys,
+tokens, and secrets are not accepted in argv.
 
 The SDK provides an equivalent composable creation call:
 
 ```ts
-const workspace = await appaloft.workspaces.create({
-  sandbox: sandboxInput,
-  harness: "opencode",
+const workspace = await appaloft.workspaces.open({
+  repository: "https://github.com/acme/web.git",
+  repositoryIdentity: "github.com/acme/web",
+  ref: "refs/heads/feature/login",
+  branch: "feature/login",
+  commitSha: "0123456789abcdef0123456789abcdef01234567",
+  profile: "opencode-default",
 });
 
 console.log(workspace.workspaceId, workspace.agent.runtimeId);
@@ -73,24 +131,29 @@ const appaloft = createAppaloftClient({
 
 Use this provider only in a trusted backend or operator process, not in a browser bundle. The SDK validates the returned material and delivers its derived authorization header to network Git commands through Sandbox stdin and process-scoped Git configuration; it does not place credentials in the repository URL or process argv. A template may still prepare private-source access when the operator owns that lifecycle.
 
+If a step fails after the Sandbox identity exists, the error carries the exact phase, existing
+`workspaceId`/`runtimeId`, retryability, and recovery/terminate entrypoints. Reopening coordinates
+against that same partial identity instead of silently creating a duplicate Sandbox.
+
 ## Reconnecting after disconnect
 
-Terminal sessions are backed by a PTY managed by Appaloft — a client disconnect is just a "detach." As long as the session's TTL and the Sandbox are both still valid, reconnecting with the same `terminalSessionId` replays a bounded amount of history output and continues the same process:
+Terminal sessions are backed by a PTY managed by Appaloft — a client disconnect is just a "detach."
+While the session TTL and Sandbox remain valid, running `workspace open` again reuses the Session,
+replays bounded output, and continues the same Agent process:
+
+```bash
+appaloft workspace open .
+```
+
+Lower-level diagnostic commands remain available:
 
 ```bash
 appaloft workspace connect <workspaceId>
-appaloft workspace connect <workspaceId> --session-id <terminalSessionId>
-```
-
-Reopening a Workspace detail page in the Web console also automatically finds and reconnects to the latest active Sandbox session.
-
-For the OpenCode runtime, you can also refresh the remote service directly and get a native attach:
-
-```bash
 appaloft workspace attach <workspaceId>
 ```
 
-This command only issues a private, revocable access descriptor valid for at most one hour, returning the connection info for a local `opencode attach`. Providers that don't support the secure gateway explicitly return "unavailable" rather than exposing an unprotected port.
+Native attach issues only short-lived revocable private access. It never returns a raw server
+address, SSH key, or long-lived credential.
 
 ## Temporary development preview
 
@@ -141,6 +204,10 @@ A Task Run is persisted server-side — a client disconnecting **does not cancel
 - **Treating Workspace as a resource independent from Sandbox**: `workspaceId` and `sandboxId` are the same id — understanding the Sandbox's isolation and lifecycle model (see [Sandbox Model](/docs/en/agents/sandboxes/)) means understanding Workspace's underlying behavior.
 - **Assuming a client disconnect cancels a running Task**: a Task Run is persisted and recovered server-side — disconnecting only affects observation, not execution.
 - **Treating a development preview as a production access URL**: a development preview is a temporary, expirable live preview — a completely different mechanism from a [Generated Access URL](/docs/en/access/generated-routes/).
+- **Treating `.` as an upload directory**: it is used only to resolve Git context; local changes are
+  never uploaded implicitly.
+- **Creating before HEAD is pushed**: Workspace source must resolve to an exact remote SHA; push or
+  select the correct upstream first.
 
 ## Related tasks
 

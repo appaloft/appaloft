@@ -204,6 +204,7 @@ import {
   PgProjectReadModel,
   PgProjectRepository,
   PgProviderJobLogRetentionStore,
+  PgRepositoryBindingRepository,
   PgResourceAccessFailureEvidenceProjection,
   PgResourceDeletionBlockerReader,
   PgResourceDependencyBindingReadModel,
@@ -246,6 +247,7 @@ import {
   PgStorageVolumeRepository,
   PgTunnelSessionRepository,
   PgWorkspaceCollaborationRepository,
+  PgWorkspaceOpenEntryRepository,
 } from "@appaloft/persistence-pg";
 import { createBuiltinPlugins } from "@appaloft/plugin-builtins";
 import { LocalPluginHost } from "@appaloft/plugin-host";
@@ -1206,6 +1208,17 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.projectRepository, {
     useFactory: instanceCachingFactory(() => new PgProjectRepository(input.database.db)),
+  });
+  container.register(tokens.repositoryBindingRepository, {
+    useFactory: instanceCachingFactory(() => new PgRepositoryBindingRepository(input.database.db)),
+  });
+  container.register(tokens.workspaceOpenEntryRepository, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new PgWorkspaceOpenEntryRepository(input.database.db, () =>
+          dependencyContainer.resolve<Clock>(tokens.clock).now(),
+        ),
+    ),
   });
   container.register(tokens.sandboxRepository, {
     useFactory: instanceCachingFactory(() => new PgExecutionSandboxRepository(input.database.db)),

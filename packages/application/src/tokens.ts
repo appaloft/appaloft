@@ -30,6 +30,13 @@ export const tokens = {
   agentWorkspaceProfileHarnessRegistrar: Symbol.for(
     "appaloft.agent_workspace_profile_harness_registrar",
   ),
+  agentWorkspaceOpenService: Symbol.for("appaloft.agent_workspace_open_service"),
+  agentWorkspaceOpenPreflightService: Symbol.for("appaloft.agent_workspace_open_preflight_service"),
+  workspaceOpenEntryRepository: Symbol.for("appaloft.workspace_open_entry_repository"),
+  workspaceOpenCredentialAdmission: Symbol.for("appaloft.workspace_open_credential_admission"),
+  workspaceOpenPlacement: Symbol.for("appaloft.workspace_open_placement"),
+  repositoryBindingRepository: Symbol.for("appaloft.repository_binding_repository"),
+  repositoryBindingService: Symbol.for("appaloft.repository_binding_service"),
   agentTaskRunService: Symbol.for("appaloft.agent_task_run_service"),
   githubAgentAutomationStore: Symbol.for("appaloft.github_agent_automation_store"),
   githubAgentConfigurationRepository: Symbol.for("appaloft.github_agent_configuration_repository"),
@@ -111,6 +118,9 @@ export const tokens = {
   deploymentConfigReader: Symbol.for("appaloft.deployment_config_reader"),
   sourceVersionDetector: Symbol.for("appaloft.source_version_detector"),
   projectRepository: Symbol.for("appaloft.project_repository"),
+  configureProjectWorkspaceProfileUseCase: Symbol.for(
+    "appaloft.configure_project_workspace_profile_use_case",
+  ),
   projectDeletionBlockerReader: Symbol.for("appaloft.project_deletion_blocker_reader"),
   serverRepository: Symbol.for("appaloft.server_repository"),
   serverDeletionBlockerReader: Symbol.for("appaloft.server_deletion_blocker_reader"),

@@ -1,6 +1,5 @@
 import { type Result } from "@appaloft/core";
 import { z } from "zod";
-import { agentWorkspaceCredentialReferenceSchema } from "./agent-workspace-profile-messages";
 import { Command, Query } from "./cqrs";
 import { parseOperationInput } from "./operations/shared-schema";
 import { type StreamSandboxAgentRunEventsResult } from "./sandbox-agent-runtime";
@@ -16,12 +15,12 @@ export const createSandboxAgentRuntimeInputSchema = z
     harnessKey: z.string().trim().min(1).max(120),
     harnessTemplateId: id,
     idempotencyKey,
+    projectId: id.optional(),
     profileInstallationId: z
       .string()
       .trim()
       .regex(/^awpi_[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/)
       .optional(),
-    credentialReferences: z.array(agentWorkspaceCredentialReferenceSchema).max(32).optional(),
   })
   .strict();
 export const listSandboxAgentRuntimesInputSchema = z.object({ sandboxId: id }).strict();

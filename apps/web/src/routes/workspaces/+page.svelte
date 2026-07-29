@@ -49,31 +49,6 @@
     displayName: string;
     status: "disabled" | "enabled";
   };
-  type CompiledWorkspaceProfile = {
-    sandbox: {
-      source: { kind: "template"; templateId: string };
-      requestedIsolation: "container-trusted" | "gvisor" | "kata" | "microvm";
-      limits: {
-        cpuMillis: number;
-        memoryBytes: number;
-        diskBytes: number;
-        maxProcesses: number;
-      };
-      networkPolicy:
-        | { mode: "deny" }
-        | {
-            mode: "allowlist";
-            rules: { kind: "domain"; value: string; ports: number[] }[];
-          };
-    };
-    initialization: { id: string; argv: string[]; cwd?: string }[];
-    runtime: { harnessKey: string; harnessTemplateId: string };
-    defaultPorts: {
-      port: number;
-      visibility: "private" | "organization" | "public";
-      ttlSeconds: number;
-    }[];
-  };
   type WorkspaceDescriptor = {
     sandbox: SandboxDescriptor;
     runtimes: RuntimeDescriptor[];
@@ -93,13 +68,14 @@
   let repository = $state("");
   let repositoryRef = $state("");
   let branch = $state("");
+  let commitSha = $state("");
   let collaborationName = $state("");
   let collaborationWorkspaceId = $state("");
   const collaborationCreateCapability = {
     operationKey: "workspace-collaborations.create",
   } as const;
   const workspaceCreateCapability = {
-    operationKey: "sandboxes.create",
+    operationKey: "workspaces.open",
   } as const;
 
   $effect(() => {
@@ -221,6 +197,13 @@
     };
   }
 
+  function repositoryIdentity(value: string): string {
+    const url = new URL(value.trim());
+    const path = url.pathname.replace(/^\/+|\/+$/g, "").replace(/\.git$/u, "");
+    if (!path.includes("/")) throw new Error("agent_workspace_repository_invalid");
+    return `${url.hostname.toLowerCase()}/${path}`;
+  }
+
   function assertSuccessfulExec(result: unknown): void {
     const frames =
       result && typeof result === "object" && "mode" in result && result.mode === "foreground"
@@ -234,34 +217,46 @@
 
   const createWorkspaceMutation = createMutation(() => ({
     mutationFn: async () => {
-      const compiledProfile = selectedProfile
-        ? ((await orpcClient.agentWorkspaceProfiles.compile({
-            installationId: selectedProfile.installationId,
-          })) as unknown as CompiledWorkspaceProfile)
-        : null;
+      const normalizedRepository = repository.trim();
+      const normalizedRef = repositoryRef.trim() ? validateGitRef(repositoryRef) : "";
+      const normalizedBranch = branch.trim() ? validateGitRef(branch) : "";
+      const normalizedCommitSha = commitSha.trim().toLowerCase();
+      if (selectedProfile) {
+        repositoryNetworkPolicy(normalizedRepository);
+        if (
+          !normalizedRef ||
+          !normalizedBranch ||
+          !/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/u.test(normalizedCommitSha)
+        ) {
+          throw new Error("agent_workspace_exact_source_pin_required");
+        }
+        const opened = (await orpcClient.workspaces.open({
+          repository: normalizedRepository,
+          repositoryIdentity: repositoryIdentity(normalizedRepository),
+          ref: normalizedRef,
+          branch: normalizedBranch,
+          commitSha: normalizedCommitSha,
+          profile: selectedProfile.installationId,
+          forceNew: true,
+          attach: false,
+        })) as { workspaceId: string };
+        return opened.workspaceId;
+      }
       const harness = selectedHarness;
       const sandboxTemplateId =
-        compiledProfile?.sandbox.source.templateId ?? harness?.sandboxTemplateId;
-      const harnessKey = compiledProfile?.runtime.harnessKey ?? harness?.key;
-      const harnessTemplateId =
-        compiledProfile?.runtime.harnessTemplateId ?? harness?.harnessTemplateId;
+        harness?.sandboxTemplateId;
+      const harnessKey = harness?.key;
+      const harnessTemplateId = harness?.harnessTemplateId;
       if (!sandboxTemplateId || !harnessKey || !harnessTemplateId) {
         throw new Error("agent_workspace_harness_template_unavailable");
       }
       const template = catalogQuery.data?.templates.find(
         (candidate) => candidate.templateId === sandboxTemplateId,
       );
-      const normalizedRepository = repository.trim();
-      const normalizedRef = repositoryRef.trim() ? validateGitRef(repositoryRef) : "";
-      const normalizedBranch = branch.trim() ? validateGitRef(branch) : "";
-      const profileNetworkRules =
-        compiledProfile?.sandbox.networkPolicy.mode === "allowlist"
-          ? compiledProfile.sandbox.networkPolicy.rules
-          : [];
       const sourceNetworkRules = normalizedRepository
         ? repositoryNetworkPolicy(normalizedRepository).rules
         : [];
-      const networkRules = [...profileNetworkRules, ...sourceNetworkRules].filter(
+      const networkRules = sourceNetworkRules.filter(
         (rule, index, all) =>
           all.findIndex(
             (candidate) =>
@@ -271,15 +266,13 @@
           ) === index,
       );
       const sandbox = (await orpcClient.sandboxes.create({
-        source: compiledProfile?.sandbox.source ?? {
+        source: {
           kind: "template",
           templateId: sandboxTemplateId,
         },
         requestedIsolation:
-          compiledProfile?.sandbox.requestedIsolation ??
-          template?.minimumIsolation ??
-          "container-trusted",
-        limits: compiledProfile?.sandbox.limits ?? {
+          template?.minimumIsolation ?? "container-trusted",
+        limits: {
           cpuMillis: 2_000,
           memoryBytes: 4 * 1024 * 1024 * 1024,
           diskBytes: 20 * 1024 * 1024 * 1024,
@@ -315,33 +308,11 @@
         }
       }
 
-      for (const step of compiledProfile?.initialization ?? []) {
-        assertSuccessfulExec(
-          await orpcClient.sandboxes.exec({
-            sandboxId: sandbox.sandboxId,
-            argv: step.argv,
-            ...(step.cwd ? { cwd: step.cwd } : {}),
-          }),
-        );
-      }
-
-      for (const port of compiledProfile?.defaultPorts ?? []) {
-        await orpcClient.sandboxes.ports.expose({
-          sandboxId: sandbox.sandboxId,
-          port: port.port,
-          visibility: port.visibility,
-          expiresAt: new Date(Date.now() + port.ttlSeconds * 1_000).toISOString(),
-        });
-      }
-
       await orpcClient.sandboxes.agents.runtimes.create({
         sandboxId: sandbox.sandboxId,
         harnessKey,
         harnessTemplateId,
         idempotencyKey: crypto.randomUUID(),
-        ...(selectedProfile
-          ? { profileInstallationId: selectedProfile.installationId }
-          : {}),
       });
       return sandbox.sandboxId;
     },
@@ -608,6 +579,15 @@
           />
         </label>
       </div>
+      <label class="grid gap-1.5 text-sm">
+        <span class="font-medium">Git commit SHA</span>
+        <input
+          class="h-10 rounded-md border bg-background px-3 font-mono"
+          bind:value={commitSha}
+          autocomplete="off"
+          placeholder="0123456789abcdef0123456789abcdef01234567"
+        />
+      </label>
       {#if createWorkspaceMutation.error}
         <p class="text-sm text-destructive">
           {readErrorMessage(createWorkspaceMutation.error)}
