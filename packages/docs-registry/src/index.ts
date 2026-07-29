@@ -137,7 +137,7 @@ export const publicDocsHelpTopics = {
       "docs/specs/111-agent-workspace-entry-workflow/spec.md",
       "docs/specs/112-agent-task-run-workflow/spec.md",
       "docs/specs/113-workspace-collaboration/spec.md",
-      "docs/specs/119-profile-aware-workspace-open-and-attach/spec.md",
+      "docs/specs/120-profile-aware-workspace-open-and-attach/spec.md",
       "docs/testing/agent-workspace-test-matrix.md",
       "docs/testing/agent-task-run-test-matrix.md",
       "docs/testing/workspace-collaboration-test-matrix.md",
