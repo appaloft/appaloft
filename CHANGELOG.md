@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.6.2](https://github.com/appaloft/appaloft/compare/v1.6.1...v1.6.2) (2026-07-29)
+
+
+### Features
+
+* add GitHub agent automation triggers ([#863](https://github.com/appaloft/appaloft/issues/863)) ([c33d22c](https://github.com/appaloft/appaloft/commit/c33d22c26b6962a5cb34c7170ce3a51b730eda4c))
+* **server:** add workload role admission ([#862](https://github.com/appaloft/appaloft/issues/862)) ([46b6d0a](https://github.com/appaloft/appaloft/commit/46b6d0ad737c1784fcb25bbe6d25460326ad8e75))
+
+
+### Bug Fixes
+
+* align Docker capacity prune semantics ([#867](https://github.com/appaloft/appaloft/issues/867)) ([92d892b](https://github.com/appaloft/appaloft/commit/92d892bbed4511570fbc8b169241dcfa3c702618))
+* **sdk:** materialize workspace source in populated roots ([#860](https://github.com/appaloft/appaloft/issues/860)) ([0e9c037](https://github.com/appaloft/appaloft/commit/0e9c0377eb88c6716fc0f71c7ed0798f98b82d9d))
+* **sdk:** support trusted private workspace sources ([#866](https://github.com/appaloft/appaloft/issues/866)) ([f5157fa](https://github.com/appaloft/appaloft/commit/f5157fa2e751ee9824f466b6cdd2a17bb03a6a01))
+
 ## [1.6.1](https://github.com/appaloft/appaloft/compare/v1.6.0...v1.6.1) (2026-07-28)
 
 
