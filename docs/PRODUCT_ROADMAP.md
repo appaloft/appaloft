@@ -509,14 +509,6 @@ Required:
   public docs/help, and tests.
 - [x] Add `servers.configure-workload-roles` and normalized Server Workload Role readback across
   registration, list, and show without treating roles as capability or target kind.
-- [ ] Add a neutral remote artifact-builder executor with separately governed readiness, logs,
-  cancellation, cache ownership, and artifact provenance.
-- [ ] Add registered-Server Sandbox placement only after its neutral candidate/binding carries
-  Server identity and keeps isolation/provider evidence independently mandatory.
-- [ ] Specify drain/evacuation as a separate lifecycle workflow; workload-role configuration does
-  not move or stop existing work.
-- [ ] Verify any private Cloud/Enterprise eligibility policy through composed-runtime governance;
-  public Server Workload Roles do not claim or define private behavior.
 - [x] Add resource show/archive/delete.
 - [x] Add separate resource source update semantics where specs require a separate command.
 - [x] Add separate resource runtime update semantics where specs require a separate command.
@@ -530,6 +522,19 @@ Required:
 - [x] Complete resource detail editing affordances for source/runtime/network/access/health/
   configuration profile changes.
 - [x] Ensure CLI, HTTP/oRPC, Web, and future MCP naming reuse the same command/query schemas.
+
+Deferred workload-role follow-ups:
+- [ ] Add a neutral remote artifact-builder executor with separately governed readiness, logs,
+  cancellation, cache ownership, and artifact provenance.
+- [ ] Add registered-Server Sandbox placement only after its neutral candidate/binding carries
+  Server identity and keeps isolation/provider evidence independently mandatory.
+- [ ] Specify drain/evacuation as a separate lifecycle workflow; workload-role configuration does
+  not move or stop existing work.
+- [ ] Verify any private Cloud/Enterprise eligibility policy through composed-runtime governance;
+  public Server Workload Roles do not claim or define private behavior.
+
+These follow-ups remain visible and unchecked, but they are post-`1.0.0`, separately governed work
+rather than retroactive Phase 4 release blockers.
 
 Phase 4 resource profile editing verification notes from 2026-04-27:
 - Resource detail source/runtime/network profile forms dispatch `resources.configure-source`,
