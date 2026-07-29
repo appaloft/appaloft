@@ -43,7 +43,7 @@ Existing Pi/OpenCode Harness registrations, Runtime records, `harnessKey`, catal
 Workspace/Task/Collaboration operations remain valid. Adapter is additive distribution language
 over the existing Harness port.
 
-[Spec 119](../119-profile-aware-workspace-open-and-attach/spec.md) adds installation-owned named
+[Spec 120](../120-profile-aware-workspace-open-and-attach/spec.md) adds installation-owned named
 Credential Connection mappings, exact Profile selector resolution, Project defaults, immutable
 creation pins and capability-driven auto attach. Portable Profile definitions remain tenant- and
 secret-free.

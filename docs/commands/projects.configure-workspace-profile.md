@@ -38,6 +38,6 @@ requires an explicit Profile until another default is configured.
 
 ## References
 
-- [ADR-102](../decisions/ADR-102-profile-aware-workspace-open-and-attach.md)
-- [Spec 119](../specs/119-profile-aware-workspace-open-and-attach/spec.md)
+- [ADR-103](../decisions/ADR-103-profile-aware-workspace-open-and-attach.md)
+- [Spec 120](../specs/120-profile-aware-workspace-open-and-attach/spec.md)
 - [Test Matrix](../testing/profile-aware-workspace-open-test-matrix.md)

@@ -88,6 +88,6 @@ and its bound Sandbox status.
 
 ## Profile-Aware Open Extension
 
-[ADR-102](./ADR-102-profile-aware-workspace-open-and-attach.md) adds the public Repository Binding,
+[ADR-103](./ADR-103-profile-aware-workspace-open-and-attach.md) adds the public Repository Binding,
 Project default Profile, atomic `workspaces.open` coordination and capability-driven direct attach.
 It does not change this ADR's aggregate boundary: Workspace identity remains the Sandbox id.
