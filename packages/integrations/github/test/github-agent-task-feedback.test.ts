@@ -202,6 +202,132 @@ describe("GitHub Agent Task feedback adapter", () => {
     expect(rendered.length).toBeLessThan(50_000);
   });
 
+  test("[GH-AUTO-FEEDBACK-013][GH-AUTO-FIX-014] publishes Issue-triggered Checks at the hydrated source SHA", async () => {
+    const sourceHeadSha = "a".repeat(40);
+    for (const issueTrigger of [
+      {
+        ...trigger,
+        thread: { kind: "issue" as const, number: 43 },
+        pullRequest: undefined,
+        source: { ref: "refs/heads/main", headSha: sourceHeadSha },
+        command: { kind: "fix" as const },
+      },
+      {
+        ...trigger,
+        event: "issues" as const,
+        action: "labeled" as const,
+        thread: { kind: "issue" as const, number: 44 },
+        commentId: undefined,
+        pullRequest: undefined,
+        source: { ref: "refs/heads/main", headSha: sourceHeadSha },
+        command: undefined,
+        label: { id: "900", name: "appaloft:fix" },
+      },
+    ]) {
+      const requests: Array<{ url: string; method: string; body: unknown }> = [];
+      let id = 200;
+      const adapter = createGitHubAgentTaskFeedbackAdapter(
+        "installation-token",
+        async (url, init) => {
+          const requestUrl = String(url);
+          requests.push({
+            url: requestUrl,
+            method: init?.method ?? "GET",
+            body: init?.body ? JSON.parse(String(init.body)) : undefined,
+          });
+          const existingId = requestUrl.match(/\/(?:comments|check-runs)\/(\d+)$/u)?.[1];
+          if (!existingId) id += 1;
+          return new Response(JSON.stringify({ id: existingId ?? id }), {
+            status: 201,
+            headers: { "content-type": "application/json" },
+          });
+        },
+        "https://api.github.test",
+      );
+
+      const created = await adapter.update(context, {
+        trigger: issueTrigger,
+        task: queued,
+      });
+      const updated = await adapter.update(context, {
+        trigger: issueTrigger,
+        task: { ...queued, status: "completed" },
+        existing: created._unsafeUnwrap(),
+      });
+
+      expect(created._unsafeUnwrap()).toEqual({
+        statusCommentId: "201",
+        checkRunId: "202",
+      });
+      expect(updated._unsafeUnwrap()).toEqual({
+        statusCommentId: "201",
+        checkRunId: "202",
+      });
+      expect(requests.map(({ url, method }) => ({ url, method }))).toEqual([
+        {
+          url: `https://api.github.test/repos/appaloft/agent-sandbox-smoke/issues/${issueTrigger.thread.number}/comments`,
+          method: "POST",
+        },
+        {
+          url: "https://api.github.test/repos/appaloft/agent-sandbox-smoke/check-runs",
+          method: "POST",
+        },
+        {
+          url: "https://api.github.test/repos/appaloft/agent-sandbox-smoke/issues/comments/201",
+          method: "PATCH",
+        },
+        {
+          url: "https://api.github.test/repos/appaloft/agent-sandbox-smoke/check-runs/202",
+          method: "PATCH",
+        },
+      ]);
+      expect(requests[1]?.body).toMatchObject({
+        head_sha: sourceHeadSha,
+        status: "queued",
+      });
+      expect(requests[3]?.body).toMatchObject({
+        status: "completed",
+        conclusion: "success",
+      });
+      expect(requests[3]?.body).not.toHaveProperty("head_sha");
+    }
+  });
+
+  test("[GH-AUTO-FEEDBACK-013] omits a Check when no exact source SHA is available", async () => {
+    const requests: Array<{ url: string; method: string }> = [];
+    const adapter = createGitHubAgentTaskFeedbackAdapter(
+      "installation-token",
+      async (url, init) => {
+        requests.push({
+          url: String(url),
+          method: init?.method ?? "GET",
+        });
+        return new Response(JSON.stringify({ id: 300 }), {
+          status: 201,
+          headers: { "content-type": "application/json" },
+        });
+      },
+      "https://api.github.test",
+    );
+
+    const result = await adapter.update(context, {
+      trigger: {
+        ...trigger,
+        thread: { kind: "issue", number: 45 },
+        pullRequest: undefined,
+      },
+      task: queued,
+    });
+
+    expect(result._unsafeUnwrap()).toEqual({ statusCommentId: "300" });
+    expect(requests).toEqual([
+      {
+        url: "https://api.github.test/repos/appaloft/agent-sandbox-smoke/issues/45/comments",
+        method: "POST",
+      },
+    ]);
+  });
+
   test("[GH-AUTO-AUTHZ-008] denial exposes only an actionable reason and optional Connect Agent URL", async () => {
     const bodies: unknown[] = [];
     const adapter = createGitHubAgentTaskFeedbackAdapter(

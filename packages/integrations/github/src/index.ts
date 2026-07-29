@@ -2196,8 +2196,9 @@ export class GitHubAgentTaskFeedbackAdapter implements GitHubAgentFeedbackPort {
     if (commentId.isErr()) return err(commentId.error);
 
     let checkRunId = existing.checkRunId;
-    if (input.trigger.pullRequest) {
-      const check = githubAgentCheckRun(input.task, input.trigger.pullRequest.headSha);
+    const checkHeadSha = input.trigger.pullRequest?.headSha ?? input.trigger.source?.headSha;
+    if (checkHeadSha) {
+      const check = githubAgentCheckRun(input.task, checkHeadSha);
       const { head_sha: _headSha, ...checkUpdate } = check;
       const checkId = await this.requestId(
         input.trigger,
