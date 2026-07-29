@@ -4,7 +4,7 @@
 | --- | --- | --- | --- | --- |
 | GH-AUTO-WEBHOOK-001 | Integration/contract | Supported signed event/action and invalid signature/payload | All required events normalize with numeric ids; invalid input fails before dispatch. | public automated pass |
 | GH-AUTO-COMMAND-002 | Unit/property | Valid commands, code blocks, multiple commands, env/secret/credential ids | Only the strict grammar parses; unsafe text is not persisted as a Task prompt. | public automated pass |
-| GH-AUTO-BINDING-003 | Domain/persistence | Create, select, revoke, and cross-tenant Repository Binding | Numeric repository identity is unique in tenant scope; revoked/cross-tenant binding cannot execute. | public automated pass |
+| GH-AUTO-BINDING-003 | Domain/persistence/application | Create, select, revoke, cross-tenant, and Workspace-open Repository Binding projection | Numeric repository identity is unique in tenant scope; an active GitHub binding resolves through the connector-neutral Workspace-open port; revoked/cross-tenant/conflicting binding cannot execute. | public automated pass |
 | GH-AUTO-RULE-004 | Domain/application | Label, ready-for-review, synchronize, repository scope and full rule policy | Only exact active rules match and every execution field is resolved. | public automated pass |
 | GH-AUTO-PROFILE-005 | Domain/application | Resolve Codex/OpenCode/Pi Profile and incompatible capabilities | Exact Adapter/Profile/Template pins resolve; missing capability fails before Sandbox. | public automated pass |
 | GH-AUTO-CREDENTIAL-006 | Domain/runtime | Native account, native API key, isolated server config, disabled managed provider | Lifecycle/scope is enforced and public state never exposes plaintext. | public contract pass; hosted custody pending |
@@ -33,7 +33,9 @@ matrix alone.
 
 ## Public Automated Evidence
 
-- Focused suites cover the ids marked `public automated pass` or `public contract pass`.
+- Focused suites cover the ids marked `public automated pass` or `public contract pass`, including
+  `packages/application/test/github-repository-binding-workspace-projection.test.ts` for the
+  GitHub-to-Workspace binding projection and conflict fail-closed behavior.
 - Public `lint`, `typecheck`, and `build` completed successfully on 2026-07-29.
 - The repository-level test gate passed all feature suites, HTTP/WebSocket suites, SDK/CLI/Web
   suites, and WebView acceptance. One unrelated PGlite audit test exceeded its five-second
