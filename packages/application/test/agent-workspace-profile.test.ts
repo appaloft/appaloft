@@ -277,6 +277,43 @@ describe("Agent Workspace Profile installation and compilation", () => {
     ]);
   });
 
+  test("[ADAPTER-CRED-006][PROFILE-PIN-010] compiles task-scoped references without mutating installation defaults", async () => {
+    const { adapterService, service } = harness();
+    await adapterService.install(context("org_a"), { manifest: adapterManifest() });
+    const profile = await service.install(context("org_a"), { manifest: profileManifest() });
+    expect(profile.isOk()).toBe(true);
+    if (profile.isErr()) return;
+    expect(
+      (
+        await service.configureCredentialConnections(context("org_a"), {
+          installationId: profile.value.installationId,
+          connections: [{ requirementId: "model-api", connectionReference: "model-default" }],
+        })
+      ).isOk(),
+    ).toBe(true);
+
+    const scoped = await service.compileForNewWorkspace(
+      context("org_a"),
+      profile.value.installationId,
+      {
+        credentialReferences: [
+          { requirementId: "model-api", connectionReference: "task-credential" },
+        ],
+      },
+    );
+    expect(scoped._unsafeUnwrap().credentialBindings?.[0]?.connectionReference).toBe(
+      "task-credential",
+    );
+
+    const persisted = await service.compileForNewWorkspace(
+      context("org_a"),
+      profile.value.installationId,
+    );
+    expect(persisted._unsafeUnwrap().credentialBindings?.[0]?.connectionReference).toBe(
+      "model-default",
+    );
+  });
+
   test("[PROFILE-PIN-010][ADAPTER-DISABLE-008] disable fences new compiles and active references fence uninstall", async () => {
     const { activeReferences, adapterService, service } = harness();
     await adapterService.install(context("org_a"), { manifest: adapterManifest() });

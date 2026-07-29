@@ -534,6 +534,9 @@ export class AgentWorkspaceProfileInstallationService {
   async compileForNewWorkspace(
     context: ExecutionContext,
     installationId: string,
+    input: {
+      credentialReferences?: readonly AgentWorkspaceCredentialReference[];
+    } = {},
   ): Promise<Result<AgentWorkspaceProfileCompiledPlan>> {
     const found = await this.findWithDefinition(context, installationId);
     if (found.isErr()) return err(found.error);
@@ -549,7 +552,8 @@ export class AgentWorkspaceProfileInstallationService {
     const compiled = this.dependencies.validatorCompiler.compile(validated.value.manifest, {
       profileInstallationId: installationId,
       adapterInstallation: adapter.value,
-      credentialReferences: found.value.installation.toState().credentialConnections,
+      credentialReferences:
+        input.credentialReferences ?? found.value.installation.toState().credentialConnections,
     });
     if (!compiled.ok) return this.validationError(compiled.issues);
     const registered = this.dependencies.harnessRegistrar.register(
