@@ -22,6 +22,7 @@
 | GH-AUTO-CLEANUP-018 | Runtime/provider | Stop, expiry, PR close, retry, provider readback | Exact process/port/domain/route/network/volume/worktree/session cleanup is confirmed. | public orchestration pass; provider readback pending |
 | GH-AUTO-SURFACE-019 | Contract/transport/Web | Manage and inspect all new objects and Task controls | Catalog, HTTP/oRPC, SDK, CLI, Web, and capability metadata use the same schemas. | public automated pass |
 | GH-AUTO-CAPABILITY-020 | Adapter conformance | Codex/OpenCode/Pi capability differences | Native and fallback paths remain truthful without vendor-specific domain models. | fallback pass; real adapters pending |
+| GH-AUTO-BOUNDARY-021 | Architecture/contract/composition | Public server and one hosted fixture compose automation, credential metadata, repository materialization, feedback/finalization, and lifecycle cleanup | One public delivery/review/thread store is resolved; accepted intent/authz is immutable; preview/materialization/rendering use public seams; public graph has no private import; hosted fixture has no parallel lifecycle/idempotency table or contract. | public seams automated pass; hosted reuse pending |
 
 ## External Acceptance Boundary
 

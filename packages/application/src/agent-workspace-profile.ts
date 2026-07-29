@@ -71,6 +71,13 @@ export interface AgentWorkspaceProfileCompiledPlan {
     visibility: "private" | "organization" | "public";
     ttlSeconds: number;
   }[];
+  preview?: {
+    startArgv: string[];
+    cwd?: string;
+    port: number;
+    visibility: "private" | "organization" | "public";
+    ttlSeconds: number;
+  };
   suggestedChecks: { name: string; argv: string[]; cwd?: string }[];
   credentialRequirements: AgentWorkspaceCredentialRequirement[];
   credentialBindings?: AgentWorkspaceCredentialBinding[];

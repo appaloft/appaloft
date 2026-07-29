@@ -38,6 +38,7 @@ export const tokens = {
   repositoryBindingRepository: Symbol.for("appaloft.repository_binding_repository"),
   repositoryBindingService: Symbol.for("appaloft.repository_binding_service"),
   agentTaskRunService: Symbol.for("appaloft.agent_task_run_service"),
+  githubAgentAutomationStore: Symbol.for("appaloft.github_agent_automation_store"),
   githubAgentConfigurationRepository: Symbol.for("appaloft.github_agent_configuration_repository"),
   githubAgentConfigurationService: Symbol.for("appaloft.github_agent_configuration_service"),
   workspaceCollaborationRepository: Symbol.for("appaloft.workspace_collaboration_repository"),

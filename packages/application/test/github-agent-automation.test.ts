@@ -39,6 +39,7 @@ function allowedAuthorization(): GitHubAgentAuthorizationPort {
     authorize: async (_context, input) =>
       ok({
         allowed: true,
+        authorizationKind: "task-execution",
         actorSnapshot: {
           githubUserId: input.trigger.sender.id,
           appaloftUserId: "user_303",
@@ -193,6 +194,17 @@ describe("GitHub Agent automation service", () => {
 
     expect(first._unsafeUnwrap()).toMatchObject({
       status: "accepted",
+      intent: { action: "fix", source: "manual", mode: "write" },
+      authorization: {
+        authorizationKind: "task-execution",
+        workspaceProfileInstallationId: "awpi_opencode",
+        sandboxTemplateId: "sbt_opencode",
+        serverPoolId: "pool_test",
+        maximumRuntimeSeconds: 3_600,
+        maximumRetries: 2,
+        previewPolicy: "private",
+        pullRequestDeliveryPolicy: "create-or-update",
+      },
       task: { taskId: "task_1", workspaceId: "workspace_1" },
     });
     expect(duplicate._unsafeUnwrap()).toEqual({
@@ -392,5 +404,78 @@ describe("GitHub Agent automation service", () => {
       task: { taskId: "task_1", status: "cleaned" },
     });
     expect(tasks.calls).toContain("cleanup:task_1");
+  });
+
+  test("[GH-AUTO-BOUNDARY-021] lifecycle cleanup authorization needs no fake Agent execution references", async () => {
+    const store = new InMemoryGitHubAgentAutomationStore();
+    const tasks = taskPort();
+    const feedback = feedbackPort();
+    const executionAuthorization = allowedAuthorization();
+    const service = new GitHubAgentAutomationService({
+      store,
+      authorization: {
+        authorize: async (executionContext, input) =>
+          input.intent.action === "cleanup"
+            ? ok({
+                allowed: true,
+                authorizationKind: "lifecycle-cleanup",
+                actorSnapshot: {
+                  githubUserId: input.trigger.sender.id,
+                  organizationId: "org_test",
+                  externalCollaborator: false,
+                },
+                repositoryBindingId: "grb_test",
+                projectId: "project_test",
+                authorizationReason: "authorized-retention-cleanup",
+              })
+            : executionAuthorization.authorize(executionContext, input),
+      },
+      tasks: tasks.port,
+      feedback: feedback.port,
+    });
+    const pullRequest = {
+      number: 42,
+      headSha: "abcdef",
+      baseRef: "main",
+      headRepositoryId: "123456",
+      headRepositoryFullName: "appaloft/agent-sandbox-smoke",
+      fork: false,
+    };
+    await service.handle(
+      context,
+      trigger({
+        deliveryId: "delivery_boundary_fix",
+        thread: { kind: "pull-request", number: 42 },
+        pullRequest,
+      }),
+    );
+
+    const cleaned = await service.handle(
+      context,
+      trigger(
+        {
+          deliveryId: "delivery_boundary_closed",
+          event: "pull_request",
+          action: "closed",
+          thread: { kind: "pull-request", number: 42 },
+          pullRequest,
+        },
+        false,
+      ),
+    );
+
+    expect(cleaned._unsafeUnwrap()).toMatchObject({
+      status: "accepted",
+      intent: { action: "cleanup", source: "lifecycle" },
+      authorization: {
+        authorizationKind: "lifecycle-cleanup",
+        repositoryBindingId: "grb_test",
+        projectId: "project_test",
+      },
+      task: { status: "cleaned" },
+    });
+    expect(JSON.stringify(cleaned._unsafeUnwrap())).not.toContain(
+      "lifecycle-cleanup:no-credential",
+    );
   });
 });

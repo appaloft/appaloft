@@ -186,6 +186,33 @@ Replace placeholders with confirmed paths; do not execute `<workspace>` or `path
 - agents should treat `docs/testing/*-test-matrix.md` and equivalent testing specs as the authoritative behavioral coverage map for command/event/workflow testing
 - if a capability also changes a normative local spec, update the corresponding command/event/workflow/testing docs in the same change
 
+### Public/Private Boundary Review Round
+
+Run a dedicated, read-only **Public/Private Boundary Review Round** whenever public Appaloft is
+changed for a hosted/private composition, or a private repository consumes a new or changed public
+contract. This round is a merge and downstream-Code gate, not a general code-review substitute.
+
+The round has one responsibility: prove that lifecycle ownership and dependency direction remain
+correct. It must:
+
+- compare the public implementation and the private diff before private Code resumes;
+- classify every new private type, table, repository, adapter, and projection as `KEEP_PRIVATE`,
+  `MOVE_PUBLIC`, `REUSE_PUBLIC`, or `DELETE_OR_MERGE`;
+- verify Workspace, Sandbox, Agent Task, Preview, Deployment, source delivery, and native Agent
+  session truth still comes from the existing public domain and operations;
+- verify public packages have no private imports, private code has not copied public source, and
+  hosted persistence contains only tenancy, authorization, custody, governance, audit, or
+  composition state;
+- treat duplicate lifecycle state, idempotency state, public contracts, or neutral provider policy
+  as a blocking boundary violation;
+- produce an evidence-based `PASS` or `BLOCKED` report with exact files, symbols, tables, severity,
+  and the minimum public-first correction order.
+
+The review is read-only: do not edit code, stage, commit, push, merge, or advance a submodule during
+the round. A `BLOCKED` result returns the work to Spec/Ticket or public Code as appropriate. Private
+Code may resume only after the required public change is merged, the downstream pin is updated, and
+the boundary review gate is `PASS`.
+
 ## Public Documentation Rules
 
 - public documentation is a first-class product surface governed by [ADR-030: Public Documentation Round And Platform](docs/decisions/ADR-030-public-documentation-round-and-platform.md) (Docs Round contract) and [ADR-101: Nimbus Public Documentation Platform](docs/decisions/ADR-101-nimbus-public-documentation-platform.md) (platform, IA v3, Markdown processor, toolchain)

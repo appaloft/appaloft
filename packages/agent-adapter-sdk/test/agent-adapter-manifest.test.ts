@@ -109,6 +109,10 @@ function validProfile() {
         ttlSeconds: 86_400,
       },
     ],
+    preview: {
+      portName: "application",
+      start: { id: "preview", argv: ["bun", "run", "dev", "--host", "0.0.0.0"] },
+    },
     persistentPaths: ["/workspace/.codex"],
     suggestedChecks: [{ name: "tests", argv: ["bun", "test"] }],
   } as const;
@@ -548,6 +552,12 @@ describe("Agent Workspace Profile validation and compilation", () => {
       },
       initialization: [{ argv: ["codex", "--version"] }],
       defaultPorts: [{ port: 3_000, visibility: "private", ttlSeconds: 86_400 }],
+      preview: {
+        startArgv: ["bun", "run", "dev", "--host", "0.0.0.0"],
+        port: 3_000,
+        visibility: "private",
+        ttlSeconds: 86_400,
+      },
       suggestedChecks: [{ name: "tests", argv: ["bun", "test"] }],
       pin: {
         profileInstallationId: "awpi_profile",

@@ -6,6 +6,22 @@
 - [x] Complete Discovery, ADR-102, Spec 119, Plan, Tasks, and public Test Matrix.
 - [x] Create and link public tracking #845 and actor-visible vertical slices #846-#849.
 - [x] Mark implementation issues `ready-for-agent` after ticket review.
+- [x] Record the 2026-07-29 boundary audit and owner-confirmed correction in Discovery/ADR/Spec.
+- [x] Create and link public boundary-composition issue #876 under #845.
+
+## Public Composition Boundary Slice
+
+- [x] GH-AUTO-BOUNDARY-021: register `GitHubAgentAutomationStore` in public server composition.
+- [x] GH-AUTO-BOUNDARY-021: expose one public GitHub signature verification seam.
+- [x] GH-AUTO-BOUNDARY-021: return normalized intent and the complete immutable allowed execution
+  snapshot in accepted automation outcomes.
+- [x] GH-AUTO-BOUNDARY-021: expose neutral repository materialization, Workspace Profile preview
+  plan, and bounded Task/Review/PR projection seams.
+- [x] GH-AUTO-BOUNDARY-021: model lifecycle cleanup authorization without fake Agent
+  Profile/credential references and make Task controls reference-based.
+- [x] GH-AUTO-BOUNDARY-021: add public composition and downstream-boundary contract tests.
+- [ ] Run the dedicated read-only Public/Private Boundary Review Round and require `PASS` before
+  hosted Code resumes.
 
 ## Event And Policy Slice
 

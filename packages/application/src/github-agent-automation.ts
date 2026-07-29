@@ -70,25 +70,42 @@ export interface GitHubAgentActorSnapshot {
   externalCollaborator: boolean;
 }
 
+export interface GitHubAgentTaskExecutionAuthorization {
+  allowed: true;
+  authorizationKind: "task-execution";
+  actorSnapshot: GitHubAgentActorSnapshot;
+  repositoryBindingId: string;
+  projectId: string;
+  ruleId?: string;
+  agentProfileId: string;
+  workspaceProfileInstallationId: string;
+  sandboxTemplateId: string;
+  serverPoolId: string;
+  credentialConnectionId: string;
+  mode: "review-only" | "write";
+  maximumRuntimeSeconds: number;
+  maximumRetries: number;
+  previewPolicy: "disabled" | "private";
+  pullRequestDeliveryPolicy: "none" | "manual-approval" | "create-or-update" | "review-only";
+  authorizationReason: string;
+}
+
+export interface GitHubAgentLifecycleCleanupAuthorization {
+  allowed: true;
+  authorizationKind: "lifecycle-cleanup";
+  actorSnapshot: GitHubAgentActorSnapshot;
+  repositoryBindingId: string;
+  projectId: string;
+  ruleId?: string;
+  authorizationReason: string;
+}
+
+export type GitHubAgentAllowedAuthorizationDecision =
+  | GitHubAgentTaskExecutionAuthorization
+  | GitHubAgentLifecycleCleanupAuthorization;
+
 export type GitHubAgentAuthorizationDecision =
-  | {
-      allowed: true;
-      actorSnapshot: GitHubAgentActorSnapshot;
-      repositoryBindingId: string;
-      projectId: string;
-      ruleId?: string;
-      agentProfileId: string;
-      workspaceProfileInstallationId: string;
-      sandboxTemplateId: string;
-      serverPoolId: string;
-      credentialConnectionId: string;
-      mode: "review-only" | "write";
-      maximumRuntimeSeconds: number;
-      maximumRetries: number;
-      previewPolicy: "disabled" | "private";
-      pullRequestDeliveryPolicy: "none" | "manual-approval" | "create-or-update" | "review-only";
-      authorizationReason: string;
-    }
+  | GitHubAgentAllowedAuthorizationDecision
   | {
       allowed: false;
       reasonCode: string;
@@ -157,31 +174,47 @@ export interface GitHubAgentTaskSummary {
   feedback?: GitHubAgentTaskFeedbackDetails;
 }
 
+export interface GitHubAgentTaskReference {
+  taskId: string;
+  workspaceId: string;
+}
+
+export interface GitHubRepositoryWorkspaceMaterializerPort {
+  materialize(
+    context: ExecutionContext,
+    input: {
+      trigger: GitHubAgentTrigger;
+      workspaceId: string;
+      mode: "review-only" | "write";
+    },
+  ): Promise<Result<void>>;
+}
+
 export interface GitHubAgentTaskPort {
   startOrResume(
     context: ExecutionContext,
     input: {
       trigger: GitHubAgentTrigger;
       intent: GitHubAgentIntent;
-      authorization: Extract<GitHubAgentAuthorizationDecision, { allowed: true }>;
+      authorization: GitHubAgentTaskExecutionAuthorization;
       current?: GitHubAgentTaskSummary;
     },
   ): Promise<Result<GitHubAgentTaskSummary>>;
   status(
     context: ExecutionContext,
-    input: GitHubAgentTaskSummary,
+    input: GitHubAgentTaskReference,
   ): Promise<Result<GitHubAgentTaskSummary>>;
   steer(
     context: ExecutionContext,
-    input: GitHubAgentTaskSummary & { instruction: string },
+    input: GitHubAgentTaskReference & { instruction: string },
   ): Promise<Result<GitHubAgentTaskSummary>>;
   stop(
     context: ExecutionContext,
-    input: GitHubAgentTaskSummary,
+    input: GitHubAgentTaskReference,
   ): Promise<Result<GitHubAgentTaskSummary>>;
   resume(
     context: ExecutionContext,
-    input: GitHubAgentTaskSummary,
+    input: GitHubAgentTaskReference,
   ): Promise<Result<GitHubAgentTaskSummary>>;
   replace(
     context: ExecutionContext,
@@ -189,12 +222,12 @@ export interface GitHubAgentTaskPort {
       current: GitHubAgentTaskSummary;
       profile: string;
       trigger: GitHubAgentTrigger;
-      authorization: Extract<GitHubAgentAuthorizationDecision, { allowed: true }>;
+      authorization: GitHubAgentTaskExecutionAuthorization;
     },
   ): Promise<Result<GitHubAgentTaskSummary>>;
   cleanup(
     context: ExecutionContext,
-    input: GitHubAgentTaskSummary,
+    input: GitHubAgentTaskReference,
   ): Promise<Result<GitHubAgentTaskSummary>>;
 }
 
@@ -311,16 +344,9 @@ export interface GitHubAgentAutomationOutcome {
   connectAgentUrl?: string;
   task?: GitHubAgentTaskSummary;
   feedback?: GitHubAgentFeedbackState;
+  intent?: GitHubAgentIntent;
   actorSnapshot?: GitHubAgentActorSnapshot;
-  authorization?: {
-    repositoryBindingId: string;
-    projectId: string;
-    ruleId?: string;
-    agentProfileId: string;
-    credentialConnectionId: string;
-    mode: "review-only" | "write";
-    reason: string;
-  };
+  authorization?: GitHubAgentAllowedAuthorizationDecision;
 }
 
 export interface GitHubAgentAutomationStore {
@@ -440,7 +466,7 @@ export class GitHubAgentAutomationService {
       );
     }
 
-    const intent = intentFromTrigger(trigger);
+    const intent = resolveGitHubAgentIntent(trigger);
     if (!intent) {
       return this.finish(context, {
         status: "ignored",
@@ -452,15 +478,20 @@ export class GitHubAgentAutomationService {
     }
 
     if (trigger.pullRequest?.fork) {
-      return this.reject(context, trigger, {
-        allowed: false,
-        reasonCode: "github_fork_pull_request_denied",
-        message: "Fork pull requests are not eligible for Agent execution.",
-        actorSnapshot: {
-          githubUserId: trigger.sender.id,
-          externalCollaborator: true,
+      return this.reject(
+        context,
+        trigger,
+        {
+          allowed: false,
+          reasonCode: "github_fork_pull_request_denied",
+          message: "Fork pull requests are not eligible for Agent execution.",
+          actorSnapshot: {
+            githubUserId: trigger.sender.id,
+            externalCollaborator: true,
+          },
         },
-      });
+        intent,
+      );
     }
 
     const authorization = await this.dependencies.authorization.authorize(context, {
@@ -469,14 +500,19 @@ export class GitHubAgentAutomationService {
     });
     if (authorization.isErr()) return err(authorization.error);
     if (!authorization.value.allowed) {
-      return this.reject(context, trigger, authorization.value);
+      return this.reject(context, trigger, authorization.value, intent);
     }
 
     const allowed = authorization.value;
     const threadKey = githubAgentThreadKey(trigger);
     const current = await this.dependencies.store.currentTask(context, threadKey);
 
-    if (intent.action === "review" && intent.source === "automation" && trigger.pullRequest) {
+    if (
+      intent.action === "review" &&
+      intent.source === "automation" &&
+      trigger.pullRequest &&
+      allowed.authorizationKind === "task-execution"
+    ) {
       const reviewKey = githubReviewExecutionKey({
         providerRepositoryId: trigger.repository.id,
         pullRequestNumber: trigger.pullRequest.number,
@@ -491,8 +527,9 @@ export class GitHubAgentAutomationService {
           deliveryId: trigger.deliveryId,
           reasonCode: "github_review_execution_duplicate",
           message: "This pull request head has already been reviewed by the matching rule.",
+          intent: cloneIntent(intent),
           actorSnapshot: { ...allowed.actorSnapshot },
-          authorization: authorizationSnapshot(allowed),
+          authorization: cloneAllowedAuthorization(allowed),
         });
       }
     }
@@ -505,39 +542,48 @@ export class GitHubAgentAutomationService {
           deliveryId: trigger.deliveryId,
           reasonCode: "github_agent_task_not_found",
           message: "No linked Agent Task requires cleanup.",
+          intent: cloneIntent(intent),
           actorSnapshot: { ...allowed.actorSnapshot },
-          authorization: authorizationSnapshot(allowed),
+          authorization: cloneAllowedAuthorization(allowed),
         });
       }
       const task = await this.dependencies.tasks.cleanup(context, current);
       if (task.isErr()) return err(task.error);
       await this.dependencies.store.setCurrentTask(context, threadKey, task.value);
-      return this.updateAndFinish(context, trigger, allowed, task.value);
+      return this.updateAndFinish(context, trigger, intent, allowed, task.value);
+    }
+
+    if (allowed.authorizationKind !== "task-execution") {
+      return err(
+        domainError.invariant(
+          "GitHub Agent lifecycle authorization cannot start or control an Agent Task",
+        ),
+      );
     }
 
     if (intent.action === "status") {
       return current
-        ? this.control(context, trigger, allowed, current, "status")
-        : this.noCurrentTask(context, trigger, allowed);
+        ? this.control(context, trigger, intent, allowed, current, "status")
+        : this.noCurrentTask(context, trigger, intent, allowed);
     }
     if (intent.action === "steer") {
       return current
-        ? this.control(context, trigger, allowed, current, "steer", intent.instruction)
-        : this.noCurrentTask(context, trigger, allowed);
+        ? this.control(context, trigger, intent, allowed, current, "steer", intent.instruction)
+        : this.noCurrentTask(context, trigger, intent, allowed);
     }
     if (intent.action === "stop") {
       return current
-        ? this.control(context, trigger, allowed, current, "stop")
-        : this.noCurrentTask(context, trigger, allowed);
+        ? this.control(context, trigger, intent, allowed, current, "stop")
+        : this.noCurrentTask(context, trigger, intent, allowed);
     }
     if (intent.action === "resume") {
       return current
-        ? this.control(context, trigger, allowed, current, "resume")
-        : this.noCurrentTask(context, trigger, allowed);
+        ? this.control(context, trigger, intent, allowed, current, "resume")
+        : this.noCurrentTask(context, trigger, intent, allowed);
     }
     if (intent.action === "new") {
       if (!current || !intent.profile) {
-        return this.noCurrentTask(context, trigger, allowed);
+        return this.noCurrentTask(context, trigger, intent, allowed);
       }
       const acknowledged = await this.dependencies.feedback.acknowledge(context, { trigger });
       if (acknowledged.isErr()) return err(acknowledged.error);
@@ -549,7 +595,14 @@ export class GitHubAgentAutomationService {
       });
       if (task.isErr()) return err(task.error);
       await this.dependencies.store.setCurrentTask(context, threadKey, task.value);
-      return this.updateAndFinish(context, trigger, allowed, task.value, acknowledged.value);
+      return this.updateAndFinish(
+        context,
+        trigger,
+        intent,
+        allowed,
+        task.value,
+        acknowledged.value,
+      );
     }
 
     const acknowledged = await this.dependencies.feedback.acknowledge(context, { trigger });
@@ -562,13 +615,14 @@ export class GitHubAgentAutomationService {
     });
     if (task.isErr()) return err(task.error);
     await this.dependencies.store.setCurrentTask(context, threadKey, task.value);
-    return this.updateAndFinish(context, trigger, allowed, task.value, acknowledged.value);
+    return this.updateAndFinish(context, trigger, intent, allowed, task.value, acknowledged.value);
   }
 
   private async control(
     context: ExecutionContext,
     trigger: GitHubAgentTrigger,
-    authorization: Extract<GitHubAgentAuthorizationDecision, { allowed: true }>,
+    intent: GitHubAgentIntent,
+    authorization: GitHubAgentTaskExecutionAuthorization,
     current: GitHubAgentTaskSummary,
     action: "status" | "steer" | "stop" | "resume",
     instruction?: string,
@@ -592,6 +646,7 @@ export class GitHubAgentAutomationService {
     return this.updateAndFinish(
       context,
       trigger,
+      intent,
       authorization,
       controlled.value,
       acknowledged.value,
@@ -601,7 +656,8 @@ export class GitHubAgentAutomationService {
   private async noCurrentTask(
     context: ExecutionContext,
     trigger: GitHubAgentTrigger,
-    authorization: Extract<GitHubAgentAuthorizationDecision, { allowed: true }>,
+    intent: GitHubAgentIntent,
+    authorization: GitHubAgentTaskExecutionAuthorization,
   ): Promise<Result<GitHubAgentAutomationOutcome>> {
     const decision: Extract<GitHubAgentAuthorizationDecision, { allowed: false }> = {
       allowed: false,
@@ -609,13 +665,14 @@ export class GitHubAgentAutomationService {
       message: "No current Agent Task is linked to this GitHub thread.",
       actorSnapshot: authorization.actorSnapshot,
     };
-    return this.reject(context, trigger, decision);
+    return this.reject(context, trigger, decision, intent);
   }
 
   private async reject(
     context: ExecutionContext,
     trigger: GitHubAgentTrigger,
     decision: Extract<GitHubAgentAuthorizationDecision, { allowed: false }>,
+    intent?: GitHubAgentIntent,
   ): Promise<Result<GitHubAgentAutomationOutcome>> {
     const feedback = await this.dependencies.feedback.reject(context, {
       trigger,
@@ -632,6 +689,7 @@ export class GitHubAgentAutomationService {
       message: decision.message,
       ...(decision.connectAgentUrl ? { connectAgentUrl: decision.connectAgentUrl } : {}),
       feedback: feedback.value,
+      ...(intent ? { intent: cloneIntent(intent) } : {}),
       actorSnapshot: { ...decision.actorSnapshot },
     });
   }
@@ -639,7 +697,8 @@ export class GitHubAgentAutomationService {
   private async updateAndFinish(
     context: ExecutionContext,
     trigger: GitHubAgentTrigger,
-    authorization: Extract<GitHubAgentAuthorizationDecision, { allowed: true }>,
+    intent: GitHubAgentIntent,
+    authorization: GitHubAgentAllowedAuthorizationDecision,
     task: GitHubAgentTaskSummary,
     feedbackState?: GitHubAgentFeedbackState,
   ): Promise<Result<GitHubAgentAutomationOutcome>> {
@@ -655,8 +714,9 @@ export class GitHubAgentAutomationService {
       deliveryId: trigger.deliveryId,
       task: { ...task },
       feedback: feedback.value,
+      intent: cloneIntent(intent),
       actorSnapshot: { ...authorization.actorSnapshot },
-      authorization: authorizationSnapshot(authorization),
+      authorization: cloneAllowedAuthorization(authorization),
     });
   }
 
@@ -669,7 +729,7 @@ export class GitHubAgentAutomationService {
   }
 }
 
-function intentFromTrigger(trigger: GitHubAgentTrigger): GitHubAgentIntent | null {
+export function resolveGitHubAgentIntent(trigger: GitHubAgentTrigger): GitHubAgentIntent | null {
   if (trigger.command) {
     switch (trigger.command.kind) {
       case "fix":
@@ -738,27 +798,29 @@ function githubAgentThreadKey(trigger: GitHubAgentTrigger): string {
   ].join(":");
 }
 
-function authorizationSnapshot(
-  decision: Extract<GitHubAgentAuthorizationDecision, { allowed: true }>,
-): NonNullable<GitHubAgentAutomationOutcome["authorization"]> {
-  return {
-    repositoryBindingId: decision.repositoryBindingId,
-    projectId: decision.projectId,
-    ...(decision.ruleId ? { ruleId: decision.ruleId } : {}),
-    agentProfileId: decision.agentProfileId,
-    credentialConnectionId: decision.credentialConnectionId,
-    mode: decision.mode,
-    reason: decision.authorizationReason,
-  };
-}
-
 function cloneOutcome(outcome: GitHubAgentAutomationOutcome): GitHubAgentAutomationOutcome {
   return {
     ...outcome,
     ...(outcome.task ? { task: { ...outcome.task } } : {}),
     ...(outcome.feedback ? { feedback: { ...outcome.feedback } } : {}),
+    ...(outcome.intent ? { intent: cloneIntent(outcome.intent) } : {}),
     ...(outcome.actorSnapshot ? { actorSnapshot: { ...outcome.actorSnapshot } } : {}),
-    ...(outcome.authorization ? { authorization: { ...outcome.authorization } } : {}),
+    ...(outcome.authorization
+      ? { authorization: cloneAllowedAuthorization(outcome.authorization) }
+      : {}),
+  };
+}
+
+function cloneIntent(intent: GitHubAgentIntent): GitHubAgentIntent {
+  return { ...intent };
+}
+
+function cloneAllowedAuthorization(
+  authorization: GitHubAgentAllowedAuthorizationDecision,
+): GitHubAgentAllowedAuthorizationDecision {
+  return {
+    ...authorization,
+    actorSnapshot: { ...authorization.actorSnapshot },
   };
 }
 

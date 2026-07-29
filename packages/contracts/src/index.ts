@@ -104,6 +104,13 @@ export interface CompileAgentWorkspaceProfileResponse {
     visibility: "private" | "organization" | "public";
     ttlSeconds: number;
   }>;
+  preview?: {
+    startArgv: string[];
+    cwd?: string;
+    port: number;
+    visibility: "private" | "organization" | "public";
+    ttlSeconds: number;
+  };
   suggestedChecks: Array<{
     name: string;
     argv: string[];

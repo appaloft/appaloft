@@ -408,6 +408,13 @@ export const agentWorkspaceProfileSchema = z
       )
       .max(32)
       .default([]),
+    preview: z
+      .object({
+        portName: identifierSchema,
+        start: boundedWorkspaceCommandSchema,
+      })
+      .strict()
+      .optional(),
     persistentPaths: z.array(persistentPathSchema).max(64).default([]),
     suggestedChecks: z
       .array(
@@ -453,6 +460,16 @@ export const agentWorkspaceProfileSchema = z
       context,
       "port",
     );
+    if (
+      profile.preview &&
+      !profile.defaultPorts.some((port) => port.name === profile.preview?.portName)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Preview portName must reference one default port",
+        path: ["preview", "portName"],
+      });
+    }
     addDuplicateIssues(profile.persistentPaths, ["persistentPaths"], "persistent paths", context);
   });
 
@@ -576,6 +593,7 @@ export type AgentWorkspaceProfileCompileIssueCode =
   | "invalid_interaction_mode"
   | "missing_required_capability"
   | "missing_sandbox_template"
+  | "missing_preview_port"
   | "sandbox_template_digest_mismatch"
   | "sandbox_template_version_mismatch"
   | "adapter_template_requirement_mismatch";
@@ -642,6 +660,13 @@ export interface CompiledAgentWorkspaceProfilePlan {
     visibility: "private" | "organization" | "public";
     ttlSeconds: number;
   }[];
+  preview?: {
+    startArgv: string[];
+    cwd?: string;
+    port: number;
+    visibility: "private" | "organization" | "public";
+    ttlSeconds: number;
+  };
   suggestedChecks: {
     name: string;
     argv: string[];
@@ -1010,6 +1035,34 @@ export function compileAgentWorkspaceProfile(
             : ("display-only" as const),
       }
     : undefined;
+  let preview: CompiledAgentWorkspaceProfilePlan["preview"];
+  if (profile.preview) {
+    const port = profile.defaultPorts.find(
+      (candidate) => candidate.name === profile.preview?.portName,
+    );
+    if (!port) {
+      return {
+        ok: false,
+        issues: [
+          {
+            code: "missing_preview_port",
+            message: "Preview portName must reference one default port",
+            path: ["preview", "portName"],
+          },
+        ],
+      };
+    }
+    const cwd = workspaceRelativePath(
+      profile.preview.start.workingDirectory ?? profile.workingDirectory,
+    );
+    preview = {
+      startArgv: [...profile.preview.start.argv],
+      ...(cwd ? { cwd } : {}),
+      port: port.port,
+      visibility: port.visibility,
+      ttlSeconds: port.ttlSeconds,
+    };
+  }
 
   return {
     ok: true,
@@ -1058,6 +1111,7 @@ export function compileAgentWorkspaceProfile(
         },
       },
       defaultPorts: profile.defaultPorts.map((port) => ({ ...port })),
+      ...(preview ? { preview } : {}),
       suggestedChecks: profile.suggestedChecks.map((check) => {
         const cwd = workspaceRelativePath(check.workingDirectory ?? profile.workingDirectory);
         return {

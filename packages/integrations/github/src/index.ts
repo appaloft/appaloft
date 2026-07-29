@@ -3,6 +3,7 @@ import {
   appaloftTraceAttributes,
   createAdapterSpanName,
   type ExecutionContext,
+  type ExecutionSandboxService,
   type GitHubAgentFeedbackPort,
   type GitHubAgentFeedbackState,
   type GitHubAgentReviewDeliveryPort,
@@ -18,6 +19,7 @@ import {
   type GitHubPreviewPullRequestWebhookVerifier,
   type GitHubRepositoryBrowser,
   type GitHubRepositorySummary,
+  type GitHubRepositoryWorkspaceMaterializerPort,
   type GitHubSourceEventWebhookVerificationInput,
   type GitHubSourceEventWebhookVerificationResult,
   type GitHubSourceEventWebhookVerifier,
@@ -25,11 +27,13 @@ import {
   type PreviewFeedbackWriter,
   type PreviewFeedbackWriterInput,
   type PreviewFeedbackWriterResult,
+  type SandboxExecResult,
   type SourceEventChangedPathResolution,
   type SourceEventChangedPathResolver,
   type SourceEventChangedPathResolverInput,
   type VerifiedSourceEventInput,
 } from "@appaloft/application";
+import { ash } from "@appaloft/ash";
 import { domainError, err, ok, type Result } from "@appaloft/core";
 
 export interface GitHubAppIntegrationOptions {
@@ -425,6 +429,111 @@ export function createGitHubRepositoryBrowser(
   apiBaseUrl?: string,
 ): GitHubRepositoryBrowser {
   return new GitHubApiRepositoryBrowser(fetcher, apiBaseUrl);
+}
+
+export interface GitHubRepositoryActorReadback {
+  readonly githubUserId: string;
+  readonly loginSnapshot: string;
+  readonly permission: "admin" | "maintain" | "push" | "triage" | "pull" | "none";
+  readonly organizationMember: boolean;
+}
+
+export interface GitHubRepositoryPermissionReader {
+  read(input: {
+    readonly installationId: string;
+    readonly repositoryFullName: string;
+    readonly githubUserId: string;
+  }): Promise<Result<GitHubRepositoryActorReadback>>;
+}
+
+export class GitHubApiRepositoryPermissionReader implements GitHubRepositoryPermissionReader {
+  constructor(
+    private readonly accessToken: (installationId: string) => Promise<string | null>,
+    private readonly fetcher: typeof fetch = fetch,
+    private readonly apiBaseUrl = "https://api.github.com",
+  ) {}
+
+  async read(input: {
+    installationId: string;
+    repositoryFullName: string;
+    githubUserId: string;
+  }): Promise<Result<GitHubRepositoryActorReadback>> {
+    if (!/^[1-9]\d*$/u.test(input.githubUserId)) {
+      return err(domainError.validation("GitHub sender id must be numeric"));
+    }
+    const token = await this.accessToken(input.installationId);
+    if (!token) {
+      return err(
+        domainError.conflict("GitHub installation credential is unavailable", {
+          code: "github_installation_credential_missing",
+        }),
+      );
+    }
+    const headers = {
+      accept: "application/vnd.github+json",
+      authorization: `Bearer ${token}`,
+      "x-github-api-version": "2022-11-28",
+      "user-agent": "appaloft-github-agent",
+    };
+    const userResponse = await this.fetcher(
+      `${this.apiBaseUrl}/user/${encodeURIComponent(input.githubUserId)}`,
+      { headers },
+    );
+    if (!userResponse.ok) {
+      return err(
+        domainError.conflict("GitHub sender identity could not be verified", {
+          code: "github_sender_readback_failed",
+          status: userResponse.status,
+        }),
+      );
+    }
+    const user = objectRecord(await userResponse.json());
+    if (!user || String(user.id) !== input.githubUserId || typeof user.login !== "string") {
+      return err(
+        domainError.conflict("GitHub sender identity readback did not match the webhook", {
+          code: "github_sender_readback_mismatch",
+        }),
+      );
+    }
+    const repository = parseRepositoryFullName(input.repositoryFullName);
+    if (!repository) {
+      return err(domainError.validation("GitHub repository full name is invalid"));
+    }
+    const permissionResponse = await this.fetcher(
+      `${this.apiBaseUrl}/repos/${repository.owner}/${repository.name}/collaborators/${encodeURIComponent(user.login)}/permission`,
+      { headers },
+    );
+    if (!permissionResponse.ok) {
+      return err(
+        domainError.conflict("GitHub repository permission could not be verified", {
+          code: "github_repository_permission_readback_failed",
+          status: permissionResponse.status,
+        }),
+      );
+    }
+    const permissionPayload = objectRecord(await permissionResponse.json());
+    const permission = normalizeGitHubRepositoryPermission(
+      typeof permissionPayload?.permission === "string" ? permissionPayload.permission : "",
+    );
+    const membershipResponse = await this.fetcher(
+      `${this.apiBaseUrl}/orgs/${repository.owner}/members/${encodeURIComponent(user.login)}`,
+      { headers },
+    );
+    if (membershipResponse.status !== 204 && membershipResponse.status !== 404) {
+      return err(
+        domainError.conflict("GitHub organization membership could not be verified", {
+          code: "github_organization_membership_readback_failed",
+          status: membershipResponse.status,
+        }),
+      );
+    }
+    return ok({
+      githubUserId: input.githubUserId,
+      loginSnapshot: user.login,
+      permission,
+      organizationMember: membershipResponse.status === 204,
+    });
+  }
 }
 
 interface ActionSourcePackageManifestInput {
@@ -1507,6 +1616,14 @@ export interface GitHubAgentWebhookInput {
   receivedAt?: string;
 }
 
+export interface GitHubWebhookSignatureInput {
+  rawBody: string;
+  signature: string;
+  secretValue: string;
+  eventName?: string;
+  deliveryId?: string;
+}
+
 export interface NormalizedGitHubAgentEvent {
   provider: "github";
   event: GitHubAgentEventName;
@@ -1633,18 +1750,8 @@ export function parseAppaloftGitHubCommand(body: string): Result<AppaloftGitHubC
 export async function verifyAndNormalizeGitHubAgentWebhook(
   input: GitHubAgentWebhookInput,
 ): Promise<Result<NormalizedGitHubAgentEvent>> {
-  const expectedSignature = await hmacSha256Hex(input.secretValue, input.rawBody);
-  const suppliedSignature = normalizeSha256Signature(input.signature);
-  if (!suppliedSignature || !constantTimeEqualHex(expectedSignature, suppliedSignature)) {
-    return err(
-      domainError.sourceEventSignatureInvalid("GitHub Agent webhook signature is invalid", {
-        phase: "github-agent-webhook-verification",
-        sourceKind: "github",
-        eventKind: input.eventName,
-        deliveryId: input.deliveryId,
-      }),
-    );
-  }
+  const verified = await verifyGitHubWebhookSignature(input);
+  if (verified.isErr()) return err(verified.error);
 
   let parsed: unknown;
   try {
@@ -1742,6 +1849,24 @@ export async function verifyAndNormalizeGitHubAgentWebhook(
   });
 }
 
+export async function verifyGitHubWebhookSignature(
+  input: GitHubWebhookSignatureInput,
+): Promise<Result<void>> {
+  const expectedSignature = await hmacSha256Hex(input.secretValue, input.rawBody);
+  const suppliedSignature = normalizeSha256Signature(input.signature);
+  if (!suppliedSignature || !constantTimeEqualHex(expectedSignature, suppliedSignature)) {
+    return err(
+      domainError.sourceEventSignatureInvalid("GitHub Agent webhook signature is invalid", {
+        phase: "github-agent-webhook-verification",
+        sourceKind: "github",
+        ...(input.eventName ? { eventKind: input.eventName } : {}),
+        ...(input.deliveryId ? { deliveryId: input.deliveryId } : {}),
+      }),
+    );
+  }
+  return ok(undefined);
+}
+
 export function githubAgentSourceEventInput(
   event: NormalizedGitHubAgentEvent,
 ): VerifiedSourceEventInput {
@@ -1798,6 +1923,100 @@ export function githubAgentTriggerFromSourceEvent(
     ...(event.pullRequest ? { pullRequest: { ...event.pullRequest } } : {}),
     ...(event.receivedAt ? { receivedAt: event.receivedAt } : {}),
   };
+}
+
+export class GitHubRepositoryWorkspaceMaterializerAdapter
+  implements GitHubRepositoryWorkspaceMaterializerPort
+{
+  constructor(
+    private readonly sandboxes: Pick<ExecutionSandboxService, "exec" | "writeFile">,
+    private readonly installationToken: (installationId: string) => Promise<string | null>,
+  ) {}
+
+  async materialize(
+    context: ExecutionContext,
+    input: Parameters<GitHubRepositoryWorkspaceMaterializerPort["materialize"]>[1],
+  ): Promise<Result<void>> {
+    const token = await this.installationToken(input.trigger.installationId);
+    if (!token || token.length > 4_096 || /[\r\n\0]/u.test(token)) {
+      return err(
+        domainError.conflict("GitHub installation credential is unavailable for checkout", {
+          code: "github_agent_checkout_credential_missing",
+        }),
+      );
+    }
+    const repository = parseRepositoryFullName(input.trigger.repository.fullName);
+    if (!repository) {
+      return err(domainError.validation("GitHub repository full name is invalid"));
+    }
+
+    const tokenPath = ".appaloft-github-token";
+    const askpassPath = ".appaloft-git-askpass";
+    const askpass = ash`#!/bin/sh
+      case "$1" in
+        *Username*) printf '%s\n' x-access-token ;;
+        *) cat ${ash.arg(`./${tokenPath}`)} ;;
+      esac
+    `;
+    const encoder = new TextEncoder();
+    const execute = async (argv: string[], timeoutMs = 10 * 60_000): Promise<Result<void>> => {
+      const executed = await this.sandboxes.exec(context, input.workspaceId, {
+        argv,
+        timeoutMs,
+      });
+      if (executed.isErr()) return err(executed.error);
+      return foregroundSandboxExecSucceeded(executed.value)
+        ? ok(undefined)
+        : err(
+            domainError.conflict("GitHub repository checkout failed", {
+              code: "github_agent_checkout_failed",
+            }),
+          );
+    };
+
+    try {
+      const tokenWritten = await this.sandboxes.writeFile(context, input.workspaceId, {
+        path: tokenPath,
+        content: encoder.encode(`${token}\n`),
+      });
+      if (tokenWritten.isErr()) return err(tokenWritten.error);
+      const askpassWritten = await this.sandboxes.writeFile(context, input.workspaceId, {
+        path: askpassPath,
+        content: encoder.encode(ash.render(askpass)),
+      });
+      if (askpassWritten.isErr()) return err(askpassWritten.error);
+      const protectedFiles = await execute(["chmod", "600", tokenPath, askpassPath]);
+      if (protectedFiles.isErr()) return protectedFiles;
+
+      const repositoryUrl = `https://github.com/${repository.owner}/${repository.name}.git`;
+      const cloned = await execute([
+        "env",
+        `GIT_ASKPASS=./${askpassPath}`,
+        "GIT_TERMINAL_PROMPT=0",
+        "git",
+        "clone",
+        "--no-checkout",
+        "--filter=blob:none",
+        repositoryUrl,
+        ".",
+      ]);
+      if (cloned.isErr()) return cloned;
+      const hooksDisabled = await execute(["git", "config", "core.hooksPath", "/dev/null"]);
+      if (hooksDisabled.isErr()) return hooksDisabled;
+
+      const revision = input.trigger.pullRequest?.headSha;
+      if (revision) {
+        const fetched = await execute(["git", "fetch", "--no-tags", "origin", revision]);
+        if (fetched.isErr()) return fetched;
+      }
+      return execute(["git", "checkout", "--detach", revision ?? "HEAD"]);
+    } finally {
+      await this.sandboxes.exec(context, input.workspaceId, {
+        argv: ["rm", "-f", tokenPath, askpassPath],
+        timeoutMs: 30_000,
+      });
+    }
+  }
 }
 
 export class GitHubAgentTaskFeedbackAdapter implements GitHubAgentFeedbackPort {
@@ -1949,6 +2168,13 @@ export class GitHubAgentTaskFeedbackAdapter implements GitHubAgentFeedbackPort {
           }),
         );
   }
+}
+
+function foregroundSandboxExecSucceeded(result: SandboxExecResult): boolean {
+  return (
+    result.mode === "foreground" &&
+    result.frames.some((frame) => frame.kind === "exit" && frame.exitCode === 0)
+  );
 }
 
 export class GitHubAgentReviewDeliveryAdapter implements GitHubAgentReviewDeliveryPort {
@@ -2660,6 +2886,17 @@ function parseRepositoryFullName(value: string): { owner: string; name: string }
     owner: encodeURIComponent(owner),
     name: encodeURIComponent(name),
   };
+}
+
+function normalizeGitHubRepositoryPermission(
+  value: string,
+): GitHubRepositoryActorReadback["permission"] {
+  if (value === "admin" || value === "maintain" || value === "triage" || value === "pull") {
+    return value;
+  }
+  if (value === "push" || value === "write") return "push";
+  if (value === "read") return "pull";
+  return "none";
 }
 
 function gitHubApiUrl(apiBaseUrl: string, path: string): URL {

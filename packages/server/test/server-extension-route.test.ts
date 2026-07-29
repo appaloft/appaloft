@@ -11,6 +11,7 @@ import {
   type AuditEventRecorder,
   type CommandBus,
   type ExecutionContext,
+  type GitHubAgentAutomationStore,
   type OperationCheckRequest,
   type OperationGuardDecision,
   type OperationGuardPort,
@@ -973,6 +974,32 @@ describe("createAppaloftServer", () => {
       });
     } finally {
       socket?.close();
+      await server.shutdown();
+    }
+  }, 45_000);
+
+  test("[GH-AUTO-BOUNDARY-021] registers the authoritative GitHub Agent automation store", async () => {
+    const dataDir = await createTempDataDir();
+    const server = await createAppaloftServer({
+      flags: {
+        appVersion: "0.1.0-test",
+        authProvider: "none",
+        dataDir,
+        docsStaticDir: "",
+        httpHost: "localhost",
+        httpPort: 3001,
+        pgliteDataDir: join(dataDir, "pglite"),
+        webStaticDir: "",
+      },
+      authRuntime: createTestAuthRuntime(),
+    });
+
+    try {
+      expect(server.container.isRegistered(tokens.githubAgentAutomationStore, true)).toBe(true);
+      expect(
+        server.container.resolve<GitHubAgentAutomationStore>(tokens.githubAgentAutomationStore),
+      ).toBeDefined();
+    } finally {
       await server.shutdown();
     }
   }, 45_000);

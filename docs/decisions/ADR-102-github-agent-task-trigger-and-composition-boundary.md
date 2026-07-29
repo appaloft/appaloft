@@ -42,6 +42,18 @@ fork code can exfiltrate credentials.
 11. Agent credentials are process-scoped and never enter repository code, tests, Preview, Git
     evidence, snapshots, logs, argv, or comments.
 12. Cleanup uses existing lifecycle operations and requires provider readback before success.
+13. The public server composition registers the authoritative `GitHubAgentAutomationStore`.
+    Downstream runtimes resolve it and must not persist a second delivery outcome, review execution,
+    or GitHub thread-to-Task pointer.
+14. A successful automation outcome carries the normalized intent and complete immutable allowed
+    execution snapshot required by durable finalization. Downstream runtimes must not reparse the
+    trigger or reconstruct authorization from mutable Rule/Profile state.
+15. GitHub signature verification, Repository-to-Workspace materialization, Workspace Profile
+    Preview plans, and bounded Task/Review/PR projection are neutral public seams. Hosted
+    composition supplies installation credentials, tenancy, custody, authorization, durable
+    scheduling, and audit only.
+16. A dedicated read-only Public/Private Boundary Review Round blocks downstream Code and merge
+    when lifecycle truth, idempotency truth, neutral contracts, or persistence are duplicated.
 
 ## Consequences
 
@@ -52,6 +64,8 @@ fork code can exfiltrate credentials.
 - More durable process state and uniqueness constraints are required.
 - Native session support remains capability-driven; fallback is visible rather than pretending
   native context survived.
+- Hosted implementations become smaller composition adapters and cannot trade short-term wiring
+  convenience for a second source of domain or delivery truth.
 
 ## Alternatives Rejected
 

@@ -2,10 +2,12 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 
 import {
+  GitHubApiRepositoryPermissionReader,
   githubAgentSourceEventInput,
   githubAgentTriggerFromSourceEvent,
   parseAppaloftGitHubCommand,
   verifyAndNormalizeGitHubAgentWebhook,
+  verifyGitHubWebhookSignature,
 } from "../src/index";
 
 async function signature(secret: string, body: string): Promise<string> {
@@ -53,6 +55,62 @@ async function normalize(eventName: string, payload: Record<string, unknown>) {
 }
 
 describe("GitHub Agent automation webhook", () => {
+  test("[GH-AUTO-BOUNDARY-021] repository actor readback is a public GitHub adapter", async () => {
+    const requests: string[] = [];
+    const reader = new GitHubApiRepositoryPermissionReader(
+      async () => "installation-token",
+      (async (input: URL | RequestInfo) => {
+        const url = String(input);
+        requests.push(url);
+        if (url.endsWith("/user/303")) {
+          return Response.json({ id: 303, login: "octocat" });
+        }
+        if (url.endsWith("/repos/appaloft/agent-sandbox-smoke/collaborators/octocat/permission")) {
+          return Response.json({ permission: "write" });
+        }
+        if (url.endsWith("/orgs/appaloft/members/octocat")) {
+          return new Response(null, { status: 204 });
+        }
+        return new Response(null, { status: 404 });
+      }) as typeof fetch,
+    );
+
+    const readback = await reader.read({
+      installationId: "98765",
+      repositoryFullName: "appaloft/agent-sandbox-smoke",
+      githubUserId: "303",
+    });
+
+    expect(readback._unsafeUnwrap()).toEqual({
+      githubUserId: "303",
+      loginSnapshot: "octocat",
+      permission: "push",
+      organizationMember: true,
+    });
+    expect(requests).toHaveLength(3);
+  });
+
+  test("[GH-AUTO-BOUNDARY-021] generic GitHub signature verification is the shared ingress seam", async () => {
+    const rawBody = JSON.stringify({ installation: { id: 98765 }, action: "created" });
+    const verified = await verifyGitHubWebhookSignature({
+      rawBody,
+      signature: await signature("webhook-secret", rawBody),
+      secretValue: "webhook-secret",
+      eventName: "installation",
+      deliveryId: "delivery-installation",
+    });
+    const denied = await verifyGitHubWebhookSignature({
+      rawBody,
+      signature: "sha256=0".padEnd(71, "0"),
+      secretValue: "webhook-secret",
+      eventName: "installation",
+      deliveryId: "delivery-installation-invalid",
+    });
+
+    expect(verified._unsafeUnwrap()).toBeUndefined();
+    expect(denied.isErr()).toBe(true);
+  });
+
   test("[GH-AUTO-WEBHOOK-001] normalizes issue and PR comments using numeric identities", async () => {
     const issueComment = await normalize("issue_comment", {
       action: "created",
