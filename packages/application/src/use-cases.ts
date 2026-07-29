@@ -237,6 +237,7 @@ export * from "./operations/servers/check-server-delete-safety.query-service";
 export * from "./operations/servers/configure-scheduled-runtime-prune-policy.use-case";
 export * from "./operations/servers/configure-server-credential.use-case";
 export * from "./operations/servers/configure-server-edge-proxy.use-case";
+export * from "./operations/servers/configure-server-workload-roles.use-case";
 export * from "./operations/servers/count-servers.query-service";
 export * from "./operations/servers/create-ssh-credential.use-case";
 export * from "./operations/servers/deactivate-server.use-case";

@@ -13,6 +13,9 @@ register server metadata
 
 Registration success is not readiness. Connectivity and proxy bootstrap are formal lifecycle stages.
 
+Server Workload Roles are orthogonal to this lifecycle. Registration may persist optional normalized
+roles, but connectivity and proxy readiness do not add, remove, infer, or prove a workload role.
+
 ## Global References
 
 This workflow inherits:
@@ -21,6 +24,9 @@ This workflow inherits:
 - [ADR-004: Server Readiness State Storage](../decisions/ADR-004-server-readiness-state-storage.md)
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
+- [ADR-101: Server Workload Role Admission](../decisions/ADR-101-server-workload-role-admission.md)
+- [Server Workload Roles Spec](../specs/118-server-workload-roles/spec.md)
+- [Server Workload Role Test Matrix](../testing/server-workload-role-test-matrix.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -68,6 +74,8 @@ Synchronous admission includes:
 - server id and credential reference validation;
 - provider/proxy kind support validation;
 - proxy bootstrap attempt admission.
+- optional workload-role validation as registration state only; missing or `[]` is unrestricted by
+  role, and duplicate or unknown canonical values reject registration before persistence.
 
 Synchronous rejection returns `err(DomainError)` and must not publish lifecycle success events.
 
@@ -113,6 +121,11 @@ Server readiness:
 - `failed` or equivalent terminal failure state includes phase and retriable flag.
 
 Generated default access routes require proxy readiness when the selected resource uses reverse-proxy exposure. A connected server with failed proxy bootstrap is still not ready for generated proxy-backed routes.
+
+Readiness remains independent of role intent. A ready target may still reject a new workload on role
+mismatch, and a role match never makes a disconnected, inactive, or proxy-ineligible target ready.
+Deployment plan/create evaluates active lifecycle and `deployment-runtime` before later readiness
+and backend gates.
 
 ## Event / State Mapping
 
@@ -204,9 +217,18 @@ Edge proxy provider selection is resolved through the provider registry and comp
 
 Proxy bootstrap must use the provider contract defined by [Edge Proxy Provider And Route Realization](./edge-proxy-provider-and-route-realization.md). The provider renders the ensure plan; runtime execution runs it locally or over SSH.
 
+`servers.configure-workload-roles` is a separate prospective intent mutation. It does not run this
+bootstrap workflow, alter connectivity or proxy state, or drain existing work. Accepted deployment
+snapshots remain authoritative after role replacement. `artifact-builder` does not claim builder
+execution, and `sandbox-worker` does not claim Sandbox placement capability.
+
 ## Current Implementation Notes And Migration Gaps
 
 Current `servers.register` persists a `DeploymentTarget` and publishes `deployment_target.registered`.
+
+Current registration persists normalized workload roles without changing connectivity or proxy
+bootstrap sequencing. The dedicated role configuration command does not publish bootstrap events or
+invoke provider effects.
 
 Current event handling starts proxy bootstrap directly from `deployment_target.registered`, before a formal durable `server-connected` event exists.
 

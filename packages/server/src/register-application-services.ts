@@ -128,6 +128,7 @@ import {
   ConfigureServerCredentialUseCase,
   ConfigureServerEdgeProxyCommandHandler,
   ConfigureServerEdgeProxyUseCase,
+  ConfigureServerWorkloadRolesUseCase,
   ConfigureStorageVolumeBackupPolicyCommandHandler,
   ConfigureStorageVolumeBackupPolicyUseCase,
   ConfirmActionPreviewRouteCommandHandler,
@@ -4331,6 +4332,10 @@ export function registerApplicationServices(
     ResourceSecretReferenceQueryService,
   );
   container.registerSingleton(tokens.registerServerUseCase, RegisterServerUseCase);
+  container.registerSingleton(
+    tokens.configureServerWorkloadRolesUseCase,
+    ConfigureServerWorkloadRolesUseCase,
+  );
   container.registerSingleton(
     tokens.configureServerCredentialUseCase,
     ConfigureServerCredentialUseCase,

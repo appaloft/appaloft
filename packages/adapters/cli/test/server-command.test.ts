@@ -1,3 +1,5 @@
+import "../../../application/node_modules/reflect-metadata/Reflect.js";
+
 import { describe, expect, test } from "bun:test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -89,6 +91,92 @@ describe("CLI server commands", () => {
     });
   });
 
+  test("[SRV-ROLE-ENTRY-002] register and configure dispatch canonical workload role arrays", async () => {
+    ensureReflectMetadata();
+    const { ConfigureServerWorkloadRolesCommand, RegisterServerCommand, createExecutionContext } =
+      await import("@appaloft/application");
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({ workloadRoles: [], changed: true } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_server_workload_roles_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "server",
+        "register",
+        "--name",
+        "Classified server",
+        "--host",
+        "classified.internal",
+        "--workload-role",
+        "deployment-runtime",
+        "--workload-role",
+        "artifact-builder",
+      ]);
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "server",
+        "configure-workload-roles",
+        "srv_classified",
+        "--workload-role",
+        "deployment-runtime",
+        "--workload-role",
+        "sandbox-worker",
+      ]);
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "server",
+        "configure-workload-roles",
+        "srv_classified",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(3);
+    expect(commands[0]).toBeInstanceOf(RegisterServerCommand);
+    expect(commands[0]).toMatchObject({
+      workloadRoles: ["deployment-runtime", "artifact-builder"],
+    });
+    expect(commands[1]).toBeInstanceOf(ConfigureServerWorkloadRolesCommand);
+    expect(commands[1]).toMatchObject({
+      serverId: "srv_classified",
+      workloadRoles: ["deployment-runtime", "sandbox-worker"],
+    });
+    expect(commands[2]).toBeInstanceOf(ConfigureServerWorkloadRolesCommand);
+    expect(commands[2]).toMatchObject({
+      serverId: "srv_classified",
+      workloadRoles: [],
+    });
+  });
+
   test("[SRV-LIFE-ENTRY-001] server show dispatches the application query", async () => {
     ensureReflectMetadata();
     const { ShowServerQuery, createExecutionContext } = await import("@appaloft/application");
@@ -108,6 +196,7 @@ describe("CLI server commands", () => {
             host: "203.0.113.10",
             port: 22,
             providerKey: "generic-ssh",
+            workloadRoles: [],
             lifecycleStatus: "active",
             createdAt: "2026-01-01T00:00:00.000Z",
           },
@@ -130,9 +219,13 @@ describe("CLI server commands", () => {
       executionContextFactory,
     });
 
+    let stdout = "";
     const writeStdout = process.stdout.write;
     try {
-      process.stdout.write = (() => true) as typeof process.stdout.write;
+      process.stdout.write = ((chunk: string | Uint8Array) => {
+        stdout += String(chunk);
+        return true;
+      }) as typeof process.stdout.write;
       await program.parseAsync(["node", "appaloft", "server", "show", "srv_primary"]);
     } finally {
       process.stdout.write = writeStdout;
@@ -144,6 +237,8 @@ describe("CLI server commands", () => {
       serverId: "srv_primary",
       includeRollups: true,
     });
+    expect(stdout).toContain('"workloadRoles": []');
+    expect(stdout).toContain("General purpose (all workload types)");
   });
 
   test("[RUNTIME-CAPACITY-INSPECT-001] server capacity inspect dispatches the application query", async () => {

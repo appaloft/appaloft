@@ -18,6 +18,7 @@ import {
   ResourceByIdSpec,
   ResourceId,
   type Result,
+  ServerWorkloadRoleValue,
   safeTry,
 } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
@@ -36,6 +37,8 @@ import {
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { type CreateDeploymentCommandInput } from "./create-deployment.command";
+
+const deploymentRuntimeRole = ServerWorkloadRoleValue.rehydrate("deployment-runtime");
 
 export interface ResolvedDeploymentContext {
   project: Project;
@@ -63,6 +66,7 @@ export class DeploymentContextResolver {
   async resolve(
     context: ExecutionContext,
     input: CreateDeploymentCommandInput,
+    options: { enforceWorkloadRole?: boolean } = {},
   ): Promise<Result<ResolvedDeploymentContext>> {
     const self = this;
     const repositoryContext = toRepositoryContext(context);
@@ -144,7 +148,10 @@ export class DeploymentContextResolver {
       if (!server) {
         return err(domainError.validation("serverId is required for this deployment context"));
       }
-      yield* server.ensureCanAcceptNewWork("deployments.create");
+      yield* server.ensureCanAcceptNewWork(
+        "deployments.create",
+        options.enforceWorkloadRole === false ? undefined : { requiredRole: deploymentRuntimeRole },
+      );
 
       const destination = explicitDestination;
       if (!destination) {

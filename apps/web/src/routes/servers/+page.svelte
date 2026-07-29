@@ -44,7 +44,10 @@
   } from "$lib/console/console-page-extension";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
-  import { serverProviderDisplayLabel } from "$lib/console/server-registration";
+  import {
+    serverProviderDisplayLabel,
+    type ServerWorkloadRole,
+  } from "$lib/console/server-registration";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import { formatTime } from "$lib/console/utils";
   import {
@@ -381,6 +384,17 @@
     }
   }
 
+  function serverWorkloadRoleLabel(role: ServerWorkloadRole): string {
+    switch (role) {
+      case "deployment-runtime":
+        return $t(i18nKeys.console.servers.workloadRoleDeploymentRuntime);
+      case "artifact-builder":
+        return $t(i18nKeys.console.servers.workloadRoleArtifactBuilder);
+      case "sandbox-worker":
+        return $t(i18nKeys.console.servers.workloadRoleSandboxWorker);
+    }
+  }
+
   function edgeProxyStatusLabel(status: NonNullable<ServerSummary["edgeProxy"]>["status"]): string {
     switch (status) {
       case "pending":
@@ -675,6 +689,22 @@
                       </p>
                     </div>
                   </div>
+                </div>
+
+                <div
+                  class="mt-3 flex min-w-0 flex-wrap items-center gap-2 lg:col-span-2"
+                  aria-label={$t(i18nKeys.console.servers.workloadRolesTitle)}
+                  data-server-row-workload-roles
+                >
+                  {#if server.workloadRoles.length === 0}
+                    <span class="text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.servers.workloadRolesGeneralPurpose)}
+                    </span>
+                  {:else}
+                    {#each server.workloadRoles as role (role)}
+                      <Badge variant="outline">{serverWorkloadRoleLabel(role)}</Badge>
+                    {/each}
+                  {/if}
                 </div>
 
                 <div

@@ -14,6 +14,7 @@ must not rely on message text as the contract.
 - [ADR-004: Server Readiness State Storage](../decisions/ADR-004-server-readiness-state-storage.md)
 - [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
 - [ADR-026: Aggregate Mutation Command Boundary](../decisions/ADR-026-aggregate-mutation-command-boundary.md)
+- [ADR-101: Server Workload Role Admission](../decisions/ADR-101-server-workload-role-admission.md)
 - [Deployment Target Lifecycle Workflow](../workflows/deployment-target-lifecycle.md)
 - [Error Model](./model.md)
 - [neverthrow Conventions](./neverthrow-conventions.md)
@@ -27,6 +28,7 @@ type ServerLifecycleErrorDetails = {
   commandName?:
     | "servers.rename"
     | "servers.configure-edge-proxy"
+    | "servers.configure-workload-roles"
     | "servers.deactivate"
     | "servers.delete";
   phase:
@@ -37,6 +39,7 @@ type ServerLifecycleErrorDetails = {
     | "server-delete-check-read"
     | "server-admission"
     | "server-lifecycle-guard"
+    | "server-workload-role-guard"
     | "server-persistence"
     | "event-publication"
     | "event-consumption";
@@ -57,6 +60,8 @@ type ServerLifecycleErrorDetails = {
     | "audit-log";
   relatedState?: string;
   deletionBlockers?: string[];
+  requiredRole?: "deployment-runtime" | "artifact-builder" | "sandbox-worker";
+  workloadRoles?: Array<"deployment-runtime" | "artifact-builder" | "sandbox-worker">;
 };
 ```
 
@@ -83,12 +88,28 @@ Server lifecycle commands use these branches:
 | Error code | Category | Phase | Retriable | Meaning |
 | --- | --- | --- | --- | --- |
 | `validation_error` | `validation` | `command-validation` | No | Command input is missing or malformed. |
+| `server_workload_role_mismatch` | `application` | `server-workload-role-guard` | No | A selected server's non-empty workload-role set does not include the role required for new placement. Safe details are `commandName`, `serverId`, `requiredRole`, and normalized `workloadRoles`; `[]` is unrestricted and does not produce this error. |
 | `not_found` | `not-found` | `server-admission` | No | Server cannot be found or is not visible. |
 | `server_inactive` | `conflict` | `server-lifecycle-guard` | No | Inactive server cannot receive new deployment, scheduling, proxy target configuration, or other new-work mutation. |
 | `server_delete_blocked` | `conflict` | `server-lifecycle-guard` | No | Delete or final removal is blocked by retained deployments, resources, domains, routes, terminal sessions, logs, audit, or support diagnostics. |
 | `invariant_violation` | `domain` | `server-lifecycle-guard` | No | DeploymentTarget rejected the requested lifecycle transition. |
 | `infra_error` | `infra` | `server-persistence` | Conditional | Server state could not be safely persisted. |
 | `infra_error` | `infra` | `event-publication` | Conditional | A lifecycle event could not be recorded before command success. |
+
+Unknown or duplicate role values supplied to `servers.register` or
+`servers.configure-workload-roles` return `validation_error` at `phase = command-validation` and
+must not persist a server or role change or publish an event. Details may identify the rejected
+field path or canonical role value, but must not include credentials, provider output, or workload
+data.
+
+`servers.configure-workload-roles` accepts the complete replacement set, including `[]`. It may
+configure an inactive server because the change declares prospective placement intent rather than
+accepting new work. A deleted server returns `not_found`. Reordering an equivalent valid set is an
+idempotent success with no persistence write or event publication.
+
+`server_workload_role_mismatch` is a new-work admission result, not a lifecycle state. Consumers
+must keep it distinct from `server_inactive`: changing or selecting a role-compatible server can
+resolve a mismatch, while an inactive server must be activated through its lifecycle contract.
 
 `servers.rename` does not block on retained dependencies and does not enforce a unique display
 name. The server id remains the durable reference. Deleted server tombstones are immutable through
@@ -130,7 +151,11 @@ Server lifecycle consumers additionally must:
 - show proxy status from read-model state rather than running repair from a read path;
 - expose retry or repair affordances only through explicit operations such as
   `servers.bootstrap-proxy`;
-- avoid retry affordances for validation, not-found, conflict, and invariant errors.
+- avoid retry affordances for validation, not-found, conflict, and invariant errors;
+- map `server_workload_role_mismatch` by `code` and `phase`, show the safe required/current role
+  sets, and offer configuration or server-selection recovery rather than an automatic retry;
+- preserve the independent lifecycle, readiness, capability, provider, and private-policy gates
+  after role admission succeeds.
 
 ## Test Assertions
 

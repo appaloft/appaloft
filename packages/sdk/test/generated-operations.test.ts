@@ -241,6 +241,23 @@ describe("generated SDK operation metadata", () => {
     });
   });
 
+  test("[SRV-ROLE-ENTRY-003][TS-SDK-GEN-001] exposes server workload-role metadata", () => {
+    expect(
+      generatedSdkOperations.find(
+        (operation) => operation.operationKey === "servers.configure-workload-roles",
+      ),
+    ).toMatchObject({
+      operationGroup: "servers",
+      operationMethod: "configureWorkloadRoles",
+      kind: "command",
+      route: {
+        method: "POST",
+        path: "/servers/{serverId}/workload-roles",
+      },
+      docsHref: "/docs/servers/register-connect/#server-workload-roles",
+    });
+  });
+
   test("[DEP-CANCEL-ENTRY-003][TS-SDK-GEN-001] exposes deployment cancel metadata", () => {
     expect(
       generatedSdkOperations.find((operation) => operation.operationKey === "deployments.cancel"),

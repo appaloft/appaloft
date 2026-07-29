@@ -137,6 +137,16 @@ Product constraints:
   [Spec 117](./specs/117-agent-adapter-sdk-and-workspace-profiles/spec.md): canonical declarative
   manifests, fail-closed compatibility, tenant installations, safe Profile compilation, public
   entrypoint parity and deterministic third-party conformance without uploaded control-plane code.
+- [x] Complete the public [Server Workload Roles Spec 118](./specs/118-server-workload-roles/spec.md)
+  implementation scope under [ADR-101](./decisions/ADR-101-server-workload-role-admission.md):
+  canonical optional role sets across register/configure/list/show, `deployment-runtime` admission
+  parity for deployment plan/create before effects, and continuity for accepted Runtime Plan
+  snapshots and existing Deployment history.
+- [ ] Record the focused and release-gate verification evidence for Spec 118 before claiming release
+  readiness; implementation completion does not substitute for unrun verification.
+- [ ] Keep the neutral remote artifact-builder executor, registered-Server Sandbox placement,
+  drain/evacuation, and private Cloud/Enterprise eligibility policy as separately governed
+  follow-ups. Configuring `artifact-builder` or `sandbox-worker` does not complete those capabilities.
 - [x] Keep Delivery Evidence Chain claims limited to observed delivery evidence; do not imply
   formal correctness, security, vulnerability absence, or compliance.
 - [x] Treat Appaloft as a self-hosted deployment control plane, not a web-first CRUD app.
@@ -190,8 +200,8 @@ Already implemented or materially present:
 - [x] Active operations cover resource create/list/show, source/runtime/network/health
   configuration, resource variables/effective config, archive/delete, health, logs, proxy preview,
   diagnostics, and Web detail observation.
-- [x] Active operations cover server registration, credentials, connectivity, proxy repair, and
-  terminal open.
+- [x] Active operations cover server registration, complete-set workload-role configuration,
+  normalized list/show role readback, credentials, connectivity, proxy repair, and terminal open.
 - [x] Active operations cover deployment create/list/show/logs, standalone event replay/follow, and
   create-time progress streaming.
 - [x] Active operations cover domain binding create/confirm/list.
@@ -483,6 +493,10 @@ Already done:
   immediately affect runtime state.
 - [x] Server register/list/show/rename/deactivate/delete safety/guarded delete/connectivity,
   proxy-repair, and credential baseline exist.
+- [x] Server Workload Roles register/configure/list/show parity and `deployment-runtime`
+  deployment-plan/create admission are implemented under Spec 118. Empty role sets preserve the
+  existing general-purpose baseline, mismatch is rejected before effects, and accepted snapshots
+  remain authoritative after later role changes.
 
 Required:
 - [x] Add project show/rename/archive with Web detail/settings closure and side-effect clarity.
@@ -493,6 +507,16 @@ Required:
 - [x] Add credential show/delete when unused.
 - [x] Add `credentials.rotate-ssh` reusable SSH credential rotation across CLI, HTTP/oRPC, Web,
   public docs/help, and tests.
+- [x] Add `servers.configure-workload-roles` and normalized Server Workload Role readback across
+  registration, list, and show without treating roles as capability or target kind.
+- [ ] Add a neutral remote artifact-builder executor with separately governed readiness, logs,
+  cancellation, cache ownership, and artifact provenance.
+- [ ] Add registered-Server Sandbox placement only after its neutral candidate/binding carries
+  Server identity and keeps isolation/provider evidence independently mandatory.
+- [ ] Specify drain/evacuation as a separate lifecycle workflow; workload-role configuration does
+  not move or stop existing work.
+- [ ] Verify any private Cloud/Enterprise eligibility policy through composed-runtime governance;
+  public Server Workload Roles do not claim or define private behavior.
 - [x] Add resource show/archive/delete.
 - [x] Add separate resource source update semantics where specs require a separate command.
 - [x] Add separate resource runtime update semantics where specs require a separate command.
@@ -2651,6 +2675,12 @@ work below before GA.
 - [x] Deployment target/server: rename.
 - [x] Deployment target/server: configure-edge-proxy.
 - [x] Deployment target/server: broad credential usage visibility.
+- [x] Deployment target/server: optional workload roles at registration, complete-set mutation via
+  `servers.configure-workload-roles`, normalized list/show readback, and prospective
+  `deployment-runtime` admission for deployment plan/create while preserving accepted snapshots.
+- [ ] Deployment target/server workload-role follow-ups: neutral remote artifact-builder execution,
+  registered-Server Sandbox placement, drain/evacuation, and private eligibility policy remain
+  incomplete under their own governance.
 - [x] SSH credential: create/list, attach to server.
 - [x] SSH credential: show, delete when unused, usage visibility.
 - [x] SSH credential: `credentials.rotate-ssh` in-place rotation with usage acknowledgement.

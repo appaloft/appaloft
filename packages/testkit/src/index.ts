@@ -1007,6 +1007,7 @@ export class MemoryServerReadModel implements ServerReadModel {
             port: state.port.value,
             providerKey: state.providerKey.value,
             targetKind: state.targetKind.value,
+            workloadRoles: state.workloadRoles.toJSON(),
             lifecycleStatus: state.lifecycleStatus.value as "active" | "inactive",
             ...memoryServerEdgeProxySummary(state),
             ...(state.deactivatedAt ? { deactivatedAt: state.deactivatedAt.value } : {}),
@@ -1045,6 +1046,7 @@ export class MemoryServerReadModel implements ServerReadModel {
         port: state.port.value,
         providerKey: state.providerKey.value,
         targetKind: state.targetKind.value,
+        workloadRoles: state.workloadRoles.toJSON(),
         lifecycleStatus: state.lifecycleStatus.value as "active" | "inactive",
         ...memoryServerEdgeProxySummary(state),
         ...(state.deactivatedAt ? { deactivatedAt: state.deactivatedAt.value } : {}),
@@ -1068,6 +1070,7 @@ export class MemoryServerReadModel implements ServerReadModel {
             port: state.port.value,
             providerKey: state.providerKey.value,
             targetKind: state.targetKind.value,
+            workloadRoles: state.workloadRoles.toJSON(),
             lifecycleStatus: state.lifecycleStatus.value as "active" | "inactive",
             ...memoryServerEdgeProxySummary(state),
             ...(state.deactivatedAt ? { deactivatedAt: state.deactivatedAt.value } : {}),
@@ -2865,7 +2868,7 @@ export class MemoryCertificateRetryCandidateReader implements CertificateRetryCa
       const state = certificate.toState();
       const latestAttempt = state.attempts[state.attempts.length - 1];
 
-      if (!latestAttempt || latestAttempt.status.value !== "retry_scheduled") {
+      if (latestAttempt?.status.value !== "retry_scheduled") {
         continue;
       }
 

@@ -3,6 +3,7 @@ import {
   DeploymentTarget,
   DeploymentTargetId,
   DeploymentTargetName,
+  DeploymentTargetWorkloadRoles,
   domainError,
   EdgeProxyKindValue,
   err,
@@ -31,7 +32,10 @@ import {
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
-import { type RegisterServerCommandInput } from "./register-server.command";
+import {
+  type RegisterServerCommandInput,
+  type RegisterServerResult,
+} from "./register-server.command";
 
 const registerServerOperation = findOperationCatalogEntryByKey("servers.register");
 const defaultOperationGuardPort = new AllowAllOperationGuardPort();
@@ -56,7 +60,7 @@ export class RegisterServerUseCase {
   async execute(
     context: ExecutionContext,
     input: RegisterServerCommandInput,
-  ): Promise<Result<{ id: string }>> {
+  ): Promise<Result<RegisterServerResult>> {
     const { clock, eventBus, idGenerator, logger, operationGuardPort, serverRepository } = this;
     const repositoryContext = toRepositoryContext(context);
 
@@ -83,6 +87,7 @@ export class RegisterServerUseCase {
       const host = yield* HostAddress.create(input.host);
       const providerKey = yield* ProviderKey.create(input.providerKey);
       const targetKind = yield* TargetKindValue.create(input.targetKind ?? "single-server");
+      const workloadRoles = yield* DeploymentTargetWorkloadRoles.create(input.workloadRoles ?? []);
       const createdAt = yield* CreatedAt.create(clock.now());
       const port = yield* PortNumber.create(input.port ?? 22);
       const edgeProxyKind = yield* EdgeProxyKindValue.create(input.proxyKind ?? "traefik");
@@ -110,6 +115,7 @@ export class RegisterServerUseCase {
         host,
         providerKey,
         targetKind,
+        workloadRoles,
         createdAt,
         port,
         edgeProxyKind,
@@ -122,7 +128,10 @@ export class RegisterServerUseCase {
       );
       await publishDomainEventsAndReturn(context, eventBus, logger, server, undefined);
 
-      return ok({ id: server.toState().id.value });
+      return ok({
+        id: server.toState().id.value,
+        workloadRoles: server.toState().workloadRoles.toJSON(),
+      });
     });
   }
 }

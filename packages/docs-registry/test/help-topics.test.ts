@@ -246,6 +246,24 @@ describe("public docs help registry", () => {
     }
   });
 
+  test("[SRV-ROLE-ENTRY-005] workload role help resolves to the bilingual stable anchor", () => {
+    const topic = publicDocsHelpTopics["server.workload-roles"];
+
+    expect(topic.relatedOperation).toBe("servers.configure-workload-roles");
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe(
+      "/docs/servers/register-connect/#server-workload-roles",
+    );
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/servers/register-connect/#server-workload-roles",
+    );
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/specs/118-server-workload-roles/spec.md",
+        "docs/testing/server-workload-role-test-matrix.md",
+      ]),
+    );
+  });
+
   test("[RUNTIME-CTRL-DOCS-001] runtime-control help topics resolve to stable anchors", () => {
     const runtimeControlsTopic = publicDocsHelpTopics["resource.runtime-controls"];
     const restartVsRedeployTopic = publicDocsHelpTopics["resource.runtime-restart-vs-redeploy"];

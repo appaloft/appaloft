@@ -3166,6 +3166,17 @@ export const zhCN = {
       sshPublicKeyHint: "SSH 连接只需要私钥；这里用于凭据库展示或人工核对。",
       sshUsername: "登录用户（可选）",
       sshUsernameHint: "如果服务器地址已写成 ubuntu@203.0.113.10，这里可以留空。",
+      workloadRoleArtifactBuilder: "制品构建器",
+      workloadRoleArtifactBuilderDescription:
+        "记录未来制品构建放置意图，不代表远程构建已就绪或具备相关能力。",
+      workloadRoleDeploymentRuntime: "部署运行时",
+      workloadRoleDeploymentRuntimeDescription: "接收新的应用运行时放置。",
+      workloadRoleSandboxWorker: "沙箱工作节点",
+      workloadRoleSandboxWorkerDescription: "在独立要求通过后，接收新的沙箱、Agent 和工作区放置。",
+      workloadRolesDescription:
+        "可选声明这台服务器计划接收的新工作负载类别。只影响新的放置，不会移动或停止当前工作负载。",
+      workloadRolesGeneralPurpose: "通用用途（所有工作负载类型）",
+      workloadRolesTitle: "工作负载角色",
     },
     servers: {
       capacityApplyAction: "执行 prune",
@@ -3397,6 +3408,22 @@ export const zhCN = {
       savedCredentialLibraryEmptyBody: "创建使用可复用私钥的服务器，或通过 CLI 保存凭据。",
       savedCredentialLibraryEmptyTitle: "暂无已保存 SSH 凭据",
       savedCredentialLibraryTitle: "已保存 SSH 凭据",
+      workloadRoleArtifactBuilder: "制品构建器",
+      workloadRoleArtifactBuilderDescription:
+        "仅表示放置意图，不代表远程构建已就绪或具备相关能力。",
+      workloadRoleDeploymentRuntime: "部署运行时",
+      workloadRoleDeploymentRuntimeDescription: "接收新的应用运行时放置。",
+      workloadRoleSandboxWorker: "沙箱工作节点",
+      workloadRoleSandboxWorkerDescription: "在独立要求通过后，接收新的沙箱、Agent 和工作区放置。",
+      workloadRolesGeneralPurpose: "通用用途（所有工作负载类型）",
+      workloadRolesNewPlacementOnly: "更改只影响新的放置，不会排空、移动或停止当前工作负载。",
+      workloadRolesSaveChanged: "完整工作负载角色集合已替换。",
+      workloadRolesSaveFailed: "无法保存工作负载角色",
+      workloadRolesSaveSucceeded: "工作负载角色已保存",
+      workloadRolesSaveUnchanged: "工作负载角色集合原本就没有变化。",
+      workloadRolesSettingsDescription:
+        "选择这台服务器计划接收的完整新工作负载类别集合。清空所有角色可保持不受角色限制。",
+      workloadRolesTitle: "工作负载角色",
     },
     shell: {
       connections: "连接",

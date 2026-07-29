@@ -41,6 +41,7 @@ import {
   type ResourceServiceState,
   ResourceSlug,
   type Result,
+  ServerWorkloadRoleValue,
   safeTry,
   UpsertDeploymentTargetSpec,
   UpsertDestinationSpec,
@@ -160,6 +161,8 @@ function normalizeDeploymentResourceInput(
   };
 }
 
+const deploymentRuntimeRole = ServerWorkloadRoleValue.rehydrate("deployment-runtime");
+
 @injectable()
 export class DeploymentContextBootstrapService {
   constructor(
@@ -196,6 +199,7 @@ export class DeploymentContextBootstrapService {
   async bootstrap(
     context: ExecutionContext,
     input: CreateDeploymentCommandInput,
+    options: { enforceWorkloadRole?: boolean } = {},
   ): Promise<Result<BootstrappedDeploymentInput>> {
     const self = this;
 
@@ -208,9 +212,22 @@ export class DeploymentContextBootstrapService {
             ? { configFilePath: bootstrapInput.configFilePath }
             : {}),
         });
+        yield* await self.ensureExistingServerCanAcceptNewWork(
+          context,
+          bootstrapInput,
+          config,
+          options,
+        );
         const configured = yield* await self.applyConfigStrategy(context, bootstrapInput, config);
         return ok(configured);
       }
+
+      yield* await self.ensureExistingServerCanAcceptNewWork(
+        context,
+        bootstrapInput,
+        null,
+        options,
+      );
 
       if (input.destinationId) {
         return ok(input);
@@ -233,6 +250,59 @@ export class DeploymentContextBootstrapService {
         destinationId,
       });
     });
+  }
+
+  private async ensureExistingServerCanAcceptNewWork(
+    context: ExecutionContext,
+    input: LegacyDeploymentBootstrapInput,
+    config: DeploymentConfigSnapshot | null,
+    options: { enforceWorkloadRole?: boolean },
+  ): Promise<Result<void>> {
+    const repositoryContext = toRepositoryContext(context);
+    let server: DeploymentTarget | null = null;
+
+    if (input.serverId) {
+      const serverIdResult = DeploymentTargetId.create(input.serverId);
+      if (serverIdResult.isErr()) {
+        return err(serverIdResult.error);
+      }
+      server = await this.serverRepository.findOne(
+        repositoryContext,
+        DeploymentTargetByIdSpec.create(serverIdResult.value),
+      );
+      if (!server) {
+        return err(domainError.notFound("server", input.serverId));
+      }
+    } else if (config?.targets && config.targets.length > 0) {
+      const selectedTarget = selectDeploymentTarget(config.targets, config.deployment?.targetKey);
+      if (selectedTarget) {
+        const providerKeyValue = normalizeProviderKey(selectedTarget.providerKey);
+        const hostValue = defaultTargetHost(selectedTarget);
+        if (hostValue) {
+          const providerKeyResult = ProviderKey.create(providerKeyValue);
+          if (providerKeyResult.isErr()) {
+            return err(providerKeyResult.error);
+          }
+          const hostResult = HostAddress.create(hostValue);
+          if (hostResult.isErr()) {
+            return err(hostResult.error);
+          }
+          server = await this.serverRepository.findOne(
+            repositoryContext,
+            DeploymentTargetByProviderAndHostSpec.create(providerKeyResult.value, hostResult.value),
+          );
+        }
+      }
+    }
+
+    if (!server) {
+      return ok(undefined);
+    }
+
+    return server.ensureCanAcceptNewWork(
+      "deployments.create",
+      options.enforceWorkloadRole === false ? undefined : { requiredRole: deploymentRuntimeRole },
+    );
   }
 
   private async applyConfigStrategy(

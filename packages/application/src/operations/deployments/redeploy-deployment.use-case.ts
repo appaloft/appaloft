@@ -128,6 +128,7 @@ export class RedeployDeploymentUseCase {
         {
           triggerKind: DeploymentTriggerKindValue.redeploy(),
           ...(sourceState ? { sourceDeploymentId: sourceState.id.value } : {}),
+          ...(sourceState ? { enforceWorkloadRole: false } : {}),
           ownerLabel: "deployments.redeploy",
         },
       );

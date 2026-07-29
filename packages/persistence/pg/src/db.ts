@@ -118,6 +118,7 @@ import { sandboxAgentDeliveryMigration } from "./migrations/109_sandbox_agent_de
 import { workspaceCollaborationsMigration } from "./migrations/110_workspace_collaborations";
 import { agentAdapterInstallationsMigration } from "./migrations/111_agent_adapter_installations";
 import { agentWorkspaceProfilesMigration } from "./migrations/112_agent_workspace_profiles";
+import { serverWorkloadRolesMigration } from "./migrations/113_server_workload_roles";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -332,6 +333,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "110_workspace_collaborations": workspaceCollaborationsMigration,
       "111_agent_adapter_installations": agentAdapterInstallationsMigration,
       "112_agent_workspace_profiles": agentWorkspaceProfilesMigration,
+      "113_server_workload_roles": serverWorkloadRolesMigration,
     };
   }
 }

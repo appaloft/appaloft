@@ -176,6 +176,7 @@ function server(overrides: Partial<ServerSummary> = {}): ServerSummary {
     providerKey: "generic-ssh",
     targetKind: "single-server",
     lifecycleStatus: "active",
+    workloadRoles: [],
     createdAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
   };

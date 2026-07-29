@@ -6,5 +6,6 @@ export * from "./destination";
 export * from "./destination-specifications";
 export * from "./domain-binding";
 export * from "./domain-binding-specifications";
+export * from "./server-workload-role";
 export * from "./ssh-credential";
 export * from "./ssh-credential-specifications";

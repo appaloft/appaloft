@@ -296,6 +296,7 @@ function serverSummary(overrides: Partial<ServerSummary> = {}): ServerSummary {
     providerKey: "local-shell",
     targetKind: "single-server",
     lifecycleStatus: "active",
+    workloadRoles: [],
     edgeProxy: {
       kind: "caddy",
       status: "failed",

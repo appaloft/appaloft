@@ -42,6 +42,9 @@ This query inherits:
 - [ADR-004: Server Readiness State Storage](../decisions/ADR-004-server-readiness-state-storage.md)
 - [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
 - [ADR-026: Aggregate Mutation Command Boundary](../decisions/ADR-026-aggregate-mutation-command-boundary.md)
+- [ADR-101: Server Workload Role Admission](../decisions/ADR-101-server-workload-role-admission.md)
+- [Server Workload Roles Spec](../specs/118-server-workload-roles/spec.md)
+- [Server Workload Role Test Matrix](../testing/server-workload-role-test-matrix.md)
 - [Deployment Target Lifecycle Workflow](../workflows/deployment-target-lifecycle.md)
 - [Deployment Target Lifecycle Error Spec](../errors/servers.lifecycle.md)
 - [Deployment Target Lifecycle Test Matrix](../testing/deployment-target-lifecycle-test-matrix.md)
@@ -72,7 +75,9 @@ proxy repair options, resource configuration fields, domain names, or live-probe
 ```ts
 type ServerDetail = {
   schemaVersion: "servers.show/v1";
-  server: ServerSummary;
+  server: ServerSummary & {
+    workloadRoles: ServerWorkloadRole[];
+  };
   rollups?: {
     resources: {
       total: number;
@@ -97,6 +102,16 @@ type ServerDetail = {
 
 `server` includes existing server identity, host/port, provider key, credential summary with masked
 secret booleans, edge proxy kind/status, and last safe proxy error metadata.
+It also includes `workloadRoles: ServerWorkloadRole[]` as the normalized declaration of placement
+intent. Values are exactly `deployment-runtime`, `artifact-builder`, and `sandbox-worker`, in that
+canonical order when present. The field is never omitted: `[]` explicitly means
+general-purpose/unrestricted by role for every defined workload category, not unknown, not missing,
+and not incapable.
+
+`workloadRoles` must remain independent from `targetKind`, lifecycle, connectivity, runtime
+availability, edge proxy state, provider capability, credential state, health, capacity, isolation,
+and private placement policy. In particular, `artifact-builder` does not claim remote artifact-build
+readiness, and `sandbox-worker` does not prove Sandbox capability or isolation.
 
 Rollups are observational:
 
@@ -137,6 +152,11 @@ rollups for zero usage.
 | Automation / MCP | Future query/tool over the same operation key. | Future |
 | Public docs | Existing `server.deployment-target` anchor covers read/detail semantics. | Active |
 
+All entrypoints expose the same canonical role values and explicit `[]` meaning. Readback after
+`servers.register` or `servers.configure-workload-roles` reflects the normalized persisted complete
+set. Role changes are prospective and do not rewrite the deployment/resource/domain rollups or any
+accepted workload snapshot represented by this detail response.
+
 ## Current Implementation Notes And Migration Gaps
 
 The active implementation exposes `servers.show` through application, operation catalog,
@@ -145,6 +165,10 @@ HTTP/oRPC, CLI, Web server detail, contracts, and public docs coverage.
 Server rename and edge-proxy configuration remain future lifecycle commands. Deactivate,
 delete-safety, and guarded soft delete are separate active operations and must not be exposed as
 generic `servers.update`.
+
+The active detail read model exposes normalized `workloadRoles` for classified and general-purpose
+servers. Neutral artifact-builder execution and Server-aware Sandbox placement remain governed
+follow-ups; the query reports declared intent without manufacturing capability or readiness.
 
 Credential usage visibility beyond the selected server's credential summary remains future
 credential lifecycle work.

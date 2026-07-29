@@ -109,6 +109,7 @@ describe("servers.register command", () => {
 
     const result = await handler.handle(createTestContext(), command._unsafeUnwrap());
     expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().workloadRoles).toEqual([]);
 
     const serverId = result._unsafeUnwrap().id;
     const persisted = serverRepository.items.get(serverId)?.toState();
@@ -125,6 +126,67 @@ describe("servers.register command", () => {
       providerKey: "local-shell",
       targetKind: "single-server",
     });
+  });
+
+  test("[SRV-ROLE-001/002] servers.register defaults to unrestricted and persists canonical roles", async () => {
+    const unrestrictedHarness = createHarness();
+    const unrestricted = RegisterServerCommand.create({
+      name: "General purpose",
+      host: "general.internal",
+      providerKey: "generic-ssh",
+    });
+    const unrestrictedResult = await unrestrictedHarness.handler.handle(
+      createTestContext(),
+      unrestricted._unsafeUnwrap(),
+    );
+    expect(unrestrictedResult._unsafeUnwrap().workloadRoles).toEqual([]);
+    expect(
+      unrestrictedHarness.serverRepository.items
+        .get(unrestrictedResult._unsafeUnwrap().id)
+        ?.toState()
+        .workloadRoles.toJSON(),
+    ).toEqual([]);
+
+    const classifiedHarness = createHarness();
+    const classified = RegisterServerCommand.create({
+      name: "Classified",
+      host: "classified.internal",
+      providerKey: "generic-ssh",
+      workloadRoles: ["artifact-builder", "deployment-runtime"],
+    });
+    const classifiedResult = await classifiedHarness.handler.handle(
+      createTestContext(),
+      classified._unsafeUnwrap(),
+    );
+    expect(classifiedResult._unsafeUnwrap().workloadRoles).toEqual([
+      "deployment-runtime",
+      "artifact-builder",
+    ]);
+    expect(
+      classifiedHarness.serverRepository.items
+        .get(classifiedResult._unsafeUnwrap().id)
+        ?.toState()
+        .workloadRoles.toJSON(),
+    ).toEqual(["deployment-runtime", "artifact-builder"]);
+  });
+
+  test("[SRV-ROLE-004] servers.register rejects duplicate and unknown roles", () => {
+    expect(
+      RegisterServerCommand.create({
+        name: "Duplicate",
+        host: "duplicate.internal",
+        providerKey: "generic-ssh",
+        workloadRoles: ["deployment-runtime", "deployment-runtime"],
+      }).isErr(),
+    ).toBe(true);
+    expect(
+      RegisterServerCommand.create({
+        name: "Unknown",
+        host: "unknown.internal",
+        providerKey: "generic-ssh",
+        workloadRoles: ["unknown-role" as "deployment-runtime"],
+      }).isErr(),
+    ).toBe(true);
   });
 
   test("[SWARM-TARGET-REG-001] servers.register persists Swarm manager target kind metadata", async () => {

@@ -100,6 +100,8 @@ import {
   ConfigureServerCredentialUseCase,
   ConfigureServerEdgeProxyCommandHandler,
   ConfigureServerEdgeProxyUseCase,
+  ConfigureServerWorkloadRolesCommandHandler,
+  ConfigureServerWorkloadRolesUseCase,
   ConfigureStorageVolumeBackupPolicyCommandHandler,
   ConfigureStorageVolumeBackupPolicyUseCase,
   ConfirmActionPreviewRouteCommandHandler,
@@ -1686,6 +1688,7 @@ export function registerApplicationServices(
   container.registerSingleton(ListDefaultAccessDomainPoliciesQueryHandler);
   container.registerSingleton(ShowDefaultAccessDomainPolicyQueryHandler);
   container.registerSingleton(ConfigureServerEdgeProxyCommandHandler);
+  container.registerSingleton(ConfigureServerWorkloadRolesCommandHandler);
   container.registerSingleton(ConfigureDomainBindingRouteCommandHandler);
   container.registerSingleton(ConfigureResourceAccessCommandHandler);
   container.registerSingleton(ConfigureResourceAutoDeployCommandHandler);
@@ -2379,6 +2382,10 @@ export function registerApplicationServices(
   container.registerSingleton(
     tokens.configureServerCredentialUseCase,
     ConfigureServerCredentialUseCase,
+  );
+  container.registerSingleton(
+    tokens.configureServerWorkloadRolesUseCase,
+    ConfigureServerWorkloadRolesUseCase,
   );
   container.registerSingleton(tokens.createSshCredentialUseCase, CreateSshCredentialUseCase);
   container.registerSingleton(tokens.countServersQueryService, CountServersQueryService);

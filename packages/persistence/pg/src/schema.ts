@@ -30,6 +30,7 @@ export interface ServersTable {
   port: number;
   provider_key: string;
   target_kind: ColumnType<string, string | undefined, string>;
+  workload_roles: ColumnType<string[], string[] | undefined, string[]>;
   lifecycle_status: ColumnType<string, string | undefined, string>;
   deactivated_at: ColumnType<string | null, string | null | undefined, string | null>;
   deactivation_reason: ColumnType<string | null, string | null | undefined, string | null>;

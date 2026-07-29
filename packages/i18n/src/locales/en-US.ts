@@ -3429,6 +3429,18 @@ export const enUS = {
       sshUsername: "Login user (optional)",
       sshUsernameHint:
         "If the server host already includes a user, such as ubuntu@203.0.113.10, this can stay empty.",
+      workloadRoleArtifactBuilder: "Artifact builder",
+      workloadRoleArtifactBuilderDescription:
+        "Records intent for future artifact build placement; it does not prove remote build readiness or capability.",
+      workloadRoleDeploymentRuntime: "Deployment runtime",
+      workloadRoleDeploymentRuntimeDescription: "Accept new application runtime placement.",
+      workloadRoleSandboxWorker: "Sandbox worker",
+      workloadRoleSandboxWorkerDescription:
+        "Accept new Sandbox, agent, and Workspace placement when independent requirements pass.",
+      workloadRolesDescription:
+        "Optionally declare the kinds of new workload this server is intended to accept. This affects only new placement; current workloads are not moved or stopped.",
+      workloadRolesGeneralPurpose: "General purpose (all workload types)",
+      workloadRolesTitle: "Workload roles",
     },
     servers: {
       capacityApplyAction: "Apply prune",
@@ -3678,6 +3690,24 @@ export const enUS = {
         "Create a server with a reusable private key or use the CLI to save a credential.",
       savedCredentialLibraryEmptyTitle: "No saved SSH credentials",
       savedCredentialLibraryTitle: "Saved SSH credentials",
+      workloadRoleArtifactBuilder: "Artifact builder",
+      workloadRoleArtifactBuilderDescription:
+        "Placement intent only; this does not prove remote build readiness or capability.",
+      workloadRoleDeploymentRuntime: "Deployment runtime",
+      workloadRoleDeploymentRuntimeDescription: "Accept new application runtime placement.",
+      workloadRoleSandboxWorker: "Sandbox worker",
+      workloadRoleSandboxWorkerDescription:
+        "Accept new Sandbox, agent, and Workspace placement when independent requirements pass.",
+      workloadRolesGeneralPurpose: "General purpose (all workload types)",
+      workloadRolesNewPlacementOnly:
+        "Changes apply only to new placement. Current workloads are not drained, moved, or stopped.",
+      workloadRolesSaveChanged: "The complete workload role set was replaced.",
+      workloadRolesSaveFailed: "Unable to save workload roles",
+      workloadRolesSaveSucceeded: "Workload roles saved",
+      workloadRolesSaveUnchanged: "The workload role set was already unchanged.",
+      workloadRolesSettingsDescription:
+        "Choose the complete set of new workload categories this server is intended to accept. Clear every role to keep it unrestricted.",
+      workloadRolesTitle: "Workload roles",
     },
     shell: {
       connections: "Connections",

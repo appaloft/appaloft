@@ -4,19 +4,25 @@ import { Command } from "../../cqrs";
 import { parseOperationInput } from "../shared-schema";
 import {
   type RegisterServerCommandInput,
+  type RegisterServerCommandPayload,
+  type RegisterServerResult,
   registerServerCommandInputSchema,
 } from "./register-server.schema";
 
 export {
   type RegisterServerCommandInput,
+  type RegisterServerCommandPayload,
+  type RegisterServerResult,
   registerServerCommandInputSchema,
+  registerServerResultSchema,
 } from "./register-server.schema";
 
-export class RegisterServerCommand extends Command<{ id: string }> {
+export class RegisterServerCommand extends Command<RegisterServerResult> {
   constructor(
     public readonly name: string,
     public readonly host: string,
     public readonly providerKey: string,
+    public readonly workloadRoles: RegisterServerCommandPayload["workloadRoles"] = [],
     public readonly targetKind: RegisterServerCommandInput["targetKind"] = "single-server",
     public readonly port?: number,
     public readonly proxyKind: RegisterServerCommandInput["proxyKind"] = "traefik",
@@ -32,6 +38,7 @@ export class RegisterServerCommand extends Command<{ id: string }> {
             parsed.name,
             host.value,
             parsed.providerKey,
+            parsed.workloadRoles,
             parsed.targetKind,
             parsed.port,
             parsed.proxyKind,

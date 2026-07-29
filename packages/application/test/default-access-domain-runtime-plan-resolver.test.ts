@@ -9,6 +9,7 @@ import {
   DeploymentTargetLifecycleStatusValue,
   DeploymentTargetName,
   type DeploymentTargetState,
+  DeploymentTargetWorkloadRoles,
   DetectSummary,
   DisplayNameText,
   EdgeProxyKindValue,
@@ -108,6 +109,7 @@ function createServer(): DeploymentTargetState {
     providerKey: ProviderKey.rehydrate("generic-ssh"),
     targetKind: TargetKindValue.rehydrate("single-server"),
     lifecycleStatus: DeploymentTargetLifecycleStatusValue.active(),
+    workloadRoles: DeploymentTargetWorkloadRoles.unrestricted(),
     edgeProxy: {
       kind: EdgeProxyKindValue.rehydrate("traefik"),
       status: EdgeProxyStatusValue.rehydrate("ready"),
