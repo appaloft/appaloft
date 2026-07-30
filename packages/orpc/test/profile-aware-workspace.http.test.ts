@@ -15,6 +15,7 @@ import {
   type Query,
   type QueryBus,
   ShowRepositoryBindingQuery,
+  type TenantContextResolver,
   UnbindRepositoryCommand,
 } from "@appaloft/application";
 import { ok, type Result } from "@appaloft/core";
@@ -59,9 +60,10 @@ function request(path: string, init: RequestInit): Request {
 }
 
 describe("Profile-aware Workspace HTTP routes", () => {
-  test("[WS-OPEN-SURFACE-019] dispatches open and configuration through the composed router", async () => {
+  test("[WS-OPEN-SURFACE-019][GH-AUTO-TENANT-022] dispatches open and configuration through the composed router", async () => {
     const commands: Command<unknown>[] = [];
     const queries: Query<unknown>[] = [];
+    const dispatchedContexts: ExecutionContext[] = [];
     const profile = {
       installationId: "awpi_default",
       definitionDigest: `sha256:${"1".repeat(64)}`,
@@ -74,7 +76,8 @@ describe("Profile-aware Workspace HTTP routes", () => {
       credentialConnections: [{ requirementId: "model-api", connectionReference: "conn_model" }],
     };
     const commandBus = {
-      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+      execute: async <T>(context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        dispatchedContexts.push(context);
         commands.push(command as Command<unknown>);
         if (command instanceof ConfigureProjectWorkspaceProfileCommand) {
           return ok({
@@ -89,17 +92,27 @@ describe("Profile-aware Workspace HTTP routes", () => {
       },
     } as CommandBus;
     const queryBus = {
-      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+      execute: async <T>(context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        dispatchedContexts.push(context);
         queries.push(query as Query<unknown>);
         return ok({ repositoryIdentity: "github.com/Acme/Web" } as T);
       },
     } as QueryBus;
+    const tenantContextResolver: TenantContextResolver = {
+      async resolveTenantContext(context) {
+        return {
+          ...(context.tenant ?? { tenantId: "tenant_instance" }),
+          tenantId: `resolved_${context.tenant?.tenantId ?? "tenant_instance"}`,
+        };
+      },
+    };
     const app = mountAppaloftOrpcRoutes(new Elysia(), {
       commandBus,
       executionContextFactory: contextFactory,
       logger,
       productSessionAuthorizationPort: authorization,
       queryBus,
+      tenantContextResolver,
     });
 
     const calls = [
@@ -158,5 +171,9 @@ describe("Profile-aware Workspace HTTP routes", () => {
     expect(commands.some((command) => command instanceof BindProjectRepositoryCommand)).toBe(true);
     expect(commands.some((command) => command instanceof UnbindRepositoryCommand)).toBe(true);
     expect(queries.some((query) => query instanceof ShowRepositoryBindingQuery)).toBe(true);
+    expect(dispatchedContexts).not.toHaveLength(0);
+    expect(
+      dispatchedContexts.every((context) => context.tenant?.tenantId === "resolved_org_workspace"),
+    ).toBe(true);
   });
 });

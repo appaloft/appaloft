@@ -854,6 +854,7 @@ import {
   streamSandboxEventsQueryInputSchema,
   switchCurrentOrganizationCommandInputSchema,
   syncEnvironmentProfileCommandInputSchema,
+  type TenantContextResolver,
   TerminateSandboxAgentRuntimeCommand,
   TerminateSandboxCommand,
   TerminateSandboxProcessCommand,
@@ -1199,6 +1200,7 @@ export interface AppaloftOrpcContext {
   actionDeployTokenAuthorizationPort?: ActionDeployTokenAuthorizationPort;
   actionSourcePackageConfigReader?: ActionSourcePackageConfigReader;
   productSessionAuthorizationPort?: ProductSessionAuthorizationPort;
+  tenantContextResolver?: TenantContextResolver;
   requestContextRunner?: RequestContextRunner;
 }
 
@@ -3154,7 +3156,7 @@ async function executeCommand<TMessage extends Command<TResult>, TResult>(
 ): Promise<TResult> {
   const command = unwrapResult(context.executionContext, message);
   const productActor = await authorizeProductSessionForCommand(context, command);
-  const executionContext = productActor
+  const authorizedContext = productActor
     ? createRequestExecutionContext(
         context.executionContextFactory,
         context.executionContext.entrypoint === "rpc" ? "rpc" : "http",
@@ -3163,6 +3165,13 @@ async function executeCommand<TMessage extends Command<TResult>, TResult>(
         productActor.principal,
       )
     : context.executionContext;
+  const executionContext =
+    productActor && context.tenantContextResolver
+      ? {
+          ...authorizedContext,
+          tenant: await context.tenantContextResolver.resolveTenantContext(authorizedContext),
+        }
+      : authorizedContext;
 
   return unwrapResult(
     executionContext,
@@ -3229,7 +3238,7 @@ async function executeQuery<TMessage extends Query<TResult>, TResult>(
 ): Promise<TResult> {
   const query = unwrapResult(context.executionContext, message);
   const productActor = await authorizeProductSessionForQuery(context, query);
-  const executionContext = productActor
+  const authorizedContext = productActor
     ? createRequestExecutionContext(
         context.executionContextFactory,
         context.executionContext.entrypoint === "rpc" ? "rpc" : "http",
@@ -3238,6 +3247,13 @@ async function executeQuery<TMessage extends Query<TResult>, TResult>(
         productActor.principal,
       )
     : context.executionContext;
+  const executionContext =
+    productActor && context.tenantContextResolver
+      ? {
+          ...authorizedContext,
+          tenant: await context.tenantContextResolver.resolveTenantContext(authorizedContext),
+        }
+      : authorizedContext;
 
   return unwrapResult(executionContext, await context.queryBus.execute(executionContext, query));
 }
