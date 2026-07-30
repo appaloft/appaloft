@@ -34,6 +34,8 @@
   [#749](https://github.com/appaloft/appaloft-cloud/issues/749),
   [#750](https://github.com/appaloft/appaloft-cloud/issues/750), and
   [#751](https://github.com/appaloft/appaloft-cloud/issues/751).
+- [x] Track the npm CLI launcher executable-mode regression under public issue
+  [#900](https://github.com/appaloft/appaloft/issues/900).
 - [ ] Link the final public merged commit.
 
 ## Implementation
@@ -54,6 +56,8 @@
 - [x] Run public lint, typecheck, test, build, `check:ash`, and docs registry gates.
 - [x] Run Cloud focused authz/audit/credential/placement/composition tests and full gates.
 - [x] Run public frozen install gate.
+- [x] Add `CLI-NPM-PACKAGE-001` coverage so a frozen install cannot make a clean source checkout
+  appear dirty through the tracked npm launcher mode.
 - [x] Record reusable registered-Server Pi/OpenCode substrate evidence from Cloud run
   [30433192272](https://github.com/appaloft/appaloft-cloud/actions/runs/30433192272): real-provider
   model replies, managed-terminal/native attach, reconnectable state, hibernation and exact fixture
