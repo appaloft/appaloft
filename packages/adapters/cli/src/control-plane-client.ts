@@ -1098,7 +1098,9 @@ function requestFacadeOperation<T = unknown>(
   operationKey: string,
   input?: AppaloftSdkFacadeInput,
 ): ReturnType<AppaloftSdkFacadeMethod> {
-  const method = facadeMethodForOperationKey(client, operationKey);
+  const operationFacade =
+    isRecord(client) && isRecord(client.operations) ? client.operations : client;
+  const method = facadeMethodForOperationKey(operationFacade, operationKey);
 
   return method<T>(input);
 }

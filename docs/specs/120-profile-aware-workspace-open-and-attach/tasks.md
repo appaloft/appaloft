@@ -36,6 +36,8 @@
   [#751](https://github.com/appaloft/appaloft-cloud/issues/751).
 - [x] Track the npm CLI launcher executable-mode regression under public issue
   [#900](https://github.com/appaloft/appaloft/issues/900).
+- [x] Track the generated-facade collision found by remote `workspace open` smoke under public issue
+  [#904](https://github.com/appaloft/appaloft/issues/904).
 - [ ] Link the final public merged commit.
 
 ## Implementation
