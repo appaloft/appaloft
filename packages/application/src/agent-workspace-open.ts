@@ -1,5 +1,3 @@
-import { Buffer } from "node:buffer";
-
 import {
   type DomainError,
   type DomainErrorDetails,
@@ -289,32 +287,76 @@ function validateSourceCredential(
   return ok(credential);
 }
 
-function authenticatedGitCommand(
+type WorkspaceSourceCommand = {
+  readonly argv: readonly string[];
+  readonly cwd?: string;
+  readonly stdin?: Uint8Array;
+};
+
+type AuthenticatedGitCommands = {
+  readonly prepare: WorkspaceSourceCommand;
+  readonly approve: WorkspaceSourceCommand;
+  readonly fetch: WorkspaceSourceCommand;
+  readonly cleanup: readonly WorkspaceSourceCommand[];
+};
+
+const workspaceSourceCredentialCacheDirectory = "/tmp/.appaloft-workspace-source-credential";
+const workspaceSourceCredentialCacheSocket = `${workspaceSourceCredentialCacheDirectory}/credential-cache.sock`;
+const workspaceSourceCredentialHelper = `cache --timeout=60 --socket=${workspaceSourceCredentialCacheSocket}`;
+
+function authenticatedGitCommands(
   repository: string,
   credential: WorkspaceOpenSourceHttpBasicCredential,
   argv: readonly string[],
-): { readonly argv: readonly string[]; readonly stdin: Uint8Array } {
-  const origin = new URL(repository).origin;
-  const authorization = Buffer.from(
-    `${credential.username}:${credential.password}`,
-    "utf8",
-  ).toString("base64");
+): AuthenticatedGitCommands {
+  const repositoryUrl = new URL(repository);
+  const credentialHelperArguments = [
+    "-c",
+    "credential.helper=",
+    "-c",
+    `credential.helper=${workspaceSourceCredentialHelper}`,
+  ] as const;
   return {
-    argv: [
-      "git",
-      "-c",
-      "credential.helper=",
-      "-c",
-      "credential.interactive=never",
-      "-c",
-      "core.askPass=/bin/false",
-      "-c",
-      "include.path=/dev/stdin",
-      ...argv.slice(1),
+    prepare: {
+      argv: ["mkdir", "-m", "700", workspaceSourceCredentialCacheDirectory],
+    },
+    approve: {
+      argv: ["git", ...credentialHelperArguments, "credential", "approve"],
+      stdin: new TextEncoder().encode(
+        [
+          `protocol=${repositoryUrl.protocol.slice(0, -1)}`,
+          `host=${repositoryUrl.host}`,
+          `username=${credential.username}`,
+          `password=${credential.password}`,
+          "",
+          "",
+        ].join("\n"),
+      ),
+    },
+    fetch: {
+      argv: [
+        "git",
+        ...credentialHelperArguments,
+        "-c",
+        "credential.interactive=never",
+        "-c",
+        "core.askPass=/bin/false",
+        ...argv.slice(1),
+      ],
+    },
+    cleanup: [
+      {
+        argv: [
+          "git",
+          "credential-cache",
+          `--socket=${workspaceSourceCredentialCacheSocket}`,
+          "exit",
+        ],
+      },
+      {
+        argv: ["rmdir", workspaceSourceCredentialCacheDirectory],
+      },
     ],
-    stdin: new TextEncoder().encode(
-      `[http "${origin}/"]\n\textraHeader = Authorization: Basic ${authorization}\n`,
-    ),
   };
 }
 
@@ -521,7 +563,8 @@ export class AgentWorkspaceOpenService {
         await this.dependencies.reservations.release(context, preflight.value.reservation);
         throw sandbox.error;
       }
-      workspaceId = sandbox.value.sandboxId;
+      const createdWorkspaceId = sandbox.value.sandboxId;
+      workspaceId = createdWorkspaceId;
       await this.dependencies.reservations.release(context, preflight.value.reservation);
 
       phase = "workspace-open-source-materialization";
@@ -533,39 +576,76 @@ export class AgentWorkspaceOpenService {
         });
         if (materialized.isErr()) throw materialized.error;
       } else {
-        const fetchArgv = ["git", "fetch", "--no-tags", "--depth", "1", "origin", input.ref];
-        const sourceCommands: readonly {
-          argv: readonly string[];
-          cwd?: string;
-          stdin?: Uint8Array;
-        }[] = [
-          {
-            argv: ["git", "init", "."],
-          },
-          {
-            argv: ["git", "remote", "add", "origin", input.repository],
-          },
-          sourceCredential.value
-            ? authenticatedGitCommand(input.repository, sourceCredential.value, fetchArgv)
-            : { argv: fetchArgv },
-          {
-            argv: ["git", "checkout", "--detach", input.commitSha],
-          },
-          {
-            argv: ["git", "switch", "-c", input.branch],
-          },
-        ];
-        for (const command of sourceCommands) {
-          const executed = await this.dependencies.sandboxes.exec(context, workspaceId, command);
-          if (executed.isErr() || !executionSucceeded(executed.value)) {
-            const failure = executed.isErr()
-              ? executed.error
-              : domainError.conflict("Workspace source materialization failed", {
-                  code: "workspace_open_source_materialization_failed",
-                });
-            throw failure;
+        const executeSourceCommand = async (
+          command: WorkspaceSourceCommand,
+        ): Promise<Result<void>> => {
+          const executed = await this.dependencies.sandboxes.exec(
+            context,
+            createdWorkspaceId,
+            command,
+          );
+          if (executed.isErr()) return err(executed.error);
+          if (!executionSucceeded(executed.value)) {
+            return err(
+              domainError.conflict("Workspace source materialization failed", {
+                code: "workspace_open_source_materialization_failed",
+              }),
+            );
           }
+          return ok(undefined);
+        };
+        const requireSourceCommand = async (command: WorkspaceSourceCommand): Promise<void> => {
+          const executed = await executeSourceCommand(command);
+          if (executed.isErr()) throw executed.error;
+        };
+
+        const fetchArgv = ["git", "fetch", "--no-tags", "--depth", "1", "origin", input.ref];
+
+        await requireSourceCommand({ argv: ["git", "init", "."] });
+        await requireSourceCommand({
+          argv: ["git", "remote", "add", "origin", input.repository],
+        });
+        if (sourceCredential.value) {
+          const authenticated = authenticatedGitCommands(
+            input.repository,
+            sourceCredential.value,
+            fetchArgv,
+          );
+          await requireSourceCommand(authenticated.prepare);
+          let sourceFailure: unknown;
+          try {
+            await requireSourceCommand(authenticated.approve);
+            await requireSourceCommand(authenticated.fetch);
+          } catch (error) {
+            sourceFailure = error;
+          }
+
+          let cleanupFailure: DomainError | undefined;
+          for (const cleanupCommand of authenticated.cleanup) {
+            const cleaned = await executeSourceCommand(cleanupCommand);
+            if (cleaned.isErr() && !cleanupFailure) cleanupFailure = cleaned.error;
+          }
+          if (cleanupFailure) {
+            throw domainError.conflict("Workspace source credential cleanup failed", {
+              code: "workspace_open_source_credential_cleanup_failed",
+              cleanupFailureCode:
+                cleanupFailure.details?.code ?? cleanupFailure.code ?? "source_cleanup_failed",
+              ...(isDomainError(sourceFailure)
+                ? {
+                    sourceFailureCode:
+                      sourceFailure.details?.code ?? sourceFailure.code ?? "source_fetch_failed",
+                  }
+                : {}),
+            });
+          }
+          if (sourceFailure) throw sourceFailure;
+        } else {
+          await requireSourceCommand({ argv: fetchArgv });
         }
+        await requireSourceCommand({
+          argv: ["git", "checkout", "--detach", input.commitSha],
+        });
+        await requireSourceCommand({ argv: ["git", "switch", "-c", input.branch] });
       }
       for (const initialization of preflight.value.plan.initialization) {
         phase = `workspace-open-initialization:${initialization.id}`;
