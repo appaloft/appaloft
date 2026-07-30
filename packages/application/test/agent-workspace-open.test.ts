@@ -23,6 +23,8 @@ describe("Agent Workspace open application workflow", () => {
     const phases: string[] = [];
     let failSandboxCreate = false;
     let failSourceCredential = false;
+    let failSourceFetch = false;
+    let failSourceCredentialCacheExit = false;
     let releasedReservations = 0;
     const placementReservationIds: (string | undefined)[] = [];
     const sandboxPlacement: Array<{ providerKey?: string; expiresAt?: string }> = [];
@@ -174,7 +176,19 @@ describe("Agent Workspace open application workflow", () => {
             argv: [...command.argv],
             ...(command.stdin ? { stdin: command.stdin.slice() } : {}),
           });
-          return ok({ mode: "foreground", frames: [{ kind: "exit", exitCode: 0 }] });
+          return ok({
+            mode: "foreground",
+            frames: [
+              {
+                kind: "exit",
+                exitCode:
+                  (failSourceFetch && command.argv.includes("fetch")) ||
+                  (failSourceCredentialCacheExit && command.argv.includes("credential-cache"))
+                    ? 1
+                    : 0,
+              },
+            ],
+          });
         },
         exposePort: async () => ok(undefined),
       },
@@ -322,16 +336,26 @@ describe("Agent Workspace open application workflow", () => {
     expect(executedCommands.map(({ argv }) => argv)).toEqual([
       ["git", "init", "."],
       ["git", "remote", "add", "origin", "https://github.com/Acme/Web.git"],
+      ["mkdir", "-m", "700", "/tmp/.appaloft-workspace-source-credential"],
       [
         "git",
         "-c",
         "credential.helper=",
         "-c",
+        "credential.helper=cache --timeout=60 --socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
+        "credential",
+        "approve",
+      ],
+      [
+        "git",
+        "-c",
+        "credential.helper=",
+        "-c",
+        "credential.helper=cache --timeout=60 --socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
+        "-c",
         "credential.interactive=never",
         "-c",
         "core.askPass=/bin/false",
-        "-c",
-        "include.path=/dev/stdin",
         "fetch",
         "--no-tags",
         "--depth",
@@ -339,18 +363,81 @@ describe("Agent Workspace open application workflow", () => {
         "origin",
         "refs/heads/feature/open",
       ],
+      [
+        "git",
+        "credential-cache",
+        "--socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
+        "exit",
+      ],
+      ["rmdir", "/tmp/.appaloft-workspace-source-credential"],
       ["git", "checkout", "--detach", "0123456789abcdef0123456789abcdef01234567"],
       ["git", "switch", "-c", "feature/open"],
     ]);
     expect(JSON.stringify(executedCommands.map(({ argv }) => argv))).not.toContain(
       "source-token-must-not-enter-argv",
     );
-    expect(new TextDecoder().decode(executedCommands[2]?.stdin)).toBe(
-      `[http "https://github.com/"]\n\textraHeader = Authorization: Basic ${Buffer.from(
-        "x-access-token:source-token-must-not-enter-argv",
-        "utf8",
-      ).toString("base64")}\n`,
+    expect(new TextDecoder().decode(executedCommands[3]?.stdin)).toBe(
+      "protocol=https\nhost=github.com\nusername=x-access-token\npassword=source-token-must-not-enter-argv\n\n",
     );
+    const authenticatedApproval = executedCommands[3];
+    const authenticatedFetch = executedCommands[4];
+    expect(authenticatedApproval?.stdin).toBeDefined();
+    expect(authenticatedFetch?.stdin).toBeUndefined();
+    const temporaryDirectory = Bun.spawnSync(["mktemp", "-d"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    expect(temporaryDirectory.exitCode).toBe(0);
+    const credentialCacheDirectory = temporaryDirectory.stdout.toString().trim();
+    const credentialCacheSocket = `${credentialCacheDirectory}/credential-cache.sock`;
+    const productionCredentialCacheSocket =
+      "/tmp/.appaloft-workspace-source-credential/credential-cache.sock";
+    const withProbeSocket = (argv: readonly string[]): string[] =>
+      argv.map((argument) =>
+        argument.replace(productionCredentialCacheSocket, credentialCacheSocket),
+      );
+    try {
+      const approved = Bun.spawnSync(withProbeSocket(authenticatedApproval?.argv ?? []), {
+        stdin: new Blob([new TextDecoder().decode(authenticatedApproval?.stdin)]),
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      expect(approved.exitCode).toBe(0);
+      expect(approved.stderr.toString()).toBe("");
+
+      const fetchArgumentIndex = authenticatedFetch?.argv.indexOf("fetch") ?? -1;
+      expect(fetchArgumentIndex).toBeGreaterThan(0);
+      const filled = Bun.spawnSync(
+        [
+          ...withProbeSocket(authenticatedFetch?.argv.slice(0, fetchArgumentIndex) ?? []),
+          "credential",
+          "fill",
+        ],
+        {
+          stdin: new Blob(["protocol=https\nhost=github.com\n\n"]),
+          stdout: "pipe",
+          stderr: "pipe",
+        },
+      );
+      expect(filled.exitCode).toBe(0);
+      expect(filled.stderr.toString()).toBe("");
+      expect(filled.stdout.toString()).toContain("username=x-access-token\n");
+      expect(filled.stdout.toString()).toContain("password=source-token-must-not-enter-argv\n");
+    } finally {
+      const cacheExit = Bun.spawnSync(
+        ["git", "credential-cache", `--socket=${credentialCacheSocket}`, "exit"],
+        {
+          stdout: "pipe",
+          stderr: "pipe",
+        },
+      );
+      expect(cacheExit.exitCode).toBe(0);
+      const directoryCleanup = Bun.spawnSync(["rmdir", credentialCacheDirectory], {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      expect(directoryCleanup.exitCode).toBe(0);
+    }
     expect(mismatched._unsafeUnwrapErr().details?.code).toBe("workspace_open_source_pin_mismatch");
     expect(mismatched._unsafeUnwrapErr().details?.guidance).toContain("--new");
     expect(sourceCredentialFailure._unsafeUnwrapErr().details?.code).toBe(
@@ -386,5 +473,74 @@ describe("Agent Workspace open application workflow", () => {
       "preflight",
       "sandbox-create",
     ]);
+
+    const commandCountBeforeFetchFailure = executedCommands.length;
+    failSandboxCreate = false;
+    failSourceFetch = true;
+    const sourceFetchFailure = await service.open(context, {
+      ...input,
+      forceNew: true,
+    });
+    failSourceFetch = false;
+    expect(sourceFetchFailure._unsafeUnwrapErr().details?.code).toBe(
+      "workspace_open_source_materialization_failed",
+    );
+    expect(executedCommands.slice(commandCountBeforeFetchFailure).map(({ argv }) => argv)).toEqual([
+      ["git", "init", "."],
+      ["git", "remote", "add", "origin", "https://github.com/Acme/Web.git"],
+      ["mkdir", "-m", "700", "/tmp/.appaloft-workspace-source-credential"],
+      [
+        "git",
+        "-c",
+        "credential.helper=",
+        "-c",
+        "credential.helper=cache --timeout=60 --socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
+        "credential",
+        "approve",
+      ],
+      [
+        "git",
+        "-c",
+        "credential.helper=",
+        "-c",
+        "credential.helper=cache --timeout=60 --socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
+        "-c",
+        "credential.interactive=never",
+        "-c",
+        "core.askPass=/bin/false",
+        "fetch",
+        "--no-tags",
+        "--depth",
+        "1",
+        "origin",
+        "refs/heads/feature/open",
+      ],
+      [
+        "git",
+        "credential-cache",
+        "--socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
+        "exit",
+      ],
+      ["rmdir", "/tmp/.appaloft-workspace-source-credential"],
+    ]);
+
+    const commandCountBeforeCleanupFailure = executedCommands.length;
+    failSourceCredentialCacheExit = true;
+    const sourceCleanupFailure = await service.open(context, {
+      ...input,
+      forceNew: true,
+    });
+    failSourceCredentialCacheExit = false;
+    expect(sourceCleanupFailure._unsafeUnwrapErr().details?.code).toBe(
+      "workspace_open_source_credential_cleanup_failed",
+    );
+    expect(
+      executedCommands.slice(commandCountBeforeCleanupFailure).map(({ argv }) => argv),
+    ).toContainEqual(["rmdir", "/tmp/.appaloft-workspace-source-credential"]);
+    expect(
+      executedCommands
+        .slice(commandCountBeforeCleanupFailure)
+        .some(({ argv }) => argv.includes("checkout")),
+    ).toBe(false);
   });
 });
