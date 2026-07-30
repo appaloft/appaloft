@@ -16,6 +16,8 @@
   webhook acceptance exposed an unrecorded delivery outcome.
 - [x] Create and link public tenant-context resolution issue #921 after composed hosted
   acceptance exposed different Profile visibility between authenticated and system entrypoints.
+- [x] Create and link public repository materialization regression issue #925 after real hosted
+  acceptance proved the GitHub adapter still required an empty Workspace root despite #908/#909.
 
 ## Public Composition Boundary Slice
 
@@ -41,6 +43,8 @@
 - [x] GH-AUTO-BINDING-003/WS-OPEN-BIND-005: project an active GitHub App Repository Binding
   through the connector-neutral Workspace-open binding port, preserve an explicit unbind, and fail
   closed on conflicting Project ownership.
+- [x] GH-AUTO-BOUNDARY-021: make the GitHub repository materializer reuse the populated-root
+  `git init`/exact-fetch behavior required by #908/#909 and reject clone-to-dot regressions.
 - [ ] Run the dedicated read-only Public/Private Boundary Review Round and require `PASS` before
   hosted Code resumes.
 
@@ -113,6 +117,8 @@
 - [x] Docs outcome for #902: the complete zh-CN/en-US
   `agents/github-agent-tasks#github-agent-tasks` pages now explain bounded automation request
   context and pre-Workspace fail-closed behavior.
+- [x] Docs outcome for #925: not user-facing. The fix restores the already documented repository
+  materialization workflow and changes no command, API, status, error code, or recovery guidance.
 - [x] Synchronize Domain Model, Business Operation Map, operation catalog, SDK/CLI/Web docs, and
   Test Matrix evidence.
 - [ ] Commit and push public changes with a neutral message.
