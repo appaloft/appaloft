@@ -97,5 +97,7 @@
 - [x] Synchronize CLI help, public docs, SDK guidance, Console behavior, ADR/Spec/tasks and issues.
 - [x] Merge the public source-authentication implementation through PR
   [#922](https://github.com/appaloft/appaloft/pull/922).
-- [ ] Merge this evidence Sync, update Cloud gitlink to the resulting public `main` SHA, then
-  complete Cloud PR.
+- [x] Merge evidence Sync PR
+  [#924](https://github.com/appaloft/appaloft/pull/924) as
+  `355715375431dd7a90d911b7646ce828479aa0f1`; the final Cloud gitlink and Ready transition are
+  recorded by the hosted-composition feature tasks and PR.
