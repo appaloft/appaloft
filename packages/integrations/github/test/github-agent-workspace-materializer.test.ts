@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import { createExecutionContext } from "@appaloft/application";
 import { ok } from "@appaloft/core";
@@ -47,7 +48,8 @@ describe("GitHub Repository Workspace materializer", () => {
     expect(written.some((file) => file.content === "installation-token-value\n")).toBe(true);
     expect(JSON.stringify(argv)).not.toContain("installation-token-value");
     expect(argv).toEqual([
-      ["chmod", "600", ".appaloft-github-token", ".appaloft-git-askpass"],
+      ["chmod", "600", ".appaloft-github-token"],
+      ["chmod", "700", ".appaloft-git-askpass"],
       ["git", "init", "."],
       ["git", "remote", "add", "origin", "https://github.com/appaloft/example.git"],
       ["git", "config", "core.hooksPath", "/dev/null"],
