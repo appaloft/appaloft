@@ -18,6 +18,11 @@ export type GitHubAgentCommand =
   | { kind: "resume" }
   | { kind: "new"; profile: string };
 
+export interface GitHubAgentThreadRequest {
+  title: string;
+  body?: string;
+}
+
 export interface GitHubAgentTrigger {
   provider: "github";
   sourceEventId: string;
@@ -32,6 +37,7 @@ export interface GitHubAgentTrigger {
   };
   sender: { id: string; loginSnapshot?: string; typeSnapshot?: string };
   thread: { kind: "issue" | "pull-request"; number: number };
+  threadRequest?: GitHubAgentThreadRequest;
   commentId?: string;
   command?: GitHubAgentCommand;
   label?: { id?: string; name: string };
@@ -883,18 +889,46 @@ export function resolveGitHubAgentIntent(trigger: GitHubAgentTrigger): GitHubAge
   if (trigger.action === "labeled" && trigger.label) {
     switch (trigger.label.name.toLowerCase()) {
       case "appaloft:fix":
-        return { action: "fix", source: "automation", mode: "write" };
+        return {
+          action: "fix",
+          source: "automation",
+          mode: "write",
+          ...(trigger.threadRequest
+            ? { instruction: githubAgentThreadRequestInstruction(trigger.threadRequest) }
+            : {}),
+        };
       case "appaloft:review":
-        return { action: "review", source: "automation", mode: "review-only" };
+        return {
+          action: "review",
+          source: "automation",
+          mode: "review-only",
+          ...(trigger.threadRequest
+            ? { instruction: githubAgentThreadRequestInstruction(trigger.threadRequest) }
+            : {}),
+        };
       case "appaloft:preview":
-        return { action: "preview", source: "automation", mode: "write" };
+        return {
+          action: "preview",
+          source: "automation",
+          mode: "write",
+          ...(trigger.threadRequest
+            ? { instruction: githubAgentThreadRequestInstruction(trigger.threadRequest) }
+            : {}),
+        };
     }
   }
   if (
     trigger.event === "pull_request" &&
     (trigger.action === "ready_for_review" || trigger.action === "synchronize")
   ) {
-    return { action: "review", source: "automation", mode: "review-only" };
+    return {
+      action: "review",
+      source: "automation",
+      mode: "review-only",
+      ...(trigger.threadRequest
+        ? { instruction: githubAgentThreadRequestInstruction(trigger.threadRequest) }
+        : {}),
+    };
   }
   if (trigger.event === "pull_request" && trigger.action === "closed") {
     return { action: "cleanup", source: "lifecycle", mode: "write" };
@@ -952,6 +986,7 @@ function cloneTrigger(trigger: GitHubAgentTrigger): GitHubAgentTrigger {
     repository: { ...trigger.repository },
     sender: { ...trigger.sender },
     thread: { ...trigger.thread },
+    ...(trigger.threadRequest ? { threadRequest: { ...trigger.threadRequest } } : {}),
     ...(trigger.command ? { command: { ...trigger.command } } : {}),
     ...(trigger.label ? { label: { ...trigger.label } } : {}),
     ...(trigger.pullRequest ? { pullRequest: { ...trigger.pullRequest } } : {}),
@@ -981,5 +1016,43 @@ export function assertGitHubAgentTriggerSafe(input: GitHubAgentTrigger): Result<
   if (input.source && !/^[0-9a-f]{40}$/u.test(input.source.headSha)) {
     return err(domainError.validation("GitHub Agent trigger source head SHA is invalid"));
   }
+  if (input.threadRequest) {
+    const request = assertGitHubAgentThreadRequestSafe(input.threadRequest);
+    if (request.isErr()) return err(request.error);
+  }
   return ok(undefined);
+}
+
+const githubAgentThreadRequestTitleLimit = 512;
+const githubAgentThreadRequestBodyLimit = 16_384;
+const githubAgentThreadRequestSecret =
+  /(?:\b(?:api[_-]?key|password|private[_-]?key|secret|token|credential(?:connection)?id)\b\s*[:=]\s*\S|\b[A-Z][A-Z0-9_]{2,}\s*=\s*\S|\b(?:gh[opsu]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{12,}|sk-[A-Za-z0-9_-]{12,})|-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----)/iu;
+
+export function assertGitHubAgentThreadRequestSafe(input: GitHubAgentThreadRequest): Result<void> {
+  const title = input.title.trim();
+  const body = input.body?.trim();
+  if (
+    !title ||
+    title.length > githubAgentThreadRequestTitleLimit ||
+    (body !== undefined && body.length > githubAgentThreadRequestBodyLimit)
+  ) {
+    return err(domainError.validation("GitHub Agent thread request is missing or too long"));
+  }
+  if (
+    githubAgentThreadRequestSecret.test(title) ||
+    (body && githubAgentThreadRequestSecret.test(body))
+  ) {
+    return err(
+      domainError.validation(
+        "GitHub Agent thread request cannot contain credentials, secret material, or environment assignments",
+      ),
+    );
+  }
+  return ok(undefined);
+}
+
+function githubAgentThreadRequestInstruction(input: GitHubAgentThreadRequest): string {
+  return input.body
+    ? `GitHub request: ${input.title}\n\n${input.body}`
+    : `GitHub request: ${input.title}`;
 }

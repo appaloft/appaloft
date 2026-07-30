@@ -10,6 +10,7 @@ import {
   type GitHubAgentTaskPort,
   type GitHubAgentTrigger,
   InMemoryGitHubAgentAutomationStore,
+  resolveGitHubAgentIntent,
 } from "../src";
 
 function trigger(
@@ -177,6 +178,60 @@ const context = createExecutionContext({
 });
 
 describe("GitHub Agent automation service", () => {
+  test("[GH-AUTO-RULE-006] automated rules preserve the bounded Issue or PR request", () => {
+    const request = {
+      title: "Keep the status API compatible",
+      body: "Add a regression test and preserve the existing response shape.",
+    };
+    const labelIntent = resolveGitHubAgentIntent(
+      trigger(
+        {
+          deliveryId: "delivery_label_context",
+          event: "issues",
+          action: "labeled",
+          label: { id: "77", name: "appaloft:fix" },
+          threadRequest: request,
+        },
+        false,
+      ),
+    );
+    const readyIntent = resolveGitHubAgentIntent(
+      trigger(
+        {
+          deliveryId: "delivery_ready_context",
+          event: "pull_request",
+          action: "ready_for_review",
+          thread: { kind: "pull-request", number: 42 },
+          pullRequest: {
+            number: 42,
+            headSha: "a".repeat(40),
+            baseRef: "main",
+            headRepositoryId: "123456",
+            headRepositoryFullName: "appaloft/agent-sandbox-smoke",
+            fork: false,
+          },
+          threadRequest: request,
+        },
+        false,
+      ),
+    );
+
+    expect(labelIntent).toEqual({
+      action: "fix",
+      source: "automation",
+      mode: "write",
+      instruction:
+        "GitHub request: Keep the status API compatible\n\nAdd a regression test and preserve the existing response shape.",
+    });
+    expect(readyIntent).toEqual({
+      action: "review",
+      source: "automation",
+      mode: "review-only",
+      instruction:
+        "GitHub request: Keep the status API compatible\n\nAdd a regression test and preserve the existing response shape.",
+    });
+  });
+
   test("[GH-AUTO-DELIVERY-007][GH-AUTO-TASK-009] duplicate delivery returns the first task without duplicate compute or feedback", async () => {
     const store = new InMemoryGitHubAgentAutomationStore();
     const tasks = taskPort();

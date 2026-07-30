@@ -1,6 +1,7 @@
 import { createSign } from "node:crypto";
 import {
   appaloftTraceAttributes,
+  assertGitHubAgentThreadRequestSafe,
   createAdapterSpanName,
   type ExecutionContext,
   type ExecutionSandboxService,
@@ -1647,6 +1648,10 @@ export interface NormalizedGitHubAgentEvent {
     kind: "issue" | "pull-request";
     number: number;
   };
+  threadRequest?: {
+    title: string;
+    body?: string;
+  };
   comment?: {
     id: string;
     command?: AppaloftGitHubCommand;
@@ -1816,6 +1821,10 @@ export async function verifyAndNormalizeGitHubAgentWebhook(
   if (label.isErr()) {
     return err(label.error);
   }
+  const threadRequest = githubAgentThreadRequest(event, action, payload, label.value);
+  if (threadRequest.isErr()) {
+    return err(threadRequest.error);
+  }
 
   const owner = objectRecord(repositoryPayload.owner);
   const ownerId = positiveNumericId(owner?.id);
@@ -1843,6 +1852,7 @@ export async function verifyAndNormalizeGitHubAgentWebhook(
       ...(typeSnapshot ? { typeSnapshot } : {}),
     },
     thread,
+    ...(threadRequest.value ? { threadRequest: threadRequest.value } : {}),
     ...(comment.value ? { comment: comment.value } : {}),
     ...(label.value ? { label: label.value } : {}),
     ...(pullRequest.value ? { pullRequest: pullRequest.value } : {}),
@@ -1919,6 +1929,7 @@ export function githubAgentTriggerFromSourceEvent(
     },
     sender: { ...event.sender },
     thread: { ...event.thread },
+    ...(event.threadRequest ? { threadRequest: { ...event.threadRequest } } : {}),
     ...(event.comment?.id ? { commentId: event.comment.id } : {}),
     ...(event.comment?.command ? { command: event.comment.command } : {}),
     ...(event.label ? { label: { ...event.label } } : {}),
@@ -2731,6 +2742,33 @@ function githubAgentLabel(
   if (!name) return err(domainError.validation("GitHub Agent label is invalid"));
   const id = positiveNumericId(label?.id);
   return ok({ ...(id ? { id } : {}), name });
+}
+
+function githubAgentThreadRequest(
+  event: GitHubAgentEventName,
+  action: GitHubAgentEventAction,
+  payload: Record<string, unknown>,
+  label: NormalizedGitHubAgentEvent["label"] | undefined,
+): Result<NormalizedGitHubAgentEvent["threadRequest"] | undefined> {
+  const automationLabel =
+    action === "labeled" &&
+    !!label &&
+    ["appaloft:fix", "appaloft:review", "appaloft:preview"].includes(label.name.toLowerCase());
+  const automaticPullRequestReview =
+    event === "pull_request" && (action === "ready_for_review" || action === "synchronize");
+  if (!automationLabel && !automaticPullRequestReview) return ok(undefined);
+
+  const threadPayload =
+    event === "issues" ? objectRecord(payload.issue) : objectRecord(payload.pull_request);
+  const title = typeof threadPayload?.title === "string" ? threadPayload.title.trim() : "";
+  const rawBody = threadPayload?.body;
+  if (!title || (rawBody !== null && rawBody !== undefined && typeof rawBody !== "string")) {
+    return err(domainError.validation("GitHub Agent automation thread request is invalid"));
+  }
+  const body = typeof rawBody === "string" ? rawBody.trim() : "";
+  const request = { title, ...(body ? { body } : {}) };
+  const safe = assertGitHubAgentThreadRequestSafe(request);
+  return safe.isErr() ? err(safe.error) : ok(request);
 }
 
 function positiveNumericId(value: unknown): string | null {

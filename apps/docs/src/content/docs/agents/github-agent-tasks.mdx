@@ -36,6 +36,10 @@ Workspace/Sandbox。该能力不会创建第二套 Task、Preview 或 Deployment
 3. 创建 Automation Rule，明确 event/action、actor policy、Server pool、运行上限、Preview
    policy 与 PR delivery policy。
 
+Label、`ready_for_review` 与 `synchronize` 自动规则会把当前 Issue 或 PR 的标题和正文作为
+受限 Task 请求传给 Agent；它们不会只传递一个无上下文的通用动作。请求内容会在创建
+Workspace 前检查长度、环境变量赋值与 secret-like 内容，不安全的请求会 fail closed。
+
 CLI 的 create/bind 命令接受一个 JSON input file；文件只能包含非敏感配置引用，不能包含
 API Key、环境变量或原始凭据。
 
