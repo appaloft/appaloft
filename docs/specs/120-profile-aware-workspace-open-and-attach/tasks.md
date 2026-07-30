@@ -50,7 +50,9 @@
 - [x] Track the authenticated Workspace source Ash execution boundary under public issue
   [#918](https://github.com/appaloft/appaloft/issues/918) and PR
   [#919](https://github.com/appaloft/appaloft/pull/919).
-- [ ] Link the final public merged commit.
+- [x] Link public PR
+  [#919](https://github.com/appaloft/appaloft/pull/919) final merged commit
+  `4a30316e139e2d1a13e2b0f0f9be93b2cedc977b`.
 
 ## Implementation
 
@@ -87,4 +89,5 @@
 
 - [x] Update matrix status and test bindings from actual results.
 - [x] Synchronize CLI help, public docs, SDK guidance, Console behavior, ADR/Spec/tasks and issues.
-- [ ] Merge public PR, update Cloud gitlink to the final public `main` SHA, then complete Cloud PR.
+- [ ] Merge this evidence Sync, update Cloud gitlink to the resulting public `main` SHA, then
+  complete Cloud PR.
