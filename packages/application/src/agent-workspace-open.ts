@@ -301,25 +301,20 @@ function authenticatedGitCommand(
   ).toString("base64");
   return {
     argv: [
-      "sh",
+      "git",
       "-c",
-      [
-        "IFS= read -r APPALOFT_GIT_AUTHORIZATION || exit 90",
-        '[ -n "$APPALOFT_GIT_AUTHORIZATION" ] || exit 90',
-        'export GIT_CONFIG_COUNT="1"',
-        'export GIT_CONFIG_KEY_0="$1"',
-        'export GIT_CONFIG_VALUE_0="Authorization: Basic $APPALOFT_GIT_AUTHORIZATION"',
-        'export GIT_TERMINAL_PROMPT="0"',
-        'export GIT_TRACE_CURL="0"',
-        'export GIT_CURL_VERBOSE="0"',
-        "shift",
-        'exec git "$@"',
-      ].join("; "),
-      "appaloft-workspace-source-auth",
-      `http.${origin}/.extraHeader`,
+      "credential.helper=",
+      "-c",
+      "credential.interactive=never",
+      "-c",
+      "core.askPass=/bin/false",
+      "-c",
+      "include.path=/dev/stdin",
       ...argv.slice(1),
     ],
-    stdin: new TextEncoder().encode(`${authorization}\n`),
+    stdin: new TextEncoder().encode(
+      `[http "${origin}/"]\n\textraHeader = Authorization: Basic ${authorization}\n`,
+    ),
   };
 }
 

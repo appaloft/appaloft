@@ -323,11 +323,15 @@ describe("Agent Workspace open application workflow", () => {
       ["git", "init", "."],
       ["git", "remote", "add", "origin", "https://github.com/Acme/Web.git"],
       [
-        "sh",
+        "git",
         "-c",
-        expect.stringContaining('exec git "$@"'),
-        "appaloft-workspace-source-auth",
-        "http.https://github.com/.extraHeader",
+        "credential.helper=",
+        "-c",
+        "credential.interactive=never",
+        "-c",
+        "core.askPass=/bin/false",
+        "-c",
+        "include.path=/dev/stdin",
         "fetch",
         "--no-tags",
         "--depth",
@@ -342,9 +346,10 @@ describe("Agent Workspace open application workflow", () => {
       "source-token-must-not-enter-argv",
     );
     expect(new TextDecoder().decode(executedCommands[2]?.stdin)).toBe(
-      `${Buffer.from("x-access-token:source-token-must-not-enter-argv", "utf8").toString(
-        "base64",
-      )}\n`,
+      `[http "https://github.com/"]\n\textraHeader = Authorization: Basic ${Buffer.from(
+        "x-access-token:source-token-must-not-enter-argv",
+        "utf8",
+      ).toString("base64")}\n`,
     );
     expect(mismatched._unsafeUnwrapErr().details?.code).toBe("workspace_open_source_pin_mismatch");
     expect(mismatched._unsafeUnwrapErr().details?.guidance).toContain("--new");
