@@ -19,9 +19,10 @@ const input = {
 };
 
 describe("Agent Workspace open application workflow", () => {
-  test("[WS-OPEN-ADMIT-008][WS-OPEN-CREATE-010][WS-OPEN-RESUME-011][WS-OPEN-SHA-013][WS-OPEN-PARTIAL-017] preflights before effects, preserves source pins, resumes, and releases failed placement", async () => {
+  test("[WS-OPEN-CRED-007][WS-OPEN-ADMIT-008][WS-OPEN-CREATE-010][WS-OPEN-RESUME-011][WS-OPEN-SHA-013][WS-OPEN-PARTIAL-017][WS-OPEN-REMOTE-018] preflights before effects, preserves source pins, resumes, and releases failed placement", async () => {
     const phases: string[] = [];
     let failSandboxCreate = false;
+    let failSourceCredential = false;
     let releasedReservations = 0;
     const placementReservationIds: (string | undefined)[] = [];
     const sandboxPlacement: Array<{ providerKey?: string; expiresAt?: string }> = [];
@@ -30,7 +31,7 @@ describe("Agent Workspace open application workflow", () => {
     > = [];
     const admittedScopes: Array<Parameters<WorkspaceOpenDependencies["preflight"]["admit"]>[2]> =
       [];
-    const executedCommands: string[][] = [];
+    const executedCommands: Array<{ argv: string[]; stdin?: Uint8Array }> = [];
     const failedEntries: Array<{ workspaceId?: string; phase: string; code: string }> = [];
     let preferred:
       | {
@@ -131,6 +132,22 @@ describe("Agent Workspace open application workflow", () => {
         },
         markWorkspaceTerminated: async () => ok({ advanced: true }),
       },
+      sourceCredentials: {
+        resolve: async () => {
+          phases.push("source-credential");
+          return failSourceCredential
+            ? err(
+                domainError.conflict("Workspace source credential is unavailable", {
+                  code: "workspace_open_source_credential_unavailable",
+                }),
+              )
+            : ok({
+                kind: "http-basic",
+                username: "x-access-token",
+                password: "source-token-must-not-enter-argv",
+              });
+        },
+      },
       sandboxes: {
         create: async (_context, sandboxInput) => {
           placementReservationIds.push(sandboxInput.placementReservationId);
@@ -153,7 +170,10 @@ describe("Agent Workspace open application workflow", () => {
           return ok({ sandboxId: workspaceId, status: "ready" });
         },
         exec: async (_context, _workspaceId, command) => {
-          executedCommands.push([...command.argv]);
+          executedCommands.push({
+            argv: [...command.argv],
+            ...(command.stdin ? { stdin: command.stdin.slice() } : {}),
+          });
           return ok({ mode: "foreground", frames: [{ kind: "exit", exitCode: 0 }] });
         },
         exposePort: async () => ok(undefined),
@@ -256,6 +276,12 @@ describe("Agent Workspace open application workflow", () => {
       commitSha: "f".repeat(40),
     });
     const resumed = await service.open(context, input);
+    failSourceCredential = true;
+    const sourceCredentialFailure = await service.open(context, {
+      ...input,
+      forceNew: true,
+    });
+    failSourceCredential = false;
     failSandboxCreate = true;
     const providerFailure = await service.open(context, {
       ...input,
@@ -293,15 +319,38 @@ describe("Agent Workspace open application workflow", () => {
       untrustedCode: false,
       serverPoolId: "server-pool-1",
     });
-    expect(executedCommands).toEqual([
+    expect(executedCommands.map(({ argv }) => argv)).toEqual([
       ["git", "init", "."],
       ["git", "remote", "add", "origin", "https://github.com/Acme/Web.git"],
-      ["git", "fetch", "--no-tags", "--depth", "1", "origin", "refs/heads/feature/open"],
+      [
+        "sh",
+        "-c",
+        expect.stringContaining('exec git "$@"'),
+        "appaloft-workspace-source-auth",
+        "http.https://github.com/.extraHeader",
+        "fetch",
+        "--no-tags",
+        "--depth",
+        "1",
+        "origin",
+        "refs/heads/feature/open",
+      ],
       ["git", "checkout", "--detach", "0123456789abcdef0123456789abcdef01234567"],
       ["git", "switch", "-c", "feature/open"],
     ]);
+    expect(JSON.stringify(executedCommands.map(({ argv }) => argv))).not.toContain(
+      "source-token-must-not-enter-argv",
+    );
+    expect(new TextDecoder().decode(executedCommands[2]?.stdin)).toBe(
+      `${Buffer.from("x-access-token:source-token-must-not-enter-argv", "utf8").toString(
+        "base64",
+      )}\n`,
+    );
     expect(mismatched._unsafeUnwrapErr().details?.code).toBe("workspace_open_source_pin_mismatch");
     expect(mismatched._unsafeUnwrapErr().details?.guidance).toContain("--new");
+    expect(sourceCredentialFailure._unsafeUnwrapErr().details?.code).toBe(
+      "workspace_open_source_credential_unavailable",
+    );
     expect(providerFailure.isErr()).toBe(true);
     expect(providerFailure._unsafeUnwrapErr().details).toMatchObject({
       workspaceId: "sbx_1",
@@ -319,12 +368,16 @@ describe("Agent Workspace open application workflow", () => {
     ]);
     expect(phases).toEqual([
       "context",
+      "source-credential",
       "preflight",
       "sandbox-create",
       "context",
       "context",
       "sandbox-resume",
       "context",
+      "source-credential",
+      "context",
+      "source-credential",
       "preflight",
       "sandbox-create",
     ]);

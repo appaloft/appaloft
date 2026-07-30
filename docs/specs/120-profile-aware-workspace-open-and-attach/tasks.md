@@ -43,6 +43,8 @@
   [#906](https://github.com/appaloft/appaloft/issues/906).
 - [x] Track safe source materialization into Template working directories under public issue
   [#908](https://github.com/appaloft/appaloft/issues/908).
+- [x] Track request-scoped private Repository source credential custody for remote Workspace open
+  under public issue [#912](https://github.com/appaloft/appaloft/issues/912).
 - [ ] Link the final public merged commit.
 
 ## Implementation

@@ -715,6 +715,7 @@ import {
   type WorkspaceOpenCredentialAdmissionPort,
   type WorkspaceOpenEntryRepository,
   type WorkspaceOpenPlacementPort,
+  type WorkspaceOpenSourceCredentialProviderPort,
 } from "@appaloft/application";
 import { type AshScript, ash } from "@appaloft/ash";
 import {
@@ -3907,6 +3908,14 @@ export function registerApplicationServices(
         entries: dependencyContainer.resolve<WorkspaceOpenEntryRepository>(
           tokens.workspaceOpenEntryRepository,
         ),
+        ...(dependencyContainer.isRegistered(tokens.workspaceOpenSourceCredentialProvider, true)
+          ? {
+              sourceCredentials:
+                dependencyContainer.resolve<WorkspaceOpenSourceCredentialProviderPort>(
+                  tokens.workspaceOpenSourceCredentialProvider,
+                ),
+            }
+          : {}),
         sandboxes: {
           async create(context, input) {
             const created = await sandboxService.createAndReconcile(context, {
@@ -3944,6 +3953,7 @@ export function registerApplicationServices(
             const executed = await sandboxService.exec(context, workspaceId, {
               argv: [...input.argv],
               ...(input.cwd ? { cwd: input.cwd } : {}),
+              ...(input.stdin ? { stdin: input.stdin } : {}),
             });
             if (executed.isErr()) return err(executed.error);
             if (executed.value.mode !== "foreground") {
