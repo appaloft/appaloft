@@ -190,7 +190,11 @@ describe("GitHub Agent automation webhook", () => {
   test("[GH-AUTO-WEBHOOK-001] normalizes labels and supported pull request actions", async () => {
     const issueLabel = await normalize("issues", {
       action: "labeled",
-      issue: { number: 41 },
+      issue: {
+        number: 41,
+        title: "Keep the status API compatible",
+        body: "Add a regression test and preserve the existing response shape.",
+      },
       label: { id: 77, name: "appaloft:fix" },
     });
     const ready = await normalize("pull_request", {
@@ -198,6 +202,8 @@ describe("GitHub Agent automation webhook", () => {
       number: 42,
       pull_request: {
         number: 42,
+        title: "Add repository automation",
+        body: "Review the delivery dedupe behavior before merging.",
         head: {
           sha: "abcdef123456abcdef123456abcdef123456abcd",
           repo: { id: 123456, full_name: repository().full_name },
@@ -211,12 +217,20 @@ describe("GitHub Agent automation webhook", () => {
       action: "labeled",
       thread: { kind: "issue", number: 41 },
       label: { id: "77", name: "appaloft:fix" },
+      threadRequest: {
+        title: "Keep the status API compatible",
+        body: "Add a regression test and preserve the existing response shape.",
+      },
     });
     expect(ready._unsafeUnwrap()).toMatchObject({
       event: "pull_request",
       action: "ready_for_review",
       thread: { kind: "pull-request", number: 42 },
       pullRequest: { headSha: "abcdef123456abcdef123456abcdef123456abcd", fork: false },
+      threadRequest: {
+        title: "Add repository automation",
+        body: "Review the delivery dedupe behavior before merging.",
+      },
     });
 
     const topLevelPullRequestComment = await normalize("issue_comment", {
@@ -236,6 +250,8 @@ describe("GitHub Agent automation webhook", () => {
         number: 42,
         pull_request: {
           number: 42,
+          title: "Add repository automation",
+          body: "Review the delivery dedupe behavior before merging.",
           head: {
             sha: "abcdef123456abcdef123456abcdef123456abcd",
             repo: { id: 123456, full_name: repository().full_name },
@@ -251,6 +267,58 @@ describe("GitHub Agent automation webhook", () => {
         pullRequest: { headSha: "abcdef123456abcdef123456abcdef123456abcd", fork: false },
       });
     }
+  });
+
+  test("[GH-AUTO-WEBHOOK-001] preserves only bounded secret-safe automation request context", async () => {
+    const safe = await normalize("issues", {
+      action: "labeled",
+      issue: {
+        number: 41,
+        title: "Keep the public API compatible",
+        body: "Update the implementation and add a regression test.",
+      },
+      label: { id: 77, name: "appaloft:fix" },
+    });
+    const secretLike = await normalize("issues", {
+      action: "labeled",
+      issue: {
+        number: 41,
+        title: "Use the provided token",
+        body: `API_KEY=${"x".repeat(24)}`,
+      },
+      label: { id: 77, name: "appaloft:fix" },
+    });
+    const oversized = await normalize("pull_request", {
+      action: "ready_for_review",
+      number: 42,
+      pull_request: {
+        number: 42,
+        title: "Review this change",
+        body: "x".repeat(16_385),
+        head: {
+          sha: "abcdef123456abcdef123456abcdef123456abcd",
+          repo: { id: 123456, full_name: repository().full_name },
+        },
+        base: { ref: "main" },
+      },
+    });
+
+    expect(safe._unsafeUnwrap()).toMatchObject({
+      threadRequest: {
+        title: "Keep the public API compatible",
+        body: "Update the implementation and add a regression test.",
+      },
+    });
+    expect(
+      githubAgentTriggerFromSourceEvent(safe._unsafeUnwrap(), "sevt_safe_context"),
+    ).toMatchObject({
+      threadRequest: {
+        title: "Keep the public API compatible",
+        body: "Update the implementation and add a regression test.",
+      },
+    });
+    expect(secretLike.isErr()).toBe(true);
+    expect(oversized.isErr()).toBe(true);
   });
 
   test("[GH-AUTO-BOUNDARY-021][GH-AUTO-AUTHZ-005] resolves exact issue and PR source pins before authorization", async () => {

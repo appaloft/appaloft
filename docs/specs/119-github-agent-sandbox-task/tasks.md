@@ -82,6 +82,8 @@
 - [x] Link an Issue Task's generated PR through the existing public process store so PR close
   resolves exact cleanup without making the related write Task current for normal PR commands
   (#898).
+- [x] Preserve bounded, secret-safe Issue/PR request context for label and automatic PR-review
+  rules so automated Tasks receive the actor-visible request instead of a generic action (#902).
 
 ## Retention And Cleanup Slice
 
@@ -101,6 +103,9 @@
 - [x] Docs outcome for #898: existing complete zh-CN/en-US
   `agents/github-agent-tasks#github-agent-tasks` already defines PR-close cleanup; no registry or
   new-page change is required.
+- [x] Docs outcome for #902: the complete zh-CN/en-US
+  `agents/github-agent-tasks#github-agent-tasks` pages now explain bounded automation request
+  context and pre-Workspace fail-closed behavior.
 - [x] Synchronize Domain Model, Business Operation Map, operation catalog, SDK/CLI/Web docs, and
   Test Matrix evidence.
 - [ ] Commit and push public changes with a neutral message.

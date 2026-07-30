@@ -37,6 +37,11 @@ Task, Preview, or Deployment model.
 3. Create an Automation Rule with explicit event/action, actor policy, server pool, execution
    limits, Preview policy, and pull request delivery policy.
 
+Label, `ready_for_review`, and `synchronize` rules pass the current Issue or pull request title and
+body to the Agent as a bounded Task request instead of a context-free generic action. The request
+is checked for length, environment assignments, and secret-like content before Workspace creation;
+unsafe requests fail closed.
+
 The CLI create and bind commands accept JSON input files containing non-sensitive references only.
 Do not place API keys, environment variables, or raw credentials in these files.
 
