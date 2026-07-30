@@ -34,6 +34,9 @@ export const tokens = {
   agentWorkspaceOpenPreflightService: Symbol.for("appaloft.agent_workspace_open_preflight_service"),
   workspaceOpenEntryRepository: Symbol.for("appaloft.workspace_open_entry_repository"),
   workspaceOpenCredentialAdmission: Symbol.for("appaloft.workspace_open_credential_admission"),
+  workspaceOpenSourceCredentialProvider: Symbol.for(
+    "appaloft.workspace_open_source_credential_provider",
+  ),
   workspaceOpenPlacement: Symbol.for("appaloft.workspace_open_placement"),
   repositoryBindingRepository: Symbol.for("appaloft.repository_binding_repository"),
   repositoryBindingService: Symbol.for("appaloft.repository_binding_service"),

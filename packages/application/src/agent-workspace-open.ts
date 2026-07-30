@@ -1,3 +1,5 @@
+import { Buffer } from "node:buffer";
+
 import {
   type DomainError,
   type DomainErrorDetails,
@@ -34,8 +36,26 @@ export interface WorkspaceOpenSourceMaterializerPort {
     input: {
       readonly workspaceId: string;
       readonly source: WorkspaceOpenInput;
+      readonly credential?: WorkspaceOpenSourceHttpBasicCredential;
     },
   ): Promise<Result<void>>;
+}
+
+export interface WorkspaceOpenSourceHttpBasicCredential {
+  readonly kind: "http-basic";
+  readonly username: string;
+  readonly password: string;
+}
+
+export interface WorkspaceOpenSourceCredentialProviderPort {
+  resolve(
+    context: ExecutionContext,
+    input: {
+      readonly projectId: string;
+      readonly repository: string;
+      readonly repositoryIdentity: string;
+    },
+  ): Promise<Result<WorkspaceOpenSourceHttpBasicCredential | null>>;
 }
 
 export interface WorkspaceOpenOptions {
@@ -172,6 +192,7 @@ export interface WorkspaceOpenDependencies {
     ): Promise<Result<WorkspaceOpenPreflight>>;
   };
   readonly entries: WorkspaceOpenEntryRepository;
+  readonly sourceCredentials?: WorkspaceOpenSourceCredentialProviderPort;
   readonly sandboxes: {
     create(
       context: ExecutionContext,
@@ -185,7 +206,7 @@ export interface WorkspaceOpenDependencies {
     exec(
       context: ExecutionContext,
       workspaceId: string,
-      input: { argv: readonly string[]; cwd?: string },
+      input: { argv: readonly string[]; cwd?: string; stdin?: Uint8Array },
     ): Promise<Result<ForegroundExecution>>;
     exposePort(
       context: ExecutionContext,
@@ -244,6 +265,62 @@ function subjectId(context: ExecutionContext): string {
 
 function executionSucceeded(result: ForegroundExecution): boolean {
   return result.frames.some((frame) => frame.kind === "exit" && frame.exitCode === 0);
+}
+
+function validateSourceCredential(
+  credential: WorkspaceOpenSourceHttpBasicCredential | null,
+): Result<WorkspaceOpenSourceHttpBasicCredential | null> {
+  if (!credential) return ok(null);
+  if (
+    credential.kind !== "http-basic" ||
+    !credential.username ||
+    credential.username.length > 256 ||
+    /[:\r\n\0]/u.test(credential.username) ||
+    !credential.password ||
+    credential.password.length > 4_096 ||
+    /[\r\n\0]/u.test(credential.password)
+  ) {
+    return err(
+      domainError.validation("Workspace source credential is invalid", {
+        code: "workspace_open_source_credential_invalid",
+      }),
+    );
+  }
+  return ok(credential);
+}
+
+function authenticatedGitCommand(
+  repository: string,
+  credential: WorkspaceOpenSourceHttpBasicCredential,
+  argv: readonly string[],
+): { readonly argv: readonly string[]; readonly stdin: Uint8Array } {
+  const origin = new URL(repository).origin;
+  const authorization = Buffer.from(
+    `${credential.username}:${credential.password}`,
+    "utf8",
+  ).toString("base64");
+  return {
+    argv: [
+      "sh",
+      "-c",
+      [
+        "IFS= read -r APPALOFT_GIT_AUTHORIZATION || exit 90",
+        '[ -n "$APPALOFT_GIT_AUTHORIZATION" ] || exit 90',
+        'export GIT_CONFIG_COUNT="1"',
+        'export GIT_CONFIG_KEY_0="$1"',
+        'export GIT_CONFIG_VALUE_0="Authorization: Basic $APPALOFT_GIT_AUTHORIZATION"',
+        'export GIT_TERMINAL_PROMPT="0"',
+        'export GIT_TRACE_CURL="0"',
+        'export GIT_CURL_VERBOSE="0"',
+        "shift",
+        'exec git "$@"',
+      ].join("; "),
+      "appaloft-workspace-source-auth",
+      `http.${origin}/.extraHeader`,
+      ...argv.slice(1),
+    ],
+    stdin: new TextEncoder().encode(`${authorization}\n`),
+  };
 }
 
 function withPartialEvidence(
@@ -382,6 +459,17 @@ export class AgentWorkspaceOpenService {
       );
     }
 
+    const sourceCredentialResult = this.dependencies.sourceCredentials
+      ? await this.dependencies.sourceCredentials.resolve(context, {
+          projectId: resolved.value.projectId,
+          repository: input.repository,
+          repositoryIdentity: input.repositoryIdentity,
+        })
+      : ok(null);
+    if (sourceCredentialResult.isErr()) return err(sourceCredentialResult.error);
+    const sourceCredential = validateSourceCredential(sourceCredentialResult.value);
+    if (sourceCredential.isErr()) return err(sourceCredential.error);
+
     const preflight = await this.dependencies.preflight.admit(context, resolved.value, {
       ...(options.credentialReferences
         ? { credentialReferences: options.credentialReferences }
@@ -446,19 +534,25 @@ export class AgentWorkspaceOpenService {
         const materialized = await options.sourceMaterializer.materialize(context, {
           workspaceId,
           source: input,
+          ...(sourceCredential.value ? { credential: sourceCredential.value } : {}),
         });
         if (materialized.isErr()) throw materialized.error;
       } else {
-        const sourceCommands: readonly { argv: readonly string[]; cwd?: string }[] = [
+        const fetchArgv = ["git", "fetch", "--no-tags", "--depth", "1", "origin", input.ref];
+        const sourceCommands: readonly {
+          argv: readonly string[];
+          cwd?: string;
+          stdin?: Uint8Array;
+        }[] = [
           {
             argv: ["git", "init", "."],
           },
           {
             argv: ["git", "remote", "add", "origin", input.repository],
           },
-          {
-            argv: ["git", "fetch", "--no-tags", "--depth", "1", "origin", input.ref],
-          },
+          sourceCredential.value
+            ? authenticatedGitCommand(input.repository, sourceCredential.value, fetchArgv)
+            : { argv: fetchArgv },
           {
             argv: ["git", "checkout", "--detach", input.commitSha],
           },
