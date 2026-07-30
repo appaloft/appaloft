@@ -2128,20 +2128,30 @@ export class GitHubRepositoryWorkspaceMaterializerAdapter
     });
     if (hooksDisabled.isErr()) return hooksDisabled;
 
-    const authenticated = createWorkspaceSourceGitCredentialCommands(
+    const credential = {
+      kind: "http-basic" as const,
+      username: "x-access-token",
+      password: token,
+    };
+    const authenticated = createWorkspaceSourceGitCredentialCommands(repositoryUrl, credential, [
+      "git",
+      "fetch",
+      "--no-tags",
+      "--filter=blob:none",
+      "origin",
+      revision,
+    ]);
+    const authenticatedCheckout = createWorkspaceSourceGitCredentialCommands(
       repositoryUrl,
-      {
-        kind: "http-basic",
-        username: "x-access-token",
-        password: token,
-      },
-      ["git", "fetch", "--no-tags", "--filter=blob:none", "origin", revision],
-    );
+      credential,
+      ["git", "checkout", "--detach", revision],
+    ).fetch;
     const prepared = await execute(authenticated.prepare);
     if (prepared.isErr()) return prepared;
 
     let sourceResult = await execute(authenticated.approve);
     if (sourceResult.isOk()) sourceResult = await execute(authenticated.fetch);
+    if (sourceResult.isOk()) sourceResult = await execute(authenticatedCheckout);
     let cleanupFailure: ReturnType<typeof domainError.conflict> | undefined;
     for (const cleanup of authenticated.cleanup) {
       const cleaned = await execute(cleanup, 30_000);
@@ -2165,7 +2175,7 @@ export class GitHubRepositoryWorkspaceMaterializerAdapter
       );
     }
     if (sourceResult.isErr()) return sourceResult;
-    return execute({ argv: ["git", "checkout", "--detach", revision] });
+    return ok(undefined);
   }
 }
 
