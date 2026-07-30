@@ -645,6 +645,35 @@ describe("DockerSandboxProvider", () => {
     ).rejects.toThrow("symbolic link");
   });
 
+  test("[AGENT-TASK-RESUME-002][SBX-FILE-004] replaces files atomically inside the workspace", async () => {
+    const runner = new CapturingRunner();
+    const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
+    await provider.provision(request);
+    const content = new TextEncoder().encode('{"status":"awaiting-approval"}');
+
+    await provider.writeFile({
+      sandboxId: "sbx_demo",
+      providerHandle: "appaloft-sbx_demo",
+      path: ".appaloft/tasks/srun_demo/state.json",
+      content,
+    });
+
+    const write = runner.calls.at(-1);
+    expect(write?.stdin).toEqual(content);
+    const commandIndex = write?.argv.indexOf("-c") ?? -1;
+    const script = commandIndex >= 0 ? (write?.argv[commandIndex + 1] ?? "") : "";
+    expect(script).toContain('mktemp "$directory/.appaloft-write.XXXXXX"');
+    expect(script).toContain('trap cleanup EXIT HUP INT TERM');
+    expect(script).toContain('cat > "$temporary"');
+    expect(script).toContain('chmod "$(stat -c %a "$destination")" "$temporary"');
+    expect(script).toContain('mv -f -- "$temporary" "$destination"');
+    expect(script).toContain("trap - EXIT HUP INT TERM");
+    expect(script).not.toContain('cat > "$1"');
+    expect(script.indexOf('cat > "$temporary"')).toBeLessThan(
+      script.indexOf('mv -f -- "$temporary" "$destination"'),
+    );
+  });
+
   test("[SBX-SNAPSHOT-001] captures a named Docker image and returns observed size", async () => {
     const runner = new CapturingRunner();
     const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
