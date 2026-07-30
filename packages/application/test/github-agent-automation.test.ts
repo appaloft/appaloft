@@ -469,6 +469,94 @@ describe("GitHub Agent automation service", () => {
     expect(tasks.calls).toContain("cleanup:task_1");
   });
 
+  test("[GH-AUTO-FIX-014][GH-AUTO-CLEANUP-018] pull request close cleans a related Issue Task without making it current", async () => {
+    const store = new InMemoryGitHubAgentAutomationStore();
+    const tasks = taskPort();
+    const feedback = feedbackPort();
+    const service = new GitHubAgentAutomationService({
+      store,
+      authorization: allowedAuthorization(),
+      tasks: tasks.port,
+      feedback: feedback.port,
+    });
+    const issueTask = {
+      taskId: "task_issue_fix",
+      workspaceId: "workspace_issue_fix",
+      activeRunId: "run_issue_fix",
+      status: "completed" as const,
+      taskUrl: "https://appaloft.test/tasks/task_issue_fix",
+      sessionRecovery: "native" as const,
+    };
+    expect(
+      await store.linkPullRequestTask(context, {
+        repositoryId: "123456",
+        pullRequestNumber: 84,
+        task: issueTask,
+      }),
+    ).toBe(true);
+    expect(
+      await store.linkPullRequestTask(context, {
+        repositoryId: "123456",
+        pullRequestNumber: 84,
+        task: {
+          ...issueTask,
+          taskId: "task_conflict",
+          workspaceId: "workspace_conflict",
+        },
+      }),
+    ).toBe(false);
+
+    const ordinaryReview = await service.handle(
+      context,
+      trigger({
+        deliveryId: "delivery_related_review",
+        thread: { kind: "pull-request", number: 84 },
+        command: { kind: "review" },
+        pullRequest: {
+          number: 84,
+          headSha: "a".repeat(40),
+          baseRef: "main",
+          headRepositoryId: "123456",
+          headRepositoryFullName: "appaloft/agent-sandbox-smoke",
+          fork: false,
+        },
+      }),
+    );
+    expect(ordinaryReview._unsafeUnwrap()).toMatchObject({
+      status: "accepted",
+      task: { taskId: "task_1" },
+    });
+    expect(tasks.calls).toContain("start:review:84");
+
+    const cleaned = await service.handle(
+      context,
+      trigger(
+        {
+          deliveryId: "delivery_related_closed",
+          event: "pull_request",
+          action: "closed",
+          thread: { kind: "pull-request", number: 84 },
+          pullRequest: {
+            number: 84,
+            headSha: "a".repeat(40),
+            baseRef: "main",
+            headRepositoryId: "123456",
+            headRepositoryFullName: "appaloft/agent-sandbox-smoke",
+            fork: false,
+          },
+        },
+        false,
+      ),
+    );
+
+    expect(cleaned._unsafeUnwrap()).toMatchObject({
+      status: "accepted",
+      task: { taskId: "task_issue_fix", status: "cleaned" },
+    });
+    expect(tasks.calls).toContain("cleanup:task_1");
+    expect(tasks.calls).toContain("cleanup:task_issue_fix");
+  });
+
   test("[GH-AUTO-BOUNDARY-021] lifecycle cleanup authorization needs no fake Agent execution references", async () => {
     const store = new InMemoryGitHubAgentAutomationStore();
     const tasks = taskPort();
