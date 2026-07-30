@@ -47,6 +47,9 @@
   under public issue [#912](https://github.com/appaloft/appaloft/issues/912).
 - [x] Track fail-closed declarative native attach server-port compilation under public issue
   [#914](https://github.com/appaloft/appaloft/issues/914).
+- [x] Track the authenticated Workspace source Ash execution boundary under public issue
+  [#918](https://github.com/appaloft/appaloft/issues/918) and PR
+  [#919](https://github.com/appaloft/appaloft/pull/919).
 - [ ] Link the final public merged commit.
 
 ## Implementation
@@ -75,9 +78,10 @@
   [30433192272](https://github.com/appaloft/appaloft-cloud/actions/runs/30433192272): real-provider
   model replies, managed-terminal/native attach, reconnectable state, hibernation and exact fixture
   cleanup passed.
-- [ ] Run explicit Profile-aware `workspace open` Pi/OpenCode opt-in smoke with Repository Binding,
+- [x] Run explicit Profile-aware `workspace open` Pi/OpenCode opt-in smoke with Repository Binding,
   installed Profile/Connection pins, repeated-open identity, terminate and exact provider orphan
-  readback.
+  readback in Cloud run
+  [30519239677](https://github.com/appaloft/appaloft-cloud/actions/runs/30519239677).
 
 ## Sync
 
