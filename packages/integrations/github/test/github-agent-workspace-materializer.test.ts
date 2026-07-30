@@ -6,16 +6,14 @@ import { GitHubRepositoryWorkspaceMaterializerAdapter } from "../src";
 
 describe("GitHub Repository Workspace materializer", () => {
   test("[GH-AUTO-BOUNDARY-021] materializes through public Sandbox operations without token argv", async () => {
-    const argv: string[][] = [];
-    const written: Array<{ path: string; content: string }> = [];
+    const commands: Array<{ argv: string[]; stdin?: string }> = [];
     const adapter = new GitHubRepositoryWorkspaceMaterializerAdapter(
       {
-        writeFile: async (_context, _sandboxId, input) => {
-          written.push({ path: input.path, content: new TextDecoder().decode(input.content) });
-          return ok({ path: input.path, sizeBytes: input.content.byteLength });
-        },
         exec: async (_context, _sandboxId, input) => {
-          argv.push([...input.argv]);
+          commands.push({
+            argv: [...input.argv],
+            ...(input.stdin ? { stdin: new TextDecoder().decode(input.stdin) } : {}),
+          });
           return ok({
             mode: "foreground",
             frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
@@ -45,44 +43,38 @@ describe("GitHub Repository Workspace materializer", () => {
     );
 
     expect(result.isOk()).toBe(true);
-    expect(written.some((file) => file.content === "installation-token-value\n")).toBe(true);
-    expect(JSON.stringify(argv)).not.toContain("installation-token-value");
-    expect(argv).toEqual([
-      ["chmod", "600", ".appaloft-github-token"],
-      ["chmod", "700", ".appaloft-git-askpass"],
-      ["git", "init", "."],
-      ["git", "remote", "add", "origin", "https://github.com/appaloft/example.git"],
-      ["git", "config", "core.hooksPath", "/dev/null"],
-      [
-        "env",
-        "GIT_ASKPASS=./.appaloft-git-askpass",
-        "GIT_TERMINAL_PROMPT=0",
-        "git",
-        "fetch",
-        "--no-tags",
-        "--filter=blob:none",
-        "origin",
-        "a".repeat(40),
-      ],
-      [
-        "env",
-        "GIT_ASKPASS=./.appaloft-git-askpass",
-        "GIT_TERMINAL_PROMPT=0",
-        "git",
-        "checkout",
-        "--detach",
-        "a".repeat(40),
-      ],
-      ["rm", "-f", ".appaloft-github-token", ".appaloft-git-askpass"],
+    expect(JSON.stringify(commands.map(({ argv }) => argv))).not.toContain(
+      "installation-token-value",
+    );
+    expect(JSON.stringify(commands)).not.toContain("GIT_ASKPASS");
+    expect(JSON.stringify(commands)).not.toContain(".appaloft-git-askpass");
+    const approval = commands.find(({ argv }) => argv.includes("approve"));
+    const fetch = commands.find(({ argv }) => argv.includes("fetch"));
+    expect(approval?.stdin).toBe(
+      "protocol=https\nhost=github.com\nusername=x-access-token\npassword=installation-token-value\n\n",
+    );
+    expect(fetch?.stdin).toBeUndefined();
+    expect(fetch?.argv).toContain(
+      "credential.helper=cache --timeout=60 --socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
+    );
+    expect(fetch?.argv).toContain("credential.interactive=never");
+    expect(fetch?.argv).toContain("core.askPass=/bin/false");
+    expect(commands.some(({ argv }) => argv.includes("clone"))).toBe(false);
+    expect(commands.map(({ argv }) => argv)).toContainEqual([
+      "git",
+      "credential-cache",
+      "--socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
+      "exit",
     ]);
-    expect(argv.some((command) => command.includes("clone"))).toBe(false);
+    expect(commands.map(({ argv }) => argv)).toContainEqual([
+      "rmdir",
+      "/tmp/.appaloft-workspace-source-credential",
+    ]);
   });
 
   test("[GH-AUTO-BOUNDARY-021] fails closed when the exact source pin is missing", async () => {
     const adapter = new GitHubRepositoryWorkspaceMaterializerAdapter(
       {
-        writeFile: async (_context, _sandboxId, input) =>
-          ok({ path: input.path, sizeBytes: input.content.byteLength }),
         exec: async () =>
           ok({
             mode: "foreground",
@@ -116,12 +108,10 @@ describe("GitHub Repository Workspace materializer", () => {
     );
   });
 
-  test("[GH-AUTO-BOUNDARY-021] removes installation credential files after fetch failure", async () => {
+  test("[GH-AUTO-BOUNDARY-021] cleans the credential cache after fetch failure", async () => {
     const argv: string[][] = [];
     const adapter = new GitHubRepositoryWorkspaceMaterializerAdapter(
       {
-        writeFile: async (_context, _sandboxId, input) =>
-          ok({ path: input.path, sizeBytes: input.content.byteLength }),
         exec: async (_context, _sandboxId, input) => {
           argv.push([...input.argv]);
           return ok({
@@ -160,6 +150,56 @@ describe("GitHub Repository Workspace materializer", () => {
 
     expect(result.isErr()).toBe(true);
     expect(result._unsafeUnwrapErr().details?.code).toBe("github_agent_checkout_failed");
-    expect(argv.at(-1)).toEqual(["rm", "-f", ".appaloft-github-token", ".appaloft-git-askpass"]);
+    expect(argv).toContainEqual([
+      "git",
+      "credential-cache",
+      "--socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
+      "exit",
+    ]);
+    expect(argv.at(-1)).toEqual(["rmdir", "/tmp/.appaloft-workspace-source-credential"]);
+  });
+
+  test("[GH-AUTO-BOUNDARY-021] fails closed when credential cache cleanup fails", async () => {
+    const argv: string[][] = [];
+    const adapter = new GitHubRepositoryWorkspaceMaterializerAdapter(
+      {
+        exec: async (_context, _sandboxId, input) => {
+          argv.push([...input.argv]);
+          const cleanupFailed =
+            input.argv.includes("credential-cache") && input.argv.includes("exit");
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: cleanupFailed ? 1 : 0 }],
+          });
+        },
+      },
+      async () => "installation-token-value",
+    );
+    const result = await adapter.materialize(
+      createExecutionContext({ entrypoint: "worker", requestId: "req_cleanup_failure" }),
+      {
+        trigger: {
+          provider: "github",
+          sourceEventId: "sevt_4",
+          event: "issue_comment",
+          action: "created",
+          deliveryId: "delivery_4",
+          installationId: "98765",
+          repository: { id: "123456", fullName: "appaloft/example" },
+          sender: { id: "303" },
+          thread: { kind: "issue", number: 41 },
+          source: { ref: "main", headSha: "a".repeat(40) },
+        },
+        workspaceId: "workspace_4",
+        mode: "write",
+      },
+    );
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().details?.code).toBe(
+      "github_agent_checkout_credential_cleanup_failed",
+    );
+    expect(argv.at(-1)).toEqual(["rmdir", "/tmp/.appaloft-workspace-source-credential"]);
+    expect(argv.some((command) => command.includes("checkout"))).toBe(false);
   });
 });

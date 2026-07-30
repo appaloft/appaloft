@@ -125,6 +125,12 @@
   materialization workflow and changes no command, API, status, error code, or recovery guidance.
 - [x] Docs outcome for #927: not user-facing. The fix restores the already documented
   installation-authenticated materialization behavior and changes no public command or contract.
+- [x] Reopen #927 after registered-server smoke proved Docker's Workspace tmpfs is `noexec`;
+  remove the executable askpass/token-file path and reuse the existing neutral Workspace source
+  Git credential-cache command plan with credential input only on Sandbox stdin.
+- [x] Prove GitHub checkout clears ambient credential helpers, disables interactive/askpass
+  fallback, exits the task-scoped credential cache, removes its socket directory, and fails closed
+  when credential cleanup cannot be confirmed.
 - [x] Synchronize Domain Model, Business Operation Map, operation catalog, SDK/CLI/Web docs, and
   Test Matrix evidence.
 - [ ] Commit and push public changes with a neutral message.
