@@ -75,8 +75,9 @@ The live URL expires or is revoked with its exposure and must not outlive Sandbo
 
 ## Native Attach
 
-A native-attach Adapter may publish a Sandbox-private server port and a validated local client
-handoff. `workspace attach` refreshes the Runtime-owned server capability, then issues a private
+A native-attach Adapter must publish an exact Sandbox-private server port and may publish a
+validated local client handoff. Missing or invalid ports fail during Profile compilation before
+Sandbox effects. `workspace attach` refreshes the Runtime-owned server capability, then issues a private
 attach capability that expires no later than one hour through the configured gateway. An approved
 `local-client-exec` capability permits the CLI to spawn the validated argv directly without a
 shell. Otherwise the CLI displays the Adapter-declared argv. A provider without scoped, expiring

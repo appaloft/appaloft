@@ -335,6 +335,116 @@ describe("Agent Adapter manifest validation", () => {
     });
   });
 
+  test("[ADAPTER-CAP-004][WS-ATTACH-NATIVE-015] requires and compiles the native attach server port", () => {
+    const nativeManifest = {
+      ...validManifest(),
+      requirements: {
+        ...validManifest().requirements,
+        capabilities: {
+          required: ["native-attach", "headless"],
+          optional: ["background-task"],
+        },
+      },
+      interactionModes: [
+        {
+          id: "native",
+          transport: "native-attach",
+          command: ["codex", "attach", "http://127.0.0.1:4096"],
+          eventFidelity: "raw-pty",
+          sessionRecovery: "native-session-store",
+          clientHandoff: "display-only",
+          serverPort: 4_096,
+        },
+        validManifest().interactionModes[1],
+      ],
+      healthcheck: { kind: "http", port: 4_096, path: "/health" },
+    } as const;
+    const validated = validateAgentAdapterManifest(nativeManifest, {
+      availableCapabilities: ["native-attach", "headless", "background-task", "credential-grants"],
+      sandboxTemplates: [{ id: "node-agent", version: "22.4.1", digest }],
+      runtimes: [{ id: "codex", version: "0.82.0" }],
+    });
+    expect(validated.ok).toBe(true);
+    if (!validated.ok) return;
+
+    const compiled = compileAgentWorkspaceProfile(
+      {
+        ...validProfile(),
+        adapter: {
+          ...validProfile().adapter,
+          digest: validated.definition.digest,
+          interactiveModeId: "native",
+        },
+      },
+      {
+        profileInstallationId: "awpi_native",
+        adapterInstallationId: "aai_native",
+        adapterDefinition: validated.definition,
+        availableCapabilities: [
+          "native-attach",
+          "headless",
+          "background-task",
+          "credential-grants",
+        ],
+        sandboxTemplates: [{ id: "node-agent", version: "22.4.1", digest }],
+      },
+    );
+    expect(compiled).toMatchObject({
+      ok: true,
+      plan: {
+        runtime: {
+          declarativeHarness: {
+            attach: {
+              transport: "native-attach",
+              serverPort: 4_096,
+            },
+          },
+        },
+      },
+    });
+
+    const missingPort = validateAgentAdapterManifest({
+      ...nativeManifest,
+      interactionModes: [
+        {
+          id: "native",
+          transport: "native-attach",
+          command: ["codex", "attach", "http://127.0.0.1:4096"],
+          eventFidelity: "raw-pty",
+          sessionRecovery: "native-session-store",
+          clientHandoff: "display-only",
+        },
+        validManifest().interactionModes[1],
+      ],
+    });
+    const invalidPort = validateAgentAdapterManifest({
+      ...nativeManifest,
+      interactionModes: [
+        { ...nativeManifest.interactionModes[0], serverPort: 0 },
+        validManifest().interactionModes[1],
+      ],
+    });
+    const terminalPort = validateAgentAdapterManifest({
+      ...validManifest(),
+      interactionModes: [
+        { ...validManifest().interactionModes[0], serverPort: 4_096 },
+        validManifest().interactionModes[1],
+      ],
+    });
+    expect(missingPort).toMatchObject({
+      ok: false,
+      issues: [{ code: "invalid_manifest", path: ["interactionModes", 0, "serverPort"] }],
+    });
+    expect(invalidPort).toMatchObject({
+      ok: false,
+      issues: [{ code: "invalid_manifest", path: ["interactionModes", 0, "serverPort"] }],
+    });
+    expect(terminalPort).toMatchObject({
+      ok: false,
+      issues: [{ code: "invalid_manifest", path: ["interactionModes", 0, "serverPort"] }],
+    });
+  });
+
   test("[ADAPTER-CRED-006] rejects credential values and unsafe persistent paths", () => {
     const credentialValue = validateAgentAdapterManifest({
       ...validManifest(),
