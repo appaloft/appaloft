@@ -38,6 +38,9 @@
   [#900](https://github.com/appaloft/appaloft/issues/900).
 - [x] Track the generated-facade collision found by remote `workspace open` smoke under public issue
   [#904](https://github.com/appaloft/appaloft/issues/904).
+- [x] Track the default execution-context tenant propagation regression found by hosted Credential
+  Connection admission under public issue
+  [#906](https://github.com/appaloft/appaloft/issues/906).
 - [ ] Link the final public merged commit.
 
 ## Implementation
