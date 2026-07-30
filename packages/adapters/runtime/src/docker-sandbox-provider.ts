@@ -1114,7 +1114,7 @@ export class DockerSandboxProvider implements SandboxProvider {
         request.providerHandle,
         "sh",
         "-c",
-        'mkdir -p "$(dirname "$1")" && cat > "$1"',
+        'destination="$1"; directory="$(dirname "$destination")"; mkdir -p "$directory" || exit 1; temporary="$(mktemp "$directory/.appaloft-write.XXXXXX")" || exit 1; cleanup() { rm -f -- "$temporary"; }; trap cleanup EXIT HUP INT TERM; cat > "$temporary" || exit 1; if [ -e "$destination" ]; then chmod "$(stat -c %a "$destination")" "$temporary" || exit 1; fi; mv -f -- "$temporary" "$destination" || exit 1; trap - EXIT HUP INT TERM',
         "appaloft-file-write",
         path,
       ],

@@ -29,7 +29,7 @@ result and create a pull request without losing the task when the client disconn
 | ID | Scenario | Given | When | Then |
 | --- | --- | --- | --- | --- |
 | AGENT-TASK-RUN-001 | Submit and follow | A ready Workspace Runtime exists | a Task Run is submitted | One Sandbox Agent Run is created; live bounded events are observable and disconnect does not cancel it. |
-| AGENT-TASK-RESUME-002 | Resume finalization | The Agent Run completed while the client was absent | Task Run resume executes | The same run id is used and finalization continues idempotently from the task result document. |
+| AGENT-TASK-RESUME-002 | Resume finalization | The Agent Run completed while the client was absent | Task Run resume executes | The same run id is used and finalization continues idempotently from an atomically replaced protected task result document; concurrent observers see only complete state. |
 | AGENT-TASK-CHECK-003 | Run checks | The Agent Run completed | configured argv checks execute | Each check records command identity, exit status and bounded output; a required failure blocks approval. |
 | AGENT-TASK-DIFF-004 | Capture changes | Checks complete | Git evidence is inspected | Bounded status, stat and patch plus truncation metadata are stored and returned. |
 | AGENT-TASK-PREVIEW-005 | Start Development Preview | A start argv and port are configured | preview preparation executes | The service starts in the Sandbox and one visibility/TTL-scoped port descriptor is returned. |
