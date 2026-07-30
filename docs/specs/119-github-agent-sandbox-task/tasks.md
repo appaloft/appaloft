@@ -18,6 +18,8 @@
   acceptance exposed different Profile visibility between authenticated and system entrypoints.
 - [x] Create and link public repository materialization regression issue #925 after real hosted
   acceptance proved the GitHub adapter still required an empty Workspace root despite #908/#909.
+- [x] Create and link public askpass permission regression issue #927 after real hosted acceptance
+  proved the task-scoped shell helper was not executable in a registered Linux Sandbox.
 
 ## Public Composition Boundary Slice
 
@@ -45,6 +47,8 @@
   closed on conflicting Project ownership.
 - [x] GH-AUTO-BOUNDARY-021: make the GitHub repository materializer reuse the populated-root
   `git init`/exact-fetch behavior required by #908/#909 and reject clone-to-dot regressions.
+- [x] GH-AUTO-BOUNDARY-021: keep the installation token at mode `0600` while making the
+  task-scoped askpass helper owner-executable at mode `0700`.
 - [ ] Run the dedicated read-only Public/Private Boundary Review Round and require `PASS` before
   hosted Code resumes.
 
@@ -119,6 +123,8 @@
   context and pre-Workspace fail-closed behavior.
 - [x] Docs outcome for #925: not user-facing. The fix restores the already documented repository
   materialization workflow and changes no command, API, status, error code, or recovery guidance.
+- [x] Docs outcome for #927: not user-facing. The fix restores the already documented
+  installation-authenticated materialization behavior and changes no public command or contract.
 - [x] Synchronize Domain Model, Business Operation Map, operation catalog, SDK/CLI/Web docs, and
   Test Matrix evidence.
 - [ ] Commit and push public changes with a neutral message.

@@ -2130,8 +2130,10 @@ export class GitHubRepositoryWorkspaceMaterializerAdapter
         content: encoder.encode(ash.render(askpass)),
       });
       if (askpassWritten.isErr()) return err(askpassWritten.error);
-      const protectedFiles = await execute(["chmod", "600", tokenPath, askpassPath]);
-      if (protectedFiles.isErr()) return protectedFiles;
+      const protectedToken = await execute(["chmod", "600", tokenPath]);
+      if (protectedToken.isErr()) return protectedToken;
+      const protectedAskpass = await execute(["chmod", "700", askpassPath]);
+      if (protectedAskpass.isErr()) return protectedAskpass;
 
       const repositoryUrl = `https://github.com/${repository.owner}/${repository.name}.git`;
       const initialized = await execute(["git", "init", "."]);
