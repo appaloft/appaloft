@@ -451,7 +451,13 @@ export class AgentWorkspaceOpenService {
       } else {
         const sourceCommands: readonly { argv: readonly string[]; cwd?: string }[] = [
           {
-            argv: ["git", "clone", "--no-checkout", "--", input.repository, "."],
+            argv: ["git", "init", "."],
+          },
+          {
+            argv: ["git", "remote", "add", "origin", input.repository],
+          },
+          {
+            argv: ["git", "fetch", "--no-tags", "--depth", "1", "origin", input.ref],
           },
           {
             argv: ["git", "checkout", "--detach", input.commitSha],

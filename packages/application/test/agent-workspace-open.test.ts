@@ -30,7 +30,7 @@ describe("Agent Workspace open application workflow", () => {
     > = [];
     const admittedScopes: Array<Parameters<WorkspaceOpenDependencies["preflight"]["admit"]>[2]> =
       [];
-    const materializedSources: string[] = [];
+    const executedCommands: string[][] = [];
     const failedEntries: Array<{ workspaceId?: string; phase: string; code: string }> = [];
     let preferred:
       | {
@@ -152,7 +152,10 @@ describe("Agent Workspace open application workflow", () => {
           phases.push("sandbox-resume");
           return ok({ sandboxId: workspaceId, status: "ready" });
         },
-        exec: async () => ok({ mode: "foreground", frames: [{ kind: "exit", exitCode: 0 }] }),
+        exec: async (_context, _workspaceId, command) => {
+          executedCommands.push([...command.argv]);
+          return ok({ mode: "foreground", frames: [{ kind: "exit", exitCode: 0 }] });
+        },
         exposePort: async () => ok(undefined),
       },
       agents: {
@@ -247,12 +250,6 @@ describe("Agent Workspace open application workflow", () => {
       },
       placementProviderKey: "server-pool-1",
       expiresAt: "2026-07-28T02:00:00.000Z",
-      sourceMaterializer: {
-        materialize: async (_context, value) => {
-          materializedSources.push(`${value.workspaceId}:${value.source.repositoryIdentity}`);
-          return ok(undefined);
-        },
-      },
     });
     const mismatched = await service.open(context, {
       ...input,
@@ -296,7 +293,13 @@ describe("Agent Workspace open application workflow", () => {
       untrustedCode: false,
       serverPoolId: "server-pool-1",
     });
-    expect(materializedSources).toEqual(["sbx_1:github.com/Acme/Web"]);
+    expect(executedCommands).toEqual([
+      ["git", "init", "."],
+      ["git", "remote", "add", "origin", "https://github.com/Acme/Web.git"],
+      ["git", "fetch", "--no-tags", "--depth", "1", "origin", "refs/heads/feature/open"],
+      ["git", "checkout", "--detach", "0123456789abcdef0123456789abcdef01234567"],
+      ["git", "switch", "-c", "feature/open"],
+    ]);
     expect(mismatched._unsafeUnwrapErr().details?.code).toBe("workspace_open_source_pin_mismatch");
     expect(mismatched._unsafeUnwrapErr().details?.guidance).toContain("--new");
     expect(providerFailure.isErr()).toBe(true);
