@@ -1765,6 +1765,42 @@ describe("CLI remote control-plane client", () => {
     });
   });
 
+  test("[WS-OPEN-REMOTE-018][CONTROL-PLANE-CLI-010] workspace open uses the raw generated operation facade", async () => {
+    const requests: Request[] = [];
+    const body = {
+      repository: "https://github.com/appaloft/appaloft.git",
+      repositoryIdentity: "github.com/appaloft/appaloft",
+      ref: "refs/heads/main",
+      branch: "main",
+      commitSha: "a".repeat(40),
+      profile: "pi-default",
+      forceNew: false,
+      attach: true,
+    };
+    const result = await requestControlPlaneOperation({
+      profile: profile("local"),
+      operationKey: "workspaces.open",
+      body,
+      fetch: async (request) => {
+        requests.push(request);
+        return jsonResponse({
+          workspaceId: "sbx_remote",
+          resumed: false,
+        });
+      },
+      phase: "remote-operation-dispatch",
+    });
+
+    expect(result._unsafeUnwrap()).toEqual({
+      workspaceId: "sbx_remote",
+      resumed: false,
+    });
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      ["POST /api/workspaces/open"],
+    );
+    expect(await requests[0]?.json()).toEqual(body);
+  });
+
   test("[CONTROL-PLANE-CLI-019] unknown top-level commands fail before runtime initialization", async () => {
     const argv = ["node", "appaloft", "deployment", "proof", "dep_123"];
     const results = await Promise.all([
