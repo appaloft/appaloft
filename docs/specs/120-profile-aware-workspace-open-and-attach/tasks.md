@@ -41,6 +41,8 @@
 - [x] Track the default execution-context tenant propagation regression found by hosted Credential
   Connection admission under public issue
   [#906](https://github.com/appaloft/appaloft/issues/906).
+- [x] Track safe source materialization into Template working directories under public issue
+  [#908](https://github.com/appaloft/appaloft/issues/908).
 - [ ] Link the final public merged commit.
 
 ## Implementation
