@@ -2134,24 +2134,24 @@ export class GitHubRepositoryWorkspaceMaterializerAdapter
       if (protectedFiles.isErr()) return protectedFiles;
 
       const repositoryUrl = `https://github.com/${repository.owner}/${repository.name}.git`;
-      const cloned = await execute([
-        "env",
-        `GIT_ASKPASS=./${askpassPath}`,
-        "GIT_TERMINAL_PROMPT=0",
-        "git",
-        "clone",
-        "--no-checkout",
-        "--filter=blob:none",
-        repositoryUrl,
-        ".",
-      ]);
-      if (cloned.isErr()) return cloned;
+      const initialized = await execute(["git", "init", "."]);
+      if (initialized.isErr()) return initialized;
+      const remoteAdded = await execute(["git", "remote", "add", "origin", repositoryUrl]);
+      if (remoteAdded.isErr()) return remoteAdded;
       const hooksDisabled = await execute(["git", "config", "core.hooksPath", "/dev/null"]);
       if (hooksDisabled.isErr()) return hooksDisabled;
 
-      const fetched = await execute(["git", "fetch", "--no-tags", "origin", revision]);
+      const authenticated = (argv: string[]) => [
+        "env",
+        `GIT_ASKPASS=./${askpassPath}`,
+        "GIT_TERMINAL_PROMPT=0",
+        ...argv,
+      ];
+      const fetched = await execute(
+        authenticated(["git", "fetch", "--no-tags", "--filter=blob:none", "origin", revision]),
+      );
       if (fetched.isErr()) return fetched;
-      return execute(["git", "checkout", "--detach", revision]);
+      return execute(authenticated(["git", "checkout", "--detach", revision]));
     } finally {
       await this.sandboxes.exec(context, input.workspaceId, {
         argv: ["rm", "-f", tokenPath, askpassPath],
