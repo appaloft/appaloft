@@ -12,6 +12,8 @@
 - [x] Create and link public Repository Binding / Workspace-open convergence issue #890.
 - [x] Create and link public secure neutral Console form issue #892 after composed hosted
   acceptance exposed the missing actionable input surface.
+- [x] Create and link public post-acknowledgement Task failure feedback issue #916 after real
+  webhook acceptance exposed an unrecorded delivery outcome.
 
 ## Public Composition Boundary Slice
 
@@ -84,6 +86,9 @@
   (#898).
 - [x] Preserve bounded, secret-safe Issue/PR request context for label and automatic PR-review
   rules so automated Tasks receive the actor-visible request instead of a generic action (#902).
+- [x] Reuse the acknowledgement feedback state to publish one bounded failure comment and record
+  the delivery outcome when Task start/replace fails, so replay cannot create compute or feedback
+  again (#916).
 
 ## Retention And Cleanup Slice
 
