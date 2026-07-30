@@ -348,7 +348,6 @@
       "name": "@appaloft/integration-github",
       "dependencies": {
         "@appaloft/application": "workspace:*",
-        "@appaloft/ash": "workspace:*",
         "@appaloft/core": "workspace:*",
         "@appaloft/integration-core": "workspace:*",
       },

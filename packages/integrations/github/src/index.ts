@@ -3,6 +3,7 @@ import {
   appaloftTraceAttributes,
   assertGitHubAgentThreadRequestSafe,
   createAdapterSpanName,
+  createWorkspaceSourceGitCredentialCommands,
   type ExecutionContext,
   type ExecutionSandboxService,
   type GitHubAgentFeedbackPort,
@@ -34,8 +35,8 @@ import {
   type SourceEventChangedPathResolver,
   type SourceEventChangedPathResolverInput,
   type VerifiedSourceEventInput,
+  type WorkspaceSourceCommand,
 } from "@appaloft/application";
-import { ash } from "@appaloft/ash";
 import { domainError, err, ok, type Result } from "@appaloft/core";
 
 export interface GitHubAppIntegrationOptions {
@@ -2066,7 +2067,7 @@ export class GitHubRepositoryWorkspaceMaterializerAdapter
   implements GitHubRepositoryWorkspaceMaterializerPort
 {
   constructor(
-    private readonly sandboxes: Pick<ExecutionSandboxService, "exec" | "writeFile">,
+    private readonly sandboxes: Pick<ExecutionSandboxService, "exec">,
     private readonly installationToken: (installationId: string) => Promise<string | null>,
   ) {}
 
@@ -2095,18 +2096,14 @@ export class GitHubRepositoryWorkspaceMaterializerAdapter
       return err(domainError.validation("GitHub repository full name is invalid"));
     }
 
-    const tokenPath = ".appaloft-github-token";
-    const askpassPath = ".appaloft-git-askpass";
-    const askpass = ash`#!/bin/sh
-      case "$1" in
-        *Username*) printf '%s\n' x-access-token ;;
-        *) cat ${ash.arg(`./${tokenPath}`)} ;;
-      esac
-    `;
-    const encoder = new TextEncoder();
-    const execute = async (argv: string[], timeoutMs = 10 * 60_000): Promise<Result<void>> => {
+    const execute = async (
+      command: WorkspaceSourceCommand,
+      timeoutMs = 10 * 60_000,
+    ): Promise<Result<void>> => {
       const executed = await this.sandboxes.exec(context, input.workspaceId, {
-        argv,
+        argv: [...command.argv],
+        ...(command.cwd ? { cwd: command.cwd } : {}),
+        ...(command.stdin ? { stdin: command.stdin } : {}),
         timeoutMs,
       });
       if (executed.isErr()) return err(executed.error);
@@ -2119,47 +2116,56 @@ export class GitHubRepositoryWorkspaceMaterializerAdapter
           );
     };
 
-    try {
-      const tokenWritten = await this.sandboxes.writeFile(context, input.workspaceId, {
-        path: tokenPath,
-        content: encoder.encode(`${token}\n`),
-      });
-      if (tokenWritten.isErr()) return err(tokenWritten.error);
-      const askpassWritten = await this.sandboxes.writeFile(context, input.workspaceId, {
-        path: askpassPath,
-        content: encoder.encode(ash.render(askpass)),
-      });
-      if (askpassWritten.isErr()) return err(askpassWritten.error);
-      const protectedToken = await execute(["chmod", "600", tokenPath]);
-      if (protectedToken.isErr()) return protectedToken;
-      const protectedAskpass = await execute(["chmod", "700", askpassPath]);
-      if (protectedAskpass.isErr()) return protectedAskpass;
+    const repositoryUrl = `https://github.com/${repository.owner}/${repository.name}.git`;
+    const initialized = await execute({ argv: ["git", "init", "."] });
+    if (initialized.isErr()) return initialized;
+    const remoteAdded = await execute({
+      argv: ["git", "remote", "add", "origin", repositoryUrl],
+    });
+    if (remoteAdded.isErr()) return remoteAdded;
+    const hooksDisabled = await execute({
+      argv: ["git", "config", "core.hooksPath", "/dev/null"],
+    });
+    if (hooksDisabled.isErr()) return hooksDisabled;
 
-      const repositoryUrl = `https://github.com/${repository.owner}/${repository.name}.git`;
-      const initialized = await execute(["git", "init", "."]);
-      if (initialized.isErr()) return initialized;
-      const remoteAdded = await execute(["git", "remote", "add", "origin", repositoryUrl]);
-      if (remoteAdded.isErr()) return remoteAdded;
-      const hooksDisabled = await execute(["git", "config", "core.hooksPath", "/dev/null"]);
-      if (hooksDisabled.isErr()) return hooksDisabled;
+    const authenticated = createWorkspaceSourceGitCredentialCommands(
+      repositoryUrl,
+      {
+        kind: "http-basic",
+        username: "x-access-token",
+        password: token,
+      },
+      ["git", "fetch", "--no-tags", "--filter=blob:none", "origin", revision],
+    );
+    const prepared = await execute(authenticated.prepare);
+    if (prepared.isErr()) return prepared;
 
-      const authenticated = (argv: string[]) => [
-        "env",
-        `GIT_ASKPASS=./${askpassPath}`,
-        "GIT_TERMINAL_PROMPT=0",
-        ...argv,
-      ];
-      const fetched = await execute(
-        authenticated(["git", "fetch", "--no-tags", "--filter=blob:none", "origin", revision]),
-      );
-      if (fetched.isErr()) return fetched;
-      return execute(authenticated(["git", "checkout", "--detach", revision]));
-    } finally {
-      await this.sandboxes.exec(context, input.workspaceId, {
-        argv: ["rm", "-f", tokenPath, askpassPath],
-        timeoutMs: 30_000,
-      });
+    let sourceResult = await execute(authenticated.approve);
+    if (sourceResult.isOk()) sourceResult = await execute(authenticated.fetch);
+    let cleanupFailure: ReturnType<typeof domainError.conflict> | undefined;
+    for (const cleanup of authenticated.cleanup) {
+      const cleaned = await execute(cleanup, 30_000);
+      if (cleaned.isErr() && !cleanupFailure) cleanupFailure = cleaned.error;
     }
+    if (cleanupFailure) {
+      return err(
+        domainError.conflict("GitHub checkout credential cleanup failed", {
+          code: "github_agent_checkout_credential_cleanup_failed",
+          cleanupFailureCode:
+            cleanupFailure.details?.code ?? cleanupFailure.code ?? "source_cleanup_failed",
+          ...(sourceResult.isErr()
+            ? {
+                sourceFailureCode:
+                  sourceResult.error.details?.code ??
+                  sourceResult.error.code ??
+                  "source_fetch_failed",
+              }
+            : {}),
+        }),
+      );
+    }
+    if (sourceResult.isErr()) return sourceResult;
+    return execute({ argv: ["git", "checkout", "--detach", revision] });
   }
 }
 

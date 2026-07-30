@@ -287,13 +287,13 @@ function validateSourceCredential(
   return ok(credential);
 }
 
-type WorkspaceSourceCommand = {
+export type WorkspaceSourceCommand = {
   readonly argv: readonly string[];
   readonly cwd?: string;
   readonly stdin?: Uint8Array;
 };
 
-type AuthenticatedGitCommands = {
+export type WorkspaceSourceGitCredentialCommands = {
   readonly prepare: WorkspaceSourceCommand;
   readonly approve: WorkspaceSourceCommand;
   readonly fetch: WorkspaceSourceCommand;
@@ -304,11 +304,11 @@ const workspaceSourceCredentialCacheDirectory = "/tmp/.appaloft-workspace-source
 const workspaceSourceCredentialCacheSocket = `${workspaceSourceCredentialCacheDirectory}/credential-cache.sock`;
 const workspaceSourceCredentialHelper = `cache --timeout=60 --socket=${workspaceSourceCredentialCacheSocket}`;
 
-function authenticatedGitCommands(
+export function createWorkspaceSourceGitCredentialCommands(
   repository: string,
   credential: WorkspaceOpenSourceHttpBasicCredential,
   argv: readonly string[],
-): AuthenticatedGitCommands {
+): WorkspaceSourceGitCredentialCommands {
   const repositoryUrl = new URL(repository);
   const credentialHelperArguments = [
     "-c",
@@ -606,7 +606,7 @@ export class AgentWorkspaceOpenService {
           argv: ["git", "remote", "add", "origin", input.repository],
         });
         if (sourceCredential.value) {
-          const authenticated = authenticatedGitCommands(
+          const authenticated = createWorkspaceSourceGitCredentialCommands(
             input.repository,
             sourceCredential.value,
             fetchArgv,
