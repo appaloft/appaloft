@@ -40,6 +40,8 @@ class DefaultExecutionContextFactory implements ExecutionContextFactory {
       ...(input.actor ? { actor: input.actor } : {}),
       ...(input.auth ? { auth: input.auth } : {}),
       ...(input.principal ? { principal: input.principal } : {}),
+      ...(input.requestSecurity ? { requestSecurity: input.requestSecurity } : {}),
+      ...(input.tenant ? { tenant: input.tenant } : {}),
     };
   }
 }
