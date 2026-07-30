@@ -45,6 +45,8 @@
   [#908](https://github.com/appaloft/appaloft/issues/908).
 - [x] Track request-scoped private Repository source credential custody for remote Workspace open
   under public issue [#912](https://github.com/appaloft/appaloft/issues/912).
+- [x] Track fail-closed declarative native attach server-port compilation under public issue
+  [#914](https://github.com/appaloft/appaloft/issues/914).
 - [ ] Link the final public merged commit.
 
 ## Implementation
@@ -58,6 +60,8 @@
 - [x] Route SDK and Console creation through the same workflow.
 - [x] Implement PG/PGlite persistence and migrations.
 - [x] Implement generated operation, HTTP/oRPC, SDK, CLI, and remote-dispatch surfaces.
+- [x] Preserve the exact scoped server port from native-attach Adapter manifests in compiled
+  declarative Harness descriptors.
 
 ## Verification
 

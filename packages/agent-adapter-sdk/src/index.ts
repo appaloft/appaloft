@@ -86,6 +86,7 @@ const interactionModeSchema = z
     structuredEventSchemaVersion: z.literal("appaloft.agent-event/v1").optional(),
     sessionRecovery: z.enum(["process-lifetime", "managed-run-lineage", "native-session-store"]),
     clientHandoff: z.enum(["local-client-exec", "display-only"]).optional(),
+    serverPort: z.number().int().min(1).max(65_535).optional(),
   })
   .strict()
   .superRefine((mode, context) => {
@@ -124,6 +125,20 @@ const interactionModeSchema = z
         code: "custom",
         message: "client handoff is only valid for native-attach modes",
         path: ["clientHandoff"],
+      });
+    }
+    if (mode.transport === "native-attach" && mode.serverPort === undefined) {
+      context.addIssue({
+        code: "custom",
+        message: "native-attach modes require a scoped server port",
+        path: ["serverPort"],
+      });
+    }
+    if (mode.transport !== "native-attach" && mode.serverPort !== undefined) {
+      context.addIssue({
+        code: "custom",
+        message: "server port is only valid for native-attach modes",
+        path: ["serverPort"],
       });
     }
     if (mode.eventFidelity === "structured-events" && !mode.structuredEventSchemaVersion) {
@@ -649,6 +664,7 @@ export interface CompiledAgentWorkspaceProfilePlan {
         command: string[];
         sessionRecovery: "managed-run-lineage" | "native-session-store";
         clientHandoff: "local-client-exec" | "display-only";
+        serverPort?: number;
       };
       persistentPaths: string[];
       healthcheck?: NonNullable<AgentAdapterManifest["healthcheck"]>;
@@ -1033,6 +1049,10 @@ export function compileAgentWorkspaceProfile(
           interactiveMode.transport === "native-attach"
             ? (interactiveMode.clientHandoff ?? "display-only")
             : ("display-only" as const),
+        ...(interactiveMode.transport === "native-attach" &&
+        interactiveMode.serverPort !== undefined
+          ? { serverPort: interactiveMode.serverPort }
+          : {}),
       }
     : undefined;
   let preview: CompiledAgentWorkspaceProfilePlan["preview"];
