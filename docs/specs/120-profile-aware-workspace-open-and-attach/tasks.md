@@ -53,6 +53,11 @@
 - [x] Link public PR
   [#919](https://github.com/appaloft/appaloft/pull/919) final merged commit
   `4a30316e139e2d1a13e2b0f0f9be93b2cedc977b`.
+- [x] Link public PR
+  [#922](https://github.com/appaloft/appaloft/pull/922) final merged commit
+  `a7e939ad582cfc31890b7636bf6ed2545af74b67`, which proves the typed Git credential
+  protocol and isolated memory-only credential cache against the authenticated fetch command's
+  exact helper arguments.
 
 ## Implementation
 
@@ -80,14 +85,17 @@
   [30433192272](https://github.com/appaloft/appaloft-cloud/actions/runs/30433192272): real-provider
   model replies, managed-terminal/native attach, reconnectable state, hibernation and exact fixture
   cleanup passed.
-- [x] Run explicit Profile-aware `workspace open` Pi/OpenCode opt-in smoke with Repository Binding,
-  installed Profile/Connection pins, repeated-open identity, terminate and exact provider orphan
-  readback in Cloud run
-  [30519239677](https://github.com/appaloft/appaloft-cloud/actions/runs/30519239677).
+- [x] Run explicit Profile-aware `workspace open` Pi/OpenCode opt-in smoke with a challenged private
+  GitHub Repository fetch, Repository Binding, installed Profile/Connection pins, repeated-open
+  identity, managed-terminal/native-attach reconnect, terminate and exact provider orphan readback
+  in Cloud run
+  [30531244785](https://github.com/appaloft/appaloft-cloud/actions/runs/30531244785).
 
 ## Sync
 
 - [x] Update matrix status and test bindings from actual results.
 - [x] Synchronize CLI help, public docs, SDK guidance, Console behavior, ADR/Spec/tasks and issues.
+- [x] Merge the public source-authentication implementation through PR
+  [#922](https://github.com/appaloft/appaloft/pull/922).
 - [ ] Merge this evidence Sync, update Cloud gitlink to the resulting public `main` SHA, then
   complete Cloud PR.
