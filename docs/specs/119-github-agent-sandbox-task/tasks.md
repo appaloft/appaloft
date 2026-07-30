@@ -14,6 +14,8 @@
   acceptance exposed the missing actionable input surface.
 - [x] Create and link public post-acknowledgement Task failure feedback issue #916 after real
   webhook acceptance exposed an unrecorded delivery outcome.
+- [x] Create and link public tenant-context resolution issue #921 after composed hosted
+  acceptance exposed different Profile visibility between authenticated and system entrypoints.
 
 ## Public Composition Boundary Slice
 

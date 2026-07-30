@@ -23,6 +23,7 @@ import {
   type QueryBus,
   type ResourceAccessFailureEvidenceRecorder,
   type SourceEventVerificationPort,
+  type TenantContextResolver,
   type TerminalSession,
   type TerminalSessionGateway,
   toRepositoryContext,
@@ -924,6 +925,7 @@ export function createHttpApp(input: {
   terminalSessionGateway?: TerminalSessionGateway;
   pluginRuntime?: SystemPluginRuntime;
   authRuntime?: AuthRuntime;
+  tenantContextResolver?: TenantContextResolver;
   requestContextRunner?: RequestContextRunner;
   orpcRouterContributions?: readonly AppaloftOrpcRouterContribution[];
   embeddedStaticAssets?: EmbeddedStaticAssets;
@@ -2169,6 +2171,11 @@ export function createHttpApp(input: {
     ...(input.authRuntime
       ? {
           productSessionAuthorizationPort: input.authRuntime,
+        }
+      : {}),
+    ...(input.tenantContextResolver
+      ? {
+          tenantContextResolver: input.tenantContextResolver,
         }
       : {}),
     ...(input.config.githubAppWebhookSecret || input.config.githubWebhookSecret

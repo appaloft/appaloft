@@ -66,6 +66,7 @@ import {
   type SourceLinkRecord,
   type SourceLinkRepository,
   type StorageVolumeBackupAutomationService,
+  type TenantContextResolver,
   type TerminalSessionGateway,
   type TunnelSessionService,
   tokens,
@@ -2035,6 +2036,10 @@ export async function createAppaloftServer(
     actionSourcePackageConfigReader: createGitHubActionSourcePackageConfigReader(),
     pluginRuntime,
     authRuntime,
+    tenantContextResolver: resolveToken<TenantContextResolver>(
+      childContainer,
+      tokens.tenantContextResolver,
+    ),
     requestContextRunner,
     ...(options?.embeddedWebAssets ? { embeddedWebAssets: options.embeddedWebAssets } : {}),
     ...(options?.embeddedDocsAssets ? { embeddedDocsAssets: options.embeddedDocsAssets } : {}),
