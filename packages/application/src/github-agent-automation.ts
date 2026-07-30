@@ -1,6 +1,7 @@
 import {
   type AgentAdapterKind,
   type AgentCredentialAuthMode,
+  type DomainError,
   domainError,
   err,
   githubReviewExecutionKey,
@@ -711,7 +712,16 @@ export class GitHubAgentAutomationService {
         trigger,
         authorization: allowed,
       });
-      if (task.isErr()) return err(task.error);
+      if (task.isErr()) {
+        return this.rejectTaskFailure(
+          context,
+          trigger,
+          intent,
+          allowed,
+          task.error,
+          acknowledged.value,
+        );
+      }
       await this.dependencies.store.setCurrentTask(context, threadKey, task.value);
       return this.updateAndFinish(
         context,
@@ -731,7 +741,16 @@ export class GitHubAgentAutomationService {
       authorization: allowed,
       ...(current ? { current } : {}),
     });
-    if (task.isErr()) return err(task.error);
+    if (task.isErr()) {
+      return this.rejectTaskFailure(
+        context,
+        trigger,
+        intent,
+        allowed,
+        task.error,
+        acknowledged.value,
+      );
+    }
     await this.dependencies.store.setCurrentTask(context, threadKey, task.value);
     return this.updateAndFinish(context, trigger, intent, allowed, task.value, acknowledged.value);
   }
@@ -791,12 +810,14 @@ export class GitHubAgentAutomationService {
     trigger: GitHubAgentTrigger,
     decision: Extract<GitHubAgentAuthorizationDecision, { allowed: false }>,
     intent?: GitHubAgentIntent,
+    feedbackState?: GitHubAgentFeedbackState,
   ): Promise<Result<GitHubAgentAutomationOutcome>> {
     const feedback = await this.dependencies.feedback.reject(context, {
       trigger,
       reasonCode: decision.reasonCode,
       message: decision.message,
       ...(decision.connectAgentUrl ? { connectAgentUrl: decision.connectAgentUrl } : {}),
+      ...(feedbackState ? { existing: feedbackState } : {}),
     });
     if (feedback.isErr()) return err(feedback.error);
     return this.finish(context, {
@@ -810,6 +831,29 @@ export class GitHubAgentAutomationService {
       ...(intent ? { intent: cloneIntent(intent) } : {}),
       actorSnapshot: { ...decision.actorSnapshot },
     });
+  }
+
+  private rejectTaskFailure(
+    context: ExecutionContext,
+    trigger: GitHubAgentTrigger,
+    intent: GitHubAgentIntent,
+    authorization: GitHubAgentTaskExecutionAuthorization,
+    failure: DomainError,
+    feedbackState: GitHubAgentFeedbackState,
+  ): Promise<Result<GitHubAgentAutomationOutcome>> {
+    const detailCode = typeof failure.details?.code === "string" ? failure.details.code.trim() : "";
+    return this.reject(
+      context,
+      trigger,
+      {
+        allowed: false,
+        reasonCode: detailCode || failure.code,
+        message: failure.message,
+        actorSnapshot: authorization.actorSnapshot,
+      },
+      intent,
+      feedbackState,
+    );
   }
 
   private async updateAndFinish(

@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
-import { ok } from "@appaloft/core";
+import { domainError, err, ok } from "@appaloft/core";
 
 import {
   createExecutionContext,
@@ -337,6 +337,69 @@ describe("GitHub Agent automation service", () => {
     expect(feedback.calls).toEqual([
       "reject:agent_credential_missing",
       "reject:github_fork_pull_request_denied",
+    ]);
+  });
+
+  test("[GH-AUTO-FEEDBACK-013][GH-AUTO-IDEMPOTENCY-003][GH-AUTO-TASK-010] records one bounded failure after task start", async () => {
+    const store = new InMemoryGitHubAgentAutomationStore();
+    const taskCalls: string[] = [];
+    const feedbackCalls: Array<Record<string, unknown>> = [];
+    const service = new GitHubAgentAutomationService({
+      store,
+      authorization: allowedAuthorization(),
+      tasks: {
+        ...taskPort().port,
+        startOrResume: async () => {
+          taskCalls.push("start");
+          return err(
+            domainError.conflict("Workspace placement is unavailable", {
+              code: "workspace_placement_unavailable",
+            }),
+          );
+        },
+      },
+      feedback: {
+        acknowledge: async () => ok({ reactionId: "reaction_start_failure" }),
+        update: async () => ok({}),
+        reject: async (_context, input) => {
+          feedbackCalls.push({
+            reasonCode: input.reasonCode,
+            message: input.message,
+            existing: input.existing,
+          });
+          return ok({
+            ...input.existing,
+            statusCommentId: "comment_start_failure",
+          });
+        },
+      },
+    });
+    const input = trigger({ deliveryId: "delivery_start_failure" });
+
+    const failed = await service.handle(context, input);
+    const duplicate = await service.handle(context, input);
+
+    expect(failed._unsafeUnwrap()).toMatchObject({
+      status: "denied",
+      reasonCode: "workspace_placement_unavailable",
+      message: "Workspace placement is unavailable",
+      feedback: {
+        reactionId: "reaction_start_failure",
+        statusCommentId: "comment_start_failure",
+      },
+    });
+    expect(duplicate._unsafeUnwrap()).toMatchObject({
+      status: "denied",
+      duplicate: true,
+      reasonCode: "workspace_placement_unavailable",
+    });
+    expect(taskCalls).toEqual(["start"]);
+    expect(feedbackCalls).toEqual([
+      {
+        reasonCode: "workspace_placement_unavailable",
+        message: "Workspace placement is unavailable",
+        existing: { reactionId: "reaction_start_failure" },
+      },
     ]);
   });
 
