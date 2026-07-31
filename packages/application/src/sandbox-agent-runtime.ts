@@ -1758,6 +1758,17 @@ export class SandboxAgentDeliveryService {
             ? ok(runDescriptor(persisted.value.record))
             : err(admitted.error);
         }
+        const admittedRun = await this.dependencies.repository.findRun(repositoryContext, runId);
+        if (admittedRun?.run.toState().status.value === "cancelled") {
+          const revoked = await this.revokeCredentialGrants(
+            context,
+            runtimeRecord,
+            "cancelled",
+            runId,
+          );
+          if (revoked.isErr()) return err(revoked.error);
+          return ok(runDescriptor(admittedRun));
+        }
       }
       const contextState = record.run.toState().context.toState();
       const persistedEvents = await this.dependencies.repository.listRunEvents(

@@ -544,6 +544,7 @@ describe("SandboxAgentDeliveryService", () => {
     });
     let harnessCalls = 0;
     let launchCalls = 0;
+    const revokeReasons: string[] = [];
     const { service } = fixture({
       harness: {
         key: "fake",
@@ -567,11 +568,7 @@ describe("SandboxAgentDeliveryService", () => {
           if (admissionCalls === 1) return ok(undefined);
           markAdmissionStarted?.();
           await admissionPending;
-          return err(
-            domainError.conflict("Credential connection is revoked", {
-              code: "agent_credential_connection_revoked",
-            }),
-          );
+          return ok(undefined);
         },
         async launch() {
           launchCalls += 1;
@@ -580,7 +577,8 @@ describe("SandboxAgentDeliveryService", () => {
         async openTerminal() {
           throw new Error("terminal must not open");
         },
-        async revoke() {
+        async revoke(_context, input) {
+          revokeReasons.push(input.reason);
           return ok(undefined);
         },
       },
@@ -610,6 +608,7 @@ describe("SandboxAgentDeliveryService", () => {
     expect(reconciled._unsafeUnwrap().status).toBe("cancelled");
     expect(harnessCalls).toBe(0);
     expect(launchCalls).toBe(0);
+    expect(revokeReasons.filter((reason) => reason === "cancelled")).toHaveLength(2);
   });
 
   test("[AGENT-ADAPTER-018] lists neutral harness capabilities and admitted templates", async () => {
