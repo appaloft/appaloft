@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import { Buffer } from "node:buffer";
-import { ok } from "@appaloft/core";
+import { domainError, err, ok } from "@appaloft/core";
 import {
   createExecutionContext,
   InMemorySandboxAgentDeliveryRepository,
@@ -224,8 +224,9 @@ describe("SandboxAgentDeliveryService", () => {
     expect(stored?.profilePin).toEqual(pin);
   });
 
-  test("[ADAPTER-CRED-006][PROFILE-PIN-010] admits, launches and revokes the exact pinned child scope", async () => {
+  test("[ADAPTER-CRED-006][PROFILE-PIN-010][GH-AUTO-DURABLE-CREDENTIAL-023] re-admits, launches and revokes the exact persisted child scope", async () => {
     const calls: Array<{ kind: string; input: Record<string, unknown> }> = [];
+    let processCredentialAdmitted = false;
     const pin = {
       profileInstallationId: "awpi_codex",
       profileDefinitionDigest: `sha256:${"1".repeat(64)}`,
@@ -322,10 +323,18 @@ describe("SandboxAgentDeliveryService", () => {
       processCredentialGrants: {
         async admit(_context, input) {
           calls.push({ kind: "admit", input });
+          processCredentialAdmitted = true;
           return ok(undefined);
         },
         async launch(_context, input) {
           calls.push({ kind: "launch", input });
+          if (!processCredentialAdmitted) {
+            return err(
+              domainError.conflict("Process credential scope was not admitted", {
+                code: "test_process_credential_scope_not_admitted",
+              }),
+            );
+          }
           return ok({ mode: "background", processId: "spr_codex" });
         },
         async openTerminal(_context, input) {
@@ -371,6 +380,7 @@ describe("SandboxAgentDeliveryService", () => {
       processId: "spr_codex_tui",
     });
 
+    processCredentialAdmitted = false;
     const run = await service.createRun(context, {
       sandboxId: "sbx_demo",
       runtimeId: "sar_test",
@@ -381,8 +391,26 @@ describe("SandboxAgentDeliveryService", () => {
     expect(run.isOk()).toBe(true);
     const reconciled = await service.reconcileRun(context, "srun_test");
     expect(reconciled.isOk()).toBe(true);
-    expect(calls.map((call) => call.kind)).toEqual(["admit", "terminal", "launch", "revoke"]);
+    expect(calls.map((call) => call.kind)).toEqual([
+      "admit",
+      "terminal",
+      "admit",
+      "launch",
+      "revoke",
+    ]);
     expect(calls[2]?.input).toMatchObject({
+      scope: {
+        tenantId: "tenant_a",
+        organizationId: "org_a",
+        sandboxId: "sbx_demo",
+        profileInstallationId: "awpi_codex",
+        adapterInstallationId: "aai_codex",
+        adapterDefinitionDigest: pin.adapterDefinitionDigest,
+        runtimeId: "sar_test",
+      },
+      bindings: [binding],
+    });
+    expect(calls[3]?.input).toMatchObject({
       scope: {
         tenantId: "tenant_a",
         organizationId: "org_a",

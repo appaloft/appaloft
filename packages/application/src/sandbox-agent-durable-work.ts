@@ -50,6 +50,9 @@ export class DurableSandboxAgentWorkQueue {
       updatedAt: now,
       safeInput: {
         tenantId: context.tenant?.tenantId ?? "tenant_instance",
+        ...(context.tenant?.organizationId
+          ? { organizationId: context.tenant.organizationId }
+          : {}),
         itemKind: input.kind,
         itemId: input.id,
         ...(input.kind === "agent-task-run" ? { workspaceId: input.workspaceId } : {}),
@@ -72,10 +75,12 @@ export class SandboxAgentDurableWorkHandler implements DurableWorkHandler {
     _worker: DurableWorkWorkerIdentity,
   ): Promise<Result<DurableWorkHandlerResult>> {
     const tenantId = item.safeInput?.tenantId;
+    const organizationId = item.safeInput?.organizationId;
     const itemKind = item.safeInput?.itemKind;
     const itemId = item.safeInput?.itemId;
     if (
       typeof tenantId !== "string" ||
+      (organizationId !== undefined && typeof organizationId !== "string") ||
       (itemKind !== "sandbox-agent-run" &&
         itemKind !== "sandbox-promotion" &&
         itemKind !== "agent-task-run") ||
@@ -85,7 +90,11 @@ export class SandboxAgentDurableWorkHandler implements DurableWorkHandler {
     }
     const tenantContext: ExecutionContext = {
       ...context,
-      tenant: { tenantId, source: "durable-work" },
+      tenant: {
+        tenantId,
+        ...(organizationId ? { organizationId } : {}),
+        source: "durable-work",
+      },
     };
     const result =
       itemKind === "sandbox-agent-run"

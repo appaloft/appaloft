@@ -1674,6 +1674,21 @@ export class SandboxAgentDeliveryService {
         record.taskEnvelope,
       );
       if (task.isErr()) throw new Error(`sandbox_agent_task_unprotect_failed:${task.error.code}`);
+      if (runtimeRecord.credentialBindings?.length) {
+        const scope = credentialGrantScope(context, runtimeRecord);
+        if (!scope || !this.dependencies.processCredentialGrants) {
+          throw new Error("sandbox_agent_process_credential_grants_unavailable");
+        }
+        const admitted = await this.dependencies.processCredentialGrants.admit(context, {
+          scope,
+          bindings: runtimeRecord.credentialBindings,
+        });
+        if (admitted.isErr()) {
+          throw new Error(
+            `sandbox_agent_process_credential_admission_failed:${admitted.error.code}`,
+          );
+        }
+      }
       const contextState = record.run.toState().context.toState();
       const persistedEvents = await this.dependencies.repository.listRunEvents(
         repositoryContext,

@@ -70,6 +70,12 @@ fork code can exfiltrate credentials.
     PR-top-level comments are hydrated to a numeric head repository and fork decision before any
     credential lease or compute; Issue tasks resolve the repository default branch to an exact
     commit. Checkout fails closed when that resolved pin is absent and never falls back to `HEAD`.
+20. Durable Sandbox Agent work preserves the complete resolved tenant scope needed by credential
+    custody, including an optional organization id. Before a persisted Runtime executes a Run after
+    process restart, the public Runtime service idempotently replays credential admission from the
+    persisted Profile pin and credential bindings. Hosted adapters revalidate current custody and
+    repopulate process-local grant state; they must not require a parallel Runtime, Task, or
+    credential-admission lifecycle table.
 
 ## Consequences
 
@@ -82,6 +88,8 @@ fork code can exfiltrate credentials.
   native context survived.
 - Hosted implementations become smaller composition adapters and cannot trade short-term wiring
   convenience for a second source of domain or delivery truth.
+- Restart-safe credential execution remains rooted in the existing public Runtime record while
+  hosted custody can fail closed when the owner scope, connection status, or binding changed.
 
 ## Alternatives Rejected
 
