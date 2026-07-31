@@ -87,9 +87,11 @@
   safe input and reconstruct the exact tenant context in the worker.
 - [x] GH-AUTO-DURABLE-CREDENTIAL-023: replay the existing process-credential admission port from
   persisted Runtime Profile pin/bindings before a restarted worker launches the Agent process.
-- [x] GH-AUTO-DURABLE-CREDENTIAL-023: prove restarted process-local admission recovery through the
-  public Runtime service and retain hosted revoked/cross-scope fail-closed coverage without a
-  parallel admission table.
+- [x] GH-AUTO-DURABLE-CREDENTIAL-023: prove restarted process-local admission recovery and denied
+  admission fail-closed behavior through the public Runtime service without a parallel admission
+  table.
+- [ ] GH-AUTO-DURABLE-CREDENTIAL-023: compose hosted revoked/cross-scope restart coverage with zero
+  secret resolution, process launch, or Sandbox effects after the public change is merged and pinned.
 
 ## GitHub Feedback And Delivery Slice
 

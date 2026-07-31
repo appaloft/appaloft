@@ -1,6 +1,7 @@
 import {
   AgentHarnessTemplateId,
   CreatedAt,
+  type DomainError,
   domainError,
   ExpiresAt,
   err,
@@ -904,6 +905,12 @@ export class SandboxAgentApprovalPendingError extends Error {
   }
 }
 
+class SandboxAgentCredentialAdmissionError extends Error {
+  constructor(readonly domainError: DomainError) {
+    super("sandbox_agent_process_credential_admission_failed");
+  }
+}
+
 function artifactDescriptor(artifact: SourceArtifact): SourceArtifactDescriptor {
   const state = artifact.toState();
   return {
@@ -955,10 +962,23 @@ function infrastructureError(error: unknown): ReturnType<typeof domainError.conf
 }
 
 function agentRunFailureDiagnostic(error: unknown): {
-  code: "sandbox_agent_harness_failed";
+  code: string;
   summary: string;
 } {
-  const message = error instanceof Error ? error.message : "Agent harness execution failed";
+  const admissionError =
+    error instanceof SandboxAgentCredentialAdmissionError ? error.domainError : undefined;
+  const detailCode = admissionError?.details?.code;
+  const admittedCode =
+    typeof detailCode === "string" && /^[a-z0-9][a-z0-9._-]{0,119}$/u.test(detailCode)
+      ? detailCode
+      : admissionError?.code;
+  const message = admissionError
+    ? `Credential admission failed (${admissionError.category}; retryable=${String(
+        admissionError.retryable,
+      )}): ${admissionError.message}`
+    : error instanceof Error
+      ? error.message
+      : "Agent harness execution failed";
   let inPrivateKey = false;
   const redactedLines = message.split(/\r?\n/u).map((line) => {
     if (/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/u.test(line)) {
@@ -990,7 +1010,7 @@ function agentRunFailureDiagnostic(error: unknown): {
   const joined = redactedLines.join("\n").trim();
   const sanitized = joined.length <= 1_024 ? joined : `${joined.slice(0, 1_011)}\n[TRUNCATED]`;
   return {
-    code: "sandbox_agent_harness_failed",
+    code: admittedCode ?? "sandbox_agent_harness_failed",
     summary: sanitized || "Agent harness execution failed",
   };
 }
@@ -1684,9 +1704,7 @@ export class SandboxAgentDeliveryService {
           bindings: runtimeRecord.credentialBindings,
         });
         if (admitted.isErr()) {
-          throw new Error(
-            `sandbox_agent_process_credential_admission_failed:${admitted.error.code}`,
-          );
+          throw new SandboxAgentCredentialAdmissionError(admitted.error);
         }
       }
       const contextState = record.run.toState().context.toState();
@@ -1831,7 +1849,11 @@ export class SandboxAgentDeliveryService {
       });
       await this.dependencies.repository.saveRun(repositoryContext, currentRecord);
       await this.dependencies.repository.saveRuntime(repositoryContext, currentRuntimeRecord);
-      return err(infrastructureError(error));
+      return err(
+        error instanceof SandboxAgentCredentialAdmissionError
+          ? error.domainError
+          : infrastructureError(error),
+      );
     }
   }
 
