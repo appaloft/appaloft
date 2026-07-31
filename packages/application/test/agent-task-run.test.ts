@@ -53,7 +53,12 @@ function createHarness(
   } = {},
 ) {
   const files = new Map<string, Uint8Array>();
-  const queued: Array<{ kind: string; id: string; workspaceId: string }> = [];
+  const queued: Array<{
+    kind: string;
+    id: string;
+    workspaceId: string;
+    activeRunId: string;
+  }> = [];
   const commands: string[][] = [];
   const createdRunInputs: Array<{
     task: string;
@@ -242,7 +247,14 @@ describe("Agent Task Run application workflow", () => {
       sourceRoot: ".",
     });
     expect(created.isOk()).toBe(true);
-    expect(harness.queued).toEqual([{ kind: "agent-task-run", id: taskRunId, workspaceId }]);
+    expect(harness.queued).toEqual([
+      {
+        kind: "agent-task-run",
+        id: taskRunId,
+        workspaceId,
+        activeRunId: taskRunId,
+      },
+    ]);
     const persistedText = new TextDecoder().decode(
       [...harness.files.values()][0] ?? new Uint8Array(),
     );
@@ -534,6 +546,20 @@ describe("Agent Task Run application workflow", () => {
     expect(harness.createdRunInputs[1]).toMatchObject({
       context: { mode: "continue", parentRunId: taskRunId },
     });
+    expect(harness.queued).toEqual([
+      {
+        kind: "agent-task-run",
+        id: taskRunId,
+        workspaceId,
+        activeRunId: taskRunId,
+      },
+      {
+        kind: "agent-task-run",
+        id: taskRunId,
+        workspaceId,
+        activeRunId: `${taskRunId}_2`,
+      },
+    ]);
   });
 
   test("[GH-AUTO-SESSION-011] fallback steer injects bounded evidence and rejects credential references", async () => {
@@ -568,6 +594,20 @@ describe("Agent Task Run application workflow", () => {
     });
     expect(harness.createdRunInputs[1]?.task).toContain("cannot prove native session resume");
     expect(harness.createdRunInputs[1]?.task).toContain("keep the existing API compatible");
+    expect(harness.queued).toEqual([
+      {
+        kind: "agent-task-run",
+        id: taskRunId,
+        workspaceId,
+        activeRunId: taskRunId,
+      },
+      {
+        kind: "agent-task-run",
+        id: taskRunId,
+        workspaceId,
+        activeRunId: `${taskRunId}_2`,
+      },
+    ]);
 
     const rejected = await harness.service.steer(
       cliContext,
