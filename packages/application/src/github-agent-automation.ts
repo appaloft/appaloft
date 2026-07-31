@@ -264,6 +264,8 @@ export interface GitHubAgentFeedbackState {
   pullRequestId?: string;
 }
 
+export type GitHubAgentThreadFeedbackState = Omit<GitHubAgentFeedbackState, "reactionId">;
+
 export interface GitHubAgentFeedbackPort {
   acknowledge(
     context: ExecutionContext,
@@ -393,10 +395,19 @@ export interface GitHubAgentAutomationStore {
     context: ExecutionContext,
     threadKey: string,
   ): Promise<GitHubAgentTaskSummary | undefined>;
+  currentTaskFeedback(
+    context: ExecutionContext,
+    threadKey: string,
+  ): Promise<GitHubAgentThreadFeedbackState | undefined>;
   setCurrentTask(
     context: ExecutionContext,
     threadKey: string,
     task: GitHubAgentTaskSummary,
+  ): Promise<void>;
+  setCurrentTaskFeedback(
+    context: ExecutionContext,
+    threadKey: string,
+    feedback: GitHubAgentThreadFeedbackState,
   ): Promise<void>;
   relatedPullRequestTask(
     context: ExecutionContext,
@@ -416,6 +427,7 @@ export class InMemoryGitHubAgentAutomationStore implements GitHubAgentAutomation
   private readonly deliveries = new Map<string, GitHubAgentAutomationOutcome | null>();
   private readonly reviewExecutions = new Set<string>();
   private readonly currentTasks = new Map<string, GitHubAgentTaskSummary>();
+  private readonly currentTaskFeedbackStates = new Map<string, GitHubAgentThreadFeedbackState>();
 
   async claimDelivery(
     _context: ExecutionContext,
@@ -457,12 +469,30 @@ export class InMemoryGitHubAgentAutomationStore implements GitHubAgentAutomation
     return task ? { ...task } : undefined;
   }
 
+  async currentTaskFeedback(
+    _context: ExecutionContext,
+    threadKey: string,
+  ): Promise<GitHubAgentThreadFeedbackState | undefined> {
+    const feedback = this.currentTaskFeedbackStates.get(threadKey);
+    return feedback ? { ...feedback } : undefined;
+  }
+
   async setCurrentTask(
     _context: ExecutionContext,
     threadKey: string,
     task: GitHubAgentTaskSummary,
   ): Promise<void> {
     this.currentTasks.set(threadKey, { ...task });
+  }
+
+  async setCurrentTaskFeedback(
+    _context: ExecutionContext,
+    threadKey: string,
+    feedback: GitHubAgentThreadFeedbackState,
+  ): Promise<void> {
+    if (this.currentTasks.has(threadKey)) {
+      this.currentTaskFeedbackStates.set(threadKey, { ...feedback });
+    }
   }
 
   async relatedPullRequestTask(
@@ -588,6 +618,9 @@ export class GitHubAgentAutomationService {
     const allowed = authorization.value;
     const threadKey = githubAgentThreadKey(trigger);
     const current = await this.dependencies.store.currentTask(context, threadKey);
+    const currentFeedback = current
+      ? await this.dependencies.store.currentTaskFeedback(context, threadKey)
+      : undefined;
     const related =
       intent.action === "cleanup" && trigger.thread.kind === "pull-request"
         ? await this.dependencies.store.relatedPullRequestTask(context, {
@@ -669,7 +702,14 @@ export class GitHubAgentAutomationService {
       if (!primary) {
         return err(domainError.invariant("GitHub Agent cleanup produced no Task result"));
       }
-      return this.updateAndFinish(context, trigger, intent, allowed, primary);
+      return this.updateAndFinish(
+        context,
+        trigger,
+        intent,
+        allowed,
+        primary,
+        sameGitHubAgentTask(current, primary) ? currentFeedback : undefined,
+      );
     }
 
     if (allowed.authorizationKind !== "task-execution") {
@@ -682,22 +722,31 @@ export class GitHubAgentAutomationService {
 
     if (intent.action === "status") {
       return current
-        ? this.control(context, trigger, intent, allowed, current, "status")
+        ? this.control(context, trigger, intent, allowed, current, currentFeedback, "status")
         : this.noCurrentTask(context, trigger, intent, allowed);
     }
     if (intent.action === "steer") {
       return current
-        ? this.control(context, trigger, intent, allowed, current, "steer", intent.instruction)
+        ? this.control(
+            context,
+            trigger,
+            intent,
+            allowed,
+            current,
+            currentFeedback,
+            "steer",
+            intent.instruction,
+          )
         : this.noCurrentTask(context, trigger, intent, allowed);
     }
     if (intent.action === "stop") {
       return current
-        ? this.control(context, trigger, intent, allowed, current, "stop")
+        ? this.control(context, trigger, intent, allowed, current, currentFeedback, "stop")
         : this.noCurrentTask(context, trigger, intent, allowed);
     }
     if (intent.action === "resume") {
       return current
-        ? this.control(context, trigger, intent, allowed, current, "resume")
+        ? this.control(context, trigger, intent, allowed, current, currentFeedback, "resume")
         : this.noCurrentTask(context, trigger, intent, allowed);
     }
     if (intent.action === "new") {
@@ -752,7 +801,10 @@ export class GitHubAgentAutomationService {
       );
     }
     await this.dependencies.store.setCurrentTask(context, threadKey, task.value);
-    return this.updateAndFinish(context, trigger, intent, allowed, task.value, acknowledged.value);
+    return this.updateAndFinish(context, trigger, intent, allowed, task.value, {
+      ...(sameGitHubAgentTask(current, task.value) ? (currentFeedback ?? {}) : {}),
+      ...acknowledged.value,
+    });
   }
 
   private async control(
@@ -761,6 +813,7 @@ export class GitHubAgentAutomationService {
     intent: GitHubAgentIntent,
     authorization: GitHubAgentTaskExecutionAuthorization,
     current: GitHubAgentTaskSummary,
+    currentFeedback: GitHubAgentThreadFeedbackState | undefined,
     action: "status" | "steer" | "stop" | "resume",
     instruction?: string,
   ): Promise<Result<GitHubAgentAutomationOutcome>> {
@@ -780,14 +833,10 @@ export class GitHubAgentAutomationService {
       githubAgentThreadKey(trigger),
       controlled.value,
     );
-    return this.updateAndFinish(
-      context,
-      trigger,
-      intent,
-      authorization,
-      controlled.value,
-      acknowledged.value,
-    );
+    return this.updateAndFinish(context, trigger, intent, authorization, controlled.value, {
+      ...(currentFeedback ?? {}),
+      ...acknowledged.value,
+    });
   }
 
   private async noCurrentTask(
@@ -870,6 +919,11 @@ export class GitHubAgentAutomationService {
       ...(feedbackState ? { existing: feedbackState } : {}),
     });
     if (feedback.isErr()) return err(feedback.error);
+    await this.dependencies.store.setCurrentTaskFeedback(
+      context,
+      githubAgentThreadKey(trigger),
+      threadFeedbackState(feedback.value),
+    );
     return this.finish(context, {
       status: "accepted",
       sourceEventId: trigger.sourceEventId,
@@ -890,6 +944,18 @@ export class GitHubAgentAutomationService {
     await this.dependencies.store.recordOutcome(context, outcome);
     return ok(cloneOutcome(outcome));
   }
+}
+
+function threadFeedbackState(feedback: GitHubAgentFeedbackState): GitHubAgentThreadFeedbackState {
+  const { reactionId: _reactionId, ...state } = feedback;
+  return state;
+}
+
+function sameGitHubAgentTask(
+  left: GitHubAgentTaskSummary | undefined,
+  right: GitHubAgentTaskSummary,
+): boolean {
+  return left?.taskId === right.taskId && left.workspaceId === right.workspaceId;
 }
 
 export function resolveGitHubAgentIntent(trigger: GitHubAgentTrigger): GitHubAgentIntent | null {

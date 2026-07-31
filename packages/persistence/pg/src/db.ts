@@ -121,6 +121,7 @@ import { agentWorkspaceProfilesMigration } from "./migrations/112_agent_workspac
 import { serverWorkloadRolesMigration } from "./migrations/113_server_workload_roles";
 import { githubAgentAutomationMigration } from "./migrations/114_github_agent_automation";
 import { profileAwareWorkspaceOpenMigration } from "./migrations/115_profile_aware_workspace_open";
+import { githubAgentThreadFeedbackMigration } from "./migrations/116_github_agent_thread_feedback";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -338,6 +339,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "113_server_workload_roles": serverWorkloadRolesMigration,
       "114_github_agent_automation": githubAgentAutomationMigration,
       "115_profile_aware_workspace_open": profileAwareWorkspaceOpenMigration,
+      "116_github_agent_thread_feedback": githubAgentThreadFeedbackMigration,
     };
   }
 }

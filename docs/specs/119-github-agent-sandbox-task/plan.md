@@ -31,6 +31,9 @@
    generated SDK, CLI, MCP metadata where applicable, and public Web.
 9. Add provider-neutral GitHub feedback ports and GitHub adapters that upsert reaction/comment,
    Check, Review, PR, and annotations using persisted external ids and stable idempotency keys.
+   Keep the status comment and Check ids on the current thread/Task binding so distinct
+   `status`/`steer`/`stop`/`resume` deliveries and a process restart reuse the same bounded feedback
+   objects without merging per-command acknowledgement reactions.
 10. Register the public `GitHubAgentAutomationStore` in the public server composition and expose
     neutral seams for generic GitHub signature verification, immutable accepted hydrated
     trigger/execution context,

@@ -46,7 +46,7 @@ Agent Adapters.
 | Existing server config | Disabled for unattended automation by default. Opt-in requires owner/project/profile/server scope and a verified isolated Unix/container identity and HOME. |
 | Automation identity | Public rules keep an opaque reference. Hosted composition owns a non-human, organization-owned, revocable Project Automation Identity. It is not a user or Deploy Token. |
 | Native account login | Run the installed Agent CLI's official browser/device login in an owner-isolated enrollment Sandbox. Treat the resulting native bundle as opaque encrypted material. Do not implement provider login protocols. |
-| Feedback | One reaction, one updatable status comment, one head-specific Check Run, and the required PR or Review. Raw Agent output remains in the Task event stream. |
+| Feedback | One reaction per command, one updatable status comment and one head-specific Check Run per current thread Task, plus the required PR or Review. The thread/Task binding retains those feedback ids across distinct `steer`/`stop`/`resume`/`status` deliveries so control commands update rather than fork feedback. Raw Agent output remains in the Task event stream. |
 | Command grammar | Parse one line-leading command outside code blocks. Only `new --profile <allowed-profile>` accepts a flag. Reject env, secret, credential-id, or unsafe instructions before Task prompt persistence. |
 | UI boundary | Public owns neutral operations/SDK/CLI/Web surfaces. Hosted composition injects tenancy, identity, credential custody, automation identity, entitlement, audit, and hosted authz. |
 | Head concurrency | Pin base/head SHA. Supersede stale review work, never force-push or silently rebase changed user work, and dedupe reviews by head/rule/content fingerprint. |

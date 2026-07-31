@@ -3,6 +3,7 @@ import {
   type GitHubAgentAutomationOutcome,
   type GitHubAgentAutomationStore,
   type GitHubAgentTaskSummary,
+  type GitHubAgentThreadFeedbackState,
   toRepositoryContext,
 } from "@appaloft/application";
 import { type Kysely } from "kysely";
@@ -100,6 +101,19 @@ export class PgGitHubAgentAutomationStore implements GitHubAgentAutomationStore 
     return row ? taskFromJson(row.task) : undefined;
   }
 
+  async currentTaskFeedback(
+    context: ExecutionContext,
+    threadKey: string,
+  ): Promise<GitHubAgentThreadFeedbackState | undefined> {
+    const row = await resolveRepositoryExecutor(this.db, toRepositoryContext(context))
+      .selectFrom("github_agent_thread_tasks")
+      .select("feedback_state")
+      .where("tenant_id", "=", tenantId(context))
+      .where("thread_key", "=", threadKey)
+      .executeTakeFirst();
+    return row?.feedback_state ? feedbackFromJson(row.feedback_state) : undefined;
+  }
+
   async setCurrentTask(
     context: ExecutionContext,
     threadKey: string,
@@ -121,6 +135,22 @@ export class PgGitHubAgentAutomationStore implements GitHubAgentAutomationStore 
           updated_at: at,
         }),
       )
+      .execute();
+  }
+
+  async setCurrentTaskFeedback(
+    context: ExecutionContext,
+    threadKey: string,
+    feedback: GitHubAgentThreadFeedbackState,
+  ): Promise<void> {
+    await resolveRepositoryExecutor(this.db, toRepositoryContext(context))
+      .updateTable("github_agent_thread_tasks")
+      .set({
+        feedback_state: feedback as unknown as Record<string, unknown>,
+        updated_at: now(),
+      })
+      .where("tenant_id", "=", tenantId(context))
+      .where("thread_key", "=", threadKey)
       .execute();
   }
 
@@ -226,4 +256,16 @@ function taskFromJson(value: Record<string, unknown>): GitHubAgentTaskSummary | 
     taskUrl: value.taskUrl,
     sessionRecovery: value.sessionRecovery,
   };
+}
+
+function feedbackFromJson(
+  value: Record<string, unknown>,
+): GitHubAgentThreadFeedbackState | undefined {
+  const state: GitHubAgentThreadFeedbackState = {};
+  for (const key of ["statusCommentId", "checkRunId", "reviewId", "pullRequestId"] as const) {
+    const id = value[key];
+    if (id !== undefined && typeof id !== "string") return undefined;
+    if (typeof id === "string") state[key] = id;
+  }
+  return state;
 }

@@ -24,6 +24,9 @@
   acceptance proved the terminal Run state discarded the actionable harness failure.
 - [x] Create and link public durable credential restart issue #934 after external run `30597332756`
   proved the worker lost organization scope and process-local credential admission across restart.
+- [x] Create and link public feedback-continuity issue #936 after external run `30604398408` proved
+  that `stop` created a second Task status comment instead of reusing the current thread Task's
+  existing bounded feedback ids.
 
 ## Public Composition Boundary Slice
 
@@ -114,6 +117,9 @@
   again (#916).
 - [x] Persist one bounded, redacted failure diagnostic on the existing Sandbox Agent Run and
   project it through the existing Agent Task failure field (#932).
+- [x] Preserve the current thread Task's status comment and Check ids across distinct
+  `status`/`steer`/`stop`/`resume` deliveries and process restart; prove control acknowledgements
+  remain per delivery while Task feedback is updated in place (#936).
 
 ## Retention And Cleanup Slice
 

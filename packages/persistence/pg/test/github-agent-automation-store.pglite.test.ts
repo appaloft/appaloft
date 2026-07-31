@@ -18,7 +18,7 @@ function context(tenantId: string) {
 }
 
 describe("Postgres GitHub Agent automation store", () => {
-  test("[GH-AUTO-DELIVERY-007][GH-AUTO-LINEAGE-012] atomically claims delivery/review and persists tenant-scoped thread state", async () => {
+  test("[GH-AUTO-DELIVERY-007][GH-AUTO-LINEAGE-012][GH-AUTO-FEEDBACK-013] atomically claims delivery/review and persists tenant-scoped thread state", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "appaloft-github-agent-"));
     const {
       createDatabase,
@@ -152,6 +152,19 @@ describe("Postgres GitHub Agent automation store", () => {
       ).toEqual(outcome.task);
       expect(
         await secondStore.currentTask(tenantB, "github-thread:123456:pull-request:42"),
+      ).toBeUndefined();
+      await firstStore.setCurrentTaskFeedback(tenantA, "github-thread:123456:pull-request:42", {
+        statusCommentId: "comment_1",
+        checkRunId: "check_1",
+      });
+      expect(
+        await secondStore.currentTaskFeedback(tenantA, "github-thread:123456:pull-request:42"),
+      ).toEqual({
+        statusCommentId: "comment_1",
+        checkRunId: "check_1",
+      });
+      expect(
+        await secondStore.currentTaskFeedback(tenantB, "github-thread:123456:pull-request:42"),
       ).toBeUndefined();
 
       const task =
