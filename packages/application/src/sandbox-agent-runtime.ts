@@ -1,6 +1,7 @@
 import {
   AgentHarnessTemplateId,
   CreatedAt,
+  type DomainError,
   domainError,
   ExpiresAt,
   err,
@@ -954,11 +955,25 @@ function infrastructureError(error: unknown): ReturnType<typeof domainError.conf
   });
 }
 
-function agentRunFailureDiagnostic(error: unknown): {
-  code: "sandbox_agent_harness_failed";
+function agentRunFailureDiagnostic(
+  error: unknown,
+  admissionError?: DomainError,
+): {
+  code: string;
   summary: string;
 } {
-  const message = error instanceof Error ? error.message : "Agent harness execution failed";
+  const detailCode = admissionError?.details?.code;
+  const admittedCode =
+    typeof detailCode === "string" && /^[a-z0-9][a-z0-9._-]{0,119}$/u.test(detailCode)
+      ? detailCode
+      : admissionError?.code;
+  const message = admissionError
+    ? `Credential admission failed (${admissionError.category}; retryable=${String(
+        admissionError.retryable,
+      )}): ${admissionError.message}`
+    : error instanceof Error
+      ? error.message
+      : "Agent harness execution failed";
   let inPrivateKey = false;
   const redactedLines = message.split(/\r?\n/u).map((line) => {
     if (/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/u.test(line)) {
@@ -990,7 +1005,7 @@ function agentRunFailureDiagnostic(error: unknown): {
   const joined = redactedLines.join("\n").trim();
   const sanitized = joined.length <= 1_024 ? joined : `${joined.slice(0, 1_011)}\n[TRUNCATED]`;
   return {
-    code: "sandbox_agent_harness_failed",
+    code: admittedCode ?? "sandbox_agent_harness_failed",
     summary: sanitized || "Agent harness execution failed",
   };
 }
@@ -1029,6 +1044,52 @@ export class SandboxAgentDeliveryService {
     const scope = credentialGrantScope(context, record, runId);
     if (!scope || !this.dependencies.processCredentialGrants) return ok(undefined);
     return this.dependencies.processCredentialGrants.revoke(context, { scope, reason });
+  }
+
+  private async persistReconcileFailure(
+    context: ExecutionContext,
+    repositoryContext: RepositoryContext,
+    record: SandboxAgentRunRecord,
+    runtimeRecord: SandboxAgentRuntimeRecord,
+    error: unknown,
+    admissionError?: DomainError,
+  ): Promise<Result<{ record: SandboxAgentRunRecord; cancelled: boolean }>> {
+    const currentRecord =
+      (await this.dependencies.repository.findRun(repositoryContext, record.run.id.value)) ??
+      record;
+    const currentRuntimeRecord =
+      (await this.dependencies.repository.findRuntime(
+        repositoryContext,
+        currentRecord.run.toState().runtimeId.value,
+      )) ?? runtimeRecord;
+    const cancellationAlreadyPersisted = currentRecord.run.toState().status.value === "cancelled";
+    const revoked = await this.revokeCredentialGrants(
+      context,
+      currentRuntimeRecord,
+      cancellationAlreadyPersisted ? "cancelled" : "failed",
+      currentRecord.run.id.value,
+    );
+    if (revoked.isErr()) return err(revoked.error);
+    const cancelled = currentRecord.run.toState().status.value === "cancelled";
+    const failedAt = asUpdatedAt(this.dependencies.clock.now());
+    if (failedAt.isErr()) return err(failedAt.error);
+    if (!cancelled) {
+      const diagnostic = agentRunFailureDiagnostic(error, admissionError);
+      const failed = currentRecord.run.fail({
+        at: failedAt.value,
+        code: diagnostic.code,
+        summary: diagnostic.summary,
+      });
+      if (failed.isErr()) return err(failed.error);
+      await this.dependencies.repository.saveRun(repositoryContext, currentRecord);
+    }
+    const released = currentRuntimeRecord.runtime.releaseRun({
+      runId: currentRecord.run.id,
+      at: failedAt.value,
+    });
+    if (released.isErr()) return err(released.error);
+    await this.dependencies.repository.saveRuntime(repositoryContext, currentRuntimeRecord);
+    return ok({ record: currentRecord, cancelled });
   }
 
   listHarnesses(_context: ExecutionContext): Promise<Result<SandboxAgentHarnessDescriptor[]>> {
@@ -1674,6 +1735,41 @@ export class SandboxAgentDeliveryService {
         record.taskEnvelope,
       );
       if (task.isErr()) throw new Error(`sandbox_agent_task_unprotect_failed:${task.error.code}`);
+      if (runtimeRecord.credentialBindings?.length) {
+        const scope = credentialGrantScope(context, runtimeRecord);
+        if (!scope || !this.dependencies.processCredentialGrants) {
+          throw new Error("sandbox_agent_process_credential_grants_unavailable");
+        }
+        const admitted = await this.dependencies.processCredentialGrants.admit(context, {
+          scope,
+          bindings: runtimeRecord.credentialBindings,
+        });
+        if (admitted.isErr()) {
+          const persisted = await this.persistReconcileFailure(
+            context,
+            repositoryContext,
+            record,
+            runtimeRecord,
+            admitted.error,
+            admitted.error,
+          );
+          if (persisted.isErr()) return err(persisted.error);
+          return persisted.value.cancelled
+            ? ok(runDescriptor(persisted.value.record))
+            : err(admitted.error);
+        }
+        const admittedRun = await this.dependencies.repository.findRun(repositoryContext, runId);
+        if (admittedRun?.run.toState().status.value === "cancelled") {
+          const revoked = await this.revokeCredentialGrants(
+            context,
+            runtimeRecord,
+            "cancelled",
+            runId,
+          );
+          if (revoked.isErr()) return err(revoked.error);
+          return ok(runDescriptor(admittedRun));
+        }
+      }
       const contextState = record.run.toState().context.toState();
       const persistedEvents = await this.dependencies.repository.listRunEvents(
         repositoryContext,
@@ -1779,43 +1875,15 @@ export class SandboxAgentDeliveryService {
           }),
         );
       }
-      const currentRecord =
-        (await this.dependencies.repository.findRun(repositoryContext, runId)) ?? record;
-      const currentRuntimeRecord =
-        (await this.dependencies.repository.findRuntime(
-          repositoryContext,
-          currentRecord.run.toState().runtimeId.value,
-        )) ?? runtimeRecord;
-      const revoked = await this.revokeCredentialGrants(
+      const persisted = await this.persistReconcileFailure(
         context,
-        currentRuntimeRecord,
-        currentRecord.run.toState().status.value === "cancelled" ? "cancelled" : "failed",
-        runId,
+        repositoryContext,
+        record,
+        runtimeRecord,
+        error,
       );
-      if (revoked.isErr()) return err(revoked.error);
-      const failedAt = asUpdatedAt(this.dependencies.clock.now());
-      if (failedAt.isErr()) return err(failedAt.error);
-      if (currentRecord.run.toState().status.value === "cancelled") {
-        currentRuntimeRecord.runtime.releaseRun({
-          runId: currentRecord.run.id,
-          at: failedAt.value,
-        });
-        await this.dependencies.repository.saveRuntime(repositoryContext, currentRuntimeRecord);
-        return ok(runDescriptor(currentRecord));
-      }
-      const diagnostic = agentRunFailureDiagnostic(error);
-      const failed = currentRecord.run.fail({
-        at: failedAt.value,
-        code: diagnostic.code,
-        summary: diagnostic.summary,
-      });
-      if (failed.isErr()) return err(failed.error);
-      currentRuntimeRecord.runtime.releaseRun({
-        runId: currentRecord.run.id,
-        at: failedAt.value,
-      });
-      await this.dependencies.repository.saveRun(repositoryContext, currentRecord);
-      await this.dependencies.repository.saveRuntime(repositoryContext, currentRuntimeRecord);
+      if (persisted.isErr()) return err(persisted.error);
+      if (persisted.value.cancelled) return ok(runDescriptor(persisted.value.record));
       return err(infrastructureError(error));
     }
   }

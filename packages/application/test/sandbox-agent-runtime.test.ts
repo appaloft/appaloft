@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import { Buffer } from "node:buffer";
-import { ok } from "@appaloft/core";
+import { domainError, err, ok } from "@appaloft/core";
 import {
   createExecutionContext,
   InMemorySandboxAgentDeliveryRepository,
@@ -148,6 +148,81 @@ function fixture(
   return { service, repository, queued, counters, exposedPorts };
 }
 
+function credentialProfileFixture() {
+  const pin = {
+    profileInstallationId: "awpi_codex",
+    profileDefinitionDigest: `sha256:${"1".repeat(64)}`,
+    profileId: "codex-default",
+    profileVersion: "1.0.0",
+    adapterInstallationId: "aai_codex",
+    adapterDefinitionDigest: `sha256:${"2".repeat(64)}`,
+    adapterId: "codex-cli",
+    adapterVersion: "1.0.0",
+    harnessKey: "fake",
+    harnessTemplateId: "aht_fake_1",
+    sandboxTemplateId: "aht_fake_1",
+    sandboxTemplateVersion: "1.0.0",
+    sandboxTemplateDigest: `sha256:${"a".repeat(64)}`,
+    capabilities: {
+      taskMode: true,
+      interactive: true,
+      backgroundRuns: true,
+      nativeSession: false,
+      persistentPaths: ["/workspace"],
+      healthcheck: { kind: "process" as const },
+    },
+  };
+  const binding = {
+    requirementId: "model-api",
+    kind: "model-api" as const,
+    purpose: "Codex model access",
+    delivery: {
+      kind: "process-environment" as const,
+      variable: "OPENAI_API_KEY",
+    },
+    connectionReference: "model-default",
+  };
+  return {
+    pin,
+    binding,
+    profilePlan: {
+      sandbox: {
+        source: { kind: "template" as const, templateId: "aht_fake_1" },
+        requestedIsolation: "container-trusted" as const,
+        limits: {
+          cpuMillis: 1_000,
+          memoryBytes: 1_024,
+          diskBytes: 2_048,
+          maxProcesses: 16,
+        },
+        networkPolicy: { mode: "deny" as const },
+      },
+      initialization: [],
+      runtime: {
+        harnessKey: "fake",
+        harnessTemplateId: "aht_fake_1",
+        declarativeHarness: {},
+      },
+      defaultPorts: [],
+      suggestedChecks: [],
+      credentialRequirements: [
+        {
+          id: "model-api",
+          kind: "model-api" as const,
+          required: true,
+          purpose: "Codex model access",
+          delivery: {
+            kind: "process-environment" as const,
+            variable: "OPENAI_API_KEY",
+          },
+        },
+      ],
+      credentialBindings: [binding],
+      pin,
+    },
+  };
+}
+
 describe("SandboxAgentDeliveryService", () => {
   test("[PROFILE-PIN-010][WS-OPEN-ADMIT-008] persists a precompiled Profile pin without recompiling after Sandbox creation", async () => {
     let compileCalls = 0;
@@ -224,41 +299,10 @@ describe("SandboxAgentDeliveryService", () => {
     expect(stored?.profilePin).toEqual(pin);
   });
 
-  test("[ADAPTER-CRED-006][PROFILE-PIN-010] admits, launches and revokes the exact pinned child scope", async () => {
+  test("[ADAPTER-CRED-006][PROFILE-PIN-010][GH-AUTO-DURABLE-CREDENTIAL-023] re-admits, launches and revokes the exact persisted child scope", async () => {
     const calls: Array<{ kind: string; input: Record<string, unknown> }> = [];
-    const pin = {
-      profileInstallationId: "awpi_codex",
-      profileDefinitionDigest: `sha256:${"1".repeat(64)}`,
-      profileId: "codex-default",
-      profileVersion: "1.0.0",
-      adapterInstallationId: "aai_codex",
-      adapterDefinitionDigest: `sha256:${"2".repeat(64)}`,
-      adapterId: "codex-cli",
-      adapterVersion: "1.0.0",
-      harnessKey: "fake",
-      harnessTemplateId: "aht_fake_1",
-      sandboxTemplateId: "aht_fake_1",
-      sandboxTemplateVersion: "1.0.0",
-      sandboxTemplateDigest: `sha256:${"a".repeat(64)}`,
-      capabilities: {
-        taskMode: true,
-        interactive: true,
-        backgroundRuns: true,
-        nativeSession: false,
-        persistentPaths: ["/workspace"],
-        healthcheck: { kind: "process" as const },
-      },
-    };
-    const binding = {
-      requirementId: "model-api",
-      kind: "model-api" as const,
-      purpose: "Codex model access",
-      delivery: {
-        kind: "process-environment" as const,
-        variable: "OPENAI_API_KEY",
-      },
-      connectionReference: "model-default",
-    };
+    let processCredentialAdmitted = false;
+    const { pin, binding, profilePlan } = credentialProfileFixture();
     const { service, repository } = fixture({
       harness: {
         key: "fake",
@@ -282,50 +326,24 @@ describe("SandboxAgentDeliveryService", () => {
       },
       workspaceProfileResolver: {
         async compileForNewWorkspace() {
-          return ok({
-            sandbox: {
-              source: { kind: "template", templateId: "aht_fake_1" },
-              requestedIsolation: "container-trusted",
-              limits: {
-                cpuMillis: 1_000,
-                memoryBytes: 1_024,
-                diskBytes: 2_048,
-                maxProcesses: 16,
-              },
-              networkPolicy: { mode: "deny" },
-            },
-            initialization: [],
-            runtime: {
-              harnessKey: "fake",
-              harnessTemplateId: "aht_fake_1",
-              declarativeHarness: {},
-            },
-            defaultPorts: [],
-            suggestedChecks: [],
-            credentialRequirements: [
-              {
-                id: "model-api",
-                kind: "model-api",
-                required: true,
-                purpose: "Codex model access",
-                delivery: {
-                  kind: "process-environment",
-                  variable: "OPENAI_API_KEY",
-                },
-              },
-            ],
-            credentialBindings: [binding],
-            pin,
-          });
+          return ok(profilePlan);
         },
       },
       processCredentialGrants: {
         async admit(_context, input) {
           calls.push({ kind: "admit", input });
+          processCredentialAdmitted = true;
           return ok(undefined);
         },
         async launch(_context, input) {
           calls.push({ kind: "launch", input });
+          if (!processCredentialAdmitted) {
+            return err(
+              domainError.conflict("Process credential scope was not admitted", {
+                code: "test_process_credential_scope_not_admitted",
+              }),
+            );
+          }
           return ok({ mode: "background", processId: "spr_codex" });
         },
         async openTerminal(_context, input) {
@@ -371,6 +389,7 @@ describe("SandboxAgentDeliveryService", () => {
       processId: "spr_codex_tui",
     });
 
+    processCredentialAdmitted = false;
     const run = await service.createRun(context, {
       sandboxId: "sbx_demo",
       runtimeId: "sar_test",
@@ -381,8 +400,26 @@ describe("SandboxAgentDeliveryService", () => {
     expect(run.isOk()).toBe(true);
     const reconciled = await service.reconcileRun(context, "srun_test");
     expect(reconciled.isOk()).toBe(true);
-    expect(calls.map((call) => call.kind)).toEqual(["admit", "terminal", "launch", "revoke"]);
+    expect(calls.map((call) => call.kind)).toEqual([
+      "admit",
+      "terminal",
+      "admit",
+      "launch",
+      "revoke",
+    ]);
     expect(calls[2]?.input).toMatchObject({
+      scope: {
+        tenantId: "tenant_a",
+        organizationId: "org_a",
+        sandboxId: "sbx_demo",
+        profileInstallationId: "awpi_codex",
+        adapterInstallationId: "aai_codex",
+        adapterDefinitionDigest: pin.adapterDefinitionDigest,
+        runtimeId: "sar_test",
+      },
+      bindings: [binding],
+    });
+    expect(calls[3]?.input).toMatchObject({
       scope: {
         tenantId: "tenant_a",
         organizationId: "org_a",
@@ -413,6 +450,165 @@ describe("SandboxAgentDeliveryService", () => {
       },
     });
     expect(JSON.stringify(calls)).not.toContain("sk-test-secret-value");
+  });
+
+  test("[GH-AUTO-DURABLE-CREDENTIAL-023] fails closed before harness or process launch when restored admission is denied", async () => {
+    const { profilePlan } = credentialProfileFixture();
+    let admissionCalls = 0;
+    let harnessCalls = 0;
+    let launchCalls = 0;
+    const { service } = fixture({
+      harness: {
+        key: "fake",
+        templateId: "aht_fake_1",
+        version: "1.0.0",
+        templateDigest: `sha256:${"a".repeat(64)}`,
+        async execute() {
+          harnessCalls += 1;
+          return { events: [], outcomeDigest: "sha256:must-not-run" };
+        },
+        async cancel() {},
+      },
+      workspaceProfileResolver: {
+        async compileForNewWorkspace() {
+          return ok(profilePlan);
+        },
+      },
+      processCredentialGrants: {
+        async admit() {
+          admissionCalls += 1;
+          return admissionCalls === 1
+            ? ok(undefined)
+            : err(
+                domainError.conflict("Credential connection is revoked", {
+                  code: "agent_credential_connection_revoked",
+                }),
+              );
+        },
+        async launch() {
+          launchCalls += 1;
+          return ok({ mode: "background", processId: "spr_must_not_launch" });
+        },
+        async openTerminal() {
+          throw new Error("terminal must not open");
+        },
+        async revoke() {
+          return ok(undefined);
+        },
+      },
+    });
+
+    const runtime = await service.createRuntime(context, {
+      sandboxId: "sbx_demo",
+      harnessKey: "fake",
+      harnessTemplateId: "aht_fake_1",
+      idempotencyKey: "runtime_denied_after_restart",
+      profileInstallationId: "awpi_codex",
+    });
+    expect(runtime.isOk()).toBe(true);
+    await service.createRun(context, {
+      sandboxId: "sbx_demo",
+      runtimeId: "sar_test",
+      task: "must not execute",
+      context: { mode: "fresh" },
+      idempotencyKey: "run_denied_after_restart",
+    });
+
+    const reconciled = await service.reconcileRun(context, "srun_test");
+
+    expect(reconciled._unsafeUnwrapErr().details?.code).toBe("agent_credential_connection_revoked");
+    expect(admissionCalls).toBe(2);
+    expect(harnessCalls).toBe(0);
+    expect(launchCalls).toBe(0);
+    expect((await service.showRun(context, "sar_test", "srun_test"))._unsafeUnwrap()).toMatchObject(
+      {
+        status: "failed",
+        failure: {
+          code: "agent_credential_connection_revoked",
+          summary: expect.stringContaining("retryable=false"),
+        },
+      },
+    );
+  });
+
+  test("[GH-AUTO-CONTROL-010][GH-AUTO-DURABLE-CREDENTIAL-023] cancellation wins while restored admission is pending", async () => {
+    const { profilePlan } = credentialProfileFixture();
+    let admissionCalls = 0;
+    let releaseAdmission: (() => void) | undefined;
+    const admissionPending = new Promise<void>((resolve) => {
+      releaseAdmission = resolve;
+    });
+    let markAdmissionStarted: (() => void) | undefined;
+    const admissionStarted = new Promise<void>((resolve) => {
+      markAdmissionStarted = resolve;
+    });
+    let harnessCalls = 0;
+    let launchCalls = 0;
+    const revokeReasons: string[] = [];
+    const { service } = fixture({
+      harness: {
+        key: "fake",
+        templateId: "aht_fake_1",
+        version: "1.0.0",
+        templateDigest: `sha256:${"a".repeat(64)}`,
+        async execute() {
+          harnessCalls += 1;
+          return { events: [], outcomeDigest: "sha256:must-not-run" };
+        },
+        async cancel() {},
+      },
+      workspaceProfileResolver: {
+        async compileForNewWorkspace() {
+          return ok(profilePlan);
+        },
+      },
+      processCredentialGrants: {
+        async admit() {
+          admissionCalls += 1;
+          if (admissionCalls === 1) return ok(undefined);
+          markAdmissionStarted?.();
+          await admissionPending;
+          return ok(undefined);
+        },
+        async launch() {
+          launchCalls += 1;
+          return ok({ mode: "background", processId: "spr_must_not_launch" });
+        },
+        async openTerminal() {
+          throw new Error("terminal must not open");
+        },
+        async revoke(_context, input) {
+          revokeReasons.push(input.reason);
+          return ok(undefined);
+        },
+      },
+    });
+    await service.createRuntime(context, {
+      sandboxId: "sbx_demo",
+      harnessKey: "fake",
+      harnessTemplateId: "aht_fake_1",
+      idempotencyKey: "runtime_cancel_admission",
+      profileInstallationId: "awpi_codex",
+    });
+    await service.createRun(context, {
+      sandboxId: "sbx_demo",
+      runtimeId: "sar_test",
+      task: "must not execute",
+      context: { mode: "fresh" },
+      idempotencyKey: "run_cancel_admission",
+    });
+
+    const reconciling = service.reconcileRun(context, "srun_test");
+    await admissionStarted;
+    const cancelled = await service.cancelRun(context, "sar_test", "srun_test");
+    releaseAdmission?.();
+    const reconciled = await reconciling;
+
+    expect(cancelled._unsafeUnwrap().status).toBe("cancelled");
+    expect(reconciled._unsafeUnwrap().status).toBe("cancelled");
+    expect(harnessCalls).toBe(0);
+    expect(launchCalls).toBe(0);
+    expect(revokeReasons.filter((reason) => reason === "cancelled")).toHaveLength(2);
   });
 
   test("[AGENT-ADAPTER-018] lists neutral harness capabilities and admitted templates", async () => {

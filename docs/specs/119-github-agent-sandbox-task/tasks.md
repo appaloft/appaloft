@@ -22,6 +22,8 @@
   proved the task-scoped shell helper was not executable in a registered Linux Sandbox.
 - [x] Create and link public bounded Agent Run failure diagnostic issue #932 after real hosted
   acceptance proved the terminal Run state discarded the actionable harness failure.
+- [x] Create and link public durable credential restart issue #934 after external run `30597332756`
+  proved the worker lost organization scope and process-local credential admission across restart.
 
 ## Public Composition Boundary Slice
 
@@ -81,6 +83,15 @@
 - [x] Implement recoverable stop, steer, resume, and explicit native-session fallback.
 - [ ] Compose existing Workspace create/recover, Agent Task, durable work, checks, Diff, and Preview.
 - [ ] Enforce cumulative runtime, automatic retry classes, and Task control permission.
+- [x] GH-AUTO-DURABLE-CREDENTIAL-023: persist optional organization id in Sandbox Agent durable-work
+  safe input and reconstruct the exact tenant context in the worker.
+- [x] GH-AUTO-DURABLE-CREDENTIAL-023: replay the existing process-credential admission port from
+  persisted Runtime Profile pin/bindings before a restarted worker launches the Agent process.
+- [x] GH-AUTO-DURABLE-CREDENTIAL-023: prove restarted process-local admission recovery and denied
+  admission fail-closed behavior through the public Runtime service without a parallel admission
+  table.
+- [ ] GH-AUTO-DURABLE-CREDENTIAL-023: compose hosted revoked/cross-scope restart coverage with zero
+  secret resolution, process launch, or Sandbox effects after the public change is merged and pinned.
 
 ## GitHub Feedback And Delivery Slice
 
@@ -137,6 +148,9 @@
   when credential cleanup cannot be confirmed.
 - [x] Prove failed Agent Runs redact and bound harness errors, survive Postgres round-trip, keep
   legacy rows readable, and expose the diagnostic through Agent Task feedback (#932).
+- [x] Docs outcome for #934: not user-facing. The fix restores the already specified
+  restart-safe credential-bound Agent Task execution and changes no command, API, status, error
+  vocabulary, or recovery guidance.
 - [x] Synchronize Domain Model, Business Operation Map, operation catalog, SDK/CLI/Web docs, and
   Test Matrix evidence.
 - [ ] Commit and push public changes with a neutral message.

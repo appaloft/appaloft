@@ -47,6 +47,11 @@
 13. Resolve an exact GitHub source pin through the public integration before authorization for
     compute-starting intents. Hydrate PR-top-level comments before fork policy and require the
     resolved SHA during repository materialization; never use ambient `HEAD` as lifecycle truth.
+14. Persist optional organization identity in Sandbox Agent durable-work safe input and reconstruct
+    the same resolved tenant scope in the worker.
+15. Before a persisted credential-bound Runtime executes after restart, replay the existing
+    idempotent process-credential admission port from the Runtime's persisted Profile pin and
+    credential bindings; do not add a second admission repository or hosted lifecycle model.
 
 ## Migration
 
@@ -80,6 +85,9 @@
 - Add source-resolution tests proving Issue default-branch pins and PR-top-level fork identity are
   resolved before authorization, and that checkout refuses an absent exact pin before credential
   materialization.
+- Add a restart regression proving durable work retains organization scope and that a new
+  process-credential adapter instance is re-admitted from the existing Runtime record before
+  launch, while revoked/cross-scope credentials remain fail closed.
 - Run public lint, typecheck, test, and build before public delivery.
 
 ## Risks

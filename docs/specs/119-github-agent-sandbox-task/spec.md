@@ -2,10 +2,12 @@
 
 ## Status
 
-Accepted for failure-diagnostic bug-fix Code Round. Public tracking #845 and implementation issues
-#846-#849 are complete. Public #876 governs the additional composition slice required by the
-2026-07-29 boundary audit; public #932 governs the bounded Agent Run failure diagnostic exposed by
-the dedicated hosted acceptance. Hosted composition remains in Cloud #722-#727.
+Implemented for durable credential restart under public #934; public repository validation and
+delivery remain in progress. Public tracking #845 and implementation issues #846-#849 are complete.
+Public #876 governs the additional composition slice required by the 2026-07-29 boundary audit;
+public #932 governs the bounded Agent Run failure diagnostic exposed by the dedicated hosted
+acceptance. Public #934 governs the restart-safe durable tenant context and credential-admission
+replay exposed by external run `30597332756`. Hosted composition remains in Cloud #722-#727.
 
 ## Goal
 
@@ -41,6 +43,7 @@ Sandbox cleanup.
 | GH-AUTO-CAPABILITY-020 | Adapter-neutral execution | Codex, OpenCode, and Pi installations declare different capabilities | A Task composes execution | Capability gates select native session or fallback behavior without vendor-specific Workspace/Task models or a universal model protocol. |
 | GH-AUTO-BOUNDARY-021 | Single authoritative composition | A hosted or self-hosted runtime composes GitHub Agent automation | Runtime dependencies and delivery/finalization adapters are wired | SourceEvent owns delivery outcomes, the public automation store owns review/thread linkage, public credential metadata is reused, accepted execution intent/snapshot is immutable, repository materialization uses the existing template-populated Workspace root without deleting its files or requiring an empty clone destination, bounded delivery projection uses public seams, and no downstream runtime creates parallel Workspace/Task/Preview/Deployment/session/idempotency contracts or persistence. |
 | GH-AUTO-TENANT-022 | Resolved tenant parity | A runtime configures a tenant-context policy and an authenticated actor installs a Profile through public oRPC | The command or query enters the application bus and a later system trigger resolves the same organization | Both paths use the configured `TenantContextResolver`; the default public policy remains compatible, while custom hosted or self-hosted policies can canonicalize tenant identity without transport-specific or GitHub-specific lookup logic. |
+| GH-AUTO-DURABLE-CREDENTIAL-023 | Restart-safe credential admission | A credential-bound Sandbox Agent Runtime and Run survive a control-plane process restart | Durable work reconstructs its execution context and reconciles the Run | The durable item preserves tenant id plus optional organization id; the Runtime service idempotently replays process-credential admission from its persisted Profile pin and bindings before launch; current connection scope/status is revalidated, secrets remain process-scoped, and no parallel Runtime/Task/admission model is introduced. |
 
 ## Supported GitHub Inputs
 
@@ -80,6 +83,11 @@ record or hosted projection.
 The public server composition registers the authoritative GitHub Agent automation store as a
 dependency. Hosted compositions resolve that dependency rather than constructing their own
 delivery, review-execution, or thread-task persistence.
+
+Durable Sandbox Agent items written before the optional organization field remain readable.
+Credential-free Runtime work is unchanged. A credential-bound Runtime may replay the existing
+idempotent admission port after restart, but still fails closed when its persisted scope or current
+Connection no longer passes custody validation.
 
 ## Non-goals
 
