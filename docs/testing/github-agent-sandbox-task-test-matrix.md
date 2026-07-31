@@ -14,7 +14,7 @@
 | GH-AUTO-CONTROL-010 | Application | steer, stop, resume, new and terminal Task | Same Workspace is controlled; stop is recoverable; new switches pointer without ambiguity. | public automated pass |
 | GH-AUTO-SESSION-011 | Runtime | Adapter with and without native resume | Native ref is restored, or a labelled fallback Run receives bounded prior context. | public automated pass |
 | GH-AUTO-LINEAGE-012 | Persistence | Old one-Run state, retry, cumulative budget | Migration is lossless; ordered lineage and limits survive restart. | public automated pass |
-| GH-AUTO-FEEDBACK-013 | Integration | Issue comment, Issue label, PR trigger, post-acknowledgement Task start failure, repeated phase events, checks, Diff, Preview, delivery, retention, sensitive URLs, and oversized/secret-like output | One reaction/comment/Check is upserted at the exact PR head or hydrated Issue source SHA; a Task start failure reuses the acknowledgement state for one bounded reason and records the delivery outcome; later updates or replay reuse the same ids while secret-like content and sensitive URLs are omitted. | public automated pass |
+| GH-AUTO-FEEDBACK-013 | Integration | Issue comment, Issue label, PR trigger, post-acknowledgement Task start failure, distinct status/steer/stop/resume deliveries, repeated phase events, process restart, checks, Diff, Preview, delivery, retention, sensitive URLs, and oversized/secret-like output | One acknowledgement reaction exists per command; one status comment per current thread Task and one head-specific Check are upserted at the exact PR head or hydrated Issue source SHA. A Task start failure reuses acknowledgement state for one bounded reason; later phases, control deliveries, restart, and replay reuse the same Task feedback ids while secret-like content and sensitive URLs are omitted. | public automated pass, including restart persistence; hosted rerun pending after external run `30604398408` exposed the fixed regression |
 | GH-AUTO-FIX-014 | Git adapter | Fix success, repeated delivery, changed head, unauthorized write | One branch/PR is created or updated; no merge/default branch/force push. | public adapter pass; hosted acceptance pending |
 | GH-AUTO-REVIEW-015 | Git adapter | Review findings and identical repo/PR/head/rule replay | No push; valid annotations and exactly-once review/content fingerprints. | public automated pass |
 | GH-AUTO-HEAD-016 | Durable workflow | PR synchronize while review/fix runs | Stale review is superseded and unsafe fix enters reconciliation. | review guard pass; hosted fix reconciliation pending |
@@ -40,7 +40,9 @@ matrix alone.
   GitHub-to-Workspace binding projection and conflict fail-closed behavior.
 - `apps/web/src/lib/console/console-page-extension.test.ts` plus Svelte diagnostics cover the #892
   actionable form regression without adding any hosted or GitHub-specific contract to public Web.
-- Public `lint`, `typecheck`, and `build` completed successfully on 2026-07-29.
+- Public `lint`, `typecheck`, `build`, and the complete 35-task repository test gate completed
+  successfully on 2026-07-31. The feedback-continuity suites include application control-delivery
+  reuse and PGlite process-restart readback.
 - The repository-level test gate passed all feature suites, HTTP/WebSocket suites, SDK/CLI/Web
   suites, and WebView acceptance. One unrelated PGlite audit test exceeded its five-second
   concurrent timeout; its complete file then passed 10/10 in isolation. Hosted and real-provider

@@ -533,6 +533,142 @@ describe("GitHub Agent automation service", () => {
     expect(tasks.calls).toContain("resume:task_1");
   });
 
+  test("[GH-AUTO-FEEDBACK-013][GH-AUTO-CONTROL-010] control deliveries reuse the current Task feedback ids", async () => {
+    const store = new InMemoryGitHubAgentAutomationStore();
+    const tasks = taskPort();
+    const updates: Array<{
+      deliveryId: string;
+      existing: Record<string, string>;
+    }> = [];
+    const service = new GitHubAgentAutomationService({
+      store,
+      authorization: allowedAuthorization(),
+      tasks: tasks.port,
+      feedback: {
+        acknowledge: async (_executionContext, input) =>
+          ok({ reactionId: `reaction_${input.trigger.deliveryId}` }),
+        update: async (_executionContext, input) => {
+          updates.push({
+            deliveryId: input.trigger.deliveryId,
+            existing: { ...(input.existing ?? {}) },
+          });
+          return ok({
+            ...(input.existing ?? {}),
+            statusCommentId: input.existing?.statusCommentId ?? "comment_1",
+            checkRunId: input.existing?.checkRunId ?? "check_1",
+          });
+        },
+        reject: async () => ok({}),
+      },
+    });
+
+    await service.handle(context, trigger({ deliveryId: "delivery_fix_continuity" }));
+    await service.handle(
+      context,
+      trigger({
+        deliveryId: "delivery_steer_continuity",
+        command: { kind: "steer", instruction: "preserve the public API" },
+      }),
+    );
+    await service.handle(
+      context,
+      trigger({ deliveryId: "delivery_stop_continuity", command: { kind: "stop" } }),
+    );
+    await service.handle(
+      context,
+      trigger({ deliveryId: "delivery_resume_continuity", command: { kind: "resume" } }),
+    );
+
+    expect(updates).toEqual([
+      {
+        deliveryId: "delivery_fix_continuity",
+        existing: { reactionId: "reaction_delivery_fix_continuity" },
+      },
+      {
+        deliveryId: "delivery_steer_continuity",
+        existing: {
+          reactionId: "reaction_delivery_steer_continuity",
+          statusCommentId: "comment_1",
+          checkRunId: "check_1",
+        },
+      },
+      {
+        deliveryId: "delivery_stop_continuity",
+        existing: {
+          reactionId: "reaction_delivery_stop_continuity",
+          statusCommentId: "comment_1",
+          checkRunId: "check_1",
+        },
+      },
+      {
+        deliveryId: "delivery_resume_continuity",
+        existing: {
+          reactionId: "reaction_delivery_resume_continuity",
+          statusCommentId: "comment_1",
+          checkRunId: "check_1",
+        },
+      },
+    ]);
+  });
+
+  test("[GH-AUTO-FEEDBACK-013][GH-AUTO-TASK-009] a newly selected Task does not inherit prior Task feedback ids", async () => {
+    const store = new InMemoryGitHubAgentAutomationStore();
+    let startCount = 0;
+    const updates: Array<{
+      taskId: string;
+      existing: Record<string, string>;
+    }> = [];
+    const service = new GitHubAgentAutomationService({
+      store,
+      authorization: allowedAuthorization(),
+      tasks: {
+        ...taskPort().port,
+        startOrResume: async () => {
+          startCount += 1;
+          const suffix = String(startCount);
+          return ok({
+            taskId: `task_${suffix}`,
+            workspaceId: `workspace_${suffix}`,
+            activeRunId: `run_${suffix}`,
+            status: "queued",
+            taskUrl: `https://appaloft.test/tasks/task_${suffix}`,
+            sessionRecovery: "new",
+          });
+        },
+      },
+      feedback: {
+        acknowledge: async (_executionContext, input) =>
+          ok({ reactionId: `reaction_${input.trigger.deliveryId}` }),
+        update: async (_executionContext, input) => {
+          updates.push({
+            taskId: input.task.taskId,
+            existing: { ...(input.existing ?? {}) },
+          });
+          return ok({
+            ...(input.existing ?? {}),
+            statusCommentId: `comment_${input.task.taskId}`,
+            checkRunId: `check_${input.task.taskId}`,
+          });
+        },
+        reject: async () => ok({}),
+      },
+    });
+
+    await service.handle(context, trigger({ deliveryId: "delivery_first_task" }));
+    await service.handle(context, trigger({ deliveryId: "delivery_second_task" }));
+
+    expect(updates).toEqual([
+      {
+        taskId: "task_1",
+        existing: { reactionId: "reaction_delivery_first_task" },
+      },
+      {
+        taskId: "task_2",
+        existing: { reactionId: "reaction_delivery_second_task" },
+      },
+    ]);
+  });
+
   test("[GH-AUTO-CLEANUP-018] pull request close cleans only the linked current Task", async () => {
     const store = new InMemoryGitHubAgentAutomationStore();
     const tasks = taskPort();

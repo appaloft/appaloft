@@ -1156,6 +1156,7 @@ export interface GitHubAgentThreadTasksTable {
   tenant_id: string;
   thread_key: string;
   task: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+  feedback_state: ColumnType<JsonRecord | null, JsonRecord | null | undefined, JsonRecord | null>;
   updated_at: UpdatableTimestampColumn;
 }
 
