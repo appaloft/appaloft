@@ -1753,7 +1753,10 @@ export class SandboxAgentDeliveryService {
             admitted.error,
             admitted.error,
           );
-          return persisted.isErr() ? err(persisted.error) : err(admitted.error);
+          if (persisted.isErr()) return err(persisted.error);
+          return persisted.value.cancelled
+            ? ok(runDescriptor(persisted.value.record))
+            : err(admitted.error);
         }
       }
       const contextState = record.run.toState().context.toState();

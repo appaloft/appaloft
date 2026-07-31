@@ -531,6 +531,87 @@ describe("SandboxAgentDeliveryService", () => {
     );
   });
 
+  test("[GH-AUTO-CONTROL-010][GH-AUTO-DURABLE-CREDENTIAL-023] cancellation wins while restored admission is pending", async () => {
+    const { profilePlan } = credentialProfileFixture();
+    let admissionCalls = 0;
+    let releaseAdmission: (() => void) | undefined;
+    const admissionPending = new Promise<void>((resolve) => {
+      releaseAdmission = resolve;
+    });
+    let markAdmissionStarted: (() => void) | undefined;
+    const admissionStarted = new Promise<void>((resolve) => {
+      markAdmissionStarted = resolve;
+    });
+    let harnessCalls = 0;
+    let launchCalls = 0;
+    const { service } = fixture({
+      harness: {
+        key: "fake",
+        templateId: "aht_fake_1",
+        version: "1.0.0",
+        templateDigest: `sha256:${"a".repeat(64)}`,
+        async execute() {
+          harnessCalls += 1;
+          return { events: [], outcomeDigest: "sha256:must-not-run" };
+        },
+        async cancel() {},
+      },
+      workspaceProfileResolver: {
+        async compileForNewWorkspace() {
+          return ok(profilePlan);
+        },
+      },
+      processCredentialGrants: {
+        async admit() {
+          admissionCalls += 1;
+          if (admissionCalls === 1) return ok(undefined);
+          markAdmissionStarted?.();
+          await admissionPending;
+          return err(
+            domainError.conflict("Credential connection is revoked", {
+              code: "agent_credential_connection_revoked",
+            }),
+          );
+        },
+        async launch() {
+          launchCalls += 1;
+          return ok({ mode: "background", processId: "spr_must_not_launch" });
+        },
+        async openTerminal() {
+          throw new Error("terminal must not open");
+        },
+        async revoke() {
+          return ok(undefined);
+        },
+      },
+    });
+    await service.createRuntime(context, {
+      sandboxId: "sbx_demo",
+      harnessKey: "fake",
+      harnessTemplateId: "aht_fake_1",
+      idempotencyKey: "runtime_cancel_admission",
+      profileInstallationId: "awpi_codex",
+    });
+    await service.createRun(context, {
+      sandboxId: "sbx_demo",
+      runtimeId: "sar_test",
+      task: "must not execute",
+      context: { mode: "fresh" },
+      idempotencyKey: "run_cancel_admission",
+    });
+
+    const reconciling = service.reconcileRun(context, "srun_test");
+    await admissionStarted;
+    const cancelled = await service.cancelRun(context, "sar_test", "srun_test");
+    releaseAdmission?.();
+    const reconciled = await reconciling;
+
+    expect(cancelled._unsafeUnwrap().status).toBe("cancelled");
+    expect(reconciled._unsafeUnwrap().status).toBe("cancelled");
+    expect(harnessCalls).toBe(0);
+    expect(launchCalls).toBe(0);
+  });
+
   test("[AGENT-ADAPTER-018] lists neutral harness capabilities and admitted templates", async () => {
     const { service } = fixture({
       harness: {
