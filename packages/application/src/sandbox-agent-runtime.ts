@@ -717,6 +717,10 @@ export interface SandboxAgentRunDescriptor {
   status: string;
   context: { mode: "fresh" } | { mode: "continue"; parentRunId: string };
   outcomeDigest?: string;
+  failure?: {
+    code: string;
+    summary: string;
+  };
   createdAt: string;
   updatedAt?: string;
 }
@@ -863,6 +867,14 @@ function runDescriptor(record: SandboxAgentRunRecord): SandboxAgentRunDescriptor
         ? { mode: "fresh" }
         : { mode: "continue", parentRunId: context.parentRunId.value },
     ...(state.outcomeDigest ? { outcomeDigest: state.outcomeDigest.value } : {}),
+    ...(state.failureCode && state.failureSummary
+      ? {
+          failure: {
+            code: state.failureCode.value,
+            summary: state.failureSummary.value,
+          },
+        }
+      : {}),
     createdAt: state.createdAt.value,
     ...(state.updatedAt ? { updatedAt: state.updatedAt.value } : {}),
   };
@@ -935,10 +947,52 @@ function asUpdatedAt(value: string): Result<UpdatedAt> {
 }
 
 function infrastructureError(error: unknown): ReturnType<typeof domainError.conflict> {
+  const diagnostic = agentRunFailureDiagnostic(error);
   return domainError.conflict("Sandbox Agent delivery adapter failed", {
     code: "sandbox_agent_delivery_adapter_failed",
-    cause: error instanceof Error ? error.message.slice(0, 256) : "unknown",
+    cause: diagnostic.summary,
   });
+}
+
+function agentRunFailureDiagnostic(error: unknown): {
+  code: "sandbox_agent_harness_failed";
+  summary: string;
+} {
+  const message = error instanceof Error ? error.message : "Agent harness execution failed";
+  let inPrivateKey = false;
+  const redactedLines = message.split(/\r?\n/u).map((line) => {
+    if (/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/u.test(line)) {
+      inPrivateKey = true;
+      return "[REDACTED PRIVATE KEY]";
+    }
+    if (inPrivateKey) {
+      if (/-----END [A-Z0-9 ]*PRIVATE KEY-----/u.test(line)) inPrivateKey = false;
+      return "[REDACTED]";
+    }
+    if (
+      /(?:api[_-]?key|authorization|credential|password|private[_-]?key|secret|token)\s*[:=]/iu.test(
+        line,
+      )
+    ) {
+      return "[REDACTED SECRET-LIKE OUTPUT]";
+    }
+    return line
+      .replace(
+        /\b(Authorization\s*:\s*(?:Bearer|Basic|Token)?\s*)[A-Za-z0-9._~+/=-]+/giu,
+        "$1[REDACTED]",
+      )
+      .replace(/\b([a-z][a-z0-9+.-]*:\/\/)([^:@/\s]+):([^@/\s]+)@/giu, "$1[REDACTED]@")
+      .replace(
+        /([?&](?:access_token|auth|authorization|cookie|key|password|secret|sig|signature|token|api_key)=)[^&\s]+/giu,
+        "$1[REDACTED]",
+      );
+  });
+  const joined = redactedLines.join("\n").trim();
+  const sanitized = joined.length <= 1_024 ? joined : `${joined.slice(0, 1_011)}\n[TRUNCATED]`;
+  return {
+    code: "sandbox_agent_harness_failed",
+    summary: sanitized || "Agent harness execution failed",
+  };
 }
 
 function requireExternalApprovalActor(context: ExecutionContext): Result<void> {
@@ -1749,7 +1803,13 @@ export class SandboxAgentDeliveryService {
         await this.dependencies.repository.saveRuntime(repositoryContext, currentRuntimeRecord);
         return ok(runDescriptor(currentRecord));
       }
-      currentRecord.run.fail({ at: failedAt.value, code: "sandbox_agent_harness_failed" });
+      const diagnostic = agentRunFailureDiagnostic(error);
+      const failed = currentRecord.run.fail({
+        at: failedAt.value,
+        code: diagnostic.code,
+        summary: diagnostic.summary,
+      });
+      if (failed.isErr()) return err(failed.error);
       currentRuntimeRecord.runtime.releaseRun({
         runId: currentRecord.run.id,
         at: failedAt.value,

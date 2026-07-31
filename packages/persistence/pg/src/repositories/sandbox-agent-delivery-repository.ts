@@ -23,6 +23,8 @@ import {
   SandboxAgentApprovalId,
   SandboxAgentApprovalRequestDigest,
   SandboxAgentRun,
+  SandboxAgentRunFailureCode,
+  SandboxAgentRunFailureSummary,
   SandboxAgentRunId,
   SandboxAgentRunStatusValue,
   SandboxAgentRuntime,
@@ -97,6 +99,8 @@ type RunJson = {
   context: { mode: "fresh" } | { mode: "continue"; parentRunId: string };
   taskDigest: string;
   outcomeDigest?: string;
+  failureCode?: string;
+  failureSummary?: string;
 };
 function runRecord(row: RunRow): SandboxAgentRunRecord {
   const state = json<RunJson>(row.state);
@@ -120,6 +124,12 @@ function runRecord(row: RunRow): SandboxAgentRunRecord {
       updatedAt: UpdatedAt.rehydrate(timestamp(row.updated_at)),
       ...(state.outcomeDigest
         ? { outcomeDigest: AgentRunOutcomeDigest.rehydrate(state.outcomeDigest) }
+        : {}),
+      ...(state.failureCode && state.failureSummary
+        ? {
+            failureCode: SandboxAgentRunFailureCode.rehydrate(state.failureCode),
+            failureSummary: SandboxAgentRunFailureSummary.rehydrate(state.failureSummary),
+          }
         : {}),
     }),
     sandboxId: row.sandbox_id,
@@ -380,6 +390,12 @@ export class PgSandboxAgentDeliveryRepository implements SandboxAgentDeliveryRep
           : { mode: "continue" as const, parentRunId: runContext.parentRunId.value },
       taskDigest: state.taskDigest.value,
       ...(state.outcomeDigest ? { outcomeDigest: state.outcomeDigest.value } : {}),
+      ...(state.failureCode && state.failureSummary
+        ? {
+            failureCode: state.failureCode.value,
+            failureSummary: state.failureSummary.value,
+          }
+        : {}),
     };
     await resolveRepositoryExecutor(this.db, context)
       .insertInto("sandbox_agent_runs")

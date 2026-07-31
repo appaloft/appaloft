@@ -2,10 +2,10 @@
 
 ## Status
 
-Accepted for boundary-correction Code Round. Public tracking #845 and implementation issues
+Accepted for failure-diagnostic bug-fix Code Round. Public tracking #845 and implementation issues
 #846-#849 are complete. Public #876 governs the additional composition slice required by the
-2026-07-29 boundary audit before hosted Code resumes; hosted composition remains in Cloud
-#722-#727.
+2026-07-29 boundary audit; public #932 governs the bounded Agent Run failure diagnostic exposed by
+the dedicated hosted acceptance. Hosted composition remains in Cloud #722-#727.
 
 ## Goal
 
@@ -31,7 +31,7 @@ Sandbox cleanup.
 | GH-AUTO-CONTROL-010 | Current task control | A thread has a current controllable Task | `steer`, `stop`, `resume`, or `new` is accepted | Steer and resume keep the same Workspace; stop is recoverable; new stops the old task and switches the pointer; terminal/cleaned tasks are not silently revived. |
 | GH-AUTO-SESSION-011 | Truthful session recovery | An Adapter does or does not support native resume | A stopped/hibernated Task resumes | Native session is restored when supported; otherwise a new Run is created with the prior summary, diff, checks, and steer context and is explicitly reported as fallback. |
 | GH-AUTO-LINEAGE-012 | Multi-Run Agent Task | A Task retries or resumes | A new Agent run starts | The first run id remains the stable Task id, `activeRunId` and bounded ordered lineage persist, and cumulative runtime/retry limits are enforced. |
-| GH-AUTO-FEEDBACK-013 | Bounded feedback | A Task changes phase | GitHub and Console consume Task events | One reaction, one updatable status comment, one head-specific Check, and required delivery objects are upserted. The shared summary can carry phase, checks, redacted/truncated Diff, Preview scope/TTL, delivery, failure, and cleanup state; secret-like lines and sensitive URLs are omitted, total GitHub Markdown is bounded, and complete raw output remains on the Task page. |
+| GH-AUTO-FEEDBACK-013 | Bounded feedback | A Task changes phase or its Agent harness fails | GitHub and Console consume Task events | One reaction, one updatable status comment, one head-specific Check, and required delivery objects are upserted. The existing Sandbox Agent Run persists a stable failure code plus bounded, redacted summary and the Agent Task projects that diagnostic into its existing failure field. The shared summary can carry phase, checks, redacted/truncated Diff, Preview scope/TTL, delivery, failure, and cleanup state; secret-like lines and sensitive URLs are omitted, total GitHub Markdown is bounded, and complete safe output remains on the Task page. |
 | GH-AUTO-FIX-014 | Write delivery | An authorized fix reaches accepted evidence | PR delivery policy permits write | An isolated branch is pushed and a Task-owned PR is created or updated with summary, checks, diff, and Preview; no merge/default-branch/force-push occurs. |
 | GH-AUTO-REVIEW-015 | Read-only review | An authorized review is triggered | Findings are delivered | No code is pushed; actionable findings use Review/Check annotations where valid, content is deduped, and the same repo/PR/head/rule executes at most once. |
 | GH-AUTO-HEAD-016 | Head SHA concurrency | PR head changes during work | Reconciliation runs | Stale review is superseded and does not annotate the new head; unsafe fix delivery enters `needs_reconciliation`; synchronize rules may create one review for the new head. |
@@ -72,6 +72,10 @@ Existing `AgentTaskRunService` callers retain their first-run `taskRunId`, exist
 descriptors remain readable, and existing Workspace, Sandbox, Preview, SourceEvent, Connection,
 Adapter, Profile, and Git delivery operations remain authoritative. New fields and operations are
 additive or versioned with deterministic migration.
+
+Existing Sandbox Agent Run persistence rows without a failure diagnostic remain readable. Failed
+Run diagnostics are additive fields in the existing Run state and descriptor, not a separate error
+record or hosted projection.
 
 The public server composition registers the authoritative GitHub Agent automation store as a
 dependency. Hosted compositions resolve that dependency rather than constructing their own

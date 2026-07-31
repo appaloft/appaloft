@@ -18,6 +18,7 @@ function runDescriptor(
   status: string,
   runId = taskRunId,
   context: SandboxAgentRunDescriptor["context"] = { mode: "fresh" },
+  failure?: SandboxAgentRunDescriptor["failure"],
 ): SandboxAgentRunDescriptor {
   return {
     runId,
@@ -25,6 +26,7 @@ function runDescriptor(
     sandboxId: workspaceId,
     status,
     context,
+    ...(failure ? { failure } : {}),
     createdAt: now,
   };
 }
@@ -61,6 +63,7 @@ function createHarness(
   let runStatus = "running";
   let activeRunId = taskRunId;
   let activeRunContext: SandboxAgentRunDescriptor["context"] = { mode: "fresh" };
+  let runFailure: SandboxAgentRunDescriptor["failure"];
   let runSequence = 0;
   let exposureRevoked = false;
   let processTerminated = false;
@@ -80,7 +83,7 @@ function createHarness(
       },
       listRuns: async () =>
         ok({ items: [runDescriptor(runStatus, activeRunId, activeRunContext)] }),
-      showRun: async () => ok(runDescriptor(runStatus, activeRunId, activeRunContext)),
+      showRun: async () => ok(runDescriptor(runStatus, activeRunId, activeRunContext, runFailure)),
       cancelRun: async () => {
         runStatus = "cancelled";
         return ok(runDescriptor(runStatus, activeRunId, activeRunContext));
@@ -198,6 +201,9 @@ function createHarness(
     createdRunInputs,
     setRunStatus: (status: string) => {
       runStatus = status;
+    },
+    setRunFailure: (failure: NonNullable<SandboxAgentRunDescriptor["failure"]>) => {
+      runFailure = failure;
     },
     wasExposureRevoked: () => exposureRevoked,
     wasProcessTerminated: () => processTerminated,
@@ -406,6 +412,35 @@ describe("Agent Task Run application workflow", () => {
       failure: {
         phase: "finalization",
         retryable: true,
+      },
+    });
+  });
+
+  test("[AGENT-FAILURE-011][GH-AUTO-FEEDBACK-013] projects the failed Run diagnostic into the Agent Task", async () => {
+    const harness = createHarness();
+    await harness.service.create(cliContext, {
+      workspaceId,
+      runtimeId,
+      task: "Implement issue #123",
+      runContext: { mode: "fresh" },
+      idempotencyKey: "task-create-agent-failure",
+      checks: [],
+      immutableReview: false,
+      sourceRoot: ".",
+    });
+    harness.setRunFailure({
+      code: "sandbox_agent_harness_failed",
+      summary: "The configured provider rejected the requested model.",
+    });
+    harness.setRunStatus("failed");
+
+    const failed = await harness.service.reconcile(cliContext, workspaceId, taskRunId);
+    expect(failed._unsafeUnwrap()).toMatchObject({
+      status: "failed",
+      failure: {
+        phase: "agent-run",
+        message: "The configured provider rejected the requested model.",
+        retryable: false,
       },
     });
   });
