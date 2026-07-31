@@ -20,6 +20,8 @@
   acceptance proved the GitHub adapter still required an empty Workspace root despite #908/#909.
 - [x] Create and link public askpass permission regression issue #927 after real hosted acceptance
   proved the task-scoped shell helper was not executable in a registered Linux Sandbox.
+- [x] Create and link public bounded Agent Run failure diagnostic issue #932 after real hosted
+  acceptance proved the terminal Run state discarded the actionable harness failure.
 
 ## Public Composition Boundary Slice
 
@@ -99,6 +101,8 @@
 - [x] Reuse the acknowledgement feedback state to publish one bounded failure comment and record
   the delivery outcome when Task start/replace fails, so replay cannot create compute or feedback
   again (#916).
+- [x] Persist one bounded, redacted failure diagnostic on the existing Sandbox Agent Run and
+  project it through the existing Agent Task failure field (#932).
 
 ## Retention And Cleanup Slice
 
@@ -131,6 +135,8 @@
 - [x] Prove GitHub checkout clears ambient credential helpers, disables interactive/askpass
   fallback, exits the task-scoped credential cache, removes its socket directory, and fails closed
   when credential cleanup cannot be confirmed.
+- [x] Prove failed Agent Runs redact and bound harness errors, survive Postgres round-trip, keep
+  legacy rows readable, and expose the diagnostic through Agent Task feedback (#932).
 - [x] Synchronize Domain Model, Business Operation Map, operation catalog, SDK/CLI/Web docs, and
   Test Matrix evidence.
 - [ ] Commit and push public changes with a neutral message.

@@ -66,6 +66,42 @@ export class AgentRunOutcomeDigest extends ScalarValueObject<string> {
   }
 }
 
+const failureCodeBrand: unique symbol = Symbol("SandboxAgentRunFailureCode");
+export class SandboxAgentRunFailureCode extends ScalarValueObject<string> {
+  private [failureCodeBrand]!: void;
+  private constructor(value: string) {
+    super(value);
+  }
+  static create(value: string): Result<SandboxAgentRunFailureCode> {
+    const normalized = value.trim();
+    if (!/^[a-z0-9][a-z0-9._-]{0,119}$/u.test(normalized)) {
+      return err(domainError.validation("Sandbox Agent Run failure code is invalid"));
+    }
+    return ok(new SandboxAgentRunFailureCode(normalized));
+  }
+  static rehydrate(value: string): SandboxAgentRunFailureCode {
+    return new SandboxAgentRunFailureCode(value.trim());
+  }
+}
+
+const failureSummaryBrand: unique symbol = Symbol("SandboxAgentRunFailureSummary");
+export class SandboxAgentRunFailureSummary extends ScalarValueObject<string> {
+  private [failureSummaryBrand]!: void;
+  private constructor(value: string) {
+    super(value);
+  }
+  static create(value: string): Result<SandboxAgentRunFailureSummary> {
+    const normalized = value.trim();
+    if (!normalized || normalized.length > 1_024 || normalized.includes("\0")) {
+      return err(domainError.validation("Sandbox Agent Run failure summary is invalid"));
+    }
+    return ok(new SandboxAgentRunFailureSummary(normalized));
+  }
+  static rehydrate(value: string): SandboxAgentRunFailureSummary {
+    return new SandboxAgentRunFailureSummary(value.trim());
+  }
+}
+
 export interface SandboxAgentRunState {
   id: SandboxAgentRunId;
   runtimeId: SandboxAgentRuntimeId;
@@ -73,6 +109,8 @@ export interface SandboxAgentRunState {
   taskDigest: AgentTaskDigest;
   status: SandboxAgentRunStatusValue;
   outcomeDigest?: AgentRunOutcomeDigest;
+  failureCode?: SandboxAgentRunFailureCode;
+  failureSummary?: SandboxAgentRunFailureSummary;
   createdAt: CreatedAt;
   updatedAt?: UpdatedAt;
 }
@@ -166,11 +204,20 @@ export class SandboxAgentRun extends AggregateRoot<SandboxAgentRunState, Sandbox
     return ok(undefined);
   }
 
-  fail(input: { at: UpdatedAt; code: string }): Result<void> {
+  fail(input: { at: UpdatedAt; code: string; summary: string }): Result<void> {
     if (this.state.status.isTerminal()) return ok(undefined);
+    const failureCode = SandboxAgentRunFailureCode.create(input.code);
+    if (failureCode.isErr()) return err(failureCode.error);
+    const failureSummary = SandboxAgentRunFailureSummary.create(input.summary);
+    if (failureSummary.isErr()) return err(failureSummary.error);
     this.state.status = SandboxAgentRunStatusValue.rehydrate("failed");
+    this.state.failureCode = failureCode.value;
+    this.state.failureSummary = failureSummary.value;
     this.state.updatedAt = input.at;
-    this.recordDomainEvent("sandbox-agent-run-failed", input.at, { code: input.code });
+    this.recordDomainEvent("sandbox-agent-run-failed", input.at, {
+      code: failureCode.value.value,
+      summary: failureSummary.value.value,
+    });
     return ok(undefined);
   }
 

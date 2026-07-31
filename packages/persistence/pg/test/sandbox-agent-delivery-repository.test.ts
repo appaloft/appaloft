@@ -170,6 +170,27 @@ describe("PgSandboxAgentDeliveryRepository", () => {
       expect(storedRun.task_envelope).toBe("cps:v1:test:iv:ciphertext:tag:end");
       expect(storedRun.task_envelope).not.toContain("build app");
       expect(JSON.stringify(storedRun.state)).not.toContain("build app");
+      expect(
+        (await repository.findRun(tenantA, "srun_pg"))?.run.toState().failureCode,
+      ).toBeUndefined();
+      run.start({ at: UpdatedAt.rehydrate("2026-07-20T00:00:03.100Z") })._unsafeUnwrap();
+      run
+        .fail({
+          at: UpdatedAt.rehydrate("2026-07-20T00:00:03.200Z"),
+          code: "sandbox_agent_harness_failed",
+          summary: "Provider rejected the requested model.",
+        })
+        ._unsafeUnwrap();
+      await repository.saveRun(tenantA, {
+        run,
+        sandboxId: "sbx_agent_pg",
+        taskEnvelope: "cps:v1:test:iv:ciphertext:tag:end",
+        idempotencyKey: "run_once",
+      });
+      expect((await repository.findRun(tenantA, "srun_pg"))?.run.toState()).toMatchObject({
+        failureCode: { value: "sandbox_agent_harness_failed" },
+        failureSummary: { value: "Provider rejected the requested model." },
+      });
       await repository.appendRunEvents(tenantA, "srun_pg", [
         {
           eventId: "event_1",

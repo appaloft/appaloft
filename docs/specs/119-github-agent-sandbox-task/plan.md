@@ -67,6 +67,9 @@
 - Add actor/permission/fork/credential fail-closed contract tests with zero-effect spies.
 - Add Task lineage, native resume/fallback, Workspace composition, feedback, Git delivery, Preview,
   retention, and provider-readback cleanup tests.
+- Add Sandbox Agent Run failure tests proving the existing Run state persists one stable code and
+  bounded redacted summary, survives Postgres round-trip, remains backward compatible with older
+  rows, and projects through the existing Agent Task failure field.
 - Prove transport parity across catalog, HTTP/oRPC, SDK, CLI, and Web.
 - Add `GH-AUTO-BOUNDARY-021` contract/composition tests for dependency registration, immutable
   accepted execution context, neutral materialization/projection seams, and absence of private

@@ -1002,7 +1002,7 @@ export class AgentTaskRunService {
             status: "failed",
             failure: {
               phase: "agent-run",
-              message: `Agent Run ended with ${run.value.status}`,
+              message: run.value.failure?.summary ?? `Agent Run ended with ${run.value.status}`,
               retryable: false,
             },
           },

@@ -592,6 +592,50 @@ describe("SandboxAgentDeliveryService", () => {
     expect(terminated).toBe(true);
   });
 
+  test("[AGENT-FAILURE-011] persists a bounded redacted harness failure", async () => {
+    const { service } = fixture({
+      harness: {
+        key: "failed-run",
+        templateId: "aht_fake_1",
+        version: "1.0.0",
+        templateDigest: `sha256:${"a".repeat(64)}`,
+        async execute() {
+          throw new Error(
+            `Provider request failed\napi_key=must-not-persist\n${"x".repeat(2_000)}`,
+          );
+        },
+        async cancel() {},
+      },
+    });
+    await service.createRuntime(context, {
+      sandboxId: "sbx_demo",
+      harnessKey: "failed-run",
+      harnessTemplateId: "aht_fake_1",
+      idempotencyKey: "runtime_failed_run",
+    });
+    await service.createRun(context, {
+      sandboxId: "sbx_demo",
+      runtimeId: "sar_test",
+      task: "Fix the fixture",
+      context: { mode: "fresh" },
+      idempotencyKey: "run_failed",
+    });
+
+    const reconciled = await service.reconcileRun(context, "srun_test");
+    expect(reconciled.isErr()).toBe(true);
+    const shown = await service.showRun(context, "sar_test", "srun_test");
+    expect(shown._unsafeUnwrap()).toMatchObject({
+      status: "failed",
+      failure: {
+        code: "sandbox_agent_harness_failed",
+      },
+    });
+    const summary = shown._unsafeUnwrap().failure?.summary ?? "";
+    expect(summary).toContain("Provider request failed");
+    expect(summary).not.toContain("must-not-persist");
+    expect(summary.length).toBeLessThanOrEqual(1_024);
+  });
+
   test("[PROMOTION-SCOPE-001] runtime-style deploy tokens cannot resolve external intent", async () => {
     const { service } = fixture();
     const runtimeIdentity = createExecutionContext({

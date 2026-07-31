@@ -73,4 +73,30 @@ describe("Sandbox Agent Runtime", () => {
     expect(continued.toState().context.parentRunId?.value).toBe("srun_fresh");
     expect(fresh.toState().status.value).toBe("completed");
   });
+
+  test("[AGENT-FAILURE-011] retains a bounded failed Run diagnostic", () => {
+    const run = SandboxAgentRun.create({
+      id: SandboxAgentRunId.rehydrate("srun_failed"),
+      runtimeId: SandboxAgentRuntimeId.rehydrate("sar_demo"),
+      context: { mode: "fresh" },
+      taskDigest: `sha256:${"c".repeat(64)}`,
+      createdAt,
+    })._unsafeUnwrap();
+    run.start({ at: updatedAt })._unsafeUnwrap();
+
+    expect(
+      run
+        .fail({
+          at: updatedAt,
+          code: "sandbox_agent_harness_failed",
+          summary: "Provider rejected the requested model.",
+        })
+        .isOk(),
+    ).toBe(true);
+    expect(run.toState()).toMatchObject({
+      status: { value: "failed" },
+      failureCode: { value: "sandbox_agent_harness_failed" },
+      failureSummary: { value: "Provider rejected the requested model." },
+    });
+  });
 });
