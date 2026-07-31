@@ -235,7 +235,12 @@ export interface AgentTaskRunDependencies {
   workQueue: {
     enqueue(
       context: ExecutionContext,
-      item: { kind: "agent-task-run"; id: string; workspaceId: string },
+      item: {
+        kind: "agent-task-run";
+        id: string;
+        workspaceId: string;
+        activeRunId: string;
+      },
     ): Promise<void>;
   };
   integrationAuth: Pick<IntegrationAuthPort, "getProviderAccessToken">;
@@ -504,6 +509,7 @@ export class AgentTaskRunService {
         kind: "agent-task-run",
         id: run.value.runId,
         workspaceId: input.workspaceId,
+        activeRunId: existing.value.activeRunId,
       });
       return existing;
     }
@@ -560,6 +566,7 @@ export class AgentTaskRunService {
         kind: "agent-task-run",
         id: result.taskRunId,
         workspaceId: input.workspaceId,
+        activeRunId: result.activeRunId,
       });
     } catch (error) {
       return err(
@@ -615,6 +622,7 @@ export class AgentTaskRunService {
           kind: "agent-task-run",
           id: taskRunId,
           workspaceId,
+          activeRunId: task.value.activeRunId,
         });
       } catch (error) {
         return err(
@@ -780,6 +788,7 @@ export class AgentTaskRunService {
         kind: "agent-task-run",
         id: task.taskRunId,
         workspaceId: task.workspaceId,
+        activeRunId: next.activeRunId,
       });
     } catch (error) {
       return err(

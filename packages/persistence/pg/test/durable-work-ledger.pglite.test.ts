@@ -4,7 +4,11 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createExecutionContext, toRepositoryContext } from "@appaloft/application";
+import {
+  createExecutionContext,
+  DurableSandboxAgentWorkQueue,
+  toRepositoryContext,
+} from "@appaloft/application";
 
 function context() {
   return toRepositoryContext(
@@ -333,6 +337,67 @@ describe("durable work ledger persistence", () => {
           deploymentId: "dep_2",
         },
       },
+    ]);
+
+    await database.close();
+  });
+
+  test("[GH-AUTO-CONTROL-010][GH-AUTO-LINEAGE-012][GH-AUTO-DURABLE-CREDENTIAL-023] persists one durable item per active Agent Run generation", async () => {
+    const { createDatabase, createMigrator, PgDurableWorkLedger } = await import("../src");
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-agent-task-generation-"));
+    const database = await createDatabase({
+      driver: "pglite",
+      pgliteDataDir: workspaceDir,
+    });
+    const migrator = createMigrator(database.db);
+    await migrator.migrateToLatest();
+    const ledger = new PgDurableWorkLedger(database.db);
+    let sequence = 0;
+    const queue = new DurableSandboxAgentWorkQueue(
+      ledger,
+      { now: () => "2026-07-31T00:00:00.000Z" },
+      { next: () => `dwi_agent_task_${++sequence}` },
+    );
+    const executionContext = createExecutionContext({
+      entrypoint: "system",
+      requestId: "req_agent_task_generation",
+      tenant: {
+        tenantId: "tenant_agent_task",
+        organizationId: "org_agent_task",
+        source: "test",
+      },
+    });
+    const initialGeneration = {
+      kind: "agent-task-run" as const,
+      id: "srun_task",
+      workspaceId: "sbx_task",
+      activeRunId: "srun_task",
+    };
+
+    await Promise.all([
+      queue.enqueue(executionContext, initialGeneration),
+      queue.enqueue(executionContext, initialGeneration),
+    ]);
+    await queue.enqueue(executionContext, {
+      ...initialGeneration,
+      activeRunId: "srun_task_2",
+    });
+
+    const listed = await ledger.listItems(toRepositoryContext(executionContext), {
+      kind: "sandbox-agent-delivery",
+      subjectKind: "agent-task-run",
+      subjectId: "srun_task",
+      limit: 100,
+    });
+    expect(listed.isOk()).toBe(true);
+    if (listed.isErr()) throw new Error(listed.error.message);
+    expect(listed.value.map((item) => item.dedupeKey).sort()).toEqual([
+      "agent-task-run:srun_task:srun_task",
+      "agent-task-run:srun_task:srun_task_2",
+    ]);
+    expect(listed.value.map((item) => item.safeInput?.activeRunId).sort()).toEqual([
+      "srun_task",
+      "srun_task_2",
     ]);
 
     await database.close();

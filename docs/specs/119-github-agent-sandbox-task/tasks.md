@@ -93,6 +93,9 @@
 - [x] GH-AUTO-DURABLE-CREDENTIAL-023: prove restarted process-local admission recovery and denied
   admission fail-closed behavior through the public Runtime service without a parallel admission
   table.
+- [x] GH-AUTO-CONTROL-010/GH-AUTO-LINEAGE-012: key durable Agent Task reconciliation by stable
+  Task plus active Run generation and make same-generation enqueue idempotent in application and
+  PostgreSQL persistence regressions (#938).
 - [ ] GH-AUTO-DURABLE-CREDENTIAL-023: compose hosted revoked/cross-scope restart coverage with zero
   secret resolution, process launch, or Sandbox effects after the public change is merged and pinned.
 

@@ -614,7 +614,12 @@ export interface SandboxAgentDeliveryDependencies {
       context: ExecutionContext,
       item:
         | { kind: "sandbox-agent-run" | "sandbox-promotion"; id: string }
-        | { kind: "agent-task-run"; id: string; workspaceId: string },
+        | {
+            kind: "agent-task-run";
+            id: string;
+            workspaceId: string;
+            activeRunId: string;
+          },
     ): Promise<void>;
   };
   artifactCapture: {
