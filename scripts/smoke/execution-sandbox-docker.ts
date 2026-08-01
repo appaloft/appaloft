@@ -118,6 +118,32 @@ async function cleanup(): Promise<void> {
   await rm(portableRecoveryRoot, { recursive: true, force: true });
 }
 
+async function assertWorkspaceProcessHome(
+  sandboxId: string,
+  providerHandle: string,
+  phase: string,
+): Promise<void> {
+  const result = await provider.exec({
+    sandboxId,
+    providerHandle,
+    argv: [
+      "sh",
+      "-c",
+      'printf "%s\\n%s\\n%s\\n%s\\n%s" "$HOME" "$XDG_DATA_HOME" "$XDG_CONFIG_HOME" "$XDG_STATE_HOME" "$XDG_CACHE_HOME"',
+    ],
+  });
+  assert(result.mode === "foreground", `${phase} process-home probe ran in the background`);
+  const stdout = result.frames
+    .filter((frame) => frame.kind === "stdout")
+    .map((frame) => frame.data)
+    .join("");
+  assert(
+    stdout ===
+      "/workspace\n/workspace/.local/share\n/workspace/.config\n/workspace/.local/state\n/workspace/.cache",
+    `${phase} process home escaped the Workspace: ${stdout}`,
+  );
+}
+
 try {
   const source = await provider.provision({
     sandboxId: sourceSandboxId,
@@ -150,6 +176,7 @@ try {
       foreground.frames.some((frame) => frame.kind === "stdout" && frame.data === "sandbox-smoke"),
     "foreground execution failed",
   );
+  await assertWorkspaceProcessHome(sourceSandboxId, source.providerHandle, "initial");
   const hibernated = await provider.pause({
     sandboxId: sourceSandboxId,
     providerHandle: source.providerHandle,
@@ -190,6 +217,7 @@ try {
   });
   hibernationHandle = undefined;
   handles.set(sourceSandboxId, resumed.providerHandle);
+  await assertWorkspaceProcessHome(sourceSandboxId, resumed.providerHandle, "resumed");
   const resumedBytes = await provider.readFile({
     sandboxId: sourceSandboxId,
     providerHandle: resumed.providerHandle,

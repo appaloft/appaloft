@@ -14,6 +14,11 @@ import {
   type SandboxNetworkPolicyState,
   SandboxWorkspacePath,
 } from "@appaloft/core";
+import { sandboxWorkspaceProcessEnvironment } from "./sandbox-workspace-process-environment";
+
+const sandboxProcessDockerExecArgs = Object.freeze(
+  sandboxWorkspaceProcessEnvironment.flatMap((value) => ["-e", value]),
+);
 
 export interface SandboxDockerCommandResult {
   exitCode: number;
@@ -738,12 +743,13 @@ export class DockerSandboxProvider implements SandboxProvider {
             "docker",
             "exec",
             "-it",
+            ...sandboxProcessDockerExecArgs,
             "-w",
             cwd,
             request.providerHandle,
             "sh",
             "-c",
-            'export HOME=/workspace; export XDG_DATA_HOME=/workspace/.local/share; stty -echo; exec sh -s -- "$@"',
+            'stty -echo; exec sh -s -- "$@"',
             "appaloft-managed-terminal",
             ...processArgv,
           ]
@@ -751,12 +757,13 @@ export class DockerSandboxProvider implements SandboxProvider {
             "docker",
             "exec",
             "-it",
+            ...sandboxProcessDockerExecArgs,
             "-w",
             cwd,
             request.providerHandle,
             "sh",
             "-lc",
-            'export HOME=/workspace; export XDG_DATA_HOME=/workspace/.local/share; if command -v bash >/dev/null 2>&1; then exec bash --noprofile --norc -i; fi; exec sh -i',
+            'if command -v bash >/dev/null 2>&1; then exec bash --noprofile --norc -i; fi; exec sh -i',
           ],
       {
         initialRows: request.initialRows,
@@ -862,6 +869,7 @@ export class DockerSandboxProvider implements SandboxProvider {
           await this.docker([
             "exec",
             "-d",
+            ...sandboxProcessDockerExecArgs,
             "-w",
             cwd,
             request.providerHandle,
@@ -909,6 +917,7 @@ export class DockerSandboxProvider implements SandboxProvider {
         await this.docker([
           "exec",
           "-d",
+          ...sandboxProcessDockerExecArgs,
           "-w",
           cwd,
           request.providerHandle,
@@ -929,6 +938,7 @@ export class DockerSandboxProvider implements SandboxProvider {
       [
         "exec",
         ...(request.stdin ? ["-i"] : []),
+        ...sandboxProcessDockerExecArgs,
         "-w",
         cwd,
         request.providerHandle,

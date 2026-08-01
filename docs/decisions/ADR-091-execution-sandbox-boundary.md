@@ -45,6 +45,9 @@ Enterprise customer-owned execution while creating a private replacement for pub
 9. Workspace file operations are confined below the provider-declared workspace root. Network
    policy is deny-by-default for untrusted execution; credential grants use secret references and
    destination-bound brokerage rather than plaintext result fields.
+   Every Sandbox process also receives a provider-owned writable home and XDG directories below
+   that workspace root. A read-only container root, host account home, or shared root/global Agent
+   home must never become process state, credential state, logs, caches, or recovery truth.
 10. Pause/resume preserves one Sandbox identity. Providers declare whether pause freezes an
     allocation or releases compute, plus the portability of recovery state; the detailed recovery
     contract is governed by ADR-097. Snapshot capture remains a reusable one-to-many source and

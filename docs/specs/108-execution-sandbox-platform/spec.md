@@ -61,6 +61,7 @@ Kubernetes, hosted providers and Enterprise customer-owned execution.
 | SANDBOX-SPEC-011 | External application SDK | An application has a scoped token | It calls generated SDK methods | SDK methods map to catalog operations and typed errors/streams; it does not import application/core or create SDK-only behavior. |
 | SANDBOX-SPEC-012 | Tenant, quota and audit | Multiple organizations create Sandboxes | Commands/queries/audit execute | Repository context isolates tenants, list queries are bounded, quota guards run before provider mutation, and safe lifecycle/exec/port/snapshot facts are auditable. |
 | SANDBOX-SPEC-013 | Reconciliation | The control plane or provider restarts during lifecycle work | Reconciliation runs | Desired and observed state converge idempotently; orphan cleanup is scoped by Appaloft ownership labels/handles and never deletes unrelated workloads. |
+| SANDBOX-SPEC-014 | Workspace-scoped process home | A Sandbox provider uses a read-only runtime root and a writable confined workspace | Any foreground, background, initialization, terminal, Agent, or resumed process starts | `HOME` and XDG data/config/state/cache resolve below the provider workspace root, survive compute-released pause/resume through declared workspace state, and never fall back to a host, root, or shared global home. |
 
 ## Public Surfaces
 

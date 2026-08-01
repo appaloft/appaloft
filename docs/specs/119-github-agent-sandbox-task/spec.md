@@ -9,7 +9,9 @@ public #932 governs the bounded Agent Run failure diagnostic exposed by the dedi
 acceptance. Public #934 governs the restart-safe durable tenant context and credential-admission
 replay exposed by external run `30597332756`. External run `30604398408` exposed that a control
 delivery did not reuse the current thread Task's status comment id; public #936 implements and
-validates the feedback-continuity regression fix. Hosted composition remains in Cloud #722-#727.
+validates the feedback-continuity regression fix. Public #941 governs the workspace-scoped
+process-home regression exposed by external run `30690194327`. Hosted composition remains in Cloud
+#722-#727.
 
 ## Goal
 
@@ -46,6 +48,7 @@ Sandbox cleanup.
 | GH-AUTO-BOUNDARY-021 | Single authoritative composition | A hosted or self-hosted runtime composes GitHub Agent automation | Runtime dependencies and delivery/finalization adapters are wired | SourceEvent owns delivery outcomes, the public automation store owns review/thread linkage, public credential metadata is reused, accepted execution intent/snapshot is immutable, repository materialization uses the existing template-populated Workspace root without deleting its files or requiring an empty clone destination, bounded delivery projection uses public seams, and no downstream runtime creates parallel Workspace/Task/Preview/Deployment/session/idempotency contracts or persistence. |
 | GH-AUTO-TENANT-022 | Resolved tenant parity | A runtime configures a tenant-context policy and an authenticated actor installs a Profile through public oRPC | The command or query enters the application bus and a later system trigger resolves the same organization | Both paths use the configured `TenantContextResolver`; the default public policy remains compatible, while custom hosted or self-hosted policies can canonicalize tenant identity without transport-specific or GitHub-specific lookup logic. |
 | GH-AUTO-DURABLE-CREDENTIAL-023 | Restart-safe credential admission | A credential-bound Sandbox Agent Runtime and Run survive a control-plane process restart | Durable work reconstructs its execution context and reconciles the Run | The durable item preserves tenant id plus optional organization id; the Runtime service idempotently replays process-credential admission from its persisted Profile pin and bindings before launch; current connection scope/status is revalidated, secrets remain process-scoped, and no parallel Runtime/Task/admission model is introduced. |
+| GH-AUTO-RUNTIME-HOME-024 | Isolated Agent process home | A GitHub Agent Task starts or resumes inside a read-only-root Sandbox | The Adapter launches native version, server, task, test, Preview, terminal, or fallback-session processes | Every process uses the existing Sandbox workspace-scoped home/XDG contract; native Agent logs, config, cache, and session state remain writable and recoverable below the isolated Workspace and never use root/global home. |
 
 ## Supported GitHub Inputs
 
@@ -70,6 +73,8 @@ Supported commands are `@appaloft fix`, `review`, `status`, `steer <instruction>
   immediately and remain recoverable for seven days.
 - Private Preview defaults to 24 hours and cannot exceed 72 hours.
 - Pull-request close performs destructive cleanup and removes recoverability for that thread.
+- Agent-native process homes are Workspace-scoped. A resumed Task must not depend on a writable
+  container root or shared server account home.
 
 ## Compatibility
 
