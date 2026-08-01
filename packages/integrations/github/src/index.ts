@@ -2226,7 +2226,7 @@ export class GitHubAgentTaskFeedbackAdapter implements GitHubAgentFeedbackPort {
 
     let checkRunId = existing.checkRunId;
     const checkHeadSha = input.trigger.pullRequest?.headSha ?? input.trigger.source?.headSha;
-    if (checkHeadSha) {
+    if (existing.checkRunId || checkHeadSha) {
       const check = githubAgentCheckRun(input.task, checkHeadSha);
       const { head_sha: _headSha, ...checkUpdate } = check;
       const checkId = await this.requestId(
@@ -2586,12 +2586,12 @@ function githubAgentStatusBody(task: GitHubAgentTaskSummary): string {
 
 function githubAgentCheckRun(
   task: GitHubAgentTaskSummary,
-  headSha: string,
+  headSha?: string,
 ): Record<string, unknown> {
   if (task.status === "queued") {
     return {
       name: "Appaloft Agent Task",
-      head_sha: headSha,
+      ...(headSha ? { head_sha: headSha } : {}),
       status: "queued",
       details_url: task.taskUrl,
       output: { title: "Task queued", summary: githubAgentStatusBody(task) },
@@ -2600,7 +2600,7 @@ function githubAgentCheckRun(
   if (task.status === "running") {
     return {
       name: "Appaloft Agent Task",
-      head_sha: headSha,
+      ...(headSha ? { head_sha: headSha } : {}),
       status: "in_progress",
       details_url: task.taskUrl,
       output: { title: "Task running", summary: githubAgentStatusBody(task) },
@@ -2616,7 +2616,7 @@ function githubAgentCheckRun(
           : "neutral";
   return {
     name: "Appaloft Agent Task",
-    head_sha: headSha,
+    ...(headSha ? { head_sha: headSha } : {}),
     status: "completed",
     conclusion,
     details_url: task.taskUrl,

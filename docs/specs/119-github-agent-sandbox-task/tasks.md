@@ -135,6 +135,8 @@
 - [x] Preserve the current thread Task's status comment and Check ids across distinct
   `status`/`steer`/`stop`/`resume` deliveries and process restart; prove control acknowledgements
   remain per delivery while Task feedback is updated in place (#936).
+- [x] Update an existing head-bound Check from a control delivery without requiring a newly
+  hydrated source SHA; retain exact-SHA admission for Check creation (#953).
 
 ## Retention And Cleanup Slice
 
@@ -159,6 +161,9 @@
   context and pre-Workspace fail-closed behavior.
 - [x] Docs outcome for #925: not user-facing. The fix restores the already documented repository
   materialization workflow and changes no command, API, status, error code, or recovery guidance.
+- [x] Docs outcome for #953: not user-facing. The adapter correction restores the existing
+  `agents/github-agent-tasks#github-agent-tasks` contract that one current Task comment and Check
+  converge without adding or changing a user command, field, page, or help anchor.
 - [x] Docs outcome for #927: not user-facing. The fix restores the already documented
   installation-authenticated materialization behavior and changes no public command or contract.
 - [x] Reopen #927 after registered-server smoke proved Docker's Workspace tmpfs is `noexec`;

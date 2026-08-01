@@ -293,6 +293,51 @@ describe("GitHub Agent Task feedback adapter", () => {
     }
   });
 
+  test("[GH-AUTO-FEEDBACK-013] updates an existing Check when a control delivery has no new source SHA", async () => {
+    const requests: Array<{ url: string; method: string; body: unknown }> = [];
+    const adapter = createGitHubAgentTaskFeedbackAdapter(
+      "installation-token",
+      async (url, init) => {
+        requests.push({
+          url: String(url),
+          method: init?.method ?? "GET",
+          body: init?.body ? JSON.parse(String(init.body)) : undefined,
+        });
+        return Response.json({ id: String(url).endsWith("/check-runs/302") ? 302 : 301 });
+      },
+      "https://api.github.test",
+    );
+
+    const result = await adapter.update(context, {
+      trigger: {
+        ...trigger,
+        thread: { kind: "issue", number: 45 },
+        pullRequest: undefined,
+        source: undefined,
+        command: { kind: "resume" },
+      },
+      task: { ...queued, status: "completed" },
+      existing: { statusCommentId: "301", checkRunId: "302" },
+    });
+
+    expect(result._unsafeUnwrap()).toEqual({ statusCommentId: "301", checkRunId: "302" });
+    expect(requests.map(({ url, method }) => ({ url, method }))).toEqual([
+      {
+        url: "https://api.github.test/repos/appaloft/agent-sandbox-smoke/issues/comments/301",
+        method: "PATCH",
+      },
+      {
+        url: "https://api.github.test/repos/appaloft/agent-sandbox-smoke/check-runs/302",
+        method: "PATCH",
+      },
+    ]);
+    expect(requests[1]?.body).toMatchObject({
+      status: "completed",
+      conclusion: "success",
+    });
+    expect(requests[1]?.body).not.toHaveProperty("head_sha");
+  });
+
   test("[GH-AUTO-FEEDBACK-013] omits a Check when no exact source SHA is available", async () => {
     const requests: Array<{ url: string; method: string }> = [];
     const adapter = createGitHubAgentTaskFeedbackAdapter(
