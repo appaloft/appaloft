@@ -1,4 +1,4 @@
-import { domainError, err, ok, type Result } from "@appaloft/core";
+import { type DomainErrorDetails, domainError, err, ok, type Result } from "@appaloft/core";
 import { z } from "zod";
 
 export const emptyOperationInputSchema = z.object({});
@@ -83,13 +83,78 @@ export function trimToUndefined(value?: string | null): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
+function validationIssuePath(path: unknown, trailingKey?: string): string {
+  const segments = Array.isArray(path)
+    ? path
+        .filter((segment) => typeof segment === "string" || typeof segment === "number")
+        .map(String)
+    : [];
+  if (trailingKey) {
+    segments.push(trailingKey);
+  }
+  return segments.length > 0 ? segments.join(".") : "$";
+}
+
+export type OperationInputValidationPhase = "command-validation" | "query-validation";
+
+export function operationInputValidationDetails(
+  issues: unknown,
+  phase: OperationInputValidationPhase,
+): DomainErrorDetails {
+  const validationIssueCodes: string[] = [];
+  const validationIssuePaths: string[] = [];
+  const validationIssueMessages: string[] = [];
+
+  for (const issue of Array.isArray(issues) ? issues : []) {
+    if (!issue || typeof issue !== "object") {
+      continue;
+    }
+
+    const record = issue as Record<string, unknown>;
+    if (record.code === "unrecognized_keys" && Array.isArray(record.keys)) {
+      for (const key of record.keys) {
+        if (typeof key !== "string") {
+          continue;
+        }
+        const path = validationIssuePath(record.path, key);
+        validationIssueCodes.push("unsupported_field");
+        validationIssuePaths.push(path);
+        validationIssueMessages.push(`Unsupported field: ${path}`);
+      }
+      continue;
+    }
+
+    const path = validationIssuePath(record.path);
+    validationIssueCodes.push("invalid_input");
+    validationIssuePaths.push(path);
+    validationIssueMessages.push(`Invalid input at ${path}`);
+  }
+
+  return {
+    phase,
+    validationIssueCodes,
+    validationIssuePaths,
+    validationIssueMessages,
+  };
+}
+
 export function parseOperationInput<TSchema extends z.ZodTypeAny>(
   schema: TSchema,
   input: unknown,
+  options?: { validationPhase: OperationInputValidationPhase },
 ): Result<z.output<TSchema>> {
   const parsed = schema.safeParse(input);
 
   if (!parsed.success) {
+    if (options) {
+      return err(
+        domainError.validation(
+          "Input validation failed",
+          operationInputValidationDetails(parsed.error.issues, options.validationPhase),
+        ),
+      );
+    }
+
     return err(
       domainError.validation(parsed.error.issues[0]?.message ?? "Input validation failed"),
     );

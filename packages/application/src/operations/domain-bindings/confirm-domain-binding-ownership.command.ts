@@ -31,7 +31,9 @@ export class ConfirmDomainBindingOwnershipCommand extends Command<{
   static create(
     input: ConfirmDomainBindingOwnershipCommandInput,
   ): Result<ConfirmDomainBindingOwnershipCommand> {
-    return parseOperationInput(confirmDomainBindingOwnershipCommandInputSchema, input).map(
+    return parseOperationInput(confirmDomainBindingOwnershipCommandInputSchema, input, {
+      validationPhase: "command-validation",
+    }).map(
       (parsed) =>
         new ConfirmDomainBindingOwnershipCommand(
           parsed.domainBindingId,

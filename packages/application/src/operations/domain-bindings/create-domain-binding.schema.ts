@@ -28,6 +28,7 @@ export const createDomainBindingCommandInputSchema = z
     certificatePolicy: z.enum(certificatePolicies).optional(),
     idempotencyKey: nonEmptyTrimmedString("Idempotency key").optional(),
   })
+  .strict()
   .superRefine((value, context) => {
     if (!value.serverId && value.destinationId) {
       context.addIssue({

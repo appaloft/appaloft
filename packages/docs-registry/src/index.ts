@@ -259,6 +259,37 @@ export const publicDocsHelpTopics = {
       "docs/testing/error-knowledge-contract-test-matrix.md",
     ],
   },
+  "errors.operation-input-validation": {
+    id: "errors.operation-input-validation",
+    title: "Operation input validation",
+    description:
+      "How deployment-critical operation inputs reject unsupported fields and return privacy-safe issue paths.",
+    page: {
+      "zh-CN": "reference/errors-statuses",
+      "en-US": "en/reference/errors-statuses",
+    },
+    anchor: "operation-input-validation",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "mcp"],
+    relatedOperation: "resources.configure-network",
+    aliases: [
+      "unsupported field",
+      "unknown field",
+      "strict input",
+      "additionalProperties",
+      "未知字段",
+      "输入校验",
+    ],
+    specReferences: [
+      "docs/errors/model.md",
+      "docs/errors/resources.lifecycle.md",
+      "docs/errors/routing-domain-tls.md",
+      "docs/testing/operation-input-contract-test-matrix.md",
+    ],
+  },
   "errors.remote-state-lock": {
     id: "errors.remote-state-lock",
     title: "Remote state lock",

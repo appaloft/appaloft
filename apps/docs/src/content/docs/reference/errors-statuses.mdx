@@ -4,13 +4,16 @@ description: "用户可见错误、阶段和状态说明。"
 docType: "reference"
 localeState:
   zh-CN: complete
-  en-US: needs-update
+  en-US: complete
 searchAliases:
   - "error"
   - "status"
   - "phase"
   - "错误"
 relatedOperations:
+  - "resources.configure-network"
+  - "domain-bindings.create"
+  - "certificates.issue-or-renew"
   - "operator-work.list"
   - "operator-work.show"
   - "audit-events.list"
@@ -33,6 +36,23 @@ Appaloft 的用户可见错误不是一段自然语言消息——它是一个�
 | `actionability` | 调用方应该修正输入、等待重试、运行诊断、交给自动恢复,还是无需动作 |
 | `links` | 人类可读的公共文档、Agent/LLM 可读指南、相关 Spec/Runbook |
 | `remedies` | 可以安全展示或自动建议的恢复动作 |
+
+## 操作输入校验 <a id="operation-input-validation" />
+
+资源网络、托管域名和证书写操作会拒绝未知字段,不会在静默丢弃字段后继续执行。这个规则同时作用于顶层输入和命令拥有的嵌套对象。例如,把 `domains` 或 `authentication` 传给 `resources.configure-network`,或者传入未知的 `networkProfile.routingMode`,都会在 dispatch 和持久化之前失败。
+
+调用方会收到稳定的 `validation_error`,并在 `details` 中看到:
+
+| 字段 | 含义 |
+| --- | --- |
+| `phase` | 固定为 `command-validation` |
+| `validationIssueCodes` | 每个问题的稳定 code;未知字段为 `unsupported_field`,其他非法输入为 `invalid_input` |
+| `validationIssuePaths` | 与 code 对齐的字段路径,例如 `networkProfile.routingMode` |
+| `validationIssueMessages` | 与 code/path 对齐的安全说明 |
+
+这三组数组按相同下标对应同一个问题。details 只包含字段名和安全说明,不会回显字段值、证书材料、凭据、Token 或密钥。HTTP/API 返回 `400`;CLI 和 MCP 返回同一个结构化错误。生成的 MCP input schema 会用 `additionalProperties: false` 告诉客户端这些对象不接受额外字段。
+
+恢复方式是删除拼错或不属于该 operation 的字段,或者改用拥有该意图的显式 operation。不要把校验失败当成“部分字段已经保存”;命令没有进入 dispatch 或持久化。
 
 ## Agent 应该如何读取错误
 

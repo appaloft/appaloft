@@ -28,7 +28,9 @@ export class RetryDomainBindingVerificationCommand extends Command<RetryDomainBi
   static create(
     input: RetryDomainBindingVerificationCommandInput,
   ): Result<RetryDomainBindingVerificationCommand> {
-    return parseOperationInput(retryDomainBindingVerificationCommandInputSchema, input).map(
+    return parseOperationInput(retryDomainBindingVerificationCommandInputSchema, input, {
+      validationPhase: "command-validation",
+    }).map(
       (parsed) =>
         new RetryDomainBindingVerificationCommand(
           parsed.domainBindingId,

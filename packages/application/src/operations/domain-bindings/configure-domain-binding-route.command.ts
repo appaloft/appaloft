@@ -25,7 +25,9 @@ export class ConfigureDomainBindingRouteCommand extends Command<{ id: string }> 
   static create(
     input: ConfigureDomainBindingRouteCommandInput,
   ): Result<ConfigureDomainBindingRouteCommand> {
-    return parseOperationInput(configureDomainBindingRouteCommandInputSchema, input).map(
+    return parseOperationInput(configureDomainBindingRouteCommandInputSchema, input, {
+      validationPhase: "command-validation",
+    }).map(
       (parsed) =>
         new ConfigureDomainBindingRouteCommand(
           parsed.domainBindingId,

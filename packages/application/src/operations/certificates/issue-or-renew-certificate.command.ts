@@ -33,7 +33,9 @@ export class IssueOrRenewCertificateCommand extends Command<IssueOrRenewCertific
   static create(
     input: IssueOrRenewCertificateCommandInput,
   ): Result<IssueOrRenewCertificateCommand> {
-    return parseOperationInput(issueOrRenewCertificateCommandInputSchema, input).map(
+    return parseOperationInput(issueOrRenewCertificateCommandInputSchema, input, {
+      validationPhase: "command-validation",
+    }).map(
       (parsed) =>
         new IssueOrRenewCertificateCommand(
           parsed.domainBindingId,

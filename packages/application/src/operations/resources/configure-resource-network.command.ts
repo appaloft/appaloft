@@ -24,7 +24,9 @@ export class ConfigureResourceNetworkCommand extends Command<{ id: string }> {
   static create(
     input: ConfigureResourceNetworkCommandInput,
   ): Result<ConfigureResourceNetworkCommand> {
-    return parseOperationInput(configureResourceNetworkCommandInputSchema, input).map(
+    return parseOperationInput(configureResourceNetworkCommandInputSchema, input, {
+      validationPhase: "command-validation",
+    }).map(
       (parsed) => new ConfigureResourceNetworkCommand(parsed.resourceId, parsed.networkProfile),
     );
   }

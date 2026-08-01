@@ -9,6 +9,7 @@ import {
   DeleteCertificateCommand,
   type ExecutionContext,
   type ExecutionContextFactory,
+  type ProductSessionAuthorizationPort,
   type Query,
   type QueryBus,
   RetryCertificateCommand,
@@ -34,8 +35,26 @@ class TestExecutionContextFactory implements ExecutionContextFactory {
       entrypoint: input.entrypoint,
       locale: input.locale,
       actor: input.actor,
+      principal: input.principal,
     });
   }
+}
+
+const productSessionAuthorizationPort: ProductSessionAuthorizationPort = {
+  authorizeProductSession: async (_context, input) =>
+    ok({
+      actor: { kind: "user", id: "usr_certificate", label: "certificate@example.test" },
+      email: "certificate@example.test",
+      organizationId: input.organizationId ?? "org_certificate",
+      role: input.requiredRole,
+      userId: "usr_certificate",
+    }),
+};
+
+function certificateRequest(url: string, init: RequestInit): Request {
+  const headers = new Headers(init.headers);
+  headers.set("cookie", "better-auth.session_token=certificate-lifecycle-test");
+  return new Request(url, { ...init, headers });
 }
 
 function createApp() {
@@ -67,6 +86,7 @@ function createApp() {
     commandBus,
     executionContextFactory: new TestExecutionContextFactory(),
     logger: new NoopLogger(),
+    productSessionAuthorizationPort,
     queryBus,
   });
 
@@ -82,7 +102,7 @@ describe("certificate lifecycle HTTP routes", () => {
     const harness = createApp();
 
     const response = await harness.app.handle(
-      new Request("http://localhost/api/certificates/crt_demo", {
+      certificateRequest("http://localhost/api/certificates/crt_demo", {
         method: "GET",
       }),
     );
@@ -100,7 +120,7 @@ describe("certificate lifecycle HTTP routes", () => {
     const harness = createApp();
 
     const response = await harness.app.handle(
-      new Request("http://localhost/api/certificates/crt_demo/retries", {
+      certificateRequest("http://localhost/api/certificates/crt_demo/retries", {
         method: "POST",
         body: JSON.stringify({ certificateId: "crt_demo", idempotencyKey: "retry-key" }),
         headers: { "content-type": "application/json" },
@@ -116,11 +136,40 @@ describe("certificate lifecycle HTTP routes", () => {
     });
   });
 
+  test("[OP-INPUT-HTTP-003] rejects unsupported certificate retry fields before dispatch", async () => {
+    const harness = createApp();
+
+    const response = await harness.app.handle(
+      certificateRequest("http://localhost/api/certificates/crt_demo/retries", {
+        method: "POST",
+        body: JSON.stringify({
+          certificateId: "crt_demo",
+          idempotencyKey: "retry-key",
+          providerKey: "unsupported-provider",
+        }),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "validation_error",
+        details: {
+          phase: "command-validation",
+          validationIssueCodes: ["unsupported_field"],
+          validationIssuePaths: ["providerKey"],
+        },
+      },
+    });
+    expect(harness.capturedCommand()).toBeUndefined();
+  });
+
   test("[ROUTE-TLS-ENTRY-028] dispatches certificate revoke through CommandBus", async () => {
     const harness = createApp();
 
     const response = await harness.app.handle(
-      new Request("http://localhost/api/certificates/crt_demo/revoke", {
+      certificateRequest("http://localhost/api/certificates/crt_demo/revoke", {
         method: "POST",
         body: JSON.stringify({ certificateId: "crt_demo", reason: "operator-requested" }),
         headers: { "content-type": "application/json" },
@@ -140,7 +189,7 @@ describe("certificate lifecycle HTTP routes", () => {
     const harness = createApp();
 
     const response = await harness.app.handle(
-      new Request("http://localhost/api/certificates/crt_demo", {
+      certificateRequest("http://localhost/api/certificates/crt_demo", {
         method: "DELETE",
         body: JSON.stringify({
           certificateId: "crt_demo",
@@ -157,5 +206,33 @@ describe("certificate lifecycle HTTP routes", () => {
       certificateId: "crt_demo",
       confirmation: { certificateId: "crt_demo" },
     });
+  });
+
+  test("[OP-INPUT-HTTP-003] rejects unsupported nested certificate delete fields before dispatch", async () => {
+    const harness = createApp();
+
+    const response = await harness.app.handle(
+      certificateRequest("http://localhost/api/certificates/crt_demo", {
+        method: "DELETE",
+        body: JSON.stringify({
+          certificateId: "crt_demo",
+          confirmation: { certificateId: "crt_demo", force: true },
+        }),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "validation_error",
+        details: {
+          phase: "command-validation",
+          validationIssueCodes: ["unsupported_field"],
+          validationIssuePaths: ["confirmation.force"],
+        },
+      },
+    });
+    expect(harness.capturedCommand()).toBeUndefined();
   });
 });

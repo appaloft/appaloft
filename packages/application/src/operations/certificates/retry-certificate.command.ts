@@ -27,7 +27,9 @@ export class RetryCertificateCommand extends Command<RetryCertificateCommandResu
   }
 
   static create(input: RetryCertificateCommandInput): Result<RetryCertificateCommand> {
-    return parseOperationInput(retryCertificateCommandInputSchema, input).map(
+    return parseOperationInput(retryCertificateCommandInputSchema, input, {
+      validationPhase: "command-validation",
+    }).map(
       (parsed) =>
         new RetryCertificateCommand(
           parsed.certificateId,

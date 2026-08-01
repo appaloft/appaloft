@@ -148,6 +148,7 @@ export const createResourceNetworkProfileInputSchema = z
     targetServiceName: z.string().trim().min(1).optional(),
     hostPort: z.number().int().positive().optional(),
   })
+  .strict()
   .superRefine((value, context) => {
     if (value.hostPort && value.exposureMode !== "direct-port") {
       context.addIssue({

@@ -30,7 +30,9 @@ export class ImportCertificateCommand extends Command<ImportCertificateCommandRe
   }
 
   static create(input: ImportCertificateCommandInput): Result<ImportCertificateCommand> {
-    return parseOperationInput(importCertificateCommandInputSchema, input).map(
+    return parseOperationInput(importCertificateCommandInputSchema, input, {
+      validationPhase: "command-validation",
+    }).map(
       (parsed) =>
         new ImportCertificateCommand(
           parsed.domainBindingId,
