@@ -57,6 +57,11 @@ Enterprise customer-owned execution while creating a private replacement for pub
 12. Cloud and Enterprise behavior is injected through public ports, policies, event consumers,
     projections and composition roots. Public Appaloft contains no Cloud pricing, fleet topology,
     official domain or license rules.
+13. A provider operation admitted from a ready Sandbox may complete after pause, resume, terminate,
+    or reconciliation has advanced the aggregate. Its late activity bookkeeping must never save the
+    stale pre-transition aggregate or replace the current lifecycle status/provider recovery handle.
+    Activity recording must re-read and respect current lifecycle truth; if the Sandbox is no longer
+    ready, the provider result may be returned without mutating aggregate state.
 
 ## Context Relationships
 

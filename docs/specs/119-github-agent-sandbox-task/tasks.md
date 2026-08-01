@@ -30,6 +30,8 @@
 - [x] Create and link public workspace-scoped process-home issue #941 after external run
   `30690194327` proved a resumed OpenCode Run attempted to open
   `/root/.local/share/opencode/log/opencode.log` inside a read-only-root Sandbox.
+- [x] Create and link public pause-safe activity persistence issue #951 after external run
+  `30699497767` proved a late ready-state activity save replaced the paused recovery handle.
 
 ## Public Composition Boundary Slice
 
@@ -106,6 +108,8 @@
 - [x] SBX-RUNTIME-005/GH-AUTO-RUNTIME-HOME-024: make Docker exec/terminal and OpenCode native
   process launches share one writable Workspace-scoped HOME/XDG contract; prove the exact
   read-only-root regression and compute-released resume path.
+- [x] GH-AUTO-LIFECYCLE-025: block an admitted runtime operation, pause the Sandbox, then finish the
+  old operation and prove its activity bookkeeping cannot overwrite paused state or recovery handle.
 
 ## GitHub Feedback And Delivery Slice
 
@@ -175,6 +179,16 @@
 - [x] Docs outcome for #947: not user-facing. The fix restores the existing Agent Run completion
   contract and changes no command, API schema, status vocabulary, Console affordance, or recovery
   guidance.
+- [x] Docs outcome for #951: not user-facing. The fix narrows activity persistence so it cannot
+  overwrite the already documented Sandbox pause/resume/cleanup lifecycle; no command, API schema,
+  status vocabulary, Console affordance, or recovery guidance changes.
+- [x] Prove #951 with deterministic detached-aggregate concurrency and PostgreSQL conditional-update
+  regressions; run public lint, 61-package typecheck, 5-task build, and the canonical 35-task test
+  gate. The first two full-test attempts exposed unrelated existing timing/environment flakes; the
+  exact tests passed in isolation and the final canonical run passed 35/35 tasks.
+- [x] Pass the independent read-only public/private pre-delivery boundary review with P0 0, P1 0,
+  and no new P2 finding; the narrow activity operation belongs to the public Sandbox repository and
+  Cloud adds no lifecycle state or workaround.
 - [x] Synchronize Domain Model, Business Operation Map, operation catalog, SDK/CLI/Web docs, and
   Test Matrix evidence.
 - [ ] Commit and push public changes with a neutral message.

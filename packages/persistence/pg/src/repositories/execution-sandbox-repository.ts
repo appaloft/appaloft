@@ -222,6 +222,28 @@ export class PgExecutionSandboxRepository implements SandboxRepository {
       .execute();
   }
 
+  async recordActivityIfReady(
+    context: RepositoryContext,
+    sandboxId: string,
+    at: UpdatedAt,
+  ): Promise<boolean> {
+    const timestamp = at.value;
+    const updated = await resolveRepositoryExecutor(this.db, context)
+      .updateTable("execution_sandboxes")
+      .set({
+        state: sql`jsonb_set(state, '{lastActivityAt}', to_jsonb(${timestamp}::text), true)`,
+        updated_at: timestamp,
+      })
+      .where("tenant_id", "=", contextTenantId(context))
+      .where("id", "=", sandboxId)
+      .where("status", "=", "ready")
+      .where(
+        sql<boolean>`coalesce((state ->> 'lastActivityAt')::timestamptz, created_at) <= ${timestamp}::timestamptz`,
+      )
+      .executeTakeFirst();
+    return updated.numUpdatedRows > 0n;
+  }
+
   async find(context: RepositoryContext, sandboxId: string): Promise<StoredSandbox | null> {
     const row = await resolveRepositoryExecutor(this.db, context)
       .selectFrom("execution_sandboxes")

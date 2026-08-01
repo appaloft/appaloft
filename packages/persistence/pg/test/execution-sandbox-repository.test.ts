@@ -94,6 +94,17 @@ describe("PgExecutionSandboxRepository", () => {
         rules: [],
       });
       expect(
+        await repository.recordActivityIfReady(
+          context("tenant_a"),
+          "sbx_pg",
+          UpdatedAt.rehydrate("2026-07-20T00:00:02.500Z"),
+        ),
+      ).toBe(true);
+      expect(
+        (await repository.find(context("tenant_a"), "sbx_pg"))?.sandbox.toState().lastActivityAt
+          ?.value,
+      ).toBe("2026-07-20T00:00:02.500Z");
+      expect(
         await repository.listProviderRuntimes(context("tenant_a"), {
           providerKey: "hermetic",
           limit: 10,
@@ -107,20 +118,36 @@ describe("PgExecutionSandboxRepository", () => {
           offset: 0,
         }),
       ).toEqual([]);
-      aggregate
+      const lifecycle = (await repository.find(context("tenant_a"), "sbx_pg"))?.sandbox;
+      if (!lifecycle) throw new Error("Sandbox lifecycle fixture is missing");
+      lifecycle
         .requestPause({ at: UpdatedAt.rehydrate("2026-07-20T00:00:03.000Z") })
         ._unsafeUnwrap();
-      aggregate
+      lifecycle
         .markPaused({
           at: UpdatedAt.rehydrate("2026-07-20T00:00:04.000Z"),
           providerHandle: "opaque:snapshot",
           suspension: { mode: "process-frozen", portability: "provider-local" },
         })
         ._unsafeUnwrap();
-      aggregate
+      lifecycle
         .requestResume({ at: UpdatedAt.rehydrate("2026-07-20T00:00:05.000Z") })
         ._unsafeUnwrap();
-      await repository.save(context("tenant_a"), aggregate, "hermetic");
+      await repository.save(context("tenant_a"), lifecycle, "hermetic");
+      expect(
+        await repository.recordActivityIfReady(
+          context("tenant_a"),
+          "sbx_pg",
+          UpdatedAt.rehydrate("2026-07-20T00:00:06.000Z"),
+        ),
+      ).toBe(false);
+      expect(
+        (await repository.find(context("tenant_a"), "sbx_pg"))?.sandbox.toState(),
+      ).toMatchObject({
+        status: { value: "resuming" },
+        providerHandle: "opaque:snapshot",
+        lastActivityAt: { value: "2026-07-20T00:00:02.500Z" },
+      });
       expect(
         await repository.listProviderRuntimeClaims(context("tenant_a"), {
           providerKey: "hermetic",

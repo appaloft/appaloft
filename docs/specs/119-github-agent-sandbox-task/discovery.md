@@ -90,3 +90,18 @@ Review Round becomes a durable downstream-Code and merge gate.
   wrap or copy this neutral isolation behavior. The owner instructed the work to continue under the
   original GitHub Agent Sandbox Task goal, so Spec, Ticket, Test-First, and public Code rounds are
   authorized for this repair.
+
+## 2026-08-01 Pause/Activity Concurrency Evidence
+
+- External run `30699497767` kept one Task `srun_er8q3l6yah9v`, one Workspace
+  `sbx_6fnk2al7y3ui`, one bounded status comment, and truthful fallback session recovery across
+  steer, stop, and resume.
+- Stop released the exact Docker container, but an already-admitted Sandbox runtime operation later
+  persisted its pre-pause aggregate snapshot while recording activity. PostgreSQL then again
+  described the Sandbox as ready with the deleted container handle instead of paused with its
+  recovery handle. Resume and product cleanup consequently failed with
+  `sandbox_provider_operation_failed`; the external exact-fixture cleanup still proved zero remote
+  artifacts but cannot count as product cleanup success.
+- This is a provider-neutral public lifecycle race in `ExecutionSandboxService.withActivity`, not a
+  registered-Server tenancy or hosted orchestration concern. Cloud must not add a private lock,
+  shadow lifecycle field, or missing-container cleanup workaround.

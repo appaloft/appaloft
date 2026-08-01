@@ -10,8 +10,9 @@ acceptance. Public #934 governs the restart-safe durable tenant context and cred
 replay exposed by external run `30597332756`. External run `30604398408` exposed that a control
 delivery did not reuse the current thread Task's status comment id; public #936 implements and
 validates the feedback-continuity regression fix. Public #941 governs the workspace-scoped
-process-home regression exposed by external run `30690194327`. Hosted composition remains in Cloud
-#722-#727.
+process-home regression exposed by external run `30690194327`. Public #951 governs the
+pause/activity concurrency regression exposed by external run `30699497767`. Hosted composition
+remains in Cloud #722-#727.
 
 ## Goal
 
@@ -49,6 +50,7 @@ Sandbox cleanup.
 | GH-AUTO-TENANT-022 | Resolved tenant parity | A runtime configures a tenant-context policy and an authenticated actor installs a Profile through public oRPC | The command or query enters the application bus and a later system trigger resolves the same organization | Both paths use the configured `TenantContextResolver`; the default public policy remains compatible, while custom hosted or self-hosted policies can canonicalize tenant identity without transport-specific or GitHub-specific lookup logic. |
 | GH-AUTO-DURABLE-CREDENTIAL-023 | Restart-safe credential admission | A credential-bound Sandbox Agent Runtime and Run survive a control-plane process restart | Durable work reconstructs its execution context and reconciles the Run | The durable item preserves tenant id plus optional organization id; the Runtime service idempotently replays process-credential admission from its persisted Profile pin and bindings before launch; current connection scope/status is revalidated, secrets remain process-scoped, and no parallel Runtime/Task/admission model is introduced. |
 | GH-AUTO-RUNTIME-HOME-024 | Isolated Agent process home | A GitHub Agent Task starts or resumes inside a read-only-root Sandbox | The Adapter launches native version, server, task, test, Preview, terminal, or fallback-session processes | Every process uses the existing Sandbox workspace-scoped home/XDG contract; native Agent logs, config, cache, and session state remain writable and recoverable below the isolated Workspace and never use root/global home. |
+| GH-AUTO-LIFECYCLE-025 | Pause-safe activity persistence | A runtime operation admitted while a Sandbox is ready completes after pause or another lifecycle transition has persisted | The operation records provider activity | Activity bookkeeping re-reads current Sandbox truth and cannot replace the newer lifecycle status or provider recovery handle; a non-ready current Sandbox remains unchanged so resume and exact cleanup use the authoritative handle. |
 
 ## Supported GitHub Inputs
 

@@ -1,14 +1,16 @@
 import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
-import { ok } from "@appaloft/core";
+import { ok, Sandbox } from "@appaloft/core";
 import {
   createExecutionContext,
   ExecutionSandboxService,
   InMemorySandboxRepository,
+  type RepositoryContext,
   type SandboxProvider,
   SandboxProviderRegistry,
   StaticSandboxQuotaPolicy,
   StaticSandboxSnapshotLifecyclePolicy,
+  type StoredSandbox,
 } from "../src";
 
 const context = createExecutionContext({
@@ -16,6 +18,37 @@ const context = createExecutionContext({
   requestId: "req_sandbox_test",
   tenant: { tenantId: "tenant_a", organizationId: "org_a" },
 });
+
+class DetachedSandboxRepository extends InMemorySandboxRepository {
+  private readonly detached = new Map<string, StoredSandbox>();
+
+  override async save(
+    context: RepositoryContext,
+    sandbox: Sandbox,
+    providerKey: string,
+  ): Promise<void> {
+    const tenantId = context.tenant?.tenantId ?? "tenant_instance";
+    this.detached.set(`${tenantId}:${sandbox.id.value}`, {
+      tenantId,
+      providerKey,
+      sandbox: Sandbox.rehydrate(sandbox.toState()),
+    });
+  }
+
+  override async find(
+    context: RepositoryContext,
+    sandboxId: string,
+  ): Promise<StoredSandbox | null> {
+    const tenantId = context.tenant?.tenantId ?? "tenant_instance";
+    const stored = this.detached.get(`${tenantId}:${sandboxId}`);
+    return stored
+      ? {
+          ...stored,
+          sandbox: Sandbox.rehydrate(stored.sandbox.toState()),
+        }
+      : null;
+  }
+}
 
 function provider(input: { isolation?: "container-trusted" | "gvisor" } = {}) {
   let provisionCalls = 0;
@@ -658,6 +691,52 @@ describe("ExecutionSandboxService", () => {
       providerKey: "hermetic",
     });
     expect(resumed.suspension).toBeUndefined();
+  });
+
+  test("[GH-AUTO-LIFECYCLE-025] late activity cannot overwrite paused recovery state", async () => {
+    const fake = provider();
+    const originalExec = fake.adapter.exec.bind(fake.adapter);
+    let releaseExec!: () => void;
+    let markExecEntered!: () => void;
+    const execGate = new Promise<void>((resolve) => {
+      releaseExec = resolve;
+    });
+    const execEntered = new Promise<void>((resolve) => {
+      markExecEntered = resolve;
+    });
+    fake.adapter.exec = async (request) => {
+      markExecEntered();
+      await execGate;
+      return originalExec(request);
+    };
+    const app = service(fake.adapter, undefined, {
+      repository: new DetachedSandboxRepository(),
+    });
+    await app.createAndReconcile(context, createInput);
+
+    const lateExec = app.exec(context, "sbx_test", { argv: ["python", "-V"] });
+    await execEntered;
+    expect((await app.pause(context, "sbx_test"))._unsafeUnwrap()).toMatchObject({
+      status: "paused",
+      suspension: { mode: "compute-released", portability: "provider-local" },
+    });
+    releaseExec();
+    expect((await lateExec).isOk()).toBe(true);
+
+    expect((await app.show(context, "sbx_test"))._unsafeUnwrap()).toMatchObject({
+      status: "paused",
+      suspension: { mode: "compute-released", portability: "provider-local" },
+    });
+    let resumeHandle = "";
+    fake.adapter.resume = async (request) => {
+      resumeHandle = request.providerHandle;
+      return {
+        providerHandle: `handle:${request.sandboxId}:resumed`,
+        realizedIsolation: "gvisor",
+      };
+    };
+    expect((await app.resume(context, "sbx_test"))._unsafeUnwrap().status).toBe("ready");
+    expect(resumeHandle).toBe("recovery:sbx_test");
   });
 
   test("[HIB-APP-003] retains paused recovery metadata when resume fails", async () => {
