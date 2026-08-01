@@ -6,14 +6,16 @@ export const domainBindingOwnershipVerificationModes = ["dns", "manual"] as cons
 export type DomainBindingOwnershipVerificationMode =
   (typeof domainBindingOwnershipVerificationModes)[number];
 
-export const confirmDomainBindingOwnershipCommandInputSchema = z.object({
-  domainBindingId: nonEmptyTrimmedString("Domain binding id"),
-  verificationAttemptId: nonEmptyTrimmedString("Verification attempt id").optional(),
-  verificationMode: z.enum(domainBindingOwnershipVerificationModes).optional(),
-  confirmedBy: nonEmptyTrimmedString("Confirmed by").optional(),
-  evidence: nonEmptyTrimmedString("Evidence").optional(),
-  idempotencyKey: nonEmptyTrimmedString("Idempotency key").optional(),
-});
+export const confirmDomainBindingOwnershipCommandInputSchema = z
+  .object({
+    domainBindingId: nonEmptyTrimmedString("Domain binding id"),
+    verificationAttemptId: nonEmptyTrimmedString("Verification attempt id").optional(),
+    verificationMode: z.enum(domainBindingOwnershipVerificationModes).optional(),
+    confirmedBy: nonEmptyTrimmedString("Confirmed by").optional(),
+    evidence: nonEmptyTrimmedString("Evidence").optional(),
+    idempotencyKey: nonEmptyTrimmedString("Idempotency key").optional(),
+  })
+  .strict();
 
 export type ConfirmDomainBindingOwnershipCommandInput = z.input<
   typeof confirmDomainBindingOwnershipCommandInputSchema

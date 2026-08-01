@@ -1724,6 +1724,23 @@ describe("public docs operation coverage", () => {
     expect(resourceProfileMatrix).toContain("configuration set/import");
   });
 
+  test("[OP-INPUT-DOCS-005] resource network docs record strict input and active MCP", async () => {
+    const commandSpec = await repositoryFile("docs/commands/resources.configure-network.md").text();
+    const matrix = await repositoryFile(
+      "docs/testing/operation-input-contract-test-matrix.md",
+    ).text();
+
+    expect(commandSpec).toContain("Generated `resources_configure_network` tool");
+    expect(commandSpec).toContain("| Active |");
+    expect(commandSpec).toContain("Unknown top-level fields");
+    expect(commandSpec).not.toContain("Future command/tool over the same operation key");
+    expect(matrix).toContain("OP-INPUT-STRICT-001");
+    expect(matrix).toContain("OP-INPUT-ERROR-002");
+    expect(matrix).toContain("OP-INPUT-HTTP-003");
+    expect(matrix).toContain("OP-INPUT-MCP-004");
+    expect(matrix).toContain("OP-INPUT-DOCS-005");
+  });
+
   test("[SRC-AUTO-SURFACE-003] source auto-deploy operations record docs coverage", () => {
     expect(getPublicDocsOperationCoverage("resources.configure-auto-deploy")).toMatchObject({
       operationKey: "resources.configure-auto-deploy",

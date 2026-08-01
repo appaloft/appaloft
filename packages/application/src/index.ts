@@ -61,6 +61,7 @@ export * from "./operation-audit";
 export * from "./operation-audit-domain-event-projector";
 export * from "./operation-catalog";
 export * from "./operation-guard";
+export { operationInputValidationDetails } from "./operations/shared-schema";
 export * from "./operations/storage-volumes/storage-volume-backup-automation";
 export * from "./operations/system/control-plane-portability";
 export * from "./operations/tunnels/tunnel-session";

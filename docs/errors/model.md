@@ -43,6 +43,9 @@ type ErrorDetails = {
   serverId?: string;
   requiredRole?: string;
   workloadRoles?: readonly string[];
+  validationIssueCodes?: readonly string[];
+  validationIssuePaths?: readonly string[];
+  validationIssueMessages?: readonly string[];
   [key: string]: string | number | boolean | null | undefined | readonly string[];
 };
 
@@ -89,6 +92,34 @@ type PlatformError = {
 The implementation may carry some fields inside `details` while the richer shape is introduced. The contract still requires every spec to define the logical fields.
 
 Secrets, private keys, access tokens, raw environment secret values, and command output that may contain secrets must not be stored in error details.
+
+## Operation Input Validation
+
+Public command inputs that own deployment-critical state must reject unknown top-level fields and
+unknown fields inside owned nested objects. They must not accept a request by silently stripping
+unsupported intent.
+
+Command-schema failures use:
+
+```ts
+{
+  code: "validation_error",
+  phase: "command-validation",
+  validationIssueCodes: string[],
+  validationIssuePaths: string[],
+  validationIssueMessages: string[],
+}
+```
+
+The three issue arrays are positional: values at the same index describe one validation issue.
+Unknown fields use issue code `unsupported_field` and a dot-separated path. Root-level shape errors
+may use `$`. Messages are safe summaries rather than copies of raw input. Details may include field
+names but must never include field values, certificate/private-key material, credentials, tokens,
+secrets, or raw provider/runtime output.
+
+CLI, HTTP/oRPC, generated SDK metadata, and MCP must consume or derive from the same application
+operation schema. HTTP/oRPC normalizes transport validation failures into the same stable error
+code, phase, and privacy-safe issue arrays before returning them to callers.
 
 ## Error Knowledge Contract
 

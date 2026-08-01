@@ -106,7 +106,7 @@ Admission errors reject the command and return `err(DomainError)`.
 
 | Error code | Phase | Retriable | Meaning |
 | --- | --- | --- | --- |
-| `validation_error` | `command-validation` | No | Input shape, domain name, path prefix, TLS mode, reason, provider, or challenge type is invalid. |
+| `validation_error` | `command-validation` | No | Input shape, domain name, path prefix, TLS mode, reason, provider, or challenge type is invalid. Unsupported domain-binding or certificate fields are rejected rather than silently discarded; safe details include aligned issue code/path/message arrays without certificate material, credentials, or other input values. |
 | `not_found` | `context-resolution`, `certificate-context-resolution` | No | Project, environment, resource, server, destination, domain binding, or certificate is missing. |
 | `conflict` | `domain-binding-admission` | No | Duplicate active binding conflicts with the command. |
 | `domain_binding_proxy_required` | `domain-binding-admission` | No | Durable domain binding requested with proxy disabled. |

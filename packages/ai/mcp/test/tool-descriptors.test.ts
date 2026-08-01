@@ -140,6 +140,34 @@ describe("MCP tool descriptors", () => {
     }
   });
 
+  test("[OP-INPUT-MCP-004] deployment-critical write tools publish closed JSON schemas", () => {
+    const selectedOperationKeys = [
+      "resources.configure-network",
+      "domain-bindings.create",
+      "domain-bindings.configure-route",
+      "domain-bindings.confirm-ownership",
+      "domain-bindings.delete",
+      "domain-bindings.retry-verification",
+      "certificates.issue-or-renew",
+      "certificates.import",
+      "certificates.retry",
+      "certificates.revoke",
+      "certificates.delete",
+    ];
+
+    for (const operationKey of selectedOperationKeys) {
+      const schema = toolContractsByOperationKey.get(operationKey)?.inputJsonSchema;
+      expect(schema, operationKey).toBeDefined();
+      expect(schema?.additionalProperties, operationKey).toBe(false);
+    }
+
+    const networkSchema = toolContractsByOperationKey.get("resources.configure-network")
+      ?.inputJsonSchema as {
+      properties?: { networkProfile?: { additionalProperties?: unknown } };
+    };
+    expect(networkSchema.properties?.networkProfile?.additionalProperties).toBe(false);
+  });
+
   test("[MCP-TOOL-DESC-003] high-value deployment and resource tools use operation-key names", () => {
     expect(toolContractsByOperationKey.get("deployments.plan")).toMatchObject({
       name: "deployments_plan",
@@ -404,6 +432,54 @@ describe("MCP tool descriptors", () => {
     });
 
     expect(isResultError(result)).toBe(true);
+    expect(dispatched).toHaveLength(0);
+  });
+
+  test("[OP-INPUT-MCP-004] generated handlers reject unsupported fields before dispatch", async () => {
+    const dispatched: unknown[] = [];
+    const handlers = createOperationToolHandlers({
+      commandBus: {
+        execute: async (_context: unknown, command: unknown) => {
+          dispatched.push(command);
+          return { ok: true };
+        },
+      },
+      queryBus: {
+        execute: async (_context: unknown, query: unknown) => {
+          dispatched.push(query);
+          return { ok: true };
+        },
+      },
+    });
+
+    const result = await handlers.resources_configure_network({
+      context: createExecutionContext({
+        requestId: "req_appaloft_mcp_strict_input_test",
+        entrypoint: "mcp",
+      }),
+      input: {
+        resourceId: "res_demo",
+        networkProfile: {
+          internalPort: 3000,
+          upstreamProtocol: "http",
+          exposureMode: "reverse-proxy",
+          routingMode: "custom",
+        },
+        domains: ["app.example.com"],
+      },
+    });
+
+    expect(isResultError(result)).toBe(true);
+    expect(result).toMatchObject({
+      error: {
+        code: "validation_error",
+        details: {
+          phase: "command-validation",
+          validationIssueCodes: ["unsupported_field", "unsupported_field"],
+          validationIssuePaths: ["networkProfile.routingMode", "domains"],
+        },
+      },
+    });
     expect(dispatched).toHaveLength(0);
   });
 

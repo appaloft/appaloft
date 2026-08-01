@@ -9,6 +9,7 @@ import {
   DeleteCertificateCommand,
   type ExecutionContext,
   type ExecutionContextFactory,
+  type ProductSessionAuthorizationPort,
   type Query,
   type QueryBus,
   RetryCertificateCommand,
@@ -34,8 +35,26 @@ class TestExecutionContextFactory implements ExecutionContextFactory {
       entrypoint: input.entrypoint,
       locale: input.locale,
       actor: input.actor,
+      principal: input.principal,
     });
   }
+}
+
+const productSessionAuthorizationPort: ProductSessionAuthorizationPort = {
+  authorizeProductSession: async (_context, input) =>
+    ok({
+      actor: { kind: "user", id: "usr_certificate", label: "certificate@example.test" },
+      email: "certificate@example.test",
+      organizationId: input.organizationId ?? "org_certificate",
+      role: input.requiredRole,
+      userId: "usr_certificate",
+    }),
+};
+
+function certificateRequest(url: string, init: RequestInit): Request {
+  const headers = new Headers(init.headers);
+  headers.set("cookie", "better-auth.session_token=certificate-lifecycle-test");
+  return new Request(url, { ...init, headers });
 }
 
 function createApp() {
@@ -67,6 +86,7 @@ function createApp() {
     commandBus,
     executionContextFactory: new TestExecutionContextFactory(),
     logger: new NoopLogger(),
+    productSessionAuthorizationPort,
     queryBus,
   });
 
@@ -82,7 +102,7 @@ describe("certificate lifecycle HTTP routes", () => {
     const harness = createApp();
 
     const response = await harness.app.handle(
-      new Request("http://localhost/api/certificates/crt_demo", {
+      certificateRequest("http://localhost/api/certificates/crt_demo", {
         method: "GET",
       }),
     );
@@ -100,7 +120,7 @@ describe("certificate lifecycle HTTP routes", () => {
     const harness = createApp();
 
     const response = await harness.app.handle(
-      new Request("http://localhost/api/certificates/crt_demo/retries", {
+      certificateRequest("http://localhost/api/certificates/crt_demo/retries", {
         method: "POST",
         body: JSON.stringify({ certificateId: "crt_demo", idempotencyKey: "retry-key" }),
         headers: { "content-type": "application/json" },
@@ -120,7 +140,7 @@ describe("certificate lifecycle HTTP routes", () => {
     const harness = createApp();
 
     const response = await harness.app.handle(
-      new Request("http://localhost/api/certificates/crt_demo/revoke", {
+      certificateRequest("http://localhost/api/certificates/crt_demo/revoke", {
         method: "POST",
         body: JSON.stringify({ certificateId: "crt_demo", reason: "operator-requested" }),
         headers: { "content-type": "application/json" },
@@ -140,7 +160,7 @@ describe("certificate lifecycle HTTP routes", () => {
     const harness = createApp();
 
     const response = await harness.app.handle(
-      new Request("http://localhost/api/certificates/crt_demo", {
+      certificateRequest("http://localhost/api/certificates/crt_demo", {
         method: "DELETE",
         body: JSON.stringify({
           certificateId: "crt_demo",

@@ -141,6 +141,20 @@ describe("public docs help registry", () => {
     );
   });
 
+  test("[OP-INPUT-DOCS-005] strict operation input help resolves for API and MCP callers", () => {
+    const topic = publicDocsHelpTopics["errors.operation-input-validation"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe(
+      "/docs/reference/errors-statuses/#operation-input-validation",
+    );
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/reference/errors-statuses/#operation-input-validation",
+    );
+    expect(topic.surfaces).toEqual(expect.arrayContaining(["cli", "http-api", "mcp"]));
+    expect(topic.relatedOperation).toBe("resources.configure-network");
+    expect(topic.specReferences).toContain("docs/testing/operation-input-contract-test-matrix.md");
+  });
+
   test("[AGENT-DEPLOY-SKILL-003] agent deploy skill resolves to public docs and governing source", () => {
     const topic = publicDocsHelpTopics["agent.deploy-skill"];
 

@@ -2198,6 +2198,7 @@ export const resourceNetworkProfileSchema = z
     targetServiceName: z.string().min(1).optional(),
     hostPort: z.number().int().positive().optional(),
   })
+  .strict()
   .superRefine((value, context) => {
     if (value.hostPort && value.exposureMode !== "direct-port") {
       context.addIssue({
@@ -3615,10 +3616,12 @@ export const resetResourceHealthResponseSchema = z.object({
   id: z.string(),
 });
 
-export const configureResourceNetworkInputSchema = z.object({
-  resourceId: z.string().min(1),
-  networkProfile: resourceNetworkProfileSchema,
-});
+export const configureResourceNetworkInputSchema = z
+  .object({
+    resourceId: z.string().min(1),
+    networkProfile: resourceNetworkProfileSchema,
+  })
+  .strict();
 
 export const configureResourceNetworkResponseSchema = z.object({
   id: z.string(),
@@ -4921,6 +4924,7 @@ export const createDomainBindingInputSchema = z
     certificatePolicy: z.enum(["auto", "manual", "disabled"]).optional(),
     idempotencyKey: z.string().min(1).optional(),
   })
+  .strict()
   .superRefine((value, context) => {
     if (!value.serverId && value.destinationId) {
       context.addIssue({
@@ -4935,14 +4939,16 @@ export const createDomainBindingResponseSchema = z.object({
   id: z.string(),
 });
 
-export const confirmDomainBindingOwnershipInputSchema = z.object({
-  domainBindingId: z.string().min(1),
-  verificationAttemptId: z.string().min(1).optional(),
-  verificationMode: z.enum(["dns", "manual"]).optional(),
-  confirmedBy: z.string().min(1).optional(),
-  evidence: z.string().min(1).optional(),
-  idempotencyKey: z.string().min(1).optional(),
-});
+export const confirmDomainBindingOwnershipInputSchema = z
+  .object({
+    domainBindingId: z.string().min(1),
+    verificationAttemptId: z.string().min(1).optional(),
+    verificationMode: z.enum(["dns", "manual"]).optional(),
+    confirmedBy: z.string().min(1).optional(),
+    evidence: z.string().min(1).optional(),
+    idempotencyKey: z.string().min(1).optional(),
+  })
+  .strict();
 
 export const confirmDomainBindingOwnershipResponseSchema = z.object({
   id: z.string(),
@@ -5035,14 +5041,16 @@ export const domainBindingDetailSchema = z.object({
 
 export const showDomainBindingResponseSchema = domainBindingDetailSchema;
 
-export const configureDomainBindingRouteInputSchema = z.object({
-  domainBindingId: z.string().min(1),
-  redirectTo: z.string().min(1).optional(),
-  redirectStatus: z
-    .union([z.literal(301), z.literal(302), z.literal(307), z.literal(308)])
-    .optional(),
-  idempotencyKey: z.string().min(1).optional(),
-});
+export const configureDomainBindingRouteInputSchema = z
+  .object({
+    domainBindingId: z.string().min(1),
+    redirectTo: z.string().min(1).optional(),
+    redirectStatus: z
+      .union([z.literal(301), z.literal(302), z.literal(307), z.literal(308)])
+      .optional(),
+    idempotencyKey: z.string().min(1).optional(),
+  })
+  .strict();
 
 export const configureDomainBindingRouteResponseSchema = z.object({
   id: z.string(),
@@ -5054,51 +5062,61 @@ export const checkDomainBindingDeleteSafetyInputSchema = z.object({
 
 export const checkDomainBindingDeleteSafetyResponseSchema = domainBindingDeleteSafetySchema;
 
-export const deleteDomainBindingInputSchema = z.object({
-  domainBindingId: z.string().min(1),
-  confirmation: z.object({
+export const deleteDomainBindingInputSchema = z
+  .object({
     domainBindingId: z.string().min(1),
-  }),
-  idempotencyKey: z.string().min(1).optional(),
-});
+    confirmation: z
+      .object({
+        domainBindingId: z.string().min(1),
+      })
+      .strict(),
+    idempotencyKey: z.string().min(1).optional(),
+  })
+  .strict();
 
 export const deleteDomainBindingResponseSchema = z.object({
   id: z.string(),
 });
 
-export const retryDomainBindingVerificationInputSchema = z.object({
-  domainBindingId: z.string().min(1),
-  idempotencyKey: z.string().min(1).optional(),
-});
+export const retryDomainBindingVerificationInputSchema = z
+  .object({
+    domainBindingId: z.string().min(1),
+    idempotencyKey: z.string().min(1).optional(),
+  })
+  .strict();
 
 export const retryDomainBindingVerificationResponseSchema = z.object({
   id: z.string(),
   verificationAttemptId: z.string(),
 });
 
-export const issueOrRenewCertificateInputSchema = z.object({
-  domainBindingId: z.string().min(1),
-  certificateId: z.string().min(1).optional(),
-  reason: z.enum(["issue", "renew", "replace"]).default("issue"),
-  providerKey: z.string().min(1).optional(),
-  challengeType: z.string().min(1).optional(),
-  idempotencyKey: z.string().min(1).optional(),
-  causationId: z.string().min(1).optional(),
-});
+export const issueOrRenewCertificateInputSchema = z
+  .object({
+    domainBindingId: z.string().min(1),
+    certificateId: z.string().min(1).optional(),
+    reason: z.enum(["issue", "renew", "replace"]).default("issue"),
+    providerKey: z.string().min(1).optional(),
+    challengeType: z.string().min(1).optional(),
+    idempotencyKey: z.string().min(1).optional(),
+    causationId: z.string().min(1).optional(),
+  })
+  .strict();
 
 export const issueOrRenewCertificateResponseSchema = z.object({
   certificateId: z.string(),
   attemptId: z.string(),
 });
 
-export const importCertificateInputSchema = z.object({
-  domainBindingId: z.string().min(1),
-  certificateChain: z.string().min(1),
-  privateKey: z.string().min(1),
-  passphrase: z.string().min(1).optional(),
-  idempotencyKey: z.string().min(1).optional(),
-  causationId: z.string().min(1).optional(),
-});
+export const importCertificateInputSchema = z
+  .object({
+    domainBindingId: z.string().min(1),
+    certificateChain: z.string().min(1),
+    privateKey: z.string().min(1),
+    passphrase: z.string().min(1).optional(),
+    idempotencyKey: z.string().min(1).optional(),
+    causationId: z.string().min(1).optional(),
+  })
+  .strict();
 
 export const importCertificateResponseSchema = z.object({
   certificateId: z.string(),

@@ -2,6 +2,20 @@
 title: "Error Codes and Statuses"
 description: "User-visible errors, phases, and status descriptions."
 docType: "reference"
+localeState:
+  zh-CN: complete
+  en-US: complete
+searchAliases:
+  - "error"
+  - "status"
+  - "phase"
+  - "validation"
+relatedOperations:
+  - "resources.configure-network"
+  - "domain-bindings.create"
+  - "certificates.issue-or-renew"
+sidebar:
+  order: 3
 ---
 
 ## Stable identifier
@@ -18,6 +32,23 @@ Known errors additionally carry:
 | `actionability` | Whether the caller should fix the input, wait and retry, run diagnostics, hand it to automatic recovery, or take no action |
 | `links` | Human-readable public docs, an agent/LLM-readable guide, and related specs/runbooks |
 | `remedies` | Recovery actions that are safe to display or suggest automatically |
+
+## Operation input validation <a id="operation-input-validation" />
+
+Resource-network, managed-domain, and certificate write operations reject unknown fields instead of silently discarding them and continuing. This applies to top-level input and nested objects owned by the command. For example, passing `domains` or `authentication` to `resources.configure-network`, or passing an unknown `networkProfile.routingMode`, fails before dispatch and persistence.
+
+The caller receives the stable `validation_error` code with these `details` fields:
+
+| Field | Meaning |
+| --- | --- |
+| `phase` | Always `command-validation` for command-schema failures |
+| `validationIssueCodes` | One stable code per issue; unknown fields use `unsupported_field` |
+| `validationIssuePaths` | The aligned field path, such as `networkProfile.routingMode` |
+| `validationIssueMessages` | A privacy-safe explanation aligned with the code and path |
+
+The values at the same index describe one issue. Details include only field names and safe summaries; they never echo field values, certificate material, credentials, tokens, or secrets. HTTP/API returns `400`; CLI and MCP return the same structured error. Generated MCP input schemas use `additionalProperties: false` to tell clients that these objects do not accept extra fields.
+
+To recover, remove the misspelled or unrelated field, or call the explicit operation that owns that intent. Do not assume any part of a rejected command was saved: dispatch and persistence did not run.
 
 ## How an agent should read errors
 

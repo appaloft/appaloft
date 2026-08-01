@@ -528,6 +528,7 @@ import {
   openAgentWorkspaceInputSchema,
   openTerminalSessionCommandInputSchema,
   operationCatalog,
+  operationInputValidationDetails,
   PauseSandboxCommand,
   PlanConnectorCapabilityQuery,
   PlanDomainBindingDnsQuery,
@@ -2738,6 +2739,10 @@ async function normalizeOpenApiErrorResponse(response: Response): Promise<Respon
   const payload = readRecord(body?.json) ?? readRecord(body?.error) ?? body;
   const data = readRecord(payload?.data);
   const domainCode = typeof data?.domainCode === "string" ? data.domainCode : undefined;
+  const validationDetails =
+    Array.isArray(data?.issues) && data.issues.length > 0
+      ? operationInputValidationDetails(data.issues)
+      : undefined;
   if (!payload) {
     return response;
   }
@@ -2749,12 +2754,14 @@ async function normalizeOpenApiErrorResponse(response: Response): Promise<Respon
     typeof data?.retryable === "boolean"
       ? data.retryable
       : category === "provider" || category === "retryable" || category === "timeout";
-  const message =
-    typeof payload.message === "string" && payload.message.length > 0
+  const message = validationDetails
+    ? "Input validation failed"
+    : typeof payload.message === "string" && payload.message.length > 0
       ? payload.message
       : "Appaloft operation failed";
-  const details = readRecord(data?.details);
-  const code = domainCode ?? domainCodeFromOrpcCode(payload.code);
+  const details = readRecord(data?.details) ?? validationDetails;
+  const code =
+    domainCode ?? (validationDetails ? "validation_error" : domainCodeFromOrpcCode(payload.code));
 
   if (!code) {
     return response;
