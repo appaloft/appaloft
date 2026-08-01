@@ -12,6 +12,8 @@
 - [x] `AGENT-WS-ATTACH-016`: add scoped attach capability tests.
 - [x] `AGENT-WS-WEB-017`: add Public Console Workspace structure tests.
 - [x] `AGENT-ADAPTER-018`: add capability descriptor contract tests.
+- [x] Public #947: wait through the bounded provider transition from child exit to a definitive
+  background exit-code observation; fail explicitly when no definitive status arrives.
 - [x] `AGENT-WS-EGRESS-019`: add authenticated egress adapter and proxy tests.
 
 ## Source Of Truth
@@ -44,6 +46,9 @@
 - [x] Run focused core/application/runtime/CLI/SDK tests.
 - [x] Run public lint, typecheck, tests, build and `check:ash`.
 - [x] Run affected Cloud tests, lint, typecheck and tests.
+- [x] Docs outcome for #947: not user-facing. The fix restores the existing background Agent Run
+  completion contract without changing commands, API schemas, status vocabulary, or recovery
+  guidance.
 
 ## Post-Implementation Sync
 

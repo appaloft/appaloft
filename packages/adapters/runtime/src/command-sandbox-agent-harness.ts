@@ -10,6 +10,8 @@ import {
 } from "@appaloft/application";
 import { ok, type Result } from "@appaloft/core";
 
+const backgroundExitStatusGraceMs = 5_000;
+
 export interface CommandSandboxAgentExecutionPort {
   exec(
     context: ExecutionContext,
@@ -284,6 +286,7 @@ export class CommandSandboxAgentHarness implements SandboxAgentHarness {
     this.active.set(input.runId, active);
     const deadline = Date.now() + (this.descriptor.timeoutMs ?? 30 * 60_000);
     let completedProcess: SandboxProcessDescriptor | undefined;
+    let exitStatusDeadline: number | undefined;
     try {
       while (true) {
         if (active.cancelled) throw new Error("command_agent_run_cancelled");
@@ -296,9 +299,18 @@ export class CommandSandboxAgentHarness implements SandboxAgentHarness {
           (candidate) => candidate.processId === active.processId,
         );
         if (!process || process.status !== "running") {
-          completedProcess = process;
-          break;
+          if (!input.launchProcess || Number.isInteger(process?.exitCode)) {
+            completedProcess = process;
+            break;
+          }
+          exitStatusDeadline ??= Math.min(deadline, Date.now() + backgroundExitStatusGraceMs);
+          if (Date.now() >= exitStatusDeadline) {
+            throw new Error("command_agent_run_exit_unavailable");
+          }
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          continue;
         }
+        exitStatusDeadline = undefined;
         if (Date.now() >= deadline) {
           await this.execution.terminateProcess(
             input.executionContext,
