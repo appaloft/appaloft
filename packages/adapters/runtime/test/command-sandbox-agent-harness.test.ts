@@ -95,4 +95,103 @@ describe("CommandSandboxAgentHarness", () => {
     expect(events).toEqual(["custom agent completed"]);
     expect(result.outcomeDigest).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
+
+  test("[AGENT-ADAPTER-018] waits for a definitive background exit status", async () => {
+    const files = new Map<string, Uint8Array>([
+      [".appaloft-agent/srun_exit_race/stdout.log", new TextEncoder().encode("done\n")],
+      [".appaloft-agent/srun_exit_race/stderr.log", new Uint8Array()],
+    ]);
+    let processObservations = 0;
+    const execution: CommandSandboxAgentExecutionPort = {
+      exec: async () => ok({ mode: "background", processId: "spr_exit_race" }),
+      listProcesses: async () => {
+        processObservations += 1;
+        if (processObservations === 1) {
+          return ok([{ processId: "spr_exit_race", status: "running" }]);
+        }
+        if (processObservations === 2) {
+          return ok([{ processId: "spr_exit_race", status: "exited" }]);
+        }
+        return ok([{ processId: "spr_exit_race", status: "exited", exitCode: 0 }]);
+      },
+      terminateProcess: async () => ok(undefined),
+      readFile: async (_context, _sandboxId, input) => {
+        const content = files.get(input.path);
+        return content ? ok(content) : err(new Error("not found"));
+      },
+      writeFile: async (_context, _sandboxId, input) =>
+        ok({ path: input.path, sizeBytes: input.content.byteLength }),
+      removeFile: async () => ok(undefined),
+    };
+    const harness = new CommandSandboxAgentHarness(execution, {
+      key: "custom-cli",
+      templateId: "aht_custom_cli_v1",
+      sandboxTemplateId: "sbt_custom_cli_v1",
+      version: "1.2.3",
+      templateDigest: `sha256:${"a".repeat(64)}`,
+      run: { argv: ["custom-agent", "{task}"] },
+    });
+
+    const result = await harness.execute({
+      executionContext: createExecutionContext({ requestId: "req_exit_race" }),
+      sandboxId: "sbx_exit_race",
+      runtimeId: "sar_exit_race",
+      runId: "srun_exit_race",
+      task: "finish the change",
+      context: { mode: "fresh" },
+      launchProcess: async () =>
+        ok({ mode: "background", processId: "spr_exit_race" } as SandboxExecResult),
+      emitEvent: async () => {},
+      requestApproval: async () => "approved",
+    });
+
+    expect(processObservations).toBe(3);
+    expect(result.outcomeDigest).toMatch(/^sha256:[a-f0-9]{64}$/);
+  });
+
+  test("[AGENT-ADAPTER-018] bounds an unavailable background exit status", async () => {
+    let processObservations = 0;
+    const execution: CommandSandboxAgentExecutionPort = {
+      exec: async () => ok({ mode: "background", processId: "spr_exit_missing" }),
+      listProcesses: async () => {
+        processObservations += 1;
+        return ok([{ processId: "spr_exit_missing", status: "exited" }]);
+      },
+      terminateProcess: async () => ok(undefined),
+      readFile: async (_context, _sandboxId, input) => {
+        if (input.path.endsWith("stdout.log") || input.path.endsWith("stderr.log")) {
+          return ok(new Uint8Array());
+        }
+        return err(new Error("not found"));
+      },
+      writeFile: async (_context, _sandboxId, input) =>
+        ok({ path: input.path, sizeBytes: input.content.byteLength }),
+      removeFile: async () => ok(undefined),
+    };
+    const harness = new CommandSandboxAgentHarness(execution, {
+      key: "custom-cli",
+      templateId: "aht_custom_cli_v1",
+      sandboxTemplateId: "sbt_custom_cli_v1",
+      version: "1.2.3",
+      templateDigest: `sha256:${"a".repeat(64)}`,
+      run: { argv: ["custom-agent", "{task}"] },
+      timeoutMs: 1,
+    });
+
+    expect(
+      harness.execute({
+        executionContext: createExecutionContext({ requestId: "req_exit_missing" }),
+        sandboxId: "sbx_exit_missing",
+        runtimeId: "sar_exit_missing",
+        runId: "srun_exit_missing",
+        task: "finish the change",
+        context: { mode: "fresh" },
+        launchProcess: async () =>
+          ok({ mode: "background", processId: "spr_exit_missing" } as SandboxExecResult),
+        emitEvent: async () => {},
+        requestApproval: async () => "approved",
+      }),
+    ).rejects.toThrow("command_agent_run_exit_unavailable");
+    expect(processObservations).toBe(2);
+  });
 });

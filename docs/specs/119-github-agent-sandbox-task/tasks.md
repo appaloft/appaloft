@@ -170,6 +170,11 @@
   vocabulary, or recovery guidance.
 - [x] Docs outcome for #945: not user-facing. The fix enforces the existing active-Run generation
   contract and changes no command, API schema, status vocabulary, or recovery guidance.
+- [x] Public #947 fixes the bounded background Agent exit-status observation exposed by external
+  run `30694283308`; the existing Task/Workspace/Sandbox and process operations remain unchanged.
+- [x] Docs outcome for #947: not user-facing. The fix restores the existing Agent Run completion
+  contract and changes no command, API schema, status vocabulary, Console affordance, or recovery
+  guidance.
 - [x] Synchronize Domain Model, Business Operation Map, operation catalog, SDK/CLI/Web docs, and
   Test Matrix evidence.
 - [ ] Commit and push public changes with a neutral message.
