@@ -1,7 +1,11 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-import { ConfigureResourceNetworkCommand } from "../src/messages";
+import {
+  ConfigureResourceNetworkCommand,
+  ListDeploymentsQuery,
+  operationInputValidationDetails,
+} from "../src";
 import {
   configureDomainBindingRouteCommandInputSchema,
   configureResourceNetworkCommandInputSchema,
@@ -167,5 +171,34 @@ describe("public operation input contract", () => {
       "Unsupported field: domains",
     ]);
     expect(JSON.stringify(error)).not.toContain(secretValue);
+  });
+
+  test("[OP-INPUT-ERROR-002] validation issue codes use an application-owned vocabulary", () => {
+    const details = operationInputValidationDetails(
+      [
+        { code: "invalid_type", path: ["resourceId"] },
+        { code: "too_small", path: ["networkProfile", "internalPort"] },
+        { code: "future_zod_code", path: [] },
+      ],
+      "command-validation",
+    );
+
+    expect(details.validationIssueCodes).toEqual([
+      "invalid_input",
+      "invalid_input",
+      "invalid_input",
+    ]);
+    expect(details.validationIssuePaths).toEqual([
+      "resourceId",
+      "networkProfile.internalPort",
+      "$",
+    ]);
+  });
+
+  test("[OP-INPUT-ERROR-002] operations outside the strict-input slice keep their prior error shape", () => {
+    const result = ListDeploymentsQuery.create({ limit: 501 });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().details).toBeUndefined();
   });
 });

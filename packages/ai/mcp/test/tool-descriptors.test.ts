@@ -166,6 +166,19 @@ describe("MCP tool descriptors", () => {
       properties?: { networkProfile?: { additionalProperties?: unknown } };
     };
     expect(networkSchema.properties?.networkProfile?.additionalProperties).toBe(false);
+
+    const resourceCreateSchema = toolContractsByOperationKey.get("resources.create")
+      ?.inputJsonSchema as {
+      properties?: { networkProfile?: { additionalProperties?: unknown } };
+    };
+    expect(resourceCreateSchema.properties?.networkProfile?.additionalProperties).toBe(false);
+
+    for (const operationKey of ["domain-bindings.delete", "certificates.delete"]) {
+      const schema = toolContractsByOperationKey.get(operationKey)?.inputJsonSchema as {
+        properties?: { confirmation?: { additionalProperties?: unknown } };
+      };
+      expect(schema.properties?.confirmation?.additionalProperties, operationKey).toBe(false);
+    }
   });
 
   test("[MCP-TOOL-DESC-003] high-value deployment and resource tools use operation-key names", () => {

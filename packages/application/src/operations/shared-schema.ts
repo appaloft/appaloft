@@ -95,7 +95,12 @@ function validationIssuePath(path: unknown, trailingKey?: string): string {
   return segments.length > 0 ? segments.join(".") : "$";
 }
 
-export function operationInputValidationDetails(issues: unknown): DomainErrorDetails {
+export type OperationInputValidationPhase = "command-validation" | "query-validation";
+
+export function operationInputValidationDetails(
+  issues: unknown,
+  phase: OperationInputValidationPhase,
+): DomainErrorDetails {
   const validationIssueCodes: string[] = [];
   const validationIssuePaths: string[] = [];
   const validationIssueMessages: string[] = [];
@@ -120,14 +125,13 @@ export function operationInputValidationDetails(issues: unknown): DomainErrorDet
     }
 
     const path = validationIssuePath(record.path);
-    const code = typeof record.code === "string" ? record.code : "invalid_input";
-    validationIssueCodes.push(code);
+    validationIssueCodes.push("invalid_input");
     validationIssuePaths.push(path);
     validationIssueMessages.push(`Invalid input at ${path}`);
   }
 
   return {
-    phase: "command-validation",
+    phase,
     validationIssueCodes,
     validationIssuePaths,
     validationIssueMessages,
@@ -137,15 +141,22 @@ export function operationInputValidationDetails(issues: unknown): DomainErrorDet
 export function parseOperationInput<TSchema extends z.ZodTypeAny>(
   schema: TSchema,
   input: unknown,
+  options?: { validationPhase: OperationInputValidationPhase },
 ): Result<z.output<TSchema>> {
   const parsed = schema.safeParse(input);
 
   if (!parsed.success) {
+    if (options) {
+      return err(
+        domainError.validation(
+          "Input validation failed",
+          operationInputValidationDetails(parsed.error.issues, options.validationPhase),
+        ),
+      );
+    }
+
     return err(
-      domainError.validation(
-        "Input validation failed",
-        operationInputValidationDetails(parsed.error.issues),
-      ),
+      domainError.validation(parsed.error.issues[0]?.message ?? "Input validation failed"),
     );
   }
 

@@ -523,6 +523,8 @@ import {
   OfferWorkspaceCollaborationHandoffCommand,
   OpenAgentWorkspaceCommand,
   OpenTerminalSessionCommand,
+  type OperationInputValidationPhase,
+  type OperationKey,
   type OperatorWorkEventStreamEnvelope,
   offerWorkspaceCollaborationHandoffInputSchema,
   openAgentWorkspaceInputSchema,
@@ -2715,7 +2717,10 @@ function domainCodeFromOrpcCode(value: unknown): string | undefined {
     .toLowerCase();
 }
 
-async function normalizeOpenApiErrorResponse(response: Response): Promise<Response> {
+async function normalizeOpenApiErrorResponse(
+  response: Response,
+  validationPhase?: OperationInputValidationPhase,
+): Promise<Response> {
   if (response.status < 400) {
     return response;
   }
@@ -2740,8 +2745,8 @@ async function normalizeOpenApiErrorResponse(response: Response): Promise<Respon
   const data = readRecord(payload?.data);
   const domainCode = typeof data?.domainCode === "string" ? data.domainCode : undefined;
   const validationDetails =
-    Array.isArray(data?.issues) && data.issues.length > 0
-      ? operationInputValidationDetails(data.issues)
+    validationPhase && Array.isArray(data?.issues) && data.issues.length > 0
+      ? operationInputValidationDetails(data.issues, validationPhase)
       : undefined;
   if (!payload) {
     return response;
@@ -2788,6 +2793,60 @@ async function normalizeOpenApiErrorResponse(response: Response): Promise<Respon
         message,
         retryable,
         ...((details ?? fallbackDetails) ? { details: details ?? fallbackDetails } : {}),
+      },
+    },
+    {
+      headers,
+      status: response.status,
+    },
+  );
+}
+
+async function normalizeRpcErrorResponse(
+  response: Response,
+  validationPhase?: OperationInputValidationPhase,
+): Promise<Response> {
+  if (!validationPhase || response.status < 400) {
+    return response;
+  }
+
+  const bodyText = await response
+    .clone()
+    .text()
+    .catch(() => "");
+  if (!bodyText) {
+    return response;
+  }
+
+  let parsedBody: unknown;
+  try {
+    parsedBody = JSON.parse(bodyText);
+  } catch {
+    return response;
+  }
+
+  const body = readRecord(parsedBody);
+  const payload = readRecord(body?.json);
+  const data = readRecord(payload?.data);
+  if (!body || !payload || !data || !Array.isArray(data.issues) || data.issues.length === 0) {
+    return response;
+  }
+
+  const { issues: _issues, ...preservedData } = data;
+  const headers = new Headers(response.headers);
+  headers.set("content-type", "application/json");
+
+  return Response.json(
+    {
+      ...body,
+      json: {
+        ...payload,
+        message: "Input validation failed",
+        data: {
+          ...preservedData,
+          domainCode: "validation_error",
+          details: operationInputValidationDetails(data.issues, validationPhase),
+        },
       },
     },
     {
@@ -9294,6 +9353,55 @@ type OperationCatalogOrpcTransports = {
   };
 };
 
+const strictOperationInputOperations = [
+  { key: "resources.create", rpcPath: "/api/rpc/resources/create" },
+  {
+    key: "resources.configure-network",
+    rpcPath: "/api/rpc/resources/configureNetwork",
+  },
+  { key: "domain-bindings.create", rpcPath: "/api/rpc/domainBindings/create" },
+  {
+    key: "domain-bindings.confirm-ownership",
+    rpcPath: "/api/rpc/domainBindings/confirmOwnership",
+  },
+  {
+    key: "domain-bindings.configure-route",
+    rpcPath: "/api/rpc/domainBindings/configureRoute",
+  },
+  { key: "domain-bindings.delete", rpcPath: "/api/rpc/domainBindings/delete" },
+  {
+    key: "domain-bindings.retry-verification",
+    rpcPath: "/api/rpc/domainBindings/retryVerification",
+  },
+  { key: "certificates.import", rpcPath: "/api/rpc/certificates/import" },
+  {
+    key: "certificates.issue-or-renew",
+    rpcPath: "/api/rpc/certificates/issueOrRenew",
+  },
+  { key: "certificates.retry", rpcPath: "/api/rpc/certificates/retry" },
+  { key: "certificates.revoke", rpcPath: "/api/rpc/certificates/revoke" },
+  { key: "certificates.delete", rpcPath: "/api/rpc/certificates/delete" },
+] as const satisfies readonly { key: OperationKey; rpcPath: string }[];
+
+const strictOperationInputOperationKeys = new Set<OperationKey>(
+  strictOperationInputOperations.map((operation) => operation.key),
+);
+
+const strictOperationInputRpcPaths = new Set<string>(
+  strictOperationInputOperations.map((operation) => operation.rpcPath),
+);
+
+const strictOperationInputOrpcRoutes = operationCatalog.flatMap((entry) => {
+  if (!strictOperationInputOperationKeys.has(entry.key)) {
+    return [];
+  }
+
+  const transports = entry.transports as OperationCatalogOrpcTransports;
+  return [transports.orpc, ...(transports.orpcAdditional ?? [])].filter(
+    (route) => route !== undefined,
+  );
+});
+
 const productSessionOrpcRoutes: readonly ProductSessionOrpcRoute[] = operationCatalog.flatMap(
   (entry) => {
     const transportAccess = (entry as { transportAccess?: OperationCatalogTransportAccess })
@@ -9354,6 +9462,18 @@ function productSessionRouteForRequest(request: Request): ProductSessionOrpcRout
   return productSessionOrpcRoutes.find(
     (route) => route.method === request.method && matchesOperationRoute(route.path, pathname),
   );
+}
+
+function strictOperationInputValidationPhaseForRequest(
+  request: Request,
+): OperationInputValidationPhase | undefined {
+  const pathname = new URL(request.url).pathname;
+  return strictOperationInputRpcPaths.has(pathname) ||
+    strictOperationInputOrpcRoutes.some(
+      (route) => route.method === request.method && matchesOperationRoute(route.path, pathname),
+    )
+    ? "command-validation"
+    : undefined;
 }
 
 function missingProductSessionPreflightResponse(
@@ -11285,7 +11405,10 @@ export function mountAppaloftOrpcRoutes(
         });
       }
 
-      const normalizedResponse = await normalizeOpenApiErrorResponse(response);
+      const normalizedResponse = await normalizeOpenApiErrorResponse(
+        response,
+        strictOperationInputValidationPhaseForRequest(request),
+      );
       await logOrpcErrorResponse(
         context.logger,
         "orpc_http_handler_error",
@@ -11328,8 +11451,17 @@ export function mountAppaloftOrpcRoutes(
         });
       }
 
-      await logOrpcErrorResponse(context.logger, "orpc_rpc_handler_error", request, response);
-      return response;
+      const normalizedResponse = await normalizeRpcErrorResponse(
+        response,
+        strictOperationInputValidationPhaseForRequest(request),
+      );
+      await logOrpcErrorResponse(
+        context.logger,
+        "orpc_rpc_handler_error",
+        request,
+        normalizedResponse,
+      );
+      return normalizedResponse;
     } catch (error) {
       context.logger.error("orpc_rpc_handler_unhandled_error", {
         method: request.method,

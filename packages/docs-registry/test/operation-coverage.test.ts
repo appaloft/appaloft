@@ -1731,14 +1731,17 @@ describe("public docs operation coverage", () => {
     ).text();
 
     expect(commandSpec).toContain("Generated `resources_configure_network` tool");
-    expect(commandSpec).toContain("| Active |");
+    expect(commandSpec).toContain(
+      "| Automation / MCP | Generated `resources_configure_network` tool over the same operation key and schema. | Active |",
+    );
     expect(commandSpec).toContain("Unknown top-level fields");
     expect(commandSpec).not.toContain("Future command/tool over the same operation key");
-    expect(matrix).toContain("OP-INPUT-STRICT-001");
-    expect(matrix).toContain("OP-INPUT-ERROR-002");
-    expect(matrix).toContain("OP-INPUT-HTTP-003");
-    expect(matrix).toContain("OP-INPUT-MCP-004");
-    expect(matrix).toContain("OP-INPUT-DOCS-005");
+    expect(matrix).toContain("packages/application/test/operation-input-contract.test.ts");
+    expect(matrix).toContain("packages/contracts/test/operation-input-contract.test.ts");
+    expect(matrix).toContain("packages/orpc/test/resource-network-profile.http.test.ts");
+    expect(matrix).toContain("packages/orpc/test/certificate-lifecycle.http.test.ts");
+    expect(matrix).toContain("packages/ai/mcp/test/tool-descriptors.test.ts");
+    expect(matrix).toContain("packages/docs-registry/test/help-topics.test.ts");
   });
 
   test("[SRC-AUTO-SURFACE-003] source auto-deploy operations record docs coverage", () => {

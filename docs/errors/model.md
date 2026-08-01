@@ -112,10 +112,11 @@ Command-schema failures use:
 ```
 
 The three issue arrays are positional: values at the same index describe one validation issue.
-Unknown fields use issue code `unsupported_field` and a dot-separated path. Root-level shape errors
-may use `$`. Messages are safe summaries rather than copies of raw input. Details may include field
-names but must never include field values, certificate/private-key material, credentials, tokens,
-secrets, or raw provider/runtime output.
+Unknown fields use issue code `unsupported_field`; all other schema issues use the
+application-owned `invalid_input` code rather than exposing validation-library codes. Paths are
+dot-separated, and root-level shape errors may use `$`. Messages are safe summaries rather than
+copies of raw input. Details may include field names but must never include field values,
+certificate/private-key material, credentials, tokens, secrets, or raw provider/runtime output.
 
 CLI, HTTP/oRPC, generated SDK metadata, and MCP must consume or derive from the same application
 operation schema. HTTP/oRPC normalizes transport validation failures into the same stable error

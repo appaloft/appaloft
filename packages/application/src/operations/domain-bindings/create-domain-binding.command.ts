@@ -36,7 +36,9 @@ export class CreateDomainBindingCommand extends Command<{ id: string }> {
   }
 
   static create(input: CreateDomainBindingCommandInput): Result<CreateDomainBindingCommand> {
-    return parseOperationInput(createDomainBindingCommandInputSchema, input).map(
+    return parseOperationInput(createDomainBindingCommandInputSchema, input, {
+      validationPhase: "command-validation",
+    }).map(
       (parsed) =>
         new CreateDomainBindingCommand(
           parsed.projectId,

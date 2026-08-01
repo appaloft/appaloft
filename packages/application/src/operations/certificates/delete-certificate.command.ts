@@ -27,7 +27,9 @@ export class DeleteCertificateCommand extends Command<DeleteCertificateCommandRe
   }
 
   static create(input: DeleteCertificateCommandInput): Result<DeleteCertificateCommand> {
-    return parseOperationInput(deleteCertificateCommandInputSchema, input).map(
+    return parseOperationInput(deleteCertificateCommandInputSchema, input, {
+      validationPhase: "command-validation",
+    }).map(
       (parsed) =>
         new DeleteCertificateCommand(
           parsed.certificateId,

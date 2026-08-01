@@ -12,15 +12,14 @@ Privacy-safe issue details include one code, path, and message per rejected issu
 field names but must never echo input values, certificate material, credentials, tokens, secrets,
 or raw provider/runtime output.
 
-This patch-level bug fix covers these command families:
+This matrix covers these command families:
 
 - `resources.configure-network`, including the nested resource network profile also consumed by
   `resources.create`;
 - managed domain-binding create, route, ownership, delete, and verification-retry commands;
 - certificate issue/renew, import, retry, revoke, and delete commands.
 
-A repository-wide review of other permissive command and query schemas remains a compatibility
-audit gap. This matrix does not declare unreviewed operations strict.
+Operations outside this matrix are not declared strict.
 
 ## Governing Sources
 
@@ -38,8 +37,8 @@ audit gap. This matrix does not declare unreviewed operations strict.
 | ID | Scenario | Surface | Automation level | Test binding | Expected result |
 | --- | --- | --- | --- | --- | --- |
 | `OP-INPUT-STRICT-001` | Selected resource-network, domain-binding, and certificate command schemas receive unknown top-level or owned nested fields. | Application command schema and public contract mirror | Unit / contract | `packages/application/test/operation-input-contract.test.ts`; `packages/contracts/test/operation-input-contract.test.ts` | Parse fails before command construction; no unsupported field is stripped into an accepted command. |
-| `OP-INPUT-ERROR-002` | Shared command parsing receives multiple invalid or unsupported fields, including a secret-looking value. | Application error boundary, CLI, MCP | Unit | `packages/application/test/operation-input-contract.test.ts` | Returns `validation_error`, `phase = command-validation`, and aligned safe issue code/path/message arrays for every issue; input values are absent. |
-| `OP-INPUT-HTTP-003` | Authenticated resource-network HTTP request includes unsupported top-level and nested fields. | HTTP/oRPC | Adapter integration | `packages/orpc/test/resource-network-profile.http.test.ts` | Returns HTTP 400 with normalized `validation_error` and safe issue details; command bus is not called. |
+| `OP-INPUT-ERROR-002` | Selected command parsing receives invalid or unsupported fields, including a secret-looking value, while an operation outside the slice fails validation. | Application error boundary, CLI, MCP | Unit | `packages/application/test/operation-input-contract.test.ts` | Selected commands return `validation_error`, `phase = command-validation`, and aligned safe issue arrays using only `unsupported_field` or `invalid_input`; input values are absent. Operations outside the slice retain their prior error shape. |
+| `OP-INPUT-HTTP-003` | Authenticated resource-network and certificate HTTP requests include invalid, unsupported top-level, or unsupported nested fields; a typed RPC request does the same; an unrelated query receives invalid input. | HTTP/oRPC | Adapter integration | `packages/orpc/test/resource-network-profile.http.test.ts`; `packages/orpc/test/certificate-lifecycle.http.test.ts` | Selected commands return HTTP 400 with normalized `validation_error` and safe issue details without dispatch. Typed RPC responses preserve the oRPC envelope, and query validation is not mislabeled as command validation. |
 | `OP-INPUT-MCP-004` | MCP descriptors and handlers expose selected strict operation inputs. | MCP descriptor and dispatch | Contract / integration | `packages/ai/mcp/test/tool-descriptors.test.ts` | JSON schemas use `additionalProperties: false`; unsupported input returns the shared validation error before dispatch. |
 | `OP-INPUT-DOCS-005` | Users and agents need to understand unknown-field rejection and recovery. | Public docs, registry, command spec | Docs contract | `packages/docs-registry/test/help-topics.test.ts`; `packages/docs-registry/test/operation-coverage.test.ts` | Both locales expose `operation-input-validation`; registry covers CLI, HTTP/API, and MCP; `resources.configure-network` marks MCP Active. |
 
@@ -49,5 +48,3 @@ audit gap. This matrix does not declare unreviewed operations strict.
   callers must remove or correct them after the fix.
 - Stable code: `validation_error` remains unchanged.
 - Stable phase: input-shape failures use `command-validation`.
-- Migration gap: evaluate remaining non-strict operation inputs by command/query family before any
-  repository-wide policy is enforced.

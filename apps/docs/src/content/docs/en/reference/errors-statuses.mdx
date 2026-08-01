@@ -14,6 +14,10 @@ relatedOperations:
   - "resources.configure-network"
   - "domain-bindings.create"
   - "certificates.issue-or-renew"
+  - "operator-work.list"
+  - "operator-work.show"
+  - "audit-events.list"
+  - "audit-events.export"
 sidebar:
   order: 3
 ---
@@ -42,7 +46,7 @@ The caller receives the stable `validation_error` code with these `details` fiel
 | Field | Meaning |
 | --- | --- |
 | `phase` | Always `command-validation` for command-schema failures |
-| `validationIssueCodes` | One stable code per issue; unknown fields use `unsupported_field` |
+| `validationIssueCodes` | One stable code per issue: unknown fields use `unsupported_field`; other invalid input uses `invalid_input` |
 | `validationIssuePaths` | The aligned field path, such as `networkProfile.routingMode` |
 | `validationIssueMessages` | A privacy-safe explanation aligned with the code and path |
 

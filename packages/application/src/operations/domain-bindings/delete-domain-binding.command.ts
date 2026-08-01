@@ -23,7 +23,9 @@ export class DeleteDomainBindingCommand extends Command<{ id: string }> {
   }
 
   static create(input: DeleteDomainBindingCommandInput): Result<DeleteDomainBindingCommand> {
-    return parseOperationInput(deleteDomainBindingCommandInputSchema, input).map(
+    return parseOperationInput(deleteDomainBindingCommandInputSchema, input, {
+      validationPhase: "command-validation",
+    }).map(
       (parsed) =>
         new DeleteDomainBindingCommand(
           parsed.domainBindingId,

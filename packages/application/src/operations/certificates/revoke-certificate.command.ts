@@ -27,7 +27,9 @@ export class RevokeCertificateCommand extends Command<RevokeCertificateCommandRe
   }
 
   static create(input: RevokeCertificateCommandInput): Result<RevokeCertificateCommand> {
-    return parseOperationInput(revokeCertificateCommandInputSchema, input).map(
+    return parseOperationInput(revokeCertificateCommandInputSchema, input, {
+      validationPhase: "command-validation",
+    }).map(
       (parsed) =>
         new RevokeCertificateCommand(
           parsed.certificateId,

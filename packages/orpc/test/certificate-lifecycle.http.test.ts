@@ -136,6 +136,35 @@ describe("certificate lifecycle HTTP routes", () => {
     });
   });
 
+  test("[OP-INPUT-HTTP-003] rejects unsupported certificate retry fields before dispatch", async () => {
+    const harness = createApp();
+
+    const response = await harness.app.handle(
+      certificateRequest("http://localhost/api/certificates/crt_demo/retries", {
+        method: "POST",
+        body: JSON.stringify({
+          certificateId: "crt_demo",
+          idempotencyKey: "retry-key",
+          providerKey: "unsupported-provider",
+        }),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "validation_error",
+        details: {
+          phase: "command-validation",
+          validationIssueCodes: ["unsupported_field"],
+          validationIssuePaths: ["providerKey"],
+        },
+      },
+    });
+    expect(harness.capturedCommand()).toBeUndefined();
+  });
+
   test("[ROUTE-TLS-ENTRY-028] dispatches certificate revoke through CommandBus", async () => {
     const harness = createApp();
 
@@ -177,5 +206,33 @@ describe("certificate lifecycle HTTP routes", () => {
       certificateId: "crt_demo",
       confirmation: { certificateId: "crt_demo" },
     });
+  });
+
+  test("[OP-INPUT-HTTP-003] rejects unsupported nested certificate delete fields before dispatch", async () => {
+    const harness = createApp();
+
+    const response = await harness.app.handle(
+      certificateRequest("http://localhost/api/certificates/crt_demo", {
+        method: "DELETE",
+        body: JSON.stringify({
+          certificateId: "crt_demo",
+          confirmation: { certificateId: "crt_demo", force: true },
+        }),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "validation_error",
+        details: {
+          phase: "command-validation",
+          validationIssueCodes: ["unsupported_field"],
+          validationIssuePaths: ["confirmation.force"],
+        },
+      },
+    });
+    expect(harness.capturedCommand()).toBeUndefined();
   });
 });

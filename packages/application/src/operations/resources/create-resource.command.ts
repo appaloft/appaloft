@@ -34,7 +34,9 @@ export class CreateResourceCommand extends Command<{ id: string }> {
   }
 
   static create(input: CreateResourceCommandInput): Result<CreateResourceCommand> {
-    return parseOperationInput(createResourceCommandInputSchema, input).map(
+    return parseOperationInput(createResourceCommandInputSchema, input, {
+      validationPhase: "command-validation",
+    }).map(
       (parsed) =>
         new CreateResourceCommand(
           parsed.projectId,

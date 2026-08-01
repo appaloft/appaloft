@@ -46,7 +46,7 @@ Appaloft 的用户可见错误不是一段自然语言消息——它是一个�
 | 字段 | 含义 |
 | --- | --- |
 | `phase` | 固定为 `command-validation` |
-| `validationIssueCodes` | 每个问题的稳定 code;未知字段为 `unsupported_field` |
+| `validationIssueCodes` | 每个问题的稳定 code;未知字段为 `unsupported_field`,其他非法输入为 `invalid_input` |
 | `validationIssuePaths` | 与 code 对齐的字段路径,例如 `networkProfile.routingMode` |
 | `validationIssueMessages` | 与 code/path 对齐的安全说明 |
 
