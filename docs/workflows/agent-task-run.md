@@ -14,16 +14,22 @@ sandboxes.agent-tasks.create
   -> structured commit/push/pull-request delivery
 ```
 
-`taskRunId` is the underlying `SandboxAgentRunId`. The application process manager persists one
-protected, tamper-evident state document at `.appaloft/tasks/<taskRunId>/state.json`; it does not
-create a duplicate execution aggregate or control-plane table.
+`taskRunId` is the first underlying `SandboxAgentRunId` and remains the stable Task identity.
+`activeRunId` identifies the current Run generation after steer or resume. The application process
+manager persists one protected, tamper-evident state document at
+`.appaloft/tasks/<taskRunId>/state.json`; it does not create a duplicate execution aggregate or
+control-plane table.
 
 ## Submit And Resume
 
 1. `sandboxes.agent-tasks.create` creates the underlying Agent Run and protected initial state.
 2. Durable Operator Work polls the Run. Client disconnect is observation-only.
-3. `resume` re-enqueues the same task identity when recovery is needed.
-4. `cancel` cancels the underlying Run and revokes only the exact task-owned preview/process.
+3. `steer` and stopped-task `resume` keep the stable Task/Workspace, create a new active Run, and
+   enqueue durable work fenced by that `activeRunId` generation.
+4. A stale durable generation cannot overwrite the newer active Run, lineage, or Task status;
+   replay of the current generation remains idempotent.
+5. `cancel` cancels the active underlying Run and revokes only the exact task-owned
+   preview/process.
 
 ## Finalize
 

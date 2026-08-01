@@ -50,6 +50,7 @@ function createHarness(
     stateProtector?: AgentTaskRunDependencies["stateProtector"];
     existingPullRequest?: boolean;
     unrelatedStagedChanges?: boolean;
+    showRun?: AgentTaskRunDependencies["agents"]["showRun"];
   } = {},
 ) {
   const files = new Map<string, Uint8Array>();
@@ -88,7 +89,9 @@ function createHarness(
       },
       listRuns: async () =>
         ok({ items: [runDescriptor(runStatus, activeRunId, activeRunContext)] }),
-      showRun: async () => ok(runDescriptor(runStatus, activeRunId, activeRunContext, runFailure)),
+      showRun:
+        options.showRun ??
+        (async () => ok(runDescriptor(runStatus, activeRunId, activeRunContext, runFailure))),
       cancelRun: async () => {
         runStatus = "cancelled";
         return ok(runDescriptor(runStatus, activeRunId, activeRunContext));
@@ -617,6 +620,58 @@ describe("Agent Task Run application workflow", () => {
     );
     expect(rejected.isErr()).toBe(true);
     expect(harness.createdRunInputs).toHaveLength(2);
+  });
+
+  test("[GH-AUTO-CONTROL-010][GH-AUTO-LINEAGE-012] stale reconciliation cannot overwrite a steered active Run", async () => {
+    let markShowRunStarted: (() => void) | undefined;
+    const showRunStarted = new Promise<void>((resolve) => {
+      markShowRunStarted = resolve;
+    });
+    let releaseShowRun: (() => void) | undefined;
+    const showRunPending = new Promise<void>((resolve) => {
+      releaseShowRun = resolve;
+    });
+    const harness = createHarness({
+      showRun: async (_context, _runtimeId, runId) => {
+        markShowRunStarted?.();
+        await showRunPending;
+        return ok(runDescriptor("cancelled", runId));
+      },
+    });
+    await harness.service.create(cliContext, {
+      workspaceId,
+      runtimeId,
+      task: "Implement issue #123",
+      runContext: { mode: "fresh" },
+      idempotencyKey: "task-stale-generation",
+      checks: [],
+      immutableReview: false,
+      sourceRoot: ".",
+    });
+
+    const staleReconciliation = harness.service.reconcile(cliContext, workspaceId, taskRunId);
+    await showRunStarted;
+    const steered = await harness.service.steer(
+      cliContext,
+      workspaceId,
+      taskRunId,
+      "keep the existing API compatible",
+    );
+    expect(steered._unsafeUnwrap()).toMatchObject({
+      taskRunId,
+      activeRunId: `${taskRunId}_2`,
+      status: "running",
+    });
+
+    releaseShowRun?.();
+    await staleReconciliation;
+    expect(
+      (await harness.service.show(cliContext, workspaceId, taskRunId))._unsafeUnwrap(),
+    ).toMatchObject({
+      taskRunId,
+      activeRunId: `${taskRunId}_2`,
+      status: "running",
+    });
   });
 
   test("[AGENT-TASK-RUN-001] cancels the Agent Run when initial protected state cannot persist", async () => {

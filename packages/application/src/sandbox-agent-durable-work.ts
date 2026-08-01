@@ -130,6 +130,13 @@ export class SandboxAgentDurableWorkHandler implements DurableWorkHandler {
     ) {
       return err(domainError.invariant("Sandbox Agent durable work input is invalid"));
     }
+    if (
+      itemKind === "agent-task-run" &&
+      (typeof item.safeInput?.workspaceId !== "string" ||
+        typeof item.safeInput.activeRunId !== "string")
+    ) {
+      return err(domainError.invariant("Agent Task durable work generation is invalid"));
+    }
     const tenantContext: ExecutionContext = {
       ...context,
       tenant: {
@@ -143,8 +150,15 @@ export class SandboxAgentDurableWorkHandler implements DurableWorkHandler {
         ? await this.service.reconcileRun(tenantContext, itemId)
         : itemKind === "sandbox-promotion"
           ? await this.service.reconcilePromotion(tenantContext, itemId)
-          : this.taskService && typeof item.safeInput?.workspaceId === "string"
-            ? await this.taskService.reconcile(tenantContext, item.safeInput.workspaceId, itemId)
+          : this.taskService &&
+              typeof item.safeInput?.workspaceId === "string" &&
+              typeof item.safeInput.activeRunId === "string"
+            ? await this.taskService.reconcile(
+                tenantContext,
+                item.safeInput.workspaceId,
+                itemId,
+                item.safeInput.activeRunId,
+              )
             : err(domainError.invariant("Agent Task durable work service is unavailable"));
     if (result.isErr() && result.error.details?.code === "sandbox_agent_approval_pending") {
       return ok({
