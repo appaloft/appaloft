@@ -342,6 +342,11 @@ export interface SandboxQuotaUsage {
 }
 export interface SandboxRepository {
   save(context: RepositoryContext, sandbox: Sandbox, providerKey: string): Promise<void>;
+  recordActivityIfReady(
+    context: RepositoryContext,
+    sandboxId: string,
+    at: UpdatedAt,
+  ): Promise<boolean>;
   find(context: RepositoryContext, sandboxId: string): Promise<StoredSandbox | null>;
   list(
     context: RepositoryContext,
@@ -425,6 +430,18 @@ export class InMemorySandboxRepository implements SandboxRepository {
   async save(context: RepositoryContext, sandbox: Sandbox, providerKey: string): Promise<void> {
     const tenant = tenantId(context);
     this.items.set(`${tenant}:${sandbox.id.value}`, { tenantId: tenant, providerKey, sandbox });
+  }
+  async recordActivityIfReady(
+    context: RepositoryContext,
+    sandboxId: string,
+    at: UpdatedAt,
+  ): Promise<boolean> {
+    const stored = await this.find(context, sandboxId);
+    if (stored?.sandbox.toState().status.value !== "ready") return false;
+    const touched = stored.sandbox.touchActivity({ at });
+    if (touched.isErr()) return false;
+    await this.save(context, stored.sandbox, stored.providerKey);
+    return true;
   }
   async find(context: RepositoryContext, sandboxId: string): Promise<StoredSandbox | null> {
     return this.items.get(`${tenantId(context)}:${sandboxId}`) ?? null;
@@ -956,26 +973,18 @@ export class ExecutionSandboxService {
     }
   }
 
-  private async touchActivity(
-    context: ExecutionContext,
-    stored: StoredSandbox,
-  ): Promise<Result<void>> {
-    const touched = stored.sandbox.touchActivity({
-      at: UpdatedAt.rehydrate(this.clock.now()),
-    });
-    if (touched.isErr()) return err(touched.error);
-    await this.saveSandbox(context, stored.sandbox, stored.providerKey);
-    return ok(undefined);
-  }
-
   private async withActivity<T>(
     context: ExecutionContext,
     stored: StoredSandbox,
     result: Result<T>,
   ): Promise<Result<T>> {
     if (result.isErr()) return err(result.error);
-    const touched = await this.touchActivity(context, stored);
-    return touched.isErr() ? err(touched.error) : ok(result.value);
+    await this.repository.recordActivityIfReady(
+      toRepositoryContext(context),
+      stored.sandbox.id.value,
+      UpdatedAt.rehydrate(this.clock.now()),
+    );
+    return ok(result.value);
   }
 
   private snapshotCompatibleWithProvider(

@@ -26,6 +26,7 @@
 | GH-AUTO-TENANT-022 | HTTP/oRPC/composition | Authenticated command and query execution with a configured tenant resolver | Both application buses receive the resolved tenant context; the default resolver preserves the public organization scope and an injected runtime policy may canonicalize it without changing Profile/Workspace contracts. | public automated pass |
 | GH-AUTO-DURABLE-CREDENTIAL-023 | Application/durable runtime | A credential-bound Sandbox Agent Runtime is created, the control-plane process restarts, and queued Run work is reconciled | Durable safe input round-trips tenant id and optional organization id; the restarted worker replays the existing idempotent credential admission from persisted Runtime pin/bindings before process launch; missing/revoked/cross-scope credentials fail before secret resolution or compute; no admission table or parallel Runtime/Task state is created. | public success and denied-admission automated pass; hosted restart composition and external restart rerun pending |
 | GH-AUTO-RUNTIME-HOME-024 | Runtime/provider + opt-in acceptance | An OpenCode GitHub Agent Task starts, hibernates, and resumes in a read-only-root Sandbox | Docker process boundaries and the native Adapter use the existing Workspace-scoped HOME/XDG contract for version, server, task, tests, Preview, terminal, and fallback recovery; no process opens root/global Agent state and the resumed Run reaches a truthful terminal result. | public focused tests and local Docker product probe passed; external rerun pending after run `30690194327` reproduced `/root/.local/share/opencode/log/opencode.log` |
+| GH-AUTO-LIFECYCLE-025 | Application/concurrency | A successful provider operation admitted from ready is held while pause persists a recovery handle, then completes late | Activity persistence re-reads current state, leaves the Sandbox paused with the exact recovery handle, and does not resurrect the deleted ready runtime; resume/terminate can continue from authoritative lifecycle truth. | public application/PG automated pass under #951; hosted rerun pending |
 
 ## External Acceptance Boundary
 
@@ -44,6 +45,13 @@ matrix alone.
 - Public `lint`, `typecheck`, `build`, and the complete 35-task repository test gate completed
   successfully on 2026-07-31. The feedback-continuity suites include application control-delivery
   reuse and PGlite process-restart readback.
+- Public #951 adds a detached-aggregate concurrency regression proving a late provider operation
+  cannot replace paused lifecycle truth, plus a PostgreSQL regression proving the activity write is
+  conditional on current `ready` status and updates only `lastActivityAt`. Focused application and
+  PG suites passed, as did lint, 61-package typecheck, 5-task build, and the canonical 35-task
+  repository test gate on 2026-08-01. Two earlier full-test attempts exposed unrelated existing
+  runtime timing/environment flakes; their exact tests passed repeatedly or as complete package
+  suites before the final canonical pass.
 - The repository-level test gate passed all feature suites, HTTP/WebSocket suites, SDK/CLI/Web
   suites, and WebView acceptance. One unrelated PGlite audit test exceeded its five-second
   concurrent timeout; its complete file then passed 10/10 in isolation. Hosted and real-provider

@@ -58,6 +58,9 @@
 16. Reuse the Execution Sandbox workspace-scoped process-home contract for every GitHub Agent
     process. Provider exec/terminal boundaries and native Adapter probes must agree on writable
     HOME/XDG paths so compute-released resume does not depend on root/global state.
+17. Fence runtime activity bookkeeping from Sandbox lifecycle transitions. Re-read the authoritative
+    Sandbox after the provider call and never save a stale ready aggregate over pause, resume,
+    termination, or reconciliation state.
 
 ## Migration
 
@@ -97,6 +100,8 @@
 - Add `SBX-RUNTIME-005` and `GH-AUTO-RUNTIME-HOME-024` regressions proving Docker exec/terminal and
   OpenCode native version/server/task processes use the same workspace-scoped HOME/XDG contract,
   including after compute-released resume.
+- Add a deterministic late-activity/pause concurrency regression for `GH-AUTO-LIFECYCLE-025` and
+  prove the paused recovery handle remains authoritative.
 - Run public lint, typecheck, test, and build before public delivery.
 
 ## Risks
@@ -108,6 +113,8 @@
 - GitHub line annotations can become invalid when the head changes; delivery must re-read head SHA.
 - Existing Task state is compatibility-sensitive; migration and recovery tests must cover old state.
 - Cleanup success requires provider readback and durable retry, not optimistic state mutation.
+- Late runtime activity can race pause/resume/terminate; full stale aggregate persistence would
+  destroy the current recovery handle, so activity bookkeeping must re-read lifecycle truth.
 - A read-only runtime root makes any missing process-home boundary fail as an Agent startup error;
   provider and Adapter tests must assert the rendered environment rather than relying on a base
   image's pre-created root files.
