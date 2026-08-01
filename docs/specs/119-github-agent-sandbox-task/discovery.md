@@ -77,3 +77,16 @@ a second delivery/review/thread-task store and repeated public credential metada
 confirmed the correction round: public Appaloft must expose the neutral composition seams first;
 hosted code must then reuse them and delete its parallel state. A dedicated Public/Private Boundary
 Review Round becomes a durable downstream-Code and merge gate.
+
+## 2026-08-01 Registered-Server Repair Evidence
+
+- External run `30690194327` proved one Task and Workspace survived serialized steer, stop, and
+  resume with truthful fallback recovery, then failed because OpenCode attempted to open
+  `/root/.local/share/opencode/log/opencode.log` inside the read-only-root Sandbox.
+- The exact pinned OpenCode 1.18.4 image reproduces that failure deterministically on both amd64 and
+  arm64 when the process lacks a workspace-scoped HOME/XDG environment. The same process crosses
+  the logging boundary when those paths resolve below `/workspace`.
+- The root cause belongs to the public Execution Sandbox/provider process boundary. Cloud must not
+  wrap or copy this neutral isolation behavior. The owner instructed the work to continue under the
+  original GitHub Agent Sandbox Task goal, so Spec, Ticket, Test-First, and public Code rounds are
+  authorized for this repair.

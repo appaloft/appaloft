@@ -132,7 +132,7 @@ const request = {
 };
 
 describe("DockerSandboxProvider", () => {
-  test("[TERM-SESSION-SANDBOX-001] opens the managed container shell through a PTY runner", async () => {
+  test("[TERM-SESSION-SANDBOX-001][SBX-RUNTIME-005] opens the managed container shell with a Workspace-scoped home", async () => {
     const runner = new CapturingRunner();
     const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
     await provider.provision(request);
@@ -151,12 +151,22 @@ describe("DockerSandboxProvider", () => {
           "docker",
           "exec",
           "-it",
+          "-e",
+          "HOME=/workspace",
+          "-e",
+          "XDG_DATA_HOME=/workspace/.local/share",
+          "-e",
+          "XDG_CONFIG_HOME=/workspace/.config",
+          "-e",
+          "XDG_STATE_HOME=/workspace/.local/state",
+          "-e",
+          "XDG_CACHE_HOME=/workspace/.cache",
           "-w",
           "/workspace/src",
           "appaloft-sbx_demo",
           "sh",
           "-lc",
-          expect.stringContaining("export HOME=/workspace"),
+          expect.stringContaining("exec bash"),
         ],
         initialRows: 32,
         initialCols: 120,
@@ -188,6 +198,16 @@ describe("DockerSandboxProvider", () => {
       "docker",
       "exec",
       "-it",
+      "-e",
+      "HOME=/workspace",
+      "-e",
+      "XDG_DATA_HOME=/workspace/.local/share",
+      "-e",
+      "XDG_CONFIG_HOME=/workspace/.config",
+      "-e",
+      "XDG_STATE_HOME=/workspace/.local/state",
+      "-e",
+      "XDG_CACHE_HOME=/workspace/.cache",
       "-w",
       "/workspace",
       "appaloft-sbx_demo",
@@ -480,7 +500,7 @@ describe("DockerSandboxProvider", () => {
     ]);
   });
 
-  test("[SBX-PROC-001] [SBX-EXEC-STDIN-001] attaches foreground stdin without placing it in argv", async () => {
+  test("[SBX-PROC-001][SBX-EXEC-STDIN-001][SBX-RUNTIME-005] attaches foreground stdin with a Workspace-scoped home", async () => {
     const runner = new CapturingRunner();
     const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
     await provider.provision(request);
@@ -506,6 +526,16 @@ describe("DockerSandboxProvider", () => {
         "docker",
         "exec",
         "-i",
+        "-e",
+        "HOME=/workspace",
+        "-e",
+        "XDG_DATA_HOME=/workspace/.local/share",
+        "-e",
+        "XDG_CONFIG_HOME=/workspace/.config",
+        "-e",
+        "XDG_STATE_HOME=/workspace/.local/state",
+        "-e",
+        "XDG_CACHE_HOME=/workspace/.cache",
         "-w",
         "/workspace/src",
         "appaloft-sbx_demo",
@@ -550,7 +580,7 @@ describe("DockerSandboxProvider", () => {
     }
   });
 
-  test("[SBX-PROC-001] streams bounded launch input through a private pipe without placing it in argv", async () => {
+  test("[SBX-PROC-001][SBX-RUNTIME-005] streams bounded launch input through a Workspace-scoped process home", async () => {
     const runner = new CapturingRunner();
     const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
     await provider.provision(request);
@@ -567,6 +597,16 @@ describe("DockerSandboxProvider", () => {
     const launch = runner.calls.find((call) => call.argv.includes("-d"));
     const delivered = runner.calls.at(-1);
     expect(launch?.argv).not.toContain("-i");
+    expect(launch?.argv).toEqual(
+      expect.arrayContaining([
+        "-e",
+        "HOME=/workspace",
+        "XDG_DATA_HOME=/workspace/.local/share",
+        "XDG_CONFIG_HOME=/workspace/.config",
+        "XDG_STATE_HOME=/workspace/.local/state",
+        "XDG_CACHE_HOME=/workspace/.cache",
+      ]),
+    );
     expect(launch?.argv.join(" ")).toContain('wait "$child"');
     expect(launch?.argv.join(" ")).toContain('rm -f -- "$pid_file" "$input_pipe"');
     expect(delivered?.argv).toContain("-i");
@@ -715,7 +755,7 @@ describe("DockerSandboxProvider", () => {
     );
   });
 
-  test("[HIB-DOCKER-001][HIB-DOCKER-002] releases compute and restores workspace state", async () => {
+  test("[HIB-DOCKER-001][HIB-DOCKER-002][SBX-RUNTIME-005] releases compute and restores Workspace-scoped process state", async () => {
     const runner = new CapturingRunner();
     const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
     const provisioned = await provider.provision(request);
@@ -774,6 +814,23 @@ describe("DockerSandboxProvider", () => {
           "docker image rm appaloft-sandbox-hibernate:sbx_demo",
       ),
     ).toBe(true);
+
+    await provider.exec({
+      sandboxId: "sbx_demo",
+      providerHandle: resumed.providerHandle,
+      argv: ["sh", "-c", "test \"$HOME\" = /workspace"],
+    });
+    const resumedExec = runner.calls.at(-1)?.argv ?? [];
+    expect(resumedExec).toEqual(
+      expect.arrayContaining([
+        "-e",
+        "HOME=/workspace",
+        "XDG_DATA_HOME=/workspace/.local/share",
+        "XDG_CONFIG_HOME=/workspace/.config",
+        "XDG_STATE_HOME=/workspace/.local/state",
+        "XDG_CACHE_HOME=/workspace/.cache",
+      ]),
+    );
   });
 
   test("[HIB-DOCKER-003] terminates provider-local recovery idempotently", async () => {

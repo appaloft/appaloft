@@ -44,6 +44,10 @@ sandbox-templates.create (optional)
 
 ## Runtime Interaction
 
+- Every provider process boundary supplies a writable workspace-scoped `HOME` plus XDG
+  data/config/state/cache directories below the confined workspace root. This applies uniformly to
+  foreground/background exec, initialization, managed terminals, Agent harnesses, and resumed
+  work. A read-only container root or host/global account home is never an implicit fallback.
 - Foreground exec streams output and terminal result without persisting raw output in aggregate,
   audit or ordinary lifecycle read models.
 - Background exec returns a process id and provider readback powers later list/show/events/terminate.

@@ -7,6 +7,7 @@ import {
   type SandboxProcessDescriptor,
 } from "@appaloft/application";
 import { type Result } from "@appaloft/core";
+import { sandboxWorkspaceProcessArgv } from "./sandbox-workspace-process-environment";
 
 export interface OpenCodeSandboxExecutionPort {
   exec(
@@ -320,7 +321,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
     }
 
     const version = await this.execution.exec(input.executionContext, input.sandboxId, {
-      argv: [this.executable, "--version"],
+      argv: sandboxWorkspaceProcessArgv([this.executable, "--version"]),
       ...(this.cwd === "." ? {} : { cwd: this.cwd }),
     });
     if (version.isErr()) throw new Error(version.error.message);
@@ -349,15 +350,14 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
         "-c",
         'IFS= read -r config; IFS= read -r token; export OPENCODE_CONFIG_CONTENT="$config"; export APPALOFT_MODEL_ACCESS_TOKEN="$token"; exec "$@"',
         "appaloft-opencode-server",
-        "env",
-        "HOME=/workspace",
-        "XDG_DATA_HOME=/workspace/.local/share",
-        this.executable,
-        "serve",
-        "--hostname",
-        "0.0.0.0",
-        "--port",
-        String(this.port),
+        ...sandboxWorkspaceProcessArgv([
+          this.executable,
+          "serve",
+          "--hostname",
+          "0.0.0.0",
+          "--port",
+          String(this.port),
+        ]),
       ],
       ...(this.cwd === "." ? {} : { cwd: this.cwd }),
       background: true,
@@ -484,20 +484,19 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       stdoutPath,
       stderrPath,
       exitPath,
-      "env",
-      "HOME=/workspace",
-      "XDG_DATA_HOME=/workspace/.local/share",
-      this.executable,
-      "run",
-      "--dir",
-      this.cwd === "." ? "/workspace" : `/workspace/${this.cwd}`,
-      "--model",
-      `${capability.provider}/${capability.model}`,
-      "--format",
-      "json",
-      "--auto",
-      ...(input.context.mode === "continue" ? ["--continue"] : []),
-      input.task,
+      ...sandboxWorkspaceProcessArgv([
+        this.executable,
+        "run",
+        "--dir",
+        this.cwd === "." ? "/workspace" : `/workspace/${this.cwd}`,
+        "--model",
+        `${capability.provider}/${capability.model}`,
+        "--format",
+        "json",
+        "--auto",
+        ...(input.context.mode === "continue" ? ["--continue"] : []),
+        input.task,
+      ]),
     ];
     const result = await this.execution.exec(input.executionContext, input.sandboxId, {
       argv,

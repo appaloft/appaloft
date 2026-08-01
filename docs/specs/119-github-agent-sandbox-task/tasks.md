@@ -27,6 +27,9 @@
 - [x] Create and link public feedback-continuity issue #936 after external run `30604398408` proved
   that `stop` created a second Task status comment instead of reusing the current thread Task's
   existing bounded feedback ids.
+- [x] Create and link public workspace-scoped process-home issue #941 after external run
+  `30690194327` proved a resumed OpenCode Run attempted to open
+  `/root/.local/share/opencode/log/opencode.log` inside a read-only-root Sandbox.
 
 ## Public Composition Boundary Slice
 
@@ -98,6 +101,9 @@
   PostgreSQL persistence regressions (#938).
 - [ ] GH-AUTO-DURABLE-CREDENTIAL-023: compose hosted revoked/cross-scope restart coverage with zero
   secret resolution, process launch, or Sandbox effects after the public change is merged and pinned.
+- [x] SBX-RUNTIME-005/GH-AUTO-RUNTIME-HOME-024: make Docker exec/terminal and OpenCode native
+  process launches share one writable Workspace-scoped HOME/XDG contract; prove the exact
+  read-only-root regression and compute-released resume path.
 
 ## GitHub Feedback And Delivery Slice
 

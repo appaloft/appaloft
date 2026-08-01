@@ -167,6 +167,9 @@ describe("OpenCodeSandboxAgentHarness", () => {
       argv: expect.arrayContaining([
         "HOME=/workspace",
         "XDG_DATA_HOME=/workspace/.local/share",
+        "XDG_CONFIG_HOME=/workspace/.config",
+        "XDG_STATE_HOME=/workspace/.local/state",
+        "XDG_CACHE_HOME=/workspace/.cache",
         "serve",
         "--hostname",
         "0.0.0.0",
@@ -180,6 +183,11 @@ describe("OpenCodeSandboxAgentHarness", () => {
     const run = calls.find((call) => Array.isArray(call.argv) && call.argv.includes("run"));
     expect(run?.argv).toEqual(
       expect.arrayContaining([
+        "HOME=/workspace",
+        "XDG_DATA_HOME=/workspace/.local/share",
+        "XDG_CONFIG_HOME=/workspace/.config",
+        "XDG_STATE_HOME=/workspace/.local/state",
+        "XDG_CACHE_HOME=/workspace/.cache",
         "run",
         "--dir",
         "/workspace/app",
@@ -393,7 +401,7 @@ describe("OpenCodeSandboxAgentHarness", () => {
     ]);
   });
 
-  test("[AGENT-OPENCODE-011] uses the provider workspace root by default and preserves exec errors", async () => {
+  test("[AGENT-OPENCODE-011][SBX-RUNTIME-005][GH-AUTO-RUNTIME-HOME-024] uses the provider workspace home for native probes and preserves exec errors", async () => {
     const calls: Parameters<OpenCodeSandboxExecutionPort["exec"]>[2][] = [];
     const execution: OpenCodeSandboxExecutionPort = {
       async exec(_context, _sandboxId, input) {
@@ -443,7 +451,20 @@ describe("OpenCodeSandboxAgentHarness", () => {
         runtimeId: "sar_open",
       }),
     ).rejects.toThrow("Sandbox exec was rejected");
-    expect(calls).toEqual([{ argv: ["opencode", "--version"] }]);
+    expect(calls).toEqual([
+      {
+        argv: [
+          "env",
+          "HOME=/workspace",
+          "XDG_DATA_HOME=/workspace/.local/share",
+          "XDG_CONFIG_HOME=/workspace/.config",
+          "XDG_STATE_HOME=/workspace/.local/state",
+          "XDG_CACHE_HOME=/workspace/.cache",
+          "opencode",
+          "--version",
+        ],
+      },
+    ]);
   });
 
   test("[AGENT-WS-OPEN-008] cancellation stops the headless child and runtime termination stops the native server", async () => {
