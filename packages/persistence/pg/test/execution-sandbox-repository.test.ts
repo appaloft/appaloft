@@ -61,7 +61,7 @@ function sandbox(
 }
 
 describe("PgExecutionSandboxRepository", () => {
-  test("[SBX-PG-001] round-trips safe aggregate and snapshot state", async () => {
+  test("[SBX-PG-001][SBX-RECONCILE-002] round-trips aggregate state and provider runtime claims", async () => {
     const directory = mkdtempSync(join(tmpdir(), "appaloft-sandbox-pg-"));
     directories.push(directory);
     const database = await createDatabase({ driver: "pglite", pgliteDataDir: directory });
@@ -107,6 +107,33 @@ describe("PgExecutionSandboxRepository", () => {
           offset: 0,
         }),
       ).toEqual([]);
+      aggregate
+        .requestPause({ at: UpdatedAt.rehydrate("2026-07-20T00:00:03.000Z") })
+        ._unsafeUnwrap();
+      aggregate
+        .markPaused({
+          at: UpdatedAt.rehydrate("2026-07-20T00:00:04.000Z"),
+          providerHandle: "opaque:snapshot",
+          suspension: { mode: "process-frozen", portability: "provider-local" },
+        })
+        ._unsafeUnwrap();
+      aggregate
+        .requestResume({ at: UpdatedAt.rehydrate("2026-07-20T00:00:05.000Z") })
+        ._unsafeUnwrap();
+      await repository.save(context("tenant_a"), aggregate, "hermetic");
+      expect(
+        await repository.listProviderRuntimeClaims(context("tenant_a"), {
+          providerKey: "hermetic",
+          limit: 10,
+          offset: 0,
+        }),
+      ).toEqual([
+        {
+          sandboxId: "sbx_pg",
+          status: "resuming",
+          providerHandle: "opaque:snapshot",
+        },
+      ]);
 
       const grant = SandboxCredentialGrant.create({
         grantId: "grant_pg",

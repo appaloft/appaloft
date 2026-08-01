@@ -20,6 +20,7 @@ import {
   type SandboxResourceLimitsState,
   SandboxSnapshot,
   SandboxSnapshotId,
+  type SandboxStatus,
   SandboxTemplate,
   SandboxTemplateId,
   SandboxTemplateName,
@@ -327,6 +328,11 @@ export class SandboxProviderRegistry {
 export type StoredSandbox = { tenantId: string; providerKey: string; sandbox: Sandbox };
 export type StoredSnapshot = { tenantId: string; providerKey: string; snapshot: SandboxSnapshot };
 export type StoredTemplate = { tenantId: string; template: SandboxTemplate };
+export interface SandboxProviderRuntimeClaim {
+  sandboxId: string;
+  status: SandboxStatus;
+  providerHandle?: string;
+}
 export interface SandboxQuotaUsage {
   activeSandboxes: number;
   cpuMillis: number;
@@ -349,6 +355,10 @@ export interface SandboxRepository {
     context: RepositoryContext,
     input: { providerKey: string; limit: number; offset: number },
   ): Promise<Array<{ sandboxId: string; providerHandle: string }>>;
+  listProviderRuntimeClaims?(
+    context: RepositoryContext,
+    input: { providerKey: string; limit: number; offset: number },
+  ): Promise<SandboxProviderRuntimeClaim[]>;
   listMaintenanceTenantIds(
     context: RepositoryContext,
     input: { limit: number; offset: number },
@@ -449,6 +459,24 @@ export class InMemorySandboxRepository implements SandboxRepository {
         return state.providerHandle
           ? [{ sandboxId: state.id.value, providerHandle: state.providerHandle }]
           : [];
+      })
+      .slice(input.offset, input.offset + input.limit);
+  }
+  async listProviderRuntimeClaims(
+    context: RepositoryContext,
+    input: { providerKey: string; limit: number; offset: number },
+  ): Promise<SandboxProviderRuntimeClaim[]> {
+    return [...this.items.values()]
+      .filter(
+        (item) => item.tenantId === tenantId(context) && item.providerKey === input.providerKey,
+      )
+      .map((item) => {
+        const state = item.sandbox.toState();
+        return {
+          sandboxId: state.id.value,
+          status: state.status.value,
+          ...(state.providerHandle ? { providerHandle: state.providerHandle } : {}),
+        };
       })
       .slice(input.offset, input.offset + input.limit);
   }
@@ -1746,16 +1774,39 @@ export class ExecutionSandboxService {
         continue;
       }
       const persisted = new Set<string>();
+      const protectedTransitions = new Set<string>();
       for (let offset = 0; ; offset += limit) {
-        const page = await this.repository.listProviderRuntimes(repositoryContext, {
-          providerKey: provider.key,
-          limit,
-          offset,
-        });
-        for (const runtime of page) {
-          persisted.add(`${runtime.sandboxId}\0${runtime.providerHandle}`);
+        const storedPage = this.repository.listProviderRuntimeClaims
+          ? undefined
+          : await this.repository.list(repositoryContext, { limit, offset });
+        const claims = this.repository.listProviderRuntimeClaims
+          ? await this.repository.listProviderRuntimeClaims(repositoryContext, {
+              providerKey: provider.key,
+              limit,
+              offset,
+            })
+          : (storedPage ?? [])
+              .filter((stored) => stored.providerKey === provider.key)
+              .map((stored) => {
+                const state = stored.sandbox.toState();
+                return {
+                  sandboxId: state.id.value,
+                  status: state.status.value,
+                  ...(state.providerHandle ? { providerHandle: state.providerHandle } : {}),
+                };
+              });
+        for (const claim of claims) {
+          if (claim.providerHandle) {
+            persisted.add(`${claim.sandboxId}\0${claim.providerHandle}`);
+          }
+          if (
+            "status" in claim &&
+            ["provisioning", "pausing", "resuming", "terminating"].includes(claim.status)
+          ) {
+            protectedTransitions.add(claim.sandboxId);
+          }
         }
-        if (page.length < limit) break;
+        if ((storedPage?.length ?? claims.length) < limit) break;
       }
 
       let cursor: string | undefined;
@@ -1775,6 +1826,10 @@ export class ExecutionSandboxService {
             continue;
           }
           if (persisted.has(`${runtime.sandboxId}\0${runtime.providerHandle}`)) {
+            retained.push(runtime.sandboxId);
+            continue;
+          }
+          if (protectedTransitions.has(runtime.sandboxId)) {
             retained.push(runtime.sandboxId);
             continue;
           }
