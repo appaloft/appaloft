@@ -155,11 +155,18 @@ describe("Sandbox Agent durable work", () => {
     });
 
     let reconciledTenant: ExecutionContext["tenant"];
+    let reconciledGeneration: string | undefined;
     const handler = new SandboxAgentDurableWorkHandler(
       {} as SandboxAgentDeliveryService,
       {
-        async reconcile(context: ExecutionContext) {
+        async reconcile(
+          context: ExecutionContext,
+          _workspaceId: string,
+          _taskRunId: string,
+          expectedActiveRunId?: string,
+        ) {
           reconciledTenant = context.tenant;
+          reconciledGeneration = expectedActiveRunId;
           return ok({});
         },
       } as unknown as AgentTaskRunService,
@@ -179,6 +186,7 @@ describe("Sandbox Agent durable work", () => {
       organizationId: "org_demo",
       source: "durable-work",
     });
+    expect(reconciledGeneration).toBe("srun_task_org");
   });
 
   test("[GH-AUTO-DURABLE-CREDENTIAL-023] continues legacy Task Run work without an organization scope", async () => {

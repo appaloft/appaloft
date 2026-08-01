@@ -99,6 +99,8 @@
 - [x] GH-AUTO-CONTROL-010/GH-AUTO-LINEAGE-012: key durable Agent Task reconciliation by stable
   Task plus active Run generation and make same-generation enqueue idempotent in application and
   PostgreSQL persistence regressions (#938).
+- [x] GH-AUTO-CONTROL-010/GH-AUTO-LINEAGE-012: fence an in-flight stale reconciliation so steer,
+  stop, or resume cannot be overwritten by the superseded Run's terminal status (#945).
 - [ ] GH-AUTO-DURABLE-CREDENTIAL-023: compose hosted revoked/cross-scope restart coverage with zero
   secret resolution, process launch, or Sandbox effects after the public change is merged and pinned.
 - [x] SBX-RUNTIME-005/GH-AUTO-RUNTIME-HOME-024: make Docker exec/terminal and OpenCode native
@@ -166,6 +168,8 @@
 - [x] Docs outcome for #934: not user-facing. The fix restores the already specified
   restart-safe credential-bound Agent Task execution and changes no command, API, status, error
   vocabulary, or recovery guidance.
+- [x] Docs outcome for #945: not user-facing. The fix enforces the existing active-Run generation
+  contract and changes no command, API schema, status vocabulary, or recovery guidance.
 - [x] Synchronize Domain Model, Business Operation Map, operation catalog, SDK/CLI/Web docs, and
   Test Matrix evidence.
 - [ ] Commit and push public changes with a neutral message.

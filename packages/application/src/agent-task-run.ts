@@ -402,7 +402,16 @@ export class AgentTaskRunService {
   private async persist(
     context: ExecutionContext,
     result: AgentTaskRunDescriptor,
+    expectedActiveRunId?: string,
   ): Promise<Result<AgentTaskRunDescriptor>> {
+    if (expectedActiveRunId) {
+      const current = await this.read(context, {
+        workspaceId: result.workspaceId,
+        taskRunId: result.taskRunId,
+      });
+      if (current.isErr()) return current;
+      if (current.value.activeRunId !== expectedActiveRunId) return current;
+    }
     const protectedState = await this.dependencies.stateProtector.protect(
       { purpose: "agent-task-state" },
       JSON.stringify(result),
@@ -950,9 +959,12 @@ export class AgentTaskRunService {
     context: ExecutionContext,
     workspaceId: string,
     taskRunId: string,
+    expectedActiveRunId?: string,
   ): Promise<Result<AgentTaskRunDescriptor>> {
     let task = await this.read(context, { workspaceId, taskRunId });
     if (task.isErr()) return task;
+    const reconciliationActiveRunId = expectedActiveRunId ?? task.value.activeRunId;
+    if (task.value.activeRunId !== reconciliationActiveRunId) return task;
     if (
       [
         "checks-failed",
@@ -973,6 +985,10 @@ export class AgentTaskRunService {
       task.value.activeRunId,
     );
     if (run.isErr()) return err(run.error);
+    const latest = await this.read(context, { workspaceId, taskRunId });
+    if (latest.isErr()) return latest;
+    if (latest.value.activeRunId !== reconciliationActiveRunId) return latest;
+    task = latest;
     if (!["completed", "failed", "cancelled"].includes(run.value.status)) {
       task = await this.persist(
         context,
@@ -981,8 +997,10 @@ export class AgentTaskRunService {
           { agentRun: run.value, status: "running" },
           this.dependencies.clock.now(),
         ),
+        reconciliationActiveRunId,
       );
       if (task.isErr()) return task;
+      if (task.value.activeRunId !== reconciliationActiveRunId) return task;
       return err(
         domainError.conflict("Agent Task is waiting for its Agent Run", {
           code: "agent_task_run_pending",
@@ -999,6 +1017,7 @@ export class AgentTaskRunService {
           { agentRun: run.value, status: "cancelled" },
           this.dependencies.clock.now(),
         ),
+        reconciliationActiveRunId,
       );
     }
     if (run.value.status !== "completed") {
@@ -1017,6 +1036,7 @@ export class AgentTaskRunService {
           },
           this.dependencies.clock.now(),
         ),
+        reconciliationActiveRunId,
       );
     }
     task = await this.persist(
@@ -1026,13 +1046,16 @@ export class AgentTaskRunService {
         { agentRun: run.value, status: "finalizing", failure: undefined },
         this.dependencies.clock.now(),
       ),
+      reconciliationActiveRunId,
     );
     if (task.isErr()) return task;
+    if (task.value.activeRunId !== reconciliationActiveRunId) return task;
     const failFinalization = async (
       failure: DomainError,
     ): Promise<Result<AgentTaskRunDescriptor>> => {
       const latest = await this.read(context, { workspaceId, taskRunId });
       if (latest.isErr()) return latest;
+      if (latest.value.activeRunId !== reconciliationActiveRunId) return latest;
       const persisted = await this.persist(
         context,
         updateTask(
@@ -1047,8 +1070,11 @@ export class AgentTaskRunService {
           },
           this.dependencies.clock.now(),
         ),
+        reconciliationActiveRunId,
       );
-      return persisted.isErr() ? persisted : err(failure);
+      return persisted.isErr() || persisted.value.activeRunId !== reconciliationActiveRunId
+        ? persisted
+        : err(failure);
     };
     try {
       if (task.value.checks.length < task.value.plan.checks.length) {
@@ -1076,8 +1102,10 @@ export class AgentTaskRunService {
           task = await this.persist(
             context,
             updateTask(task.value, { checks }, this.dependencies.clock.now()),
+            reconciliationActiveRunId,
           );
           if (task.isErr()) return task;
+          if (task.value.activeRunId !== reconciliationActiveRunId) return task;
         }
       }
       const requiredCheckFailed = task.value.checks.some(
@@ -1089,8 +1117,10 @@ export class AgentTaskRunService {
         task = await this.persist(
           context,
           updateTask(task.value, { changes: changes.value }, this.dependencies.clock.now()),
+          reconciliationActiveRunId,
         );
         if (task.isErr()) return task;
+        if (task.value.activeRunId !== reconciliationActiveRunId) return task;
       }
       if (!requiredCheckFailed && task.value.plan.preview && !task.value.developmentPreview) {
         const previewPlan = task.value.plan.preview;
@@ -1124,8 +1154,10 @@ export class AgentTaskRunService {
               },
               this.dependencies.clock.now(),
             ),
+            reconciliationActiveRunId,
           );
           if (task.isErr()) return task;
+          if (task.value.activeRunId !== reconciliationActiveRunId) return task;
         }
         const exposure = await this.dependencies.sandbox.exposePort(context, workspaceId, {
           port: previewPlan.port,
@@ -1140,8 +1172,10 @@ export class AgentTaskRunService {
             { developmentPreview: exposure.value },
             this.dependencies.clock.now(),
           ),
+          reconciliationActiveRunId,
         );
         if (task.isErr()) return task;
+        if (task.value.activeRunId !== reconciliationActiveRunId) return task;
       }
       if (!requiredCheckFailed && task.value.plan.immutableReview && !task.value.sourceArtifact) {
         const artifact = await this.dependencies.agents.createSourceArtifact(context, {
@@ -1152,8 +1186,10 @@ export class AgentTaskRunService {
         task = await this.persist(
           context,
           updateTask(task.value, { sourceArtifact: artifact.value }, this.dependencies.clock.now()),
+          reconciliationActiveRunId,
         );
         if (task.isErr()) return task;
+        if (task.value.activeRunId !== reconciliationActiveRunId) return task;
       }
       if (
         !requiredCheckFailed &&
@@ -1172,8 +1208,10 @@ export class AgentTaskRunService {
             { candidatePreview: preview.value },
             this.dependencies.clock.now(),
           ),
+          reconciliationActiveRunId,
         );
         if (task.isErr()) return task;
+        if (task.value.activeRunId !== reconciliationActiveRunId) return task;
       }
       return this.persist(
         context,
@@ -1185,6 +1223,7 @@ export class AgentTaskRunService {
           },
           this.dependencies.clock.now(),
         ),
+        reconciliationActiveRunId,
       );
     } catch (error) {
       return failFinalization(
