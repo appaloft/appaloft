@@ -45,6 +45,11 @@ function provider(): SandboxProvider & { removed: SandboxOwnedRuntime[] } {
           },
           {
             ownerScope: "tenant_a",
+            sandboxId: "sbx_kept",
+            providerHandle: "runtime:stale",
+          },
+          {
+            ownerScope: "tenant_a",
             sandboxId: "sbx_orphan",
             providerHandle: "runtime:orphan",
           },
@@ -146,7 +151,7 @@ describe("ExecutionSandboxService provider reconciliation", () => {
     expect(observedReservationId).toBe("wres_exact");
   });
 
-  test("[SBX-RECONCILE-001] removes only provider-owned runtimes absent from tenant persistence", async () => {
+  test("[SBX-RECONCILE-001] removes provider runtimes without an exact persisted claim", async () => {
     const adapter = provider();
     const app = service(adapter);
     expect((await app.service.createAndReconcile(context, createInput)).isOk()).toBe(true);
@@ -157,16 +162,66 @@ describe("ExecutionSandboxService provider reconciliation", () => {
 
     expect(result._unsafeUnwrap()).toEqual({
       retained: ["sbx_kept"],
-      removed: ["sbx_orphan"],
+      removed: ["sbx_kept", "sbx_orphan"],
       failed: [],
     });
     expect(adapter.removed).toEqual([
+      {
+        ownerScope: "tenant_a",
+        sandboxId: "sbx_kept",
+        providerHandle: "runtime:stale",
+      },
       {
         ownerScope: "tenant_a",
         sandboxId: "sbx_orphan",
         providerHandle: "runtime:orphan",
       },
     ]);
+  });
+
+  test("[SBX-RECONCILE-002] retains a provider runtime while its Sandbox resume is in flight", async () => {
+    const adapter = provider();
+    adapter.pause = async () => ({ providerHandle: "snapshot:sbx_kept" });
+    adapter.listOwnedRuntimes = async () => ({
+      items: [
+        {
+          ownerScope: "tenant_a",
+          sandboxId: "sbx_kept",
+          providerHandle: "runtime:resumed",
+        },
+      ],
+    });
+    let releaseResume!: () => void;
+    let markResumeEntered!: () => void;
+    const resumeGate = new Promise<void>((resolve) => {
+      releaseResume = resolve;
+    });
+    const resumeEntered = new Promise<void>((resolve) => {
+      markResumeEntered = resolve;
+    });
+    adapter.resume = async () => {
+      markResumeEntered();
+      await resumeGate;
+      return { providerHandle: "runtime:resumed", realizedIsolation: "gvisor" };
+    };
+    const app = service(adapter);
+    expect((await app.service.createAndReconcile(context, createInput)).isOk()).toBe(true);
+    expect((await app.service.pause(context, "sbx_kept")).isOk()).toBe(true);
+
+    const resume = app.service.resume(context, "sbx_kept");
+    await resumeEntered;
+    const reconciliation = await app.service.reconcileProviderOrphans(context, {
+      providerKey: "reconcile-test",
+    });
+    releaseResume();
+    expect((await resume)._unsafeUnwrap().status).toBe("ready");
+
+    expect(reconciliation._unsafeUnwrap()).toEqual({
+      retained: ["sbx_kept"],
+      removed: [],
+      failed: [],
+    });
+    expect(adapter.removed).toEqual([]);
   });
 
   test("[SBX-RECONCILE-001] fails closed when provider inventory cannot be read", async () => {

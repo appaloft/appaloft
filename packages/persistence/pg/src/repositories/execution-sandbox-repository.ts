@@ -1,5 +1,6 @@
 import {
   type RepositoryContext,
+  type SandboxProviderRuntimeClaim,
   type SandboxQuotaUsage,
   type SandboxRepository,
   type StoredSandbox,
@@ -290,6 +291,31 @@ export class PgExecutionSandboxRepository implements SandboxRepository {
       return state.providerHandle
         ? [{ sandboxId: row.id, providerHandle: state.providerHandle }]
         : [];
+    });
+  }
+
+  async listProviderRuntimeClaims(
+    context: RepositoryContext,
+    input: { providerKey: string; limit: number; offset: number },
+  ): Promise<SandboxProviderRuntimeClaim[]> {
+    const rows = await resolveRepositoryExecutor(this.db, context)
+      .selectFrom("execution_sandboxes")
+      .select(["id", "status", "state"])
+      .where("tenant_id", "=", contextTenantId(context))
+      .where("provider_key", "=", input.providerKey)
+      .orderBy("id", "asc")
+      .limit(input.limit)
+      .offset(input.offset)
+      .execute();
+    return rows.map((row) => {
+      const state = row.state as SerializedSandboxState;
+      return {
+        sandboxId: row.id,
+        status: SandboxStatusValue.rehydrate(
+          row.status as Parameters<typeof SandboxStatusValue.rehydrate>[0],
+        ).value,
+        ...(state.providerHandle ? { providerHandle: state.providerHandle } : {}),
+      };
     });
   }
 
