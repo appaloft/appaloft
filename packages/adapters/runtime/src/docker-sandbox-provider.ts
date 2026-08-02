@@ -700,7 +700,7 @@ export class DockerSandboxProvider implements SandboxProvider {
     }
     const containerExists = await this.assertHandleIfPresent(request);
     try {
-      if (containerExists) await this.docker(["rm", "-f", request.providerHandle]);
+      if (containerExists) await this.removeContainerConvergently(request);
     } finally {
       await this.revokeExternalAccess(request);
     }
@@ -1747,5 +1747,24 @@ export class DockerSandboxProvider implements SandboxProvider {
       throw new Error(`Docker Sandbox command failed: ${result.stderr || text(result.stdout)}`);
     }
     return result;
+  }
+
+  private async removeContainerConvergently(request: {
+    sandboxId: string;
+    providerHandle: string;
+  }): Promise<void> {
+    const removed = await this.runner.run(["docker", "rm", "-f", request.providerHandle]);
+    if (removed.exitCode === 0) return;
+    const concurrentRemoval = `removal of container ${request.providerHandle} is already in progress`;
+    if (!removed.stderr?.toLowerCase().includes(concurrentRemoval.toLowerCase())) {
+      throw new Error(`Docker Sandbox command failed: ${removed.stderr || text(removed.stdout)}`);
+    }
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      if (!(await this.assertHandleIfPresent(request))) return;
+      if (attempt < 3) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 100));
+      }
+    }
+    throw new Error(`Docker Sandbox command failed: ${removed.stderr || text(removed.stdout)}`);
   }
 }
