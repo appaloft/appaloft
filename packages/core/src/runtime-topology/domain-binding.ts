@@ -1,6 +1,7 @@
 import { AggregateRoot } from "../shared/entity";
 import { domainError } from "../shared/errors";
 import {
+  type CertificateId,
   type DeploymentId,
   type DeploymentTargetId,
   type DestinationId,
@@ -26,6 +27,7 @@ import {
   type RoutePathPrefix,
 } from "../shared/text-values";
 import { ScalarValueObject } from "../shared/value-object";
+import { type CertificateFingerprintValue } from "./certificate";
 
 export const domainBindingStatuses = [
   "requested",
@@ -135,11 +137,21 @@ export class DomainBindingStatusValue extends ScalarValueObject<DomainBindingSta
   }
 
   allowsCertificateImport(): boolean {
-    return this.value === "bound" || this.value === "ready" || this.value === "not_ready";
+    return (
+      this.value === "bound" ||
+      this.value === "certificate_pending" ||
+      this.value === "ready" ||
+      this.value === "not_ready"
+    );
   }
 
   allowsCertificateReadiness(): boolean {
-    return this.value === "bound" || this.value === "certificate_pending";
+    return (
+      this.value === "bound" ||
+      this.value === "certificate_pending" ||
+      this.value === "ready" ||
+      this.value === "not_ready"
+    );
   }
 
   allowsRouteReadiness(): boolean {
@@ -315,6 +327,10 @@ export class CertificatePolicyValue extends ScalarValueObject<CertificatePolicy>
     return this.value === "manual";
   }
 
+  isAuto(): boolean {
+    return this.value === "auto";
+  }
+
   requiresCertificateFor(tlsMode: TlsModeValue): boolean {
     return !tlsMode.isDisabled() && !this.isDisabled();
   }
@@ -411,6 +427,10 @@ export interface DomainBindingState {
   redirectTo?: PublicDomainName;
   redirectStatus?: CanonicalRedirectStatusCode;
   certificatePolicy: CertificatePolicyValue;
+  activeCertificateProof?: {
+    certificateId: CertificateId;
+    fingerprint: CertificateFingerprintValue;
+  };
   status: DomainBindingStatusValue;
   verificationAttempts: DomainVerificationAttemptState[];
   dnsObservation?: DomainDnsObservationState;
@@ -669,7 +689,11 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
   }
 
   canBecomeReadyAfterCertificateIssued(): boolean {
-    return this.state.status.allowsCertificateReadiness() && this.requiresCertificateForReadiness();
+    return (
+      this.state.status.allowsCertificateReadiness() &&
+      this.state.certificatePolicy.isAuto() &&
+      !this.state.tlsMode.isDisabled()
+    );
   }
 
   canBecomeReadyAfterCertificateImported(): boolean {
@@ -918,10 +942,30 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
 
   markReady(input: {
     readyAt: CreatedAt;
+    certificateId?: CertificateId;
+    certificateFingerprint?: CertificateFingerprintValue;
     correlationId?: string;
     causationId?: string;
   }): Result<void> {
+    if (Boolean(input.certificateId) !== Boolean(input.certificateFingerprint)) {
+      return err(
+        domainError.invariant(
+          "Certificate readiness proof requires both certificate identity and fingerprint",
+          {
+            phase: "domain-ready",
+            domainBindingId: this.state.id.value,
+          },
+        ),
+      );
+    }
+
     if (this.state.status.isReady()) {
+      if (input.certificateId && input.certificateFingerprint) {
+        this.state.activeCertificateProof = {
+          certificateId: input.certificateId,
+          fingerprint: input.certificateFingerprint,
+        };
+      }
       return ok(undefined);
     }
 
@@ -936,6 +980,12 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     }
 
     this.state.status = DomainBindingStatusValue.rehydrate("ready");
+    if (input.certificateId && input.certificateFingerprint) {
+      this.state.activeCertificateProof = {
+        certificateId: input.certificateId,
+        fingerprint: input.certificateFingerprint,
+      };
+    }
     delete this.state.routeFailure;
 
     this.recordDomainEvent("domain-ready", input.readyAt, {
@@ -1093,6 +1143,64 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
             redirectStatus: this.state.redirectStatus?.value ?? 308,
           }
         : {}),
+      configuredAt: input.configuredAt.value,
+      ...(input.correlationId ? { correlationId: input.correlationId } : {}),
+      ...(input.causationId ? { causationId: input.causationId } : {}),
+    });
+
+    return ok({ changed: true });
+  }
+
+  configureCertificatePolicy(input: {
+    certificatePolicy: CertificatePolicyValue;
+    configuredAt: CreatedAt;
+    correlationId?: string;
+    causationId?: string;
+  }): Result<{ changed: boolean }> {
+    if (
+      this.state.status.isDeleted() ||
+      !this.state.status.isActive() ||
+      this.state.tlsMode.isDisabled() ||
+      input.certificatePolicy.isDisabled()
+    ) {
+      return err(
+        domainError.certificatePolicyNotAllowed(
+          "Certificate policy can only be configured for an active TLS-enabled domain binding",
+          {
+            phase: "certificate-policy-configuration",
+            domainBindingId: this.state.id.value,
+            tlsMode: this.state.tlsMode.value,
+            certificatePolicy: input.certificatePolicy.value,
+            relatedState: this.state.status.value,
+          },
+        ),
+      );
+    }
+
+    if (this.state.certificatePolicy.equals(input.certificatePolicy)) {
+      return ok({ changed: false });
+    }
+
+    const previousCertificatePolicy = this.state.certificatePolicy;
+    this.state.certificatePolicy = input.certificatePolicy;
+    if (
+      this.state.status.isBound() ||
+      this.state.status.isReady() ||
+      this.state.status.isNotReady() ||
+      this.state.status.value === "certificate_pending"
+    ) {
+      this.state.status = DomainBindingStatusValue.rehydrate("certificate_pending");
+    }
+    delete this.state.routeFailure;
+
+    this.recordDomainEvent("domain-binding-certificate-policy-configured", input.configuredAt, {
+      domainBindingId: this.state.id.value,
+      domainName: this.state.domainName.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      resourceId: this.state.resourceId.value,
+      previousCertificatePolicy: previousCertificatePolicy.value,
+      certificatePolicy: this.state.certificatePolicy.value,
       configuredAt: input.configuredAt.value,
       ...(input.correlationId ? { correlationId: input.correlationId } : {}),
       ...(input.causationId ? { causationId: input.causationId } : {}),

@@ -13,6 +13,7 @@ export interface BufferedProcessInput {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   timeoutMs?: number;
+  stdin?: string | Uint8Array;
   redactions?: readonly string[];
   timeoutMessage?: string;
 }
@@ -46,7 +47,16 @@ export async function runBufferedProcess(
       ...(input.env ? { env: input.env } : {}),
       stdout: "pipe",
       stderr: "pipe",
+      stdin: input.stdin === undefined ? "ignore" : "pipe",
     });
+    if (input.stdin !== undefined) {
+      const stdin = subprocess.stdin;
+      if (!stdin) {
+        throw new Error("Process stdin pipe is unavailable");
+      }
+      stdin.write(input.stdin);
+      stdin.end();
+    }
     const stdoutPromise = new Response(subprocess.stdout).text();
     const stderrPromise = new Response(subprocess.stderr).text();
     let timeout: Timer | undefined;

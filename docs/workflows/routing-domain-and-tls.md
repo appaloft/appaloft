@@ -13,6 +13,8 @@ create durable domain binding
   -> evaluate route readiness
   -> request certificate when required
   -> issue certificate or record failure
+  -> activate selected certificate in the edge proxy
+  -> reload and prove the served hostname/SNI fingerprint
   -> mark domain ready when all gates pass
 ```
 
@@ -41,6 +43,7 @@ This workflow inherits:
 - [ADR-007: Certificate Provider And Challenge Default](../decisions/ADR-007-certificate-provider-and-challenge-default.md)
 - [ADR-008: Renewal Trigger Model](../decisions/ADR-008-renewal-trigger-model.md)
 - [ADR-009: Certificates Import Command](../decisions/ADR-009-certificates-import-command.md)
+- [ADR-104: Certificate Route Activation Reconciliation](../decisions/ADR-104-certificate-route-activation-reconciliation.md)
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [Error Model](../errors/model.md)
@@ -163,6 +166,9 @@ domain-bindings.create
   -> route readiness satisfied
   -> certificate-requested, if tlsMode is auto or certificatePolicy is auto
   -> certificate-issued
+  -> certificate route activation
+  -> provider reload
+  -> served-certificate hostname/SNI fingerprint proof
   -> domain-ready
 ```
 
@@ -211,6 +217,9 @@ domain-bindings.create
   -> route readiness satisfied
   -> certificates.import
   -> certificate-imported
+  -> certificate route activation
+  -> provider reload
+  -> served-certificate hostname/SNI fingerprint proof
   -> domain-ready
 ```
 
@@ -283,7 +292,13 @@ Async work includes:
   challenge type require it;
 - certificate provider request;
 - certificate storage;
-- domain-ready evaluation after `certificate-imported` or `certificate-issued`;
+- provider-neutral candidate certificate activation while retaining the previous serving
+  certificate until proof succeeds;
+- provider reload/dynamic configuration convergence;
+- direct TLS observation using the binding hostname as SNI, including expected fingerprint,
+  hostname coverage, and validity proof;
+- domain-ready evaluation after activation and proof requested by `certificate-imported` or
+  `certificate-issued`;
 - domain readiness finalization.
 
 Async work must persist state and publish formal events after durable transitions.
@@ -427,7 +442,7 @@ The minimal v1 readiness baseline is:
 
 For TLS-disabled bindings, no certificate gate remains after route readiness is satisfied. The domain-ready process manager may persist the binding as `ready` and publish `domain-ready`.
 
-For TLS auto or certificate-policy auto bindings, route readiness alone is not sufficient. The binding remains `bound` until certificate issuance completes. `certificate-requested` is consumed by the certificate worker through provider-neutral ports; `certificate-issued` records active certificate state and drives certificate-backed `domain-ready`; `certificate-issuance-failed` records failed or retry-scheduled attempt state.
+For TLS auto or certificate-policy auto bindings, route readiness alone is not sufficient. The binding remains certificate-pending until issuance and route reconciliation complete. `certificate-requested` is consumed by the certificate worker through provider-neutral ports; `certificate-issued` records active certificate state and requests binding-scoped material activation, proxy reload, and direct-origin hostname/SNI fingerprint proof. Only that proof drives certificate-backed `domain-ready`; `certificate-issuance-failed` records failed or retry-scheduled attempt state.
 
 The route readiness baseline does not create a separate public command. It is an event/process-manager continuation from `domain-bound` and a query/read-model projection for resources and domain bindings.
 

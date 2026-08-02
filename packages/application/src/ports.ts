@@ -366,6 +366,7 @@ export interface MaintenanceWorkerStatusReader {
 
 export type CoordinationScopeKind =
   | "resource-runtime"
+  | "domain-binding"
   | "preview-lifecycle"
   | "source-link"
   | "state-root-maintenance";
@@ -397,7 +398,11 @@ export interface MutationCoordinatorRunExclusiveInput<T> {
   policy: CoordinationPolicy;
   scope: CoordinationScope;
   owner: CoordinationOwner;
-  work: () => Promise<Result<T>>;
+  work: (lease?: MutationLeaseGuard) => Promise<Result<T>>;
+}
+
+export interface MutationLeaseGuard {
+  assertOwned(): Promise<Result<void>>;
 }
 
 export interface MutationCoordinator {
@@ -1135,6 +1140,11 @@ export interface DomainRouteBindingCandidate {
   pathHandling?: "preserve" | "strip";
   proxyKind: EdgeProxyKind;
   tlsMode: TlsMode;
+  certificate?: {
+    source: "appaloft-managed" | "appaloft-imported";
+    certificateId: string;
+    domainBindingId: string;
+  };
   targetServiceName?: string;
   redirectTo?: string;
   redirectStatus?: 301 | 302 | 307 | 308;
@@ -1559,6 +1569,94 @@ export interface CertificateSecretStore {
       deactivatedAt: string;
     },
   ): Promise<Result<void, DomainError>>;
+}
+
+export interface CertificateMaterialReference {
+  certificateId: string;
+  source: "managed" | "imported";
+  secretRef?: string;
+  certificateChainRef?: string;
+  privateKeyRef?: string;
+  passphraseRef?: string;
+}
+
+export interface MaterializedCertificate {
+  certificateId: string;
+  certificateChain: string;
+  privateKey: string;
+  passphrase?: string;
+}
+
+export interface CertificateMaterializer {
+  materialize(
+    context: ExecutionContext,
+    input: CertificateMaterialReference,
+  ): Promise<Result<MaterializedCertificate, DomainError>>;
+}
+
+export interface CertificateRouteActivationInput {
+  certificateId: string;
+  certificateSource: "managed" | "imported";
+  domainBindingId: string;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  domainName: string;
+  pathPrefix: string;
+  targetServiceName?: string;
+  proxyKind: EdgeProxyKind;
+  serverId?: string;
+  destinationId?: string;
+  material: MaterializedCertificate;
+}
+
+export interface CertificateRouteActivationResult {
+  activationId: string;
+  previousActivationId?: string;
+}
+
+export interface CertificateRouteFinalizationInput {
+  domainBindingId: string;
+  proxyKind: EdgeProxyKind;
+  serverId?: string;
+  activationId: string;
+}
+
+export interface CertificateRouteActivator {
+  activate(
+    context: ExecutionContext,
+    input: CertificateRouteActivationInput,
+  ): Promise<Result<CertificateRouteActivationResult, DomainError>>;
+  rollback(
+    context: ExecutionContext,
+    input: CertificateRouteActivationInput & CertificateRouteActivationResult,
+  ): Promise<Result<void, DomainError>>;
+  finalize(
+    context: ExecutionContext,
+    input: CertificateRouteFinalizationInput,
+  ): Promise<Result<void, DomainError>>;
+}
+
+export interface TlsCertificateObservationInput {
+  serverName: string;
+  expectedFingerprint: string;
+  proxyKind: EdgeProxyKind;
+  serverId?: string;
+  activationId: string;
+}
+
+export interface TlsCertificateObservation {
+  fingerprint: string;
+  subjectAlternativeNames: string[];
+  notBefore: string;
+  expiresAt: string;
+}
+
+export interface TlsCertificateObserver {
+  observe(
+    context: ExecutionContext,
+    input: TlsCertificateObservationInput,
+  ): Promise<Result<TlsCertificateObservation, DomainError>>;
 }
 
 export interface DependencyBindingSecretStoreInput {
@@ -2651,6 +2749,14 @@ export interface EdgeProxyRouteInput {
   pathPrefix: string;
   pathHandling?: "preserve" | "strip";
   tlsMode: TlsMode;
+  domainBindingId?: string;
+  certificate?:
+    | { source: "provider-local" }
+    | {
+        source: "appaloft-managed" | "appaloft-imported";
+        certificateId: string;
+        domainBindingId: string;
+      };
   targetPort?: number;
   targetServiceName?: string;
   providerKey?: string;
@@ -2758,8 +2864,12 @@ export interface ProxyConfigurationWarning {
   details?: Record<string, string | number | boolean | null>;
 }
 
-export type ProxyConfigurationTlsAutomation = "disabled" | "provider-local";
-export type ProxyConfigurationTlsCertificateSource = "none" | "provider-local";
+export type ProxyConfigurationTlsAutomation = "disabled" | "provider-local" | "appaloft";
+export type ProxyConfigurationTlsCertificateSource =
+  | "none"
+  | "provider-local"
+  | "appaloft-managed"
+  | "appaloft-imported";
 
 export interface ProxyConfigurationTlsDiagnostic {
   hostname: string;
@@ -9803,6 +9913,13 @@ export interface RequestedAccessRouteConfig {
   pathPrefix: string;
   pathHandling?: "preserve" | "strip";
   tlsMode: TlsMode;
+  domainBindingId?: string;
+  certificate?: {
+    source: "appaloft-managed" | "appaloft-imported";
+    certificateId: string;
+    domainBindingId: string;
+  };
+  source?: "generated-default" | "domain-binding" | "deployment-snapshot" | "server-applied";
   targetServiceName?: string;
   routeBehavior?: "serve" | "redirect";
   redirectTo?: string;

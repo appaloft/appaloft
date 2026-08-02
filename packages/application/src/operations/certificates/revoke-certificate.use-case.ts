@@ -14,6 +14,7 @@ import {
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import { createCoordinationOwner, mutationCoordinationPolicies } from "../../mutation-coordination";
 import {
   type AppLogger,
   type CertificateProviderPort,
@@ -22,6 +23,8 @@ import {
   type Clock,
   type EventBus,
   type IdGenerator,
+  type MutationCoordinator,
+  type MutationLeaseGuard,
   type ProcessAttemptRecorder,
 } from "../../ports";
 import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
@@ -121,11 +124,36 @@ export class RevokeCertificateUseCase {
     private readonly logger: AppLogger,
     @inject(tokens.processAttemptRecorder)
     private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
+    @inject(tokens.mutationCoordinator)
+    private readonly mutationCoordinator?: MutationCoordinator,
   ) {}
 
   async execute(
     context: ExecutionContext,
     input: RevokeCertificateCommandInput,
+  ): Promise<Result<RevokeCertificateCommandResult>> {
+    if (!this.mutationCoordinator) return this.executeExclusive(context, input);
+    const certificateId = CertificateId.create(input.certificateId);
+    if (certificateId.isErr()) return err(certificateId.error);
+    const certificate = await this.certificateRepository.findOne(
+      toRepositoryContext(context),
+      CertificateByIdSpec.create(certificateId.value),
+    );
+    if (!certificate) return err(certificateNotFound(certificateId.value.value));
+    const domainBindingId = certificate.toState().domainBindingId.value;
+    return this.mutationCoordinator.runExclusive({
+      context,
+      policy: mutationCoordinationPolicies.revokeCertificate,
+      scope: { kind: "domain-binding", key: domainBindingId },
+      owner: createCoordinationOwner(context, "certificates.revoke"),
+      work: (lease) => this.executeExclusive(context, input, lease),
+    });
+  }
+
+  private async executeExclusive(
+    context: ExecutionContext,
+    input: RevokeCertificateCommandInput,
+    lease?: MutationLeaseGuard,
   ): Promise<Result<RevokeCertificateCommandResult>> {
     const {
       certificateProvider,
@@ -140,6 +168,7 @@ export class RevokeCertificateUseCase {
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
+      if (lease) yield* await lease.assertOwned();
       const certificateId = yield* CertificateId.create(input.certificateId);
       const certificate = await certificateRepository.findOne(
         repositoryContext,
@@ -161,6 +190,7 @@ export class RevokeCertificateUseCase {
           : undefined;
 
       if (attemptId) {
+        if (lease) yield* await lease.assertOwned();
         await recordManagedCertificateRevocation({
           recorder: processAttemptRecorder,
           repositoryContext,
@@ -180,6 +210,7 @@ export class RevokeCertificateUseCase {
           ...(state.fingerprint ? { fingerprint: state.fingerprint.value } : {}),
         });
 
+        if (lease) yield* await lease.assertOwned();
         const providerResult = await certificateProvider.revoke(context, {
           certificateId: state.id.value,
           domainBindingId: state.domainBindingId.value,
@@ -189,6 +220,7 @@ export class RevokeCertificateUseCase {
           ...(reason ? { reason: reason.value } : {}),
           revokedAt: revokedAt.value,
         });
+        if (lease) yield* await lease.assertOwned();
         if (providerResult.isErr()) {
           const phase =
             typeof providerResult.error.details?.phase === "string"
@@ -231,6 +263,7 @@ export class RevokeCertificateUseCase {
         return ok({ certificateId: state.id.value });
       }
 
+      if (lease) yield* await lease.assertOwned();
       yield* await certificateSecretStore.deactivate(context, {
         certificateId: state.id.value,
         domainBindingId: state.domainBindingId.value,
@@ -238,11 +271,13 @@ export class RevokeCertificateUseCase {
         deactivatedAt: revokedAt.value,
       });
 
+      if (lease) yield* await lease.assertOwned();
       await certificateRepository.upsert(
         repositoryContext,
         certificate,
         UpsertCertificateSpec.fromCertificate(certificate),
       );
+      if (lease) yield* await lease.assertOwned();
       if (attemptId) {
         await recordManagedCertificateRevocation({
           recorder: processAttemptRecorder,
@@ -265,6 +300,7 @@ export class RevokeCertificateUseCase {
           retriable: false,
         });
       }
+      if (lease) yield* await lease.assertOwned();
       await publishDomainEventsAndReturn(context, eventBus, logger, certificate, undefined);
 
       return ok({ certificateId: state.id.value });

@@ -5,6 +5,7 @@ import {
   type AppLogger,
   type Command,
   type CommandBus,
+  ConfigureDomainBindingCertificatePolicyCommand,
   createExecutionContext,
   DeleteCertificateCommand,
   type ExecutionContext,
@@ -63,6 +64,13 @@ function createApp() {
   const commandBus = {
     execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
       capturedCommand = command as Command<unknown>;
+      if (command instanceof ConfigureDomainBindingCertificatePolicyCommand) {
+        return ok({
+          id: "dmb_demo",
+          certificatePolicy: "manual",
+          reconciliationStatus: "pending",
+        } as T);
+      }
       return ok({ certificateId: "crt_demo", attemptId: "cat_retry" } as T);
     },
   } as CommandBus;
@@ -98,6 +106,37 @@ function createApp() {
 }
 
 describe("certificate lifecycle HTTP routes", () => {
+  test("[ROUTE-TLS-ENTRY-030] dispatches domain binding certificate policy through CommandBus", async () => {
+    const harness = createApp();
+
+    const response = await harness.app.handle(
+      certificateRequest("http://localhost/api/domain-bindings/dmb_demo/certificate-policy", {
+        method: "POST",
+        body: JSON.stringify({
+          domainBindingId: "dmb_demo",
+          certificatePolicy: "manual",
+          idempotencyKey: "policy-key",
+        }),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      id: "dmb_demo",
+      certificatePolicy: "manual",
+      reconciliationStatus: "pending",
+    });
+    expect(harness.capturedCommand()).toBeInstanceOf(
+      ConfigureDomainBindingCertificatePolicyCommand,
+    );
+    expect(harness.capturedCommand()).toMatchObject({
+      domainBindingId: "dmb_demo",
+      certificatePolicy: "manual",
+      idempotencyKey: "policy-key",
+    });
+  });
+
   test("[ROUTE-TLS-ENTRY-026] dispatches certificate show through QueryBus", async () => {
     const harness = createApp();
 

@@ -2237,6 +2237,25 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "domain-bindings.configure-certificate-policy",
+    operationGroup: "domain-bindings",
+    operationMethod: "configureCertificatePolicy",
+    facadePath: ["domainBindings", "configureCertificatePolicy"],
+    operationId: "domainBindings.configureCertificatePolicy",
+    kind: "command",
+    domain: "domain-bindings",
+    messageName: "ConfigureDomainBindingCertificatePolicyCommand",
+    route: {
+      method: "POST",
+      path: "/domain-bindings/{domainBindingId}/certificate-policy",
+    },
+    docsHref: "/docs/access/certificates/#certificate-readiness",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "domain-bindings.configure-route",
     operationGroup: "domain-bindings",
     operationMethod: "configureRoute",
@@ -8026,6 +8045,7 @@ export interface GeneratedAppaloftClient {
     readonly show: AppaloftSdkFacadeMethod;
   };
   readonly domainBindings: {
+    readonly configureCertificatePolicy: AppaloftSdkFacadeMethod;
     readonly configureRoute: AppaloftSdkFacadeMethod;
     readonly confirmOwnership: AppaloftSdkFacadeMethod;
     readonly create: AppaloftSdkFacadeMethod;

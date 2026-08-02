@@ -462,6 +462,13 @@ function createAccessRoutes(input: {
               requestedAccessRoute.pathHandling ?? "preserve",
             ),
             tlsMode: TlsModeValue.rehydrate(requestedAccessRoute.tlsMode),
+            ...(requestedAccessRoute.domainBindingId
+              ? { domainBindingId: requestedAccessRoute.domainBindingId }
+              : {}),
+            ...(requestedAccessRoute.certificate
+              ? { certificate: { ...requestedAccessRoute.certificate } }
+              : {}),
+            ...(requestedAccessRoute.source ? { source: requestedAccessRoute.source } : {}),
             ...(requestedAccessRoute.targetServiceName
               ? {
                   targetServiceName: yield* ResourceServiceName.create(
@@ -1855,5 +1862,27 @@ export class RoutingExecutionBackend implements ExecutionBackend {
 
 export { LocalExecutionBackend };
 export { RuntimeServerEdgeProxyBootstrapper } from "./server-edge-proxy-bootstrapper";
+export {
+  DirectOriginTlsCertificateObserver,
+  type DirectOriginTlsProbe,
+  type DirectOriginTlsProbeInput,
+  probeDirectOriginTls,
+} from "./direct-origin-tls-certificate-observer";
+export {
+  type CertificateRouteRuntime,
+  type CertificateRouteRuntimeActivationInput,
+  type CertificateRouteRuntimeRollbackInput,
+  DockerCertificateRouteActivator,
+} from "./docker-certificate-route-activator";
+export {
+  type CertificateRouteCommandInput,
+  type CertificateRouteCommandResult,
+  type CertificateRouteCommandRunner,
+  DockerCliCertificateRouteRuntime,
+} from "./docker-certificate-route-runtime";
+export {
+  type CertificateRouteProcessExecutor,
+  LocalSshCertificateRouteCommandRunner,
+} from "./certificate-route-command-runner";
 export { RuntimeServerRuntimePreparer } from "./server-runtime-preparer";
 export { LocalAgentTunnelProvider, type LocalAgentTunnelProviderOptions } from "./tunnel-provider";

@@ -181,6 +181,15 @@ const domainBindingDetailRouteSource = readFileSync(
   ),
   "utf8",
 );
+
+test("domain binding detail exposes an explicit certificate policy transition", () => {
+  expect(domainBindingDetailPageSource).toContain("data-domain-binding-certificate-policy");
+  expect(domainBindingDetailPageSource).toContain(
+    "configureDomainBindingCertificatePolicyMutation",
+  );
+  expect(domainBindingDetailPageSource).toContain("configureCertificatePolicy");
+  expect(domainBindingDetailPageSource).toContain("webDocsHrefs.certificateReadiness");
+});
 const marketplaceBlueprintDetailPageSource = readFileSync(
   fileURLToPath(new URL("../../routes/marketplace/[slug]/+page.svelte", import.meta.url)),
   "utf8",

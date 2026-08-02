@@ -139,7 +139,8 @@ describe("CaddyEdgeProxyProvider", () => {
     expect(reload._unsafeUnwrap().steps).toEqual([
       expect.objectContaining({
         name: "caddy-docker-provider-reload",
-        mode: "automatic",
+        mode: "command",
+        command: "docker restart appaloft-caddy",
       }),
     ]);
     expect(view.isOk()).toBe(true);
@@ -217,6 +218,129 @@ describe("CaddyEdgeProxyProvider", () => {
         appaloftCertificateManaged: false,
       }),
     ]);
+  });
+
+  test("[EDGE-PROXY-RELOAD-004B] durable imported certificate route avoids Caddy local automation", async () => {
+    const provider = new CaddyEdgeProxyProvider();
+    const route = {
+      proxyKind: "caddy" as const,
+      domains: ["manual.example.test"],
+      pathPrefix: "/",
+      tlsMode: "auto" as const,
+      source: "domain-binding" as const,
+      domainBindingId: "dmb_manual",
+      certificate: {
+        source: "appaloft-imported" as const,
+        certificateId: "crt_manual",
+        domainBindingId: "dmb_manual",
+      },
+      targetPort: 3000,
+    };
+    const plan = await provider.realizeRoutes(
+      { correlationId: "req_managed_tls" },
+      { deploymentId: "dep-managed-tls", port: 3000, accessRoutes: [route] },
+    );
+    expect(plan.isOk()).toBe(true);
+    expect(plan._unsafeUnwrap().labels).toContain(
+      "caddy.tls=/data/appaloft/certificates/dmb_manual/certificate.pem /data/appaloft/certificates/dmb_manual/private-key.pem",
+    );
+
+    const view = await provider.renderConfigurationView(
+      { correlationId: "req_managed_tls" },
+      {
+        resourceId: "res_demo",
+        deploymentId: "dep-managed-tls",
+        routeScope: "latest",
+        status: "applied",
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        stale: false,
+        accessRoutes: [route],
+        port: 3000,
+        includeDiagnostics: true,
+      },
+    );
+    expect(view._unsafeUnwrap().diagnostics?.tlsRoutes?.[0]).toMatchObject({
+      automation: "appaloft",
+      certificateSource: "appaloft-imported",
+      appaloftCertificateManaged: true,
+    });
+  });
+
+  test("[EDGE-PROXY-RELOAD-004E] durable TLS route without binding identity fails closed", async () => {
+    const result = await new CaddyEdgeProxyProvider().realizeRoutes(
+      { correlationId: "req_pending_tls" },
+      {
+        deploymentId: "dep-pending-tls",
+        port: 3000,
+        accessRoutes: [
+          {
+            proxyKind: "caddy",
+            domains: ["pending.example.test"],
+            pathPrefix: "/",
+            tlsMode: "auto",
+            source: "domain-binding",
+            targetPort: 3000,
+          },
+        ],
+      },
+    );
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "certificate_route_reconciliation_failed",
+      retryable: true,
+      details: expect.objectContaining({ phase: "route-certificate-selection" }),
+    });
+  });
+
+  test("[EDGE-PROXY-RELOAD-004E] certificate-pending route uses the stable binding TLS path", async () => {
+    const result = await new CaddyEdgeProxyProvider().realizeRoutes(
+      { correlationId: "req_pending_tls" },
+      {
+        deploymentId: "dep-pending-tls",
+        port: 3000,
+        accessRoutes: [
+          {
+            proxyKind: "caddy",
+            domains: ["pending.example.test"],
+            pathPrefix: "/",
+            tlsMode: "auto",
+            source: "domain-binding",
+            domainBindingId: "dmb_pending",
+            targetPort: 3000,
+          },
+        ],
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().labels).toContain(
+      "caddy.tls=/data/appaloft/certificates/dmb_pending/certificate.pem /data/appaloft/certificates/dmb_pending/private-key.pem",
+    );
+  });
+
+  test("[EDGE-PROXY-RELOAD-004E] TLS-disabled durable route does not mount certificate material", async () => {
+    const result = await new CaddyEdgeProxyProvider().realizeRoutes(
+      { correlationId: "req_disabled_tls" },
+      {
+        deploymentId: "dep-disabled-tls",
+        port: 3000,
+        accessRoutes: [
+          {
+            proxyKind: "caddy",
+            domains: ["http.example.test"],
+            pathPrefix: "/",
+            tlsMode: "disabled",
+            source: "domain-binding",
+            domainBindingId: "dmb_http_only",
+            targetPort: 3000,
+          },
+        ],
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().labels.join("\n")).not.toContain(".tls=");
   });
 
   test("[EDGE-PROXY-ROUTE-008] renders canonical redirect aliases without proxying alias hosts", async () => {

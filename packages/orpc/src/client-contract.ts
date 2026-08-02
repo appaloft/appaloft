@@ -25,6 +25,7 @@ import {
   type CompleteConnectionCallbackCommandInput,
   type ConfigureDefaultAccessDomainPolicyCommandInput,
   type ConfigureDependencyResourceBackupPolicyCommandInput,
+  type ConfigureDomainBindingCertificatePolicyCommandInput,
   type ConfigureDomainBindingRouteCommandInput,
   type ConfigurePreviewPolicyCommandInput,
   type ConfigureResourceAccessCommandInput,
@@ -296,6 +297,7 @@ import {
   type CompleteConnectionCallbackResponse,
   type ConfigureDefaultAccessDomainPolicyResponse,
   type ConfigureDependencyResourceBackupPolicyResponse,
+  type ConfigureDomainBindingCertificatePolicyResponse,
   type ConfigureDomainBindingRouteResponse,
   type ConfigurePreviewPolicyResponse,
   type ConfigureProjectWorkspaceProfileCommandInput,
@@ -2360,6 +2362,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ConfigureDomainBindingRouteCommandInput,
       ConfigureDomainBindingRouteResponse,
+      AppaloftClientError
+    >;
+    configureCertificatePolicy: Client<
+      AppaloftClientContext,
+      ConfigureDomainBindingCertificatePolicyCommandInput,
+      ConfigureDomainBindingCertificatePolicyResponse,
       AppaloftClientError
     >;
     confirmOwnership: Client<

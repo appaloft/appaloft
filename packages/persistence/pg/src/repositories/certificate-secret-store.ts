@@ -1,4 +1,6 @@
 import {
+  type CertificateMaterializer,
+  type CertificateMaterialReference,
   type CertificateProviderIssueResult,
   type CertificateSecretStore,
   type Clock,
@@ -49,7 +51,33 @@ function storageFailure(
     : domainError.certificateImportStorageFailed(message, details, true);
 }
 
-export class PgCertificateSecretStore implements CertificateSecretStore {
+function jsonRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function requiredPayloadText(
+  payload: unknown,
+  key: string,
+  input: { certificateId: string; phase: string },
+): Result<string> {
+  const value = jsonRecord(payload)[key];
+  return typeof value === "string" && value
+    ? ok(value)
+    : err(
+        domainError.certificateRouteReconciliationFailed(
+          "Stored certificate material is incomplete",
+          {
+            certificateId: input.certificateId,
+            phase: input.phase,
+            field: key,
+          },
+        ),
+      );
+}
+
+export class PgCertificateSecretStore implements CertificateSecretStore, CertificateMaterializer {
   constructor(
     private readonly db: Kysely<Database>,
     private readonly clock: Clock,
@@ -190,6 +218,126 @@ export class PgCertificateSecretStore implements CertificateSecretStore {
           phase: "certificate-import-storage",
           error,
         }),
+      );
+    }
+  }
+
+  async materialize(
+    context: ExecutionContext,
+    input: CertificateMaterialReference,
+  ): Promise<
+    Result<{
+      certificateId: string;
+      certificateChain: string;
+      privateKey: string;
+      passphrase?: string;
+    }>
+  > {
+    void context;
+    const phase = "certificate-materialization";
+
+    try {
+      const refs = [
+        input.secretRef,
+        input.certificateChainRef,
+        input.privateKeyRef,
+        input.passphraseRef,
+      ].filter((ref): ref is string => Boolean(ref));
+      const rows = refs.length
+        ? await this.db
+            .selectFrom("certificate_secrets")
+            .select(["ref", "certificate_id", "source", "kind", "payload", "metadata"])
+            .where("ref", "in", refs)
+            .execute()
+        : [];
+      const byRef = new Map(rows.map((row) => [row.ref, row]));
+
+      const read = (ref: string | undefined, kind: CertificateSecretKind) => {
+        const row = ref ? byRef.get(ref) : undefined;
+        if (
+          !row ||
+          row.certificate_id !== input.certificateId ||
+          row.source !== input.source ||
+          row.kind !== kind ||
+          typeof jsonRecord(row.metadata).deactivatedAt === "string"
+        ) {
+          return err(
+            domainError.certificateRouteReconciliationFailed(
+              "Stored certificate material reference is unavailable",
+              { certificateId: input.certificateId, phase, kind },
+            ),
+          );
+        }
+        return ok(row.payload);
+      };
+
+      if (input.source === "managed") {
+        const payload = read(input.secretRef, "managed-bundle");
+        if (payload.isErr()) return err(payload.error);
+        const certificatePem = requiredPayloadText(payload.value, "certificatePem", {
+          certificateId: input.certificateId,
+          phase,
+        });
+        if (certificatePem.isErr()) return err(certificatePem.error);
+        const privateKey = requiredPayloadText(payload.value, "privateKeyPem", {
+          certificateId: input.certificateId,
+          phase,
+        });
+        if (privateKey.isErr()) return err(privateKey.error);
+        const chain = jsonRecord(payload.value).certificateChainPem;
+        return ok({
+          certificateId: input.certificateId,
+          certificateChain:
+            typeof chain === "string" && chain
+              ? `${certificatePem.value}\n${chain}`
+              : certificatePem.value,
+          privateKey: privateKey.value,
+        });
+      }
+
+      const chainPayload = read(input.certificateChainRef, "certificate-chain");
+      if (chainPayload.isErr()) return err(chainPayload.error);
+      const keyPayload = read(input.privateKeyRef, "private-key");
+      if (keyPayload.isErr()) return err(keyPayload.error);
+      const certificateChain = requiredPayloadText(chainPayload.value, "value", {
+        certificateId: input.certificateId,
+        phase,
+      });
+      if (certificateChain.isErr()) return err(certificateChain.error);
+      const privateKey = requiredPayloadText(keyPayload.value, "value", {
+        certificateId: input.certificateId,
+        phase,
+      });
+      if (privateKey.isErr()) return err(privateKey.error);
+
+      let passphrase: string | undefined;
+      if (input.passphraseRef) {
+        const passphrasePayload = read(input.passphraseRef, "passphrase");
+        if (passphrasePayload.isErr()) return err(passphrasePayload.error);
+        const passphraseResult = requiredPayloadText(passphrasePayload.value, "value", {
+          certificateId: input.certificateId,
+          phase,
+        });
+        if (passphraseResult.isErr()) return err(passphraseResult.error);
+        passphrase = passphraseResult.value;
+      }
+
+      return ok({
+        certificateId: input.certificateId,
+        certificateChain: certificateChain.value,
+        privateKey: privateKey.value,
+        ...(passphrase ? { passphrase } : {}),
+      });
+    } catch (error) {
+      return err(
+        domainError.certificateRouteReconciliationFailed(
+          "Stored certificate material could not be materialized",
+          {
+            certificateId: input.certificateId,
+            phase,
+            errorMessage: error instanceof Error ? error.message : String(error),
+          },
+        ),
       );
     }
   }

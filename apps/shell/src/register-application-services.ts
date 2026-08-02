@@ -73,6 +73,8 @@ import {
   ConfigureDefaultAccessDomainPolicyUseCase,
   ConfigureDependencyResourceBackupPolicyCommandHandler,
   ConfigureDependencyResourceBackupPolicyUseCase,
+  ConfigureDomainBindingCertificatePolicyCommandHandler,
+  ConfigureDomainBindingCertificatePolicyUseCase,
   ConfigureDomainBindingRouteCommandHandler,
   ConfigureDomainBindingRouteUseCase,
   ConfigurePreviewPolicyCommandHandler,
@@ -328,8 +330,6 @@ import {
   type ManagedRedisProviderPort,
   type ManagedRedisRealizationInput,
   type ManagedRedisRealizationResult,
-  MarkDomainReadyOnCertificateImportedHandler,
-  MarkDomainReadyOnCertificateIssuedHandler,
   MarkDomainReadyOnDeploymentFinishedHandler,
   MarkDomainReadyOnDomainBoundHandler,
   MarkDomainRouteFailedOnDeploymentFinishedHandler,
@@ -380,6 +380,9 @@ import {
   QueryDependencyResourceQueryService,
   ReactivateOrganizationMemberCommandHandler,
   ReactivateOrganizationMemberUseCase,
+  ReconcileDomainCertificateOnImportedHandler,
+  ReconcileDomainCertificateOnIssuedHandler,
+  ReconcileDomainCertificateUseCase,
   ReconcileStaleDeploymentCommandHandler,
   ReconcileStaleDeploymentUseCase,
   RedeployDeploymentCommandHandler,
@@ -1641,8 +1644,9 @@ export function registerApplicationServices(
 ): void {
   container.registerSingleton(BootstrapServerEdgeProxyOnTargetRegisteredHandler);
   container.registerSingleton(MarkDomainReadyOnDomainBoundHandler);
-  container.registerSingleton(MarkDomainReadyOnCertificateImportedHandler);
-  container.registerSingleton(MarkDomainReadyOnCertificateIssuedHandler);
+  container.registerSingleton(ReconcileDomainCertificateUseCase);
+  container.registerSingleton(ReconcileDomainCertificateOnImportedHandler);
+  container.registerSingleton(ReconcileDomainCertificateOnIssuedHandler);
   container.registerSingleton(MarkDomainReadyOnDeploymentFinishedHandler);
   container.registerSingleton(MarkDomainRouteFailedOnDeploymentFinishedHandler);
   container.registerSingleton(MarkServerAppliedRouteStatusOnDeploymentFinishedHandler);
@@ -1689,6 +1693,7 @@ export function registerApplicationServices(
   container.registerSingleton(ShowDefaultAccessDomainPolicyQueryHandler);
   container.registerSingleton(ConfigureServerEdgeProxyCommandHandler);
   container.registerSingleton(ConfigureServerWorkloadRolesCommandHandler);
+  container.registerSingleton(ConfigureDomainBindingCertificatePolicyCommandHandler);
   container.registerSingleton(ConfigureDomainBindingRouteCommandHandler);
   container.registerSingleton(ConfigureResourceAccessCommandHandler);
   container.registerSingleton(ConfigureResourceAutoDeployCommandHandler);
@@ -2558,6 +2563,10 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.archiveDeploymentUseCase, ArchiveDeploymentUseCase);
   container.registerSingleton(tokens.cleanupPreviewUseCase, CleanupPreviewUseCase);
   container.registerSingleton(tokens.createDomainBindingUseCase, CreateDomainBindingUseCase);
+  container.registerSingleton(
+    tokens.configureDomainBindingCertificatePolicyUseCase,
+    ConfigureDomainBindingCertificatePolicyUseCase,
+  );
   container.registerSingleton(
     tokens.configureDomainBindingRouteUseCase,
     ConfigureDomainBindingRouteUseCase,

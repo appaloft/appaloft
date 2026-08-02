@@ -73,6 +73,35 @@ async function parseCli(program: { parseAsync(args: string[]): Promise<unknown> 
 }
 
 describe("CLI certificate commands", () => {
+  test("[ROUTE-TLS-ENTRY-030] domain binding policy command dispatches the explicit policy transition", async () => {
+    const { ConfigureDomainBindingCertificatePolicyCommand } = await import(
+      "@appaloft/application"
+    );
+    const { commands, program } = await createCommandCaptureHarness(
+      "req_cli_domain_binding_certificate_policy_test",
+    );
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "domain-binding",
+      "configure-certificate-policy",
+      "dmb_demo",
+      "--policy",
+      "manual",
+      "--idempotency-key",
+      "policy-key",
+    ]);
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(ConfigureDomainBindingCertificatePolicyCommand);
+    expect(commands[0]).toMatchObject({
+      domainBindingId: "dmb_demo",
+      certificatePolicy: "manual",
+      idempotencyKey: "policy-key",
+    });
+  });
+
   test("[ROUTE-TLS-ENTRY-026] certificate show dispatches ShowCertificateQuery", async () => {
     const { ShowCertificateQuery } = await import("@appaloft/application");
     const { program, queries } = await createCommandCaptureHarness("req_cli_certificate_show_test");

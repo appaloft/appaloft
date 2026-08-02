@@ -420,6 +420,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft domain-binding dns-plan <domainBindingId> [--connector cloudflare-dns]` - `domain-bindings.dns-plan`
 - `appaloft domain-binding dns-readiness <domainBindingId>` - `domain-bindings.dns-readiness.inspect`
 - `appaloft domain-binding configure-route <domainBindingId>` - `domain-bindings.configure-route`
+- `appaloft domain-binding configure-certificate-policy <domainBindingId> --policy auto|manual` - `domain-bindings.configure-certificate-policy`
 - `appaloft domain-binding delete-check <domainBindingId>` - `domain-bindings.delete-check`
 - `appaloft domain-binding delete <domainBindingId> --confirm <domainBindingId>` - `domain-bindings.delete`
 - `appaloft domain-binding retry-verification <domainBindingId>` - `domain-bindings.retry-verification`

@@ -155,6 +155,7 @@ import { rollbackDeploymentCommandInputSchema } from "./operations/deployments/r
 import { showDeploymentQueryInputSchema } from "./operations/deployments/show-deployment.query";
 import { streamDeploymentTimelineQueryInputSchema } from "./operations/deployments/stream-deployment-timeline.query";
 import { checkDomainBindingDeleteSafetyQueryInputSchema } from "./operations/domain-bindings/check-domain-binding-delete-safety.query";
+import { configureDomainBindingCertificatePolicyCommandInputSchema } from "./operations/domain-bindings/configure-domain-binding-certificate-policy.command";
 import { configureDomainBindingRouteCommandInputSchema } from "./operations/domain-bindings/configure-domain-binding-route.command";
 import { confirmDomainBindingOwnershipCommandInputSchema } from "./operations/domain-bindings/confirm-domain-binding-ownership.command";
 import { createDomainBindingCommandInputSchema } from "./operations/domain-bindings/create-domain-binding.command";
@@ -4380,6 +4381,23 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft domain-binding dns-readiness <domainBindingId>",
       orpc: { method: "POST", path: "/api/domain-bindings/dns-readiness/inspect" },
+    },
+  },
+  {
+    key: "domain-bindings.configure-certificate-policy",
+    kind: "command",
+    domain: "domain-bindings",
+    messageName: "ConfigureDomainBindingCertificatePolicyCommand",
+    handlerName: "ConfigureDomainBindingCertificatePolicyCommandHandler",
+    serviceName: "ConfigureDomainBindingCertificatePolicyUseCase",
+    inputSchema: configureDomainBindingCertificatePolicyCommandInputSchema,
+    serviceToken: tokens.configureDomainBindingCertificatePolicyUseCase,
+    transports: {
+      cli: "appaloft domain-binding configure-certificate-policy <domainBindingId> --policy auto|manual",
+      orpc: {
+        method: "POST",
+        path: "/api/domain-bindings/{domainBindingId}/certificate-policy",
+      },
     },
   },
   {

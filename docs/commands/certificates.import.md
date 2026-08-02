@@ -173,13 +173,16 @@ passphrases, secret refs, file paths, or temporary storage details.
 
 ## Domain Readiness Interaction
 
-`certificate-imported` may trigger `domain-ready` evaluation when:
+`certificate-imported` requests provider-neutral route reconciliation. `domain-ready` is allowed only when:
 
 - the binding is still durably owned;
-- route readiness is already satisfied or later becomes satisfied;
-- no TLS-disabled policy disables certificate use.
+- the current manual policy still permits the imported certificate;
+- binding-scoped material is atomically activated and the edge proxy reload succeeds;
+- direct-origin hostname/SNI observation serves the selected fingerprint with the expected SAN and
+  validity window.
 
-Importing a valid certificate does not bypass domain ownership or route-readiness gates.
+Activation or proof failure restores the previous certificate material and preserves the existing
+usable route. Importing a valid certificate does not bypass domain ownership or route-readiness gates.
 
 ## Domain-Specific Error Codes
 

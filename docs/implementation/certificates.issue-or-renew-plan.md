@@ -176,22 +176,22 @@ The second executable slice is event-driven certificate issuance through provide
   key or certificate material;
 - tests use injected fake provider and secret-store ports for deterministic success/failure paths.
 
-This slice intentionally does not ship a real ACME adapter, ACME account persistence, challenge
-token serving, retry scheduler, proxy reload, or certificate-backed `domain-ready`.
+This historical slice did not ship a real ACME adapter, ACME account persistence, challenge token
+serving, retry scheduler, proxy reload, or certificate-backed `domain-ready`. Its readiness notes
+are superseded by ADR-104 and spec 121.
 
-## Third Code Round Slice
+## Third Code Round Slice (superseded readiness implementation)
 
 The third executable slice is certificate-backed domain readiness:
 
-- `certificate-issued` event handler consumes the event as a first-class behavior entrypoint;
-- when the referenced domain binding is still `bound`, the handler marks it `ready` and publishes
-  `domain-ready`;
+- `certificate-issued` originally drove a direct readiness handler; ADR-104 and spec 121 replace
+  that optimistic path with activation, reload, served SNI proof, and rollback reconciliation;
 - duplicate `certificate-issued` handling is idempotent and does not duplicate `domain-ready`;
 - resource access summary projects ready TLS-auto durable domain bindings as HTTPS routes when a
   latest reverse-proxy deployment route exists.
 
-This slice intentionally does not ship real ACME provider behavior, proxy reload, route realization
-failure state, or durable outbox/inbox processing.
+The historical slice did not ship proxy reload or route realization failure handling. Current code
+does; durable outbox/inbox processing remains outside this slice.
 
 ## Fourth Code Round Slice
 
@@ -267,7 +267,8 @@ Current code also implements the second executable slice:
 - shell registration for the event handler with an explicitly unavailable default provider adapter,
   so local CLI/API users see a retryable post-acceptance failure instead of a hidden no-op when no
   real certificate provider is configured;
-- `certificate-issued` handler for certificate-backed `domain-ready`;
+- `certificate-issued` and `certificate-imported` reconciliation handlers for activation/reload,
+  matching served-certificate proof, rollback, and only then certificate-backed `domain-ready`;
 - certificate-backed HTTPS durable route projection in resource access summaries;
 - application tests for `ROUTE-TLS-EVT-005`, `ROUTE-TLS-EVT-006`, and
   `ROUTE-TLS-READMODEL-005`, plus domain-readiness tests for `ROUTE-TLS-EVT-008` and
