@@ -42,7 +42,11 @@ and its bound Sandbox status.
    - browser Console access over the same canonical operations.
 7. OpenCode session state is stored below the Sandbox workspace by setting `HOME=/workspace` and
    `XDG_DATA_HOME=/workspace/.local/share`. Pause/resume preserves it; Sandbox termination removes
-   it unless the user explicitly captures a Sandbox Snapshot or Source Artifact.
+   it unless the user explicitly captures a Sandbox Snapshot or Source Artifact. The Adapter
+   disables OpenCode's redundant native snapshots because their repositories would otherwise sit
+   below the same Workspace tree and recursively include prior packs. Appaloft's Git Diff, Task
+   evidence, and Sandbox recovery remain authoritative; OpenCode's native session store remains
+   enabled.
 8. A native remote OpenCode endpoint is never exposed directly by the core workflow. The server
    listens only inside the Sandbox provider's private network namespace so a hosted or self-hosted
    gateway can translate a scoped, expiring access capability to it. The Sandbox publishes no

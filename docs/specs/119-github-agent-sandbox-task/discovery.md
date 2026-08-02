@@ -91,6 +91,20 @@ Review Round becomes a durable downstream-Code and merge gate.
   original GitHub Agent Sandbox Task goal, so Spec, Ticket, Test-First, and public Code rounds are
   authorized for this repair.
 
+## 2026-08-02 OpenCode Native Snapshot Evidence
+
+- External run `30749962974` kept native OpenCode data below the Workspace-scoped HOME/XDG tree,
+  but OpenCode also created Git snapshot repositories below
+  `/workspace/.local/share/opencode/snapshot`.
+- Direct registered-server cgroup and bounded file-size readback showed prior snapshot pack files
+  becoming input to later snapshots. Workspace-backed tmpfs usage grew recursively until the exact
+  8 GiB Sandbox limit produced an OOM kill.
+- Appaloft already persists authoritative Git Diff, checks, Task evidence, and Sandbox recovery.
+  OpenCode native snapshots duplicate that responsibility, while its native session store remains
+  required for truthful resume. The neutral public Adapter therefore disables only native
+  snapshots through OpenCode's supported configuration and preserves session state and the
+  provider/model protocol (#964).
+
 ## 2026-08-01 Pause/Activity Concurrency Evidence
 
 - External run `30699497767` kept one Task `srun_er8q3l6yah9v`, one Workspace
