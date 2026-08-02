@@ -462,6 +462,10 @@ function createAccessRoutes(input: {
               requestedAccessRoute.pathHandling ?? "preserve",
             ),
             tlsMode: TlsModeValue.rehydrate(requestedAccessRoute.tlsMode),
+            ...(requestedAccessRoute.certificate
+              ? { certificate: { ...requestedAccessRoute.certificate } }
+              : {}),
+            ...(requestedAccessRoute.source ? { source: requestedAccessRoute.source } : {}),
             ...(requestedAccessRoute.targetServiceName
               ? {
                   targetServiceName: yield* ResourceServiceName.create(

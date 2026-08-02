@@ -737,6 +737,24 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
     input: ProxyRouteRealizationInput,
   ): Promise<Result<ProxyRouteRealizationPlan, DomainError>> {
     const providerRoutes = input.accessRoutes.filter((route) => route.proxyKind === "traefik");
+    const pendingCertificateRoute = providerRoutes.find(
+      (route) =>
+        route.source === "domain-binding" &&
+        route.tlsMode === "auto" &&
+        !route.certificate?.source.startsWith("appaloft-"),
+    );
+    if (pendingCertificateRoute) {
+      return err(
+        domainError.certificateRouteReconciliationFailed(
+          "Durable TLS route requires a selected Appaloft certificate",
+          {
+            phase: "route-certificate-selection",
+            providerKey: this.key,
+            domainName: pendingCertificateRoute.domains[0] ?? "unknown",
+          },
+        ),
+      );
+    }
     const unsupportedStatus = unsupportedRedirectStatus(providerRoutes);
     if (unsupportedStatus) {
       return err(

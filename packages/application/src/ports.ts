@@ -1135,6 +1135,10 @@ export interface DomainRouteBindingCandidate {
   pathHandling?: "preserve" | "strip";
   proxyKind: EdgeProxyKind;
   tlsMode: TlsMode;
+  certificate?: {
+    source: "appaloft-managed" | "appaloft-imported";
+    certificateId: string;
+  };
   targetServiceName?: string;
   redirectTo?: string;
   redirectStatus?: 301 | 302 | 307 | 308;
@@ -9881,6 +9885,11 @@ export interface RequestedAccessRouteConfig {
   pathPrefix: string;
   pathHandling?: "preserve" | "strip";
   tlsMode: TlsMode;
+  certificate?: {
+    source: "appaloft-managed" | "appaloft-imported";
+    certificateId: string;
+  };
+  source?: "generated-default" | "domain-binding" | "deployment-snapshot" | "server-applied";
   targetServiceName?: string;
   routeBehavior?: "serve" | "redirect";
   redirectTo?: string;

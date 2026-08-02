@@ -14,11 +14,15 @@
    transition. The transition records selected policy and a non-ready reconciliation requirement;
    it does not import, issue, reload, or mark ready as a hidden side effect.
 2. Extend provider-neutral route intent with an explicit certificate source/identity selection for
-   durable domain routes. Keep provider-local TLS an explicit, separate route policy.
+   durable domain routes. A durable TLS route without a selected certificate is explicitly pending
+   and cannot fall back to provider-local automation. Keep provider-local TLS an explicit, separate
+   route policy for server-applied routes.
 3. Add a request-scoped certificate materialization port that resolves opaque active certificate
    references only inside the runtime/provider activation adapter.
 4. Add certificate route activation and TLS observation ports. The application reconciliation
-   handler coordinates candidate apply, provider reload, and direct hostname/SNI proof.
+   handler first resolves the authoritative current binding plus latest serving
+   deployment/service/port and prior activation identity, then coordinates candidate apply,
+   provider reload, and direct hostname/SNI proof.
 5. Publish `domain-ready` only after proof matches the selected certificate fingerprint and validity
    requirements. Record safe failure state without certificate material.
 6. Implement Traefik and Caddy dynamic certificate configuration. Do not emit Traefik

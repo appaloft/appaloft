@@ -2607,6 +2607,11 @@ describe("DefaultRuntimePlanResolver", () => {
             domains: ["app.example.com"],
             pathPrefix: "/",
             tlsMode: "auto",
+            source: "domain-binding",
+            certificate: {
+              source: "appaloft-imported",
+              certificateId: "crt_app",
+            },
             targetServiceName: "web",
           },
           {
@@ -2623,7 +2628,15 @@ describe("DefaultRuntimePlanResolver", () => {
 
     expect(result.isOk()).toBe(true);
     expect(result._unsafeUnwrap().execution.accessRoutes).toEqual([
-      expect.objectContaining({ targetServiceName: "web", targetPort: 3000 }),
+      expect.objectContaining({
+        targetServiceName: "web",
+        targetPort: 3000,
+        source: "domain-binding",
+        certificate: {
+          source: "appaloft-imported",
+          certificateId: "crt_app",
+        },
+      }),
       expect.objectContaining({ targetServiceName: "api", targetPort: 3001 }),
     ]);
   });

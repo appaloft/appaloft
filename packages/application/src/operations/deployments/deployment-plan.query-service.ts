@@ -105,6 +105,7 @@ interface DomainBindingRouteGroup {
   pathPrefix: DomainRouteBindingCandidate["pathPrefix"];
   pathHandling?: DomainRouteBindingCandidate["pathHandling"];
   tlsMode: DomainRouteBindingCandidate["tlsMode"];
+  certificate?: DomainRouteBindingCandidate["certificate"];
   targetServiceName?: string;
   redirectTo?: string;
   redirectStatus?: 301 | 302 | 307 | 308;
@@ -128,6 +129,7 @@ function domainBindingRouteGroups(
         pathPrefix: binding.pathPrefix,
         pathHandling: binding.pathHandling ?? "preserve",
         tlsMode: binding.tlsMode,
+        ...(binding.certificate ? { certificate: binding.certificate } : {}),
         ...(binding.targetServiceName ? { targetServiceName: binding.targetServiceName } : {}),
         redirectTo: binding.redirectTo,
         redirectStatus: binding.redirectStatus ?? 308,
@@ -136,7 +138,7 @@ function domainBindingRouteGroups(
     }
 
     const pathHandling = binding.pathHandling ?? "preserve";
-    const groupKey = `${binding.pathPrefix}\u0000${pathHandling}\u0000${binding.tlsMode}\u0000${binding.targetServiceName ?? ""}`;
+    const groupKey = `${binding.pathPrefix}\u0000${pathHandling}\u0000${binding.tlsMode}\u0000${binding.targetServiceName ?? ""}\u0000${binding.certificate?.source ?? ""}\u0000${binding.certificate?.certificateId ?? ""}`;
     const existingIndex = groupIndexes.get(groupKey);
     if (existingIndex === undefined) {
       groupIndexes.set(groupKey, groups.length);
@@ -145,6 +147,7 @@ function domainBindingRouteGroups(
         pathPrefix: binding.pathPrefix,
         pathHandling,
         tlsMode: binding.tlsMode,
+        ...(binding.certificate ? { certificate: binding.certificate } : {}),
         ...(binding.targetServiceName ? { targetServiceName: binding.targetServiceName } : {}),
       });
       continue;
@@ -211,10 +214,12 @@ function requestedDeploymentWithDurableDomainBindings(
     tlsMode: primaryBinding.tlsMode,
     accessRoutes: routeGroups.map((group) => ({
       proxyKind: primaryBinding.proxyKind,
+      source: "domain-binding" as const,
       domains: group.domains,
       pathPrefix: group.pathPrefix,
       pathHandling: group.pathHandling ?? "preserve",
       tlsMode: group.tlsMode,
+      ...(group.certificate ? { certificate: group.certificate } : {}),
       ...(group.targetServiceName ? { targetServiceName: group.targetServiceName } : {}),
       ...(group.redirectTo
         ? {

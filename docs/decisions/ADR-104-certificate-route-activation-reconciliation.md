@@ -35,6 +35,12 @@ failure/rollback semantics, secret handling, and provider contracts.
 7. Secret references may cross the application port, but PEM/private key/passphrase values exist
    only inside request-scoped materialization and runtime/provider execution boundaries. They must
    not enter events, logs, process details, public results, or argv.
+8. A durable TLS route without a selected Appaloft certificate is certificate-pending. It must not
+   fall back to provider-local automation or expose the workload as ready HTTPS. Certificate
+   challenge handling remains a separate workflow concern.
+9. Certificate route activation resolves the authoritative current route target before mutation:
+   binding, latest serving deployment/service/port, server/destination, provider, and previous
+   activation identity. Writing files without applying that exact route is not activation success.
 
 ## Consequences
 

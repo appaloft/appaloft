@@ -551,6 +551,10 @@ describe("DeploymentPlanQueryService", () => {
           pathPrefix: "/",
           proxyKind: "traefik",
           tlsMode: "auto",
+          certificate: {
+            source: "appaloft-managed",
+            certificateId: "crt_custom",
+          },
           status: "ready",
           createdAt: "2026-01-01T00:02:00.000Z",
         },
@@ -571,9 +575,14 @@ describe("DeploymentPlanQueryService", () => {
       accessRoutes: [
         {
           proxyKind: "traefik",
+          source: "domain-binding",
           domains: ["app.example.test"],
           pathPrefix: "/",
           tlsMode: "auto",
+          certificate: {
+            source: "appaloft-managed",
+            certificateId: "crt_custom",
+          },
         },
       ],
       accessRouteMetadata: {

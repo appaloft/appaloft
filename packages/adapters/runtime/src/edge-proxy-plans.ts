@@ -45,6 +45,8 @@ export function routeInputsFromAccessRoutes(accessRoutes: AccessRoute[]): EdgePr
     pathPrefix: route.pathPrefix,
     pathHandling: route.pathHandling,
     tlsMode: route.tlsMode,
+    ...(route.certificate ? { certificate: route.certificate } : {}),
+    ...(route.source ? { source: route.source } : {}),
     ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
     ...(route.targetServiceName ? { targetServiceName: route.targetServiceName } : {}),
     ...(route.routeBehavior === "redirect" ? { routeBehavior: route.routeBehavior } : {}),

@@ -36,6 +36,8 @@ hostname.
 | CERT-RECON-AC-007 | Idempotent reconciliation | The selected certificate fingerprint is already proven for the route | the event or worker repeats | No duplicate destructive apply occurs and readiness remains converged. |
 | CERT-RECON-AC-008 | Provider contract | A durable route selects Appaloft-managed or imported certificate lifecycle | Traefik or Caddy renders it | Provider-local certificate automation is absent and provider-owned dynamic certificate activation is used. |
 | CERT-RECON-AC-009 | Real SNI proof | A real local Traefik or Caddy fixture has old and candidate certificates | reconciliation runs | A direct TLS client using the hostname as SNI observes the candidate fingerprint before readiness. |
+| CERT-RECON-AC-010 | Certificate-pending route | A durable TLS binding has no selected Appaloft certificate | its route intent is rendered | The workload is not exposed as ready HTTPS and provider-local automation is absent; challenge handling remains separate. |
+| CERT-RECON-AC-011 | Authoritative activation target | A selected candidate must replace the serving certificate | reconciliation resolves its target | Activation uses the current binding plus latest serving deployment/service/port and prior activation identity; missing or stale target facts fail closed before mutation. |
 
 ## Domain Ownership
 
@@ -74,4 +76,5 @@ hostname.
 
 ## Open Questions
 
-None for Ticket derivation.
+- Swarm certificate distribution remains a deferred runtime-target capability and may not advertise
+  certificate activation until its target-specific atomic distribution contract is implemented.

@@ -260,6 +260,33 @@ describe("CaddyEdgeProxyProvider", () => {
     });
   });
 
+  test("[EDGE-PROXY-RELOAD-004E] durable certificate-pending route does not fall back to Caddy automation", async () => {
+    const result = await new CaddyEdgeProxyProvider().realizeRoutes(
+      { correlationId: "req_pending_tls" },
+      {
+        deploymentId: "dep-pending-tls",
+        port: 3000,
+        accessRoutes: [
+          {
+            proxyKind: "caddy",
+            domains: ["pending.example.test"],
+            pathPrefix: "/",
+            tlsMode: "auto",
+            source: "domain-binding",
+            targetPort: 3000,
+          },
+        ],
+      },
+    );
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "certificate_route_reconciliation_failed",
+      retryable: true,
+      details: expect.objectContaining({ phase: "route-certificate-selection" }),
+    });
+  });
+
   test("[EDGE-PROXY-ROUTE-008] renders canonical redirect aliases without proxying alias hosts", async () => {
     const provider = new CaddyEdgeProxyProvider();
     const accessRoutes = [

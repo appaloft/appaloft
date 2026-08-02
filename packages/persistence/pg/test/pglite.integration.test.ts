@@ -990,6 +990,26 @@ describe("pglite persistence integration", () => {
         status: "bound",
         createdAt: "2026-01-01T00:01:00.000Z",
       });
+      await database.db
+        .insertInto("certificates")
+        .values({
+          id: "crt_destination_scoped",
+          domain_binding_id: "dmb_destination_scoped",
+          domain_name: "destination.example.test",
+          status: "active",
+          source: "imported",
+          provider_key: "manual",
+          challenge_type: "none",
+          issued_at: "2026-01-01T00:01:30.000Z",
+          expires_at: "2027-01-01T00:01:30.000Z",
+          fingerprint: "sha256:destination-scoped",
+          secret_ref: "appaloft+pg://certificate/crt_destination_scoped/imported-bundle",
+          safe_metadata: {},
+          secret_refs: {},
+          attempts: [],
+          created_at: "2026-01-01T00:01:30.000Z",
+        })
+        .execute();
       await insertDomainBinding(database.db, target, {
         id: "dmb_server_scoped",
         domainName: "server.example.test",
@@ -1003,10 +1023,17 @@ describe("pglite persistence integration", () => {
         target,
       );
 
-      expect(bindings.map((binding) => binding.id)).toEqual([
-        "dmb_server_scoped",
-        "dmb_destination_scoped",
+      expect(bindings).toEqual([
+        expect.objectContaining({ id: "dmb_server_scoped" }),
+        expect.objectContaining({
+          id: "dmb_destination_scoped",
+          certificate: {
+            source: "appaloft-imported",
+            certificateId: "crt_destination_scoped",
+          },
+        }),
       ]);
+      expect(bindings[0]).not.toHaveProperty("certificate");
       await database.close();
     } finally {
       rmSync(workspaceDir, { recursive: true, force: true });

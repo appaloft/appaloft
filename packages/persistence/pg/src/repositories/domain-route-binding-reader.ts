@@ -63,21 +63,52 @@ export class PgDomainRouteBindingReader implements DomainRouteBindingReader {
           .orderBy("created_at", "desc")
           .execute();
 
-        return rows.map((row) => ({
-          id: row.id,
-          domainName: row.domain_name,
-          pathPrefix: row.path_prefix,
-          pathHandling: row.path_handling === "strip" ? "strip" : "preserve",
-          proxyKind: row.proxy_kind as DomainRouteBindingCandidate["proxyKind"],
-          tlsMode: row.tls_mode as DomainRouteBindingCandidate["tlsMode"],
-          ...(row.target_service_name ? { targetServiceName: row.target_service_name } : {}),
-          ...(row.redirect_to ? { redirectTo: row.redirect_to } : {}),
-          ...(row.redirect_status
-            ? { redirectStatus: row.redirect_status as 301 | 302 | 307 | 308 }
-            : {}),
-          status: row.status as DomainRouteBindingCandidate["status"],
-          createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
-        }));
+        const certificateRows =
+          rows.length === 0
+            ? []
+            : await executor
+                .selectFrom("certificates")
+                .select(["id", "domain_binding_id", "source"])
+                .where(
+                  "domain_binding_id",
+                  "in",
+                  rows.map((row) => row.id),
+                )
+                .where("status", "=", "active")
+                .orderBy("created_at", "desc")
+                .execute();
+        const certificateByBindingId = new Map<
+          string,
+          NonNullable<DomainRouteBindingCandidate["certificate"]>
+        >();
+        for (const certificate of certificateRows) {
+          if (certificateByBindingId.has(certificate.domain_binding_id)) continue;
+          if (certificate.source !== "managed" && certificate.source !== "imported") continue;
+          certificateByBindingId.set(certificate.domain_binding_id, {
+            source: certificate.source === "managed" ? "appaloft-managed" : "appaloft-imported",
+            certificateId: certificate.id,
+          });
+        }
+
+        return rows.map((row) => {
+          const certificate = certificateByBindingId.get(row.id);
+          return {
+            id: row.id,
+            domainName: row.domain_name,
+            pathPrefix: row.path_prefix,
+            pathHandling: row.path_handling === "strip" ? "strip" : "preserve",
+            proxyKind: row.proxy_kind as DomainRouteBindingCandidate["proxyKind"],
+            tlsMode: row.tls_mode as DomainRouteBindingCandidate["tlsMode"],
+            ...(certificate ? { certificate } : {}),
+            ...(row.target_service_name ? { targetServiceName: row.target_service_name } : {}),
+            ...(row.redirect_to ? { redirectTo: row.redirect_to } : {}),
+            ...(row.redirect_status
+              ? { redirectStatus: row.redirect_status as 301 | 302 | 307 | 308 }
+              : {}),
+            status: row.status as DomainRouteBindingCandidate["status"],
+            createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
+          };
+        });
       },
     );
   }

@@ -117,6 +117,7 @@ Then:
 | EDGE-PROXY-RELOAD-004B | contract | Durable certificate route avoids provider-local automation | Durable managed/manual route selects an Appaloft certificate identity | Traefik/Caddy render provider-owned dynamic certificate activation without local ACME automation | Traefik has no `certresolver`; diagnostics report Appaloft-managed source | No |
 | EDGE-PROXY-RELOAD-004C | integration | Failed candidate preserves serving certificate | Previous certificate is active and candidate apply/reload/proof fails | Activation fails closed | Previous serving route/certificate remains; candidate does not become ready | Yes |
 | EDGE-PROXY-RELOAD-004D | opt-in Docker e2e | Hostname/SNI fingerprint proof | Real Traefik or Caddy has old and candidate certificates | Candidate activation/reload runs, then a direct TLS client connects with binding hostname SNI | Observed leaf fingerprint equals the independent expected candidate before `domain-ready` | Conditional |
+| EDGE-PROXY-RELOAD-004E | contract | Durable certificate-pending route fails closed | Durable TLS binding has no selected Appaloft certificate identity | Provider route intent omits provider-local automation and does not expose ready HTTPS | Route remains pending until a candidate and authoritative serving target are available | Yes after certificate selection |
 
 ## Proxy Configuration Query Matrix
 

@@ -3212,6 +3212,10 @@ describe("CreateDeploymentUseCase", () => {
         pathPrefix: "/",
         proxyKind: "traefik",
         tlsMode: "auto",
+        certificate: {
+          source: "appaloft-imported",
+          certificateId: "crt_custom",
+        },
         status: "ready",
         createdAt: "2026-01-01T00:02:00.000Z",
       },
@@ -3262,9 +3266,14 @@ describe("CreateDeploymentUseCase", () => {
       accessRoutes: [
         {
           proxyKind: "traefik",
+          source: "domain-binding",
           domains: ["app.example.test"],
           pathPrefix: "/",
           tlsMode: "auto",
+          certificate: {
+            source: "appaloft-imported",
+            certificateId: "crt_custom",
+          },
         },
       ],
       accessRouteMetadata: {
