@@ -13,6 +13,8 @@ create durable domain binding
   -> evaluate route readiness
   -> request certificate when required
   -> issue certificate or record failure
+  -> activate selected certificate in the edge proxy
+  -> reload and prove the served hostname/SNI fingerprint
   -> mark domain ready when all gates pass
 ```
 
@@ -41,6 +43,7 @@ This workflow inherits:
 - [ADR-007: Certificate Provider And Challenge Default](../decisions/ADR-007-certificate-provider-and-challenge-default.md)
 - [ADR-008: Renewal Trigger Model](../decisions/ADR-008-renewal-trigger-model.md)
 - [ADR-009: Certificates Import Command](../decisions/ADR-009-certificates-import-command.md)
+- [ADR-104: Certificate Route Activation Reconciliation](../decisions/ADR-104-certificate-route-activation-reconciliation.md)
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [Error Model](../errors/model.md)
@@ -163,6 +166,9 @@ domain-bindings.create
   -> route readiness satisfied
   -> certificate-requested, if tlsMode is auto or certificatePolicy is auto
   -> certificate-issued
+  -> certificate route activation
+  -> provider reload
+  -> served-certificate hostname/SNI fingerprint proof
   -> domain-ready
 ```
 
@@ -211,6 +217,9 @@ domain-bindings.create
   -> route readiness satisfied
   -> certificates.import
   -> certificate-imported
+  -> certificate route activation
+  -> provider reload
+  -> served-certificate hostname/SNI fingerprint proof
   -> domain-ready
 ```
 
@@ -283,7 +292,13 @@ Async work includes:
   challenge type require it;
 - certificate provider request;
 - certificate storage;
-- domain-ready evaluation after `certificate-imported` or `certificate-issued`;
+- provider-neutral candidate certificate activation while retaining the previous serving
+  certificate until proof succeeds;
+- provider reload/dynamic configuration convergence;
+- direct TLS observation using the binding hostname as SNI, including expected fingerprint,
+  hostname coverage, and validity proof;
+- domain-ready evaluation after activation and proof requested by `certificate-imported` or
+  `certificate-issued`;
 - domain readiness finalization.
 
 Async work must persist state and publish formal events after durable transitions.

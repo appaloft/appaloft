@@ -6,8 +6,8 @@
 certificate chain and private key were validated, stored through approved secret handling, and
 durable certificate state was recorded with `source = imported`.
 
-It does not mean provider-driven issuance occurred, and it does not mean every route using the
-domain is already healthy.
+It does not mean provider-driven issuance occurred, edge activation succeeded, the proxy serves
+this certificate, or every route using the domain is healthy.
 
 ## Global References
 
@@ -16,6 +16,7 @@ This event inherits:
 - [ADR-002: Routing, Domain, And TLS Boundary](../decisions/ADR-002-routing-domain-tls-boundary.md)
 - [ADR-008: Renewal Trigger Model](../decisions/ADR-008-renewal-trigger-model.md)
 - [ADR-009: Certificates Import Command](../decisions/ADR-009-certificates-import-command.md)
+- [ADR-104: Certificate Route Activation Reconciliation](../decisions/ADR-104-certificate-route-activation-reconciliation.md)
 - [Error Model](../errors/model.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
 
@@ -41,7 +42,7 @@ Publisher: `certificates.import` use case after durable imported-certificate sta
 
 Expected consumers:
 
-- domain-ready process manager;
+- certificate route reconciliation process manager;
 - certificate read-model projection;
 - resource access summary/domain status projection;
 - audit/notification;
@@ -78,7 +79,8 @@ certificate import attempt: validating|storing -> imported
 certificate: pending|active|failed -> active(source = imported)
 ```
 
-If the domain binding is otherwise bound and route-ready, this event should lead to `domain-ready`.
+If the binding is otherwise eligible, this event requests certificate route reconciliation. Only
+successful activation/reload and served-certificate proof may lead to `domain-ready`.
 
 ## Idempotency
 
@@ -107,14 +109,14 @@ certificate state to failed.
 
 ## Current Implementation Notes And Migration Gaps
 
-`certificate-imported` is now implemented and consumed by the manual readiness path so that manual
-certificate imports can drive `domain-ready` when the binding is already route-ready. Durable
-PG/PGlite-backed secret persistence now exists before publication, so the event is no longer gated
-on temporary ref-only storage.
+`certificate-imported` is implemented with durable PG/PGlite-backed secret persistence before
+publication. Current code still consumes it through a direct manual-readiness handler without edge
+activation or served-certificate proof; Spec 121 replaces that optimistic path.
 
 Remaining migration gaps:
 
-- none for the normative `certificate-imported` baseline.
+- certificate route activation/reload and hostname/SNI served-fingerprint proof before readiness;
+- fail-safe preservation of the previously serving certificate during candidate failure.
 
 ## Open Questions
 

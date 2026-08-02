@@ -872,6 +872,11 @@ Phase 6 release-gate verification notes from 2026-05-04:
   configure-route/delete-check/delete/retry-verification plus certificate issue-or-renew/import/
   show/retry/revoke/delete. The governing routing/domain/TLS workflow, lifecycle specs, public docs,
   operation catalog entries, CLI/API/Web surfaces, and test matrix rows are synchronized.
+- Certificate route activation reconciliation is a newly identified post-1.0 correctness gap under
+  Spec 121. Before claiming that stored managed/imported material makes a durable domain ready,
+  Appaloft must add explicit policy transition, activate/reload the selected candidate, prove the
+  served hostname/SNI fingerprint, preserve the prior serving certificate on failure, and bind real
+  Traefik/Caddy Docker evidence. The additive public operation targets the next minor release.
 - The merged real Traefik access failure middleware baseline closed the last required
   `resource-access-failure` diagnostic row. Provider-native metadata lookup beyond safe
   Appaloft-applied metadata and a Web lookup form remain future enhancements, not `0.8.0` release
