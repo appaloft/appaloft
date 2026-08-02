@@ -25,10 +25,13 @@
    provider reload, and direct hostname/SNI proof.
 5. Publish `domain-ready` only after proof matches the selected certificate fingerprint and validity
    requirements. Record safe failure state without certificate material.
-6. Implement Traefik and Caddy dynamic certificate configuration. Do not emit Traefik
+6. Implement Traefik and Caddy binding-scoped, stable-path dynamic certificate configuration. Do not emit Traefik
    `certresolver` or Caddy provider-local automation for durable Appaloft-managed/imported routes.
-7. Use candidate-first/atomic provider configuration so a failed apply, reload, or proof leaves the
-   previous serving configuration available.
+7. Use candidate-first/atomic material replacement so a failed apply, reload, or proof leaves the
+   previous serving configuration available. Certificate activation must not inspect, reconstruct,
+   replace, stop, or rename the serving workload container.
+8. Serialize reconciliation per domain binding and re-read authoritative binding/certificate state
+   inside the coordination boundary before any runtime mutation.
 
 ## CQRS, Events, And Observation
 
@@ -36,7 +39,8 @@
   resource access, proxy configuration, certificate, diagnostics, and operator-work read surfaces.
 - `certificate-issued` and `certificate-imported` remain stored-material facts. Their consumer
   requests reconciliation instead of directly deciding readiness.
-- Duplicate event delivery is idempotent by binding plus certificate fingerprint/attempt identity.
+- Duplicate event delivery is idempotent by binding plus certificate fingerprint/attempt identity;
+  delayed events are rejected when policy, source, or active certificate lifecycle no longer match.
 - If a new durable reconciliation event is added, specify producer, retry, dedupe, and read-model
   effects before implementation.
 

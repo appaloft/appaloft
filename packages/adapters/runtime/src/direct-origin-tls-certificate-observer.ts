@@ -113,7 +113,12 @@ export class DirectOriginTlsCertificateObserver implements TlsCertificateObserve
   constructor(
     private readonly servers: ServerRepository,
     private readonly probe: DirectOriginTlsProbe = probeDirectOriginTls,
-    private readonly options: { httpsPort?: number; timeoutMs?: number } = {},
+    private readonly options: {
+      httpsPort?: number;
+      timeoutMs?: number;
+      maxAttempts?: number;
+      retryIntervalMs?: number;
+    } = {},
   ) {}
 
   async observe(
@@ -139,11 +144,35 @@ export class DirectOriginTlsCertificateObserver implements TlsCertificateObserve
       return err(domainError.notFound("Deployment target", input.serverId));
     }
     const state = server.toState();
-    return this.probe({
-      host: state.host.value,
-      port: this.options.httpsPort ?? 443,
-      serverName: input.serverName,
-      timeoutMs: this.options.timeoutMs ?? 10_000,
-    });
+    const normalizeFingerprint = (value: string) => value.replaceAll(":", "").toLowerCase();
+    const expectedFingerprint = normalizeFingerprint(input.expectedFingerprint);
+    const maxAttempts = Math.max(1, this.options.maxAttempts ?? 20);
+    let lastResult: Result<TlsCertificateObservation, DomainError> | undefined;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      lastResult = await this.probe({
+        host: state.host.value,
+        port: this.options.httpsPort ?? 443,
+        serverName: input.serverName,
+        timeoutMs: this.options.timeoutMs ?? 10_000,
+      });
+      if (
+        lastResult.isOk() &&
+        normalizeFingerprint(lastResult.value.fingerprint) === expectedFingerprint
+      ) {
+        return lastResult;
+      }
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, this.options.retryIntervalMs ?? 250));
+      }
+    }
+    return (
+      lastResult ??
+      err(
+        domainError.certificateRouteReconciliationFailed(
+          "Direct-origin TLS certificate proof did not converge",
+          { phase: "tls-certificate-proof", retryable: true },
+        ),
+      )
+    );
   }
 }

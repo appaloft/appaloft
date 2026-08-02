@@ -47,14 +47,20 @@ describe("server SSH mutation coordinator", () => {
         ownerId: "req_server_ssh_mutation_snapshot",
         label: "deployments.cleanup-preview",
       },
-      work: async () => ok("done"),
+      work: async (lease) => {
+        expect(lease).toBeDefined();
+        expect((await lease?.assertOwned())?.isOk()).toBe(true);
+        return ok("done");
+      },
     });
 
     expect(result).toEqual(ok("done"));
     expect(
-      commands.map(({ command }) =>
-        command.replaceAll(/req_server_ssh_mutation_snapshot:\d+:[a-z0-9]+/g, "<lock-token>"),
-      ),
+      commands
+        .map(({ command }) =>
+          command.replaceAll(/req_server_ssh_mutation_snapshot:\d+:[a-z0-9]+/g, "<lock-token>"),
+        )
+        .join("\n--- command ---\n"),
     ).toMatchSnapshot();
   });
 });

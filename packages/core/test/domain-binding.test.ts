@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
   CanonicalRedirectStatusCode,
+  CertificateFingerprintValue,
+  CertificateId,
   CertificatePolicyValue,
   CreatedAt,
   DeploymentTargetId,
@@ -164,6 +166,7 @@ describe("DomainBinding", () => {
       certificatePolicy: "manual",
     });
     expect(manualCertificate.canBecomeReadyAfterCertificateImported()).toBe(true);
+    expect(manualCertificate.canBecomeReadyAfterCertificateIssued()).toBe(false);
 
     const tlsDisabled = domainBinding({
       status: "bound",
@@ -187,6 +190,27 @@ describe("DomainBinding", () => {
     expect(DomainBindingStatusValue.rehydrate("pending_verification").allowsReadyMarking()).toBe(
       false,
     );
+  });
+
+  test("[ROUTE-TLS-EVT-024] requires certificate identity and fingerprint as one readiness proof", () => {
+    const binding = domainBinding({ status: "bound", certificatePolicy: "manual" });
+
+    expect(
+      binding
+        .markReady({
+          readyAt: CreatedAt.rehydrate("2026-01-01T00:01:00.000Z"),
+          certificateId: CertificateId.rehydrate("crt_demo"),
+        })
+        .isErr(),
+    ).toBe(true);
+    expect(
+      binding
+        .markReady({
+          readyAt: CreatedAt.rehydrate("2026-01-01T00:01:00.000Z"),
+          certificateFingerprint: CertificateFingerprintValue.rehydrate("sha256:demo"),
+        })
+        .isErr(),
+    ).toBe(true);
   });
 
   test("[DMBH-DOMAIN-002] answers canonical redirect target eligibility", () => {

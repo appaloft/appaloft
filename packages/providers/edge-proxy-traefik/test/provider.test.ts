@@ -317,7 +317,12 @@ describe("TraefikEdgeProxyProvider", () => {
       pathPrefix: "/",
       tlsMode: "auto" as const,
       source: "domain-binding" as const,
-      certificate: { source: "appaloft-imported" as const, certificateId: "crt_manual" },
+      domainBindingId: "dmb_manual",
+      certificate: {
+        source: "appaloft-imported" as const,
+        certificateId: "crt_manual",
+        domainBindingId: "dmb_manual",
+      },
       targetPort: 3000,
     };
     const plan = await provider.realizeRoutes(

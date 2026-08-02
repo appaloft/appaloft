@@ -48,7 +48,7 @@ This test matrix inherits:
 | Validator/domain service | Domain match, key match, not-before, expiry, algorithm, and malformed-chain checks. |
 | Use case/handler | Secret-store write, durable state write, event publication, idempotency, and structured error mapping. |
 | Operator work projection | Successful manual import records a safe terminal process attempt without secret-bearing material. |
-| Event/process manager | `certificate-imported` dedupe and `domain-ready` follow-up behavior. |
+| Event/process manager | `certificate-imported` dedupe, edge activation/reload, served SNI proof, rollback, and proof-gated `domain-ready`. |
 | Read model | `certificates.list`, `domain-bindings.list`, and resource access summaries expose only safe metadata/state. |
 | Entry workflow | CLI, HTTP/oRPC, and Web resource-scoped surfaces collect secrets safely and converge on one command contract. |
 
@@ -75,9 +75,9 @@ This test matrix inherits:
 
 | Test ID | Preferred automation | Case | Given event | Existing state | Expected result | Expected follow-up event | Expected state | Retriable |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| CERT-IMPORT-EVT-001 | integration | Imported certificate makes bound route ready | `certificate-imported` | Binding is `bound`, manual policy, route readiness already satisfied | `ok` | `domain-ready` | Binding moves to `ready` | No |
-| CERT-IMPORT-EVT-002 | integration | Imported certificate waits for route readiness | `certificate-imported` | Binding is `bound`, manual policy, route readiness not yet satisfied | `ok` | None | Certificate active imported; binding remains `bound` or `not_ready` until route gate later succeeds | No |
-| CERT-IMPORT-EVT-003 | integration | Duplicate imported event | Same `certificate-imported` repeated | Certificate already active imported | `ok` | No duplicate `domain-ready` | State remains unchanged | No |
+| CERT-IMPORT-EVT-001 | integration | Imported certificate reconciles the serving route | `certificate-imported` | Binding is owned, manual policy, and a serving route exists | `ok` only after material activation, provider reload, and matching direct-origin SNI proof | `domain-ready` | Binding stores the active certificate id/fingerprint proof pair and moves to `ready` | Yes before proof |
+| CERT-IMPORT-EVT-002 | integration | Activation or proof fails safely | `certificate-imported` | Existing route/certificate is usable | `err` | None | Previous material and usable route remain active; binding does not become ready for the candidate | Yes |
+| CERT-IMPORT-EVT-003 | integration | Duplicate imported event | Same `certificate-imported` repeated after proof | Certificate and binding proof pair already match | `ok`; retries deferred backup retirement only | No duplicate `domain-ready` | Proven state remains unchanged and stale backup material is retired idempotently | Yes only when cleanup fails |
 
 ## Read Model Matrix
 

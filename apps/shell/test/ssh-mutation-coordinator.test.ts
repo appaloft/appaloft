@@ -56,15 +56,21 @@ describe("SSH mutation coordinator", () => {
         ownerId: "req_ssh_mutation_test",
         label: "deployments.cleanup-preview",
       },
-      work: async () => ok("done"),
+      work: async (lease) => {
+        expect(lease).toBeDefined();
+        expect((await lease?.assertOwned())?.isOk()).toBe(true);
+        return ok("done");
+      },
     });
 
     expect(result).toEqual(ok("done"));
-    expect(commands).toHaveLength(2);
+    expect(commands).toHaveLength(3);
     expect(
-      commands.map(({ command }) =>
-        command.replaceAll(/req_ssh_mutation_test:\d+:[a-z0-9]+/g, "<lock-token>"),
-      ),
+      commands
+        .map(({ command }) =>
+          command.replaceAll(/req_ssh_mutation_test:\d+:[a-z0-9]+/g, "<lock-token>"),
+        )
+        .join("\n--- command ---\n"),
     ).toMatchSnapshot();
     expect(commands[0]?.command).toContain('coordination_root="$data_root/locks/coordination"');
     expect(commands[0]?.command).toContain('lock_dir="$scope_root/$scope_hash.lock"');
@@ -76,7 +82,7 @@ describe("SSH mutation coordinator", () => {
     expect(commands[0]?.command).toContain('[ ! -d "$lock_dir" ]');
     expect(commands[0]?.command).toContain("SSH mutation coordination lock could not be created");
     expect(commands[0]?.command).not.toContain("OPENSSH PRIVATE KEY");
-    expect(commands[1]?.command).toContain('rm -rf "$lock_dir"');
+    expect(commands[2]?.command).toContain('rm -rf "$lock_dir"');
   });
 
   test("retries an active coordination scope briefly before succeeding", async () => {

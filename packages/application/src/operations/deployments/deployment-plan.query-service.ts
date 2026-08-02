@@ -101,6 +101,7 @@ function requestedDeploymentWithRuntimeContextMetadata(
 }
 
 interface DomainBindingRouteGroup {
+  domainBindingId: string;
   domains: string[];
   pathPrefix: DomainRouteBindingCandidate["pathPrefix"];
   pathHandling?: DomainRouteBindingCandidate["pathHandling"];
@@ -125,6 +126,7 @@ function domainBindingRouteGroups(
 
     if (binding.redirectTo) {
       groups.push({
+        domainBindingId: binding.id,
         domains: [binding.domainName],
         pathPrefix: binding.pathPrefix,
         pathHandling: binding.pathHandling ?? "preserve",
@@ -138,11 +140,12 @@ function domainBindingRouteGroups(
     }
 
     const pathHandling = binding.pathHandling ?? "preserve";
-    const groupKey = `${binding.pathPrefix}\u0000${pathHandling}\u0000${binding.tlsMode}\u0000${binding.targetServiceName ?? ""}\u0000${binding.certificate?.source ?? ""}\u0000${binding.certificate?.certificateId ?? ""}`;
+    const groupKey = `${binding.id}\u0000${binding.pathPrefix}\u0000${pathHandling}\u0000${binding.tlsMode}\u0000${binding.targetServiceName ?? ""}\u0000${binding.certificate?.source ?? ""}\u0000${binding.certificate?.certificateId ?? ""}`;
     const existingIndex = groupIndexes.get(groupKey);
     if (existingIndex === undefined) {
       groupIndexes.set(groupKey, groups.length);
       groups.push({
+        domainBindingId: binding.id,
         domains: [binding.domainName],
         pathPrefix: binding.pathPrefix,
         pathHandling,
@@ -215,6 +218,7 @@ function requestedDeploymentWithDurableDomainBindings(
     accessRoutes: routeGroups.map((group) => ({
       proxyKind: primaryBinding.proxyKind,
       source: "domain-binding" as const,
+      domainBindingId: group.domainBindingId,
       domains: group.domains,
       pathPrefix: group.pathPrefix,
       pathHandling: group.pathHandling ?? "preserve",

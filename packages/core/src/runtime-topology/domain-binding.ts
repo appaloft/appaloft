@@ -146,7 +146,12 @@ export class DomainBindingStatusValue extends ScalarValueObject<DomainBindingSta
   }
 
   allowsCertificateReadiness(): boolean {
-    return this.value === "bound" || this.value === "certificate_pending";
+    return (
+      this.value === "bound" ||
+      this.value === "certificate_pending" ||
+      this.value === "ready" ||
+      this.value === "not_ready"
+    );
   }
 
   allowsRouteReadiness(): boolean {
@@ -322,6 +327,10 @@ export class CertificatePolicyValue extends ScalarValueObject<CertificatePolicy>
     return this.value === "manual";
   }
 
+  isAuto(): boolean {
+    return this.value === "auto";
+  }
+
   requiresCertificateFor(tlsMode: TlsModeValue): boolean {
     return !tlsMode.isDisabled() && !this.isDisabled();
   }
@@ -418,8 +427,10 @@ export interface DomainBindingState {
   redirectTo?: PublicDomainName;
   redirectStatus?: CanonicalRedirectStatusCode;
   certificatePolicy: CertificatePolicyValue;
-  activeCertificateId?: CertificateId;
-  activeCertificateFingerprint?: CertificateFingerprintValue;
+  activeCertificateProof?: {
+    certificateId: CertificateId;
+    fingerprint: CertificateFingerprintValue;
+  };
   status: DomainBindingStatusValue;
   verificationAttempts: DomainVerificationAttemptState[];
   dnsObservation?: DomainDnsObservationState;
@@ -678,7 +689,11 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
   }
 
   canBecomeReadyAfterCertificateIssued(): boolean {
-    return this.state.status.allowsCertificateReadiness() && this.requiresCertificateForReadiness();
+    return (
+      this.state.status.allowsCertificateReadiness() &&
+      this.state.certificatePolicy.isAuto() &&
+      !this.state.tlsMode.isDisabled()
+    );
   }
 
   canBecomeReadyAfterCertificateImported(): boolean {
@@ -932,12 +947,24 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     correlationId?: string;
     causationId?: string;
   }): Result<void> {
+    if (Boolean(input.certificateId) !== Boolean(input.certificateFingerprint)) {
+      return err(
+        domainError.invariant(
+          "Certificate readiness proof requires both certificate identity and fingerprint",
+          {
+            phase: "domain-ready",
+            domainBindingId: this.state.id.value,
+          },
+        ),
+      );
+    }
+
     if (this.state.status.isReady()) {
-      if (input.certificateId) {
-        this.state.activeCertificateId = input.certificateId;
-      }
-      if (input.certificateFingerprint) {
-        this.state.activeCertificateFingerprint = input.certificateFingerprint;
+      if (input.certificateId && input.certificateFingerprint) {
+        this.state.activeCertificateProof = {
+          certificateId: input.certificateId,
+          fingerprint: input.certificateFingerprint,
+        };
       }
       return ok(undefined);
     }
@@ -953,11 +980,11 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     }
 
     this.state.status = DomainBindingStatusValue.rehydrate("ready");
-    if (input.certificateId) {
-      this.state.activeCertificateId = input.certificateId;
-    }
-    if (input.certificateFingerprint) {
-      this.state.activeCertificateFingerprint = input.certificateFingerprint;
+    if (input.certificateId && input.certificateFingerprint) {
+      this.state.activeCertificateProof = {
+        certificateId: input.certificateId,
+        fingerprint: input.certificateFingerprint,
+      };
     }
     delete this.state.routeFailure;
 

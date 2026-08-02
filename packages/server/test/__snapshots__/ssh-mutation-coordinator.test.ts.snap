@@ -1,8 +1,6 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
 exports[`server SSH mutation coordinator snapshots rendered acquire and release commands 1`] = `
-[
-  
 "sh -lc 'set -eu
 data_root='\\''/var/lib/appaloft/runtime/state'\\''
 scope_kind='\\''preview-lifecycle'\\''
@@ -61,10 +59,28 @@ if ! mkdir "$lock_dir"; then
 fi
 printf '\\''{"ownerId":%s,"label":%s,"lockToken":%s,"operationKey":%s,"coordinationMode":%s,"scopeKind":%s,"scopeKey":%s,"startedAt":"%s","lastHeartbeatAt":"%s","staleAfterSeconds":%s}
 '\\'' '\\''"req_server_ssh_mutation_snapshot"'\\'' '\\''"deployments.cleanup-preview"'\\'' '\\''"<lock-token>"'\\'' '\\''"deployments.cleanup-preview"'\\'' '\\''"serialize-with-bounded-wait"'\\'' '\\''"preview-lifecycle"'\\'' '\\''"source-fingerprint:v1:branch%3Amain"'\\'' "$now" "$now" "$stale_after_seconds" > "$owner_file"
-printf "coordinated %s %s\\n" "$scope_kind" "$scope_hash"'"
-,
-  
-"sh -lc 'set -eu
+printf "coordinated %s %s\\n" "$scope_kind" "$scope_hash"'
+--- command ---
+sh -lc 'set -eu
+data_root='\\''/var/lib/appaloft/runtime/state'\\''
+scope_kind='\\''preview-lifecycle'\\''
+scope_hash='\\''b2a5839fa8cbe1cc63c1da5b'\\''
+stale_after_seconds='\\''30'\\''
+expected_owner_id_fragment='\\''"ownerId":"req_server_ssh_mutation_snapshot"'\\''
+expected_lock_token_fragment='\\''"lockToken":"<lock-token>"'\\''
+now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+lock_dir="$data_root/locks/coordination/$scope_kind/$scope_hash.lock"
+owner_file="$lock_dir/owner.json"
+[ -d "$lock_dir" ] || exit 75
+[ -f "$owner_file" ] || exit 75
+grep -F "$expected_owner_id_fragment" "$owner_file" >/dev/null 2>&1 || { cat "$owner_file" >&2; exit 75; }
+grep -F "$expected_lock_token_fragment" "$owner_file" >/dev/null 2>&1 || { cat "$owner_file" >&2; exit 75; }
+started_at="$(sed -n '\\''s/.*"startedAt"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p'\\'' "$owner_file" | head -n 1 || true)"
+[ -n "$started_at" ] || started_at="$now"
+sed -e '\\''s/"lastHeartbeatAt"[[:space:]]*:[[:space:]]*"[^"]*"/"lastHeartbeatAt":"'\\''"$now"'\\''"/'\\'' -e '\\''s/"staleAfterSeconds"[[:space:]]*:[[:space:]]*[0-9][0-9]*/"staleAfterSeconds":'\\''"$stale_after_seconds"'\\''/'\\'' "$owner_file" > "$owner_file.tmp"
+mv "$owner_file.tmp" "$owner_file"'
+--- command ---
+sh -lc 'set -eu
 data_root='\\''/var/lib/appaloft/runtime/state'\\''
 scope_kind='\\''preview-lifecycle'\\''
 scope_hash='\\''b2a5839fa8cbe1cc63c1da5b'\\''
@@ -78,6 +94,4 @@ grep -F "$expected_owner_id_fragment" "$owner_file" >/dev/null 2>&1 || { cat "$o
 grep -F "$expected_lock_token_fragment" "$owner_file" >/dev/null 2>&1 || { cat "$owner_file" >&2; exit 75; }
 rm -rf "$lock_dir"
 printf "released %s %s\\n" "$scope_kind" "$scope_hash"'"
-,
-]
 `;

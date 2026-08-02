@@ -75,7 +75,11 @@ function succeededDeployment(input: {
     pathPrefix: RoutePathPrefix.create("/")._unsafeUnwrap(),
     tlsMode: TlsModeValue.rehydrate("auto"),
     source: "domain-binding",
-    certificate: { source: "appaloft-managed", certificateId: "crt_previous" },
+    certificate: {
+      source: "appaloft-managed",
+      certificateId: "crt_previous",
+      domainBindingId: "dmb_demo",
+    },
     targetPort: PortNumber.rehydrate(3000),
     ...(input.targetServiceName
       ? { targetServiceName: ResourceServiceName.rehydrate(input.targetServiceName) }
@@ -217,29 +221,20 @@ describe("DockerCertificateRouteActivator", () => {
       previousActivationId: "act_previous",
     });
     expect(runtime.input).toMatchObject({
-      deploymentId: "dep_previous",
-      certificateId: "crt_candidate",
+      domainBindingId: "dmb_demo",
       proxyKind: "traefik",
       server: expect.objectContaining({ id: expect.objectContaining({ value: "srv_demo" }) }),
-      accessRoutes: [
-        expect.objectContaining({
-          source: "domain-binding",
-          domains: ["manual.example.test"],
-          certificate: {
-            source: "appaloft-imported",
-            certificateId: "crt_candidate",
-          },
-        }),
-      ],
-      routePlan: expect.objectContaining({
-        labels: expect.not.arrayContaining([
-          expect.stringContaining("tls.certresolver=appaloft"),
-        ]),
-      }),
+      material: {
+        certificateId: "crt_candidate",
+        certificateChain: "candidate-chain",
+        privateKey: "candidate-key",
+      },
+      ensurePlan: expect.objectContaining({ proxyKind: "traefik" }),
+      reloadPlan: expect.objectContaining({ proxyKind: "traefik" }),
     });
   });
 
-  test("[EDGE-PROXY-RELOAD-004B] selects the authoritative Compose project and route service", async () => {
+  test("[EDGE-PROXY-RELOAD-004B] leaves the authoritative Compose workload untouched", async () => {
     const server = DeploymentTarget.register({
       id: DeploymentTargetId.rehydrate("srv_demo"),
       name: DeploymentTargetName.rehydrate("Demo"),
@@ -264,9 +259,6 @@ describe("DockerCertificateRouteActivator", () => {
     );
 
     expect(result.isOk()).toBe(true);
-    expect(runtime.input?.containerSelector).toEqual({
-      composeProjectName: "appaloft-dep_previous",
-      serviceName: "api",
-    });
+    expect(runtime.input).not.toHaveProperty("containerSelector");
   });
 });

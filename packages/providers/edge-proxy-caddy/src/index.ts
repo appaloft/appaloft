@@ -58,14 +58,13 @@ function labelsForCaddy(input: {
   const path = input.route.pathPrefix === "/" ? "" : `${input.route.pathPrefix}*`;
   const pathDirective = input.route.pathHandling === "strip" ? "handle_path" : "handle";
   const redirect = input.route.routeBehavior === "redirect" || Boolean(input.route.redirectTo);
-  const certificateId = input.route.certificate?.source.startsWith("appaloft-")
-    ? input.route.certificate.certificateId?.replace(/[^a-zA-Z0-9_-]/g, "")
-    : undefined;
-  const certificateLabel = certificateId
-    ? [
-        `caddy${suffix}.tls=/data/appaloft/certificates/${certificateId}/certificate.pem /data/appaloft/certificates/${certificateId}/private-key.pem`,
-      ]
-    : [];
+  const domainBindingId = input.route.domainBindingId?.replace(/[^a-zA-Z0-9_-]/g, "");
+  const certificateLabel =
+    domainBindingId && input.route.tlsMode === "auto"
+      ? [
+          `caddy${suffix}.tls=/data/appaloft/certificates/${domainBindingId}/certificate.pem /data/appaloft/certificates/${domainBindingId}/private-key.pem`,
+        ]
+      : [];
 
   if (redirect && input.route.redirectTo) {
     const target = `${scheme}://${input.route.redirectTo}{uri} ${input.route.redirectStatus ?? 308}`;
@@ -161,6 +160,11 @@ function tlsDiagnostics(input: ProxyConfigurationViewInput): ProxyConfigurationT
       const appaloftSource = route.certificate?.source.startsWith("appaloft-")
         ? route.certificate.source
         : undefined;
+      const appaloftCertificate =
+        route.certificate?.source === "appaloft-managed" ||
+        route.certificate?.source === "appaloft-imported"
+          ? route.certificate
+          : undefined;
 
       return {
         hostname,
@@ -178,7 +182,7 @@ function tlsDiagnostics(input: ProxyConfigurationViewInput): ProxyConfigurationT
         details: appaloftSource
           ? {
               siteScheme: "https",
-              certificateId: route.certificate?.certificateId ?? "unselected",
+              certificateId: appaloftCertificate?.certificateId ?? "unselected",
               automationOwner: "appaloft",
             }
           : enabled
@@ -309,14 +313,12 @@ export class CaddyEdgeProxyProvider implements EdgeProxyProvider {
     const providerRoutes = input.accessRoutes.filter((route) => route.proxyKind === "caddy");
     const pendingCertificateRoute = providerRoutes.find(
       (route) =>
-        route.source === "domain-binding" &&
-        route.tlsMode === "auto" &&
-        !route.certificate?.source.startsWith("appaloft-"),
+        route.source === "domain-binding" && route.tlsMode === "auto" && !route.domainBindingId,
     );
     if (pendingCertificateRoute) {
       return err(
         domainError.certificateRouteReconciliationFailed(
-          "Durable TLS route requires a selected Appaloft certificate",
+          "Durable TLS route requires a stable domain binding identity",
           {
             phase: "route-certificate-selection",
             providerKey: this.key,
@@ -365,9 +367,10 @@ export class CaddyEdgeProxyProvider implements EdgeProxyProvider {
           ? [
               {
                 name: "caddy-docker-provider-reload",
-                mode: "automatic",
+                mode: "command",
+                command: "docker restart appaloft-caddy",
                 successMessage:
-                  "Caddy Docker proxy watches container label changes and activates routes automatically",
+                  "Caddy reloads binding-scoped certificate material from its data volume",
                 metadata: {
                   routeCount: String(routeCount),
                   reason: input.reason,

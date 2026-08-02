@@ -554,6 +554,7 @@ describe("DeploymentPlanQueryService", () => {
           certificate: {
             source: "appaloft-managed",
             certificateId: "crt_custom",
+            domainBindingId: "dmb_custom",
           },
           status: "ready",
           createdAt: "2026-01-01T00:02:00.000Z",

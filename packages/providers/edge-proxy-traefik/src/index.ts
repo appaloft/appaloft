@@ -557,6 +557,11 @@ function tlsDiagnostics(input: ProxyConfigurationViewInput): ProxyConfigurationT
       const appaloftSource = route.certificate?.source.startsWith("appaloft-")
         ? route.certificate.source
         : undefined;
+      const appaloftCertificate =
+        route.certificate?.source === "appaloft-managed" ||
+        route.certificate?.source === "appaloft-imported"
+          ? route.certificate
+          : undefined;
 
       return {
         hostname,
@@ -575,7 +580,7 @@ function tlsDiagnostics(input: ProxyConfigurationViewInput): ProxyConfigurationT
           ? {
               entrypoint: "websecure",
               routerTlsLabel: "true",
-              certificateId: route.certificate?.certificateId ?? "unselected",
+              certificateId: appaloftCertificate?.certificateId ?? "unselected",
             }
           : enabled
             ? {

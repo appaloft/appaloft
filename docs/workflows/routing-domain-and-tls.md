@@ -442,7 +442,7 @@ The minimal v1 readiness baseline is:
 
 For TLS-disabled bindings, no certificate gate remains after route readiness is satisfied. The domain-ready process manager may persist the binding as `ready` and publish `domain-ready`.
 
-For TLS auto or certificate-policy auto bindings, route readiness alone is not sufficient. The binding remains `bound` until certificate issuance completes. `certificate-requested` is consumed by the certificate worker through provider-neutral ports; `certificate-issued` records active certificate state and drives certificate-backed `domain-ready`; `certificate-issuance-failed` records failed or retry-scheduled attempt state.
+For TLS auto or certificate-policy auto bindings, route readiness alone is not sufficient. The binding remains certificate-pending until issuance and route reconciliation complete. `certificate-requested` is consumed by the certificate worker through provider-neutral ports; `certificate-issued` records active certificate state and requests binding-scoped material activation, proxy reload, and direct-origin hostname/SNI fingerprint proof. Only that proof drives certificate-backed `domain-ready`; `certificate-issuance-failed` records failed or retry-scheduled attempt state.
 
 The route readiness baseline does not create a separate public command. It is an event/process-manager continuation from `domain-bound` and a query/read-model projection for resources and domain bindings.
 

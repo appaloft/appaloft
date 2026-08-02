@@ -45,6 +45,7 @@ export function routeInputsFromAccessRoutes(accessRoutes: AccessRoute[]): EdgePr
     pathPrefix: route.pathPrefix,
     pathHandling: route.pathHandling,
     tlsMode: route.tlsMode,
+    ...(route.domainBindingId ? { domainBindingId: route.domainBindingId } : {}),
     ...(route.certificate ? { certificate: route.certificate } : {}),
     ...(route.source ? { source: route.source } : {}),
     ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),

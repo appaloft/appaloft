@@ -2,8 +2,8 @@
 
 ## Status
 
-- Round: Code in progress; certificate reconciliation implemented, policy operation pending
-- Artifact state: public issues #955 and #956 are ready-for-agent
+- Round: Sync and delivery; implementation and reconciliation review complete
+- Artifact state: public issues #955 and #956 implemented; PR/CI delivery pending
 - Compatibility: additive public operation plus backward-compatible readiness correction
 
 ## Business Outcome
@@ -38,6 +38,10 @@ hostname.
 | CERT-RECON-AC-009 | Real SNI proof | A real local Traefik or Caddy fixture has old and candidate certificates | reconciliation runs | A direct TLS client using the hostname as SNI observes the candidate fingerprint before readiness. |
 | CERT-RECON-AC-010 | Certificate-pending route | A durable TLS binding has no selected Appaloft certificate | its route intent is rendered | The workload is not exposed as ready HTTPS and provider-local automation is absent; challenge handling remains separate. |
 | CERT-RECON-AC-011 | Authoritative activation target | A selected candidate must replace the serving certificate | reconciliation resolves its target | Activation uses the current binding plus latest serving deployment/service/port and prior activation identity; missing or stale target facts fail closed before mutation. |
+| CERT-RECON-AC-012 | Stable activation identity | A serving workload has network, resource, security, and Compose-owned runtime state | certificate material changes | Activation swaps binding-scoped proxy material atomically and never reconstructs or replaces the workload container. |
+| CERT-RECON-AC-013 | Delayed event rejection | A binding policy or certificate lifecycle changed after an event was emitted | the stale event is replayed | Reconciliation rejects the event before activation unless source, active lifecycle, policy, binding, and fingerprint still agree. |
+| CERT-RECON-AC-014 | Durable proof migration | A legacy TLS binding was optimistically marked ready without served-certificate proof | migration runs | The binding returns to certificate-pending and no deployable route selects an unproven certificate. |
+| CERT-RECON-AC-015 | Concurrent certificate mutation | Reconciliation overlaps policy configuration, issue/renew, import, provider issuance, or revocation for one binding | either operation enters its mutation phase | All writers serialize on the same binding scope; nested event handlers reuse the owned lease, and stale state cannot overwrite a newer policy or certificate lifecycle. |
 
 ## Domain Ownership
 

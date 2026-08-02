@@ -58,10 +58,12 @@
 
 - 2026-08-02: real Docker smoke passed for `traefik:v3.7.9` and
   `lucaslorentz/caddy-docker-proxy:2.9-alpine`, each with `nginx:1.29.5-alpine` as the routed
-  workload and `alpine:3.22.2` as the stdin-only material helper.
+  workload and pinned
+  `alpine@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412`
+  as the stdin-only material helper.
 - Both smokes used loopback ephemeral HTTPS ports, direct hostname/SNI observation, independently
-  generated expected fingerprints, candidate activation, and rollback proof that restored the old
-  fingerprint.
+  generated expected fingerprints, same-certificate-id candidate activation, and rollback proof
+  that restored the old fingerprint without recreating or renaming the workload container.
 - All containers, volumes, networks, and temporary PEM files used unique test names and were
   removed after the run; no existing Appaloft Docker resource was changed.
 - 2026-08-02: policy transitions are exposed through the named operation, HTTP/oRPC, CLI, generated
@@ -70,6 +72,11 @@
 - Durable binding state now stores the proven certificate id and fingerprint. Reconciliation is
   idempotent only for the same identity and fingerprint, so replacing material in the same
   certificate aggregate still activates and proves the replacement before readiness.
+- Reconciliation, policy configuration, issue/renew, import, provider issuance, and revocation now
+  share binding-scoped mutation coordination. Nested event handlers reuse the owned fenced lease;
+  reconciliation revalidates active source/policy eligibility inside that boundary. Migration 117
+  returns legacy optimistic ready TLS rows to `certificate_pending`, and route projection requires
+  an exact certificate id/fingerprint proof pair.
 - Focused tests, PGlite migration coverage, `bun run lint:ci`, `bun run typecheck`, the full
   `bun run test` suite, and `bun run build` passed. The full suite was rerun outside the sandbox
   because its agent-workspace fixture requires a temporary Git credential-cache socket.

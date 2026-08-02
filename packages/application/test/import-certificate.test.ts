@@ -2,8 +2,17 @@ import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
 import {
+  Certificate,
+  CertificateAttemptId,
+  CertificateByDomainBindingIdSpec,
   CertificateByIdSpec,
+  CertificateChallengeTypeValue,
+  CertificateExpiresAtValue,
+  CertificateFingerprintValue,
   CertificateId,
+  CertificateIssuedAtValue,
+  CertificateIssueReasonValue,
+  CertificateSecretRefValue,
   CreatedAt,
   DeploymentTarget,
   DeploymentTargetId,
@@ -28,11 +37,13 @@ import {
   ProjectId,
   ProjectName,
   ProviderKey,
+  PublicDomainName,
   Resource,
   ResourceId,
   ResourceKindValue,
   ResourceName,
   type Result,
+  UpsertCertificateSpec,
   UpsertDeploymentTargetSpec,
   UpsertDestinationSpec,
   UpsertEnvironmentSpec,
@@ -54,11 +65,13 @@ import {
   MemoryResourceRepository,
   MemoryServerRepository,
   NoopLogger,
+  PassThroughMutationCoordinator,
   SequenceIdGenerator,
 } from "@appaloft/testkit";
 import {
   type CertificateMaterializer,
   type CertificateRouteActivator,
+  ConfigureDomainBindingCertificatePolicyUseCase,
   ConfirmDomainBindingOwnershipUseCase,
   CreateDomainBindingUseCase,
   createExecutionContext,
@@ -67,7 +80,8 @@ import {
   type ExecutionContext,
   ImportCertificateUseCase,
   ListCertificatesQueryService,
-  MarkDomainReadyOnCertificateImportedHandler,
+  type MutationCoordinator,
+  type MutationCoordinatorRunExclusiveInput,
   type OperationCheckRequest,
   type OperationGuardDecision,
   type OperationGuardPort,
@@ -185,7 +199,7 @@ class SuccessfulCertificateMaterializer implements CertificateMaterializer {
 class SuccessfulCertificateRouteActivator implements CertificateRouteActivator {
   lastInput: Parameters<CertificateRouteActivator["activate"]>[1] | undefined;
 
-  constructor(private readonly steps: string[]) {}
+  constructor(protected readonly steps: string[]) {}
 
   async activate(
     _context: Parameters<CertificateRouteActivator["activate"]>[0],
@@ -236,6 +250,54 @@ class FailingCertificateRouteActivator implements CertificateRouteActivator {
   async finalize(): ReturnType<CertificateRouteActivator["finalize"]> {
     this.steps.push("finalize");
     return ok(undefined);
+  }
+}
+
+class FlakyFinalizeCertificateRouteActivator extends SuccessfulCertificateRouteActivator {
+  private finalizeAttempts = 0;
+
+  override async finalize(
+    _context: Parameters<CertificateRouteActivator["finalize"]>[0],
+    _input: Parameters<CertificateRouteActivator["finalize"]>[1],
+  ): ReturnType<CertificateRouteActivator["finalize"]> {
+    this.finalizeAttempts += 1;
+    this.steps.push("finalize");
+    return this.finalizeAttempts === 1
+      ? err(
+          domainError.certificateRouteReconciliationFailed(
+            "Previous certificate material could not be retired",
+            { phase: "certificate-route-finalization" },
+          ),
+        )
+      : ok(undefined);
+  }
+}
+
+class CapturingMutationCoordinator implements MutationCoordinator {
+  readonly calls: MutationCoordinatorRunExclusiveInput<unknown>[] = [];
+
+  async runExclusive<T>(input: MutationCoordinatorRunExclusiveInput<T>): Promise<Result<T>> {
+    this.calls.push(input as MutationCoordinatorRunExclusiveInput<unknown>);
+    return input.work();
+  }
+}
+
+class LeaseLosingMutationCoordinator implements MutationCoordinator {
+  async runExclusive<T>(input: MutationCoordinatorRunExclusiveInput<T>): Promise<Result<T>> {
+    let assertions = 0;
+    return input.work({
+      assertOwned: async () => {
+        assertions += 1;
+        return assertions === 1
+          ? ok(undefined)
+          : err(
+              domainError.conflict("Certificate mutation lease was replaced", {
+                phase: "operation-coordination",
+                causeCode: "coordination_lease_lost",
+              }),
+            );
+      },
+    });
   }
 }
 
@@ -689,42 +751,35 @@ describe("ImportCertificateUseCase", () => {
     expect(eventsByType(seed.eventBus.events, "certificate-imported")).toHaveLength(0);
   });
 
-  test("[ROUTE-TLS-EVT-009] certificate-imported keeps a manual binding bound until reconciliation proof", async () => {
+  test("[CERT-RECON-CONC-002] lease loss after validation prevents certificate writes and events", async () => {
     const seed = await seedImportContext();
-    const handler = new MarkDomainReadyOnCertificateImportedHandler(
+    const eventsBefore = seed.eventBus.events.length;
+    const result = await new ImportCertificateUseCase(
       seed.domainBindings,
+      seed.certificates,
+      new FakeCertificateMaterialValidator(ok(createValidationResult())),
+      new FakeCertificateSecretStore(),
+      seed.clock,
+      seed.idGenerator,
+      seed.eventBus,
       seed.logger,
-    );
-
-    const handled = await handler.handle(seed.context, {
-      type: "certificate-imported",
-      aggregateId: "crt_demo",
-      occurredAt: "2026-01-01T00:00:00.000Z",
-      payload: {
-        certificateId: "crt_demo",
-        domainBindingId: seed.domainBindingId,
-        domainName: "manual.example.test",
-        attemptId: "cat_demo",
-        importedAt: "2026-01-01T00:00:00.000Z",
-        source: "imported",
-        notBefore: "2025-12-01T00:00:00.000Z",
-        expiresAt: "2026-06-01T00:00:00.000Z",
-        subjectAlternativeNames: ["manual.example.test"],
-        keyAlgorithm: "rsa",
-        correlationId: "req_certificate_import_test",
-        causationId: "cat_demo",
-      },
+      undefined,
+      undefined,
+      new LeaseLosingMutationCoordinator(),
+    ).execute(seed.context, {
+      domainBindingId: seed.domainBindingId,
+      certificateChain: "leaf-chain",
+      privateKey: "leaf-key",
     });
 
-    expect(handled.isOk()).toBe(true);
-    const domainReadyEvents = eventsByType(seed.eventBus.events, "domain-ready");
-    expect(domainReadyEvents).toHaveLength(0);
-
-    const persisted = await seed.domainBindings.findOne(
-      toRepositoryContext(seed.context),
-      DomainBindingByIdSpec.create(DomainBindingId.rehydrate(seed.domainBindingId)),
-    );
-    expect(persisted?.toState().status.value).toBe("bound");
+    expect(result.isErr()).toBe(true);
+    expect(
+      await seed.certificates.findOne(
+        seed.repositoryContext,
+        CertificateByDomainBindingIdSpec.create(DomainBindingId.rehydrate(seed.domainBindingId)),
+      ),
+    ).toBeNull();
+    expect(seed.eventBus.events).toHaveLength(eventsBefore);
   });
 
   test("[ROUTE-TLS-EVT-017][EDGE-PROXY-RELOAD-004A] imported certificate becomes ready only after activation and SNI proof", async () => {
@@ -751,12 +806,14 @@ describe("ImportCertificateUseCase", () => {
 
     const steps: string[] = [];
     const activator = new SuccessfulCertificateRouteActivator(steps);
+    const coordinator = new CapturingMutationCoordinator();
     const useCase = new ReconcileDomainCertificateUseCase(
       seed.domainBindings,
       seed.certificates,
       new SuccessfulCertificateMaterializer(steps),
       activator,
       new MatchingTlsCertificateObserver(steps),
+      coordinator,
       seed.clock,
       seed.eventBus,
       seed.logger,
@@ -764,6 +821,13 @@ describe("ImportCertificateUseCase", () => {
     const reconciled = await useCase.execute(seed.context, event);
 
     expect(reconciled.isOk()).toBe(true);
+    expect(coordinator.calls[0]).toMatchObject({
+      policy: expect.objectContaining({
+        operationKey: "domain-bindings.reconcile-certificate",
+        scopeKind: "domain-binding",
+      }),
+      scope: { kind: "domain-binding", key: seed.domainBindingId },
+    });
     expect(steps).toEqual(["materialize", "activate", "observe:manual.example.test", "finalize"]);
     expect(activator.lastInput).toMatchObject({
       projectId: "prj_demo",
@@ -811,6 +875,7 @@ describe("ImportCertificateUseCase", () => {
       new SuccessfulCertificateMaterializer(steps),
       new SuccessfulCertificateRouteActivator(steps),
       new MismatchingTlsCertificateObserver(steps),
+      new PassThroughMutationCoordinator(),
       seed.clock,
       seed.eventBus,
       seed.logger,
@@ -852,6 +917,7 @@ describe("ImportCertificateUseCase", () => {
       new SuccessfulCertificateMaterializer(steps),
       new FailingCertificateRouteActivator(steps),
       new MatchingTlsCertificateObserver(steps),
+      new PassThroughMutationCoordinator(),
       seed.clock,
       seed.eventBus,
       seed.logger,
@@ -865,6 +931,279 @@ describe("ImportCertificateUseCase", () => {
       DomainBindingByIdSpec.create(DomainBindingId.rehydrate(seed.domainBindingId)),
     );
     expect(persisted?.toState().status.value).toBe("bound");
+  });
+
+  test("[CERT-RECON-CONC-002] lease loss after materialization prevents route activation", async () => {
+    const seed = await seedImportContext();
+    await new ImportCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      new FakeCertificateMaterialValidator(ok(createValidationResult())),
+      new FakeCertificateSecretStore(),
+      seed.clock,
+      seed.idGenerator,
+      seed.eventBus,
+      seed.logger,
+    ).execute(seed.context, {
+      domainBindingId: seed.domainBindingId,
+      certificateChain: "leaf-chain",
+      privateKey: "leaf-key",
+    });
+    const event = eventsByType(seed.eventBus.events, "certificate-imported")[0];
+    if (!event) throw new Error("certificate-imported event was not captured");
+    const steps: string[] = [];
+
+    const result = await new ReconcileDomainCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      new SuccessfulCertificateMaterializer(steps),
+      new SuccessfulCertificateRouteActivator(steps),
+      new MatchingTlsCertificateObserver(steps),
+      new LeaseLosingMutationCoordinator(),
+      seed.clock,
+      seed.eventBus,
+      seed.logger,
+    ).execute(seed.context, event);
+
+    expect(result.isErr()).toBe(true);
+    expect(steps).toEqual(["materialize"]);
+  });
+
+  test("[ROUTE-TLS-EVT-022] rejects a delayed imported event after the binding switches to auto policy", async () => {
+    const seed = await seedImportContext();
+    await new ImportCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      new FakeCertificateMaterialValidator(ok(createValidationResult())),
+      new FakeCertificateSecretStore(),
+      seed.clock,
+      seed.idGenerator,
+      seed.eventBus,
+      seed.logger,
+    ).execute(seed.context, {
+      domainBindingId: seed.domainBindingId,
+      certificateChain: "leaf-chain",
+      privateKey: "leaf-key",
+    });
+    const event = eventsByType(seed.eventBus.events, "certificate-imported")[0];
+    if (!event) throw new Error("certificate-imported event was not captured");
+    expect(
+      (
+        await new ConfigureDomainBindingCertificatePolicyUseCase(
+          seed.domainBindings,
+          seed.clock,
+          seed.eventBus,
+          seed.logger,
+        ).execute(seed.context, {
+          domainBindingId: seed.domainBindingId,
+          certificatePolicy: "auto",
+        })
+      ).isOk(),
+    ).toBe(true);
+    const steps: string[] = [];
+
+    const result = await new ReconcileDomainCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      new SuccessfulCertificateMaterializer(steps),
+      new SuccessfulCertificateRouteActivator(steps),
+      new MatchingTlsCertificateObserver(steps),
+      new PassThroughMutationCoordinator(),
+      seed.clock,
+      seed.eventBus,
+      seed.logger,
+    ).execute(seed.context, event);
+
+    expect(result.isErr()).toBe(true);
+    expect(steps).toEqual([]);
+  });
+
+  test("[CERT-RECON-CONC-001] certificate policy writers share the binding reconciliation scope", async () => {
+    const seed = await seedImportContext();
+    const coordinator = new CapturingMutationCoordinator();
+    const result = await new ConfigureDomainBindingCertificatePolicyUseCase(
+      seed.domainBindings,
+      seed.clock,
+      seed.eventBus,
+      seed.logger,
+      coordinator,
+    ).execute(seed.context, {
+      domainBindingId: seed.domainBindingId,
+      certificatePolicy: "auto",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(coordinator.calls[0]).toMatchObject({
+      policy: expect.objectContaining({
+        operationKey: "domain-bindings.configure-certificate-policy",
+        scopeKind: "domain-binding",
+      }),
+      scope: { kind: "domain-binding", key: seed.domainBindingId },
+    });
+  });
+
+  test("[CERT-RECON-CONC-001] import and revoke writers share the binding reconciliation scope", async () => {
+    const seed = await seedImportContext();
+    const importCoordinator = new CapturingMutationCoordinator();
+    const imported = await new ImportCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      new FakeCertificateMaterialValidator(ok(createValidationResult())),
+      new FakeCertificateSecretStore(),
+      seed.clock,
+      seed.idGenerator,
+      seed.eventBus,
+      seed.logger,
+      undefined,
+      undefined,
+      importCoordinator,
+    ).execute(seed.context, {
+      domainBindingId: seed.domainBindingId,
+      certificateChain: "leaf-chain",
+      privateKey: "leaf-key",
+    });
+    expect(imported.isOk()).toBe(true);
+    expect(importCoordinator.calls[0]).toMatchObject({
+      policy: expect.objectContaining({ operationKey: "certificates.import" }),
+      scope: { kind: "domain-binding", key: seed.domainBindingId },
+    });
+
+    const revokeCoordinator = new CapturingMutationCoordinator();
+    const revoked = await new RevokeCertificateUseCase(
+      seed.certificates,
+      new FakeCertificateProvider(err(domainError.validation("provider should not be called"))),
+      new FakeCertificateSecretStore(),
+      seed.clock,
+      seed.idGenerator,
+      seed.eventBus,
+      seed.logger,
+      undefined,
+      revokeCoordinator,
+    ).execute(seed.context, { certificateId: imported._unsafeUnwrap().certificateId });
+    expect(revoked.isOk()).toBe(true);
+    expect(revokeCoordinator.calls[0]).toMatchObject({
+      policy: expect.objectContaining({ operationKey: "certificates.revoke" }),
+      scope: { kind: "domain-binding", key: seed.domainBindingId },
+    });
+  });
+
+  test("[ROUTE-TLS-EVT-022] rejects a delayed managed-issued event after the binding switches to manual policy", async () => {
+    const seed = await seedImportContext();
+    const policyUseCase = new ConfigureDomainBindingCertificatePolicyUseCase(
+      seed.domainBindings,
+      seed.clock,
+      seed.eventBus,
+      seed.logger,
+    );
+    expect(
+      (
+        await policyUseCase.execute(seed.context, {
+          domainBindingId: seed.domainBindingId,
+          certificatePolicy: "auto",
+        })
+      ).isOk(),
+    ).toBe(true);
+    const certificate = Certificate.request({
+      id: CertificateId.rehydrate("crt_managed_delayed"),
+      domainBindingId: DomainBindingId.rehydrate(seed.domainBindingId),
+      domainName: PublicDomainName.rehydrate("manual.example.test"),
+      attemptId: CertificateAttemptId.rehydrate("cat_managed_delayed"),
+      reason: CertificateIssueReasonValue.rehydrate("issue"),
+      providerKey: ProviderKey.rehydrate("acme"),
+      challengeType: CertificateChallengeTypeValue.rehydrate("http-01"),
+      requestedAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    })._unsafeUnwrap();
+    certificate
+      .markIssued({
+        attemptId: CertificateAttemptId.rehydrate("cat_managed_delayed"),
+        issuedAt: CertificateIssuedAtValue.rehydrate("2026-01-01T00:00:00.000Z"),
+        expiresAt: CertificateExpiresAtValue.rehydrate("2026-06-01T00:00:00.000Z"),
+        secretRef: CertificateSecretRefValue.rehydrate("secret://managed/delayed"),
+        fingerprint: CertificateFingerprintValue.rehydrate("sha256:managed-delayed"),
+      })
+      ._unsafeUnwrap();
+    const event = eventsByType(certificate.pullDomainEvents(), "certificate-issued")[0];
+    if (!event) throw new Error("certificate-issued event was not captured");
+    await seed.certificates.upsert(
+      seed.repositoryContext,
+      certificate,
+      UpsertCertificateSpec.fromCertificate(certificate),
+    );
+    expect(
+      (
+        await policyUseCase.execute(seed.context, {
+          domainBindingId: seed.domainBindingId,
+          certificatePolicy: "manual",
+        })
+      ).isOk(),
+    ).toBe(true);
+    const steps: string[] = [];
+
+    const result = await new ReconcileDomainCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      new SuccessfulCertificateMaterializer(steps),
+      new SuccessfulCertificateRouteActivator(steps),
+      new MatchingTlsCertificateObserver(steps),
+      new PassThroughMutationCoordinator(),
+      seed.clock,
+      seed.eventBus,
+      seed.logger,
+    ).execute(seed.context, event);
+
+    expect(result.isErr()).toBe(true);
+    expect(steps).toEqual([]);
+  });
+
+  test("[ROUTE-TLS-EVT-023] rejects a delayed event for a revoked certificate", async () => {
+    const seed = await seedImportContext();
+    const imported = await new ImportCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      new FakeCertificateMaterialValidator(ok(createValidationResult())),
+      new FakeCertificateSecretStore(),
+      seed.clock,
+      seed.idGenerator,
+      seed.eventBus,
+      seed.logger,
+    ).execute(seed.context, {
+      domainBindingId: seed.domainBindingId,
+      certificateChain: "leaf-chain",
+      privateKey: "leaf-key",
+    });
+    const event = eventsByType(seed.eventBus.events, "certificate-imported")[0];
+    if (!event) throw new Error("certificate-imported event was not captured");
+    expect(
+      (
+        await new RevokeCertificateUseCase(
+          seed.certificates,
+          new FakeCertificateProvider(err(domainError.validation("provider should not be called"))),
+          new FakeCertificateSecretStore(),
+          seed.clock,
+          seed.idGenerator,
+          seed.eventBus,
+          seed.logger,
+        ).execute(seed.context, {
+          certificateId: imported._unsafeUnwrap().certificateId,
+        })
+      ).isOk(),
+    ).toBe(true);
+    const steps: string[] = [];
+
+    const result = await new ReconcileDomainCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      new SuccessfulCertificateMaterializer(steps),
+      new SuccessfulCertificateRouteActivator(steps),
+      new MatchingTlsCertificateObserver(steps),
+      new PassThroughMutationCoordinator(),
+      seed.clock,
+      seed.eventBus,
+      seed.logger,
+    ).execute(seed.context, event);
+
+    expect(result.isErr()).toBe(true);
+    expect(steps).toEqual([]);
   });
 
   test("[ROUTE-TLS-EVT-020] repeated proven certificate reconciliation is idempotent", async () => {
@@ -893,6 +1232,7 @@ describe("ImportCertificateUseCase", () => {
       new SuccessfulCertificateMaterializer(steps),
       new SuccessfulCertificateRouteActivator(steps),
       new MatchingTlsCertificateObserver(steps),
+      new PassThroughMutationCoordinator(),
       seed.clock,
       seed.eventBus,
       seed.logger,
@@ -900,7 +1240,56 @@ describe("ImportCertificateUseCase", () => {
     expect((await useCase.execute(seed.context, event)).isOk()).toBe(true);
     expect((await useCase.execute(seed.context, event)).isOk()).toBe(true);
 
-    expect(steps).toEqual(["materialize", "activate", "observe:manual.example.test", "finalize"]);
+    expect(steps).toEqual([
+      "materialize",
+      "activate",
+      "observe:manual.example.test",
+      "finalize",
+      "finalize",
+    ]);
+    expect(eventsByType(seed.eventBus.events, "domain-ready")).toHaveLength(1);
+  });
+
+  test("[ROUTE-TLS-EVT-020] retries deferred backup retirement on idempotent event delivery", async () => {
+    const seed = await seedImportContext();
+    await new ImportCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      new FakeCertificateMaterialValidator(ok(createValidationResult())),
+      new FakeCertificateSecretStore(),
+      seed.clock,
+      seed.idGenerator,
+      seed.eventBus,
+      seed.logger,
+    ).execute(seed.context, {
+      domainBindingId: seed.domainBindingId,
+      certificateChain: "leaf-chain",
+      privateKey: "leaf-key",
+    });
+    const event = eventsByType(seed.eventBus.events, "certificate-imported")[0];
+    if (!event) throw new Error("certificate-imported event was not captured");
+    const steps: string[] = [];
+    const useCase = new ReconcileDomainCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      new SuccessfulCertificateMaterializer(steps),
+      new FlakyFinalizeCertificateRouteActivator(steps),
+      new MatchingTlsCertificateObserver(steps),
+      new PassThroughMutationCoordinator(),
+      seed.clock,
+      seed.eventBus,
+      seed.logger,
+    );
+
+    expect((await useCase.execute(seed.context, event)).isErr()).toBe(true);
+    expect((await useCase.execute(seed.context, event)).isOk()).toBe(true);
+    expect(steps).toEqual([
+      "materialize",
+      "activate",
+      "observe:manual.example.test",
+      "finalize",
+      "finalize",
+    ]);
     expect(eventsByType(seed.eventBus.events, "domain-ready")).toHaveLength(1);
   });
 
@@ -934,6 +1323,7 @@ describe("ImportCertificateUseCase", () => {
           new SuccessfulCertificateMaterializer(firstSteps),
           new SuccessfulCertificateRouteActivator(firstSteps),
           new MatchingTlsCertificateObserver(firstSteps),
+          new PassThroughMutationCoordinator(),
           seed.clock,
           seed.eventBus,
           seed.logger,
@@ -967,6 +1357,7 @@ describe("ImportCertificateUseCase", () => {
           new SuccessfulCertificateMaterializer(replacementSteps),
           new SuccessfulCertificateRouteActivator(replacementSteps),
           new MatchingTlsCertificateObserver(replacementSteps, "sha256:replacement-cert"),
+          new PassThroughMutationCoordinator(),
           seed.clock,
           seed.eventBus,
           seed.logger,
@@ -984,8 +1375,10 @@ describe("ImportCertificateUseCase", () => {
       seed.repositoryContext,
       DomainBindingByIdSpec.create(DomainBindingId.rehydrate(seed.domainBindingId)),
     );
-    expect(persisted?.toState().activeCertificateId?.value).toBe(replacementEvent.aggregateId);
-    expect(persisted?.toState().activeCertificateFingerprint?.value).toBe(
+    expect(persisted?.toState().activeCertificateProof?.certificateId.value).toBe(
+      replacementEvent.aggregateId,
+    );
+    expect(persisted?.toState().activeCertificateProof?.fingerprint.value).toBe(
       "sha256:replacement-cert",
     );
   });

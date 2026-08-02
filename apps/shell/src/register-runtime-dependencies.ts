@@ -14,11 +14,15 @@ import {
 import {
   createDefaultRuntimeTargetBackendRegistry,
   DefaultRuntimePlanResolver,
+  DirectOriginTlsCertificateObserver,
+  DockerCertificateRouteActivator,
+  DockerCliCertificateRouteRuntime,
   DockerSwarmExecutionBackend,
   DockerSwarmShellCommandRunner,
   InMemoryExecutionBackend,
   LocalAgentTunnelProvider,
   LocalExecutionBackend,
+  LocalSshCertificateRouteCommandRunner,
   RoutingExecutionBackend,
   RuntimeControlShellCommandExecutor,
   RuntimeDeploymentProofEvidenceReader,
@@ -43,10 +47,12 @@ import {
   type AppLogger,
   type CertificateHttpChallengeToken,
   type CertificateHttpChallengeTokenStore,
+  type CertificateMaterializer,
   type CertificateMaterialValidator,
   type CertificateProviderIssueInput,
   type CertificateProviderIssueResult,
   type CertificateProviderPort,
+  type CertificateRouteActivator,
   type Clock,
   CommandBus,
   ConnectorBackupAutomationNotificationPort,
@@ -108,6 +114,7 @@ import {
   type StaticArtifactStorePort,
   type StorageRuntimeCleaner,
   type StorageVolumeBackupPolicyRepository,
+  type TlsCertificateObserver,
   tokens,
   toRepositoryContext,
 } from "@appaloft/application";
@@ -1476,6 +1483,34 @@ export function registerRuntimeDependencies(
           dependencyContainer.resolve<Clock>(tokens.clock),
         ),
     ),
+  });
+  container.register(tokens.certificateMaterializer, {
+    useFactory: instanceCachingFactory((dependencyContainer) =>
+      dependencyContainer.resolve<CertificateMaterializer>(tokens.certificateSecretStore),
+    ),
+  });
+  container.register(tokens.certificateRouteActivator, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new DockerCertificateRouteActivator(
+          dependencyContainer.resolve(tokens.deploymentRepository),
+          dependencyContainer.resolve(tokens.serverRepository),
+          dependencyContainer.resolve(tokens.edgeProxyProviderRegistry),
+          new DockerCliCertificateRouteRuntime(new LocalSshCertificateRouteCommandRunner()),
+        ) satisfies CertificateRouteActivator,
+    ),
+  });
+  container.register(tokens.tlsCertificateObserver, {
+    useFactory: instanceCachingFactory((dependencyContainer) => {
+      const configuredPort = Number(process.env.APPALOFT_EDGE_HTTPS_PORT);
+      return new DirectOriginTlsCertificateObserver(
+        dependencyContainer.resolve(tokens.serverRepository),
+        undefined,
+        Number.isInteger(configuredPort) && configuredPort > 0 && configuredPort <= 65_535
+          ? { httpsPort: configuredPort }
+          : {},
+      ) satisfies TlsCertificateObserver;
+    }),
   });
   container.register(tokens.dependencyBindingSecretStore, {
     useFactory: instanceCachingFactory(

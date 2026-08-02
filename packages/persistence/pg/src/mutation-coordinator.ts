@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import {
   type Clock,
   coordinationTimeoutError,
@@ -6,7 +8,7 @@ import {
   type MutationCoordinatorRunExclusiveInput,
   validateCoordinationScope,
 } from "@appaloft/application";
-import { err, type Result } from "@appaloft/core";
+import { domainError, err, ok, type Result } from "@appaloft/core";
 import { type Kysely } from "kysely";
 
 import { type Database } from "./schema";
@@ -20,6 +22,10 @@ function sleep(milliseconds: number): Promise<void> {
 }
 
 export class PgMutationCoordinator implements MutationCoordinator {
+  private readonly activeLeases = new AsyncLocalStorage<
+    ReadonlyMap<string, { assertOwned(): Promise<Result<void>> }>
+  >();
+
   constructor(
     private readonly db: Kysely<Database>,
     private readonly clock: Clock,
@@ -30,6 +36,10 @@ export class PgMutationCoordinator implements MutationCoordinator {
     if (scopeValidation.isErr()) {
       return err(scopeValidation.error);
     }
+
+    const activeLeaseKey = `${input.scope.kind}:${input.scope.key}`;
+    const activeLease = this.activeLeases.getStore()?.get(activeLeaseKey);
+    if (activeLease) return input.work(activeLease);
 
     const startedAt = Date.now();
     const deadline = startedAt + input.policy.waitTimeoutMs;
@@ -120,15 +130,52 @@ export class PgMutationCoordinator implements MutationCoordinator {
     acquiredAt: string,
   ): Promise<Result<T>> {
     let heartbeatActive = true;
+    let wakeHeartbeat = () => undefined;
+    let leaseLost = false;
+    const leaseLostError = () =>
+      domainError.conflict("Mutation coordination lease is no longer owned by this worker", {
+        phase: "operation-coordination",
+        coordinationScopeKind: input.scope.kind,
+        coordinationScope: input.scope.key,
+        causeCode: "coordination_lease_lost",
+      });
+    const guard = {
+      assertOwned: async (): Promise<Result<void>> => {
+        if (leaseLost) return err(leaseLostError());
+        const row = await this.db
+          .selectFrom("mutation_coordinations")
+          .select(["owner_id", "acquired_at", "lease_expires_at"])
+          .where("coordination_scope_kind", "=", input.scope.kind)
+          .where("coordination_scope_key", "=", input.scope.key)
+          .executeTakeFirst();
+        if (
+          !row ||
+          row.owner_id !== input.owner.ownerId ||
+          Date.parse(row.acquired_at) !== Date.parse(acquiredAt) ||
+          Date.parse(row.lease_expires_at) <= Date.parse(this.clock.now())
+        ) {
+          leaseLost = true;
+          return err(leaseLostError());
+        }
+        return ok(undefined);
+      },
+    };
+    const activeLeaseKey = `${input.scope.kind}:${input.scope.key}`;
     const heartbeat = (async () => {
       while (heartbeatActive) {
-        await sleep(input.policy.heartbeatIntervalMs);
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, input.policy.heartbeatIntervalMs);
+          wakeHeartbeat = () => {
+            clearTimeout(timer);
+            resolve();
+          };
+        });
         if (!heartbeatActive) {
           break;
         }
 
         const now = this.clock.now();
-        await this.db
+        const updated = await this.db
           .updateTable("mutation_coordinations")
           .set({
             heartbeat_at: now,
@@ -137,22 +184,33 @@ export class PgMutationCoordinator implements MutationCoordinator {
           .where("coordination_scope_kind", "=", input.scope.kind)
           .where("coordination_scope_key", "=", input.scope.key)
           .where("owner_id", "=", input.owner.ownerId)
-          .execute();
+          .where("acquired_at", "=", acquiredAt)
+          .executeTakeFirst();
+        if (updated.numUpdatedRows !== 1n) {
+          leaseLost = true;
+          break;
+        }
       }
-    })();
+    })().catch(() => {
+      leaseLost = true;
+    });
 
     try {
-      return await input.work();
+      const activeLeases = new Map(this.activeLeases.getStore());
+      activeLeases.set(activeLeaseKey, guard);
+      const result = await this.activeLeases.run(activeLeases, () => input.work(guard));
+      return leaseLost ? err(leaseLostError()) : result;
     } finally {
       heartbeatActive = false;
-      await heartbeat.catch(() => undefined);
+      wakeHeartbeat();
+      await heartbeat;
       await this.db
         .deleteFrom("mutation_coordinations")
         .where("coordination_scope_kind", "=", input.scope.kind)
         .where("coordination_scope_key", "=", input.scope.key)
         .where("owner_id", "=", input.owner.ownerId)
+        .where("acquired_at", "=", acquiredAt)
         .execute();
-      void acquiredAt;
     }
   }
 }

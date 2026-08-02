@@ -2,6 +2,7 @@ import {
   type CertificateRouteActivationInput,
   type CertificateRouteActivationResult,
   type CertificateRouteActivator,
+  type CertificateRouteFinalizationInput,
   type DeploymentRepository,
   type EdgeProxyProviderRegistry,
   type EdgeProxyEnsurePlan,
@@ -26,32 +27,21 @@ import {
   type Result,
 } from "@appaloft/core";
 
-import { routeInputsFromAccessRoutes } from "./edge-proxy-plans";
-import { proxyBootstrapOptionsFromEnv } from "./edge-proxy-plans";
-import { deriveRuntimeInstanceNames } from "./runtime-instance-names";
+import { proxyBootstrapOptionsFromEnv, routeInputsFromAccessRoutes } from "./edge-proxy-plans";
 
 export interface CertificateRouteRuntimeActivationInput {
-  correlationId: string;
-  certificateId: string;
-  deploymentId: string;
-  containerName: string;
-  containerSelector?: {
-    composeProjectName: string;
-    serviceName: string;
-  };
+  domainBindingId: string;
   proxyKind: "traefik" | "caddy";
   server: DeploymentTargetState;
   material: MaterializedCertificate;
   ensurePlan?: EdgeProxyEnsurePlan;
-  accessRoutes: EdgeProxyRouteInput[];
   routePlan: ProxyRouteRealizationPlan;
   reloadPlan: ProxyReloadPlan | null;
 }
 
 export interface CertificateRouteRuntimeRollbackInput {
-  correlationId: string;
   server: DeploymentTargetState;
-  certificateId: string;
+  domainBindingId: string;
   proxyKind: "traefik" | "caddy";
   activationId: string;
   previousActivationId?: string;
@@ -169,6 +159,7 @@ export class DockerCertificateRouteActivator implements CertificateRouteActivato
         source:
           input.certificateSource === "managed" ? "appaloft-managed" : "appaloft-imported",
         certificateId: input.certificateId,
+        domainBindingId: input.domainBindingId,
       },
     };
     const accessRoutesForTarget = accessRoutes.filter(
@@ -206,28 +197,12 @@ export class DockerCertificateRouteActivator implements CertificateRouteActivato
     });
     if (reloadPlan.isErr()) return err(reloadPlan.error);
 
-    const runtimeNames = deriveRuntimeInstanceNames({
-      deploymentId: state.id.value,
-      metadata: state.runtimePlan.execution.metadata,
-    });
     return this.runtime.activate({
-      correlationId: context.requestId,
-      certificateId: input.certificateId,
-      deploymentId: state.id.value,
-      containerName: runtimeNames.containerName,
-      ...(state.runtimePlan.execution.kind === "docker-compose-stack" && matchingRoute.targetServiceName
-        ? {
-            containerSelector: {
-              composeProjectName: runtimeNames.composeProjectName,
-              serviceName: matchingRoute.targetServiceName,
-            },
-          }
-        : {}),
+      domainBindingId: input.domainBindingId,
       proxyKind: input.proxyKind,
       server: server.toState(),
       material: input.material,
       ensurePlan: ensurePlan.value,
-      accessRoutes: accessRoutesForTarget,
       routePlan: routePlan.value,
       reloadPlan: reloadPlan.value,
     });
@@ -252,9 +227,8 @@ export class DockerCertificateRouteActivator implements CertificateRouteActivato
     );
     if (!server) return err(domainError.notFound("Deployment target", input.serverId));
     return this.runtime.rollback({
-      correlationId: context.requestId,
       server: server.toState(),
-      certificateId: input.certificateId,
+      domainBindingId: input.domainBindingId,
       proxyKind: input.proxyKind === "caddy" ? "caddy" : "traefik",
       activationId: input.activationId,
       ...(input.previousActivationId
@@ -265,7 +239,7 @@ export class DockerCertificateRouteActivator implements CertificateRouteActivato
 
   async finalize(
     context: ExecutionContext,
-    input: CertificateRouteActivationInput & CertificateRouteActivationResult,
+    input: CertificateRouteFinalizationInput,
   ): Promise<Result<void, DomainError>> {
     if (!input.serverId) {
       return err(
@@ -282,14 +256,10 @@ export class DockerCertificateRouteActivator implements CertificateRouteActivato
     );
     if (!server) return err(domainError.notFound("Deployment target", input.serverId));
     return this.runtime.finalize({
-      correlationId: context.requestId,
       server: server.toState(),
-      certificateId: input.certificateId,
+      domainBindingId: input.domainBindingId,
       proxyKind: input.proxyKind === "caddy" ? "caddy" : "traefik",
       activationId: input.activationId,
-      ...(input.previousActivationId
-        ? { previousActivationId: input.previousActivationId }
-        : {}),
     });
   }
 }

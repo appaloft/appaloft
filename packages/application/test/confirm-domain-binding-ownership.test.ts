@@ -59,7 +59,6 @@ import {
   ConfirmDomainBindingOwnershipUseCase,
   CreateDomainBindingUseCase,
   ListDomainBindingsQueryService,
-  MarkDomainReadyOnCertificateIssuedHandler,
   MarkDomainReadyOnDeploymentFinishedHandler,
   MarkDomainReadyOnDomainBoundHandler,
   MarkDomainRouteFailedOnDeploymentFinishedHandler,
@@ -565,63 +564,6 @@ describe("ConfirmDomainBindingOwnershipUseCase", () => {
     expect(listed.items[0]).toMatchObject({
       id: domainBindingId,
       status: "ready",
-      verificationAttemptCount: 1,
-    });
-  });
-
-  test("[ROUTE-TLS-EVT-008] certificate-issued keeps TLS-auto binding bound until reconciliation proof", async () => {
-    const {
-      confirmUseCase,
-      context,
-      domainBindingId,
-      domainBindings,
-      eventBus,
-      logger,
-      readModel,
-      repositoryContext,
-    } = await seedRoutingContext({
-      domainName: "secure.example.com",
-      tlsMode: "auto",
-    });
-
-    const result = await confirmUseCase.execute(context, { domainBindingId });
-    expect(result.isOk()).toBe(true);
-
-    const handler = new MarkDomainReadyOnCertificateIssuedHandler(domainBindings, logger);
-    const handled = await handler.handle(context, {
-      type: "certificate-issued",
-      aggregateId: "crt_demo",
-      occurredAt: "2026-01-01T00:00:00.000Z",
-      payload: {
-        certificateId: "crt_demo",
-        domainBindingId,
-        domainName: "secure.example.com",
-        attemptId: "cat_demo",
-        issuedAt: "2026-01-01T00:00:00.000Z",
-        expiresAt: "2026-04-01T00:00:00.000Z",
-        providerKey: "acme",
-        correlationId: "req_certificate_issued_test",
-        causationId: "cat_demo",
-      },
-    });
-
-    expect(handled.isOk()).toBe(true);
-
-    const persisted = await domainBindings.findOne(
-      repositoryContext,
-      DomainBindingByIdSpec.create(DomainBindingId.rehydrate(domainBindingId)),
-    );
-    expect(persisted?.toState().status.value).toBe("bound");
-
-    const domainReadyEvents = eventsByType(eventBus.events, "domain-ready");
-    expect(domainReadyEvents).toHaveLength(0);
-
-    const listed = await new ListDomainBindingsQueryService(readModel).execute(context, {
-      resourceId: "res_demo",
-    });
-    expect(listed.items[0]).toMatchObject({
-      id: domainBindingId,
-      status: "bound",
       verificationAttemptCount: 1,
     });
   });

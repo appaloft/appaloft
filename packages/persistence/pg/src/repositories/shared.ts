@@ -1403,14 +1403,12 @@ export function rehydrateDomainBindingRow(row: Selectable<Database["domain_bindi
     certificatePolicy: CertificatePolicyValue.rehydrate(
       row.certificate_policy as CertificatePolicyInput,
     ),
-    ...(row.active_certificate_id
-      ? { activeCertificateId: CertificateId.rehydrate(row.active_certificate_id) }
-      : {}),
-    ...(row.active_certificate_fingerprint
+    ...(row.active_certificate_id && row.active_certificate_fingerprint
       ? {
-          activeCertificateFingerprint: CertificateFingerprintValue.rehydrate(
-            row.active_certificate_fingerprint,
-          ),
+          activeCertificateProof: {
+            certificateId: CertificateId.rehydrate(row.active_certificate_id),
+            fingerprint: CertificateFingerprintValue.rehydrate(row.active_certificate_fingerprint),
+          },
         }
       : {}),
     status: DomainBindingStatusValue.rehydrate(row.status as DomainBindingStatusInput),

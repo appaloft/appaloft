@@ -23,6 +23,7 @@ import {
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import { createCoordinationOwner, mutationCoordinationPolicies } from "../../mutation-coordination";
 import {
   type AppLogger,
   type CertificateProviderSelectionPolicy,
@@ -31,6 +32,8 @@ import {
   type DomainBindingRepository,
   type EventBus,
   type IdGenerator,
+  type MutationCoordinator,
+  type MutationLeaseGuard,
   type ProcessAttemptRecorder,
 } from "../../ports";
 import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
@@ -125,11 +128,30 @@ export class IssueOrRenewCertificateUseCase {
     private readonly logger: AppLogger,
     @inject(tokens.processAttemptRecorder)
     private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
+    @inject(tokens.mutationCoordinator)
+    private readonly mutationCoordinator?: MutationCoordinator,
   ) {}
 
   async execute(
     context: ExecutionContext,
     input: IssueOrRenewCertificateCommandInput,
+  ): Promise<Result<IssueOrRenewCertificateCommandResult>> {
+    const domainBindingId = DomainBindingId.create(input.domainBindingId);
+    if (domainBindingId.isErr()) return err(domainBindingId.error);
+    if (!this.mutationCoordinator) return this.executeExclusive(context, input);
+    return this.mutationCoordinator.runExclusive({
+      context,
+      policy: mutationCoordinationPolicies.issueOrRenewCertificate,
+      scope: { kind: "domain-binding", key: domainBindingId.value.value },
+      owner: createCoordinationOwner(context, "certificates.issue-or-renew"),
+      work: (lease) => this.executeExclusive(context, input, lease),
+    });
+  }
+
+  private async executeExclusive(
+    context: ExecutionContext,
+    input: IssueOrRenewCertificateCommandInput,
+    lease?: MutationLeaseGuard,
   ): Promise<Result<IssueOrRenewCertificateCommandResult>> {
     const {
       certificateProviderSelectionPolicy,
@@ -144,6 +166,7 @@ export class IssueOrRenewCertificateUseCase {
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
+      if (lease) yield* await lease.assertOwned();
       const domainBindingId = yield* DomainBindingId.create(input.domainBindingId);
       const reason = yield* CertificateIssueReasonValue.create(input.reason ?? "issue");
       const requestedCertificateId = input.certificateId
@@ -245,6 +268,7 @@ export class IssueOrRenewCertificateUseCase {
             ...(input.causationId ? { causationId: input.causationId } : {}),
           });
 
+      if (lease) yield* await lease.assertOwned();
       await certificateRepository.upsert(
         repositoryContext,
         certificate,
@@ -267,6 +291,7 @@ export class IssueOrRenewCertificateUseCase {
         resourceId: domainBindingState.resourceId.value,
         ...(domainBindingState.serverId ? { serverId: domainBindingState.serverId.value } : {}),
       });
+      if (lease) yield* await lease.assertOwned();
       await publishDomainEventsAndReturn(context, eventBus, logger, certificate, undefined);
 
       return ok({

@@ -38,6 +38,8 @@ import {
 } from "@appaloft/application";
 import {
   BuildStrategyKindValue,
+  CertificateFingerprintValue,
+  CertificateId,
   ConfigKey,
   ConfigScopeValue,
   ConfigValueText,
@@ -55,6 +57,8 @@ import {
   DestinationName,
   DetectSummary,
   DisplayNameText,
+  DomainBindingByIdSpec,
+  DomainBindingId,
   type DomainError,
   domainError,
   EnvironmentId,
@@ -105,6 +109,7 @@ import {
   UpdatedAt,
   UpsertDeploymentSpec,
   UpsertDestinationSpec,
+  UpsertDomainBindingSpec,
   UpsertEnvironmentSpec,
   UpsertProjectSpec,
   UpsertResourceSpec,
@@ -885,6 +890,9 @@ async function insertDomainBinding(
     pathHandling?: "preserve" | "strip";
     redirectTo?: string;
     redirectStatus?: 301 | 302 | 307 | 308;
+    certificatePolicy?: "auto" | "manual" | "disabled";
+    activeCertificateId?: string | null;
+    activeCertificateFingerprint?: string | null;
   },
 ): Promise<void> {
   await db
@@ -904,7 +912,9 @@ async function insertDomainBinding(
       tls_mode: input.tlsMode ?? "disabled",
       redirect_to: input.redirectTo ?? null,
       redirect_status: input.redirectStatus ?? null,
-      certificate_policy: "auto",
+      certificate_policy: input.certificatePolicy ?? "auto",
+      active_certificate_id: input.activeCertificateId ?? null,
+      active_certificate_fingerprint: input.activeCertificateFingerprint ?? null,
       status: input.status,
       verification_attempts: [],
       dns_observation: null,
@@ -1010,6 +1020,14 @@ describe("pglite persistence integration", () => {
           created_at: "2026-01-01T00:01:30.000Z",
         })
         .execute();
+      await database.db
+        .updateTable("domain_bindings")
+        .set({
+          active_certificate_id: "crt_destination_scoped",
+          active_certificate_fingerprint: "sha256:destination-scoped",
+        })
+        .where("id", "=", "dmb_destination_scoped")
+        .execute();
       await insertDomainBinding(database.db, target, {
         id: "dmb_server_scoped",
         domainName: "server.example.test",
@@ -1030,10 +1048,191 @@ describe("pglite persistence integration", () => {
           certificate: {
             source: "appaloft-imported",
             certificateId: "crt_destination_scoped",
+            domainBindingId: "dmb_destination_scoped",
           },
         }),
       ]);
       expect(bindings[0]).not.toHaveProperty("certificate");
+      await database.close();
+    } finally {
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  });
+
+  test("[ROUTE-TLS-EVT-017][ROUTE-TLS-EVT-021] route selection uses only the proven certificate identity", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-route-certificate-proof-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+
+    try {
+      const { createDatabase, createMigrator, PgDomainRouteBindingReader } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({ driver: "pglite", pgliteDataDir });
+      expect((await createMigrator(database.db).migrateToLatest()).error).toBeUndefined();
+      const target = await seedSourceLinkContext(database.db, "certificate_proof_route");
+      await insertDomainBinding(database.db, target, {
+        id: "dmb_proven_route",
+        domainName: "proof.example.test",
+        status: "ready",
+        tlsMode: "auto",
+        certificatePolicy: "manual",
+        createdAt: "2026-01-01T00:01:00.000Z",
+      });
+      await database.db
+        .insertInto("certificates")
+        .values([
+          {
+            id: "crt_proven_old",
+            domain_binding_id: "dmb_proven_route",
+            domain_name: "proof.example.test",
+            status: "active",
+            source: "imported",
+            provider_key: "manual",
+            challenge_type: "none",
+            issued_at: "2026-01-01T00:01:00.000Z",
+            expires_at: "2027-01-01T00:01:00.000Z",
+            fingerprint: "sha256:old",
+            secret_ref: "appaloft+pg://certificate/crt_proven_old/imported-bundle",
+            safe_metadata: {},
+            secret_refs: {},
+            attempts: [],
+            created_at: "2026-01-01T00:01:00.000Z",
+          },
+          {
+            id: "crt_unproven_new",
+            domain_binding_id: "dmb_proven_route",
+            domain_name: "proof.example.test",
+            status: "active",
+            source: "imported",
+            provider_key: "manual",
+            challenge_type: "none",
+            issued_at: "2026-01-02T00:01:00.000Z",
+            expires_at: "2027-01-02T00:01:00.000Z",
+            fingerprint: "sha256:new",
+            secret_ref: "appaloft+pg://certificate/crt_unproven_new/imported-bundle",
+            safe_metadata: {},
+            secret_refs: {},
+            attempts: [],
+            created_at: "2026-01-02T00:01:00.000Z",
+          },
+        ])
+        .execute();
+      await database.db
+        .updateTable("domain_bindings")
+        .set({
+          active_certificate_id: "crt_proven_old",
+          active_certificate_fingerprint: "sha256:old",
+        })
+        .where("id", "=", "dmb_proven_route")
+        .execute();
+
+      const { PgDomainBindingRepository } = await import("../src/index");
+      const reader = new PgDomainRouteBindingReader(database.db);
+      expect(
+        (await reader.listDeployableBindings(createRepositoryContext(), target))[0]?.certificate,
+      ).toEqual({
+        source: "appaloft-imported",
+        certificateId: "crt_proven_old",
+        domainBindingId: "dmb_proven_route",
+      });
+
+      await database.db
+        .updateTable("certificates")
+        .set({ fingerprint: "sha256:replacement-unproven" })
+        .where("id", "=", "crt_proven_old")
+        .execute();
+      expect(
+        (await reader.listDeployableBindings(createRepositoryContext(), target))[0],
+      ).not.toHaveProperty("certificate");
+
+      const repositoryContext = createRepositoryContext();
+      const repository = new PgDomainBindingRepository(database.db);
+      const binding = await repository.findOne(
+        repositoryContext,
+        DomainBindingByIdSpec.create(DomainBindingId.rehydrate("dmb_proven_route")),
+      );
+      if (!binding) throw new Error("expected proven domain binding");
+      binding
+        .markReady({
+          readyAt: CreatedAt.rehydrate("2026-01-02T00:02:00.000Z"),
+          certificateId: CertificateId.rehydrate("crt_proven_old"),
+          certificateFingerprint: CertificateFingerprintValue.rehydrate(
+            "sha256:replacement-unproven",
+          ),
+        })
+        ._unsafeUnwrap();
+      await repository.upsert(
+        repositoryContext,
+        binding,
+        UpsertDomainBindingSpec.fromDomainBinding(binding),
+      );
+      expect(
+        await database.db
+          .selectFrom("domain_bindings")
+          .select(["active_certificate_id", "active_certificate_fingerprint"])
+          .where("id", "=", "dmb_proven_route")
+          .executeTakeFirstOrThrow(),
+      ).toEqual({
+        active_certificate_id: "crt_proven_old",
+        active_certificate_fingerprint: "sha256:replacement-unproven",
+      });
+      expect(
+        (await reader.listDeployableBindings(repositoryContext, target))[0]?.certificate,
+      ).toEqual({
+        source: "appaloft-imported",
+        certificateId: "crt_proven_old",
+        domainBindingId: "dmb_proven_route",
+      });
+
+      await database.close();
+    } finally {
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  });
+
+  test("[ROUTE-TLS-MIG-001] legacy optimistic TLS readiness returns to certificate pending", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-route-certificate-migration-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+
+    try {
+      const { createDatabase, createMigrator } = await import("../src/index");
+      const { domainBindingActiveCertificateMigration } = await import(
+        "../src/migrations/117_domain_binding_active_certificate"
+      );
+      const database = await createDatabase({ driver: "pglite", pgliteDataDir });
+      expect((await createMigrator(database.db).migrateToLatest()).error).toBeUndefined();
+      const target = await seedSourceLinkContext(database.db, "certificate_migration");
+      await insertDomainBinding(database.db, target, {
+        id: "dmb_legacy_tls_ready",
+        domainName: "legacy-tls.example.test",
+        status: "ready",
+        tlsMode: "auto",
+        certificatePolicy: "manual",
+        createdAt: "2026-01-01T00:01:00.000Z",
+      });
+      await insertDomainBinding(database.db, target, {
+        id: "dmb_plain_ready",
+        domainName: "plain.example.test",
+        status: "ready",
+        tlsMode: "disabled",
+        certificatePolicy: "disabled",
+        pathPrefix: "/plain",
+        createdAt: "2026-01-01T00:02:00.000Z",
+      });
+
+      await domainBindingActiveCertificateMigration.up(database.db);
+      expect(
+        await database.db
+          .selectFrom("domain_bindings")
+          .select(["id", "status"])
+          .where("id", "in", ["dmb_legacy_tls_ready", "dmb_plain_ready"])
+          .orderBy("id")
+          .execute(),
+      ).toEqual([
+        { id: "dmb_legacy_tls_ready", status: "certificate_pending" },
+        { id: "dmb_plain_ready", status: "ready" },
+      ]);
+
       await database.close();
     } finally {
       rmSync(workspaceDir, { recursive: true, force: true });
@@ -3435,8 +3634,8 @@ describe("pglite persistence integration", () => {
           mode: "serialize-with-bounded-wait",
           waitTimeoutMs: 20,
           retryIntervalMs: 5,
-          leaseTtlMs: 50,
-          heartbeatIntervalMs: 1,
+          leaseTtlMs: 60_000,
+          heartbeatIntervalMs: 60_000,
         },
         scope: {
           kind: "preview-lifecycle",
@@ -3446,7 +3645,33 @@ describe("pglite persistence integration", () => {
           ownerId: "req_pglite_test",
           label: "test-owner",
         },
-        work: async () => ok("released"),
+        work: async (outerLease) => {
+          expect((await outerLease?.assertOwned())?.isOk()).toBe(true);
+          return coordinator.runExclusive({
+            context,
+            policy: {
+              operationKey: "domain-bindings.reconcile-certificate",
+              scopeKind: "preview-lifecycle",
+              mode: "serialize-with-bounded-wait",
+              waitTimeoutMs: 20,
+              retryIntervalMs: 5,
+              leaseTtlMs: 60_000,
+              heartbeatIntervalMs: 60_000,
+            },
+            scope: {
+              kind: "preview-lifecycle",
+              key: "source-fingerprint:v1:branch%3Amain",
+            },
+            owner: {
+              ownerId: "req_pglite_test",
+              label: "nested-owner",
+            },
+            work: async (nestedLease) => {
+              expect(nestedLease).toBe(outerLease);
+              return ok("released");
+            },
+          });
+        },
       });
 
       expect(result).toEqual(ok("released"));
@@ -3457,6 +3682,118 @@ describe("pglite persistence integration", () => {
         .execute();
       expect(rows).toHaveLength(0);
 
+      await database.close();
+    } finally {
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 30000);
+
+  test("PgMutationCoordinator does not treat concurrent reused request ids as reentrant", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-mutation-request-id-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+
+    try {
+      const { createDatabase, createMigrator, PgMutationCoordinator } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({ driver: "pglite", pgliteDataDir });
+      expect((await createMigrator(database.db).migrateToLatest()).error).toBeUndefined();
+      const coordinator = new PgMutationCoordinator(database.db, new FixedClock());
+      const context = createTestExecutionContext();
+      const policy = {
+        operationKey: "certificates.import",
+        scopeKind: "domain-binding" as const,
+        mode: "serialize-with-bounded-wait" as const,
+        waitTimeoutMs: 20,
+        retryIntervalMs: 5,
+        leaseTtlMs: 60_000,
+        heartbeatIntervalMs: 60_000,
+      };
+      const scope = { kind: "domain-binding" as const, key: "dmb_same_request_id" };
+      const owner = { ownerId: "client_reused_request_id", label: "first" };
+      let releaseOuter: () => void = () => undefined;
+      const outerGate = new Promise<void>((resolve) => {
+        releaseOuter = resolve;
+      });
+      let signalEntered: () => void = () => undefined;
+      const entered = new Promise<void>((resolve) => {
+        signalEntered = resolve;
+      });
+      const first = coordinator.runExclusive({
+        context,
+        policy,
+        scope,
+        owner,
+        work: async () => {
+          signalEntered();
+          await outerGate;
+          return ok("first");
+        },
+      });
+      await entered;
+
+      const second = await coordinator.runExclusive({
+        context,
+        policy,
+        scope,
+        owner: { ...owner, label: "concurrent" },
+        work: async () => ok("should-not-run"),
+      });
+
+      expect(second.isErr()).toBe(true);
+      if (second.isErr()) expect(second.error.code).toBe("coordination_timeout");
+      releaseOuter();
+      expect(await first).toEqual(ok("first"));
+      await database.close();
+    } finally {
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 30000);
+
+  test("PgMutationCoordinator fences work after its lease token is replaced", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-mutation-fencing-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+
+    try {
+      const { createDatabase, createMigrator, PgMutationCoordinator } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({ driver: "pglite", pgliteDataDir });
+      const migrationResult = await createMigrator(database.db).migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+      const coordinator = new PgMutationCoordinator(database.db, new FixedClock());
+      const result = await coordinator.runExclusive({
+        context: createTestExecutionContext(),
+        policy: {
+          operationKey: "domain-bindings.reconcile-certificate",
+          scopeKind: "domain-binding",
+          mode: "serialize-with-bounded-wait",
+          waitTimeoutMs: 20,
+          retryIntervalMs: 5,
+          leaseTtlMs: 60_000,
+          heartbeatIntervalMs: 60_000,
+        },
+        scope: { kind: "domain-binding", key: "dmb_fencing" },
+        owner: { ownerId: "req_original", label: "original-owner" },
+        work: async (lease) => {
+          await database.db
+            .updateTable("mutation_coordinations")
+            .set({
+              owner_id: "req_replacement",
+              acquired_at: "2026-01-01T00:00:01.000Z",
+              lease_expires_at: "2026-01-01T00:10:00.000Z",
+            })
+            .where("coordination_scope_kind", "=", "domain-binding")
+            .where("coordination_scope_key", "=", "dmb_fencing")
+            .execute();
+          return (await lease?.assertOwned()) ?? ok(undefined);
+        },
+      });
+
+      expect(result.isErr()).toBe(true);
+      if (result.isErr()) {
+        expect(result.error.details?.causeCode).toBe("coordination_lease_lost");
+      }
       await database.close();
     } finally {
       rmSync(workspaceDir, { recursive: true, force: true });

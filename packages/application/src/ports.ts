@@ -366,6 +366,7 @@ export interface MaintenanceWorkerStatusReader {
 
 export type CoordinationScopeKind =
   | "resource-runtime"
+  | "domain-binding"
   | "preview-lifecycle"
   | "source-link"
   | "state-root-maintenance";
@@ -397,7 +398,11 @@ export interface MutationCoordinatorRunExclusiveInput<T> {
   policy: CoordinationPolicy;
   scope: CoordinationScope;
   owner: CoordinationOwner;
-  work: () => Promise<Result<T>>;
+  work: (lease?: MutationLeaseGuard) => Promise<Result<T>>;
+}
+
+export interface MutationLeaseGuard {
+  assertOwned(): Promise<Result<void>>;
 }
 
 export interface MutationCoordinator {
@@ -1138,6 +1143,7 @@ export interface DomainRouteBindingCandidate {
   certificate?: {
     source: "appaloft-managed" | "appaloft-imported";
     certificateId: string;
+    domainBindingId: string;
   };
   targetServiceName?: string;
   redirectTo?: string;
@@ -1609,6 +1615,13 @@ export interface CertificateRouteActivationResult {
   previousActivationId?: string;
 }
 
+export interface CertificateRouteFinalizationInput {
+  domainBindingId: string;
+  proxyKind: EdgeProxyKind;
+  serverId?: string;
+  activationId: string;
+}
+
 export interface CertificateRouteActivator {
   activate(
     context: ExecutionContext,
@@ -1620,12 +1633,13 @@ export interface CertificateRouteActivator {
   ): Promise<Result<void, DomainError>>;
   finalize(
     context: ExecutionContext,
-    input: CertificateRouteActivationInput & CertificateRouteActivationResult,
+    input: CertificateRouteFinalizationInput,
   ): Promise<Result<void, DomainError>>;
 }
 
 export interface TlsCertificateObservationInput {
   serverName: string;
+  expectedFingerprint: string;
   proxyKind: EdgeProxyKind;
   serverId?: string;
   activationId: string;
@@ -2735,10 +2749,14 @@ export interface EdgeProxyRouteInput {
   pathPrefix: string;
   pathHandling?: "preserve" | "strip";
   tlsMode: TlsMode;
-  certificate?: {
-    source: "provider-local" | "appaloft-managed" | "appaloft-imported";
-    certificateId?: string;
-  };
+  domainBindingId?: string;
+  certificate?:
+    | { source: "provider-local" }
+    | {
+        source: "appaloft-managed" | "appaloft-imported";
+        certificateId: string;
+        domainBindingId: string;
+      };
   targetPort?: number;
   targetServiceName?: string;
   providerKey?: string;
@@ -9895,9 +9913,11 @@ export interface RequestedAccessRouteConfig {
   pathPrefix: string;
   pathHandling?: "preserve" | "strip";
   tlsMode: TlsMode;
+  domainBindingId?: string;
   certificate?: {
     source: "appaloft-managed" | "appaloft-imported";
     certificateId: string;
+    domainBindingId: string;
   };
   source?: "generated-default" | "domain-binding" | "deployment-snapshot" | "server-applied";
   targetServiceName?: string;

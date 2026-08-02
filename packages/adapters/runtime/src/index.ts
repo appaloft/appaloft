@@ -462,6 +462,9 @@ function createAccessRoutes(input: {
               requestedAccessRoute.pathHandling ?? "preserve",
             ),
             tlsMode: TlsModeValue.rehydrate(requestedAccessRoute.tlsMode),
+            ...(requestedAccessRoute.domainBindingId
+              ? { domainBindingId: requestedAccessRoute.domainBindingId }
+              : {}),
             ...(requestedAccessRoute.certificate
               ? { certificate: { ...requestedAccessRoute.certificate } }
               : {}),

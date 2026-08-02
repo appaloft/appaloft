@@ -26,9 +26,10 @@ failure/rollback semantics, secret handling, and provider contracts.
 4. `domain-ready` for certificate-backed bindings requires a direct TLS handshake using the
    binding hostname as SNI and proof that the served leaf certificate matches the selected expected
    fingerprint, covers the hostname, and is currently valid.
-5. Providers apply a candidate atomically and keep the prior serving certificate/route until the
-   candidate is proven. Failure records safe not-ready/retriable evidence and never exposes raw
-   certificate material.
+5. Providers atomically replace stable, binding-scoped certificate material and keep a rollback
+   copy until the candidate is proven and readiness is durably persisted. They never reconstruct
+   the serving workload container. Failure returns safe retriable evidence, preserves the prior
+   serving certificate/route and readiness truth, and never exposes raw certificate material.
 6. Durable Appaloft-managed/imported routes must not use provider-local certificate automation.
    Provider-local TLS remains an explicit capability for server-applied or other route sources that
    do not claim platform-owned `Certificate` lifecycle.
@@ -41,6 +42,9 @@ failure/rollback semantics, secret handling, and provider contracts.
 9. Certificate route activation resolves the authoritative current route target before mutation:
    binding, latest serving deployment/service/port, server/destination, provider, and previous
    activation identity. Writing files without applying that exact route is not activation success.
+10. Reconciliation is serialized per binding and revalidates certificate activity/source, current
+    policy, fingerprint, and binding ownership inside the coordination boundary. Certificate id and
+    fingerprint form one inseparable durable served-proof pair.
 
 ## Consequences
 

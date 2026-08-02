@@ -47,6 +47,8 @@ export class PgDomainRouteBindingReader implements DomainRouteBindingReader {
             "redirect_to",
             "redirect_status",
             "status",
+            "active_certificate_id",
+            "active_certificate_fingerprint",
             "created_at",
           ])
           .where("project_id", "=", input.projectId)
@@ -68,25 +70,31 @@ export class PgDomainRouteBindingReader implements DomainRouteBindingReader {
             ? []
             : await executor
                 .selectFrom("certificates")
-                .select(["id", "domain_binding_id", "source"])
+                .select(["id", "domain_binding_id", "source", "fingerprint"])
                 .where(
-                  "domain_binding_id",
+                  "id",
                   "in",
-                  rows.map((row) => row.id),
+                  rows.flatMap((row) => row.active_certificate_id ?? []),
                 )
                 .where("status", "=", "active")
-                .orderBy("created_at", "desc")
                 .execute();
         const certificateByBindingId = new Map<
           string,
           NonNullable<DomainRouteBindingCandidate["certificate"]>
         >();
         for (const certificate of certificateRows) {
-          if (certificateByBindingId.has(certificate.domain_binding_id)) continue;
           if (certificate.source !== "managed" && certificate.source !== "imported") continue;
+          const binding = rows.find(
+            (row) =>
+              row.id === certificate.domain_binding_id &&
+              row.active_certificate_id === certificate.id &&
+              row.active_certificate_fingerprint === certificate.fingerprint,
+          );
+          if (!binding) continue;
           certificateByBindingId.set(certificate.domain_binding_id, {
             source: certificate.source === "managed" ? "appaloft-managed" : "appaloft-imported",
             certificateId: certificate.id,
+            domainBindingId: certificate.domain_binding_id,
           });
         }
 

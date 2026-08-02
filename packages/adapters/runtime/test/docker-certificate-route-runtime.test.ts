@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { CreatedAt, DeploymentTarget, DeploymentTargetId, DeploymentTargetName, HostAddress, PortNumber, ProviderKey } from "@appaloft/core";
+import {
+  CreatedAt,
+  DeploymentTarget,
+  DeploymentTargetId,
+  DeploymentTargetName,
+  HostAddress,
+  PortNumber,
+  ProviderKey,
+} from "@appaloft/core";
 
 import {
   type CertificateRouteCommandInput,
@@ -7,64 +15,16 @@ import {
   DockerCliCertificateRouteRuntime,
 } from "../src";
 
-const inspectOutput = JSON.stringify([
-  {
-    Config: {
-      Image: "demo:test",
-      Env: ["NODE_ENV=production"],
-      Cmd: ["node", "server.js"],
-      Labels: { "appaloft.deployment-id": "dep_previous", "traefik.http.routers.old.tls.certresolver": "appaloft" },
-      WorkingDir: "/app",
-      User: "1000:1000",
-    },
-    HostConfig: {
-      NetworkMode: "appaloft-edge",
-      RestartPolicy: { Name: "unless-stopped", MaximumRetryCount: 0 },
-      PortBindings: { "3000/tcp": [{ HostIp: "127.0.0.1", HostPort: "49152" }] },
-      ExtraHosts: ["host.docker.internal:host-gateway"],
-      Privileged: false,
-      ReadonlyRootfs: false,
-    },
-    Mounts: [{ Type: "volume", Name: "app-data", Destination: "/data", RW: true }],
-  },
-]);
-
 class RecordingRunner implements CertificateRouteCommandRunner {
-  inputs: CertificateRouteCommandInput[] = [];
+  readonly inputs: CertificateRouteCommandInput[] = [];
+
+  constructor(private readonly previousMaterial = true) {}
+
   async run(input: CertificateRouteCommandInput) {
     this.inputs.push(input);
     return {
       failed: false,
-      stdout: input.command.startsWith("docker inspect ") ? inspectOutput : "",
-      stderr: "",
-    };
-  }
-}
-
-class ComposeRecordingRunner extends RecordingRunner {
-  override async run(input: CertificateRouteCommandInput) {
-    this.inputs.push(input);
-    return {
-      failed: false,
-      stdout: input.command.startsWith("docker ps ")
-        ? "appaloft-demo-api-1\n"
-        : input.command.startsWith("docker inspect ")
-          ? inspectOutput
-          : "",
-      stderr: "",
-    };
-  }
-}
-
-class SwitchFailingRunner extends RecordingRunner {
-  override async run(input: CertificateRouteCommandInput) {
-    this.inputs.push(input);
-    if (input.command.includes("docker stop 'appaloft-dep_previous'")) {
-      return { failed: true, stdout: "", stderr: "candidate failed" };
-    }
-    return {
-      failed: false,
-      stdout: input.command.startsWith("docker inspect ") ? inspectOutput : "",
+      stdout: input.stdin ? `previous=${this.previousMaterial ? "1" : "0"}\n` : "",
       stderr: "",
     };
   }
@@ -78,168 +38,207 @@ function serverState() {
     port: PortNumber.rehydrate(22),
     providerKey: ProviderKey.rehydrate("local-shell"),
     createdAt: CreatedAt.rehydrate("2026-08-02T00:00:00.000Z"),
-  })._unsafeUnwrap().toState();
+  })
+    ._unsafeUnwrap()
+    .toState();
+}
+
+function activationInput(proxyKind: "traefik" | "caddy") {
+  return {
+    domainBindingId: "dmb_manual_example",
+    proxyKind,
+    server: serverState(),
+    material: {
+      certificateId: "crt_candidate",
+      certificateChain: "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----",
+      privateKey:
+        "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIO9Q2yKOJYJ0cV7kShYQDTLqsCST6VGNAnAtCwqD3QXg\n-----END PRIVATE KEY-----",
+    },
+    routePlan: {
+      providerKey: proxyKind,
+      labels: [
+        "appaloft.deployment-id=dep_demo",
+        ...(proxyKind === "traefik"
+          ? ["traefik.http.routers.dep-demo.tls=true"]
+          : ["caddy=https://example.com"]),
+      ],
+    },
+    reloadPlan: null,
+  };
 }
 
 describe("DockerCliCertificateRouteRuntime", () => {
-  test("[EDGE-PROXY-RELOAD-004A] installs material over stdin and switches a prepared candidate container", async () => {
+  test("[EDGE-PROXY-RELOAD-004A] atomically swaps binding-scoped Traefik material without recreating the workload", async () => {
     const runner = new RecordingRunner();
     const runtime = new DockerCliCertificateRouteRuntime(runner);
-    const chain = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----";
-    const key = "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIO9Q2yKOJYJ0cV7kShYQDTLqsCST6VGNAnAtCwqD3QXg\n-----END PRIVATE KEY-----";
+    const input = activationInput("traefik");
 
-    const result = await runtime.activate({
-      correlationId: "req_runtime_activation",
-      certificateId: "crt_candidate",
-      deploymentId: "dep_previous",
-      containerName: "appaloft-dep_previous",
-      proxyKind: "traefik",
-      server: serverState(),
-      material: { certificateId: "crt_candidate", certificateChain: chain, privateKey: key },
-      accessRoutes: [{
-        proxyKind: "traefik",
-        domains: ["manual.example.test"],
-        pathPrefix: "/",
-        tlsMode: "auto",
-        source: "domain-binding",
-        certificate: { source: "appaloft-imported", certificateId: "crt_candidate" },
-        targetPort: 3000,
-      }],
-      routePlan: {
-        providerKey: "traefik",
-        networkName: "appaloft-edge",
-        labels: [
-          "traefik.enable=true",
-          "traefik.http.routers.dep.tls=true",
-        ],
-      },
-      reloadPlan: null,
-    });
+    const result = await runtime.activate(input);
 
-    expect(result.isOk()).toBe(true);
     expect(result._unsafeUnwrap()).toEqual({
-      activationId: "appaloft-dep_previous",
-      previousActivationId: "appaloft-dep_previous-previous-dep_previous-crt_candidate",
+      activationId: "dmb_manual_example",
+      previousActivationId: "dmb_manual_example",
     });
-    expect(runner.inputs[0]?.stdin).toBeDefined();
-    expect(String(runner.inputs[0]?.stdin)).toContain(chain);
-    expect(runner.inputs.every((input) => !input.command.includes(chain) && !input.command.includes("BEGIN PRIVATE KEY"))).toBe(true);
-    expect(runner.inputs[2]?.command).toContain("docker create");
-    expect(runner.inputs[2]?.command).toContain("traefik.http.routers.dep.tls=true");
-    expect(runner.inputs[2]?.command).not.toContain("tls.certresolver");
-    expect(runner.inputs[2]?.command).toContain("docker rename 'appaloft-dep_previous' 'appaloft-dep_previous-previous-dep_previous-crt_candidate'");
+    expect(runner.inputs).toHaveLength(3);
+    expect(runner.inputs[0]?.command).toContain("docker inspect");
+    expect(runner.inputs[0]?.command).toContain('tls.certresolver":"appaloft');
+    expect(runner.inputs[1]?.command).toContain(
+      "alpine@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412",
+    );
+    expect(runner.inputs[1]?.command).toContain(
+      "/target/certificates/dmb_manual_example",
+    );
+    expect(runner.inputs[1]?.command).toContain("certificate.pem");
+    expect(runner.inputs[1]?.command).toContain(
+      "/target/certificate-dmb_manual_example.yml",
+    );
+    expect(runner.inputs[1]?.command).toContain("mv");
+    const installCommand = runner.inputs[1]?.command ?? "";
+    expect(installCommand.indexOf("trap")).toBeLessThan(
+      installCommand.indexOf(".appaloft-certificate-previous"),
+    );
+    expect(runner.inputs[1]?.command).not.toMatch(/docker (inspect|create|stop|rename)/);
+    expect(String(runner.inputs[1]?.stdin)).toContain(input.material.certificateChain);
+    expect(runner.inputs[1]?.command).not.toContain(input.material.certificateChain);
+    expect(runner.inputs[1]?.command).not.toContain("BEGIN PRIVATE KEY");
   });
 
-  test("[EDGE-PROXY-RELOAD-004C] restores the previous container or retires it only after proof", async () => {
+  test("[EDGE-PROXY-RELOAD-004C] restores the previous material on rollback and retires only its backup after durable proof", async () => {
     const runner = new RecordingRunner();
     const runtime = new DockerCliCertificateRouteRuntime(runner);
     const transition = {
-      correlationId: "req_runtime_rollback",
       server: serverState(),
-      certificateId: "crt_candidate",
+      domainBindingId: "dmb_manual_example",
       proxyKind: "traefik" as const,
-      activationId: "appaloft-dep_previous",
-      previousActivationId: "appaloft-dep_previous-previous",
+      activationId: "dmb_manual_example",
+      previousActivationId: "dmb_manual_example",
     };
 
     expect((await runtime.rollback(transition)).isOk()).toBe(true);
-    expect(runner.inputs[0]?.command).toContain(
-      "docker rename 'appaloft-dep_previous-previous' 'appaloft-dep_previous'",
-    );
-    expect(runner.inputs[0]?.command).toContain("docker start 'appaloft-dep_previous'");
-
-    expect(runner.inputs[1]?.command).toContain("certificate-crt_candidate.yml");
+    expect(runner.inputs[0]?.command).toContain("/target/.appaloft-certificate-previous/dmb_manual_example");
+    expect(runner.inputs[0]?.command).not.toContain("rm -rf '/target/certificates/dmb_manual_example'");
 
     expect((await runtime.finalize(transition)).isOk()).toBe(true);
-    expect(runner.inputs[2]?.command).toBe(
-      "docker rm -f 'appaloft-dep_previous-previous' >/dev/null",
+    expect(runner.inputs[2]?.command).toContain(
+      "/target/.appaloft-certificate-previous/dmb_manual_example",
     );
   });
 
-  test("[EDGE-PROXY-RELOAD-004B] resolves one Compose service container by authoritative labels", async () => {
-    const runner = new ComposeRecordingRunner();
+  test("[EDGE-PROXY-RELOAD-004A] uses the same stable binding identity for Caddy material", async () => {
+    const runner = new RecordingRunner(false);
     const runtime = new DockerCliCertificateRouteRuntime(runner);
-    const result = await runtime.activate({
-      correlationId: "req_compose_activation",
-      certificateId: "crt_candidate",
-      deploymentId: "dep_compose",
-      containerName: "unused-fallback",
-      containerSelector: {
-        composeProjectName: "appaloft-dep_compose",
-        serviceName: "api",
-      },
-      proxyKind: "traefik",
-      server: serverState(),
-      material: {
-        certificateId: "crt_candidate",
-        certificateChain: "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----",
-        privateKey: "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIO9Q2yKOJYJ0cV7kShYQDTLqsCST6VGNAnAtCwqD3QXg\n-----END PRIVATE KEY-----",
-      },
-      accessRoutes: [],
-      routePlan: { providerKey: "traefik", networkName: "appaloft-edge", labels: [] },
-      reloadPlan: null,
-    });
 
-    expect(result.isOk()).toBe(true);
-    expect(runner.inputs[0]?.command).toContain(
-      "label=com.docker.compose.project=appaloft-dep_compose",
+    const result = await runtime.activate(activationInput("caddy"));
+
+    expect(result._unsafeUnwrap()).toEqual({ activationId: "dmb_manual_example" });
+    expect(runner.inputs[1]?.command).toContain(
+      "/target/appaloft/certificates/dmb_manual_example",
     );
-    expect(runner.inputs[0]?.command).toContain("label=com.docker.compose.service=api");
-    expect(runner.inputs[2]?.command).toBe("docker inspect 'appaloft-demo-api-1'");
-    expect(result._unsafeUnwrap().activationId).toBe("appaloft-demo-api-1");
+    expect(runner.inputs[1]?.command).toContain("certificate.pem");
   });
 
-  test("[EDGE-PROXY-RELOAD-004A] materializes Caddy certificates at the provider label path", async () => {
-    const runner = new RecordingRunner();
-    const runtime = new DockerCliCertificateRouteRuntime(runner);
-    const result = await runtime.activate({
-      correlationId: "req_caddy_material",
-      certificateId: "crt_candidate",
-      deploymentId: "dep_caddy",
-      containerName: "appaloft-caddy-demo",
-      proxyKind: "caddy",
-      server: serverState(),
-      material: {
-        certificateId: "crt_candidate",
-        certificateChain: "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----",
-        privateKey: "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIO9Q2yKOJYJ0cV7kShYQDTLqsCST6VGNAnAtCwqD3QXg\n-----END PRIVATE KEY-----",
+  test("[EDGE-PROXY-RELOAD-004B] fails before material mutation when the Caddy workload lacks the authoritative labels", async () => {
+    const runner: CertificateRouteCommandRunner = {
+      async run() {
+        return { failed: true, stdout: "", stderr: "route labels not found" };
       },
-      accessRoutes: [],
-      routePlan: { providerKey: "caddy", networkName: "appaloft-edge", labels: [] },
-      reloadPlan: null,
-    });
-
-    expect(result.isOk()).toBe(true);
-    expect(runner.inputs[0]?.command).toContain(
-      "/target/appaloft/certificates/crt_candidate/certificate.pem",
-    );
-  });
-
-  test("[EDGE-PROXY-RELOAD-004C] candidate switch includes inline restoration before failing", async () => {
-    const runner = new SwitchFailingRunner();
+    };
     const runtime = new DockerCliCertificateRouteRuntime(runner);
+
     const result = await runtime.activate({
-      correlationId: "req_failed_switch",
-      certificateId: "crt_candidate",
-      deploymentId: "dep_previous",
-      containerName: "appaloft-dep_previous",
-      proxyKind: "traefik",
-      server: serverState(),
-      material: {
-        certificateId: "crt_candidate",
-        certificateChain: "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----",
-        privateKey: "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIO9Q2yKOJYJ0cV7kShYQDTLqsCST6VGNAnAtCwqD3QXg\n-----END PRIVATE KEY-----",
+      ...activationInput("caddy"),
+      routePlan: {
+        providerKey: "caddy",
+        labels: [
+          "caddy.tls=/data/appaloft/certificates/dmb_manual_example/certificate.pem /data/appaloft/certificates/dmb_manual_example/private-key.pem",
+        ],
       },
-      accessRoutes: [],
-      routePlan: { providerKey: "traefik", networkName: "appaloft-edge", labels: [] },
-      reloadPlan: null,
     });
 
     expect(result.isErr()).toBe(true);
-    const switchCommand = runner.inputs.at(-1)?.command ?? "";
-    expect(switchCommand).toContain(
-      "docker rename 'appaloft-dep_previous-previous-dep_previous-crt_candidate' 'appaloft-dep_previous'",
-    );
-    expect(switchCommand).toContain("docker start 'appaloft-dep_previous'");
+    if (result.isErr()) expect(result.error.message).toContain("must be redeployed");
+  });
+
+  test("[EDGE-PROXY-RELOAD-004B] fails before material mutation when the Traefik workload still owns ACME lifecycle", async () => {
+    const inputs: CertificateRouteCommandInput[] = [];
+    const runner: CertificateRouteCommandRunner = {
+      async run(input) {
+        inputs.push(input);
+        return { failed: true, stdout: "", stderr: "certresolver is still active" };
+      },
+    };
+    const runtime = new DockerCliCertificateRouteRuntime(runner);
+
+    const result = await runtime.activate(activationInput("traefik"));
+
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) expect(result.error.message).toContain("must be redeployed");
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]?.stdin).toBeUndefined();
+  });
+
+  test("[EDGE-PROXY-RELOAD-004A] executes explicit provider reload steps after the atomic material swap", async () => {
+    const runner = new RecordingRunner();
+    const runtime = new DockerCliCertificateRouteRuntime(runner);
+
+    const result = await runtime.activate({
+      ...activationInput("caddy"),
+      reloadPlan: {
+        providerKey: "caddy",
+        proxyKind: "caddy",
+        displayName: "Caddy",
+        required: true,
+        steps: [
+          {
+            name: "reload-caddy",
+            mode: "command",
+            command: "docker restart appaloft-caddy",
+            successMessage: "Caddy reloaded",
+          },
+        ],
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(runner.inputs[2]?.command).toBe("docker restart appaloft-caddy");
+  });
+
+  test("[EDGE-PROXY-RELOAD-004C] surfaces rollback failure when reload and restore both fail", async () => {
+    let call = 0;
+    const runner: CertificateRouteCommandRunner = {
+      async run(input) {
+        call += 1;
+        return {
+          failed: call >= 3,
+          stdout: input.stdin ? "previous=1\n" : "",
+          stderr: call === 3 ? "reload failed" : call === 4 ? "restore failed" : "",
+        };
+      },
+    };
+    const runtime = new DockerCliCertificateRouteRuntime(runner);
+
+    const result = await runtime.activate({
+      ...activationInput("caddy"),
+      reloadPlan: {
+        providerKey: "caddy",
+        proxyKind: "caddy",
+        displayName: "Caddy",
+        required: true,
+        steps: [
+          {
+            name: "reload-caddy",
+            mode: "command",
+            command: "docker restart appaloft-caddy",
+            successMessage: "Caddy reloaded",
+          },
+        ],
+      },
+    });
+
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error.message).toContain("could not be restored");
+    }
+    expect(call).toBe(4);
   });
 });

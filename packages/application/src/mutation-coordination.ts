@@ -78,6 +78,34 @@ export const mutationCoordinationPolicies = {
     scopeKind: "source-link",
     mode: "serialize-with-bounded-wait",
   }),
+  reconcileDomainCertificate: {
+    ...policy({
+      operationKey: "domain-bindings.reconcile-certificate",
+      scopeKind: "domain-binding",
+      mode: "serialize-with-bounded-wait",
+    }),
+    leaseTtlMs: 5 * 60_000,
+  },
+  configureDomainCertificatePolicy: policy({
+    operationKey: "domain-bindings.configure-certificate-policy",
+    scopeKind: "domain-binding",
+    mode: "serialize-with-bounded-wait",
+  }),
+  issueOrRenewCertificate: policy({
+    operationKey: "certificates.issue-or-renew",
+    scopeKind: "domain-binding",
+    mode: "serialize-with-bounded-wait",
+  }),
+  importCertificate: policy({
+    operationKey: "certificates.import",
+    scopeKind: "domain-binding",
+    mode: "serialize-with-bounded-wait",
+  }),
+  revokeCertificate: policy({
+    operationKey: "certificates.revoke",
+    scopeKind: "domain-binding",
+    mode: "serialize-with-bounded-wait",
+  }),
 } as const;
 
 export function createCoordinationOwner(

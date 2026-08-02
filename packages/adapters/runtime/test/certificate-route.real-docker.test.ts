@@ -109,6 +109,7 @@ describe("certificate route real Docker smoke", () => {
       const acmeVolume = `${suffix}-acme`;
       const proxy = `${suffix}-traefik`;
       const application = `${suffix}-app`;
+      const domainBindingId = `dmb_${suffix}`;
       const hostname = "certificate-transition.example.test";
       const tlsPort = await freePort();
       const certificateDirectory = mkdtempSync(join(tmpdir(), `${suffix}-`));
@@ -130,15 +131,9 @@ describe("certificate route real Docker smoke", () => {
       const runner = new LocalSshCertificateRouteCommandRunner();
       const runtime = new DockerCliCertificateRouteRuntime(runner, {
         traefikDynamicVolumeName: dynamicVolume,
+        traefikContainerName: proxy,
       });
-      const cleanupNames = [
-        application,
-        `${application}-candidate-dep_smoke-crt_old`,
-        `${application}-previous-dep_smoke-crt_old`,
-        `${application}-candidate-dep_smoke-crt_candidate`,
-        `${application}-previous-dep_smoke-crt_candidate`,
-        proxy,
-      ];
+      const cleanupNames = [application, proxy];
 
       try {
         await command(["docker", "network", "create", network]);
@@ -175,9 +170,11 @@ describe("certificate route real Docker smoke", () => {
           pathPrefix: "/",
           tlsMode: "auto" as const,
           source: "domain-binding" as const,
+          domainBindingId,
           certificate: {
             source: "appaloft-imported" as const,
             certificateId: "crt_old",
+            domainBindingId,
           },
           targetPort: 80,
         };
@@ -202,14 +199,10 @@ describe("certificate route real Docker smoke", () => {
         ]);
 
         const oldActivation = await runtime.activate({
-          correlationId: "req_old_activation",
-          certificateId: "crt_old",
-          deploymentId: "dep_smoke",
-          containerName: application,
+          domainBindingId,
           proxyKind: "traefik",
           server,
           material: { certificateId: "crt_old", ...oldCertificate },
-          accessRoutes: [accessRoute],
           routePlan: oldPlan,
           reloadPlan: null,
         });
@@ -219,9 +212,8 @@ describe("certificate route real Docker smoke", () => {
         ).toBe(oldCertificate.fingerprint);
         expect(
           (await runtime.finalize({
-            correlationId: "req_old_finalize",
             server,
-            certificateId: "crt_old",
+            domainBindingId,
             proxyKind: "traefik",
             ...oldActivation._unsafeUnwrap(),
           })).isOk(),
@@ -231,7 +223,8 @@ describe("certificate route real Docker smoke", () => {
           ...accessRoute,
           certificate: {
             source: "appaloft-imported" as const,
-            certificateId: "crt_candidate",
+            certificateId: "crt_old",
+            domainBindingId,
           },
         };
         const candidatePlanResult = await provider.realizeRoutes(
@@ -245,18 +238,23 @@ describe("certificate route real Docker smoke", () => {
         );
         candidatePlan.networkName = network;
         const candidateActivation = await runtime.activate({
-          correlationId: "req_candidate_activation",
-          certificateId: "crt_candidate",
-          deploymentId: "dep_smoke",
-          containerName: application,
+          domainBindingId,
           proxyKind: "traefik",
           server,
-          material: { certificateId: "crt_candidate", ...candidateCertificate },
-          accessRoutes: [candidateRoute],
+          material: { certificateId: "crt_old", ...candidateCertificate },
           routePlan: candidatePlan,
           reloadPlan: null,
         });
         expect(candidateActivation.isOk()).toBe(true);
+        const retriedCandidateActivation = await runtime.activate({
+          domainBindingId,
+          proxyKind: "traefik",
+          server,
+          material: { certificateId: "crt_old", ...candidateCertificate },
+          routePlan: candidatePlan,
+          reloadPlan: null,
+        });
+        expect(retriedCandidateActivation.isOk()).toBe(true);
         expect(
           await observedFingerprint({
             hostname,
@@ -267,11 +265,10 @@ describe("certificate route real Docker smoke", () => {
 
         expect(
           (await runtime.rollback({
-            correlationId: "req_candidate_rollback",
             server,
-            certificateId: "crt_candidate",
+            domainBindingId,
             proxyKind: "traefik",
-            ...candidateActivation._unsafeUnwrap(),
+            ...retriedCandidateActivation._unsafeUnwrap(),
           })).isOk(),
         ).toBe(true);
         expect(
@@ -298,6 +295,7 @@ describe("certificate route real Docker smoke", () => {
       const configVolume = `${suffix}-config`;
       const proxy = `${suffix}-proxy`;
       const application = `${suffix}-app`;
+      const domainBindingId = `dmb_${suffix}`;
       const hostname = "certificate-transition-caddy.example.test";
       const tlsPort = await freePort();
       const certificateDirectory = mkdtempSync(join(tmpdir(), `${suffix}-`));
@@ -318,17 +316,10 @@ describe("certificate route real Docker smoke", () => {
       const provider = new CaddyEdgeProxyProvider();
       const runtime = new DockerCliCertificateRouteRuntime(
         new LocalSshCertificateRouteCommandRunner(),
-        { caddyDataVolumeName: dataVolume },
+        { caddyDataVolumeName: dataVolume, caddyContainerName: proxy },
       );
       const deploymentId = "dep_caddy_smoke";
-      const cleanupNames = [
-        application,
-        `${application}-candidate-${deploymentId}-crt_old`,
-        `${application}-previous-${deploymentId}-crt_old`,
-        `${application}-candidate-${deploymentId}-crt_candidate`,
-        `${application}-previous-${deploymentId}-crt_candidate`,
-        proxy,
-      ];
+      const cleanupNames = [application, proxy];
 
       try {
         await command(["docker", "network", "create", network]);
@@ -361,9 +352,11 @@ describe("certificate route real Docker smoke", () => {
           pathPrefix: "/",
           tlsMode: "auto" as const,
           source: "domain-binding" as const,
+          domainBindingId,
           certificate: {
             source: "appaloft-imported" as const,
             certificateId: "crt_old",
+            domainBindingId,
           },
           targetPort: 80,
         };
@@ -387,16 +380,19 @@ describe("certificate route real Docker smoke", () => {
         ]);
 
         const oldActivation = await runtime.activate({
-          correlationId: "req_caddy_old_activation",
-          certificateId: "crt_old",
-          deploymentId,
-          containerName: application,
+          domainBindingId,
           proxyKind: "caddy",
           server,
           material: { certificateId: "crt_old", ...oldCertificate },
-          accessRoutes: [accessRoute],
           routePlan: oldPlan,
-          reloadPlan: null,
+          reloadPlan: {
+            providerKey: "caddy",
+            proxyKind: "caddy",
+            displayName: "Caddy",
+            required: true,
+            steps: [{ name: "reload", mode: "command", command: `docker restart ${proxy}` }],
+            metadata: {},
+          },
         });
         expect(oldActivation.isOk()).toBe(true);
         expect(
@@ -404,9 +400,8 @@ describe("certificate route real Docker smoke", () => {
         ).toBe(oldCertificate.fingerprint);
         expect(
           (await runtime.finalize({
-            correlationId: "req_caddy_old_finalize",
             server,
-            certificateId: "crt_old",
+            domainBindingId,
             proxyKind: "caddy",
             ...oldActivation._unsafeUnwrap(),
           })).isOk(),
@@ -416,7 +411,8 @@ describe("certificate route real Docker smoke", () => {
           ...accessRoute,
           certificate: {
             source: "appaloft-imported" as const,
-            certificateId: "crt_candidate",
+            certificateId: "crt_old",
+            domainBindingId,
           },
         };
         const candidatePlanResult = await provider.realizeRoutes(
@@ -427,18 +423,37 @@ describe("certificate route real Docker smoke", () => {
         const candidatePlan = candidatePlanResult._unsafeUnwrap();
         candidatePlan.networkName = network;
         const candidateActivation = await runtime.activate({
-          correlationId: "req_caddy_candidate_activation",
-          certificateId: "crt_candidate",
-          deploymentId,
-          containerName: application,
+          domainBindingId,
           proxyKind: "caddy",
           server,
-          material: { certificateId: "crt_candidate", ...candidateCertificate },
-          accessRoutes: [candidateRoute],
+          material: { certificateId: "crt_old", ...candidateCertificate },
           routePlan: candidatePlan,
-          reloadPlan: null,
+          reloadPlan: {
+            providerKey: "caddy",
+            proxyKind: "caddy",
+            displayName: "Caddy",
+            required: true,
+            steps: [{ name: "reload", mode: "command", command: `docker restart ${proxy}` }],
+            metadata: {},
+          },
         });
         expect(candidateActivation.isOk()).toBe(true);
+        const retriedCandidateActivation = await runtime.activate({
+          domainBindingId,
+          proxyKind: "caddy",
+          server,
+          material: { certificateId: "crt_old", ...candidateCertificate },
+          routePlan: candidatePlan,
+          reloadPlan: {
+            providerKey: "caddy",
+            proxyKind: "caddy",
+            displayName: "Caddy",
+            required: true,
+            steps: [{ name: "reload", mode: "command", command: `docker restart ${proxy}` }],
+            metadata: {},
+          },
+        });
+        expect(retriedCandidateActivation.isOk()).toBe(true);
         expect(
           await observedFingerprint({
             hostname,
@@ -448,11 +463,10 @@ describe("certificate route real Docker smoke", () => {
         ).toBe(candidateCertificate.fingerprint);
         expect(
           (await runtime.rollback({
-            correlationId: "req_caddy_candidate_rollback",
             server,
-            certificateId: "crt_candidate",
+            domainBindingId,
             proxyKind: "caddy",
-            ...candidateActivation._unsafeUnwrap(),
+            ...retriedCandidateActivation._unsafeUnwrap(),
           })).isOk(),
         ).toBe(true);
         expect(
