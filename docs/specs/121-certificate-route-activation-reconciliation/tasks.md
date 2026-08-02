@@ -4,7 +4,7 @@
 
 - [x] Record owner-confirmed discovery and accepted lifecycle decisions.
 - [x] Add ADR-104 and synchronize the operation map, workflow, roadmap, and test matrices.
-- [ ] Create public GitHub issue(s), link these governing artifacts/test ids, and add
+- [x] Create public GitHub issue(s), link these governing artifacts/test ids, and add
   `ready-for-agent` before Code Round.
 
 ## Test First

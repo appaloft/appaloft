@@ -12,6 +12,8 @@ import {
   DestinationId,
   DestinationKindValue,
   DestinationName,
+  DomainBindingByIdSpec,
+  DomainBindingId,
   type DomainEvent,
   domainError,
   Environment,
@@ -572,12 +574,10 @@ describe("ImportCertificateUseCase", () => {
     expect(eventsByType(seed.eventBus.events, "certificate-imported")).toHaveLength(0);
   });
 
-  test("[CERT-IMPORT-EVT-001] certificate-imported marks a bound manual binding ready", async () => {
+  test("[ROUTE-TLS-EVT-009] certificate-imported keeps a manual binding bound until reconciliation proof", async () => {
     const seed = await seedImportContext();
     const handler = new MarkDomainReadyOnCertificateImportedHandler(
       seed.domainBindings,
-      seed.clock,
-      seed.eventBus,
       seed.logger,
     );
 
@@ -603,14 +603,13 @@ describe("ImportCertificateUseCase", () => {
 
     expect(handled.isOk()).toBe(true);
     const domainReadyEvents = eventsByType(seed.eventBus.events, "domain-ready");
-    expect(domainReadyEvents).toHaveLength(1);
-    expect(domainReadyEvents[0]?.payload).toMatchObject({
-      domainBindingId: seed.domainBindingId,
-      domainName: "manual.example.test",
-      certificatePolicy: "manual",
-      readyAt: "2026-01-01T00:00:00.000Z",
-      causationId: "cat_demo",
-    });
+    expect(domainReadyEvents).toHaveLength(0);
+
+    const persisted = await seed.domainBindings.findOne(
+      toRepositoryContext(seed.context),
+      DomainBindingByIdSpec.create(DomainBindingId.rehydrate(seed.domainBindingId)),
+    );
+    expect(persisted?.toState().status.value).toBe("bound");
   });
 
   test("[ROUTE-TLS-CMD-025][CERT-IMPORT-CMD-014] rejects retry for imported certificates", async () => {

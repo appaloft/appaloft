@@ -1,5 +1,4 @@
 import {
-  CreatedAt,
   DomainBindingByIdSpec,
   DomainBindingId,
   type DomainEvent,
@@ -8,20 +7,13 @@ import {
   ok,
   type Result,
   safeTry,
-  UpsertDomainBindingSpec,
 } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import { EventHandler, type EventHandlerContract } from "../../cqrs";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
-import {
-  type AppLogger,
-  type Clock,
-  type DomainBindingRepository,
-  type EventBus,
-} from "../../ports";
+import { type AppLogger, type DomainBindingRepository } from "../../ports";
 import { tokens } from "../../tokens";
-import { publishDomainEventsAndReturn } from "../publish-domain-events";
 
 function readPayloadText(event: DomainEvent, key: string): Result<string> {
   const value = event.payload[key];
@@ -38,11 +30,6 @@ function readPayloadText(event: DomainEvent, key: string): Result<string> {
   );
 }
 
-function optionalPayloadText(event: DomainEvent, key: string): string | undefined {
-  const value = event.payload[key];
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
-}
-
 @EventHandler("certificate-imported")
 @injectable()
 export class MarkDomainReadyOnCertificateImportedHandler
@@ -51,16 +38,12 @@ export class MarkDomainReadyOnCertificateImportedHandler
   constructor(
     @inject(tokens.domainBindingRepository)
     private readonly domainBindingRepository: DomainBindingRepository,
-    @inject(tokens.clock)
-    private readonly clock: Clock,
-    @inject(tokens.eventBus)
-    private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
   ) {}
 
   async handle(context: ExecutionContext, event: DomainEvent): Promise<Result<void>> {
-    const { clock, domainBindingRepository, eventBus, logger } = this;
+    const { domainBindingRepository, logger } = this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
@@ -97,19 +80,11 @@ export class MarkDomainReadyOnCertificateImportedHandler
         return ok(undefined);
       }
 
-      const readyAt = yield* CreatedAt.create(clock.now());
-      yield* domainBinding.markReady({
-        readyAt,
-        correlationId: context.requestId,
-        causationId: optionalPayloadText(event, "causationId") ?? event.aggregateId,
+      logger.debug("certificate_imported_reconciliation.pending", {
+        requestId: context.requestId,
+        domainBindingId: domainBindingId.value,
+        certificateId: event.aggregateId,
       });
-
-      await domainBindingRepository.upsert(
-        repositoryContext,
-        domainBinding,
-        UpsertDomainBindingSpec.fromDomainBinding(domainBinding),
-      );
-      await publishDomainEventsAndReturn(context, eventBus, logger, domainBinding, undefined);
 
       return ok(undefined);
     });

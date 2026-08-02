@@ -505,7 +505,6 @@ describe("ConfirmDomainBindingOwnershipUseCase", () => {
 
   test("[ROUTE-TLS-EVT-004][ROUTE-TLS-READMODEL-001] domain-bound with TLS disabled marks binding ready and publishes domain-ready", async () => {
     const {
-      clock,
       confirmUseCase,
       context,
       domainBindingId,
@@ -569,9 +568,8 @@ describe("ConfirmDomainBindingOwnershipUseCase", () => {
     });
   });
 
-  test("[ROUTE-TLS-EVT-008] certificate-issued marks TLS-auto binding ready and publishes domain-ready", async () => {
+  test("[ROUTE-TLS-EVT-008] certificate-issued keeps TLS-auto binding bound until reconciliation proof", async () => {
     const {
-      clock,
       confirmUseCase,
       context,
       domainBindingId,
@@ -588,12 +586,7 @@ describe("ConfirmDomainBindingOwnershipUseCase", () => {
     const result = await confirmUseCase.execute(context, { domainBindingId });
     expect(result.isOk()).toBe(true);
 
-    const handler = new MarkDomainReadyOnCertificateIssuedHandler(
-      domainBindings,
-      clock,
-      eventBus,
-      logger,
-    );
+    const handler = new MarkDomainReadyOnCertificateIssuedHandler(domainBindings, logger);
     const handled = await handler.handle(context, {
       type: "certificate-issued",
       aggregateId: "crt_demo",
@@ -617,32 +610,17 @@ describe("ConfirmDomainBindingOwnershipUseCase", () => {
       repositoryContext,
       DomainBindingByIdSpec.create(DomainBindingId.rehydrate(domainBindingId)),
     );
-    expect(persisted?.toState().status.value).toBe("ready");
+    expect(persisted?.toState().status.value).toBe("bound");
 
     const domainReadyEvents = eventsByType(eventBus.events, "domain-ready");
-    expect(domainReadyEvents).toHaveLength(1);
-    expect(domainReadyEvents[0]?.payload).toMatchObject({
-      domainBindingId,
-      domainName: "secure.example.com",
-      pathPrefix: "/",
-      projectId: "prj_demo",
-      environmentId: "env_demo",
-      resourceId: "res_demo",
-      serverId: "srv_demo",
-      destinationId: "dst_demo",
-      tlsMode: "auto",
-      certificatePolicy: "auto",
-      readyAt: "2026-01-01T00:00:00.000Z",
-      correlationId: "req_domain_binding_confirm_test",
-      causationId: "cat_demo",
-    });
+    expect(domainReadyEvents).toHaveLength(0);
 
     const listed = await new ListDomainBindingsQueryService(readModel).execute(context, {
       resourceId: "res_demo",
     });
     expect(listed.items[0]).toMatchObject({
       id: domainBindingId,
-      status: "ready",
+      status: "bound",
       verificationAttemptCount: 1,
     });
   });
