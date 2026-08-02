@@ -92,6 +92,7 @@ export * from "./operations/deployments/runtime-plan-resolution-input.builder";
 export * from "./operations/deployments/show-deployment.query-service";
 export * from "./operations/deployments/source-version-detector";
 export * from "./operations/domain-bindings/check-domain-binding-delete-safety.query-service";
+export * from "./operations/domain-bindings/configure-domain-binding-certificate-policy.use-case";
 export * from "./operations/domain-bindings/configure-domain-binding-route.use-case";
 export * from "./operations/domain-bindings/confirm-domain-binding-ownership.use-case";
 export * from "./operations/domain-bindings/create-domain-binding.use-case";

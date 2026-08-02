@@ -5056,6 +5056,20 @@ export const configureDomainBindingRouteResponseSchema = z.object({
   id: z.string(),
 });
 
+export const configureDomainBindingCertificatePolicyInputSchema = z
+  .object({
+    domainBindingId: z.string().min(1),
+    certificatePolicy: z.enum(["auto", "manual"]),
+    idempotencyKey: z.string().min(1).optional(),
+  })
+  .strict();
+
+export const configureDomainBindingCertificatePolicyResponseSchema = z.object({
+  id: z.string(),
+  certificatePolicy: z.enum(["auto", "manual"]),
+  reconciliationStatus: z.enum(["pending", "unchanged"]),
+});
+
 export const checkDomainBindingDeleteSafetyInputSchema = z.object({
   domainBindingId: z.string().min(1),
 });
@@ -8324,6 +8338,12 @@ export type ConfigureDomainBindingRouteInput = z.infer<
 >;
 export type ConfigureDomainBindingRouteResponse = z.infer<
   typeof configureDomainBindingRouteResponseSchema
+>;
+export type ConfigureDomainBindingCertificatePolicyInput = z.infer<
+  typeof configureDomainBindingCertificatePolicyInputSchema
+>;
+export type ConfigureDomainBindingCertificatePolicyResponse = z.infer<
+  typeof configureDomainBindingCertificatePolicyResponseSchema
 >;
 export type CheckDomainBindingDeleteSafetyInput = z.infer<
   typeof checkDomainBindingDeleteSafetyInputSchema

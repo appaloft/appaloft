@@ -100,6 +100,7 @@ export * from "./operations/deployments/retry-deployment.schema";
 export * from "./operations/deployments/rollback-deployment.schema";
 export * from "./operations/deployments/show-deployment.schema";
 export * from "./operations/domain-bindings/check-domain-binding-delete-safety.schema";
+export * from "./operations/domain-bindings/configure-domain-binding-certificate-policy.schema";
 export * from "./operations/domain-bindings/configure-domain-binding-route.schema";
 export * from "./operations/domain-bindings/confirm-domain-binding-ownership.schema";
 export * from "./operations/domain-bindings/create-domain-binding.schema";

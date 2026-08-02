@@ -88,6 +88,8 @@ class KyselyDomainBindingMutationVisitor
         redirect_to: spec.state.redirectTo?.value ?? null,
         redirect_status: spec.state.redirectStatus?.value ?? null,
         certificate_policy: spec.state.certificatePolicy.value,
+        active_certificate_id: spec.state.activeCertificateId?.value ?? null,
+        active_certificate_fingerprint: spec.state.activeCertificateFingerprint?.value ?? null,
         status: spec.state.status.value,
         verification_attempts: serializeDomainVerificationAttempts(spec.state.verificationAttempts),
         dns_observation: serializeDomainDnsObservation(spec.state.dnsObservation),

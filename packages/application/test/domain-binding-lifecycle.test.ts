@@ -31,6 +31,7 @@ import {
   type Result,
   UpsertDeploymentTargetSpec,
   UpsertDestinationSpec,
+  UpsertDomainBindingSpec,
   UpsertEnvironmentSpec,
   UpsertProjectSpec,
   UpsertResourceSpec,
@@ -65,6 +66,7 @@ import {
 } from "../src";
 import {
   CheckDomainBindingDeleteSafetyQueryService,
+  ConfigureDomainBindingCertificatePolicyUseCase,
   ConfigureDomainBindingRouteUseCase,
   CreateDomainBindingUseCase,
   DeleteDomainBindingUseCase,
@@ -277,7 +279,13 @@ async function seedRoutingContext() {
     eventBus,
     logger,
   );
-  const createBinding = async (domainName: string) => {
+  const createBinding = async (
+    domainName: string,
+    input: {
+      tlsMode?: "auto" | "disabled";
+      certificatePolicy?: "auto" | "manual" | "disabled";
+    } = {},
+  ) => {
     const created = await createUseCase.execute(context, {
       projectId: "prj_demo",
       environmentId: "env_demo",
@@ -286,7 +294,8 @@ async function seedRoutingContext() {
       destinationId: "dst_demo",
       domainName,
       proxyKind: "traefik",
-      tlsMode: "auto",
+      tlsMode: input.tlsMode ?? "auto",
+      ...(input.certificatePolicy ? { certificatePolicy: input.certificatePolicy } : {}),
     });
     expect(created.isOk()).toBe(true);
     return created._unsafeUnwrap().id;
@@ -307,6 +316,77 @@ async function seedRoutingContext() {
 }
 
 describe("Domain binding lifecycle", () => {
+  test("[ROUTE-TLS-CMD-032][ROUTE-TLS-CMD-033] configures certificate policy idempotently and awaits replacement", async () => {
+    const seed = await seedRoutingContext();
+    const domainBindingId = await seed.createBinding("policy.example.com");
+    const binding = await seed.domainBindings.findOne(
+      seed.repositoryContext,
+      DomainBindingByIdSpec.create(DomainBindingId.rehydrate(domainBindingId)),
+    );
+    if (!binding) throw new Error("seeded domain binding was not found");
+    const verificationAttemptId = binding.toState().verificationAttempts[0]?.id;
+    if (!verificationAttemptId) throw new Error("verification attempt was not created");
+    binding
+      .confirmOwnership({
+        confirmedAt: CreatedAt.rehydrate(seed.clock.now()),
+        verificationAttemptId,
+      })
+      ._unsafeUnwrap();
+    await seed.domainBindings.upsert(
+      seed.repositoryContext,
+      binding,
+      UpsertDomainBindingSpec.fromDomainBinding(binding),
+    );
+
+    const useCase = new ConfigureDomainBindingCertificatePolicyUseCase(
+      seed.domainBindings,
+      seed.clock,
+      seed.eventBus,
+      seed.logger,
+    );
+    expect(
+      (
+        await useCase.execute(seed.context, { domainBindingId, certificatePolicy: "manual" })
+      ).isOk(),
+    ).toBe(true);
+    expect(
+      (
+        await useCase.execute(seed.context, { domainBindingId, certificatePolicy: "manual" })
+      ).isOk(),
+    ).toBe(true);
+
+    const configured = await seed.domainBindings.findOne(
+      seed.repositoryContext,
+      DomainBindingByIdSpec.create(DomainBindingId.rehydrate(domainBindingId)),
+    );
+    expect(configured?.toState().certificatePolicy.value).toBe("manual");
+    expect(configured?.toState().status.value).toBe("certificate_pending");
+    expect(configured?.resolveCertificateImportContext().isOk()).toBe(true);
+    expect(
+      eventsByType(seed.eventBus.events, "domain-binding-certificate-policy-configured"),
+    ).toHaveLength(1);
+  });
+
+  test("[ROUTE-TLS-CMD-034] rejects certificate policy changes for TLS-disabled bindings", async () => {
+    const seed = await seedRoutingContext();
+    const domainBindingId = await seed.createBinding("plain.example.com", {
+      tlsMode: "disabled",
+      certificatePolicy: "disabled",
+    });
+    const result = await new ConfigureDomainBindingCertificatePolicyUseCase(
+      seed.domainBindings,
+      seed.clock,
+      seed.eventBus,
+      seed.logger,
+    ).execute(seed.context, { domainBindingId, certificatePolicy: "manual" });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "certificate_policy_not_allowed",
+      details: expect.objectContaining({ phase: "certificate-policy-configuration" }),
+    });
+  });
+
   test("ROUTE-TLS-CMD-021 configures canonical redirect route explicitly", async () => {
     const seed = await seedRoutingContext();
     const targetId = await seed.createBinding("app.example.com");

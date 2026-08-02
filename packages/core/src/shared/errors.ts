@@ -361,6 +361,10 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("certificate_not_allowed", "user", message, details),
+  certificatePolicyNotAllowed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("certificate_policy_not_allowed", "user", message, details),
   certificateImportNotAllowed: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

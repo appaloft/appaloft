@@ -106,6 +106,8 @@ import {
   ConfigureDefaultAccessDomainPolicyUseCase,
   ConfigureDependencyResourceBackupPolicyCommandHandler,
   ConfigureDependencyResourceBackupPolicyUseCase,
+  ConfigureDomainBindingCertificatePolicyCommandHandler,
+  ConfigureDomainBindingCertificatePolicyUseCase,
   ConfigureDomainBindingRouteCommandHandler,
   ConfigureDomainBindingRouteUseCase,
   ConfigurePreviewPolicyCommandHandler,
@@ -3097,6 +3099,7 @@ export function registerApplicationServices(
   container.registerSingleton(ListDefaultAccessDomainPoliciesQueryHandler);
   container.registerSingleton(ShowDefaultAccessDomainPolicyQueryHandler);
   container.registerSingleton(ConfigureServerEdgeProxyCommandHandler);
+  container.registerSingleton(ConfigureDomainBindingCertificatePolicyCommandHandler);
   container.registerSingleton(ConfigureDomainBindingRouteCommandHandler);
   container.registerSingleton(ConfigureResourceAccessCommandHandler);
   container.registerSingleton(ConfigureResourceAutoDeployCommandHandler);
@@ -4732,6 +4735,10 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.pruneDeploymentsUseCase, PruneDeploymentsUseCase);
   container.registerSingleton(tokens.cleanupPreviewUseCase, CleanupPreviewUseCase);
   container.registerSingleton(tokens.createDomainBindingUseCase, CreateDomainBindingUseCase);
+  container.registerSingleton(
+    tokens.configureDomainBindingCertificatePolicyUseCase,
+    ConfigureDomainBindingCertificatePolicyUseCase,
+  );
   container.registerSingleton(
     tokens.configureDomainBindingRouteUseCase,
     ConfigureDomainBindingRouteUseCase,

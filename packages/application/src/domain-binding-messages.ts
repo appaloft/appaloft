@@ -1,4 +1,5 @@
 export * from "./operations/domain-bindings/check-domain-binding-delete-safety.query";
+export * from "./operations/domain-bindings/configure-domain-binding-certificate-policy.command";
 export * from "./operations/domain-bindings/configure-domain-binding-route.command";
 export * from "./operations/domain-bindings/confirm-domain-binding-ownership.command";
 export * from "./operations/domain-bindings/create-domain-binding.command";

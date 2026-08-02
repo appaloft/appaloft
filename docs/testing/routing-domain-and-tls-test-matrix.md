@@ -161,6 +161,7 @@ Then:
 | ROUTE-TLS-EVT-018 | integration | Activation or reload fails | Previous certificate serves and candidate is stored | activation/reload fails | safe retriable failure | no `domain-ready` | Previous serving configuration remains; binding exposes pending/not-ready evidence | Yes |
 | ROUTE-TLS-EVT-019 | integration | Served fingerprint mismatches | Candidate apply reports success | direct hostname/SNI proof sees another leaf fingerprint | safe failure | no `domain-ready` | Candidate is not promoted and no secret material is exposed | Yes after convergence/repair |
 | ROUTE-TLS-EVT-020 | integration | Duplicate reconciliation | Selected fingerprint is already proven | same event/attempt repeats | idempotent `ok` | no duplicate transition | Serving certificate and readiness remain unchanged | No |
+| ROUTE-TLS-EVT-021 | integration | Ready binding certificate replacement | A different fingerprint is imported or issued for a ready binding | candidate activation/reload/proof succeeds | `ok` | no duplicate readiness transition | Proven certificate identity advances to the replacement while the binding remains ready | No |
 
 ## Read Model Matrix
 
@@ -291,6 +292,7 @@ Then:
 | ROUTE-TLS-ENTRY-027 | e2e-preferred | CLI/API retries certificate | CLI/API runs `certificates.retry` for a retryable managed failure | `ok({ certificateId, attemptId })` | Per command error contract | `certificate-requested` | `certificate list/show` exposes the new attempt |
 | ROUTE-TLS-ENTRY-028 | e2e-preferred | CLI/API revokes certificate | CLI/API runs `certificates.revoke` for active managed and imported certificates | `ok({ certificateId })` | Per command error contract | `certificate-revoked` | Certificate show/list exposes `revoked` |
 | ROUTE-TLS-ENTRY-029 | e2e-preferred | CLI/API deletes certificate | CLI/API runs `certificates.delete` with exact confirmation for a non-active certificate | `ok({ certificateId })` | Per command error contract | `certificate-deleted` | Certificate show/list exposes `deleted`; domain binding remains present |
+| ROUTE-TLS-ENTRY-030 | e2e-preferred | CLI/API/Web configures certificate policy | Operator selects `auto` or `manual` for an active TLS binding | Shared command returns policy and pending/unchanged reconciliation status | Per command error contract | `domain-binding-certificate-policy-configured` when changed | Current route remains serving while the selected policy awaits certificate reconciliation and proof |
 
 ## Idempotency Assertions
 

@@ -1,5 +1,7 @@
 export * from "./operations/domain-bindings/check-domain-binding-delete-safety.handler";
 export * from "./operations/domain-bindings/check-domain-binding-delete-safety.query-service";
+export * from "./operations/domain-bindings/configure-domain-binding-certificate-policy.handler";
+export * from "./operations/domain-bindings/configure-domain-binding-certificate-policy.use-case";
 export * from "./operations/domain-bindings/configure-domain-binding-route.handler";
 export * from "./operations/domain-bindings/configure-domain-binding-route.use-case";
 export * from "./operations/domain-bindings/confirm-domain-binding-ownership.handler";

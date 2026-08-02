@@ -240,7 +240,10 @@ class FailingCertificateRouteActivator implements CertificateRouteActivator {
 }
 
 class MatchingTlsCertificateObserver implements TlsCertificateObserver {
-  constructor(private readonly steps: string[]) {}
+  constructor(
+    private readonly steps: string[],
+    private readonly fingerprint = "sha256:manual-cert",
+  ) {}
 
   async observe(
     _context: Parameters<TlsCertificateObserver["observe"]>[0],
@@ -248,7 +251,7 @@ class MatchingTlsCertificateObserver implements TlsCertificateObserver {
   ): ReturnType<TlsCertificateObserver["observe"]> {
     this.steps.push(`observe:${input.serverName}`);
     return ok({
-      fingerprint: "sha256:manual-cert",
+      fingerprint: this.fingerprint,
       subjectAlternativeNames: ["manual.example.test"],
       notBefore: "2025-12-01T00:00:00.000Z",
       expiresAt: "2026-06-01T00:00:00.000Z",
@@ -398,6 +401,7 @@ async function seedImportContext() {
 
 function createValidationResult(
   overrides: Partial<{
+    fingerprint: string;
     issuer: string;
     normalizedMaterialFingerprint: string;
   }> = {},
@@ -412,7 +416,7 @@ function createValidationResult(
     subjectAlternativeNames: ["manual.example.test", "api.manual.example.test"],
     keyAlgorithm: "rsa",
     issuer: overrides.issuer ?? "CN=manual.example.test, O=Appaloft Test",
-    fingerprint: "sha256:manual-cert",
+    fingerprint: overrides.fingerprint ?? "sha256:manual-cert",
   };
 }
 
@@ -898,6 +902,92 @@ describe("ImportCertificateUseCase", () => {
 
     expect(steps).toEqual(["materialize", "activate", "observe:manual.example.test", "finalize"]);
     expect(eventsByType(seed.eventBus.events, "domain-ready")).toHaveLength(1);
+  });
+
+  test("[ROUTE-TLS-EVT-021] a new certificate replaces the proven certificate on a ready binding", async () => {
+    const seed = await seedImportContext();
+    const validator = new FakeCertificateMaterialValidator(ok(createValidationResult()));
+    const importUseCase = new ImportCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      validator,
+      new FakeCertificateSecretStore(),
+      seed.clock,
+      seed.idGenerator,
+      seed.eventBus,
+      seed.logger,
+    );
+    await importUseCase.execute(seed.context, {
+      domainBindingId: seed.domainBindingId,
+      certificateChain: "first-chain",
+      privateKey: "first-key",
+    });
+    const firstEvent = eventsByType(seed.eventBus.events, "certificate-imported")[0];
+    if (!firstEvent) throw new Error("first certificate-imported event was not captured");
+
+    const firstSteps: string[] = [];
+    expect(
+      (
+        await new ReconcileDomainCertificateUseCase(
+          seed.domainBindings,
+          seed.certificates,
+          new SuccessfulCertificateMaterializer(firstSteps),
+          new SuccessfulCertificateRouteActivator(firstSteps),
+          new MatchingTlsCertificateObserver(firstSteps),
+          seed.clock,
+          seed.eventBus,
+          seed.logger,
+        ).execute(seed.context, firstEvent)
+      ).isOk(),
+    ).toBe(true);
+
+    validator.setResult(
+      ok(
+        createValidationResult({
+          fingerprint: "sha256:replacement-cert",
+          normalizedMaterialFingerprint: "sha256:replacement-material",
+        }),
+      ),
+    );
+    await importUseCase.execute(seed.context, {
+      domainBindingId: seed.domainBindingId,
+      certificateChain: "replacement-chain",
+      privateKey: "replacement-key",
+    });
+    const replacementEvent = eventsByType(seed.eventBus.events, "certificate-imported")[1];
+    if (!replacementEvent)
+      throw new Error("replacement certificate-imported event was not captured");
+
+    const replacementSteps: string[] = [];
+    expect(
+      (
+        await new ReconcileDomainCertificateUseCase(
+          seed.domainBindings,
+          seed.certificates,
+          new SuccessfulCertificateMaterializer(replacementSteps),
+          new SuccessfulCertificateRouteActivator(replacementSteps),
+          new MatchingTlsCertificateObserver(replacementSteps, "sha256:replacement-cert"),
+          seed.clock,
+          seed.eventBus,
+          seed.logger,
+        ).execute(seed.context, replacementEvent)
+      ).isOk(),
+    ).toBe(true);
+    expect(replacementSteps).toEqual([
+      "materialize",
+      "activate",
+      "observe:manual.example.test",
+      "finalize",
+    ]);
+
+    const persisted = await seed.domainBindings.findOne(
+      seed.repositoryContext,
+      DomainBindingByIdSpec.create(DomainBindingId.rehydrate(seed.domainBindingId)),
+    );
+    expect(persisted?.toState().activeCertificateId?.value).toBe(replacementEvent.aggregateId);
+    expect(persisted?.toState().activeCertificateFingerprint?.value).toBe(
+      "sha256:replacement-cert",
+    );
   });
 
   test("[ROUTE-TLS-CMD-025][CERT-IMPORT-CMD-014] rejects retry for imported certificates", async () => {

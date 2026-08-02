@@ -115,6 +115,7 @@ appaloft.deployments.show -> deployments.show GET /deployments/{deploymentId}
 appaloft.deployments.staleAttempts -> deployments.stale-attempts GET /deployments/stale
 appaloft.deployments.timeline -> deployments.timeline GET /deployments/{deploymentId}/timeline
 appaloft.deployments.timeline.stream -> deployments.timeline.stream GET /deployments/{deploymentId}/timeline/stream stream
+appaloft.domainBindings.configureCertificatePolicy -> domain-bindings.configure-certificate-policy POST /domain-bindings/{domainBindingId}/certificate-policy
 appaloft.domainBindings.configureRoute -> domain-bindings.configure-route POST /domain-bindings/{domainBindingId}/route
 appaloft.domainBindings.confirmOwnership -> domain-bindings.confirm-ownership POST /domain-bindings/{domainBindingId}/ownership-confirmations
 appaloft.domainBindings.create -> domain-bindings.create POST /domain-bindings

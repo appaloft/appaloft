@@ -2078,6 +2078,15 @@ export const enUS = {
       confirmOwnershipErrorTitle: "Unable to confirm domain ownership",
       confirmOwnershipSuccessTitle: "Domain ownership confirmed",
       confirmingOwnership: "Confirming",
+      certificatePolicyDescription:
+        "Choose automatic issuance or imported certificates. The current serving certificate remains until its replacement is activated and proven.",
+      certificatePolicyErrorTitle: "Unable to configure certificate policy",
+      certificatePolicyLabel: "Certificate policy",
+      certificatePolicyPending:
+        "A policy change moves readiness to certificate pending until issuance/import and SNI proof complete.",
+      certificatePolicySuccessTitle: "Certificate policy configured",
+      certificatePolicySwitchAuto: "Use automatic certificates",
+      certificatePolicySwitchManual: "Use imported certificates",
       configureRedirect: "Set redirect",
       configureRouteErrorTitle: "Unable to configure route",
       configureRouteSuccessTitle: "Route configured",

@@ -698,6 +698,9 @@ export const tokens = {
   configureDomainBindingRouteUseCase: Symbol.for(
     "appaloft.configure_domain_binding_route_use_case",
   ),
+  configureDomainBindingCertificatePolicyUseCase: Symbol.for(
+    "appaloft.configure_domain_binding_certificate_policy_use_case",
+  ),
   confirmDomainBindingOwnershipUseCase: Symbol.for(
     "appaloft.confirm_domain_binding_ownership_use_case",
   ),

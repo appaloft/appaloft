@@ -127,8 +127,6 @@ export class ReconcileDomainCertificateUseCase {
         DomainBindingByIdSpec.create(domainBindingId),
       );
       if (!domainBinding) return err(domainError.notFound("Domain binding", domainBindingId.value));
-      if (domainBinding.isReady()) return ok(undefined);
-
       const certificate = await certificates.findOne(
         repositoryContext,
         CertificateByIdSpec.create(certificateId),
@@ -151,6 +149,13 @@ export class ReconcileDomainCertificateUseCase {
             },
           ),
         );
+      }
+      if (
+        domainBinding.isReady() &&
+        bindingState.activeCertificateId?.equals(certificateId) &&
+        bindingState.activeCertificateFingerprint?.equals(certificateState.fingerprint)
+      ) {
+        return ok(undefined);
       }
 
       const reference = yield* materialReference(certificateId.value, certificateState);
@@ -214,6 +219,8 @@ export class ReconcileDomainCertificateUseCase {
 
       yield* domainBinding.markReady({
         readyAt: yield* CreatedAt.create(now),
+        certificateId,
+        certificateFingerprint: certificateState.fingerprint,
         correlationId: context.requestId,
         causationId: event.aggregateId,
       });

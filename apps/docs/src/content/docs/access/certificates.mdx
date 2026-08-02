@@ -12,6 +12,7 @@ searchAliases:
   - "证书"
   - "续期"
 relatedOperations:
+  - "domain-bindings.configure-certificate-policy"
   - "certificates.issue-or-renew"
   - "certificates.import"
   - "certificates.revoke"
@@ -37,6 +38,10 @@ Appaloft 支持两种证书来源：
 
 - **自动签发或续期** — 提供 hostname 和所有权证明，由 Appaloft 负责签发流程。
 - **导入证书** — 提供证书链、私钥和相关元数据；私钥是 Secret，任何界面、日志或诊断信息都不会回显完整内容。
+
+已有 TLS 域名可以在 Web 的域名绑定详情页切换策略，也可以运行
+`appaloft domain-binding configure-certificate-policy <domainBindingId> --policy auto|manual`。
+切换到 `manual` 后等待新的证书导入；切换到 `auto` 后等待签发。命令本身不会导入、签发或提前替换当前证书。
 
 ```bash
 # 查看证书状态和签发历史（不会返回证书 PEM 或私钥）

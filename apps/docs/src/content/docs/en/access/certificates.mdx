@@ -25,6 +25,10 @@ Appaloft supports two certificate sources:
 - **Auto-issue or renew** — you provide the hostname and proof of ownership, and Appaloft handles the issuance flow.
 - **Import a certificate** — you provide the chain, private key, and related metadata; the private key is a Secret, and no UI, log, or diagnostic information ever echoes the full content.
 
+For an existing TLS domain, switch policy from the Web domain-binding detail page or run
+`appaloft domain-binding configure-certificate-policy <domainBindingId> --policy auto|manual`.
+After switching to `manual`, import a replacement certificate; after switching to `auto`, request issuance. The policy command itself does not import, issue, or prematurely replace the serving certificate.
+
 ```bash
 # View certificate status and issuance history (never returns the certificate PEM or private key)
 appaloft certificate show <certificateId>

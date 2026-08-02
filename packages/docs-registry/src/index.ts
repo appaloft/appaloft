@@ -4448,6 +4448,11 @@ export const publicDocsOperationCoverage = [
     topicId: "domain.custom-domain-binding",
   },
   {
+    operationKey: "domain-bindings.configure-certificate-policy",
+    status: "documented",
+    topicId: "certificate.readiness",
+  },
+  {
     operationKey: "domain-bindings.confirm-ownership",
     status: "documented",
     topicId: "domain.ownership-check",
