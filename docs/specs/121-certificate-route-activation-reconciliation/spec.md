@@ -2,8 +2,8 @@
 
 ## Status
 
-- Round: Spec complete; Ticket required before Code
-- Artifact state: ready-for-ticket
+- Round: Code in progress; certificate reconciliation implemented, policy operation pending
+- Artifact state: public issues #955 and #956 are ready-for-agent
 - Compatibility: additive public operation plus backward-compatible readiness correction
 
 ## Business Outcome

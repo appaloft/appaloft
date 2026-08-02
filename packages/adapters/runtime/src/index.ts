@@ -1865,5 +1865,21 @@ export {
   type DirectOriginTlsProbeInput,
   probeDirectOriginTls,
 } from "./direct-origin-tls-certificate-observer";
+export {
+  type CertificateRouteRuntime,
+  type CertificateRouteRuntimeActivationInput,
+  type CertificateRouteRuntimeRollbackInput,
+  DockerCertificateRouteActivator,
+} from "./docker-certificate-route-activator";
+export {
+  type CertificateRouteCommandInput,
+  type CertificateRouteCommandResult,
+  type CertificateRouteCommandRunner,
+  DockerCliCertificateRouteRuntime,
+} from "./docker-certificate-route-runtime";
+export {
+  type CertificateRouteProcessExecutor,
+  LocalSshCertificateRouteCommandRunner,
+} from "./certificate-route-command-runner";
 export { RuntimeServerRuntimePreparer } from "./server-runtime-preparer";
 export { LocalAgentTunnelProvider, type LocalAgentTunnelProviderOptions } from "./tunnel-provider";

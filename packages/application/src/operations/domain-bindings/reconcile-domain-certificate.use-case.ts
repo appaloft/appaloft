@@ -12,6 +12,7 @@ import {
   safeTry,
   UpsertDomainBindingSpec,
 } from "@appaloft/core";
+import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import {
@@ -26,6 +27,7 @@ import {
   type TlsCertificateObservation,
   type TlsCertificateObserver,
 } from "../../ports";
+import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 
 function payloadText(event: DomainEvent, key: string): Result<string> {
@@ -81,15 +83,24 @@ function proofMatches(
   );
 }
 
+@injectable()
 export class ReconcileDomainCertificateUseCase {
   constructor(
+    @inject(tokens.domainBindingRepository)
     private readonly domainBindings: DomainBindingRepository,
+    @inject(tokens.certificateRepository)
     private readonly certificates: CertificateRepository,
+    @inject(tokens.certificateMaterializer)
     private readonly materializer: CertificateMaterializer,
+    @inject(tokens.certificateRouteActivator)
     private readonly activator: CertificateRouteActivator,
+    @inject(tokens.tlsCertificateObserver)
     private readonly observer: TlsCertificateObserver,
+    @inject(tokens.clock)
     private readonly clock: Clock,
+    @inject(tokens.eventBus)
     private readonly eventBus: EventBus,
+    @inject(tokens.logger)
     private readonly logger: AppLogger,
   ) {}
 
@@ -146,8 +157,16 @@ export class ReconcileDomainCertificateUseCase {
       const material = yield* await materializer.materialize(context, reference);
       const activationInput = {
         certificateId: certificateId.value,
+        certificateSource: reference.source,
         domainBindingId: domainBindingId.value,
+        projectId: bindingState.projectId.value,
+        environmentId: bindingState.environmentId.value,
+        resourceId: bindingState.resourceId.value,
         domainName: bindingState.domainName.value,
+        pathPrefix: bindingState.pathPrefix.value,
+        ...(bindingState.targetServiceName
+          ? { targetServiceName: bindingState.targetServiceName.value }
+          : {}),
         proxyKind: bindingState.proxyKind.value,
         ...(bindingState.serverId ? { serverId: bindingState.serverId.value } : {}),
         ...(bindingState.destinationId ? { destinationId: bindingState.destinationId.value } : {}),
@@ -185,6 +204,12 @@ export class ReconcileDomainCertificateUseCase {
             },
           ),
         );
+      }
+
+      const finalized = await activator.finalize(context, { ...activationInput, ...activation });
+      if (finalized.isErr()) {
+        yield* await activator.rollback(context, { ...activationInput, ...activation });
+        return err(finalized.error);
       }
 
       yield* domainBinding.markReady({

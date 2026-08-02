@@ -411,8 +411,6 @@ import {
   type ManagedRedisProviderPort,
   type ManagedRedisRealizationInput,
   type ManagedRedisRealizationResult,
-  MarkDomainReadyOnCertificateImportedHandler,
-  MarkDomainReadyOnCertificateIssuedHandler,
   MarkDomainReadyOnDeploymentFinishedHandler,
   MarkDomainReadyOnDomainBoundHandler,
   MarkDomainRouteFailedOnDeploymentFinishedHandler,
@@ -475,6 +473,9 @@ import {
   QueryEntitlementsQueryService,
   ReactivateOrganizationMemberCommandHandler,
   ReactivateOrganizationMemberUseCase,
+  ReconcileDomainCertificateOnImportedHandler,
+  ReconcileDomainCertificateOnIssuedHandler,
+  ReconcileDomainCertificateUseCase,
   ReconcileStaleDeploymentCommandHandler,
   ReconcileStaleDeploymentUseCase,
   RecordUsageIntentCommandHandler,
@@ -3037,8 +3038,9 @@ export function registerApplicationServices(
 ): void {
   container.registerSingleton(BootstrapServerEdgeProxyOnTargetRegisteredHandler);
   container.registerSingleton(MarkDomainReadyOnDomainBoundHandler);
-  container.registerSingleton(MarkDomainReadyOnCertificateImportedHandler);
-  container.registerSingleton(MarkDomainReadyOnCertificateIssuedHandler);
+  container.registerSingleton(ReconcileDomainCertificateUseCase);
+  container.registerSingleton(ReconcileDomainCertificateOnImportedHandler);
+  container.registerSingleton(ReconcileDomainCertificateOnIssuedHandler);
   container.registerSingleton(MarkDomainReadyOnDeploymentFinishedHandler);
   container.registerSingleton(MarkDomainRouteFailedOnDeploymentFinishedHandler);
   container.registerSingleton(MarkServerAppliedRouteStatusOnDeploymentFinishedHandler);

@@ -183,13 +183,16 @@ class SuccessfulCertificateMaterializer implements CertificateMaterializer {
 }
 
 class SuccessfulCertificateRouteActivator implements CertificateRouteActivator {
+  lastInput: Parameters<CertificateRouteActivator["activate"]>[1] | undefined;
+
   constructor(private readonly steps: string[]) {}
 
   async activate(
     _context: Parameters<CertificateRouteActivator["activate"]>[0],
-    _input: Parameters<CertificateRouteActivator["activate"]>[1],
+    input: Parameters<CertificateRouteActivator["activate"]>[1],
   ): ReturnType<CertificateRouteActivator["activate"]> {
     this.steps.push("activate");
+    this.lastInput = input;
     return ok({
       activationId: "activation_candidate",
       previousActivationId: "activation_previous",
@@ -201,6 +204,37 @@ class SuccessfulCertificateRouteActivator implements CertificateRouteActivator {
     _input: Parameters<CertificateRouteActivator["rollback"]>[1],
   ): ReturnType<CertificateRouteActivator["rollback"]> {
     this.steps.push("rollback");
+    return ok(undefined);
+  }
+
+  async finalize(
+    _context: Parameters<CertificateRouteActivator["finalize"]>[0],
+    _input: Parameters<CertificateRouteActivator["finalize"]>[1],
+  ): ReturnType<CertificateRouteActivator["finalize"]> {
+    this.steps.push("finalize");
+    return ok(undefined);
+  }
+}
+
+class FailingCertificateRouteActivator implements CertificateRouteActivator {
+  constructor(private readonly steps: string[]) {}
+
+  async activate(): ReturnType<CertificateRouteActivator["activate"]> {
+    this.steps.push("activate");
+    return err(
+      domainError.certificateRouteReconciliationFailed("Candidate route activation failed", {
+        phase: "certificate-route-activation",
+      }),
+    );
+  }
+
+  async rollback(): ReturnType<CertificateRouteActivator["rollback"]> {
+    this.steps.push("rollback");
+    return ok(undefined);
+  }
+
+  async finalize(): ReturnType<CertificateRouteActivator["finalize"]> {
+    this.steps.push("finalize");
     return ok(undefined);
   }
 }
@@ -712,11 +746,12 @@ describe("ImportCertificateUseCase", () => {
     if (!event) throw new Error("certificate-imported event was not captured");
 
     const steps: string[] = [];
+    const activator = new SuccessfulCertificateRouteActivator(steps);
     const useCase = new ReconcileDomainCertificateUseCase(
       seed.domainBindings,
       seed.certificates,
       new SuccessfulCertificateMaterializer(steps),
-      new SuccessfulCertificateRouteActivator(steps),
+      activator,
       new MatchingTlsCertificateObserver(steps),
       seed.clock,
       seed.eventBus,
@@ -725,7 +760,19 @@ describe("ImportCertificateUseCase", () => {
     const reconciled = await useCase.execute(seed.context, event);
 
     expect(reconciled.isOk()).toBe(true);
-    expect(steps).toEqual(["materialize", "activate", "observe:manual.example.test"]);
+    expect(steps).toEqual(["materialize", "activate", "observe:manual.example.test", "finalize"]);
+    expect(activator.lastInput).toMatchObject({
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      domainBindingId: seed.domainBindingId,
+      certificateSource: "imported",
+      domainName: "manual.example.test",
+      pathPrefix: "/",
+      proxyKind: "traefik",
+    });
     expect(eventsByType(seed.eventBus.events, "domain-ready")).toHaveLength(1);
     const persisted = await seed.domainBindings.findOne(
       seed.repositoryContext,
@@ -775,6 +822,47 @@ describe("ImportCertificateUseCase", () => {
     expect(eventsByType(seed.eventBus.events, "domain-ready")).toHaveLength(0);
   });
 
+  test("[ROUTE-TLS-EVT-018][EDGE-PROXY-RELOAD-004C] activation failure preserves the current route and readiness", async () => {
+    const seed = await seedImportContext();
+    await new ImportCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      new FakeCertificateMaterialValidator(ok(createValidationResult())),
+      new FakeCertificateSecretStore(),
+      seed.clock,
+      seed.idGenerator,
+      seed.eventBus,
+      seed.logger,
+    ).execute(seed.context, {
+      domainBindingId: seed.domainBindingId,
+      certificateChain: "leaf-chain",
+      privateKey: "leaf-key",
+    });
+    const event = eventsByType(seed.eventBus.events, "certificate-imported")[0];
+    if (!event) throw new Error("certificate-imported event was not captured");
+
+    const steps: string[] = [];
+    const reconciled = await new ReconcileDomainCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      new SuccessfulCertificateMaterializer(steps),
+      new FailingCertificateRouteActivator(steps),
+      new MatchingTlsCertificateObserver(steps),
+      seed.clock,
+      seed.eventBus,
+      seed.logger,
+    ).execute(seed.context, event);
+
+    expect(reconciled.isErr()).toBe(true);
+    expect(steps).toEqual(["materialize", "activate"]);
+    expect(eventsByType(seed.eventBus.events, "domain-ready")).toHaveLength(0);
+    const persisted = await seed.domainBindings.findOne(
+      seed.repositoryContext,
+      DomainBindingByIdSpec.create(DomainBindingId.rehydrate(seed.domainBindingId)),
+    );
+    expect(persisted?.toState().status.value).toBe("bound");
+  });
+
   test("[ROUTE-TLS-EVT-020] repeated proven certificate reconciliation is idempotent", async () => {
     const seed = await seedImportContext();
     await new ImportCertificateUseCase(
@@ -808,7 +896,7 @@ describe("ImportCertificateUseCase", () => {
     expect((await useCase.execute(seed.context, event)).isOk()).toBe(true);
     expect((await useCase.execute(seed.context, event)).isOk()).toBe(true);
 
-    expect(steps).toEqual(["materialize", "activate", "observe:manual.example.test"]);
+    expect(steps).toEqual(["materialize", "activate", "observe:manual.example.test", "finalize"]);
     expect(eventsByType(seed.eventBus.events, "domain-ready")).toHaveLength(1);
   });
 

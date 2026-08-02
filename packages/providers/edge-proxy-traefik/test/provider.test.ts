@@ -349,6 +349,22 @@ describe("TraefikEdgeProxyProvider", () => {
     });
   });
 
+  test("[EDGE-PROXY-RELOAD-004A] proxy bootstrap mounts the Appaloft dynamic certificate store", async () => {
+    const ensure = await new TraefikEdgeProxyProvider().ensureProxy(
+      { correlationId: "req_traefik_certificate_store" },
+      { proxyKind: "traefik" },
+    );
+
+    expect(ensure.isOk()).toBe(true);
+    expect(ensure._unsafeUnwrap().containerCommand).toContain(
+      "appaloft-traefik-dynamic:/etc/traefik/dynamic",
+    );
+    expect(ensure._unsafeUnwrap().containerCommand).toContain(
+      "--providers.file.directory=/etc/traefik/dynamic",
+    );
+    expect(ensure._unsafeUnwrap().containerCommand).toContain("--providers.file.watch=true");
+  });
+
   test("[EDGE-PROXY-RELOAD-004E] durable certificate-pending route does not fall back to Traefik ACME", async () => {
     const result = await new TraefikEdgeProxyProvider().realizeRoutes(
       { correlationId: "req_pending_tls" },

@@ -1590,8 +1590,14 @@ export interface CertificateMaterializer {
 
 export interface CertificateRouteActivationInput {
   certificateId: string;
+  certificateSource: "managed" | "imported";
   domainBindingId: string;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
   domainName: string;
+  pathPrefix: string;
+  targetServiceName?: string;
   proxyKind: EdgeProxyKind;
   serverId?: string;
   destinationId?: string;
@@ -1609,6 +1615,10 @@ export interface CertificateRouteActivator {
     input: CertificateRouteActivationInput,
   ): Promise<Result<CertificateRouteActivationResult, DomainError>>;
   rollback(
+    context: ExecutionContext,
+    input: CertificateRouteActivationInput & CertificateRouteActivationResult,
+  ): Promise<Result<void, DomainError>>;
+  finalize(
     context: ExecutionContext,
     input: CertificateRouteActivationInput & CertificateRouteActivationResult,
   ): Promise<Result<void, DomainError>>;

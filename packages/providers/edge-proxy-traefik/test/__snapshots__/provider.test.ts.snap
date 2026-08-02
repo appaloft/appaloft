@@ -60,10 +60,12 @@ exit 1"
 [ "$(docker inspect -f '{{.Config.Image}}' 'appaloft-traefik' 2>/dev/null)" = 'traefik:v3.7.9' ] &&
 docker inspect -f '{{range .Args}}{{println .}}{{end}}' 'appaloft-traefik' 2>/dev/null | grep -Fx -- '--certificatesresolvers.appaloft.acme.httpchallenge=true' >/dev/null &&
 docker inspect -f '{{range .Args}}{{println .}}{{end}}' 'appaloft-traefik' 2>/dev/null | grep -Fx -- '--certificatesresolvers.appaloft.acme.httpchallenge.entrypoint=web' >/dev/null &&
-docker inspect -f '{{range .Args}}{{println .}}{{end}}' 'appaloft-traefik' 2>/dev/null | grep -Fx -- '--certificatesresolvers.appaloft.acme.storage=/letsencrypt/acme.json' >/dev/null ||
+docker inspect -f '{{range .Args}}{{println .}}{{end}}' 'appaloft-traefik' 2>/dev/null | grep -Fx -- '--certificatesresolvers.appaloft.acme.storage=/letsencrypt/acme.json' >/dev/null &&
+docker inspect -f '{{range .Args}}{{println .}}{{end}}' 'appaloft-traefik' 2>/dev/null | grep -Fx -- '--providers.file.directory=/etc/traefik/dynamic' >/dev/null &&
+docker inspect -f '{{range .Args}}{{println .}}{{end}}' 'appaloft-traefik' 2>/dev/null | grep -Fx -- '--providers.file.watch=true' >/dev/null ||
 (
   docker rm -f 'appaloft-traefik' >/dev/null 2>&1 || true
-  docker run -d --restart unless-stopped --name 'appaloft-traefik' --network 'appaloft-edge' -p '8080:80' -p '8443:443' --add-host host.docker.internal:host-gateway -v /var/run/docker.sock:/var/run/docker.sock:ro -v 'appaloft-traefik-acme:/letsencrypt' 'traefik:v3.7.9' --providers.docker=true --providers.docker.exposedbydefault=false --providers.docker.network='appaloft-edge' --entrypoints.web.address=:80 --entrypoints.websecure.address=:443 '--certificatesresolvers.appaloft.acme.httpchallenge=true' '--certificatesresolvers.appaloft.acme.httpchallenge.entrypoint=web' '--certificatesresolvers.appaloft.acme.storage=/letsencrypt/acme.json'
+  docker run -d --restart unless-stopped --name 'appaloft-traefik' --network 'appaloft-edge' -p '8080:80' -p '8443:443' --add-host host.docker.internal:host-gateway -v /var/run/docker.sock:/var/run/docker.sock:ro -v 'appaloft-traefik-acme:/letsencrypt' -v 'appaloft-traefik-dynamic:/etc/traefik/dynamic' 'traefik:v3.7.9' --providers.docker=true --providers.docker.exposedbydefault=false --providers.docker.network='appaloft-edge' --entrypoints.web.address=:80 --entrypoints.websecure.address=:443 '--providers.file.directory=/etc/traefik/dynamic' '--providers.file.watch=true' '--certificatesresolvers.appaloft.acme.httpchallenge=true' '--certificatesresolvers.appaloft.acme.httpchallenge.entrypoint=web' '--certificatesresolvers.appaloft.acme.storage=/letsencrypt/acme.json'
 )"
 ,
     "networkCommand": "docker network inspect 'appaloft-edge' >/dev/null 2>&1 || docker network create 'appaloft-edge'",
