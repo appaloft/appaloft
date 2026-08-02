@@ -680,8 +680,8 @@
         "docs/CORE_OPERATIONS.md",
         "docs/BUSINESS_OPERATION_MAP.md",
         "docs/testing/system-diagnostics-test-matrix.md",
-        "apps/docs/src/content/docs/self-hosting/upgrades.md",
-        "apps/docs/src/content/docs/deploy/sources.md",
+        "apps/docs/src/content/docs/self-hosting/upgrades.mdx",
+        "apps/docs/src/content/docs/deliver/sources.mdx",
         "skills/appaloft/references/cli-entrypoints.md"
       ],
       "assertions": [

@@ -301,11 +301,13 @@ allowed only as a recorded interim state, not a permanent one.
 
 Translated pages must not localize URL anchor ids used by product help.
 
-Public docs, `apps/www`, and the Cloud console share one locale preference through the
-`appaloft.locale` cookie (set with `PUBLIC_APPALOFT_LOCALE_COOKIE_DOMAIN` scoped to the shared parent
-domain). A locale choice made on any one of the three surfaces must be honored by the other two;
-`apps/docs` must read and write this exact cookie name rather than introducing a docs-only locale
-preference. Content collections remain the mechanism for locale separation (a `zh-CN` collection and
+Public docs and the Cloud console share one locale preference through the `appaloft.locale` cookie
+(set with `PUBLIC_APPALOFT_LOCALE_COOKIE_DOMAIN` scoped to the shared parent domain). The canonical
+marketing site at `apps/site` must adopt that contract before cross-surface locale sync is complete;
+its binding is currently open. Once all three surfaces participate, a locale choice made on any one
+must be honored by the other two. `apps/docs` must read and write this exact cookie name rather than
+introducing a docs-only locale preference.
+Content collections remain the mechanism for locale separation (a `zh-CN` collection and
 an `en-US` sibling collection per page), matching how versioning would also be modeled if Appaloft
 ever needs multi-version public docs.
 

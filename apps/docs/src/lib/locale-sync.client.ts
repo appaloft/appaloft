@@ -7,8 +7,10 @@
  * browsing — including clicks on plain `<a href>` locale links.
  *
  * The shared `appaloft.locale` cookie (ADR-101 Localization section) is
- * also read/written by `apps/www` and the Cloud console; this module must
- * keep using that exact name/shape rather than inventing a docs-only one.
+ * also read/written by the Cloud console. The canonical marketing site at
+ * `apps/site` must adopt this same contract before cross-surface locale sync
+ * is complete; this module must keep using the exact name/shape rather than
+ * inventing a docs-only one.
  */
 import {
   appaloftLocaleStorageKey,

@@ -164,12 +164,12 @@ Public Documentation Structure governance remain in force except where explicitl
     a sibling `docs-fr/` collection as the canonical i18n shape); `apps/docs` must follow that same
     shape instead of inventing a page-level locale switch.
 18. The shared `appaloft.locale` cookie contract is unchanged: `apps/docs` reads and writes the same
-    `appaloft.locale` cookie name, the same `PUBLIC_APPALOFT_LOCALE_COOKIE_DOMAIN` (or equivalent
-    Nimbus/Astro-idiomatic env var name carrying the same value and default) used by `apps/www` and
-    the Cloud console today, so a locale choice made in any one of the three surfaces is honored by
-    the other two. This ADR does not change the cookie name, shape, or domain scoping; it only
-    requires the new platform to keep reading/writing the existing contract instead of introducing a
-    parallel one.
+    `appaloft.locale` cookie name and the same `PUBLIC_APPALOFT_LOCALE_COOKIE_DOMAIN` (or equivalent
+    Nimbus/Astro-idiomatic env var name carrying the same value and default) used by the Cloud
+    console. The canonical marketing site at `apps/site` must adopt the same contract before
+    cross-surface locale sync is complete; it does not implement that binding today. This ADR does
+    not change the cookie name, shape, or domain scoping; it requires every participating surface to
+    use the existing contract instead of introducing a parallel one.
 19. Translated pages must keep stable help-anchor ids exactly as ADR-030 requires; Nimbus's
     filesystem-is-the-route model must not be used to let a translated page's slug or anchor drift
     from its source-locale counterpart.
