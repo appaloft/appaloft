@@ -42,9 +42,11 @@ matrix alone.
   GitHub-to-Workspace binding projection and conflict fail-closed behavior.
 - `apps/web/src/lib/console/console-page-extension.test.ts` plus Svelte diagnostics cover the #892
   actionable form regression without adding any hosted or GitHub-specific contract to public Web.
-- Public `lint`, `typecheck`, `build`, and the complete 35-task repository test gate completed
-  successfully on 2026-07-31. The feedback-continuity suites include application control-delivery
-  reuse and PGlite process-restart readback.
+- Public `lint`, `typecheck`, `build`, and the complete repository test gate passed through final
+  public #953 / PR #954 on 2026-08-02. The feedback suites include application control-delivery
+  reuse, PGlite process-restart readback, and existing-Check updates without a newly hydrated source
+  SHA while preserving exact-SHA admission for Check creation. Final public `main` is
+  `7cdd99ca83554bf76184d209199f60a75b3a4679`.
 - Public #951 adds a detached-aggregate concurrency regression proving a late provider operation
   cannot replace paused lifecycle truth, plus a PostgreSQL regression proving the activity write is
   conditional on current `ready` status and updates only `lastActivityAt`. Focused application and
