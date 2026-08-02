@@ -2,8 +2,10 @@
 
 ## Status
 
-Implemented for feedback continuity under public #936; public delivery remains in progress.
-Public tracking #845 and implementation issues #846-#849 are complete.
+Public implementation is delivered through public #953 / PR #954. Public tracking #845 and
+implementation issues #846-#849 are complete; real GitHub App, registered Server, native-provider,
+Preview, and exact provider-cleanup acceptance remain an explicit downstream hosted opt-in boundary
+and are not inferred from public CI.
 Public #876 governs the additional composition slice required by the 2026-07-29 boundary audit;
 public #932 governs the bounded Agent Run failure diagnostic exposed by the dedicated hosted
 acceptance. Public #934 governs the restart-safe durable tenant context and credential-admission
@@ -11,10 +13,11 @@ replay exposed by external run `30597332756`. External run `30604398408` exposed
 delivery did not reuse the current thread Task's status comment id; public #936 implements and
 validates the feedback-continuity regression fix. Public #941 governs the workspace-scoped
 process-home regression exposed by external run `30690194327`. Public #951 governs the
-pause/activity concurrency regression exposed by external run `30699497767`. Hosted composition
-remains in Cloud #722-#727. External run `30707022006` proved that a terminal control delivery
-without a newly hydrated source SHA updated the current Task comment but left its existing Check
-in progress; public #953 owns the neutral existing-Check update correction.
+pause/activity concurrency regression exposed by external run `30699497767`. Hosted behavior
+remains in the downstream composition. External run `30707022006` proved that a terminal control
+delivery without a newly hydrated source SHA updated the current Task comment but left its existing
+Check in progress; public #953 / PR #954 delivered the neutral existing-Check update correction at
+final public `main` SHA `7cdd99ca83554bf76184d209199f60a75b3a4679`.
 
 ## Goal
 

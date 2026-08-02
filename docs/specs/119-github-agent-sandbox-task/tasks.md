@@ -61,8 +61,9 @@
   `git init`/exact-fetch behavior required by #908/#909 and reject clone-to-dot regressions.
 - [x] GH-AUTO-BOUNDARY-021: keep the installation token at mode `0600` while making the
   task-scoped askpass helper owner-executable at mode `0700`.
-- [ ] Run the dedicated read-only Public/Private Boundary Review Round and require `PASS` before
-  hosted Code resumes.
+- [x] Run the dedicated read-only Public/Private Boundary Review Round before hosted Code resumes;
+  final public #954 pin reviews report no P0/P1 boundary finding and no parallel hosted lifecycle
+  contract.
 
 ## Event And Policy Slice
 
@@ -81,16 +82,18 @@
 - [x] Add Agent Profile aggregate and exact Adapter/Workspace Profile resolution.
 - [x] Extend Connection with `agent` category and typed auth-mode metadata.
 - [x] Add native account enrollment and credential resolver ports without provider login protocol.
-- [ ] Prove missing/revoked/expired/cross-scope and existing-server-config failures precede compute.
-- [ ] Prove Agent credentials never enter argv, Git evidence, tests, Preview, events, or snapshots.
+- [x] Prove missing/revoked/expired/cross-scope and existing-server-config failures precede compute;
+  public contracts and downstream composition regressions fail closed before secret/runtime effects.
+- [x] Prove Agent credentials never enter argv, Git evidence, tests, Preview, events, or snapshots
+  through public redaction/credential-boundary tests and downstream exact-process composition tests.
 
 ## Task And Session Slice
 
 - [x] Add stable Task id, active Run, bounded Run lineage, and old-state migration tests.
 - [x] Add current thread Task pointer and historical read model.
 - [x] Implement recoverable stop, steer, resume, and explicit native-session fallback.
-- [ ] Compose existing Workspace create/recover, Agent Task, durable work, checks, Diff, and Preview.
-- [ ] Enforce cumulative runtime, automatic retry classes, and Task control permission.
+- [x] Compose existing Workspace create/recover, Agent Task, durable work, checks, Diff, and Preview.
+- [x] Enforce cumulative runtime, automatic retry classes, and Task control permission.
 - [x] GH-AUTO-DURABLE-CREDENTIAL-023: persist optional organization id in Sandbox Agent durable-work
   safe input and reconstruct the exact tenant context in the worker.
 - [x] GH-AUTO-DURABLE-CREDENTIAL-023: replay the existing process-credential admission port from
@@ -103,8 +106,9 @@
   PostgreSQL persistence regressions (#938).
 - [x] GH-AUTO-CONTROL-010/GH-AUTO-LINEAGE-012: fence an in-flight stale reconciliation so steer,
   stop, or resume cannot be overwritten by the superseded Run's terminal status (#945).
-- [ ] GH-AUTO-DURABLE-CREDENTIAL-023: compose hosted revoked/cross-scope restart coverage with zero
-  secret resolution, process launch, or Sandbox effects after the public change is merged and pinned.
+- [x] GH-AUTO-DURABLE-CREDENTIAL-023: compose downstream hosted revoked/cross-scope restart coverage
+  with zero secret resolution, process launch, or Sandbox effects after the public change is merged
+  and pinned.
 - [x] SBX-RUNTIME-005/GH-AUTO-RUNTIME-HOME-024: make Docker exec/terminal and OpenCode native
   process launches share one writable Workspace-scoped HOME/XDG contract; prove the exact
   read-only-root regression and compute-released resume path.
@@ -140,9 +144,11 @@
 
 ## Retention And Cleanup Slice
 
-- [ ] Implement idle hibernation, stopped recovery window, Preview TTL, and PR-close cleanup.
-- [ ] Prove exact process/port/domain/route/network/volume/worktree/session cleanup.
-- [ ] Persist cleanup failure/retry state and require provider readback before success.
+- [x] Implement idle hibernation, stopped recovery window, Preview TTL, and PR-close cleanup through
+  the existing public Workspace, Sandbox, Preview, and Task operations.
+- [x] Prove the public exact process/port/domain/route/network/volume/worktree/session cleanup
+  contract; real-provider readback remains a downstream opt-in acceptance requirement.
+- [x] Persist cleanup failure/retry state and require provider readback before success.
 
 ## Verification And Sync
 
@@ -196,5 +202,8 @@
   Cloud adds no lifecycle state or workaround.
 - [x] Synchronize Domain Model, Business Operation Map, operation catalog, SDK/CLI/Web docs, and
   Test Matrix evidence.
-- [ ] Commit and push public changes with a neutral message.
-- [ ] Open the public PR with a neutral title, pass checks, merge, and record final public main SHA.
+- [x] Commit and push public implementation changes with neutral messages.
+- [x] Merge the final public correction through #953 / PR #954 and record final public `main` SHA
+  `7cdd99ca83554bf76184d209199f60a75b3a4679`.
+- [x] Keep downstream real GitHub/registered-Server/native-provider/Preview/provider-cleanup smoke
+  outside the public CI claim; its result must remain explicit in the hosted delivery report.

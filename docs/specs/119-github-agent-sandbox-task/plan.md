@@ -128,3 +128,13 @@
 5. Pin that SHA in Cloud and implement hosted composition.
 6. Run a read-only Public/Private Boundary Review Round; hosted Code or merge remains blocked until
    its evidence-based gate is `PASS`.
+
+## Delivery Status
+
+- Public contracts, operations, persistence, adapters, surfaces, and the final existing-Check
+  convergence correction are merged through public #953 / PR #954 at
+  `7cdd99ca83554bf76184d209199f60a75b3a4679`.
+- Downstream hosted composition must still supply and prove tenancy, authorization, credential
+  custody, native-provider execution, registered-Server placement, Preview delivery, and exact
+  provider cleanup through an explicit opt-in acceptance. Public deterministic tests do not replace
+  that evidence.
