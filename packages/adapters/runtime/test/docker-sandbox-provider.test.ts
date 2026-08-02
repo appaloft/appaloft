@@ -670,6 +670,7 @@ describe("DockerSandboxProvider", () => {
       ]),
     );
     expect(launch?.argv.join(" ")).toContain('wait "$child"');
+    expect(launch?.argv.join(" ")).toContain('exec setsid "$@"');
     expect(launch?.argv.join(" ")).toContain('rm -f -- "$pid_file" "$input_pipe"');
     expect(delivered?.argv).toContain("-i");
     expect(runner.calls.every((call) => !call.argv.join(" ").includes("scoped-launch-secret"))).toBe(
@@ -696,20 +697,33 @@ describe("DockerSandboxProvider", () => {
     expect(runner.calls.at(-1)?.argv.join(" ")).toContain("appaloft-background-cleanup");
   });
 
-  test("[SBX-PROC-001] process termination is idempotent after a background command exits", async () => {
+  test("[SBX-PROC-001] terminates the complete background process group idempotently", async () => {
     const runner = new CapturingRunner();
     const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
     await provider.provision(request);
+    const started = await provider.exec({
+      sandboxId: "sbx_demo",
+      providerHandle: "appaloft-sbx_demo",
+      argv: ["agent", "run"],
+      background: true,
+    });
+    expect(started.mode).toBe("background");
+    if (started.mode !== "background") throw new Error("expected background process");
+    expect(runner.calls.findLast((call) => call.argv.includes("-d"))?.argv.join(" ")).toContain(
+      'exec setsid "$@"',
+    );
 
     await provider.terminateProcess({
       sandboxId: "sbx_demo",
       providerHandle: "appaloft-sbx_demo",
-      processId: "spr_deadbeef",
+      processId: started.processId,
     });
 
     const terminated = runner.calls.at(-1)?.argv.join(" ") ?? "";
+    expect(terminated).toContain('kill -TERM "-$pid"');
+    expect(terminated).toContain('kill -KILL "-$pid"');
     expect(terminated).toContain('kill "$pid" 2>/dev/null || true');
-    expect(terminated).toContain('rm -f -- "$1"');
+    expect(terminated).toContain('rm -f -- "$1" "$2"');
   });
 
   test("[SBX-FILE-003] revalidates handles and paths before Docker mutation", async () => {

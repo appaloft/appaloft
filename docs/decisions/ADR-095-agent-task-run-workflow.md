@@ -45,6 +45,11 @@ distinction between a mutable workspace and an immutable artifact.
    observable. An in-Sandbox agent identity cannot approve its own delivery.
 7. Operator Work remains the operational projection for durable worker attempts. It is not the
    user-facing Task Run model.
+8. A Docker-backed background process is launched in its own process group. Cancellation signals
+   that exact group, waits for bounded graceful exit, then uses a final kill signal if any member
+   remains. It removes only the exact process markers and remains idempotent when the process has
+   already exited. A Sandbox image without the provider-required `setsid` executable fails the
+   background Run instead of falling back to an untracked child process.
 
 ## Consequences
 
@@ -59,6 +64,9 @@ distinction between a mutable workspace and an immutable artifact.
   private Cloud model.
 - Delivery retries retain only safe branch, commit SHA and pull-request URL evidence. A missing or
   expired forge credential returns the Task to `approved` with an explicit retryable failure.
+- Stop, steer and cleanup cannot report success while an Adapter descendant continues consuming
+  the same Workspace's compute or memory. The process group is provider execution state, not a new
+  Agent session or Task model.
 
 ## Migration Gaps
 

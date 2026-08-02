@@ -264,10 +264,30 @@ try {
   const background = await provider.exec({
     sandboxId: sourceSandboxId,
     providerHandle: resumedAgain.providerHandle,
-    argv: ["sleep", "30"],
+    argv: [
+      "sh",
+      "-c",
+      "trap '' TERM; sh -c 'trap \"\" TERM; echo $$ > /workspace/descendant.pid; exec sleep 300' & wait",
+    ],
     background: true,
   });
   assert(background.mode === "background", "background process did not return a process id");
+  let descendantReady = false;
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    try {
+      descendantReady =
+        (
+          await provider.readFile({
+            sandboxId: sourceSandboxId,
+            providerHandle: resumedAgain.providerHandle,
+            path: "descendant.pid",
+          })
+        ).byteLength > 0;
+    } catch {}
+    if (descendantReady) break;
+    await Bun.sleep(20);
+  }
+  assert(descendantReady, "background descendant marker was not created");
   assert(
     (
       await provider.listProcesses({
@@ -282,6 +302,25 @@ try {
     providerHandle: resumedAgain.providerHandle,
     processId: background.processId,
   });
+  await provider.terminateProcess({
+    sandboxId: sourceSandboxId,
+    providerHandle: resumedAgain.providerHandle,
+    processId: background.processId,
+  });
+  const descendant = await provider.exec({
+    sandboxId: sourceSandboxId,
+    providerHandle: resumedAgain.providerHandle,
+    argv: [
+      "sh",
+      "-c",
+      'pid=$(cat descendant.pid); [ ! -r "/proc/$pid/stat" ] || [ "$(awk \'{print $3}\' "/proc/$pid/stat")" = Z ]',
+    ],
+  });
+  assert(
+    descendant.mode === "foreground" &&
+      descendant.frames.some((frame) => frame.kind === "exit" && frame.exitCode === 0),
+    "background descendant remained running after exact repeated termination",
+  );
   const snapshot = await provider.captureSnapshot({
     sandboxId: sourceSandboxId,
     providerHandle: resumedAgain.providerHandle,

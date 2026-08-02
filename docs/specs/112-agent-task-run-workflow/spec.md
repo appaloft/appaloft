@@ -38,6 +38,7 @@ result and create a pull request without losing the task when the client disconn
 | AGENT-TASK-PR-008 | Pull-request delivery | An approved Task Result and configured change-delivery adapter exist | delivery executes | Commit/push/PR are idempotent and the safe pull-request URL/ref is recorded; adapter failure remains retryable. |
 | AGENT-TASK-CANCEL-009 | Cancel | A Task Run is active | cancellation is requested | The underlying Agent Run is cancelled and no delivery action runs. |
 | AGENT-TASK-WEB-010 | Browser task experience | Task Runs exist | Console list/detail is opened | Progress, logs, checks, changes, previews, approval and delivery recovery actions use public contracts. |
+| AGENT-TASK-PROC-011 | Stop complete process tree | An Adapter Run owns a background process with descendants | stop, steer, cancellation or cleanup terminates the process | The Docker Sandbox provider signals the exact isolated process group, escalates from TERM to KILL after a bounded wait, removes only its exact process markers and leaves no running descendant; repeated termination is safe. |
 
 ## Domain Ownership
 
