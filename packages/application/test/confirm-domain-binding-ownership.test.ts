@@ -505,6 +505,7 @@ describe("ConfirmDomainBindingOwnershipUseCase", () => {
 
   test("[ROUTE-TLS-EVT-004][ROUTE-TLS-READMODEL-001] domain-bound with TLS disabled marks binding ready and publishes domain-ready", async () => {
     const {
+      clock,
       confirmUseCase,
       context,
       domainBindingId,
