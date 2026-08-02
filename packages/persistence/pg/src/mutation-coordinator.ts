@@ -78,11 +78,11 @@ export class PgMutationCoordinator implements MutationCoordinator {
             .onConflict((conflict) =>
               conflict.columns(["coordination_scope_kind", "coordination_scope_key"]).doNothing(),
             )
-            .returning(["coordination_scope_kind"])
+            .returning(["coordination_scope_kind", "acquired_at"])
             .executeTakeFirst();
 
           if (inserted) {
-            return this.executeWithLease(input, acquiredAt);
+            return this.executeWithLease(input, inserted.acquired_at);
           }
 
           const now = this.clock.now();
@@ -101,11 +101,11 @@ export class PgMutationCoordinator implements MutationCoordinator {
             .where("coordination_scope_kind", "=", scopeKind)
             .where("coordination_scope_key", "=", scopeKey)
             .where("lease_expires_at", "<=", now)
-            .returning(["coordination_scope_kind"])
+            .returning(["coordination_scope_kind", "acquired_at"])
             .executeTakeFirst();
 
           if (stolen) {
-            return this.executeWithLease(input, now);
+            return this.executeWithLease(input, stolen.acquired_at);
           }
 
           await sleep(input.policy.retryIntervalMs);
@@ -175,7 +175,7 @@ export class PgMutationCoordinator implements MutationCoordinator {
         }
 
         const now = this.clock.now();
-        const updated = await this.db
+        await this.db
           .updateTable("mutation_coordinations")
           .set({
             heartbeat_at: now,
@@ -185,8 +185,16 @@ export class PgMutationCoordinator implements MutationCoordinator {
           .where("coordination_scope_key", "=", input.scope.key)
           .where("owner_id", "=", input.owner.ownerId)
           .where("acquired_at", "=", acquiredAt)
+          .execute();
+        const retained = await this.db
+          .selectFrom("mutation_coordinations")
+          .select("owner_id")
+          .where("coordination_scope_kind", "=", input.scope.kind)
+          .where("coordination_scope_key", "=", input.scope.key)
+          .where("owner_id", "=", input.owner.ownerId)
+          .where("acquired_at", "=", acquiredAt)
           .executeTakeFirst();
-        if (updated.numUpdatedRows !== 1n) {
+        if (!retained) {
           leaseLost = true;
           break;
         }

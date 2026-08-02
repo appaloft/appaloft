@@ -12,6 +12,7 @@ import {
   expectCliSuccess,
   fixturePath,
   parseJson,
+  parseJsonPayloads,
   runShellCli,
   startShellHttpServer,
 } from "./support/shell-e2e-fixture";
@@ -31,6 +32,20 @@ type CertificateSecretRow = {
 const certificateChainFixture = fixturePath("manual-certificate.crt");
 const privateKeyFixture = fixturePath("manual-certificate.key");
 
+function parseCertificateImportResult(raw: string): { attemptId: string; certificateId: string } {
+  const result = parseJsonPayloads(raw).find(
+    (payload): payload is { attemptId: string; certificateId: string } =>
+      typeof payload === "object" &&
+      payload !== null &&
+      "attemptId" in payload &&
+      typeof payload.attemptId === "string" &&
+      "certificateId" in payload &&
+      typeof payload.certificateId === "string",
+  );
+  if (!result) throw new SyntaxError("No certificate import result found");
+  return result;
+}
+
 describe("certificates.import command e2e", () => {
   let fixture: RoutingDomainTlsFixture;
 
@@ -45,7 +60,7 @@ describe("certificates.import command e2e", () => {
     fixture?.cleanup();
   }, 60000);
 
-  test("[CERT-IMPORT-ENTRY-001][CERT-IMPORT-EVT-001] CLI imports a manual certificate and the binding becomes ready", async () => {
+  test("[CERT-IMPORT-ENTRY-001][CERT-IMPORT-EVT-002] CLI imports a manual certificate without claiming an absent serving route is ready", async () => {
     const suffix = crypto.randomUUID().slice(0, 6);
     const context = fixture.deployWorkspaceResource({
       appPort: 5200 + Math.floor(Math.random() * 100),
@@ -70,9 +85,7 @@ describe("certificates.import command e2e", () => {
       fixture.cliOptions,
     );
     expectCliSuccess(imported, "import manual certificate through CLI");
-    const certificateResult = parseJson<{ attemptId: string; certificateId: string }>(
-      imported.stdout,
-    );
+    const certificateResult = parseCertificateImportResult(imported.stdout);
     expect(certificateResult).toEqual({
       attemptId: expect.stringMatching(/^cat_/),
       certificateId: expect.stringMatching(/^crt_/),
@@ -116,10 +129,10 @@ describe("certificates.import command e2e", () => {
           }>;
         }>(bindings.stdout).items,
       }).status,
-    ).toBe("ready");
+    ).toBe("bound");
   }, 90000);
 
-  test("[CERT-IMPORT-ENTRY-002][CERT-IMPORT-EVT-001] HTTP imports a manual certificate and the binding becomes ready", async () => {
+  test("[CERT-IMPORT-ENTRY-002][CERT-IMPORT-EVT-002] HTTP imports a manual certificate without claiming an absent serving route is ready", async () => {
     const suffix = crypto.randomUUID().slice(0, 6);
     const context = fixture.deployWorkspaceResource({
       appPort: 5300 + Math.floor(Math.random() * 100),
@@ -225,7 +238,7 @@ describe("certificates.import command e2e", () => {
             }
           ).items,
         }).status,
-      ).toBe("ready");
+      ).toBe("bound");
     } finally {
       await httpServer.stop();
     }

@@ -1036,10 +1036,8 @@ describe("pglite persistence integration", () => {
         createdAt: "2026-01-01T00:02:00.000Z",
       });
 
-      const bindings = await new PgDomainRouteBindingReader(database.db).listDeployableBindings(
-        createRepositoryContext(),
-        target,
-      );
+      const reader = new PgDomainRouteBindingReader(database.db);
+      const bindings = await reader.listDeployableBindings(createRepositoryContext(), target);
 
       expect(bindings).toEqual([
         expect.objectContaining({ id: "dmb_server_scoped" }),
@@ -1053,6 +1051,17 @@ describe("pglite persistence integration", () => {
         }),
       ]);
       expect(bindings[0]).not.toHaveProperty("certificate");
+      await database.db
+        .updateTable("domain_bindings")
+        .set({ active_certificate_id: null, active_certificate_fingerprint: null })
+        .where("id", "=", "dmb_destination_scoped")
+        .execute();
+      const bindingsWithoutCertificates = await reader.listDeployableBindings(
+        createRepositoryContext(),
+        target,
+      );
+      expect(bindingsWithoutCertificates).toHaveLength(2);
+      expect(bindingsWithoutCertificates.every((binding) => !binding.certificate)).toBe(true);
       await database.close();
     } finally {
       rmSync(workspaceDir, { recursive: true, force: true });
@@ -3682,6 +3691,54 @@ describe("pglite persistence integration", () => {
         .execute();
       expect(rows).toHaveLength(0);
 
+      await database.close();
+    } finally {
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 30000);
+
+  test("PgMutationCoordinator keeps ownership after a heartbeat", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-mutation-heartbeat-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+
+    try {
+      const { createDatabase, createMigrator, PgMutationCoordinator } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({ driver: "pglite", pgliteDataDir });
+      expect((await createMigrator(database.db).migrateToLatest()).error).toBeUndefined();
+      const coordinator = new PgMutationCoordinator(database.db, {
+        now: () => new Date().toISOString(),
+      });
+
+      const result = await coordinator.runExclusive({
+        context: createTestExecutionContext(),
+        policy: {
+          operationKey: "certificates.import",
+          scopeKind: "domain-binding",
+          mode: "serialize-with-bounded-wait",
+          waitTimeoutMs: 20,
+          retryIntervalMs: 5,
+          leaseTtlMs: 1_000,
+          heartbeatIntervalMs: 5,
+        },
+        scope: { kind: "domain-binding", key: "dmb_heartbeat" },
+        owner: { ownerId: "req_heartbeat", label: "heartbeat-owner" },
+        work: async (lease) => {
+          await Bun.sleep(30);
+          const row = await database.db
+            .selectFrom("mutation_coordinations")
+            .select(["owner_id", "acquired_at", "lease_expires_at"])
+            .where("coordination_scope_kind", "=", "domain-binding")
+            .where("coordination_scope_key", "=", "dmb_heartbeat")
+            .executeTakeFirstOrThrow();
+          expect(row.owner_id).toBe("req_heartbeat");
+          expect(Date.parse(row.lease_expires_at)).toBeGreaterThan(Date.now());
+          return (await lease?.assertOwned()) ?? ok(undefined);
+        },
+      });
+
+      expect(result).toEqual(ok(undefined));
       await database.close();
     } finally {
       rmSync(workspaceDir, { recursive: true, force: true });

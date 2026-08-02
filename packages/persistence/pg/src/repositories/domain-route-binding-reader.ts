@@ -65,17 +65,14 @@ export class PgDomainRouteBindingReader implements DomainRouteBindingReader {
           .orderBy("created_at", "desc")
           .execute();
 
+        const activeCertificateIds = rows.flatMap((row) => row.active_certificate_id ?? []);
         const certificateRows =
-          rows.length === 0
+          activeCertificateIds.length === 0
             ? []
             : await executor
                 .selectFrom("certificates")
                 .select(["id", "domain_binding_id", "source", "fingerprint"])
-                .where(
-                  "id",
-                  "in",
-                  rows.flatMap((row) => row.active_certificate_id ?? []),
-                )
+                .where("id", "in", activeCertificateIds)
                 .where("status", "=", "active")
                 .execute();
         const certificateByBindingId = new Map<
