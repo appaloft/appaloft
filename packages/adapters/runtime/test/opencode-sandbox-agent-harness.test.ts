@@ -34,7 +34,7 @@ const modelAccess = {
 };
 
 describe("OpenCodeSandboxAgentHarness", () => {
-  test("[AGENT-OPENCODE-011][WS-ATTACH-NATIVE-015] keeps one native server and translates independently scoped JSON runs", async () => {
+  test("[AGENT-OPENCODE-011][WS-ATTACH-NATIVE-015][GH-AUTO-NATIVE-STATE-027] keeps one native server and translates independently scoped JSON runs", async () => {
     const files = new Map<string, Uint8Array>();
     const calls: Parameters<OpenCodeSandboxExecutionPort["exec"]>[2][] = [];
     const issued: string[] = [];
@@ -207,6 +207,23 @@ describe("OpenCodeSandboxAgentHarness", () => {
     expect(new TextDecoder().decode(run?.stdin)).toContain(
       "http://sandbox-gateway:8788/m/smc_opencode_run/secret/v1",
     );
+    expect(JSON.parse(new TextDecoder().decode(run?.stdin).split("\n")[0] ?? "null")).toEqual({
+      model: "appaloft/coding-model",
+      snapshot: false,
+      provider: {
+        appaloft: {
+          npm: "@ai-sdk/openai-compatible",
+          name: "Appaloft scoped model gateway",
+          options: {
+            baseURL: "http://sandbox-gateway:8788/m/smc_opencode_run/secret/v1",
+            apiKey: "{env:APPALOFT_MODEL_ACCESS_TOKEN}",
+          },
+          models: {
+            "coding-model": { name: "coding-model" },
+          },
+        },
+      },
+    });
     expect(emitted).toEqual([
       {
         type: "text",

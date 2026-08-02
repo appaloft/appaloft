@@ -61,6 +61,9 @@
 17. Fence runtime activity bookkeeping from Sandbox lifecycle transitions. Re-read the authoritative
     Sandbox after the provider call and never save a stale ready aggregate over pause, resume,
     termination, or reconciliation state.
+18. Keep native Agent state bounded inside the Workspace-scoped HOME/XDG contract. Disable
+    redundant OpenCode snapshots because Appaloft already owns authoritative Git Diff, Task
+    evidence, and Sandbox recovery; preserve the native session store and provider/model protocol.
 
 ## Migration
 
