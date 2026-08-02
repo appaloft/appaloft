@@ -25,3 +25,15 @@
 - [x] Run focused core/application/runtime/CLI/SDK/Web tests.
 - [x] Run full public lint, typecheck, test, build and docs registry.
 - [x] Run dependent Cloud integration and Console tests.
+
+## Process Tree Termination Remediation
+
+- [x] Track the neutral runtime defect in public issue #961.
+- [x] Start every Docker background command, with or without bounded stdin, in one exact process
+  group.
+- [x] Terminate the group with bounded TERM-to-KILL escalation and idempotent exact marker cleanup.
+- [x] Add the structural provider regression and pass a local Docker probe whose descendant ignores
+  TERM.
+- [x] Pass the complete public repository lint/typecheck/test/build gate.
+- [ ] Pass the composed registered-server GitHub Agent smoke before closing the hosted acceptance
+  gap.

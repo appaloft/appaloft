@@ -20,6 +20,9 @@ const sandboxProcessDockerExecArgs = Object.freeze(
   sandboxWorkspaceProcessEnvironment.flatMap((value) => ["-e", value]),
 );
 
+const terminateSandboxProcessGroupScript =
+  'if [ -f "$1" ]; then pid="$(cat "$1")"; if kill -0 "-$pid" 2>/dev/null; then kill -TERM "-$pid" 2>/dev/null || true; attempts=0; while kill -0 "-$pid" 2>/dev/null && [ "$attempts" -lt 10 ]; do sleep 0.1; attempts=$((attempts + 1)); done; kill -KILL "-$pid" 2>/dev/null || true; else kill "$pid" 2>/dev/null || true; fi; fi; rm -f -- "$1" "$2"';
+
 export interface SandboxDockerCommandResult {
   exitCode: number;
   stdout: Uint8Array;
@@ -875,7 +878,7 @@ export class DockerSandboxProvider implements SandboxProvider {
             request.providerHandle,
             "sh",
             "-c",
-            'pid_file="$1"; exit_file="$2"; input_pipe="$3"; shift 3; ( exec "$@" < "$input_pipe" ) & child=$!; printf "%s\\n" "$child" > "$pid_file"; wait "$child"; code=$?; printf "%s\\n" "$code" > "$exit_file"; rm -f -- "$pid_file" "$input_pipe"; exit "$code"',
+            'pid_file="$1"; exit_file="$2"; input_pipe="$3"; shift 3; ( exec setsid "$@" < "$input_pipe" ) & child=$!; printf "%s\\n" "$child" > "$pid_file"; wait "$child"; code=$?; printf "%s\\n" "$code" > "$exit_file"; rm -f -- "$pid_file" "$input_pipe"; exit "$code"',
             "appaloft-background",
             pidFile,
             exitFile,
@@ -905,7 +908,7 @@ export class DockerSandboxProvider implements SandboxProvider {
             request.providerHandle,
             "sh",
             "-c",
-            '[ -f "$1" ] && kill "$(cat "$1")" 2>/dev/null; rm -f -- "$1" "$2" "$3"',
+            `${terminateSandboxProcessGroupScript}; rm -f -- "$3"`,
             "appaloft-background-cleanup",
             pidFile,
             inputPipe,
@@ -923,7 +926,7 @@ export class DockerSandboxProvider implements SandboxProvider {
           request.providerHandle,
           "sh",
           "-c",
-          'pid_file="$1"; exit_file="$2"; shift 2; ( exec "$@" ) & child=$!; printf "%s\\n" "$child" > "$pid_file"; wait "$child"; code=$?; printf "%s\\n" "$code" > "$exit_file"; rm -f -- "$pid_file"; exit "$code"',
+          'pid_file="$1"; exit_file="$2"; shift 2; ( exec setsid "$@" ) & child=$!; printf "%s\\n" "$child" > "$pid_file"; wait "$child"; code=$?; printf "%s\\n" "$code" > "$exit_file"; rm -f -- "$pid_file"; exit "$code"',
           "appaloft-background",
           pidFile,
           exitFile,
@@ -1056,7 +1059,7 @@ export class DockerSandboxProvider implements SandboxProvider {
       request.providerHandle,
       "sh",
       "-c",
-      'if [ -f "$1" ]; then pid="$(cat "$1")"; kill "$pid" 2>/dev/null || true; fi; rm -f -- "$1" "$2"',
+      terminateSandboxProcessGroupScript,
       "appaloft-process-terminate",
       pidFile,
       exitFile,
