@@ -58,16 +58,25 @@ function labelsForCaddy(input: {
   const path = input.route.pathPrefix === "/" ? "" : `${input.route.pathPrefix}*`;
   const pathDirective = input.route.pathHandling === "strip" ? "handle_path" : "handle";
   const redirect = input.route.routeBehavior === "redirect" || Boolean(input.route.redirectTo);
+  const certificateId = input.route.certificate?.source.startsWith("appaloft-")
+    ? input.route.certificate.certificateId?.replace(/[^a-zA-Z0-9_-]/g, "")
+    : undefined;
+  const certificateLabel = certificateId
+    ? [
+        `caddy${suffix}.tls=/data/appaloft/certificates/${certificateId}/certificate.pem /data/appaloft/certificates/${certificateId}/private-key.pem`,
+      ]
+    : [];
 
   if (redirect && input.route.redirectTo) {
     const target = `${scheme}://${input.route.redirectTo}{uri} ${input.route.redirectStatus ?? 308}`;
     return path
       ? [
           `caddy${suffix}=${site}`,
+          ...certificateLabel,
           `caddy${suffix}.handle=${path}`,
           `caddy${suffix}.handle.redir=${target}`,
         ]
-      : [`caddy${suffix}=${site}`, `caddy${suffix}.redir=${target}`];
+      : [`caddy${suffix}=${site}`, ...certificateLabel, `caddy${suffix}.redir=${target}`];
   }
 
   const reverseProxy = `{{upstreams ${input.route.targetPort ?? input.port}}}`;
@@ -75,12 +84,14 @@ function labelsForCaddy(input: {
   return path
     ? [
         `caddy${suffix}=${site}`,
+        ...certificateLabel,
         `caddy${suffix}.header.${deploymentRouteIdentityHeaderName}=${input.deploymentId}`,
         `caddy${suffix}.${pathDirective}=${path}`,
         `caddy${suffix}.${pathDirective}.reverse_proxy=${reverseProxy}`,
       ]
     : [
         `caddy${suffix}=${site}`,
+        ...certificateLabel,
         `caddy${suffix}.header.${deploymentRouteIdentityHeaderName}=${input.deploymentId}`,
         `caddy${suffix}.reverse_proxy=${reverseProxy}`,
       ];
@@ -147,27 +158,38 @@ function tlsDiagnostics(input: ProxyConfigurationViewInput): ProxyConfigurationT
     route.domains.map((hostname) => {
       const scheme = routeScheme(route);
       const enabled = route.tlsMode === "auto";
+      const appaloftSource = route.certificate?.source.startsWith("appaloft-")
+        ? route.certificate.source
+        : undefined;
 
       return {
         hostname,
         pathPrefix: route.pathPrefix,
         tlsMode: route.tlsMode,
         scheme,
-        automation: enabled ? "provider-local" : "disabled",
-        certificateSource: enabled ? "provider-local" : "none",
-        appaloftCertificateManaged: false,
-        message: enabled
-          ? "Caddy terminates TLS through resident provider-local certificate automation; no Appaloft Certificate aggregate is created for this route."
-          : "TLS is disabled for this Caddy route.",
-        details: enabled
+        automation: appaloftSource ? "appaloft" : enabled ? "provider-local" : "disabled",
+        certificateSource: appaloftSource ?? (enabled ? "provider-local" : "none"),
+        appaloftCertificateManaged: Boolean(appaloftSource),
+        message: appaloftSource
+          ? "Caddy terminates TLS with the selected Appaloft certificate after activation and proof."
+          : enabled
+            ? "Caddy terminates TLS through resident provider-local certificate automation; no Appaloft Certificate aggregate is created for this route."
+            : "TLS is disabled for this Caddy route.",
+        details: appaloftSource
           ? {
               siteScheme: "https",
-              certificateStore: "appaloft-caddy-data",
-              automationOwner: "caddy-docker-proxy",
+              certificateId: route.certificate?.certificateId ?? "unselected",
+              automationOwner: "appaloft",
             }
-          : {
-              siteScheme: "http",
-            },
+          : enabled
+            ? {
+                siteScheme: "https",
+                certificateStore: "appaloft-caddy-data",
+                automationOwner: "caddy-docker-proxy",
+              }
+            : {
+                siteScheme: "http",
+              },
       };
     }),
   );

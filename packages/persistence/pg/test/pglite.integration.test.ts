@@ -1867,6 +1867,18 @@ describe("pglite persistence integration", () => {
         expiresAt: "2026-02-01T00:00:01.000Z",
       });
 
+      const materialized = await store.materialize(createTestExecutionContext(), {
+        certificateId: "crt_managed",
+        source: "managed",
+        secretRef: "appaloft+pg://certificate/crt_managed/cat_managed/managed-bundle",
+      });
+      expect(materialized.isOk()).toBe(true);
+      expect(materialized._unsafeUnwrap()).toEqual({
+        certificateId: "crt_managed",
+        certificateChain: "leaf-cert\nissuer-chain",
+        privateKey: "private-key",
+      });
+
       const deactivated = await store.deactivate(createTestExecutionContext(), {
         certificateId: "crt_managed",
         domainBindingId: "dmb_cert_secret_managed",
@@ -1967,6 +1979,22 @@ describe("pglite persistence integration", () => {
         { value: "private-key" },
       ]);
       expect(rows.every((row) => row.source === "imported")).toBe(true);
+
+      const refs = first._unsafeUnwrap();
+      const materialized = await store.materialize(createTestExecutionContext(), {
+        certificateId: "crt_imported",
+        source: "imported",
+        certificateChainRef: refs.certificateChainRef,
+        privateKeyRef: refs.privateKeyRef,
+        ...(refs.passphraseRef ? { passphraseRef: refs.passphraseRef } : {}),
+      });
+      expect(materialized.isOk()).toBe(true);
+      expect(materialized._unsafeUnwrap()).toEqual({
+        certificateId: "crt_imported",
+        certificateChain: "chain-pem",
+        privateKey: "private-key",
+        passphrase: "passphrase",
+      });
     } finally {
       await closeDatabase?.();
       rmSync(workspaceDir, { recursive: true, force: true });

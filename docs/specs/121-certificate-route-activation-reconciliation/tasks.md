@@ -14,7 +14,7 @@
 - [ ] `ROUTE-TLS-EVT-017..020`: replace direct certificate-event readiness tests with failing
   reconciliation ordering, idempotency, and failure-retention tests.
 - [ ] `EDGE-PROXY-RELOAD-004A..004D`: add failing provider-neutral activation/reload/proof tests.
-- [ ] Add failing Traefik/Caddy contract tests proving durable managed/manual routes do not select
+- [x] Add Traefik/Caddy contract tests proving durable managed/manual routes do not select
   provider-local certificate automation.
 - [ ] Add opt-in real Docker Traefik/Caddy hostname/SNI served-fingerprint smoke.
 

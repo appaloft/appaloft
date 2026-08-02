@@ -425,11 +425,16 @@ function labelsForTraefik(input: {
     deploymentId: input.deploymentId,
     ...(suffix ? { suffix } : {}),
   });
+  const appaloftCertificate = input.route.certificate?.source.startsWith("appaloft-") ?? false;
   const autoTlsLabels =
     input.route.tlsMode === "auto"
       ? [
           `traefik.http.routers.${router}.tls=true`,
-          `traefik.http.routers.${router}.tls.certresolver=${defaultTraefikCertificateResolver}`,
+          ...(appaloftCertificate
+            ? []
+            : [
+                `traefik.http.routers.${router}.tls.certresolver=${defaultTraefikCertificateResolver}`,
+              ]),
         ]
       : [];
 
@@ -547,27 +552,38 @@ function tlsDiagnostics(input: ProxyConfigurationViewInput): ProxyConfigurationT
     route.domains.map((hostname) => {
       const scheme = routeScheme(route);
       const enabled = route.tlsMode === "auto";
+      const appaloftSource = route.certificate?.source.startsWith("appaloft-")
+        ? route.certificate.source
+        : undefined;
 
       return {
         hostname,
         pathPrefix: route.pathPrefix,
         tlsMode: route.tlsMode,
         scheme,
-        automation: enabled ? "provider-local" : "disabled",
-        certificateSource: enabled ? "provider-local" : "none",
-        appaloftCertificateManaged: false,
-        message: enabled
-          ? "Traefik terminates TLS through resident provider-local certificate automation; no Appaloft Certificate aggregate is created for this route."
-          : "TLS is disabled for this Traefik route.",
-        details: enabled
+        automation: appaloftSource ? "appaloft" : enabled ? "provider-local" : "disabled",
+        certificateSource: appaloftSource ?? (enabled ? "provider-local" : "none"),
+        appaloftCertificateManaged: Boolean(appaloftSource),
+        message: appaloftSource
+          ? "Traefik terminates TLS with the selected Appaloft certificate after activation and proof."
+          : enabled
+            ? "Traefik terminates TLS through resident provider-local certificate automation; no Appaloft Certificate aggregate is created for this route."
+            : "TLS is disabled for this Traefik route.",
+        details: appaloftSource
           ? {
               entrypoint: "websecure",
               routerTlsLabel: "true",
-              certificateStore: "provider-local",
+              certificateId: route.certificate?.certificateId ?? "unselected",
             }
-          : {
-              entrypoint: "web",
-            },
+          : enabled
+            ? {
+                entrypoint: "websecure",
+                routerTlsLabel: "true",
+                certificateStore: "provider-local",
+              }
+            : {
+                entrypoint: "web",
+              },
       };
     }),
   );

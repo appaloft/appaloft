@@ -219,6 +219,47 @@ describe("CaddyEdgeProxyProvider", () => {
     ]);
   });
 
+  test("[EDGE-PROXY-RELOAD-004B] durable imported certificate route avoids Caddy local automation", async () => {
+    const provider = new CaddyEdgeProxyProvider();
+    const route = {
+      proxyKind: "caddy" as const,
+      domains: ["manual.example.test"],
+      pathPrefix: "/",
+      tlsMode: "auto" as const,
+      source: "domain-binding" as const,
+      certificate: { source: "appaloft-imported" as const, certificateId: "crt_manual" },
+      targetPort: 3000,
+    };
+    const plan = await provider.realizeRoutes(
+      { correlationId: "req_managed_tls" },
+      { deploymentId: "dep-managed-tls", port: 3000, accessRoutes: [route] },
+    );
+    expect(plan.isOk()).toBe(true);
+    expect(plan._unsafeUnwrap().labels).toContain(
+      "caddy.tls=/data/appaloft/certificates/crt_manual/certificate.pem /data/appaloft/certificates/crt_manual/private-key.pem",
+    );
+
+    const view = await provider.renderConfigurationView(
+      { correlationId: "req_managed_tls" },
+      {
+        resourceId: "res_demo",
+        deploymentId: "dep-managed-tls",
+        routeScope: "latest",
+        status: "applied",
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        stale: false,
+        accessRoutes: [route],
+        port: 3000,
+        includeDiagnostics: true,
+      },
+    );
+    expect(view._unsafeUnwrap().diagnostics?.tlsRoutes?.[0]).toMatchObject({
+      automation: "appaloft",
+      certificateSource: "appaloft-imported",
+      appaloftCertificateManaged: true,
+    });
+  });
+
   test("[EDGE-PROXY-ROUTE-008] renders canonical redirect aliases without proxying alias hosts", async () => {
     const provider = new CaddyEdgeProxyProvider();
     const accessRoutes = [

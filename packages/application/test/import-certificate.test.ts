@@ -57,6 +57,8 @@ import {
   SequenceIdGenerator,
 } from "@appaloft/testkit";
 import {
+  type CertificateMaterializer,
+  type CertificateRouteActivator,
   ConfirmDomainBindingOwnershipUseCase,
   CreateDomainBindingUseCase,
   createExecutionContext,
@@ -71,9 +73,11 @@ import {
   type OperationGuardPort,
   type ProcessAttemptRecord,
   type ProcessAttemptRecorder,
+  ReconcileDomainCertificateUseCase,
   type RepositoryContext,
   RetryCertificateUseCase,
   RevokeCertificateUseCase,
+  type TlsCertificateObserver,
   toRepositoryContext,
 } from "../src";
 
@@ -159,6 +163,79 @@ class DenyingOperationGuardPort implements OperationGuardPort {
       },
       reason: "test-operation-denied",
     };
+  }
+}
+
+class SuccessfulCertificateMaterializer implements CertificateMaterializer {
+  constructor(private readonly steps: string[]) {}
+
+  async materialize(
+    _context: Parameters<CertificateMaterializer["materialize"]>[0],
+    input: Parameters<CertificateMaterializer["materialize"]>[1],
+  ): ReturnType<CertificateMaterializer["materialize"]> {
+    this.steps.push("materialize");
+    return ok({
+      certificateId: input.certificateId,
+      certificateChain: "candidate-chain",
+      privateKey: "candidate-key",
+    });
+  }
+}
+
+class SuccessfulCertificateRouteActivator implements CertificateRouteActivator {
+  constructor(private readonly steps: string[]) {}
+
+  async activate(
+    _context: Parameters<CertificateRouteActivator["activate"]>[0],
+    _input: Parameters<CertificateRouteActivator["activate"]>[1],
+  ): ReturnType<CertificateRouteActivator["activate"]> {
+    this.steps.push("activate");
+    return ok({
+      activationId: "activation_candidate",
+      previousActivationId: "activation_previous",
+    });
+  }
+
+  async rollback(
+    _context: Parameters<CertificateRouteActivator["rollback"]>[0],
+    _input: Parameters<CertificateRouteActivator["rollback"]>[1],
+  ): ReturnType<CertificateRouteActivator["rollback"]> {
+    this.steps.push("rollback");
+    return ok(undefined);
+  }
+}
+
+class MatchingTlsCertificateObserver implements TlsCertificateObserver {
+  constructor(private readonly steps: string[]) {}
+
+  async observe(
+    _context: Parameters<TlsCertificateObserver["observe"]>[0],
+    input: Parameters<TlsCertificateObserver["observe"]>[1],
+  ): ReturnType<TlsCertificateObserver["observe"]> {
+    this.steps.push(`observe:${input.serverName}`);
+    return ok({
+      fingerprint: "sha256:manual-cert",
+      subjectAlternativeNames: ["manual.example.test"],
+      notBefore: "2025-12-01T00:00:00.000Z",
+      expiresAt: "2026-06-01T00:00:00.000Z",
+    });
+  }
+}
+
+class MismatchingTlsCertificateObserver implements TlsCertificateObserver {
+  constructor(private readonly steps: string[]) {}
+
+  async observe(
+    _context: Parameters<TlsCertificateObserver["observe"]>[0],
+    input: Parameters<TlsCertificateObserver["observe"]>[1],
+  ): ReturnType<TlsCertificateObserver["observe"]> {
+    this.steps.push(`observe:${input.serverName}`);
+    return ok({
+      fingerprint: "sha256:unexpected-cert",
+      subjectAlternativeNames: ["manual.example.test"],
+      notBefore: "2025-12-01T00:00:00.000Z",
+      expiresAt: "2026-06-01T00:00:00.000Z",
+    });
   }
 }
 
@@ -610,6 +687,129 @@ describe("ImportCertificateUseCase", () => {
       DomainBindingByIdSpec.create(DomainBindingId.rehydrate(seed.domainBindingId)),
     );
     expect(persisted?.toState().status.value).toBe("bound");
+  });
+
+  test("[ROUTE-TLS-EVT-017][EDGE-PROXY-RELOAD-004A] imported certificate becomes ready only after activation and SNI proof", async () => {
+    const seed = await seedImportContext();
+    const imported = await new ImportCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      new FakeCertificateMaterialValidator(ok(createValidationResult())),
+      new FakeCertificateSecretStore(),
+      seed.clock,
+      seed.idGenerator,
+      seed.eventBus,
+      seed.logger,
+    ).execute(seed.context, {
+      domainBindingId: seed.domainBindingId,
+      certificateChain: "leaf-chain",
+      privateKey: "leaf-key",
+    });
+    expect(imported.isOk()).toBe(true);
+
+    const event = eventsByType(seed.eventBus.events, "certificate-imported")[0];
+    expect(event).toBeDefined();
+    if (!event) throw new Error("certificate-imported event was not captured");
+
+    const steps: string[] = [];
+    const useCase = new ReconcileDomainCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      new SuccessfulCertificateMaterializer(steps),
+      new SuccessfulCertificateRouteActivator(steps),
+      new MatchingTlsCertificateObserver(steps),
+      seed.clock,
+      seed.eventBus,
+      seed.logger,
+    );
+    const reconciled = await useCase.execute(seed.context, event);
+
+    expect(reconciled.isOk()).toBe(true);
+    expect(steps).toEqual(["materialize", "activate", "observe:manual.example.test"]);
+    expect(eventsByType(seed.eventBus.events, "domain-ready")).toHaveLength(1);
+    const persisted = await seed.domainBindings.findOne(
+      seed.repositoryContext,
+      DomainBindingByIdSpec.create(DomainBindingId.rehydrate(seed.domainBindingId)),
+    );
+    expect(persisted?.toState().status.value).toBe("ready");
+  });
+
+  test("[ROUTE-TLS-EVT-019][EDGE-PROXY-RELOAD-004C] fingerprint mismatch rolls back and does not publish domain-ready", async () => {
+    const seed = await seedImportContext();
+    await new ImportCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      new FakeCertificateMaterialValidator(ok(createValidationResult())),
+      new FakeCertificateSecretStore(),
+      seed.clock,
+      seed.idGenerator,
+      seed.eventBus,
+      seed.logger,
+    ).execute(seed.context, {
+      domainBindingId: seed.domainBindingId,
+      certificateChain: "leaf-chain",
+      privateKey: "leaf-key",
+    });
+    const event = eventsByType(seed.eventBus.events, "certificate-imported")[0];
+    if (!event) throw new Error("certificate-imported event was not captured");
+
+    const steps: string[] = [];
+    const reconciled = await new ReconcileDomainCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      new SuccessfulCertificateMaterializer(steps),
+      new SuccessfulCertificateRouteActivator(steps),
+      new MismatchingTlsCertificateObserver(steps),
+      seed.clock,
+      seed.eventBus,
+      seed.logger,
+    ).execute(seed.context, event);
+
+    expect(reconciled.isErr()).toBe(true);
+    expect(reconciled._unsafeUnwrapErr()).toMatchObject({
+      code: "certificate_route_reconciliation_failed",
+      retryable: true,
+      details: expect.objectContaining({ phase: "tls-certificate-proof" }),
+    });
+    expect(steps).toEqual(["materialize", "activate", "observe:manual.example.test", "rollback"]);
+    expect(eventsByType(seed.eventBus.events, "domain-ready")).toHaveLength(0);
+  });
+
+  test("[ROUTE-TLS-EVT-020] repeated proven certificate reconciliation is idempotent", async () => {
+    const seed = await seedImportContext();
+    await new ImportCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      new FakeCertificateMaterialValidator(ok(createValidationResult())),
+      new FakeCertificateSecretStore(),
+      seed.clock,
+      seed.idGenerator,
+      seed.eventBus,
+      seed.logger,
+    ).execute(seed.context, {
+      domainBindingId: seed.domainBindingId,
+      certificateChain: "leaf-chain",
+      privateKey: "leaf-key",
+    });
+    const event = eventsByType(seed.eventBus.events, "certificate-imported")[0];
+    if (!event) throw new Error("certificate-imported event was not captured");
+
+    const steps: string[] = [];
+    const useCase = new ReconcileDomainCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      new SuccessfulCertificateMaterializer(steps),
+      new SuccessfulCertificateRouteActivator(steps),
+      new MatchingTlsCertificateObserver(steps),
+      seed.clock,
+      seed.eventBus,
+      seed.logger,
+    );
+    expect((await useCase.execute(seed.context, event)).isOk()).toBe(true);
+    expect((await useCase.execute(seed.context, event)).isOk()).toBe(true);
+
+    expect(steps).toEqual(["materialize", "activate", "observe:manual.example.test"]);
+    expect(eventsByType(seed.eventBus.events, "domain-ready")).toHaveLength(1);
   });
 
   test("[ROUTE-TLS-CMD-025][CERT-IMPORT-CMD-014] rejects retry for imported certificates", async () => {

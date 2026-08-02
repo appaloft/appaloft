@@ -1561,6 +1561,76 @@ export interface CertificateSecretStore {
   ): Promise<Result<void, DomainError>>;
 }
 
+export interface CertificateMaterialReference {
+  certificateId: string;
+  source: "managed" | "imported";
+  secretRef?: string;
+  certificateChainRef?: string;
+  privateKeyRef?: string;
+  passphraseRef?: string;
+}
+
+export interface MaterializedCertificate {
+  certificateId: string;
+  certificateChain: string;
+  privateKey: string;
+  passphrase?: string;
+}
+
+export interface CertificateMaterializer {
+  materialize(
+    context: ExecutionContext,
+    input: CertificateMaterialReference,
+  ): Promise<Result<MaterializedCertificate, DomainError>>;
+}
+
+export interface CertificateRouteActivationInput {
+  certificateId: string;
+  domainBindingId: string;
+  domainName: string;
+  proxyKind: EdgeProxyKind;
+  serverId?: string;
+  destinationId?: string;
+  material: MaterializedCertificate;
+}
+
+export interface CertificateRouteActivationResult {
+  activationId: string;
+  previousActivationId?: string;
+}
+
+export interface CertificateRouteActivator {
+  activate(
+    context: ExecutionContext,
+    input: CertificateRouteActivationInput,
+  ): Promise<Result<CertificateRouteActivationResult, DomainError>>;
+  rollback(
+    context: ExecutionContext,
+    input: CertificateRouteActivationInput & CertificateRouteActivationResult,
+  ): Promise<Result<void, DomainError>>;
+}
+
+export interface TlsCertificateObservationInput {
+  serverName: string;
+  proxyKind: EdgeProxyKind;
+  serverId?: string;
+  activationId: string;
+}
+
+export interface TlsCertificateObservation {
+  fingerprint: string;
+  subjectAlternativeNames: string[];
+  notBefore: string;
+  expiresAt: string;
+}
+
+export interface TlsCertificateObserver {
+  observe(
+    context: ExecutionContext,
+    input: TlsCertificateObservationInput,
+  ): Promise<Result<TlsCertificateObservation, DomainError>>;
+}
+
 export interface DependencyBindingSecretStoreInput {
   bindingId: string;
   resourceId: string;
@@ -2651,6 +2721,10 @@ export interface EdgeProxyRouteInput {
   pathPrefix: string;
   pathHandling?: "preserve" | "strip";
   tlsMode: TlsMode;
+  certificate?: {
+    source: "provider-local" | "appaloft-managed" | "appaloft-imported";
+    certificateId?: string;
+  };
   targetPort?: number;
   targetServiceName?: string;
   providerKey?: string;
@@ -2758,8 +2832,12 @@ export interface ProxyConfigurationWarning {
   details?: Record<string, string | number | boolean | null>;
 }
 
-export type ProxyConfigurationTlsAutomation = "disabled" | "provider-local";
-export type ProxyConfigurationTlsCertificateSource = "none" | "provider-local";
+export type ProxyConfigurationTlsAutomation = "disabled" | "provider-local" | "appaloft";
+export type ProxyConfigurationTlsCertificateSource =
+  | "none"
+  | "provider-local"
+  | "appaloft-managed"
+  | "appaloft-imported";
 
 export interface ProxyConfigurationTlsDiagnostic {
   hostname: string;
