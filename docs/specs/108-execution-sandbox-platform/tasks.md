@@ -35,6 +35,9 @@
 - [x] Add hermetic runtime provider and contract suite.
 - [x] Add Docker `container-trusted` provider with scoped cleanup.
 - [x] Add optional Docker+gVisor capability probe and provider path.
+- [x] `SBX-RUNTIME-006`: converge an exact concurrent Docker Sandbox removal only after bounded
+  readback proves the owned container is absent; keep a present container or unrelated failure
+  fail closed.
 
 ## Entrypoints And Docs
 
