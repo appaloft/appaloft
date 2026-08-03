@@ -137,9 +137,9 @@
 
 ## Delivery Status
 
-- Public contracts, operations, persistence, adapters, surfaces, and the final existing-Check
-  convergence correction are merged through public #953 / PR #954 at
-  `7cdd99ca83554bf76184d209199f60a75b3a4679`.
+- Public contracts, operations, persistence, adapters, surfaces, fallback-session correction, safe
+  Review Task-link handling, and bounded Review secret redaction are merged through public #986 /
+  PR #987 at `b6b238506a848e677e4c29799cd642f8f21bff66`.
 - Downstream hosted composition must still supply and prove tenancy, authorization, credential
   custody, native-provider execution, registered-Server placement, Preview delivery, and exact
   provider cleanup through an explicit opt-in acceptance. Public deterministic tests do not replace
