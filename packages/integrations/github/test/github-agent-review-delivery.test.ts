@@ -115,6 +115,50 @@ describe("GitHub Agent Review delivery", () => {
     expect(transport.requests).toHaveLength(2);
   });
 
+  test("[#984][GH-AUTO-REVIEW-015] delivers a projected Task link without treating its query as an environment assignment", async () => {
+    const transport = fetchSequence([
+      { head: { sha: "abcdef123456" } },
+      [],
+      { id: 7002, html_url: "https://github.test/review/7002" },
+    ]);
+    const result = await new GitHubAgentReviewDeliveryAdapter(
+      "installation-token",
+      transport.fetcher,
+    ).submit(context, {
+      trigger,
+      expectedHeadSha: "abcdef123456",
+      contentDigest: "sha256:review-content-002",
+      summary:
+        "Review completed without structured narrative output. [Open Task](https://appaloft.test/workspaces/sbx_alpha?task=srun_alpha)",
+      findings: [],
+    });
+
+    expect(result._unsafeUnwrap()).toEqual({
+      reviewId: "7002",
+      reviewUrl: "https://github.test/review/7002",
+      duplicate: false,
+    });
+    expect(transport.requests).toHaveLength(3);
+  });
+
+  test("[#984][GH-AUTO-REVIEW-015] still rejects secret-like outbound Review text", async () => {
+    const transport = fetchSequence([]);
+    const result = await new GitHubAgentReviewDeliveryAdapter(
+      "installation-token",
+      transport.fetcher,
+    ).submit(context, {
+      trigger,
+      expectedHeadSha: "abcdef123456",
+      contentDigest: "sha256:review-content-003",
+      summary: "token=must-not-leave-the-task",
+      findings: [],
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().code).toBe("validation_error");
+    expect(transport.requests).toHaveLength(0);
+  });
+
   test("[GH-AUTO-HEAD-016] refuses to annotate a changed head", async () => {
     const transport = fetchSequence([{ head: { sha: "new-head-sha" } }]);
     const result = await new GitHubAgentReviewDeliveryAdapter(
