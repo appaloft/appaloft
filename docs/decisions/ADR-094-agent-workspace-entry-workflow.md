@@ -46,10 +46,11 @@ and its bound Sandbox status.
    disables OpenCode's redundant native snapshots because their repositories would otherwise sit
    below the same Workspace tree and recursively include prior packs. Appaloft's Git Diff, Task
    evidence, and Sandbox recovery remain authoritative; OpenCode's native session store remains
-   enabled. Because supported OpenCode releases span both the legacy singular `snapshot` setting
-   and the current plural `snapshots` setting, the generated ephemeral config disables both. An
-   unknown compatibility field is inert; relying on only one spelling is unsafe across pinned
-   Adapter versions.
+   enabled. The generated ephemeral config uses only fields accepted by the exact pinned native
+   runtime. Before starting a persistent server or Run, the Adapter validates that config through
+   the installed binary with config passed on Sandbox stdin and output discarded. Validation
+   failure revokes scoped model access and returns a stable secret-safe error; unknown fields are
+   never treated as inert compatibility aliases.
 8. A native remote OpenCode endpoint is never exposed directly by the core workflow. The server
    listens only inside the Sandbox provider's private network namespace so a hosted or self-hosted
    gateway can translate a scoped, expiring access capability to it. The Sandbox publishes no

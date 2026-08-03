@@ -52,6 +52,12 @@ describe("OpenCodeSandboxAgentHarness", () => {
             ],
           } satisfies SandboxExecResult);
         }
+        if (input.argv.includes("debug") && input.argv.includes("config")) {
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
+          } satisfies SandboxExecResult);
+        }
         if (input.argv.includes("serve")) {
           return ok({ mode: "background", processId: "spr_server" } satisfies SandboxExecResult);
         }
@@ -180,6 +186,19 @@ describe("OpenCodeSandboxAgentHarness", () => {
     expect(server?.stdin).toBeInstanceOf(Uint8Array);
     expect(JSON.stringify(server?.argv)).not.toContain("/secret/");
     expect(JSON.stringify(server?.argv)).not.toContain("appaloft-scoped-capability");
+    const validations = calls.filter(
+      (call) => Array.isArray(call.argv) && call.argv.includes("debug") && call.argv.includes("config"),
+    );
+    expect(validations).toHaveLength(2);
+    for (const validation of validations) {
+      const validationArgv = [...validation.argv];
+      expect(validationArgv).toEqual(expect.arrayContaining(["debug", "config"]));
+      expect(validation.background).not.toBe(true);
+      expect(validation.stdin).toBeInstanceOf(Uint8Array);
+      expect(validationArgv.some((argument) => argument.includes(">/dev/null 2>&1"))).toBe(true);
+      expect(JSON.stringify(validationArgv)).not.toContain("/secret/");
+      expect(JSON.stringify(validationArgv)).not.toContain("appaloft-scoped-capability");
+    }
     const run = calls.find((call) => Array.isArray(call.argv) && call.argv.includes("run"));
     expect(run?.argv).toEqual(
       expect.arrayContaining([
@@ -210,7 +229,6 @@ describe("OpenCodeSandboxAgentHarness", () => {
     expect(JSON.parse(new TextDecoder().decode(run?.stdin).split("\n")[0] ?? "null")).toEqual({
       model: "appaloft/coding-model",
       snapshot: false,
-      snapshots: false,
       provider: {
         appaloft: {
           npm: "@ai-sdk/openai-compatible",
@@ -254,6 +272,159 @@ describe("OpenCodeSandboxAgentHarness", () => {
     });
   });
 
+  test("[GH-AUTO-NATIVE-STATE-027] rejects an invalid pinned native config before server startup", async () => {
+    const calls: Parameters<OpenCodeSandboxExecutionPort["exec"]>[2][] = [];
+    const revoked: string[] = [];
+    const execution: OpenCodeSandboxExecutionPort = {
+      async exec(_context, _sandboxId, input) {
+        calls.push(input);
+        if (input.argv.includes("--version")) {
+          return ok({
+            mode: "foreground",
+            frames: [
+              { kind: "stdout", sequence: 1, data: "1.18.4\n" },
+              { kind: "exit", sequence: 2, exitCode: 0 },
+            ],
+          } satisfies SandboxExecResult);
+        }
+        return ok({
+          mode: "foreground",
+          frames: [
+            { kind: "stderr", sequence: 1, data: "Configuration is invalid at a secret path" },
+            { kind: "exit", sequence: 2, exitCode: 1 },
+          ],
+        } satisfies SandboxExecResult);
+      },
+      async listProcesses() {
+        return ok([]);
+      },
+      async terminateProcess() {
+        return ok(undefined);
+      },
+      async readFile() {
+        return err({
+          code: "sandbox_file_not_found",
+          category: "user",
+          message: "missing",
+          retryable: false,
+          details: {},
+        });
+      },
+      async writeFile() {
+        throw new Error("unexpected write");
+      },
+      async removeFile() {
+        return ok(undefined);
+      },
+    };
+    const harness = new OpenCodeSandboxAgentHarness(execution, {
+      templateId: "aht_opencode_managed_v1",
+      sandboxTemplateId: "stp_opencode_pinned",
+      version: "1.18.4",
+      templateDigest: `sha256:${"b".repeat(64)}`,
+      modelAccess: {
+        async issue() {
+          return modelAccess.issue();
+        },
+        async revoke(input) {
+          revoked.push(input.capabilityId);
+        },
+      },
+    });
+
+    expect(
+      harness.prepareRuntime?.({
+        executionContext: context,
+        sandboxId: "sbx_open",
+        runtimeId: "sar_open",
+      }),
+    ).rejects.toThrow("opencode_harness_config_invalid");
+    expect(calls.some((call) => call.argv.includes("serve"))).toBe(false);
+    expect(revoked).toEqual(["smc_opencode"]);
+    expect(JSON.stringify(calls)).not.toContain("appaloft-scoped-capability");
+  });
+
+  test("[GH-AUTO-NATIVE-STATE-027] rejects an invalid run-scoped config before headless startup", async () => {
+    const calls: Parameters<OpenCodeSandboxExecutionPort["exec"]>[2][] = [];
+    const revoked: string[] = [];
+    const marker = new TextEncoder().encode(
+      JSON.stringify({
+        schemaVersion: "opencode-server-marker/v2",
+        processId: "spr_server",
+        capabilityId: "smc_opencode_runtime",
+        expiresAt: "2099-01-01T00:00:00.000Z",
+        provider: "appaloft",
+        model: "coding-model",
+      }),
+    );
+    const execution: OpenCodeSandboxExecutionPort = {
+      async exec(_context, _sandboxId, input) {
+        calls.push(input);
+        return ok({
+          mode: "foreground",
+          frames: [
+            { kind: "stderr", sequence: 1, data: "Configuration is invalid" },
+            { kind: "exit", sequence: 2, exitCode: 1 },
+          ],
+        } satisfies SandboxExecResult);
+      },
+      async listProcesses() {
+        return ok([{ processId: "spr_server", status: "running" }]);
+      },
+      async terminateProcess() {
+        return ok(undefined);
+      },
+      async readFile(_context, _sandboxId, input) {
+        return input.path.endsWith("opencode-process-id")
+          ? ok(marker)
+          : err({
+              code: "sandbox_file_not_found",
+              category: "user",
+              message: "missing",
+              retryable: false,
+              details: {},
+            });
+      },
+      async writeFile() {
+        throw new Error("unexpected write");
+      },
+      async removeFile() {
+        return ok(undefined);
+      },
+    };
+    const harness = new OpenCodeSandboxAgentHarness(execution, {
+      templateId: "aht_opencode_managed_v1",
+      sandboxTemplateId: "stp_opencode_pinned",
+      version: "1.18.4",
+      templateDigest: `sha256:${"b".repeat(64)}`,
+      modelAccess: {
+        async issue() {
+          return {
+            ...(await modelAccess.issue()),
+            capabilityId: "smc_opencode_run",
+          };
+        },
+        async revoke(input) {
+          revoked.push(input.capabilityId);
+        },
+      },
+    });
+
+    await expect(
+      harness.execute({
+        executionContext: context,
+        sandboxId: "sbx_open",
+        runtimeId: "sar_open",
+        runId: "srun_open",
+        task: "Build it",
+        context: { mode: "fresh" },
+        requestApproval: async () => "rejected",
+      }),
+    ).rejects.toThrow("opencode_harness_config_invalid");
+    expect(calls.some((call) => call.background === true)).toBe(false);
+    expect(revoked).toEqual(["smc_opencode_run"]);
+  });
+
   test("[AGENT-OPENCODE-011] cleans server and model capability when durable startup state fails", async () => {
     const terminated: string[] = [];
     const revoked: string[] = [];
@@ -266,6 +437,12 @@ describe("OpenCodeSandboxAgentHarness", () => {
               { kind: "stdout", sequence: 1, data: "1.1.60\n" },
               { kind: "exit", sequence: 2, exitCode: 0 },
             ],
+          });
+        }
+        if (input.argv.includes("debug") && input.argv.includes("config")) {
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
           });
         }
         return ok({ mode: "background", processId: "spr_server" });
@@ -348,7 +525,13 @@ describe("OpenCodeSandboxAgentHarness", () => {
       [".appaloft-agent/srun_failed/exit-code", new TextEncoder().encode("1")],
     ]);
     const execution: OpenCodeSandboxExecutionPort = {
-      async exec() {
+      async exec(_context, _sandboxId, input) {
+        if (input.argv.includes("debug") && input.argv.includes("config")) {
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
+          });
+        }
         return ok({ mode: "background", processId: "spr_run" });
       },
       async listProcesses() {
@@ -504,7 +687,13 @@ describe("OpenCodeSandboxAgentHarness", () => {
       ],
     ]);
     const execution: OpenCodeSandboxExecutionPort = {
-      async exec() {
+      async exec(_context, _sandboxId, input) {
+        if (input.argv.includes("debug") && input.argv.includes("config")) {
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
+          });
+        }
         return ok({ mode: "background", processId: "spr_run" });
       },
       async listProcesses() {

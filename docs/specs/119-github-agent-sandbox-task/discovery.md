@@ -107,15 +107,18 @@ Review Round becomes a durable downstream-Code and merge gate.
 
 ### Configuration compatibility correction
 
-- External run `30754835742` proved that the first repair's singular `snapshot: false` field was
-  ignored by pinned OpenCode `1.18.4`; native packs still appeared below
-  `/workspace/.local/share/opencode/snapshot` and the manual Review Task did not reach a terminal
-  state within 30 minutes.
-- The official OpenCode `v1.18.4` source schema defines the plural `snapshots` field, while legacy
-  supported documentation and releases use singular `snapshot`. The neutral Adapter must emit both
-  disabled compatibility fields rather than guess from a vendor version string.
-- The run reported `oom=0` and `oom_kill=0`, so this evidence corrects configuration compatibility;
-  it does not weaken the separate process-tree and exact-cleanup requirements.
+- External run `30754835742` proved that the first repair did not yet prevent native packs below
+  `/workspace/.local/share/opencode/snapshot`; it did not prove that OpenCode ignored the singular
+  field. The subsequent compatibility assumption was therefore broader than the evidence.
+- Composed run `30784070803` used public `855e8b275ddb69ad3b14d2bfe9187be99435c9c0`, retried the
+  first Task repeatedly, left ten background-process markers, and ended with an 8 GiB cgroup OOM.
+- A deterministic probe with the exact official `opencode-ai@1.18.4` binary rejects the emitted
+  plural `snapshots` key as an unrecognized field. The same pinned source exposes and evaluates the
+  singular `snapshot` setting. Unknown compatibility fields are not inert and must not be emitted.
+- The neutral Adapter must generate configuration for the exact pinned native runtime and validate
+  it with that installed binary before starting a persistent server or Run. Validation receives
+  config through Sandbox stdin, emits no config output, revokes the scoped capability on failure,
+  and returns one stable secret-safe error (#980).
 
 ## 2026-08-01 Pause/Activity Concurrency Evidence
 
