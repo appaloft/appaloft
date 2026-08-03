@@ -26,9 +26,12 @@ control-plane table.
 2. Durable Operator Work polls the Run. Client disconnect is observation-only.
 3. `steer` and stopped-task `resume` keep the stable Task/Workspace, create a new active Run, and
    enqueue durable work fenced by that `activeRunId` generation.
-4. A stale durable generation cannot overwrite the newer active Run, lineage, or Task status;
+4. A proven `nativeAgentSessionRef` uses native continuation. Without that proof, the new Run is a
+   truthful `fallback` fresh session whose bounded prompt contains the protected original objective,
+   prior Diff/check evidence, prior steer instructions, and the current instruction.
+5. A stale durable generation cannot overwrite the newer active Run, lineage, or Task status;
    replay of the current generation remains idempotent.
-5. `cancel` cancels the active underlying Run and revokes only the exact task-owned
+6. `cancel` cancels the active underlying Run and revokes only the exact task-owned
    preview/process.
 
 ## Finalize

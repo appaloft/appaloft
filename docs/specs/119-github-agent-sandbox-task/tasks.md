@@ -32,6 +32,9 @@
   `/root/.local/share/opencode/log/opencode.log` inside a read-only-root Sandbox.
 - [x] Create and link public pause-safe activity persistence issue #951 after external run
   `30699497767` proved a late ready-state activity save replaced the paused recovery handle.
+- [x] Create and link public fallback-resume objective issue #982 after composed external run
+  `30791490605` proved an immediate stop/resume could start a fallback Run without the original
+  Task objective and leave delivery retrying a branch with no commit.
 
 ## Public Composition Boundary Slice
 
@@ -92,6 +95,9 @@
 - [x] Add stable Task id, active Run, bounded Run lineage, and old-state migration tests.
 - [x] Add current thread Task pointer and historical read model.
 - [x] Implement recoverable stop, steer, resume, and explicit native-session fallback.
+- [x] GH-AUTO-SESSION-011: persist the bounded redacted original Task objective and make an
+  unproven native-session fallback start a fresh child Run with objective, diff/check, steer, and
+  current-instruction context (#982).
 - [x] Compose existing Workspace create/recover, Agent Task, durable work, checks, Diff, and Preview.
 - [x] Enforce cumulative runtime, automatic retry classes, and Task control permission.
 - [x] GH-AUTO-DURABLE-CREDENTIAL-023: persist optional organization id in Sandbox Agent durable-work

@@ -570,7 +570,7 @@ describe("Agent Task Run application workflow", () => {
     await harness.service.create(cliContext, {
       workspaceId,
       runtimeId,
-      task: "Implement issue #123",
+      task: "Implement issue #123\nAPI_KEY=must-not-survive",
       runContext: { mode: "fresh" },
       idempotencyKey: "task-fallback-steer",
       checks: [],
@@ -596,7 +596,13 @@ describe("Agent Task Run application workflow", () => {
       ],
     });
     expect(harness.createdRunInputs[1]?.task).toContain("cannot prove native session resume");
+    expect(harness.createdRunInputs[1]?.task).toContain(
+      "Original task objective:\nImplement issue #123",
+    );
+    expect(harness.createdRunInputs[1]?.task).toContain("[REDACTED SECRET-LIKE OUTPUT]");
+    expect(harness.createdRunInputs[1]?.task).not.toContain("must-not-survive");
     expect(harness.createdRunInputs[1]?.task).toContain("keep the existing API compatible");
+    expect(harness.createdRunInputs[1]?.context).toEqual({ mode: "fresh" });
     expect(harness.queued).toEqual([
       {
         kind: "agent-task-run",
@@ -620,6 +626,50 @@ describe("Agent Task Run application workflow", () => {
     );
     expect(rejected.isErr()).toBe(true);
     expect(harness.createdRunInputs).toHaveLength(2);
+  });
+
+  test("[GH-AUTO-SESSION-011] fallback resume preserves the original objective and prior steer context", async () => {
+    const harness = createHarness();
+    await harness.service.create(cliContext, {
+      workspaceId,
+      runtimeId,
+      task: "Implement issue #123 and keep the exported API stable",
+      runContext: { mode: "fresh" },
+      idempotencyKey: "task-fallback-resume",
+      checks: [],
+      immutableReview: false,
+      sourceRoot: ".",
+    });
+
+    const steered = await harness.service.steer(
+      cliContext,
+      workspaceId,
+      taskRunId,
+      "retain the current export name",
+    );
+    expect(steered._unsafeUnwrap().sessionRecovery).toBe("fallback");
+
+    const stopped = await harness.service.stop(cliContext, workspaceId, taskRunId);
+    expect(stopped._unsafeUnwrap().status).toBe("stopped");
+    const resumed = await harness.service.resume(cliContext, workspaceId, taskRunId);
+
+    expect(resumed._unsafeUnwrap()).toMatchObject({
+      taskRunId,
+      activeRunId: `${taskRunId}_3`,
+      status: "running",
+      sessionRecovery: "fallback",
+    });
+    expect(resumed._unsafeUnwrap().runLineage).toHaveLength(3);
+    expect(harness.createdRunInputs[2]?.context).toEqual({ mode: "fresh" });
+    expect(harness.createdRunInputs[2]?.task).toContain(
+      "Original task objective:\nImplement issue #123 and keep the exported API stable",
+    );
+    expect(harness.createdRunInputs[2]?.task).toContain(
+      "Previous steer instructions:\n- retain the current export name",
+    );
+    expect(harness.createdRunInputs[2]?.task).toContain(
+      "User instruction:\nResume the current Agent Task.",
+    );
   });
 
   test("[GH-AUTO-CONTROL-010][GH-AUTO-LINEAGE-012] stale reconciliation cannot overwrite a steered active Run", async () => {

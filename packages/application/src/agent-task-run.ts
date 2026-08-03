@@ -118,6 +118,7 @@ export interface AgentTaskRunDescriptor {
   sessionRecovery: "new" | "native" | "fallback";
   nativeSessionCapable: boolean;
   nativeAgentSessionRef?: string;
+  objective?: string;
   steerHistory: Array<{
     instruction: string;
     requestedAt: string;
@@ -560,6 +561,7 @@ export class AgentTaskRunService {
       ...(input.nativeAgentSessionRef
         ? { nativeAgentSessionRef: input.nativeAgentSessionRef }
         : {}),
+      objective: bounded(redact(input.task).value, 16_384).value,
       steerHistory: [],
       checks: [],
       createdAt: now,
@@ -720,6 +722,7 @@ export class AgentTaskRunService {
       recovery === "fallback"
         ? [
             "The Agent adapter cannot prove native session resume. Continue as a new session.",
+            task.objective ? `Original task objective:\n${task.objective}` : "",
             `Previous task status: ${task.status}.`,
             task.changes?.stat ? `Previous Git diff summary:\n${task.changes.stat}` : "",
             task.checks.length > 0
@@ -728,6 +731,11 @@ export class AgentTaskRunService {
                   .join("\n")}`
               : "",
             task.failure ? `Previous failure: ${task.failure.message}` : "",
+            task.steerHistory.length > 0
+              ? `Previous steer instructions:\n${task.steerHistory
+                  .map((entry) => `- ${entry.instruction}`)
+                  .join("\n")}`
+              : "",
           ]
             .filter(Boolean)
             .join("\n\n")
@@ -740,7 +748,10 @@ export class AgentTaskRunService {
       sandboxId: task.workspaceId,
       runtimeId: task.runtimeId,
       task: prompt,
-      context: { mode: "continue", parentRunId: task.activeRunId },
+      context:
+        recovery === "native"
+          ? { mode: "continue", parentRunId: task.activeRunId }
+          : { mode: "fresh" },
       idempotencyKey: `agent-task-${input.reason}:${task.taskRunId}:${task.runLineage.length + 1}`,
     });
     if (run.isErr()) return err(run.error);
