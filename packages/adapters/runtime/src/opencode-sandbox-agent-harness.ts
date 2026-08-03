@@ -175,7 +175,6 @@ function modelConfig(capability: OpenCodeSandboxModelCapability): string {
   return JSON.stringify({
     model: `${capability.provider}/${capability.model}`,
     snapshot: false,
-    snapshots: false,
     provider: {
       [capability.provider]: {
         npm: "@ai-sdk/openai-compatible",
@@ -346,6 +345,14 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       throw new Error("opencode_model_access_invalid");
     }
     const config = modelConfig(capability);
+    if (!(await this.nativeConfigIsValid(input.executionContext, input.sandboxId, config))) {
+      await modelAccess.revoke({
+        ...input,
+        runId: input.runtimeId,
+        capabilityId: capability.capabilityId,
+      });
+      throw new Error("opencode_harness_config_invalid");
+    }
     const started = await this.execution.exec(input.executionContext, input.sandboxId, {
       argv: [
         "sh",
@@ -470,6 +477,16 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       throw new Error("opencode_model_access_invalid");
     }
     const config = modelConfig(capability);
+    if (!(await this.nativeConfigIsValid(input.executionContext, input.sandboxId, config))) {
+      await modelAccess.revoke({
+        executionContext: input.executionContext,
+        sandboxId: input.sandboxId,
+        runtimeId: input.runtimeId,
+        runId: input.runId,
+        capabilityId: capability.capabilityId,
+      });
+      throw new Error("opencode_harness_config_invalid");
+    }
     const outputRoot = `.appaloft-agent/${input.runId}`;
     const stdoutPath = `${outputRoot}/stdout.jsonl`;
     const stderrPath = `${outputRoot}/stderr.log`;
@@ -696,6 +713,25 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
         ? revokeError
         : new Error("opencode_model_access_revoke_failed");
     }
+  }
+
+  private async nativeConfigIsValid(
+    executionContext: ExecutionContext,
+    sandboxId: string,
+    config: string,
+  ): Promise<boolean> {
+    const validated = await this.execution.exec(executionContext, sandboxId, {
+      argv: [
+        "sh",
+        "-c",
+        'IFS= read -r config; export OPENCODE_CONFIG_CONTENT="$config"; exec "$@" >/dev/null 2>&1',
+        "appaloft-opencode-config",
+        ...sandboxWorkspaceProcessArgv([this.executable, "debug", "config"]),
+      ],
+      ...(this.cwd === "." ? {} : { cwd: this.cwd }),
+      stdin: new TextEncoder().encode(`${config}\n`),
+    });
+    return validated.isOk() && foregroundSucceeded(validated.value);
   }
 
   private workspaceFilePath(path: string): string {

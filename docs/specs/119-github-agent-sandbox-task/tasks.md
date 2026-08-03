@@ -114,11 +114,12 @@
   read-only-root regression and compute-released resume path.
 - [x] GH-AUTO-LIFECYCLE-025: block an admitted runtime operation, pause the Sandbox, then finish the
   old operation and prove its activity bookkeeping cannot overwrite paused state or recovery handle.
-- [ ] GH-AUTO-NATIVE-STATE-027: correct the native Adapter config to emit both legacy `snapshot`
-  and OpenCode 1.18.4 `snapshots` disabled fields, preserve native sessions and scoped model
-  configuration, and rerun registered-server acceptance after run `30754835742` proved the
-  singular-only repair was ignored (#964). Public focused regression plus repository-wide lint,
-  typecheck, test, and build pass; registered-server acceptance remains the unchecked exit gate.
+- [ ] GH-AUTO-NATIVE-STATE-027: emit only the singular snapshot policy accepted by exact pinned
+  OpenCode 1.18.4, validate the generated native config before background startup, revoke scoped
+  model access on validation failure, and preserve native sessions plus independent headless Runs
+  (#980). Focused regression, runtime package tests/typecheck, `check:ash`, public lint, 61-package
+  typecheck, repository test, and build pass; registered-server acceptance after run `30784070803`
+  remains the unchecked exit gate.
 
 ## GitHub Feedback And Delivery Slice
 
