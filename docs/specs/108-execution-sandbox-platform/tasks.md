@@ -35,9 +35,11 @@
 - [x] Add hermetic runtime provider and contract suite.
 - [x] Add Docker `container-trusted` provider with scoped cleanup.
 - [x] Add optional Docker+gVisor capability probe and provider path.
-- [x] `SBX-RUNTIME-006`: converge an exact concurrent Docker Sandbox removal only after bounded
-  readback proves the owned container is absent; keep a present container or unrelated failure
-  fail closed.
+- [x] `SBX-RUNTIME-006`: extend exact concurrent Docker Sandbox removal to a bounded multi-second
+  readback window with deterministic test timing; run `30754835742` proved the original three
+  100 ms probes can expire while Docker still removes the owned container. Keep a present container
+  through the complete bound or an unrelated failure fail closed. Automated regression passes;
+  downstream registered-server acceptance remains pending (#959).
 
 ## Entrypoints And Docs
 

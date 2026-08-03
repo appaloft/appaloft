@@ -205,6 +205,7 @@ type DockerSandboxProviderInput = {
   egressPolicy?: SandboxEgressPolicyAdapter;
   internalNetwork?: string;
   now?: () => string;
+  sleep?: (delayMs: number) => Promise<void>;
   credentialBroker?: boolean;
   portableRecovery?: {
     kind: "shared-filesystem";
@@ -233,6 +234,8 @@ function hibernationImage(sandboxId: string): string {
 
 const portableRecoveryHandlePrefix = "appaloft-docker-recovery:v1:";
 const portableSnapshotHandlePrefix = "appaloft-docker-snapshot:v1:";
+const concurrentRemovalReadbackAttempts = 20;
+const concurrentRemovalReadbackDelayMs = 250;
 
 interface PortableRecoveryHandle {
   sandboxId: string;
@@ -352,6 +355,7 @@ export class DockerSandboxProvider implements SandboxProvider {
   private readonly portPublisher: SandboxPortPublisher | undefined;
   private readonly egressPolicy: SandboxEgressPolicyAdapter | undefined;
   private readonly now: () => string;
+  private readonly sleep: (delayMs: number) => Promise<void>;
   private readonly runtimeName: "runc" | "runsc";
   private readonly networkName: string;
   private readonly portableRecovery: DockerSandboxProviderInput["portableRecovery"];
@@ -399,6 +403,7 @@ export class DockerSandboxProvider implements SandboxProvider {
     this.portPublisher = input.portPublisher;
     this.egressPolicy = input.egressPolicy;
     this.now = input.now ?? (() => new Date().toISOString());
+    this.sleep = input.sleep ?? ((delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)));
   }
 
   async probe(): Promise<void> {
@@ -1762,10 +1767,10 @@ export class DockerSandboxProvider implements SandboxProvider {
     if (!removed.stderr?.toLowerCase().includes(concurrentRemoval.toLowerCase())) {
       throw new Error(`Docker Sandbox command failed: ${removed.stderr || text(removed.stdout)}`);
     }
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
+    for (let attempt = 1; attempt <= concurrentRemovalReadbackAttempts; attempt += 1) {
       if (!(await this.assertHandleIfPresent(request))) return;
-      if (attempt < 3) {
-        await new Promise<void>((resolve) => setTimeout(resolve, 100));
+      if (attempt < concurrentRemovalReadbackAttempts) {
+        await this.sleep(concurrentRemovalReadbackDelayMs);
       }
     }
     throw new Error(`Docker Sandbox command failed: ${removed.stderr || text(removed.stdout)}`);
