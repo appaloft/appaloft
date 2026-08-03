@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.7.1](https://github.com/appaloft/appaloft/compare/v1.7.0...v1.7.1) (2026-08-03)
+
+
+### Bug Fixes
+
+* extend concurrent sandbox termination readback ([#975](https://github.com/appaloft/appaloft/issues/975)) ([855e8b2](https://github.com/appaloft/appaloft/commit/855e8b275ddb69ad3b14d2bfe9187be99435c9c0))
+* **release:** allow pending release publication ([#970](https://github.com/appaloft/appaloft/issues/970)) ([3fab319](https://github.com/appaloft/appaloft/commit/3fab3196e44e94329008ddb70b3b878c1f487749))
+* **release:** restore dedicated release identity ([#973](https://github.com/appaloft/appaloft/issues/973)) ([583f14f](https://github.com/appaloft/appaloft/commit/583f14f2a009a6c535737d2b2ff257e44211a41a))
+* **release:** scan pending release range ([#971](https://github.com/appaloft/appaloft/issues/971)) ([77e6030](https://github.com/appaloft/appaloft/commit/77e6030d644725c3e9f5d4e5b0c0461f6763f82b))
+* support opencode snapshot config variants ([#972](https://github.com/appaloft/appaloft/issues/972)) ([cf1851f](https://github.com/appaloft/appaloft/commit/cf1851ff917e6822aceebd5bf2b4baaabbae1f24))
+
 ## [1.7.0](https://github.com/appaloft/appaloft/compare/v1.6.4...v1.7.0) (2026-08-03)
 
 
