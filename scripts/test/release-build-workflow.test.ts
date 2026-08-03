@@ -38,6 +38,8 @@ describe("release build workflow", () => {
     expect(scripts["release:state:check"]).toBe("bun run scripts/release/check-release-state.ts");
     expect(workflow).toContain("Verify repository release state");
     expect(workflow).toContain("release:state:check --latest-release-tag");
+    expect(workflow).not.toContain("secrets.RELEASE_PLEASE_TOKEN");
+    expect(workflow.match(/github\.token/g)?.length).toBeGreaterThanOrEqual(5);
     expect(workflow.indexOf("Verify repository release state")).toBeLessThan(
       workflow.indexOf("googleapis/release-please-action@v4"),
     );
