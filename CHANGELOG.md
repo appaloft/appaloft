@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.2](https://github.com/appaloft/appaloft/compare/v1.7.1...v1.7.2) (2026-08-03)
+
+
+### Bug Fixes
+
+* **release:** prevent publish run races ([#978](https://github.com/appaloft/appaloft/issues/978)) ([c34999c](https://github.com/appaloft/appaloft/commit/c34999cdf47e9c768b970b595f75c2e89203b0a6))
+
 ## [1.7.1](https://github.com/appaloft/appaloft/compare/v1.7.0...v1.7.1) (2026-08-03)
 
 
