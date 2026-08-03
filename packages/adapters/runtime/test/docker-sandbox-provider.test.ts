@@ -25,6 +25,8 @@ class CapturingRunner implements SandboxDockerCommandRunner {
   concurrentRemoval = false;
   concurrentRemovalLeavesContainer = false;
   concurrentRemovalStarted = false;
+  concurrentRemovalReadbacksBeforeAbsent = 0;
+  concurrentRemovalReadbacks = 0;
   inventory = "";
   portableRecoveryDigest = "b".repeat(64);
   snapshotImageIdentity = "ssn_demo|sbx_demo";
@@ -54,6 +56,10 @@ class CapturingRunner implements SandboxDockerCommandRunner {
       !this.concurrentRemovalLeavesContainer &&
       command.includes("docker inspect --format")
     ) {
+      this.concurrentRemovalReadbacks += 1;
+      if (this.concurrentRemovalReadbacks <= this.concurrentRemovalReadbacksBeforeAbsent) {
+        return this.result("sbx_demo\n");
+      }
       return {
         exitCode: 1,
         stdout: new Uint8Array(),
@@ -410,10 +416,18 @@ describe("DockerSandboxProvider", () => {
     ).toBe(false);
   });
 
-  test("[SBX-RUNTIME-006] converges when concurrent termination already removes the exact container", async () => {
+  test("[SBX-RUNTIME-006] converges after a concurrent removal outlives three ownership readbacks", async () => {
     const runner = new CapturingRunner();
     runner.concurrentRemoval = true;
-    const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
+    runner.concurrentRemovalReadbacksBeforeAbsent = 5;
+    const delays: number[] = [];
+    const provider = new DockerSandboxProvider({
+      isolation: "gvisor",
+      runner,
+      sleep: async (delayMs) => {
+        delays.push(delayMs);
+      },
+    });
     await provider.provision(request);
 
     await provider.terminate({
@@ -422,18 +436,22 @@ describe("DockerSandboxProvider", () => {
     });
 
     expect(runner.concurrentRemovalStarted).toBe(true);
-    expect(
-      runner.calls.filter(
-        (call) => call.argv[0] === "docker" && call.argv[1] === "inspect",
-      ).length,
-    ).toBeGreaterThanOrEqual(2);
+    expect(runner.concurrentRemovalReadbacks).toBe(6);
+    expect(delays).toEqual([250, 250, 250, 250, 250]);
   });
 
   test("[SBX-RUNTIME-006] fails closed when a concurrent-removal response leaves the container present", async () => {
     const runner = new CapturingRunner();
     runner.concurrentRemoval = true;
     runner.concurrentRemovalLeavesContainer = true;
-    const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
+    const delays: number[] = [];
+    const provider = new DockerSandboxProvider({
+      isolation: "gvisor",
+      runner,
+      sleep: async (delayMs) => {
+        delays.push(delayMs);
+      },
+    });
     await provider.provision(request);
 
     await expect(
@@ -442,6 +460,7 @@ describe("DockerSandboxProvider", () => {
         providerHandle: "appaloft-sbx_demo",
       }),
     ).rejects.toThrow("removal of container appaloft-sbx_demo is already in progress");
+    expect(delays).toHaveLength(19);
   });
 
   test("[AGENT-WS-EGRESS-019] injects only a scoped proxy env file and revokes it with the Sandbox", async () => {
