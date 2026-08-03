@@ -271,6 +271,11 @@ flows.
 6. Merge the Release Please PR when ready to publish. Use the default release PR title as the merge
    commit subject so it starts with `chore: release `. The merge commit is the publishing
    confirmation and triggers the release publish run automatically.
+7. After merging the release PR, monitor that push-triggered `Release` run to completion. Do not
+   dispatch another `Release` workflow for the same release commit: both runs share release state,
+   and a concurrent manual run can observe the GitHub Release before the push run has uploaded its
+   artifacts. If the push run has created the tag or GitHub Release, let that run finish; do not
+   cancel it in favor of a second run.
 
 If you do not want to publish yet, do not run `Release`, or leave the Release Please PR unmerged.
 
