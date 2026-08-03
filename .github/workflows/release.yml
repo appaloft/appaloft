@@ -86,6 +86,8 @@ jobs:
     steps:
       - name: Check out release source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Bun for release-state preflight
         uses: oven-sh/setup-bun@v2
@@ -103,9 +105,9 @@ jobs:
             gh release view --repo "${GITHUB_REPOSITORY}" --json tagName --jq '.tagName'
           )"
           repository_version="$(jq -r '.version' package.json)"
-          release_commit_message="$(git log -1 --pretty=%B)"
+          release_commit_messages="$(git log "${latest_release_tag}..HEAD" --pretty=%B)"
           release_state_args=(--latest-release-tag "${latest_release_tag}")
-          if grep -Fq "chore: release ${repository_version}" <<< "${release_commit_message}"; then
+          if grep -Fq "chore: release ${repository_version}" <<< "${release_commit_messages}"; then
             release_state_args+=(--allow-unpublished-version "${repository_version}")
           fi
           bun run release:state:check "${release_state_args[@]}"
