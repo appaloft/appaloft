@@ -115,7 +115,7 @@ jobs:
       - id: release
         uses: googleapis/release-please-action@v4
         with:
-          token: ${{ github.token }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: .github/release-please-config.json
           manifest-file: .github/.release-please-manifest.json
           release-as: ${{ inputs.release_as }}
