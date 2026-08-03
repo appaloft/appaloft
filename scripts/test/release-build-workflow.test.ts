@@ -40,6 +40,9 @@ describe("release build workflow", () => {
     expect(workflow).toContain("release_state_args=(--latest-release-tag");
     expect(workflow).toContain("contains(github.event.head_commit.message, 'chore: release ')");
     expect(workflow).toContain(
+      ['git log "$', "{latest_release_tag}", '..HEAD" --pretty=%B'].join(""),
+    );
+    expect(workflow).toContain(
       ["--allow-unpublished-version ", '"$', "{repository_version}", '"'].join(""),
     );
     expect(workflow).not.toContain("secrets.RELEASE_PLEASE_TOKEN");
