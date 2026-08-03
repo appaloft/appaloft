@@ -84,6 +84,26 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+
+      - name: Set up Bun for release-state preflight
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+
+      - name: Verify repository release state
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+
+          latest_release_tag="$(
+            gh release view --repo "${GITHUB_REPOSITORY}" --json tagName --jq '.tagName'
+          )"
+          bun run release:state:check --latest-release-tag "${latest_release_tag}"
+
       - id: release
         uses: googleapis/release-please-action@v4
         with:
