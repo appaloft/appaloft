@@ -672,6 +672,57 @@ describe("Agent Task Run application workflow", () => {
     );
   });
 
+  test("[GH-AUTO-CONTROL-010][GH-AUTO-LIFECYCLE-028] stopped state fences a late same-Run reconciliation before resume", async () => {
+    let markShowRunStarted: (() => void) | undefined;
+    const showRunStarted = new Promise<void>((resolve) => {
+      markShowRunStarted = resolve;
+    });
+    let releaseShowRun: (() => void) | undefined;
+    const showRunPending = new Promise<void>((resolve) => {
+      releaseShowRun = resolve;
+    });
+    const harness = createHarness({
+      showRun: async (_context, _runtimeId, runId) => {
+        markShowRunStarted?.();
+        await showRunPending;
+        return ok(runDescriptor("running", runId));
+      },
+    });
+    await harness.service.create(cliContext, {
+      workspaceId,
+      runtimeId,
+      task: "Implement issue #123",
+      runContext: { mode: "fresh" },
+      idempotencyKey: "task-stopped-reconciliation-fence",
+      checks: [],
+      immutableReview: false,
+      sourceRoot: ".",
+    });
+
+    const lateReconciliation = harness.service.reconcile(cliContext, workspaceId, taskRunId);
+    await showRunStarted;
+    const stopped = await harness.service.stop(cliContext, workspaceId, taskRunId);
+    expect(stopped._unsafeUnwrap().status).toBe("stopped");
+
+    releaseShowRun?.();
+    await lateReconciliation;
+    expect(
+      (await harness.service.show(cliContext, workspaceId, taskRunId))._unsafeUnwrap(),
+    ).toMatchObject({
+      taskRunId,
+      activeRunId: taskRunId,
+      status: "stopped",
+    });
+
+    const resumed = await harness.service.resume(cliContext, workspaceId, taskRunId);
+    expect(resumed._unsafeUnwrap()).toMatchObject({
+      taskRunId,
+      activeRunId: `${taskRunId}_2`,
+      status: "running",
+      sessionRecovery: "fallback",
+    });
+  });
+
   test("[GH-AUTO-CONTROL-010][GH-AUTO-LINEAGE-012] stale reconciliation cannot overwrite a steered active Run", async () => {
     let markShowRunStarted: (() => void) | undefined;
     const showRunStarted = new Promise<void>((resolve) => {

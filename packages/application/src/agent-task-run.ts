@@ -90,6 +90,21 @@ export type AgentTaskRunStatus =
   | "failed"
   | "cancelled";
 
+const reconciliationProtectedTaskStatuses: readonly AgentTaskRunStatus[] = [
+  "checks-failed",
+  "awaiting-approval",
+  "approved",
+  "delivering",
+  "delivered",
+  "failed",
+  "stopped",
+  "cancelled",
+];
+
+function isReconciliationProtectedTaskStatus(status: AgentTaskRunStatus): boolean {
+  return reconciliationProtectedTaskStatuses.includes(status);
+}
+
 export interface AgentTaskRunLineageEntry {
   runId: string;
   parentRunId?: string;
@@ -412,6 +427,7 @@ export class AgentTaskRunService {
       });
       if (current.isErr()) return current;
       if (current.value.activeRunId !== expectedActiveRunId) return current;
+      if (isReconciliationProtectedTaskStatus(current.value.status)) return current;
     }
     const protectedState = await this.dependencies.stateProtector.protect(
       { purpose: "agent-task-state" },
@@ -976,18 +992,7 @@ export class AgentTaskRunService {
     if (task.isErr()) return task;
     const reconciliationActiveRunId = expectedActiveRunId ?? task.value.activeRunId;
     if (task.value.activeRunId !== reconciliationActiveRunId) return task;
-    if (
-      [
-        "checks-failed",
-        "awaiting-approval",
-        "approved",
-        "delivering",
-        "delivered",
-        "failed",
-        "stopped",
-        "cancelled",
-      ].includes(task.value.status)
-    ) {
+    if (isReconciliationProtectedTaskStatus(task.value.status)) {
       return task;
     }
     const run = await this.dependencies.agents.showRun(
