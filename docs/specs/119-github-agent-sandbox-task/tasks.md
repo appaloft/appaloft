@@ -153,6 +153,8 @@
   remain per delivery while Task feedback is updated in place (#936).
 - [x] Update an existing head-bound Check from a control delivery without requiring a newly
   hydrated source SHA; retain exact-SHA admission for Check creation (#953).
+- [x] Separate inbound command environment-assignment rejection from outbound Review secret
+  detection so the public fallback Task link containing `?task=` remains deliverable (#984).
 
 ## Retention And Cleanup Slice
 
@@ -182,6 +184,9 @@
 - [x] Docs outcome for #953: not user-facing. The adapter correction restores the existing
   `agents/github-agent-tasks#github-agent-tasks` contract that one current Task comment and Check
   converge without adding or changing a user command, field, page, or help anchor.
+- [x] Docs outcome for #984: not user-facing. The adapter correction restores the documented
+  Review/Task-link delivery path without adding a command, API field, status, page, or help anchor;
+  inbound command and outbound secret rejection remain unchanged product behavior.
 - [x] Docs outcome for #927: not user-facing. The fix restores the already documented
   installation-authenticated materialization behavior and changes no public command or contract.
 - [x] Reopen #927 after registered-server smoke proved Docker's Workspace tmpfs is `noexec`;

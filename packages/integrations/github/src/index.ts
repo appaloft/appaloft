@@ -1677,8 +1677,9 @@ export interface NormalizedGitHubAgentEvent {
 const appaloftCommandPrefix = "@appaloft";
 const appaloftCommandInstructionLimit = 4_096;
 const githubCommentBodyLimit = 65_536;
-const sensitiveCommandText =
-  /(?:\b(?:api[_-]?key|password|private[_-]?key|secret|token|credential(?:connection)?id)\b\s*[:=]|\b[A-Z][A-Z0-9_]{2,}\s*=|\b(?:ghp_|github_pat_|xox[baprs]-|sk-[A-Za-z0-9_-]{12,}))/iu;
+const secretMaterialText =
+  /(?:\b(?:api[_-]?key|password|private[_-]?key|secret|token|credential(?:connection)?id)\b\s*[:=]|\b(?:ghp_|github_pat_|xox[baprs]-|sk-[A-Za-z0-9_-]{12,}))/iu;
+const environmentAssignmentText = /\b[A-Z][A-Z0-9_]{2,}\s*=/iu;
 const credentialSelectionText =
   /(?:--(?:credential|api-key|env|environment|model)\b|\b(?:credential|connection)[_-]?(?:id|ref)\b)/iu;
 const profileSlug = /^[a-z0-9](?:[a-z0-9.-]{0,78}[a-z0-9])?$/u;
@@ -1705,7 +1706,11 @@ export function parseAppaloftGitHubCommand(body: string): Result<AppaloftGitHubC
   }
 
   const commandLine = commandLines[0] ?? "";
-  if (sensitiveCommandText.test(commandLine) || credentialSelectionText.test(commandLine)) {
+  if (
+    secretMaterialText.test(commandLine) ||
+    environmentAssignmentText.test(commandLine) ||
+    credentialSelectionText.test(commandLine)
+  ) {
     return err(
       domainError.validation(
         "GitHub commands cannot contain credentials, secret material, or environment assignments",
@@ -2362,7 +2367,7 @@ export class GitHubAgentReviewDeliveryAdapter implements GitHubAgentReviewDelive
       return err(domainError.validation("GitHub Review delivery input is invalid or stale"));
     }
     const summary = boundedText(input.summary, 32_000);
-    if (!summary || sensitiveCommandText.test(summary)) {
+    if (!summary || secretMaterialText.test(summary)) {
       return err(domainError.validation("GitHub Review summary is invalid or contains secrets"));
     }
     const comments: Array<Record<string, unknown>> = [];
@@ -2374,7 +2379,7 @@ export class GitHubAgentReviewDeliveryAdapter implements GitHubAgentReviewDelive
         path.startsWith("/") ||
         path.split("/").includes("..") ||
         !body ||
-        sensitiveCommandText.test(body) ||
+        secretMaterialText.test(body) ||
         !Number.isSafeInteger(finding.line) ||
         finding.line < 1
       ) {
