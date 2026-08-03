@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.6.4](https://github.com/appaloft/appaloft/compare/v1.6.3...v1.6.4) (2026-07-29)
+
+
+### Features
+
+* add bounded GitHub task feedback ([#873](https://github.com/appaloft/appaloft/issues/873)) ([f6ba369](https://github.com/appaloft/appaloft/commit/f6ba3692cc04806522f51b6abec925a0237c05b5))
+
+## [1.6.3](https://github.com/appaloft/appaloft/compare/v1.6.2...v1.6.3) (2026-07-29)
+
+
+### Bug Fixes
+
+* keep deferred workload roles out of release gates ([#871](https://github.com/appaloft/appaloft/issues/871)) ([d98486a](https://github.com/appaloft/appaloft/commit/d98486a49bcca4a39ac6e0c8803d0f567999d61d))
+
 ## [1.6.2](https://github.com/appaloft/appaloft/compare/v1.6.1...v1.6.2) (2026-07-29)
 
 
