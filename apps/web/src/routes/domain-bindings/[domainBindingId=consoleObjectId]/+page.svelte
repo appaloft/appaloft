@@ -16,6 +16,7 @@
   } from "@lucide/svelte";
   import type {
     ConfirmDomainBindingOwnershipInput,
+    ConfigureDomainBindingCertificatePolicyInput,
     ConfigureDomainBindingRouteInput,
     DeleteDomainBindingInput,
     DomainBindingDeleteSafety,
@@ -188,6 +189,26 @@
       lifecycleFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.domainBindings.configureRouteErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+
+  const configureDomainBindingCertificatePolicyMutation = createMutation(() => ({
+    mutationFn: (input: ConfigureDomainBindingCertificatePolicyInput) =>
+      orpcClient.domainBindings.configureCertificatePolicy(input),
+    onSuccess: (_result, variables) => {
+      lifecycleFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.domainBindings.certificatePolicySuccessTitle),
+        detail: variables.certificatePolicy,
+      };
+      void refreshDomainBindingDetail();
+    },
+    onError: (error) => {
+      lifecycleFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.domainBindings.certificatePolicyErrorTitle),
         detail: readErrorMessage(error),
       };
     },
@@ -473,6 +494,17 @@
             redirectStatus: parseRedirectStatus(routeRedirectStatusDraft),
           }
         : {}),
+    });
+  }
+
+  function configureDomainBindingCertificatePolicy(
+    binding: DomainBindingSummary,
+    certificatePolicy: "auto" | "manual",
+  ): void {
+    lifecycleFeedback = null;
+    configureDomainBindingCertificatePolicyMutation.mutate({
+      domainBindingId: binding.id,
+      certificatePolicy,
     });
   }
 
@@ -896,6 +928,50 @@
           class={[detailTabPanelScrollClass, "space-y-5"]}
           data-domain-binding-lifecycle-handoff
         >
+          <section class="console-panel space-y-4 p-4" data-domain-binding-certificate-policy>
+            <div class="space-y-1">
+              <h2 class="text-lg font-semibold">
+                {$t(i18nKeys.console.domainBindings.certificatePolicyLabel)}
+              </h2>
+              <p class="text-sm text-muted-foreground">
+                {$t(i18nKeys.console.domainBindings.certificatePolicyDescription)}
+              </p>
+            </div>
+            <div class="rounded-md border bg-background px-3 py-2 text-sm">
+              <p class="font-medium">{selectedDomainBinding.certificatePolicy}</p>
+              <p class="mt-1 text-xs text-muted-foreground">
+                {$t(i18nKeys.console.domainBindings.certificatePolicyPending)}
+              </p>
+            </div>
+            <div class="flex flex-col gap-2 sm:flex-row">
+              <Button
+                type="button"
+                variant={selectedDomainBinding.certificatePolicy === "auto" ? "secondary" : "outline"}
+                disabled={selectedDomainBinding.tlsMode === "disabled" ||
+                  selectedDomainBinding.status === "deleted" ||
+                  configureDomainBindingCertificatePolicyMutation.isPending ||
+                  selectedDomainBinding.certificatePolicy === "auto"}
+                onclick={() => configureDomainBindingCertificatePolicy(selectedDomainBinding, "auto")}
+              >
+                {$t(i18nKeys.console.domainBindings.certificatePolicySwitchAuto)}
+              </Button>
+              <Button
+                type="button"
+                variant={selectedDomainBinding.certificatePolicy === "manual" ? "secondary" : "outline"}
+                disabled={selectedDomainBinding.tlsMode === "disabled" ||
+                  selectedDomainBinding.status === "deleted" ||
+                  configureDomainBindingCertificatePolicyMutation.isPending ||
+                  selectedDomainBinding.certificatePolicy === "manual"}
+                onclick={() => configureDomainBindingCertificatePolicy(selectedDomainBinding, "manual")}
+              >
+                {$t(i18nKeys.console.domainBindings.certificatePolicySwitchManual)}
+              </Button>
+              <DocsHelpLink
+                href={webDocsHrefs.certificateReadiness}
+                ariaLabel={$t(i18nKeys.console.domainBindings.certificatePolicyLabel)}
+              />
+            </div>
+          </section>
           <section class="console-panel space-y-4 p-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div class="space-y-1">

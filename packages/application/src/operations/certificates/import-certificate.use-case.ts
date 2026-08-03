@@ -30,6 +30,7 @@ import {
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import { createCoordinationOwner, mutationCoordinationPolicies } from "../../mutation-coordination";
 import { findOperationCatalogEntryByKey } from "../../operation-catalog";
 import { checkOperationGuards } from "../../operation-guard";
 import {
@@ -42,6 +43,8 @@ import {
   type DomainBindingRepository,
   type EventBus,
   type IdGenerator,
+  type MutationCoordinator,
+  type MutationLeaseGuard,
   type OperationGuardPort,
   type ProcessAttemptRecorder,
 } from "../../ports";
@@ -163,11 +166,30 @@ export class ImportCertificateUseCase {
     private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
     @inject(tokens.operationGuardPort)
     private readonly operationGuardPort?: OperationGuardPort,
+    @inject(tokens.mutationCoordinator)
+    private readonly mutationCoordinator?: MutationCoordinator,
   ) {}
 
   async execute(
     context: ExecutionContext,
     input: ImportCertificateCommandInput,
+  ): Promise<Result<ImportCertificateCommandResult>> {
+    const domainBindingId = DomainBindingId.create(input.domainBindingId);
+    if (domainBindingId.isErr()) return err(domainBindingId.error);
+    if (!this.mutationCoordinator) return this.executeExclusive(context, input);
+    return this.mutationCoordinator.runExclusive({
+      context,
+      policy: mutationCoordinationPolicies.importCertificate,
+      scope: { kind: "domain-binding", key: domainBindingId.value.value },
+      owner: createCoordinationOwner(context, "certificates.import"),
+      work: (lease) => this.executeExclusive(context, input, lease),
+    });
+  }
+
+  private async executeExclusive(
+    context: ExecutionContext,
+    input: ImportCertificateCommandInput,
+    lease?: MutationLeaseGuard,
   ): Promise<Result<ImportCertificateCommandResult>> {
     const {
       certificateMaterialValidator,
@@ -184,6 +206,7 @@ export class ImportCertificateUseCase {
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
+      if (lease) yield* await lease.assertOwned();
       const domainBindingId = yield* DomainBindingId.create(input.domainBindingId);
       const importedAt = yield* CreatedAt.create(clock.now());
       const idempotencyKey = yield* CertificateAttemptIdempotencyKeyValue.fromOptional(
@@ -240,6 +263,7 @@ export class ImportCertificateUseCase {
         ...(input.passphrase ? { passphrase: input.passphrase } : {}),
         importedAt: importedAt.value,
       });
+      if (lease) yield* await lease.assertOwned();
       const materialFingerprint = yield* CertificateMaterialFingerprintValue.create(
         validation.normalizedMaterialFingerprint,
       );
@@ -299,6 +323,7 @@ export class ImportCertificateUseCase {
         subjectAlternativeNames.push(yield* PublicDomainName.create(domainName));
       }
 
+      if (lease) yield* await lease.assertOwned();
       const secretRefs = yield* await certificateSecretStore.storeImported(context, {
         certificateId: certificateId.value,
         domainBindingId: domainBindingId.value,
@@ -365,11 +390,13 @@ export class ImportCertificateUseCase {
             ...(input.causationId ? { causationId: input.causationId } : {}),
           });
 
+      if (lease) yield* await lease.assertOwned();
       await certificateRepository.upsert(
         repositoryContext,
         certificate,
         UpsertCertificateSpec.fromCertificate(certificate),
       );
+      if (lease) yield* await lease.assertOwned();
       await recordImportedCertificateAttempt({
         recorder: processAttemptRecorder,
         repositoryContext,
@@ -386,6 +413,7 @@ export class ImportCertificateUseCase {
         resourceId: domainBindingState.resourceId.value,
         ...(domainBindingState.serverId ? { serverId: domainBindingState.serverId.value } : {}),
       });
+      if (lease) yield* await lease.assertOwned();
       await publishDomainEventsAndReturn(context, eventBus, logger, certificate, undefined);
 
       return ok({

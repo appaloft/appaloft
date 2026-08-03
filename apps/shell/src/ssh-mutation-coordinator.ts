@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
 import { buildSshRemoteStateProcessArgs, type SshRemoteStateTarget } from "@appaloft/adapter-cli";
 import {
@@ -208,8 +209,8 @@ function remoteHeartbeatCommand(input: {
     'now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"',
     'lock_dir="$data_root/locks/coordination/$scope_kind/$scope_hash.lock"',
     'owner_file="$lock_dir/owner.json"',
-    '[ -d "$lock_dir" ] || exit 0',
-    '[ -f "$owner_file" ] || exit 0',
+    `[ -d "$lock_dir" ] || exit ${lockOwnershipExitCode}`,
+    `[ -f "$owner_file" ] || exit ${lockOwnershipExitCode}`,
     'grep -F "$expected_owner_id_fragment" "$owner_file" >/dev/null 2>&1 || { cat "$owner_file" >&2; exit 75; }',
     'grep -F "$expected_lock_token_fragment" "$owner_file" >/dev/null 2>&1 || { cat "$owner_file" >&2; exit 75; }',
     'started_at="$(sed -n \'s/.*"startedAt"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p\' "$owner_file" | head -n 1 || true)"',
@@ -289,6 +290,10 @@ function remoteInfraError(input: {
 }
 
 export class SshMutationCoordinator implements MutationCoordinator {
+  private readonly activeLeases = new AsyncLocalStorage<
+    ReadonlyMap<string, { assertOwned(): Promise<Result<void>> }>
+  >();
+
   private readonly runner: SshMutationCoordinatorRunner;
   private readonly cwd: string;
   private readonly env: NodeJS.ProcessEnv;
@@ -304,6 +309,10 @@ export class SshMutationCoordinator implements MutationCoordinator {
     if (scopeValidation.isErr()) {
       return err(scopeValidation.error);
     }
+
+    const activeLeaseKey = `${input.scope.kind}:${input.scope.key}`;
+    const activeLease = this.activeLeases.getStore()?.get(activeLeaseKey);
+    if (activeLease) return input.work(activeLease);
 
     const startedAt = Date.now();
     const deadline = startedAt + input.policy.waitTimeoutMs;
@@ -453,7 +462,46 @@ export class SshMutationCoordinator implements MutationCoordinator {
     let workResult: Result<T> | null = null;
     let releaseError: DomainError | null = null;
 
+    const assertOwned = async (): Promise<Result<void>> => {
+      if (heartbeatError) return err(heartbeatError);
+      const result = await this.runner.run({
+        target: this.options.target,
+        command: remoteHeartbeatCommand({
+          dataRoot: this.options.dataRoot,
+          scopeKind: input.scope.kind,
+          scopeHash: lease.scopeHash,
+          ownerId: input.owner.ownerId,
+          lockToken: lease.lockToken,
+          staleAfterSeconds: Math.ceil(input.policy.leaseTtlMs / 1_000),
+        }),
+        cwd: this.cwd,
+        env: this.env,
+        ...(this.options.target.identityFile
+          ? { redactions: [this.options.target.identityFile] }
+          : {}),
+      });
+      if (!result.failed) return ok(undefined);
+      const ownershipError = remoteInfraError({
+        message:
+          result.exitCode === lockOwnershipExitCode
+            ? "SSH mutation coordination ownership was lost while the command was running"
+            : "SSH mutation coordination ownership check failed",
+        target: this.options.target,
+        phase: "operation-coordination",
+        exitCode: result.exitCode,
+        stderr: result.stderr,
+        scopeKind: input.scope.kind,
+        scopeKey: input.scope.key,
+        operationKey: input.policy.operationKey,
+      });
+      heartbeatError = ownershipError;
+      return err(ownershipError);
+    };
+    const activeLeaseKey = `${input.scope.kind}:${input.scope.key}`;
+
     try {
+      const activeLeases = new Map(this.activeLeases.getStore());
+      activeLeases.set(activeLeaseKey, { assertOwned });
       if (waitedForScope) {
         if (!this.options.refreshLocalState) {
           return err(
@@ -477,7 +525,7 @@ export class SshMutationCoordinator implements MutationCoordinator {
         }
       }
 
-      workResult = await input.work();
+      workResult = await this.activeLeases.run(activeLeases, () => input.work({ assertOwned }));
     } finally {
       if (heartbeatTimer) {
         clearInterval(heartbeatTimer);

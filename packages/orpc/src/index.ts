@@ -78,6 +78,7 @@ import {
   ConfigureAuditEventLegalHoldCommand,
   ConfigureDefaultAccessDomainPolicyCommand,
   ConfigureDependencyResourceBackupPolicyCommand,
+  ConfigureDomainBindingCertificatePolicyCommand,
   ConfigureDomainBindingRouteCommand,
   ConfigurePreviewPolicyCommand,
   ConfigureProjectWorkspaceProfileCommand,
@@ -161,6 +162,7 @@ import {
   configureAuditEventLegalHoldCommandInputSchema,
   configureDefaultAccessDomainPolicyCommandInputSchema,
   configureDependencyResourceBackupPolicyCommandInputSchema,
+  configureDomainBindingCertificatePolicyCommandInputSchema,
   configureDomainBindingRouteCommandInputSchema,
   configurePreviewPolicyCommandInputSchema,
   configureProjectWorkspaceProfileCommandInputSchema,
@@ -931,6 +933,7 @@ import {
   completeConnectionCallbackResponseSchema,
   configureDefaultAccessDomainPolicyResponseSchema,
   configureDependencyResourceBackupPolicyResponseSchema,
+  configureDomainBindingCertificatePolicyResponseSchema,
   configureDomainBindingRouteResponseSchema,
   configurePreviewPolicyResponseSchema,
   configureResourceAccessResponseSchema,
@@ -2253,6 +2256,10 @@ export const apiRouteDescriptions = {
   configureDomainBindingRoute: routeDescription(
     "Configures whether a custom domain binding serves traffic or redirects to a canonical binding.",
     "domain.custom-domain-binding",
+  ),
+  configureDomainBindingCertificatePolicy: routeDescription(
+    "Switches a TLS-enabled custom domain between automatic and imported certificate lifecycle while preserving the serving certificate until replacement proof succeeds.",
+    "certificate.readiness",
   ),
   confirmDomainBindingOwnership: routeDescription(
     "Confirms that a user controls the custom domain.",
@@ -5265,6 +5272,19 @@ export const configureDomainBindingRouteProcedure = base
   .output(configureDomainBindingRouteResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, ConfigureDomainBindingRouteCommand.create(input)),
+  );
+
+export const configureDomainBindingCertificatePolicyProcedure = base
+  .route({
+    method: "POST",
+    path: "/domain-bindings/{domainBindingId}/certificate-policy",
+    description: apiRouteDescriptions.configureDomainBindingCertificatePolicy,
+    successStatus: 200,
+  })
+  .input(configureDomainBindingCertificatePolicyCommandInputSchema)
+  .output(configureDomainBindingCertificatePolicyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureDomainBindingCertificatePolicyCommand.create(input)),
   );
 
 export const confirmDomainBindingOwnershipProcedure = base
@@ -9062,6 +9082,7 @@ export const appaloftOrpcRouter = {
     dnsPlan: planDomainBindingDnsProcedure,
     inspectDnsReadiness: inspectDomainBindingDnsReadinessProcedure,
     create: createDomainBindingProcedure,
+    configureCertificatePolicy: configureDomainBindingCertificatePolicyProcedure,
     configureRoute: configureDomainBindingRouteProcedure,
     confirmOwnership: confirmDomainBindingOwnershipProcedure,
     deleteCheck: checkDomainBindingDeleteSafetyProcedure,
@@ -9367,6 +9388,10 @@ const strictOperationInputOperations = [
   {
     key: "domain-bindings.configure-route",
     rpcPath: "/api/rpc/domainBindings/configureRoute",
+  },
+  {
+    key: "domain-bindings.configure-certificate-policy",
+    rpcPath: "/api/rpc/domainBindings/configureCertificatePolicy",
   },
   { key: "domain-bindings.delete", rpcPath: "/api/rpc/domainBindings/delete" },
   {
@@ -11887,6 +11912,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/domain-bindings/:domainBindingId",
     "/api/domain-bindings/:domainBindingId/dns-plan",
     "/api/domain-bindings/:domainBindingId/route",
+    "/api/domain-bindings/:domainBindingId/certificate-policy",
     "/api/domain-bindings/:domainBindingId/ownership-confirmations",
     "/api/domain-bindings/:domainBindingId/delete-check",
     "/api/domain-bindings/:domainBindingId/verification-retries",

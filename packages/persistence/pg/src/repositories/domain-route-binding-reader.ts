@@ -47,6 +47,8 @@ export class PgDomainRouteBindingReader implements DomainRouteBindingReader {
             "redirect_to",
             "redirect_status",
             "status",
+            "active_certificate_id",
+            "active_certificate_fingerprint",
             "created_at",
           ])
           .where("project_id", "=", input.projectId)
@@ -63,21 +65,55 @@ export class PgDomainRouteBindingReader implements DomainRouteBindingReader {
           .orderBy("created_at", "desc")
           .execute();
 
-        return rows.map((row) => ({
-          id: row.id,
-          domainName: row.domain_name,
-          pathPrefix: row.path_prefix,
-          pathHandling: row.path_handling === "strip" ? "strip" : "preserve",
-          proxyKind: row.proxy_kind as DomainRouteBindingCandidate["proxyKind"],
-          tlsMode: row.tls_mode as DomainRouteBindingCandidate["tlsMode"],
-          ...(row.target_service_name ? { targetServiceName: row.target_service_name } : {}),
-          ...(row.redirect_to ? { redirectTo: row.redirect_to } : {}),
-          ...(row.redirect_status
-            ? { redirectStatus: row.redirect_status as 301 | 302 | 307 | 308 }
-            : {}),
-          status: row.status as DomainRouteBindingCandidate["status"],
-          createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
-        }));
+        const activeCertificateIds = rows.flatMap((row) => row.active_certificate_id ?? []);
+        const certificateRows =
+          activeCertificateIds.length === 0
+            ? []
+            : await executor
+                .selectFrom("certificates")
+                .select(["id", "domain_binding_id", "source", "fingerprint"])
+                .where("id", "in", activeCertificateIds)
+                .where("status", "=", "active")
+                .execute();
+        const certificateByBindingId = new Map<
+          string,
+          NonNullable<DomainRouteBindingCandidate["certificate"]>
+        >();
+        for (const certificate of certificateRows) {
+          if (certificate.source !== "managed" && certificate.source !== "imported") continue;
+          const binding = rows.find(
+            (row) =>
+              row.id === certificate.domain_binding_id &&
+              row.active_certificate_id === certificate.id &&
+              row.active_certificate_fingerprint === certificate.fingerprint,
+          );
+          if (!binding) continue;
+          certificateByBindingId.set(certificate.domain_binding_id, {
+            source: certificate.source === "managed" ? "appaloft-managed" : "appaloft-imported",
+            certificateId: certificate.id,
+            domainBindingId: certificate.domain_binding_id,
+          });
+        }
+
+        return rows.map((row) => {
+          const certificate = certificateByBindingId.get(row.id);
+          return {
+            id: row.id,
+            domainName: row.domain_name,
+            pathPrefix: row.path_prefix,
+            pathHandling: row.path_handling === "strip" ? "strip" : "preserve",
+            proxyKind: row.proxy_kind as DomainRouteBindingCandidate["proxyKind"],
+            tlsMode: row.tls_mode as DomainRouteBindingCandidate["tlsMode"],
+            ...(certificate ? { certificate } : {}),
+            ...(row.target_service_name ? { targetServiceName: row.target_service_name } : {}),
+            ...(row.redirect_to ? { redirectTo: row.redirect_to } : {}),
+            ...(row.redirect_status
+              ? { redirectStatus: row.redirect_status as 301 | 302 | 307 | 308 }
+              : {}),
+            status: row.status as DomainRouteBindingCandidate["status"],
+            createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
+          };
+        });
       },
     );
   }

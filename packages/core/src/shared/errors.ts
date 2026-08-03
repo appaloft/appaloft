@@ -361,6 +361,10 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("certificate_not_allowed", "user", message, details),
+  certificatePolicyNotAllowed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("certificate_policy_not_allowed", "user", message, details),
   certificateImportNotAllowed: (
     message: string,
     details?: Record<string, string | number | boolean | null>,
@@ -421,6 +425,12 @@ export const domainError = {
     retryable = true,
   ): DomainError =>
     createError("certificate_import_storage_failed", "infra", message, details, retryable),
+  certificateRouteReconciliationFailed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = true,
+  ): DomainError =>
+    createError("certificate_route_reconciliation_failed", "infra", message, details, retryable),
   certificateRetryNotAllowed: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

@@ -2120,6 +2120,12 @@ export const publicDocsHelpTopics = {
     surfaces: ["web", "cli", "http-api", "mcp"],
     relatedOperation: "certificates.issue-or-renew",
     aliases: ["certificate", "tls", "https", "证书"],
+    specReferences: [
+      "docs/decisions/ADR-104-certificate-route-activation-reconciliation.md",
+      "docs/specs/121-certificate-route-activation-reconciliation/spec.md",
+      "docs/testing/edge-proxy-provider-and-route-configuration-test-matrix.md",
+      "docs/testing/routing-domain-and-tls-test-matrix.md",
+    ],
   },
   "observability.runtime-logs": {
     id: "observability.runtime-logs",
@@ -4440,6 +4446,11 @@ export const publicDocsOperationCoverage = [
     operationKey: "domain-bindings.configure-route",
     status: "documented",
     topicId: "domain.custom-domain-binding",
+  },
+  {
+    operationKey: "domain-bindings.configure-certificate-policy",
+    status: "documented",
+    topicId: "certificate.readiness",
   },
   {
     operationKey: "domain-bindings.confirm-ownership",

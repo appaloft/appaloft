@@ -1891,6 +1891,7 @@ Implemented operations:
 | Show domain binding | Query | `domain-bindings.show` | `ShowDomainBindingQuery` | `ShowDomainBindingQueryInput` | `appaloft domain-binding show <domainBindingId>` | `GET /api/domain-bindings/{domainBindingId}` |
 | Plan domain binding DNS category connector records | Query | `domain-bindings.dns-plan` | `PlanDomainBindingDnsQuery` | `PlanDomainBindingDnsQueryInput` | `appaloft domain-binding dns-plan <domainBindingId> [--connector cloudflare-dns]` | `POST /api/domain-bindings/{domainBindingId}/dns-plan` |
 | Configure domain binding route behavior | Command | `domain-bindings.configure-route` | `ConfigureDomainBindingRouteCommand` | `ConfigureDomainBindingRouteCommandInput` | `appaloft domain-binding configure-route <domainBindingId> [--redirect-to <domain>] [--redirect-status 301\|302\|307\|308]` | `POST /api/domain-bindings/{domainBindingId}/route` |
+| Configure domain binding certificate policy | Command | `domain-bindings.configure-certificate-policy` | `ConfigureDomainBindingCertificatePolicyCommand` | `ConfigureDomainBindingCertificatePolicyCommandInput` | `appaloft domain-binding configure-certificate-policy <domainBindingId> --policy auto\|manual` | `POST /api/domain-bindings/{domainBindingId}/certificate-policy` |
 | Confirm domain binding ownership | Command | `domain-bindings.confirm-ownership` | `ConfirmDomainBindingOwnershipCommand` | `ConfirmDomainBindingOwnershipCommandInput` | `appaloft domain-binding confirm-ownership <domainBindingId> [--verification-mode dns\|manual]` | `POST /api/domain-bindings/{domainBindingId}/ownership-confirmations` |
 | List domain bindings | Query | `domain-bindings.list` | `ListDomainBindingsQuery` | `ListDomainBindingsQueryInput` | `appaloft domain-binding list` | `GET /api/domain-bindings` |
 | Check domain binding delete safety | Query | `domain-bindings.delete-check` | `CheckDomainBindingDeleteSafetyQuery` | `CheckDomainBindingDeleteSafetyQueryInput` | `appaloft domain-binding delete-check <domainBindingId>` | `GET /api/domain-bindings/{domainBindingId}/delete-check` |
@@ -1937,15 +1938,18 @@ Current boundary:
 - `certificate-requested` is also a first-class event behavior entrypoint: the certificate worker
   consumes it through injected provider and secret-store ports, then records `certificate-issued` or
   `certificate-issuance-failed` as durable follow-up state
-- `certificate-issued` is a first-class event behavior entrypoint for certificate-backed readiness:
-  when the referenced domain binding is still bound, the handler marks it ready and publishes
-  `domain-ready`
+- `certificate-issued` is a stored-material fact. For certificate-backed readiness, its consumer
+  must reconcile the selected material into the edge proxy, apply reload/activation, and prove the
+  served hostname/SNI fingerprint before publishing `domain-ready`
 - `certificates.import` is an active manual-certificate operation for manual-policy bindings:
   it publishes `certificate-imported` instead of `certificate-issued`, is exposed through the
   operation catalog plus CLI/API entrypoints and the resource-scoped Web entrypoint, and now uses
   durable PG/PGlite-backed secret persistence rather than placeholder refs. Successful manual
   imports are also projected into `operator-work.*` through safe process-attempt rows without PEM,
   private-key, or passphrase material
+- `certificate-imported` is also a stored-material fact, not edge readiness. Its consumer follows
+  the same activation/reload/served-certificate proof gate and preserves the previous serving
+  certificate when candidate reconciliation fails
 - the default shell composition intentionally registers an unavailable certificate provider until a
   real provider adapter is configured; this records retryable `certificate_provider_unavailable`
   state after accepted issue requests rather than pretending HTTPS is active

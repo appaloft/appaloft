@@ -43,7 +43,9 @@ domain-bound
 
 when automatic certificate policy applies.
 
-For manual certificate policy, `domain-ready` may follow `certificate-imported` after the imported certificate is durably validated, stored, and attached.
+For manual certificate policy, `domain-ready` may follow `certificate-imported` only after the
+imported certificate is durably validated/stored, activated in the edge proxy, and proven through a
+direct hostname/SNI observation.
 
 ## Publisher
 
@@ -105,9 +107,11 @@ Duplicate `domain-ready` must not duplicate notifications or admission side effe
 
 `domain-ready` must follow `domain-bound`.
 
-If TLS/certificate policy requires automatic issuance, it must also follow `certificate-issued`.
+If TLS/certificate policy requires automatic issuance, it must follow `certificate-issued` plus
+successful activation/reload and served-certificate proof.
 
-If TLS/certificate policy is manual, it must follow `certificate-imported`.
+If TLS/certificate policy is manual, it must follow `certificate-imported` plus successful
+activation/reload and served-certificate proof.
 
 It must not follow `certificate-issuance-failed` for the same certificate attempt unless a later successful attempt occurs.
 

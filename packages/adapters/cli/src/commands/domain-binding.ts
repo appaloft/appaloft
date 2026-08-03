@@ -1,5 +1,6 @@
 import {
   CheckDomainBindingDeleteSafetyQuery,
+  ConfigureDomainBindingCertificatePolicyCommand,
   ConfigureDomainBindingRouteCommand,
   ConfirmDomainBindingOwnershipCommand,
   CreateDomainBindingCommand,
@@ -38,6 +39,7 @@ const redirectStatusOption = Options.choice("redirect-status", [
 const certificatePolicyOption = Options.choice("certificate-policy", certificatePolicies).pipe(
   Options.optional,
 );
+const policyOption = Options.choice("policy", ["auto", "manual"] as const);
 const idempotencyKeyOption = Options.text("idempotency-key").pipe(Options.optional);
 const verificationAttemptIdOption = Options.text("verification-attempt-id").pipe(Options.optional);
 const verificationModeOption = Options.choice("verification-mode", ["dns", "manual"] as const).pipe(
@@ -222,6 +224,25 @@ const configureRouteCommand = EffectCommand.make(
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.domainBindingConfigureRoute));
 
+const configureCertificatePolicyCommand = EffectCommand.make(
+  "configure-certificate-policy",
+  {
+    domainBindingId: domainBindingIdArg,
+    policy: policyOption,
+    idempotencyKey: idempotencyKeyOption,
+  },
+  ({ domainBindingId, idempotencyKey, policy }) =>
+    runCommand(
+      ConfigureDomainBindingCertificatePolicyCommand.create({
+        domainBindingId,
+        certificatePolicy: policy,
+        idempotencyKey: optionalValue(idempotencyKey),
+      }),
+    ),
+).pipe(
+  EffectCommand.withDescription(cliCommandDescriptions.domainBindingConfigureCertificatePolicy),
+);
+
 const deleteCheckCommand = EffectCommand.make(
   "delete-check",
   {
@@ -286,6 +307,7 @@ export const domainBindingCommand = EffectCommand.make("domain-binding").pipe(
     createCommand,
     showCommand,
     dnsPlanCommand,
+    configureCertificatePolicyCommand,
     configureRouteCommand,
     confirmOwnershipCommand,
     deleteCheckCommand,

@@ -309,6 +309,94 @@ describe("TraefikEdgeProxyProvider", () => {
     ]);
   });
 
+  test("[EDGE-PROXY-RELOAD-004B] durable imported certificate route avoids Traefik certresolver", async () => {
+    const provider = new TraefikEdgeProxyProvider();
+    const route = {
+      proxyKind: "traefik" as const,
+      domains: ["manual.example.test"],
+      pathPrefix: "/",
+      tlsMode: "auto" as const,
+      source: "domain-binding" as const,
+      domainBindingId: "dmb_manual",
+      certificate: {
+        source: "appaloft-imported" as const,
+        certificateId: "crt_manual",
+        domainBindingId: "dmb_manual",
+      },
+      targetPort: 3000,
+    };
+    const plan = await provider.realizeRoutes(
+      { correlationId: "req_managed_tls" },
+      { deploymentId: "dep-managed-tls", port: 3000, accessRoutes: [route] },
+    );
+    expect(plan.isOk()).toBe(true);
+    expect(plan._unsafeUnwrap().labels).toContain("traefik.http.routers.dep-managed-tls.tls=true");
+    expect(plan._unsafeUnwrap().labels.join("\n")).not.toContain("tls.certresolver=");
+
+    const view = await provider.renderConfigurationView(
+      { correlationId: "req_managed_tls" },
+      {
+        resourceId: "res_demo",
+        deploymentId: "dep-managed-tls",
+        routeScope: "latest",
+        status: "applied",
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        stale: false,
+        accessRoutes: [route],
+        port: 3000,
+        includeDiagnostics: true,
+      },
+    );
+    expect(view._unsafeUnwrap().diagnostics?.tlsRoutes?.[0]).toMatchObject({
+      automation: "appaloft",
+      certificateSource: "appaloft-imported",
+      appaloftCertificateManaged: true,
+    });
+  });
+
+  test("[EDGE-PROXY-RELOAD-004A] proxy bootstrap mounts the Appaloft dynamic certificate store", async () => {
+    const ensure = await new TraefikEdgeProxyProvider().ensureProxy(
+      { correlationId: "req_traefik_certificate_store" },
+      { proxyKind: "traefik" },
+    );
+
+    expect(ensure.isOk()).toBe(true);
+    expect(ensure._unsafeUnwrap().containerCommand).toContain(
+      "appaloft-traefik-dynamic:/etc/traefik/dynamic",
+    );
+    expect(ensure._unsafeUnwrap().containerCommand).toContain(
+      "--providers.file.directory=/etc/traefik/dynamic",
+    );
+    expect(ensure._unsafeUnwrap().containerCommand).toContain("--providers.file.watch=true");
+  });
+
+  test("[EDGE-PROXY-RELOAD-004E] durable certificate-pending route does not fall back to Traefik ACME", async () => {
+    const result = await new TraefikEdgeProxyProvider().realizeRoutes(
+      { correlationId: "req_pending_tls" },
+      {
+        deploymentId: "dep-pending-tls",
+        port: 3000,
+        accessRoutes: [
+          {
+            proxyKind: "traefik",
+            domains: ["pending.example.test"],
+            pathPrefix: "/",
+            tlsMode: "auto",
+            source: "domain-binding",
+            targetPort: 3000,
+          },
+        ],
+      },
+    );
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "certificate_route_reconciliation_failed",
+      retryable: true,
+      details: expect.objectContaining({ phase: "route-certificate-selection" }),
+    });
+  });
+
   test("[EDGE-PROXY-ROUTE-008] renders canonical redirect aliases without proxying alias hosts", async () => {
     const provider = new TraefikEdgeProxyProvider();
     const accessRoutes = [

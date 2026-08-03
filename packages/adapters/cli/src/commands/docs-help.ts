@@ -1002,6 +1002,10 @@ export const cliCommandDescriptions = {
     "Configure domain binding route behavior",
     "domain.custom-domain-binding",
   ),
+  domainBindingConfigureCertificatePolicy: withDocs(
+    "Switch a TLS domain between automatic and imported certificate lifecycle",
+    "certificate.readiness",
+  ),
   domainBindingConfirmOwnership: withDocs(
     "Confirm domain binding ownership",
     "domain.ownership-check",

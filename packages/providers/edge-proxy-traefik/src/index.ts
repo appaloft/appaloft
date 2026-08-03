@@ -30,6 +30,8 @@ import {
 } from "@appaloft/core";
 
 export const traefikEdgeNetworkName = "appaloft-edge";
+export const traefikDynamicCertificateVolumeName = "appaloft-traefik-dynamic";
+export const traefikDynamicConfigurationDirectory = "/etc/traefik/dynamic";
 const traefikImage = "traefik:v3.7.9";
 const defaultAccessFailureMiddlewareName = "appaloft-resource-access-errors";
 const defaultAccessFailureRendererPath = "/.appaloft/resource-access-failure";
@@ -425,11 +427,16 @@ function labelsForTraefik(input: {
     deploymentId: input.deploymentId,
     ...(suffix ? { suffix } : {}),
   });
+  const appaloftCertificate = input.route.certificate?.source.startsWith("appaloft-") ?? false;
   const autoTlsLabels =
     input.route.tlsMode === "auto"
       ? [
           `traefik.http.routers.${router}.tls=true`,
-          `traefik.http.routers.${router}.tls.certresolver=${defaultTraefikCertificateResolver}`,
+          ...(appaloftCertificate
+            ? []
+            : [
+                `traefik.http.routers.${router}.tls.certresolver=${defaultTraefikCertificateResolver}`,
+              ]),
         ]
       : [];
 
@@ -547,27 +554,43 @@ function tlsDiagnostics(input: ProxyConfigurationViewInput): ProxyConfigurationT
     route.domains.map((hostname) => {
       const scheme = routeScheme(route);
       const enabled = route.tlsMode === "auto";
+      const appaloftSource = route.certificate?.source.startsWith("appaloft-")
+        ? route.certificate.source
+        : undefined;
+      const appaloftCertificate =
+        route.certificate?.source === "appaloft-managed" ||
+        route.certificate?.source === "appaloft-imported"
+          ? route.certificate
+          : undefined;
 
       return {
         hostname,
         pathPrefix: route.pathPrefix,
         tlsMode: route.tlsMode,
         scheme,
-        automation: enabled ? "provider-local" : "disabled",
-        certificateSource: enabled ? "provider-local" : "none",
-        appaloftCertificateManaged: false,
-        message: enabled
-          ? "Traefik terminates TLS through resident provider-local certificate automation; no Appaloft Certificate aggregate is created for this route."
-          : "TLS is disabled for this Traefik route.",
-        details: enabled
+        automation: appaloftSource ? "appaloft" : enabled ? "provider-local" : "disabled",
+        certificateSource: appaloftSource ?? (enabled ? "provider-local" : "none"),
+        appaloftCertificateManaged: Boolean(appaloftSource),
+        message: appaloftSource
+          ? "Traefik terminates TLS with the selected Appaloft certificate after activation and proof."
+          : enabled
+            ? "Traefik terminates TLS through resident provider-local certificate automation; no Appaloft Certificate aggregate is created for this route."
+            : "TLS is disabled for this Traefik route.",
+        details: appaloftSource
           ? {
               entrypoint: "websecure",
               routerTlsLabel: "true",
-              certificateStore: "provider-local",
+              certificateId: appaloftCertificate?.certificateId ?? "unselected",
             }
-          : {
-              entrypoint: "web",
-            },
+          : enabled
+            ? {
+                entrypoint: "websecure",
+                routerTlsLabel: "true",
+                certificateStore: "provider-local",
+              }
+            : {
+                entrypoint: "web",
+              },
       };
     }),
   );
@@ -600,6 +623,10 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
       `--certificatesresolvers.${defaultTraefikCertificateResolver}.acme.httpchallenge.entrypoint=web`,
       `--certificatesresolvers.${defaultTraefikCertificateResolver}.acme.storage=${defaultTraefikAcmeStoragePath}`,
     ];
+    const fileProviderArgs = [
+      `--providers.file.directory=${traefikDynamicConfigurationDirectory}`,
+      "--providers.file.watch=true",
+    ];
     const networkCommand = ash`
       docker network inspect ${ash.arg(traefikEdgeNetworkName)} >/dev/null 2>&1 || docker network create ${ash.arg(traefikEdgeNetworkName)}
     `;
@@ -608,10 +635,12 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
       [ "$(docker inspect -f '{{.Config.Image}}' ${ash.arg(containerName)} 2>/dev/null)" = ${ash.arg(traefikImage)} ] &&
       docker inspect -f '{{range .Args}}{{println .}}{{end}}' ${ash.arg(containerName)} 2>/dev/null | grep -Fx -- ${ash.arg(acmeResolverArgs[0] ?? "")} >/dev/null &&
       docker inspect -f '{{range .Args}}{{println .}}{{end}}' ${ash.arg(containerName)} 2>/dev/null | grep -Fx -- ${ash.arg(acmeResolverArgs[1] ?? "")} >/dev/null &&
-      docker inspect -f '{{range .Args}}{{println .}}{{end}}' ${ash.arg(containerName)} 2>/dev/null | grep -Fx -- ${ash.arg(acmeResolverArgs[2] ?? "")} >/dev/null ||
+      docker inspect -f '{{range .Args}}{{println .}}{{end}}' ${ash.arg(containerName)} 2>/dev/null | grep -Fx -- ${ash.arg(acmeResolverArgs[2] ?? "")} >/dev/null &&
+      docker inspect -f '{{range .Args}}{{println .}}{{end}}' ${ash.arg(containerName)} 2>/dev/null | grep -Fx -- ${ash.arg(fileProviderArgs[0] ?? "")} >/dev/null &&
+      docker inspect -f '{{range .Args}}{{println .}}{{end}}' ${ash.arg(containerName)} 2>/dev/null | grep -Fx -- ${ash.arg(fileProviderArgs[1] ?? "")} >/dev/null ||
       (
         docker rm -f ${ash.arg(containerName)} >/dev/null 2>&1 || true
-        docker run -d --restart unless-stopped --name ${ash.arg(containerName)} --network ${ash.arg(traefikEdgeNetworkName)} -p ${ash.arg(`${httpPort}:80`)} -p ${ash.arg(`${httpsPort}:443`)} --add-host host.docker.internal:host-gateway -v /var/run/docker.sock:/var/run/docker.sock:ro -v ${ash.arg(`${defaultTraefikAcmeVolumeName}:/letsencrypt`)} ${ash.arg(traefikImage)} --providers.docker=true --providers.docker.exposedbydefault=false --providers.docker.network=${ash.arg(traefikEdgeNetworkName)} --entrypoints.web.address=:80 --entrypoints.websecure.address=:443 ${ash.list(acmeResolverArgs)}
+        docker run -d --restart unless-stopped --name ${ash.arg(containerName)} --network ${ash.arg(traefikEdgeNetworkName)} -p ${ash.arg(`${httpPort}:80`)} -p ${ash.arg(`${httpsPort}:443`)} --add-host host.docker.internal:host-gateway -v /var/run/docker.sock:/var/run/docker.sock:ro -v ${ash.arg(`${defaultTraefikAcmeVolumeName}:/letsencrypt`)} -v ${ash.arg(`${traefikDynamicCertificateVolumeName}:${traefikDynamicConfigurationDirectory}`)} ${ash.arg(traefikImage)} --providers.docker=true --providers.docker.exposedbydefault=false --providers.docker.network=${ash.arg(traefikEdgeNetworkName)} --entrypoints.web.address=:80 --entrypoints.websecure.address=:443 ${ash.list([...fileProviderArgs, ...acmeResolverArgs])}
       )
     `;
 
@@ -721,6 +750,24 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
     input: ProxyRouteRealizationInput,
   ): Promise<Result<ProxyRouteRealizationPlan, DomainError>> {
     const providerRoutes = input.accessRoutes.filter((route) => route.proxyKind === "traefik");
+    const pendingCertificateRoute = providerRoutes.find(
+      (route) =>
+        route.source === "domain-binding" &&
+        route.tlsMode === "auto" &&
+        !route.certificate?.source.startsWith("appaloft-"),
+    );
+    if (pendingCertificateRoute) {
+      return err(
+        domainError.certificateRouteReconciliationFailed(
+          "Durable TLS route requires a selected Appaloft certificate",
+          {
+            phase: "route-certificate-selection",
+            providerKey: this.key,
+            domainName: pendingCertificateRoute.domains[0] ?? "unknown",
+          },
+        ),
+      );
+    }
     const unsupportedStatus = unsupportedRedirectStatus(providerRoutes);
     if (unsupportedStatus) {
       return err(

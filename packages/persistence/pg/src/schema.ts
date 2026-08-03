@@ -500,6 +500,8 @@ export interface DomainBindingsTable {
   redirect_to: string | null;
   redirect_status: number | null;
   certificate_policy: string;
+  active_certificate_id: string | null;
+  active_certificate_fingerprint: string | null;
   status: string;
   verification_attempts: ColumnType<
     Record<string, unknown>[],

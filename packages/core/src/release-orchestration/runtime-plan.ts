@@ -268,6 +268,13 @@ export interface AccessRouteState {
   pathPrefix: RoutePathPrefix;
   pathHandling?: RoutePathHandlingValue;
   tlsMode: TlsModeValue;
+  domainBindingId?: string;
+  certificate?: {
+    source: "appaloft-managed" | "appaloft-imported";
+    certificateId: string;
+    domainBindingId: string;
+  };
+  source?: "generated-default" | "domain-binding" | "deployment-snapshot" | "server-applied";
   targetPort?: PortNumber;
   targetServiceName?: ResourceServiceName;
   redirectTo?: PublicDomainName;
@@ -842,6 +849,18 @@ export class AccessRoute extends ValueObject<AccessRouteState> {
     return this.state.tlsMode.value;
   }
 
+  get certificate(): AccessRouteState["certificate"] {
+    return this.state.certificate ? { ...this.state.certificate } : undefined;
+  }
+
+  get domainBindingId(): string | undefined {
+    return this.state.domainBindingId;
+  }
+
+  get source(): AccessRouteState["source"] {
+    return this.state.source;
+  }
+
   get targetPort(): number | undefined {
     return this.state.targetPort?.value;
   }
@@ -877,6 +896,9 @@ export class AccessRoute extends ValueObject<AccessRouteState> {
       pathPrefix: this.state.pathPrefix,
       pathHandling: this.state.pathHandling ?? RoutePathHandlingValue.default(),
       tlsMode: this.state.tlsMode,
+      ...(this.state.domainBindingId ? { domainBindingId: this.state.domainBindingId } : {}),
+      ...(this.state.certificate ? { certificate: { ...this.state.certificate } } : {}),
+      ...(this.state.source ? { source: this.state.source } : {}),
       ...(this.state.targetPort ? { targetPort: this.state.targetPort } : {}),
       ...(this.state.targetServiceName ? { targetServiceName: this.state.targetServiceName } : {}),
       ...(this.state.redirectTo ? { redirectTo: this.state.redirectTo } : {}),

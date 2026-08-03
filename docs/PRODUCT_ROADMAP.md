@@ -52,10 +52,10 @@ Version plan:
 Current release alignment:
 
 <!-- release-alignment:start -->
-- [x] On 2026-07-28, the latest public release is `v1.6.0`; root package
-  and Release Please manifest on `main` are `1.6.0`; the release PR target is
-  `1.6.1`.
-- [x] On 2026-07-28, the roadmap gate allows `Release-As: 1.6.1` because
+- [x] On 2026-08-03, the latest public release is `v1.6.4`; root package
+  and Release Please manifest on `main` are `1.6.4`; the release PR target is
+  `1.7.0`.
+- [x] On 2026-08-03, the roadmap gate allows `Release-As: 1.7.0` because
   Phase 0 through Phase 12 release rules, required items, and exit criteria are checked.
 <!-- release-alignment:end -->
 
@@ -872,6 +872,11 @@ Phase 6 release-gate verification notes from 2026-05-04:
   configure-route/delete-check/delete/retry-verification plus certificate issue-or-renew/import/
   show/retry/revoke/delete. The governing routing/domain/TLS workflow, lifecycle specs, public docs,
   operation catalog entries, CLI/API/Web surfaces, and test matrix rows are synchronized.
+- Certificate route activation reconciliation is a newly identified post-1.0 correctness gap under
+  Spec 121. Before claiming that stored managed/imported material makes a durable domain ready,
+  Appaloft must add explicit policy transition, activate/reload the selected candidate, prove the
+  served hostname/SNI fingerprint, preserve the prior serving certificate on failure, and bind real
+  Traefik/Caddy Docker evidence. The additive public operation targets the next minor release.
 - The merged real Traefik access failure middleware baseline closed the last required
   `resource-access-failure` diagnostic row. Provider-native metadata lookup beyond safe
   Appaloft-applied metadata and a Web lookup form remain future enhancements, not `0.8.0` release

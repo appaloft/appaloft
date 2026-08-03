@@ -27,6 +27,7 @@ import { inject, injectable } from "tsyringe";
 
 import { EventHandler, type EventHandlerContract } from "../../cqrs";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import { createCoordinationOwner, mutationCoordinationPolicies } from "../../mutation-coordination";
 import {
   type AppLogger,
   type CertificateProviderIssueInput,
@@ -35,6 +36,8 @@ import {
   type CertificateSecretStore,
   type Clock,
   type EventBus,
+  type MutationCoordinator,
+  type MutationLeaseGuard,
   type ProcessAttemptRecorder,
 } from "../../ports";
 import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
@@ -177,9 +180,28 @@ export class IssueCertificateOnCertificateRequestedHandler
     private readonly logger: AppLogger,
     @inject(tokens.processAttemptRecorder)
     private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
+    @inject(tokens.mutationCoordinator)
+    private readonly mutationCoordinator?: MutationCoordinator,
   ) {}
 
   async handle(context: ExecutionContext, event: DomainEvent): Promise<Result<void>> {
+    const domainBindingId = readPayloadText(event, "domainBindingId");
+    if (domainBindingId.isErr()) return err(domainBindingId.error);
+    if (!this.mutationCoordinator) return this.handleExclusive(context, event);
+    return this.mutationCoordinator.runExclusive({
+      context,
+      policy: mutationCoordinationPolicies.issueOrRenewCertificate,
+      scope: { kind: "domain-binding", key: domainBindingId.value },
+      owner: createCoordinationOwner(context, "certificates.issue-requested"),
+      work: (lease) => this.handleExclusive(context, event, lease),
+    });
+  }
+
+  private async handleExclusive(
+    context: ExecutionContext,
+    event: DomainEvent,
+    lease?: MutationLeaseGuard,
+  ): Promise<Result<void>> {
     const {
       certificateProvider,
       certificateRepository,
@@ -192,6 +214,7 @@ export class IssueCertificateOnCertificateRequestedHandler
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
+      if (lease) yield* await lease.assertOwned();
       const certificateIdText = yield* readPayloadText(event, "certificateId");
       const attemptIdText = yield* readPayloadText(event, "attemptId");
       const certificateId = yield* CertificateId.create(certificateIdText);
@@ -230,11 +253,13 @@ export class IssueCertificateOnCertificateRequestedHandler
 
       const issueInput = toProviderIssueInput(claimResult.value.context);
 
+      if (lease) yield* await lease.assertOwned();
       await certificateRepository.upsert(
         repositoryContext,
         certificate,
         UpsertCertificateSpec.fromCertificate(certificate),
       );
+      if (lease) yield* await lease.assertOwned();
       await recordCertificateAttempt({
         recorder: processAttemptRecorder,
         repositoryContext,
@@ -254,7 +279,9 @@ export class IssueCertificateOnCertificateRequestedHandler
         updatedAt: clock.now(),
       });
 
+      if (lease) yield* await lease.assertOwned();
       const issuedResult = await certificateProvider.issue(context, issueInput);
+      if (lease) yield* await lease.assertOwned();
       if (issuedResult.isErr()) {
         const error = issuedResult.error;
         const causationId = optionalPayloadText(event, "causationId");
@@ -274,11 +301,13 @@ export class IssueCertificateOnCertificateRequestedHandler
           correlationId: context.requestId,
           ...(causationId ? { causationId } : {}),
         });
+        if (lease) yield* await lease.assertOwned();
         await certificateRepository.upsert(
           repositoryContext,
           certificate,
           UpsertCertificateSpec.fromCertificate(certificate),
         );
+        if (lease) yield* await lease.assertOwned();
         await recordCertificateAttempt({
           recorder: processAttemptRecorder,
           repositoryContext,
@@ -300,6 +329,7 @@ export class IssueCertificateOnCertificateRequestedHandler
           errorCode: error.code,
           retriable: error.retryable,
         });
+        if (lease) yield* await lease.assertOwned();
         await publishDomainEventsAndReturn(context, eventBus, logger, certificate, undefined);
         return ok(undefined);
       }
@@ -312,7 +342,9 @@ export class IssueCertificateOnCertificateRequestedHandler
         attemptId: issueInput.attemptId,
         providerKey: issueInput.providerKey,
       };
+      if (lease) yield* await lease.assertOwned();
       const storedResult = await certificateSecretStore.store(context, issued);
+      if (lease) yield* await lease.assertOwned();
       if (storedResult.isErr()) {
         const error = storedResult.error;
         const causationId = optionalPayloadText(event, "causationId");
@@ -334,11 +366,13 @@ export class IssueCertificateOnCertificateRequestedHandler
           correlationId: context.requestId,
           ...(causationId ? { causationId } : {}),
         });
+        if (lease) yield* await lease.assertOwned();
         await certificateRepository.upsert(
           repositoryContext,
           certificate,
           UpsertCertificateSpec.fromCertificate(certificate),
         );
+        if (lease) yield* await lease.assertOwned();
         await recordCertificateAttempt({
           recorder: processAttemptRecorder,
           repositoryContext,
@@ -360,6 +394,7 @@ export class IssueCertificateOnCertificateRequestedHandler
           errorCode: failureCode.value,
           retriable: error.retryable,
         });
+        if (lease) yield* await lease.assertOwned();
         await publishDomainEventsAndReturn(context, eventBus, logger, certificate, undefined);
         return ok(undefined);
       }
@@ -378,11 +413,13 @@ export class IssueCertificateOnCertificateRequestedHandler
         correlationId: context.requestId,
         ...(causationId ? { causationId } : {}),
       });
+      if (lease) yield* await lease.assertOwned();
       await certificateRepository.upsert(
         repositoryContext,
         certificate,
         UpsertCertificateSpec.fromCertificate(certificate),
       );
+      if (lease) yield* await lease.assertOwned();
       await recordCertificateAttempt({
         recorder: processAttemptRecorder,
         repositoryContext,
@@ -404,6 +441,7 @@ export class IssueCertificateOnCertificateRequestedHandler
         expiresAt: expiresAt.value,
         retriable: false,
       });
+      if (lease) yield* await lease.assertOwned();
       await publishDomainEventsAndReturn(context, eventBus, logger, certificate, undefined);
 
       return ok(undefined);

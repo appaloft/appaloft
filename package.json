@@ -1,6 +1,6 @@
 {
   "name": "appaloft",
-  "version": "1.6.2",
+  "version": "1.7.0",
   "devDependencies": {
     "@appaloft/adapter-packaging": "workspace:*",
     "@appaloft/ash": "workspace:*",
@@ -57,6 +57,7 @@
     "release:notes": "bun run scripts/release/generate-release-notes.ts",
     "release:npm:prepare": "bun run scripts/release/prepare-npm-packages.ts",
     "release:homebrew": "bun run scripts/release/generate-homebrew.ts",
+    "release:state:check": "bun run scripts/release/check-release-state.ts",
     "desktop:dev": "bun run package:binary-bundle && bun run --cwd apps/desktop dev",
     "desktop:package": "bun run package:binary-bundle && bun run --cwd apps/desktop package:app",
     "checksums": "bun run scripts/release/generate-checksums.ts",

@@ -211,6 +211,11 @@ describe("edge proxy plans", () => {
           domains: ["www.example.test", "app.example.test"],
           pathPrefix: "/",
           tlsMode: "auto" as const,
+          source: "domain-binding" as const,
+          certificate: {
+            source: "appaloft-imported" as const,
+            certificateId: "crt_config_domain",
+          },
           targetPort: 3000,
         },
       ],
@@ -226,6 +231,11 @@ describe("edge proxy plans", () => {
           domains: ["www.example.test", "app.example.test"],
           pathPrefix: "/",
           tlsMode: "auto",
+          source: "domain-binding",
+          certificate: {
+            source: "appaloft-imported",
+            certificateId: "crt_config_domain",
+          },
           targetPort: 3000,
         },
       ],

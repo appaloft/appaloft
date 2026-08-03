@@ -1,5 +1,85 @@
 # Changelog
 
+## [1.7.0](https://github.com/appaloft/appaloft/compare/v1.6.4...v1.7.0) (2026-08-03)
+
+
+### Features
+
+* add profile-aware workspace open ([#874](https://github.com/appaloft/appaloft/issues/874)) ([a4e2bb1](https://github.com/appaloft/appaloft/commit/a4e2bb13398bcab23f224338a0dfd555956e24ae))
+* enforce GitHub agent composition boundary ([#879](https://github.com/appaloft/appaloft/issues/879)) ([257855a](https://github.com/appaloft/appaloft/commit/257855a19e0ec3d65f05f479b367049c1e709f3c))
+* reuse workspace open for GitHub agent tasks ([#889](https://github.com/appaloft/appaloft/issues/889)) ([d1b6baf](https://github.com/appaloft/appaloft/commit/d1b6baf8fcf41e2207b3936b56a389a95ffb3b55))
+* support task-scoped agent credential bindings ([#884](https://github.com/appaloft/appaloft/issues/884)) ([4c4e7a0](https://github.com/appaloft/appaloft/commit/4c4e7a03751daf6997ef1314cf7731ee569e9987))
+* **tls:** reconcile certificate transitions at the edge ([#963](https://github.com/appaloft/appaloft/issues/963)) ([3f99767](https://github.com/appaloft/appaloft/commit/3f9976744b67c06450f97c1401c7bc0999f08857))
+* **web:** support secure console extension forms ([#894](https://github.com/appaloft/appaloft/issues/894)) ([3535c38](https://github.com/appaloft/appaloft/commit/3535c38c77406ad691fb6f66466adf64f9d86cb4))
+
+
+### Bug Fixes
+
+* **agent-task:** commit controlled staged index ([#877](https://github.com/appaloft/appaloft/issues/877)) ([5494902](https://github.com/appaloft/appaloft/commit/5494902b5e589afbe637a8c6ee5e4120ab954da0))
+* align workspace docs registry spec reference ([#886](https://github.com/appaloft/appaloft/issues/886)) ([b1c710d](https://github.com/appaloft/appaloft/commit/b1c710d2fd86a49d2a7fe9cae281a9f7a6b42029))
+* bound opencode workspace snapshot state ([#965](https://github.com/appaloft/appaloft/issues/965)) ([d4ea4aa](https://github.com/appaloft/appaloft/commit/d4ea4aae263493e484c0646233cf6312bb38094e))
+* broker remote Workspace source credentials ([#913](https://github.com/appaloft/appaloft/issues/913)) ([878b5c0](https://github.com/appaloft/appaloft/commit/878b5c0a0904262f623a5ff9ca6ecaf907cc341f))
+* clean up generated pull request tasks ([#899](https://github.com/appaloft/appaloft/issues/899)) ([c53fe93](https://github.com/appaloft/appaloft/commit/c53fe93a30f8731b7d5af5fde2d95b30cb97d738))
+* coalesce Workspace resume retries ([#897](https://github.com/appaloft/appaloft/issues/897)) ([2b152af](https://github.com/appaloft/appaloft/commit/2b152af6bac9aa88bec5249842bd072043852e17))
+* compile declarative native attach ports ([#915](https://github.com/appaloft/appaloft/issues/915)) ([30c4bf4](https://github.com/appaloft/appaloft/commit/30c4bf481cd865a5d94ba5f6fb73f1689a4cf6cb))
+* converge concurrent sandbox termination ([#960](https://github.com/appaloft/appaloft/issues/960)) ([b81d251](https://github.com/appaloft/appaloft/commit/b81d2517899deac7df9f85e797529b2f6af768dd))
+* default repository egress for legacy workspace input ([#893](https://github.com/appaloft/appaloft/issues/893)) ([a85f484](https://github.com/appaloft/appaloft/commit/a85f4848450776d6f4a61ef3d204eb7e1c8f8500))
+* dispatch workspace open through generated operations ([#905](https://github.com/appaloft/appaloft/issues/905)) ([c9a3ef5](https://github.com/appaloft/appaloft/commit/c9a3ef5c69206beccf3b1a26770f73107db9248e))
+* fence agent task reconciliation by active run ([#946](https://github.com/appaloft/appaloft/issues/946)) ([d867952](https://github.com/appaloft/appaloft/commit/d86795219e787613694a004d7c484d5811cb18ac))
+* **github:** make checkout helper executable ([#928](https://github.com/appaloft/appaloft/issues/928)) ([406c960](https://github.com/appaloft/appaloft/commit/406c96063f8e077d46070fef8c39f1fbfbd12da8))
+* **github:** materialize source in populated workspaces ([#926](https://github.com/appaloft/appaloft/issues/926)) ([5b8a354](https://github.com/appaloft/appaloft/commit/5b8a3545dfa117820db8ca9d0381ebaa118c4e4d))
+* **github:** reuse sandbox credential cache ([#930](https://github.com/appaloft/appaloft/issues/930)) ([366c636](https://github.com/appaloft/appaloft/commit/366c63682d41e9cb026a05d07e2809162a689c5f))
+* isolate sandbox process homes ([#942](https://github.com/appaloft/appaloft/issues/942)) ([0d72d6b](https://github.com/appaloft/appaloft/commit/0d72d6bd53b9e6f5a02682ae54e6634c41b6d76c))
+* keep github agent checks in sync ([#954](https://github.com/appaloft/appaloft/issues/954)) ([7cdd99c](https://github.com/appaloft/appaloft/commit/7cdd99ca83554bf76184d209199f60a75b3a4679))
+* keep npm CLI launcher executable ([#901](https://github.com/appaloft/appaloft/issues/901)) ([5072ea9](https://github.com/appaloft/appaloft/commit/5072ea96630bc16b98380cfad172ca12bb071fde))
+* make GitHub bindings workspace-openable ([#891](https://github.com/appaloft/appaloft/issues/891)) ([b10af82](https://github.com/appaloft/appaloft/commit/b10af82e70adb2f0485899e982e4dc5d046eae9c))
+* materialize workspace source safely ([#909](https://github.com/appaloft/appaloft/issues/909)) ([8643661](https://github.com/appaloft/appaloft/commit/864366113f6b982a991eb0eae48bbee8dc92f18c))
+* preserve execution tenant context ([#907](https://github.com/appaloft/appaloft/issues/907)) ([a86783b](https://github.com/appaloft/appaloft/commit/a86783b393e14033f8a556e3dcf79e169de3a16c))
+* preserve github task feedback continuity ([#937](https://github.com/appaloft/appaloft/issues/937)) ([9625ad6](https://github.com/appaloft/appaloft/commit/9625ad62c9a1a86c5e3a835fecc7c41fb8305f6d))
+* preserve GitHub task request context ([#903](https://github.com/appaloft/appaloft/issues/903)) ([de22226](https://github.com/appaloft/appaloft/commit/de222265f3aa5953215f126a704f5229bd71b8f2))
+* preserve sandbox lifecycle during activity ([#952](https://github.com/appaloft/appaloft/issues/952)) ([0bedd4f](https://github.com/appaloft/appaloft/commit/0bedd4f2e2f6d77b50745d11bd0de87c313a521a))
+* protect sandbox recovery from orphan cleanup ([#950](https://github.com/appaloft/appaloft/issues/950)) ([813e737](https://github.com/appaloft/appaloft/commit/813e737192cbff282c6a9c631c4db1ce56bc4b49))
+* publish github task start failure feedback ([#917](https://github.com/appaloft/appaloft/issues/917)) ([8ab0eb8](https://github.com/appaloft/appaloft/commit/8ab0eb8e2063d30417cc86c3b588b1ae146812b2))
+* publish Issue-triggered task checks ([#896](https://github.com/appaloft/appaloft/issues/896)) ([a34f718](https://github.com/appaloft/appaloft/commit/a34f7183b1042791d6a2aac8372a9c2e33243389))
+* reject unsupported operation input fields ([#943](https://github.com/appaloft/appaloft/issues/943)) ([550ece9](https://github.com/appaloft/appaloft/commit/550ece9076f50234898867e70019f6e29ed3a69c))
+* **release:** reconcile published version state ([#967](https://github.com/appaloft/appaloft/issues/967)) ([a6dd26c](https://github.com/appaloft/appaloft/commit/a6dd26ccdda6063c65e8b2d21cf190b59a90702d))
+* **release:** use scoped workflow token ([#968](https://github.com/appaloft/appaloft/issues/968)) ([650bcae](https://github.com/appaloft/appaloft/commit/650bcae1640b7cf59f669684ac92c2325f9abcda))
+* replace Sandbox files atomically ([#911](https://github.com/appaloft/appaloft/issues/911)) ([9a38512](https://github.com/appaloft/appaloft/commit/9a38512ba05a2cc425a537c068cbc1b0ddf06b6b))
+* resolve authorized tenant contexts ([#923](https://github.com/appaloft/appaloft/issues/923)) ([28e75c5](https://github.com/appaloft/appaloft/commit/28e75c5c1e9157067bb5e52bb0f4bfe92ca9e7cf))
+* restore durable agent credential admission ([#935](https://github.com/appaloft/appaloft/issues/935)) ([ea5d60b](https://github.com/appaloft/appaloft/commit/ea5d60ba8990c30f91f58803042042bcc0fdf387))
+* retain agent run failure diagnostics ([#933](https://github.com/appaloft/appaloft/issues/933)) ([bc3b9dc](https://github.com/appaloft/appaloft/commit/bc3b9dca13d150bfc7c583672e9987056676904e))
+* retain github auth through checkout ([#931](https://github.com/appaloft/appaloft/issues/931)) ([9a7dd0b](https://github.com/appaloft/appaloft/commit/9a7dd0b4f86a204590c3bc63b1ca2c35fc7a425e))
+* separate durable agent task generations ([#939](https://github.com/appaloft/appaloft/issues/939)) ([9df99b5](https://github.com/appaloft/appaloft/commit/9df99b55b52cac72dbb9f474cfc9be24c8ad25f2))
+* terminate sandbox process trees ([#962](https://github.com/appaloft/appaloft/issues/962)) ([d5f95cf](https://github.com/appaloft/appaloft/commit/d5f95cff5cbb3a38156ee2cb357e93cdcfbd8074))
+* wait for definitive agent process exit ([#948](https://github.com/appaloft/appaloft/issues/948)) ([ab4b9ce](https://github.com/appaloft/appaloft/commit/ab4b9ce60b126a3dca1d06e25e205fd4333977e4))
+* **workspace:** make source credentials effective ([#922](https://github.com/appaloft/appaloft/issues/922)) ([a7e939a](https://github.com/appaloft/appaloft/commit/a7e939ad582cfc31890b7636bf6ed2545af74b67))
+* **workspace:** remove shell source authentication ([#919](https://github.com/appaloft/appaloft/issues/919)) ([4a30316](https://github.com/appaloft/appaloft/commit/4a30316e139e2d1a13e2b0f0f9be93b2cedc977b))
+
+
+### Documentation
+
+* align agent credential reference example ([#882](https://github.com/appaloft/appaloft/issues/882)) ([a739e18](https://github.com/appaloft/appaloft/commit/a739e18c43e3a22bbb4c0cf622237bd1e2957aba))
+* clarify workspace open smoke evidence ([#887](https://github.com/appaloft/appaloft/issues/887)) ([3ad8229](https://github.com/appaloft/appaloft/commit/3ad82298b72de3becf0d65677833b980a9e311e1))
+* resolve workspace governance identifiers ([#880](https://github.com/appaloft/appaloft/issues/880)) ([409086f](https://github.com/appaloft/appaloft/commit/409086fbb0e622ad98d317961b99aa45e460bae3))
+* sync GitHub agent automation delivery status ([#957](https://github.com/appaloft/appaloft/issues/957)) ([fdabc82](https://github.com/appaloft/appaloft/commit/fdabc82f4fb7f4af1b55598947c4e9618d3e8c59))
+* **workspace:** complete cross-repository sync ([#929](https://github.com/appaloft/appaloft/issues/929)) ([c24ba1e](https://github.com/appaloft/appaloft/commit/c24ba1e0f96adf2c4d1ef2ab854bba62dcf9e840))
+* **workspace:** sync source credential evidence ([#924](https://github.com/appaloft/appaloft/issues/924)) ([3557153](https://github.com/appaloft/appaloft/commit/355715375431dd7a90d911b7646ce828479aa0f1))
+* **workspace:** sync source hardening merge ([#920](https://github.com/appaloft/appaloft/issues/920)) ([b49c385](https://github.com/appaloft/appaloft/commit/b49c385d36c858fedd358a2daae558a0c55c05c9))
+
+## [1.6.4](https://github.com/appaloft/appaloft/compare/v1.6.3...v1.6.4) (2026-07-29)
+
+
+### Features
+
+* add bounded GitHub task feedback ([#873](https://github.com/appaloft/appaloft/issues/873)) ([f6ba369](https://github.com/appaloft/appaloft/commit/f6ba3692cc04806522f51b6abec925a0237c05b5))
+
+## [1.6.3](https://github.com/appaloft/appaloft/compare/v1.6.2...v1.6.3) (2026-07-29)
+
+
+### Bug Fixes
+
+* keep deferred workload roles out of release gates ([#871](https://github.com/appaloft/appaloft/issues/871)) ([d98486a](https://github.com/appaloft/appaloft/commit/d98486a49bcca4a39ac6e0c8803d0f567999d61d))
+
 ## [1.6.2](https://github.com/appaloft/appaloft/compare/v1.6.1...v1.6.2) (2026-07-29)
 
 

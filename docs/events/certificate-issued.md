@@ -2,9 +2,11 @@
 
 ## Normative Contract
 
-`certificate-issued` means a certificate issuance or renewal attempt succeeded and certificate state is durably recorded.
+`certificate-issued` means a certificate issuance or renewal attempt succeeded and certificate
+state is durably recorded.
 
-It does not mean every route using the domain is healthy.
+It does not mean edge activation succeeded, the proxy serves this certificate, or every route using
+the domain is healthy.
 
 ## Global References
 
@@ -14,6 +16,7 @@ This event inherits:
 - [ADR-007: Certificate Provider And Challenge Default](../decisions/ADR-007-certificate-provider-and-challenge-default.md)
 - [ADR-008: Renewal Trigger Model](../decisions/ADR-008-renewal-trigger-model.md)
 - [ADR-009: Certificates Import Command](../decisions/ADR-009-certificates-import-command.md)
+- [ADR-104: Certificate Route Activation Reconciliation](../decisions/ADR-104-certificate-route-activation-reconciliation.md)
 - [Error Model](../errors/model.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
 
@@ -38,7 +41,7 @@ Publisher: certificate provider worker or certificate process manager after dura
 
 Expected consumers:
 
-- domain-ready process manager;
+- certificate route reconciliation process manager;
 - certificate read-model projection;
 - audit/notification;
 - edge proxy route activation/reload process when provider configuration changes require it.
@@ -71,7 +74,8 @@ certificate attempt: issuing -> issued
 certificate: pending|renewing -> active
 ```
 
-If the domain binding is otherwise bound and route-ready, this event should lead to `domain-ready`.
+If the binding is otherwise eligible, this event requests certificate route reconciliation. Only
+successful activation/reload and served-certificate proof may lead to `domain-ready`.
 
 ## Idempotency
 
@@ -95,8 +99,9 @@ Current code records issued certificate attempt state and publishes `certificate
 `certificate-requested` event handler after injected provider issuance and secret storage both
 succeed.
 
-Current code consumes `certificate-issued` for certificate-backed domain readiness. If the referenced
-domain binding is still `bound`, the handler marks it `ready` and publishes `domain-ready`.
+Current code consumes `certificate-issued` through a direct certificate-backed readiness handler.
+If the referenced binding is still eligible, it marks it `ready` without edge activation or served
+certificate proof; Spec 121 replaces that optimistic path.
 
 Current code implements the real ACME adapter, HTTP-01 challenge token serving, provider-owned
 proxy reload/activation plans for route realization, and durable route realization failure state for

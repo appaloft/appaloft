@@ -14,7 +14,9 @@ Certificate readiness describes "whether HTTPS is available." It is a completely
 
 If certificate status is reported mixed together with deployment status, users can't tell whether they should redeploy the app or just wait for certificate issuance. Splitting certificate readiness into an independent, observable state lets "HTTPS won't open" be pinpointed precisely to one specific thing: the chain, private key mismatch, hostname coverage, or expiration.
 
-Certificate readiness needs to answer three questions at once: does Appaloft have usable certificate material for this hostname? Does the certificate cover the current hostname and remain unexpired? Is the proxy actually using this certificate to serve HTTPS externally?
+Certificate readiness needs to answer three questions at once: does Appaloft have usable certificate material for this hostname? Does the certificate cover the current hostname and remain unexpired? Is the proxy actually using this certificate to serve HTTPS externally? Issuance or import only means candidate material is stored safely. Appaloft must still apply that candidate to the current serving route and connect directly to the proxy with the hostname as SNI to verify the served leaf fingerprint. The domain becomes `ready` only after all three checks pass.
+
+The currently working certificate keeps serving during a transition. If material activation, proxy reload, or fingerprint proof fails, Appaloft rolls back the candidate and leaves the domain pending/not-ready instead of treating “stored” as “serving.” A Docker Compose route is switched only when project/service labels resolve exactly one serving container; replicas and unsupported runtime targets fail closed.
 
 ## Where you see it in Web, CLI, and API
 
@@ -22,6 +24,10 @@ Appaloft supports two certificate sources:
 
 - **Auto-issue or renew** — you provide the hostname and proof of ownership, and Appaloft handles the issuance flow.
 - **Import a certificate** — you provide the chain, private key, and related metadata; the private key is a Secret, and no UI, log, or diagnostic information ever echoes the full content.
+
+For an existing TLS domain, switch policy from the Web domain-binding detail page or run
+`appaloft domain-binding configure-certificate-policy <domainBindingId> --policy auto|manual`.
+After switching to `manual`, import a replacement certificate; after switching to `auto`, request issuance. The policy command itself does not import, issue, or prematurely replace the serving certificate.
 
 ```bash
 # View certificate status and issuance history (never returns the certificate PEM or private key)
@@ -39,6 +45,7 @@ appaloft certificate revoke <certificateId>
 - **Treating a certificate failure as a deployment failure**: confirm the app's runtime status and generated access URL are fine first, then troubleshoot the certificate separately.
 - **Assuming deleting a domain binding automatically revokes the certificate**: the two have independent lifecycles — deleting a binding doesn't automatically revoke or delete a certificate, and vice versa.
 - **Redeploying the app right after a renewal failure**: renewal failures are usually related to domain ownership, DNS pointing, or certificate material — not the app itself.
+- **Treating a successful import as a completed proxy switch**: import stores candidate material; wait for proxy activation and SNI fingerprint proof.
 
 ## Related tasks
 

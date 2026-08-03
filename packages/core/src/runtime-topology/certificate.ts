@@ -768,6 +768,14 @@ export class Certificate extends AggregateRoot<CertificateState> {
     });
   }
 
+  isActive(): boolean {
+    return this.state.status.value === "active";
+  }
+
+  hasSource(source: CertificateSource): boolean {
+    return this.state.source.value === source;
+  }
+
   requestAttempt(input: {
     attemptId: CertificateAttemptId;
     reason: CertificateIssueReasonValue;

@@ -206,6 +206,9 @@ export const tokens = {
   certificateProvider: Symbol.for("appaloft.certificate_provider"),
   certificateMaterialValidator: Symbol.for("appaloft.certificate_material_validator"),
   certificateSecretStore: Symbol.for("appaloft.certificate_secret_store"),
+  certificateMaterializer: Symbol.for("appaloft.certificate_materializer"),
+  certificateRouteActivator: Symbol.for("appaloft.certificate_route_activator"),
+  tlsCertificateObserver: Symbol.for("appaloft.tls_certificate_observer"),
   dependencyResourceSecretStore: Symbol.for("appaloft.dependency_resource_secret_store"),
   dependencyBindingSecretStore: Symbol.for("appaloft.dependency_binding_secret_store"),
   certificateHttpChallengeTokenStore: Symbol.for("appaloft.certificate_http_challenge_token_store"),
@@ -694,6 +697,9 @@ export const tokens = {
   createDomainBindingUseCase: Symbol.for("appaloft.create_domain_binding_use_case"),
   configureDomainBindingRouteUseCase: Symbol.for(
     "appaloft.configure_domain_binding_route_use_case",
+  ),
+  configureDomainBindingCertificatePolicyUseCase: Symbol.for(
+    "appaloft.configure_domain_binding_certificate_policy_use_case",
   ),
   confirmDomainBindingOwnershipUseCase: Symbol.for(
     "appaloft.confirm_domain_binding_ownership_use_case",

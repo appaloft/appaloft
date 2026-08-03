@@ -142,7 +142,7 @@ export function expectCliSuccess(result: CliResult, label: string): void {
   expect(result.exitCode, `${label}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`).toBe(0);
 }
 
-function parseJsonPayloads(raw: string): unknown[] {
+export function parseJsonPayloads(raw: string): unknown[] {
   const payloads: unknown[] = [];
 
   for (let offset = 0; offset < raw.length; ) {
