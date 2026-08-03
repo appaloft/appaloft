@@ -55,7 +55,9 @@ docker build --build-arg APPALOFT_APP_VERSION=0.1.0 -t appaloft-all-in-one:local
 - `nightly.yml`: scheduled Compose/self-host smoke.
 - `release.yml`: manually creates or updates a Release Please PR on `main`, adds roadmap release
   alignment to that PR, and publishes only when the merged release PR pushes a `chore: release ...`
-  commit to `main`. Public docs deployment is no longer tied to product releases.
+  commit to `main`. Release orchestration uses the workflow-scoped `github.token`; the workflow
+  explicitly dispatches CI for generated release PRs so it does not depend on a long-lived PAT to
+  trigger those checks. Public docs deployment is no longer tied to product releases.
 - `public-launch-basic-docker-smoke.yml`, `public-launch-github-repo-smoke.yml`, and
   `public-launch-cron-smoke.yml`: GitHub Actions secret-gated public launch smokes used by nightly
   and release. They prove that public Appaloft can register a temporary project/server, deploy a
@@ -173,7 +175,6 @@ The CLI binary bundle embeds:
 
 ## Required Secrets
 
-- `RELEASE_PLEASE_TOKEN`: recommended GitHub App token or PAT so release-created events can trigger downstream workflows when needed.
 - `NPM_TOKEN`: optional fallback for npm publish. Prefer npm trusted publishing/OIDC. Because the
   source repository is private, npm provenance is not requested.
 - `HOMEBREW_TAP_TOKEN`: token with write access to `appaloft/homebrew-tap`.
