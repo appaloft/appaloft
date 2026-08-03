@@ -120,6 +120,9 @@
   read-only-root regression and compute-released resume path.
 - [x] GH-AUTO-LIFECYCLE-025: block an admitted runtime operation, pause the Sandbox, then finish the
   old operation and prove its activity bookkeeping cannot overwrite paused state or recovery handle.
+- [x] GH-AUTO-LIFECYCLE-028: deterministically block same-Run reconciliation, persist stop, release
+  the late running readback, and prove protected Task state remains stopped before resume appends a
+  fallback child Run (#989).
 - [ ] GH-AUTO-NATIVE-STATE-027: emit only the singular snapshot policy accepted by exact pinned
   OpenCode 1.18.4, validate the generated native config before background startup, revoke scoped
   model access on validation failure, and preserve native sessions plus independent headless Runs
@@ -217,6 +220,9 @@
 - [x] Docs outcome for #951: not user-facing. The fix narrows activity persistence so it cannot
   overwrite the already documented Sandbox pause/resume/cleanup lifecycle; no command, API schema,
   status vocabulary, Console affordance, or recovery guidance changes.
+- [x] Docs outcome for #989: not user-facing. The fix enforces the already documented recoverable
+  stop/resume contract and changes no command, API schema, status vocabulary, Console affordance,
+  or recovery guidance.
 - [x] Prove #951 with deterministic detached-aggregate concurrency and PostgreSQL conditional-update
   regressions; run public lint, 61-package typecheck, 5-task build, and the canonical 35-task test
   gate. The first two full-test attempts exposed unrelated existing timing/environment flakes; the
@@ -227,7 +233,12 @@
 - [x] Synchronize Domain Model, Business Operation Map, operation catalog, SDK/CLI/Web docs, and
   Test Matrix evidence.
 - [x] Commit and push public implementation changes with neutral messages.
-- [x] Merge the final public correction through #986 / PR #987 and record final public `main` SHA
-  `b6b238506a848e677e4c29799cd642f8f21bff66`.
+- [x] Synchronize Review delivery evidence through public #988 and record public `main` SHA
+  `953eceebaeeff56ecfb796a580afac41292f8859` before the #989 correction.
+- [x] Run the #989 focused regression plus public lint, 61-package typecheck, 5-task build, and the
+  canonical 35-task repository test gate. The sandboxed test attempt was blocked only by Unix socket
+  permissions; the exact file passed and the complete non-sandbox repository run passed 35/35.
+- [ ] Merge the #989 correction, record its final public `main` SHA, advance the Cloud gitlink, and
+  complete the final read-only boundary review before hosted delivery continues.
 - [x] Keep downstream real GitHub/registered-Server/native-provider/Preview/provider-cleanup smoke
   outside the public CI claim; its result must remain explicit in the hosted delivery report.

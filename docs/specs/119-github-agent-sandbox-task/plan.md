@@ -108,6 +108,8 @@
   including after compute-released resume.
 - Add a deterministic late-activity/pause concurrency regression for `GH-AUTO-LIFECYCLE-025` and
   prove the paused recovery handle remains authoritative.
+- Add a deterministic same-Run reconciliation/stop race for `GH-AUTO-LIFECYCLE-028`; prove a late
+  running result cannot overwrite recoverable stopped state and resume appends a new Run.
 - Run public lint, typecheck, test, and build before public delivery.
 
 ## Risks
@@ -121,6 +123,8 @@
 - Cleanup success requires provider readback and durable retry, not optimistic state mutation.
 - Late runtime activity can race pause/resume/terminate; full stale aggregate persistence would
   destroy the current recovery handle, so activity bookkeeping must re-read lifecycle truth.
+- A reconciliation generation can still be current when stop wins concurrently; active-Run identity
+  alone is insufficient, so reconciliation persistence must also fence protected lifecycle states.
 - A read-only runtime root makes any missing process-home boundary fail as an Agent startup error;
   provider and Adapter tests must assert the rendered environment rather than relying on a base
   image's pre-created root files.
@@ -138,8 +142,10 @@
 ## Delivery Status
 
 - Public contracts, operations, persistence, adapters, surfaces, fallback-session correction, safe
-  Review Task-link handling, and bounded Review secret redaction are merged through public #986 /
-  PR #987 at `b6b238506a848e677e4c29799cd642f8f21bff66`.
+  Review Task-link handling, and bounded Review secret redaction are merged and synchronized
+  through public #988 at `953eceebaeeff56ecfb796a580afac41292f8859`.
+- Public #989 supplies the neutral Task lifecycle fence needed before rerunning hosted acceptance:
+  a reconciliation write must re-read and preserve same-generation stopped/later-phase truth.
 - Downstream hosted composition must still supply and prove tenancy, authorization, credential
   custody, native-provider execution, registered-Server placement, Preview delivery, and exact
   provider cleanup through an explicit opt-in acceptance. Public deterministic tests do not replace

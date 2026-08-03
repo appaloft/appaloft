@@ -19,8 +19,9 @@ delivery without a newly hydrated source SHA updated the current Task comment bu
 Check in progress; public #953 / PR #954 delivered the neutral existing-Check update correction at
 that stage. Public #982/#983 then restored truthful fallback objective/session context; public
 #984/#985 separated safe Task links from inbound assignment rejection; public #986/#987 made Review
-delivery reuse bounded feedback redaction for secret-like output. Final public `main` SHA is
-`b6b238506a848e677e4c29799cd642f8f21bff66`.
+delivery reuse bounded feedback redaction for secret-like output, and public #988 synchronized that
+delivery evidence at `953eceebaeeff56ecfb796a580afac41292f8859`. External run `30820316185`
+then exposed a same-Run stop/reconciliation race governed by public #989.
 
 ## Goal
 
@@ -60,6 +61,7 @@ Sandbox cleanup.
 | GH-AUTO-RUNTIME-HOME-024 | Isolated Agent process home | A GitHub Agent Task starts or resumes inside a read-only-root Sandbox | The Adapter launches native version, server, task, test, Preview, terminal, or fallback-session processes | Every process uses the existing Sandbox workspace-scoped home/XDG contract; native Agent logs, config, cache, and session state remain writable and recoverable below the isolated Workspace and never use root/global home. |
 | GH-AUTO-LIFECYCLE-025 | Pause-safe activity persistence | A runtime operation admitted while a Sandbox is ready completes after pause or another lifecycle transition has persisted | The operation records provider activity | Activity bookkeeping re-reads current Sandbox truth and cannot replace the newer lifecycle status or provider recovery handle; a non-ready current Sandbox remains unchanged so resume and exact cleanup use the authoritative handle. |
 | GH-AUTO-NATIVE-STATE-027 | Bounded native Agent state | An OpenCode Task runs with native state below the Workspace-scoped HOME/XDG paths | The Adapter composes native OpenCode configuration | Appaloft emits only fields accepted by the exact pinned native runtime, validates the ephemeral configuration through the installed binary before starting a server or Run, and fails with a stable secret-safe error after revoking scoped access when validation fails; redundant native snapshots remain disabled while native session state, provider/model configuration, bounded Task events, authoritative Git Diff, and Sandbox recovery remain unchanged. |
+| GH-AUTO-LIFECYCLE-028 | Stop-safe same-Run reconciliation | A reconciliation has read an active Run and remains in flight while stop persists recoverable Task state | The late reconciliation attempts to persist the same active Run generation | Persistence re-reads Task lifecycle truth and cannot replace a protected stopped or later-phase status; resume appends a fresh recovery Run on the same Task and Workspace. |
 
 ## Supported GitHub Inputs
 
