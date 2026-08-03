@@ -141,8 +141,12 @@ describe("GitHub Agent Review delivery", () => {
     expect(transport.requests).toHaveLength(3);
   });
 
-  test("[#984][GH-AUTO-REVIEW-015] still rejects secret-like outbound Review text", async () => {
-    const transport = fetchSequence([]);
+  test("[#986][GH-AUTO-REVIEW-015] redacts secret-like Review text before delivery", async () => {
+    const transport = fetchSequence([
+      { head: { sha: "abcdef123456" } },
+      [],
+      { id: 7003, html_url: "https://github.test/review/7003" },
+    ]);
     const result = await new GitHubAgentReviewDeliveryAdapter(
       "installation-token",
       transport.fetcher,
@@ -151,12 +155,26 @@ describe("GitHub Agent Review delivery", () => {
       expectedHeadSha: "abcdef123456",
       contentDigest: "sha256:review-content-003",
       summary: "token=must-not-leave-the-task",
-      findings: [],
+      findings: [
+        {
+          path: "src/api.ts",
+          line: 18,
+          body: "API_KEY=must-not-leave-the-finding",
+          severity: "warning",
+        },
+      ],
     });
 
-    expect(result.isErr()).toBe(true);
-    expect(result._unsafeUnwrapErr().code).toBe("validation_error");
-    expect(transport.requests).toHaveLength(0);
+    expect(result._unsafeUnwrap()).toEqual({
+      reviewId: "7003",
+      reviewUrl: "https://github.test/review/7003",
+      duplicate: false,
+    });
+    expect(transport.requests).toHaveLength(3);
+    const delivered = String(transport.requests[2]?.init?.body);
+    expect(delivered).toContain("[REDACTED SECRET-LIKE OUTPUT]");
+    expect(delivered).not.toContain("must-not-leave-the-task");
+    expect(delivered).not.toContain("must-not-leave-the-finding");
   });
 
   test("[GH-AUTO-HEAD-016] refuses to annotate a changed head", async () => {

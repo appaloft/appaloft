@@ -2366,30 +2366,30 @@ export class GitHubAgentReviewDeliveryAdapter implements GitHubAgentReviewDelive
     ) {
       return err(domainError.validation("GitHub Review delivery input is invalid or stale"));
     }
-    const summary = boundedText(input.summary, 32_000);
-    if (!summary || secretMaterialText.test(summary)) {
-      return err(domainError.validation("GitHub Review summary is invalid or contains secrets"));
+    const rawSummary = boundedText(input.summary, 32_000);
+    if (!rawSummary) {
+      return err(domainError.validation("GitHub Review summary is invalid"));
     }
+    const summary = safeFeedbackText(rawSummary, 32_000);
     const comments: Array<Record<string, unknown>> = [];
     for (const finding of input.findings) {
       const path = boundedText(finding.path, 1_024);
-      const body = boundedText(finding.body, 4_000);
+      const rawBody = boundedText(finding.body, 4_000);
       if (
         !path ||
         path.startsWith("/") ||
         path.split("/").includes("..") ||
-        !body ||
-        secretMaterialText.test(body) ||
+        !rawBody ||
         !Number.isSafeInteger(finding.line) ||
         finding.line < 1
       ) {
-        return err(domainError.validation("GitHub Review finding is invalid or contains secrets"));
+        return err(domainError.validation("GitHub Review finding is invalid"));
       }
       comments.push({
         path,
         line: finding.line,
         side: "RIGHT",
-        body: `[${finding.severity}] ${body}`,
+        body: `[${finding.severity}] ${safeFeedbackText(rawBody, 4_000)}`,
       });
     }
 
