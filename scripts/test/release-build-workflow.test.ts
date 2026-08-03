@@ -45,7 +45,7 @@ describe("release build workflow", () => {
     expect(workflow).toContain(
       ["--allow-unpublished-version ", '"$', "{repository_version}", '"'].join(""),
     );
-    expect(workflow).not.toContain("secrets.RELEASE_PLEASE_TOKEN");
+    expect(workflow).toContain(["token: $", "{{ secrets.RELEASE_PLEASE_TOKEN }}"].join(""));
     expect(workflow.match(/github\.token/g)?.length).toBeGreaterThanOrEqual(5);
     expect(workflow.indexOf("Verify repository release state")).toBeLessThan(
       workflow.indexOf("googleapis/release-please-action@v4"),
