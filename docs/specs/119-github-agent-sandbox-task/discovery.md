@@ -105,6 +105,18 @@ Review Round becomes a durable downstream-Code and merge gate.
   snapshots through OpenCode's supported configuration and preserves session state and the
   provider/model protocol (#964).
 
+### Configuration compatibility correction
+
+- External run `30754835742` proved that the first repair's singular `snapshot: false` field was
+  ignored by pinned OpenCode `1.18.4`; native packs still appeared below
+  `/workspace/.local/share/opencode/snapshot` and the manual Review Task did not reach a terminal
+  state within 30 minutes.
+- The official OpenCode `v1.18.4` source schema defines the plural `snapshots` field, while legacy
+  supported documentation and releases use singular `snapshot`. The neutral Adapter must emit both
+  disabled compatibility fields rather than guess from a vendor version string.
+- The run reported `oom=0` and `oom_kill=0`, so this evidence corrects configuration compatibility;
+  it does not weaken the separate process-tree and exact-cleanup requirements.
+
 ## 2026-08-01 Pause/Activity Concurrency Evidence
 
 - External run `30699497767` kept one Task `srun_er8q3l6yah9v`, one Workspace

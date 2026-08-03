@@ -114,9 +114,11 @@
   read-only-root regression and compute-released resume path.
 - [x] GH-AUTO-LIFECYCLE-025: block an admitted runtime operation, pause the Sandbox, then finish the
   old operation and prove its activity bookkeeping cannot overwrite paused state or recovery handle.
-- [x] GH-AUTO-NATIVE-STATE-027: disable redundant OpenCode snapshots in the native Adapter config,
-  preserve native sessions and scoped model configuration, and prove the Workspace cannot contain
-  recursively nested OpenCode snapshot packs (#964).
+- [ ] GH-AUTO-NATIVE-STATE-027: correct the native Adapter config to emit both legacy `snapshot`
+  and OpenCode 1.18.4 `snapshots` disabled fields, preserve native sessions and scoped model
+  configuration, and rerun registered-server acceptance after run `30754835742` proved the
+  singular-only repair was ignored (#964). Public focused regression plus repository-wide lint,
+  typecheck, test, and build pass; registered-server acceptance remains the unchecked exit gate.
 
 ## GitHub Feedback And Delivery Slice
 

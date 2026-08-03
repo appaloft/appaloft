@@ -175,6 +175,7 @@ function modelConfig(capability: OpenCodeSandboxModelCapability): string {
   return JSON.stringify({
     model: `${capability.provider}/${capability.model}`,
     snapshot: false,
+    snapshots: false,
     provider: {
       [capability.provider]: {
         npm: "@ai-sdk/openai-compatible",
