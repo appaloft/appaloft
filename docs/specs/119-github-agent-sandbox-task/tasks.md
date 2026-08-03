@@ -155,6 +155,8 @@
   hydrated source SHA; retain exact-SHA admission for Check creation (#953).
 - [x] Separate inbound command environment-assignment rejection from outbound Review secret
   detection so the public fallback Task link containing `?task=` remains deliverable (#984).
+- [x] Reuse bounded feedback redaction for Review summary and finding bodies so secret-like lines
+  never leave the Task while structural path/line/head validation remains fail closed (#986).
 
 ## Retention And Cleanup Slice
 
@@ -187,6 +189,11 @@
 - [x] Docs outcome for #984: not user-facing. The adapter correction restores the documented
   Review/Task-link delivery path without adding a command, API field, status, page, or help anchor;
   inbound command and outbound secret rejection remain unchanged product behavior.
+- [x] Docs outcome for #986: existing anchor
+  `agents/github-agent-tasks#github-agent-tasks` already promises that secret-like Task output is not
+  written to GitHub. The adapter now fulfills that contract by delivering an explicit bounded
+  redaction instead of failing the entire Review; both locales and the docs-registry entry remain
+  complete and unchanged.
 - [x] Docs outcome for #927: not user-facing. The fix restores the already documented
   installation-authenticated materialization behavior and changes no public command or contract.
 - [x] Reopen #927 after registered-server smoke proved Docker's Workspace tmpfs is `noexec`;
@@ -220,7 +227,7 @@
 - [x] Synchronize Domain Model, Business Operation Map, operation catalog, SDK/CLI/Web docs, and
   Test Matrix evidence.
 - [x] Commit and push public implementation changes with neutral messages.
-- [x] Merge the final public correction through #953 / PR #954 and record final public `main` SHA
-  `7cdd99ca83554bf76184d209199f60a75b3a4679`.
+- [x] Merge the final public correction through #986 / PR #987 and record final public `main` SHA
+  `b6b238506a848e677e4c29799cd642f8f21bff66`.
 - [x] Keep downstream real GitHub/registered-Server/native-provider/Preview/provider-cleanup smoke
   outside the public CI claim; its result must remain explicit in the hosted delivery report.

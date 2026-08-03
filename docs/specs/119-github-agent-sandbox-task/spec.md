@@ -2,7 +2,7 @@
 
 ## Status
 
-Public implementation is delivered through public #953 / PR #954. Public tracking #845 and
+Public implementation is delivered through public #986 / PR #987. Public tracking #845 and
 implementation issues #846-#849 are complete; real GitHub App, registered Server, native-provider,
 Preview, and exact provider-cleanup acceptance remain an explicit downstream hosted opt-in boundary
 and are not inferred from public CI.
@@ -17,7 +17,10 @@ pause/activity concurrency regression exposed by external run `30699497767`. Hos
 remains in the downstream composition. External run `30707022006` proved that a terminal control
 delivery without a newly hydrated source SHA updated the current Task comment but left its existing
 Check in progress; public #953 / PR #954 delivered the neutral existing-Check update correction at
-final public `main` SHA `7cdd99ca83554bf76184d209199f60a75b3a4679`.
+that stage. Public #982/#983 then restored truthful fallback objective/session context; public
+#984/#985 separated safe Task links from inbound assignment rejection; public #986/#987 made Review
+delivery reuse bounded feedback redaction for secret-like output. Final public `main` SHA is
+`b6b238506a848e677e4c29799cd642f8f21bff66`.
 
 ## Goal
 
@@ -45,7 +48,7 @@ Sandbox cleanup.
 | GH-AUTO-LINEAGE-012 | Multi-Run Agent Task | A Task retries or resumes | A new Agent run starts | The first run id remains the stable Task id, `activeRunId` and bounded ordered lineage persist, durable work is keyed by stable Task plus active Run generation rather than Task alone, and cumulative runtime/retry limits are enforced. |
 | GH-AUTO-FEEDBACK-013 | Bounded feedback | A Task changes phase, receives a control command, or its Agent harness fails | GitHub and Console consume Task events | One reaction per command, one updatable status comment per current thread Task, one head-specific Check, and required delivery objects are upserted. The thread/Task binding preserves status comment and Check ids across distinct `status`/`steer`/`stop`/`resume` deliveries and process restart; an existing Check is updated without requiring a newly hydrated source SHA, while creating a Check still requires the exact head/source SHA, and replay of one delivery remains idempotent. The existing Sandbox Agent Run persists a stable failure code plus bounded, redacted summary and the Agent Task projects that diagnostic into its existing failure field. The shared summary can carry phase, checks, redacted/truncated Diff, Preview scope/TTL, delivery, failure, and cleanup state; secret-like lines and sensitive URLs are omitted, total GitHub Markdown is bounded, and complete safe output remains on the Task page. |
 | GH-AUTO-FIX-014 | Write delivery | An authorized fix reaches accepted evidence | PR delivery policy permits write | An isolated branch is pushed and a Task-owned PR is created or updated with summary, checks, diff, and Preview; no merge/default-branch/force-push occurs. |
-| GH-AUTO-REVIEW-015 | Read-only review | An authorized review is triggered | Findings are delivered | No code is pushed; actionable findings use Review/Check annotations where valid, content is deduped, the same repo/PR/head/rule executes at most once, and a projected safe Task URL is not confused with an inbound environment assignment while secret-like outbound text remains rejected. |
+| GH-AUTO-REVIEW-015 | Read-only review | An authorized review is triggered | Findings are delivered | No code is pushed; actionable findings use Review/Check annotations where valid, content is deduped, the same repo/PR/head/rule executes at most once, a projected safe Task URL is not confused with an inbound environment assignment, and secret-like summary/finding lines are replaced by explicit bounded redaction before delivery while structural path/line/head validation remains fail closed. |
 | GH-AUTO-HEAD-016 | Head SHA concurrency | PR head changes during work | Reconciliation runs | Stale review is superseded and does not annotate the new head; unsafe fix delivery enters `needs_reconciliation`; synchronize rules may create one review for the new head. |
 | GH-AUTO-PREVIEW-017 | Safe private Preview | A permitted fix requests Preview | Preview is created from the Task evidence | The existing Preview lifecycle receives source SHA, private access policy, and TTL; Agent credentials never reach test/Preview processes. |
 | GH-AUTO-CLEANUP-018 | Hibernate and exact cleanup | A Task stops/completes, TTL expires, or PR closes | Retention executes | Existing pause/terminate/Preview cleanup operations revoke processes, ports, routes, domains, networks, volumes, worktree, and session material according to policy and verify provider readback idempotently. |
