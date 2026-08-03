@@ -63,13 +63,21 @@ if (!repositoryVersion) {
 
 const args = parseCliArgs(Bun.argv.slice(2));
 const latestReleaseTag = stringArg(args, "latest-release-tag");
+const allowedUnpublishedVersion = stringArg(args, "allow-unpublished-version");
 if (latestReleaseTag) {
   const latestReleaseVersion = requireVersion(latestReleaseTag, "latest GitHub release tag");
-  if (latestReleaseVersion !== repositoryVersion) {
+  if (
+    latestReleaseVersion !== repositoryVersion &&
+    allowedUnpublishedVersion !== repositoryVersion
+  ) {
     throw new Error(
       `Repository release state is ${repositoryVersion}, but the latest GitHub release is ${latestReleaseTag}. Reconcile the repository version sources before running Release Please.`,
     );
   }
 }
 
-console.log(`Repository release state is synchronized at ${repositoryVersion}.`);
+if (latestReleaseTag && normalizeReleaseVersion(latestReleaseTag) !== repositoryVersion) {
+  console.log(`Repository release state ${repositoryVersion} is awaiting publication.`);
+} else {
+  console.log(`Repository release state is synchronized at ${repositoryVersion}.`);
+}

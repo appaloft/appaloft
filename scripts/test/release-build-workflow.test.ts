@@ -37,7 +37,11 @@ describe("release build workflow", () => {
     ).toEqual(new Set([packageJson.version]));
     expect(scripts["release:state:check"]).toBe("bun run scripts/release/check-release-state.ts");
     expect(workflow).toContain("Verify repository release state");
-    expect(workflow).toContain("release:state:check --latest-release-tag");
+    expect(workflow).toContain("release_state_args=(--latest-release-tag");
+    expect(workflow).toContain("contains(github.event.head_commit.message, 'chore: release ')");
+    expect(workflow).toContain(
+      ["--allow-unpublished-version ", '"$', "{repository_version}", '"'].join(""),
+    );
     expect(workflow).not.toContain("secrets.RELEASE_PLEASE_TOKEN");
     expect(workflow.match(/github\.token/g)?.length).toBeGreaterThanOrEqual(5);
     expect(workflow.indexOf("Verify repository release state")).toBeLessThan(
@@ -56,6 +60,25 @@ describe("release build workflow", () => {
     expect(mismatch.stderr.toString()).toContain(
       "Reconcile the repository version sources before running Release Please.",
     );
+
+    const unpublished = Bun.spawnSync(
+      [
+        "bun",
+        "run",
+        "release:state:check",
+        "--latest-release-tag",
+        "v0.0.0",
+        "--allow-unpublished-version",
+        packageJson.version,
+      ],
+      {
+        cwd: root,
+        stderr: "pipe",
+        stdout: "pipe",
+      },
+    );
+    expect(unpublished.exitCode).toBe(0);
+    expect(unpublished.stdout.toString()).toContain("is awaiting publication");
   });
 
   test("[RELEASE-HARDENING-003] publishes governed release artifact classes", async () => {
