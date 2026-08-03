@@ -78,7 +78,7 @@ permissions:
 
 jobs:
   release-please:
-    if: "${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'chore: release ') }}"
+    if: "${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'chore: release ') }}"
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
@@ -102,7 +102,13 @@ jobs:
           latest_release_tag="$(
             gh release view --repo "${GITHUB_REPOSITORY}" --json tagName --jq '.tagName'
           )"
-          bun run release:state:check --latest-release-tag "${latest_release_tag}"
+          repository_version="$(jq -r '.version' package.json)"
+          release_commit_message="$(git log -1 --pretty=%B)"
+          release_state_args=(--latest-release-tag "${latest_release_tag}")
+          if grep -Fq "chore: release ${repository_version}" <<< "${release_commit_message}"; then
+            release_state_args+=(--allow-unpublished-version "${repository_version}")
+          fi
+          bun run release:state:check "${release_state_args[@]}"
 
       - id: release
         uses: googleapis/release-please-action@v4
