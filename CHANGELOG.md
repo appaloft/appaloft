@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/appaloft/appaloft/compare/v1.7.3...v1.8.0) (2026-08-04)
+
+
+### Features
+
+* **web:** simplify agent workspace setup ([#999](https://github.com/appaloft/appaloft/issues/999)) ([8e37238](https://github.com/appaloft/appaloft/commit/8e372385e305b9c0140770d258c7205f4d2efcb0))
+
 ## [1.7.3](https://github.com/appaloft/appaloft/compare/v1.7.2...v1.7.3) (2026-08-04)
 
 
