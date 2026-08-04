@@ -1,10 +1,12 @@
 import "reflect-metadata";
 
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -132,7 +134,114 @@ function runningGitComposeDeployment(input: {
   return deployment;
 }
 
+function runningLocalComposeDeployment(input: {
+  deploymentId: string;
+  sourceWorkdir: string;
+}): Deployment {
+  const deployment = Deployment.create({
+    id: DeploymentId.rehydrate(input.deploymentId),
+    projectId: ProjectId.rehydrate("prj_source_integrity"),
+    environmentId: EnvironmentId.rehydrate("env_production"),
+    resourceId: ResourceId.rehydrate("res_web"),
+    serverId: DeploymentTargetId.rehydrate("srv_local"),
+    destinationId: DestinationId.rehydrate("dst_local"),
+    runtimePlan: RuntimePlan.rehydrate({
+      id: RuntimePlanId.rehydrate(`plan_${input.deploymentId}`),
+      source: SourceDescriptor.rehydrate({
+        kind: SourceKindValue.rehydrate("local-folder"),
+        locator: SourceLocator.rehydrate(input.sourceWorkdir),
+        displayName: DisplayNameText.rehydrate("User-authored Compose source"),
+        metadata: { composeFilePath: "docker-compose.yml" },
+      }),
+      buildStrategy: BuildStrategyKindValue.rehydrate("compose-deploy"),
+      packagingMode: PackagingModeValue.rehydrate("compose-bundle"),
+      execution: RuntimeExecutionPlan.rehydrate({
+        kind: ExecutionStrategyKindValue.rehydrate("docker-compose-stack"),
+        composeFile: FilePathText.rehydrate("docker-compose.yml"),
+      }),
+      target: DeploymentTargetDescriptor.rehydrate({
+        kind: TargetKindValue.rehydrate("single-server"),
+        providerKey: ProviderKey.rehydrate("local-shell"),
+        serverIds: [DeploymentTargetId.rehydrate("srv_local")],
+      }),
+      detectSummary: DetectSummary.rehydrate("Local Docker Compose deployment"),
+      steps: [PlanStepText.rehydrate("Apply user-authored Compose source")],
+      generatedAt: GeneratedAt.rehydrate("2026-07-26T00:00:00.000Z"),
+    }),
+    environmentSnapshot: EnvironmentConfigSnapshot.rehydrate({
+      id: EnvironmentSnapshotId.rehydrate(`snap_${input.deploymentId}`),
+      environmentId: EnvironmentId.rehydrate("env_production"),
+      createdAt: GeneratedAt.rehydrate("2026-07-26T00:00:00.000Z"),
+      precedence: [ConfigScopeValue.rehydrate("environment")],
+      variables: [],
+    }),
+    createdAt: CreatedAt.rehydrate("2026-07-26T00:00:00.000Z"),
+  })._unsafeUnwrap();
+
+  deployment.markPlanning(startedAt)._unsafeUnwrap();
+  deployment.markPlanned(startedAt)._unsafeUnwrap();
+  deployment.start(startedAt)._unsafeUnwrap();
+  return deployment;
+}
+
 describe("Git source redeploy safety", () => {
+  test("[DEP-CREATE-PKG-004] local Compose execution keeps generated overrides out of the source workdir", async () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), "appaloft-compose-source-integrity-"));
+    const sourceWorkdir = mkdtempSync(join(tmpdir(), "appaloft-user-compose-source-"));
+    const fakeBin = join(runtimeRoot, "fake-bin");
+    const composeFile = join(sourceWorkdir, "docker-compose.yml");
+    const originalPath = process.env.PATH;
+    mkdirSync(fakeBin, { recursive: true });
+    writeFileSync(composeFile, "services:\n  web:\n    image: acme/web:latest\n");
+    writeFileSync(
+      join(fakeBin, "docker"),
+      "#!/bin/sh\ncase \" $* \" in\n  *\" config --services \"*) printf 'web\\n'; exit 0 ;;\n  *) exit 1 ;;\nesac\n",
+    );
+    chmodSync(join(fakeBin, "docker"), 0o755);
+    const sourceBefore = readFileSync(composeFile, "utf8");
+    const sourceEntriesBefore = readdirSync(sourceWorkdir);
+
+    try {
+      process.env.PATH = `${fakeBin}:${originalPath ?? ""}`;
+      const deploymentId = "dep_compose_source_integrity";
+      const deployment = runningLocalComposeDeployment({ deploymentId, sourceWorkdir });
+      const backend = new LocalExecutionBackend(
+        runtimeRoot,
+        logger(),
+        progressRecorder(),
+        progressReporter(),
+      );
+
+      const result = await backend.execute(context("req_compose_source_integrity"), deployment);
+
+      expect(result.isOk()).toBe(true);
+      const state = deployment.toState();
+      const overrideFile = join(
+        runtimeRoot,
+        "local-deployments",
+        deploymentId,
+        "compose",
+        "ownership-labels.override.yml",
+      );
+      expect(state.status.value).toBe("failed");
+      expect(state.runtimePlan.execution.metadata?.errorCode).toBe("docker_compose_failed");
+      expect(state.runtimePlan.execution.metadata?.composeOwnershipOverrideFile).toBe(overrideFile);
+      expect(existsSync(overrideFile)).toBe(true);
+      expect(readFileSync(overrideFile, "utf8")).toContain("services:");
+      expect(readFileSync(composeFile, "utf8")).toBe(sourceBefore);
+      expect(readdirSync(sourceWorkdir)).toEqual(sourceEntriesBefore);
+      expect(existsSync(join(sourceWorkdir, ".appaloft.compose.labels.override.yml"))).toBe(false);
+    } finally {
+      if (originalPath === undefined) {
+        delete process.env.PATH;
+      } else {
+        process.env.PATH = originalPath;
+      }
+      rmSync(runtimeRoot, { recursive: true, force: true });
+      rmSync(sourceWorkdir, { recursive: true, force: true });
+    }
+  });
+
   test("[DEP-CREATE-PKG-002] local clone failure leaves the previous attempt workspace untouched", async () => {
     const runtimeRoot = mkdtempSync(join(tmpdir(), "appaloft-local-git-redeploy-"));
     const previousDeploymentId = "dep_previous_local";

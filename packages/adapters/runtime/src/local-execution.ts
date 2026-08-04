@@ -94,7 +94,10 @@ import {
 } from "./dependency-runtime-secrets";
 import { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild } from "./workspace-planners";
 import { runBufferedProcess, shellCommand } from "./buffered-process";
-import { renderComposeOwnershipLabelOverrideScript } from "./compose-label-overrides";
+import {
+  localComposeOwnershipOverrideFile,
+  renderComposeOwnershipLabelOverrideScript,
+} from "./compose-label-overrides";
 import {
   replicatedWorkloadComposeFileFromMetadata,
   replicatedWorkloadReplicasFromMetadata,
@@ -2842,7 +2845,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
         state.runtimePlan.execution.composeFile === state.runtimePlan.source.locator)
         ? resolve(workdir, "docker-compose.yml")
         : (state.runtimePlan.execution.composeFile ?? state.runtimePlan.source.locator));
-    const composeOwnershipOverrideFile = resolve(workdir, ".appaloft.compose.labels.override.yml");
+    const composeOwnershipOverrideFile = localComposeOwnershipOverrideFile(runtimeDir);
+    mkdirSync(dirname(composeOwnershipOverrideFile), { recursive: true });
     timeline.push(phaseLog("plan", `Compose working directory: ${workdir}`));
     const composeOwnershipLabels = dockerLabelsFromAssignments(
       appaloftDockerContainerLabelsForDeployment(state),
