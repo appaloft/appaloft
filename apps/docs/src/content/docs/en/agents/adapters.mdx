@@ -2,9 +2,28 @@
 title: "Agent Adapters"
 description: "How to install and choose an agent adapter."
 docType: "reference"
+localeState:
+  zh-CN: complete
+  en-US: complete
+searchAliases:
+  - "agent adapter"
+  - "model connection"
+  - "opencode"
+  - "pi"
 ---
 
 ## Stable identifier <a id="agent-adapter-installations" />
+
+Ordinary remote development setup does not require writing a manifest. Open **Organization
+Settings → Agent workspaces** and complete these tasks in order:
+
+1. Check whether OpenCode or Pi is ready.
+2. Connect DeepSeek, OpenAI, Anthropic, or a compatible provider under **Model connections**.
+3. Choose an approved Workspace Profile when creating the Workspace.
+
+A model API key belongs to the provider connection, not to OpenCode or Pi, and must never be placed
+in an Adapter or Profile manifest. The manifest workflow below is for custom integration authors and
+appears under **Custom integrations** in the Web console.
 
 An Agent Adapter is a declarative, immutable agent integration definition — it describes the required Sandbox template, runtime, capabilities, interaction modes, persistence paths, and credential types. **Appaloft never loads code from a manifest, and never accepts arbitrary shell command strings.**
 
@@ -64,7 +83,8 @@ appaloft agent-adapter list
 appaloft agent-adapter show <installation-id>
 ```
 
-You can also paste a manifest into the Web console's **Organization Settings → Agent Adapter** page to validate then install.
+You can also paste a manifest under **Organization Settings → Agent workspaces → Custom
+integrations** to validate then install.
 
 ### Workspace configuration templates
 

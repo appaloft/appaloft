@@ -1519,11 +1519,11 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
     "/api/rpc/agentWorkspaceProfiles/list": {
       json: [
         {
-          installationId: "awpi_codex_team",
+          installationId: "awpi_pi_team",
           definitionDigest: `sha256:${"b".repeat(64)}`,
-          profileId: "codex-team",
+          profileId: "pi-team",
           profileVersion: "1.0.0",
-          displayName: "Codex team default",
+          displayName: "Pi team default",
           status: "enabled",
           installedAt: "2026-07-26T12:30:00.000Z",
         },
@@ -5662,8 +5662,11 @@ describe.serial("console e2e with Bun.WebView", () => {
       await using view = createWebView({ width: 1280, height: 900 });
       await view.navigate(`${previewUrl}/organization/agent-adapters`);
 
-      await expectAnyText(view, ["Agent Adapters", "Agent 适配器"]);
+      await expectAnyText(view, ["Agent workspaces", "Agent 工作区"]);
       await expectText(view, "OpenCode");
+      await expectText(view, "Pi");
+      await expectAnyText(view, ["Model connections", "模型连接"]);
+      await expectAnyText(view, ["Custom integrations", "自定义集成"]);
       await expectText(view, "aai_opencode");
       await expectAnyText(view, ["Compatible", "兼容"]);
       await expectElement(view, "[data-organization-agent-adapters-display-surface]");
@@ -5702,8 +5705,8 @@ describe.serial("console e2e with Bun.WebView", () => {
       await view.navigate(`${previewUrl}/organization/agent-adapters`);
 
       await expectElement(view, "[data-organization-agent-workspace-profiles]");
-      await expectText(view, "Codex team default");
-      await expectText(view, "awpi_codex_team");
+      await expectText(view, "Pi team default");
+      await expectText(view, "awpi_pi_team");
       expect(
         await view.evaluate<boolean>(
           `document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`,
@@ -5714,7 +5717,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       await view.navigate(`${previewUrl}/workspaces`);
       await waitForRecordedRequest("/api/rpc/agentWorkspaceProfiles/list");
       await clickButtonByAnyText(view, ["Create workspace", "创建工作区"]);
-      await expectText(view, "Codex team default");
+      await expectText(view, "Pi team default");
     }
 
     {
@@ -5722,7 +5725,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       await view.navigate(`${previewUrl}/organization/agent-adapters`);
 
       await expectElement(view, "[data-organization-agent-workspace-profiles]");
-      await expectText(view, "Codex team default");
+      await expectText(view, "Pi team default");
       expect(
         await view.evaluate<boolean>(
           `document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`,

@@ -1360,7 +1360,8 @@ export const zhCN = {
       agentAdaptersEmptyDescription:
         "先安装通过校验的 Adapter 定义，再在新的 Agent Workspace 中使用。",
       agentAdaptersEmptyTitle: "还没有安装 Agent Adapter",
-      agentAdaptersTitle: "Agent Adapters",
+      agentAdaptersTitle: "Agent 工作区",
+      agentInstallationsTitle: "已安装的 Agent 集成",
       agentAdapterStatusDisabled: "已禁用",
       agentAdapterStatusEnabled: "已启用",
       agentAdapterUnchecked: "未检查",
@@ -1372,6 +1373,26 @@ export const zhCN = {
       agentAdapterValidatedDigest: "已校验的定义摘要",
       agentAdapterValidating: "正在校验",
       agentAdapterVersion: "版本",
+      agentCustomIntegrationsDescription:
+        "面向需要安装声明式 Adapter 或工作区配置 manifest 的集成开发者。模型密钥永远不应写进这些 manifest。",
+      agentCustomIntegrationsTitle: "自定义集成",
+      agentModelConnectionsAction: "配置模型访问",
+      agentModelConnectionsDescription:
+        "为 OpenCode 和 Pi 连接 DeepSeek、OpenAI、Anthropic 或兼容模型提供商。密钥会被加密，并与 Adapter manifest 分离。",
+      agentModelConnectionsTitle: "模型连接",
+      agentModelConnectionsUnavailable: "当前 Appaloft 实例尚未提供托管的模型连接能力。",
+      agentOptionNotConfigured: "尚未配置",
+      agentOptionOpenCodeDescription: "支持原生连接、后台任务和持久化会话。",
+      agentOptionPiDescription: "支持原生终端交互和有界后台任务。",
+      agentOptionReady: "可用",
+      agentOptionsDescription:
+        "OpenCode 和 Pi 保留自己的终端体验；Appaloft 提供隔离工作区、重连、凭据和预览。",
+      agentOptionsTitle: "Agents",
+      agentWorkspaceSetupDescription:
+        "依次准备 Agent、模型访问和可复用工作区配置。自定义 manifest 属于高级集成路径。",
+      agentWorkspaceSetupTitle: "Agent 工作区",
+      customAgentAdapterInstallAction: "安装自定义 Adapter",
+      customWorkspaceProfileInstallAction: "安装自定义配置模板",
       agentWorkspaceProfileDisableAction: "禁用配置模板",
       agentWorkspaceProfileDisableDescription:
         "阻止新工作区使用这个配置模板，同时保留现有已固定工作区的恢复能力。",

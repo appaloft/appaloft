@@ -42,4 +42,25 @@ describe("Agent Adapter organization management", () => {
     expect(pageSource).toContain("capabilityKey(agentWorkspaceProfileInstallCapability)");
     expect(pageSource).not.toContain("organizationId: currentOrganizationId,\n        manifest");
   });
+
+  test("[AGENT-SETUP-UX-001][AGENT-SETUP-UX-002][AGENT-SETUP-UX-003] presents task setup before custom manifests", async () => {
+    const pageSource = await readFile(
+      new URL("../../routes/organization/+page.svelte", import.meta.url),
+      "utf8",
+    );
+
+    expect(pageSource).toContain("data-organization-agent-setup-overview");
+    expect(pageSource).toContain('data-organization-agent-option="opencode"');
+    expect(pageSource).toContain('data-organization-agent-option="pi"');
+    expect(pageSource).toContain("data-organization-model-connections");
+    expect(pageSource).toContain("agent-model-connections");
+    expect(pageSource).toContain("data-organization-agent-custom-integrations");
+    const primarySurface =
+      pageSource.match(
+        /data-organization-agent-setup-overview[\s\S]*?data-organization-agent-custom-integrations/,
+      )?.[0] ?? "";
+    expect(primarySurface).not.toContain("openAgentAdapterInstallDialog");
+    expect(primarySurface).not.toContain("openAgentWorkspaceProfileInstallDialog");
+    expect(primarySurface).not.toContain("<Textarea");
+  });
 });

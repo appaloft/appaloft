@@ -185,7 +185,7 @@ export const publicDocsHelpTopics = {
     id: "agent.adapter-installations",
     title: "Agent Adapter and Workspace Profile installations",
     description:
-      "How organizations validate, install, compile, inspect, disable, and safely uninstall declarative Agent Adapters and Workspace Profiles.",
+      "How organizations set up OpenCode or Pi with a model connection and Workspace Profile, or manage declarative Agent Adapters and Profiles as an advanced workflow.",
     page: {
       "zh-CN": "agents/adapters",
       "en-US": "en/agents/adapters",
@@ -201,17 +201,22 @@ export const publicDocsHelpTopics = {
       "agent adapter",
       "adapter manifest",
       "adapter installation",
+      "model connection",
+      "opencode",
+      "pi",
       "workspace profile",
       "Agent 适配器",
+      "模型连接",
       "工作区配置",
     ],
     specReferences: [
       "docs/decisions/ADR-100-agent-adapter-distribution-and-workspace-profile-boundary.md",
       "docs/specs/117-agent-adapter-sdk-and-workspace-profiles/spec.md",
+      "docs/specs/122-agent-workspace-setup-experience/spec.md",
       "docs/testing/agent-adapter-sdk-and-workspace-profile-test-matrix.md",
     ],
     webSurfaces: [
-      "apps/web/src/routes/organization: tenant-scoped Agent Adapter and Workspace Profile installation lifecycle management",
+      "apps/web/src/routes/organization: task-oriented OpenCode/Pi setup, optional model-connection capability, and advanced tenant-scoped Adapter/Profile lifecycle management",
       "apps/web/src/routes/workspaces: approved Workspace Profile selection and immutable runtime pinning",
     ],
   },
