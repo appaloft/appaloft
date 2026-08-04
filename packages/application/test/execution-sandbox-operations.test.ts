@@ -50,13 +50,20 @@ class DetachedSandboxRepository extends InMemorySandboxRepository {
   }
 }
 
-function provider(input: { isolation?: "container-trusted" | "gvisor" } = {}) {
+function provider(
+  input: {
+    isolation?: "container-trusted" | "gvisor";
+    runtimeHome?: boolean;
+    runtimeHomeCleanupFailure?: boolean;
+  } = {},
+) {
   let provisionCalls = 0;
   let terminateCalls = 0;
   let resumeCalls = 0;
   let snapshotCaptureCalls = 0;
   const deletedSnapshotIds: string[] = [];
   let updatedNetworkMode: "deny" | "allowlist" | undefined;
+  const runtimeHomeCalls: string[] = [];
   let lastProvisionSource: Parameters<SandboxProvider["provision"]>[0]["source"] | undefined;
   let lastProvisionOwner:
     | Pick<Parameters<SandboxProvider["provision"]>[0], "ownerScope" | "ownerOrganizationId">
@@ -137,6 +144,21 @@ function provider(input: { isolation?: "container-trusted" | "gvisor" } = {}) {
       return [{ processId: "proc_1", status: "running" }];
     },
     async terminateProcess() {},
+    ...(input.runtimeHome
+      ? {
+          async materializeRuntimeHome(request) {
+            runtimeHomeCalls.push(
+              `materialize:${request.owner.kind}:${request.owner.id}:${request.agent}:${request.runtimeId}:${request.sourceRef}`,
+            );
+          },
+          async cleanupRuntimeHome(request) {
+            runtimeHomeCalls.push(`cleanup:${request.runtimeId ?? "all"}`);
+            if (input.runtimeHomeCleanupFailure) {
+              throw new Error("runtime HOME cleanup failed");
+            }
+          },
+        }
+      : {}),
     async captureSnapshot(request) {
       snapshotCaptureCalls += 1;
       return {
@@ -160,6 +182,7 @@ function provider(input: { isolation?: "container-trusted" | "gvisor" } = {}) {
     snapshotCaptureCalls: () => snapshotCaptureCalls,
     deletedSnapshotIds: () => [...deletedSnapshotIds],
     updatedNetworkMode: () => updatedNetworkMode,
+    runtimeHomeCalls: () => [...runtimeHomeCalls],
     lastProvisionSource: () => lastProvisionSource,
     lastProvisionOwner: () => lastProvisionOwner,
   };
@@ -251,6 +274,137 @@ describe("ExecutionSandboxService", () => {
     expect((await app.terminate(context, "sbx_test")).isOk()).toBe(true);
     expect((await app.terminate(context, "sbx_test")).isOk()).toBe(true);
     expect((await app.exec(context, "sbx_test", { argv: ["python", "-V"] })).isErr()).toBe(true);
+  });
+
+  test("[GH-AUTO-CREDENTIAL-HOME-030] delegates an opaque owner HOME to the exact provider and cleans it before pause", async () => {
+    const fake = provider({ runtimeHome: true });
+    const app = service(fake.adapter);
+    await app.createAndReconcile(context, createInput);
+
+    const materialized = await app.materializeRuntimeHome(context, "sbx_test", {
+      sourceRef: "agent-home://organization/org_a/opencode",
+      owner: { kind: "organization", id: "org_a" },
+      agent: "opencode",
+      runtimeId: "sar_opencode_a",
+    });
+    expect(materialized).toMatchObject({ value: undefined });
+    expect(fake.runtimeHomeCalls()).toEqual([
+      "materialize:organization:org_a:opencode:sar_opencode_a:agent-home://organization/org_a/opencode",
+    ]);
+
+    expect(
+      (
+        await app.materializeRuntimeHome(context, "sbx_test", {
+          sourceRef: "agent-home://organization/org_a/opencode",
+          owner: { kind: "organization", id: "org_a" },
+          agent: "opencode",
+          runtimeId: "sar_opencode_a",
+        })
+      ).isOk(),
+    ).toBe(true);
+    expect(fake.runtimeHomeCalls()).toEqual([
+      "materialize:organization:org_a:opencode:sar_opencode_a:agent-home://organization/org_a/opencode",
+      "materialize:organization:org_a:opencode:sar_opencode_a:agent-home://organization/org_a/opencode",
+    ]);
+
+    expect((await app.pause(context, "sbx_test")).isOk()).toBe(true);
+    expect(fake.runtimeHomeCalls()).toEqual([
+      "materialize:organization:org_a:opencode:sar_opencode_a:agent-home://organization/org_a/opencode",
+      "materialize:organization:org_a:opencode:sar_opencode_a:agent-home://organization/org_a/opencode",
+      "cleanup:all",
+    ]);
+  });
+
+  test("[GH-AUTO-CREDENTIAL-HOME-030] fails closed when the exact provider has no runtime HOME seam", async () => {
+    const fake = provider();
+    const app = service(fake.adapter);
+    await app.createAndReconcile(context, createInput);
+
+    const result = await app.materializeRuntimeHome(context, "sbx_test", {
+      sourceRef: "agent-home://user/usr_a/pi",
+      owner: { kind: "user", id: "usr_a" },
+      agent: "pi",
+      runtimeId: "sar_pi_a",
+    });
+    expect(result.isErr()).toBe(true);
+    expect(JSON.stringify(result)).toContain("sandbox_runtime_home_materialization_unsupported");
+  });
+
+  test("[GH-AUTO-CREDENTIAL-HOME-030] cleans only the requested Runtime HOME after one Agent stops", async () => {
+    const fake = provider({ runtimeHome: true });
+    const app = service(fake.adapter);
+    await app.createAndReconcile(context, createInput);
+
+    expect(
+      (
+        await app.cleanupRuntimeHome(context, "sbx_test", {
+          runtimeId: "sar_opencode_a",
+        })
+      ).isOk(),
+    ).toBe(true);
+    expect(fake.runtimeHomeCalls()).toEqual(["cleanup:sar_opencode_a"]);
+
+    const invalid = await app.cleanupRuntimeHome(context, "sbx_test", {
+      runtimeId: "../other-runtime",
+    });
+    expect(invalid.isErr()).toBe(true);
+    expect(JSON.stringify(invalid)).toContain("sandbox_runtime_home_cleanup_invalid");
+  });
+
+  test("[GH-AUTO-CREDENTIAL-HOME-030] cleans runtime HOME before a manual Snapshot and termination", async () => {
+    const fake = provider({ runtimeHome: true });
+    const app = service(fake.adapter);
+    await app.createAndReconcile(context, createInput);
+    await app.materializeRuntimeHome(context, "sbx_test", {
+      sourceRef: "agent-home://organization/org_a/opencode",
+      owner: { kind: "organization", id: "org_a" },
+      agent: "opencode",
+      runtimeId: "sar_opencode_a",
+    });
+
+    expect(
+      (
+        await app.createSnapshot(context, "sbx_test", {
+          capability: "filesystem",
+        })
+      ).isOk(),
+    ).toBe(true);
+    expect(fake.runtimeHomeCalls()).toEqual([
+      "materialize:organization:org_a:opencode:sar_opencode_a:agent-home://organization/org_a/opencode",
+      "cleanup:all",
+    ]);
+
+    await app.materializeRuntimeHome(context, "sbx_test", {
+      sourceRef: "agent-home://organization/org_a/opencode",
+      owner: { kind: "organization", id: "org_a" },
+      agent: "opencode",
+      runtimeId: "sar_opencode_a",
+    });
+    expect((await app.terminate(context, "sbx_test")).isOk()).toBe(true);
+    expect(fake.runtimeHomeCalls().slice(-2)).toEqual([
+      "materialize:organization:org_a:opencode:sar_opencode_a:agent-home://organization/org_a/opencode",
+      "cleanup:all",
+    ]);
+  });
+
+  test("[GH-AUTO-CREDENTIAL-HOME-030] fails closed before pause when runtime HOME cleanup fails", async () => {
+    const fake = provider({ runtimeHome: true, runtimeHomeCleanupFailure: true });
+    const app = service(fake.adapter);
+    await app.createAndReconcile(context, createInput);
+    await app.materializeRuntimeHome(context, "sbx_test", {
+      sourceRef: "agent-home://user/usr_a/pi",
+      owner: { kind: "user", id: "usr_a" },
+      agent: "pi",
+      runtimeId: "sar_pi_a",
+    });
+
+    const paused = await app.pause(context, "sbx_test");
+    expect(paused.isErr()).toBe(true);
+    expect((await app.show(context, "sbx_test"))._unsafeUnwrap().status).toBe("ready");
+    expect(fake.runtimeHomeCalls()).toEqual([
+      "materialize:user:usr_a:pi:sar_pi_a:agent-home://user/usr_a/pi",
+      "cleanup:all",
+    ]);
   });
 
   test("[SBX-FILE-001] writes binary content through a confined provider request", async () => {
