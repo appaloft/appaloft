@@ -184,6 +184,9 @@
   const planContextEndpoint = $derived(
     resolvePlanContextEndpoint(webExtensionsQuery.data?.items ?? []),
   );
+  const agentModelConnectionsHref = $derived(
+    resolveAgentModelConnectionsHref(webExtensionsQuery.data?.items ?? []),
+  );
   const activeSection = $derived.by<OrganizationManagementSection>(() => {
     if (section) {
       return section;
@@ -749,6 +752,17 @@
   const deployTokens = $derived(deployTokensQuery.data?.items ?? []);
   const agentAdapters = $derived(agentAdaptersQuery.data ?? []);
   const agentWorkspaceProfiles = $derived(agentWorkspaceProfilesQuery.data ?? []);
+  const openCodeAgentReady = $derived(
+    agentAdapters.some(
+      (adapter) =>
+        adapter.status === "enabled" && adapter.adapterId.toLowerCase().includes("opencode"),
+    ),
+  );
+  const piAgentReady = $derived(
+    agentAdapters.some(
+      (adapter) => adapter.status === "enabled" && /(^|-)pi($|-)/u.test(adapter.adapterId),
+    ),
+  );
   const canInstallAgentWorkspaceProfile = $derived(
     $capabilities.capabilities[capabilityKey(agentWorkspaceProfileInstallCapability)]?.allowed ===
       true,
@@ -1406,6 +1420,25 @@
     return typeof endpoint === "string" && endpoint.length > 0 ? endpoint : null;
   }
 
+  function resolveAgentModelConnectionsHref(
+    extensions: readonly SystemPluginWebExtension[],
+  ): string | null {
+    for (const extension of extensions) {
+      const metadata = extension.metadata;
+      if (
+        extension.placement === "settings" &&
+        extension.target === "console-route" &&
+        metadata &&
+        typeof metadata === "object" &&
+        !Array.isArray(metadata) &&
+        metadata.capability === "agent-model-connections"
+      ) {
+        return extension.path;
+      }
+    }
+    return null;
+  }
+
   function submitOrganizationProfile(event: SubmitEvent): void {
     event.preventDefault();
     if (canSubmitOrganizationProfile) {
@@ -1843,6 +1876,7 @@
             </p>
           {/if}
         </div>
+
       </section>
       {/if}
       {/if}
@@ -2206,24 +2240,106 @@
         class={centeredOrganizationSectionClass("space-y-5")}
         data-organization-agent-adapters-display-surface
       >
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div class="max-w-2xl">
-            <div class="flex items-center gap-2">
-              <Bot class="size-5 text-primary" />
-              <h2 class="text-lg font-semibold">
-                {$t(i18nKeys.console.organization.agentAdaptersTitle)}
-              </h2>
+        <div class="max-w-2xl">
+          <div class="flex items-center gap-2">
+            <Bot class="size-5 text-primary" />
+            <h2 class="text-lg font-semibold">
+              {$t(i18nKeys.console.organization.agentWorkspaceSetupTitle)}
+            </h2>
+          </div>
+          <p class="mt-2 text-sm leading-6 text-muted-foreground">
+            {$t(i18nKeys.console.organization.agentWorkspaceSetupDescription)}
+          </p>
+        </div>
+
+        <div class="grid gap-3 lg:grid-cols-3" data-organization-agent-setup-overview>
+          <div class="rounded-lg border bg-card p-4">
+            <h3 class="font-semibold">{$t(i18nKeys.console.organization.agentOptionsTitle)}</h3>
+            <p class="mt-1 text-sm leading-5 text-muted-foreground">
+              {$t(i18nKeys.console.organization.agentOptionsDescription)}
+            </p>
+            <div class="mt-4 space-y-3">
+              <div class="rounded-md border p-3" data-organization-agent-option="opencode">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="font-medium">OpenCode</span>
+                  <Badge variant={openCodeAgentReady ? "outline" : "secondary"}>
+                    {openCodeAgentReady
+                      ? $t(i18nKeys.console.organization.agentOptionReady)
+                      : $t(i18nKeys.console.organization.agentOptionNotConfigured)}
+                  </Badge>
+                </div>
+                <p class="mt-1 text-xs leading-5 text-muted-foreground">
+                  {$t(i18nKeys.console.organization.agentOptionOpenCodeDescription)}
+                </p>
+              </div>
+              <div class="rounded-md border p-3" data-organization-agent-option="pi">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="font-medium">Pi</span>
+                  <Badge variant={piAgentReady ? "outline" : "secondary"}>
+                    {piAgentReady
+                      ? $t(i18nKeys.console.organization.agentOptionReady)
+                      : $t(i18nKeys.console.organization.agentOptionNotConfigured)}
+                  </Badge>
+                </div>
+                <p class="mt-1 text-xs leading-5 text-muted-foreground">
+                  {$t(i18nKeys.console.organization.agentOptionPiDescription)}
+                </p>
+              </div>
             </div>
-            <p class="mt-2 text-sm leading-6 text-muted-foreground">
-              {$t(i18nKeys.console.organization.agentAdaptersDescription)}
+          </div>
+
+          <div class="rounded-lg border bg-card p-4" data-organization-model-connections>
+            <div class="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <KeyRound class="size-4" />
+            </div>
+            <h3 class="mt-4 font-semibold">
+              {$t(i18nKeys.console.organization.agentModelConnectionsTitle)}
+            </h3>
+            <p class="mt-1 text-sm leading-5 text-muted-foreground">
+              {$t(i18nKeys.console.organization.agentModelConnectionsDescription)}
+            </p>
+            {#if agentModelConnectionsHref}
+              <Button
+                type="button"
+                class="mt-4"
+                variant="outline"
+                onclick={() => navigateTo(agentModelConnectionsHref)}
+              >
+                {$t(i18nKeys.console.organization.agentModelConnectionsAction)}
+                <ArrowRight class="size-4" />
+              </Button>
+            {:else}
+              <p class="mt-4 text-xs leading-5 text-muted-foreground">
+                {$t(i18nKeys.console.organization.agentModelConnectionsUnavailable)}
+              </p>
+            {/if}
+          </div>
+
+          <div class="rounded-lg border bg-card p-4">
+            <div class="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <FolderOpen class="size-4" />
+            </div>
+            <h3 class="mt-4 font-semibold">
+              {$t(i18nKeys.console.organization.agentWorkspaceProfilesTitle)}
+            </h3>
+            <p class="mt-1 text-sm leading-5 text-muted-foreground">
+              {$t(i18nKeys.console.organization.agentWorkspaceProfilesDescription)}
+            </p>
+            <p class="mt-4 text-sm font-medium">
+              {agentWorkspaceProfiles.length} · {$t(
+                i18nKeys.console.organization.agentWorkspaceProfilesTitle,
+              )}
             </p>
           </div>
-          {#if canManageAgentAdapters}
-            <Button type="button" onclick={openAgentAdapterInstallDialog}>
-              <PackagePlus class="size-4" />
-              {$t(i18nKeys.console.organization.agentAdapterInstallAction)}
-            </Button>
-          {/if}
+        </div>
+
+        <div class="border-t pt-5">
+          <h3 class="text-base font-semibold">
+            {$t(i18nKeys.console.organization.agentInstallationsTitle)}
+          </h3>
+          <p class="mt-1 text-sm leading-6 text-muted-foreground">
+            {$t(i18nKeys.console.organization.agentAdaptersDescription)}
+          </p>
         </div>
 
         {#if agentAdaptersSectionLoading}
@@ -2253,10 +2369,6 @@
             tone="credential"
             title={$t(i18nKeys.console.organization.agentAdaptersEmptyTitle)}
             description={$t(i18nKeys.console.organization.agentAdaptersEmptyDescription)}
-            actionLabel={canManageAgentAdapters
-              ? $t(i18nKeys.console.organization.agentAdapterInstallAction)
-              : undefined}
-            onAction={openAgentAdapterInstallDialog}
           />
         {:else}
           <div class="console-record-list">
@@ -2329,15 +2441,6 @@
                 {$t(i18nKeys.console.organization.agentWorkspaceProfilesDescription)}
               </p>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={!canInstallAgentWorkspaceProfile}
-              onclick={openAgentWorkspaceProfileInstallDialog}
-            >
-              <PackagePlus class="size-4" />
-              {$t(i18nKeys.console.organization.agentWorkspaceProfileInstallAction)}
-            </Button>
           </div>
 
           {#if agentWorkspaceProfiles.length === 0}
@@ -2392,6 +2495,35 @@
                   </Button>
                 </div>
               {/each}
+            </div>
+          {/if}
+        </div>
+
+        <div
+          class="rounded-lg border border-dashed p-4"
+          data-organization-agent-custom-integrations
+        >
+          <h3 class="font-semibold">
+            {$t(i18nKeys.console.organization.agentCustomIntegrationsTitle)}
+          </h3>
+          <p class="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+            {$t(i18nKeys.console.organization.agentCustomIntegrationsDescription)}
+          </p>
+          {#if canManageAgentAdapters}
+            <div class="mt-4 flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onclick={openAgentAdapterInstallDialog}>
+                <PackagePlus class="size-4" />
+                {$t(i18nKeys.console.organization.customAgentAdapterInstallAction)}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!canInstallAgentWorkspaceProfile}
+                onclick={openAgentWorkspaceProfileInstallDialog}
+              >
+                <PackagePlus class="size-4" />
+                {$t(i18nKeys.console.organization.customWorkspaceProfileInstallAction)}
+              </Button>
             </div>
           {/if}
         </div>

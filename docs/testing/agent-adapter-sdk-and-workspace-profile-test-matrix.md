@@ -14,6 +14,10 @@
 | PROFILE-PIN-010 | Application/persistence | Definitions update after Workspace create | Resolved digest/Harness/capabilities remain stable for recovery. |
 | ADAPTER-SURFACE-011 | Contract/transport | Lifecycle operations are exposed | Catalog, HTTP/oRPC, CLI mapping, generated SDK, MCP descriptor, and Web source tests prove the six lifecycle operations use the application schemas. |
 | ADAPTER-CODEX-012 | Fixture/opt-in e2e | Fixture and real Codex use declarative Adapter | Own TUI/headless output, reconnect, lifecycle, and exact cleanup are truthful. |
+| AGENT-SETUP-UX-001 | Web/source + WebView | Organization setup distinguishes Agents, Model connections and Workspace Profiles | Source contract and desktop WebView prove task-oriented setup with OpenCode/Pi. |
+| AGENT-SETUP-UX-002 | Web/source | Raw Adapter/Profile manifests are advanced actions | Primary display surface contains no form/textarea; custom actions open the existing dialogs. |
+| AGENT-SETUP-UX-003 | Web/source | Optional hosted model connection capability is contributed | Neutral extension metadata resolves the CTA without a private import; absence remains safe. |
+| AGENT-SETUP-UX-004 | WebView | Desktop and 390px mobile setup | Both viewports have no horizontal overflow and preserve readable actions/status. |
 
 ## Current Evidence
 
@@ -33,5 +37,9 @@
 - `ADAPTER-SURFACE-011` covers both the Adapter and Profile operation families across the catalog,
   HTTP/oRPC, CLI, generated SDK metadata, and Web Console source.
 - `ADAPTER-CODEX-012` remains an explicit opt-in acceptance gate. Its local Docker and real-provider
-  evidence must include target, credential boundary, reconnect behavior, exact cleanup, and any
-  truthful capability limitation.
+  evidence is deferred and is not part of the OpenCode/Pi V1 setup surface. A later Codex slice must
+  include target, credential boundary, reconnect behavior, exact cleanup, and any truthful
+  capability limitation.
+- `AGENT-SETUP-UX-001..003` are covered by the Organization page source contract and localized
+  labels. `AGENT-SETUP-UX-004` is covered by desktop and 390px WebView acceptance with overflow
+  assertions.

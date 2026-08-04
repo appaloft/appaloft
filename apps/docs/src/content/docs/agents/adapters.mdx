@@ -4,13 +4,14 @@ description: "如何安装与选择 Agent 适配器。"
 docType: "reference"
 localeState:
   zh-CN: complete
-  en-US: needs-update
+  en-US: complete
 searchAliases:
   - "agent adapter"
   - "adapter manifest"
-  - "codex"
+  - "model connection"
   - "opencode"
   - "pi"
+  - "模型连接"
   - "适配器"
 relatedOperations:
   - "agent-adapters.validate"
@@ -21,6 +22,16 @@ sidebar:
 ---
 
 ## 标识 <a id="agent-adapter-installations" />
+
+普通的远程开发设置不需要编写 manifest。请在 **组织设置 → Agent 工作区** 按以下顺序完成：
+
+1. 查看 OpenCode 或 Pi 是否已经可用；
+2. 在 **模型连接** 中连接 DeepSeek、OpenAI、Anthropic 或兼容 provider；
+3. 选择组织批准的 Workspace Profile 创建工作区。
+
+模型 API key 属于 provider connection，不属于 OpenCode/Pi，也绝不能写进 Adapter 或 Profile
+manifest。下面的 manifest 流程只面向自定义 Agent 集成开发者，在 Web 控制台中位于
+**自定义集成**。
 
 Agent 适配器（Agent Adapter）是一个声明式、不可变的 Agent 集成定义——它描述所需的 Sandbox 模板、运行时、能力、交互模式、持久化路径和凭据类型。**Appaloft 不会从 manifest 加载代码，也不接受任意 shell 命令字符串**。
 
@@ -80,7 +91,7 @@ appaloft agent-adapter list
 appaloft agent-adapter show <installation-id>
 ```
 
-也可以在 Web 控制台的 **组织设置 → Agent Adapter** 页面粘贴 manifest，先校验再安装。
+也可以在 Web 控制台的 **组织设置 → Agent 工作区 → 自定义集成** 中粘贴 manifest，先校验再安装。
 
 ### Workspace 配置模板
 

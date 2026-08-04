@@ -1481,7 +1481,8 @@ export const enUS = {
       agentAdaptersEmptyDescription:
         "Install a validated Adapter definition before using it in a new Agent Workspace.",
       agentAdaptersEmptyTitle: "No Agent Adapters installed",
-      agentAdaptersTitle: "Agent Adapters",
+      agentAdaptersTitle: "Agent workspaces",
+      agentInstallationsTitle: "Installed Agent integrations",
       agentAdapterStatusDisabled: "Disabled",
       agentAdapterStatusEnabled: "Enabled",
       agentAdapterUnchecked: "Unchecked",
@@ -1494,6 +1495,27 @@ export const enUS = {
       agentAdapterValidatedDigest: "Validated definition digest",
       agentAdapterValidating: "Validating",
       agentAdapterVersion: "Version",
+      agentCustomIntegrationsDescription:
+        "For integration authors who need to install a declarative Adapter or Workspace Profile manifest. API keys never belong in these manifests.",
+      agentCustomIntegrationsTitle: "Custom integrations",
+      agentModelConnectionsAction: "Configure model access",
+      agentModelConnectionsDescription:
+        "Connect a DeepSeek, OpenAI, Anthropic, or compatible provider for OpenCode and Pi. Keys are encrypted and kept outside Adapter manifests.",
+      agentModelConnectionsTitle: "Model connections",
+      agentModelConnectionsUnavailable:
+        "This Appaloft instance has not contributed a managed Model connections provider.",
+      agentOptionNotConfigured: "Not configured",
+      agentOptionOpenCodeDescription: "Native attach, headless tasks, and durable session state.",
+      agentOptionPiDescription: "Native terminal interaction and bounded headless tasks.",
+      agentOptionReady: "Ready",
+      agentOptionsDescription:
+        "OpenCode and Pi keep their own terminal experience. Appaloft supplies the isolated Workspace, reconnection, credentials, and previews.",
+      agentOptionsTitle: "Agents",
+      agentWorkspaceSetupDescription:
+        "Prepare an Agent, its model access, and a reusable Workspace Profile. Custom manifests are an advanced integration path.",
+      agentWorkspaceSetupTitle: "Agent workspaces",
+      customAgentAdapterInstallAction: "Install custom Adapter",
+      customWorkspaceProfileInstallAction: "Install custom Profile",
       agentWorkspaceProfileDisableAction: "Disable profile",
       agentWorkspaceProfileDisableDescription:
         "Block this profile from new Workspaces while existing pinned Workspaces remain recoverable.",
