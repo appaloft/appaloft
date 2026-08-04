@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.8.0](https://github.com/appaloft/appaloft/compare/v1.7.2...v1.8.0) (2026-08-04)
+
+
+### Features
+
+* add sandbox runtime home materialization seam ([#996](https://github.com/appaloft/appaloft/issues/996)) ([b3a999c](https://github.com/appaloft/appaloft/commit/b3a999c02aa681149c8f1ba8b3bc4bcd963b6e11))
+
+
+### Bug Fixes
+
+* allow safe task links in agent reviews ([#985](https://github.com/appaloft/appaloft/issues/985)) ([b502e9c](https://github.com/appaloft/appaloft/commit/b502e9c8a621f0d44fb63f594576635d040f1a86))
+* fence stopped task reconciliation ([#990](https://github.com/appaloft/appaloft/issues/990)) ([0e09daf](https://github.com/appaloft/appaloft/commit/0e09daf4b01123986c83ad5bbe2e6dc30a486c2e))
+* preserve fallback task objective ([#983](https://github.com/appaloft/appaloft/issues/983)) ([2a7fb70](https://github.com/appaloft/appaloft/commit/2a7fb7071889afb3b84716ca71d22608f8bb79e7))
+* redact secret-like review output ([#987](https://github.com/appaloft/appaloft/issues/987)) ([b6b2385](https://github.com/appaloft/appaloft/commit/b6b238506a848e677e4c29799cd642f8f21bff66))
+* **runtime:** keep compose override out of source workspace ([#994](https://github.com/appaloft/appaloft/issues/994)) ([0a8f0c4](https://github.com/appaloft/appaloft/commit/0a8f0c4adf15eef4455b136b51f76eac2f50a111))
+* serialize GitHub agent task controls ([#992](https://github.com/appaloft/appaloft/issues/992)) ([38b736a](https://github.com/appaloft/appaloft/commit/38b736ad76e6fcb42c600056d5d11a8f028953c8))
+* validate pinned OpenCode runtime config ([#981](https://github.com/appaloft/appaloft/issues/981)) ([652fd51](https://github.com/appaloft/appaloft/commit/652fd51d5d297f0e4b47072905f806dc35ba9258))
+
+
+### Documentation
+
+* sync github agent review delivery ([#988](https://github.com/appaloft/appaloft/issues/988)) ([953ecee](https://github.com/appaloft/appaloft/commit/953eceebaeeff56ecfb796a580afac41292f8859))
+
 ## [1.7.2](https://github.com/appaloft/appaloft/compare/v1.7.1...v1.7.2) (2026-08-03)
 
 
