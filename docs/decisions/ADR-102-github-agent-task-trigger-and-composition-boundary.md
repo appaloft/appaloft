@@ -76,6 +76,11 @@ fork code can exfiltrate credentials.
     persisted Profile pin and credential bindings. Hosted adapters revalidate current custody and
     repopulate process-local grant state; they must not require a parallel Runtime, Task, or
     credential-admission lifecycle table.
+21. Control deliveries for one GitHub repository thread reuse the public `MutationCoordinator`
+    before re-reading and mutating the current Task pointer. The tenant-qualified thread scope
+    serializes `status`, `steer`, `stop`, and `resume` across concurrent webhook requests while
+    unrelated threads remain independent. This adds no GitHub-specific lease table and no new Task,
+    Workspace, Sandbox, Agent session, or Git delivery model.
 
 ## Consequences
 
@@ -90,6 +95,8 @@ fork code can exfiltrate credentials.
   convenience for a second source of domain or delivery truth.
 - Restart-safe credential execution remains rooted in the existing public Runtime record while
   hosted custody can fail closed when the owner scope, connection status, or binding changed.
+- Concurrent controls cannot apply a stale thread Task snapshot after a slower prior control
+  completes; durable composition supplies the existing heartbeat/fencing mutation coordinator.
 
 ## Alternatives Rejected
 

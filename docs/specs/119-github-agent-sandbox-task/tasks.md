@@ -35,6 +35,9 @@
 - [x] Create and link public fallback-resume objective issue #982 after composed external run
   `30791490605` proved an immediate stop/resume could start a fallback Run without the original
   Task objective and leave delivery retrying a branch with no commit.
+- [x] Create and link public thread-control serialization issue #991 after external run
+  `30828152502` proved an acknowledged resume could overlap a long-running stop and leave the
+  current Task projection stopped.
 
 ## Public Composition Boundary Slice
 
@@ -123,6 +126,9 @@
 - [x] GH-AUTO-LIFECYCLE-028: deterministically block same-Run reconciliation, persist stop, release
   the late running readback, and prove protected Task state remains stopped before resume appends a
   fallback child Run (#989).
+- [x] GH-AUTO-LIFECYCLE-029: serialize overlapping same-thread controls through the existing public
+  mutation coordinator, re-read Task/feedback inside guarded work, and prove a different thread
+  remains independently executable without a GitHub-specific lease table (#991).
 - [ ] GH-AUTO-NATIVE-STATE-027: emit only the singular snapshot policy accepted by exact pinned
   OpenCode 1.18.4, validate the generated native config before background startup, revoke scoped
   model access on validation failure, and preserve native sessions plus independent headless Runs
