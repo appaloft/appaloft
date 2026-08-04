@@ -53,6 +53,15 @@ export const mutationCoordinationPolicies = {
     scopeKind: "resource-runtime",
     mode: "serialize-with-bounded-wait",
   }),
+  githubAgentThreadControl: {
+    ...policy({
+      operationKey: "github-agent-task.control",
+      scopeKind: "github-agent-thread",
+      mode: "serialize-with-bounded-wait",
+    }),
+    waitTimeoutMs: 120_000,
+    retryIntervalMs: 25,
+  },
   stopResourceRuntime: policy({
     operationKey: "resources.runtime.stop",
     scopeKind: "resource-runtime",

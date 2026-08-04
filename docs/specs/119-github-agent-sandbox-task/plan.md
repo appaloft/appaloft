@@ -67,6 +67,10 @@
     through the supported singular `snapshot` field because Appaloft already owns authoritative Git
     Diff, Task evidence, and Sandbox recovery; preserve the native session store and provider/model
     protocol.
+19. Serialize current-Task controls with the existing public `MutationCoordinator`, using a
+    tenant-qualified GitHub thread scope. Coordinate after acknowledgement, re-read Task and
+    feedback inside the guarded work, and persist the outcome before releasing; unrelated GitHub
+    threads retain independent progress and no GitHub-specific lease table is introduced.
 
 ## Migration
 
@@ -110,6 +114,9 @@
   prove the paused recovery handle remains authoritative.
 - Add a deterministic same-Run reconciliation/stop race for `GH-AUTO-LIFECYCLE-028`; prove a late
   running result cannot overwrite recoverable stopped state and resume appends a new Run.
+- Add a deterministic overlapping stop/resume regression for `GH-AUTO-LIFECYCLE-029`; prove same-
+  thread control order, Task re-read inside the existing mutation coordination boundary, lease
+  ownership fencing, and independent progress for a different thread.
 - Run public lint, typecheck, test, and build before public delivery.
 
 ## Risks
@@ -125,6 +132,9 @@
   destroy the current recovery handle, so activity bookkeeping must re-read lifecycle truth.
 - A reconciliation generation can still be current when stop wins concurrently; active-Run identity
   alone is insufficient, so reconciliation persistence must also fence protected lifecycle states.
+- Distinct webhook deliveries can overlap after delivery dedupe succeeds; without a shared public
+  mutation-coordination scope, the slower earlier control can overwrite the newer current-Task
+  projection or operate on a Sandbox in transition.
 - A read-only runtime root makes any missing process-home boundary fail as an Agent startup error;
   provider and Adapter tests must assert the rendered environment rather than relying on a base
   image's pre-created root files.
@@ -146,6 +156,8 @@
   through public #988 at `953eceebaeeff56ecfb796a580afac41292f8859`.
 - Public #989 supplies the neutral Task lifecycle fence needed before rerunning hosted acceptance:
   a reconciliation write must re-read and preserve same-generation stopped/later-phase truth.
+- Public #991 supplies neutral same-thread control serialization after external run `30828152502`
+  proved an acknowledged resume could race a long-running stop and leave the Task stopped.
 - Downstream hosted composition must still supply and prove tenancy, authorization, credential
   custody, native-provider execution, registered-Server placement, Preview delivery, and exact
   provider cleanup through an explicit opt-in acceptance. Public deterministic tests do not replace

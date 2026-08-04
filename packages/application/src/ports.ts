@@ -367,6 +367,7 @@ export interface MaintenanceWorkerStatusReader {
 export type CoordinationScopeKind =
   | "resource-runtime"
   | "domain-binding"
+  | "github-agent-thread"
   | "preview-lifecycle"
   | "source-link"
   | "state-root-maintenance";

@@ -9,6 +9,8 @@ import {
   type Result,
 } from "@appaloft/core";
 import { type ExecutionContext } from "./execution-context";
+import { createCoordinationOwner, mutationCoordinationPolicies } from "./mutation-coordination";
+import { type MutationCoordinator } from "./ports";
 
 export type GitHubAgentCommand =
   | { kind: "fix"; instruction?: string }
@@ -526,6 +528,7 @@ export class InMemoryGitHubAgentAutomationStore implements GitHubAgentAutomation
 
 export interface GitHubAgentAutomationDependencies {
   store: GitHubAgentAutomationStore;
+  mutationCoordinator: MutationCoordinator;
   authorization: GitHubAgentAuthorizationPort;
   tasks: GitHubAgentTaskPort;
   feedback: GitHubAgentFeedbackPort;
@@ -721,33 +724,16 @@ export class GitHubAgentAutomationService {
     }
 
     if (intent.action === "status") {
-      return current
-        ? this.control(context, trigger, intent, allowed, current, currentFeedback, "status")
-        : this.noCurrentTask(context, trigger, intent, allowed);
+      return this.control(context, trigger, intent, allowed, "status");
     }
     if (intent.action === "steer") {
-      return current
-        ? this.control(
-            context,
-            trigger,
-            intent,
-            allowed,
-            current,
-            currentFeedback,
-            "steer",
-            intent.instruction,
-          )
-        : this.noCurrentTask(context, trigger, intent, allowed);
+      return this.control(context, trigger, intent, allowed, "steer", intent.instruction);
     }
     if (intent.action === "stop") {
-      return current
-        ? this.control(context, trigger, intent, allowed, current, currentFeedback, "stop")
-        : this.noCurrentTask(context, trigger, intent, allowed);
+      return this.control(context, trigger, intent, allowed, "stop");
     }
     if (intent.action === "resume") {
-      return current
-        ? this.control(context, trigger, intent, allowed, current, currentFeedback, "resume")
-        : this.noCurrentTask(context, trigger, intent, allowed);
+      return this.control(context, trigger, intent, allowed, "resume");
     }
     if (intent.action === "new") {
       if (!current || !intent.profile) {
@@ -812,30 +798,44 @@ export class GitHubAgentAutomationService {
     trigger: GitHubAgentTrigger,
     intent: GitHubAgentIntent,
     authorization: GitHubAgentTaskExecutionAuthorization,
-    current: GitHubAgentTaskSummary,
-    currentFeedback: GitHubAgentThreadFeedbackState | undefined,
     action: "status" | "steer" | "stop" | "resume",
     instruction?: string,
   ): Promise<Result<GitHubAgentAutomationOutcome>> {
     const acknowledged = await this.dependencies.feedback.acknowledge(context, { trigger });
     if (acknowledged.isErr()) return err(acknowledged.error);
-    const controlled =
-      action === "status"
-        ? await this.dependencies.tasks.status(context, current)
-        : action === "steer" && instruction
-          ? await this.dependencies.tasks.steer(context, { ...current, instruction })
-          : action === "stop"
-            ? await this.dependencies.tasks.stop(context, current)
-            : await this.dependencies.tasks.resume(context, current);
-    if (controlled.isErr()) return err(controlled.error);
-    await this.dependencies.store.setCurrentTask(
+    const threadKey = githubAgentThreadKey(trigger);
+    return this.dependencies.mutationCoordinator.runExclusive({
       context,
-      githubAgentThreadKey(trigger),
-      controlled.value,
-    );
-    return this.updateAndFinish(context, trigger, intent, authorization, controlled.value, {
-      ...(currentFeedback ?? {}),
-      ...acknowledged.value,
+      policy: mutationCoordinationPolicies.githubAgentThreadControl,
+      scope: {
+        kind: "github-agent-thread",
+        key: `${context.tenant?.tenantId ?? "tenant_instance"}:${threadKey}`,
+      },
+      owner: createCoordinationOwner(context, `github-agent-${action}`),
+      work: async (lease) => {
+        const current = await this.dependencies.store.currentTask(context, threadKey);
+        if (!current) return this.noCurrentTask(context, trigger, intent, authorization);
+        const currentFeedback = await this.dependencies.store.currentTaskFeedback(
+          context,
+          threadKey,
+        );
+        const controlled =
+          action === "status"
+            ? await this.dependencies.tasks.status(context, current)
+            : action === "steer" && instruction
+              ? await this.dependencies.tasks.steer(context, { ...current, instruction })
+              : action === "stop"
+                ? await this.dependencies.tasks.stop(context, current)
+                : await this.dependencies.tasks.resume(context, current);
+        if (controlled.isErr()) return err(controlled.error);
+        const ownership = await lease?.assertOwned();
+        if (ownership?.isErr()) return err(ownership.error);
+        await this.dependencies.store.setCurrentTask(context, threadKey, controlled.value);
+        return this.updateAndFinish(context, trigger, intent, authorization, controlled.value, {
+          ...(currentFeedback ?? {}),
+          ...acknowledged.value,
+        });
+      },
     });
   }
 

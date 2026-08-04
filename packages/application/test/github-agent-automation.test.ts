@@ -10,6 +10,7 @@ import {
   type GitHubAgentTaskPort,
   type GitHubAgentTrigger,
   InMemoryGitHubAgentAutomationStore,
+  type MutationCoordinator,
   resolveGitHubAgentIntent,
 } from "../src";
 
@@ -177,6 +178,37 @@ const context = createExecutionContext({
   requestId: "req_github_agent_automation",
 });
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((complete) => {
+    resolve = complete;
+  });
+  return { promise, resolve };
+}
+
+function mutationCoordinator(): MutationCoordinator {
+  const queues = new Map<string, Promise<void>>();
+  return {
+    async runExclusive(input) {
+      const key = `${input.scope.kind}:${input.scope.key}`;
+      const previous = queues.get(key) ?? Promise.resolve();
+      let release: () => void = () => {};
+      const turn = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const tail = previous.then(() => turn);
+      queues.set(key, tail);
+      await previous;
+      try {
+        return await input.work({ assertOwned: async () => ok(undefined) });
+      } finally {
+        release();
+        if (queues.get(key) === tail) queues.delete(key);
+      }
+    },
+  };
+}
+
 describe("GitHub Agent automation service", () => {
   test("[GH-AUTO-RULE-006] automated rules preserve the bounded Issue or PR request", () => {
     const request = {
@@ -238,6 +270,7 @@ describe("GitHub Agent automation service", () => {
     const feedback = feedbackPort();
     const service = new GitHubAgentAutomationService({
       store,
+      mutationCoordinator: mutationCoordinator(),
       authorization: allowedAuthorization(),
       sourceResolver: {
         resolve: async (_context, value) =>
@@ -301,6 +334,7 @@ describe("GitHub Agent automation service", () => {
     };
     const service = new GitHubAgentAutomationService({
       store,
+      mutationCoordinator: mutationCoordinator(),
       authorization: deniedAuthorization,
       tasks: tasks.port,
       feedback: feedback.port,
@@ -346,6 +380,7 @@ describe("GitHub Agent automation service", () => {
     const feedbackCalls: Array<Record<string, unknown>> = [];
     const service = new GitHubAgentAutomationService({
       store,
+      mutationCoordinator: mutationCoordinator(),
       authorization: allowedAuthorization(),
       tasks: {
         ...taskPort().port,
@@ -410,6 +445,7 @@ describe("GitHub Agent automation service", () => {
     let authorizationCalls = 0;
     const service = new GitHubAgentAutomationService({
       store,
+      mutationCoordinator: mutationCoordinator(),
       authorization: {
         authorize: async () => {
           authorizationCalls += 1;
@@ -461,6 +497,7 @@ describe("GitHub Agent automation service", () => {
     const feedback = feedbackPort();
     const service = new GitHubAgentAutomationService({
       store,
+      mutationCoordinator: mutationCoordinator(),
       authorization: allowedAuthorization(),
       tasks: tasks.port,
       feedback: feedback.port,
@@ -501,6 +538,7 @@ describe("GitHub Agent automation service", () => {
     const feedback = feedbackPort();
     const service = new GitHubAgentAutomationService({
       store,
+      mutationCoordinator: mutationCoordinator(),
       authorization: allowedAuthorization(),
       tasks: tasks.port,
       feedback: feedback.port,
@@ -533,6 +571,112 @@ describe("GitHub Agent automation service", () => {
     expect(tasks.calls).toContain("resume:task_1");
   });
 
+  test("[GH-AUTO-CONTROL-010][GH-AUTO-LIFECYCLE-029] overlapping stop and resume preserve command order", async () => {
+    const store = new InMemoryGitHubAgentAutomationStore();
+    const stopEntered = deferred<void>();
+    const stopRelease = deferred<void>();
+    const controlCalls: string[] = [];
+    const tasks = taskPort();
+    const service = new GitHubAgentAutomationService({
+      store,
+      mutationCoordinator: mutationCoordinator(),
+      authorization: allowedAuthorization(),
+      tasks: {
+        ...tasks.port,
+        status: async (_executionContext, input) => {
+          controlCalls.push(`status:${input.taskId}`);
+          return ok({
+            taskId: input.taskId,
+            workspaceId: input.workspaceId,
+            activeRunId: "run_other",
+            status: "running",
+            taskUrl: "https://appaloft.test/tasks/task_other",
+            sessionRecovery: "native",
+          });
+        },
+        stop: async (_executionContext, input) => {
+          controlCalls.push("stop:entered");
+          stopEntered.resolve();
+          await stopRelease.promise;
+          controlCalls.push("stop:completed");
+          return ok({
+            taskId: input.taskId,
+            workspaceId: input.workspaceId,
+            activeRunId: "run_1",
+            status: "stopped",
+            taskUrl: "https://appaloft.test/tasks/task_1",
+            sessionRecovery: "native",
+          });
+        },
+        resume: async (_executionContext, input) => {
+          controlCalls.push("resume:entered");
+          return ok({
+            taskId: input.taskId,
+            workspaceId: input.workspaceId,
+            activeRunId: "run_2",
+            status: "running",
+            taskUrl: "https://appaloft.test/tasks/task_1",
+            sessionRecovery: "fallback",
+          });
+        },
+      },
+      feedback: feedbackPort().port,
+    });
+    await service.handle(context, trigger({ deliveryId: "delivery_serialized_fix" }));
+    await store.setCurrentTask(context, "github-thread:123456:issue:42", {
+      taskId: "task_other",
+      workspaceId: "workspace_other",
+      activeRunId: "run_other",
+      status: "running",
+      taskUrl: "https://appaloft.test/tasks/task_other",
+      sessionRecovery: "native",
+    });
+
+    const stopping = service.handle(
+      context,
+      trigger({ deliveryId: "delivery_serialized_stop", command: { kind: "stop" } }),
+    );
+    await stopEntered.promise;
+    const otherThread = await service.handle(
+      context,
+      trigger({
+        deliveryId: "delivery_parallel_status",
+        thread: { kind: "issue", number: 42 },
+        command: { kind: "status" },
+      }),
+    );
+    const resuming = service.handle(
+      context,
+      trigger({ deliveryId: "delivery_serialized_resume", command: { kind: "resume" } }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(otherThread._unsafeUnwrap()).toMatchObject({ task: { taskId: "task_other" } });
+    expect(controlCalls).toEqual(["stop:entered", "status:task_other"]);
+    stopRelease.resolve();
+    await stopping;
+    const resumed = await resuming;
+
+    expect(controlCalls).toEqual([
+      "stop:entered",
+      "status:task_other",
+      "stop:completed",
+      "resume:entered",
+    ]);
+    expect(resumed._unsafeUnwrap()).toMatchObject({
+      task: {
+        taskId: "task_1",
+        workspaceId: "workspace_1",
+        activeRunId: "run_2",
+        status: "running",
+        sessionRecovery: "fallback",
+      },
+    });
+    await expect(
+      store.currentTask(context, "github-thread:123456:issue:41"),
+    ).resolves.toMatchObject({ activeRunId: "run_2", status: "running" });
+  });
+
   test("[GH-AUTO-FEEDBACK-013][GH-AUTO-CONTROL-010] control deliveries reuse the current Task feedback ids", async () => {
     const store = new InMemoryGitHubAgentAutomationStore();
     const tasks = taskPort();
@@ -542,6 +686,7 @@ describe("GitHub Agent automation service", () => {
     }> = [];
     const service = new GitHubAgentAutomationService({
       store,
+      mutationCoordinator: mutationCoordinator(),
       authorization: allowedAuthorization(),
       tasks: tasks.port,
       feedback: {
@@ -620,6 +765,7 @@ describe("GitHub Agent automation service", () => {
     }> = [];
     const service = new GitHubAgentAutomationService({
       store,
+      mutationCoordinator: mutationCoordinator(),
       authorization: allowedAuthorization(),
       tasks: {
         ...taskPort().port,
@@ -675,6 +821,7 @@ describe("GitHub Agent automation service", () => {
     const feedback = feedbackPort();
     const service = new GitHubAgentAutomationService({
       store,
+      mutationCoordinator: mutationCoordinator(),
       authorization: allowedAuthorization(),
       tasks: tasks.port,
       feedback: feedback.port,
@@ -729,6 +876,7 @@ describe("GitHub Agent automation service", () => {
     const feedback = feedbackPort();
     const service = new GitHubAgentAutomationService({
       store,
+      mutationCoordinator: mutationCoordinator(),
       authorization: allowedAuthorization(),
       tasks: tasks.port,
       feedback: feedback.port,
@@ -818,6 +966,7 @@ describe("GitHub Agent automation service", () => {
     const executionAuthorization = allowedAuthorization();
     const service = new GitHubAgentAutomationService({
       store,
+      mutationCoordinator: mutationCoordinator(),
       authorization: {
         authorize: async (executionContext, input) =>
           input.intent.action === "cleanup"
