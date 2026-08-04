@@ -366,6 +366,12 @@ identity, Compose file, environment variables, labels, ports, working directory,
 rules. Local shell strings, SSH shell strings, and future Docker API requests are render targets
 for those command specs, not the command contract itself.
 
+For a user-authored local Compose source, adapter-generated ownership-label overrides belong to the
+deployment attempt's Appaloft runtime workspace and are passed to Compose as explicit additional
+files. They must not be created in or overwrite the selected source workdir. Repository `.env`
+files remain source input; deployment environment precedence is resolved from the immutable
+environment snapshot and injected at runtime rather than by rewriting repository files.
+
 The zero-to-SSH supported catalog acceptance harness proves that supported framework and
 container-native fixture descriptors can reach this command boundary without widening it. The
 harness may assert preview/create parity, runtime target backend selection, Docker/OCI artifact

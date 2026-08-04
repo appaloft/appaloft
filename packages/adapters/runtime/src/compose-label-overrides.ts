@@ -1,6 +1,11 @@
+import { resolve } from "node:path";
 import { type RuntimeCommandLabel } from "./runtime-commands/types";
 import type { DockerRunMountInput } from "./runtime-commands";
 import type { DockerStorageVolumeRealization } from "./storage-runtime-mounts";
+
+export function localComposeOwnershipOverrideFile(runtimeDir: string): string {
+  return resolve(runtimeDir, "compose", "ownership-labels.override.yml");
+}
 
 function yamlQuoted(value: string): string {
   return JSON.stringify(value);

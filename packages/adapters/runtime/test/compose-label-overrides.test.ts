@@ -1,13 +1,27 @@
 import { describe, expect, test } from "bun:test";
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { ash } from "@appaloft/ash";
 
-import { renderComposeOwnershipLabelOverrideScript } from "../src/compose-label-overrides";
+import {
+  localComposeOwnershipOverrideFile,
+  renderComposeOwnershipLabelOverrideScript,
+} from "../src/compose-label-overrides";
 import { dockerLabelsFromAssignments } from "../src/runtime-commands";
 
 describe("compose ownership label overrides", () => {
+  test("[DEP-CREATE-PKG-004] places the generated override in the deployment runtime workspace", () => {
+    const sourceWorkdir = "/srv/user-source";
+    const runtimeDir = "/var/lib/appaloft/runtime/local-deployments/dep_www";
+    const overrideFile = localComposeOwnershipOverrideFile(runtimeDir);
+
+    expect(overrideFile).toBe(
+      "/var/lib/appaloft/runtime/local-deployments/dep_www/compose/ownership-labels.override.yml",
+    );
+    expect(relative(sourceWorkdir, overrideFile).startsWith(".." + "/")).toBe(true);
+  });
+
   test("[RT-USAGE-002] renders an override generator with Appaloft ownership labels", () => {
     const script = renderComposeOwnershipLabelOverrideScript({
       composeFile: "/srv/app/docker-compose.yml",
