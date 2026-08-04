@@ -71,6 +71,11 @@
     tenant-qualified GitHub thread scope. Coordinate after acknowledgement, re-read Task and
     feedback inside the guarded work, and persist the outcome before releasing; unrelated GitHub
     threads retain independent progress and no GitHub-specific lease table is introduced.
+20. Add a provider-neutral runtime-home materialize/cleanup operation to the existing Execution
+    Sandbox service and optional provider contract. The public operation carries only the admitted
+    owner, Agent kind, Runtime id, and opaque source reference to the exact selected provider. Provider or
+    hosted adapters own source resolution and allowed-file policy; public state never stores HOME
+    contents, and unsupported providers fail closed instead of using ambient root/global state.
 
 ## Migration
 
@@ -117,6 +122,10 @@
 - Add a deterministic overlapping stop/resume regression for `GH-AUTO-LIFECYCLE-029`; prove same-
   thread control order, Task re-read inside the existing mutation coordination boundary, lease
   ownership fencing, and independent progress for a different thread.
+- Add `GH-AUTO-CREDENTIAL-HOME-030` application/provider regressions proving exact-provider
+  delegation, owner-scope validation, idempotent materialization, Runtime-targeted cleanup without
+  disturbing sibling Runtimes, whole-Sandbox cleanup before pause/snapshot, unsupported-provider
+  denial, and absence of credential bytes from public descriptors/events.
 - Run public lint, typecheck, test, and build before public delivery.
 
 ## Risks

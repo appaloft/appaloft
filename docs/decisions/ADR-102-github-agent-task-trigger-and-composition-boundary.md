@@ -81,6 +81,14 @@ fork code can exfiltrate credentials.
     serializes `status`, `steer`, `stop`, and `resume` across concurrent webhook requests while
     unrelated threads remain independent. This adds no GitHub-specific lease table and no new Task,
     Workspace, Sandbox, Agent session, or Git delivery model.
+22. The existing Execution Sandbox service exposes one provider-neutral runtime-home
+    materialize/cleanup seam. It passes an admitted opaque source reference, owner scope, Agent
+    kind, and Runtime id only to the exact selected provider. Hosted or self-hosted adapters own
+    source lookup and
+    allowed-file policy. Unsupported providers fail closed, public state never persists HOME
+    contents. Run completion may clean only the exact Runtime HOME so sibling Runtimes remain
+    isolated; whole-Sandbox cleanup must precede hibernation, snapshot, termination, or unrelated
+    reuse.
 
 ## Consequences
 

@@ -91,6 +91,19 @@ Review Round becomes a durable downstream-Code and merge gate.
   original GitHub Agent Sandbox Task goal, so Spec, Ticket, Test-First, and public Code rounds are
   authorized for this repair.
 
+## 2026-08-04 Existing Server Config Materialization Decision
+
+- The owner confirmed that the previously deferred `existing-server-config` mode should be
+  implemented under the original GitHub Agent Sandbox Task goal.
+- A registered Server's login or root HOME must not be mounted or copied wholesale. The public
+  boundary exposes only a provider-neutral Sandbox runtime-home materialize/cleanup seam; hosted
+  composition resolves the opaque owner-scoped source, exact registered Server, supported Agent
+  files, and custody policy.
+- Materialization is idempotent and occurs only after credential scope admission on the exact
+  Sandbox provider. Cleanup removes materialized credential files before hibernation, snapshot,
+  termination, or a later Run. Unsupported providers and unavailable, cross-owner, or malformed
+  sources fail closed without falling back to ambient HOME state.
+
 ## 2026-08-02 OpenCode Native Snapshot Evidence
 
 - External run `30749962974` kept native OpenCode data below the Workspace-scoped HOME/XDG tree,

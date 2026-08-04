@@ -38,6 +38,8 @@
 - [x] Create and link public thread-control serialization issue #991 after external run
   `30828152502` proved an acknowledged resume could overlap a long-running stop and leave the
   current Task projection stopped.
+- [x] Create and link public runtime-HOME materialization issue #995 for
+  `GH-AUTO-CREDENTIAL-HOME-030` and mark it `ready-for-agent` after ticket review.
 
 ## Public Composition Boundary Slice
 
@@ -92,6 +94,12 @@
   public contracts and downstream composition regressions fail closed before secret/runtime effects.
 - [x] Prove Agent credentials never enter argv, Git evidence, tests, Preview, events, or snapshots
   through public redaction/credential-boundary tests and downstream exact-process composition tests.
+- [x] GH-AUTO-CREDENTIAL-HOME-030: add the provider-neutral Sandbox runtime-HOME
+  materialize/cleanup seam with exact-provider delegation and fail-closed unsupported behavior.
+- [x] GH-AUTO-CREDENTIAL-HOME-030: allow one completed Run to clean only its exact Runtime HOME
+  without disrupting sibling Agent Runtimes in the same Sandbox.
+- [x] GH-AUTO-CREDENTIAL-HOME-030: prove materialized credential files are removed before
+  pause/snapshot/termination and never enter public persistence or event payloads.
 
 ## Task And Session Slice
 
@@ -203,6 +211,9 @@
   written to GitHub. The adapter now fulfills that contract by delivering an explicit bounded
   redaction instead of failing the entire Review; both locales and the docs-registry entry remain
   complete and unchanged.
+- [x] Docs outcome for #995: not user-facing. The change adds a provider-neutral application seam
+  used by downstream composition and introduces no command, API field, Web affordance, status, or
+  recovery instruction; the existing credential safety contract remains unchanged.
 - [x] Docs outcome for #927: not user-facing. The fix restores the already documented
   installation-authenticated materialization behavior and changes no public command or contract.
 - [x] Reopen #927 after registered-server smoke proved Docker's Workspace tmpfs is `noexec`;

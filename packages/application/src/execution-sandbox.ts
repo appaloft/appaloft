@@ -1,4 +1,5 @@
 import {
+  type AgentAdapterKind,
   CreatedAt,
   createDomainEvent,
   domainError,
@@ -194,6 +195,23 @@ export interface SandboxProvider {
     realizedIsolation: SandboxIsolation;
   }>;
   terminate(request: { sandboxId: string; providerHandle: string }): Promise<void>;
+  materializeRuntimeHome?(request: {
+    sandboxId: string;
+    providerHandle: string;
+    ownerScope: string;
+    ownerOrganizationId?: string;
+    sourceRef: string;
+    owner: { kind: "user" | "organization"; id: string };
+    agent: AgentAdapterKind;
+    runtimeId: string;
+  }): Promise<void>;
+  cleanupRuntimeHome?(request: {
+    sandboxId: string;
+    providerHandle: string;
+    ownerScope: string;
+    ownerOrganizationId?: string;
+    runtimeId?: string;
+  }): Promise<void>;
   openTerminal?(request: {
     sandboxId: string;
     providerHandle: string;
@@ -2422,6 +2440,8 @@ export class ExecutionSandboxService {
     if (!ready.value.provider.capabilities.pause) {
       return err(domainError.conflict("Sandbox provider does not support pause"));
     }
+    const runtimeHome = await this.cleanupRuntimeHomeWithReady(context, ready.value);
+    if (runtimeHome.isErr()) return err(runtimeHome.error);
     const at = UpdatedAt.rehydrate(this.clock.now());
     const requested = ready.value.stored.sandbox.requestPause({ at });
     if (requested.isErr()) return err(requested.error);
@@ -2601,6 +2621,8 @@ export class ExecutionSandboxService {
     if (!ready.value.provider.capabilities.snapshot.includes(input.capability)) {
       return err(domainError.conflict("Sandbox snapshot capability is unsupported"));
     }
+    const runtimeHome = await this.cleanupRuntimeHomeWithReady(context, ready.value);
+    if (runtimeHome.isErr()) return err(runtimeHome.error);
     const createdAt = CreatedAt.rehydrate(this.clock.now());
     const expiresAt = input.expiresAt ? ExpiresAt.create(input.expiresAt) : null;
     if (expiresAt?.isErr()) return err(expiresAt.error);
@@ -2812,6 +2834,11 @@ export class ExecutionSandboxService {
     if (!stored) return err(domainError.notFound("Sandbox", sandboxId));
     if (["terminated", "expired"].includes(stored.sandbox.toState().status.value))
       return ok(descriptor(stored));
+    const readyForCleanup = await this.ready(context, sandboxId);
+    if (readyForCleanup.isOk()) {
+      const runtimeHome = await this.cleanupRuntimeHomeWithReady(context, readyForCleanup.value);
+      if (runtimeHome.isErr()) return err(runtimeHome.error);
+    }
     const snapshots = await this.repository.listSnapshotsForSandbox(repositoryContext, sandboxId, {
       limit: 500,
     });
@@ -2845,5 +2872,102 @@ export class ExecutionSandboxService {
     if (terminated.isErr()) return err(terminated.error);
     await this.saveSandbox(context, stored.sandbox, stored.providerKey);
     return ok(descriptor(stored));
+  }
+
+  async materializeRuntimeHome(
+    context: ExecutionContext,
+    sandboxId: string,
+    input: {
+      sourceRef: string;
+      owner: { kind: "user" | "organization"; id: string };
+      agent: AgentAdapterKind;
+      runtimeId: string;
+    },
+  ): Promise<Result<void>> {
+    if (
+      !input.sourceRef ||
+      input.sourceRef.length > 1_024 ||
+      input.sourceRef.includes("\0") ||
+      !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}$/u.test(input.owner.id) ||
+      !/^[A-Za-z][A-Za-z0-9_.:-]{0,159}$/u.test(input.runtimeId) ||
+      !["user", "organization"].includes(input.owner.kind) ||
+      !["codex", "opencode", "pi"].includes(input.agent)
+    ) {
+      return err(
+        domainError.validation("Sandbox runtime HOME materialization input is invalid", {
+          code: "sandbox_runtime_home_materialization_invalid",
+        }),
+      );
+    }
+    const ready = await this.ready(context, sandboxId);
+    if (ready.isErr()) return err(ready.error);
+    if (!ready.value.provider.materializeRuntimeHome) {
+      return err(
+        domainError.conflict("Sandbox provider does not support runtime HOME materialization", {
+          code: "sandbox_runtime_home_materialization_unsupported",
+          providerKey: ready.value.stored.providerKey,
+        }),
+      );
+    }
+    const repositoryContext = toRepositoryContext(context);
+    const ownerOrganizationId =
+      repositoryContext.tenant?.organizationId ??
+      repositoryContext.principal?.activeOrganization?.organizationId;
+    const materialized = await this.providerOperation(
+      "execution-sandbox-runtime-home-materialize",
+      () =>
+        ready.value.provider.materializeRuntimeHome?.({
+          sandboxId,
+          providerHandle: ready.value.providerHandle,
+          ownerScope: tenantId(repositoryContext),
+          ...(ownerOrganizationId ? { ownerOrganizationId } : {}),
+          sourceRef: input.sourceRef,
+          owner: { ...input.owner },
+          agent: input.agent,
+          runtimeId: input.runtimeId,
+        }) ?? Promise.resolve(),
+    );
+    return materialized.isErr() ? err(materialized.error) : ok(undefined);
+  }
+
+  async cleanupRuntimeHome(
+    context: ExecutionContext,
+    sandboxId: string,
+    input: { runtimeId?: string } = {},
+  ): Promise<Result<void>> {
+    if (input.runtimeId && !/^[A-Za-z][A-Za-z0-9_.:-]{0,159}$/u.test(input.runtimeId)) {
+      return err(
+        domainError.validation("Sandbox runtime HOME cleanup input is invalid", {
+          code: "sandbox_runtime_home_cleanup_invalid",
+        }),
+      );
+    }
+    const ready = await this.ready(context, sandboxId);
+    if (ready.isErr()) return err(ready.error);
+    return this.cleanupRuntimeHomeWithReady(context, ready.value, input.runtimeId);
+  }
+
+  private async cleanupRuntimeHomeWithReady(
+    context: ExecutionContext,
+    ready: { stored: StoredSandbox; provider: SandboxProvider; providerHandle: string },
+    runtimeId?: string,
+  ): Promise<Result<void>> {
+    if (!ready.provider.cleanupRuntimeHome) return ok(undefined);
+    const repositoryContext = toRepositoryContext(context);
+    const ownerOrganizationId =
+      repositoryContext.tenant?.organizationId ??
+      repositoryContext.principal?.activeOrganization?.organizationId;
+    const cleaned = await this.providerOperation(
+      "execution-sandbox-runtime-home-cleanup",
+      () =>
+        ready.provider.cleanupRuntimeHome?.({
+          sandboxId: ready.stored.sandbox.id.value,
+          providerHandle: ready.providerHandle,
+          ownerScope: tenantId(repositoryContext),
+          ...(ownerOrganizationId ? { ownerOrganizationId } : {}),
+          ...(runtimeId ? { runtimeId } : {}),
+        }) ?? Promise.resolve(),
+    );
+    return cleaned.isErr() ? err(cleaned.error) : ok(undefined);
   }
 }
