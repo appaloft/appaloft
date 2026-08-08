@@ -19,6 +19,14 @@ const context = createExecutionContext({
   tenant: { tenantId: "tenant_opencode" },
 });
 
+const modelCredentialBinding = {
+  requirementId: "model-api",
+  kind: "model-api" as const,
+  purpose: "Agent model access",
+  delivery: { kind: "stdin" as const },
+  connectionReference: "model-connection-opencode",
+};
+
 const modelAccess = {
   async issue() {
     return {
@@ -37,7 +45,7 @@ describe("OpenCodeSandboxAgentHarness", () => {
   test("[AGENT-OPENCODE-011][WS-ATTACH-NATIVE-015][GH-AUTO-NATIVE-STATE-027] keeps one native server and translates independently scoped JSON runs", async () => {
     const files = new Map<string, Uint8Array>();
     const calls: Parameters<OpenCodeSandboxExecutionPort["exec"]>[2][] = [];
-    const issued: string[] = [];
+    const issued: Array<{ runId: string; connectionReference: string }> = [];
     const revoked: Array<{ runId: string; capabilityId: string }> = [];
     let runPolls = 0;
     const execution: OpenCodeSandboxExecutionPort = {
@@ -119,7 +127,10 @@ describe("OpenCodeSandboxAgentHarness", () => {
       startupPollIntervalMs: 1,
       modelAccess: {
         async issue(input) {
-          issued.push(input.runId);
+          issued.push({
+            runId: input.runId,
+            connectionReference: input.credentialBinding.connectionReference,
+          });
           const capability = await modelAccess.issue();
           const capabilityId =
             input.runId === "sar_open" ? "smc_opencode_runtime" : "smc_opencode_run";
@@ -150,12 +161,14 @@ describe("OpenCodeSandboxAgentHarness", () => {
       executionContext: context,
       sandboxId: "sbx_open",
       runtimeId: "sar_open",
+      credentialBindings: [modelCredentialBinding],
     });
     const emitted: Array<{ type: string; data: Record<string, unknown> }> = [];
     const result = await harness.execute({
       executionContext: context,
       sandboxId: "sbx_open",
       runtimeId: "sar_open",
+      credentialBindings: [modelCredentialBinding],
       runId: "srun_open",
       task: "Build it",
       context: { mode: "fresh" },
@@ -254,7 +267,10 @@ describe("OpenCodeSandboxAgentHarness", () => {
       },
     ]);
     expect(result.outcomeDigest).toStartWith("sha256:");
-    expect(issued).toEqual(["sar_open", "srun_open"]);
+    expect(issued).toEqual([
+      { runId: "sar_open", connectionReference: "model-connection-opencode" },
+      { runId: "srun_open", connectionReference: "model-connection-opencode" },
+    ]);
     expect(revoked).toEqual([
       { runId: "srun_open", capabilityId: "smc_opencode_run" },
     ]);
@@ -337,6 +353,7 @@ describe("OpenCodeSandboxAgentHarness", () => {
         executionContext: context,
         sandboxId: "sbx_open",
         runtimeId: "sar_open",
+        credentialBindings: [modelCredentialBinding],
       }),
     ).rejects.toThrow("opencode_harness_config_invalid");
     expect(calls.some((call) => call.argv.includes("serve"))).toBe(false);
@@ -415,6 +432,7 @@ describe("OpenCodeSandboxAgentHarness", () => {
         executionContext: context,
         sandboxId: "sbx_open",
         runtimeId: "sar_open",
+        credentialBindings: [modelCredentialBinding],
         runId: "srun_open",
         task: "Build it",
         context: { mode: "fresh" },
@@ -495,6 +513,7 @@ describe("OpenCodeSandboxAgentHarness", () => {
         executionContext: context,
         sandboxId: "sbx_open",
         runtimeId: "sar_open",
+        credentialBindings: [modelCredentialBinding],
       }),
     ).rejects.toThrow("marker unavailable");
     expect(terminated).toEqual(["spr_server"]);
@@ -591,6 +610,7 @@ describe("OpenCodeSandboxAgentHarness", () => {
         executionContext: context,
         sandboxId: "sbx_open",
         runtimeId: "sar_open",
+        credentialBindings: [modelCredentialBinding],
         runId: "srun_failed",
         task: "Fail safely",
         context: { mode: "fresh" },
@@ -650,6 +670,7 @@ describe("OpenCodeSandboxAgentHarness", () => {
         executionContext: context,
         sandboxId: "sbx_open",
         runtimeId: "sar_open",
+        credentialBindings: [modelCredentialBinding],
       }),
     ).rejects.toThrow("Sandbox exec was rejected");
     expect(calls).toEqual([
@@ -666,6 +687,68 @@ describe("OpenCodeSandboxAgentHarness", () => {
         ],
       },
     ]);
+  });
+
+  test("[MODEL-ACCESS-BIND-002][MODEL-ACCESS-BIND-003] fails before native startup when the model binding is missing or ambiguous", async () => {
+    let issueCalls = 0;
+    const execution = {
+      async exec() {
+        throw new Error("child_must_not_start");
+      },
+      async listProcesses() {
+        return ok([]);
+      },
+      async terminateProcess() {
+        return ok(undefined);
+      },
+      async readFile() {
+        return err({
+          code: "sandbox_file_not_found",
+          category: "user" as const,
+          message: "missing",
+          retryable: false,
+          details: {},
+        });
+      },
+      async writeFile(_context: unknown, _sandboxId: string, input: { path: string; content: Uint8Array }) {
+        return ok({ path: input.path, sizeBytes: input.content.byteLength });
+      },
+      async removeFile() {
+        return ok(undefined);
+      },
+    } satisfies OpenCodeSandboxExecutionPort;
+    const harness = new OpenCodeSandboxAgentHarness(execution, {
+      templateId: "aht_opencode_managed_v1",
+      sandboxTemplateId: "stp_opencode_pinned",
+      version: "1.1.60",
+      templateDigest: `sha256:${"b".repeat(64)}`,
+      modelAccess: {
+        async issue() {
+          issueCalls += 1;
+          return modelAccess.issue();
+        },
+        async revoke() {},
+      },
+    });
+    const baseInput = {
+      executionContext: context,
+      sandboxId: "sbx_open",
+      runtimeId: "sar_open",
+    };
+
+    await expect(harness.prepareRuntime?.(baseInput)).rejects.toThrow(
+      "sandbox_agent_model_connection_binding_missing",
+    );
+    await expect(
+      harness.prepareRuntime?.({
+        ...baseInput,
+        credentialBindings: [
+          modelCredentialBinding,
+          { ...modelCredentialBinding, connectionReference: "model-connection-other" },
+        ],
+      }),
+    ).rejects.toThrow("sandbox_agent_model_connection_binding_ambiguous");
+    expect(issueCalls).toBe(0);
   });
 
   test("[AGENT-WS-OPEN-008] cancellation stops the headless child and runtime termination stops the native server", async () => {
@@ -736,6 +819,7 @@ describe("OpenCodeSandboxAgentHarness", () => {
       executionContext: context,
       sandboxId: "sbx_open",
       runtimeId: "sar_open",
+      credentialBindings: [modelCredentialBinding],
       runId: "srun_cancel",
       task: "Keep working",
       context: { mode: "continue", parentRunId: "srun_parent" },

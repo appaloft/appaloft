@@ -63,6 +63,53 @@ export interface SandboxAgentHarnessCapabilities {
   healthcheck?: { kind: "process" } | { kind: "http"; port: number; path: string };
 }
 
+export type SandboxAgentModelProtocol =
+  | "openai-chat-completions"
+  | "openai-responses"
+  | "anthropic-messages";
+
+export interface SandboxAgentModelAccessDescriptor {
+  capabilityId: string;
+  baseUrl: string;
+  accessToken: string;
+  provider: string;
+  model: string;
+  protocol?: SandboxAgentModelProtocol;
+  expiresAt: string;
+}
+
+export interface SandboxAgentModelAccessIssueInput {
+  executionContext: ExecutionContext;
+  sandboxId: string;
+  runtimeId: string;
+  runId: string;
+  credentialBinding: AgentWorkspaceCredentialBinding;
+}
+
+export interface SandboxAgentModelAccessProvider {
+  issue(input: SandboxAgentModelAccessIssueInput): Promise<SandboxAgentModelAccessDescriptor>;
+  revoke(input: {
+    executionContext: ExecutionContext;
+    sandboxId: string;
+    runtimeId: string;
+    runId: string;
+    capabilityId: string;
+  }): Promise<void>;
+}
+
+export function requireSandboxAgentModelCredentialBinding(
+  bindings: readonly AgentWorkspaceCredentialBinding[] = [],
+): AgentWorkspaceCredentialBinding {
+  const modelBindings = bindings.filter((binding) => binding.kind === "model-api");
+  if (modelBindings.length === 0) {
+    throw new Error("sandbox_agent_model_connection_binding_missing");
+  }
+  if (modelBindings.length !== 1) {
+    throw new Error("sandbox_agent_model_connection_binding_ambiguous");
+  }
+  return modelBindings[0] as AgentWorkspaceCredentialBinding;
+}
+
 export type SandboxAgentSandboxSource =
   | { kind: "image"; image: string }
   | { kind: "snapshot"; snapshotId: string }
@@ -81,6 +128,7 @@ export interface SandboxAgentHarness {
     executionContext: ExecutionContext;
     sandboxId: string;
     runtimeId: string;
+    credentialBindings?: readonly AgentWorkspaceCredentialBinding[];
   }): Promise<void>;
   terminateRuntime?(input: {
     executionContext: ExecutionContext;
@@ -92,6 +140,7 @@ export interface SandboxAgentHarness {
     sandboxId: string;
     runtimeId: string;
     runId: string;
+    credentialBindings?: readonly AgentWorkspaceCredentialBinding[];
     task: string;
     context: { mode: "fresh" } | { mode: "continue"; parentRunId: string };
     launchProcess?(input: {
@@ -1375,6 +1424,7 @@ export class SandboxAgentDeliveryService {
           executionContext: context,
           sandboxId: input.sandboxId,
           runtimeId: runtimeId.value.value,
+          credentialBindings: record.credentialBindings ?? [],
         });
       } catch (error) {
         const failedAt = asUpdatedAt(this.dependencies.clock.now());
@@ -1805,6 +1855,7 @@ export class SandboxAgentDeliveryService {
         sandboxId: record.sandboxId,
         runtimeId: runtimeRecord.runtime.id.value,
         runId,
+        credentialBindings: runtimeRecord.credentialBindings ?? [],
         task: task.value.plaintext,
         context:
           contextState.mode === "fresh"

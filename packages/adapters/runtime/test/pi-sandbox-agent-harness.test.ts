@@ -14,6 +14,14 @@ const context = createExecutionContext({
   tenant: { tenantId: "tenant_pi" },
 });
 
+const modelCredentialBinding = {
+  requirementId: "model-api",
+  kind: "model-api" as const,
+  purpose: "Agent model access",
+  delivery: { kind: "stdin" as const },
+  connectionReference: "model-connection-pi",
+};
+
 const modelAccess = {
   async issue() {
     return {
@@ -31,6 +39,7 @@ const modelAccess = {
 describe("PiSandboxAgentHarness", () => {
   test("[AGENT-PI-006] admits only the pinned Sandbox template and translates JSONL", async () => {
     let polls = 0;
+    let issuedConnectionReference: string | undefined;
     let captured: Parameters<PiSandboxExecutionPort["exec"]>[2] | undefined;
     const emitted: Array<{ type: string; data: Record<string, unknown>; processPoll: number }> = [];
     const files = new Map([
@@ -72,7 +81,13 @@ describe("PiSandboxAgentHarness", () => {
       templateDigest: `sha256:${"a".repeat(64)}`,
       timeoutMs: 2_000,
       cwd: ".",
-      modelAccess,
+      modelAccess: {
+        ...modelAccess,
+        async issue(input) {
+          issuedConnectionReference = input.credentialBinding.connectionReference;
+          return modelAccess.issue();
+        },
+      },
     });
 
     expect(harness.admitSandbox({ kind: "template", templateId: "stp_pi_pinned" })).toBe(true);
@@ -81,6 +96,7 @@ describe("PiSandboxAgentHarness", () => {
       executionContext: context,
       sandboxId: "sbx_pi",
       runtimeId: "sar_pi",
+      credentialBindings: [modelCredentialBinding],
       runId: "srun_pi",
       task: "Build it",
       context: { mode: "fresh" },
@@ -100,6 +116,7 @@ describe("PiSandboxAgentHarness", () => {
     expect(captured?.argv).toContain("appaloft");
     expect(captured?.argv).toContain("read,bash,edit,write,grep,find,ls");
     expect(captured?.argv).toContain("Build it");
+    expect(issuedConnectionReference).toBe("model-connection-pi");
     expect(emitted).toEqual([
       {
         type: "message",
@@ -146,6 +163,7 @@ describe("PiSandboxAgentHarness", () => {
       executionContext: context,
       sandboxId: "sbx_pi",
       runtimeId: "sar_pi",
+      credentialBindings: [modelCredentialBinding],
       runId: "srun_cancel",
       task: "Keep working",
       context: { mode: "fresh" },
@@ -205,6 +223,7 @@ describe("PiSandboxAgentHarness", () => {
         executionContext: context,
         sandboxId: "sbx_pi",
         runtimeId: "sar_pi",
+        credentialBindings: [modelCredentialBinding],
         runId: "srun_failed",
         task: "Build it",
         context: { mode: "fresh" },
@@ -273,6 +292,7 @@ describe("PiSandboxAgentHarness", () => {
         executionContext: context,
         sandboxId: "sbx_pi",
         runtimeId: "sar_pi",
+        credentialBindings: [modelCredentialBinding],
         runId: "srun_connection",
         task: "Build it",
         context: { mode: "fresh" },
@@ -289,5 +309,65 @@ describe("PiSandboxAgentHarness", () => {
       },
     });
     expect(JSON.stringify(emitted.at(-1))).not.toContain("must-not-leak");
+  });
+
+  test("[MODEL-ACCESS-BIND-002][MODEL-ACCESS-BIND-003] fails before issue when the model binding is missing or ambiguous", async () => {
+    let issueCalls = 0;
+    const execution = {
+      async exec() {
+        throw new Error("child_must_not_start");
+      },
+      async listProcesses() {
+        return ok([]);
+      },
+      async terminateProcess() {
+        return ok(undefined);
+      },
+      async readFile() {
+        return ok(new Uint8Array());
+      },
+      async writeFile(_context: unknown, _sandboxId: string, input: { path: string; content: Uint8Array }) {
+        return ok({ path: input.path, sizeBytes: input.content.byteLength });
+      },
+      async removeFile() {
+        return ok(undefined);
+      },
+    } satisfies PiSandboxExecutionPort;
+    const harness = new PiSandboxAgentHarness(execution, {
+      templateId: "aht_pi_managed_v1",
+      sandboxTemplateId: "stp_pi_pinned",
+      version: "1.2.3",
+      templateDigest: `sha256:${"a".repeat(64)}`,
+      modelAccess: {
+        async issue() {
+          issueCalls += 1;
+          return modelAccess.issue();
+        },
+        async revoke() {},
+      },
+    });
+    const baseInput = {
+      executionContext: context,
+      sandboxId: "sbx_pi",
+      runtimeId: "sar_pi",
+      runId: "srun_binding",
+      task: "Build it",
+      context: { mode: "fresh" as const },
+      requestApproval: async () => "rejected" as const,
+    };
+
+    await expect(harness.execute(baseInput)).rejects.toThrow(
+      "sandbox_agent_model_connection_binding_missing",
+    );
+    await expect(
+      harness.execute({
+        ...baseInput,
+        credentialBindings: [
+          modelCredentialBinding,
+          { ...modelCredentialBinding, connectionReference: "model-connection-other" },
+        ],
+      }),
+    ).rejects.toThrow("sandbox_agent_model_connection_binding_ambiguous");
+    expect(issueCalls).toBe(0);
   });
 });

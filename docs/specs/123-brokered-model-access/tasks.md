@@ -3,23 +3,23 @@
 ## Source of truth and ticket
 
 - [x] Record owner-confirmed discovery, spec, ADR and test matrix.
-- [ ] Create one actor-visible public issue and label it `ready-for-agent`.
+- [x] Create public [appaloft#1001](https://github.com/appaloft/appaloft/issues/1001) and label it `ready-for-agent`.
 
 ## Test first
 
-- [ ] Add `MODEL-ACCESS-BIND-001..003` Runtime/Harness contract tests.
-- [ ] Add `MODEL-ACCESS-CAP-004/REVOKE-005` Pi/OpenCode broker tests.
-- [ ] Keep `MODEL-ACCESS-SURFACE-006/COMPAT-007` parity and custom harness tests green.
+- [x] Add `MODEL-ACCESS-BIND-001..003` Runtime/Harness contract tests.
+- [x] Add `MODEL-ACCESS-CAP-004` Pi/OpenCode broker tests; revoke provider behavior remains Cloud companion acceptance.
+- [x] Keep `MODEL-ACCESS-SURFACE-006/COMPAT-007` parity and custom harness tests green.
 
 ## Implementation
 
-- [ ] Add a shared brokered model access contract.
-- [ ] Propagate resolved Runtime credential bindings into Harness execution.
-- [ ] Bind Pi/OpenCode issuance to exactly one `model-api` reference.
-- [ ] Keep provider secret values outside all public inputs, results and child process material.
+- [x] Add a shared brokered model access contract.
+- [x] Propagate resolved Runtime credential bindings into Harness execution.
+- [x] Bind Pi/OpenCode issuance to exactly one `model-api` reference.
+- [x] Keep provider secret values outside all public inputs, results and child process material.
 
 ## Verification and sync
 
-- [ ] Run focused tests, lint, typecheck, full public test and build.
-- [ ] Update operation/domain/roadmap docs and matrix evidence.
-- [ ] Reconcile issue, tasks and implementation before public merge.
+- [x] Run focused tests, lint, typecheck, full public test and build.
+- [x] Update operation/domain/roadmap docs and matrix evidence.
+- [x] Reconcile issue, tasks and implementation before public merge.

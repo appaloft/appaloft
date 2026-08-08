@@ -1,5 +1,7 @@
 import {
   type ExecutionContext,
+  requireSandboxAgentModelCredentialBinding,
+  type SandboxAgentModelAccessProvider,
   type SandboxAgentHarness,
   type SandboxAgentHarnessEvent,
   type SandboxExecResult,
@@ -47,28 +49,7 @@ export interface OpenCodeSandboxExecutionPort {
   ): Promise<Result<void>>;
 }
 
-export interface OpenCodeSandboxModelAccessProvider {
-  issue(input: {
-    executionContext: ExecutionContext;
-    sandboxId: string;
-    runtimeId: string;
-    runId: string;
-  }): Promise<{
-    capabilityId: string;
-    baseUrl: string;
-    accessToken: string;
-    provider: string;
-    model: string;
-    expiresAt: string;
-  }>;
-  revoke(input: {
-    executionContext: ExecutionContext;
-    sandboxId: string;
-    runtimeId: string;
-    runId: string;
-    capabilityId: string;
-  }): Promise<void>;
-}
+export type OpenCodeSandboxModelAccessProvider = SandboxAgentModelAccessProvider;
 
 export interface OpenCodeSandboxAgentHarnessOptions {
   templateId: string;
@@ -260,11 +241,12 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
     return source.kind === "template" && source.templateId === this.options.sandboxTemplateId;
   }
 
-  async prepareRuntime(input: {
-    executionContext: ExecutionContext;
-    sandboxId: string;
-    runtimeId: string;
-  }): Promise<void> {
+  async prepareRuntime(
+    input: Parameters<NonNullable<SandboxAgentHarness["prepareRuntime"]>>[0],
+  ): Promise<void> {
+    const credentialBinding = requireSandboxAgentModelCredentialBinding(input.credentialBindings);
+    const modelAccess = this.options.modelAccess;
+    if (!modelAccess) throw new Error("opencode_model_access_unavailable");
     const markerPath = this.serverMarkerPath(input.runtimeId);
     const marked = await this.execution.readFile(input.executionContext, input.sandboxId, {
       path: markerPath,
@@ -330,11 +312,12 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       throw new Error("opencode_harness_version_mismatch");
     }
 
-    const modelAccess = this.options.modelAccess;
-    if (!modelAccess) throw new Error("opencode_model_access_unavailable");
     const capability = await modelAccess.issue({
-      ...input,
+      executionContext: input.executionContext,
+      sandboxId: input.sandboxId,
+      runtimeId: input.runtimeId,
       runId: input.runtimeId,
+      credentialBinding,
     });
     if (!validModelCapability(capability, this.options.timeoutMs ?? 30 * 60_000)) {
       await modelAccess.revoke({
@@ -460,11 +443,13 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
     await this.prepareRuntime(input);
     const modelAccess = this.options.modelAccess;
     if (!modelAccess) throw new Error("opencode_model_access_unavailable");
+    const credentialBinding = requireSandboxAgentModelCredentialBinding(input.credentialBindings);
     const capability = await modelAccess.issue({
       executionContext: input.executionContext,
       sandboxId: input.sandboxId,
       runtimeId: input.runtimeId,
       runId: input.runId,
+      credentialBinding,
     });
     if (!validModelCapability(capability, this.options.timeoutMs ?? 30 * 60_000)) {
       await modelAccess.revoke({
