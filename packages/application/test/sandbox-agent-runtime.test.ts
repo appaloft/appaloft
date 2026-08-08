@@ -655,6 +655,7 @@ describe("SandboxAgentDeliveryService", () => {
 
   test("[AGENT-WS-ATTACH-016][WS-ATTACH-NATIVE-015] refreshes the native runtime and issues scoped attach access", async () => {
     let prepareCalls = 0;
+    const preparedCredentialBindings: Array<unknown> = [];
     const { service, exposedPorts } = fixture({
       harness: {
         key: "opencode",
@@ -667,8 +668,9 @@ describe("SandboxAgentDeliveryService", () => {
           sessionRecovery: "native-session-store",
           serverPort: 4096,
         },
-        async prepareRuntime() {
+        async prepareRuntime(input) {
           prepareCalls += 1;
+          preparedCredentialBindings.push(input.credentialBindings);
         },
         async execute() {
           return { events: [], outcomeDigest: "sha256:complete" };
@@ -694,6 +696,7 @@ describe("SandboxAgentDeliveryService", () => {
     )._unsafeUnwrap();
 
     expect(prepareCalls).toBe(2);
+    expect(preparedCredentialBindings).toEqual([[], []]);
     expect(exposedPorts).toEqual([
       {
         sandboxId: "sbx_demo",

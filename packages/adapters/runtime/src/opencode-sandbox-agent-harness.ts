@@ -263,11 +263,11 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
         marker.schemaVersion === "opencode-server-marker/v2" &&
         marker.provider &&
         marker.model &&
-        new Date(marker.expiresAt).getTime() >
-          Date.now() + (this.options.timeoutMs ?? 30 * 60_000) &&
+        new Date(marker.expiresAt).getTime() > Date.now() + this.serverCapabilitySafetyWindowMs() &&
         processes.value.some(
           (process) => process.processId === marker.processId && process.status === "running",
-        )
+        ) &&
+        (await this.serverIsHealthy(input.executionContext, input.sandboxId))
       ) {
         return;
       }
@@ -319,7 +319,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       runId: input.runtimeId,
       credentialBinding,
     });
-    if (!validModelCapability(capability, this.options.timeoutMs ?? 30 * 60_000)) {
+    if (!validModelCapability(capability, this.serverCapabilitySafetyWindowMs())) {
       await modelAccess.revoke({
         ...input,
         runId: input.runtimeId,
@@ -366,7 +366,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       );
     }
     const processId = started.value.processId;
-    const attempts = this.options.startupPollAttempts ?? 20;
+    const attempts = this.options.startupPollAttempts ?? 50;
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       const processes = await this.execution.listProcesses(
         input.executionContext,
@@ -376,7 +376,8 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
         processes.isOk() &&
         processes.value.some(
           (process) => process.processId === processId && process.status === "running",
-        )
+        ) &&
+        (await this.serverIsHealthy(input.executionContext, input.sandboxId))
       ) {
         const written = await this.execution.writeFile(
           input.executionContext,
@@ -402,7 +403,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
         return;
       }
       await new Promise((resolve) =>
-        setTimeout(resolve, this.options.startupPollIntervalMs ?? 100),
+        setTimeout(resolve, this.options.startupPollIntervalMs ?? 200),
       );
     }
     await this.cleanupStartedServer(input, processId, capability.capabilityId);
@@ -721,5 +722,31 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
 
   private workspaceFilePath(path: string): string {
     return this.cwd === "." ? path : `${this.cwd}/${path}`;
+  }
+
+  private serverCapabilitySafetyWindowMs(): number {
+    const attempts = this.options.startupPollAttempts ?? 50;
+    const intervalMs = this.options.startupPollIntervalMs ?? 200;
+    return Math.max(30_000, attempts * intervalMs + 10_000);
+  }
+
+  private async serverIsHealthy(
+    context: ExecutionContext,
+    sandboxId: string,
+  ): Promise<boolean> {
+    const result = await this.execution.exec(context, sandboxId, {
+      argv: sandboxWorkspaceProcessArgv([
+        "curl",
+        "--fail",
+        "--silent",
+        "--show-error",
+        "--max-time",
+        "2",
+        `http://127.0.0.1:${this.port}/global/health`,
+      ]),
+      ...(this.cwd === "." ? {} : { cwd: this.cwd }),
+      timeoutMs: 3_000,
+    });
+    return result.isOk() && foregroundSucceeded(result.value);
   }
 }

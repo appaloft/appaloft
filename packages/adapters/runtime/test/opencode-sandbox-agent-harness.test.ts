@@ -41,7 +41,164 @@ const modelAccess = {
   async revoke() {},
 };
 
+function isHealthProbe(input: Parameters<OpenCodeSandboxExecutionPort["exec"]>[2]): boolean {
+  return input.argv.some((argument) => argument.endsWith("/global/health"));
+}
+
 describe("OpenCodeSandboxAgentHarness", () => {
+  test("[AGENT-OPENCODE-011][AGENT-WS-ATTACH-016] reuses a healthy server with a still-valid short-lived capability", async () => {
+    const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
+    const marker = new TextEncoder().encode(
+      JSON.stringify({
+        schemaVersion: "opencode-server-marker/v2",
+        processId: "spr_server",
+        capabilityId: "smc_opencode_runtime",
+        expiresAt,
+        provider: "appaloft",
+        model: "coding-model",
+      }),
+    );
+    const calls: Parameters<OpenCodeSandboxExecutionPort["exec"]>[2][] = [];
+    let issueCalls = 0;
+    const execution: OpenCodeSandboxExecutionPort = {
+      async exec(_context, _sandboxId, input) {
+        calls.push(input);
+        if (isHealthProbe(input)) {
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
+          });
+        }
+        throw new Error("existing server must not restart");
+      },
+      async listProcesses() {
+        return ok([{ processId: "spr_server", status: "running" }]);
+      },
+      async terminateProcess() {
+        throw new Error("existing server must not terminate");
+      },
+      async readFile() {
+        return ok(marker);
+      },
+      async writeFile() {
+        throw new Error("existing marker must not be replaced");
+      },
+      async removeFile() {
+        throw new Error("existing marker must not be removed");
+      },
+    };
+    const harness = new OpenCodeSandboxAgentHarness(execution, {
+      templateId: "aht_opencode_managed_v1",
+      sandboxTemplateId: "stp_opencode_pinned",
+      version: "1.18.4",
+      templateDigest: `sha256:${"b".repeat(64)}`,
+      startupPollIntervalMs: 1,
+      modelAccess: {
+        async issue() {
+          issueCalls += 1;
+          return modelAccess.issue();
+        },
+        async revoke() {},
+      },
+    });
+
+    await harness.prepareRuntime?.({
+      executionContext: context,
+      sandboxId: "sbx_open",
+      runtimeId: "sar_open",
+      credentialBindings: [modelCredentialBinding],
+    });
+
+    expect(issueCalls).toBe(0);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.argv).toEqual(
+      expect.arrayContaining(["curl", "http://127.0.0.1:4096/global/health"]),
+    );
+  });
+
+  test("[AGENT-OPENCODE-011][AGENT-WS-ATTACH-016] records startup only after delayed HTTP readiness", async () => {
+    const files = new Map<string, Uint8Array>();
+    const calls: Parameters<OpenCodeSandboxExecutionPort["exec"]>[2][] = [];
+    let healthPolls = 0;
+    const execution: OpenCodeSandboxExecutionPort = {
+      async exec(_context, _sandboxId, input) {
+        calls.push(input);
+        if (input.argv.includes("--version")) {
+          return ok({
+            mode: "foreground",
+            frames: [
+              { kind: "stdout", sequence: 1, data: "1.18.4\n" },
+              { kind: "exit", sequence: 2, exitCode: 0 },
+            ],
+          });
+        }
+        if (input.argv.includes("debug") && input.argv.includes("config")) {
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
+          });
+        }
+        if (input.argv.includes("serve")) {
+          return ok({ mode: "background", processId: "spr_server" });
+        }
+        if (isHealthProbe(input)) {
+          healthPolls += 1;
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: healthPolls < 3 ? 7 : 0 }],
+          });
+        }
+        throw new Error("unexpected command");
+      },
+      async listProcesses() {
+        return ok([{ processId: "spr_server", status: "running" }]);
+      },
+      async terminateProcess() {
+        return ok(undefined);
+      },
+      async readFile(_context, _sandboxId, input) {
+        const value = files.get(input.path);
+        return value
+          ? ok(value)
+          : err({
+              code: "sandbox_file_not_found",
+              category: "user",
+              message: "missing",
+              retryable: false,
+              details: {},
+            });
+      },
+      async writeFile(_context, _sandboxId, input) {
+        files.set(input.path, input.content);
+        return ok({ path: input.path, sizeBytes: input.content.byteLength });
+      },
+      async removeFile(_context, _sandboxId, input) {
+        files.delete(input.path);
+        return ok(undefined);
+      },
+    };
+    const harness = new OpenCodeSandboxAgentHarness(execution, {
+      templateId: "aht_opencode_managed_v1",
+      sandboxTemplateId: "stp_opencode_pinned",
+      version: "1.18.4",
+      templateDigest: `sha256:${"b".repeat(64)}`,
+      startupPollAttempts: 4,
+      startupPollIntervalMs: 1,
+      modelAccess,
+    });
+
+    await harness.prepareRuntime?.({
+      executionContext: context,
+      sandboxId: "sbx_open",
+      runtimeId: "sar_open",
+      credentialBindings: [modelCredentialBinding],
+    });
+
+    expect(healthPolls).toBe(3);
+    expect(files.has(".appaloft-agent/sar_open/opencode-process-id")).toBe(true);
+    expect(JSON.stringify(calls)).not.toContain("appaloft-scoped-capability");
+  });
+
   test("[AGENT-OPENCODE-011][WS-ATTACH-NATIVE-015][GH-AUTO-NATIVE-STATE-027] keeps one native server and translates independently scoped JSON runs", async () => {
     const files = new Map<string, Uint8Array>();
     const calls: Parameters<OpenCodeSandboxExecutionPort["exec"]>[2][] = [];
@@ -61,6 +218,12 @@ describe("OpenCodeSandboxAgentHarness", () => {
           } satisfies SandboxExecResult);
         }
         if (input.argv.includes("debug") && input.argv.includes("config")) {
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
+          } satisfies SandboxExecResult);
+        }
+        if (isHealthProbe(input)) {
           return ok({
             mode: "foreground",
             frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
@@ -377,6 +540,12 @@ describe("OpenCodeSandboxAgentHarness", () => {
     const execution: OpenCodeSandboxExecutionPort = {
       async exec(_context, _sandboxId, input) {
         calls.push(input);
+        if (isHealthProbe(input)) {
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
+          } satisfies SandboxExecResult);
+        }
         return ok({
           mode: "foreground",
           frames: [
@@ -458,6 +627,12 @@ describe("OpenCodeSandboxAgentHarness", () => {
           });
         }
         if (input.argv.includes("debug") && input.argv.includes("config")) {
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
+          });
+        }
+        if (isHealthProbe(input)) {
           return ok({
             mode: "foreground",
             frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
@@ -545,6 +720,12 @@ describe("OpenCodeSandboxAgentHarness", () => {
     ]);
     const execution: OpenCodeSandboxExecutionPort = {
       async exec(_context, _sandboxId, input) {
+        if (isHealthProbe(input)) {
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
+          });
+        }
         if (input.argv.includes("debug") && input.argv.includes("config")) {
           return ok({
             mode: "foreground",
@@ -771,6 +952,12 @@ describe("OpenCodeSandboxAgentHarness", () => {
     ]);
     const execution: OpenCodeSandboxExecutionPort = {
       async exec(_context, _sandboxId, input) {
+        if (isHealthProbe(input)) {
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
+          });
+        }
         if (input.argv.includes("debug") && input.argv.includes("config")) {
           return ok({
             mode: "foreground",
