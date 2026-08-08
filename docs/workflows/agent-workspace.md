@@ -56,6 +56,9 @@ resolution and a consumable admission/placement reservation all complete before 
 
 The preferred Workspace lookup is keyed by tenant + subject + Project + Repository Identity +
 branch. A matching non-terminal Sandbox with the same immutable source SHA is resumed/reconnected.
+When the caller explicitly selects a Profile, lookup instead resumes the latest non-terminal
+Workspace pinned to that resolved Profile within the same key, even if another Profile is globally
+preferred. Omitting the selector keeps the global preference behavior.
 `--new` creates another isolated Sandbox and makes it preferred without mutating the previous one.
 A source SHA mismatch fails and directs the caller to `--new`; V1 never performs implicit Git sync.
 

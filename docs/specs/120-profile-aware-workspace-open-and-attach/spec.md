@@ -55,6 +55,7 @@ resource ids or exposing host credentials.
 | WS-OPEN-REMOTE-018 | Remote CLI parity | An authenticated remote profile is active | create/open runs | Local Git preflight stays local; every business operation dispatches through catalog-backed remote contracts and terminal gateway; server-side source credential custody is injected into the same public workflow before Sandbox creation rather than being supplied by CLI argv or public operation input. |
 | WS-OPEN-SURFACE-019 | Cross-surface parity | CLI, SDK, Console use Workspace creation | same input is supplied | All call the same Profile-aware workflow schema and return the same descriptor semantics. |
 | WS-OPEN-CLEANUP-020 | Exact termination cleanup | A Workspace has source preference, Runtime, grants, Terminal/native access, reservation, and Sandbox state | terminate completes | Owned ephemeral state and preference are revoked/advanced exactly; Repository Binding, Project default, Profile installation, and other Workspaces remain. |
+| WS-OPEN-PROFILE-021 | Resume an explicitly selected Profile | Multiple non-terminal Workspaces for the same source coordinates use different Agent Profiles | open runs with an explicit Profile selector | The latest non-terminal Workspace pinned to the resolved Profile is resumed even when another Profile is globally preferred; source and Runtime pins remain fail-closed. |
 
 ## Public Surfaces
 

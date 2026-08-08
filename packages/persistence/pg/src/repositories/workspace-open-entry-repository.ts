@@ -49,11 +49,17 @@ export class PgWorkspaceOpenEntryRepository implements WorkspaceOpenEntryReposit
   async findPreferred(
     context: ExecutionContext,
     key: WorkspaceOpenKey,
+    selection?: { readonly profileInstallationId?: string },
   ): Promise<WorkspaceOpenEntry | undefined> {
     void context;
-    const row = await whereKey(this.db.selectFrom("workspace_open_entries").selectAll(), key)
-      .where("preferred", "=", true)
-      .executeTakeFirst();
+    const scoped = whereKey(this.db.selectFrom("workspace_open_entries").selectAll(), key);
+    const row = selection?.profileInstallationId
+      ? await scoped
+          .where("profile_installation_id", "=", selection.profileInstallationId)
+          .where("status", "!=", "terminal")
+          .orderBy("generation", "desc")
+          .executeTakeFirst()
+      : await scoped.where("preferred", "=", true).executeTakeFirst();
     return row ? readEntry(row) : undefined;
   }
 

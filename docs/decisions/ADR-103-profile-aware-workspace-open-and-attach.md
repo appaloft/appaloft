@@ -41,6 +41,8 @@ for a Repository-to-Project Workspace onboarding decision.
    preferred Workspace source pin to match the requested commit; otherwise callers use `--new`.
 9. `--new` creates a distinct Sandbox, makes it preferred for later open, and leaves older
    Workspaces untouched.
+   An explicit Profile selector may resume the latest non-terminal older Workspace pinned to that
+   resolved Profile; omitting the selector continues to use the global preference.
 10. Attach behavior derives only from the pinned Adapter capability snapshot:
     - managed-terminal reuses the current valid Agent TUI Terminal Session and automatically
       bridges the CLI to it;
