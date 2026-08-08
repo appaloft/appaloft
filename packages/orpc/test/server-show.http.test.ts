@@ -256,7 +256,7 @@ describe("server show HTTP route", () => {
     const app = mountServerShowRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      serverShowRequest("http://localhost/api/servers/srv_primary/capacity", {
+      serverShowRequest("http://localhost/api/servers/srv_primary/capacity?profile=placement", {
         method: "GET",
       }),
     );
@@ -274,6 +274,7 @@ describe("server show HTTP route", () => {
     expect(capturedQuery).toBeInstanceOf(InspectServerCapacityQuery);
     expect(capturedQuery).toMatchObject({
       serverId: "srv_primary",
+      profile: "placement",
     });
   });
 

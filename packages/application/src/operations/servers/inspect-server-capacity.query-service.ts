@@ -127,6 +127,7 @@ export class InspectServerCapacityQueryService {
     const serverState = server.toState();
     const inspectPromise = this.capacityInspector.inspect(context, {
       server: serverState,
+      profile: query.profile,
     });
     const inspectTimeout = createTimeout(this.boundedInspectTimeoutMs);
     let resultOrTimeout: Result<RuntimeTargetCapacityInspection> | "timeout";

@@ -7,6 +7,22 @@ APPALOFT_STATE_ROOT='/var/lib/appaloft/runtime/state'
 APPALOFT_SOURCE_WORKSPACE_ROOT='/var/lib/appaloft/runtime/ssh-deployments'
 APPALOFT_CAPACITY_PROFILE='full'
 printf 'APPALOFT_CAPACITY_V1\\n'
+if [ "$APPALOFT_CAPACITY_PROFILE" = "placement" ]; then
+  for target_path in / /var/lib/docker "$APPALOFT_RUNTIME_ROOT"; do
+    df -P -k "$target_path" 2>/dev/null | awk -v p="$target_path" 'NR==2 {gsub(/%/, "", $5); printf "CAPACITY_DISK\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n", p, $6, $2, $3, $4, $5}'
+  done
+  if [ -r /proc/meminfo ]; then
+    awk '/MemTotal:/ {total=$2} /MemAvailable:/ {available=$2} END {if (total) printf "CAPACITY_MEMORY\\t%s\\t%s\\n", total, available}' /proc/meminfo
+  fi
+  cores=$(getconf _NPROCESSORS_ONLN 2>/dev/null)
+  if [ -r /proc/loadavg ]; then
+    read load1 load5 load15 rest < /proc/loadavg
+    printf 'CAPACITY_CPU\\t%s\\t%s\\t%s\\t%s\\n' "\${cores:-}" "$load1" "$load5" "$load15"
+  else
+    printf 'CAPACITY_CPU\\t%s\\t\\t\\t\\n' "\${cores:-}"
+  fi
+  exit 0
+fi
 if command -v docker >/dev/null 2>&1; then
   APPALOFT_DOCKER_AVAILABLE=1
   docker ps -aq --filter label=appaloft.managed=true 2>/dev/null | while read -r container_id; do
@@ -94,6 +110,22 @@ APPALOFT_STATE_ROOT='/var/lib/appaloft/runtime/state'
 APPALOFT_SOURCE_WORKSPACE_ROOT='/var/lib/appaloft/runtime/ssh-deployments'
 APPALOFT_CAPACITY_PROFILE='attribution'
 printf 'APPALOFT_CAPACITY_V1\\n'
+if [ "$APPALOFT_CAPACITY_PROFILE" = "placement" ]; then
+  for target_path in / /var/lib/docker "$APPALOFT_RUNTIME_ROOT"; do
+    df -P -k "$target_path" 2>/dev/null | awk -v p="$target_path" 'NR==2 {gsub(/%/, "", $5); printf "CAPACITY_DISK\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n", p, $6, $2, $3, $4, $5}'
+  done
+  if [ -r /proc/meminfo ]; then
+    awk '/MemTotal:/ {total=$2} /MemAvailable:/ {available=$2} END {if (total) printf "CAPACITY_MEMORY\\t%s\\t%s\\n", total, available}' /proc/meminfo
+  fi
+  cores=$(getconf _NPROCESSORS_ONLN 2>/dev/null)
+  if [ -r /proc/loadavg ]; then
+    read load1 load5 load15 rest < /proc/loadavg
+    printf 'CAPACITY_CPU\\t%s\\t%s\\t%s\\t%s\\n' "\${cores:-}" "$load1" "$load5" "$load15"
+  else
+    printf 'CAPACITY_CPU\\t%s\\t\\t\\t\\n' "\${cores:-}"
+  fi
+  exit 0
+fi
 if command -v docker >/dev/null 2>&1; then
   APPALOFT_DOCKER_AVAILABLE=1
   docker ps -aq --filter label=appaloft.managed=true 2>/dev/null | while read -r container_id; do

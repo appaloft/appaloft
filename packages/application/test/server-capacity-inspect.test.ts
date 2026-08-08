@@ -172,6 +172,20 @@ describe("InspectServerCapacityQueryService", () => {
     expect(result.isOk()).toBe(true);
     expect(result._unsafeUnwrap().schemaVersion).toBe("servers.capacity.inspect/v1");
     expect((inspector as StaticCapacityInspector).inputs[0]?.server.id.value).toBe("srv_primary");
+    expect((inspector as StaticCapacityInspector).inputs[0]?.profile).toBe("full");
+  });
+
+  test("[RUNTIME-CAPACITY-INSPECT-001] forwards the bounded placement profile", async () => {
+    const { inspector, service } = createService();
+    const query = InspectServerCapacityQuery.create({
+      serverId: "srv_primary",
+      profile: "placement",
+    })._unsafeUnwrap();
+
+    const result = await service.execute(createExecutionContext({ entrypoint: "system" }), query);
+
+    expect(result.isOk()).toBe(true);
+    expect((inspector as StaticCapacityInspector).inputs[0]?.profile).toBe("placement");
   });
 
   test("returns a structured timeout when target capacity inspection hangs", async () => {
