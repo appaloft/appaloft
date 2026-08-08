@@ -4,6 +4,7 @@ import { join } from "node:path";
 import {
   type ExecutionContext,
   type RuntimeTargetCapacityInspection,
+  type RuntimeTargetCapacityInspectionProfile,
   type RuntimeTargetCapacityInspector,
   type RuntimeTargetCapacityPruneCandidate,
   type RuntimeTargetCapacityPruneResult,
@@ -80,7 +81,7 @@ export function renderRuntimeTargetCapacityScript(input: {
   runtimeRoot: string;
   stateRoot?: string;
   sourceWorkspaceRoot?: string;
-  profile?: "full" | "attribution";
+  profile?: RuntimeTargetCapacityInspectionProfile;
 }): AshScript {
   const runtimeRoot = input.runtimeRoot.replace(/\/+$/, "");
   const stateRoot = input.stateRoot ?? `${runtimeRoot}/state`;
@@ -111,6 +112,22 @@ export function renderRuntimeTargetCapacityScript(input: {
     ${ash.env("APPALOFT_SOURCE_WORKSPACE_ROOT", sourceWorkspaceRoot)}
     ${ash.env("APPALOFT_CAPACITY_PROFILE", profile)}
     printf 'APPALOFT_CAPACITY_V1\n'
+    if [ "$APPALOFT_CAPACITY_PROFILE" = "placement" ]; then
+      for target_path in / /var/lib/docker "$APPALOFT_RUNTIME_ROOT"; do
+        df -P -k "$target_path" 2>/dev/null | awk -v p="$target_path" 'NR==2 {gsub(/%/, "", $5); printf "CAPACITY_DISK\t%s\t%s\t%s\t%s\t%s\t%s\n", p, $6, $2, $3, $4, $5}'
+      done
+      if [ -r /proc/meminfo ]; then
+        awk '/MemTotal:/ {total=$2} /MemAvailable:/ {available=$2} END {if (total) printf "CAPACITY_MEMORY\t%s\t%s\n", total, available}' /proc/meminfo
+      fi
+      cores=$(getconf _NPROCESSORS_ONLN 2>/dev/null)
+      if [ -r /proc/loadavg ]; then
+        read load1 load5 load15 rest < /proc/loadavg
+        printf 'CAPACITY_CPU\t%s\t%s\t%s\t%s\n' "${coresOrEmpty}" "$load1" "$load5" "$load15"
+      else
+        printf 'CAPACITY_CPU\t%s\t\t\t\n' "${coresOrEmpty}"
+      fi
+      exit 0
+    fi
     if command -v docker >/dev/null 2>&1; then
       APPALOFT_DOCKER_AVAILABLE=1
       docker ps -aq --filter label=appaloft.managed=true 2>/dev/null | while read -r container_id; do
@@ -562,6 +579,7 @@ export function parseRuntimeTargetCapacityOutput(input: {
   server: DeploymentTargetState;
   inspectedAt: string;
   timedOut?: boolean;
+  profile?: RuntimeTargetCapacityInspectionProfile;
 }): Result<RuntimeTargetCapacityInspection> {
   if (!input.stdout.includes("APPALOFT_CAPACITY_V1")) {
     return err(
@@ -808,6 +826,19 @@ export function parseRuntimeTargetCapacityOutput(input: {
       warning("partial-diagnostic", "Capacity diagnostic emitted non-fatal stderr output", {
         resource: "appaloft-runtime",
       }),
+    );
+  }
+
+  if (
+    input.profile === "placement" &&
+    (disk.size === 0 || memory.available === null || cpu.logicalCores === null)
+  ) {
+    warnings.push(
+      warning(
+        "partial-diagnostic",
+        "Placement capacity evidence is missing required disk, memory, or CPU values",
+        { resource: "appaloft-runtime" },
+      ),
     );
   }
 
@@ -1101,7 +1132,7 @@ export class RuntimeTargetCapacityInspectorAdapter implements RuntimeTargetCapac
     _context: ExecutionContext,
     input: {
       server: DeploymentTargetState;
-      profile?: "full" | "attribution";
+      profile?: RuntimeTargetCapacityInspectionProfile;
     },
   ): Promise<Result<RuntimeTargetCapacityInspection>> {
     const providerKey = input.server.providerKey.value;
@@ -1132,6 +1163,7 @@ export class RuntimeTargetCapacityInspectorAdapter implements RuntimeTargetCapac
       server: input.server,
       inspectedAt: new Date().toISOString(),
       timedOut: result.timedOut,
+      profile: input.profile ?? "full",
     });
 
     if (parsed.isOk()) {

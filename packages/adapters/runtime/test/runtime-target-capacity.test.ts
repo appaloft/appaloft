@@ -88,20 +88,71 @@ describe("runtime target capacity diagnostics", () => {
       profile: "attribution",
     });
     const rendered = ash.render(script);
+    const attributionStart = rendered.indexOf(
+      'if [ "$APPALOFT_CAPACITY_PROFILE" = "attribution" ]',
+    );
+    const attributionExit = rendered.indexOf("exit 0", attributionStart);
 
     expect(rendered).toMatchSnapshot();
     expect(rendered).toContain("APPALOFT_CAPACITY_PROFILE='attribution'");
     expect(rendered).toContain("CAPACITY_APPALOFT_CONTAINER");
     expect(rendered).toContain("CAPACITY_APPALOFT_WORKSPACE");
     expect(rendered).toContain("exit 0");
-    expect(rendered.indexOf("CAPACITY_APPALOFT_CONTAINER")).toBeLessThan(
-      rendered.indexOf("exit 0"),
+    expect(attributionStart).toBeGreaterThan(0);
+    expect(rendered.indexOf("CAPACITY_APPALOFT_CONTAINER")).toBeLessThan(attributionExit);
+    expect(rendered.indexOf("CAPACITY_APPALOFT_WORKSPACE")).toBeLessThan(attributionExit);
+    expect(attributionExit).toBeLessThan(rendered.indexOf("docker system df"));
+    expect(attributionExit).toBeLessThan(rendered.indexOf("df -P -i"));
+  });
+
+  test("[RUNTIME-CAPACITY-INSPECT-001] renders placement evidence before expensive diagnostics", () => {
+    const rendered = ash.render(
+      renderRuntimeTargetCapacityScript({
+        runtimeRoot: "/var/lib/appaloft/runtime",
+        profile: "placement",
+      }),
     );
-    expect(rendered.indexOf("CAPACITY_APPALOFT_WORKSPACE")).toBeLessThan(
-      rendered.indexOf("exit 0"),
+    const placementExit = rendered.indexOf("exit 0");
+
+    expect(rendered).toContain("APPALOFT_CAPACITY_PROFILE='placement'");
+    expect(rendered).toContain("CAPACITY_DISK");
+    expect(rendered).toContain("CAPACITY_MEMORY");
+    expect(rendered).toContain("CAPACITY_CPU");
+    expect(placementExit).toBeGreaterThan(0);
+    expect(placementExit).toBeLessThan(rendered.indexOf("docker inspect --size"));
+    expect(placementExit).toBeLessThan(rendered.indexOf("du -sk"));
+    expect(placementExit).toBeLessThan(rendered.indexOf("df -P -i"));
+    expect(placementExit).toBeLessThan(rendered.indexOf("docker system df"));
+  });
+
+  test("[RUNTIME-CAPACITY-INSPECT-002] placement evidence is complete only with disk, memory, and CPU", () => {
+    const complete = parseRuntimeTargetCapacityOutput({
+      stdout: [
+        "APPALOFT_CAPACITY_V1",
+        "CAPACITY_DISK\t/\t/\t102400\t51200\t51200\t50",
+        "CAPACITY_MEMORY\t1048576\t524288",
+        "CAPACITY_CPU\t2\t0.10\t0.20\t0.30",
+      ].join("\n"),
+      server: server(),
+      inspectedAt: "2026-01-01T00:00:00.000Z",
+      profile: "placement",
+    })._unsafeUnwrap();
+    const incomplete = parseRuntimeTargetCapacityOutput({
+      stdout: [
+        "APPALOFT_CAPACITY_V1",
+        "CAPACITY_MEMORY\t1048576\t524288",
+        "CAPACITY_CPU\t2\t0.10\t0.20\t0.30",
+      ].join("\n"),
+      server: server(),
+      inspectedAt: "2026-01-01T00:00:00.000Z",
+      profile: "placement",
+    })._unsafeUnwrap();
+
+    expect(complete.partial).toBe(false);
+    expect(incomplete.partial).toBe(true);
+    expect(incomplete.warnings).toContainEqual(
+      expect.objectContaining({ code: "partial-diagnostic" }),
     );
-    expect(rendered.indexOf("exit 0")).toBeLessThan(rendered.indexOf("docker system df"));
-    expect(rendered.indexOf("exit 0")).toBeLessThan(rendered.indexOf("df -P -k"));
   });
 
   test("[RUNTIME-CAPACITY-INSPECT-002] parses disk, inode, Docker, runtime, and warning output", () => {

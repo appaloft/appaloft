@@ -2052,12 +2052,14 @@ export interface RuntimeTargetCapacityInspection {
   partial: boolean;
 }
 
+export type RuntimeTargetCapacityInspectionProfile = "full" | "attribution" | "placement";
+
 export interface RuntimeTargetCapacityInspector {
   inspect(
     context: ExecutionContext,
     input: {
       server: DeploymentTargetState;
-      profile?: "full" | "attribution";
+      profile?: RuntimeTargetCapacityInspectionProfile;
     },
   ): Promise<Result<RuntimeTargetCapacityInspection>>;
 }
