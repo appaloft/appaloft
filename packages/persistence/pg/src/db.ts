@@ -123,6 +123,7 @@ import { githubAgentAutomationMigration } from "./migrations/114_github_agent_au
 import { profileAwareWorkspaceOpenMigration } from "./migrations/115_profile_aware_workspace_open";
 import { githubAgentThreadFeedbackMigration } from "./migrations/116_github_agent_thread_feedback";
 import { domainBindingActiveCertificateMigration } from "./migrations/117_domain_binding_active_certificate";
+import { agentWorkspaceProfileMcpConnectionsMigration } from "./migrations/118_agent_workspace_profile_mcp_connections";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -342,6 +343,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "115_profile_aware_workspace_open": profileAwareWorkspaceOpenMigration,
       "116_github_agent_thread_feedback": githubAgentThreadFeedbackMigration,
       "117_domain_binding_active_certificate": domainBindingActiveCertificateMigration,
+      "118_agent_workspace_profile_mcp_connections": agentWorkspaceProfileMcpConnectionsMigration,
     };
   }
 }

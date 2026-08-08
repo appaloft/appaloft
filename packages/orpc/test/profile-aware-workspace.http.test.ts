@@ -6,6 +6,7 @@ import {
   type Command,
   type CommandBus,
   ConfigureAgentWorkspaceProfileCredentialConnectionsCommand,
+  ConfigureAgentWorkspaceProfileMcpConnectionsCommand,
   ConfigureProjectWorkspaceProfileCommand,
   createExecutionContext,
   type ExecutionContext,
@@ -74,6 +75,9 @@ describe("Profile-aware Workspace HTTP routes", () => {
       status: "enabled",
       installedAt: "2026-07-29T00:00:00.000Z",
       credentialConnections: [{ requirementId: "model-api", connectionReference: "conn_model" }],
+      mcpConnections: [
+        { requirementId: "appaloft-tools", connectionReference: "mcpconn_appaloft" },
+      ],
     };
     const commandBus = {
       execute: async <T>(context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
@@ -86,6 +90,9 @@ describe("Profile-aware Workspace HTTP routes", () => {
           } as T);
         }
         if (command instanceof ConfigureAgentWorkspaceProfileCredentialConnectionsCommand) {
+          return ok(profile as T);
+        }
+        if (command instanceof ConfigureAgentWorkspaceProfileMcpConnectionsCommand) {
           return ok(profile as T);
         }
         return ok({ accepted: true } as T);
@@ -142,6 +149,15 @@ describe("Profile-aware Workspace HTTP routes", () => {
           connections: [{ requirementId: "model-api", connectionReference: "conn_model" }],
         }),
       }),
+      request("/api/agent-workspace-profiles/awpi_default/mcp-connections", {
+        method: "POST",
+        body: JSON.stringify({
+          installationId: "awpi_default",
+          connections: [
+            { requirementId: "appaloft-tools", connectionReference: "mcpconn_appaloft" },
+          ],
+        }),
+      }),
       request("/api/repository-bindings", {
         method: "POST",
         body: JSON.stringify({
@@ -158,7 +174,9 @@ describe("Profile-aware Workspace HTTP routes", () => {
     ];
     const responses = await Promise.all(calls.map((call) => app.handle(call)));
 
-    expect(responses.map((response) => response.status)).toEqual([202, 200, 200, 200, 200, 200]);
+    expect(responses.map((response) => response.status)).toEqual([
+      202, 200, 200, 200, 200, 200, 200,
+    ]);
     expect(commands.some((command) => command instanceof OpenAgentWorkspaceCommand)).toBe(true);
     expect(
       commands.some((command) => command instanceof ConfigureProjectWorkspaceProfileCommand),
@@ -166,6 +184,11 @@ describe("Profile-aware Workspace HTTP routes", () => {
     expect(
       commands.some(
         (command) => command instanceof ConfigureAgentWorkspaceProfileCredentialConnectionsCommand,
+      ),
+    ).toBe(true);
+    expect(
+      commands.some(
+        (command) => command instanceof ConfigureAgentWorkspaceProfileMcpConnectionsCommand,
       ),
     ).toBe(true);
     expect(commands.some((command) => command instanceof BindProjectRepositoryCommand)).toBe(true);

@@ -11,6 +11,7 @@ appaloft.agentAdapters.uninstall -> agent-adapters.uninstall DELETE /agent-adapt
 appaloft.agentAdapters.validate -> agent-adapters.validate POST /agent-adapters/validate
 appaloft.agentWorkspaceProfiles.compile -> agent-workspace-profiles.compile POST /agent-workspace-profiles/{installationId}/compile
 appaloft.agentWorkspaceProfiles.configureCredentialConnections -> agent-workspace-profiles.configure-credential-connections POST /agent-workspace-profiles/{installationId}/credential-connections
+appaloft.agentWorkspaceProfiles.configureMcpConnections -> agent-workspace-profiles.configure-mcp-connections POST /agent-workspace-profiles/{installationId}/mcp-connections
 appaloft.agentWorkspaceProfiles.disable -> agent-workspace-profiles.disable POST /agent-workspace-profiles/{installationId}/disable
 appaloft.agentWorkspaceProfiles.install -> agent-workspace-profiles.install POST /agent-workspace-profiles
 appaloft.agentWorkspaceProfiles.list -> agent-workspace-profiles.list GET /agent-workspace-profiles

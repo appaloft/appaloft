@@ -16,6 +16,7 @@ import {
 } from "./agent-workspace-open";
 import {
   type AgentWorkspaceCredentialBinding,
+  type AgentWorkspaceMcpBinding,
   type AgentWorkspaceProfileInstallationService,
   type AgentWorkspaceProfileRegistryRepository,
 } from "./agent-workspace-profile";
@@ -31,6 +32,17 @@ export interface WorkspaceOpenCredentialAdmissionPort {
       readonly profileInstallationId: string;
       readonly bindings: readonly AgentWorkspaceCredentialBinding[];
       readonly scope?: NonNullable<WorkspaceOpenOptions["credentialAdmissionScope"]>;
+    },
+  ): Promise<Result<void>>;
+}
+
+export interface WorkspaceOpenMcpAdmissionPort {
+  admit(
+    context: ExecutionContext,
+    input: {
+      readonly projectId: string;
+      readonly profileInstallationId: string;
+      readonly bindings: readonly AgentWorkspaceMcpBinding[];
     },
   ): Promise<Result<void>>;
 }
@@ -63,6 +75,21 @@ export class FailClosedWorkspaceOpenCredentialAdmission
       domainError.conflict("Credential Connection custody admission is unavailable", {
         code: "workspace_open_credential_admission_unavailable",
         guidance: "Connect the required Credential and retry workspace open.",
+      }),
+    );
+  }
+}
+
+export class FailClosedWorkspaceOpenMcpAdmission implements WorkspaceOpenMcpAdmissionPort {
+  async admit(
+    _context: ExecutionContext,
+    input: { bindings: readonly AgentWorkspaceMcpBinding[] },
+  ): Promise<Result<void>> {
+    if (input.bindings.length === 0) return ok(undefined);
+    return err(
+      domainError.conflict("Remote MCP Connection admission is unavailable", {
+        code: "workspace_open_mcp_admission_unavailable",
+        guidance: "Enable and bind the required Remote MCP Connection, then retry workspace open.",
       }),
     );
   }
@@ -117,6 +144,7 @@ export class AgentWorkspaceOpenPreflightService {
         "compileForNewWorkspace"
       >;
       readonly credentialAdmission: WorkspaceOpenCredentialAdmissionPort;
+      readonly mcpAdmission: WorkspaceOpenMcpAdmissionPort;
       readonly placement: WorkspaceOpenPlacementPort;
     },
   ) {}
@@ -236,6 +264,12 @@ export class AgentWorkspaceOpenPreflightService {
       ...(options.credentialAdmissionScope ? { scope: options.credentialAdmissionScope } : {}),
     });
     if (admitted.isErr()) return err(admitted.error);
+    const mcpAdmitted = await this.dependencies.mcpAdmission.admit(context, {
+      projectId: resolved.projectId,
+      profileInstallationId: resolved.profileInstallationId,
+      bindings: plan.value.mcpBindings ?? [],
+    });
+    if (mcpAdmitted.isErr()) return err(mcpAdmitted.error);
     const reservation = await this.dependencies.placement.reserve(context, {
       projectId: resolved.projectId,
       profileInstallationId: resolved.profileInstallationId,

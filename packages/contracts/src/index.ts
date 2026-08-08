@@ -19,6 +19,8 @@ export interface AgentAdapterInstallationResponse {
   compatibility: AgentAdapterCompatibilityResponse;
   installedAt: string;
   updatedAt?: string;
+  credentialConnections: AgentWorkspaceCredentialReference[];
+  mcpConnections: AgentWorkspaceMcpReference[];
 }
 
 export interface ValidateAgentAdapterResponse {
@@ -117,6 +119,9 @@ export interface CompileAgentWorkspaceProfileResponse {
     cwd?: string;
   }>;
   credentialRequirements: unknown[];
+  credentialBindings?: unknown[];
+  mcpRequirements: unknown[];
+  mcpBindings?: unknown[];
   pin: {
     profileInstallationId: string;
     profileDefinitionDigest: string;
@@ -141,6 +146,11 @@ export interface UninstallAgentWorkspaceProfileResponse {
 }
 
 export interface AgentWorkspaceCredentialReference {
+  requirementId: string;
+  connectionReference: string;
+}
+
+export interface AgentWorkspaceMcpReference {
   requirementId: string;
   connectionReference: string;
 }

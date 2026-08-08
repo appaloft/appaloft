@@ -575,12 +575,15 @@ describe("OpenCodeSandboxAgentHarness", () => {
         new TextDecoder().decode(files.get(".appaloft-agent/sar_open/opencode-process-id")),
       ),
     ).toEqual({
-      schemaVersion: "opencode-server-marker/v2",
+      schemaVersion: "opencode-server-marker/v3",
       processId: "spr_server",
       capabilityId: "smc_opencode_runtime",
       expiresAt: "2099-01-01T00:00:00.000Z",
       provider: "appaloft",
       model: "coding-model",
+      mcpBindingDigest:
+        "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      mcpCapabilities: [],
     });
   });
 
@@ -1163,5 +1166,83 @@ describe("OpenCodeSandboxAgentHarness", () => {
       { runId: "srun_cancel", capabilityId: "smc_opencode" },
       { runId: "sar_open", capabilityId: "smc_opencode" },
     ]);
+  });
+
+  test("[MCP-ACCESS-REVOKE-007] runtime termination attempts every revoke after process failure", async () => {
+    const cleanup: string[] = [];
+    const marker = new TextEncoder().encode(
+      JSON.stringify({
+        schemaVersion: "opencode-server-marker/v3",
+        processId: "spr_server",
+        capabilityId: "smc_server",
+        expiresAt: "2099-01-01T00:00:00.000Z",
+        provider: "appaloft",
+        model: "coding-model",
+        mcpBindingDigest: `sha256:${"a".repeat(64)}`,
+        mcpCapabilities: [
+          { capabilityId: "mcp_cap_server", expiresAt: "2099-01-01T00:00:00.000Z" },
+        ],
+      }),
+    );
+    const execution: OpenCodeSandboxExecutionPort = {
+      async exec() {
+        return ok({ mode: "foreground", frames: [] });
+      },
+      async listProcesses() {
+        return ok([]);
+      },
+      async terminateProcess() {
+        cleanup.push("process");
+        return err({
+          code: "sandbox_process_terminate_failed",
+          category: "system",
+          message: "terminate failed",
+          retryable: true,
+          details: {},
+        });
+      },
+      async readFile() {
+        return ok(marker);
+      },
+      async writeFile() {
+        return ok({ path: "unused", sizeBytes: 0 });
+      },
+      async removeFile() {
+        cleanup.push("marker");
+        return ok(undefined);
+      },
+    };
+    const harness = new OpenCodeSandboxAgentHarness(execution, {
+      templateId: "aht_opencode_managed_v1",
+      sandboxTemplateId: "stp_opencode_pinned",
+      version: "1.1.60",
+      templateDigest: `sha256:${"b".repeat(64)}`,
+      modelAccess: {
+        ...modelAccess,
+        async revoke() {
+          cleanup.push("model");
+        },
+      },
+      mcpAccess: {
+        async issue() {
+          throw new Error("not used");
+        },
+        async revoke() {
+          cleanup.push("mcp");
+        },
+        async revokeScope() {
+          cleanup.push("scope");
+        },
+      },
+    });
+
+    await expect(
+      harness.terminateRuntime?.({
+        executionContext: context,
+        sandboxId: "sbx_open",
+        runtimeId: "sar_open",
+      }),
+    ).rejects.toThrow("terminate failed");
+    expect(cleanup).toEqual(["process", "model", "mcp", "scope", "marker"]);
   });
 });

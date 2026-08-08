@@ -1021,6 +1021,7 @@ Workspace pin; it does not create a second Workspace aggregate.
 | `agent-workspace-profiles.install` | Command | `InstallAgentWorkspaceProfileCommand` | Declarative Profile manifest | `appaloft agent-workspace-profile install <manifest>` | `POST /api/agent-workspace-profiles` |
 | `agent-workspace-profiles.list` | Query | `ListAgentWorkspaceProfilesQuery` | Optional bounded limit | `appaloft agent-workspace-profile list` | `GET /api/agent-workspace-profiles` |
 | `agent-workspace-profiles.show` | Query | `ShowAgentWorkspaceProfileQuery` | Installation id | `appaloft agent-workspace-profile show <installationId>` | `GET /api/agent-workspace-profiles/{installationId}` |
+| `agent-workspace-profiles.configure-mcp-connections` | Command | `ConfigureAgentWorkspaceProfileMcpConnectionsCommand` | Installation id and opaque requirement-to-Connection references | `appaloft agent-workspace-profile mcp-connection set <installationId>` | `POST /api/agent-workspace-profiles/{installationId}/mcp-connections` |
 | `agent-workspace-profiles.compile` | Query | `CompileAgentWorkspaceProfileQuery` | Installation id and optional named credential references | `appaloft agent-workspace-profile compile <installationId> [--credential-reference requirement=secret://ref]` | `POST /api/agent-workspace-profiles/{installationId}/compile` |
 | `agent-workspace-profiles.disable` | Command | `DisableAgentWorkspaceProfileCommand` | Installation id | `appaloft agent-workspace-profile disable <installationId>` | `POST /api/agent-workspace-profiles/{installationId}/disable` |
 | `agent-workspace-profiles.uninstall` | Command | `UninstallAgentWorkspaceProfileCommand` | Installation id | `appaloft agent-workspace-profile uninstall <installationId>` | `DELETE /api/agent-workspace-profiles/{installationId}` |
@@ -1135,6 +1136,7 @@ Supporting configuration operations are:
 | Unbind Repository | Command | `repository-bindings.unbind` | `UnbindRepositoryCommand` |
 | Configure Project default Workspace Profile | Command | `projects.configure-workspace-profile` | `ConfigureProjectWorkspaceProfileCommand` |
 | Configure Profile Credential Connections | Command | `agent-workspace-profiles.configure-credential-connections` | `ConfigureAgentWorkspaceProfileCredentialConnectionsCommand` |
+| Configure Profile MCP Connections | Command | `agent-workspace-profiles.configure-mcp-connections` | `ConfigureAgentWorkspaceProfileMcpConnectionsCommand` |
 
 The convenience `workspaceId` is the Sandbox id. Pi and OpenCode remain Adapter keys and do not
 create provider-specific operation names. See

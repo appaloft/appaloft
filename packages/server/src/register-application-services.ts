@@ -12,6 +12,7 @@ import {
   agentAdapterHostCapabilities,
   compileAgentWorkspaceProfile,
   resolveAgentAdapterCredentialBindings,
+  resolveAgentAdapterMcpBindings,
   validateAgentAdapterManifest,
   validateAgentWorkspaceProfile,
 } from "@appaloft/agent-adapter-sdk";
@@ -275,6 +276,7 @@ import {
   ExportGlobalAuditEventsQueryHandler,
   ExportGlobalAuditEventsQueryService,
   FailClosedWorkspaceOpenCredentialAdmission,
+  FailClosedWorkspaceOpenMcpAdmission,
   ForceRedeployDeploymentCommandHandler,
   ForceRedeployDeploymentUseCase,
   GenericSignedSourceEventVerifier,
@@ -717,6 +719,7 @@ import {
   WorkspaceCollaborationService,
   type WorkspaceOpenCredentialAdmissionPort,
   type WorkspaceOpenEntryRepository,
+  type WorkspaceOpenMcpAdmissionPort,
   type WorkspaceOpenPlacementPort,
   type WorkspaceOpenSourceCredentialProviderPort,
 } from "@appaloft/application";
@@ -3691,6 +3694,22 @@ export function registerApplicationServices(
                 })),
               };
             }
+            const mcpBindings = input.mcpReferences
+              ? resolveAgentAdapterMcpBindings(
+                  input.adapterInstallation.definition.manifest,
+                  input.mcpReferences,
+                )
+              : undefined;
+            if (mcpBindings && !mcpBindings.ok) {
+              return {
+                ok: false,
+                issues: mcpBindings.issues.map((issue) => ({
+                  code: issue.code,
+                  path: issue.path ?? [],
+                  message: issue.message,
+                })),
+              };
+            }
             return {
               ok: true,
               plan: {
@@ -3700,6 +3719,14 @@ export function registerApplicationServices(
                       credentialBindings: bindings.bindings.map((binding) => ({
                         ...binding,
                         delivery: { ...binding.delivery },
+                      })),
+                    }
+                  : {}),
+                ...(mcpBindings?.ok
+                  ? {
+                      mcpBindings: mcpBindings.bindings.map((binding) => ({
+                        ...binding,
+                        requestedTools: [...binding.requestedTools],
                       })),
                     }
                   : {}),
@@ -3853,6 +3880,11 @@ export function registerApplicationServices(
       useValue: new FailClosedWorkspaceOpenCredentialAdmission(),
     });
   }
+  if (!container.isRegistered(tokens.workspaceOpenMcpAdmission, true)) {
+    container.register(tokens.workspaceOpenMcpAdmission, {
+      useValue: new FailClosedWorkspaceOpenMcpAdmission(),
+    });
+  }
   if (!container.isRegistered(tokens.workspaceOpenPlacement, true)) {
     container.register(tokens.workspaceOpenPlacement, {
       useValue: new InMemoryWorkspaceOpenPlacementPort(),
@@ -3890,6 +3922,9 @@ export function registerApplicationServices(
         ),
         credentialAdmission: dependencyContainer.resolve<WorkspaceOpenCredentialAdmissionPort>(
           tokens.workspaceOpenCredentialAdmission,
+        ),
+        mcpAdmission: dependencyContainer.resolve<WorkspaceOpenMcpAdmissionPort>(
+          tokens.workspaceOpenMcpAdmission,
         ),
         placement: dependencyContainer.resolve<WorkspaceOpenPlacementPort>(
           tokens.workspaceOpenPlacement,

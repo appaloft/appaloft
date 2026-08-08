@@ -20,6 +20,7 @@ const sandboxTemplateIdentifierPattern = /^[a-z][a-z0-9_-]{0,127}$/;
 const digestPattern = /^sha256:[a-f0-9]{64}$/;
 const environmentVariablePattern = /^[A-Z_][A-Z0-9_]{0,127}$/;
 const connectionReferencePattern = /^[A-Za-z][A-Za-z0-9_.:-]{0,159}$/;
+const mcpToolNamePattern = /^[A-Za-z][A-Za-z0-9_.:/-]{0,127}$/;
 const safeHttpPathPattern = /^\/(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[^?#]*$/;
 const domainNamePattern =
   /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
@@ -199,6 +200,30 @@ export const agentAdapterCredentialReferenceSchema = z
   })
   .strict();
 
+const mcpRequirementSchema = z
+  .object({
+    id: identifierSchema,
+    required: z.boolean().default(true),
+    purpose: nonEmptyTextSchema,
+    requestedTools: z.array(z.string().trim().regex(mcpToolNamePattern)).max(128).default([]),
+  })
+  .strict()
+  .superRefine((requirement, context) => {
+    addDuplicateIssues(
+      requirement.requestedTools,
+      ["requestedTools"],
+      "requested MCP tool names",
+      context,
+    );
+  });
+
+export const agentAdapterMcpReferenceSchema = z
+  .object({
+    requirementId: identifierSchema,
+    connectionReference: z.string().trim().regex(connectionReferencePattern),
+  })
+  .strict();
+
 const healthcheckSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("process") }).strict(),
   z
@@ -260,6 +285,7 @@ export const agentAdapterManifestSchema = z
     persistentPaths: z.array(persistentPathSchema).max(64).default([]),
     healthcheck: healthcheckSchema.optional(),
     credentials: z.array(credentialRequirementSchema).max(32).default([]),
+    mcpServers: z.array(mcpRequirementSchema).max(32).default([]),
   })
   .strict()
   .superRefine((manifest, context) => {
@@ -279,6 +305,12 @@ export const agentAdapterManifestSchema = z
       manifest.credentials.map((credential) => credential.id),
       ["credentials"],
       "credential requirement ids",
+      context,
+    );
+    addDuplicateIssues(
+      manifest.mcpServers.map((requirement) => requirement.id),
+      ["mcpServers"],
+      "MCP requirement ids",
       context,
     );
     addDuplicateIssues(manifest.persistentPaths, ["persistentPaths"], "persistent paths", context);
@@ -545,6 +577,7 @@ export const agentWorkspaceProfileSchema = z
 export type AgentAdapterManifest = z.infer<typeof agentAdapterManifestSchema>;
 export type AgentAdapterHostCapability = (typeof agentAdapterHostCapabilities)[number];
 export type AgentAdapterCredentialReference = z.infer<typeof agentAdapterCredentialReferenceSchema>;
+export type AgentAdapterMcpReference = z.infer<typeof agentAdapterMcpReferenceSchema>;
 export interface ResolvedAgentAdapterCredentialBinding {
   requirementId: string;
   kind: AgentAdapterManifest["credentials"][number]["kind"];
@@ -577,6 +610,32 @@ export type AgentAdapterCredentialBindingResult =
       ok: false;
       issues: AgentAdapterCredentialBindingIssue[];
     };
+
+export interface ResolvedAgentAdapterMcpBinding {
+  requirementId: string;
+  connectionReference: string;
+  purpose: string;
+  required: boolean;
+  requestedTools: string[];
+}
+
+export type AgentAdapterMcpBindingIssueCode =
+  | "invalid_adapter_manifest"
+  | "invalid_mcp_binding"
+  | "unknown_mcp_requirement"
+  | "duplicate_mcp_binding"
+  | "missing_required_mcp_connection";
+
+export interface AgentAdapterMcpBindingIssue {
+  code: AgentAdapterMcpBindingIssueCode;
+  message: string;
+  path?: (string | number)[];
+  requirementId?: string;
+}
+
+export type AgentAdapterMcpBindingResult =
+  | { ok: true; bindings: ResolvedAgentAdapterMcpBinding[] }
+  | { ok: false; issues: AgentAdapterMcpBindingIssue[] };
 
 export interface AgentAdapterCompatibilityEnvironment {
   adapterApiVersion?: string;
@@ -744,6 +803,7 @@ export interface CompiledAgentWorkspaceProfilePlan {
     cwd?: string;
   }[];
   credentialRequirements: AgentAdapterManifest["credentials"];
+  mcpRequirements: AgentAdapterManifest["mcpServers"];
   pin: {
     profileInstallationId: string;
     profileDefinitionDigest: string;
@@ -1200,6 +1260,10 @@ export function compileAgentWorkspaceProfile(
         ...requirement,
         delivery: { ...requirement.delivery },
       })),
+      mcpRequirements: adapter.manifest.mcpServers.map((requirement) => ({
+        ...requirement,
+        requestedTools: [...requirement.requestedTools],
+      })),
       pin: {
         profileInstallationId: environment.profileInstallationId,
         profileDefinitionDigest: profileValidation.definition.digest,
@@ -1309,6 +1373,90 @@ export function resolveAgentAdapterCredentialBindings(
     });
   }
   return issues.length > 0 ? { ok: false, issues } : { ok: true, bindings };
+}
+
+export function resolveAgentAdapterMcpBindings(
+  manifestInput: unknown,
+  referencesInput: unknown,
+): AgentAdapterMcpBindingResult {
+  const manifest = agentAdapterManifestSchema.safeParse(manifestInput);
+  if (!manifest.success) {
+    return {
+      ok: false,
+      issues: manifest.error.issues.map((issue) => ({
+        code: "invalid_adapter_manifest",
+        message: issue.message,
+        path: issue.path.filter(
+          (part): part is string | number => typeof part === "string" || typeof part === "number",
+        ),
+      })),
+    };
+  }
+  const references = z.array(agentAdapterMcpReferenceSchema).max(32).safeParse(referencesInput);
+  if (!references.success) {
+    return {
+      ok: false,
+      issues: references.error.issues.map((issue) => ({
+        code: "invalid_mcp_binding",
+        message: issue.message,
+        path: issue.path.filter(
+          (part): part is string | number => typeof part === "string" || typeof part === "number",
+        ),
+      })),
+    };
+  }
+
+  const requirements = new Map(
+    manifest.data.mcpServers.map((requirement) => [requirement.id, requirement] as const),
+  );
+  const referencesByRequirement = new Map<string, AgentAdapterMcpReference>();
+  const issues: AgentAdapterMcpBindingIssue[] = [];
+  for (const reference of references.data) {
+    if (!requirements.has(reference.requirementId)) {
+      issues.push({
+        code: "unknown_mcp_requirement",
+        message: `MCP requirement ${reference.requirementId} is not declared by the Adapter`,
+        requirementId: reference.requirementId,
+      });
+      continue;
+    }
+    if (referencesByRequirement.has(reference.requirementId)) {
+      issues.push({
+        code: "duplicate_mcp_binding",
+        message: `MCP requirement ${reference.requirementId} is bound more than once`,
+        requirementId: reference.requirementId,
+      });
+      continue;
+    }
+    referencesByRequirement.set(reference.requirementId, reference);
+  }
+  for (const requirement of manifest.data.mcpServers) {
+    if (requirement.required && !referencesByRequirement.has(requirement.id)) {
+      issues.push({
+        code: "missing_required_mcp_connection",
+        message: `MCP requirement ${requirement.id} requires a Connection reference`,
+        requirementId: requirement.id,
+      });
+    }
+  }
+  if (issues.length > 0) return { ok: false, issues };
+  return {
+    ok: true,
+    bindings: manifest.data.mcpServers.flatMap((requirement) => {
+      const reference = referencesByRequirement.get(requirement.id);
+      return reference
+        ? [
+            {
+              requirementId: requirement.id,
+              connectionReference: reference.connectionReference,
+              purpose: requirement.purpose,
+              required: requirement.required,
+              requestedTools: [...requirement.requestedTools],
+            },
+          ]
+        : [];
+    }),
+  };
 }
 
 function addDuplicateIssues(

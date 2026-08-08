@@ -59,6 +59,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft agent-workspace-profile show <installationId>` - `agent-workspace-profiles.show`
 - `appaloft agent-workspace-profile compile <installationId>` - `agent-workspace-profiles.compile`
 - `appaloft agent-workspace-profile credential-connection set <installationId>` - `agent-workspace-profiles.configure-credential-connections`
+- `appaloft agent-workspace-profile mcp-connection set <installationId>` - `agent-workspace-profiles.configure-mcp-connections`
 - `appaloft agent-workspace-profile disable <installationId>` - `agent-workspace-profiles.disable`
 - `appaloft agent-workspace-profile uninstall <installationId>` - `agent-workspace-profiles.uninstall`
 - `appaloft project configure-workspace-profile <projectId>` - `projects.configure-workspace-profile`

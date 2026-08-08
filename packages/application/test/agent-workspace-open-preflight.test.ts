@@ -31,6 +31,7 @@ import {
   type ProjectRepository,
   toRepositoryContext,
   type WorkspaceOpenCredentialAdmissionPort,
+  type WorkspaceOpenMcpAdmissionPort,
   type WorkspaceOpenPlacementPort,
 } from "../src";
 
@@ -118,7 +119,11 @@ const plan = {
 };
 
 async function fixture(
-  options: { admission?: WorkspaceOpenCredentialAdmissionPort; staleProfile?: boolean } = {},
+  options: {
+    admission?: WorkspaceOpenCredentialAdmissionPort;
+    mcpAdmission?: WorkspaceOpenMcpAdmissionPort;
+    staleProfile?: boolean;
+  } = {},
 ) {
   const profiles = new InMemoryAgentWorkspaceProfileRegistryRepository();
   const definitionDigest = `sha256:${"1".repeat(64)}`;
@@ -211,6 +216,11 @@ async function fixture(
           return ok(undefined);
         },
       } satisfies WorkspaceOpenCredentialAdmissionPort),
+    mcpAdmission:
+      options.mcpAdmission ??
+      ({
+        admit: async () => ok(undefined),
+      } satisfies WorkspaceOpenMcpAdmissionPort),
     placement,
   });
   return {
@@ -262,6 +272,39 @@ describe("Agent Workspace open preflight", () => {
       profile: "awpi_default",
     });
     expect(result.isErr()).toBe(true);
+    expect(reserved).toEqual([]);
+  });
+
+  test("[MCP-ACCESS-BIND-003] rejects unavailable MCP bindings before placement or Sandbox effects", async () => {
+    const { reserved, service } = await fixture({
+      mcpAdmission: {
+        admit: async () =>
+          err(
+            domainError.conflict("Remote MCP Connection is unavailable", {
+              code: "workspace_open_mcp_connection_unavailable",
+            }),
+          ),
+      },
+    });
+    const resolved = await service.resolveContext(context, input);
+    const result = await service.admit(context, resolved._unsafeUnwrap(), {
+      precompiledProfilePlan: {
+        ...plan,
+        mcpBindings: [
+          {
+            requirementId: "docs",
+            connectionReference: "mcpconn_docs",
+            required: true,
+            purpose: "Documentation",
+            requestedTools: ["docs.search"],
+          },
+        ],
+      },
+    });
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().details?.code).toBe(
+      "workspace_open_mcp_connection_unavailable",
+    );
     expect(reserved).toEqual([]);
   });
 

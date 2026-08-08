@@ -244,6 +244,24 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "agent-workspace-profiles.configure-mcp-connections",
+    operationGroup: "agent-workspace-profiles",
+    operationMethod: "configureMcpConnections",
+    facadePath: ["agentWorkspaceProfiles", "configureMcpConnections"],
+    operationId: "agentWorkspaceProfiles.configureMcpConnections",
+    kind: "command",
+    domain: "agent-workspace-profiles",
+    messageName: "ConfigureAgentWorkspaceProfileMcpConnectionsCommand",
+    route: {
+      method: "POST",
+      path: "/agent-workspace-profiles/{installationId}/mcp-connections",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "agent-workspace-profiles.disable",
     operationGroup: "agent-workspace-profiles",
     operationMethod: "disable",
@@ -7892,6 +7910,7 @@ export interface GeneratedAppaloftClient {
   readonly agentWorkspaceProfiles: {
     readonly compile: AppaloftSdkFacadeMethod;
     readonly configureCredentialConnections: AppaloftSdkFacadeMethod;
+    readonly configureMcpConnections: AppaloftSdkFacadeMethod;
     readonly disable: AppaloftSdkFacadeMethod;
     readonly install: AppaloftSdkFacadeMethod;
     readonly list: AppaloftSdkFacadeMethod;

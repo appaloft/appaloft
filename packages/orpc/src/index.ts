@@ -75,6 +75,7 @@ import {
   CompileAgentWorkspaceProfileQuery,
   CompleteConnectionCallbackCommand,
   ConfigureAgentWorkspaceProfileCredentialConnectionsCommand,
+  ConfigureAgentWorkspaceProfileMcpConnectionsCommand,
   ConfigureAuditEventLegalHoldCommand,
   ConfigureDefaultAccessDomainPolicyCommand,
   ConfigureDependencyResourceBackupPolicyCommand,
@@ -159,6 +160,8 @@ import {
   completeConnectionCallbackCommandInputSchema,
   configureAgentWorkspaceProfileCredentialConnectionsInputSchema,
   configureAgentWorkspaceProfileCredentialConnectionsResponseSchema,
+  configureAgentWorkspaceProfileMcpConnectionsInputSchema,
+  configureAgentWorkspaceProfileMcpConnectionsResponseSchema,
   configureAuditEventLegalHoldCommandInputSchema,
   configureDefaultAccessDomainPolicyCommandInputSchema,
   configureDependencyResourceBackupPolicyCommandInputSchema,
@@ -8222,6 +8225,17 @@ export const configureAgentWorkspaceProfileCredentialConnectionsProcedure = base
       ConfigureAgentWorkspaceProfileCredentialConnectionsCommand.create(input),
     ),
   );
+export const configureAgentWorkspaceProfileMcpConnectionsProcedure = base
+  .route({
+    method: "POST",
+    path: "/agent-workspace-profiles/{installationId}/mcp-connections",
+    successStatus: 200,
+  })
+  .input(configureAgentWorkspaceProfileMcpConnectionsInputSchema)
+  .output(configureAgentWorkspaceProfileMcpConnectionsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureAgentWorkspaceProfileMcpConnectionsCommand.create(input)),
+  );
 export const disableAgentWorkspaceProfileProcedure = base
   .route({
     method: "POST",
@@ -8748,6 +8762,7 @@ export const appaloftOrpcRouter = {
     show: showAgentWorkspaceProfileProcedure,
     compile: compileAgentWorkspaceProfileProcedure,
     configureCredentialConnections: configureAgentWorkspaceProfileCredentialConnectionsProcedure,
+    configureMcpConnections: configureAgentWorkspaceProfileMcpConnectionsProcedure,
     disable: disableAgentWorkspaceProfileProcedure,
     uninstall: uninstallAgentWorkspaceProfileProcedure,
   },
@@ -11787,6 +11802,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/agent-workspace-profiles/:installationId",
     "/api/agent-workspace-profiles/:installationId/compile",
     "/api/agent-workspace-profiles/:installationId/credential-connections",
+    "/api/agent-workspace-profiles/:installationId/mcp-connections",
     "/api/agent-workspace-profiles/:installationId/disable",
     "/api/workspace-collaborations",
     "/api/workspace-collaborations/:collaborationId",
