@@ -50,6 +50,8 @@
 - [x] Track the authenticated Workspace source Ash execution boundary under public issue
   [#918](https://github.com/appaloft/appaloft/issues/918) and PR
   [#919](https://github.com/appaloft/appaloft/pull/919).
+- [x] Track explicit Profile resume across coexisting Pi/OpenCode Workspaces under public issue
+  [#1005](https://github.com/appaloft/appaloft/issues/1005).
 - [x] Link public PR
   [#919](https://github.com/appaloft/appaloft/pull/919) final merged commit
   `4a30316e139e2d1a13e2b0f0f9be93b2cedc977b`.
@@ -69,6 +71,8 @@
 - [x] Implement capability-driven auto attach and managed-terminal session reuse.
 - [x] Route SDK and Console creation through the same workflow.
 - [x] Implement PG/PGlite persistence and migrations.
+- [x] Resolve an explicit Profile selector to its latest non-terminal Workspace without changing
+  the global preferred Workspace or `--new` semantics.
 - [x] Implement generated operation, HTTP/oRPC, SDK, CLI, and remote-dispatch surfaces.
 - [x] Preserve the exact scoped server port from native-attach Adapter manifests in compiled
   declarative Harness descriptors.

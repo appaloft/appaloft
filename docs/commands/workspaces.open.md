@@ -28,7 +28,9 @@ Before Sandbox effects it resolves, in order:
 
 The workflow then coordinates tenant + subject + Project + Repository Identity + branch. A
 matching preferred Workspace is resumed/reconnected; `forceNew` creates a distinct Sandbox and
-advances the preference. Source mismatch fails and requires a new Workspace.
+advances the preference. An explicit Profile selector resumes the latest non-terminal Workspace
+pinned to that resolved Profile within the same coordinates, while an omitted selector uses the
+global preference. Source mismatch fails and requires a new Workspace.
 
 ```ts
 type OpenAgentWorkspaceCommandInput = {

@@ -98,6 +98,9 @@ export interface WorkspaceOpenEntryRepository {
   findPreferred(
     context: ExecutionContext,
     key: WorkspaceOpenKey,
+    selection?: {
+      readonly profileInstallationId?: string;
+    },
   ): Promise<WorkspaceOpenEntry | undefined>;
   begin(
     context: ExecutionContext,
@@ -419,7 +422,13 @@ export class AgentWorkspaceOpenService {
 
     const preferred = input.forceNew
       ? undefined
-      : await this.dependencies.entries.findPreferred(context, key);
+      : await this.dependencies.entries.findPreferred(
+          context,
+          key,
+          input.profile
+            ? { profileInstallationId: resolved.value.profileInstallationId }
+            : undefined,
+        );
     if (preferred && preferred.status !== "terminal") {
       if (preferred.commitSha !== input.commitSha) {
         return err(

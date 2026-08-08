@@ -42,7 +42,7 @@ function context(tenantId: string) {
 }
 
 describe("Profile-aware Workspace open persistence", () => {
-  test("[WS-OPEN-BIND-005][WS-OPEN-RESUME-011][WS-OPEN-NEW-012][WS-OPEN-CLEANUP-020] stores tenant bindings and one preferred Workspace generation", async () => {
+  test("[WS-OPEN-BIND-005][WS-OPEN-RESUME-011][WS-OPEN-NEW-012][WS-OPEN-CLEANUP-020][WS-OPEN-PROFILE-021] stores tenant bindings and one preferred Workspace generation", async () => {
     const directory = mkdtempSync(join(tmpdir(), "appaloft-workspace-open-pg-"));
     directories.push(directory);
     const database = await createDatabase({
@@ -131,7 +131,7 @@ describe("Profile-aware Workspace open persistence", () => {
         (
           await entries.begin(tenantA, key, {
             commitSha: "b".repeat(40),
-            profileInstallationId: "awpi_default",
+            profileInstallationId: "awpi_opencode",
             forceNew: true,
           })
         )._unsafeUnwrap(),
@@ -146,6 +146,28 @@ describe("Profile-aware Workspace open persistence", () => {
         workspaceId: "sbx_second",
         runtimeId: "sar_second",
       });
+      expect(
+        await entries.findPreferred(tenantA, key, {
+          profileInstallationId: "awpi_default",
+        }),
+      ).toMatchObject({
+        workspaceId: "sbx_first",
+        runtimeId: "sar_first",
+      });
+      expect(
+        await entries.findPreferred(tenantA, key, {
+          profileInstallationId: "awpi_missing",
+        }),
+      ).toBeUndefined();
+      expect(
+        await entries.findPreferred(
+          tenantB,
+          { ...key, tenantId: "tenant_b" },
+          {
+            profileInstallationId: "awpi_default",
+          },
+        ),
+      ).toBeUndefined();
       expect(
         (await entries.markWorkspaceTerminated(tenantB, "sbx_second"))._unsafeUnwrap(),
       ).toEqual({ advanced: false });

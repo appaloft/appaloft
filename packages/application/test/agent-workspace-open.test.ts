@@ -19,7 +19,7 @@ const input = {
 };
 
 describe("Agent Workspace open application workflow", () => {
-  test("[WS-OPEN-CRED-007][WS-OPEN-ADMIT-008][WS-OPEN-CREATE-010][WS-OPEN-RESUME-011][WS-OPEN-SHA-013][WS-OPEN-PARTIAL-017][WS-OPEN-REMOTE-018] preflights before effects, preserves source pins, resumes, and releases failed placement", async () => {
+  test("[WS-OPEN-CRED-007][WS-OPEN-ADMIT-008][WS-OPEN-CREATE-010][WS-OPEN-RESUME-011][WS-OPEN-SHA-013][WS-OPEN-PARTIAL-017][WS-OPEN-REMOTE-018][WS-OPEN-PROFILE-021] preflights before effects, preserves source pins, resumes, and releases failed placement", async () => {
     const phases: string[] = [];
     let failSandboxCreate = false;
     let failSourceCredential = false;
@@ -44,6 +44,7 @@ describe("Agent Workspace open application workflow", () => {
           status: "ready";
         }
       | undefined;
+    let profileWorkspace = preferred;
     const dependencies: WorkspaceOpenDependencies = {
       preflight: {
         resolveContext: async () => {
@@ -112,7 +113,10 @@ describe("Agent Workspace open application workflow", () => {
         },
       },
       entries: {
-        findPreferred: async () => preferred,
+        findPreferred: async (_context, _key, selection?: { profileInstallationId?: string }) =>
+          selection?.profileInstallationId === "awpi_default" && profileWorkspace
+            ? profileWorkspace
+            : preferred,
         begin: async () => ok({ workspaceId: "sbx_1", created: true }),
         complete: async (_context, value) => {
           preferred = {
@@ -290,6 +294,19 @@ describe("Agent Workspace open application workflow", () => {
       commitSha: "f".repeat(40),
     });
     const resumed = await service.open(context, input);
+    profileWorkspace = preferred;
+    preferred = {
+      workspaceId: "sbx_opencode",
+      runtimeId: "sar_opencode",
+      commitSha: input.commitSha,
+      profileInstallationId: "awpi_opencode",
+      status: "ready",
+    };
+    const explicitlySelectedProfileResumed = await service.open(context, {
+      ...input,
+      profile: "awpi_default",
+    });
+    preferred = profileWorkspace;
     failSourceCredential = true;
     const sourceCredentialFailure = await service.open(context, {
       ...input,
@@ -308,6 +325,11 @@ describe("Agent Workspace open application workflow", () => {
       agent: { runtimeId: "sar_1" },
     });
     expect(resumed._unsafeUnwrap()).toMatchObject({
+      workspaceId: "sbx_1",
+      resumed: true,
+      agent: { runtimeId: "sar_1" },
+    });
+    expect(explicitlySelectedProfileResumed._unsafeUnwrap()).toMatchObject({
       workspaceId: "sbx_1",
       resumed: true,
       agent: { runtimeId: "sar_1" },
@@ -464,6 +486,8 @@ describe("Agent Workspace open application workflow", () => {
       "preflight",
       "sandbox-create",
       "context",
+      "context",
+      "sandbox-resume",
       "context",
       "sandbox-resume",
       "context",
