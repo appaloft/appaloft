@@ -122,6 +122,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-100: Agent Adapter Distribution And Workspace Profile Boundary](./ADR-100-agent-adapter-distribution-and-workspace-profile-boundary.md) | Accepted | Defines portable declarative Adapter/Profile manifests, trusted-code composition, digest-addressed definitions, tenant installations, capability negotiation and safe Workspace pinning without uploaded control-plane execution. |
 | [ADR-103: Profile-Aware Workspace Open And Attach](./ADR-103-profile-aware-workspace-open-and-attach.md) | Accepted | Defines Repository Binding, Project default Profile, atomic create-or-resume, immutable source pins, named Credential Connections and capability-driven attach without a second Workspace aggregate. |
 | [ADR-104: Certificate Route Activation Reconciliation](./ADR-104-certificate-route-activation-reconciliation.md) | Accepted | Defines explicit certificate-policy transition, provider-neutral certificate activation, served-certificate proof, and fail-safe readiness ordering for durable domain routes. |
+| [ADR-105: Brokered Model Access Capability](./ADR-105-brokered-model-access-capability.md) | Accepted | Defines exact Profile-pinned `model-api` binding propagation and short-lived capability-only Agent access without exposing provider credentials or creating provider-specific operations. |
 
 ## Authoring Rules
 

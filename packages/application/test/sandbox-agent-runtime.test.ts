@@ -301,6 +301,7 @@ describe("SandboxAgentDeliveryService", () => {
 
   test("[ADAPTER-CRED-006][PROFILE-PIN-010][GH-AUTO-DURABLE-CREDENTIAL-023] re-admits, launches and revokes the exact persisted child scope", async () => {
     const calls: Array<{ kind: string; input: Record<string, unknown> }> = [];
+    let harnessCredentialBindings: readonly unknown[] | undefined;
     let processCredentialAdmitted = false;
     const { pin, binding, profilePlan } = credentialProfileFixture();
     const { service, repository } = fixture({
@@ -315,6 +316,7 @@ describe("SandboxAgentDeliveryService", () => {
           sessionRecovery: "managed-run-lineage",
         },
         async execute(input) {
+          harnessCredentialBindings = input.credentialBindings;
           const launched = await input.launchProcess?.({
             argv: ["codex", "exec", input.task],
             background: true,
@@ -400,6 +402,7 @@ describe("SandboxAgentDeliveryService", () => {
     expect(run.isOk()).toBe(true);
     const reconciled = await service.reconcileRun(context, "srun_test");
     expect(reconciled.isOk()).toBe(true);
+    expect(harnessCredentialBindings).toEqual([binding]);
     expect(calls.map((call) => call.kind)).toEqual([
       "admit",
       "terminal",

@@ -1143,6 +1143,13 @@ create provider-specific operation names. See
 [Spec 120](./specs/120-profile-aware-workspace-open-and-attach/spec.md), and
 [Agent Workspace Workflow](./workflows/agent-workspace.md).
 
+Brokered model access adds no secret-bearing operation. The existing Profile configuration binds
+one safe `model-api` Connection reference; `workspaces.open` carries the compiled binding into the
+Runtime, and the Harness exchanges it through a hosting-provided issuer for an ephemeral gateway
+descriptor. See [ADR-105](./decisions/ADR-105-brokered-model-access-capability.md),
+[Spec 123](./specs/123-brokered-model-access/spec.md), and the
+[Brokered Model Access Test Matrix](./testing/brokered-model-access-test-matrix.md).
+
 ## Workspace Collaboration
 
 `WorkspaceCollaboration` is the public team and multi-Agent coordination owner. Every lane references

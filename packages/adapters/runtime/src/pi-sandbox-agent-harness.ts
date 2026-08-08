@@ -1,10 +1,13 @@
 import {
   type ExecutionContext,
+  requireSandboxAgentModelCredentialBinding,
   type SandboxAgentHarness,
   type SandboxAgentHarnessEvent,
   type SandboxFileDescriptor,
   type SandboxProcessDescriptor,
   type SandboxExecResult,
+  type SandboxAgentModelAccessDescriptor,
+  type SandboxAgentModelAccessProvider,
 } from "@appaloft/application";
 import { type Result } from "@appaloft/core";
 
@@ -46,30 +49,9 @@ export interface PiSandboxExecutionPort {
   ): Promise<Result<void>>;
 }
 
-export interface PiSandboxModelAccessProvider {
-  issue(input: {
-    executionContext: ExecutionContext;
-    sandboxId: string;
-    runtimeId: string;
-    runId: string;
-  }): Promise<PiSandboxModelAccess>;
-  revoke(input: {
-    executionContext: ExecutionContext;
-    sandboxId: string;
-    runtimeId: string;
-    runId: string;
-    capabilityId: string;
-  }): Promise<void>;
-}
+export type PiSandboxModelAccessProvider = SandboxAgentModelAccessProvider;
 
-export interface PiSandboxModelAccess {
-  capabilityId: string;
-  baseUrl: string;
-  accessToken: string;
-  provider: string;
-  model: string;
-  expiresAt: string;
-}
+export type PiSandboxModelAccess = SandboxAgentModelAccessDescriptor;
 
 export interface PiSandboxAgentHarnessOptions {
   templateId: string;
@@ -274,7 +256,14 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
     if (!modelAccessProvider) {
       throw new Error("pi_model_access_unavailable");
     }
-    const modelAccess = await modelAccessProvider.issue(input);
+    const credentialBinding = requireSandboxAgentModelCredentialBinding(input.credentialBindings);
+    const modelAccess = await modelAccessProvider.issue({
+      executionContext: input.executionContext,
+      sandboxId: input.sandboxId,
+      runtimeId: input.runtimeId,
+      runId: input.runId,
+      credentialBinding,
+    });
     const outputRoot = `.appaloft-agent/${input.runId}`;
     const agentDir = `${outputRoot}/agent`;
     const modelConfig = createPiSandboxModelConfig(modelAccess);
