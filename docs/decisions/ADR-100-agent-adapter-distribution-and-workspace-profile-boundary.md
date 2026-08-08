@@ -46,11 +46,19 @@ Blueprint language.
     arbitrary terminal output.
 11. Event fidelity is explicit: raw PTY bytes, bounded/redacted stdout/stderr, or schema-validated
     structured events.
+12. A Declarative Adapter that owns a long-running Runtime declares one bounded argv-based
+    `start` command. Runtime startup uses the same process-scoped credential grant boundary as
+    other Agent children. Appaloft records the Runtime as ready only after the exact child remains
+    running and its declared process or HTTP health check succeeds. Native attach requires a start
+    command plus an HTTP health check whose port matches the attach server port. Failed startup is
+    terminated and revoked before the create operation returns a typed failure.
 
 ## Consequences
 
 - Pi and OpenCode remain trusted reference adapters without becoming domain types.
 - Codex CLI can prove third-party declarative compatibility while using its own TUI.
+- OpenCode and other native-attach Adapters can start a credential-scoped server without uploading
+  control-plane code or exposing its private listener.
 - npm may be the first package transport, but manifests and domain contracts remain package-neutral
   and local-first.
 - Cloud and Enterprise can add approval, tenant policy, audit, curated availability, and credential

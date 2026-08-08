@@ -127,6 +127,13 @@ export interface SandboxAgentHarness {
     sandboxId: string;
     runtimeId: string;
     credentialBindings?: readonly AgentWorkspaceCredentialBinding[];
+    launchProcess?(input: {
+      argv: readonly string[];
+      cwd?: string;
+      background: true;
+      timeoutMs?: number;
+      replaceTerminated?: boolean;
+    }): Promise<Result<SandboxExecResult>>;
   }): Promise<void>;
   terminateRuntime?(input: {
     executionContext: ExecutionContext;
@@ -235,6 +242,7 @@ export interface SandboxAgentProcessCredentialGrantPort {
         cwd?: string;
         background: true;
         timeoutMs?: number;
+        replaceTerminated?: boolean;
       };
     },
   ): Promise<Result<SandboxExecResult>>;
@@ -1087,6 +1095,32 @@ async function sha256(value: string): Promise<string> {
 export class SandboxAgentDeliveryService {
   constructor(private readonly dependencies: SandboxAgentDeliveryDependencies) {}
 
+  private runtimeStartProcessLauncher(
+    context: ExecutionContext,
+    record: SandboxAgentRuntimeRecord,
+  ):
+    | NonNullable<
+        Parameters<NonNullable<SandboxAgentHarness["prepareRuntime"]>>[0]["launchProcess"]
+      >
+    | undefined {
+    if (!record.credentialBindings?.length) return undefined;
+    return async (process) => {
+      const scope = credentialGrantScope(context, record, record.runtime.id.value);
+      if (!scope?.runId || !this.dependencies.processCredentialGrants) {
+        return err(
+          domainError.conflict("Process-scoped Agent credentials are unavailable", {
+            code: "sandbox_agent_process_credential_grants_unavailable",
+          }),
+        );
+      }
+      return this.dependencies.processCredentialGrants.launch(context, {
+        scope: { ...scope, runId: scope.runId },
+        bindings: record.credentialBindings ?? [],
+        process,
+      });
+    };
+  }
+
   private async revokeCredentialGrants(
     context: ExecutionContext,
     record: SandboxAgentRuntimeRecord,
@@ -1242,11 +1276,13 @@ export class SandboxAgentDeliveryService {
         toRepositoryContext(context),
         input.runtimeId,
       );
+      const launchProcess = record ? this.runtimeStartProcessLauncher(context, record) : undefined;
       await harness.prepareRuntime?.({
         executionContext: context,
         sandboxId: input.sandboxId,
         runtimeId: input.runtimeId,
         credentialBindings: record?.credentialBindings ?? [],
+        ...(launchProcess ? { launchProcess } : {}),
       });
     } catch (error) {
       return err(infrastructureError(error));
@@ -1422,12 +1458,14 @@ export class SandboxAgentDeliveryService {
       if (admitted.isErr()) return err(admitted.error);
     }
     if (harness.prepareRuntime) {
+      const launchProcess = this.runtimeStartProcessLauncher(context, record);
       try {
         await harness.prepareRuntime({
           executionContext: context,
           sandboxId: input.sandboxId,
           runtimeId: runtimeId.value.value,
           credentialBindings: record.credentialBindings ?? [],
+          ...(launchProcess ? { launchProcess } : {}),
         });
       } catch (error) {
         const failedAt = asUpdatedAt(this.dependencies.clock.now());
@@ -1435,6 +1473,8 @@ export class SandboxAgentDeliveryService {
         const failed = runtime.value.markFailed({ at: failedAt.value });
         if (failed.isErr()) return err(failed.error);
         await this.dependencies.repository.saveRuntime(repositoryContext, record);
+        const revoked = await this.revokeCredentialGrants(context, record, "failed");
+        if (revoked.isErr()) return err(revoked.error);
         return err(infrastructureError(error));
       }
     }

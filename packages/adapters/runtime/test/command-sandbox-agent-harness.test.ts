@@ -194,4 +194,270 @@ describe("CommandSandboxAgentHarness", () => {
     ).rejects.toThrow("command_agent_run_exit_unavailable");
     expect(processObservations).toBe(2);
   });
+
+  test("[ADAPTER-RUNTIME-013] launches a Runtime start child through its scoped process seam before recording readiness", async () => {
+    const files = new Map<string, Uint8Array>();
+    const launched: string[][] = [];
+    const execution: CommandSandboxAgentExecutionPort = {
+      exec: async () => {
+        throw new Error("unscoped Runtime start must not execute");
+      },
+      listProcesses: async () => ok([{ processId: "spr_server", status: "running" }]),
+      terminateProcess: async () => ok(undefined),
+      readFile: async (_context, _sandboxId, input) => {
+        const content = files.get(input.path);
+        return content ? ok(content) : err(new Error("not found"));
+      },
+      writeFile: async (_context, _sandboxId, input) => {
+        files.set(input.path, input.content);
+        return ok({ path: input.path, sizeBytes: input.content.byteLength });
+      },
+      removeFile: async (_context, _sandboxId, input) => {
+        files.delete(input.path);
+        return ok(undefined);
+      },
+    };
+    const harness = new CommandSandboxAgentHarness(execution, {
+      key: "custom-server",
+      templateId: "aht_custom_server_v1",
+      sandboxTemplateId: "sbt_custom_server_v1",
+      version: "1.2.3",
+      templateDigest: `sha256:${"a".repeat(64)}`,
+      start: { argv: ["custom-agent", "serve"] },
+      run: { argv: ["custom-agent", "run", "{task}"] },
+      healthcheck: { kind: "process" },
+    });
+
+    await harness.prepareRuntime?.({
+      executionContext: createExecutionContext({ requestId: "req_runtime_start" }),
+      sandboxId: "sbx_server",
+      runtimeId: "sar_server",
+      launchProcess: async (input) => {
+        launched.push([...input.argv]);
+        return ok({ mode: "background", processId: "spr_server" });
+      },
+    });
+
+    expect(launched).toEqual([["custom-agent", "serve"]]);
+    expect(new TextDecoder().decode(files.get(".appaloft-agent/sar_server/command-agent-process-id"))).toBe(
+      "spr_server",
+    );
+  });
+
+  test("[ADAPTER-RUNTIME-013] never reuses a Task-scoped launcher for the long-running Runtime child", async () => {
+    const files = new Map<string, Uint8Array>([
+      [".appaloft-agent/srun_task/stdout.log", new TextEncoder().encode("done\n")],
+      [".appaloft-agent/srun_task/stderr.log", new Uint8Array()],
+    ]);
+    const launches: string[][] = [];
+    const execution: CommandSandboxAgentExecutionPort = {
+      exec: async () => {
+        throw new Error("Task execution must use its scoped launcher");
+      },
+      listProcesses: async () =>
+        ok([{ processId: "spr_task", status: "exited", exitCode: 0 }]),
+      terminateProcess: async () => ok(undefined),
+      readFile: async (_context, _sandboxId, input) => {
+        const content = files.get(input.path);
+        return content ? ok(content) : err(new Error("not found"));
+      },
+      writeFile: async (_context, _sandboxId, input) =>
+        ok({ path: input.path, sizeBytes: input.content.byteLength }),
+      removeFile: async () => ok(undefined),
+    };
+    const harness = new CommandSandboxAgentHarness(execution, {
+      key: "custom-server",
+      templateId: "aht_custom_server_v1",
+      sandboxTemplateId: "sbt_custom_server_v1",
+      version: "1.2.3",
+      templateDigest: `sha256:${"a".repeat(64)}`,
+      start: { argv: ["custom-agent", "serve"] },
+      run: { argv: ["custom-agent", "run", "{task}"] },
+      healthcheck: { kind: "process" },
+    });
+
+    await harness.execute({
+      executionContext: createExecutionContext({ requestId: "req_task_scope" }),
+      sandboxId: "sbx_server",
+      runtimeId: "sar_server",
+      runId: "srun_task",
+      task: "review the change",
+      context: { mode: "fresh" },
+      launchProcess: async (input) => {
+        launches.push([...input.argv]);
+        return ok({ mode: "background", processId: "spr_task" });
+      },
+      emitEvent: async () => {},
+      requestApproval: async () => "approved",
+    });
+
+    expect(launches).toHaveLength(1);
+    expect(launches[0]).toContain("review the change");
+    expect(launches[0]).not.toContain("serve");
+  });
+
+  test("[ADAPTER-RUNTIME-013] probes bounded HTTP readiness and cleans the exact unhealthy start child", async () => {
+    const healthProbes: string[][] = [];
+    const terminated: string[] = [];
+    let markerWrites = 0;
+    const execution: CommandSandboxAgentExecutionPort = {
+      exec: async (_context, _sandboxId, input) => {
+        healthProbes.push([...input.argv]);
+        return ok({
+          mode: "foreground",
+          frames: [{ kind: "exit", sequence: 1, exitCode: 1 }],
+        });
+      },
+      listProcesses: async () => ok([{ processId: "spr_unhealthy", status: "running" }]),
+      terminateProcess: async (_context, _sandboxId, processId) => {
+        terminated.push(processId);
+        return ok(undefined);
+      },
+      readFile: async () => err(new Error("not found")),
+      writeFile: async (_context, _sandboxId, input) => {
+        markerWrites += 1;
+        return ok({ path: input.path, sizeBytes: input.content.byteLength });
+      },
+      removeFile: async () => ok(undefined),
+    };
+    const harness = new CommandSandboxAgentHarness(execution, {
+      key: "custom-server",
+      templateId: "aht_custom_server_v1",
+      sandboxTemplateId: "sbt_custom_server_v1",
+      version: "1.2.3",
+      templateDigest: `sha256:${"a".repeat(64)}`,
+      start: { argv: ["custom-agent", "serve", "--port", "4096"] },
+      run: { argv: ["custom-agent", "run", "{task}"] },
+      healthcheck: { kind: "http", port: 4_096, path: "/health" },
+      startupPollAttempts: 2,
+      startupPollIntervalMs: 1,
+    });
+
+    expect(
+      harness.prepareRuntime?.({
+        executionContext: createExecutionContext({ requestId: "req_runtime_health" }),
+        sandboxId: "sbx_server",
+        runtimeId: "sar_server",
+        launchProcess: async () =>
+          ok({ mode: "background", processId: "spr_unhealthy" }),
+      }),
+    ).rejects.toThrow("command_agent_runtime_start_failed");
+
+    expect(healthProbes).toHaveLength(2);
+    expect(healthProbes[0]).toEqual(
+      expect.arrayContaining(["curl", "http://127.0.0.1:4096/health"]),
+    );
+    expect(terminated).toEqual(["spr_unhealthy"]);
+    expect(markerWrites).toBe(0);
+  });
+
+  test("[ADAPTER-RUNTIME-013] terminates an accepted start child when its ready marker cannot be persisted", async () => {
+    const terminated: string[] = [];
+    const execution: CommandSandboxAgentExecutionPort = {
+      exec: async () => ok({ mode: "foreground", frames: [] }),
+      listProcesses: async () => ok([{ processId: "spr_unmarked", status: "running" }]),
+      terminateProcess: async (_context, _sandboxId, processId) => {
+        terminated.push(processId);
+        return ok(undefined);
+      },
+      readFile: async () => err(new Error("not found")),
+      writeFile: async () => err(new Error("marker storage unavailable")),
+      removeFile: async () => ok(undefined),
+    };
+    const harness = new CommandSandboxAgentHarness(execution, {
+      key: "custom-server",
+      templateId: "aht_custom_server_v1",
+      sandboxTemplateId: "sbt_custom_server_v1",
+      version: "1.2.3",
+      templateDigest: `sha256:${"a".repeat(64)}`,
+      start: { argv: ["custom-agent", "serve"] },
+      run: { argv: ["custom-agent", "run", "{task}"] },
+      healthcheck: { kind: "process" },
+    });
+
+    expect(
+      harness.prepareRuntime?.({
+        executionContext: createExecutionContext({ requestId: "req_runtime_marker" }),
+        sandboxId: "sbx_server",
+        runtimeId: "sar_server",
+        launchProcess: async () => ok({ mode: "background", processId: "spr_unmarked" }),
+      }),
+    ).rejects.toThrow("marker storage unavailable");
+    expect(terminated).toEqual(["spr_unmarked"]);
+  });
+
+  test("[ADAPTER-RUNTIME-013] replaces an unhealthy marked server before relaunching its Runtime start child", async () => {
+    const files = new Map<string, Uint8Array>([
+      [
+        ".appaloft-agent/sar_server/command-agent-process-id",
+        new TextEncoder().encode("spr_stale"),
+      ],
+    ]);
+    const terminated: string[] = [];
+    const launches: Array<{ argv: readonly string[]; replaceTerminated?: boolean }> = [];
+    let healthProbe = 0;
+    const execution: CommandSandboxAgentExecutionPort = {
+      exec: async () => {
+        healthProbe += 1;
+        return ok({
+          mode: "foreground",
+          frames: [{ kind: "exit", sequence: 1, exitCode: healthProbe === 1 ? 1 : 0 }],
+        });
+      },
+      listProcesses: async () =>
+        ok([
+          { processId: "spr_stale", status: "running" },
+          { processId: "spr_new", status: "running" },
+        ]),
+      terminateProcess: async (_context, _sandboxId, processId) => {
+        terminated.push(processId);
+        return ok(undefined);
+      },
+      readFile: async (_context, _sandboxId, input) => {
+        const content = files.get(input.path);
+        return content ? ok(content) : err(new Error("not found"));
+      },
+      writeFile: async (_context, _sandboxId, input) => {
+        files.set(input.path, input.content);
+        return ok({ path: input.path, sizeBytes: input.content.byteLength });
+      },
+      removeFile: async (_context, _sandboxId, input) => {
+        files.delete(input.path);
+        return ok(undefined);
+      },
+    };
+    const harness = new CommandSandboxAgentHarness(execution, {
+      key: "custom-server",
+      templateId: "aht_custom_server_v1",
+      sandboxTemplateId: "sbt_custom_server_v1",
+      version: "1.2.3",
+      templateDigest: `sha256:${"a".repeat(64)}`,
+      start: { argv: ["custom-agent", "serve", "--port", "4096"] },
+      run: { argv: ["custom-agent", "run", "{task}"] },
+      healthcheck: { kind: "http", port: 4_096, path: "/health" },
+      startupPollAttempts: 2,
+      startupPollIntervalMs: 1,
+    });
+
+    await harness.prepareRuntime?.({
+      executionContext: createExecutionContext({ requestId: "req_runtime_replace" }),
+      sandboxId: "sbx_server",
+      runtimeId: "sar_server",
+      launchProcess: async (input) => {
+        launches.push(input);
+        return ok({ mode: "background", processId: "spr_new" });
+      },
+    });
+
+    expect(terminated).toEqual(["spr_stale"]);
+    expect(launches).toEqual([
+      expect.objectContaining({
+        argv: ["custom-agent", "serve", "--port", "4096"],
+        replaceTerminated: true,
+      }),
+    ]);
+    expect(new TextDecoder().decode(files.get(".appaloft-agent/sar_server/command-agent-process-id"))).toBe(
+      "spr_new",
+    );
+  });
 });

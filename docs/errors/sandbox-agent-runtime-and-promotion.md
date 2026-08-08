@@ -6,6 +6,7 @@
 | `sandbox_agent_runtime_unavailable` | conflict | Parent Sandbox is not ready/resumable; inspect Sandbox state. |
 | `sandbox_agent_runtime_busy` | conflict | One Run is active; response includes safe active Run id. |
 | `sandbox_agent_harness_unsupported` | validation | Template/harness/model capability is unavailable. |
+| `sandbox_agent_delivery_adapter_failed` | conflict | Runtime startup or Harness delivery failed. For declarative Runtime start, inspect the safe cause, correct the bounded start/healthcheck contract, and retry; no ready Runtime is returned. |
 | `sandbox_agent_run_parent_invalid` | validation | Continue parent is wrong Runtime, active or missing. |
 | `sandbox_agent_approval_required` | conflict | Run waits for external approval; inspect approval query. |
 | `sandbox_agent_approval_expired` | conflict | Approval request expired; retry tool action to create a new request. |

@@ -9,6 +9,7 @@ import {
   type SandboxProcessDescriptor,
 } from "@appaloft/application";
 import { ok, type Result } from "@appaloft/core";
+import { sandboxWorkspaceProcessArgv } from "./sandbox-workspace-process-environment";
 
 const backgroundExitStatusGraceMs = 5_000;
 
@@ -72,6 +73,8 @@ export interface CommandSandboxAgentDescriptor {
   persistentPaths?: readonly string[];
   healthcheck?: SandboxAgentHarnessCapabilities["healthcheck"];
   timeoutMs?: number;
+  startupPollAttempts?: number;
+  startupPollIntervalMs?: number;
 }
 
 function normalizedRelativePath(value: string | undefined): string | undefined {
@@ -162,39 +165,97 @@ export class CommandSandboxAgentHarness implements SandboxAgentHarness {
     executionContext: ExecutionContext;
     sandboxId: string;
     runtimeId: string;
+    launchProcess?: NonNullable<
+      Parameters<NonNullable<SandboxAgentHarness["prepareRuntime"]>>[0]["launchProcess"]
+    >;
   }): Promise<void> {
     if (!this.descriptor.start) return;
     const markerPath = this.processMarkerPath(input.runtimeId);
+    let replaceTerminated = false;
     const marker = await this.execution.readFile(input.executionContext, input.sandboxId, {
       path: markerPath,
     });
     if (marker.isOk()) {
       const processId = new TextDecoder().decode(marker.value).trim();
-      const processes = await this.execution.listProcesses(input.executionContext, input.sandboxId);
-      if (
-        processes.isOk() &&
-        processes.value.some(
-          (process) => process.processId === processId && process.status === "running",
-        )
-      ) {
+      if (!/^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,159}$/u.test(processId)) {
+        throw new Error("command_agent_runtime_marker_invalid");
+      }
+      if (await this.runtimeIsReady(input.executionContext, input.sandboxId, processId)) {
         return;
       }
+      const processes = await this.execution.listProcesses(
+        input.executionContext,
+        input.sandboxId,
+      );
+      if (processes.isErr()) throw new Error(processes.error.message);
+      if (
+        processes.value.some(
+          (candidate) => candidate.processId === processId && candidate.status === "running",
+        )
+      ) {
+        const terminated = await this.execution.terminateProcess(
+          input.executionContext,
+          input.sandboxId,
+          processId,
+        );
+        if (terminated.isErr()) throw new Error(terminated.error.message);
+      }
+      const removed = await this.execution.removeFile(input.executionContext, input.sandboxId, {
+        path: markerPath,
+      });
+      if (removed.isErr()) throw new Error(removed.error.message);
+      replaceTerminated = true;
     }
-    const started = await this.execution.exec(input.executionContext, input.sandboxId, {
+    const process = {
       argv: safeArgv(this.descriptor.start.argv, "Command Agent start"),
       ...(this.cwd ? { cwd: this.cwd } : {}),
-      background: true,
-    });
+      background: true as const,
+      ...(replaceTerminated ? { replaceTerminated: true } : {}),
+    };
+    const started = input.launchProcess
+      ? await input.launchProcess(process)
+      : await this.execution.exec(input.executionContext, input.sandboxId, process);
     if (started.isErr() || started.value.mode !== "background") {
       throw new Error(
         started.isErr() ? started.error.message : "command_agent_start_background_required",
       );
     }
+    const processId = started.value.processId;
+    const attempts = this.descriptor.startupPollAttempts ?? 50;
+    let ready = false;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      ready = await this.runtimeIsReady(
+        input.executionContext,
+        input.sandboxId,
+        processId,
+      );
+      if (ready) break;
+      await new Promise((resolve) =>
+        setTimeout(resolve, this.descriptor.startupPollIntervalMs ?? 200),
+      );
+    }
+    if (!ready) {
+      const terminated = await this.execution.terminateProcess(
+        input.executionContext,
+        input.sandboxId,
+        processId,
+      );
+      if (terminated.isErr()) throw new Error(terminated.error.message);
+      throw new Error("command_agent_runtime_start_failed");
+    }
     const written = await this.execution.writeFile(input.executionContext, input.sandboxId, {
       path: markerPath,
-      content: new TextEncoder().encode(started.value.processId),
+      content: new TextEncoder().encode(processId),
     });
-    if (written.isErr()) throw new Error(written.error.message);
+    if (written.isErr()) {
+      const terminated = await this.execution.terminateProcess(
+        input.executionContext,
+        input.sandboxId,
+        processId,
+      );
+      if (terminated.isErr()) throw new Error(terminated.error.message);
+      throw new Error(written.error.message);
+    }
   }
 
   async terminateRuntime(input: {
@@ -223,7 +284,6 @@ export class CommandSandboxAgentHarness implements SandboxAgentHarness {
   }
 
   async execute(input: Parameters<SandboxAgentHarness["execute"]>[0]) {
-    await this.prepareRuntime(input);
     const outputRoot = `.appaloft-agent/${input.runId}`;
     const stdoutPath = `${outputRoot}/stdout.log`;
     const stderrPath = `${outputRoot}/stderr.log`;
@@ -370,5 +430,41 @@ export class CommandSandboxAgentHarness implements SandboxAgentHarness {
 
   private processMarkerPath(runtimeId: string): string {
     return `.appaloft-agent/${runtimeId}/command-agent-process-id`;
+  }
+
+  private async runtimeIsReady(
+    context: ExecutionContext,
+    sandboxId: string,
+    processId: string,
+  ): Promise<boolean> {
+    const processes = await this.execution.listProcesses(context, sandboxId);
+    if (
+      processes.isErr() ||
+      !processes.value.some(
+        (candidate) => candidate.processId === processId && candidate.status === "running",
+      )
+    ) {
+      return false;
+    }
+    const healthcheck = this.descriptor.healthcheck;
+    if (!healthcheck || healthcheck.kind === "process") return true;
+    const result = await this.execution.exec(context, sandboxId, {
+      argv: sandboxWorkspaceProcessArgv([
+        "curl",
+        "--fail",
+        "--silent",
+        "--show-error",
+        "--max-time",
+        "2",
+        `http://127.0.0.1:${healthcheck.port}${healthcheck.path}`,
+      ]),
+      ...(this.cwd ? { cwd: this.cwd } : {}),
+      timeoutMs: 3_000,
+    });
+    return (
+      result.isOk() &&
+      result.value.mode === "foreground" &&
+      result.value.frames.some((frame) => frame.kind === "exit" && frame.exitCode === 0)
+    );
   }
 }

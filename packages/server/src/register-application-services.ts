@@ -3721,6 +3721,7 @@ export function registerApplicationServices(
                   argv: readonly string[];
                   taskInput: "append-argument" | "stdin";
                 };
+                start?: { argv: readonly string[] };
                 attach?: CommandSandboxAgentDescriptor["attach"];
                 persistentPaths?: readonly string[];
                 healthcheck?: CommandSandboxAgentDescriptor["healthcheck"];
@@ -3740,6 +3741,7 @@ export function registerApplicationServices(
                 templateDigest: input.templateDigest,
                 ...(input.cwd ? { cwd: input.cwd } : {}),
                 run: { argv: input.run.argv },
+                ...(input.start ? { start: { argv: input.start.argv } } : {}),
                 ...(input.attach ? { attach: input.attach } : {}),
                 ...(input.persistentPaths ? { persistentPaths: input.persistentPaths } : {}),
                 ...(input.healthcheck ? { healthcheck: input.healthcheck } : {}),

@@ -220,6 +220,14 @@ describe("Agent Adapter manifest validation", () => {
         },
       ],
     });
+    const shellStart = validateAgentAdapterManifest({
+      ...validManifest(),
+      start: ["sh", "-c", "codex serve"],
+    });
+    const undeclaredStartRuntime = validateAgentAdapterManifest({
+      ...validManifest(),
+      start: ["opencode", "serve"],
+    });
 
     expect(codeEntrypoint).toMatchObject({
       ok: false,
@@ -228,6 +236,14 @@ describe("Agent Adapter manifest validation", () => {
     expect(shellCommand).toMatchObject({
       ok: false,
       issues: [{ code: "invalid_manifest", path: ["interactionModes", 0, "command", 0] }],
+    });
+    expect(shellStart).toMatchObject({
+      ok: false,
+      issues: [{ code: "invalid_manifest", path: ["start", 0] }],
+    });
+    expect(undeclaredStartRuntime).toMatchObject({
+      ok: false,
+      issues: [{ code: "invalid_manifest", path: ["start", 0] }],
     });
   });
 
@@ -335,7 +351,7 @@ describe("Agent Adapter manifest validation", () => {
     });
   });
 
-  test("[ADAPTER-CAP-004][WS-ATTACH-NATIVE-015] requires and compiles the native attach server port", () => {
+  test("[ADAPTER-CAP-004][ADAPTER-NATIVE-014][WS-ATTACH-NATIVE-015] requires and compiles the native attach server lifecycle", () => {
     const nativeManifest = {
       ...validManifest(),
       requirements: {
@@ -357,6 +373,7 @@ describe("Agent Adapter manifest validation", () => {
         },
         validManifest().interactionModes[1],
       ],
+      start: ["codex", "serve", "--hostname", "0.0.0.0", "--port", "4096"],
       healthcheck: { kind: "http", port: 4_096, path: "/health" },
     } as const;
     const validated = validateAgentAdapterManifest(nativeManifest, {
@@ -394,6 +411,9 @@ describe("Agent Adapter manifest validation", () => {
       plan: {
         runtime: {
           declarativeHarness: {
+            start: {
+              argv: ["codex", "serve", "--hostname", "0.0.0.0", "--port", "4096"],
+            },
             attach: {
               transport: "native-attach",
               serverPort: 4_096,
@@ -431,6 +451,18 @@ describe("Agent Adapter manifest validation", () => {
         validManifest().interactionModes[1],
       ],
     });
+    const missingStart = validateAgentAdapterManifest({
+      ...nativeManifest,
+      start: undefined,
+    });
+    const processHealthcheck = validateAgentAdapterManifest({
+      ...nativeManifest,
+      healthcheck: { kind: "process" },
+    });
+    const mismatchedHealthcheckPort = validateAgentAdapterManifest({
+      ...nativeManifest,
+      healthcheck: { kind: "http", port: 4_097, path: "/health" },
+    });
     expect(missingPort).toMatchObject({
       ok: false,
       issues: [{ code: "invalid_manifest", path: ["interactionModes", 0, "serverPort"] }],
@@ -442,6 +474,18 @@ describe("Agent Adapter manifest validation", () => {
     expect(terminalPort).toMatchObject({
       ok: false,
       issues: [{ code: "invalid_manifest", path: ["interactionModes", 0, "serverPort"] }],
+    });
+    expect(missingStart).toMatchObject({
+      ok: false,
+      issues: [{ code: "invalid_manifest", path: ["start"] }],
+    });
+    expect(processHealthcheck).toMatchObject({
+      ok: false,
+      issues: [{ code: "invalid_manifest", path: ["healthcheck"] }],
+    });
+    expect(mismatchedHealthcheckPort).toMatchObject({
+      ok: false,
+      issues: [{ code: "invalid_manifest", path: ["healthcheck", "port"] }],
     });
   });
 

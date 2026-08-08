@@ -136,7 +136,8 @@ Product constraints:
   [ADR-100](./decisions/ADR-100-agent-adapter-distribution-and-workspace-profile-boundary.md) and
   [Spec 117](./specs/117-agent-adapter-sdk-and-workspace-profiles/spec.md): canonical declarative
   manifests, fail-closed compatibility, tenant installations, safe Profile compilation, public
-  entrypoint parity and deterministic third-party conformance without uploaded control-plane code.
+  entrypoint parity, fail-closed long-running Runtime startup/readiness, and deterministic
+  third-party conformance without uploaded control-plane code.
 - [x] Complete the public [Server Workload Roles Spec 118](./specs/118-server-workload-roles/spec.md)
   implementation scope under [ADR-101](./decisions/ADR-101-server-workload-role-admission.md):
   canonical optional role sets across register/configure/list/show, `deployment-runtime` admission

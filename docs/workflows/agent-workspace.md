@@ -48,10 +48,12 @@ resolution and a consumable admission/placement reservation all complete before 
    terminate action. A repeated open coordinates against the same partial identity instead of
    creating a duplicate.
 6. Pi is ready for managed Runs and interactive use through the Sandbox terminal.
-7. OpenCode Runtime preparation verifies the pinned CLI version, starts one `opencode serve`
-   listener inside the Sandbox provider's private network namespace without publishing a host
-   port, waits for the declared HTTP healthcheck to succeed, and only then records its Appaloft
-   Sandbox process id below `/workspace`. Reconnect forwards the Runtime's safe credential bindings
+7. A native-attach declarative Runtime launches its manifest-declared bounded `start` argv through
+   the process-scoped credential grant, inside the Sandbox provider's private network namespace
+   without publishing a host port. OpenCode uses this path for one `opencode serve` listener.
+   Runtime creation waits for the declared HTTP healthcheck to succeed and only then records its
+   Appaloft Sandbox process id below `/workspace` and marks the Runtime ready. Reconnect forwards
+   the Runtime's safe credential bindings
    back to the harness and reuses a healthy server while its scoped model capability retains the
    bounded startup safety window; an expired, exited or unhealthy server is revoked and replaced
    before attach access is issued.

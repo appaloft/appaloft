@@ -26,6 +26,8 @@ Workspace from a version-pinned Profile without granting uploaded code control-p
 | PROFILE-PIN-010 | Resolved Workspace snapshot | An approved Profile creates a Workspace | Definitions later change | The Workspace continues with its pinned digest, Harness key, and capability snapshot. |
 | ADAPTER-SURFACE-011 | Public entrypoint parity | Definitions/installations are managed | CLI/API/SDK/Web/MCP metadata are generated | All active operations use the same command/query schemas and tenant context. |
 | ADAPTER-CODEX-012 | External compatibility | Codex declarative Adapter/Profile pass conformance | An opt-in runtime smoke runs | Codex uses its own TUI/headless mode through existing Workspace lifecycle and exact cleanup. |
+| ADAPTER-RUNTIME-013 | Runtime startup acceptance | A declarative Adapter declares a bounded `start` argv and process or HTTP healthcheck | Runtime creation runs | The exact start child launches through the scoped credential grant, the Runtime becomes ready only after the child and declared healthcheck are ready, and a failed or unhealthy child is terminated and revoked without a ready Runtime or marker. |
+| ADAPTER-NATIVE-014 | Native attach server contract | An Adapter declares a native-attach interaction | Manifest validation or Profile compilation runs | A bounded Runtime start command and HTTP healthcheck matching the exact attach server port are required before Sandbox effects; absent or inconsistent declarations fail closed. |
 
 ## Non-goals
 
@@ -42,6 +44,11 @@ Workspace from a version-pinned Profile without granting uploaded code control-p
 Existing Pi/OpenCode Harness registrations, Runtime records, `harnessKey`, catalog queries, and
 Workspace/Task/Collaboration operations remain valid. Adapter is additive distribution language
 over the existing Harness port.
+
+The optional declarative `start` field is an additive V1 manifest capability. Existing terminal
+and headless Adapters without a long-running Runtime remain valid. Previously accepted
+native-attach manifests without a start command were nonfunctional; they now fail validation until
+the missing bounded start and matching HTTP healthcheck are declared.
 
 [Spec 120](../120-profile-aware-workspace-open-and-attach/spec.md) adds installation-owned named
 Credential Connection mappings, exact Profile selector resolution, Project defaults, immutable
