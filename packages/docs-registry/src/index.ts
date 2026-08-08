@@ -3193,6 +3193,7 @@ export const publicDocsOperationCoverage = [
     "agent-workspace-profiles.show",
     "agent-workspace-profiles.compile",
     "agent-workspace-profiles.configure-credential-connections",
+    "agent-workspace-profiles.configure-mcp-connections",
     "agent-workspace-profiles.disable",
     "agent-workspace-profiles.uninstall",
   ].map((operationKey) => ({
