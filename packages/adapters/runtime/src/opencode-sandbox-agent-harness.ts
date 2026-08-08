@@ -248,11 +248,13 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
     const modelAccess = this.options.modelAccess;
     if (!modelAccess) throw new Error("opencode_model_access_unavailable");
     const markerPath = this.serverMarkerPath(input.runtimeId);
-    const marked = await this.execution.readFile(input.executionContext, input.sandboxId, {
-      path: markerPath,
-    });
-    if (marked.isOk()) {
-      const marker = this.parseServerMarker(new TextDecoder().decode(marked.value));
+    const marked = await this.readServerMarker(
+      input.executionContext,
+      input.sandboxId,
+      markerPath,
+    );
+    if (marked) {
+      const marker = this.parseServerMarker(new TextDecoder().decode(marked));
       const processes = await this.execution.listProcesses(
         input.executionContext,
         input.sandboxId,
@@ -273,7 +275,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       }
       const legacyProcessId = marker
         ? undefined
-        : this.parseLegacyProcessId(new TextDecoder().decode(marked.value));
+        : this.parseLegacyProcessId(new TextDecoder().decode(marked));
       const processId = marker?.processId ?? legacyProcessId;
       if (
         processId &&
@@ -416,11 +418,13 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
     runtimeId: string;
   }): Promise<void> {
     const markerPath = this.serverMarkerPath(input.runtimeId);
-    const marker = await this.execution.readFile(input.executionContext, input.sandboxId, {
-      path: markerPath,
-    });
-    if (marker.isErr()) return;
-    const parsed = this.parseServerMarker(new TextDecoder().decode(marker.value));
+    const marker = await this.readServerMarker(
+      input.executionContext,
+      input.sandboxId,
+      markerPath,
+    );
+    if (!marker) return;
+    const parsed = this.parseServerMarker(new TextDecoder().decode(marker));
     if (parsed) {
       const terminated = await this.execution.terminateProcess(
         input.executionContext,
@@ -626,6 +630,24 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
 
   private serverMarkerPath(runtimeId: string): string {
     return `.appaloft-agent/${runtimeId}/opencode-process-id`;
+  }
+
+  private async readServerMarker(
+    context: ExecutionContext,
+    sandboxId: string,
+    path: string,
+  ): Promise<Uint8Array | null> {
+    const attempts = 3;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      const result = await this.execution.readFile(context, sandboxId, { path });
+      if (result.isOk()) return result.value;
+      if (result.error.code === "sandbox_file_not_found") return null;
+      if (result.error.retryable !== true || attempt === attempts) {
+        throw new Error(result.error.message);
+      }
+      await new Promise((resolve) => setTimeout(resolve, attempt * 100));
+    }
+    throw new Error("opencode_server_marker_read_failed");
   }
 
   private parseServerMarker(
