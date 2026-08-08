@@ -4,6 +4,7 @@
 
 - [x] Record owner-confirmed discovery, spec, ADR and test matrix.
 - [x] Create public [appaloft#1001](https://github.com/appaloft/appaloft/issues/1001) and label it `ready-for-agent`.
+- [x] Create follow-up [appaloft#1003](https://github.com/appaloft/appaloft/issues/1003) for the narrow protocol export required by the Cloud boundary review.
 
 ## Test first
 
@@ -17,6 +18,7 @@
 - [x] Propagate resolved Runtime credential bindings into Harness execution.
 - [x] Bind Pi/OpenCode issuance to exactly one `model-api` reference.
 - [x] Keep provider secret values outside all public inputs, results and child process material.
+- [x] Export `SandboxAgentModelProtocol` through a narrow application subpath so private compositions can reuse the public vocabulary without importing the application barrel.
 
 ## Verification and sync
 
