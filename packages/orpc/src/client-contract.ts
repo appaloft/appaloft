@@ -273,6 +273,7 @@ import {
   type AccountProfileResponse,
   type AgentAdapterInstallationResponse,
   type AgentWorkspaceCredentialReference,
+  type AgentWorkspaceMcpReference,
   type AgentWorkspaceProfileInstallationResponse,
   type ArchiveDeploymentResponse,
   type ArchiveEnvironmentResponse,
@@ -731,6 +732,15 @@ export type AppaloftOrpcClientContract = {
       {
         installationId: string;
         connections: AgentWorkspaceCredentialReference[];
+      },
+      AgentWorkspaceProfileInstallationResponse,
+      AppaloftClientError
+    >;
+    configureMcpConnections: Client<
+      AppaloftClientContext,
+      {
+        installationId: string;
+        connections: AgentWorkspaceMcpReference[];
       },
       AgentWorkspaceProfileInstallationResponse,
       AppaloftClientError

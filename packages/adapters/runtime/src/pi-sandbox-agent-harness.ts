@@ -8,6 +8,10 @@ import {
   type SandboxExecResult,
   type SandboxAgentModelAccessDescriptor,
   type SandboxAgentModelAccessProvider,
+  type SandboxAgentMcpAccessDescriptor,
+  type SandboxAgentMcpAccessProvider,
+  issueSandboxAgentMcpAccess,
+  revokeSandboxAgentMcpAccess,
 } from "@appaloft/application";
 import { type Result } from "@appaloft/core";
 
@@ -63,6 +67,9 @@ export interface PiSandboxAgentHarnessOptions {
   timeoutMs?: number;
   offlineStartup?: boolean;
   modelAccess?: PiSandboxModelAccessProvider;
+  mcpAccess?: SandboxAgentMcpAccessProvider;
+  /** Absolute path to a reviewed, template-owned Pi MCP extension. */
+  mcpExtensionPath?: string;
 }
 
 export function createPiSandboxModelConfig(modelAccess: PiSandboxModelAccess): string {
@@ -93,6 +100,7 @@ export function createPiSandboxArgv(input: {
   executable?: string;
   offlineStartup?: boolean;
   modelAccess: PiSandboxModelAccess;
+  mcpExtensionPath?: string;
   prompt: string;
 }): string[] {
   return [
@@ -103,6 +111,7 @@ export function createPiSandboxArgv(input: {
     "--tools",
     "read,bash,edit,write,grep,find,ls",
     "--no-extensions",
+    ...(input.mcpExtensionPath ? ["--extension", input.mcpExtensionPath] : []),
     "--no-skills",
     "--no-prompt-templates",
     "--no-context-files",
@@ -115,6 +124,30 @@ export function createPiSandboxArgv(input: {
     "--print",
     input.prompt,
   ];
+}
+
+export function createPiSandboxMcpConfig(
+  capabilities: readonly SandboxAgentMcpAccessDescriptor[],
+): string {
+  return JSON.stringify({
+    schemaVersion: "appaloft.pi-mcp/v1",
+    servers: capabilities.map((capability) => ({
+      name: capability.serverName,
+      transport: capability.transport,
+      url: capability.url,
+      headers: { Authorization: `Bearer ${capability.accessToken}` },
+      tools: [...capability.effectiveTools],
+    })),
+  });
+}
+
+function validPiMcpExtensionPath(path: string | undefined): path is string {
+  return Boolean(
+    path &&
+      path.startsWith("/") &&
+      !/[\0\r\n]/u.test(path) &&
+      !path.split("/").some((segment) => segment === ".."),
+  );
 }
 
 async function sha256(value: string): Promise<string> {
@@ -257,6 +290,10 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
       throw new Error("pi_model_access_unavailable");
     }
     const credentialBinding = requireSandboxAgentModelCredentialBinding(input.credentialBindings);
+    const mcpBindings = input.mcpBindings ?? [];
+    if (mcpBindings.length > 0 && !validPiMcpExtensionPath(this.options.mcpExtensionPath)) {
+      throw new Error("pi_mcp_extension_unavailable");
+    }
     const modelAccess = await modelAccessProvider.issue({
       executionContext: input.executionContext,
       sandboxId: input.sandboxId,
@@ -264,6 +301,22 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
       runId: input.runId,
       credentialBinding,
     });
+    let mcpCapabilities: SandboxAgentMcpAccessDescriptor[] = [];
+    try {
+      mcpCapabilities = await issueSandboxAgentMcpAccess(
+        this.options.mcpAccess,
+        {
+          executionContext: input.executionContext,
+          sandboxId: input.sandboxId,
+          runtimeId: input.runtimeId,
+          runId: input.runId,
+        },
+        mcpBindings,
+      );
+    } catch (error) {
+      await modelAccessProvider.revoke({ ...input, capabilityId: modelAccess.capabilityId });
+      throw error;
+    }
     const outputRoot = `.appaloft-agent/${input.runId}`;
     const agentDir = `${outputRoot}/agent`;
     const modelConfig = createPiSandboxModelConfig(modelAccess);
@@ -272,10 +325,7 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
       content: new TextEncoder().encode(modelConfig),
     });
     if (configured.isErr()) {
-      await modelAccessProvider.revoke({
-        ...input,
-        capabilityId: modelAccess.capabilityId,
-      });
+      await this.revokeCapabilities(input, modelAccess.capabilityId, mcpCapabilities);
       throw new Error(configured.error.message);
     }
     const piArgv = createPiSandboxArgv({
@@ -284,15 +334,19 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
         ? {}
         : { offlineStartup: this.options.offlineStartup }),
       modelAccess,
+      ...(mcpCapabilities.length > 0
+        ? { mcpExtensionPath: this.options.mcpExtensionPath }
+        : {}),
       prompt,
     });
+    const mcpConfig = createPiSandboxMcpConfig(mcpCapabilities);
     const stdoutPath = `${outputRoot}/stdout.jsonl`;
     const stderrPath = `${outputRoot}/stderr.log`;
     const exitPath = `${outputRoot}/exit-code`;
     const argv = [
       "sh",
       "-c",
-      'mkdir -p "$1"; out="$2"; err="$3"; status="$4"; export PI_CODING_AGENT_DIR="$5"; shift 5; "$@" >"$out" 2>"$err"; code=$?; printf "%s" "$code" >"$status"',
+      'IFS= read -r mcp_config; export APPALOFT_MCP_CONFIG="$mcp_config"; mkdir -p "$1"; out="$2"; err="$3"; status="$4"; export PI_CODING_AGENT_DIR="$5"; shift 5; "$@" >"$out" 2>"$err"; code=$?; printf "%s" "$code" >"$status"',
       "appaloft-pi-run",
       outputRoot,
       stdoutPath,
@@ -307,6 +361,7 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
         argv,
         ...(this.options.cwd && this.options.cwd !== "." ? { cwd: this.options.cwd } : {}),
         background: true,
+        stdin: new TextEncoder().encode(`${mcpConfig}\n`),
       });
       if (result.isErr()) throw new Error(result.error.message);
       if (result.value.mode !== "background") {
@@ -393,10 +448,7 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
     } finally {
       this.active.delete(input.runId);
       await this.cleanup(input.executionContext, input.sandboxId, outputRoot);
-      await modelAccessProvider.revoke({
-        ...input,
-        capabilityId: modelAccess.capabilityId,
-      });
+      await this.revokeCapabilities(input, modelAccess.capabilityId, mcpCapabilities);
     }
   }
 
@@ -425,5 +477,24 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
     } catch {
       // Run output is bounded and lives under the Sandbox-owned workspace; lifecycle cleanup remains authoritative.
     }
+  }
+
+  private async revokeCapabilities(
+    input: Parameters<SandboxAgentHarness["execute"]>[0],
+    modelCapabilityId: string,
+    mcpCapabilities: readonly SandboxAgentMcpAccessDescriptor[],
+  ): Promise<void> {
+    let firstError: unknown;
+    try {
+      await revokeSandboxAgentMcpAccess(this.options.mcpAccess, input, mcpCapabilities);
+    } catch (error) {
+      firstError = error;
+    }
+    try {
+      await this.options.modelAccess?.revoke({ ...input, capabilityId: modelCapabilityId });
+    } catch (error) {
+      firstError ??= error;
+    }
+    if (firstError) throw firstError;
   }
 }

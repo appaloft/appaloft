@@ -12,6 +12,7 @@ import {
   agentAdapterHostCapabilities,
   compileAgentWorkspaceProfile,
   resolveAgentAdapterCredentialBindings,
+  resolveAgentAdapterMcpBindings,
   validateAgentAdapterManifest,
   validateAgentWorkspaceProfile,
 } from "@appaloft/agent-adapter-sdk";
@@ -3691,6 +3692,22 @@ export function registerApplicationServices(
                 })),
               };
             }
+            const mcpBindings = input.mcpReferences
+              ? resolveAgentAdapterMcpBindings(
+                  input.adapterInstallation.definition.manifest,
+                  input.mcpReferences,
+                )
+              : undefined;
+            if (mcpBindings && !mcpBindings.ok) {
+              return {
+                ok: false,
+                issues: mcpBindings.issues.map((issue) => ({
+                  code: issue.code,
+                  path: issue.path ?? [],
+                  message: issue.message,
+                })),
+              };
+            }
             return {
               ok: true,
               plan: {
@@ -3700,6 +3717,14 @@ export function registerApplicationServices(
                       credentialBindings: bindings.bindings.map((binding) => ({
                         ...binding,
                         delivery: { ...binding.delivery },
+                      })),
+                    }
+                  : {}),
+                ...(mcpBindings?.ok
+                  ? {
+                      mcpBindings: mcpBindings.bindings.map((binding) => ({
+                        ...binding,
+                        requestedTools: [...binding.requestedTools],
                       })),
                     }
                   : {}),

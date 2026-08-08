@@ -81,6 +81,8 @@ export interface AgentWorkspaceProfileCompiledPlan {
   suggestedChecks: { name: string; argv: string[]; cwd?: string }[];
   credentialRequirements: AgentWorkspaceCredentialRequirement[];
   credentialBindings?: AgentWorkspaceCredentialBinding[];
+  mcpRequirements?: AgentWorkspaceMcpRequirement[];
+  mcpBindings?: AgentWorkspaceMcpBinding[];
   pin: AgentWorkspaceProfilePin;
 }
 
@@ -107,6 +109,26 @@ export interface AgentWorkspaceCredentialBinding {
   purpose: string;
   delivery: AgentWorkspaceCredentialRequirement["delivery"];
   connectionReference: string;
+}
+
+export interface AgentWorkspaceMcpReference {
+  requirementId: string;
+  connectionReference: string;
+}
+
+export interface AgentWorkspaceMcpRequirement {
+  id: string;
+  required: boolean;
+  purpose: string;
+  requestedTools: string[];
+}
+
+export interface AgentWorkspaceMcpBinding {
+  requirementId: string;
+  connectionReference: string;
+  required: boolean;
+  purpose: string;
+  requestedTools: string[];
 }
 
 export interface AgentWorkspaceProfilePin {
@@ -145,6 +167,7 @@ export interface AgentWorkspaceProfileValidatorCompiler {
       profileInstallationId: string;
       adapterInstallation: ResolvedAgentAdapterInstallation;
       credentialReferences?: readonly AgentWorkspaceCredentialReference[];
+      mcpReferences?: readonly AgentWorkspaceMcpReference[];
     },
   ):
     | { ok: true; plan: AgentWorkspaceProfileCompiledPlan }
@@ -166,6 +189,7 @@ export interface AgentWorkspaceProfileInstallationReadModel {
   installedAt: string;
   updatedAt?: string;
   credentialConnections: readonly AgentWorkspaceCredentialReference[];
+  mcpConnections: readonly AgentWorkspaceMcpReference[];
 }
 
 export interface AgentWorkspaceProfileRegistryRepository {
@@ -504,6 +528,49 @@ export class AgentWorkspaceProfileInstallationService {
     return this.readModel(found.value.installation, found.value.definition);
   }
 
+  async configureMcpConnections(
+    context: ExecutionContext,
+    input: {
+      installationId: string;
+      connections: readonly AgentWorkspaceMcpReference[];
+    },
+  ): Promise<Result<AgentWorkspaceProfileInstallationReadModel>> {
+    const found = await this.findWithDefinition(context, input.installationId);
+    if (found.isErr()) return err(found.error);
+    const available = found.value.installation.assertAvailableForNewWorkspace();
+    if (available.isErr()) return err(available.error);
+    const validated = this.validateStored(found.value.definition, input.installationId);
+    if (validated.isErr()) return err(validated.error);
+    const adapter = await this.dependencies.adapterService.resolveDefinitionForNewWorkspace(
+      context,
+      validated.value.adapterDefinitionDigest,
+    );
+    if (adapter.isErr()) return err(adapter.error);
+    const compiled = this.dependencies.validatorCompiler.compile(validated.value.manifest, {
+      profileInstallationId: input.installationId,
+      adapterInstallation: adapter.value,
+      mcpReferences: input.connections,
+    });
+    if (!compiled.ok) return this.validationError(compiled.issues);
+    const expectedRevision = found.value.installation.toState().revision.value;
+    const at = UpdatedAt.create(this.dependencies.clock.now());
+    if (at.isErr()) return err(at.error);
+    const configured = found.value.installation.configureMcpConnections(
+      input.connections,
+      at.value,
+    );
+    if (configured.isErr()) return err(configured.error);
+    if (configured.value.changed) {
+      const saved = await this.dependencies.repository.saveInstallation(
+        toRepositoryContext(context),
+        found.value.installation,
+        expectedRevision,
+      );
+      if (saved.isErr()) return err(saved.error);
+    }
+    return this.readModel(found.value.installation, found.value.definition);
+  }
+
   async uninstall(
     context: ExecutionContext,
     installationId: string,
@@ -536,6 +603,7 @@ export class AgentWorkspaceProfileInstallationService {
     installationId: string,
     input: {
       credentialReferences?: readonly AgentWorkspaceCredentialReference[];
+      mcpReferences?: readonly AgentWorkspaceMcpReference[];
     } = {},
   ): Promise<Result<AgentWorkspaceProfileCompiledPlan>> {
     const found = await this.findWithDefinition(context, installationId);
@@ -554,6 +622,7 @@ export class AgentWorkspaceProfileInstallationService {
       adapterInstallation: adapter.value,
       credentialReferences:
         input.credentialReferences ?? found.value.installation.toState().credentialConnections,
+      mcpReferences: input.mcpReferences ?? found.value.installation.toState().mcpConnections,
     });
     if (!compiled.ok) return this.validationError(compiled.issues);
     const registered = this.dependencies.harnessRegistrar.register(
@@ -640,6 +709,7 @@ export class AgentWorkspaceProfileInstallationService {
       status: state.status.value,
       installedAt: state.installedAt.value,
       credentialConnections: state.credentialConnections.map((connection) => ({ ...connection })),
+      mcpConnections: state.mcpConnections.map((connection) => ({ ...connection })),
       ...(state.updatedAt ? { updatedAt: state.updatedAt.value } : {}),
     });
   }

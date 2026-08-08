@@ -25,6 +25,7 @@ export const agentWorkspaceCredentialReferenceSchema = z
       .regex(/^[A-Za-z][A-Za-z0-9_.:-]{0,159}$/),
   })
   .strict();
+export const agentWorkspaceMcpReferenceSchema = agentWorkspaceCredentialReferenceSchema;
 const credentialRequirementSchema = z
   .object({
     id: z
@@ -56,6 +57,31 @@ const credentialBindingSchema = credentialRequirementSchema
       .trim()
       .regex(/^[a-z][a-z0-9-]{0,62}$/),
     connectionReference: agentWorkspaceCredentialReferenceSchema.shape.connectionReference,
+  })
+  .strict();
+const mcpRequirementSchema = z
+  .object({
+    id: z
+      .string()
+      .trim()
+      .regex(/^[a-z][a-z0-9-]{0,62}$/),
+    required: z.boolean(),
+    purpose: z.string().trim().min(1).max(1_000),
+    requestedTools: z
+      .array(
+        z
+          .string()
+          .trim()
+          .regex(/^[A-Za-z][A-Za-z0-9_.:/-]{0,127}$/),
+      )
+      .max(128),
+  })
+  .strict();
+const mcpBindingSchema = mcpRequirementSchema
+  .omit({ id: true })
+  .extend({
+    requirementId: agentWorkspaceMcpReferenceSchema.shape.requirementId,
+    connectionReference: agentWorkspaceMcpReferenceSchema.shape.connectionReference,
   })
   .strict();
 const healthcheckSchema = z.discriminatedUnion("kind", [
@@ -91,6 +117,10 @@ export const configureAgentWorkspaceProfileCredentialConnectionsInputSchema =
       connections: z.array(agentWorkspaceCredentialReferenceSchema).max(32),
     })
     .strict();
+export const configureAgentWorkspaceProfileMcpConnectionsInputSchema =
+  showAgentWorkspaceProfileInputSchema
+    .extend({ connections: z.array(agentWorkspaceMcpReferenceSchema).max(32) })
+    .strict();
 
 export const agentWorkspaceProfileInstallationSchema = z
   .object({
@@ -104,6 +134,7 @@ export const agentWorkspaceProfileInstallationSchema = z
     installedAt: z.string().datetime(),
     updatedAt: z.string().datetime().optional(),
     credentialConnections: z.array(agentWorkspaceCredentialReferenceSchema),
+    mcpConnections: z.array(agentWorkspaceMcpReferenceSchema),
   })
   .strict();
 
@@ -120,6 +151,8 @@ export const listAgentWorkspaceProfilesResponseSchema = z.array(
 export const showAgentWorkspaceProfileResponseSchema = agentWorkspaceProfileInstallationSchema;
 export const disableAgentWorkspaceProfileResponseSchema = agentWorkspaceProfileInstallationSchema;
 export const configureAgentWorkspaceProfileCredentialConnectionsResponseSchema =
+  agentWorkspaceProfileInstallationSchema;
+export const configureAgentWorkspaceProfileMcpConnectionsResponseSchema =
   agentWorkspaceProfileInstallationSchema;
 export const uninstallAgentWorkspaceProfileResponseSchema = z
   .object({
@@ -219,6 +252,8 @@ export const compileAgentWorkspaceProfileResponseSchema = z
     ),
     credentialRequirements: z.array(credentialRequirementSchema),
     credentialBindings: z.array(credentialBindingSchema).optional(),
+    mcpRequirements: z.array(mcpRequirementSchema).default([]),
+    mcpBindings: z.array(mcpBindingSchema).optional(),
     pin: z
       .object({
         profileInstallationId: installationIdSchema,
@@ -251,6 +286,9 @@ export type CompileAgentWorkspaceProfileResponse = z.output<
 >;
 export type ConfigureAgentWorkspaceProfileCredentialConnectionsResponse = z.output<
   typeof configureAgentWorkspaceProfileCredentialConnectionsResponseSchema
+>;
+export type ConfigureAgentWorkspaceProfileMcpConnectionsResponse = z.output<
+  typeof configureAgentWorkspaceProfileMcpConnectionsResponseSchema
 >;
 export type UninstallAgentWorkspaceProfileResponse = z.output<
   typeof uninstallAgentWorkspaceProfileResponseSchema
@@ -348,6 +386,24 @@ export class ConfigureAgentWorkspaceProfileCredentialConnectionsCommand extends 
   ): Result<ConfigureAgentWorkspaceProfileCredentialConnectionsCommand> {
     return command(
       configureAgentWorkspaceProfileCredentialConnectionsInputSchema,
+      input,
+      (parsed) => new this(parsed),
+    );
+  }
+}
+
+export class ConfigureAgentWorkspaceProfileMcpConnectionsCommand extends Command<
+  z.output<typeof configureAgentWorkspaceProfileMcpConnectionsResponseSchema>
+> {
+  constructor(
+    public readonly input: z.output<typeof configureAgentWorkspaceProfileMcpConnectionsInputSchema>,
+  ) {
+    super();
+  }
+
+  static create(input: unknown): Result<ConfigureAgentWorkspaceProfileMcpConnectionsCommand> {
+    return command(
+      configureAgentWorkspaceProfileMcpConnectionsInputSchema,
       input,
       (parsed) => new this(parsed),
     );

@@ -5,6 +5,7 @@ import {
   agentWorkspaceProfileSchemaVersion,
   compileAgentWorkspaceProfile,
   resolveAgentAdapterCredentialBindings,
+  resolveAgentAdapterMcpBindings,
   validateAgentAdapterManifest,
   validateAgentWorkspaceProfile,
 } from "../src";
@@ -61,6 +62,14 @@ function validManifest() {
           kind: "process-environment",
           variable: "OPENAI_API_KEY",
         },
+      },
+    ],
+    mcpServers: [
+      {
+        id: "appaloft-tools",
+        required: true,
+        purpose: "Read deployment and Workspace state.",
+        requestedTools: ["projects.list", "workspaces.show"],
       },
     ],
   } as const;
@@ -511,6 +520,84 @@ describe("Agent Adapter manifest validation", () => {
     expect(escapingPath).toMatchObject({
       ok: false,
       issues: [{ code: "invalid_manifest", path: ["persistentPaths", 0] }],
+    });
+  });
+
+  test("[MCP-ACCESS-MANIFEST-001] accepts bounded MCP requirements and rejects connection material", () => {
+    expect(validateAgentAdapterManifest(validManifest()).ok).toBe(true);
+    expect(
+      validateAgentAdapterManifest({
+        ...validManifest(),
+        mcpServers: [
+          {
+            ...validManifest().mcpServers[0],
+            endpoint: "https://mcp.example.test/mcp",
+            headers: { Authorization: "Bearer secret" },
+            command: ["node", "server.js"],
+          },
+        ],
+      }),
+    ).toMatchObject({
+      ok: false,
+      issues: [{ code: "invalid_manifest", path: ["mcpServers", 0] }],
+    });
+    expect(
+      validateAgentAdapterManifest({
+        ...validManifest(),
+        mcpServers: [
+          validManifest().mcpServers[0],
+          { ...validManifest().mcpServers[0], requestedTools: ["projects.show"] },
+        ],
+      }),
+    ).toMatchObject({
+      ok: false,
+      issues: [{ code: "invalid_manifest", path: ["mcpServers", 1] }],
+    });
+  });
+
+  test("[MCP-ACCESS-BIND-002][MCP-ACCESS-BIND-003] resolves exact opaque MCP bindings", () => {
+    expect(
+      resolveAgentAdapterMcpBindings(validManifest(), [
+        {
+          requirementId: "appaloft-tools",
+          connectionReference: "mcpconn_appaloft",
+        },
+      ]),
+    ).toEqual({
+      ok: true,
+      bindings: [
+        {
+          requirementId: "appaloft-tools",
+          connectionReference: "mcpconn_appaloft",
+          purpose: "Read deployment and Workspace state.",
+          required: true,
+          requestedTools: ["projects.list", "workspaces.show"],
+        },
+      ],
+    });
+    expect(resolveAgentAdapterMcpBindings(validManifest(), [])).toMatchObject({
+      ok: false,
+      issues: [{ code: "missing_required_mcp_connection", requirementId: "appaloft-tools" }],
+    });
+    expect(
+      resolveAgentAdapterMcpBindings(validManifest(), [
+        { requirementId: "appaloft-tools", connectionReference: "mcpconn_first" },
+        { requirementId: "appaloft-tools", connectionReference: "mcpconn_second" },
+      ]),
+    ).toMatchObject({
+      ok: false,
+      issues: [{ code: "duplicate_mcp_binding", requirementId: "appaloft-tools" }],
+    });
+    expect(
+      resolveAgentAdapterMcpBindings(validManifest(), [
+        { requirementId: "unknown", connectionReference: "mcpconn_unknown" },
+      ]),
+    ).toMatchObject({
+      ok: false,
+      issues: [
+        { code: "unknown_mcp_requirement", requirementId: "unknown" },
+        { code: "missing_required_mcp_connection", requirementId: "appaloft-tools" },
+      ],
     });
   });
 

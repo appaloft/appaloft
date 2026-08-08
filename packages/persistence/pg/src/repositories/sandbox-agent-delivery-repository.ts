@@ -1,5 +1,6 @@
 import {
   type AgentWorkspaceCredentialBinding,
+  type AgentWorkspaceMcpBinding,
   type AgentWorkspaceProfilePin,
   type CandidatePreviewRecord,
   type RepositoryContext,
@@ -72,6 +73,7 @@ type RuntimeJson = {
   projectId?: string;
   profilePin?: AgentWorkspaceProfilePin;
   credentialBindings?: AgentWorkspaceCredentialBinding[];
+  mcpBindings?: AgentWorkspaceMcpBinding[];
 };
 function runtimeRecord(row: RuntimeRow): SandboxAgentRuntimeRecord {
   const state = json<RuntimeJson>(row.state);
@@ -92,6 +94,7 @@ function runtimeRecord(row: RuntimeRow): SandboxAgentRuntimeRecord {
     ...(state.projectId ? { projectId: state.projectId } : {}),
     ...(state.profilePin ? { profilePin: state.profilePin } : {}),
     ...(state.credentialBindings ? { credentialBindings: state.credentialBindings } : {}),
+    ...(state.mcpBindings ? { mcpBindings: state.mcpBindings } : {}),
   };
 }
 
@@ -247,6 +250,7 @@ export class PgSandboxAgentDeliveryRepository implements SandboxAgentDeliveryRep
       ...(record.projectId ? { projectId: record.projectId } : {}),
       ...(record.profilePin ? { profilePin: record.profilePin } : {}),
       ...(record.credentialBindings ? { credentialBindings: record.credentialBindings } : {}),
+      ...(record.mcpBindings ? { mcpBindings: record.mcpBindings } : {}),
     };
     await executor
       .insertInto("sandbox_agent_runtimes")
@@ -329,6 +333,7 @@ export class PgSandboxAgentDeliveryRepository implements SandboxAgentDeliveryRep
           ...(record.projectId ? { projectId: record.projectId } : {}),
           ...(record.profilePin ? { profilePin: record.profilePin } : {}),
           ...(record.credentialBindings ? { credentialBindings: record.credentialBindings } : {}),
+          ...(record.mcpBindings ? { mcpBindings: record.mcpBindings } : {}),
         },
         updated_at: state.updatedAt?.value ?? state.createdAt.value,
       })

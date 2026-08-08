@@ -22,9 +22,15 @@ export interface AgentWorkspaceProfileInstallationState {
   installedAt: CreatedAt;
   updatedAt?: UpdatedAt;
   credentialConnections: readonly AgentWorkspaceProfileCredentialConnection[];
+  mcpConnections: readonly AgentWorkspaceProfileMcpConnection[];
 }
 
 export interface AgentWorkspaceProfileCredentialConnection {
+  readonly requirementId: string;
+  readonly connectionReference: string;
+}
+
+export interface AgentWorkspaceProfileMcpConnection {
   readonly requirementId: string;
   readonly connectionReference: string;
 }
@@ -40,7 +46,7 @@ export class AgentWorkspaceProfileInstallation extends AggregateRoot<
   static install(
     input: Omit<
       AgentWorkspaceProfileInstallationState,
-      "credentialConnections" | "revision" | "status"
+      "credentialConnections" | "mcpConnections" | "revision" | "status"
     >,
   ): Result<AgentWorkspaceProfileInstallation> {
     const installation = new AgentWorkspaceProfileInstallation({
@@ -48,6 +54,7 @@ export class AgentWorkspaceProfileInstallation extends AggregateRoot<
       status: AgentWorkspaceProfileInstallationStatus.enabled(),
       revision: AgentWorkspaceProfileInstallationRevision.initial(),
       credentialConnections: [],
+      mcpConnections: [],
     });
     installation.recordDomainEvent(
       "agent_workspace_profile_installation.installed",
@@ -67,6 +74,7 @@ export class AgentWorkspaceProfileInstallation extends AggregateRoot<
     return new AgentWorkspaceProfileInstallation({
       ...state,
       credentialConnections: [...(state.credentialConnections ?? [])],
+      mcpConnections: [...(state.mcpConnections ?? [])],
     });
   }
 
@@ -140,6 +148,48 @@ export class AgentWorkspaceProfileInstallation extends AggregateRoot<
     return ok({ changed: true });
   }
 
+  configureMcpConnections(
+    connections: readonly AgentWorkspaceProfileMcpConnection[],
+    at: UpdatedAt,
+  ): Result<{ changed: boolean }> {
+    const normalized = [...connections]
+      .map((connection) => ({
+        requirementId: connection.requirementId.trim(),
+        connectionReference: connection.connectionReference.trim(),
+      }))
+      .sort((left, right) => left.requirementId.localeCompare(right.requirementId));
+    if (
+      normalized.some(
+        (connection, index) =>
+          !/^[a-z][a-z0-9-]{0,62}$/u.test(connection.requirementId) ||
+          !/^[A-Za-z][A-Za-z0-9_.:-]{0,159}$/u.test(connection.connectionReference) ||
+          normalized[index - 1]?.requirementId === connection.requirementId,
+      )
+    ) {
+      return err(domainError.validation("Agent Workspace Profile MCP Connections are invalid"));
+    }
+    const current = [...this.state.mcpConnections].sort((left, right) =>
+      left.requirementId.localeCompare(right.requirementId),
+    );
+    if (
+      current.length === normalized.length &&
+      current.every(
+        (connection, index) =>
+          connection.requirementId === normalized[index]?.requirementId &&
+          connection.connectionReference === normalized[index]?.connectionReference,
+      )
+    ) {
+      return ok({ changed: false });
+    }
+    this.state.mcpConnections = normalized;
+    this.state.revision = this.state.revision.next();
+    this.state.updatedAt = at;
+    this.recordDomainEvent("agent_workspace_profile_installation.mcp_connections_configured", at, {
+      requirementIds: normalized.map((connection) => connection.requirementId),
+    });
+    return ok({ changed: true });
+  }
+
   assertCanUninstall(activeReferences: ActiveAgentWorkspaceReferenceCount): Result<void> {
     if (activeReferences.hasActiveReferences()) {
       return err(
@@ -161,6 +211,7 @@ export class AgentWorkspaceProfileInstallation extends AggregateRoot<
       credentialConnections: this.state.credentialConnections.map((connection) => ({
         ...connection,
       })),
+      mcpConnections: this.state.mcpConnections.map((connection) => ({ ...connection })),
     };
   }
 }

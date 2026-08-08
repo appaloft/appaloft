@@ -4,9 +4,14 @@ import {
   type SandboxAgentModelAccessProvider,
   type SandboxAgentHarness,
   type SandboxAgentHarnessEvent,
+  type SandboxAgentMcpAccessDescriptor,
+  type SandboxAgentMcpAccessProvider,
   type SandboxExecResult,
   type SandboxFileDescriptor,
   type SandboxProcessDescriptor,
+  issueSandboxAgentMcpAccess,
+  reconcileSandboxAgentMcpAccessScope,
+  revokeSandboxAgentMcpAccess,
 } from "@appaloft/application";
 import { type Result } from "@appaloft/core";
 import { sandboxWorkspaceProcessArgv } from "./sandbox-workspace-process-environment";
@@ -63,6 +68,7 @@ export interface OpenCodeSandboxAgentHarnessOptions {
   startupPollAttempts?: number;
   startupPollIntervalMs?: number;
   modelAccess?: OpenCodeSandboxModelAccessProvider;
+  mcpAccess?: SandboxAgentMcpAccessProvider;
 }
 
 type OpenCodeSandboxModelCapability = Awaited<
@@ -152,7 +158,10 @@ function validModelCapability(
   );
 }
 
-function modelConfig(capability: OpenCodeSandboxModelCapability): string {
+export function createOpenCodeSandboxConfig(
+  capability: OpenCodeSandboxModelCapability,
+  mcpCapabilities: readonly SandboxAgentMcpAccessDescriptor[] = [],
+): string {
   return JSON.stringify({
     model: `${capability.provider}/${capability.model}`,
     snapshot: false,
@@ -169,6 +178,24 @@ function modelConfig(capability: OpenCodeSandboxModelCapability): string {
         },
       },
     },
+    ...(mcpCapabilities.length > 0
+      ? {
+          mcp: Object.fromEntries(
+            mcpCapabilities.map((mcpCapability) => [
+              mcpCapability.serverName,
+              {
+                type: "remote",
+                url: mcpCapability.url,
+                enabled: true,
+                oauth: false,
+                headers: {
+                  Authorization: `Bearer ${mcpCapability.accessToken}`,
+                },
+              },
+            ]),
+          ),
+        }
+      : {}),
   });
 }
 
@@ -247,6 +274,8 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
     const credentialBinding = requireSandboxAgentModelCredentialBinding(input.credentialBindings);
     const modelAccess = this.options.modelAccess;
     if (!modelAccess) throw new Error("opencode_model_access_unavailable");
+    const mcpBindings = input.mcpBindings ?? [];
+    const mcpBindingDigest = await sha256(JSON.stringify(mcpBindings));
     const markerPath = this.serverMarkerPath(input.runtimeId);
     const marked = await this.readServerMarker(
       input.executionContext,
@@ -262,7 +291,14 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       if (processes.isErr()) throw new Error(processes.error.message);
       if (
         marker &&
-        marker.schemaVersion === "opencode-server-marker/v2" &&
+        (marker.schemaVersion === "opencode-server-marker/v3"
+          ? marker.mcpBindingDigest === mcpBindingDigest &&
+            marker.mcpCapabilities.every(
+              (capability) =>
+                new Date(capability.expiresAt).getTime() >
+                Date.now() + this.serverCapabilitySafetyWindowMs(),
+            )
+          : marker.schemaVersion === "opencode-server-marker/v2" && mcpBindings.length === 0) &&
         marker.provider &&
         marker.model &&
         new Date(marker.expiresAt).getTime() > Date.now() + this.serverCapabilitySafetyWindowMs() &&
@@ -277,6 +313,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
         ? undefined
         : this.parseLegacyProcessId(new TextDecoder().decode(marked));
       const processId = marker?.processId ?? legacyProcessId;
+      let cleanupError: unknown;
       if (
         processId &&
         processes.value.some(
@@ -288,21 +325,42 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
           input.sandboxId,
           processId,
         );
-        if (terminated.isErr()) throw new Error(terminated.error.message);
+        if (terminated.isErr()) cleanupError = new Error(terminated.error.message);
       }
       if (marker) {
-        await this.options.modelAccess?.revoke({
+        try {
+          await this.options.modelAccess?.revoke({
+            ...input,
+            runId: input.runtimeId,
+            capabilityId: marker.capabilityId,
+          });
+        } catch (error) {
+          cleanupError ??= error;
+        }
+        try {
+          await this.revokeMcpCapabilityIds(
+            { ...input, runId: input.runtimeId },
+            marker.mcpCapabilities.map((capability) => capability.capabilityId),
+          );
+        } catch (error) {
+          cleanupError ??= error;
+        }
+      }
+      try {
+        await reconcileSandboxAgentMcpAccessScope(this.options.mcpAccess, {
           ...input,
           runId: input.runtimeId,
-          capabilityId: marker.capabilityId,
         });
+      } catch (error) {
+        cleanupError ??= error;
       }
       const removed = await this.execution.removeFile(
         input.executionContext,
         input.sandboxId,
         { path: markerPath },
       );
-      if (removed.isErr()) throw new Error(removed.error.message);
+      if (removed.isErr()) cleanupError ??= new Error(removed.error.message);
+      if (cleanupError) throw cleanupError;
     }
 
     const version = await this.execution.exec(input.executionContext, input.sandboxId, {
@@ -329,13 +387,29 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       });
       throw new Error("opencode_model_access_invalid");
     }
-    const config = modelConfig(capability);
-    if (!(await this.nativeConfigIsValid(input.executionContext, input.sandboxId, config))) {
+    let mcpCapabilities: SandboxAgentMcpAccessDescriptor[] = [];
+    try {
+      mcpCapabilities = await issueSandboxAgentMcpAccess(
+        this.options.mcpAccess,
+        {
+          executionContext: input.executionContext,
+          sandboxId: input.sandboxId,
+          runtimeId: input.runtimeId,
+          runId: input.runtimeId,
+        },
+        mcpBindings,
+      );
+    } catch (error) {
       await modelAccess.revoke({
         ...input,
         runId: input.runtimeId,
         capabilityId: capability.capabilityId,
       });
+      throw error;
+    }
+    const config = createOpenCodeSandboxConfig(capability, mcpCapabilities);
+    if (!(await this.nativeConfigIsValid(input.executionContext, input.sandboxId, config))) {
+      await this.revokePreparedCapabilities(input, capability.capabilityId, mcpCapabilities);
       throw new Error("opencode_harness_config_invalid");
     }
     const started = await this.execution.exec(input.executionContext, input.sandboxId, {
@@ -358,11 +432,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       stdin: new TextEncoder().encode(`${config}\n${capability.accessToken}\n`),
     });
     if (started.isErr() || started.value.mode !== "background") {
-      await modelAccess.revoke({
-        ...input,
-        runId: input.runtimeId,
-        capabilityId: capability.capabilityId,
-      });
+      await this.revokePreparedCapabilities(input, capability.capabilityId, mcpCapabilities);
       throw new Error(
         started.isErr() ? started.error.message : "opencode_server_background_process_required",
       );
@@ -388,18 +458,28 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
             path: markerPath,
             content: new TextEncoder().encode(
               JSON.stringify({
-                schemaVersion: "opencode-server-marker/v2",
+                schemaVersion: "opencode-server-marker/v3",
                 processId,
                 capabilityId: capability.capabilityId,
                 expiresAt: capability.expiresAt,
                 provider: capability.provider,
                 model: capability.model,
+                mcpBindingDigest,
+                mcpCapabilities: mcpCapabilities.map((mcpCapability) => ({
+                  capabilityId: mcpCapability.capabilityId,
+                  expiresAt: mcpCapability.expiresAt,
+                })),
               }),
             ),
           },
         );
         if (written.isErr()) {
-          await this.cleanupStartedServer(input, processId, capability.capabilityId);
+          await this.cleanupStartedServer(
+            input,
+            processId,
+            capability.capabilityId,
+            mcpCapabilities,
+          );
           throw new Error(written.error.message);
         }
         return;
@@ -408,7 +488,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
         setTimeout(resolve, this.options.startupPollIntervalMs ?? 200),
       );
     }
-    await this.cleanupStartedServer(input, processId, capability.capabilityId);
+    await this.cleanupStartedServer(input, processId, capability.capabilityId, mcpCapabilities);
     throw new Error("opencode_server_start_failed");
   }
 
@@ -423,25 +503,53 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       input.sandboxId,
       markerPath,
     );
-    if (!marker) return;
+    if (!marker) {
+      await reconcileSandboxAgentMcpAccessScope(this.options.mcpAccess, {
+        ...input,
+        runId: input.runtimeId,
+      });
+      return;
+    }
     const parsed = this.parseServerMarker(new TextDecoder().decode(marker));
+    let cleanupError: unknown;
     if (parsed) {
       const terminated = await this.execution.terminateProcess(
         input.executionContext,
         input.sandboxId,
         parsed.processId,
       );
-      if (terminated.isErr()) throw new Error(terminated.error.message);
-      await this.options.modelAccess?.revoke({
+      if (terminated.isErr()) cleanupError = new Error(terminated.error.message);
+      try {
+        await this.options.modelAccess?.revoke({
+          ...input,
+          runId: input.runtimeId,
+          capabilityId: parsed.capabilityId,
+        });
+      } catch (error) {
+        cleanupError ??= error;
+      }
+      try {
+        await this.revokeMcpCapabilityIds(
+          { ...input, runId: input.runtimeId },
+          parsed.mcpCapabilities.map((capability) => capability.capabilityId),
+        );
+      } catch (error) {
+        cleanupError ??= error;
+      }
+    }
+    try {
+      await reconcileSandboxAgentMcpAccessScope(this.options.mcpAccess, {
         ...input,
         runId: input.runtimeId,
-        capabilityId: parsed.capabilityId,
       });
+    } catch (error) {
+      cleanupError ??= error;
     }
     const removed = await this.execution.removeFile(input.executionContext, input.sandboxId, {
       path: markerPath,
     });
-    if (removed.isErr()) throw new Error(removed.error.message);
+    if (removed.isErr()) cleanupError ??= new Error(removed.error.message);
+    if (cleanupError) throw cleanupError;
   }
 
   async execute(input: Parameters<SandboxAgentHarness["execute"]>[0]) {
@@ -466,8 +574,16 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       });
       throw new Error("opencode_model_access_invalid");
     }
-    const config = modelConfig(capability);
-    if (!(await this.nativeConfigIsValid(input.executionContext, input.sandboxId, config))) {
+    const mcpCapabilities = await issueSandboxAgentMcpAccess(
+      this.options.mcpAccess,
+      {
+        executionContext: input.executionContext,
+        sandboxId: input.sandboxId,
+        runtimeId: input.runtimeId,
+        runId: input.runId,
+      },
+      input.mcpBindings,
+    ).catch(async (error) => {
       await modelAccess.revoke({
         executionContext: input.executionContext,
         sandboxId: input.sandboxId,
@@ -475,6 +591,11 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
         runId: input.runId,
         capabilityId: capability.capabilityId,
       });
+      throw error;
+    });
+    const config = createOpenCodeSandboxConfig(capability, mcpCapabilities);
+    if (!(await this.nativeConfigIsValid(input.executionContext, input.sandboxId, config))) {
+      await this.revokeCapabilities(input, capability.capabilityId, mcpCapabilities);
       throw new Error("opencode_harness_config_invalid");
     }
     const outputRoot = `.appaloft-agent/${input.runId}`;
@@ -514,23 +635,11 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       stdin: new TextEncoder().encode(`${config}\n${capability.accessToken}\n`),
     });
     if (result.isErr()) {
-      await modelAccess.revoke({
-        executionContext: input.executionContext,
-        sandboxId: input.sandboxId,
-        runtimeId: input.runtimeId,
-        runId: input.runId,
-        capabilityId: capability.capabilityId,
-      });
+      await this.revokeCapabilities(input, capability.capabilityId, mcpCapabilities);
       throw new Error(result.error.message);
     }
     if (result.value.mode !== "background") {
-      await modelAccess.revoke({
-        executionContext: input.executionContext,
-        sandboxId: input.sandboxId,
-        runtimeId: input.runtimeId,
-        runId: input.runId,
-        capabilityId: capability.capabilityId,
-      });
+      await this.revokeCapabilities(input, capability.capabilityId, mcpCapabilities);
       throw new Error("OpenCode harness requires a cancellable background process");
     }
     const active = {
@@ -606,13 +715,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       };
     } finally {
       this.active.delete(input.runId);
-      await modelAccess.revoke({
-        executionContext: input.executionContext,
-        sandboxId: input.sandboxId,
-        runtimeId: input.runtimeId,
-        runId: input.runId,
-        capabilityId: capability.capabilityId,
-      });
+      await this.revokeCapabilities(input, capability.capabilityId, mcpCapabilities);
     }
   }
 
@@ -659,6 +762,8 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
     expiresAt: string;
     provider?: string;
     model?: string;
+    mcpBindingDigest?: string;
+    mcpCapabilities: Array<{ capabilityId: string; expiresAt: string }>;
   } | null {
     try {
       const parsed = JSON.parse(value) as Record<string, unknown>;
@@ -668,7 +773,8 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
         typeof parsed.expiresAt === "string"
       ) {
         return {
-          ...(parsed.schemaVersion === "opencode-server-marker/v2"
+          ...(parsed.schemaVersion === "opencode-server-marker/v2" ||
+          parsed.schemaVersion === "opencode-server-marker/v3"
             ? { schemaVersion: parsed.schemaVersion }
             : {}),
           processId: parsed.processId,
@@ -676,6 +782,29 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
           expiresAt: parsed.expiresAt,
           ...(typeof parsed.provider === "string" ? { provider: parsed.provider } : {}),
           ...(typeof parsed.model === "string" ? { model: parsed.model } : {}),
+          ...(typeof parsed.mcpBindingDigest === "string"
+            ? { mcpBindingDigest: parsed.mcpBindingDigest }
+            : {}),
+          mcpCapabilities: Array.isArray(parsed.mcpCapabilities)
+            ? parsed.mcpCapabilities.flatMap((candidate) => {
+                if (
+                  typeof candidate === "object" &&
+                  candidate !== null &&
+                  typeof (candidate as Record<string, unknown>).capabilityId === "string" &&
+                  typeof (candidate as Record<string, unknown>).expiresAt === "string"
+                ) {
+                  const capabilityId = (candidate as Record<string, unknown>).capabilityId;
+                  const expiresAt = (candidate as Record<string, unknown>).expiresAt;
+                  return [
+                    {
+                      capabilityId: capabilityId as string,
+                      expiresAt: expiresAt as string,
+                    },
+                  ];
+                }
+                return [];
+              })
+            : [],
         };
       }
     } catch {
@@ -699,6 +828,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
     },
     processId: string,
     capabilityId: string,
+    mcpCapabilities: readonly SandboxAgentMcpAccessDescriptor[],
   ): Promise<void> {
     const terminated = await this.execution.terminateProcess(
       input.executionContext,
@@ -715,12 +845,88 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
     } catch (error) {
       revokeError = error;
     }
+    try {
+      await revokeSandboxAgentMcpAccess(
+        this.options.mcpAccess,
+        { ...input, runId: input.runtimeId },
+        mcpCapabilities,
+      );
+    } catch (error) {
+      revokeError ??= error;
+    }
     if (terminated.isErr()) throw new Error(terminated.error.message);
     if (revokeError) {
       throw revokeError instanceof Error
         ? revokeError
         : new Error("opencode_model_access_revoke_failed");
     }
+  }
+
+  private async revokePreparedCapabilities(
+    input: {
+      executionContext: ExecutionContext;
+      sandboxId: string;
+      runtimeId: string;
+    },
+    modelCapabilityId: string,
+    mcpCapabilities: readonly SandboxAgentMcpAccessDescriptor[],
+  ): Promise<void> {
+    return this.revokeCapabilities(
+      { ...input, runId: input.runtimeId },
+      modelCapabilityId,
+      mcpCapabilities,
+    );
+  }
+
+  private async revokeCapabilities(
+    input: {
+      executionContext: ExecutionContext;
+      sandboxId: string;
+      runtimeId: string;
+      runId: string;
+    },
+    modelCapabilityId: string,
+    mcpCapabilities: readonly SandboxAgentMcpAccessDescriptor[],
+  ): Promise<void> {
+    let firstError: unknown;
+    try {
+      await this.options.modelAccess?.revoke({
+        ...input,
+        capabilityId: modelCapabilityId,
+      });
+    } catch (error) {
+      firstError = error;
+    }
+    try {
+      await revokeSandboxAgentMcpAccess(
+        this.options.mcpAccess,
+        input,
+        mcpCapabilities,
+      );
+    } catch (error) {
+      firstError ??= error;
+    }
+    if (firstError) throw firstError;
+  }
+
+  private async revokeMcpCapabilityIds(
+    input: {
+      executionContext: ExecutionContext;
+      sandboxId: string;
+      runtimeId: string;
+      runId: string;
+    },
+    capabilityIds: readonly string[],
+  ): Promise<void> {
+    let firstError: unknown;
+    for (const capabilityId of capabilityIds) {
+      try {
+        await this.options.mcpAccess?.revoke({ ...input, capabilityId });
+      } catch (error) {
+        firstError ??= error;
+      }
+    }
+    if (firstError) throw firstError;
   }
 
   private async nativeConfigIsValid(

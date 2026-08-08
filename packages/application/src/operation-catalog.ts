@@ -24,6 +24,7 @@ import { openAgentWorkspaceInputSchema } from "./agent-workspace-open-messages";
 import {
   compileAgentWorkspaceProfileInputSchema,
   configureAgentWorkspaceProfileCredentialConnectionsInputSchema,
+  configureAgentWorkspaceProfileMcpConnectionsInputSchema,
   disableAgentWorkspaceProfileInputSchema,
   installAgentWorkspaceProfileInputSchema,
   listAgentWorkspaceProfilesInputSchema,
@@ -5221,6 +5222,24 @@ export const operationCatalog = [
       orpc: {
         method: "POST",
         path: "/api/agent-workspace-profiles/{installationId}/credential-connections",
+      },
+    },
+  },
+  {
+    key: "agent-workspace-profiles.configure-mcp-connections",
+    kind: "command",
+    domain: "agent-workspace-profiles",
+    messageName: "ConfigureAgentWorkspaceProfileMcpConnectionsCommand",
+    handlerName: "AgentWorkspaceProfileCommandHandler",
+    serviceName: "AgentWorkspaceProfileInstallationService",
+    inputSchema: configureAgentWorkspaceProfileMcpConnectionsInputSchema,
+    serviceToken: tokens.agentWorkspaceProfileInstallationService,
+    transportAccess: { productSession: { minRole: "admin" } },
+    transports: {
+      cli: "appaloft agent-workspace-profile mcp-connection set <installationId>",
+      orpc: {
+        method: "POST",
+        path: "/api/agent-workspace-profiles/{installationId}/mcp-connections",
       },
     },
   },

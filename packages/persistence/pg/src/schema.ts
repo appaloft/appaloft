@@ -1577,6 +1577,11 @@ export interface AgentWorkspaceProfileInstallationsTable {
     Record<string, unknown>[] | undefined,
     Record<string, unknown>[]
   >;
+  mcp_connections: ColumnType<
+    Record<string, unknown>[],
+    Record<string, unknown>[] | undefined,
+    Record<string, unknown>[]
+  >;
 }
 
 export interface ProjectRepositoryBindingsTable {

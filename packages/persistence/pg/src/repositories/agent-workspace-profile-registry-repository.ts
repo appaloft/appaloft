@@ -71,6 +71,17 @@ function installationFromRow(row: InstallationRow): AgentWorkspaceProfileInstall
           ]
         : [],
     ),
+    mcpConnections: row.mcp_connections.flatMap((connection) =>
+      typeof connection.requirementId === "string" &&
+      typeof connection.connectionReference === "string"
+        ? [
+            {
+              requirementId: connection.requirementId,
+              connectionReference: connection.connectionReference,
+            },
+          ]
+        : [],
+    ),
     ...(updatedAt !== installedAt ? { updatedAt: UpdatedAt.rehydrate(updatedAt) } : {}),
   });
 }
@@ -150,6 +161,7 @@ export class PgAgentWorkspaceProfileRegistryRepository
           credential_connections: state.credentialConnections.map((connection) => ({
             ...connection,
           })),
+          mcp_connections: state.mcpConnections.map((connection) => ({ ...connection })),
         })
         .onConflict((conflict) => conflict.columns(["tenant_id", "definition_digest"]).doNothing())
         .executeTakeFirst();
@@ -171,6 +183,7 @@ export class PgAgentWorkspaceProfileRegistryRepository
         credential_connections: state.credentialConnections.map((connection) => ({
           ...connection,
         })),
+        mcp_connections: state.mcpConnections.map((connection) => ({ ...connection })),
       })
       .where("tenant_id", "=", tenantId(context))
       .where("id", "=", state.id.value)

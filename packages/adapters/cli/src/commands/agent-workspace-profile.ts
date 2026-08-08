@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import {
   CompileAgentWorkspaceProfileQuery,
   ConfigureAgentWorkspaceProfileCredentialConnectionsCommand,
+  ConfigureAgentWorkspaceProfileMcpConnectionsCommand,
   DisableAgentWorkspaceProfileCommand,
   InstallAgentWorkspaceProfileCommand,
   ListAgentWorkspaceProfilesQuery,
@@ -18,6 +19,7 @@ const manifestPathArg = Args.text({ name: "manifest" });
 const installationIdArg = Args.text({ name: "installation-id" });
 const limitOption = Options.integer("limit").pipe(Options.optional);
 const credentialConnectionOption = Options.text("connection").pipe(Options.repeated);
+const mcpConnectionOption = Options.text("connection").pipe(Options.repeated);
 
 function readManifest(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8")) as unknown;
@@ -35,6 +37,8 @@ function credentialConnections(values: readonly string[]) {
     };
   });
 }
+
+const mcpConnections = credentialConnections;
 
 const validateCommand = EffectCommand.make(
   "validate",
@@ -96,6 +100,25 @@ const credentialConnectionCommand = EffectCommand.make("credential-connection").
   EffectCommand.withSubcommands([credentialConnectionSetCommand]),
 );
 
+const mcpConnectionSetCommand = EffectCommand.make(
+  "set",
+  { installationId: installationIdArg, connection: mcpConnectionOption },
+  ({ connection, installationId }) =>
+    runCommand(
+      ConfigureAgentWorkspaceProfileMcpConnectionsCommand.create({
+        installationId,
+        connections: mcpConnections(connection),
+      }),
+    ),
+).pipe(
+  EffectCommand.withDescription("Map Profile MCP requirements to named remote MCP Connections"),
+);
+
+const mcpConnectionCommand = EffectCommand.make("mcp-connection").pipe(
+  EffectCommand.withDescription("Configure opaque remote MCP Connection references"),
+  EffectCommand.withSubcommands([mcpConnectionSetCommand]),
+);
+
 const disableCommand = EffectCommand.make(
   "disable",
   { installationId: installationIdArg },
@@ -119,6 +142,7 @@ export const agentWorkspaceProfileCommand = EffectCommand.make("agent-workspace-
     showCommand,
     compileCommand,
     credentialConnectionCommand,
+    mcpConnectionCommand,
     disableCommand,
     uninstallCommand,
   ]),

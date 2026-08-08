@@ -95,6 +95,7 @@ export * from "./runtime-topology";
 export * from "./runtime-usage-handlers";
 export * from "./runtime-usage-messages";
 export * from "./sandbox-agent-durable-work";
+export * from "./sandbox-agent-mcp-access";
 export * from "./sandbox-agent-runtime";
 export * from "./sandbox-agent-runtime-handlers";
 export * from "./sandbox-agent-runtime-messages";

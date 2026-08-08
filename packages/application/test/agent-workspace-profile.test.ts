@@ -69,6 +69,7 @@ function compiledPlan(
     defaultPorts: [],
     suggestedChecks: [],
     credentialRequirements: [],
+    mcpRequirements: [],
     pin: {
       profileInstallationId,
       profileDefinitionDigest: profileDigest,
@@ -172,6 +173,17 @@ function harness() {
                       variable: "OPENAI_API_KEY",
                     },
                     connectionReference: reference.connectionReference,
+                  })),
+                }
+              : {}),
+            ...(input.mcpReferences
+              ? {
+                  mcpBindings: input.mcpReferences.map((reference) => ({
+                    requirementId: reference.requirementId,
+                    connectionReference: reference.connectionReference,
+                    purpose: "Read Appaloft state",
+                    required: true,
+                    requestedTools: ["projects.list"],
                   })),
                 }
               : {}),
@@ -312,6 +324,38 @@ describe("Agent Workspace Profile installation and compilation", () => {
     expect(persisted._unsafeUnwrap().credentialBindings?.[0]?.connectionReference).toBe(
       "model-default",
     );
+  });
+
+  test("[MCP-ACCESS-BIND-002][MCP-ACCESS-BIND-003] configures and compiles exact MCP references", async () => {
+    const { adapterService, service } = harness();
+    await adapterService.install(context("org_a"), { manifest: adapterManifest() });
+    const profile = await service.install(context("org_a"), { manifest: profileManifest() });
+    expect(profile.isOk()).toBe(true);
+    if (profile.isErr()) return;
+
+    const configured = await service.configureMcpConnections(context("org_a"), {
+      installationId: profile.value.installationId,
+      connections: [{ requirementId: "appaloft-tools", connectionReference: "mcpconn_appaloft" }],
+    });
+    expect(configured._unsafeUnwrap().mcpConnections).toEqual([
+      { requirementId: "appaloft-tools", connectionReference: "mcpconn_appaloft" },
+    ]);
+
+    const compiled = await service.compileForNewWorkspace(
+      context("org_a"),
+      profile.value.installationId,
+    );
+    expect(compiled._unsafeUnwrap().mcpBindings).toEqual([
+      {
+        requirementId: "appaloft-tools",
+        connectionReference: "mcpconn_appaloft",
+        purpose: "Read Appaloft state",
+        required: true,
+        requestedTools: ["projects.list"],
+      },
+    ]);
+    expect(JSON.stringify(compiled)).not.toContain("https://");
+    expect(JSON.stringify(compiled)).not.toContain("Authorization");
   });
 
   test("[PROFILE-PIN-010][ADAPTER-DISABLE-008] disable fences new compiles and active references fence uninstall", async () => {

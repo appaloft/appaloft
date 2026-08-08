@@ -30,6 +30,7 @@ import {
 } from "@appaloft/core";
 import {
   type AgentWorkspaceCredentialBinding,
+  type AgentWorkspaceMcpBinding,
   type AgentWorkspaceProfileCompiledPlan,
   type AgentWorkspaceProfilePin,
 } from "./agent-workspace-profile";
@@ -127,6 +128,7 @@ export interface SandboxAgentHarness {
     sandboxId: string;
     runtimeId: string;
     credentialBindings?: readonly AgentWorkspaceCredentialBinding[];
+    mcpBindings?: readonly AgentWorkspaceMcpBinding[];
     launchProcess?(input: {
       argv: readonly string[];
       cwd?: string;
@@ -146,6 +148,7 @@ export interface SandboxAgentHarness {
     runtimeId: string;
     runId: string;
     credentialBindings?: readonly AgentWorkspaceCredentialBinding[];
+    mcpBindings?: readonly AgentWorkspaceMcpBinding[];
     task: string;
     context: { mode: "fresh" } | { mode: "continue"; parentRunId: string };
     launchProcess?(input: {
@@ -196,6 +199,7 @@ export interface SandboxAgentRuntimeRecord {
   projectId?: string;
   profilePin?: AgentWorkspaceProfilePin;
   credentialBindings?: readonly AgentWorkspaceCredentialBinding[];
+  mcpBindings?: readonly AgentWorkspaceMcpBinding[];
 }
 
 export interface SandboxAgentCredentialGrantScope {
@@ -1441,6 +1445,9 @@ export class SandboxAgentDeliveryService {
       ...(resolvedProfilePlan?.credentialBindings?.length
         ? { credentialBindings: resolvedProfilePlan.credentialBindings }
         : {}),
+      ...(resolvedProfilePlan?.mcpBindings?.length
+        ? { mcpBindings: resolvedProfilePlan.mcpBindings }
+        : {}),
     };
     const credentialScope = credentialGrantScope(context, record);
     if (credentialScope) {
@@ -1465,6 +1472,7 @@ export class SandboxAgentDeliveryService {
           sandboxId: input.sandboxId,
           runtimeId: runtimeId.value.value,
           credentialBindings: record.credentialBindings ?? [],
+          mcpBindings: record.mcpBindings ?? [],
           ...(launchProcess ? { launchProcess } : {}),
         });
       } catch (error) {
@@ -1899,6 +1907,7 @@ export class SandboxAgentDeliveryService {
         runtimeId: runtimeRecord.runtime.id.value,
         runId,
         credentialBindings: runtimeRecord.credentialBindings ?? [],
+        mcpBindings: runtimeRecord.mcpBindings ?? [],
         task: task.value.plaintext,
         context:
           contextState.mode === "fresh"

@@ -4,6 +4,7 @@ import { type AgentWorkspaceProfileInstallationService } from "./agent-workspace
 import {
   CompileAgentWorkspaceProfileQuery,
   ConfigureAgentWorkspaceProfileCredentialConnectionsCommand,
+  ConfigureAgentWorkspaceProfileMcpConnectionsCommand,
   DisableAgentWorkspaceProfileCommand,
   InstallAgentWorkspaceProfileCommand,
   ListAgentWorkspaceProfilesQuery,
@@ -23,6 +24,7 @@ import { tokens } from "./tokens";
 type ProfileCommand =
   | InstallAgentWorkspaceProfileCommand
   | ConfigureAgentWorkspaceProfileCredentialConnectionsCommand
+  | ConfigureAgentWorkspaceProfileMcpConnectionsCommand
   | DisableAgentWorkspaceProfileCommand
   | UninstallAgentWorkspaceProfileCommand;
 type ProfileQuery =
@@ -49,6 +51,9 @@ export class AgentWorkspaceProfileCommandHandler
     }
     if (command instanceof ConfigureAgentWorkspaceProfileCredentialConnectionsCommand) {
       return this.service.configureCredentialConnections(context, command.input);
+    }
+    if (command instanceof ConfigureAgentWorkspaceProfileMcpConnectionsCommand) {
+      return this.service.configureMcpConnections(context, command.input);
     }
     if (command instanceof UninstallAgentWorkspaceProfileCommand) {
       return this.service.uninstall(context, command.input.installationId);
@@ -85,6 +90,9 @@ export class AgentWorkspaceProfileQueryHandler
 
 CommandHandler(InstallAgentWorkspaceProfileCommand)(AgentWorkspaceProfileCommandHandler);
 CommandHandler(ConfigureAgentWorkspaceProfileCredentialConnectionsCommand)(
+  AgentWorkspaceProfileCommandHandler,
+);
+CommandHandler(ConfigureAgentWorkspaceProfileMcpConnectionsCommand)(
   AgentWorkspaceProfileCommandHandler,
 );
 CommandHandler(DisableAgentWorkspaceProfileCommand)(AgentWorkspaceProfileCommandHandler);
