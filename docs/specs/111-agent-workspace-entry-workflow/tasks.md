@@ -10,6 +10,9 @@
 - [x] `AGENT-WS-SOURCE-015`: add trusted transient private-source credential composition and secret-boundary tests.
 - [x] `AGENT-WS-CONNECT-015`: add reconnect alias and managed-terminal tests.
 - [x] `AGENT-WS-ATTACH-016`: add scoped attach capability tests.
+- [x] `AGENT-OPENCODE-011` / `AGENT-WS-ATTACH-016`: public #1009 retries transient
+  registered-Server marker reads and fails closed on non-not-found errors before model access or a
+  competing OpenCode server can start.
 - [x] `AGENT-WS-WEB-017`: add Public Console Workspace structure tests.
 - [x] `AGENT-ADAPTER-018`: add capability descriptor contract tests.
 - [x] Public #947: wait through the bounded provider transition from child exit to a definitive

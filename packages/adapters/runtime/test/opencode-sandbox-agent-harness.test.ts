@@ -116,6 +116,139 @@ describe("OpenCodeSandboxAgentHarness", () => {
     );
   });
 
+  test("[AGENT-OPENCODE-011][AGENT-WS-ATTACH-016] retries a transient marker read without starting a competing server", async () => {
+    const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
+    const marker = new TextEncoder().encode(
+      JSON.stringify({
+        schemaVersion: "opencode-server-marker/v2",
+        processId: "spr_server",
+        capabilityId: "smc_opencode_runtime",
+        expiresAt,
+        provider: "appaloft",
+        model: "coding-model",
+      }),
+    );
+    let markerReads = 0;
+    let issueCalls = 0;
+    const calls: Parameters<OpenCodeSandboxExecutionPort["exec"]>[2][] = [];
+    const execution: OpenCodeSandboxExecutionPort = {
+      async exec(_context, _sandboxId, input) {
+        calls.push(input);
+        if (isHealthProbe(input)) {
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
+          });
+        }
+        throw new Error("transient marker recovery must not start another server");
+      },
+      async listProcesses() {
+        return ok([{ processId: "spr_server", status: "running" }]);
+      },
+      async terminateProcess() {
+        throw new Error("recovered server must not terminate");
+      },
+      async readFile() {
+        markerReads += 1;
+        return markerReads === 1
+          ? err({
+              code: "sandbox_provider_operation_failed",
+              category: "provider",
+              message: "temporary registered Server read failure",
+              retryable: true,
+              details: {},
+            })
+          : ok(marker);
+      },
+      async writeFile() {
+        throw new Error("recovered marker must not be replaced");
+      },
+      async removeFile() {
+        throw new Error("recovered marker must not be removed");
+      },
+    };
+    const harness = new OpenCodeSandboxAgentHarness(execution, {
+      templateId: "aht_opencode_managed_v1",
+      sandboxTemplateId: "stp_opencode_pinned",
+      version: "1.18.4",
+      templateDigest: `sha256:${"b".repeat(64)}`,
+      modelAccess: {
+        async issue() {
+          issueCalls += 1;
+          return modelAccess.issue();
+        },
+        async revoke() {},
+      },
+    });
+
+    await harness.prepareRuntime?.({
+      executionContext: context,
+      sandboxId: "sbx_open",
+      runtimeId: "sar_open",
+      credentialBindings: [modelCredentialBinding],
+    });
+
+    expect(markerReads).toBe(2);
+    expect(issueCalls).toBe(0);
+    expect(calls).toHaveLength(1);
+  });
+
+  test("[AGENT-OPENCODE-011][AGENT-WS-ATTACH-016] fails closed on a non-retryable marker read", async () => {
+    let issued = false;
+    let executed = false;
+    const execution: OpenCodeSandboxExecutionPort = {
+      async exec() {
+        executed = true;
+        throw new Error("marker failure must precede execution");
+      },
+      async listProcesses() {
+        throw new Error("marker failure must precede process lookup");
+      },
+      async terminateProcess() {
+        throw new Error("marker failure must precede termination");
+      },
+      async readFile() {
+        return err({
+          code: "sandbox_provider_operation_failed",
+          category: "provider",
+          message: "registered Server read denied",
+          retryable: false,
+          details: {},
+        });
+      },
+      async writeFile() {
+        throw new Error("marker failure must precede write");
+      },
+      async removeFile() {
+        throw new Error("marker failure must precede removal");
+      },
+    };
+    const harness = new OpenCodeSandboxAgentHarness(execution, {
+      templateId: "aht_opencode_managed_v1",
+      sandboxTemplateId: "stp_opencode_pinned",
+      version: "1.18.4",
+      templateDigest: `sha256:${"b".repeat(64)}`,
+      modelAccess: {
+        async issue() {
+          issued = true;
+          return modelAccess.issue();
+        },
+        async revoke() {},
+      },
+    });
+
+    await expect(
+      harness.prepareRuntime?.({
+        executionContext: context,
+        sandboxId: "sbx_open",
+        runtimeId: "sar_open",
+        credentialBindings: [modelCredentialBinding],
+      }),
+    ).rejects.toThrow("registered Server read denied");
+    expect(executed).toBe(false);
+    expect(issued).toBe(false);
+  });
+
   test("[AGENT-OPENCODE-011][AGENT-WS-ATTACH-016] records startup only after delayed HTTP readiness", async () => {
     const files = new Map<string, Uint8Array>();
     const calls: Parameters<OpenCodeSandboxExecutionPort["exec"]>[2][] = [];
