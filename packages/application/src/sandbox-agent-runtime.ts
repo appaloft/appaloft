@@ -1238,10 +1238,15 @@ export class SandboxAgentDeliveryService {
       );
     }
     try {
+      const record = await this.dependencies.repository.findRuntime(
+        toRepositoryContext(context),
+        input.runtimeId,
+      );
       await harness.prepareRuntime?.({
         executionContext: context,
         sandboxId: input.sandboxId,
         runtimeId: input.runtimeId,
+        credentialBindings: record?.credentialBindings ?? [],
       });
     } catch (error) {
       return err(infrastructureError(error));
