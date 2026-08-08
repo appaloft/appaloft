@@ -276,6 +276,7 @@ import {
   ExportGlobalAuditEventsQueryHandler,
   ExportGlobalAuditEventsQueryService,
   FailClosedWorkspaceOpenCredentialAdmission,
+  FailClosedWorkspaceOpenMcpAdmission,
   ForceRedeployDeploymentCommandHandler,
   ForceRedeployDeploymentUseCase,
   GenericSignedSourceEventVerifier,
@@ -718,6 +719,7 @@ import {
   WorkspaceCollaborationService,
   type WorkspaceOpenCredentialAdmissionPort,
   type WorkspaceOpenEntryRepository,
+  type WorkspaceOpenMcpAdmissionPort,
   type WorkspaceOpenPlacementPort,
   type WorkspaceOpenSourceCredentialProviderPort,
 } from "@appaloft/application";
@@ -3878,6 +3880,11 @@ export function registerApplicationServices(
       useValue: new FailClosedWorkspaceOpenCredentialAdmission(),
     });
   }
+  if (!container.isRegistered(tokens.workspaceOpenMcpAdmission, true)) {
+    container.register(tokens.workspaceOpenMcpAdmission, {
+      useValue: new FailClosedWorkspaceOpenMcpAdmission(),
+    });
+  }
   if (!container.isRegistered(tokens.workspaceOpenPlacement, true)) {
     container.register(tokens.workspaceOpenPlacement, {
       useValue: new InMemoryWorkspaceOpenPlacementPort(),
@@ -3915,6 +3922,9 @@ export function registerApplicationServices(
         ),
         credentialAdmission: dependencyContainer.resolve<WorkspaceOpenCredentialAdmissionPort>(
           tokens.workspaceOpenCredentialAdmission,
+        ),
+        mcpAdmission: dependencyContainer.resolve<WorkspaceOpenMcpAdmissionPort>(
+          tokens.workspaceOpenMcpAdmission,
         ),
         placement: dependencyContainer.resolve<WorkspaceOpenPlacementPort>(
           tokens.workspaceOpenPlacement,
