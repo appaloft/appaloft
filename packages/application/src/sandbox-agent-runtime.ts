@@ -40,6 +40,9 @@ import {
 } from "./execution-context";
 import { type SandboxExecResult } from "./execution-sandbox";
 import { type ControlPlaneSecretProtector } from "./ports";
+import { type SandboxAgentModelProtocol } from "./sandbox-agent-model-access";
+
+export type { SandboxAgentModelProtocol } from "./sandbox-agent-model-access";
 
 export interface SandboxAgentHarnessEvent {
   type: string;
@@ -62,11 +65,6 @@ export interface SandboxAgentHarnessCapabilities {
   persistentPaths: readonly string[];
   healthcheck?: { kind: "process" } | { kind: "http"; port: number; path: string };
 }
-
-export type SandboxAgentModelProtocol =
-  | "openai-chat-completions"
-  | "openai-responses"
-  | "anthropic-messages";
 
 export interface SandboxAgentModelAccessDescriptor {
   capabilityId: string;
