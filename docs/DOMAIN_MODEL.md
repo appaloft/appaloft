@@ -460,6 +460,12 @@ Cloud and third-party products may add placement, entitlement, metering, managed
 identity-aware attach gateways and preview-domain adapters. Those overlays consume the public
 workflow and do not redefine its operation language.
 
+Brokered model access follows the same boundary. A Profile installation owns one named
+`model-api` Connection reference, the Runtime retains the immutable safe binding, and the Harness
+passes that binding to a hosting-provided model access issuer. The Agent may receive an ephemeral
+gateway descriptor, but provider credential custody, tenant authorization, audit, rotation and
+billing never enter public aggregate state, operation input, snapshots or events.
+
 `workspaces.open` is the public application workflow for Profile-aware create-or-resume. A durable
 Workspace-entry projection may coordinate the preferred `SandboxId` for tenant + subject + Project
 + Repository Identity + branch and retain its immutable source pin. The projection does not own
@@ -474,6 +480,9 @@ Governing artifacts:
 - [Agent Workspace Workflow](./workflows/agent-workspace.md)
 - [Agent Workspace Test Matrix](./testing/agent-workspace-test-matrix.md)
 - [Profile-Aware Workspace Open Test Matrix](./testing/profile-aware-workspace-open-test-matrix.md)
+- [ADR-105](./decisions/ADR-105-brokered-model-access-capability.md)
+- [Spec 123](./specs/123-brokered-model-access/spec.md)
+- [Brokered Model Access Test Matrix](./testing/brokered-model-access-test-matrix.md)
 
 ### Agent Adapter And Workspace Profile Distribution
 
