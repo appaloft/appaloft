@@ -455,6 +455,223 @@ describe("SandboxAgentDeliveryService", () => {
     expect(JSON.stringify(calls)).not.toContain("sk-test-secret-value");
   });
 
+  test("[ADAPTER-RUNTIME-013] creates a ready Runtime only after its credential-scoped start child launches", async () => {
+    const calls: Array<{ kind: string; input: Record<string, unknown> }> = [];
+    const { profilePlan } = credentialProfileFixture();
+    const { service } = fixture({
+      harness: {
+        key: "fake",
+        templateId: "aht_fake_1",
+        version: "1.0.0",
+        templateDigest: `sha256:${"a".repeat(64)}`,
+        async prepareRuntime(input) {
+          const launched = await input.launchProcess?.({
+            argv: ["opencode", "serve", "--port", "4096"],
+            background: true,
+          });
+          if (!launched?.isOk()) throw new Error("runtime start launch unavailable");
+        },
+        async execute() {
+          return { events: [], outcomeDigest: "sha256:complete" };
+        },
+        async cancel() {},
+      },
+      workspaceProfileResolver: {
+        async compileForNewWorkspace() {
+          return ok(profilePlan);
+        },
+      },
+      processCredentialGrants: {
+        async admit(_context, input) {
+          calls.push({ kind: "admit", input });
+          return ok(undefined);
+        },
+        async launch(_context, input) {
+          calls.push({ kind: "launch", input });
+          return ok({ mode: "background", processId: "spr_opencode_server" });
+        },
+        async openTerminal() {
+          throw new Error("terminal must not open");
+        },
+        async revoke(_context, input) {
+          calls.push({ kind: "revoke", input });
+          return ok(undefined);
+        },
+      },
+    });
+
+    const runtime = await service.createRuntime(context, {
+      sandboxId: "sbx_demo",
+      harnessKey: "fake",
+      harnessTemplateId: "aht_fake_1",
+      idempotencyKey: "runtime_start",
+      profileInstallationId: "awpi_codex",
+    });
+
+    expect(runtime._unsafeUnwrap()).toMatchObject({ status: "ready" });
+    expect(calls.map((call) => call.kind)).toEqual(["admit", "launch"]);
+    expect(calls[1]?.input).toMatchObject({
+      scope: {
+        tenantId: "tenant_a",
+        sandboxId: "sbx_demo",
+        runtimeId: "sar_test",
+        runId: "sar_test",
+      },
+      process: {
+        argv: ["opencode", "serve", "--port", "4096"],
+        background: true,
+      },
+    });
+  });
+
+  test("[ADAPTER-RUNTIME-013] records failed startup and revokes its exact Runtime credential scope", async () => {
+    const calls: Array<{ kind: string; input: Record<string, unknown> }> = [];
+    const { profilePlan } = credentialProfileFixture();
+    const { service, repository } = fixture({
+      harness: {
+        key: "fake",
+        templateId: "aht_fake_1",
+        version: "1.0.0",
+        templateDigest: `sha256:${"a".repeat(64)}`,
+        async prepareRuntime(input) {
+          const launched = await input.launchProcess?.({
+            argv: ["opencode", "serve", "--port", "4096"],
+            background: true,
+          });
+          if (!launched?.isOk()) throw new Error("runtime start launch unavailable");
+          throw new Error("command_agent_runtime_start_failed");
+        },
+        async execute() {
+          return { events: [], outcomeDigest: "sha256:must-not-run" };
+        },
+        async cancel() {},
+      },
+      workspaceProfileResolver: {
+        async compileForNewWorkspace() {
+          return ok(profilePlan);
+        },
+      },
+      processCredentialGrants: {
+        async admit(_context, input) {
+          calls.push({ kind: "admit", input });
+          return ok(undefined);
+        },
+        async launch(_context, input) {
+          calls.push({ kind: "launch", input });
+          return ok({ mode: "background", processId: "spr_failed_server" });
+        },
+        async openTerminal() {
+          throw new Error("terminal must not open");
+        },
+        async revoke(_context, input) {
+          calls.push({ kind: "revoke", input });
+          return ok(undefined);
+        },
+      },
+    });
+
+    const runtime = await service.createRuntime(context, {
+      sandboxId: "sbx_demo",
+      harnessKey: "fake",
+      harnessTemplateId: "aht_fake_1",
+      idempotencyKey: "runtime_start_failed",
+      profileInstallationId: "awpi_codex",
+    });
+
+    expect(runtime._unsafeUnwrapErr()).toMatchObject({
+      details: {
+        code: "sandbox_agent_delivery_adapter_failed",
+        cause: "command_agent_runtime_start_failed",
+      },
+    });
+    expect(calls.map((call) => call.kind)).toEqual(["admit", "launch", "revoke"]);
+    expect(calls[2]?.input).toMatchObject({
+      reason: "failed",
+      scope: {
+        tenantId: "tenant_a",
+        sandboxId: "sbx_demo",
+        runtimeId: "sar_test",
+      },
+    });
+    const stored = await repository.findRuntime(toRepositoryContext(context), "sar_test");
+    expect(stored?.runtime.toState().status.value).toBe("failed");
+  });
+
+  test("[ADAPTER-RUNTIME-013][WS-ATTACH-NATIVE-015] makes the scoped replacement launcher available during native attach refresh", async () => {
+    const launches: Array<Record<string, unknown>> = [];
+    let prepareCalls = 0;
+    const { profilePlan } = credentialProfileFixture();
+    const { service } = fixture({
+      harness: {
+        key: "fake",
+        templateId: "aht_fake_1",
+        version: "1.0.0",
+        templateDigest: `sha256:${"a".repeat(64)}`,
+        interaction: {
+          transport: "native-attach",
+          command: ["opencode", "attach", "http://127.0.0.1:4096"],
+          sessionRecovery: "native-session-store",
+          serverPort: 4_096,
+        },
+        async prepareRuntime(input) {
+          prepareCalls += 1;
+          const launched = await input.launchProcess?.({
+            argv: ["opencode", "serve", "--port", "4096"],
+            background: true,
+            ...(prepareCalls > 1 ? { replaceTerminated: true } : {}),
+          });
+          if (!launched?.isOk()) throw new Error("runtime start launch unavailable");
+        },
+        async execute() {
+          return { events: [], outcomeDigest: "sha256:complete" };
+        },
+        async cancel() {},
+      },
+      workspaceProfileResolver: {
+        async compileForNewWorkspace() {
+          return ok(profilePlan);
+        },
+      },
+      processCredentialGrants: {
+        async admit() {
+          return ok(undefined);
+        },
+        async launch(_context, input) {
+          launches.push(input);
+          return ok({ mode: "background", processId: `spr_server_${launches.length}` });
+        },
+        async openTerminal() {
+          throw new Error("terminal must not open");
+        },
+        async revoke() {
+          return ok(undefined);
+        },
+      },
+    });
+    const runtime = (
+      await service.createRuntime(context, {
+        sandboxId: "sbx_demo",
+        harnessKey: "fake",
+        harnessTemplateId: "aht_fake_1",
+        idempotencyKey: "runtime_attach_refresh",
+        profileInstallationId: "awpi_codex",
+      })
+    )._unsafeUnwrap();
+
+    const attached = await service.issueAttachAccess(context, {
+      sandboxId: "sbx_demo",
+      runtimeId: runtime.runtimeId,
+      expiresAt: "2026-07-20T00:30:00.000Z",
+    });
+
+    expect(attached.isOk()).toBe(true);
+    expect(launches).toHaveLength(2);
+    expect(launches[1]).toMatchObject({
+      scope: { runtimeId: "sar_test", runId: "sar_test" },
+      process: { replaceTerminated: true },
+    });
+  });
+
   test("[GH-AUTO-DURABLE-CREDENTIAL-023] fails closed before harness or process launch when restored admission is denied", async () => {
     const { profilePlan } = credentialProfileFixture();
     let admissionCalls = 0;

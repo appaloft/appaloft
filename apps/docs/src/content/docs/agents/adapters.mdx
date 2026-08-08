@@ -81,6 +81,13 @@ Agent 适配器（Agent Adapter）是一个声明式、不可变的 Agent 集成
 }
 ```
 
+只有需要长驻 Runtime 的适配器才声明顶层 `start`，例如 OpenCode 使用
+`["opencode", "serve", "--hostname", "0.0.0.0", "--port", "4096"]`。`start` 是受限
+argv 数组，不是 shell 字符串；它只在 Sandbox 内执行。对于 native attach，`start`、attach
+`serverPort` 和 HTTP healthcheck 必须指向同一端口。Appaloft 会等到进程仍在运行且健康检查
+成功后才把 Runtime 标记为 ready；失败会终止精确进程并撤销其凭据 grant。纯
+terminal/headless 适配器不需要 `start`，可继续使用 process healthcheck。
+
 ## 命令 / 接口示例
 
 ```bash

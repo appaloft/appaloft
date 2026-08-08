@@ -14,6 +14,8 @@
 | PROFILE-PIN-010 | Application/persistence | Definitions update after Workspace create | Resolved digest/Harness/capabilities remain stable for recovery. |
 | ADAPTER-SURFACE-011 | Contract/transport | Lifecycle operations are exposed | Catalog, HTTP/oRPC, CLI mapping, generated SDK, MCP descriptor, and Web source tests prove the six lifecycle operations use the application schemas. |
 | ADAPTER-CODEX-012 | Fixture/opt-in e2e | Fixture and real Codex use declarative Adapter | Own TUI/headless output, reconnect, lifecycle, and exact cleanup are truthful. |
+| ADAPTER-RUNTIME-013 | Contract/application/runtime/opt-in e2e | Declarative Runtime owns a long-running start child | Scoped child launch occurs once; process/HTTP readiness gates the ready Runtime and marker; failed startup terminates the exact process, revokes its grant and returns no ready Runtime. Bindings: `packages/agent-adapter-sdk/test/agent-adapter-manifest.test.ts`; `packages/application/test/sandbox-agent-runtime.test.ts`; `packages/adapters/runtime/test/command-sandbox-agent-harness.test.ts`; authorized hosted Workspace smoke. |
+| ADAPTER-NATIVE-014 | Contract/compiler | Native attach declares its server lifecycle | Validation rejects missing start, process-only healthcheck, or a healthcheck port different from the attach server port before Sandbox effects. Bindings: `packages/agent-adapter-sdk/test/agent-adapter-manifest.test.ts`; `packages/agent-adapter-sdk/test/agent-workspace-profile.test.ts`. |
 | AGENT-SETUP-UX-001 | Web/source + WebView | Organization setup distinguishes Agents, Model connections and Workspace Profiles | Source contract and desktop WebView prove task-oriented setup with OpenCode/Pi. |
 | AGENT-SETUP-UX-002 | Web/source | Raw Adapter/Profile manifests are advanced actions | Primary display surface contains no form/textarea; custom actions open the existing dialogs. |
 | AGENT-SETUP-UX-003 | Web/source | Optional hosted model connection capability is contributed | Neutral extension metadata resolves the CTA without a private import; absence remains safe. |
@@ -40,6 +42,10 @@
   evidence is deferred and is not part of the OpenCode/Pi V1 setup surface. A later Codex slice must
   include target, credential boundary, reconnect behavior, exact cleanup, and any truthful
   capability limitation.
+- `ADAPTER-RUNTIME-013/ADAPTER-NATIVE-014` are the release-gate correction for declarative
+  native-attach startup discovered by the hosted Pi/OpenCode acceptance run. Their public
+  contract/application/runtime bindings pass; the authorized hosted rerun remains pending until
+  the Cloud composition consumes the merged public commit.
 - `AGENT-SETUP-UX-001..003` are covered by the Organization page source contract and localized
   labels. `AGENT-SETUP-UX-004` is covered by desktop and 390px WebView acceptance with overflow
   assertions.

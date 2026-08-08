@@ -73,6 +73,14 @@ A minimal Codex terminal/headless adapter manifest example (replace the template
 }
 ```
 
+Only adapters with a long-running Runtime declare top-level `start`; for example, OpenCode uses
+`["opencode", "serve", "--hostname", "0.0.0.0", "--port", "4096"]`. It is a bounded argv
+array, never a shell string, and runs only inside the Sandbox. For native attach, `start`, the attach
+`serverPort`, and the HTTP healthcheck must target the same port. Appaloft marks the Runtime ready
+only after the child remains running and the healthcheck succeeds; failure terminates the exact
+child and revokes its credential grant. Terminal/headless-only adapters do not need `start` and may
+keep a process healthcheck.
+
 ## Command / interface examples
 
 ```bash

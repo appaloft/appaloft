@@ -24,6 +24,11 @@
   grant port. The port owns exact-scope admission, one-time launch, process-lifetime revocation, and
   safe managed-terminal attachment; it never returns credential values to the control plane.
 - Implement Declarative Harness execution through existing Sandbox process/terminal boundaries.
+- Compile an optional declarative Runtime start argv into the Harness. Launch it through the same
+  process-scoped credential grant as other Agent children, poll the declared process/HTTP
+  healthcheck, persist its marker only after acceptance, and terminate/revoke exact failed startup.
+- Reject native-attach manifests unless Runtime start and HTTP healthcheck agree with the attach
+  server port before Profile compilation can create Sandbox effects.
 - Keep Trusted Code Adapter registration at composition time.
 - Add CLI local file/package loading; the server receives canonical content and never fetches an
   arbitrary URL.
@@ -34,6 +39,8 @@
 - Add application lifecycle, tenant isolation, reference fencing, operation catalog, HTTP/oRPC,
   CLI, SDK, MCP descriptor, and persistence tests.
 - Add deterministic fixture Agent integration without model credentials.
+- Add contract and runtime tests for native-attach start validation, credential-scoped startup,
+  bounded readiness, marker timing, and failure cleanup.
 - Add deterministic credential-grant fixtures that prove missing, duplicate, cross-tenant,
   stale-pin, replay, completion, cancellation, Runtime termination, and Sandbox cleanup behavior
   without an external model provider.
@@ -45,3 +52,5 @@
 - Definition and installation identity must not leak tenant ownership into portable manifests.
 - Profile resolution must be atomic enough to prevent digest/version drift during Workspace create.
 - Existing Harness catalog and Runtime persistence must remain backward compatible.
+- Terminal/headless-only manifests remain compatible; nonfunctional native-attach manifests need
+  an additive `start` declaration before their next validation/install/compile.

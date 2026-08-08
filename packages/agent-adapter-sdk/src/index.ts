@@ -256,6 +256,7 @@ export const agentAdapterManifestSchema = z
       })
       .strict(),
     interactionModes: z.array(interactionModeSchema).min(1).max(16),
+    start: commandSchema.optional(),
     persistentPaths: z.array(persistentPathSchema).max(64).default([]),
     healthcheck: healthcheckSchema.optional(),
     credentials: z.array(credentialRequirementSchema).max(32).default([]),
@@ -303,6 +304,23 @@ export const agentAdapterManifestSchema = z
       });
     }
     const runtimeIds = new Set(manifest.requirements.runtimes.map((runtime) => runtime.id));
+    if (manifest.start) {
+      const executable = manifest.start[0] ?? "";
+      const executableName = executable.split("/").at(-1)?.toLowerCase() ?? "";
+      if (shellExecutables.has(executableName)) {
+        context.addIssue({
+          code: "custom",
+          message: "declarative Adapter start must not invoke a shell interpreter",
+          path: ["start", 0],
+        });
+      } else if (!runtimeIds.has(executable)) {
+        context.addIssue({
+          code: "custom",
+          message: "start executable must match a declared runtime requirement id",
+          path: ["start", 0],
+        });
+      }
+    }
     for (const [index, mode] of manifest.interactionModes.entries()) {
       const executable = mode.command[0] ?? "";
       const executableName = executable.split("/").at(-1)?.toLowerCase() ?? "";
@@ -320,6 +338,42 @@ export const agentAdapterManifestSchema = z
           message: "command executable must match a declared runtime requirement id",
           path: ["interactionModes", index, "command", 0],
         });
+      }
+    }
+    const nativeModes = manifest.interactionModes.filter(
+      (mode) => mode.transport === "native-attach",
+    );
+    if (nativeModes.length > 0) {
+      if (!manifest.start) {
+        context.addIssue({
+          code: "custom",
+          message: "native attach requires a declarative Runtime start command",
+          path: ["start"],
+        });
+      }
+      if (manifest.healthcheck?.kind !== "http") {
+        context.addIssue({
+          code: "custom",
+          message: "native attach requires an HTTP Runtime healthcheck",
+          path: ["healthcheck"],
+        });
+      } else {
+        const healthcheckPort = manifest.healthcheck.port;
+        if (
+          nativeModes.every(
+            (mode) =>
+              typeof mode.serverPort === "number" &&
+              mode.serverPort >= 1 &&
+              mode.serverPort <= 65_535,
+          ) &&
+          nativeModes.some((mode) => mode.serverPort !== healthcheckPort)
+        ) {
+          context.addIssue({
+            code: "custom",
+            message: "native attach serverPort must match the Runtime healthcheck port",
+            path: ["healthcheck", "port"],
+          });
+        }
       }
     }
   });
@@ -659,6 +713,7 @@ export interface CompiledAgentWorkspaceProfilePlan {
         argv: string[];
         taskInput: "append-argument" | "stdin";
       };
+      start?: { argv: string[] };
       attach?: {
         transport: "managed-terminal" | "native-attach";
         command: string[];
@@ -1125,6 +1180,7 @@ export function compileAgentWorkspaceProfile(
             argv: [...taskMode.command],
             taskInput: taskMode.taskInput ?? "append-argument",
           },
+          ...(adapter.manifest.start ? { start: { argv: [...adapter.manifest.start] } } : {}),
           ...(attach ? { attach } : {}),
           persistentPaths,
           ...(adapter.manifest.healthcheck ? { healthcheck: adapter.manifest.healthcheck } : {}),

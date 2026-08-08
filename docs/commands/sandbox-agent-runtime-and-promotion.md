@@ -15,13 +15,17 @@ are bounded task input encrypted at rest; persisted events contain only redacted
 credentials and identities cannot resolve approvals.
 
 For declarative Profiles with credential requirements, Runtime creation calls the configured
-`SandboxAgentProcessCredentialGrantPort` before any child process. The port validates the tenant,
+`SandboxAgentProcessCredentialGrantPort` before any child process. A manifest-declared Runtime
+`start` child also launches through this port and cannot become ready until its declared process or
+HTTP healthcheck succeeds. The port validates the tenant,
 Sandbox, installation, definition digest and Runtime scope. Headless runs and Agent-owned managed
 terminals both launch through this port; ordinary Sandbox `exec` and generic shell terminals cannot
 inherit the grants. A managed terminal delivers its bounded bootstrap through an echo-disabled PTY
 input channel; secret values never enter Docker/SSH argv or the terminal descriptor. Completion,
 cancellation, Runtime termination and Workspace cleanup revoke the matching run or Runtime scope.
 Missing ports, stale pins, duplicate/replayed references, and cross-tenant scopes fail closed.
+Failed Runtime startup terminates the exact child and revokes its Runtime scope before returning;
+no ready marker or descriptor is fabricated.
 
 ## Artifact And Candidate Preview
 
