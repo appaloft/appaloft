@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.1](https://github.com/appaloft/appaloft/compare/v1.8.0...v1.8.1) (2026-08-09)
+
+
+### Bug Fixes
+
+* **runtime:** normalize brokered Pi model compatibility ([#1019](https://github.com/appaloft/appaloft/issues/1019)) ([4bb5360](https://github.com/appaloft/appaloft/commit/4bb5360599a6826f77f89006f9ffa96cb1690895))
+
 ## [1.8.0](https://github.com/appaloft/appaloft/compare/v1.7.4...v1.8.0) (2026-08-09)
 
 
