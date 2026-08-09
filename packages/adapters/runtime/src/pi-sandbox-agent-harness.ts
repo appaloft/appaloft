@@ -80,6 +80,14 @@ export function createPiSandboxModelConfig(modelAccess: PiSandboxModelAccess): s
         api: "openai-completions",
         apiKey: modelAccess.accessToken,
         authHeader: true,
+        compat: {
+          supportsStore: false,
+          supportsDeveloperRole: false,
+          supportsReasoningEffort: false,
+          supportsUsageInStreaming: false,
+          maxTokensField: "max_tokens",
+          supportsStrictMode: false,
+        },
         models: [
           {
             id: modelAccess.model,

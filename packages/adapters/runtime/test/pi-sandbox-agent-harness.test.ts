@@ -6,7 +6,11 @@ import {
   type SandboxProcessDescriptor,
 } from "@appaloft/application";
 import { ok } from "@appaloft/core";
-import { PiSandboxAgentHarness, type PiSandboxExecutionPort } from "../src";
+import {
+  createPiSandboxModelConfig,
+  PiSandboxAgentHarness,
+  type PiSandboxExecutionPort,
+} from "../src";
 
 const context = createExecutionContext({
   entrypoint: "worker",
@@ -37,6 +41,29 @@ const modelAccess = {
 };
 
 describe("PiSandboxAgentHarness", () => {
+  test("[AGENT-PI-012] uses conservative Chat Completions compatibility behind a broker URL", () => {
+    const config = JSON.parse(
+      createPiSandboxModelConfig({
+        capabilityId: "smc_compat",
+        baseUrl: "http://gateway/m/smc_compat/token/v1",
+        accessToken: "appaloft-scoped-capability",
+        provider: "appaloft",
+        model: "deepseek-chat",
+        expiresAt: "2026-07-20T01:00:00.000Z",
+      }),
+    );
+
+    expect(config.providers.appaloft.api).toBe("openai-completions");
+    expect(config.providers.appaloft.compat).toEqual({
+      supportsStore: false,
+      supportsDeveloperRole: false,
+      supportsReasoningEffort: false,
+      supportsUsageInStreaming: false,
+      maxTokensField: "max_tokens",
+      supportsStrictMode: false,
+    });
+  });
+
   test("[AGENT-PI-006] admits only the pinned Sandbox template and translates JSONL", async () => {
     let polls = 0;
     let issuedConnectionReference: string | undefined;
