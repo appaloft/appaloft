@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.8.0](https://github.com/appaloft/appaloft/compare/v1.7.4...v1.8.0) (2026-08-09)
+
+
+### Features
+
+* **agent-workspaces:** add remote MCP access contracts ([#1016](https://github.com/appaloft/appaloft/issues/1016)) ([32e0538](https://github.com/appaloft/appaloft/commit/32e053889a7346de9601d25946a54019fe4cf666))
+* **capacity:** add bounded placement inspection ([#1012](https://github.com/appaloft/appaloft/issues/1012)) ([de45897](https://github.com/appaloft/appaloft/commit/de45897903720992852fc997a2647c9c99a6eaa3))
+
+
+### Bug Fixes
+
+* **agent-adapters:** gate runtime startup readiness ([#1014](https://github.com/appaloft/appaloft/issues/1014)) ([fe1bd58](https://github.com/appaloft/appaloft/commit/fe1bd58654b2f724b819362d8f089c8a6c0c6c36))
+* **agent-workspace:** gate OpenCode attach on readiness ([#1008](https://github.com/appaloft/appaloft/issues/1008)) ([14b9f86](https://github.com/appaloft/appaloft/commit/14b9f862e791c3205fb5c84e24cd9cdba7412001))
+* **agent-workspace:** retry OpenCode marker reads ([#1010](https://github.com/appaloft/appaloft/issues/1010)) ([6559307](https://github.com/appaloft/appaloft/commit/6559307f005e6ecd7b0fbbf0a0cec40c83eefb4f))
+* **workspace:** resume explicitly selected profile ([#1006](https://github.com/appaloft/appaloft/issues/1006)) ([4826802](https://github.com/appaloft/appaloft/commit/4826802fcaa13bcda9d96acaac9786c8cb95c35a))
+
 ## [1.7.4](https://github.com/appaloft/appaloft/compare/v1.7.3...v1.7.4) (2026-08-04)
 
 
