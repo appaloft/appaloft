@@ -2,7 +2,8 @@
   "name": "appaloft-workspace-control-tui-opentui-spike",
   "private": true,
   "type": "module",
-  "dependencies": {
-    "@opentui/core": "0.5.1"
+  "scripts": {
+    "start": "bun index.ts",
+    "smoke": "bun test terminal-session-bridge.test.ts && bun smoke.ts"
   }
 }
