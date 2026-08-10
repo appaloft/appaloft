@@ -21,9 +21,11 @@ The spike must not:
 ## Candidate Order
 
 1. Spike `@opentui/core` using its imperative API to match the Bun/TypeScript CLI.
-2. Keep business operations and PTY transport behind framework-neutral interfaces.
-3. If any required gate fails without a bounded upstream fix, choose a separate Rust/Ratatui
-   frontend that consumes the same public operation and PTY contracts.
+2. Use `Bun.Terminal` for local child PTY/ConPTY and the existing Appaloft `TerminalSession` for
+   managed remote byte streams behind one framework-neutral terminal viewport.
+3. Keep business operations, process ownership and PTY transport outside the renderer.
+4. If the released OpenTUI API fails a required gate, choose a separate Rust/Ratatui frontend that
+   consumes the same public operation and terminal contracts.
 
 ## Required Gates
 
@@ -36,12 +38,15 @@ The spike must not:
 | WS-TUI-SPIKE-005 | Reconnect | Transport disconnect and reconnect preserve bounded replay cursor/scrollback without restarting a healthy Agent process. |
 | WS-TUI-SPIKE-006 | Terminal matrix | Terminal.app, iTerm2, Ghostty, VS Code Terminal and representative Linux terminals satisfy the required interaction set. |
 | WS-TUI-SPIKE-007 | Fallback | `--no-tui` and headless/machine-readable Workspace operations remain usable when the TUI cannot start. |
+| WS-TUI-SPIKE-008 | Same-session Focus Mode | Embedded and native full-screen views share one live Session/PTY and Agent process. |
+| WS-TUI-SPIKE-009 | Sustained operation | A 30-60 minute soak and burst-output run records CPU, memory, input latency and screen integrity. |
 
 ## Selection Rule
 
-OpenTUI becomes an implementation dependency only if every required gate passes on the supported
-release targets. Otherwise the presentation frontend changes; the public Workspace, operation,
-Terminal and attach contracts do not.
+OpenTUI becomes an implementation dependency only after its embedded-terminal API is publicly
+released and every required gate passes on supported release targets. An unreleased commit may be
+used only on the throwaway Spike branch. Otherwise the presentation frontend changes; the public
+Workspace, operation, Terminal and attach contracts do not.
 
 ## 2026-08-10 Spike Result
 
@@ -51,15 +56,37 @@ Unicode rendering, deterministic `q` teardown and `--no-tui`. OpenTUI exposes no
 or PTY renderable for nesting an arbitrary Agent alternate screen, so `WS-TUI-SPIKE-002` is blocked
 and an embedded/split-pane production dependency is rejected.
 
-The result also narrowed the next product slice: Spec 126 uses an Appaloft control shell that
-releases the whole terminal to the existing Adapter-owned native attach transport, then restores
-and refreshes the shell. That shape does not claim nested PTY behavior; it remains gated by the
-supported release, ownership/cleanup, reconnect, Unicode, terminal-matrix and fallback checks in
-its own Test Matrix.
+That result is historical evidence for the released 0.5.1 API, not a durable product decision.
+Railway's public implementation subsequently confirmed that its management tree and Agent TUI
+coexist by feeding a PTY through a terminal emulator, while native full-screen is an optional
+same-session mode.
+
+## 2026-08-10 Upstream Reassessment
+
+- OpenTUI PR #1338 merged an internal Ghostty VT runtime with persistent parsing, resize, scroll,
+  input encoding and PTY replies.
+- OpenTUI PR #1340 proposes the public embedded-terminal renderable, including terminal-state
+  drawing, focus, input, paste, mouse, resize, cursor and cleanup. It remains unreleased.
+- `Bun.Terminal` supplies local PTY/ConPTY process transport; the current Appaloft
+  `TerminalSession` contract already supplies managed output, input, resize, detach and close.
+
+The next Spike therefore tests OpenTUI's emerging embedded surface against both byte-stream
+adapters and representative Pi, OpenCode, Codex and Claude Code terminal behavior. It does not
+change dependencies or production code. Spec 126 requires embedded-by-default Workspace mode plus
+same-session full-screen Focus Mode; handoff-only is no longer an acceptable final implementation.
 
 ## Deferred Questions
 
-- Exact navigation, keymap, accessibility and theming belong to the future control-TUI Spec.
+- Exact visual styling, accessibility details and non-reserved navigation keys belong to the
+  implementation design under Spec 126; focus-release ownership is already normative.
 - Windows terminal and credential-store acceptance is a later platform gate.
 - Exit-triggered Workspace cleanup and keep-awake policy are lifecycle behaviors, not framework
   research.
+
+## Primary References
+
+- <https://github.com/anomalyco/opentui/pull/1338>
+- <https://github.com/anomalyco/opentui/pull/1340>
+- <https://bun.com/docs/runtime/child-process#terminal-pty-support>
+- <https://github.com/railwayapp/cli/blob/master/src/commands/cloud_agent/tui/session.rs>
+- <https://github.com/railwayapp/cli/blob/master/src/commands/cloud_agent/tui/ui.rs>

@@ -28,20 +28,24 @@ control TUI also needs a durable ownership boundary before a terminal framework 
    using `--control-plane-profile` and the existing target resolver.
 4. `appaloft workspace open` and all current headless Workspace subcommands remain supported.
    `appaloft code` is additive and does not deprecate them.
-5. A future no-subcommand `appaloft workspace` experience may present Appaloft-owned Workspace,
-   Server, Profile, Terminal, Task, Preview, Deployment and recovery state. Every mutation must
-   dispatch an existing public operation and retain a headless or machine-readable equivalent.
+5. A no-subcommand `appaloft workspace` experience presents Appaloft-owned Workspace, Server,
+   Profile, Terminal, Task, Preview, Deployment and recovery state beside an embedded native Agent
+   terminal. Every mutation must dispatch an existing public operation and retain a headless or
+   machine-readable equivalent.
 6. Agent conversation and session semantics remain owned by Pi, OpenCode, Claude Code, Codex and
-   other Agent adapters. Appaloft may embed or hand off their native PTY, but must not scrape
-   terminal text into a vendor-neutral conversation model or interpret hidden reasoning.
-7. Terminal framework choice is not part of the product contract. A disposable hardest-path spike
-   must prove every behavior required by the selected presentation shape. A split-pane or embedded
-   Agent surface requires terminal-emulator/nested-PTY evidence. A control shell that releases the
-   terminal for full-screen native Agent handoff does not claim embedded PTY behavior, but still
-   requires supported release packaging, deterministic ownership/cleanup, reconnect, Unicode and
-   terminal-matrix evidence. Failure selects a different presentation frontend without changing
-   public operations or PTY contracts.
-8. `--keep-awake` and exit-triggered removal are not part of the first activation slice. They need
+   other Agent adapters. Appaloft terminal-emulates and renders their native PTY byte stream but
+   must not scrape terminal text into a vendor-neutral conversation model, infer tool calls or
+   interpret hidden reasoning.
+7. The Workspace control experience is dual mode. Embedded mode keeps Appaloft navigation visible
+   while the Agent owns focus inside its pane. Focus mode maximizes the same live Terminal Session
+   or local PTY without starting another Agent process, then returns to the outer presentation.
+   Full-screen handoff is an explicit same-session mode, not a substitute for the embedded pane.
+8. Terminal framework choice is not part of the product contract. A disposable hardest-path spike
+   must prove terminal emulation, nested native Agent behavior, input/focus ownership, reconnect,
+   same-session mode switching, Unicode, supported release packaging and terminal-matrix behavior.
+   Failure selects a different presentation frontend without changing public operations or PTY
+   contracts.
+9. `--keep-awake` and exit-triggered removal are not part of the first activation slice. They need
    separate lifecycle acceptance for policy ownership, partial failure, native handoff and cleanup
    evidence before becoming public options.
 
@@ -52,7 +56,8 @@ control TUI also needs a durable ownership boundary before a terminal framework 
   `workspaces.open`; only CLI presentation is added.
 - Existing automation remains compatible because `workspace open` and all headless commands stay
   available.
-- The future control TUI cannot become a second application layer or a replacement Agent chat UI.
+- The control TUI cannot become a second application layer or a replacement Agent chat UI.
+- Embedded and full-screen modes share one live Session identity and one Agent process.
 - OpenTUI, Ratatui or another frontend can be replaced without changing Workspace domain truth.
 
 ## Rejected Alternatives
@@ -67,10 +72,11 @@ control TUI also needs a durable ownership boundary before a terminal framework 
 
 ## Migration Gaps
 
-- `appaloft code` is specified but not implemented in this Spec Round.
-- Spec 125 research rejected an embedded OpenTUI Agent pane and supplied partial host evidence for
-  an OpenTUI control shell. Spec 126 governs the separate full-screen native-handoff behavior and
-  keeps production Code gated by the supported release and terminal matrix.
+- `appaloft code` is implemented under Spec 125; the no-subcommand Workspace control presentation
+  remains unimplemented under Spec 126.
+- The first OpenTUI 0.5.1 spike lacked a public terminal renderable. New upstream Ghostty VT work
+  reopens the embedded route, but Spec 126 keeps production Code gated by a released public API and
+  the shared Agent, release and terminal acceptance matrix.
 - `--keep-awake` and exit-triggered removal require a separate Spec/Test Matrix update.
 
 ## Verification
