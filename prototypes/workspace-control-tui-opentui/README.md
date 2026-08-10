@@ -55,12 +55,15 @@ a replacement child.
   focus release/re-entry, resize propagation and same-child PID checks.
 - `terminal-session-bridge.test.ts` passed the existing framework-neutral `TerminalSession` output,
   input, resize, detach and close mapping without introducing Agent semantics.
+- `terminal-viewport-reconnect.test.ts` passed transport loss, detach and rebind of the same
+  viewport to the exact managed Terminal Session identity with bounded replay and no second Agent.
 - A real interactive PTY run rendered the split Workspace/Agent layout and restored host terminal
   state after `Ctrl+]`, `q`.
 - Appaloft's existing `TerminalSession` already exposes the required transport-neutral output,
   `write`, `resize`, `detach` and `close` boundary. This Spike did not change that contract.
-- The OpenTUI public embedded API is not released. Real remote reconnect, multi-terminal coverage,
-  supported release artifacts and the required 30–60 minute soak remain incomplete.
+- The OpenTUI public embedded API is not released. Multi-terminal coverage and supported release
+  artifacts remain incomplete. The repeatable 30-minute soak records CPU, RSS, render latency and
+  final-frame integrity through `bun soak.ts`.
 
 ## Gate Verdict
 
@@ -70,11 +73,11 @@ a replacement child.
 | `WS-TUI-SPIKE-002` | host pass | A representative alternate-screen child rendered from an unmodified PTY byte stream inside `EmbeddedTerminalRenderable`. |
 | `WS-TUI-SPIKE-003` | partial | Resize, bracketed paste, focus release and deterministic restoration passed; real mouse protocols, signals and Agent-specific keymaps still need the terminal matrix. |
 | `WS-TUI-SPIKE-004` | host pass | CJK, emoji, combining text and wide glyphs rendered in upstream and Appaloft smoke coverage. |
-| `WS-TUI-SPIKE-005` | partial | Existing `TerminalSession` mapping passed a contract test, but real managed-terminal disconnect/reconnect and replay were not exercised. |
+| `WS-TUI-SPIKE-005` | contract pass | Transport loss and rebind preserve the exact managed Session id and bounded replay at the existing TerminalSession seam; a real SSH transport remains in product acceptance. |
 | `WS-TUI-SPIKE-006` | pending | Only the current macOS host PTY was exercised; Terminal.app/iTerm2/Ghostty/VS Code/Linux remain. |
 | `WS-TUI-SPIKE-007` | partial | Source `--no-tui` passed without creating a renderer; packaging with the unreleased native core remains. |
 | `WS-TUI-SPIKE-008` | host pass | Pane/Focus Mode resizing retained the exact Bun PTY and child PID; remote Session identity still needs integration coverage. |
-| `WS-TUI-SPIKE-009` | pending | The required 30–60 minute soak and burst-output measurements have not run. |
+| `WS-TUI-SPIKE-009` | running | The 30-minute burst-output soak is running against the exact upstream core; record its final measurements before closing the gate. |
 
 ## Inference
 
@@ -83,9 +86,10 @@ Appaloft can own Workspace navigation while Pi/OpenCode/Claude Code/Codex keep o
 native terminal UI. The bridge is byte-stream transport plus terminal emulation, not semantic
 proxying of messages, tools or reasoning.
 
-This is a **Go for the next implementation spike**, not a Go for a production dependency. The
-remaining risks are maturity, packaging, reconnect and terminal correctness—not the core split-pane
-architecture.
+This is a **Go for renderer-neutral production foundations**, not a Go for an OpenTUI production
+dependency. The remaining OpenTUI risks are release maturity, packaging and terminal correctness,
+not the core split-pane architecture. The Ratatui fallback Spike is the independent delivery
+benchmark.
 
 ## Recommendation
 

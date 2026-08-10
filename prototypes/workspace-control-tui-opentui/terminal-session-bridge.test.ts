@@ -13,9 +13,9 @@ test("maps TerminalSession bytes and lifecycle without Agent semantics", async (
   let closed = 0;
 
   const frames: TerminalSessionFrame[] = [
-    { type: "ready" },
-    { type: "output", stream: "stdout", data: "\x1b[?1049hagent native screen" },
-    { type: "closed", exitCode: 0, reason: "fixture complete" },
+    { kind: "ready", sessionId: "term_fixture" },
+    { kind: "output", stream: "stdout", data: "\x1b[?1049hagent native screen" },
+    { kind: "closed", exitCode: 0, reason: "completed" },
   ];
   const session: TerminalSession = {
     async *[Symbol.asyncIterator]() {
@@ -46,7 +46,7 @@ test("maps TerminalSession bytes and lifecycle without Agent semantics", async (
   expect(rendered).toEqual(["\x1b[?1049hagent native screen"]);
   expect(writes).toEqual(["native input"]);
   expect(sizes).toEqual([{ cols: 120, rows: 40 }]);
-  expect(result).toEqual({ type: "closed", exitCode: 0, reason: "fixture complete" });
+  expect(result).toEqual({ kind: "closed", exitCode: 0, reason: "completed" });
   expect(detached).toBe(1);
   expect(closed).toBe(1);
 });

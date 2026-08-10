@@ -1,0 +1,17 @@
+[package]
+name = "appaloft-workspace-control-tui-ratatui-spike"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+anyhow = "1.0"
+portable-pty = "0.8"
+ratatui = "0.29"
+vt100 = "0.15"
+
+[profile.release]
+lto = "fat"
+opt-level = "z"
+panic = "abort"
+strip = true

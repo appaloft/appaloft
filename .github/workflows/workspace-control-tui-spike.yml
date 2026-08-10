@@ -1,0 +1,67 @@
+name: Workspace Control TUI Spike
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - spike/workspace-control-tui-opentui
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workspace-control-tui-spike-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  terminal-session-bridge:
+    name: TerminalSession bridge (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-14
+          - ubuntu-22.04
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+
+      - name: Test framework-neutral reconnect
+        run: >-
+          bun test
+          prototypes/workspace-control-tui-opentui/terminal-session-bridge.test.ts
+          prototypes/workspace-control-tui-opentui/terminal-viewport-reconnect.test.ts
+
+  ratatui-fallback:
+    name: Ratatui fallback (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-14
+          - ubuntu-22.04
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --check --manifest-path prototypes/workspace-control-tui-ratatui/Cargo.toml
+
+      - name: Test PTY and renderer
+        run: cargo test --manifest-path prototypes/workspace-control-tui-ratatui/Cargo.toml
+
+      - name: Build release binary
+        run: cargo build --release --manifest-path prototypes/workspace-control-tui-ratatui/Cargo.toml
+
+      - name: Run release smoke
+        run: prototypes/workspace-control-tui-ratatui/target/release/appaloft-workspace-control-tui-ratatui-spike
