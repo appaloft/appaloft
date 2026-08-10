@@ -1724,6 +1724,22 @@ describe("CLI remote control-plane client", () => {
     });
   });
 
+  test("[WS-CODE-LOCAL-003] code preserves local dispatch when no trusted remote target is selected", async () => {
+    const result = await resolveCliExecutionTarget({
+      argv: ["node", "appaloft", "code"],
+      store: new MemoryCliControlPlaneProfileStore(),
+    });
+
+    expect(result._unsafeUnwrap()).toMatchObject({
+      kind: "local",
+      argv: ["node", "appaloft", "code"],
+      diagnostics: {
+        command: "code",
+        effectiveMode: "none",
+      },
+    });
+  });
+
   test("[SBX-CLI-AGENT-001][CONTROL-PLANE-CLI-006] sandbox commands are remote-capable", async () => {
     const result = await resolveCliExecutionTarget({
       argv: ["node", "appaloft", "sandbox", "agent", "runtime", "list", "sbx_123"],
@@ -1739,8 +1755,9 @@ describe("CLI remote control-plane client", () => {
     });
   });
 
-  test("[WS-OPEN-REMOTE-018][CONTROL-PLANE-CLI-006] Profile-aware Workspace commands are remote-capable", async () => {
+  test("[WS-CODE-PARITY-002][WS-OPEN-REMOTE-018][CONTROL-PLANE-CLI-006] Profile-aware Workspace commands are remote-capable", async () => {
     for (const argv of [
+      ["node", "appaloft", "code"],
       ["node", "appaloft", "workspace", "open", "."],
       [
         "node",

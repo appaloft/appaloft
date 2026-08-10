@@ -6,6 +6,7 @@ localeState:
   zh-CN: complete
   en-US: complete
 searchAliases:
+  - "appaloft code"
   - "remote development"
   - "workspace open"
   - "OpenCode"
@@ -45,10 +46,12 @@ After configuring the Repository Binding, Project default Agent Profile, Server 
 Credential Connections, run this from a clean, pushed Git branch:
 
 ```bash
-appaloft workspace open .
+appaloft code
 ```
 
-The CLI uses `.` only to find the Git root, upstream remote, branch, and HEAD SHA. It does not
+`appaloft code [path]` is the primary task-oriented entry; path defaults to `.`. The compatibility
+command `appaloft workspace open [path]` delegates to the same `workspaces.open` operation. The CLI
+uses the path only to find the Git root, upstream remote, branch, and HEAD SHA. It does not
 upload the local directory or uncommitted files. It normalizes the remote to a Repository identity,
 finds the Project through its Repository Binding, selects `--profile` or the Project default
 Profile, then creates or resumes the remote Workspace. By default it enters the Agent-owned
@@ -65,9 +68,14 @@ The same command resumes the preferred Workspace when its source SHA still match
 a new isolated Workspace, or `--no-attach` to return only the descriptor:
 
 ```bash
-appaloft workspace open . --new
-appaloft workspace open . --no-attach
+appaloft code . --new
+appaloft code . --no-attach
 ```
+
+`--profile` selects an Agent Workspace Profile. It is distinct from the global
+`--control-plane-profile`, which selects a saved local control-plane connection. The first slice
+does not add `--keep-awake` or automatic-removal shortcuts; use explicit Workspace lifecycle
+commands to pause, resume, or terminate.
 
 Staged, unstaged, or untracked files; no upstream; an unpushed HEAD; or a remote branch tip that
 differs from HEAD all fail before any remote creation. The error shows the exact HEAD SHA and safe
@@ -138,12 +146,15 @@ against that same partial identity instead of silently creating a duplicate Sand
 ## Reconnecting after disconnect
 
 Terminal sessions are backed by a PTY managed by Appaloft — a client disconnect is just a "detach."
-While the session TTL and Sandbox remain valid, running `workspace open` again reuses the Session,
+While the session TTL and Sandbox remain valid, running `appaloft code` again reuses the Session,
 replays bounded output, and continues the same Agent process:
 
 ```bash
-appaloft workspace open .
+appaloft code
 ```
+
+Existing automation can keep using `appaloft workspace open .`; it is not deprecated and its
+machine-readable behavior is unchanged.
 
 Lower-level diagnostic commands remain available:
 

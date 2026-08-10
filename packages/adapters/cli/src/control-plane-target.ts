@@ -76,6 +76,7 @@ const remoteCapableTopLevelCommands = new Set([
   "audit-event",
   "blueprint",
   "certificate",
+  "code",
   "default-access",
   "dependency",
   "deploy",

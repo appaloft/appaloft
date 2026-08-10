@@ -126,6 +126,7 @@ export const publicDocsHelpTopics = {
     anchor: "agent-workspace-open",
     relatedOperation: "workspaces.open",
     aliases: [
+      "appaloft code",
       "agent workspace",
       "workspace open",
       "remote development",
@@ -138,10 +139,12 @@ export const publicDocsHelpTopics = {
       "docs/specs/112-agent-task-run-workflow/spec.md",
       "docs/specs/113-workspace-collaboration/spec.md",
       "docs/specs/120-profile-aware-workspace-open-and-attach/spec.md",
+      "docs/specs/125-workspace-code-activation/spec.md",
       "docs/testing/agent-workspace-test-matrix.md",
       "docs/testing/agent-task-run-test-matrix.md",
       "docs/testing/workspace-collaboration-test-matrix.md",
       "docs/testing/profile-aware-workspace-open-test-matrix.md",
+      "docs/testing/workspace-code-activation-test-matrix.md",
     ],
     webSurfaces: [
       "apps/web/src/routes/workspaces and workspace-collaborations: create, reconnect, collaborate, preview, review, and deliver",

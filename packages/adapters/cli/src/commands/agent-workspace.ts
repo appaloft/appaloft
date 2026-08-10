@@ -60,6 +60,7 @@ import {
   runQuery,
   runTerminalCommand,
 } from "../runtime.js";
+import { cliCommandDescriptions } from "./docs-help.js";
 
 const workspaceId = Args.text({ name: "workspaceId" });
 const terminalDirectory = Options.text("directory").pipe(Options.optional);
@@ -246,44 +247,46 @@ const create = EffectCommand.make(
   ),
 );
 
-const open = EffectCommand.make(
-  "open",
-  {
-    path: Args.text({ name: "path" }).pipe(Args.withDefault(".")),
-    profile: Options.text("profile").pipe(Options.optional),
-    forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
-    noAttach: Options.boolean("no-attach").pipe(Options.withDefault(false)),
-  },
-  ({ forceNew, noAttach, path, profile }) =>
-    Effect.gen(function* () {
-      const cli = yield* CliRuntime;
-      const source = yield* Effect.tryPromise({
-        try: () => (cli.resolveLocalWorkspaceGitContext ?? resolveLocalGitWorkspaceContext)(path),
-        catch: (error) => workspaceCliError(error, "workspace-open-git-context"),
-      });
-      const attach = !noAttach;
-      const command = yield* resultToEffect(
-        OpenAgentWorkspaceCommand.create({
-          repository: source.credentialFreeHttpsRepository,
-          repositoryIdentity: source.repositoryIdentity,
-          ref: source.ref,
-          branch: source.branch,
-          commitSha: source.headSha,
-          ...(optionalValue(profile) ? { profile: optionalValue(profile) } : {}),
-          forceNew,
-          attach,
-        }),
-      );
-      const result = yield* resultToEffect(
-        yield* Effect.promise(() => cli.executeCommand(command)),
-      );
-      yield* completeWorkspaceOpen(result, attach, cli.launchNativeWorkspaceClient);
-    }),
-).pipe(
-  EffectCommand.withDescription(
-    "Create or resume a Profile-aware Workspace from clean, pushed local Git context",
-  ),
-);
+function makeWorkspaceOpenCommand(name: "code" | "open") {
+  return EffectCommand.make(
+    name,
+    {
+      path: Args.text({ name: "path" }).pipe(Args.withDefault(".")),
+      profile: Options.text("profile").pipe(Options.optional),
+      forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
+      noAttach: Options.boolean("no-attach").pipe(Options.withDefault(false)),
+    },
+    ({ forceNew, noAttach, path, profile }) =>
+      Effect.gen(function* () {
+        const cli = yield* CliRuntime;
+        const source = yield* Effect.tryPromise({
+          try: () => (cli.resolveLocalWorkspaceGitContext ?? resolveLocalGitWorkspaceContext)(path),
+          catch: (error) => workspaceCliError(error, "workspace-open-git-context"),
+        });
+        const attach = !noAttach;
+        const command = yield* resultToEffect(
+          OpenAgentWorkspaceCommand.create({
+            repository: source.credentialFreeHttpsRepository,
+            repositoryIdentity: source.repositoryIdentity,
+            ref: source.ref,
+            branch: source.branch,
+            commitSha: source.headSha,
+            ...(optionalValue(profile) ? { profile: optionalValue(profile) } : {}),
+            forceNew,
+            attach,
+          }),
+        );
+        const result = yield* resultToEffect(
+          yield* Effect.promise(() => cli.executeCommand(command)),
+        );
+        yield* completeWorkspaceOpen(result, attach, cli.launchNativeWorkspaceClient);
+      }),
+  ).pipe(EffectCommand.withDescription(cliCommandDescriptions.agentWorkspaceOpen));
+}
+
+const open = makeWorkspaceOpenCommand("open");
+
+export const workspaceCodeCommand = makeWorkspaceOpenCommand("code");
 
 const list = EffectCommand.make(
   "list",

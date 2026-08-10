@@ -23,7 +23,7 @@ The returned `workspaceId` is the Sandbox id. No second Workspace record or life
 
 ## Task-Oriented Activation
 
-Spec 125 plans `appaloft code [path]` as CLI presentation over this exact workflow. The default
+`appaloft code [path]` is the CLI presentation over this exact workflow. The default
 path is `.`, and `--profile`, `--new` and `--no-attach` map to the existing Workspace-open input.
 It adds no operation, query, projection or local Profile preference. `appaloft workspace open
 [path]` remains supported for compatibility and explicit resource-oriented use after that command

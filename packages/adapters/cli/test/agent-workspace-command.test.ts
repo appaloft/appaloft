@@ -175,7 +175,139 @@ describe("Agent Workspace CLI", () => {
     });
   });
 
-  test("[WS-ATTACH-MANAGED-014] automatically connects a managed-terminal attach descriptor", async () => {
+  test("[WS-CODE-CLI-001][WS-CODE-PARITY-002][WS-CODE-PROFILE-005][WS-CODE-RESUME-007][WS-CODE-OPTIONS-008][WS-CODE-COMPAT-010] code delegates to the workspace open contract", async () => {
+    const commands: OpenAgentWorkspaceCommand[] = [];
+    const output: string[] = [];
+    const resolvedPaths: string[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: Command<T>) => {
+        expect(command).toBeInstanceOf(OpenAgentWorkspaceCommand);
+        commands.push(command as OpenAgentWorkspaceCommand);
+        return ok({ workspaceId: "sbx_code", resumed: true } as T);
+      },
+    } as unknown as CommandBus;
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus: { execute: async () => ok({}) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_workspace_code_cli" }),
+      },
+      resolveLocalWorkspaceGitContext: async (path) => {
+        resolvedPaths.push(path);
+        return {
+          root: "/work/repository",
+          remoteName: "origin",
+          remote: "git@github.com:Acme/Web.git",
+          repositoryIdentity: "github.com/Acme/Web",
+          credentialFreeHttpsRepository: "https://github.com/Acme/Web.git",
+          branch: "feature/code",
+          ref: "refs/heads/feature/code",
+          headSha: "0123456789abcdef0123456789abcdef01234567",
+        };
+      },
+    });
+    const write = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "code",
+        "--profile",
+        "opencode-default",
+        "--new",
+        "--no-attach",
+      ]);
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "workspace",
+        "open",
+        ".",
+        "--profile",
+        "opencode-default",
+        "--new",
+        "--no-attach",
+      ]);
+    } finally {
+      process.stdout.write = write;
+    }
+
+    expect(resolvedPaths).toEqual([".", "."]);
+    expect(commands).toHaveLength(2);
+    expect(commands[0]?.input).toEqual(commands[1]?.input);
+    expect(output.join("")).toContain('"resumed": true');
+    expect(commands[0]).toMatchObject({
+      input: {
+        repository: "https://github.com/Acme/Web.git",
+        repositoryIdentity: "github.com/Acme/Web",
+        branch: "feature/code",
+        commitSha: "0123456789abcdef0123456789abcdef01234567",
+        profile: "opencode-default",
+        forceNew: true,
+        attach: false,
+      },
+    });
+  });
+
+  test("[WS-CODE-PREFLIGHT-004][WS-CODE-ERROR-009] code preserves Git preflight errors before dispatch", async () => {
+    let commandDispatched = false;
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async () => {
+          commandDispatched = true;
+          return ok({});
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({}) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_workspace_code_preflight_cli" }),
+      },
+      resolveLocalWorkspaceGitContext: async () => {
+        throw {
+          code: "agent_workspace_git_worktree_dirty",
+          category: "user",
+          message: "Workspace source must be clean before activation",
+          retryable: false,
+          details: {
+            phase: "workspace-git-preflight",
+            recovery: "Commit or stash local changes, then push the branch",
+          },
+        };
+      },
+    });
+
+    const originalExitCode = process.exitCode;
+    const write = process.stderr.write;
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code"]);
+      throw new Error("Expected dirty Git preflight to fail");
+    } catch (error) {
+      const errorText = String(error);
+      expect(errorText).toContain('"code":"agent_workspace_git_worktree_dirty"');
+      expect(errorText).toContain('"phase":"workspace-git-preflight"');
+      expect(errorText).toContain("Commit or stash local changes, then push the branch");
+    } finally {
+      process.stderr.write = write;
+      process.exitCode = originalExitCode ?? 0;
+    }
+
+    expect(commandDispatched).toBeFalse();
+  });
+
+  test("[WS-CODE-ATTACH-006][WS-ATTACH-MANAGED-014] automatically connects a managed-terminal attach descriptor", async () => {
     const attached: string[] = [];
     const output: string[] = [];
     const frames: TerminalSessionFrame[] = [
@@ -261,13 +393,13 @@ describe("Agent Workspace CLI", () => {
       }),
     });
 
-    await program.parseAsync(["node", "appaloft", "workspace", "open", "."]);
+    await program.parseAsync(["node", "appaloft", "code"]);
 
     expect(attached).toEqual(["term_pi"]);
     expect(output.join("")).toBe("Pi ready\n");
   });
 
-  test("[WS-ATTACH-NATIVE-015] executes the Adapter-declared native client handoff without a shell", async () => {
+  test("[WS-CODE-ATTACH-006][WS-ATTACH-NATIVE-015] executes the Adapter-declared native client handoff without a shell", async () => {
     const launched: string[][] = [];
     const commandBus = {
       execute: async <T>() =>
@@ -321,7 +453,7 @@ describe("Agent Workspace CLI", () => {
       },
     });
 
-    await program.parseAsync(["node", "appaloft", "workspace", "open", "."]);
+    await program.parseAsync(["node", "appaloft", "code"]);
 
     expect(launched).toEqual([
       ["opencode", "attach", "https://attach.example.test/capability", "--dir", "/workspace"],

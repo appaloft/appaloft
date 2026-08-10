@@ -44,7 +44,7 @@
 
 ## Roadmap And Compatibility
 
-- Roadmap position: next public Agent Workspace activation slice.
+- Roadmap position: delivered public Agent Workspace activation slice.
 - Current release line: public Appaloft 1.8.x.
 - Expected version target: next compatible minor release after implementation.
 - Compatibility impact: minor; additive CLI command with no removal or changed operation schema.
@@ -60,15 +60,15 @@
 - Existing `WS-OPEN-*` and `WS-ATTACH-*` tests remain regression evidence for the delegated
   workflow; new tests must prove the top-level entry actually reaches those semantics.
 
-## Delivery Order
+## Delivery Record
 
-1. Accept ADR-107, Spec 125 and the Test Matrix.
-2. Create one actor-visible public issue and mark it `ready-for-agent` only after governing docs are
-   accepted.
-3. Enter Test-First Round for the CLI and packaging rows.
-4. Implement the smallest CLI slice without a production TUI.
-5. Run public docs, CLI, packaging and repository gates.
-6. Complete Post-Implementation Sync before release-note input.
+1. ADR-107, Spec 125 and the Test Matrix were accepted.
+2. Public issue [#1022](https://github.com/appaloft/appaloft/issues/1022) carried the actor-visible
+   slice with `ready-for-agent`.
+3. Test-First covered CLI, target resolution, help, docs and packaging boundaries.
+4. The smallest CLI slice shipped without a production TUI or new operation.
+5. Public docs, CLI, release bundle and repository gates supplied verification evidence.
+6. This Post-Implementation Sync supplies the conventional feature commit/PR release-note input.
 
 ## Risks And Migration Gaps
 

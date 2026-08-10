@@ -62,7 +62,7 @@ material, or long-lived attach credentials.
 
 | Surface | Mapping |
 | --- | --- |
-| CLI | Current `appaloft workspace open [path]` and Profile-aware `workspace create`; planned task-oriented `appaloft code [path]` |
+| CLI | Current task-oriented `appaloft code [path]`, compatible `appaloft workspace open [path]`, and Profile-aware `workspace create` |
 | SDK | `appaloft.workspaces.open(...)`; Profile-aware `workspaces.create(...)` |
 | oRPC / HTTP | Catalog-backed application command |
 | Console | Workspace create/resume entry |

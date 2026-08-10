@@ -6,6 +6,7 @@ localeState:
   zh-CN: complete
   en-US: complete
 searchAliases:
+  - "appaloft code"
   - "远程开发"
   - "OpenCode"
   - "Pi"
@@ -46,10 +47,12 @@ Sandbox 本身只是一个受控执行环境，不预设"应该跑什么"。Work
 Connection 配置后，在 clean 且已经 push 的 Git branch 中运行：
 
 ```bash
-appaloft workspace open .
+appaloft code
 ```
 
-CLI 只用 `.` 查找 Git root、upstream remote、branch 和 HEAD SHA，不会上传本地目录或未提交
+`appaloft code [path]` 是面向任务的主入口，path 默认为 `.`；它与兼容命令
+`appaloft workspace open [path]` 委托给同一个 `workspaces.open` 操作。CLI 只用 path 查找 Git
+root、upstream remote、branch 和 HEAD SHA，不会上传本地目录或未提交
 文件。它会把 remote 规范化为 Repository identity，通过 Repository Binding 找到 Project，
 选择显式 `--profile` 或 Project 默认 Profile，然后创建或恢复远端 Workspace。默认会直接进入
 Agent 自己的界面：
@@ -64,14 +67,18 @@ attach 行为只读取 Adapter capability，不根据 Pi、OpenCode 或其他 Ag
 再次运行同一命令会恢复相同来源 SHA 的 preferred Workspace。需要新隔离环境时使用：
 
 ```bash
-appaloft workspace open . --new
+appaloft code . --new
 ```
 
 只创建/恢复并输出 descriptor，不进入 Agent 界面：
 
 ```bash
-appaloft workspace open . --no-attach
+appaloft code . --no-attach
 ```
+
+`--profile` 选择 Agent Workspace Profile；它不同于全局
+`--control-plane-profile`（后者选择本机保存的控制面连接配置）。第一版不提供
+`--keep-awake` 或自动删除快捷参数，暂停、恢复和终止仍使用显式 Workspace 生命周期命令。
 
 如果 worktree 有 staged、unstaged 或 untracked 文件，或当前 branch 没有 upstream、HEAD 未
 push、remote branch tip 与 HEAD 不一致，CLI 会在任何远端创建前失败，显示将使用的 HEAD SHA
@@ -118,11 +125,13 @@ console.log(workspace.workspaceId, workspace.agent.runtimeId);
 
 ## 断线重连
 
-Terminal Session 由 Appaloft 托管的 PTY 支撑——客户端断线只是"detach"，只要 Session 的存活时间和 Sandbox 仍然有效，再次运行 `workspace open` 就会重用 Session、重放有限历史输出并继续同一个 Agent 进程：
+Terminal Session 由 Appaloft 托管的 PTY 支撑——客户端断线只是"detach"，只要 Session 的存活时间和 Sandbox 仍然有效，再次运行 `appaloft code` 就会重用 Session、重放有限历史输出并继续同一个 Agent 进程：
 
 ```bash
-appaloft workspace open .
+appaloft code
 ```
+
+已有脚本可以继续使用 `appaloft workspace open .`；它不会被弃用或改变机器可读行为。
 
 底层排障命令仍然保留：
 

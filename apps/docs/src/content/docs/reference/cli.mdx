@@ -11,6 +11,7 @@ searchAliases:
   - "terminal"
   - "命令行"
 relatedOperations:
+  - "workspaces.open"
   - "projects.create"
   - "servers.register"
   - "resources.create"
@@ -30,6 +31,7 @@ appaloft init                                 # 在当前目录初始化 appalof
 appaloft deploy .                             # 部署当前目录
 appaloft login                                # 登录 Appaloft Cloud 或自托管实例
 appaloft context list                         # 查看本机已保存的 profile/context
+appaloft code                                 # 从当前 Git 仓库打开或恢复 Agent Workspace
 
 appaloft projects list                        # 列出项目
 appaloft servers register --host <host>       # 注册服务器
@@ -41,6 +43,22 @@ appaloft deployments recovery-readiness <deploymentId>  # 查询恢复就绪状�
 ```
 
 每个命令都支持 `--help` 查看完整参数列表；交互式提示和错误恢复建议会尽量链接到本文档站点的稳定页面。
+
+## Workspace 快速入口
+
+在 clean 且已经 push 的 Git branch 中运行 `appaloft code [path]`，会通过既有
+`workspaces.open` 操作创建或恢复 Profile-aware Workspace，并在 Adapter 支持时进入 Agent
+自己的 TUI 或 native client。path 默认为 `.`。
+
+```bash
+appaloft code
+appaloft code . --profile <workspace-profile> --new
+appaloft code . --no-attach
+```
+
+`--profile` 选择 Agent Workspace Profile；全局 `--control-plane-profile` 选择本机保存的控制面
+连接。已有自动化可继续使用 `appaloft workspace open .`，其语义和机器可读行为不变。完整的
+前置条件、恢复方式与安全失败说明见 [从本地仓库打开 Workspace](/docs/agents/workspaces/#agent-workspace-open)。
 
 ## 登录与 CLI Profile <a id="cli-remote-control-plane-login" />
 
