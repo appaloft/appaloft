@@ -7,6 +7,8 @@
 - [x] Revise Spec 126, plan, tasks and stable Test Matrix ids for embedded-by-default dual mode.
 - [x] Refine ADR-107 so embedded and same-session full-screen modes share one terminal contract.
 - [x] Position the presentation in the Business Operation Map without adding an operation.
+- [x] Capture revised OpenTUI PR-head build, upstream tests, local PTY/Unicode/focus/same-session
+  smoke and framework-neutral `TerminalSession` bridge evidence on the throwaway branch.
 - [ ] Complete the revised throwaway OpenTUI/Bun spike against `WS-TUI-SPIKE-001..009`.
 - [ ] Accept the Spec/ADR refinement before Ticket or Code Round.
 

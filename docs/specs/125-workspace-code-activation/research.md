@@ -61,19 +61,27 @@ Railway's public implementation subsequently confirmed that its management tree 
 coexist by feeding a PTY through a terminal emulator, while native full-screen is an optional
 same-session mode.
 
-## 2026-08-10 Upstream Reassessment
+## 2026-08-10 Revised Embedded Spike
 
 - OpenTUI PR #1338 merged an internal Ghostty VT runtime with persistent parsing, resize, scroll,
   input encoding and PTY replies.
 - OpenTUI PR #1340 proposes the public embedded-terminal renderable, including terminal-state
-  drawing, focus, input, paste, mouse, resize, cursor and cleanup. It remains unreleased.
+  drawing, focus, input, paste, mouse, resize, cursor and cleanup. Exact commit
+  `73fc2dd62643d1fd83ccdff5dd891dfc491cb5ee` built locally and its 11 embedded-terminal tests
+  passed, but the API remains unmerged and unreleased.
 - `Bun.Terminal` supplies local PTY/ConPTY process transport; the current Appaloft
-  `TerminalSession` contract already supplies managed output, input, resize, detach and close.
+  `TerminalSession` contract already supplies managed output, input, resize, detach and close. The
+  throwaway bridge contract test passed without adding Agent semantics.
+- Throwaway Appaloft commit `d595f2e7` passed a real local PTY smoke for alternate-screen output,
+  CJK/emoji, bracketed paste, focus release/re-entry, resize propagation, exact child PID retention
+  across pane/Focus Mode and deterministic host restoration.
 
-The next Spike therefore tests OpenTUI's emerging embedded surface against both byte-stream
-adapters and representative Pi, OpenCode, Codex and Claude Code terminal behavior. It does not
-change dependencies or production code. Spec 126 requires embedded-by-default Workspace mode plus
-same-session full-screen Focus Mode; handoff-only is no longer an acceptable final implementation.
+This is a Go for the next integration Spike, not for a production dependency. The core
+split-pane/same-session architecture is viable, but `WS-TUI-SPIKE-001`, `003`, `005`, `006`, `007`
+and `009` remain partial or pending: supported release packaging, real remote reconnect/replay,
+real Agent/terminal coverage, mouse/signal correctness and the 30-60 minute soak are not complete.
+Spec 126 continues to require embedded-by-default Workspace mode plus same-session Focus Mode;
+handoff-only is not an acceptable final implementation.
 
 ## Deferred Questions
 

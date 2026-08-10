@@ -3,8 +3,8 @@
 ## Status
 
 - Round: Spec review ready
-- Artifact state: owner direction confirmed; revised embedded-terminal spike pending; Ticket and
-  Code not yet authorized
+- Artifact state: owner direction confirmed; revised host feasibility passed with release,
+  reconnect, terminal/Agent matrix and soak gates pending; Ticket and Code not yet authorized
 - Code changes allowed: no, until this Spec is accepted and an actor-visible ticket is ready
 - Compatibility: additive presentation over existing public operations
 
