@@ -11,8 +11,9 @@ The production boundary keeps local `Bun.Terminal` and managed `TerminalSession`
 the Bun parent. The Rust sidecar receives the same framework-neutral byte stream and owns only
 terminal emulation, input encoding and rendering. A real `portable-pty` fixture remains a
 non-musl reference test; it is not the selected production PTY owner. Linux x64 musl exposed a
-`portable-pty 0.8` SIGSEGV in CI, which is why the boundary fails closed instead of duplicating
-PTY lifecycle in the renderer.
+SIGSEGV first while `portable-pty 0.8` was linked and again in a `musl-gcc` cross-linked
+transport-neutral binary. The final matrix therefore excludes duplicate PTY ownership and builds
+and executes musl natively in a digest-pinned official Rust Alpine image.
 
 The Spike:
 
@@ -41,5 +42,6 @@ prototypes/workspace-control-tui-ratatui/target/release/appaloft-workspace-contr
 
 The branch-only `Workspace Control TUI Spike` workflow repeats the test, release build and
 executable smoke for all six existing macOS/Linux release targets: Darwin arm64/x64 and Linux
-arm64/x64 on glibc/musl. Production archive/npm integration, signing and the real terminal/Agent
-matrix remain separate gates.
+arm64/x64 on glibc/musl. [CI run 31405008059](https://github.com/appaloft/appaloft/actions/runs/31405008059)
+passes every target plus the macOS/Linux `TerminalSession` bridge jobs. Production archive/npm
+integration, signing and the real terminal/Agent matrix remain separate gates.

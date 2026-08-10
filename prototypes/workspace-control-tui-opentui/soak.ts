@@ -24,7 +24,9 @@ const startedRss = process.memoryUsage.rss();
 let maxRss = startedRss;
 let iterations = 0;
 let outputBytes = 0;
+let nextProgressAtMs = Math.min(durationMs, 5 * 60 * 1_000);
 const renderLatencies: number[] = [];
+let failure: unknown;
 
 try {
   while (performance.now() - startedAt < durationMs) {
@@ -42,6 +44,20 @@ try {
     renderLatencies.push(performance.now() - renderStartedAt);
     maxRss = Math.max(maxRss, process.memoryUsage.rss());
     iterations += 1;
+    const elapsedMs = performance.now() - startedAt;
+    if (elapsedMs >= nextProgressAtMs) {
+      console.error(
+        JSON.stringify({
+          progress: true,
+          elapsedMs: Math.round(elapsedMs),
+          durationMs,
+          iterations,
+          outputBytes,
+          rssBytes: process.memoryUsage.rss(),
+        }),
+      );
+      nextProgressAtMs += 5 * 60 * 1_000;
+    }
     await Bun.sleep(20);
   }
 
@@ -80,6 +96,13 @@ try {
       screenIntegrity: true,
     }),
   );
+} catch (error) {
+  failure = error;
+  console.error(error);
 } finally {
   setup.renderer.destroy();
 }
+
+// OpenTUI's native renderer may retain background handles after destroy on an unreleased PR build.
+// The Spike has already emitted the complete report and teardown has run, so end deterministically.
+process.exit(failure ? 1 : 0);

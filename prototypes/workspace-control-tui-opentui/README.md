@@ -61,45 +61,52 @@ a replacement child.
   state after `Ctrl+]`, `q`.
 - Appaloft's existing `TerminalSession` already exposes the required transport-neutral output,
   `write`, `resize`, `detach` and `close` boundary. This Spike did not change that contract.
-- The OpenTUI public embedded API is not released. Multi-terminal coverage and supported release
-  artifacts remain incomplete. The repeatable 30-minute soak records CPU, RSS, render latency and
-  final-frame integrity through `bun soak.ts`.
+- The Ratatui fallback renders the same transport-neutral Session without owning another PTY. Its
+  real-PTY host control and release-sidecar smoke pass on Darwin arm64/x64 and Linux arm64/x64 for
+  glibc and musl in [CI run 31405008059](https://github.com/appaloft/appaloft/actions/runs/31405008059).
+- Musl is compiled and executed natively in a digest-pinned official Rust Alpine image. This
+  replaced a `musl-gcc` cross-link path whose x64 output reproducibly crashed at startup.
+- The OpenTUI public embedded API remains unmerged and unreleased. The repeatable 30-minute soak
+  completed 82,273 renders and 155,056,054 output bytes with final-frame integrity, 3.75% average
+  CPU, p95 0.18 ms / p99 0.30 ms render latency and 89,456,640 bytes of peak RSS growth. An earlier
+  uninstrumented run did not terminate or emit a final report after 36 minutes; the repeatable
+  harness must call `process.exit` after renderer teardown because the unreleased native renderer
+  retains background handles.
 
 ## Gate Verdict
 
 | Gate | Verdict | Evidence / remaining gap |
 | --- | --- | --- |
-| `WS-TUI-SPIKE-001` | partial | Exact macOS arm64 native build passed; Appaloft release artifacts and supported Linux builds were not produced locally. |
+| `WS-TUI-SPIKE-001` | pass | Ratatui release-sidecar build and smoke pass on Darwin arm64/x64 and Linux arm64/x64 glibc/musl; OpenTUI remains ineligible because its API is unreleased. |
 | `WS-TUI-SPIKE-002` | host pass | A representative alternate-screen child rendered from an unmodified PTY byte stream inside `EmbeddedTerminalRenderable`. |
 | `WS-TUI-SPIKE-003` | partial | Resize, bracketed paste, focus release and deterministic restoration passed; real mouse protocols, signals and Agent-specific keymaps still need the terminal matrix. |
 | `WS-TUI-SPIKE-004` | host pass | CJK, emoji, combining text and wide glyphs rendered in upstream and Appaloft smoke coverage. |
 | `WS-TUI-SPIKE-005` | contract pass | Transport loss and rebind preserve the exact managed Session id and bounded replay at the existing TerminalSession seam; a real SSH transport remains in product acceptance. |
-| `WS-TUI-SPIKE-006` | pending | Only the current macOS host PTY was exercised; Terminal.app/iTerm2/Ghostty/VS Code/Linux remain. |
-| `WS-TUI-SPIKE-007` | partial | Source `--no-tui` passed without creating a renderer; packaging with the unreleased native core remains. |
+| `WS-TUI-SPIKE-006` | partial | Automated Darwin/Linux architecture and libc coverage passes; Terminal.app/iTerm2/Ghostty/VS Code and real Agent keymaps remain product acceptance. |
+| `WS-TUI-SPIKE-007` | pass | Source `--no-tui` is renderer-free, Ratatui sidecars are buildable on all six accepted targets, and the unreleased OpenTUI native core is excluded from production packaging. |
 | `WS-TUI-SPIKE-008` | host pass | Pane/Focus Mode resizing retained the exact Bun PTY and child PID; remote Session identity still needs integration coverage. |
-| `WS-TUI-SPIKE-009` | running | The 30-minute burst-output soak is running against the exact upstream core; record its final measurements before closing the gate. |
+| `WS-TUI-SPIKE-009` | OpenTUI reject | The instrumented 30-minute run preserved screen integrity across 82,273 renders / 155 MB output with p99 0.30 ms latency, but peak RSS grew 89 MB and natural teardown retained handles; the harness requires explicit process exit. |
 
 ## Inference
 
-OpenTUI is now the best-fit presentation candidate, and the underlying product concept is viable:
-Appaloft can own Workspace navigation while Pi/OpenCode/Claude Code/Codex keep ownership of their
-native terminal UI. The bridge is byte-stream transport plus terminal emulation, not semantic
-proxying of messages, tools or reasoning.
+The underlying product concept is viable: Appaloft can own Workspace navigation while
+Pi/OpenCode/Claude Code/Codex keep ownership of their native terminal UI. The bridge is byte-stream
+transport plus terminal emulation, not semantic proxying of messages, tools or reasoning.
 
-This is a **Go for renderer-neutral production foundations**, not a Go for an OpenTUI production
-dependency. The remaining OpenTUI risks are release maturity, packaging and terminal correctness,
-not the core split-pane architecture. The Ratatui fallback Spike is the independent delivery
-benchmark.
+This is a **Go for Ratatui behind renderer-neutral production foundations**, not a Go for an
+OpenTUI production dependency. OpenTUI can be reconsidered only after the embedded API is released
+and passes the same gates; replacing the renderer must not change the CLI presentation contract.
 
 ## Recommendation
 
 1. Keep `TerminalViewport` framework-neutral and adapt the existing `TerminalSession`; use
    `Bun.Terminal` only for local native clients.
-2. Wait for OpenTUI's embedded API to merge and release, or pin a reviewed upstream commit only in
-   an explicitly experimental build. Do not vendor or fork its Ghostty runtime into Appaloft.
-3. Next implement the remote `TerminalSession` bridge plus disconnect/reconnect harness, then run
-   release packaging, real terminal/Agent matrix and soak gates before starting the production
-   vertical slice.
+2. Ship Ratatui/Crossterm terminal emulation as a replaceable sidecar on the six accepted
+   macOS/Linux targets. The Bun parent owns existing local PTY and managed Session lifecycle.
+3. Keep OpenTUI experimental until its embedded API is merged and released; do not vendor or fork
+   its Ghostty runtime into Appaloft.
+4. In the product slice, bind the renderer to the existing remote `TerminalSession`, package the
+   six sidecars, retain Windows headless safety and run the real terminal/Agent matrix.
 
 Primary sources:
 
