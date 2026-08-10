@@ -2,9 +2,9 @@
 
 ## Status
 
-- Round: Spec complete; review required
-- Artifact state: ready for review
-- Code changes allowed: no
+- Round: Spec accepted; Ticket required
+- Artifact state: accepted
+- Code changes allowed: after the actor-visible public Ticket is marked `ready-for-agent`
 - Compatibility: additive public CLI capability; expected minor release impact
 
 ## Business Outcome
@@ -89,4 +89,5 @@ semantics without exposing internal ids or credentials.
 ## Open Questions
 
 No question remains that changes first-slice ownership, command shape, lifecycle or persistence.
-Ticket and Code remain blocked until this Spec and ADR-107 are accepted.
+The public Ticket may now be created; Code remains blocked until that Ticket is complete and marked
+`ready-for-agent`.

@@ -10,7 +10,7 @@
   operation.
 - [x] Synchronize the `workspaces.open` command spec, Agent Workspace workflow and traceability,
   while keeping the unimplemented command out of published localized docs.
-- [ ] Accept ADR-107 and Spec 125 through review before Ticket or Code Round.
+- [x] Accept ADR-107 and Spec 125 through review before Ticket or Code Round.
 
 ## Ticket
 

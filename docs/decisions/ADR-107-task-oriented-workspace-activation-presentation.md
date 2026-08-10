@@ -1,6 +1,6 @@
 # ADR-107: Task-Oriented Workspace Activation Presentation
 
-Status: Proposed
+Status: Accepted
 
 Date: 2026-08-10
 
