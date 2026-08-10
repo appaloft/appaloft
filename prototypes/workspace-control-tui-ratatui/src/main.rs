@@ -18,14 +18,17 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    #[cfg(target_env = "musl")]
-    {
-        anyhow::bail!("the musl spike supports only the transport-neutral --viewport-only path");
-    }
+    run_default_smoke()
+}
 
-    #[cfg(not(target_env = "musl"))]
+#[cfg(target_env = "musl")]
+fn run_default_smoke() -> Result<()> {
+    anyhow::bail!("the musl spike supports only the transport-neutral --viewport-only path")
+}
+
+#[cfg(not(target_env = "musl"))]
+fn run_default_smoke() -> Result<()> {
     let evidence = run_smoke()?;
-    #[cfg(not(target_env = "musl"))]
     println!(
         "{{\"pass\":true,\"childPid\":{},\"alternateScreen\":{},\"unicode\":{},\"inputRoundTrip\":{},\"resize\":{},\"sameChildPid\":{},\"renderedByRatatui\":{}}}",
         evidence.child_pid,
