@@ -1099,7 +1099,7 @@ an aggregate command and its `workspaceId` remains the Sandbox id.
 
 | Workspace action | Canonical operations | CLI / SDK |
 | --- | --- | --- |
-| Open/create-or-resume | `workspaces.open` | current `appaloft workspace open [path]`; planned `appaloft code [path]`; `appaloft.workspaces.open(...)` |
+| Open/create-or-resume | `workspaces.open` | current task entry `appaloft code [path]`; compatible `appaloft workspace open [path]`; `appaloft.workspaces.open(...)` |
 | Profile-aware create | `workspaces.open(forceNew=true)` | `appaloft workspace create --profile ...`; `appaloft.workspaces.create(...)` |
 | Adapter catalog | `sandboxes.agents.harnesses.list` | `appaloft workspace harness list`; Console capability-driven creation |
 | List/show | `sandboxes.list/show` + `sandboxes.agents.runtimes.list` | `appaloft workspace list/show`; `appaloft.workspaces.list/show` |
@@ -1145,7 +1145,7 @@ create provider-specific operation names. See
 [Spec 120](./specs/120-profile-aware-workspace-open-and-attach/spec.md), and
 [Agent Workspace Workflow](./workflows/agent-workspace.md).
 
-The planned `appaloft code` command is the task-oriented CLI presentation governed by
+The active `appaloft code` command is the task-oriented CLI presentation governed by
 [ADR-107](./decisions/ADR-107-task-oriented-workspace-activation-presentation.md) and
 [Spec 125](./specs/125-workspace-code-activation/spec.md). It adds no operation-catalog entry,
 message, projection or lifecycle. The first slice reuses the existing Profile selection, target

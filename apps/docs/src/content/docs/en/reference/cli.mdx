@@ -15,6 +15,7 @@ appaloft init                                 # Initialize appaloft.yml in the c
 appaloft deploy .                             # Deploy the current directory
 appaloft login                                # Log in to Appaloft Cloud or a self-hosted instance
 appaloft context list                         # View saved local profiles/contexts
+appaloft code                                 # Open or resume an Agent Workspace from this Git repository
 
 appaloft projects list                        # List projects
 appaloft servers register --host <host>       # Register a server
@@ -26,6 +27,24 @@ appaloft deployments recovery-readiness <deploymentId>  # Query recovery-readine
 ```
 
 Every command supports `--help` for the full argument list; interactive prompts and error recovery suggestions link to this documentation site's stable pages wherever possible.
+
+## Workspace quick entry
+
+From a clean, pushed Git branch, `appaloft code [path]` creates or resumes a Profile-aware
+Workspace through the existing `workspaces.open` operation. When the Adapter supports attach, it
+enters the Agent-owned TUI or native client. The path defaults to `.`.
+
+```bash
+appaloft code
+appaloft code . --profile <workspace-profile> --new
+appaloft code . --no-attach
+```
+
+`--profile` selects an Agent Workspace Profile; the global `--control-plane-profile` selects a
+saved local control-plane connection. Existing automation can keep using
+`appaloft workspace open .` with unchanged semantics and machine-readable behavior. See
+[Open a Workspace from a local repository](/docs/en/agents/workspaces/#agent-workspace-open) for
+prerequisites, reconnection, and safe failure guidance.
 
 ## Login and CLI profiles <a id="cli-remote-control-plane-login" />
 

@@ -121,6 +121,21 @@ describe("public docs help registry", () => {
     ).toBe("https://appaloft.com/docs/access/custom-domains/#domain-binding-purpose");
   });
 
+  test("[WS-CODE-DOCS-012] Workspace activation help keeps the task entry and compatibility contract", () => {
+    const topic = publicDocsHelpTopics["agent.workspace"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe(
+      "/docs/agents/workspaces/#agent-workspace-open",
+    );
+    expect(topic.aliases).toEqual(expect.arrayContaining(["appaloft code", "workspace open"]));
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/specs/125-workspace-code-activation/spec.md",
+        "docs/testing/workspace-code-activation-test-matrix.md",
+      ]),
+    );
+  });
+
   test("[TS-SDK-DOCS-001] TypeScript SDK help resolves to the SDK reference", () => {
     const topic = publicDocsHelpTopics["typescript-sdk.operation-client"];
 

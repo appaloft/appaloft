@@ -150,7 +150,7 @@ Current status:
   plan/show blocked readiness.
 - `PUB-DOCS-011` now also covers CLI remote control-plane login/context help through the stable
   `cli.remote-control-plane-login` topic.
-- `PUB-DOCS-011` and `PUB-DOCS-016` now govern the planned `appaloft code` task entry through the
+- `PUB-DOCS-011` and `PUB-DOCS-016` govern the active `appaloft code` task entry through the
   existing `agent.workspace` topic and stable `agents/workspaces#agent-workspace-open` anchor. The
   command must explain its compatibility mapping to `workspace open`, local/remote Profile naming
   and safe Git preflight without inventing a second operation.

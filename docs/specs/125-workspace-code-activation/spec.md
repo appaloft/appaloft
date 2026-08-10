@@ -2,9 +2,9 @@
 
 ## Status
 
-- Round: Spec accepted; Ticket required
-- Artifact state: accepted
-- Code changes allowed: after the actor-visible public Ticket is marked `ready-for-agent`
+- Round: Post-Implementation Sync complete
+- Artifact state: implemented and verified by public Ticket [#1022](https://github.com/appaloft/appaloft/issues/1022)
+- Code changes allowed: delivered through the accepted Spec and ready public Ticket
 - Compatibility: additive public CLI capability; expected minor release impact
 
 ## Business Outcome
@@ -80,7 +80,6 @@ semantics without exposing internal ids or credentials.
 
 ## Deferred Gaps
 
-- Test-First and Code Rounds must implement and bind `WS-CODE-*` rows.
 - Registered VPS and hosted target acceptance reuse this command after the local-direct slice.
 - The control TUI requires the framework spike in `research.md` and a separate behavior Spec before
   production implementation.
@@ -89,5 +88,5 @@ semantics without exposing internal ids or credentials.
 ## Open Questions
 
 No question remains that changes first-slice ownership, command shape, lifecycle or persistence.
-The public Ticket may now be created; Code remains blocked until that Ticket is complete and marked
-`ready-for-agent`.
+The local-direct slice is implemented; registered VPS acceptance and a future control TUI remain
+separate behavior rounds.
