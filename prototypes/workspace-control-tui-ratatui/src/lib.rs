@@ -1,14 +1,21 @@
+#[cfg(not(target_env = "musl"))]
 use std::io::{Read, Write};
+#[cfg(not(target_env = "musl"))]
 use std::sync::{Arc, Mutex};
+#[cfg(not(target_env = "musl"))]
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, Result, bail};
+#[cfg(not(target_env = "musl"))]
+use anyhow::bail;
+use anyhow::{Context, Result};
+#[cfg(not(target_env = "musl"))]
 use portable_pty::{CommandBuilder, MasterPty, NativePtySystem, PtySize, PtySystem};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::layout::{Constraint, Layout};
 use ratatui::widgets::{Block, Borders, Paragraph};
 
+#[cfg(not(target_env = "musl"))]
 pub struct SmokeEvidence {
     pub alternate_screen: bool,
     pub unicode: bool,
@@ -28,6 +35,7 @@ pub struct ViewportSmokeEvidence {
     pub rendered_by_ratatui: bool,
 }
 
+#[cfg(not(target_env = "musl"))]
 struct EmbeddedPty {
     parser: Arc<Mutex<vt100::Parser>>,
     writer: Box<dyn Write + Send>,
@@ -36,6 +44,7 @@ struct EmbeddedPty {
     size: (u16, u16),
 }
 
+#[cfg(not(target_env = "musl"))]
 impl EmbeddedPty {
     fn spawn(rows: u16, cols: u16) -> Result<Self> {
         let pty = NativePtySystem::default()
@@ -212,6 +221,7 @@ pub fn run_viewport_smoke() -> Result<ViewportSmokeEvidence> {
     })
 }
 
+#[cfg(not(target_env = "musl"))]
 pub fn run_smoke() -> Result<SmokeEvidence> {
     let mut pty = EmbeddedPty::spawn(20, 80)?;
     let child_pid = pty.child_pid();
@@ -245,7 +255,9 @@ pub fn run_smoke() -> Result<SmokeEvidence> {
 
 #[cfg(test)]
 mod tests {
-    use super::{run_smoke, run_viewport_smoke};
+    #[cfg(not(target_env = "musl"))]
+    use super::run_smoke;
+    use super::run_viewport_smoke;
 
     #[test]
     fn ws_tui_spike_001_004_005_008_renders_transport_neutral_session() {

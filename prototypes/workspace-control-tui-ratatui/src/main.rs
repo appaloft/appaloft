@@ -1,5 +1,7 @@
 use anyhow::Result;
-use appaloft_workspace_control_tui_ratatui_spike::{run_smoke, run_viewport_smoke};
+#[cfg(not(target_env = "musl"))]
+use appaloft_workspace_control_tui_ratatui_spike::run_smoke;
+use appaloft_workspace_control_tui_ratatui_spike::run_viewport_smoke;
 
 fn main() -> Result<()> {
     if std::env::args().any(|argument| argument == "--viewport-only") {
@@ -16,7 +18,14 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
+    #[cfg(target_env = "musl")]
+    {
+        anyhow::bail!("the musl spike supports only the transport-neutral --viewport-only path");
+    }
+
+    #[cfg(not(target_env = "musl"))]
     let evidence = run_smoke()?;
+    #[cfg(not(target_env = "musl"))]
     println!(
         "{{\"pass\":true,\"childPid\":{},\"alternateScreen\":{},\"unicode\":{},\"inputRoundTrip\":{},\"resize\":{},\"sameChildPid\":{},\"renderedByRatatui\":{}}}",
         evidence.child_pid,

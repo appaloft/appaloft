@@ -6,9 +6,11 @@ publish = false
 
 [dependencies]
 anyhow = "1.0"
-portable-pty = "0.8"
 ratatui = "0.29"
 vt100 = "0.15"
+
+[target.'cfg(not(target_env = "musl"))'.dependencies]
+portable-pty = "0.8"
 
 [profile.release]
 lto = "fat"
