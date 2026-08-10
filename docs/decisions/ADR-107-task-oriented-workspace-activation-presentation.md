@@ -35,9 +35,12 @@ control TUI also needs a durable ownership boundary before a terminal framework 
    other Agent adapters. Appaloft may embed or hand off their native PTY, but must not scrape
    terminal text into a vendor-neutral conversation model or interpret hidden reasoning.
 7. Terminal framework choice is not part of the product contract. A disposable hardest-path spike
-   must prove release packaging, nested PTY behavior, reconnect and supported terminal behavior
-   before a production control TUI Code Round. Failure selects a different presentation frontend
-   without changing public operations or PTY contracts.
+   must prove every behavior required by the selected presentation shape. A split-pane or embedded
+   Agent surface requires terminal-emulator/nested-PTY evidence. A control shell that releases the
+   terminal for full-screen native Agent handoff does not claim embedded PTY behavior, but still
+   requires supported release packaging, deterministic ownership/cleanup, reconnect, Unicode and
+   terminal-matrix evidence. Failure selects a different presentation frontend without changing
+   public operations or PTY contracts.
 8. `--keep-awake` and exit-triggered removal are not part of the first activation slice. They need
    separate lifecycle acceptance for policy ownership, partial failure, native handoff and cleanup
    evidence before becoming public options.
@@ -65,7 +68,9 @@ control TUI also needs a durable ownership boundary before a terminal framework 
 ## Migration Gaps
 
 - `appaloft code` is specified but not implemented in this Spec Round.
-- The Workspace control TUI remains a later behavior gated by the spike in Spec 125 research.
+- Spec 125 research rejected an embedded OpenTUI Agent pane and supplied partial host evidence for
+  an OpenTUI control shell. Spec 126 governs the separate full-screen native-handoff behavior and
+  keeps production Code gated by the supported release and terminal matrix.
 - `--keep-awake` and exit-triggered removal require a separate Spec/Test Matrix update.
 
 ## Verification

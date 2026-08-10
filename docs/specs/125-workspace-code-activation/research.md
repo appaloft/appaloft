@@ -43,6 +43,20 @@ OpenTUI becomes an implementation dependency only if every required gate passes 
 release targets. Otherwise the presentation frontend changes; the public Workspace, operation,
 Terminal and attach contracts do not.
 
+## 2026-08-10 Spike Result
+
+Public issue [#1024](https://github.com/appaloft/appaloft/issues/1024) and throwaway commit
+`26713855` tested OpenTUI 0.5.1. The macOS arm64 host passed Bun standalone compilation, outer-shell
+Unicode rendering, deterministic `q` teardown and `--no-tui`. OpenTUI exposes no terminal-emulator
+or PTY renderable for nesting an arbitrary Agent alternate screen, so `WS-TUI-SPIKE-002` is blocked
+and an embedded/split-pane production dependency is rejected.
+
+The result also narrowed the next product slice: Spec 126 uses an Appaloft control shell that
+releases the whole terminal to the existing Adapter-owned native attach transport, then restores
+and refreshes the shell. That shape does not claim nested PTY behavior; it remains gated by the
+supported release, ownership/cleanup, reconnect, Unicode, terminal-matrix and fallback checks in
+its own Test Matrix.
+
 ## Deferred Questions
 
 - Exact navigation, keymap, accessibility and theming belong to the future control-TUI Spec.

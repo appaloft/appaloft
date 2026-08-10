@@ -22,10 +22,10 @@ Round.
 
 | ID | Layer | Scenario | Required evidence | Status |
 | --- | --- | --- | --- | --- |
-| WS-TUI-SPIKE-001 | spike/packaging | Candidate frontend enters the supported release bundle | Runnable supported macOS/Linux artifacts use the real release path. | deferred research |
-| WS-TUI-SPIKE-002 | spike/PTY | Native Agent alternate screen is embedded | Agent-owned PTY renders without terminal scraping or a duplicated conversation model. | deferred research |
-| WS-TUI-SPIKE-003 | spike/terminal | Resize, mouse, paste, focus and signals are exercised | Input ownership and terminal restoration are deterministic. | deferred research |
-| WS-TUI-SPIKE-004 | spike/rendering | CJK, emoji and wide characters render | Cursor position and width behavior remain correct. | deferred research |
-| WS-TUI-SPIKE-005 | spike/reconnect | Transport disconnects and reconnects | Bounded replay resumes without restarting a healthy Agent process. | deferred research |
-| WS-TUI-SPIKE-006 | spike/terminal-matrix | Supported terminal applications are exercised | Required interactions pass on the documented terminal matrix. | deferred research |
-| WS-TUI-SPIKE-007 | spike/fallback | TUI startup is unavailable | `--no-tui` and headless/machine-readable Workspace operations remain usable. | deferred research |
+| WS-TUI-SPIKE-001 | spike/packaging | Candidate frontend enters the supported release bundle | Runnable supported macOS/Linux artifacts use the real release path. | partial: macOS arm64 Bun artifact only; issue #1024 |
+| WS-TUI-SPIKE-002 | spike/PTY | Native Agent alternate screen is embedded | Agent-owned PTY renders without terminal scraping or a duplicated conversation model. | blocked: OpenTUI 0.5.1 has no terminal-emulator/PTY renderable |
+| WS-TUI-SPIKE-003 | spike/terminal | Resize, mouse, paste, focus and signals are exercised | Input ownership and terminal restoration are deterministic. | partial: outer-shell teardown passed; nested ownership blocked |
+| WS-TUI-SPIKE-004 | spike/rendering | CJK, emoji and wide characters render | Cursor position and width behavior remain correct. | host passed |
+| WS-TUI-SPIKE-005 | spike/reconnect | Transport disconnects and reconnects | Bounded replay resumes without restarting a healthy Agent process. | blocked for embedded pane; moved to Spec 126 native-handoff matrix |
+| WS-TUI-SPIKE-006 | spike/terminal-matrix | Supported terminal applications are exercised | Required interactions pass on the documented terminal matrix. | pending in Spec 126 |
+| WS-TUI-SPIKE-007 | spike/fallback | TUI startup is unavailable | `--no-tui` and headless/machine-readable Workspace operations remain usable. | host passed |
