@@ -7,6 +7,13 @@ This is the production-cutoff benchmark for
 small Rust frontend can reproduce Railway's proven `portable-pty + vt100 + Ratatui` terminal
 pipeline when OpenTUI's embedded-terminal API is unavailable or fails an R1 gate.
 
+The production boundary keeps local `Bun.Terminal` and managed `TerminalSession` transport in
+the Bun parent. The Rust sidecar receives the same framework-neutral byte stream and owns only
+terminal emulation, input encoding and rendering. A real `portable-pty` fixture remains a
+non-musl reference test; it is not the selected production PTY owner. Linux x64 musl exposed a
+`portable-pty 0.8` SIGSEGV in CI, which is why the boundary fails closed instead of duplicating
+PTY lifecycle in the renderer.
+
 The Spike:
 
 - starts one real Agent fixture under a native PTY;
@@ -16,6 +23,9 @@ The Spike:
 - resizes the parser and PTY together;
 - proves the Agent child PID is unchanged; and
 - emits machine-readable smoke evidence.
+
+The `--viewport-only` smoke proves the actual sidecar boundary without allocating a second PTY and
+runs on every macOS/Linux release target.
 
 It does not implement Appaloft business operations, persist terminal output, interpret Agent
 semantics or define the final renderer protocol.

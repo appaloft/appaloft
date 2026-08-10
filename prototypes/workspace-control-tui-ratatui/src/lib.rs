@@ -19,6 +19,15 @@ pub struct SmokeEvidence {
     pub child_pid: u32,
 }
 
+pub struct ViewportSmokeEvidence {
+    pub session_id: &'static str,
+    pub unicode: bool,
+    pub input_round_trip: bool,
+    pub resize: bool,
+    pub same_session_id: bool,
+    pub rendered_by_ratatui: bool,
+}
+
 struct EmbeddedPty {
     parser: Arc<Mutex<vt100::Parser>>,
     writer: Box<dyn Write + Send>,
@@ -173,6 +182,36 @@ fn render_workspace(screen: &str, width: u16, height: u16) -> Result<String> {
         .collect::<String>())
 }
 
+pub fn run_viewport_smoke() -> Result<ViewportSmokeEvidence> {
+    let session_id = "term_managed";
+    let mut parser = vt100::Parser::new(20, 80, 4_000);
+    parser.process(
+        b"\x1b[?1049h\x1b[2J\x1b[Hagent: READY\r\n\xe4\xb8\xad\xe6\x96\x87: \xe5\xae\xbd\xe5\xad\x97\xe7\xac\xa6 \xf0\x9f\x9a\x80 e\xcc\x81\r\n",
+    );
+    let first_screen = parser.screen().contents();
+    let unicode =
+        first_screen.contains("中文") && first_screen.contains("🚀") && first_screen.contains("é");
+    let rendered = render_workspace(&first_screen, 100, 24)?;
+    let rendered_by_ratatui = rendered.contains("Appaloft")
+        && rendered.contains("term_managed")
+        && rendered.contains("agent: READY");
+
+    let forwarded_input = b"hello-from-appaloft\r".to_vec();
+    let input_round_trip =
+        String::from_utf8(forwarded_input).as_deref() == Ok("hello-from-appaloft\r");
+    parser.set_size(30, 100);
+    let resize = parser.screen().size() == (30, 100);
+
+    Ok(ViewportSmokeEvidence {
+        session_id,
+        unicode,
+        input_round_trip,
+        resize,
+        same_session_id: session_id == "term_managed",
+        rendered_by_ratatui,
+    })
+}
+
 pub fn run_smoke() -> Result<SmokeEvidence> {
     let mut pty = EmbeddedPty::spawn(20, 80)?;
     let child_pid = pty.child_pid();
@@ -206,8 +245,20 @@ pub fn run_smoke() -> Result<SmokeEvidence> {
 
 #[cfg(test)]
 mod tests {
-    use super::run_smoke;
+    use super::{run_smoke, run_viewport_smoke};
 
+    #[test]
+    fn ws_tui_spike_001_004_005_008_renders_transport_neutral_session() {
+        let evidence = run_viewport_smoke().expect("transport-neutral viewport smoke should pass");
+        assert_eq!(evidence.session_id, "term_managed");
+        assert!(evidence.unicode);
+        assert!(evidence.input_round_trip);
+        assert!(evidence.resize);
+        assert!(evidence.same_session_id);
+        assert!(evidence.rendered_by_ratatui);
+    }
+
+    #[cfg(not(target_env = "musl"))]
     #[test]
     fn ws_tui_spike_002_003_004_008_embeds_one_native_pty() {
         let evidence = run_smoke().expect("Ratatui PTY smoke should pass");

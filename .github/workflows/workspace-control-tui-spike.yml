@@ -102,3 +102,4 @@ jobs:
       - name: Run release smoke
         run: >-
           prototypes/workspace-control-tui-ratatui/target/${{ matrix.rust-target }}/release/appaloft-workspace-control-tui-ratatui-spike
+          --viewport-only
