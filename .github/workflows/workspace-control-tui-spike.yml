@@ -38,13 +38,31 @@ jobs:
           prototypes/workspace-control-tui-opentui/terminal-viewport-reconnect.test.ts
 
   ratatui-fallback:
-    name: Ratatui fallback (${{ matrix.os }})
+    name: Ratatui fallback (${{ matrix.release-target }})
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - macos-14
-          - ubuntu-22.04
+        include:
+          - release-target: darwin-arm64
+            os: macos-14
+            rust-target: aarch64-apple-darwin
+          - release-target: darwin-x64
+            os: macos-15-intel
+            rust-target: x86_64-apple-darwin
+          - release-target: linux-arm64-gnu
+            os: ubuntu-24.04-arm
+            rust-target: aarch64-unknown-linux-gnu
+          - release-target: linux-x64-gnu
+            os: ubuntu-22.04
+            rust-target: x86_64-unknown-linux-gnu
+          - release-target: linux-arm64-musl
+            os: ubuntu-24.04-arm
+            rust-target: aarch64-unknown-linux-musl
+            musl: true
+          - release-target: linux-x64-musl
+            os: ubuntu-22.04
+            rust-target: x86_64-unknown-linux-musl
+            musl: true
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
@@ -53,15 +71,34 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
+          targets: ${{ matrix.rust-target }}
+
+      - name: Install musl linker
+        if: ${{ matrix.musl == true }}
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
 
       - name: Check formatting
         run: cargo fmt --check --manifest-path prototypes/workspace-control-tui-ratatui/Cargo.toml
 
       - name: Test PTY and renderer
-        run: cargo test --manifest-path prototypes/workspace-control-tui-ratatui/Cargo.toml
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+        run: >-
+          cargo test
+          --target ${{ matrix.rust-target }}
+          --manifest-path prototypes/workspace-control-tui-ratatui/Cargo.toml
 
       - name: Build release binary
-        run: cargo build --release --manifest-path prototypes/workspace-control-tui-ratatui/Cargo.toml
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+        run: >-
+          cargo build
+          --release
+          --target ${{ matrix.rust-target }}
+          --manifest-path prototypes/workspace-control-tui-ratatui/Cargo.toml
 
       - name: Run release smoke
-        run: prototypes/workspace-control-tui-ratatui/target/release/appaloft-workspace-control-tui-ratatui-spike
+        run: >-
+          prototypes/workspace-control-tui-ratatui/target/${{ matrix.rust-target }}/release/appaloft-workspace-control-tui-ratatui-spike

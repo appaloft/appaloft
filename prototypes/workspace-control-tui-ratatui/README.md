@@ -29,6 +29,7 @@ cargo build --release --manifest-path prototypes/workspace-control-tui-ratatui/C
 prototypes/workspace-control-tui-ratatui/target/release/appaloft-workspace-control-tui-ratatui-spike
 ```
 
-The branch-only `Workspace Control TUI Spike` workflow repeats the test and release build on
-macOS arm64 and Linux x64. Production packaging, signing and the real terminal/Agent matrix remain
-separate gates.
+The branch-only `Workspace Control TUI Spike` workflow repeats the test, release build and
+executable smoke for all six existing macOS/Linux release targets: Darwin arm64/x64 and Linux
+arm64/x64 on glibc/musl. Production archive/npm integration, signing and the real terminal/Agent
+matrix remain separate gates.
