@@ -1,0 +1,8 @@
+{
+  "name": "appaloft-workspace-control-tui-opentui-spike",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@opentui/core": "0.5.1"
+  }
+}

@@ -1,0 +1,4 @@
+.bun-build
+.*.bun-build
+appaloft-tui-spike
+node_modules/
