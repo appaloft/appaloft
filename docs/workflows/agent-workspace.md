@@ -21,6 +21,24 @@ repository-bindings.show
 
 The returned `workspaceId` is the Sandbox id. No second Workspace record or lifecycle exists.
 
+## Task-Oriented Activation
+
+Spec 125 plans `appaloft code [path]` as CLI presentation over this exact workflow. The default
+path is `.`, and `--profile`, `--new` and `--no-attach` map to the existing Workspace-open input.
+It adds no operation, query, projection or local Profile preference. `appaloft workspace open
+[path]` remains supported for compatibility and explicit resource-oriented use after that command
+ships.
+
+Control-plane target selection happens before dispatch through the existing CLI resolver. With no
+trusted remote selection, activation uses local dispatch; explicit remote selection continues to
+use `--control-plane-profile` and the catalog-backed `workspaces.open` contract. The Agent
+Workspace Profile selector remains `--profile` and must not be confused with the control-plane
+profile.
+
+A future no-subcommand `appaloft workspace` control experience may render this workflow and its
+read models, but every mutation must remain a public operation with a headless equivalent. Native
+Agent conversation/session semantics remain inside the Adapter-owned PTY or attach client.
+
 ## Preflight
 
 Local Git inspection stays in the CLI adapter. It resolves Git root, configured upstream remote,

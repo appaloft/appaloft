@@ -62,7 +62,7 @@ material, or long-lived attach credentials.
 
 | Surface | Mapping |
 | --- | --- |
-| CLI | `appaloft workspace open [path]` and Profile-aware `workspace create` |
+| CLI | Current `appaloft workspace open [path]` and Profile-aware `workspace create`; planned task-oriented `appaloft code [path]` |
 | SDK | `appaloft.workspaces.open(...)`; Profile-aware `workspaces.create(...)` |
 | oRPC / HTTP | Catalog-backed application command |
 | Console | Workspace create/resume entry |
@@ -73,6 +73,9 @@ material, or long-lived attach credentials.
 - [ADR-094](../decisions/ADR-094-agent-workspace-entry-workflow.md)
 - [ADR-100](../decisions/ADR-100-agent-adapter-distribution-and-workspace-profile-boundary.md)
 - [ADR-103](../decisions/ADR-103-profile-aware-workspace-open-and-attach.md)
+- [ADR-107](../decisions/ADR-107-task-oriented-workspace-activation-presentation.md)
 - [Spec 120](../specs/120-profile-aware-workspace-open-and-attach/spec.md)
+- [Spec 125](../specs/125-workspace-code-activation/spec.md)
 - [Workflow](../workflows/agent-workspace.md)
-- [Test Matrix](../testing/profile-aware-workspace-open-test-matrix.md)
+- [Profile-Aware Open Test Matrix](../testing/profile-aware-workspace-open-test-matrix.md)
+- [Workspace Code Activation Test Matrix](../testing/workspace-code-activation-test-matrix.md)
