@@ -37,8 +37,6 @@ import {
   ShowWorkspaceCollaborationQuery,
   SteerAgentTaskRunCommand,
   StopAgentTaskRunCommand,
-  TerminateSandboxAgentRuntimeCommand,
-  TerminateSandboxCommand,
   TransferWorkspaceWriterLeaseCommand,
   type WorkspaceOpenResult,
 } from "@appaloft/application";
@@ -60,6 +58,7 @@ import {
   runQuery,
   runTerminalCommand,
 } from "../runtime.js";
+import { terminateWorkspaceWithRuntimes } from "../workspace-lifecycle-actions.js";
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const workspaceId = Args.text({ name: "workspaceId" });
@@ -359,33 +358,10 @@ const resume = EffectCommand.make("resume", { workspaceId }, ({ workspaceId }) =
 const terminate = EffectCommand.make("terminate", { workspaceId }, ({ workspaceId }) =>
   Effect.gen(function* () {
     const cli = yield* CliRuntime;
-    const runtimeQuery = yield* resultToEffect(
-      ListSandboxAgentRuntimesQuery.create({ sandboxId: workspaceId }),
+    const result = yield* resultToEffect(
+      yield* Effect.promise(() => terminateWorkspaceWithRuntimes(cli, workspaceId)),
     );
-    const runtimes = (yield* resultToEffect(
-      yield* Effect.promise(() => cli.executeQuery(runtimeQuery)),
-    )) as AgentRuntimeListResult;
-    const agents = yield* Effect.all(
-      runtimes.items
-        .filter((runtime) => runtime.status !== "terminated")
-        .map((runtime) =>
-          Effect.gen(function* () {
-            const command = yield* resultToEffect(
-              TerminateSandboxAgentRuntimeCommand.create({
-                sandboxId: workspaceId,
-                runtimeId: runtime.runtimeId,
-              }),
-            );
-            return yield* resultToEffect(yield* Effect.promise(() => cli.executeCommand(command)));
-          }),
-        ),
-      { concurrency: 4 },
-    );
-    const command = yield* resultToEffect(
-      TerminateSandboxCommand.create({ sandboxId: workspaceId }),
-    );
-    const sandbox = yield* resultToEffect(yield* Effect.promise(() => cli.executeCommand(command)));
-    yield* print({ workspaceId, agents, sandbox });
+    yield* print(result);
   }),
 );
 
@@ -1034,7 +1010,53 @@ const collaboration = EffectCommand.make("collaboration").pipe(
   ]),
 );
 
-export const agentWorkspaceCommand = EffectCommand.make("workspace").pipe(
+const workspaceNoTui = Options.boolean("no-tui").pipe(
+  Options.withDescription("Skip the interactive Workspace control TUI."),
+  Options.withDefault(false),
+);
+const workspaceJson = Options.boolean("json").pipe(
+  Options.withDescription("Print the headless Workspace control status as JSON."),
+  Options.withDefault(false),
+);
+
+export const agentWorkspaceCommand = EffectCommand.make(
+  "workspace",
+  {
+    noTui: workspaceNoTui,
+    json: workspaceJson,
+  },
+  ({ json, noTui }) =>
+    Effect.gen(function* () {
+      const cli = yield* CliRuntime;
+      const interactive = Boolean(cli.terminalIO.stdin.isTTY && cli.terminalIO.stdout.isTTY);
+      if (!interactive || noTui || json || !cli.workspaceControlPresentation) {
+        return yield* print({
+          schemaVersion: "appaloft.workspace-control/v1",
+          status: "renderer-unavailable",
+          reason: !interactive
+            ? "non-interactive-terminal"
+            : noTui
+              ? "no-tui"
+              : json
+                ? "structured-output"
+                : "presentation-not-composed",
+          nextAction: "Use an explicit appaloft workspace subcommand.",
+        });
+      }
+      yield* Effect.tryPromise({
+        try: () =>
+          cli.workspaceControlPresentation?.start({
+            executeCommand: cli.executeCommand,
+            executeQuery: cli.executeQuery,
+            ...(cli.terminalSessionGateway
+              ? { terminalSessionGateway: cli.terminalSessionGateway }
+              : {}),
+            openNativeWorkspaceTerminal: cli.openNativeWorkspaceTerminal,
+          }) ?? Promise.resolve(),
+        catch: (error) => workspaceCliError(error, "workspace-control-presentation"),
+      });
+    }),
+).pipe(
   EffectCommand.withDescription("Open and operate Profile-aware Agent Workspaces"),
   EffectCommand.withSubcommands([
     open,

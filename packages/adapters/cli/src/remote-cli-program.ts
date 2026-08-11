@@ -30,6 +30,8 @@ import {
   printCliError,
   readProcessStdinText,
 } from "./runtime.js";
+import { openBunNativeWorkspaceTerminal } from "./workspace-control-native-terminal.js";
+import { type WorkspaceControlPresentation } from "./workspace-control-presentation.js";
 
 export interface RemoteCliProgramInput {
   readonly version: string;
@@ -39,6 +41,7 @@ export interface RemoteCliProgramInput {
   readonly terminalIO?: CliTerminalIO;
   readonly webSocketFactory?: RemoteTerminalWebSocketFactory;
   readonly readStdinText?: () => Promise<string>;
+  readonly workspaceControlPresentation?: WorkspaceControlPresentation;
 }
 
 type RemoteOperationMessage = AppCommand<unknown> | AppQuery<unknown>;
@@ -459,6 +462,10 @@ export function createRemoteCliProgram(input: RemoteCliProgramInput): CliProgram
       }),
       terminalIO,
       readStdinText: () => capturedStdinText ?? sourceStdinReader(),
+      ...(input.workspaceControlPresentation
+        ? { workspaceControlPresentation: input.workspaceControlPresentation }
+        : {}),
+      openNativeWorkspaceTerminal: openBunNativeWorkspaceTerminal,
     }),
   );
 

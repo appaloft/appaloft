@@ -97,8 +97,87 @@ jobs:
             dist/release/.bun-version
             dist/release/install.sh
 
-  binary-artifacts:
+  workspace-tui-artifacts:
     needs: resolve
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin-arm64
+            os: macos-14
+            rust_target: aarch64-apple-darwin
+          - target: darwin-x64
+            os: macos-15-intel
+            rust_target: x86_64-apple-darwin
+          - target: linux-arm64-gnu
+            os: ubuntu-24.04-arm
+            rust_target: aarch64-unknown-linux-gnu
+          - target: linux-x64-gnu
+            os: ubuntu-22.04
+            rust_target: x86_64-unknown-linux-gnu
+          - target: linux-arm64-musl
+            os: ubuntu-24.04-arm
+            rust_target: aarch64-unknown-linux-musl
+            musl: true
+            container_platform: linux/arm64
+          - target: linux-x64-musl
+            os: ubuntu-22.04
+            rust_target: x86_64-unknown-linux-musl
+            musl: true
+            container_platform: linux/amd64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag_name }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+          targets: ${{ matrix.rust_target }}
+
+      - name: Check Workspace TUI formatting
+        run: cargo fmt --check --manifest-path apps/workspace-control-tui/Cargo.toml
+
+      - name: Test and build Workspace TUI
+        if: ${{ matrix.musl != true }}
+        run: |
+          cargo test --locked --target "${{ matrix.rust_target }}" --manifest-path apps/workspace-control-tui/Cargo.toml
+          cargo build --locked --release --target "${{ matrix.rust_target }}" --manifest-path apps/workspace-control-tui/Cargo.toml
+          mkdir -p dist/workspace-tui
+          cp "apps/workspace-control-tui/target/${{ matrix.rust_target }}/release/appaloft-workspace-tui" dist/workspace-tui/appaloft-workspace-tui
+          dist/workspace-tui/appaloft-workspace-tui --version
+
+      - name: Test and build native musl Workspace TUI
+        if: ${{ matrix.musl == true }}
+        run: |
+          mkdir -p dist/workspace-tui
+          docker run --rm --platform "${{ matrix.container_platform }}" \
+            -v "$PWD:/work:ro" -v "$PWD/dist/workspace-tui:/out" -w /work \
+            rust:1.97.1-alpine3.22@sha256:df4efa4e0cdfb5245fa06e3f431387b2bcc96782ce5681b7fb6b0297d745bc29 \
+            sh -c '
+              CARGO_TARGET_DIR=/tmp/appaloft-workspace-tui cargo test --locked --manifest-path apps/workspace-control-tui/Cargo.toml &&
+              CARGO_TARGET_DIR=/tmp/appaloft-workspace-tui cargo build --locked --release --manifest-path apps/workspace-control-tui/Cargo.toml &&
+              cp /tmp/appaloft-workspace-tui/release/appaloft-workspace-tui /out/appaloft-workspace-tui &&
+              /out/appaloft-workspace-tui --version
+            '
+
+      - name: Sign macOS Workspace TUI
+        if: ${{ runner.os == 'macOS' }}
+        run: codesign --force --sign - dist/workspace-tui/appaloft-workspace-tui
+
+      - name: Upload Workspace TUI
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-tui-${{ matrix.target }}
+          if-no-files-found: error
+          path: dist/workspace-tui/appaloft-workspace-tui
+
+  binary-artifacts:
+    needs:
+      - resolve
+      - workspace-tui-artifacts
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -133,17 +212,52 @@ jobs:
       - name: Verify Bun version sync
         run: bun run bun:version:check
 
+      - name: Download Workspace TUI
+        if: ${{ !startsWith(matrix.target, 'win32-') }}
+        uses: actions/download-artifact@v4
+        with:
+          name: workspace-tui-${{ matrix.target }}
+          path: dist/workspace-tui/${{ matrix.target }}
+
       - name: Build Binary Bundle
-        run: >
-          bun run package:binary-bundle --
-          --version "${APPALOFT_APP_VERSION}"
-          --target "${{ matrix.target }}"
-          --archive
+        shell: bash
+        env:
+          RELEASE_TARGET: ${{ matrix.target }}
+        run: |
+          args=(
+            --version "${APPALOFT_APP_VERSION}"
+            --target "${RELEASE_TARGET}"
+            --archive
+          )
+          if [[ "${RELEASE_TARGET}" != win32-* ]]; then
+            args+=(--workspace-tui-binary "dist/workspace-tui/${RELEASE_TARGET}/appaloft-workspace-tui")
+          fi
+          bun run package:binary-bundle -- "${args[@]}"
+
+      - name: Verify Workspace TUI Bundle Shape
+        shell: bash
+        env:
+          RELEASE_TARGET: ${{ matrix.target }}
+        run: |
+          bundle="dist/release/appaloft-v${APPALOFT_APP_VERSION}-${RELEASE_TARGET}"
+          if [[ "${RELEASE_TARGET}" == win32-* ]]; then
+            test ! -e "${bundle}/appaloft-workspace-tui"
+            grep -q "use help/headless Workspace commands" "${bundle}/README.txt"
+          else
+            test -x "${bundle}/appaloft-workspace-tui"
+            grep -q "embedded Workspace control renderer" "${bundle}/README.txt"
+          fi
 
       - name: Linux Binary Smoke
         if: ${{ matrix.target == 'linux-x64-gnu' }}
         run: |
-          ./dist/release/appaloft-v${APPALOFT_APP_VERSION}-${{ matrix.target }}/run-appaloft.sh doctor
+          bundle="./dist/release/appaloft-v${APPALOFT_APP_VERSION}-${{ matrix.target }}"
+          "${bundle}/appaloft-workspace-tui" --version
+          APPALOFT_DATA_DIR="${RUNNER_TEMP}/appaloft-workspace-tui-headless" \
+            APPALOFT_PGLITE_DATA_DIR="${RUNNER_TEMP}/appaloft-workspace-tui-headless/pglite" \
+            "${bundle}/appaloft" workspace --no-tui | grep -q 'appaloft.workspace-control/v1'
+          bun run scripts/test/workspace-control-packaged-tui.ts "${bundle}"
+          "${bundle}/run-appaloft.sh" doctor
 
       - name: Upload Binary Archive
         uses: actions/upload-artifact@v4

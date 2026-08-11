@@ -15,13 +15,17 @@ import {
   ListSshCredentialsQuery,
   OpenTerminalSessionCommand,
   PrepareServerRuntimeCommand,
+  type PrepareServerRuntimeResult,
   PruneServerCapacityCommand,
   prepareServerRuntimeModeSchema,
   RegisterServerCommand,
+  type RegisterServerResult,
   RenameServerCommand,
   ReorderServersCommand,
   RotateSshCredentialCommand,
   runtimeTargetPruneCategories,
+  type ServerConnectivityResult,
+  type ServerDetail,
   ShowScheduledRuntimePrunePolicyQuery,
   ShowServerQuery,
   ShowSshCredentialQuery,
@@ -31,6 +35,9 @@ import {
 import {
   type DomainError,
   deploymentTargetCredentialKinds,
+  domainError,
+  err,
+  ok,
   type Result,
   serverWorkloadRoles,
   targetKinds,
@@ -50,6 +57,7 @@ import {
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const nameOption = Options.text("name");
+const optionalNameOption = Options.text("name").pipe(Options.optional);
 const hostOption = Options.text("host");
 const portOption = Options.text("port").pipe(Options.withDefault("22"));
 const providerOption = Options.text("provider").pipe(Options.withDefault("generic-ssh"));
@@ -93,6 +101,12 @@ const optionalPolicyScopeOption = Options.choice("scope", scheduledRuntimePruneP
 const optionalServerIdOption = Options.text("server-id").pipe(Options.optional);
 const serverIdsOption = Options.text("server-ids");
 const startOffsetOption = Options.integer("start-offset").pipe(Options.optional);
+const enrollmentTargetArg = Args.text({ name: "target" }).pipe(Args.withDefault(""));
+const enrollmentLocalOption = Options.boolean("local").pipe(Options.withDefault(false));
+const enrollmentRuntimeModeOption = Options.choice(
+  "runtime-mode",
+  prepareServerRuntimeModeSchema.options,
+).pipe(Options.withDefault("prepare"));
 
 const generalPurposeWorkloadRoleMeaning = "General purpose (all workload types)";
 
@@ -122,6 +136,262 @@ function renderServerWorkloadRoles(value: unknown): unknown {
         ? generalPurposeWorkloadRoleMeaning
         : record.workloadRoles.join(", "),
   };
+}
+
+type ServerEnrollmentCredential =
+  | { kind: "none" }
+  | { kind: "local-ssh-agent"; username: string }
+  | { kind: "stored-ssh-private-key"; credentialId: string; username: string }
+  | { kind: "ssh-private-key-file"; path: string; username: string };
+
+interface ServerEnrollmentTarget {
+  kind: "local" | "ssh";
+  name: string;
+  host: string;
+  port: number;
+  providerKey: "local-shell" | "generic-ssh";
+  credential: ServerEnrollmentCredential;
+}
+
+function enrollmentValidation(message: string): Result<never> {
+  return err(
+    domainError.validation(message, {
+      phase: "server-enrollment-input",
+    }),
+  );
+}
+
+function decodeSshUsername(value: string): Result<string> {
+  try {
+    const username = decodeURIComponent(value).trim();
+    return username.length > 0
+      ? ok(username)
+      : enrollmentValidation("Server enrollment SSH target requires a username");
+  } catch {
+    return enrollmentValidation("Server enrollment SSH username is invalid");
+  }
+}
+
+function parseServerEnrollmentTarget(input: {
+  local: boolean;
+  target: string;
+  name?: string;
+  credentialId?: string;
+  privateKeyFile?: string;
+}): Result<ServerEnrollmentTarget> {
+  const target = input.target.trim();
+  if (input.local) {
+    if (target.length > 0) {
+      return enrollmentValidation("Use either --local or an SSH target, not both");
+    }
+    if (input.credentialId || input.privateKeyFile) {
+      return enrollmentValidation("Local server enrollment does not accept SSH credential options");
+    }
+    return ok({
+      kind: "local",
+      name: input.name?.trim() || "Local machine",
+      host: "localhost",
+      port: 22,
+      providerKey: "local-shell",
+      credential: { kind: "none" },
+    });
+  }
+  if (target.length === 0) {
+    return enrollmentValidation("Server enrollment requires --local or an ssh:// target");
+  }
+  if (input.credentialId && input.privateKeyFile) {
+    return enrollmentValidation("Use either --credential-id or --private-key-file, not both");
+  }
+
+  let url: URL;
+  try {
+    url = new URL(target);
+  } catch {
+    return enrollmentValidation("Server enrollment target must be a valid ssh:// URL");
+  }
+  if (url.protocol !== "ssh:") {
+    return enrollmentValidation("Server enrollment target must use the ssh:// scheme");
+  }
+  if (url.password.length > 0) {
+    return enrollmentValidation("Server enrollment SSH target must not contain a password");
+  }
+  if (url.pathname.length > 0 || url.search.length > 0 || url.hash.length > 0) {
+    return enrollmentValidation(
+      "Server enrollment SSH target must not contain a path, query, or fragment",
+    );
+  }
+  if (url.hostname.length === 0) {
+    return enrollmentValidation("Server enrollment SSH target requires a host");
+  }
+  const username = decodeSshUsername(url.username);
+  if (username.isErr()) return err(username.error);
+  const port = url.port.length > 0 ? Number(url.port) : 22;
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+    return enrollmentValidation("Server enrollment SSH port must be between 1 and 65535");
+  }
+
+  return ok({
+    kind: "ssh",
+    name: input.name?.trim() || url.hostname,
+    host: url.hostname,
+    port,
+    providerKey: "generic-ssh",
+    credential: input.credentialId
+      ? {
+          kind: "stored-ssh-private-key",
+          credentialId: input.credentialId,
+          username: username.value,
+        }
+      : input.privateKeyFile
+        ? {
+            kind: "ssh-private-key-file",
+            path: input.privateKeyFile,
+            username: username.value,
+          }
+        : { kind: "local-ssh-agent", username: username.value },
+  });
+}
+
+function executeEnrollmentCommand<T>(
+  cli: CliRuntime["Type"],
+  message: Result<import("@appaloft/application").Command<T>>,
+): Effect.Effect<T, DomainError> {
+  return Effect.gen(function* () {
+    const command = yield* resultToEffect(message);
+    return yield* resultToEffect(yield* Effect.promise(() => cli.executeCommand(command)));
+  });
+}
+
+function executeEnrollmentQuery<T>(
+  cli: CliRuntime["Type"],
+  message: Result<AppQuery<T>>,
+): Effect.Effect<T, DomainError> {
+  return Effect.gen(function* () {
+    const query = yield* resultToEffect(message);
+    return yield* resultToEffect(yield* Effect.promise(() => cli.executeQuery(query)));
+  });
+}
+
+function runServerEnrollment(input: {
+  local: boolean;
+  target: string;
+  name?: string;
+  credentialId?: string;
+  privateKeyFile?: string;
+  runtimeMode: "prepare" | "repair" | "upgrade";
+  workloadRoles: readonly (typeof serverWorkloadRoles)[number][];
+}): Effect.Effect<void, DomainError, CliRuntime> {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const target = yield* resultToEffect(parseServerEnrollmentTarget(input));
+    const privateKeyPath =
+      target.credential.kind === "ssh-private-key-file" ? target.credential.path : undefined;
+    const privateKey = privateKeyPath
+      ? yield* Effect.tryPromise({
+          try: () => Bun.file(privateKeyPath).text(),
+          catch: () =>
+            domainError.validation("Server enrollment private key file could not be read", {
+              phase: "server-enrollment-input",
+            }),
+        })
+      : undefined;
+    if (privateKey !== undefined && privateKey.trim().length === 0) {
+      return yield* Effect.fail(
+        domainError.validation("Server enrollment private key file must not be empty", {
+          phase: "server-enrollment-input",
+        }),
+      );
+    }
+
+    const registered = yield* executeEnrollmentCommand<RegisterServerResult>(
+      cli,
+      RegisterServerCommand.create({
+        name: target.name,
+        host: target.host,
+        port: target.port,
+        providerKey: target.providerKey,
+        proxyKind: "traefik",
+        targetKind: "single-server",
+        workloadRoles: [...input.workloadRoles],
+      }),
+    );
+    const stages = ["registered"];
+    yield* print({
+      schemaVersion: "server-enrollment-checkpoint/v1",
+      serverId: registered.id,
+      targetKind: target.kind,
+      credentialSource: target.credential.kind,
+      status: "registered",
+    });
+
+    if (target.kind === "ssh" && target.credential.kind !== "none") {
+      yield* executeEnrollmentCommand(
+        cli,
+        ConfigureServerCredentialCommand.create({
+          serverId: registered.id,
+          credential:
+            target.credential.kind === "stored-ssh-private-key"
+              ? {
+                  kind: "stored-ssh-private-key",
+                  credentialId: target.credential.credentialId,
+                  username: target.credential.username,
+                }
+              : target.credential.kind === "ssh-private-key-file"
+                ? {
+                    kind: "ssh-private-key",
+                    username: target.credential.username,
+                    privateKey: privateKey ?? "",
+                  }
+                : {
+                    kind: "local-ssh-agent",
+                    username: target.credential.username,
+                  },
+        }),
+      );
+      stages.push("credential-configured");
+    }
+
+    const connectivity = yield* executeEnrollmentCommand<ServerConnectivityResult>(
+      cli,
+      TestServerConnectivityCommand.create({ serverId: registered.id }),
+    );
+    stages.push("connectivity-tested");
+    const runtimePreparation = yield* executeEnrollmentCommand<PrepareServerRuntimeResult>(
+      cli,
+      PrepareServerRuntimeCommand.create({
+        serverId: registered.id,
+        mode: input.runtimeMode,
+      }),
+    );
+    if (runtimePreparation.status !== "ready") {
+      return yield* Effect.fail(
+        domainError.infra("Server runtime preparation did not become ready", {
+          phase: "server-enrollment-runtime",
+          serverId: registered.id,
+          retryable: true,
+        }),
+      );
+    }
+    stages.push("runtime-ready");
+    const readback = yield* executeEnrollmentQuery<ServerDetail>(
+      cli,
+      ShowServerQuery.create({ serverId: registered.id }),
+    );
+    stages.push("readback-complete");
+
+    yield* print({
+      schemaVersion: "server-enrollment/v1",
+      serverId: registered.id,
+      targetKind: target.kind,
+      stages,
+      connectivity: {
+        status: connectivity.status,
+        checks: connectivity.checks,
+      },
+      runtimePreparation,
+      readback: renderServerWorkloadRoles(readback),
+    });
+  });
 }
 
 const runServerRead = <T>(
@@ -158,6 +428,33 @@ const registerCommand = EffectCommand.make(
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverRegister));
+
+const enrollCommand = EffectCommand.make(
+  "enroll",
+  {
+    target: enrollmentTargetArg,
+    local: enrollmentLocalOption,
+    name: optionalNameOption,
+    credentialId: credentialIdOption,
+    privateKeyFile: privateKeyFileOption,
+    runtimeMode: enrollmentRuntimeModeOption,
+    workloadRoles: workloadRoleOption,
+  },
+  ({ credentialId, local, name, privateKeyFile, runtimeMode, target, workloadRoles }) => {
+    const nameValue = optionalValue(name);
+    const credentialIdValue = optionalValue(credentialId);
+    const privateKeyFileValue = optionalValue(privateKeyFile);
+    return runServerEnrollment({
+      local,
+      target,
+      ...(nameValue ? { name: nameValue } : {}),
+      ...(credentialIdValue ? { credentialId: credentialIdValue } : {}),
+      ...(privateKeyFileValue ? { privateKeyFile: privateKeyFileValue } : {}),
+      runtimeMode,
+      workloadRoles,
+    });
+  },
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverEnroll));
 
 const listCommand = EffectCommand.make("list", {}, () =>
   runServerRead(ListServersQuery.create()),
@@ -625,6 +922,7 @@ const terminalCommand = EffectCommand.make(
 export const serverCommand = EffectCommand.make("server").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.server),
   EffectCommand.withSubcommands([
+    enrollCommand,
     registerCommand,
     listCommand,
     showCommand,

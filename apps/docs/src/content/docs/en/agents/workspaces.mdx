@@ -81,6 +81,56 @@ Staged, unstaged, or untracked files; no upstream; an unpushed HEAD; or a remote
 differs from HEAD all fail before any remote creation. The error shows the exact HEAD SHA and safe
 clean/push guidance. V1 never performs implicit sync or patch upload.
 
+## Manage running Workspaces <a id="workspace-control-tui" />
+
+On a supported interactive macOS/Linux terminal, run the command without a subcommand:
+
+```bash
+appaloft workspace
+```
+
+This opens the Appaloft Workspace control TUI. Entering the TUI does not create, pause, resume, or
+terminate a Workspace. It reads existing public state for Workspaces, Agent Runtimes, Preview
+ports, Tasks, and Promotions. When a selected Runtime declares an attach capability, the Agent's
+own TUI is embedded as a native terminal byte stream. Appaloft does not parse conversations, tool
+calls, or hidden reasoning.
+
+- `↑` / `↓` or `j` / `k`: select a Workspace;
+- `Enter`: attach or focus an already connected Agent;
+- `a`: open lifecycle actions for the selected Workspace. `ready` Workspaces can pause or terminate;
+  `paused` Workspaces can resume or terminate. Termination requires a separate `y` confirmation;
+- `d`: open delivery actions derived from the selected detail. Create a private-by-default Preview
+  with an explicit 1-hour, 8-hour, or 24-hour TTL; revoke an existing Preview; approve or deliver
+  an eligible Task; or accept/retry an eligible Promotion. Revoke, approval, Git/PR delivery, and
+  Promotion actions require a separate `y` confirmation;
+- `Ctrl+]`: return input ownership to Workspace navigation without stopping or detaching the Agent;
+- `f`: toggle Focus Mode over the same Terminal Session/local PTY without starting another Agent;
+- `r`: refresh existing public read models; `R`: reconnect with the same Session identity;
+- `q`: quit only while Workspace navigation owns focus. Bare keys remain Agent-owned while the
+  Agent pane is focused.
+
+Leaving or disconnecting the TUI detaches only the client. TUI lifecycle actions dispatch the same
+public commands as the explicit headless subcommands, detach an active Agent viewport before pause
+or terminate, and read the resulting Workspace state back instead of keeping an optimistic local
+copy. Delivery actions keep the current Agent Session attached. Promotion rows with deployment
+identity query authoritative Deployment Proof and show its verdict plus mismatch and unavailable
+evidence counts; a Promotion status is never presented as proof. Failed delivery submissions keep
+their bounded form values for correction or retry without exposing credentials to the renderer.
+For scripts, CI, a non-TTY environment, or when the renderer should not load, use:
+
+```bash
+appaloft workspace --no-tui
+appaloft workspace --json
+appaloft workspace list
+```
+
+The equivalent headless surfaces remain `workspace preview`, `sandbox port revoke`, `workspace
+task approve/deliver`, `sandbox promote accept/retry`, and `deployment proof`.
+
+These paths never initialize the renderer and return a stable headless status or continue through
+the existing subcommand. Windows currently guarantees safe help/headless behavior only; embedded
+mode needs separate release and terminal acceptance.
+
 ## Explicit Profile-aware creation
 
 For automation without local Git context, use a credential-free HTTPS repository and an explicit

@@ -4,6 +4,7 @@ import {
   type ServerAppliedRouteDesiredStateStore as CliServerAppliedRouteStateStore,
   type CliSourceLinkStore,
   createCliProgram,
+  createRatatuiWorkspaceControlPresentation,
   SshRemoteStateLifecycle,
   sshRemoteStateTargetFromDecision,
 } from "@appaloft/adapter-cli";
@@ -274,6 +275,7 @@ export async function createAppComposition(
     executionContextFactory: server.executionContextFactory,
     ...(capturedStdinText === undefined ? {} : { readStdinText: async () => capturedStdinText }),
     terminalSessionGateway,
+    workspaceControlPresentation: createRatatuiWorkspaceControlPresentation(),
     deploymentProgressObserver,
     sourceLinkStore: createCliSourceLinkStore(sourceLinkRepository),
     serverAppliedRouteStore: createCliServerAppliedRouteStore(serverAppliedRouteStateRepository),

@@ -3,6 +3,7 @@ import { mkdir, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
   createCliHelpProgram,
+  createRatatuiWorkspaceControlPresentation,
   createRemoteCliProgram,
   defaultCliControlPlaneProfileStore,
   formatSafeCliError,
@@ -439,6 +440,7 @@ export async function runShellCli(
     const remoteCliProgram = createRemoteCliProgram({
       version: process.env.APPALOFT_APP_VERSION ?? "0.0.0",
       profile: target.profile,
+      workspaceControlPresentation: createRatatuiWorkspaceControlPresentation(),
       ...(capturedStdinText === undefined ? {} : { readStdinText: async () => capturedStdinText }),
     });
     let exitCode = 0;

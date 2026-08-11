@@ -72,14 +72,24 @@ control TUI also needs a durable ownership boundary before a terminal framework 
 
 ## Migration Gaps
 
-- `appaloft code` is implemented under Spec 125; the no-subcommand Workspace control presentation
-  remains unimplemented under Spec 126.
-- The first OpenTUI 0.5.1 spike lacked a public terminal renderable. New upstream Ghostty VT work
-  reopens the embedded route, but Spec 126 keeps production Code gated by a released public API and
-  the shared Agent, release and terminal acceptance matrix.
+- `appaloft code` is implemented under Spec 125. The no-subcommand Workspace control presentation
+  is in Code Round under accepted Spec 126 and public Ticket #1026.
+- Closed Spike #1024 selected a replaceable Rust/Ratatui sidecar because the required OpenTUI
+  embedded API remained unreleased and its teardown failed the bounded-process gate. This is an
+  implementation choice behind the framework-neutral presentation and terminal contracts, not a
+  new domain ownership decision.
+- The Appaloft release artifact, Linux CI and opt-in supported terminal/Agent matrix remain Spec 126
+  completion gates.
+- Preview, Agent Task delivery, Promotion and Deployment Proof actions are implemented under
+  accepted Spec 128 and dispatch only their existing public operations. The Bun parent validates
+  targets against the latest selected detail and reads authoritative Deployment Proof; the Ratatui
+  renderer owns only bounded forms and confirmation state.
 - `--keep-awake` and exit-triggered removal require a separate Spec/Test Matrix update.
 
 ## Verification
 
 See the
-[Workspace Code Activation Test Matrix](../testing/workspace-code-activation-test-matrix.md).
+[Workspace Code Activation Test Matrix](../testing/workspace-code-activation-test-matrix.md) and
+[Workspace Control TUI Test Matrix](../testing/workspace-control-tui-test-matrix.md). Delivery
+controls are verified by the
+[Workspace Control Delivery Actions Test Matrix](../testing/workspace-control-delivery-actions-test-matrix.md).

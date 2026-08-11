@@ -27,6 +27,9 @@ await createBinaryBundle({
   outDir,
   target,
   version,
+  ...(stringArg(args, "workspace-tui-binary")
+    ? { workspaceTuiBinaryPath: resolve(stringArg(args, "workspace-tui-binary") ?? "") }
+    : {}),
 });
 
 if (booleanArg(args, "archive")) {

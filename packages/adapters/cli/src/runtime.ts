@@ -33,6 +33,12 @@ import {
   type LocalGitWorkspaceContext,
   type RemoteGitWorkspaceRef,
 } from "./local-git-workspace-context.js";
+import {
+  type OpenedNativeWorkspaceTerminal,
+  type OpenNativeWorkspaceTerminalInput,
+  openBunNativeWorkspaceTerminal,
+} from "./workspace-control-native-terminal.js";
+import { type WorkspaceControlPresentation } from "./workspace-control-presentation.js";
 
 export interface CliSourceLinkStore {
   read(sourceFingerprint: string): Promise<Result<SourceLinkRecord | null>>;
@@ -91,6 +97,10 @@ export interface CliProgramInput {
     ref: string,
   ) => Promise<RemoteGitWorkspaceRef>;
   launchNativeWorkspaceClient?: (argv: readonly string[]) => Promise<void>;
+  workspaceControlPresentation?: WorkspaceControlPresentation;
+  openNativeWorkspaceTerminal?: (
+    input: OpenNativeWorkspaceTerminalInput,
+  ) => Promise<OpenedNativeWorkspaceTerminal>;
 }
 
 export interface CliTerminalReadable {
@@ -104,6 +114,7 @@ export interface CliTerminalReadable {
 }
 
 export interface CliTerminalWritable {
+  readonly isTTY?: boolean;
   write(data: string | Uint8Array): void | boolean;
 }
 
@@ -159,6 +170,10 @@ export class CliRuntime extends Context.Tag("CliRuntime")<
       ref: string,
     ) => Promise<RemoteGitWorkspaceRef>;
     readonly launchNativeWorkspaceClient?: (argv: readonly string[]) => Promise<void>;
+    readonly workspaceControlPresentation?: WorkspaceControlPresentation;
+    readonly openNativeWorkspaceTerminal: (
+      input: OpenNativeWorkspaceTerminalInput,
+    ) => Promise<OpenedNativeWorkspaceTerminal>;
   }
 >() {}
 
@@ -239,6 +254,11 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
     ...(input.launchNativeWorkspaceClient
       ? { launchNativeWorkspaceClient: input.launchNativeWorkspaceClient }
       : {}),
+    ...(input.workspaceControlPresentation
+      ? { workspaceControlPresentation: input.workspaceControlPresentation }
+      : {}),
+    openNativeWorkspaceTerminal:
+      input.openNativeWorkspaceTerminal ?? openBunNativeWorkspaceTerminal,
   });
 
 export async function readProcessStdinText(): Promise<string> {

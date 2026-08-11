@@ -438,6 +438,10 @@ export const cliCommandDescriptions = {
   repositoryBindingShow: withDocs("Show a Repository Binding", "agent.workspace"),
   repositoryBindingUnbind: withDocs("Remove a Repository Binding", "agent.workspace"),
   server: withDocs("Server operations", "server.deployment-target"),
+  serverEnroll: withDocs(
+    "Enroll the local machine or one SSH VPS and read back runtime readiness",
+    "server.connectivity-test",
+  ),
   serverRegister: withDocs(
     "Register a deployment target with optional repeatable canonical workload roles",
     "server.workload-roles",

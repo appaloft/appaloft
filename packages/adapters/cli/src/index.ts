@@ -96,6 +96,25 @@ export {
   safeCliErrorEvidence,
 } from "./runtime.js";
 export { runStandaloneControlPlaneCli } from "./standalone-control-plane.js";
+export {
+  type OpenedNativeWorkspaceTerminal,
+  type OpenNativeWorkspaceTerminalInput,
+  openBunNativeWorkspaceTerminal,
+} from "./workspace-control-native-terminal.js";
+export {
+  createBoundedWorkspaceControlPresentation,
+  type WorkspaceControlPresentation,
+  type WorkspaceControlPresentationContext,
+  type WorkspaceControlRendererEvent,
+  type WorkspaceControlRendererMessage,
+  type WorkspaceControlRendererSession,
+} from "./workspace-control-presentation.js";
+export {
+  createRatatuiWorkspaceControlPresentation,
+  openLoopbackWorkspaceControlRenderer,
+  resolveWorkspaceControlRendererBinary,
+  type WorkspaceControlRendererProcess,
+} from "./workspace-control-renderer.js";
 
 export function createCliProgram(input: CliProgramInput): CliProgram {
   const sourceStdinReader = input.readStdinText ?? readProcessStdinText;
@@ -147,6 +166,7 @@ export function createCliHelpProgram(input: { readonly version: string }): CliPr
       stderr: process.stderr,
     },
     readStdinText: readProcessStdinText,
+    openNativeWorkspaceTerminal: runtimeUnavailable,
   });
   const live = Layer.mergeAll(NodeContext.layer, helpOnlyRuntime);
 
