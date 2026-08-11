@@ -3760,6 +3760,17 @@ export function registerApplicationServices(
                   ),
                 );
               }
+              if (
+                harnessRegistry.registerAlias({
+                  key: input.key,
+                  templateId: input.templateId,
+                  sandboxTemplateId: input.sandboxTemplateId,
+                  version: input.version,
+                  templateDigest: input.templateDigest,
+                })
+              ) {
+                return ok(undefined);
+              }
               const harnessDescriptor: CommandSandboxAgentDescriptor = {
                 key: input.key,
                 templateId: input.templateId,

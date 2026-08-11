@@ -18,6 +18,79 @@ const context = createExecutionContext({
   tenant: { tenantId: "tenant_a", organizationId: "org_a" },
 });
 
+test("[WS-CREATE-PROFILE-009] an exact unique Profile pin aliases the reviewed native Agent harness", async () => {
+  const executedTasks: string[] = [];
+  const nativeHarness: SandboxAgentHarness = {
+    key: "pi",
+    templateId: "aht_pi_managed_v1",
+    sandboxTemplateId: "stp_pi_pinned",
+    version: "1.0.0",
+    templateDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    capabilities: {
+      taskMode: true,
+      interactive: true,
+      backgroundRuns: true,
+      nativeSession: false,
+      persistentPaths: ["/workspace/.appaloft-agent"],
+    },
+    admitSandbox: (source) => source.kind === "template" && source.templateId === "stp_pi_pinned",
+    async execute(input) {
+      executedTasks.push(input.task);
+      return { events: [], outcomeDigest: "sha256:native-pi" };
+    },
+    async cancel() {},
+  };
+  const registry = new SandboxAgentHarnessRegistry([nativeHarness]);
+
+  expect(
+    registry.registerAlias({
+      key: "declarative-pi-default-0123456789ab",
+      templateId: "aht_pi_managed_v1",
+      sandboxTemplateId: "stp_pi_pinned",
+      version: "1.0.0",
+      templateDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    }),
+  ).toBe(true);
+  expect(
+    registry.registerAlias({
+      key: "declarative-unreviewed-0123456789ab",
+      templateId: "aht_pi_managed_v1",
+      sandboxTemplateId: "stp_unreviewed",
+      version: "1.0.0",
+      templateDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    }),
+  ).toBe(false);
+
+  const aliased = registry.resolve("declarative-pi-default-0123456789ab");
+  expect(aliased?.key).toBe("declarative-pi-default-0123456789ab");
+  expect(aliased?.templateId).toBe(nativeHarness.templateId);
+  expect(aliased?.capabilities).toEqual(nativeHarness.capabilities);
+  expect(aliased?.admitSandbox?.({ kind: "template", templateId: "stp_pi_pinned" })).toBe(true);
+  await aliased?.execute({
+    executionContext: context,
+    sandboxId: "sbx_pi",
+    runtimeId: "sar_pi",
+    runId: "srun_pi",
+    task: "Use brokered model access",
+    context: { mode: "fresh" },
+    requestApproval: async () => "rejected",
+  });
+  expect(executedTasks).toEqual(["Use brokered model access"]);
+  expect(registry.resolve("declarative-unreviewed-0123456789ab")).toBeNull();
+
+  registry.register({ ...nativeHarness, key: "pi-duplicate" });
+  expect(() =>
+    registry.registerAlias({
+      key: "declarative-ambiguous-0123456789ab",
+      templateId: "aht_pi_managed_v1",
+      sandboxTemplateId: "stp_pi_pinned",
+      version: "1.0.0",
+      templateDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    }),
+  ).toThrow("Sandbox Agent harness alias declarative-ambiguous-0123456789ab is ambiguous");
+  expect(registry.resolve("declarative-ambiguous-0123456789ab")).toBeNull();
+});
+
 function fixture(
   options: {
     harness?: SandboxAgentHarness;

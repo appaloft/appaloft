@@ -174,13 +174,59 @@ export interface SandboxAgentHarness {
 
 export class SandboxAgentHarnessRegistry {
   private readonly harnesses = new Map<string, SandboxAgentHarness>();
+  private readonly aliases = new Set<string>();
 
   constructor(harnesses: readonly SandboxAgentHarness[] = []) {
     for (const harness of harnesses) this.register(harness);
   }
 
   register(harness: SandboxAgentHarness): void {
+    this.aliases.delete(harness.key);
     this.harnesses.set(harness.key, harness);
+  }
+
+  registerAlias(input: {
+    key: string;
+    templateId: string;
+    sandboxTemplateId: string;
+    version: string;
+    templateDigest: string;
+  }): boolean {
+    const matches = [...this.harnesses.values()].filter(
+      (harness) =>
+        !this.aliases.has(harness.key) &&
+        harness.key !== input.key &&
+        harness.templateId === input.templateId &&
+        harness.sandboxTemplateId === input.sandboxTemplateId &&
+        harness.version === input.version &&
+        harness.templateDigest === input.templateDigest,
+    );
+    if (matches.length > 1) {
+      throw new Error(`Sandbox Agent harness alias ${input.key} is ambiguous`);
+    }
+    if (matches.length === 0) return false;
+    const source = matches[0] as SandboxAgentHarness;
+    const alias: SandboxAgentHarness = {
+      key: input.key,
+      templateId: source.templateId,
+      ...(source.sandboxTemplateId ? { sandboxTemplateId: source.sandboxTemplateId } : {}),
+      version: source.version,
+      templateDigest: source.templateDigest,
+      ...(source.interaction ? { interaction: source.interaction } : {}),
+      ...(source.capabilities ? { capabilities: source.capabilities } : {}),
+      ...(source.admitSandbox
+        ? { admitSandbox: (sandboxSource) => source.admitSandbox?.(sandboxSource) ?? false }
+        : {}),
+      ...(source.prepareRuntime ? { prepareRuntime: source.prepareRuntime.bind(source) } : {}),
+      ...(source.terminateRuntime
+        ? { terminateRuntime: source.terminateRuntime.bind(source) }
+        : {}),
+      execute: (runInput) => source.execute(runInput),
+      cancel: (cancelInput) => source.cancel(cancelInput),
+    };
+    this.harnesses.set(alias.key, alias);
+    this.aliases.add(alias.key);
+    return true;
   }
 
   resolve(key: string): SandboxAgentHarness | null {
