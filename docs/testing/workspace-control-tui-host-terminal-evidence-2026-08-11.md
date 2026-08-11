@@ -25,20 +25,16 @@ Every passing run proved all of the following:
 | VS Code integrated terminal 1.132.0 | macOS / arm64 | `xterm-256color` | 120×36 | 2026-08-11 09:16:39 | `5c9ba6f79aff313e20433d500c5ba81addcda75079b1169d7df11a5af9720ef8` |
 | Debian xterm 390 on Xvfb | Linux / x64 | `xterm-256color` | 132×40 | 2026-08-11 09:32:05 | `b45da17a7ee591dfe2373801faf51f63dd23e616ce11c83a9f8ac5a31225c435` |
 | Ghostty 1.3.1 | macOS / arm64 | `xterm-ghostty` | 224×64 | 2026-08-11 09:45:42 | `3ac6d0f4330c5a5247f8c4f1b3f5a478d3debe830b140ed1e1864d9be4aaeaff` |
+| iTerm2 3.6.11 | macOS / arm64 | `xterm-256color` | 120×36 | 2026-08-11 09:58:02 | `a5ff65c26c9c4356021d715c8687efbde45e9f42dd0890bb5749ae0dc87e81c2` |
 
 The VS Code run used an isolated Extension Development Host with isolated user-data and extension
 directories. The Linux run compiled the production sidecar in Linux and started the smoke inside a
 real xterm PTY backed by Xvfb. The signed Ghostty app ran from a temporary directory; it was not
-installed and no process remained after the run.
-
-## Open run
-
-iTerm2 3.6.11 remains open. Its official archive SHA-256
+installed and no process remained after the run. The official iTerm2 3.6.11 archive SHA-256
 `36e78c5049560eaa8e122224f6652eb4b229c61cd5e7332d6d25b5c36f7398e7` matches the publisher's
-signed checksum and the extracted app passes strict code-signature verification. On this host its
-documented `--command` entry does not create a Session while the app is outside `/Applications`.
-The temporary `/Applications/iTerm.app` install-and-remove run requires explicit owner
-authorization; it must not be replaced by an environment-only simulation.
+signed checksum, and the copied app passed strict code-signature verification before launch. It
+ran from `/private/tmp/Applications`, not the real `/Applications`; its exact process and temporary
+app copy were removed after the run and both locations were checked for zero residual.
 
 ## Reproduction
 
