@@ -6177,7 +6177,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     }
   }, 25_000);
 
-  test("[RES-PROFILE-ENTRY-001] loads resource detail through resources.show", async () => {
+  test("[RES-PROFILE-ENTRY-001][RES-HEALTH-ENTRY-009] loads resource detail with live runtime inspection", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
 
@@ -6195,16 +6195,6 @@ describe.serial("console e2e with Bun.WebView", () => {
       includeAccessSummary: true,
       includeProfileDiagnostics: true,
     });
-  }, 30_000);
-
-  test("[RES-HEALTH-ENTRY-009] requests live runtime inspection on resource detail", async () => {
-    activeScenario = "dashboard";
-    resetRecordedApiRequests();
-
-    await using view = createWebView();
-    await view.navigate(`${previewUrl}${demoResourcePath}`);
-
-    await expectAnyText(view, ["Resource overview", "资源概览"]);
 
     const healthRequest = await waitForRecordedRequest("/api/rpc/resources/health");
     const healthInput = readOrpcJsonPayload(healthRequest.body);

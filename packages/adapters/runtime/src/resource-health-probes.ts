@@ -23,7 +23,7 @@ import { join } from "node:path";
 import { ash } from "@appaloft/ash";
 
 const responsePreviewLimit = 4096;
-const dockerSwarmHealthProbeTimeoutExitCode = 124;
+const runtimeHealthProbeTimeoutExitCode = 124;
 
 export interface RuntimeHealthCommandRunnerInput {
   args: string[];
@@ -429,8 +429,13 @@ function failedRuntimeProbe(input: {
   };
 }
 
-function isDockerContainerMissing(stderr: string | undefined): boolean {
-  return /\bNo such (?:object|container):(?:\s|$)/i.test(stderr ?? "");
+function isDockerContainerMissing(stderr: string | undefined, container: string): boolean {
+  const message = stderr?.trim();
+  return (
+    message === `Error: No such object: ${container}` ||
+    message === `Error: No such container: ${container}` ||
+    message === `Error response from daemon: No such container: ${container}`
+  );
 }
 
 function dockerSwarmRuntimeProbeResult(input: {
@@ -588,7 +593,7 @@ async function defaultRuntimeHealthCommandRunner(
       process.kill();
       const [stdout, stderr] = await Promise.all([stdoutPromise, stderrPromise]);
       return ok({
-        exitCode: dockerSwarmHealthProbeTimeoutExitCode,
+        exitCode: runtimeHealthProbeTimeoutExitCode,
         stdout,
         stderr: stderr || "Docker Swarm service health probe timed out.",
       });
@@ -770,12 +775,13 @@ export class RuntimeResourceHealthProbeRunner implements ResourceHealthProbeRunn
           durationMs,
           exitCode: commandResult.value.exitCode,
           reasonCode:
-            commandResult.value.exitCode === dockerSwarmHealthProbeTimeoutExitCode
+            commandResult.value.exitCode === runtimeHealthProbeTimeoutExitCode
               ? "docker_swarm_service_probe_timeout"
               : "docker_swarm_service_probe_failed",
           message:
-            commandResult.value.stderr?.trim() ||
-            "Docker Swarm service health probe could not inspect the service.",
+            commandResult.value.exitCode === runtimeHealthProbeTimeoutExitCode
+              ? "Docker Swarm service health probe timed out."
+              : "Docker Swarm service health probe could not inspect the service.",
         }),
       );
     }
@@ -836,9 +842,12 @@ export class RuntimeResourceHealthProbeRunner implements ResourceHealthProbeRunn
     }
 
     if (commandResult.value.exitCode !== 0) {
-      const containerMissing = isDockerContainerMissing(commandResult.value.stderr);
       const inspectionTimedOut =
-        commandResult.value.exitCode === dockerSwarmHealthProbeTimeoutExitCode;
+        commandResult.value.exitCode === runtimeHealthProbeTimeoutExitCode;
+      const containerMissing =
+        !inspectionTimedOut &&
+        commandResult.value.exitCode === 1 &&
+        isDockerContainerMissing(commandResult.value.stderr, container);
       return ok(
         failedRuntimeProbe({
           request,

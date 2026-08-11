@@ -206,11 +206,14 @@ Implemented scope:
   `resource_health_observations` table, and recorder/read-model executable tests.
 - opt-in Docker Swarm and local/generic-SSH single-container runtime inspection, including safe
   distinction between confirmed instance absence and inspection unavailability;
-- Web resource detail live runtime inspection, while compact list/sidebar queries avoid per-row
-  provider-native runtime probes.
+- runtime-owner resolution that keeps failed replacement attempts separate from the preserved
+  succeeded/rolled-back runtime;
+- Web resource detail live runtime inspection, while runtime-control polling and compact
+  list/sidebar queries avoid repeated or per-row provider-native runtime probes.
 
-Current implementation reads latest deployment context, resource-owned health policy, runtime
-lifecycle inferred from deployment state, configured deployment snapshot health path as fallback,
+Current implementation reads latest deployment-attempt context, the latest succeeded/rolled-back
+runtime owner, resource-owned health policy, runtime lifecycle inferred from runtime-owner state,
+configured deployment snapshot health path as fallback,
 resource access summary, domain binding state, and proxy route status. It deliberately keeps
 `overall = "unknown"` for a succeeded deployment when no configured/current health observation
 proves health.

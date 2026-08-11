@@ -114,6 +114,7 @@
   import RuntimeMonitorPanel from "$lib/components/console/RuntimeMonitorPanel.svelte";
   import RuntimeUsagePanel from "$lib/components/console/RuntimeUsagePanel.svelte";
   import ResourceStatusDot from "$lib/components/console/ResourceStatusDot.svelte";
+  import { runtimeControlAttemptCompletesPolling } from "$lib/console/resource-runtime-control-polling";
   import TerminalSessionPanel from "$lib/components/console/TerminalSessionPanel.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button, buttonVariants } from "$lib/components/ui/button";
@@ -530,6 +531,7 @@
   );
   let storageBackupVolumeId = $state("");
   let runtimeControlHealthPolling = $state(false);
+  let runtimeControlPollingAttemptId = $state<string | null>(null);
   const resourceDetailQuery = createQuery(() =>
     orpc.resources.show.queryOptions({
       input: {
@@ -539,6 +541,7 @@
         includeProfileDiagnostics: true,
       },
       enabled: browser && resourceId.length > 0,
+      refetchInterval: runtimeControlHealthPolling ? 2_000 : false,
       staleTime: 5_000,
     }),
   );
@@ -561,7 +564,6 @@
         includeRuntimeProbe: true,
       },
       enabled: browser && resourceId.length > 0,
-      refetchInterval: runtimeControlHealthPolling ? 2_000 : false,
       staleTime: 5_000,
     }),
   );
@@ -998,19 +1000,32 @@
       : [],
   );
   const resourceHealth = $derived(resourceHealthQuery.data ?? null);
-  const latestRuntimeControl = $derived(resourceHealth?.latestRuntimeControl ?? null);
+  const latestRuntimeControl = $derived(
+    resource?.latestRuntimeControl ?? resourceHealth?.latestRuntimeControl ?? null,
+  );
   const latestRuntimeControlActive = $derived(
     latestRuntimeControl ? runtimeControlAttemptIsActive(latestRuntimeControl) : false,
   );
   $effect(() => {
-    if (latestRuntimeControlActive) {
+    if (!runtimeControlPollingAttemptId && latestRuntimeControlActive && latestRuntimeControl) {
+      runtimeControlPollingAttemptId = latestRuntimeControl.runtimeControlAttemptId;
       runtimeControlHealthPolling = true;
       return;
     }
 
-    if (latestRuntimeControl && !latestRuntimeControlActive) {
-      runtimeControlHealthPolling = false;
+    if (
+      !runtimeControlHealthPolling ||
+      !runtimeControlAttemptCompletesPolling(
+        latestRuntimeControl,
+        runtimeControlPollingAttemptId,
+      )
+    ) {
+      return;
     }
+
+    runtimeControlHealthPolling = false;
+    runtimeControlPollingAttemptId = null;
+    void resourceHealthQuery.refetch();
   });
   const resourceEffectiveConfig = $derived<ResourceEffectiveConfig | null>(
     resourceEffectiveConfigQuery.data ?? null,
@@ -3083,8 +3098,9 @@
       };
       runtimeControlDialogOpen = false;
       selectedRuntimeControlOperation = null;
+      runtimeControlPollingAttemptId = result.runtimeControlAttemptId;
       runtimeControlHealthPolling = true;
-      void resourceHealthQuery.refetch();
+      void resourceDetailQuery.refetch();
       void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
     },
     onError: (error) => {
@@ -3107,8 +3123,9 @@
       };
       runtimeControlDialogOpen = false;
       selectedRuntimeControlOperation = null;
+      runtimeControlPollingAttemptId = result.runtimeControlAttemptId;
       runtimeControlHealthPolling = true;
-      void resourceHealthQuery.refetch();
+      void resourceDetailQuery.refetch();
       void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
     },
     onError: (error) => {
@@ -3131,8 +3148,9 @@
       };
       runtimeControlDialogOpen = false;
       selectedRuntimeControlOperation = null;
+      runtimeControlPollingAttemptId = result.runtimeControlAttemptId;
       runtimeControlHealthPolling = true;
-      void resourceHealthQuery.refetch();
+      void resourceDetailQuery.refetch();
       void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
     },
     onError: (error) => {
@@ -4982,6 +5000,9 @@
     }
     if (detail.resource.lastDeploymentStatus) {
       summary.lastDeploymentStatus = detail.resource.lastDeploymentStatus;
+    }
+    if (detail.resource.latestRuntimeControl) {
+      summary.latestRuntimeControl = detail.resource.latestRuntimeControl;
     }
     if (detail.networkProfile) {
       summary.networkProfile = detail.networkProfile;

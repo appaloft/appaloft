@@ -325,15 +325,16 @@ the current snapshot boundary.
 catalog, oRPC/HTTP, CLI, contracts, and Web resource surfaces.
 
 The current implementation resolves resource context, resource-owned runtime health policy, latest
-deployment context, runtime lifecycle from latest deployment state, resource access summary, proxy
-route status, and bounded live HTTP/public probes when `mode = "live"` can resolve a safe URL. It
-does not mark a successful deployment as healthy without a configured/current health observation.
+deployment-attempt context, the latest succeeded/rolled-back runtime owner, resource access
+summary, proxy route status, and bounded live HTTP/public probes when `mode = "live"` can resolve a
+safe URL. It does not mark a successful deployment as healthy without a configured/current health
+observation, and a failed replacement does not displace the preserved runtime owner.
 
 Provider-native runtime inspection covers Docker Swarm service tasks plus Docker single-container
 state on local or generic-SSH targets when `mode = "live"` and `includeRuntimeProbe = true`.
 Sanitized runtime metadata selects the service/container without exposing raw provider output. A
-confirmed missing current container returns lifecycle `exited` and overall `stopped`; inspection
-timeouts, transport failures, and ambiguous engine failures remain `unknown` with
+confirmed missing runtime-owner container returns lifecycle `exited` and overall `stopped`;
+timeouts, transport failures, mismatched container names, and ambiguous engine failures remain `unknown` with
 `resource_runtime_inspection_failed`. Complete Compose multi-service aggregation, command health
 checks, and scheduled health summary persistence cadence policy are still future work. Retained
 health observation storage/readback is available through `resources.health-history` and the

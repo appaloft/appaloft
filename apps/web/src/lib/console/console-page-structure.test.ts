@@ -1385,6 +1385,32 @@ describe("console page structure", () => {
     }
   });
 
+  test("[RES-HEALTH-ENTRY-011] keeps provider-native inspection outside runtime-control polling", () => {
+    const resourceDetailQuerySource = sourceBetween(
+      resourceDetailPageSource,
+      "const resourceDetailQuery = createQuery",
+      "const resourceDeleteSafetyQuery = createQuery",
+    );
+    const resourceHealthQuerySource = sourceBetween(
+      resourceDetailPageSource,
+      "const resourceHealthQuery = createQuery",
+      "const resourceEffectiveConfigQuery = createQuery",
+    );
+
+    expect(resourceDetailQuerySource).toContain(
+      "refetchInterval: runtimeControlHealthPolling ? 2_000 : false",
+    );
+    expect(resourceHealthQuerySource).toContain("includeRuntimeProbe: true");
+    expect(resourceHealthQuerySource).not.toContain("refetchInterval:");
+    expect(resourceDetailPageSource).toContain(
+      "summary.latestRuntimeControl = detail.resource.latestRuntimeControl",
+    );
+    expect(resourceDetailPageSource).toContain("runtimeControlAttemptCompletesPolling(");
+    expect(resourceDetailPageSource).toContain(
+      "runtimeControlPollingAttemptId = result.runtimeControlAttemptId",
+    );
+  });
+
   test("[RESOURCE-INITIAL-CREDENTIALS-IA-001] keeps initial credentials on the resource overview", () => {
     const overviewSource = sourceBetween(
       resourceDetailPageSource,

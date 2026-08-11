@@ -117,7 +117,13 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
   }
 
   async findOne(): Promise<DeploymentSummary | null> {
-    return null;
+    return (
+      [...this.deployments]
+        .filter(
+          (deployment) => deployment.status === "succeeded" || deployment.status === "rolled-back",
+        )
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0] ?? null
+    );
   }
 }
 
@@ -1608,6 +1614,123 @@ describe("ResourceHealthQueryService", () => {
         retriable: false,
       }),
     );
+  });
+
+  test("[RES-HEALTH-QRY-016] keeps unavailable runtime inspection unknown after aggregation", async () => {
+    const probeRunner = new StaticResourceHealthProbeRunner(undefined, {
+      lifecycle: "unknown",
+      health: "unknown",
+      observedAt: "2026-01-01T00:00:10.100Z",
+      reasonCode: "resource_runtime_inspection_failed",
+      message: "Runtime inspection could not inspect the current Docker instance.",
+      check: {
+        name: "runtime-service",
+        target: "container",
+        status: "failed",
+        observedAt: "2026-01-01T00:00:10.100Z",
+        durationMs: 18,
+        exitCode: 1,
+        reasonCode: "resource_runtime_inspection_failed",
+        phase: "runtime-live-probe",
+        retriable: true,
+      },
+    });
+    const service = createService({
+      resourceAggregates: [resourceAggregateWithHealthPolicy()],
+      deployments: [
+        deploymentSummary({
+          runtimePlan: {
+            ...deploymentSummary().runtimePlan,
+            execution: {
+              kind: "docker-container",
+              metadata: { containerName: "appaloft-dep_web" },
+            },
+          },
+        }),
+      ],
+      probeRunner,
+    });
+
+    const result = await service.execute(
+      createTestContext(),
+      createQuery({ mode: "live", includeRuntimeProbe: true, includeChecks: true }),
+    );
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary.overall).toBe("unknown");
+    expect(summary.runtime).toMatchObject({
+      lifecycle: "unknown",
+      health: "unknown",
+      reasonCode: "resource_runtime_inspection_failed",
+    });
+    expect(summary.sourceErrors).toContainEqual(
+      expect.objectContaining({
+        source: "runtime",
+        code: "resource_runtime_inspection_failed",
+        phase: "runtime-live-probe",
+        retriable: true,
+      }),
+    );
+  });
+
+  test("[RES-HEALTH-QRY-026][DEP-CREATE-ASYNC-012][DEP-CREATE-ASYNC-012A] inspects the preserved runtime owner after a failed replacement", async () => {
+    const ownerRuntimePlan = {
+      ...deploymentSummary().runtimePlan,
+      execution: {
+        kind: "docker-container" as const,
+        metadata: { containerName: "appaloft-dep_owner" },
+      },
+    };
+    const failedRuntimePlan = {
+      ...deploymentSummary().runtimePlan,
+      execution: {
+        kind: "docker-container" as const,
+        metadata: { containerName: "appaloft-dep_failed" },
+      },
+    };
+    const probeRunner = new StaticResourceHealthProbeRunner();
+    const service = createService({
+      resources: [
+        resourceSummary({
+          lastDeploymentId: "dep_failed",
+          lastDeploymentStatus: "failed",
+          deploymentCount: 2,
+        }),
+      ],
+      resourceAggregates: [resourceAggregateWithHealthPolicy()],
+      deployments: [
+        deploymentSummary({
+          id: "dep_owner",
+          status: "succeeded",
+          runtimePlan: ownerRuntimePlan,
+          createdAt: "2026-01-01T00:00:00.000Z",
+        }),
+        deploymentSummary({
+          id: "dep_failed",
+          status: "failed",
+          runtimePlan: failedRuntimePlan,
+          createdAt: "2026-01-01T00:01:00.000Z",
+        }),
+      ],
+      probeRunner,
+    });
+
+    const result = await service.execute(
+      createTestContext(),
+      createQuery({ mode: "live", includeRuntimeProbe: true, includeChecks: true }),
+    );
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary.latestDeployment).toMatchObject({ id: "dep_failed", status: "failed" });
+    expect(summary.runtime).toMatchObject({ lifecycle: "running", health: "healthy" });
+    expect(summary.overall).not.toBe("stopped");
+    expect(probeRunner.runtimeRequests).toHaveLength(1);
+    expect(probeRunner.runtimeRequests[0]).toMatchObject({
+      deploymentId: "dep_owner",
+      runtimeMetadata: { containerName: "appaloft-dep_owner" },
+    });
   });
 
   test("[RES-HEALTH-QRY-009] marks live HTTP policy pass as healthy", async () => {

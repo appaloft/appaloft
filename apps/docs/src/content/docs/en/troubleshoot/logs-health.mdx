@@ -55,7 +55,8 @@ GET /api/resources/res_web/health?mode=live&includeChecks=true&includeRuntimePro
 
 The Resource detail page inspects the current runtime during a live refresh. Even when the latest
 Deployment is `succeeded`, the current Resource status becomes `stopped` if Docker confirms that
-the recorded current container no longer exists. If SSH, the Docker daemon, or the probe timeout
+the runtime-owning container no longer exists. A failed replacement remains deployment history and
+does not replace an older successful runtime that is still serving. If SSH, the Docker daemon, or the probe timeout
 only makes observation unavailable, status stays `unknown` with
 `resource_runtime_inspection_failed`; Appaloft does not turn “cannot observe” into “stopped.”
 Project lists and the sidebar use compact health and do not start one remote runtime inspection per

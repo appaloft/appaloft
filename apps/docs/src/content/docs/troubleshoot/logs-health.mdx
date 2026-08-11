@@ -70,8 +70,8 @@ GET /api/resources/res_web/health?mode=live&includeChecks=true&includeRuntimePro
 **健康摘要**把以下信息合并在一次调用中返回：最近部署状态和失败阶段、运行时进程状态、健康检查策略和最近检查结果、网络 Profile 和代理目标、生成访问地址状态、自定义域名和 TLS 就绪摘要。
 
 资源详情页会在 live 刷新时检查当前运行时。即使最近一次部署是 `succeeded`，如果 Docker
-明确确认记录的当前容器已不存在，当前资源状态也会显示为 `stopped`。如果只是 SSH、Docker
-daemon 或探测超时导致无法观察，状态保持 `unknown` 并附带
+明确确认当前运行时所属的容器已不存在，当前资源状态也会显示为 `stopped`。失败的替换部署仍是
+历史记录，不会取代仍在提供服务的较早成功运行时。如果只是 SSH、Docker daemon 或探测超时导致无法观察，状态保持 `unknown` 并附带
 `resource_runtime_inspection_failed`；Appaloft 不会把“看不到”误报成“已停止”。项目列表和侧栏
 使用紧凑健康状态，不会为每个资源各启动一次远程运行时探测。
 

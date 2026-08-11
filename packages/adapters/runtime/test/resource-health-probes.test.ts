@@ -204,6 +204,27 @@ describe("RuntimeResourceHealthProbeRunner", () => {
     expect(JSON.stringify(summary)).not.toContain("CurrentState");
   });
 
+  test("[RES-HEALTH-QRY-021] keeps failed Docker Swarm inspection stderr out of health results", async () => {
+    const runner = new RuntimeResourceHealthProbeRunner(async () =>
+      ok({
+        exitCode: 1,
+        stderr: "registry denied password=hunter2 for registry.example.test/private/web",
+      }),
+    );
+
+    const result = await runner.probeRuntime(context, probeRequest());
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary).toMatchObject({
+      lifecycle: "unknown",
+      health: "unknown",
+      reasonCode: "docker_swarm_service_probe_failed",
+    });
+    expect(JSON.stringify(summary)).not.toContain("hunter2");
+    expect(JSON.stringify(summary)).not.toContain("registry.example.test");
+  });
+
   test("[RES-HEALTH-QRY-010] probes Docker container state on an SSH target", async () => {
     const runner = new RuntimeResourceHealthProbeRunner(
       async (input) => {
@@ -349,6 +370,39 @@ describe("RuntimeResourceHealthProbeRunner", () => {
     });
     expect(JSON.stringify(summary)).not.toContain("deployer");
     expect(JSON.stringify(summary)).not.toContain("secret");
+  });
+
+  test("[RES-HEALTH-QRY-016] does not treat timeout, wrapper, or another container as confirmed absence", async () => {
+    const failures = [
+      {
+        exitCode: 124,
+        stderr: "Error: No such object: appaloft-dep_web",
+      },
+      {
+        exitCode: 1,
+        stderr: "Error: No such object: appaloft-dep_other",
+      },
+      {
+        exitCode: 1,
+        stderr: "wrapper diagnostic: Error: No such object: appaloft-dep_web",
+      },
+    ];
+
+    for (const failure of failures) {
+      const runner = new RuntimeResourceHealthProbeRunner(async () => ok(failure));
+      const result = await runner.probeRuntime(context, containerProbeRequest());
+
+      expect(result.isOk()).toBe(true);
+      expect(result._unsafeUnwrap()).toMatchObject({
+        lifecycle: "unknown",
+        health: "unknown",
+        reasonCode: "resource_runtime_inspection_failed",
+        check: {
+          status: "failed",
+          retriable: true,
+        },
+      });
+    }
   });
 
   test("[RES-HEALTH-QRY-010] does not fall back to local Docker when SSH target resolution is unavailable", async () => {

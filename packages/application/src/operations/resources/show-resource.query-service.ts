@@ -325,6 +325,9 @@ function identityFromState(
   if (lastDeploymentStatus) {
     identity.lastDeploymentStatus = lastDeploymentStatus;
   }
+  if (summary?.latestRuntimeControl) {
+    identity.latestRuntimeControl = summary.latestRuntimeControl;
+  }
 
   return identity;
 }

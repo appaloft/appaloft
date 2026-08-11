@@ -241,11 +241,16 @@ deployment attempt when local loopback/container checks fail. Those checks remai
 resource-owned live observation separately inspects Docker Swarm tasks and local/SSH Docker
 single-container state when explicitly requested.
 
+The latest deployment attempt remains visible as history, but runtime observation resolves the
+latest succeeded/rolled-back deployment that still owns the active runtime. Failed replacement
+candidates remain attempt-scoped and cannot turn a preserved prior runtime into `stopped`.
+
 Bounded live HTTP policy and public access probes are implemented for safe HTTP targets. Docker
-single-container inspection distinguishes a confirmed missing current instance (`stopped`) from
-inspection unavailability (`unknown`) without returning raw engine output. Web resource detail opts
-into this runtime inspection; compact list/sidebar queries do not start one provider-native probe
-per Resource. Durable domain readiness composition now uses domain binding records so
+single-container inspection distinguishes a confirmed missing runtime-owner instance (`stopped`)
+from inspection unavailability (`unknown`) without returning raw engine output. Web resource detail
+opts into this runtime inspection, while runtime-control progress and compact list/sidebar queries
+do not start provider-native probes on each polling tick or per Resource. Durable domain readiness
+composition now uses domain binding records so
 pending/non-ready durable domains degrade public access instead of being hidden by fallback routes.
 Retained health observation storage/readback is implemented through `resources.health-history` and
 an explicit recorder boundary. Complete Compose service aggregation, command policy execution, and
