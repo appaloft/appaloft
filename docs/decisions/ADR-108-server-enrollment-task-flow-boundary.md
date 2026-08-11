@@ -1,6 +1,6 @@
 # ADR-108: Server Enrollment Task Flow Boundary
 
-Status: Proposed
+Status: Accepted
 
 Date: 2026-08-11
 
