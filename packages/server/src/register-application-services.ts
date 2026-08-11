@@ -3743,6 +3743,7 @@ export function registerApplicationServices(
                 sandboxTemplateId: string;
                 version: string;
                 templateDigest: string;
+                runtimeRequirements?: readonly { id: string; version: string }[];
                 cwd?: string;
                 run: {
                   argv: readonly string[];
@@ -3784,6 +3785,7 @@ export function registerApplicationServices(
                   sandboxTemplateId: input.sandboxTemplateId,
                   version: input.version,
                   templateDigest: input.templateDigest,
+                  runtimeRequirements: input.runtimeRequirements ?? [],
                   interaction: declarativeHarness.interaction,
                   capabilities: declarativeHarness.capabilities,
                 })

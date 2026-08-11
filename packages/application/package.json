@@ -16,6 +16,7 @@
     "@appaloft/core": "workspace:*",
     "@appaloft/i18n": "workspace:*",
     "reflect-metadata": "^0.2.2",
+    "semver": "^7.8.5",
     "tsyringe": "^4.10.0",
     "zod": "^4.4.3"
   },

@@ -811,6 +811,9 @@ describe("Agent Workspace Profile validation and compilation", () => {
     });
     expect(compiled.plan.pin.profileDefinitionDigest).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(compiled.plan.runtime.harnessKey).toBe(compiled.plan.pin.harnessKey);
+    expect(compiled.plan.runtime.declarativeHarness.runtimeRequirements).toEqual([
+      { id: "codex", version: ">=0.1.0 <1.0.0" },
+    ]);
     expect(compiled.plan.pin.capabilities).toMatchObject({
       taskMode: true,
       interactive: true,

@@ -63,6 +63,7 @@ test("[WS-CREATE-PROFILE-009] an exact unique Profile pin aliases the reviewed n
       sandboxTemplateId: "stp_pi_pinned",
       version: "1.0.0",
       templateDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      runtimeRequirements: [{ id: "pi", version: ">=1.0.0 <2.0.0" }],
       interaction: profileInteraction,
       capabilities: profileCapabilities,
     }),
@@ -74,6 +75,7 @@ test("[WS-CREATE-PROFILE-009] an exact unique Profile pin aliases the reviewed n
       sandboxTemplateId: "stp_unreviewed",
       version: "1.0.0",
       templateDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      runtimeRequirements: [{ id: "pi", version: ">=1.0.0 <2.0.0" }],
     }),
   ).toBe(false);
 
@@ -125,8 +127,9 @@ test("[WS-CREATE-PROFILE-009] an exact unique Profile pin aliases the reviewed n
       key: "declarative-opencode-default-0123456789ab",
       templateId: "aht_opencode_managed_v1",
       sandboxTemplateId: "stp_opencode_pinned",
-      version: "1.18.4",
+      version: "1.0.0",
       templateDigest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      runtimeRequirements: [{ id: "opencode", version: ">=1.18.0 <2.0.0" }],
       interaction: displayOnlyInteraction,
       capabilities: {
         ...profileCapabilities,
@@ -143,6 +146,16 @@ test("[WS-CREATE-PROFILE-009] an exact unique Profile pin aliases the reviewed n
     runtimeId: "sar_opencode",
   });
   expect(preparedRuntimes).toEqual(["sar_opencode"]);
+  expect(
+    registry.registerAlias({
+      key: "declarative-opencode-incompatible-0123456789ab",
+      templateId: "aht_opencode_managed_v1",
+      sandboxTemplateId: "stp_opencode_pinned",
+      version: "1.0.0",
+      templateDigest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      runtimeRequirements: [{ id: "opencode", version: "<1.18.0" }],
+    }),
+  ).toBe(false);
 
   registry.register({ ...nativeHarness, key: "pi-duplicate" });
   expect(() =>
@@ -152,6 +165,10 @@ test("[WS-CREATE-PROFILE-009] an exact unique Profile pin aliases the reviewed n
       sandboxTemplateId: "stp_pi_pinned",
       version: "1.0.0",
       templateDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      runtimeRequirements: [
+        { id: "pi", version: ">=1.0.0 <2.0.0" },
+        { id: "pi-duplicate", version: ">=1.0.0 <2.0.0" },
+      ],
     }),
   ).toThrow("Sandbox Agent harness alias declarative-ambiguous-0123456789ab is ambiguous");
   expect(registry.resolve("declarative-ambiguous-0123456789ab")).toBeNull();
