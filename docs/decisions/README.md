@@ -124,6 +124,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-104: Certificate Route Activation Reconciliation](./ADR-104-certificate-route-activation-reconciliation.md) | Accepted | Defines explicit certificate-policy transition, provider-neutral certificate activation, served-certificate proof, and fail-safe readiness ordering for durable domain routes. |
 | [ADR-105: Brokered Model Access Capability](./ADR-105-brokered-model-access-capability.md) | Accepted | Defines exact Profile-pinned `model-api` binding propagation and short-lived capability-only Agent access without exposing provider credentials or creating provider-specific operations. |
 | [ADR-107: Task-Oriented Workspace Activation Presentation](./ADR-107-task-oriented-workspace-activation-presentation.md) | Accepted | Defines `appaloft code` and `appaloft workspace` as presentation over existing operations, preserves headless commands and native Agent PTY ownership, and requires embedded and same-session full-screen modes behind framework-neutral terminal contracts. |
+| [ADR-108: Server Enrollment Task Flow Boundary](./ADR-108-server-enrollment-task-flow-boundary.md) | Proposed | Defines `appaloft server enroll` as a recoverable local/SSH task flow over existing Server operations, with secret-free URI parsing, safe Server-id checkpoint, real runtime readiness and no new lifecycle. |
 
 ## Authoring Rules
 
