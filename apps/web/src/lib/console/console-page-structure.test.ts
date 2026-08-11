@@ -23,6 +23,14 @@ const resourceListTableSource = readFileSync(
   fileURLToPath(new URL("../components/console/ResourceListTable.svelte", import.meta.url)),
   "utf8",
 );
+const resourceHealthDotSource = readFileSync(
+  fileURLToPath(new URL("../components/console/ResourceHealthDot.svelte", import.meta.url)),
+  "utf8",
+);
+const resourceHealthLabelSource = readFileSync(
+  fileURLToPath(new URL("../components/console/ResourceHealthLabel.svelte", import.meta.url)),
+  "utf8",
+);
 const homePageSource = readFileSync(
   fileURLToPath(new URL("../../routes/+page.svelte", import.meta.url)),
   "utf8",
@@ -1368,6 +1376,39 @@ describe("console page structure", () => {
     expect(healthPopoverSource).toContain("<ol");
     expect(healthPopoverSource).toContain("resourceHealthIssues");
     expect(healthPopoverSource).toContain("issue.action");
+  });
+
+  test("[RES-HEALTH-ENTRY-010] keeps compact health outside per-resource runtime inspection", () => {
+    for (const compactHealthSource of [resourceHealthDotSource, resourceHealthLabelSource]) {
+      expect(compactHealthSource).toContain("includeChecks: false");
+      expect(compactHealthSource).not.toContain("includeRuntimeProbe: true");
+    }
+  });
+
+  test("[RES-HEALTH-ENTRY-011] keeps provider-native inspection outside runtime-control polling", () => {
+    const resourceDetailQuerySource = sourceBetween(
+      resourceDetailPageSource,
+      "const resourceDetailQuery = createQuery",
+      "const resourceDeleteSafetyQuery = createQuery",
+    );
+    const resourceHealthQuerySource = sourceBetween(
+      resourceDetailPageSource,
+      "const resourceHealthQuery = createQuery",
+      "const resourceEffectiveConfigQuery = createQuery",
+    );
+
+    expect(resourceDetailQuerySource).toContain(
+      "refetchInterval: runtimeControlHealthPolling ? 2_000 : false",
+    );
+    expect(resourceHealthQuerySource).toContain("includeRuntimeProbe: true");
+    expect(resourceHealthQuerySource).not.toContain("refetchInterval:");
+    expect(resourceDetailPageSource).toContain(
+      "summary.latestRuntimeControl = detail.resource.latestRuntimeControl",
+    );
+    expect(resourceDetailPageSource).toContain("runtimeControlAttemptCompletesPolling(");
+    expect(resourceDetailPageSource).toContain(
+      "runtimeControlPollingAttemptId = result.runtimeControlAttemptId",
+    );
   });
 
   test("[RESOURCE-INITIAL-CREDENTIALS-IA-001] keeps initial credentials on the resource overview", () => {

@@ -56,7 +56,7 @@ generic `resources.update`.
 
 | ID | Operation | Type | Scenario | Expected |
 | --- | --- | --- | --- | --- |
-| RES-PROFILE-SHOW-001 | `resources.show` | Query service | Existing active resource with source/runtime/network profile. | Returns `ok` with `schemaVersion = "resources.show/v1"` and durable profile fields, including `runtimeProfile.runtimeName` when configured. |
+| RES-PROFILE-SHOW-001 | `resources.show` | Query service | Existing active resource with source/runtime/network profile. | Returns `ok` with `schemaVersion = "resources.show/v1"`, durable profile fields, and the latest runtime-control readback when available. |
 | RES-PROFILE-SHOW-002 | `resources.show` | Query service | Missing resource id. | Returns `not_found` with `phase = resource-read`. |
 | RES-PROFILE-SHOW-003 | `resources.show` | Query service | Archived resource. | Returns detail with `lifecycle.status = "archived"` and no mutation side effects. |
 | RES-PROFILE-SHOW-004 | `resources.show` | Read model | Latest deployment included. | Latest deployment is contextual and does not override lifecycle or health. |

@@ -3460,6 +3460,7 @@ export interface ResourceDetailIdentity {
   deploymentCount: number;
   lastDeploymentId?: string;
   lastDeploymentStatus?: DeploymentStatus;
+  latestRuntimeControl?: ResourceRuntimeControlSummary;
 }
 
 export interface ResourceDetailSourceProfile {

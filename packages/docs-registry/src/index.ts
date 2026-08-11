@@ -2216,6 +2216,16 @@ export const publicDocsHelpTopics = {
     surfaces: ["web", "cli", "http-api", "mcp"],
     relatedOperation: "resources.health",
     aliases: ["health summary", "readiness status", "status", "健康摘要"],
+    specReferences: [
+      "docs/decisions/ADR-020-resource-health-observation.md",
+      "docs/queries/resources.health.md",
+      "docs/errors/resources.health.md",
+      "docs/workflows/resource-health-observation.md",
+      "docs/testing/resource-health-test-matrix.md",
+    ],
+    webSurfaces: [
+      "apps/web/src/routes/resources/[resourceId=consoleObjectId]/+page.svelte: live Resource health refresh",
+    ],
   },
   "resource.runtime-controls": {
     id: "resource.runtime-controls",

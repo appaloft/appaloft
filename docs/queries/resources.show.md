@@ -93,7 +93,8 @@ type ResourceDetail = {
 Required behavior:
 
 - `resource` includes ids, project/environment context, name, slug, kind, optional description,
-  services, default destination, created timestamp, and updated timestamp when available.
+  services, default destination, created timestamp, latest runtime-control readback when available,
+  and updated timestamp when available.
 - `source` is the persisted `ResourceSourceBinding` in display-safe form. Secrets and credentials
   must be masked or omitted.
 - `runtimeProfile` shows planning defaults such as `RuntimePlanStrategy`, optional `runtimeName`,

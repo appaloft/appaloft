@@ -39,6 +39,7 @@ type ResourceHealthErrorDetails = {
     | "latest-deployment-resolution"
     | "read-model-load"
     | "runtime-inspection"
+    | "runtime-live-probe"
     | "health-policy-resolution"
     | "health-check-execution"
     | "proxy-route-observation"
@@ -119,7 +120,8 @@ Typical source errors:
 | --- | --- | --- | --- |
 | `deployment` | `resource_latest_deployment_unavailable` | `latest-deployment-resolution` | No latest deployment context could be found. |
 | `runtime` | `resource_runtime_unavailable` | `runtime-inspection` | No current runtime instance can be inspected. |
-| `runtime` | `resource_runtime_inspection_failed` | `runtime-inspection` | Runtime/provider inspection failed or timed out. |
+| `runtime` | `resource_runtime_inspection_failed` | `runtime-live-probe` | Runtime/provider inspection failed or timed out. |
+| `runtime` | `resource_runtime_instance_not_found` | `runtime-live-probe` | Provider inspection confirmed that the current runtime-owning deployment's instance no longer exists; current health resolves to stopped rather than unknown. |
 | `health-policy` | `resource_health_policy_not_configured` | `health-policy-resolution` | No health policy exists for a running resource. |
 | `health-policy` | `resource_health_policy_unsupported` | `health-policy-resolution` | Configured policy cannot run on the selected runtime adapter. |
 | `health-check` | `resource_health_check_failed` | `health-check-execution` | HTTP status, response text, timeout, or command exit code failed. |
@@ -190,6 +192,8 @@ Implemented source errors include:
 - `resource_public_access_stale_deployment`;
 - `resource_proxy_route_unavailable`;
 - `resource_runtime_live_probe_unavailable`.
+- `resource_runtime_inspection_failed` for unavailable or ambiguous single-container inspection;
+- `resource_runtime_instance_not_found` for a confirmed missing current Docker container.
 
 Current deployment-time verification errors belong to `deployments.create` execution and should not
 be reused as the long-lived resource health error surface without passing through this query model.

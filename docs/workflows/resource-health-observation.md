@@ -186,7 +186,10 @@ be built, even if some signal sources fail.
 
 Examples:
 
-- Docker inspect unavailable: `overall = unknown`, `sourceErrors[]` contains `runtime_inspection_failed`.
+- Docker inspect unavailable: `overall = unknown`, `sourceErrors[]` contains
+  `resource_runtime_inspection_failed`.
+- Docker confirms the recorded current container is absent: `overall = stopped`, runtime lifecycle
+  is `exited`, and `sourceErrors[]` contains `resource_runtime_instance_not_found`.
 - HTTP check returns 500: `overall = unhealthy`, check status is `failed`.
 - Public route timeout but internal health passes: `overall = degraded`.
 - Edge gateway reports `resource_access_upstream_timeout`: `overall = degraded` unless runtime
@@ -234,15 +237,24 @@ Web resource header, resource health panel, sidebar, project list, and project r
 context.
 
 Current runtime deployment execution still performs attempt-time health checks and fails the
-deployment attempt when local loopback/container checks fail. Those checks remain attempt-scoped
-until provider-native runtime/container inspection feeds resource-owned health observation.
+deployment attempt when local loopback/container checks fail. Those checks remain attempt-scoped;
+resource-owned live observation separately inspects Docker Swarm tasks and local/SSH Docker
+single-container state when explicitly requested.
 
-Bounded live HTTP policy and public access probes are implemented for safe HTTP targets. Durable
-domain readiness composition now uses domain binding records so pending/non-ready durable domains
-degrade public access instead of being hidden by fallback routes. Retained health observation
-storage/readback is implemented through `resources.health-history` and an explicit recorder
-boundary. Docker health-state inspection, command policy execution, and scheduled observer cadence
-policy are still future work.
+The latest deployment attempt remains visible as history, but runtime observation resolves the
+latest succeeded/rolled-back deployment that still owns the active runtime. Failed replacement
+candidates remain attempt-scoped and cannot turn a preserved prior runtime into `stopped`.
+
+Bounded live HTTP policy and public access probes are implemented for safe HTTP targets. Docker
+single-container inspection distinguishes a confirmed missing runtime-owner instance (`stopped`)
+from inspection unavailability (`unknown`) without returning raw engine output. Web resource detail
+opts into this runtime inspection, while runtime-control progress and compact list/sidebar queries
+do not start provider-native probes on each polling tick or per Resource. Durable domain readiness
+composition now uses domain binding records so
+pending/non-ready durable domains degrade public access instead of being hidden by fallback routes.
+Retained health observation storage/readback is implemented through `resources.health-history` and
+an explicit recorder boundary. Complete Compose service aggregation, command policy execution, and
+scheduled observer cadence policy are still future work.
 
 ## Open Questions
 
