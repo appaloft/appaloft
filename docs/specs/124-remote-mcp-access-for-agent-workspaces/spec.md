@@ -23,7 +23,7 @@
 | MCP-ACCESS-BIND-002 | Compile exact binding | Installed Profile has one reference for each required MCP requirement | Profile compiles | Plan pins requirement id, connection reference, purpose, required flag, and requested tools only. |
 | MCP-ACCESS-BIND-003 | Missing/ambiguous binding | Required reference is absent, duplicated, stale, or unknown | Configure/compile/open runs | It fails before Sandbox, capability, or child effects with a stable safe issue. |
 | MCP-ACCESS-ISSUE-004 | Issue scoped access | Compiled binding and exact Workspace/Runtime/run scope exist | Harness starts | Issuer returns only bounded gateway metadata and effective tools; upstream endpoint/credential are absent. |
-| MCP-ACCESS-HARNESS-005 | Native Agent experience | Pi or OpenCode receives capabilities | Runtime launches | Harness renders native MCP client configuration and the user continues in the Agent's own TUI/native client. |
+| MCP-ACCESS-HARNESS-005 | Native Agent experience | Pi or OpenCode receives capabilities | Runtime launches | Harness renders native MCP client configuration and the user continues in the Agent's own TUI/native client. Pi's explicit CLI tool allowlist contains the conservative built-ins plus only deterministic names derived from the issued capability's effective tools. |
 | MCP-ACCESS-POLICY-006 | Host narrows tools | Adapter requests tools outside host policy | Access is issued or tool is invoked | Effective access is the intersection; no unlisted tool becomes callable. |
 | MCP-ACCESS-REVOKE-007 | Exact cleanup | Runtime completes, cancels, is replaced, or Workspace terminates | Cleanup reconciles repeatedly | Exact MCP grants are revoked idempotently; sibling Runtime and durable Workspace data remain. |
 | MCP-ACCESS-REDACT-008 | Secret-safe evidence | Any validation, issue, proxy, or cleanup branch fails | Error/event/read model is returned | No upstream URL, token, header, credential, tool arguments, or raw response body is retained. |
@@ -53,7 +53,10 @@ owned by the harness. Pi intentionally has no built-in MCP client, so its harnes
 reviewed, version-pinned MCP extension from the immutable Sandbox template using the Pi CLI's explicit
 `--extension` option while extension discovery remains disabled. The extension reads an ephemeral
 Appaloft MCP configuration from process environment; it is not downloaded, installed, or persisted at
-Workspace launch time.
+Workspace launch time. Because Pi applies `--tools` to extension-registered tools as well as built-ins,
+the harness derives each local tool name from the issued `serverName` and `effectiveTools`, sanitizes and
+bounds it to the same extension contract, and appends only those exact names to the existing built-in
+allowlist. Gateway URLs, bearer tokens, and upstream credentials never enter argv.
 
 ## Lifecycle and failure semantics
 
