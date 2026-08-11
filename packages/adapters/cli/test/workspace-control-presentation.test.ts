@@ -2,7 +2,12 @@ import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
 import {
+  AcceptSandboxPromotionCommand,
+  ApproveAgentTaskRunCommand,
   type Command,
+  DeliverAgentTaskRunCommand,
+  DeploymentProofQuery,
+  ExposeSandboxPortCommand,
   IssueSandboxAgentAttachAccessCommand,
   ListAgentTaskRunsQuery,
   ListSandboxAgentRuntimesQuery,
@@ -12,6 +17,8 @@ import {
   PauseSandboxCommand,
   type Query,
   ResumeSandboxCommand,
+  RetrySandboxPromotionCommand,
+  RevokeSandboxPortCommand,
   ShowSandboxQuery,
   type TerminalSession,
   type TerminalSessionFrame,
@@ -50,6 +57,191 @@ class FakeRendererSession implements WorkspaceControlRendererSession {
 }
 
 describe("Workspace control presentation", () => {
+  test("[WS-TUI-DELIVERY-001..011] validates visible delivery targets, dispatches existing operations and reads real proof", async () => {
+    const commands: Command<unknown>[] = [];
+    const queries: Query<unknown>[] = [];
+    const renderer = new FakeRendererSession([
+      { type: "select", workspaceId: "sbx_1" },
+      {
+        type: "preview-expose",
+        workspaceId: "sbx_1",
+        port: 3000,
+        visibility: "private",
+        ttlMinutes: 60,
+      },
+      { type: "preview-revoke", workspaceId: "sbx_1", exposureId: "exp_1" },
+      { type: "task-approve", workspaceId: "sbx_1", taskRunId: "task_approval" },
+      {
+        type: "task-deliver",
+        workspaceId: "sbx_1",
+        taskRunId: "task_delivery",
+        branch: "feat/tui-delivery",
+        commitMessage: "feat: deliver from tui",
+        remote: "origin",
+        pullRequest: { title: "Deliver from TUI", base: "main", body: "bounded body" },
+      },
+      { type: "promotion-accept", workspaceId: "sbx_1", promotionId: "prm_planned" },
+      { type: "promotion-retry", workspaceId: "sbx_1", promotionId: "prm_failed" },
+      { type: "quit" },
+    ]);
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+      now: () => "2026-08-11T00:00:00.000Z",
+      idempotencyKey: () => "idem_tui_delivery",
+    });
+
+    await presentation.start({
+      executeCommand: async <T>(command: Command<T>) => {
+        commands.push(command as Command<unknown>);
+        return ok({} as T);
+      },
+      executeQuery: async <T>(query: Query<T>) => {
+        queries.push(query as Query<unknown>);
+        if (query instanceof ListSandboxesQuery || query instanceof ShowSandboxQuery) {
+          const descriptor = {
+            sandboxId: "sbx_1",
+            status: "ready",
+            sourceKind: "template",
+            providerKey: "registered-server",
+            createdAt: "2026-08-11T00:00:00.000Z",
+          };
+          return ok(
+            (query instanceof ListSandboxesQuery ? { items: [descriptor] } : descriptor) as T,
+          );
+        }
+        if (query instanceof ListSandboxAgentRuntimesQuery) {
+          return ok({ items: [{ runtimeId: "sar_1", status: "running" }] } as T);
+        }
+        if (query instanceof ListSandboxPortsQuery) {
+          return ok({ items: [{ exposureId: "exp_1", port: 3000, visibility: "private" }] } as T);
+        }
+        if (query instanceof ListAgentTaskRunsQuery) {
+          return ok({
+            items: [
+              { taskRunId: "task_approval", runtimeId: "sar_1", status: "awaiting-approval" },
+              { taskRunId: "task_delivery", runtimeId: "sar_1", status: "approved" },
+            ],
+          } as T);
+        }
+        if (query instanceof ListSandboxPromotionsQuery) {
+          return ok({
+            items: [
+              {
+                promotionId: "prm_planned",
+                status: "planned",
+                artifactDigest:
+                  "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                resourceId: "res_1",
+                deploymentId: "dep_1",
+              },
+              {
+                promotionId: "prm_failed",
+                status: "failed",
+                artifactDigest:
+                  "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              },
+            ],
+          } as T);
+        }
+        if (query instanceof DeploymentProofQuery) {
+          return ok({
+            verdict: "partially-verified",
+            mismatches: [{ reasonCode: "route-mismatch" }],
+            unavailableEvidence: [{ kind: "health" }, { kind: "recovery" }],
+          } as T);
+        }
+        throw new Error(`unexpected query ${query.constructor.name}`);
+      },
+    });
+
+    expect(commands.map((command) => command.constructor)).toEqual([
+      ExposeSandboxPortCommand,
+      RevokeSandboxPortCommand,
+      ApproveAgentTaskRunCommand,
+      DeliverAgentTaskRunCommand,
+      AcceptSandboxPromotionCommand,
+      RetrySandboxPromotionCommand,
+    ]);
+    expect(commands[0]).toMatchObject({
+      input: {
+        sandboxId: "sbx_1",
+        port: 3000,
+        visibility: "private",
+        expiresAt: "2026-08-11T01:00:00.000Z",
+      },
+    });
+    expect(commands[3]).toMatchObject({
+      input: {
+        workspaceId: "sbx_1",
+        taskRunId: "task_delivery",
+        branch: "feat/tui-delivery",
+        commitMessage: "feat: deliver from tui",
+        remote: "origin",
+        pullRequest: {
+          provider: "github",
+          title: "Deliver from TUI",
+          base: "main",
+          body: "bounded body",
+        },
+      },
+    });
+    expect(commands[4]).toMatchObject({
+      input: {
+        promotionId: "prm_planned",
+        expectedArtifactDigest:
+          "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        idempotencyKey: "idem_tui_delivery",
+      },
+    });
+    expect(commands[5]).toMatchObject({
+      input: { promotionId: "prm_failed", idempotencyKey: "idem_tui_delivery" },
+    });
+    expect(queries.some((query) => query instanceof DeploymentProofQuery)).toBe(true);
+    const detail = renderer.messages.findLast((message) => message.type === "detail");
+    expect(detail?.type === "detail" ? detail.promotions[0]?.proof : undefined).toEqual({
+      verdict: "partially-verified",
+      mismatchCount: 1,
+      unavailableEvidenceCount: 2,
+    });
+    expect(JSON.stringify(renderer.messages)).not.toContain("sha256:aaaaaaaa");
+  });
+
+  test("[WS-TUI-DELIVERY-002][WS-TUI-DELIVERY-009] rejects a stale target without dispatching", async () => {
+    const renderer = new FakeRendererSession([
+      { type: "select", workspaceId: "sbx_1" },
+      { type: "preview-revoke", workspaceId: "sbx_1", exposureId: "exp_stale" },
+      { type: "quit" },
+    ]);
+    const commands: Command<unknown>[] = [];
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+
+    await presentation.start({
+      executeCommand: async <T>(command: Command<T>) => {
+        commands.push(command as Command<unknown>);
+        return ok({} as T);
+      },
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery) {
+          return ok({ items: [{ sandboxId: "sbx_1", status: "ready" }] } as T);
+        }
+        if (query instanceof ShowSandboxQuery) {
+          return ok({ sandboxId: "sbx_1", status: "ready" } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    expect(commands).toEqual([]);
+    expect(renderer.messages).toContainEqual({
+      type: "error",
+      code: "workspace_control_failed",
+      phase: "workspace-control-preview-revoke",
+      retryable: false,
+    });
+  });
+
   test("[WS-TUI-QUERY-002][WS-TUI-DETAIL-003][WS-TUI-CAPABILITY-010] reads bounded existing state and derives actions from attach capabilities", async () => {
     const queries: Query<unknown>[] = [];
     const renderer = new FakeRendererSession([
@@ -142,7 +334,8 @@ describe("Workspace control presentation", () => {
               {
                 promotionId: "prm_1",
                 status: "verified",
-                proofVerdict: "verified",
+                deploymentId: "dep_1",
+                resourceId: "res_1",
                 secret: "must-not-cross",
               },
             ],
@@ -159,6 +352,9 @@ describe("Workspace control presentation", () => {
               },
             ],
           } as T);
+        }
+        if (query instanceof DeploymentProofQuery) {
+          return ok({ verdict: "verified", mismatches: [], unavailableEvidence: [] } as T);
         }
         throw new Error(`unexpected query ${query.constructor.name}`);
       },
@@ -186,7 +382,7 @@ describe("Workspace control presentation", () => {
     expect(detail?.type === "detail" ? detail.tasks[0]?.status : undefined).toBe("running");
     expect(detail?.type === "detail" ? detail.promotions[0] : undefined).toMatchObject({
       promotionId: "prm_1",
-      proofVerdict: "verified",
+      proof: { verdict: "verified", mismatchCount: 0, unavailableEvidenceCount: 0 },
     });
     expect(JSON.stringify(renderer.messages)).not.toContain("credential");
     expect(JSON.stringify(renderer.messages)).not.toContain("must-not-cross");
