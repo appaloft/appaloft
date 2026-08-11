@@ -84,6 +84,7 @@ export interface CliProgramInput {
   executionContextFactory: ExecutionContextFactory;
   terminalSessionGateway?: TerminalSessionAttachmentGateway;
   terminalIO?: CliTerminalIO;
+  environment?: NodeJS.ProcessEnv;
   readStdinText?: () => Promise<string>;
   deploymentProgressObserver?: DeploymentProgressObserver;
   prepareDeploymentStateBackend?: (
@@ -158,6 +159,7 @@ export class CliRuntime extends Context.Tag("CliRuntime")<
     readonly executeQuery: <T>(message: AppQuery<T>) => Promise<Result<T>>;
     readonly terminalSessionGateway?: TerminalSessionAttachmentGateway;
     readonly terminalIO: CliTerminalIO;
+    readonly environment?: NodeJS.ProcessEnv;
     readonly readStdinText?: () => Promise<string>;
     readonly prepareDeploymentStateBackend?: (
       decision: DeploymentStateBackendDecision,
@@ -237,6 +239,7 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
       stdout: process.stdout,
       stderr: process.stderr,
     },
+    ...(input.environment ? { environment: input.environment } : {}),
     readStdinText: input.readStdinText ?? readProcessStdinText,
     ...(input.prepareDeploymentStateBackend
       ? { prepareDeploymentStateBackend: input.prepareDeploymentStateBackend }

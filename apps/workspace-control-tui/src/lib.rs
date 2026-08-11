@@ -1624,7 +1624,7 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
     }
     frame.render_widget(
         Paragraph::new(format!(
-            " {}  │  ↑↓ select  Enter attach/focus  a lifecycle  d delivery  s recovery  Ctrl+] release  f Focus Mode  r refresh  R reconnect  q quit ",
+            " Ctrl+] release  │  {}  │  q quit  ↑↓ select  Enter attach/focus  a lifecycle  d delivery  s recovery  f Focus Mode  r refresh  R reconnect ",
             state.status_line
         ))
         .style(Style::default().fg(Color::DarkGray)),

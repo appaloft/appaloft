@@ -153,6 +153,7 @@ describe("public docs help registry", () => {
         "Focus Mode",
         "Workspace recovery Snapshot",
         "Workspace-owned cleanup",
+        "terminal-unsupported",
       ]),
     );
     expect(topic.specReferences).toEqual(
@@ -170,6 +171,7 @@ describe("public docs help registry", () => {
       expect(source).toContain("`s`");
       expect(source).toContain("Workspace-owned cleanup");
       expect(source).toContain("sandbox snapshot list/create/show/delete");
+      expect(source).toContain("terminal-unsupported");
     }
   });
 

@@ -172,6 +172,8 @@ export const publicDocsHelpTopics = {
       "Focus Mode",
       "Workspace recovery Snapshot",
       "Workspace-owned cleanup",
+      "terminal-unsupported",
+      "TERM=dumb",
       "Workspace 管理界面",
     ],
     specReferences: [

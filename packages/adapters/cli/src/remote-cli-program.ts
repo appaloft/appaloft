@@ -39,6 +39,7 @@ export interface RemoteCliProgramInput {
   readonly fetch?: AppaloftSdkFetch;
   readonly now?: () => string;
   readonly terminalIO?: CliTerminalIO;
+  readonly environment?: NodeJS.ProcessEnv;
   readonly webSocketFactory?: RemoteTerminalWebSocketFactory;
   readonly readStdinText?: () => Promise<string>;
   readonly workspaceControlPresentation?: WorkspaceControlPresentation;
@@ -461,6 +462,7 @@ export function createRemoteCliProgram(input: RemoteCliProgramInput): CliProgram
         ...(input.webSocketFactory ? { webSocketFactory: input.webSocketFactory } : {}),
       }),
       terminalIO,
+      ...(input.environment ? { environment: input.environment } : {}),
       readStdinText: () => capturedStdinText ?? sourceStdinReader(),
       ...(input.workspaceControlPresentation
         ? { workspaceControlPresentation: input.workspaceControlPresentation }

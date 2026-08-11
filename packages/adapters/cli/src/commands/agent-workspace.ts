@@ -58,6 +58,7 @@ import {
   runQuery,
   runTerminalCommand,
 } from "../runtime.js";
+import { classifyWorkspaceHostTerminal } from "../workspace-control-terminal";
 import { terminateWorkspaceWithRuntimes } from "../workspace-lifecycle-actions.js";
 import { cliCommandDescriptions } from "./docs-help.js";
 
@@ -1029,7 +1030,16 @@ export const agentWorkspaceCommand = EffectCommand.make(
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
       const interactive = Boolean(cli.terminalIO.stdin.isTTY && cli.terminalIO.stdout.isTTY);
-      if (!interactive || noTui || json || !cli.workspaceControlPresentation) {
+      const terminalFallbackReason = interactive
+        ? classifyWorkspaceHostTerminal(cli.environment ?? process.env).reason
+        : undefined;
+      if (
+        !interactive ||
+        noTui ||
+        json ||
+        terminalFallbackReason ||
+        !cli.workspaceControlPresentation
+      ) {
         return yield* print({
           schemaVersion: "appaloft.workspace-control/v1",
           status: "renderer-unavailable",
@@ -1039,7 +1049,9 @@ export const agentWorkspaceCommand = EffectCommand.make(
               ? "no-tui"
               : json
                 ? "structured-output"
-                : "presentation-not-composed",
+                : terminalFallbackReason
+                  ? terminalFallbackReason
+                  : "presentation-not-composed",
           nextAction: "Use an explicit appaloft workspace subcommand.",
         });
       }

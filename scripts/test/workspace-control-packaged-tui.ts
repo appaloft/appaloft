@@ -13,9 +13,11 @@ if (!existsSync(rendererPath)) throw new Error(`Missing packaged renderer at ${r
 const dataRoot = await mkdtemp(join(tmpdir(), "appaloft-workspace-tui-package-"));
 let output = "";
 const decoder = new TextDecoder();
+const terminalName = "xterm-256color";
 const terminal = new Bun.Terminal({
   cols: 120,
   rows: 36,
+  name: terminalName,
   data: (_terminal, data) => {
     output += decoder.decode(data, { stream: true });
   },
@@ -27,6 +29,7 @@ const child = Bun.spawn([appaloftPath, "workspace"], {
     APPALOFT_DATA_DIR: dataRoot,
     APPALOFT_PGLITE_DATA_DIR: join(dataRoot, "pglite"),
     APPALOFT_OTEL_ENABLED: "false",
+    TERM: terminalName,
   },
 });
 
