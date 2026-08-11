@@ -267,6 +267,8 @@ jobs:
 
       - name: Test Workspace TUI parent bridge
         if: ${{ needs.changes.outputs.lightweight_only != 'true' && matrix.bridge == true }}
+        env:
+          APPALOFT_WORKSPACE_TUI_REQUIRED: "true"
         run: |
           bun test \
             packages/adapters/cli/test/workspace-control-native-terminal.test.ts \
