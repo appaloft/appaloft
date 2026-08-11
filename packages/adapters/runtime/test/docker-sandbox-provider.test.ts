@@ -693,7 +693,7 @@ describe("DockerSandboxProvider", () => {
       ]),
     );
     expect(launch?.argv.join(" ")).toContain('wait "$child"');
-    expect(launch?.argv.join(" ")).toContain('exec setsid "$@"');
+    expect(launch?.argv.join(" ")).toContain('exec setsid --wait "$@"');
     expect(launch?.argv.join(" ")).toContain('rm -f -- "$pid_file" "$input_pipe"');
     expect(delivered?.argv).toContain("-i");
     expect(runner.calls.every((call) => !call.argv.join(" ").includes("scoped-launch-secret"))).toBe(
@@ -733,7 +733,7 @@ describe("DockerSandboxProvider", () => {
     expect(started.mode).toBe("background");
     if (started.mode !== "background") throw new Error("expected background process");
     expect(runner.calls.findLast((call) => call.argv.includes("-d"))?.argv.join(" ")).toContain(
-      'exec setsid "$@"',
+      'exec setsid --wait "$@"',
     );
 
     await provider.terminateProcess({
