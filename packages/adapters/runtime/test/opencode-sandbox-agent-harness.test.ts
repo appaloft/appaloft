@@ -434,6 +434,10 @@ describe("OpenCodeSandboxAgentHarness", () => {
             ...capability,
             capabilityId,
             baseUrl: `http://sandbox-gateway:8788/m/${capabilityId}/secret/v1`,
+            expiresAt:
+              input.runId === "sar_open"
+                ? capability.expiresAt
+                : new Date(Date.now() + 5 * 60_000).toISOString(),
           };
         },
         async revoke(input) {
@@ -748,6 +752,86 @@ describe("OpenCodeSandboxAgentHarness", () => {
     expect(revoked).toEqual(["smc_opencode_run"]);
   });
 
+  test("[AGENT-WS-OPEN-008] rejects and revokes a run capability without the startup safety window", async () => {
+    const revoked: string[] = [];
+    const marker = new TextEncoder().encode(
+      JSON.stringify({
+        schemaVersion: "opencode-server-marker/v2",
+        processId: "spr_server",
+        capabilityId: "smc_opencode_runtime",
+        expiresAt: "2099-01-01T00:00:00.000Z",
+        provider: "appaloft",
+        model: "coding-model",
+      }),
+    );
+    const execution: OpenCodeSandboxExecutionPort = {
+      async exec(_context, _sandboxId, input) {
+        if (isHealthProbe(input)) {
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
+          } satisfies SandboxExecResult);
+        }
+        throw new Error("near-expiry capability must fail before child startup");
+      },
+      async listProcesses() {
+        return ok([{ processId: "spr_server", status: "running" }]);
+      },
+      async terminateProcess() {
+        return ok(undefined);
+      },
+      async readFile(_context, _sandboxId, input) {
+        return input.path.endsWith("opencode-process-id")
+          ? ok(marker)
+          : err({
+              code: "sandbox_file_not_found",
+              category: "user",
+              message: "missing",
+              retryable: false,
+              details: {},
+            });
+      },
+      async writeFile() {
+        throw new Error("unexpected write");
+      },
+      async removeFile() {
+        return ok(undefined);
+      },
+    };
+    const harness = new OpenCodeSandboxAgentHarness(execution, {
+      templateId: "aht_opencode_managed_v1",
+      sandboxTemplateId: "stp_opencode_pinned",
+      version: "1.18.4",
+      templateDigest: `sha256:${"b".repeat(64)}`,
+      modelAccess: {
+        async issue() {
+          return {
+            ...(await modelAccess.issue()),
+            capabilityId: "smc_opencode_near_expiry",
+            expiresAt: new Date(Date.now() + 20_000).toISOString(),
+          };
+        },
+        async revoke(input) {
+          revoked.push(input.capabilityId);
+        },
+      },
+    });
+
+    await expect(
+      harness.execute({
+        executionContext: context,
+        sandboxId: "sbx_open",
+        runtimeId: "sar_open",
+        credentialBindings: [modelCredentialBinding],
+        runId: "srun_near_expiry",
+        task: "Fail before startup",
+        context: { mode: "fresh" },
+        requestApproval: async () => "rejected",
+      }),
+    ).rejects.toThrow("opencode_model_access_invalid");
+    expect(revoked).toEqual(["smc_opencode_near_expiry"]);
+  });
+
   test("[AGENT-OPENCODE-011] cleans server and model capability when durable startup state fails", async () => {
     const terminated: string[] = [];
     const revoked: string[] = [];
@@ -914,6 +998,10 @@ describe("OpenCodeSandboxAgentHarness", () => {
             ...capability,
             capabilityId:
               input.runId === "sar_open" ? "smc_opencode_runtime" : "smc_opencode_failed",
+            expiresAt:
+              input.runId === "sar_open"
+                ? capability.expiresAt
+                : new Date(Date.now() + 5 * 60_000).toISOString(),
           };
         },
         async revoke(input) {

@@ -296,12 +296,12 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
             marker.mcpCapabilities.every(
               (capability) =>
                 new Date(capability.expiresAt).getTime() >
-                Date.now() + this.serverCapabilitySafetyWindowMs(),
+                Date.now() + this.capabilitySafetyWindowMs(),
             )
           : marker.schemaVersion === "opencode-server-marker/v2" && mcpBindings.length === 0) &&
         marker.provider &&
         marker.model &&
-        new Date(marker.expiresAt).getTime() > Date.now() + this.serverCapabilitySafetyWindowMs() &&
+        new Date(marker.expiresAt).getTime() > Date.now() + this.capabilitySafetyWindowMs() &&
         processes.value.some(
           (process) => process.processId === marker.processId && process.status === "running",
         ) &&
@@ -379,7 +379,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       runId: input.runtimeId,
       credentialBinding,
     });
-    if (!validModelCapability(capability, this.serverCapabilitySafetyWindowMs())) {
+    if (!validModelCapability(capability, this.capabilitySafetyWindowMs())) {
       await modelAccess.revoke({
         ...input,
         runId: input.runtimeId,
@@ -564,7 +564,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       runId: input.runId,
       credentialBinding,
     });
-    if (!validModelCapability(capability, this.options.timeoutMs ?? 30 * 60_000)) {
+    if (!validModelCapability(capability, this.capabilitySafetyWindowMs())) {
       await modelAccess.revoke({
         executionContext: input.executionContext,
         sandboxId: input.sandboxId,
@@ -952,7 +952,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
     return this.cwd === "." ? path : `${this.cwd}/${path}`;
   }
 
-  private serverCapabilitySafetyWindowMs(): number {
+  private capabilitySafetyWindowMs(): number {
     const attempts = this.options.startupPollAttempts ?? 50;
     const intervalMs = this.options.startupPollIntervalMs ?? 200;
     return Math.max(30_000, attempts * intervalMs + 10_000);
