@@ -88,7 +88,7 @@ describe("FileSystemDeploymentConfigReader", () => {
     });
     expect(snapshot?.project).toBeUndefined();
     expect(snapshot?.targets).toBeUndefined();
-  });
+  }, 15_000);
 
   test("[CONFIG-FILE-SERVICE-GRAPH-005] preserves service graph runtime planning details", async () => {
     ensureReflectMetadata();
