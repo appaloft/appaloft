@@ -10,6 +10,7 @@ export interface ReleaseBinaryTarget {
   tauriTriple: string;
   executableName: string;
   archiveFormat: ReleaseArchiveFormat;
+  workspaceControlTuiExecutableName?: string;
 }
 
 export const releaseBinaryTargets = [
@@ -22,6 +23,7 @@ export const releaseBinaryTargets = [
     tauriTriple: "aarch64-apple-darwin",
     executableName: "appaloft",
     archiveFormat: "tar.gz",
+    workspaceControlTuiExecutableName: "appaloft-workspace-tui",
   },
   {
     name: "darwin-x64",
@@ -32,6 +34,7 @@ export const releaseBinaryTargets = [
     tauriTriple: "x86_64-apple-darwin",
     executableName: "appaloft",
     archiveFormat: "tar.gz",
+    workspaceControlTuiExecutableName: "appaloft-workspace-tui",
   },
   {
     name: "linux-arm64-gnu",
@@ -43,6 +46,7 @@ export const releaseBinaryTargets = [
     tauriTriple: "aarch64-unknown-linux-gnu",
     executableName: "appaloft",
     archiveFormat: "tar.gz",
+    workspaceControlTuiExecutableName: "appaloft-workspace-tui",
   },
   {
     name: "linux-x64-gnu",
@@ -54,6 +58,7 @@ export const releaseBinaryTargets = [
     tauriTriple: "x86_64-unknown-linux-gnu",
     executableName: "appaloft",
     archiveFormat: "tar.gz",
+    workspaceControlTuiExecutableName: "appaloft-workspace-tui",
   },
   {
     name: "linux-arm64-musl",
@@ -65,6 +70,7 @@ export const releaseBinaryTargets = [
     tauriTriple: "aarch64-unknown-linux-musl",
     executableName: "appaloft",
     archiveFormat: "tar.gz",
+    workspaceControlTuiExecutableName: "appaloft-workspace-tui",
   },
   {
     name: "linux-x64-musl",
@@ -76,6 +82,7 @@ export const releaseBinaryTargets = [
     tauriTriple: "x86_64-unknown-linux-musl",
     executableName: "appaloft",
     archiveFormat: "tar.gz",
+    workspaceControlTuiExecutableName: "appaloft-workspace-tui",
   },
   {
     name: "win32-arm64",

@@ -1,0 +1,10 @@
+{
+  "name": "@appaloft/workspace-control-tui",
+  "private": true,
+  "scripts": {
+    "build": "cargo build --locked --release",
+    "lint": "cargo fmt --check",
+    "test": "cargo test --locked",
+    "typecheck": "cargo check --locked"
+  }
+}

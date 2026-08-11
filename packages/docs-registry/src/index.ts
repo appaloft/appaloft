@@ -150,6 +150,34 @@ export const publicDocsHelpTopics = {
       "apps/web/src/routes/workspaces and workspace-collaborations: create, reconnect, collaborate, preview, review, and deliver",
     ],
   },
+  "agent.workspace-control": {
+    id: "agent.workspace-control",
+    title: "Workspace control TUI",
+    description:
+      "How to inspect running Workspaces, operate an embedded Agent terminal, release focus, reconnect, and use the headless fallback.",
+    page: {
+      "zh-CN": "agents/workspaces",
+      "en-US": "en/agents/workspaces",
+    },
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli"],
+    anchor: "workspace-control-tui",
+    aliases: [
+      "appaloft workspace",
+      "Workspace control TUI",
+      "embedded Agent terminal",
+      "Focus Mode",
+      "Workspace 管理界面",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-107-task-oriented-workspace-activation-presentation.md",
+      "docs/specs/126-workspace-control-tui/spec.md",
+      "docs/testing/workspace-control-tui-test-matrix.md",
+    ],
+  },
   "agent.github-tasks": {
     id: "agent.github-tasks",
     title: "GitHub-driven Agent Tasks",

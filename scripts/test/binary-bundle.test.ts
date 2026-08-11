@@ -8,6 +8,7 @@ import {
   createStaticAssetArchive,
   loadEmbeddedStaticAssetsArchive,
 } from "../release/lib/static-asset-archive";
+import { releaseBinaryTargets } from "../release/lib/targets";
 
 describe("binary bundle static asset archives", () => {
   test("round-trips static assets with route paths and content types", async () => {
@@ -54,11 +55,43 @@ describe("binary bundle README", () => {
         cpu: "arm64",
         tauriTriple: "aarch64-apple-darwin",
         archiveFormat: "tar.gz",
+        workspaceControlTuiExecutableName: "appaloft-workspace-tui",
       },
     });
 
     expect(readme).toContain("Public documentation static assets");
     expect(readme).toContain("APPALOFT_DOCS_STATIC_DIR=/path/to/docs-dist");
+    expect(readme).toContain("appaloft-workspace-tui");
+  });
+
+  test("[WS-TUI-PACKAGE-011] enables the renderer on six macOS/Linux targets and keeps Windows headless", () => {
+    expect(
+      releaseBinaryTargets
+        .filter((target) => target.workspaceControlTuiExecutableName)
+        .map((target) => target.name),
+    ).toEqual([
+      "darwin-arm64",
+      "darwin-x64",
+      "linux-arm64-gnu",
+      "linux-x64-gnu",
+      "linux-arm64-musl",
+      "linux-x64-musl",
+    ]);
+    expect(
+      releaseBinaryTargets
+        .filter((target) => target.os === "win32")
+        .every((target) => !target.workspaceControlTuiExecutableName),
+    ).toBe(true);
+    const windowsTarget = releaseBinaryTargets.find((target) => target.os === "win32");
+    expect(windowsTarget).toBeDefined();
+    const windowsReadme = bundleReadme({
+      version: "0.1.0-test",
+      target: windowsTarget as (typeof releaseBinaryTargets)[number],
+    });
+    expect(windowsReadme).toContain("use help/headless Workspace commands");
+    expect(windowsReadme).not.toContain(
+      "appaloft-workspace-tui: embedded Workspace control renderer",
+    );
   });
 });
 

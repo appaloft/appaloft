@@ -16,6 +16,7 @@ appaloft deploy .                             # Deploy the current directory
 appaloft login                                # Log in to Appaloft Cloud or a self-hosted instance
 appaloft context list                         # View saved local profiles/contexts
 appaloft code                                 # Open or resume an Agent Workspace from this Git repository
+appaloft workspace                            # Manage Workspaces with an embedded native Agent TUI
 
 appaloft projects list                        # List projects
 appaloft servers register --host <host>       # Register a server
@@ -45,6 +46,13 @@ saved local control-plane connection. Existing automation can keep using
 `appaloft workspace open .` with unchanged semantics and machine-readable behavior. See
 [Open a Workspace from a local repository](/docs/en/agents/workspaces/#agent-workspace-open) for
 prerequisites, reconnection, and safe failure guidance.
+
+`appaloft workspace` opens the Workspace control TUI on supported interactive macOS/Linux
+terminals and consumes only existing public operations/read models. `Ctrl+]` releases Agent focus;
+`f` toggles Focus Mode over the same Session. Use `--no-tui`, `--json`, or an explicit subcommand
+for non-TTY automation and Windows headless use; these paths never load the renderer. See
+[Manage running Workspaces](/docs/en/agents/workspaces/#workspace-control-tui) for the full keymap
+and session boundary.
 
 ## Login and CLI profiles <a id="cli-remote-control-plane-login" />
 

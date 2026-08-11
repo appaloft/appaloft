@@ -2,11 +2,14 @@
 
 ## Status
 
-- Round: Spec review ready
-- Artifact state: owner direction confirmed; revised host feasibility passed with release,
-  reconnect, terminal/Agent matrix and soak gates pending; Ticket and Code not yet authorized
-- Code changes allowed: no, until this Spec is accepted and an actor-visible ticket is ready
+- Round: Code
+- Artifact state: accepted through public PR
+  [#1025](https://github.com/appaloft/appaloft/pull/1025); implementation tracked by public Ticket
+  [#1026](https://github.com/appaloft/appaloft/issues/1026)
+- Code changes allowed: yes, within Ticket #1026 and this accepted boundary
 - Compatibility: additive presentation over existing public operations
+- Renderer decision: replaceable Rust/Ratatui sidecar; the OpenTUI candidate failed the released
+  public-API gate recorded by closed Spike [#1024](https://github.com/appaloft/appaloft/issues/1024)
 
 ## Business Outcome
 

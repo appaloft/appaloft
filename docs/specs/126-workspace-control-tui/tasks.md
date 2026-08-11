@@ -9,36 +9,43 @@
 - [x] Position the presentation in the Business Operation Map without adding an operation.
 - [x] Capture revised OpenTUI PR-head build, upstream tests, local PTY/Unicode/focus/same-session
   smoke and framework-neutral `TerminalSession` bridge evidence on the throwaway branch.
-- [ ] Complete the revised throwaway OpenTUI/Bun spike against `WS-TUI-SPIKE-001..009`.
-- [ ] Accept the Spec/ADR refinement before Ticket or Code Round.
+- [x] Complete and close the revised throwaway OpenTUI/Bun spike against
+  `WS-TUI-SPIKE-001..009`; select the Rust/Ratatui fallback after the released-API and teardown
+  gates fail.
+- [x] Accept the Spec/ADR refinement through public PR #1025 before Ticket or Code Round.
 
 ## Ticket
 
-- [ ] Create one public tracking issue after Spec acceptance.
-- [ ] Split only actor-visible vertical slices; link every `WS-TUI-*` id and exact fallback.
-- [ ] Mark `ready-for-agent` only after release targets and presentation boundary are exact.
+- [x] Create public tracking issue #1026 after Spec acceptance.
+- [x] Keep one actor-visible implementation slice linked to every `WS-TUI-*` id and exact fallback.
+- [x] Mark #1026 `ready-for-agent` only after release targets and presentation boundary are exact.
 
 ## Test First
 
-- [ ] Add failing entry/query/detail tests without renderer initialization in headless modes.
-- [ ] Add fake byte-stream tests for embedded rendering, focus release and same-session full-screen.
-- [ ] Add structured error and terminal restoration tests for parser/attach/resize/refresh failures.
-- [ ] Add capability-neutrality tests with multiple Adapter descriptors.
-- [ ] Add packaged macOS/Linux embedded startup plus all-artifact help/headless safety tests.
+- [x] Add failing entry/query/detail tests without renderer initialization in headless modes.
+- [x] Add fake byte-stream and real PTY tests for embedded rendering, focus release and
+  same-session full-screen.
+- [x] Add structured error, authentication, early-exit and signal restoration tests with exact
+  detach and secret-safe presentation assertions.
+- [x] Add capability-neutrality tests with multiple Adapter descriptors.
+- [x] Add packaged macOS embedded startup plus release-bundle help/headless safety tests.
+- [ ] Collect Linux embedded startup and all-artifact help/headless safety evidence in release CI.
 
 ## Implementation
 
-- [ ] Add the framework-neutral CLI presentation boundary.
-- [ ] Implement bounded list/detail refresh using existing operations.
-- [ ] Add managed `TerminalSession` and local `Bun.Terminal` viewport adapters.
-- [ ] Implement OpenTUI embedded terminal only after public API and package gates pass.
-- [ ] Implement focus release and same-session full-screen/return with no screen-semantic parsing.
-- [ ] Preserve every current headless/structured Workspace surface.
+- [x] Add the framework-neutral CLI presentation boundary.
+- [x] Implement bounded list/detail refresh using existing operations.
+- [x] Add managed `TerminalSession` and local `Bun.Terminal` viewport adapters.
+- [x] Implement the selected Rust/Ratatui renderer with VT100 cell rendering behind the
+  replaceable sidecar protocol.
+- [x] Implement focus release and same-session full-screen/return with no screen-semantic parsing.
+- [x] Preserve every current headless/structured Workspace surface.
 
 ## Docs And Verification
 
-- [ ] Update localized Workspace and CLI docs during Code/Docs Round.
-- [ ] Run focused CLI/PTY/package tests, docs registry, `lint:ci`, `typecheck`, `test`, `build` and
-  release artifact smokes.
+- [x] Update localized Workspace and CLI docs during Code/Docs Round.
+- [x] Run focused CLI/PTY/package tests, docs registry, `lint:ci`, `typecheck`, `test`, `build`
+  and the local packaged macOS PTY smoke.
+- [ ] Collect the six-target release workflow and Linux artifact smoke evidence.
 - [ ] Complete the opt-in supported terminal and real-Agent matrix.
 - [ ] Sync ADR, Spec, tasks, Test Matrix, operation map, help, docs and release evidence.
