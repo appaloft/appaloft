@@ -1194,6 +1194,46 @@ describe("SandboxAgentDeliveryService", () => {
     expect(summary.length).toBeLessThanOrEqual(1_024);
   });
 
+  test("[AGENT-FAILURE-011] preserves a stable secret-safe harness failure code", async () => {
+    const { service } = fixture({
+      harness: {
+        key: "failed-run-code",
+        templateId: "aht_fake_1",
+        version: "1.0.0",
+        templateDigest: `sha256:${"a".repeat(64)}`,
+        async execute() {
+          throw new Error("pi_model_gateway_unreachable");
+        },
+        async cancel() {},
+      },
+    });
+    await service.createRuntime(context, {
+      sandboxId: "sbx_demo",
+      harnessKey: "failed-run-code",
+      harnessTemplateId: "aht_fake_1",
+      idempotencyKey: "runtime_failed_run_code",
+    });
+    await service.createRun(context, {
+      sandboxId: "sbx_demo",
+      runtimeId: "sar_test",
+      task: "Diagnose the fixture",
+      context: { mode: "fresh" },
+      idempotencyKey: "run_failed_code",
+    });
+
+    const reconciled = await service.reconcileRun(context, "srun_test");
+    expect(reconciled.isErr()).toBe(true);
+    expect((await service.showRun(context, "sar_test", "srun_test"))._unsafeUnwrap()).toMatchObject(
+      {
+        status: "failed",
+        failure: {
+          code: "pi_model_gateway_unreachable",
+          summary: "pi_model_gateway_unreachable",
+        },
+      },
+    );
+  });
+
   test("[PROMOTION-SCOPE-001] runtime-style deploy tokens cannot resolve external intent", async () => {
     const { service } = fixture();
     const runtimeIdentity = createExecutionContext({
