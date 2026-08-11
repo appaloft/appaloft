@@ -29,7 +29,7 @@
   detach and secret-safe presentation assertions.
 - [x] Add capability-neutrality tests with multiple Adapter descriptors.
 - [x] Add packaged macOS embedded startup plus release-bundle help/headless safety tests.
-- [ ] Collect Linux embedded startup and all-artifact help/headless safety evidence in release CI.
+- [x] Collect Linux embedded startup and all-artifact help/headless safety evidence in release CI.
 
 ## Implementation
 
@@ -46,6 +46,9 @@
 - [x] Update localized Workspace and CLI docs during Code/Docs Round.
 - [x] Run focused CLI/PTY/package tests, docs registry, `lint:ci`, `typecheck`, `test`, `build`
   and the local packaged macOS PTY smoke.
-- [ ] Collect the six-target release workflow and Linux artifact smoke evidence.
-- [ ] Complete the opt-in supported terminal and real-Agent matrix.
+- [x] Collect the six-target release workflow and Linux artifact smoke evidence.
+- [x] Run the opt-in provider-free native PTY matrix against installed Pi, OpenCode, Codex and
+  Claude Code clients.
+- [ ] Complete the supported host-terminal matrix in Terminal.app, iTerm2, Ghostty, VS Code
+  Terminal and a representative Linux terminal.
 - [ ] Sync ADR, Spec, tasks, Test Matrix, operation map, help, docs and release evidence.

@@ -137,6 +137,7 @@ describe("Docker runtime image packaging", () => {
 
     expect(dockerignore).toContain(".*");
     expect(dockerignore).toContain("apps/*");
+    expect(dockerignore).toContain("!apps/workspace-control-tui/package.json");
     expect(dockerignore).toContain("**/.*.bun-build");
     expect(dockerignore).toContain("**/.appaloft");
     expect(dockerignore).toContain("**/.turbo");

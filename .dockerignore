@@ -20,6 +20,9 @@ apps/desktop/*
 !apps/shell/**
 !apps/web/
 !apps/web/**
+!apps/workspace-control-tui/
+apps/workspace-control-tui/*
+!apps/workspace-control-tui/package.json
 
 !docs/
 !docs/**
