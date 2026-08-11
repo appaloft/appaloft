@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test";
 import { type ResourceHealthSummary } from "@appaloft/contracts";
+import { describe, expect, test } from "vitest";
 
 import { runtimeControlAttemptCompletesPolling } from "./resource-runtime-control-polling";
 
