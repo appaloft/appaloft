@@ -2,10 +2,9 @@
 
 ## Status
 
-- Round: Spec
-- Artifact state: proposed for public review
-- Code changes allowed: no, until this Spec is accepted and an actor-visible Ticket is marked
-  `ready-for-agent`
+- Round: Code / Sync
+- Artifact state: accepted by public PR #1033
+- Code changes: tracked by public issue #1034
 - Compatibility: additive presentation over existing public operations
 - Governing decision: accepted ADR-107 presentation boundary; no new ADR is required
 
@@ -94,4 +93,3 @@ guidance, not mutation admission.
   API.
 - Existing Preview/Task/Promotion/proof descriptors remain backward compatible; presentation maps
   only bounded optional fields.
-

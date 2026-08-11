@@ -35,8 +35,10 @@ use `--control-plane-profile` and the catalog-backed `workspaces.open` contract.
 Workspace Profile selector remains `--profile` and must not be confused with the control-plane
 profile.
 
-A future no-subcommand `appaloft workspace` control experience may render this workflow and its
-read models, but every mutation must remain a public operation with a headless equivalent. Native
+The no-subcommand `appaloft workspace` control TUI renders this workflow and its existing read
+models. Its lifecycle and delivery actions dispatch the same public operations as the headless
+commands; Preview creation defaults private with a bounded TTL, Task/Promotion writes require
+confirmation, and Deployment Proof is queried rather than inferred from Promotion status. Native
 Agent conversation/session semantics remain inside the Adapter-owned PTY or attach client.
 
 ## Preflight

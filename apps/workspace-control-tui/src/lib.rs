@@ -67,9 +67,17 @@ pub struct PromotionSummary {
     #[serde(default)]
     pub deployment_id: Option<String>,
     #[serde(default)]
-    pub proof_verdict: Option<String>,
+    pub proof: Option<DeploymentProofSummary>,
     #[serde(default)]
     pub expires_at: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DeploymentProofSummary {
+    pub verdict: String,
+    pub mismatch_count: usize,
+    pub unavailable_evidence_count: usize,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
@@ -122,6 +130,158 @@ pub enum ActionDecision {
     AwaitConfirmation,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DeliveryAction {
+    ExposePreview,
+    RevokePreview { exposure_id: String, port: u16 },
+    ApproveTask { task_run_id: String },
+    DeliverTask { task_run_id: String },
+    AcceptPromotion { promotion_id: String },
+    RetryPromotion { promotion_id: String },
+}
+
+impl DeliveryAction {
+    pub fn label(&self) -> String {
+        match self {
+            Self::ExposePreview => "Expose Preview".to_owned(),
+            Self::RevokePreview { exposure_id, port } => {
+                format!("Revoke Preview :{port} ({exposure_id})")
+            }
+            Self::ApproveTask { task_run_id } => format!("Approve Task {task_run_id}"),
+            Self::DeliverTask { task_run_id } => format!("Deliver Task {task_run_id}"),
+            Self::AcceptPromotion { promotion_id } => {
+                format!("Accept Promotion {promotion_id}")
+            }
+            Self::RetryPromotion { promotion_id } => format!("Retry Promotion {promotion_id}"),
+        }
+    }
+}
+
+pub fn delivery_actions_for_detail(detail: &DetailMessage) -> Vec<DeliveryAction> {
+    let mut actions = if detail.workspace.status == "ready" {
+        vec![DeliveryAction::ExposePreview]
+    } else {
+        Vec::new()
+    };
+    actions.extend(
+        detail
+            .ports
+            .iter()
+            .map(|port| DeliveryAction::RevokePreview {
+                exposure_id: port.exposure_id.clone(),
+                port: port.port,
+            }),
+    );
+    for task in &detail.tasks {
+        if task.status == "awaiting-approval" {
+            actions.push(DeliveryAction::ApproveTask {
+                task_run_id: task.task_run_id.clone(),
+            });
+        } else if task.status == "approved" || task.status == "delivering" {
+            actions.push(DeliveryAction::DeliverTask {
+                task_run_id: task.task_run_id.clone(),
+            });
+        }
+    }
+    for promotion in &detail.promotions {
+        if promotion.status == "planned" {
+            actions.push(DeliveryAction::AcceptPromotion {
+                promotion_id: promotion.promotion_id.clone(),
+            });
+        } else if promotion.status == "failed" || promotion.status == "needs-attention" {
+            actions.push(DeliveryAction::RetryPromotion {
+                promotion_id: promotion.promotion_id.clone(),
+            });
+        }
+    }
+    actions
+}
+
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum PreviewVisibility {
+    Private,
+    Organization,
+    Public,
+}
+
+impl PreviewVisibility {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Private => "private",
+            Self::Organization => "organization",
+            Self::Public => "public",
+        }
+    }
+
+    fn next(self, delta: isize) -> Self {
+        let values = [Self::Private, Self::Organization, Self::Public];
+        let index = values.iter().position(|value| *value == self).unwrap_or(0) as isize;
+        values[(index + delta).rem_euclid(values.len() as isize) as usize]
+    }
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PullRequestSubmission {
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub body: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub base: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DeliverySubmission {
+    ExposePreview {
+        port: u16,
+        visibility: PreviewVisibility,
+        ttl_minutes: u16,
+    },
+    RevokePreview {
+        exposure_id: String,
+    },
+    ApproveTask {
+        task_run_id: String,
+    },
+    DeliverTask {
+        task_run_id: String,
+        branch: String,
+        commit_message: String,
+        remote: String,
+        pull_request: Option<PullRequestSubmission>,
+    },
+    AcceptPromotion {
+        promotion_id: String,
+    },
+    RetryPromotion {
+        promotion_id: String,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DeliveryDecision {
+    None,
+    FormOpened,
+    AwaitConfirmation,
+    Dispatch(DeliverySubmission),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DeliveryForm {
+    Preview {
+        port: String,
+        visibility: PreviewVisibility,
+        ttl_minutes: u16,
+        field: usize,
+    },
+    Task {
+        task_run_id: String,
+        values: [String; 6],
+        field: usize,
+    },
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum ParentMessage {
@@ -149,6 +309,10 @@ pub enum ParentMessage {
         reason: String,
         #[serde(rename = "exitCode")]
         exit_code: Option<i32>,
+    },
+    DeliveryComplete {
+        #[serde(rename = "workspaceId")]
+        workspace_id: String,
     },
     Error {
         code: String,
@@ -183,6 +347,50 @@ pub enum RendererEvent {
         workspace_id: String,
         action: LifecycleAction,
     },
+    PreviewExpose {
+        #[serde(rename = "workspaceId")]
+        workspace_id: String,
+        port: u16,
+        visibility: PreviewVisibility,
+        #[serde(rename = "ttlMinutes")]
+        ttl_minutes: u16,
+    },
+    PreviewRevoke {
+        #[serde(rename = "workspaceId")]
+        workspace_id: String,
+        #[serde(rename = "exposureId")]
+        exposure_id: String,
+    },
+    TaskApprove {
+        #[serde(rename = "workspaceId")]
+        workspace_id: String,
+        #[serde(rename = "taskRunId")]
+        task_run_id: String,
+    },
+    TaskDeliver {
+        #[serde(rename = "workspaceId")]
+        workspace_id: String,
+        #[serde(rename = "taskRunId")]
+        task_run_id: String,
+        branch: String,
+        #[serde(rename = "commitMessage")]
+        commit_message: String,
+        remote: String,
+        #[serde(rename = "pullRequest", skip_serializing_if = "Option::is_none")]
+        pull_request: Option<PullRequestSubmission>,
+    },
+    PromotionAccept {
+        #[serde(rename = "workspaceId")]
+        workspace_id: String,
+        #[serde(rename = "promotionId")]
+        promotion_id: String,
+    },
+    PromotionRetry {
+        #[serde(rename = "workspaceId")]
+        workspace_id: String,
+        #[serde(rename = "promotionId")]
+        promotion_id: String,
+    },
     TerminalInput {
         data: String,
     },
@@ -193,6 +401,53 @@ pub enum RendererEvent {
     TerminalReconnect,
     Detach,
     Quit,
+}
+
+impl RendererEvent {
+    pub fn delivery(workspace_id: String, submission: DeliverySubmission) -> Self {
+        match submission {
+            DeliverySubmission::ExposePreview {
+                port,
+                visibility,
+                ttl_minutes,
+            } => Self::PreviewExpose {
+                workspace_id,
+                port,
+                visibility,
+                ttl_minutes,
+            },
+            DeliverySubmission::RevokePreview { exposure_id } => Self::PreviewRevoke {
+                workspace_id,
+                exposure_id,
+            },
+            DeliverySubmission::ApproveTask { task_run_id } => Self::TaskApprove {
+                workspace_id,
+                task_run_id,
+            },
+            DeliverySubmission::DeliverTask {
+                task_run_id,
+                branch,
+                commit_message,
+                remote,
+                pull_request,
+            } => Self::TaskDeliver {
+                workspace_id,
+                task_run_id,
+                branch,
+                commit_message,
+                remote,
+                pull_request,
+            },
+            DeliverySubmission::AcceptPromotion { promotion_id } => Self::PromotionAccept {
+                workspace_id,
+                promotion_id,
+            },
+            DeliverySubmission::RetryPromotion { promotion_id } => Self::PromotionRetry {
+                workspace_id,
+                promotion_id,
+            },
+        }
+    }
 }
 
 pub struct AppState {
@@ -207,6 +462,11 @@ pub struct AppState {
     pub action_selected: usize,
     pub pending_confirmation: Option<LifecycleAction>,
     pub action_busy: bool,
+    pub delivery_menu_open: bool,
+    pub delivery_selected: usize,
+    pub delivery_form: Option<DeliveryForm>,
+    pub pending_delivery_confirmation: Option<DeliverySubmission>,
+    pub delivery_busy: bool,
     pub status_line: String,
     pub terminal: vt100::Parser,
     pub terminal_size: (u16, u16),
@@ -226,6 +486,11 @@ impl Default for AppState {
             action_selected: 0,
             pending_confirmation: None,
             action_busy: false,
+            delivery_menu_open: false,
+            delivery_selected: 0,
+            delivery_form: None,
+            pending_delivery_confirmation: None,
+            delivery_busy: false,
             status_line: "Connecting to Appaloft…".to_owned(),
             terminal: vt100::Parser::new(24, 80, 10_000),
             terminal_size: (80, 24),
@@ -272,6 +537,9 @@ impl AppState {
                 self.status_line = format!("Workspace {}", detail.workspace.workspace_id);
                 self.detail = Some(detail);
                 self.action_busy = false;
+                self.delivery_busy = false;
+                self.delivery_form = None;
+                self.pending_delivery_confirmation = None;
             }
             ParentMessage::TerminalReady {
                 runtime_id,
@@ -296,12 +564,19 @@ impl AppState {
                     None => format!("Agent terminal closed: {reason}"),
                 };
             }
+            ParentMessage::DeliveryComplete { workspace_id } => {
+                self.delivery_busy = false;
+                self.delivery_form = None;
+                self.pending_delivery_confirmation = None;
+                self.status_line = format!("Workspace {workspace_id} delivery action completed");
+            }
             ParentMessage::Error {
                 code,
                 phase,
                 retryable,
             } => {
                 self.action_busy = false;
+                self.delivery_busy = false;
                 self.status_line = format!(
                     "{code} at {phase}{}",
                     if retryable { " — retry with r" } else { "" }
@@ -320,6 +595,9 @@ impl AppState {
         self.detail = None;
         self.action_menu_open = false;
         self.pending_confirmation = None;
+        self.delivery_menu_open = false;
+        self.delivery_form = None;
+        self.pending_delivery_confirmation = None;
         self.selected_workspace_id().map(str::to_owned)
     }
 
@@ -405,6 +683,259 @@ impl AppState {
             return pending;
         }
         None
+    }
+
+    pub fn available_delivery_actions(&self) -> Vec<DeliveryAction> {
+        self.detail
+            .as_ref()
+            .map(delivery_actions_for_detail)
+            .unwrap_or_default()
+    }
+
+    pub fn open_delivery_menu(&mut self) -> bool {
+        if self.delivery_busy || self.available_delivery_actions().is_empty() {
+            return false;
+        }
+        self.delivery_selected = 0;
+        self.delivery_menu_open = true;
+        self.delivery_form = None;
+        self.pending_delivery_confirmation = None;
+        true
+    }
+
+    pub fn close_delivery_surface(&mut self) {
+        if self.delivery_busy {
+            return;
+        }
+        self.delivery_menu_open = false;
+        self.delivery_form = None;
+        self.pending_delivery_confirmation = None;
+    }
+
+    pub fn move_delivery_selection(&mut self, delta: isize) {
+        let actions = self.available_delivery_actions();
+        if actions.is_empty() {
+            self.delivery_selected = 0;
+            return;
+        }
+        let last = actions.len().saturating_sub(1) as isize;
+        self.delivery_selected = (self.delivery_selected as isize + delta).clamp(0, last) as usize;
+    }
+
+    pub fn activate_selected_delivery_action(&mut self) -> DeliveryDecision {
+        if !self.delivery_menu_open || self.delivery_busy {
+            return DeliveryDecision::None;
+        }
+        let Some(action) = self
+            .available_delivery_actions()
+            .get(self.delivery_selected)
+            .cloned()
+        else {
+            return DeliveryDecision::None;
+        };
+        self.delivery_menu_open = false;
+        match action {
+            DeliveryAction::ExposePreview => {
+                self.delivery_form = Some(DeliveryForm::Preview {
+                    port: String::new(),
+                    visibility: PreviewVisibility::Private,
+                    ttl_minutes: 60,
+                    field: 0,
+                });
+                DeliveryDecision::FormOpened
+            }
+            DeliveryAction::DeliverTask { task_run_id } => {
+                self.delivery_form = Some(DeliveryForm::Task {
+                    task_run_id,
+                    values: [
+                        String::new(),
+                        String::new(),
+                        "origin".to_owned(),
+                        String::new(),
+                        String::new(),
+                        String::new(),
+                    ],
+                    field: 0,
+                });
+                DeliveryDecision::FormOpened
+            }
+            DeliveryAction::RevokePreview { exposure_id, .. } => {
+                self.pending_delivery_confirmation =
+                    Some(DeliverySubmission::RevokePreview { exposure_id });
+                DeliveryDecision::AwaitConfirmation
+            }
+            DeliveryAction::ApproveTask { task_run_id } => {
+                self.pending_delivery_confirmation =
+                    Some(DeliverySubmission::ApproveTask { task_run_id });
+                DeliveryDecision::AwaitConfirmation
+            }
+            DeliveryAction::AcceptPromotion { promotion_id } => {
+                self.pending_delivery_confirmation =
+                    Some(DeliverySubmission::AcceptPromotion { promotion_id });
+                DeliveryDecision::AwaitConfirmation
+            }
+            DeliveryAction::RetryPromotion { promotion_id } => {
+                self.pending_delivery_confirmation =
+                    Some(DeliverySubmission::RetryPromotion { promotion_id });
+                DeliveryDecision::AwaitConfirmation
+            }
+        }
+    }
+
+    pub fn delivery_form_insert(&mut self, character: char) {
+        if self.delivery_busy || character == '\0' {
+            return;
+        }
+        match self.delivery_form.as_mut() {
+            Some(DeliveryForm::Preview { port, field: 0, .. })
+                if character.is_ascii_digit() && port.len() < 5 =>
+            {
+                port.push(character);
+            }
+            Some(DeliveryForm::Task { values, field, .. }) => {
+                let limits = [512, 512, 120, 256, 16_384, 512];
+                if values[*field].len() < limits[*field] {
+                    values[*field].push(character);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    pub fn delivery_form_backspace(&mut self) {
+        if self.delivery_busy {
+            return;
+        }
+        match self.delivery_form.as_mut() {
+            Some(DeliveryForm::Preview { port, field: 0, .. }) => {
+                port.pop();
+            }
+            Some(DeliveryForm::Task { values, field, .. }) => {
+                values[*field].pop();
+            }
+            _ => {}
+        }
+    }
+
+    pub fn delivery_form_next_field(&mut self) {
+        if self.delivery_busy {
+            return;
+        }
+        match self.delivery_form.as_mut() {
+            Some(DeliveryForm::Preview { field, .. }) => *field = (*field + 1) % 3,
+            Some(DeliveryForm::Task { field, .. }) => *field = (*field + 1) % 6,
+            None => {}
+        }
+    }
+
+    pub fn delivery_form_previous_field(&mut self) {
+        if self.delivery_busy {
+            return;
+        }
+        match self.delivery_form.as_mut() {
+            Some(DeliveryForm::Preview { field, .. }) => *field = (*field + 2) % 3,
+            Some(DeliveryForm::Task { field, .. }) => *field = (*field + 5) % 6,
+            None => {}
+        }
+    }
+
+    pub fn delivery_form_cycle_choice(&mut self, delta: isize) {
+        if self.delivery_busy {
+            return;
+        }
+        if let Some(DeliveryForm::Preview {
+            visibility,
+            ttl_minutes,
+            field,
+            ..
+        }) = self.delivery_form.as_mut()
+        {
+            if *field == 1 {
+                *visibility = visibility.next(delta);
+            } else if *field == 2 {
+                let values = [60_u16, 480, 1440];
+                let index = values
+                    .iter()
+                    .position(|value| value == ttl_minutes)
+                    .unwrap_or(0) as isize;
+                *ttl_minutes = values[(index + delta).rem_euclid(values.len() as isize) as usize];
+            }
+        }
+    }
+
+    pub fn submit_delivery_form(&mut self) -> DeliveryDecision {
+        if self.delivery_busy {
+            return DeliveryDecision::None;
+        }
+        match self.delivery_form.as_ref() {
+            Some(DeliveryForm::Preview {
+                port,
+                visibility,
+                ttl_minutes,
+                ..
+            }) => {
+                let Ok(port) = port.parse::<u16>() else {
+                    self.status_line = "Preview port must be between 1 and 65535".to_owned();
+                    return DeliveryDecision::None;
+                };
+                if port == 0 {
+                    self.status_line = "Preview port must be between 1 and 65535".to_owned();
+                    return DeliveryDecision::None;
+                }
+                self.delivery_busy = true;
+                DeliveryDecision::Dispatch(DeliverySubmission::ExposePreview {
+                    port,
+                    visibility: *visibility,
+                    ttl_minutes: *ttl_minutes,
+                })
+            }
+            Some(DeliveryForm::Task {
+                task_run_id,
+                values,
+                ..
+            }) => {
+                if values[0].trim().is_empty()
+                    || values[1].trim().is_empty()
+                    || values[2].trim().is_empty()
+                {
+                    self.status_line =
+                        "Task delivery requires branch, commit message and remote".to_owned();
+                    return DeliveryDecision::None;
+                }
+                let pull_request = if values[3].trim().is_empty() {
+                    None
+                } else {
+                    Some(PullRequestSubmission {
+                        title: values[3].trim().to_owned(),
+                        body: (!values[4].is_empty()).then(|| values[4].clone()),
+                        base: (!values[5].trim().is_empty()).then(|| values[5].trim().to_owned()),
+                    })
+                };
+                self.pending_delivery_confirmation = Some(DeliverySubmission::DeliverTask {
+                    task_run_id: task_run_id.clone(),
+                    branch: values[0].trim().to_owned(),
+                    commit_message: values[1].trim().to_owned(),
+                    remote: values[2].trim().to_owned(),
+                    pull_request,
+                });
+                DeliveryDecision::AwaitConfirmation
+            }
+            None => DeliveryDecision::None,
+        }
+    }
+
+    pub fn confirm_delivery_action(&mut self, confirmed: bool) -> Option<DeliverySubmission> {
+        if !confirmed {
+            self.pending_delivery_confirmation = None;
+            self.delivery_form = None;
+            return None;
+        }
+        if self.delivery_busy {
+            return None;
+        }
+        let submission = self.pending_delivery_confirmation.clone()?;
+        self.delivery_busy = true;
+        Some(submission)
     }
 }
 
@@ -656,11 +1187,21 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
                 .promotions
                 .iter()
                 .map(|promotion| {
+                    let proof = promotion
+                        .proof
+                        .as_ref()
+                        .map(|proof| {
+                            format!(
+                                "{}  mismatch:{}  unavailable:{}",
+                                proof.verdict,
+                                proof.mismatch_count,
+                                proof.unavailable_evidence_count
+                            )
+                        })
+                        .unwrap_or_else(|| "no proof".to_owned());
                     format!(
                         "{}  {}  {}",
-                        promotion.promotion_id,
-                        promotion.status,
-                        promotion.proof_verdict.as_deref().unwrap_or("no proof")
+                        promotion.promotion_id, promotion.status, proof
                     )
                 })
                 .collect::<Vec<_>>()
@@ -704,7 +1245,7 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
     }
     frame.render_widget(
         Paragraph::new(format!(
-            " {}  │  ↑↓ select  Enter attach/focus  a actions  Ctrl+] release  f Focus Mode  r refresh  R reconnect  q quit ",
+            " {}  │  ↑↓ select  Enter attach/focus  a lifecycle  d delivery  Ctrl+] release  f Focus Mode  r refresh  R reconnect  q quit ",
             state.status_line
         ))
         .style(Style::default().fg(Color::DarkGray)),
@@ -760,6 +1301,155 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
         frame.render_widget(
             Paragraph::new("Terminate this Workspace and its Agent runtimes?\nPress y to confirm, n or Esc to cancel.")
                 .block(Block::default().title(" Confirm destructive action ").borders(Borders::ALL))
+                .wrap(Wrap { trim: false }),
+            dialog,
+        );
+    } else if state.delivery_menu_open {
+        let actions = state.available_delivery_actions();
+        let width = 68_u16.min(area.width.saturating_sub(2)).max(2);
+        let height = (actions.len() as u16 + 2)
+            .min(area.height.saturating_sub(2))
+            .max(3);
+        let menu = Rect::new(
+            area.x + area.width.saturating_sub(width) / 2,
+            area.y + area.height.saturating_sub(height) / 2,
+            width,
+            height,
+        );
+        frame.render_widget(Clear, menu);
+        frame.render_widget(
+            List::new(actions.iter().enumerate().map(|(index, action)| {
+                let marker = if index == state.delivery_selected {
+                    "›"
+                } else {
+                    " "
+                };
+                ListItem::new(format!("{marker} {}", action.label())).style(
+                    if index == state.delivery_selected {
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default()
+                    },
+                )
+            }))
+            .block(
+                Block::default()
+                    .title(" Delivery Actions ")
+                    .borders(Borders::ALL),
+            ),
+            menu,
+        );
+    } else if let Some(submission) = &state.pending_delivery_confirmation {
+        let description = match submission {
+            DeliverySubmission::RevokePreview { exposure_id } => {
+                format!("Revoke Preview {exposure_id}?")
+            }
+            DeliverySubmission::ApproveTask { task_run_id } => {
+                format!("Approve Task {task_run_id}?")
+            }
+            DeliverySubmission::DeliverTask {
+                task_run_id,
+                branch,
+                remote,
+                ..
+            } => format!("Deliver Task {task_run_id} to {remote}/{branch}?"),
+            DeliverySubmission::AcceptPromotion { promotion_id } => {
+                format!("Accept Promotion {promotion_id} using its current artifact digest?")
+            }
+            DeliverySubmission::RetryPromotion { promotion_id } => {
+                format!("Retry Promotion {promotion_id}?")
+            }
+            DeliverySubmission::ExposePreview { .. } => "Expose Preview?".to_owned(),
+        };
+        let width = 72_u16.min(area.width.saturating_sub(2)).max(2);
+        let height = 6_u16.min(area.height.saturating_sub(2)).max(3);
+        let dialog = Rect::new(
+            area.x + area.width.saturating_sub(width) / 2,
+            area.y + area.height.saturating_sub(height) / 2,
+            width,
+            height,
+        );
+        frame.render_widget(Clear, dialog);
+        frame.render_widget(
+            Paragraph::new(format!(
+                "{description}\nPress y to confirm, n or Esc to cancel.{}",
+                if state.delivery_busy {
+                    "\nWorking…"
+                } else {
+                    ""
+                }
+            ))
+            .block(
+                Block::default()
+                    .title(" Confirm delivery action ")
+                    .borders(Borders::ALL),
+            )
+            .wrap(Wrap { trim: false }),
+            dialog,
+        );
+    } else if let Some(form) = &state.delivery_form {
+        let (title, lines) = match form {
+            DeliveryForm::Preview {
+                port,
+                visibility,
+                ttl_minutes,
+                field,
+            } => (
+                " Expose Preview ",
+                vec![
+                    format!("{} Port: {}", if *field == 0 { "›" } else { " " }, port),
+                    format!(
+                        "{} Visibility: {}",
+                        if *field == 1 { "›" } else { " " },
+                        visibility.label()
+                    ),
+                    format!(
+                        "{} TTL: {} minutes",
+                        if *field == 2 { "›" } else { " " },
+                        ttl_minutes
+                    ),
+                    "Tab/Shift+Tab fields · ←→ choices · Enter submit · Esc cancel".to_owned(),
+                ],
+            ),
+            DeliveryForm::Task { values, field, .. } => {
+                let labels = [
+                    "Branch", "Commit", "Remote", "PR title", "PR body", "PR base",
+                ];
+                (
+                    " Deliver Task ",
+                    labels
+                        .iter()
+                        .enumerate()
+                        .map(|(index, label)| {
+                            format!(
+                                "{} {label}: {}",
+                                if *field == index { "›" } else { " " },
+                                values[index]
+                            )
+                        })
+                        .chain(std::iter::once(
+                            "Tab/Shift+Tab fields · Enter review · Esc cancel".to_owned(),
+                        ))
+                        .collect(),
+                )
+            }
+        };
+        let width = 78_u16.min(area.width.saturating_sub(2)).max(2);
+        let height = (lines.len() as u16 + 2)
+            .min(area.height.saturating_sub(2))
+            .max(3);
+        let dialog = Rect::new(
+            area.x + area.width.saturating_sub(width) / 2,
+            area.y + area.height.saturating_sub(height) / 2,
+            width,
+            height,
+        );
+        frame.render_widget(Clear, dialog);
+        frame.render_widget(
+            Paragraph::new(lines.join("\n"))
+                .block(Block::default().title(title).borders(Borders::ALL))
                 .wrap(Wrap { trim: false }),
             dialog,
         );
@@ -878,7 +1568,11 @@ mod tests {
                     status: "verified".to_owned(),
                     resource_id: None,
                     deployment_id: None,
-                    proof_verdict: Some("verified".to_owned()),
+                    proof: Some(DeploymentProofSummary {
+                        verdict: "verified".to_owned(),
+                        mismatch_count: 0,
+                        unavailable_evidence_count: 0,
+                    }),
                     expires_at: None,
                 }],
             },
@@ -988,5 +1682,193 @@ mod tests {
         assert_eq!(state.runtime_id, None);
         assert!(!state.agent_focused);
         assert!(!state.focus_mode);
+    }
+
+    #[test]
+    fn ws_tui_delivery_palette_uses_only_visible_descriptor_targets() {
+        let detail = DetailMessage {
+            workspace: WorkspaceSummary {
+                workspace_id: "sbx_1".to_owned(),
+                status: "ready".to_owned(),
+                provider_key: None,
+                source_kind: None,
+            },
+            runtimes: Vec::new(),
+            ports: vec![PortSummary {
+                exposure_id: "exp_1".to_owned(),
+                port: 3000,
+                visibility: Some("private".to_owned()),
+                url: None,
+                expires_at: None,
+            }],
+            tasks: vec![
+                TaskSummary {
+                    task_run_id: "task_approve".to_owned(),
+                    runtime_id: None,
+                    status: "awaiting-approval".to_owned(),
+                },
+                TaskSummary {
+                    task_run_id: "task_deliver".to_owned(),
+                    runtime_id: None,
+                    status: "approved".to_owned(),
+                },
+                TaskSummary {
+                    task_run_id: "task_running".to_owned(),
+                    runtime_id: None,
+                    status: "running".to_owned(),
+                },
+            ],
+            promotions: vec![
+                PromotionSummary {
+                    promotion_id: "prm_planned".to_owned(),
+                    status: "planned".to_owned(),
+                    resource_id: None,
+                    deployment_id: None,
+                    proof: None,
+                    expires_at: None,
+                },
+                PromotionSummary {
+                    promotion_id: "prm_failed".to_owned(),
+                    status: "failed".to_owned(),
+                    resource_id: None,
+                    deployment_id: None,
+                    proof: None,
+                    expires_at: None,
+                },
+            ],
+        };
+
+        assert_eq!(
+            delivery_actions_for_detail(&detail),
+            vec![
+                DeliveryAction::ExposePreview,
+                DeliveryAction::RevokePreview {
+                    exposure_id: "exp_1".to_owned(),
+                    port: 3000,
+                },
+                DeliveryAction::ApproveTask {
+                    task_run_id: "task_approve".to_owned(),
+                },
+                DeliveryAction::DeliverTask {
+                    task_run_id: "task_deliver".to_owned(),
+                },
+                DeliveryAction::AcceptPromotion {
+                    promotion_id: "prm_planned".to_owned(),
+                },
+                DeliveryAction::RetryPromotion {
+                    promotion_id: "prm_failed".to_owned(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn ws_tui_preview_form_defaults_private_and_uses_bounded_ttl() {
+        let mut state = delivery_ready_state();
+        assert!(state.open_delivery_menu());
+        assert_eq!(
+            state.activate_selected_delivery_action(),
+            DeliveryDecision::FormOpened
+        );
+        state.delivery_form_insert('3');
+        state.delivery_form_insert('0');
+        state.delivery_form_insert('0');
+        state.delivery_form_insert('0');
+        assert_eq!(
+            state.submit_delivery_form(),
+            DeliveryDecision::Dispatch(DeliverySubmission::ExposePreview {
+                port: 3000,
+                visibility: PreviewVisibility::Private,
+                ttl_minutes: 60,
+            })
+        );
+    }
+
+    #[test]
+    fn ws_tui_delivery_events_are_bounded_and_explicit() {
+        assert_eq!(
+            serde_json::to_string(&RendererEvent::delivery(
+                "sbx_1".to_owned(),
+                DeliverySubmission::ExposePreview {
+                    port: 3000,
+                    visibility: PreviewVisibility::Private,
+                    ttl_minutes: 60,
+                },
+            ))
+            .expect("serialize Preview event"),
+            r#"{"type":"preview-expose","workspaceId":"sbx_1","port":3000,"visibility":"private","ttlMinutes":60}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&RendererEvent::delivery(
+                "sbx_1".to_owned(),
+                DeliverySubmission::AcceptPromotion {
+                    promotion_id: "prm_1".to_owned(),
+                },
+            ))
+            .expect("serialize Promotion event"),
+            r#"{"type":"promotion-accept","workspaceId":"sbx_1","promotionId":"prm_1"}"#
+        );
+    }
+
+    #[test]
+    fn ws_tui_task_delivery_confirmation_preserves_form_on_safe_error() {
+        let mut state = delivery_ready_state();
+        assert!(state.open_delivery_menu());
+        state.move_delivery_selection(1);
+        assert_eq!(
+            state.activate_selected_delivery_action(),
+            DeliveryDecision::FormOpened
+        );
+        state.delivery_form_insert('f');
+        state.delivery_form_next_field();
+        state.delivery_form_insert('c');
+        state.delivery_form_next_field();
+        assert_eq!(
+            state.submit_delivery_form(),
+            DeliveryDecision::AwaitConfirmation
+        );
+        let submission = state
+            .confirm_delivery_action(true)
+            .expect("confirmed task delivery");
+        assert!(matches!(submission, DeliverySubmission::DeliverTask { .. }));
+        state.apply(ParentMessage::Error {
+            code: "delivery_failed".to_owned(),
+            phase: "workspace-control-task-deliver".to_owned(),
+            retryable: true,
+        });
+        assert!(state.delivery_form.is_some());
+        assert!(state.pending_delivery_confirmation.is_some());
+        assert!(!state.delivery_busy);
+        state.apply(ParentMessage::DeliveryComplete {
+            workspace_id: "sbx_1".to_owned(),
+        });
+        assert!(state.delivery_form.is_none());
+        assert!(state.pending_delivery_confirmation.is_none());
+    }
+
+    fn delivery_ready_state() -> AppState {
+        let mut state = AppState::default();
+        state.apply(ParentMessage::Workspaces {
+            workspaces: vec![WorkspaceSummary {
+                workspace_id: "sbx_1".to_owned(),
+                status: "ready".to_owned(),
+                provider_key: None,
+                source_kind: None,
+            }],
+        });
+        state.apply(ParentMessage::Detail {
+            detail: DetailMessage {
+                workspace: state.workspaces[0].clone(),
+                runtimes: Vec::new(),
+                ports: Vec::new(),
+                tasks: vec![TaskSummary {
+                    task_run_id: "task_deliver".to_owned(),
+                    runtime_id: None,
+                    status: "approved".to_owned(),
+                }],
+                promotions: Vec::new(),
+            },
+        });
+        state
     }
 }

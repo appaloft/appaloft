@@ -196,6 +196,9 @@ describe("Workspace control presentation", () => {
     expect(commands[5]).toMatchObject({
       input: { promotionId: "prm_failed", idempotencyKey: "idem_tui_delivery" },
     });
+    expect(
+      renderer.messages.filter((message) => message.type === "delivery-complete"),
+    ).toHaveLength(6);
     expect(queries.some((query) => query instanceof DeploymentProofQuery)).toBe(true);
     const detail = renderer.messages.findLast((message) => message.type === "detail");
     expect(detail?.type === "detail" ? detail.promotions[0]?.proof : undefined).toEqual({
@@ -240,6 +243,69 @@ describe("Workspace control presentation", () => {
       phase: "workspace-control-preview-revoke",
       retryable: false,
     });
+  });
+
+  test("[WS-TUI-DELIVERY-008] keeps the exact Agent Session attached across delivery mutation", async () => {
+    const terminal = {
+      detached: 0,
+      async *[Symbol.asyncIterator](): AsyncIterator<TerminalSessionFrame> {},
+      write: () => Promise.resolve(),
+      resize: () => Promise.resolve(),
+      detach() {
+        this.detached += 1;
+        return Promise.resolve();
+      },
+      close: () => Promise.resolve(),
+    } satisfies TerminalSession & { detached: number };
+    const renderer = new FakeRendererSession([
+      { type: "select", workspaceId: "sbx_1" },
+      { type: "attach", workspaceId: "sbx_1", runtimeId: "sar_1" },
+      {
+        type: "preview-expose",
+        workspaceId: "sbx_1",
+        port: 3000,
+        visibility: "private",
+        ttlMinutes: 60,
+      },
+      { type: "quit" },
+    ]);
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+      now: () => "2026-08-11T00:00:00.000Z",
+    });
+
+    await presentation.start({
+      executeCommand: async <T>(command: Command<T>) =>
+        ok(
+          (command instanceof IssueSandboxAgentAttachAccessCommand
+            ? { transport: "managed-terminal", sessionId: "term_same" }
+            : {}) as T,
+        ),
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery) {
+          return ok({ items: [{ sandboxId: "sbx_1", status: "ready" }] } as T);
+        }
+        if (query instanceof ShowSandboxQuery) {
+          return ok({ sandboxId: "sbx_1", status: "ready" } as T);
+        }
+        if (query instanceof ListSandboxAgentRuntimesQuery) {
+          return ok({ items: [{ runtimeId: "sar_1", status: "running" }] } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+      terminalSessionGateway: { attach: () => ok(terminal) },
+    });
+
+    expect(renderer.messages.filter((message) => message.type === "terminal-ready")).toEqual([
+      {
+        type: "terminal-ready",
+        workspaceId: "sbx_1",
+        runtimeId: "sar_1",
+        sessionId: "term_same",
+      },
+    ]);
+    expect(renderer.messages.some((message) => message.type === "terminal-closed")).toBe(false);
+    expect(terminal.detached).toBe(1);
   });
 
   test("[WS-TUI-QUERY-002][WS-TUI-DETAIL-003][WS-TUI-CAPABILITY-010] reads bounded existing state and derives actions from attach capabilities", async () => {

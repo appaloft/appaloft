@@ -44,6 +44,42 @@ describe("Workspace control renderer channel", () => {
                   action: "resume",
                 })}\n`,
               );
+              client?.write(
+                `${JSON.stringify({
+                  type: "preview-expose",
+                  workspaceId: "sbx_1",
+                  port: 3000,
+                  visibility: "private",
+                  ttlMinutes: 999,
+                })}\n`,
+              );
+              client?.write(
+                `${JSON.stringify({
+                  type: "preview-expose",
+                  workspaceId: "sbx_1",
+                  port: 3000,
+                  visibility: "private",
+                  ttlMinutes: 60,
+                })}\n`,
+              );
+              client?.write(
+                `${JSON.stringify({
+                  type: "task-deliver",
+                  workspaceId: "sbx_1",
+                  taskRunId: "task_1",
+                  branch: "feat/tui",
+                  commitMessage: "feat: tui",
+                  remote: "origin",
+                  pullRequest: { title: "TUI delivery", base: "main" },
+                })}\n`,
+              );
+              client?.write(
+                `${JSON.stringify({
+                  type: "promotion-accept",
+                  workspaceId: "sbx_1",
+                  promotionId: "prm_1",
+                })}\n`,
+              );
               client?.write(`${JSON.stringify({ type: "quit" })}\n`);
             }
             if (message.type === "shutdown") client?.end();
@@ -69,6 +105,32 @@ describe("Workspace control renderer channel", () => {
     expect(await events.next()).toEqual({
       done: false,
       value: { type: "lifecycle-action", workspaceId: "sbx_1", action: "resume" },
+    });
+    expect(await events.next()).toEqual({
+      done: false,
+      value: {
+        type: "preview-expose",
+        workspaceId: "sbx_1",
+        port: 3000,
+        visibility: "private",
+        ttlMinutes: 60,
+      },
+    });
+    expect(await events.next()).toEqual({
+      done: false,
+      value: {
+        type: "task-deliver",
+        workspaceId: "sbx_1",
+        taskRunId: "task_1",
+        branch: "feat/tui",
+        commitMessage: "feat: tui",
+        remote: "origin",
+        pullRequest: { title: "TUI delivery", base: "main" },
+      },
+    });
+    expect(await events.next()).toEqual({
+      done: false,
+      value: { type: "promotion-accept", workspaceId: "sbx_1", promotionId: "prm_1" },
     });
     expect(await events.next()).toEqual({ done: false, value: { type: "quit" } });
     await renderer.close();

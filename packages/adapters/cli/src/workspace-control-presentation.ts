@@ -100,6 +100,7 @@ export type WorkspaceControlRendererMessage =
       readonly reason: string;
       readonly exitCode?: number;
     }
+  | { readonly type: "delivery-complete"; readonly workspaceId: string }
   | {
       readonly type: "error";
       readonly code: string;
@@ -459,6 +460,11 @@ export function createBoundedWorkspaceControlPresentation(
         await renderer.send(loaded.message);
       };
 
+      const completeDelivery = async (workspaceId: string) => {
+        await renderer.send({ type: "delivery-complete", workspaceId });
+        await sendSelectedDetail(workspaceId);
+      };
+
       const requireSelectedWorkspace = (workspaceId: string) => {
         if (
           !selectedWorkspaceId ||
@@ -661,7 +667,7 @@ export function createBoundedWorkspaceControlPresentation(
                   ),
                 ),
               );
-              await sendSelectedDetail(event.workspaceId);
+              await completeDelivery(event.workspaceId);
               continue;
             }
             if (event.type === "preview-revoke") {
@@ -679,7 +685,7 @@ export function createBoundedWorkspaceControlPresentation(
                   ),
                 ),
               );
-              await sendSelectedDetail(event.workspaceId);
+              await completeDelivery(event.workspaceId);
               continue;
             }
             if (event.type === "task-approve") {
@@ -700,7 +706,7 @@ export function createBoundedWorkspaceControlPresentation(
                   ),
                 ),
               );
-              await sendSelectedDetail(event.workspaceId);
+              await completeDelivery(event.workspaceId);
               continue;
             }
             if (event.type === "task-deliver") {
@@ -732,7 +738,7 @@ export function createBoundedWorkspaceControlPresentation(
                   ),
                 ),
               );
-              await sendSelectedDetail(event.workspaceId);
+              await completeDelivery(event.workspaceId);
               continue;
             }
             if (event.type === "promotion-accept" || event.type === "promotion-retry") {
@@ -781,7 +787,7 @@ export function createBoundedWorkspaceControlPresentation(
                   ),
                 );
               }
-              await sendSelectedDetail(event.workspaceId);
+              await completeDelivery(event.workspaceId);
               continue;
             }
             if (event.type === "terminal-input") {
