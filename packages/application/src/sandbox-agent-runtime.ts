@@ -1080,11 +1080,16 @@ function agentRunFailureDiagnostic(
   code: string;
   summary: string;
 } {
+  const stableCode = (value: unknown): string | undefined =>
+    typeof value === "string" &&
+    value.length <= 120 &&
+    /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$/u.test(value)
+      ? value
+      : undefined;
   const detailCode = admissionError?.details?.code;
-  const admittedCode =
-    typeof detailCode === "string" && /^[a-z0-9][a-z0-9._-]{0,119}$/u.test(detailCode)
-      ? detailCode
-      : admissionError?.code;
+  const admittedCode = stableCode(detailCode) ?? stableCode(admissionError?.code);
+  const harnessCode =
+    !admissionError && error instanceof Error ? stableCode(error.message) : undefined;
   const message = admissionError
     ? `Credential admission failed (${admissionError.category}; retryable=${String(
         admissionError.retryable,
@@ -1123,7 +1128,7 @@ function agentRunFailureDiagnostic(
   const joined = redactedLines.join("\n").trim();
   const sanitized = joined.length <= 1_024 ? joined : `${joined.slice(0, 1_011)}\n[TRUNCATED]`;
   return {
-    code: admittedCode ?? "sandbox_agent_harness_failed",
+    code: admittedCode ?? harnessCode ?? "sandbox_agent_harness_failed",
     summary: sanitized || "Agent harness execution failed",
   };
 }
