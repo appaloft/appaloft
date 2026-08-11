@@ -158,6 +158,22 @@ describe("release build workflow", () => {
     expect(workflow).toContain("use help/headless Workspace commands");
   });
 
+  test("[WS-TUI-PACKAGE-011] PR CI builds every supported Workspace renderer target", async () => {
+    const workflow = await readText(".github/workflows/ci.yml");
+
+    for (const target of [
+      "darwin-arm64",
+      "darwin-x64",
+      "linux-arm64-gnu",
+      "linux-x64-gnu",
+      "linux-arm64-musl",
+      "linux-x64-musl",
+    ]) {
+      expect(workflow).toContain(`target: ${target}`);
+    }
+    expect(workflow).toContain("Test and build native musl Workspace TUI");
+  });
+
   test("[RELEASE-HARDENING-006] keeps release-readiness smoke commands first-class", async () => {
     const scripts = await readPackageScripts();
     const nightlyWorkflow = await readText(".github/workflows/nightly.yml");

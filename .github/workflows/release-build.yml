@@ -221,22 +221,26 @@ jobs:
 
       - name: Build Binary Bundle
         shell: bash
+        env:
+          RELEASE_TARGET: ${{ matrix.target }}
         run: |
           args=(
             --version "${APPALOFT_APP_VERSION}"
-            --target "${{ matrix.target }}"
+            --target "${RELEASE_TARGET}"
             --archive
           )
-          if [[ "${{ matrix.target }}" != win32-* ]]; then
-            args+=(--workspace-tui-binary "dist/workspace-tui/${{ matrix.target }}/appaloft-workspace-tui")
+          if [[ "${RELEASE_TARGET}" != win32-* ]]; then
+            args+=(--workspace-tui-binary "dist/workspace-tui/${RELEASE_TARGET}/appaloft-workspace-tui")
           fi
           bun run package:binary-bundle -- "${args[@]}"
 
       - name: Verify Workspace TUI Bundle Shape
         shell: bash
+        env:
+          RELEASE_TARGET: ${{ matrix.target }}
         run: |
-          bundle="dist/release/appaloft-v${APPALOFT_APP_VERSION}-${{ matrix.target }}"
-          if [[ "${{ matrix.target }}" == win32-* ]]; then
+          bundle="dist/release/appaloft-v${APPALOFT_APP_VERSION}-${RELEASE_TARGET}"
+          if [[ "${RELEASE_TARGET}" == win32-* ]]; then
             test ! -e "${bundle}/appaloft-workspace-tui"
             grep -q "use help/headless Workspace commands" "${bundle}/README.txt"
           else
