@@ -53,6 +53,9 @@ sandbox-templates.create (optional)
 - Background exec returns a process id and provider readback powers later list/show/events/terminate.
 - File operations resolve paths below the provider workspace root after lexical and provider-level
   canonical-path checks.
+- A read of an absent confined file returns non-retryable `sandbox_file_not_found`. Providers emit
+  an explicit neutral missing-file signal after the in-runtime absence check; Docker/transport
+  errors and confinement failures are not inferred from stderr and remain provider failures.
 - Port exposure is admitted by visibility, port range, protocol and expiry, then returns an
   Appaloft access descriptor. Provider/private addresses remain internal.
 - Network policy and credential grant updates are revisioned and applied atomically or fail without

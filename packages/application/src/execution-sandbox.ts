@@ -58,6 +58,18 @@ export interface SandboxProviderCapabilities {
   credentialBroker: boolean;
 }
 
+/**
+ * Provider-neutral signal used when a confined file read targets a path that
+ * does not exist. Providers must not use this for transport or confinement
+ * failures, which remain generic provider-operation failures.
+ */
+export class SandboxProviderFileNotFoundError extends Error {
+  constructor() {
+    super("Sandbox file was not found");
+    this.name = "SandboxProviderFileNotFoundError";
+  }
+}
+
 export interface SandboxProviderRequest {
   sandboxId: string;
   ownerScope: string;
@@ -980,7 +992,19 @@ export class ExecutionSandboxService {
   private async providerOperation<T>(phase: string, run: () => Promise<T>): Promise<Result<T>> {
     try {
       return ok(await run());
-    } catch {
+    } catch (error) {
+      if (
+        phase === "execution-sandbox-file-read" &&
+        error instanceof SandboxProviderFileNotFoundError
+      ) {
+        return err({
+          code: "sandbox_file_not_found",
+          category: "user",
+          message: error.message,
+          retryable: false,
+          details: { phase },
+        });
+      }
       return err({
         code: "sandbox_provider_operation_failed",
         category: "provider",

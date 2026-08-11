@@ -7,6 +7,7 @@ import {
   InMemorySandboxRepository,
   type RepositoryContext,
   type SandboxProvider,
+  SandboxProviderFileNotFoundError,
   SandboxProviderRegistry,
   StaticSandboxQuotaPolicy,
   StaticSandboxSnapshotLifecyclePolicy,
@@ -55,6 +56,8 @@ function provider(
     isolation?: "container-trusted" | "gvisor";
     runtimeHome?: boolean;
     runtimeHomeCleanupFailure?: boolean;
+    readFileMissing?: boolean;
+    readFileFailure?: boolean;
   } = {},
 ) {
   let provisionCalls = 0;
@@ -121,6 +124,8 @@ function provider(
       return [];
     },
     async readFile() {
+      if (input.readFileMissing) throw new SandboxProviderFileNotFoundError();
+      if (input.readFileFailure) throw new Error("provider transport failed");
       return new Uint8Array([1, 2, 3]);
     },
     async writeFile(request) {
@@ -426,6 +431,44 @@ describe("ExecutionSandboxService", () => {
         })
       ).isErr(),
     ).toBe(true);
+  });
+
+  test("[SBX-FILE-005] reports an absent provider file without classifying it as a provider outage", async () => {
+    const fake = provider({ readFileMissing: true });
+    const app = service(fake.adapter);
+    await app.createAndReconcile(context, createInput);
+
+    const result = await app.readFile(context, "sbx_test", {
+      path: ".appaloft-agent/sar_open/opencode-process-id",
+    });
+
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error).toMatchObject({
+        code: "sandbox_file_not_found",
+        category: "user",
+        retryable: false,
+        details: { phase: "execution-sandbox-file-read" },
+      });
+    }
+  });
+
+  test("[SBX-FILE-005] preserves arbitrary read failures as retryable provider failures", async () => {
+    const fake = provider({ readFileFailure: true });
+    const app = service(fake.adapter);
+    await app.createAndReconcile(context, createInput);
+
+    const result = await app.readFile(context, "sbx_test", { path: "data/input.bin" });
+
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error).toMatchObject({
+        code: "sandbox_provider_operation_failed",
+        category: "provider",
+        retryable: true,
+        details: { phase: "execution-sandbox-file-read" },
+      });
+    }
   });
 
   test("[SBX-CMD-003][HIB-SNAPSHOT-001] closes pause/resume, port and snapshot capabilities", async () => {

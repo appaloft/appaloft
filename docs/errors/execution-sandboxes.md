@@ -23,6 +23,7 @@
 | `sandbox_workspace_path_invalid` | validation | workspace-confinement | false | normalized safe relative path/reason |
 | `sandbox_workspace_escape_blocked` | permission | workspace-confinement | false | sandbox id, reason; never a host path |
 | `sandbox_file_too_large` | validation | file-transfer | false | requested/max bytes |
+| `sandbox_file_not_found` | not-found | execution-sandbox-file-read | false | bounded operation phase only; never a resolved path |
 | `sandbox_port_invalid` | validation | port-admission | false | port/protocol/visibility |
 | `sandbox_port_not_ready` | conflict | port-observation | true | sandbox id, port, readiness state |
 | `sandbox_stream_cursor_expired` | conflict | stream-replay | false | stream kind, safe newest cursor and status-query operation |
@@ -38,6 +39,9 @@
   unredacted provider stderr.
 - Provider exceptions are translated to a stable code and safe classification at the adapter
   boundary.
+- A provider reports a missing confined file through `SandboxProviderFileNotFoundError`; the
+  application translates only that explicit signal to `sandbox_file_not_found`. Transport,
+  confinement and arbitrary provider failures remain `sandbox_provider_operation_failed`.
 - A capability mismatch is not retried on the same placement; placement may select another
   compatible provider before command acceptance.
 
