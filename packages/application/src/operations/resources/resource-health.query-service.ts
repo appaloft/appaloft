@@ -1,6 +1,7 @@
 import {
   domainError,
   err,
+  LatestRuntimeOwningDeploymentSpec,
   ok,
   ResourceByIdSpec,
   ResourceId,
@@ -1087,6 +1088,17 @@ export class ResourceHealthQueryService {
     const latestDeployment = previewDeploymentId
       ? deployments.find((deployment) => deployment.id === previewDeploymentId)
       : this.latestDeployment(resource, deployments);
+    let runtimeDeployment = latestDeployment;
+    if (!previewDeploymentId) {
+      const runtimeOwningDeploymentResult = await this.resolveRuntimeOwningDeployment(
+        context,
+        resource.id,
+      );
+      if (runtimeOwningDeploymentResult.isErr()) {
+        return err(runtimeOwningDeploymentResult.error);
+      }
+      runtimeDeployment = runtimeOwningDeploymentResult.value ?? latestDeployment;
+    }
     const generatedAt = this.clock.now();
     const observedAt = generatedAt;
     const sourceErrors: ResourceHealthSourceError[] = [];
@@ -1107,8 +1119,8 @@ export class ResourceHealthQueryService {
       );
     }
 
-    let healthPolicy = healthPolicySection(resource, resourceState, latestDeployment);
-    if (healthPolicy.status === "not-configured" && latestDeployment?.status === "succeeded") {
+    let healthPolicy = healthPolicySection(resource, resourceState, runtimeDeployment);
+    if (healthPolicy.status === "not-configured" && runtimeDeployment?.status === "succeeded") {
       sourceErrors.push(
         sourceError({
           source: "health-policy",
@@ -1124,7 +1136,7 @@ export class ResourceHealthQueryService {
 
     let runtime = runtimeSection(
       observedAt,
-      latestDeployment,
+      runtimeDeployment,
       healthPolicy.status === "configured",
     );
     runtime = runtimeSectionWithLatestControl(runtime, latestRuntimeControl);
@@ -1140,11 +1152,11 @@ export class ResourceHealthQueryService {
     const resolvedPolicy = resolvedHttpHealthPolicy({
       resource,
       resourceState,
-      deployment: latestDeployment,
+      deployment: runtimeDeployment,
     });
 
     if (query.mode === "live" && query.includeRuntimeProbe) {
-      if (!latestDeployment) {
+      if (!runtimeDeployment) {
         sourceErrors.push(
           sourceError({
             source: "runtime",
@@ -1153,11 +1165,11 @@ export class ResourceHealthQueryService {
             phase: "runtime-live-probe",
             retriable: true,
             relatedEntityId: resource.id,
-            message: "Live runtime probes require latest deployment context.",
+            message: "Live runtime probes require runtime deployment context.",
           }),
         );
       } else {
-        const request = this.runtimeInspectionRequest(resource, latestDeployment);
+        const request = this.runtimeInspectionRequest(resource, runtimeDeployment);
         if (!request || !this.probeRunner.probeRuntime) {
           this.recordUnsupportedLiveInspectionRequest(resource, sourceErrors);
         } else {
@@ -1215,12 +1227,12 @@ export class ResourceHealthQueryService {
 
     if (
       query.mode === "live" &&
-      latestDeployment &&
+      runtimeDeployment &&
       runtime.lifecycle === "running" &&
       healthPolicy.status === "configured" &&
       resolvedPolicy?.enabled
     ) {
-      const request = this.runtimeProbeRequest(resource, latestDeployment, resolvedPolicy);
+      const request = this.runtimeProbeRequest(resource, runtimeDeployment, resolvedPolicy);
 
       if (request) {
         const probeResult = await this.probeRunner.probe(context, request);
@@ -1352,7 +1364,7 @@ export class ResourceHealthQueryService {
     }
 
     const overall = overallStatus({
-      deployment: latestDeployment,
+      deployment: runtimeDeployment,
       runtime,
       healthPolicy,
       publicAccess,
@@ -1453,6 +1465,35 @@ export class ResourceHealthQueryService {
           {
             resourceId,
             phase: "latest-deployment-read",
+          },
+        ),
+      );
+    }
+  }
+
+  private async resolveRuntimeOwningDeployment(
+    context: ExecutionContext,
+    resourceId: string,
+  ): Promise<Result<DeploymentSummary | undefined>> {
+    try {
+      const parsedResourceId = ResourceId.create(resourceId);
+      if (parsedResourceId.isErr()) {
+        return err(parsedResourceId.error);
+      }
+
+      const deployment = await this.deploymentReadModel.findOne(
+        toRepositoryContext(context),
+        LatestRuntimeOwningDeploymentSpec.forResource(parsedResourceId.value),
+      );
+      return ok(deployment ?? undefined);
+    } catch (error) {
+      return err(
+        domainError.resourceHealthUnavailable(
+          error instanceof Error ? error.message : "Resource health is unavailable",
+          {
+            resourceId,
+            phase: "read-model-load",
+            source: "runtime-owning-deployment",
           },
         ),
       );

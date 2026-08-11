@@ -85,7 +85,7 @@ Then:
 | RES-HEALTH-QRY-013 | integration | Proxy route missing | Reverse-proxy exposure but route not applied | `ok(overall = "degraded")` | Proxy section identifies unavailable route. |
 | RES-HEALTH-QRY-014 | integration | Durable domain ready | Ready domain binding, server-applied route, and generated route all exist | `ok` uses durable domain as public access target | Durable domain precedes server-applied and generated default routes. |
 | RES-HEALTH-QRY-015 | integration | Durable domain pending | Domain binding exists but is not ready while generated or server-applied fallback route state may also exist | `ok(overall = "degraded")` when public access is required | `publicAccess` reports the durable domain as `not-ready` with `reasonCode = resource_domain_binding_not_ready`, and `sourceErrors` include the domain-binding code instead of hiding the state behind fallback routes. |
-| RES-HEALTH-QRY-016 | integration | Runtime inspection fails | Runtime provider inspect fails | `ok(overall = "unknown")` | Source error records runtime inspection failure. |
+| RES-HEALTH-QRY-016 | integration | Runtime inspection unavailable | Docker/runtime inspection times out, cannot reach the target, or returns an ambiguous failure that does not prove the instance is absent | `ok(overall = "unknown")` | Source error records `resource_runtime_inspection_failed`; unavailable observation is not misreported as stopped. |
 | RES-HEALTH-QRY-017 | integration | Read model failure | Required resource context cannot be safely loaded | `err(resource_health_unavailable)` | No partial unsafe summary is returned. |
 | RES-HEALTH-QRY-018 | integration | Edge upstream timeout observed | Latest deployment succeeded, internal health is unknown or healthy, latest edge failure is `resource_access_upstream_timeout` | `ok(overall = "degraded")` | Source error/check record includes request id, code, phase, retriable flag, and does not mark deployment success as reachable. |
 | RES-HEALTH-QRY-019 | integration | Edge proxy route unavailable observed | Latest deployment exists, edge failure is `resource_access_route_unavailable` or `resource_access_proxy_unavailable` | `ok(overall = "degraded")` | Proxy/public access sections use `resource_access_*` code and keep category out of `domain`. |
@@ -93,6 +93,8 @@ Then:
 | RES-HEALTH-QRY-021 | integration | Health failure visibility sanitizer | Live health or public access probe failure includes auth headers, cookies, sensitive query values, private key material, provider raw payload hints, or raw remote command output in its message | `ok` with degraded/unhealthy/unknown health according to the source failure | Health source errors preserve stable code/phase/retriable fields and redact unsafe adjacent text. |
 | RES-HEALTH-QRY-023 | integration | Live public access proves bound durable domain reachable | Durable domain binding is `bound` with matched DNS, no ready durable route projection exists, no application health policy is configured, and explicit live public access probe succeeds | `ok(overall = "unknown")` with `publicAccess.status = "ready"` | The successful public access probe removes the stale domain-binding source error without treating missing health policy as healthy. |
 | RES-HEALTH-QRY-024 | integration | Route realization is older than the latest deployment | Latest deployment succeeded, proxy projection says ready, but `lastRouteRealizationDeploymentId` identifies an older deployment | `ok(overall = "degraded")` with `publicAccess.status = "failed"` | Health reports `resource_public_access_stale_deployment`; a generic HTTP 200 probe cannot erase the deployment-generation mismatch. |
+| RES-HEALTH-QRY-025 | integration | Current runtime instance is confirmed missing | Latest deployment succeeded and bounded Docker inspection reports that the recorded current container does not exist | `ok(overall = "stopped")` | Runtime lifecycle is `exited`, health is `unhealthy`, source/check reason is `resource_runtime_instance_not_found`, deployment success remains context only, and raw provider output is not exposed. |
+| RES-HEALTH-QRY-026 | integration | Failed replacement preserves an older runtime owner | Latest deployment attempt failed and its candidate was removed, while an older succeeded/rolled-back deployment still owns the active runtime | `ok` keeps the latest failed attempt as deployment context and probes the older runtime owner | Runtime inspection and health-policy resolution use `LatestRuntimeOwningDeploymentSpec`; the missing failed candidate cannot make the Resource `stopped`. |
 
 ## Shared Route/Access Health Matrix
 
@@ -131,6 +133,9 @@ These rows are governed by
 | RES-HEALTH-ENTRY-006 | e2e-preferred | Deployment detail | Attempt succeeded, resource unhealthy | Deployment page links back to current resource health instead of implying the attempt proves availability. |
 | RES-HEALTH-ENTRY-007 | e2e-preferred | CLI | `resource health --json` | Prints `ResourceHealthSummary` JSON from the query. |
 | RES-HEALTH-ENTRY-008 | e2e-preferred | API/oRPC | HTTP query | Reuses input schema and returns `ResourceHealthSummary`. |
+| RES-HEALTH-ENTRY-009 | e2e-preferred | Web resource detail | Initial load or explicit health refresh | Detail dispatches live `resources.health` with `includeRuntimeProbe = true`. |
+| RES-HEALTH-ENTRY-010 | contract | Web compact health | Resource list/sidebar renders compact health for one or more Resources | Compact health does not opt into one provider-native runtime inspection per Resource. |
+| RES-HEALTH-ENTRY-011 | contract | Web runtime-control polling | A stop/start/restart attempt is active | The two-second status poll uses the Resource detail read model; provider-native runtime inspection runs once on detail load/explicit refresh and once after terminal control readback, not on every poll tick. |
 | RES-HEALTH-HIST-001 | integration | Application/PG | Retained health observations exist for a resource window | `resources.health-history` returns only matching `ResourceHealthSummary` snapshots without invoking live probes or mutation. |
 | RES-HEALTH-HIST-002 | contract | Query schema | Inverted or over-broad window | Input validation rejects the request before read-model dispatch. |
 | RES-HEALTH-HIST-003 | e2e-preferred | CLI/API/oRPC | Bounded health history request | Entrypoints dispatch `ResourceHealthHistoryQuery` through the shared schema and return `resources.health-history/v1`. |
@@ -167,6 +172,15 @@ Current covered cases:
   `RES-HEALTH-QRY-021` and `ACCESS-DIAG-005`;
 - live public access probing for provider-local TLS durable domains that are still `bound` in the
   read model is covered by `RES-HEALTH-QRY-023` and `HEALTH-ACCESS-004`;
+- single-container live inspection keeps ambiguous provider failures `unknown` under
+  `RES-HEALTH-QRY-016`, and converts confirmed missing runtime instances to `stopped` under
+  `RES-HEALTH-QRY-025` without exposing raw Docker/SSH output;
+- `RES-HEALTH-QRY-026` keeps the newest deployment attempt as history while resolving current
+  runtime evidence through the latest succeeded/rolled-back runtime owner;
+- Web resource detail live refresh opts into runtime inspection under `RES-HEALTH-ENTRY-009`, while
+  `RES-HEALTH-ENTRY-010` keeps compact list/sidebar health outside the per-Resource provider-native
+  probe path and `RES-HEALTH-ENTRY-011` keeps runtime-control polling on the cheap Resource read
+  model;
 - `resources.configure-health` is covered by application integration tests, HTTP/oRPC entrypoint
   tests, CLI dispatch tests, and Web resource detail WebView coverage.
 - `resources.reset-health` is covered by application integration tests plus CLI and HTTP/oRPC
@@ -178,13 +192,12 @@ Current covered cases:
 Current runtime adapter tests cover some deployment-time health checks. Those tests should remain
 attempt-scoped and new tests should cover the resource-owned observation contract separately.
 
-Remaining test gaps include complete provider-native runtime inspection, Docker health state,
-command policy support/unsupported cases, scheduled health observation cadence policy, and Web e2e
-mocking of mixed resource health states. Edge access
+Remaining test gaps include complete Compose multi-service and additional-provider runtime
+inspection, command policy support/unsupported cases, scheduled health observation cadence policy,
+and Web e2e mocking of mixed resource health states. Edge access
 failure diagnostic source rows `RES-HEALTH-QRY-018` and `RES-HEALTH-QRY-019` are also future
 coverage.
 
 ## Open Questions
 
-- Should Web e2e tests mock a cached `ResourceHealthSummary` first, or wait for a real runtime
-  health query implementation?
+- Which mixed cached/live Resource health states should the next Web e2e fixture cover?

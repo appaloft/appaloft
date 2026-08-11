@@ -362,6 +362,13 @@ function resourceSummary(overrides?: Partial<ResourceSummary>): ResourceSummary 
     deploymentCount: 1,
     lastDeploymentId: "dep_new",
     lastDeploymentStatus: "succeeded",
+    latestRuntimeControl: {
+      runtimeControlAttemptId: "rtctl_demo",
+      operation: "restart",
+      status: "running",
+      startedAt: "2026-01-01T00:00:07.000Z",
+      runtimeState: "restarting",
+    },
     accessSummary: {
       latestGeneratedAccessRoute: {
         url: "http://web.203.0.113.10.sslip.io",
@@ -481,6 +488,11 @@ describe("ShowResourceQueryService", () => {
     const detail = unwrap(result);
     expect(detail.schemaVersion).toBe("resources.show/v1");
     expect(detail.resource.id).toBe("res_web");
+    expect(detail.resource.latestRuntimeControl).toMatchObject({
+      runtimeControlAttemptId: "rtctl_demo",
+      status: "running",
+      runtimeState: "restarting",
+    });
     expect(detail.source).toMatchObject({
       kind: "git-public",
       locator: "https://github.com/acme/web.git",

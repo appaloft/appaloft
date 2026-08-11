@@ -211,9 +211,23 @@ They are exposed through operation catalog, oRPC/HTTP, CLI, contracts, and Web r
 The Web sidebar, resource header, resource detail health panel, project list, and project resource
 list use `ResourceHealthSummary.overall` instead of latest deployment status.
 
-The current implementation runs bounded HTTP health policy probes and optional public access probes
-when callers request `resources.health({ mode: "live" })` and a safe target URL can be resolved.
-Provider-native runtime/container inspection and command health checks remain future adapter work.
+The current implementation runs bounded HTTP health policy probes, optional public access probes,
+and opt-in provider-native Docker runtime inspection when callers request
+`resources.health({ mode: "live", includeRuntimeProbe: true })`. Docker Swarm task inspection and
+single-container inspection on local or SSH targets normalize provider evidence into the resource
+health vocabulary. A confirmed missing current container is `stopped`; an unavailable or ambiguous
+inspection remains `unknown`. Command health checks remain future adapter work.
+
+Latest deployment attempt and current runtime owner are separate inputs. Deployment context keeps
+the newest attempt, while runtime lifecycle, health policy fallback, and provider-native inspection
+resolve the latest succeeded/rolled-back runtime owner. A failed replacement candidate therefore
+cannot erase or misreport the preserved prior runtime.
+
+The Web resource detail query opts into runtime inspection so initial load and explicit refresh
+reconcile displayed health with current runtime truth. Runtime-control progress polls only the
+Resource read model and performs one final live health refresh after terminal readback. Compact list
+and sidebar health queries do not opt into one provider-native runtime inspection per Resource; a
+future bounded summary projection or internal observer owns that scale-sensitive path.
 
 Edge request failure diagnostics are a future read source for public-access/proxy health. They map
 gateway-generated failures into `resource_access_*` codes and must enter health summaries as
@@ -225,5 +239,5 @@ policy through the dedicated `resources.configure-health` command.
 
 ## Open Questions
 
-- Should scheduled health observation be owned by a background job before Web shows health as the
-  primary sidebar status?
+- Which bounded observer should replace compact query-time fallback with persisted runtime truth
+  without introducing one provider-native probe per Resource?

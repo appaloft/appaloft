@@ -3106,6 +3106,7 @@ export const resourceDetailIdentitySchema = z.object({
       "rolled-back",
     ])
     .optional(),
+  latestRuntimeControl: resourceRuntimeControlSummarySchema.optional(),
 });
 
 export const resourceDetailSourceProfileSchema = z.object({
