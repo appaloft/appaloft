@@ -28,6 +28,7 @@ class CapturingRunner implements SandboxDockerCommandRunner {
   concurrentRemovalReadbacksBeforeAbsent = 0;
   concurrentRemovalReadbacks = 0;
   inventory = "";
+  processSnapshot = "";
   portableRecoveryDigest = "b".repeat(64);
   snapshotImageIdentity = "ssn_demo|sbx_demo";
 
@@ -76,6 +77,9 @@ class CapturingRunner implements SandboxDockerCommandRunner {
     if (command.includes("info --format")) return this.result(this.runtimes);
     if (command.includes("network inspect --format")) return this.result("true\n");
     if (command.includes("ps -a --filter")) return this.result(this.inventory);
+    if (command.includes("for f in /workspace/.appaloft-process-spr_*.pid")) {
+      return this.result(this.processSnapshot);
+    }
     if (command.includes("realpath"))
       return this.result(`${this.resolvedPath ?? argv.at(-1)}\n`);
     if (command.includes("tar -C /workspace -cf -")) return this.result("archive");
@@ -743,6 +747,53 @@ describe("DockerSandboxProvider", () => {
     expect(terminated).toContain('kill -KILL "-$pid"');
     expect(terminated).toContain('kill "$pid" 2>/dev/null || true');
     expect(terminated).toContain('rm -f -- "$1" "$2"');
+  });
+
+  test("[#1051][SBX-PROC-001][AGENT-WS-OPEN-008] snapshots stale, live and terminal background processes in one container command", async () => {
+    const runner = new CapturingRunner();
+    runner.processSnapshot = [
+      "pid:spr_stale.pid:41:exited",
+      "pid:spr_live.pid:42:running",
+      "exit:spr_done.exit:7:failed",
+    ].join("\n");
+    const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
+    await provider.provision(request);
+
+    expect(
+      await provider.listProcesses({
+        sandboxId: "sbx_demo",
+        providerHandle: "appaloft-sbx_demo",
+      }),
+    ).toEqual([
+      { processId: "spr_stale", status: "exited" },
+      { processId: "spr_live", status: "running" },
+      { processId: "spr_done", status: "failed", exitCode: 7 },
+    ]);
+
+    const livenessSnapshots = runner.calls.filter((call) =>
+      call.argv.join(" ").includes("kill -0"),
+    );
+    expect(livenessSnapshots).toHaveLength(1);
+    expect(livenessSnapshots[0]?.argv.join(" ")).toContain(
+      'exit_file="/workspace/.appaloft-process-${process_id}.exit"',
+    );
+    expect(livenessSnapshots[0]?.argv.join(" ")).toContain(
+      'printf \'pid:%s:%s:running\\n\'',
+    );
+    expect(livenessSnapshots[0]?.argv.join(" ")).toContain(
+      'printf \'exit:%s:%s:%s\\n\'',
+    );
+    const exitCleanup = runner.calls.find((call) =>
+      call.argv.includes("/workspace/.appaloft-process-spr_done.exit"),
+    );
+    expect(exitCleanup?.argv).toEqual([
+      "docker",
+      "exec",
+      "appaloft-sbx_demo",
+      "rm",
+      "-f",
+      "/workspace/.appaloft-process-spr_done.exit",
+    ]);
   });
 
   test("[SBX-FILE-003] revalidates handles and paths before Docker mutation", async () => {
