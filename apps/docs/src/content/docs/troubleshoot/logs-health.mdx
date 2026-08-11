@@ -4,7 +4,7 @@ description: "读取运行时日志并解读健康摘要。"
 docType: "task"
 localeState:
   zh-CN: complete
-  en-US: needs-update
+  en-US: complete
 searchAliases:
   - "logs"
   - "health"
@@ -40,6 +40,7 @@ sidebar:
 | `--tail` | 只看最近 N 行日志 | 全部（建议显式指定，避免输出过长） |
 | `--checks` | 健康检查时附带详细检查项 | 关闭 |
 | `--public-access-probe` | 健康检查时附带一次公网访问探测 | 关闭 |
+| `--runtime-probe` | 在 live 模式下检查当前 Docker 运行时实例 | 关闭 |
 
 ## CLI 操作步骤
 
@@ -51,15 +52,15 @@ sidebar:
 # 读取最近 100 行运行时日志
 appaloft resource logs res_web --tail 100
 
-# 读取健康摘要，附带详细检查项和公网访问探测
-appaloft resource health res_web --checks --public-access-probe
+# 读取 live 健康摘要，并核对当前运行时与公网访问
+appaloft resource health res_web --live --checks --runtime-probe --public-access-probe
 ```
 
 ## HTTP/API 操作步骤
 
 ```http
 GET /api/resources/res_web/runtime-logs?tailLines=100
-GET /api/resources/res_web/health?checks=true&publicAccessProbe=true
+GET /api/resources/res_web/health?mode=live&includeChecks=true&includeRuntimeProbe=true&includePublicAccessProbe=true
 ```
 
 ## 预期输出与状态
@@ -67,6 +68,12 @@ GET /api/resources/res_web/health?checks=true&publicAccessProbe=true
 **运行时日志**来自应用进程的 stdout/stderr，适合回答：应用是否启动、启动命令是否执行、监听端口是否正确、配置/环境变量是否缺失、应用代码是否抛出运行时异常。日志**不适合**判断域名所有权或证书就绪——那些应该看[访问](/docs/access/overview/)相关状态。
 
 **健康摘要**把以下信息合并在一次调用中返回：最近部署状态和失败阶段、运行时进程状态、健康检查策略和最近检查结果、网络 Profile 和代理目标、生成访问地址状态、自定义域名和 TLS 就绪摘要。
+
+资源详情页会在 live 刷新时检查当前运行时。即使最近一次部署是 `succeeded`，如果 Docker
+明确确认记录的当前容器已不存在，当前资源状态也会显示为 `stopped`。如果只是 SSH、Docker
+daemon 或探测超时导致无法观察，状态保持 `unknown` 并附带
+`resource_runtime_inspection_failed`；Appaloft 不会把“看不到”误报成“已停止”。项目列表和侧栏
+使用紧凑健康状态，不会为每个资源各启动一次远程运行时探测。
 
 ## 验证
 
@@ -77,6 +84,8 @@ GET /api/resources/res_web/health?checks=true&publicAccessProbe=true
 | 日志显示端口冲突 | 修正[网络 Profile](/docs/deliver/profiles/)或启动命令 |
 | 日志显示缺少环境变量 | 修正[配置优先级](/docs/configuration/precedence/)中设置的变量后重新部署 |
 | 健康检查超时 | 调整健康检查路径、超时时间、重试次数或启动等待期 |
+| 最近部署成功，但当前状态为 stopped | 当前运行时实例已经不存在；检查日志与部署时间线，然后按恢复就绪状态选择 Redeploy、Retry 或 Rollback |
+| 当前状态为 unknown，且错误是 `resource_runtime_inspection_failed` | 先恢复 SSH/Docker 可观测性并刷新；不要仅凭这次探测失败判断容器已停止 |
 | 应用健康但生成访问地址失败 | 查看[代理就绪](/docs/servers/proxy-and-terminal/)和[访问](/docs/access/overview/)状态 |
 
 ## 回滚 / 恢复 <a id="resource-runtime-controls" /><a id="runtime-restart-vs-redeploy" /><a id="runtime-control-blocked-start" />

@@ -1533,6 +1533,83 @@ describe("ResourceHealthQueryService", () => {
     });
   });
 
+  test("[RES-HEALTH-QRY-025] resolves a confirmed missing runtime instance as stopped", async () => {
+    const baseDeployment = deploymentSummary();
+    const probeRunner = new StaticResourceHealthProbeRunner(undefined, {
+      lifecycle: "exited",
+      health: "unhealthy",
+      observedAt: "2026-01-01T00:00:10.100Z",
+      reasonCode: "resource_runtime_instance_not_found",
+      message: "The current Docker runtime instance is not present.",
+      check: {
+        name: "runtime-service",
+        target: "container",
+        status: "failed",
+        observedAt: "2026-01-01T00:00:10.100Z",
+        durationMs: 18,
+        exitCode: 1,
+        reasonCode: "resource_runtime_instance_not_found",
+        phase: "runtime-live-probe",
+        retriable: false,
+        metadata: {
+          providerKey: "generic-ssh",
+          runtimeKind: "docker-container",
+          containerName: "appaloft-dep_web",
+        },
+      },
+    });
+    const service = createService({
+      resourceAggregates: [resourceAggregateWithHealthPolicy()],
+      deployments: [
+        deploymentSummary({
+          runtimePlan: {
+            ...baseDeployment.runtimePlan,
+            execution: {
+              ...baseDeployment.runtimePlan.execution,
+              kind: "docker-container",
+              healthCheckPath: "/health",
+              metadata: {
+                containerName: "appaloft-dep_web",
+              },
+            },
+            target: {
+              kind: "single-server",
+              providerKey: "generic-ssh",
+              serverIds: ["srv_demo"],
+            },
+          },
+        }),
+      ],
+      probeRunner,
+    });
+
+    const result = await service.execute(
+      createTestContext(),
+      createQuery({
+        mode: "live",
+        includeRuntimeProbe: true,
+        includeChecks: true,
+      }),
+    );
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary.overall).toBe("stopped");
+    expect(summary.latestDeployment?.status).toBe("succeeded");
+    expect(summary.runtime).toMatchObject({
+      lifecycle: "exited",
+      health: "unhealthy",
+      reasonCode: "resource_runtime_instance_not_found",
+    });
+    expect(summary.sourceErrors).toContainEqual(
+      expect.objectContaining({
+        source: "runtime",
+        code: "resource_runtime_instance_not_found",
+        retriable: false,
+      }),
+    );
+  });
+
   test("[RES-HEALTH-QRY-009] marks live HTTP policy pass as healthy", async () => {
     const probeRunner = new StaticResourceHealthProbeRunner({
       name: "health-policy",

@@ -6197,6 +6197,27 @@ describe.serial("console e2e with Bun.WebView", () => {
     });
   }, 30_000);
 
+  test("[RES-HEALTH-ENTRY-009] requests live runtime inspection on resource detail", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}${demoResourcePath}`);
+
+    await expectAnyText(view, ["Resource overview", "资源概览"]);
+
+    const healthRequest = await waitForRecordedRequest("/api/rpc/resources/health");
+    const healthInput = readOrpcJsonPayload(healthRequest.body);
+
+    expect(healthInput).toMatchObject({
+      resourceId: "res_demo",
+      mode: "live",
+      includeChecks: true,
+      includePublicAccessProbe: true,
+      includeRuntimeProbe: true,
+    });
+  }, 30_000);
+
   test("[RES-HEALTH-ENTRY-001] explains degraded health reasons on resource overview", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();

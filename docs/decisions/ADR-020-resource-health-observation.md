@@ -211,9 +211,17 @@ They are exposed through operation catalog, oRPC/HTTP, CLI, contracts, and Web r
 The Web sidebar, resource header, resource detail health panel, project list, and project resource
 list use `ResourceHealthSummary.overall` instead of latest deployment status.
 
-The current implementation runs bounded HTTP health policy probes and optional public access probes
-when callers request `resources.health({ mode: "live" })` and a safe target URL can be resolved.
-Provider-native runtime/container inspection and command health checks remain future adapter work.
+The current implementation runs bounded HTTP health policy probes, optional public access probes,
+and opt-in provider-native Docker runtime inspection when callers request
+`resources.health({ mode: "live", includeRuntimeProbe: true })`. Docker Swarm task inspection and
+single-container inspection on local or SSH targets normalize provider evidence into the resource
+health vocabulary. A confirmed missing current container is `stopped`; an unavailable or ambiguous
+inspection remains `unknown`. Command health checks remain future adapter work.
+
+The Web resource detail query opts into runtime inspection so explicit refresh reconciles displayed
+health with current runtime truth. Compact list and sidebar health queries do not opt into one
+provider-native runtime inspection per Resource; a future bounded summary projection or internal
+observer owns that scale-sensitive path.
 
 Edge request failure diagnostics are a future read source for public-access/proxy health. They map
 gateway-generated failures into `resource_access_*` codes and must enter health summaries as

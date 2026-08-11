@@ -24,6 +24,7 @@ Read an app's runtime logs, and use the health summary to understand the combine
 | `--tail` | Only show the last N log lines | All (explicitly specifying is recommended to avoid excessively long output) |
 | `--checks` | Include detailed check items with the health check | Off |
 | `--public-access-probe` | Include a public access probe with the health check | Off |
+| `--runtime-probe` | Inspect the current Docker runtime instance in live mode | Off |
 
 ## CLI steps
 
@@ -35,15 +36,15 @@ Read an app's runtime logs, and use the health summary to understand the combine
 # Read the last 100 lines of runtime logs
 appaloft resource logs res_web --tail 100
 
-# Read the health summary, with detailed check items and a public access probe
-appaloft resource health res_web --checks --public-access-probe
+# Read live health and reconcile the current runtime and public access
+appaloft resource health res_web --live --checks --runtime-probe --public-access-probe
 ```
 
 ## HTTP/API steps
 
 ```http
 GET /api/resources/res_web/runtime-logs?tailLines=100
-GET /api/resources/res_web/health?checks=true&publicAccessProbe=true
+GET /api/resources/res_web/health?mode=live&includeChecks=true&includeRuntimeProbe=true&includePublicAccessProbe=true
 ```
 
 ## Expected output and status
@@ -51,6 +52,14 @@ GET /api/resources/res_web/health?checks=true&publicAccessProbe=true
 **Runtime logs** come from the app process's stdout/stderr, and are good for answering: did the app start, did the start command execute, is the listening port correct, are config/environment variables missing, did the app code throw a runtime exception. Logs are **not** good for judging domain ownership or certificate readiness — check the related [Access](/docs/en/access/overview/) status for those instead.
 
 **The health summary** merges the following into a single call: the most recent deployment status and failed phase, the runtime process state, the health check policy and most recent check result, the network profile and proxy target, generated access URL status, and a custom domain/TLS readiness summary.
+
+The Resource detail page inspects the current runtime during a live refresh. Even when the latest
+Deployment is `succeeded`, the current Resource status becomes `stopped` if Docker confirms that
+the recorded current container no longer exists. If SSH, the Docker daemon, or the probe timeout
+only makes observation unavailable, status stays `unknown` with
+`resource_runtime_inspection_failed`; Appaloft does not turn “cannot observe” into “stopped.”
+Project lists and the sidebar use compact health and do not start one remote runtime inspection per
+Resource.
 
 ## Verification
 
@@ -61,6 +70,8 @@ Match against this table to identify the root cause:
 | Logs show a port conflict | Fix the [Network Profile](/docs/en/deliver/profiles/) or the start command |
 | Logs show a missing environment variable | Fix the variable set under [Configuration Precedence](/docs/en/configuration/precedence/), then redeploy |
 | Health check times out | Adjust the health check path, timeout, retry count, or startup grace period |
+| Latest Deployment succeeded, but current status is stopped | The current runtime instance is gone; inspect logs and the Deployment timeline, then use recovery readiness to choose Redeploy, Retry, or Rollback |
+| Current status is unknown with `resource_runtime_inspection_failed` | Restore SSH/Docker observability and refresh; do not infer that the container stopped from this probe failure alone |
 | App healthy but the generated access URL fails | Check [Proxy Readiness](/docs/en/servers/proxy-and-terminal/) and [Access](/docs/en/access/overview/) status |
 
 ## Rollback / recovery <a id="resource-runtime-controls" /><a id="runtime-restart-vs-redeploy" /><a id="runtime-control-blocked-start" />

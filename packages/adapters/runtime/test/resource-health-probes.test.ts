@@ -299,6 +299,58 @@ describe("RuntimeResourceHealthProbeRunner", () => {
     expect(JSON.stringify(summary)).not.toContain("OOMKilled");
   });
 
+  test("[RES-HEALTH-QRY-025] reports a confirmed missing Docker container as an exited runtime", async () => {
+    const runner = new RuntimeResourceHealthProbeRunner(async () =>
+      ok({
+        exitCode: 1,
+        stderr: "Error: No such object: appaloft-dep_web",
+      }),
+    );
+
+    const result = await runner.probeRuntime(context, containerProbeRequest());
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary).toMatchObject({
+      lifecycle: "exited",
+      health: "unhealthy",
+      reasonCode: "resource_runtime_instance_not_found",
+      check: {
+        status: "failed",
+        target: "container",
+        reasonCode: "resource_runtime_instance_not_found",
+        retriable: false,
+      },
+    });
+    expect(JSON.stringify(summary)).not.toContain("No such object");
+  });
+
+  test("[RES-HEALTH-QRY-016] keeps ambiguous Docker inspection failures unknown and sanitized", async () => {
+    const runner = new RuntimeResourceHealthProbeRunner(async () =>
+      ok({
+        exitCode: 1,
+        stderr: "Cannot connect to Docker daemon at ssh://deployer:secret@example.test",
+      }),
+    );
+
+    const result = await runner.probeRuntime(context, containerProbeRequest());
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary).toMatchObject({
+      lifecycle: "unknown",
+      health: "unknown",
+      reasonCode: "resource_runtime_inspection_failed",
+      check: {
+        status: "failed",
+        reasonCode: "resource_runtime_inspection_failed",
+        retriable: true,
+      },
+    });
+    expect(JSON.stringify(summary)).not.toContain("deployer");
+    expect(JSON.stringify(summary)).not.toContain("secret");
+  });
+
   test("[RES-HEALTH-QRY-010] does not fall back to local Docker when SSH target resolution is unavailable", async () => {
     let commandCalled = false;
     const runner = new RuntimeResourceHealthProbeRunner(async () => {

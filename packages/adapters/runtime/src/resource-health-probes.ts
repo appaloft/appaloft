@@ -396,13 +396,15 @@ function failedRuntimeProbe(input: {
   observedAt: string;
   durationMs: number;
   exitCode?: number;
+  lifecycle?: ResourceRuntimeHealthProbeResult["lifecycle"];
+  health?: ResourceRuntimeHealthProbeResult["health"];
   reasonCode: string;
   message: string;
   retriable?: boolean;
 }): ResourceRuntimeHealthProbeResult {
   return {
-    lifecycle: "unknown",
-    health: "unknown",
+    lifecycle: input.lifecycle ?? "unknown",
+    health: input.health ?? "unknown",
     observedAt: input.observedAt,
     reasonCode: input.reasonCode,
     message: input.message,
@@ -425,6 +427,10 @@ function failedRuntimeProbe(input: {
       },
     },
   };
+}
+
+function isDockerContainerMissing(stderr: string | undefined): boolean {
+  return /\bNo such (?:object|container):(?:\s|$)/i.test(stderr ?? "");
 }
 
 function dockerSwarmRuntimeProbeResult(input: {
@@ -830,6 +836,9 @@ export class RuntimeResourceHealthProbeRunner implements ResourceHealthProbeRunn
     }
 
     if (commandResult.value.exitCode !== 0) {
+      const containerMissing = isDockerContainerMissing(commandResult.value.stderr);
+      const inspectionTimedOut =
+        commandResult.value.exitCode === dockerSwarmHealthProbeTimeoutExitCode;
       return ok(
         failedRuntimeProbe({
           request,
@@ -837,13 +846,17 @@ export class RuntimeResourceHealthProbeRunner implements ResourceHealthProbeRunn
           observedAt,
           durationMs,
           exitCode: commandResult.value.exitCode,
+          ...(containerMissing ? { lifecycle: "exited", health: "unhealthy" } : {}),
           reasonCode:
-            commandResult.value.exitCode === dockerSwarmHealthProbeTimeoutExitCode
-              ? "docker_container_probe_timeout"
-              : "docker_container_probe_failed",
-          message:
-            commandResult.value.stderr?.trim() ||
-            "Docker container health probe could not inspect the container.",
+            containerMissing
+              ? "resource_runtime_instance_not_found"
+              : "resource_runtime_inspection_failed",
+          message: containerMissing
+            ? "The current Docker runtime instance is not present."
+            : inspectionTimedOut
+              ? "Runtime inspection timed out."
+              : "Runtime inspection could not inspect the current Docker instance.",
+          ...(containerMissing ? { retriable: false } : {}),
         }),
       );
     }

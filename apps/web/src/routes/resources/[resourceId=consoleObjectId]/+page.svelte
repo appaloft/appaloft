@@ -558,6 +558,7 @@
         mode: "live",
         includeChecks: true,
         includePublicAccessProbe: true,
+        includeRuntimeProbe: true,
       },
       enabled: browser && resourceId.length > 0,
       refetchInterval: runtimeControlHealthPolling ? 2_000 : false,

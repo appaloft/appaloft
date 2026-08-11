@@ -204,6 +204,10 @@ Implemented scope:
   persistence, disabled policy, not found, and event publication.
 - `resources.health-history` query, CLI, HTTP/oRPC, contracts, operation catalog, PG/PGlite
   `resource_health_observations` table, and recorder/read-model executable tests.
+- opt-in Docker Swarm and local/generic-SSH single-container runtime inspection, including safe
+  distinction between confirmed instance absence and inspection unavailability;
+- Web resource detail live runtime inspection, while compact list/sidebar queries avoid per-row
+  provider-native runtime probes.
 
 Current implementation reads latest deployment context, resource-owned health policy, runtime
 lifecycle inferred from deployment state, configured deployment snapshot health path as fallback,
@@ -213,7 +217,7 @@ proves health.
 
 Still deferred:
 
-- provider-native runtime/container inspection and Docker health state;
+- complete Compose multi-service runtime/health aggregation and additional runtime providers;
 - command health checks;
 - background/scheduled health observation cadence policy.
 - edge request failure diagnostic source composition using `resource_access_*` codes.

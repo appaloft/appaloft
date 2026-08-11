@@ -8,8 +8,8 @@
 - Handler: `ResourceHealthQueryHandler`
 - Query service: `ResourceHealthQueryService`
 - Domain / bounded context: Workload Delivery / Resource observation
-- Current status: active query, implemented aggregation with bounded HTTP/public live probes
-- Source classification: implemented contract with provider-native runtime inspection gaps
+- Current status: active query, implemented aggregation with bounded HTTP/public/runtime live probes
+- Source classification: implemented contract with partial provider-native runtime inspection
 
 ## Normative Contract
 
@@ -62,7 +62,7 @@ type ResourceHealthQueryInput = {
 | Field | Required | Meaning |
 | --- | --- | --- |
 | `resourceId` | Yes | Resource whose current health is requested. |
-| `mode` | No | Defaults to `cached`. `cached` reads the latest observed summary. `live` performs bounded read-only HTTP/public probes when a safe target can be resolved. |
+| `mode` | No | Defaults to `cached`. `cached` reads the latest observed summary. `live` performs explicitly requested bounded read-only runtime, HTTP, and public probes when safe targets can be resolved. |
 | `includeChecks` | No | Includes individual check records when true. Defaults to true for resource detail and false for compact navigation. |
 | `includePublicAccessProbe` | No | Allows a bounded public route probe when `mode = live`. |
 | `includeRuntimeProbe` | No | Allows provider-native runtime/container/process inspection when `mode = live`; unsupported adapters report a source error rather than mutating state. |
@@ -310,7 +310,7 @@ All errors use [Resource Health Error Spec](../errors/resources.health.md).
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Resource detail shows current resource health, can request `mode = "live"` for detail refresh, and sidebar/list compact status uses this query/projection when available. | Implemented |
+| Web | Resource detail shows current resource health and requests `mode = "live"` with runtime inspection for detail refresh; sidebar/list compact status uses this query/projection without per-row provider-native runtime inspection. | Implemented |
 | Desktop | Same Web surface. | Implemented through Web shell |
 | CLI | `appaloft resource health <resourceId> [--live] [--json]` prints summary and checks. | Implemented |
 | oRPC / HTTP | `GET /api/resources/{resourceId}/health` using the query schema. | Implemented |
@@ -329,15 +329,16 @@ deployment context, runtime lifecycle from latest deployment state, resource acc
 route status, and bounded live HTTP/public probes when `mode = "live"` can resolve a safe URL. It
 does not mark a successful deployment as healthy without a configured/current health observation.
 
-Provider-native runtime inspection has initial Docker Swarm service-task coverage: when
-`mode = "live"` and `includeRuntimeProbe = true`, a Swarm-backed Docker container deployment with
-sanitized `swarm.serviceName` metadata can return normalized runtime health/check fields from
-`docker service ps` task state. Docker health-state inspection for single-container/Compose
-runtimes, command health checks, remote-manager Swarm probing, and scheduled health summary
-persistence cadence policy are still future work. Retained health observation storage/readback is
-available through `resources.health-history` and the explicit
-`ResourceHealthObservationRecorder`; unsupported live inspection sources are reported as source
-errors inside `ok(ResourceHealthSummary)`.
+Provider-native runtime inspection covers Docker Swarm service tasks plus Docker single-container
+state on local or generic-SSH targets when `mode = "live"` and `includeRuntimeProbe = true`.
+Sanitized runtime metadata selects the service/container without exposing raw provider output. A
+confirmed missing current container returns lifecycle `exited` and overall `stopped`; inspection
+timeouts, transport failures, and ambiguous engine failures remain `unknown` with
+`resource_runtime_inspection_failed`. Complete Compose multi-service aggregation, command health
+checks, and scheduled health summary persistence cadence policy are still future work. Retained
+health observation storage/readback is available through `resources.health-history` and the
+explicit `ResourceHealthObservationRecorder`; unsupported live inspection sources are reported as
+source errors inside `ok(ResourceHealthSummary)`.
 
 Runtime deployment verification still checks local loopback or Docker container reachability during
 `deployments.create` execution and records deployment success/failure. That remains
