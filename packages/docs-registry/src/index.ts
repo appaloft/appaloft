@@ -154,7 +154,7 @@ export const publicDocsHelpTopics = {
     id: "agent.workspace-control",
     title: "Workspace control TUI",
     description:
-      "How to inspect running Workspaces, operate an embedded Agent terminal, release focus, reconnect, and use the headless fallback.",
+      "How to inspect and operate Workspaces, keep one embedded Agent terminal, manage bounded delivery and recovery evidence, and use headless equivalents.",
     page: {
       "zh-CN": "agents/workspaces",
       "en-US": "en/agents/workspaces",
@@ -170,12 +170,18 @@ export const publicDocsHelpTopics = {
       "Workspace control TUI",
       "embedded Agent terminal",
       "Focus Mode",
+      "Workspace recovery Snapshot",
+      "Workspace-owned cleanup",
       "Workspace 管理界面",
     ],
     specReferences: [
       "docs/decisions/ADR-107-task-oriented-workspace-activation-presentation.md",
       "docs/specs/126-workspace-control-tui/spec.md",
+      "docs/specs/128-workspace-control-delivery-actions/spec.md",
+      "docs/specs/130-workspace-control-recovery-evidence/spec.md",
       "docs/testing/workspace-control-tui-test-matrix.md",
+      "docs/testing/workspace-control-delivery-actions-test-matrix.md",
+      "docs/testing/workspace-control-recovery-evidence-test-matrix.md",
     ],
   },
   "agent.github-tasks": {

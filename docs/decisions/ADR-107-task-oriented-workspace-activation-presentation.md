@@ -84,6 +84,10 @@ control TUI also needs a durable ownership boundary before a terminal framework 
   accepted Spec 128 and dispatch only their existing public operations. The Bun parent validates
   targets against the latest selected detail and reads authoritative Deployment Proof; the Ratatui
   renderer owns only bounded forms and confirmation state.
+- Recovery and cleanup evidence is implemented under accepted Spec 130. The Bun parent maps
+  existing Sandbox/Snapshot/Runtime/Port truth and dispatches existing Snapshot commands; the
+  Ratatui renderer owns only the bounded Recovery palette, fixed retention form and confirmation
+  state. `Workspace-owned cleanup` never claims provider-wide zero residue.
 - `--keep-awake` and exit-triggered removal require a separate Spec/Test Matrix update.
 
 ## Verification
@@ -93,3 +97,5 @@ See the
 [Workspace Control TUI Test Matrix](../testing/workspace-control-tui-test-matrix.md). Delivery
 controls are verified by the
 [Workspace Control Delivery Actions Test Matrix](../testing/workspace-control-delivery-actions-test-matrix.md).
+Recovery controls and their bounded cleanup evidence are verified by the
+[Workspace Control Recovery And Cleanup Evidence Test Matrix](../testing/workspace-control-recovery-evidence-test-matrix.md).

@@ -103,6 +103,9 @@ calls, or hidden reasoning.
   with an explicit 1-hour, 8-hour, or 24-hour TTL; revoke an existing Preview; approve or deliver
   an eligible Task; or accept/retry an eligible Promotion. Revoke, approval, Git/PR delivery, and
   Promotion actions require a separate `y` confirmation;
+- `s`: open recovery actions. Create a Snapshot with `filesystem` or `filesystem-memory`
+  capability and a fixed 1-day, 7-day, or 30-day retention, or delete an exact status-valid
+  Snapshot from the current detail. Create and delete both require a separate `y` confirmation;
 - `Ctrl+]`: return input ownership to Workspace navigation without stopping or detaching the Agent;
 - `f`: toggle Focus Mode over the same Terminal Session/local PTY without starting another Agent;
 - `r`: refresh existing public read models; `R`: reconnect with the same Session identity;
@@ -112,7 +115,11 @@ calls, or hidden reasoning.
 Leaving or disconnecting the TUI detaches only the client. TUI lifecycle actions dispatch the same
 public commands as the explicit headless subcommands, detach an active Agent viewport before pause
 or terminate, and read the resulting Workspace state back instead of keeping an optimistic local
-copy. Delivery actions keep the current Agent Session attached. Promotion rows with deployment
+copy. Delivery and Snapshot actions keep the current Agent Session attached. Recovery detail also
+shows requested/realized isolation, provision attempts, suspension continuity, and Snapshots for
+the current Workspace. For a terminated or expired Workspace, `Workspace-owned cleanup` derives
+`clear` or `residual` only from bounded Runtime and Preview queries; it is not host/provider
+zero-residual proof. Promotion rows with deployment
 identity query authoritative Deployment Proof and show its verdict plus mismatch and unavailable
 evidence counts; a Promotion status is never presented as proof. Failed delivery submissions keep
 their bounded form values for correction or retry without exposing credentials to the renderer.
@@ -125,7 +132,8 @@ appaloft workspace list
 ```
 
 The equivalent headless surfaces remain `workspace preview`, `sandbox port revoke`, `workspace
-task approve/deliver`, `sandbox promote accept/retry`, and `deployment proof`.
+task approve/deliver`, `sandbox promote accept/retry`, `deployment proof`, and `sandbox show` plus
+`sandbox snapshot list/create/show/delete`.
 
 These paths never initialize the renderer and return a stable headless status or continue through
 the existing subcommand. Windows currently guarantees safe help/headless behavior only; embedded

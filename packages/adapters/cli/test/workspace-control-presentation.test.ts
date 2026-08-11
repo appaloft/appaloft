@@ -5,6 +5,8 @@ import {
   AcceptSandboxPromotionCommand,
   ApproveAgentTaskRunCommand,
   type Command,
+  CreateSandboxSnapshotCommand,
+  DeleteSandboxSnapshotCommand,
   DeliverAgentTaskRunCommand,
   DeploymentProofQuery,
   ExposeSandboxPortCommand,
@@ -14,6 +16,7 @@ import {
   ListSandboxesQuery,
   ListSandboxPortsQuery,
   ListSandboxPromotionsQuery,
+  ListSandboxSnapshotsQuery,
   PauseSandboxCommand,
   type Query,
   ResumeSandboxCommand,
@@ -57,6 +60,256 @@ class FakeRendererSession implements WorkspaceControlRendererSession {
 }
 
 describe("Workspace control presentation", () => {
+  test("[WS-TUI-RECOVERY-001][WS-TUI-RECOVERY-002][WS-TUI-RECOVERY-007][WS-TUI-RECOVERY-008] presents exact bounded recovery and cleanup evidence", async () => {
+    const queries: Query<unknown>[] = [];
+    const renderer = new FakeRendererSession([
+      { type: "select", workspaceId: "sbx_1" },
+      { type: "quit" },
+    ]);
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+
+    await presentation.start({
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>(query: Query<T>) => {
+        queries.push(query as Query<unknown>);
+        if (query instanceof ListSandboxesQuery) {
+          return ok({ items: [{ sandboxId: "sbx_1", status: "paused" }] } as T);
+        }
+        if (query instanceof ShowSandboxQuery) {
+          return ok({
+            sandboxId: "sbx_1",
+            status: "paused",
+            requestedIsolation: "gvisor",
+            realizedIsolation: "gvisor",
+            provisionAttempts: 2,
+            suspension: {
+              mode: "compute-released",
+              portability: "provider-family",
+              recoveryFamily: "docker-linux-amd64",
+            },
+          } as T);
+        }
+        if (query instanceof ListSandboxAgentRuntimesQuery) {
+          return ok({ items: [{ runtimeId: "sar_1", status: "terminated" }] } as T);
+        }
+        if (query instanceof ListSandboxPortsQuery) return ok({ items: [] } as T);
+        if (query instanceof ListSandboxSnapshotsQuery) {
+          return ok({
+            items: [
+              {
+                snapshotId: "ssn_other",
+                sourceSandboxId: "sbx_other",
+                capability: "filesystem",
+                reason: "manual",
+                portability: "provider-local",
+                status: "ready",
+                createdAt: "2026-08-10T00:00:00.000Z",
+              },
+              {
+                snapshotId: "ssn_1",
+                sourceSandboxId: "sbx_1",
+                capability: "filesystem-memory",
+                reason: "pre-termination",
+                portability: "provider-family",
+                recoveryFamily: "docker-linux-amd64",
+                status: "ready",
+                createdAt: "2026-08-11T00:00:00.000Z",
+                expiresAt: "2026-08-18T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        if (
+          query instanceof ListSandboxPromotionsQuery ||
+          query instanceof ListAgentTaskRunsQuery
+        ) {
+          return ok({ items: [] } as T);
+        }
+        throw new Error(`unexpected query ${query.constructor.name}`);
+      },
+    });
+
+    expect(queries.filter((query) => query instanceof ListSandboxSnapshotsQuery)).toHaveLength(1);
+    const detail = renderer.messages.findLast((message) => message.type === "detail");
+    expect(detail).toMatchObject({
+      type: "detail",
+      recovery: {
+        requestedIsolation: "gvisor",
+        realizedIsolation: "gvisor",
+        provisionAttempts: 2,
+        suspension: {
+          mode: "compute-released",
+          portability: "provider-family",
+          recoveryFamily: "docker-linux-amd64",
+        },
+        snapshots: [
+          {
+            snapshotId: "ssn_1",
+            capability: "filesystem-memory",
+            reason: "pre-termination",
+            portability: "provider-family",
+            recoveryFamily: "docker-linux-amd64",
+            status: "ready",
+            expiresAt: "2026-08-18T00:00:00.000Z",
+          },
+        ],
+        cleanup: {
+          state: "not-applicable",
+          activeRuntimeCount: 0,
+          activePreviewCount: 0,
+          scope: "workspace-owned-readback",
+        },
+      },
+    });
+    expect(JSON.stringify(detail)).not.toContain("ssn_other");
+  });
+
+  test("[WS-TUI-RECOVERY-004][WS-TUI-RECOVERY-005][WS-TUI-RECOVERY-006][WS-TUI-RECOVERY-009] dispatches exact Snapshot actions without detaching the Agent", async () => {
+    const commands: Command<unknown>[] = [];
+    const terminal = {
+      detached: 0,
+      async *[Symbol.asyncIterator](): AsyncIterator<TerminalSessionFrame> {},
+      write: () => Promise.resolve(),
+      resize: () => Promise.resolve(),
+      detach() {
+        this.detached += 1;
+        return Promise.resolve();
+      },
+      close: () => Promise.resolve(),
+    } satisfies TerminalSession & { detached: number };
+    const renderer = new FakeRendererSession([
+      { type: "select", workspaceId: "sbx_1" },
+      { type: "attach", workspaceId: "sbx_1", runtimeId: "sar_1" },
+      {
+        type: "snapshot-create",
+        workspaceId: "sbx_1",
+        capability: "filesystem-memory",
+        ttlDays: 7,
+      },
+      { type: "snapshot-delete", workspaceId: "sbx_1", snapshotId: "ssn_1" },
+      { type: "quit" },
+    ]);
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+      now: () => "2026-08-11T00:00:00.000Z",
+    });
+
+    await presentation.start({
+      executeCommand: async <T>(command: Command<T>) => {
+        commands.push(command as Command<unknown>);
+        return ok(
+          (command instanceof IssueSandboxAgentAttachAccessCommand
+            ? { transport: "managed-terminal", sessionId: "term_same" }
+            : {}) as T,
+        );
+      },
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery) {
+          return ok({ items: [{ sandboxId: "sbx_1", status: "ready" }] } as T);
+        }
+        if (query instanceof ShowSandboxQuery) {
+          return ok({ sandboxId: "sbx_1", status: "ready" } as T);
+        }
+        if (query instanceof ListSandboxAgentRuntimesQuery) {
+          return ok({
+            items: [
+              {
+                runtimeId: "sar_1",
+                status: "running",
+                interaction: { transport: "managed-terminal" },
+              },
+            ],
+          } as T);
+        }
+        if (query instanceof ListSandboxSnapshotsQuery) {
+          return ok({
+            items: [
+              {
+                snapshotId: "ssn_1",
+                sourceSandboxId: "sbx_1",
+                capability: "filesystem",
+                reason: "manual",
+                portability: "provider-local",
+                status: "ready",
+                createdAt: "2026-08-10T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+      terminalSessionGateway: { attach: () => ok(terminal) },
+    });
+
+    expect(commands.map((command) => command.constructor)).toEqual([
+      IssueSandboxAgentAttachAccessCommand,
+      CreateSandboxSnapshotCommand,
+      DeleteSandboxSnapshotCommand,
+    ]);
+    expect(commands[1]).toMatchObject({
+      input: {
+        sandboxId: "sbx_1",
+        capability: "filesystem-memory",
+        expiresAt: "2026-08-18T00:00:00.000Z",
+      },
+    });
+    expect(commands[2]).toMatchObject({ input: { snapshotId: "ssn_1" } });
+    expect(
+      renderer.messages.filter((message) => message.type === "recovery-complete"),
+    ).toHaveLength(2);
+    expect(renderer.messages.filter((message) => message.type === "terminal-ready")).toHaveLength(
+      1,
+    );
+    expect(renderer.messages.some((message) => message.type === "terminal-closed")).toBe(false);
+    expect(terminal.detached).toBe(1);
+  });
+
+  test("[WS-TUI-RECOVERY-010] preserves only stable safe Snapshot failure metadata", async () => {
+    const renderer = new FakeRendererSession([
+      { type: "select", workspaceId: "sbx_1" },
+      {
+        type: "snapshot-create",
+        workspaceId: "sbx_1",
+        capability: "filesystem",
+        ttlDays: 1,
+      },
+      { type: "quit" },
+    ]);
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+
+    await presentation.start({
+      executeCommand: async () =>
+        err(
+          domainError.conflict("provider token=must-not-cross", {
+            providerHandle: "must-not-cross",
+          }),
+        ),
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery) {
+          return ok({ items: [{ sandboxId: "sbx_1", status: "ready" }] } as T);
+        }
+        if (query instanceof ShowSandboxQuery) {
+          return ok({ sandboxId: "sbx_1", status: "ready" } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    const error = renderer.messages.find((message) => message.type === "error");
+    expect(error).toMatchObject({
+      type: "error",
+      code: "conflict",
+      phase: "workspace-control-snapshot-create",
+      retryable: false,
+    });
+    expect(JSON.stringify(error)).not.toContain("must-not-cross");
+    expect(renderer.messages.some((message) => message.type === "recovery-complete")).toBe(false);
+  });
+
   test("[WS-TUI-DELIVERY-001..011] validates visible delivery targets, dispatches existing operations and reads real proof", async () => {
     const commands: Command<unknown>[] = [];
     const queries: Query<unknown>[] = [];
@@ -149,6 +402,9 @@ describe("Workspace control presentation", () => {
             mismatches: [{ reasonCode: "route-mismatch" }],
             unavailableEvidence: [{ kind: "health" }, { kind: "recovery" }],
           } as T);
+        }
+        if (query instanceof ListSandboxSnapshotsQuery) {
+          return ok({ items: [] } as T);
         }
         throw new Error(`unexpected query ${query.constructor.name}`);
       },
@@ -421,6 +677,9 @@ describe("Workspace control presentation", () => {
         }
         if (query instanceof DeploymentProofQuery) {
           return ok({ verdict: "verified", mismatches: [], unavailableEvidence: [] } as T);
+        }
+        if (query instanceof ListSandboxSnapshotsQuery) {
+          return ok({ items: [] } as T);
         }
         throw new Error(`unexpected query ${query.constructor.name}`);
       },
@@ -763,7 +1022,8 @@ describe("Workspace control presentation", () => {
           if (
             query instanceof ListSandboxAgentRuntimesQuery ||
             query instanceof ListSandboxPortsQuery ||
-            query instanceof ListSandboxPromotionsQuery
+            query instanceof ListSandboxPromotionsQuery ||
+            query instanceof ListSandboxSnapshotsQuery
           ) {
             return ok({ items: [] } as T);
           }
@@ -840,7 +1100,8 @@ describe("Workspace control presentation", () => {
         if (
           query instanceof ListSandboxPortsQuery ||
           query instanceof ListSandboxPromotionsQuery ||
-          query instanceof ListAgentTaskRunsQuery
+          query instanceof ListAgentTaskRunsQuery ||
+          query instanceof ListSandboxSnapshotsQuery
         ) {
           return ok({ items: [] } as T);
         }
@@ -884,7 +1145,8 @@ describe("Workspace control presentation", () => {
         if (
           query instanceof ListSandboxAgentRuntimesQuery ||
           query instanceof ListSandboxPortsQuery ||
-          query instanceof ListSandboxPromotionsQuery
+          query instanceof ListSandboxPromotionsQuery ||
+          query instanceof ListSandboxSnapshotsQuery
         ) {
           return ok({ items: [] } as T);
         }

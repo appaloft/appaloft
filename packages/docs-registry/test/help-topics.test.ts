@@ -136,7 +136,7 @@ describe("public docs help registry", () => {
     );
   });
 
-  test("[WS-TUI-DOCS-013] Workspace control help resolves the bilingual TUI contract", () => {
+  test("[WS-TUI-DOCS-013][WS-TUI-RECOVERY-012] Workspace control help resolves the bilingual TUI and recovery contract", () => {
     const topic = publicDocsHelpTopics["agent.workspace-control"];
 
     expect(resolvePublicDocsHelpHref(topic.id)).toBe(
@@ -147,15 +147,30 @@ describe("public docs help registry", () => {
     );
     expect(topic.surfaces).toEqual(["cli"]);
     expect(topic.aliases).toEqual(
-      expect.arrayContaining(["appaloft workspace", "Workspace control TUI", "Focus Mode"]),
+      expect.arrayContaining([
+        "appaloft workspace",
+        "Workspace control TUI",
+        "Focus Mode",
+        "Workspace recovery Snapshot",
+        "Workspace-owned cleanup",
+      ]),
     );
     expect(topic.specReferences).toEqual(
       expect.arrayContaining([
         "docs/decisions/ADR-107-task-oriented-workspace-activation-presentation.md",
         "docs/specs/126-workspace-control-tui/spec.md",
+        "docs/specs/130-workspace-control-recovery-evidence/spec.md",
         "docs/testing/workspace-control-tui-test-matrix.md",
+        "docs/testing/workspace-control-recovery-evidence-test-matrix.md",
       ]),
     );
+    const zh = readFileSync(docsSourcePath(topic.page["zh-CN"]), "utf8");
+    const en = readFileSync(docsSourcePath(topic.page["en-US"]), "utf8");
+    for (const source of [zh, en]) {
+      expect(source).toContain("`s`");
+      expect(source).toContain("Workspace-owned cleanup");
+      expect(source).toContain("sandbox snapshot list/create/show/delete");
+    }
   });
 
   test("[TS-SDK-DOCS-001] TypeScript SDK help resolves to the SDK reference", () => {

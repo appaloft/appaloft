@@ -31,7 +31,7 @@
 ## Verification And Sync
 
 - [x] Run focused Rust, CLI and renderer protocol tests.
-- [ ] Run public lint, typecheck, full test, build and release-boundary checks.
+- [x] Run public lint, typecheck, full test, build and release-boundary checks.
 - [x] Update localized docs/help, ADR migration/verification links, operation map and traceability.
-- [ ] Merge public implementation, close the Ticket and update the Cloud gitlink after independent
+- [x] Merge public implementation through PR #1035, close Ticket #1034 and update the Cloud gitlink after independent
   boundary review.

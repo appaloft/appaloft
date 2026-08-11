@@ -6,7 +6,7 @@ import {
 } from "../src/workspace-control-renderer";
 
 describe("Workspace control renderer channel", () => {
-  test("[WS-TUI-ERROR-008][WS-TUI-PACKAGE-011] authenticates one loopback client and removes the ephemeral channel", async () => {
+  test("[WS-TUI-ERROR-008][WS-TUI-PACKAGE-011][WS-TUI-RECOVERY-004][WS-TUI-RECOVERY-005] authenticates one loopback client and validates bounded recovery events", async () => {
     let client: Socket | undefined;
     let launchHost = "";
     let launchToken = "";
@@ -80,6 +80,29 @@ describe("Workspace control renderer channel", () => {
                   promotionId: "prm_1",
                 })}\n`,
               );
+              client?.write(
+                `${JSON.stringify({
+                  type: "snapshot-create",
+                  workspaceId: "sbx_1",
+                  capability: "filesystem",
+                  ttlDays: 2,
+                })}\n`,
+              );
+              client?.write(
+                `${JSON.stringify({
+                  type: "snapshot-create",
+                  workspaceId: "sbx_1",
+                  capability: "filesystem-memory",
+                  ttlDays: 7,
+                })}\n`,
+              );
+              client?.write(
+                `${JSON.stringify({
+                  type: "snapshot-delete",
+                  workspaceId: "sbx_1",
+                  snapshotId: "ssn_1",
+                })}\n`,
+              );
               client?.write(`${JSON.stringify({ type: "quit" })}\n`);
             }
             if (message.type === "shutdown") client?.end();
@@ -131,6 +154,19 @@ describe("Workspace control renderer channel", () => {
     expect(await events.next()).toEqual({
       done: false,
       value: { type: "promotion-accept", workspaceId: "sbx_1", promotionId: "prm_1" },
+    });
+    expect(await events.next()).toEqual({
+      done: false,
+      value: {
+        type: "snapshot-create",
+        workspaceId: "sbx_1",
+        capability: "filesystem-memory",
+        ttlDays: 7,
+      },
+    });
+    expect(await events.next()).toEqual({
+      done: false,
+      value: { type: "snapshot-delete", workspaceId: "sbx_1", snapshotId: "ssn_1" },
     });
     expect(await events.next()).toEqual({ done: false, value: { type: "quit" } });
     await renderer.close();
