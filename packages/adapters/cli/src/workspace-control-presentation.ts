@@ -1,5 +1,12 @@
+import { randomUUID } from "node:crypto";
+
 import {
+  AcceptSandboxPromotionCommand,
+  ApproveAgentTaskRunCommand,
   type Command,
+  DeliverAgentTaskRunCommand,
+  DeploymentProofQuery,
+  ExposeSandboxPortCommand,
   IssueSandboxAgentAttachAccessCommand,
   ListAgentTaskRunsQuery,
   ListSandboxAgentRuntimesQuery,
@@ -9,6 +16,8 @@ import {
   PauseSandboxCommand,
   type Query,
   ResumeSandboxCommand,
+  RetrySandboxPromotionCommand,
+  RevokeSandboxPortCommand,
   ShowSandboxQuery,
   type TerminalSession,
   type TerminalSessionAttachmentGateway,
@@ -54,7 +63,11 @@ export interface WorkspaceControlPromotionSummary {
   readonly status: string;
   readonly resourceId?: string;
   readonly deploymentId?: string;
-  readonly proofVerdict?: string;
+  readonly proof?: {
+    readonly verdict: string;
+    readonly mismatchCount: number;
+    readonly unavailableEvidenceCount: number;
+  };
   readonly expiresAt?: string;
 }
 
@@ -87,6 +100,7 @@ export type WorkspaceControlRendererMessage =
       readonly reason: string;
       readonly exitCode?: number;
     }
+  | { readonly type: "delivery-complete"; readonly workspaceId: string }
   | {
       readonly type: "error";
       readonly code: string;
@@ -103,6 +117,34 @@ export type WorkspaceControlRendererEvent =
       readonly workspaceId: string;
       readonly action: "pause" | "resume" | "terminate";
     }
+  | {
+      readonly type: "preview-expose";
+      readonly workspaceId: string;
+      readonly port: number;
+      readonly visibility: "private" | "organization" | "public";
+      readonly ttlMinutes: 60 | 480 | 1440;
+    }
+  | { readonly type: "preview-revoke"; readonly workspaceId: string; readonly exposureId: string }
+  | { readonly type: "task-approve"; readonly workspaceId: string; readonly taskRunId: string }
+  | {
+      readonly type: "task-deliver";
+      readonly workspaceId: string;
+      readonly taskRunId: string;
+      readonly branch: string;
+      readonly commitMessage: string;
+      readonly remote: string;
+      readonly pullRequest?: {
+        readonly title: string;
+        readonly body?: string;
+        readonly base?: string;
+      };
+    }
+  | {
+      readonly type: "promotion-accept";
+      readonly workspaceId: string;
+      readonly promotionId: string;
+    }
+  | { readonly type: "promotion-retry"; readonly workspaceId: string; readonly promotionId: string }
   | { readonly type: "terminal-input"; readonly data: string }
   | { readonly type: "terminal-resize"; readonly cols: number; readonly rows: number }
   | { readonly type: "terminal-reconnect" }
@@ -134,6 +176,7 @@ export interface WorkspaceControlPresentation {
 export interface BoundedWorkspaceControlPresentationInput {
   openRenderer(): Promise<WorkspaceControlRendererSession>;
   now?: () => string;
+  idempotencyKey?: () => string;
 }
 
 interface SandboxListResult {
@@ -244,20 +287,20 @@ function taskSummary(record: Record<string, unknown>): WorkspaceControlTaskSumma
 
 function promotionSummary(
   record: Record<string, unknown>,
+  proof?: WorkspaceControlPromotionSummary["proof"],
 ): WorkspaceControlPromotionSummary | undefined {
   const promotionId = optionalString(record, "promotionId");
   const status = optionalString(record, "status");
   if (!promotionId || !status) return undefined;
   const resourceId = optionalString(record, "resourceId");
   const deploymentId = optionalString(record, "deploymentId");
-  const proofVerdict = optionalString(record, "proofVerdict");
   const expiresAt = optionalString(record, "expiresAt");
   return {
     promotionId,
     status,
     ...(resourceId ? { resourceId } : {}),
     ...(deploymentId ? { deploymentId } : {}),
-    ...(proofVerdict ? { proofVerdict } : {}),
+    ...(proof ? { proof } : {}),
     ...(expiresAt ? { expiresAt } : {}),
   };
 }
@@ -311,7 +354,10 @@ async function listWorkspaces(
 async function loadDetail(
   context: WorkspaceControlPresentationContext,
   workspaceId: string,
-): Promise<Extract<WorkspaceControlRendererMessage, { type: "detail" }>> {
+): Promise<{
+  readonly message: Extract<WorkspaceControlRendererMessage, { type: "detail" }>;
+  readonly promotionRecords: readonly Record<string, unknown>[];
+}> {
   const workspace = resultValue(
     await context.executeQuery(operationValue(ShowSandboxQuery.create({ sandboxId: workspaceId }))),
   ) as Record<string, unknown>;
@@ -345,17 +391,45 @@ async function loadDetail(
         .filter((item): item is WorkspaceControlTaskSummary => item !== undefined),
     );
   }
+  const promotionSummaries: WorkspaceControlPromotionSummary[] = [];
+  for (const promotion of promotions.items) {
+    const deploymentId = optionalString(promotion, "deploymentId");
+    const resourceId = optionalString(promotion, "resourceId");
+    let proof: WorkspaceControlPromotionSummary["proof"];
+    if (deploymentId) {
+      const result = resultValue(
+        await context.executeQuery(
+          operationValue(
+            DeploymentProofQuery.create({
+              deploymentId,
+              ...(resourceId ? { resourceId } : {}),
+            }),
+          ),
+        ),
+      ) as unknown as Record<string, unknown>;
+      const mismatches = Array.isArray(result.mismatches) ? result.mismatches.length : 0;
+      const unavailableEvidence = Array.isArray(result.unavailableEvidence)
+        ? result.unavailableEvidence.length
+        : 0;
+      const verdict = optionalString(result, "verdict");
+      if (!verdict) throw new Error("Deployment Proof query returned an invalid descriptor");
+      proof = { verdict, mismatchCount: mismatches, unavailableEvidenceCount: unavailableEvidence };
+    }
+    const summary = promotionSummary(promotion, proof);
+    if (summary) promotionSummaries.push(summary);
+  }
   return {
-    type: "detail",
-    workspace: workspaceSummary(workspace),
-    runtimes: runtimeResult.items.map(runtimeSummary),
-    ports: ports.items
-      .map(portSummary)
-      .filter((item): item is WorkspaceControlPortSummary => item !== undefined),
-    tasks,
-    promotions: promotions.items
-      .map(promotionSummary)
-      .filter((item): item is WorkspaceControlPromotionSummary => item !== undefined),
+    message: {
+      type: "detail",
+      workspace: workspaceSummary(workspace),
+      runtimes: runtimeResult.items.map(runtimeSummary),
+      ports: ports.items
+        .map(portSummary)
+        .filter((item): item is WorkspaceControlPortSummary => item !== undefined),
+      tasks,
+      promotions: promotionSummaries,
+    },
+    promotionRecords: promotions.items,
   };
 }
 
@@ -366,6 +440,8 @@ export function createBoundedWorkspaceControlPresentation(
     async start(context) {
       const renderer = await input.openRenderer();
       let selectedWorkspaceId: string | undefined;
+      let selectedDetail: Extract<WorkspaceControlRendererMessage, { type: "detail" }> | undefined;
+      let selectedPromotionRecords: readonly Record<string, unknown>[] = [];
       let activeTerminal:
         | {
             workspaceId: string;
@@ -376,6 +452,29 @@ export function createBoundedWorkspaceControlPresentation(
           }
         | undefined;
       const terminalPumps = new Set<Promise<void>>();
+
+      const sendSelectedDetail = async (workspaceId: string) => {
+        const loaded = await loadDetail(context, workspaceId);
+        selectedDetail = loaded.message;
+        selectedPromotionRecords = loaded.promotionRecords;
+        await renderer.send(loaded.message);
+      };
+
+      const completeDelivery = async (workspaceId: string) => {
+        await renderer.send({ type: "delivery-complete", workspaceId });
+        await sendSelectedDetail(workspaceId);
+      };
+
+      const requireSelectedWorkspace = (workspaceId: string) => {
+        if (
+          !selectedWorkspaceId ||
+          selectedWorkspaceId !== workspaceId ||
+          selectedDetail?.workspace.workspaceId !== workspaceId
+        ) {
+          throw new Error("Delivery action does not match the selected Workspace");
+        }
+        return selectedDetail;
+      };
 
       const sendErrorBestEffort = async (error: unknown, phase: string) => {
         try {
@@ -463,7 +562,7 @@ export function createBoundedWorkspaceControlPresentation(
           try {
             if (event.type === "select") {
               selectedWorkspaceId = event.workspaceId;
-              await renderer.send(await loadDetail(context, event.workspaceId));
+              await sendSelectedDetail(event.workspaceId);
               continue;
             }
             if (event.type === "refresh") {
@@ -472,7 +571,7 @@ export function createBoundedWorkspaceControlPresentation(
                 workspaces: await listWorkspaces(context),
               });
               const workspaceId = event.workspaceId ?? selectedWorkspaceId;
-              if (workspaceId) await renderer.send(await loadDetail(context, workspaceId));
+              if (workspaceId) await sendSelectedDetail(workspaceId);
               continue;
             }
             if (event.type === "attach") {
@@ -549,7 +648,146 @@ export function createBoundedWorkspaceControlPresentation(
                 type: "workspaces",
                 workspaces: await listWorkspaces(context),
               });
-              await renderer.send(await loadDetail(context, event.workspaceId));
+              await sendSelectedDetail(event.workspaceId);
+              continue;
+            }
+            if (event.type === "preview-expose") {
+              requireSelectedWorkspace(event.workspaceId);
+              const now = new Date(input.now?.() ?? new Date().toISOString());
+              const expiresAt = new Date(now.getTime() + event.ttlMinutes * 60_000).toISOString();
+              resultValue(
+                await context.executeCommand(
+                  operationValue(
+                    ExposeSandboxPortCommand.create({
+                      sandboxId: event.workspaceId,
+                      port: event.port,
+                      visibility: event.visibility,
+                      expiresAt,
+                    }),
+                  ),
+                ),
+              );
+              await completeDelivery(event.workspaceId);
+              continue;
+            }
+            if (event.type === "preview-revoke") {
+              const detail = requireSelectedWorkspace(event.workspaceId);
+              if (!detail.ports.some((port) => port.exposureId === event.exposureId)) {
+                throw new Error("Preview exposure is not present in the latest Workspace detail");
+              }
+              resultValue(
+                await context.executeCommand(
+                  operationValue(
+                    RevokeSandboxPortCommand.create({
+                      sandboxId: event.workspaceId,
+                      exposureId: event.exposureId,
+                    }),
+                  ),
+                ),
+              );
+              await completeDelivery(event.workspaceId);
+              continue;
+            }
+            if (event.type === "task-approve") {
+              const detail = requireSelectedWorkspace(event.workspaceId);
+              const task = detail.tasks.find(
+                (candidate) => candidate.taskRunId === event.taskRunId,
+              );
+              if (!task || task.status !== "awaiting-approval") {
+                throw new Error("Task is not awaiting approval in the latest Workspace detail");
+              }
+              resultValue(
+                await context.executeCommand(
+                  operationValue(
+                    ApproveAgentTaskRunCommand.create({
+                      workspaceId: event.workspaceId,
+                      taskRunId: event.taskRunId,
+                    }),
+                  ),
+                ),
+              );
+              await completeDelivery(event.workspaceId);
+              continue;
+            }
+            if (event.type === "task-deliver") {
+              const detail = requireSelectedWorkspace(event.workspaceId);
+              const task = detail.tasks.find(
+                (candidate) => candidate.taskRunId === event.taskRunId,
+              );
+              if (!task || !["approved", "delivering"].includes(task.status)) {
+                throw new Error("Task is not deliverable in the latest Workspace detail");
+              }
+              resultValue(
+                await context.executeCommand(
+                  operationValue(
+                    DeliverAgentTaskRunCommand.create({
+                      workspaceId: event.workspaceId,
+                      taskRunId: event.taskRunId,
+                      branch: event.branch,
+                      commitMessage: event.commitMessage,
+                      remote: event.remote,
+                      ...(event.pullRequest
+                        ? {
+                            pullRequest: {
+                              provider: "github" as const,
+                              ...event.pullRequest,
+                            },
+                          }
+                        : {}),
+                    }),
+                  ),
+                ),
+              );
+              await completeDelivery(event.workspaceId);
+              continue;
+            }
+            if (event.type === "promotion-accept" || event.type === "promotion-retry") {
+              const detail = requireSelectedWorkspace(event.workspaceId);
+              const promotion = detail.promotions.find(
+                (candidate) => candidate.promotionId === event.promotionId,
+              );
+              const record = selectedPromotionRecords.find(
+                (candidate) => optionalString(candidate, "promotionId") === event.promotionId,
+              );
+              if (!promotion || !record) {
+                throw new Error("Promotion is not present in the latest Workspace detail");
+              }
+              const idempotencyKey = input.idempotencyKey?.() ?? randomUUID();
+              if (event.type === "promotion-accept") {
+                if (promotion.status !== "planned") {
+                  throw new Error("Promotion is not planned in the latest Workspace detail");
+                }
+                const expectedArtifactDigest = optionalString(record, "artifactDigest");
+                if (!expectedArtifactDigest) {
+                  throw new Error("Promotion descriptor has no artifact digest");
+                }
+                resultValue(
+                  await context.executeCommand(
+                    operationValue(
+                      AcceptSandboxPromotionCommand.create({
+                        promotionId: event.promotionId,
+                        expectedArtifactDigest,
+                        idempotencyKey,
+                      }),
+                    ),
+                  ),
+                );
+              } else {
+                if (!["failed", "needs-attention"].includes(promotion.status)) {
+                  throw new Error("Promotion is not retryable in the latest Workspace detail");
+                }
+                resultValue(
+                  await context.executeCommand(
+                    operationValue(
+                      RetrySandboxPromotionCommand.create({
+                        promotionId: event.promotionId,
+                        idempotencyKey,
+                      }),
+                    ),
+                  ),
+                );
+              }
+              await completeDelivery(event.workspaceId);
               continue;
             }
             if (event.type === "terminal-input") {

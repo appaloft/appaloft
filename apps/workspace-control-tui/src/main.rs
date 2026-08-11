@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
 use appaloft_workspace_control_tui::{
-    ActionDecision, AppState, ParentMessage, RendererEvent, agent_area, render, terminal_key_bytes,
-    terminal_mouse_bytes,
+    ActionDecision, AppState, DeliveryDecision, DeliverySubmission, ParentMessage, RendererEvent,
+    agent_area, render, terminal_key_bytes, terminal_mouse_bytes,
 };
 use crossterm::event::{
     DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture, Event,
@@ -54,6 +54,18 @@ fn send(stream: &mut TcpStream, event: &RendererEvent) -> Result<()> {
     serde_json::to_writer(&mut *stream, event).context("encode renderer event")?;
     stream.write_all(b"\n").context("write renderer event")?;
     stream.flush().context("flush renderer event")
+}
+
+fn send_delivery(
+    stream: &mut TcpStream,
+    state: &AppState,
+    submission: DeliverySubmission,
+) -> Result<()> {
+    let workspace_id = state
+        .selected_workspace_id()
+        .context("delivery action requires a selected Workspace")?
+        .to_owned();
+    send(stream, &RendererEvent::delivery(workspace_id, submission))
 }
 
 fn read_handshake(reader: &mut BufReader<TcpStream>) -> Result<()> {
@@ -189,6 +201,11 @@ fn main() -> Result<()> {
         }
         match read().context("read terminal input")? {
             Event::Resize(_, _) => {}
+            Event::Paste(data) if state.delivery_form.is_some() => {
+                for character in data.chars() {
+                    state.delivery_form_insert(character);
+                }
+            }
             Event::Paste(data) if state.agent_focused => send(
                 &mut writer,
                 &RendererEvent::TerminalInput {
@@ -241,6 +258,51 @@ fn main() -> Result<()> {
                     _ => {}
                 }
             }
+            Event::Key(key)
+                if key.kind == KeyEventKind::Press
+                    && state.pending_delivery_confirmation.is_some() =>
+            {
+                match key.code {
+                    KeyCode::Char('y') | KeyCode::Char('Y') => {
+                        if let Some(submission) = state.confirm_delivery_action(true) {
+                            send_delivery(&mut writer, &state, submission)?;
+                        }
+                    }
+                    KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                        state.confirm_delivery_action(false);
+                    }
+                    _ => {}
+                }
+            }
+            Event::Key(key) if key.kind == KeyEventKind::Press && state.delivery_form.is_some() => {
+                match key.code {
+                    KeyCode::Esc => state.close_delivery_surface(),
+                    KeyCode::Tab => state.delivery_form_next_field(),
+                    KeyCode::BackTab => state.delivery_form_previous_field(),
+                    KeyCode::Left => state.delivery_form_cycle_choice(-1),
+                    KeyCode::Right => state.delivery_form_cycle_choice(1),
+                    KeyCode::Backspace => state.delivery_form_backspace(),
+                    KeyCode::Enter => {
+                        if let DeliveryDecision::Dispatch(submission) = state.submit_delivery_form()
+                        {
+                            send_delivery(&mut writer, &state, submission)?;
+                        }
+                    }
+                    KeyCode::Char(character) => state.delivery_form_insert(character),
+                    _ => {}
+                }
+            }
+            Event::Key(key) if key.kind == KeyEventKind::Press && state.delivery_menu_open => {
+                match key.code {
+                    KeyCode::Esc => state.close_delivery_surface(),
+                    KeyCode::Up | KeyCode::Char('k') => state.move_delivery_selection(-1),
+                    KeyCode::Down | KeyCode::Char('j') => state.move_delivery_selection(1),
+                    KeyCode::Enter => {
+                        state.activate_selected_delivery_action();
+                    }
+                    _ => {}
+                }
+            }
             Event::Key(key) if key.kind == KeyEventKind::Press && state.action_menu_open => {
                 match key.code {
                     KeyCode::Esc => state.close_action_menu(),
@@ -278,6 +340,9 @@ fn main() -> Result<()> {
                 KeyCode::Char('f') => state.toggle_focus_mode(),
                 KeyCode::Char('a') => {
                     state.open_action_menu();
+                }
+                KeyCode::Char('d') => {
+                    state.open_delivery_menu();
                 }
                 KeyCode::Up | KeyCode::Char('k') => {
                     if let Some(workspace_id) = state.move_selection(-1) {
