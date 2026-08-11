@@ -137,7 +137,9 @@ task approve/deliver`, `sandbox promote accept/retry`, `deployment proof`, and `
 
 These paths never initialize the renderer and return a stable headless status or continue through
 the existing subcommand. Windows currently guarantees safe help/headless behavior only; embedded
-mode needs separate release and terminal acceptance.
+mode needs separate release and terminal acceptance. Windows and interactive environments with a
+missing, `dumb`, or `unknown` `TERM` return `platform-unsupported` or `terminal-unsupported` before
+renderer startup, so control sequences are never written to an unsupported host terminal.
 
 ## Explicit Profile-aware creation
 

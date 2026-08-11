@@ -133,7 +133,9 @@ approve/deliver`、`sandbox promote accept/retry`、`deployment proof`，以及 
 `sandbox snapshot list/create/show/delete`。
 
 这些路径不会初始化 renderer，并返回稳定的 headless 状态或继续执行现有子命令。Windows 当前仅
-保证 help/headless 命令安全；嵌入模式需要独立的 release 与终端验收。
+保证 help/headless 命令安全；嵌入模式需要独立的 release 与终端验收。Windows，或 `TERM`
+缺失、为 `dumb`/`unknown` 的交互环境，会在 renderer 启动前返回
+`platform-unsupported`/`terminal-unsupported`，避免把控制序列写入不支持的宿主终端。
 
 ## 使用 Profile 显式创建
 

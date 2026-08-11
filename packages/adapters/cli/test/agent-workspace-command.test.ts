@@ -72,6 +72,7 @@ describe("Agent Workspace CLI", () => {
           write: () => true,
         },
       },
+      environment: { TERM: "xterm-256color" },
       workspaceControlPresentation: {
         start: async () => {
           presentationStarts += 1;
@@ -144,6 +145,53 @@ describe("Agent Workspace CLI", () => {
     expect(output.join("")).toContain("structured-output");
   });
 
+  test("[WS-TUI-FALLBACK-009][WS-TUI-TERMINAL-012] unsupported host terminals fail closed before renderer startup", async () => {
+    let presentationStarts = 0;
+    const output: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: { execute: async () => ok({}) } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_workspace_tui_terminal_gate" }),
+      },
+      terminalIO: {
+        stdin: { isTTY: true, on: () => undefined },
+        stdout: {
+          isTTY: true,
+          write: (chunk) => {
+            output.push(String(chunk));
+            return true;
+          },
+        },
+        stderr: { isTTY: true, write: () => true },
+      },
+      environment: { TERM: "dumb" },
+      workspaceControlPresentation: {
+        start: async () => {
+          presentationStarts += 1;
+        },
+      },
+    });
+
+    const processWrite = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "workspace"]);
+    } finally {
+      process.stdout.write = processWrite;
+    }
+
+    expect(presentationStarts).toBe(0);
+    expect(output.join("")).toContain("terminal-unsupported");
+  });
+
   test("[WS-TUI-ENTRY-001][WS-TUI-QUERY-002] remote Cloud target injects the same public Workspace presentation boundary", async () => {
     let presentationStarts = 0;
     const { createRemoteCliProgram } = await import("../src");
@@ -162,6 +210,7 @@ describe("Agent Workspace CLI", () => {
         stdout: { isTTY: true, write: () => true },
         stderr: { isTTY: true, write: () => true },
       },
+      environment: { TERM: "xterm-256color" },
       workspaceControlPresentation: {
         start: async (context) => {
           presentationStarts += 1;

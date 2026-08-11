@@ -28,6 +28,7 @@ struct TerminalRestore;
 impl TerminalRestore {
     fn enter() -> Result<Self> {
         enable_raw_mode().context("enable raw terminal mode")?;
+        let restore = Self;
         execute!(
             std::io::stdout(),
             EnterAlternateScreen,
@@ -35,7 +36,7 @@ impl TerminalRestore {
             EnableBracketedPaste
         )
         .context("enter alternate terminal screen")?;
-        Ok(Self)
+        Ok(restore)
     }
 }
 

@@ -6,6 +6,7 @@ import {
   ListSandboxesQuery,
   ListSandboxPortsQuery,
   ListSandboxPromotionsQuery,
+  ListSandboxSnapshotsQuery,
   type Query,
   ShowSandboxQuery,
 } from "@appaloft/application";
@@ -51,6 +52,7 @@ await createRatatuiWorkspaceControlPresentation({ binaryPath }).start({
     }
     if (
       query instanceof ListSandboxPortsQuery ||
+      query instanceof ListSandboxSnapshotsQuery ||
       query instanceof ListSandboxPromotionsQuery ||
       query instanceof ListAgentTaskRunsQuery
     ) {

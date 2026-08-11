@@ -49,6 +49,11 @@
 - [x] Collect the six-target release workflow and Linux artifact smoke evidence.
 - [x] Run the opt-in provider-free native PTY matrix against installed Pi, OpenCode, Codex and
   Claude Code clients.
+- [x] Add a repeatable host-terminal smoke that records alternate-screen, mouse, bracketed-paste,
+  restoration, Workspace rendering and focus-release evidence without Agent/provider calls.
+- [x] Verify the host-terminal smoke in macOS Terminal.app and the Codex xterm-compatible PTY.
 - [ ] Complete the supported host-terminal matrix in Terminal.app, iTerm2, Ghostty, VS Code
-  Terminal and a representative Linux terminal.
+  Terminal and a representative Linux terminal. Terminal.app is complete; iTerm2 and Ghostty are
+  not installed on the current host, VS Code automation lacks macOS Accessibility permission, and
+  the representative Linux terminal remains pending.
 - [ ] Sync ADR, Spec, tasks, Test Matrix, operation map, help, docs and release evidence.

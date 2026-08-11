@@ -43,7 +43,7 @@ credential truth.
 | WS-TUI-FULLSCREEN-006 | Same-session full-screen | An embedded Agent is running | Focus Mode is entered and later exited | The same Terminal Session or local PTY is maximized and returned to its pane without starting another Agent process or losing identity. |
 | WS-TUI-RECONNECT-007 | Existing reconnect semantics | Transport disconnects while the Workspace/Agent remains healthy | the pane reconnects | Existing exact identity and bounded replay resume without restarting the Agent; the renderer owns no independent replay truth. |
 | WS-TUI-ERROR-008 | Structured recovery | query, renderer, terminal parser, attach, resize or refresh fails | the failure is presented | Stable existing code/phase/evidence is preserved; terminal restoration and bounded detach run; secrets, raw host data and Agent output remain excluded. |
-| WS-TUI-FALLBACK-009 | Headless compatibility | no TTY exists, `--no-tui` is supplied, machine output is requested or the TUI cannot load | Workspace management runs | Existing headless Workspace commands remain usable and unchanged; this compatibility path is not claimed as completion of the embedded experience. |
+| WS-TUI-FALLBACK-009 | Headless compatibility | no TTY exists, `--no-tui` is supplied, machine output is requested, the host terminal is unsupported or the TUI cannot load | Workspace management runs | The renderer does not start; a stable fallback reason is returned and existing headless Workspace commands remain usable and unchanged. This compatibility path is not claimed as completion of the embedded experience. |
 | WS-TUI-CAPABILITY-010 | Adapter neutrality | Pi, OpenCode, Claude Code, Codex or future adapters expose different attach capabilities | actions are rendered | Availability derives from declared capabilities and terminal contracts, never Agent-name checks or terminal scraping. |
 | WS-TUI-PACKAGE-011 | Supported release artifacts | published CLI targets are built | each artifact starts | Headless help remains safe on every target; accepted macOS/Linux targets load required renderer assets and missing assets never damage terminal state. |
 | WS-TUI-TERMINAL-012 | Terminal correctness | supported terminals exercise alternate screen, resize/reflow, mouse, focus, paste, signals, CJK, emoji and wide text | embedded and Focus modes run | Child semantics remain correct, outer focus is recoverable, and crash/signal cleanup restores the host terminal deterministically. |
@@ -55,6 +55,8 @@ credential truth.
   targets; documented focus-release and same-session full-screen commands; presentation-only
   `--no-tui` behavior if not already covered by structured/headless selection.
 - Existing CLI: `appaloft code`, `workspace open/list/show/connect/attach/terminate/...` remain.
+- Host-terminal gate: Windows and missing, `dumb` or `unknown` `TERM` values return a stable
+  `platform-unsupported` or `terminal-unsupported` headless reason before renderer startup.
 - API/oRPC/SDK/MCP: no new operation; the shell consumes existing operations.
 - Persistence/events/read models: none.
 - Cloud: may inject existing authz, placement, custody and gateway ports only.
