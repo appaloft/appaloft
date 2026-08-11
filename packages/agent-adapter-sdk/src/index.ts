@@ -767,6 +767,7 @@ export interface CompiledAgentWorkspaceProfilePlan {
       sandboxTemplateId: string;
       version: string;
       templateDigest: string;
+      runtimeRequirements: { id: string; version: string }[];
       cwd?: string;
       run: {
         argv: string[];
@@ -1235,6 +1236,9 @@ export function compileAgentWorkspaceProfile(
           sandboxTemplateId: profile.sandbox.template.id,
           version: profile.adapter.version,
           templateDigest: profile.sandbox.template.digest,
+          runtimeRequirements: adapter.manifest.requirements.runtimes.map((requirement) => ({
+            ...requirement,
+          })),
           ...(workingDirectory ? { cwd: workingDirectory } : {}),
           run: {
             argv: [...taskMode.command],

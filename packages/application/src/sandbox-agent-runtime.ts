@@ -28,6 +28,7 @@ import {
   UpdatedAt,
   WorkspaceRevision,
 } from "@appaloft/core";
+import { satisfies as semverSatisfies, valid as validSemver } from "semver";
 import {
   type AgentWorkspaceCredentialBinding,
   type AgentWorkspaceMcpBinding,
@@ -191,18 +192,25 @@ export class SandboxAgentHarnessRegistry {
     sandboxTemplateId: string;
     version: string;
     templateDigest: string;
+    runtimeRequirements: readonly { id: string; version: string }[];
     interaction?: SandboxAgentHarnessInteraction | undefined;
     capabilities?: SandboxAgentHarnessCapabilities | undefined;
   }): boolean {
-    const matches = [...this.harnesses.values()].filter(
-      (harness) =>
+    const matches = [...this.harnesses.values()].filter((harness) => {
+      const runtimeRequirement = input.runtimeRequirements.find(
+        (requirement) => requirement.id === harness.key,
+      );
+      return (
         !this.aliases.has(harness.key) &&
         harness.key !== input.key &&
         harness.templateId === input.templateId &&
         harness.sandboxTemplateId === input.sandboxTemplateId &&
-        harness.version === input.version &&
-        harness.templateDigest === input.templateDigest,
-    );
+        harness.templateDigest === input.templateDigest &&
+        runtimeRequirement !== undefined &&
+        validSemver(harness.version) !== null &&
+        semverSatisfies(harness.version, runtimeRequirement.version, { includePrerelease: true })
+      );
+    });
     if (matches.length > 1) {
       throw new Error(`Sandbox Agent harness alias ${input.key} is ambiguous`);
     }
