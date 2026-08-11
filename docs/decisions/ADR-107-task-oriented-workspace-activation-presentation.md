@@ -80,10 +80,14 @@ control TUI also needs a durable ownership boundary before a terminal framework 
   new domain ownership decision.
 - The Appaloft release artifact, Linux CI and opt-in supported terminal/Agent matrix remain Spec 126
   completion gates.
+- Preview, Agent Task delivery, Promotion and Deployment Proof actions are governed by proposed
+  Spec 128 and must continue to dispatch their existing public operations.
 - `--keep-awake` and exit-triggered removal require a separate Spec/Test Matrix update.
 
 ## Verification
 
 See the
 [Workspace Code Activation Test Matrix](../testing/workspace-code-activation-test-matrix.md) and
-[Workspace Control TUI Test Matrix](../testing/workspace-control-tui-test-matrix.md).
+[Workspace Control TUI Test Matrix](../testing/workspace-control-tui-test-matrix.md). Delivery
+controls are verified by the
+[Workspace Control Delivery Actions Test Matrix](../testing/workspace-control-delivery-actions-test-matrix.md).
