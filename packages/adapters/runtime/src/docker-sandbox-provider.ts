@@ -1007,14 +1007,16 @@ export class DockerSandboxProvider implements SandboxProvider {
       request.providerHandle,
       "sh",
       "-c",
-      "for f in /workspace/.appaloft-process-spr_*.pid; do [ -f \"$f\" ] || continue; printf 'pid:%s:%s\\n' \"${f##*-}\" \"$(cat \"$f\")\"; done; for f in /workspace/.appaloft-process-spr_*.exit; do [ -f \"$f\" ] || continue; printf 'exit:%s:%s\\n' \"${f##*-}\" \"$(cat \"$f\")\"; done",
+      "for f in /workspace/.appaloft-process-spr_*.pid; do [ -f \"$f\" ] || continue; file_name=\"${f##*-}\"; process_id=\"${file_name%.pid}\"; exit_file=\"/workspace/.appaloft-process-${process_id}.exit\"; [ -f \"$exit_file\" ] && continue; pid=\"$(cat \"$f\" 2>/dev/null || true)\"; if [ -n \"$pid\" ] && kill -0 \"$pid\" 2>/dev/null; then printf 'pid:%s:%s:running\\n' \"$file_name\" \"$pid\"; else printf 'pid:%s:%s:exited\\n' \"$file_name\" \"$pid\"; fi; done; for f in /workspace/.appaloft-process-spr_*.exit; do [ -f \"$f\" ] || continue; file_name=\"${f##*-}\"; exit_code=\"$(cat \"$f\" 2>/dev/null || true)\"; if [ \"$exit_code\" = 0 ]; then status=exited; else status=failed; fi; printf 'exit:%s:%s:%s\\n' \"$file_name\" \"$exit_code\" \"$status\"; done",
     ]);
     const processes: SandboxProcessDescriptor[] = [];
+    const consumedExitFiles: string[] = [];
     for (const line of text(listed.stdout).trim().split("\n")) {
       if (!line) continue;
-      const [kind, fileName, value] = line.split(":");
-      if (!kind || !fileName || value === undefined) continue;
+      const [kind, fileName, value, observedStatus] = line.split(":");
+      if (!kind || !fileName || value === undefined || !observedStatus) continue;
       const processId = fileName.replace(/\.(?:pid|exit)$/u, "");
+      if (!/^spr_[A-Za-z0-9]{1,128}$/u.test(processId)) continue;
       if (kind === "exit") {
         const exitCode = Number(value);
         if (Number.isInteger(exitCode)) {
@@ -1023,29 +1025,23 @@ export class DockerSandboxProvider implements SandboxProvider {
             status: exitCode === 0 ? "exited" : "failed",
             exitCode,
           });
-          await this.runner.run([
-            "docker",
-            "exec",
-            request.providerHandle,
-            "rm",
-            "-f",
-            `/workspace/.appaloft-process-${processId}.exit`,
-          ]);
+          consumedExitFiles.push(`/workspace/.appaloft-process-${processId}.exit`);
         }
         continue;
       }
-      const pid = value;
-      const observed = await this.runner.run([
+      if (kind !== "pid" || !/^\d+$/u.test(value)) continue;
+      if (observedStatus !== "running" && observedStatus !== "exited") continue;
+      processes.push({ processId, status: observedStatus });
+    }
+    if (consumedExitFiles.length > 0) {
+      await this.runner.run([
         "docker",
         "exec",
         request.providerHandle,
-        "sh",
-        "-c",
-        'kill -0 "$1" 2>/dev/null',
-        "appaloft-process-check",
-        pid,
+        "rm",
+        "-f",
+        ...consumedExitFiles,
       ]);
-      processes.push({ processId, status: observed.exitCode === 0 ? "running" : "exited" });
     }
     return processes;
   }
