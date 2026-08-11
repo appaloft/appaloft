@@ -1,6 +1,7 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
+import { SandboxProviderFileNotFoundError } from "@appaloft/application";
 
 import {
   DockerSandboxProvider,
@@ -886,13 +887,32 @@ describe("DockerSandboxProvider", () => {
     expect(runner.calls.at(-1)?.argv[1]).toBe("inspect");
 
     runner.resolvedPath = "/etc/passwd";
-    expect(
+    await expect(
       provider.readFile({
         sandboxId: "sbx_demo",
         providerHandle: "appaloft-sbx_demo",
         path: "workspace-link",
       }),
     ).rejects.toThrow("symbolic link");
+  });
+
+  test("[ADAPTER-RUNTIME-014] distinguishes an absent confined file from Docker failure", async () => {
+    const runner = new CapturingRunner();
+    const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
+    await provider.provision(request);
+    runner.resolvedPath = "__APPALOFT_WORKSPACE_FILE_NOT_FOUND__";
+
+    await expect(
+      provider.readFile({
+        sandboxId: "sbx_demo",
+        providerHandle: "appaloft-sbx_demo",
+        path: ".appaloft-agent/sar_open/opencode-process-id",
+      }),
+    ).rejects.toBeInstanceOf(SandboxProviderFileNotFoundError);
+
+    const confinement = runner.calls.at(-1)?.argv.join(" ") ?? "";
+    expect(confinement).toContain('[ ! -e "$1" ] && [ ! -L "$1" ]');
+    expect(confinement).toContain("realpath");
   });
 
   test("[AGENT-TASK-RESUME-002][SBX-FILE-004] replaces files atomically inside the workspace", async () => {

@@ -6,6 +6,7 @@ import {
   type SandboxPortExposure,
   type SandboxProcessDescriptor,
   type SandboxProvider,
+  SandboxProviderFileNotFoundError,
   type SandboxProviderRequest,
   type SandboxTerminalProcess,
 } from "@appaloft/application";
@@ -19,6 +20,8 @@ import { sandboxWorkspaceProcessEnvironment } from "./sandbox-workspace-process-
 const sandboxProcessDockerExecArgs = Object.freeze(
   sandboxWorkspaceProcessEnvironment.flatMap((value) => ["-e", value]),
 );
+
+const missingWorkspaceFileMarker = "__APPALOFT_WORKSPACE_FILE_NOT_FOUND__";
 
 const terminateSandboxProcessGroupScript =
   'if [ -f "$1" ]; then pid="$(cat "$1")"; if kill -0 "-$pid" 2>/dev/null; then kill -TERM "-$pid" 2>/dev/null || true; attempts=0; while kill -0 "-$pid" 2>/dev/null && [ "$attempts" -lt 10 ]; do sleep 0.1; attempts=$((attempts + 1)); done; kill -KILL "-$pid" 2>/dev/null || true; else kill "$pid" 2>/dev/null || true; fi; fi; rm -f -- "$1" "$2"';
@@ -1139,7 +1142,7 @@ export class DockerSandboxProvider implements SandboxProvider {
     path: string;
   }): Promise<Uint8Array> {
     await this.assertHandle(request);
-    const path = await this.confinedWorkspacePath(request, request.path, "existing");
+    const path = await this.confinedWorkspacePath(request, request.path, "read");
     return (await this.docker(["exec", request.providerHandle, "cat", path]))
       .stdout;
   }
@@ -1696,13 +1699,15 @@ export class DockerSandboxProvider implements SandboxProvider {
   private async confinedWorkspacePath(
     request: { sandboxId: string; providerHandle: string },
     path: string,
-    intent: "existing" | "write",
+    intent: "existing" | "read" | "write",
   ): Promise<string> {
     const lexical = this.workspacePath(path);
     const script =
       intent === "write"
         ? 'mkdir -p "$(dirname "$1")" || exit 1; if [ -e "$1" ] || [ -L "$1" ]; then realpath "$1"; else parent=$(realpath "$(dirname "$1")") || exit 1; printf "%s/%s\\n" "$parent" "$(basename "$1")"; fi'
-        : 'realpath "$1"';
+        : intent === "read"
+          ? `if [ ! -e "$1" ] && [ ! -L "$1" ]; then printf "%s\\n" "${missingWorkspaceFileMarker}"; exit 0; fi; realpath "$1"`
+          : 'realpath "$1"';
     const resolved = await this.docker([
       "exec",
       request.providerHandle,
@@ -1713,6 +1718,9 @@ export class DockerSandboxProvider implements SandboxProvider {
       lexical,
     ]);
     const absolute = text(resolved.stdout).trim();
+    if (absolute === missingWorkspaceFileMarker) {
+      throw new SandboxProviderFileNotFoundError();
+    }
     if (absolute !== "/workspace" && !absolute.startsWith("/workspace/")) {
       throw new Error("Sandbox path escaped the workspace through a symbolic link");
     }
