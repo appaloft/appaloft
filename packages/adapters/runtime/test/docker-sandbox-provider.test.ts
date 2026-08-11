@@ -27,6 +27,8 @@ class CapturingRunner implements SandboxDockerCommandRunner {
   concurrentRemovalStarted = false;
   concurrentRemovalReadbacksBeforeAbsent = 0;
   concurrentRemovalReadbacks = 0;
+  backgroundStartObservations = ["running:42"];
+  backgroundStartObservationCalls = 0;
   inventory = "";
   processSnapshot = "";
   portableRecoveryDigest = "b".repeat(64);
@@ -77,6 +79,17 @@ class CapturingRunner implements SandboxDockerCommandRunner {
     if (command.includes("info --format")) return this.result(this.runtimes);
     if (command.includes("network inspect --format")) return this.result("true\n");
     if (command.includes("ps -a --filter")) return this.result(this.inventory);
+    if (command.includes("appaloft-background-start-observation")) {
+      const observation =
+        this.backgroundStartObservations[
+          Math.min(
+            this.backgroundStartObservationCalls,
+            this.backgroundStartObservations.length - 1,
+          )
+        ] ?? "pending";
+      this.backgroundStartObservationCalls += 1;
+      return this.result(`${observation}\n`);
+    }
     if (command.includes("for f in /workspace/.appaloft-process-spr_*.pid")) {
       return this.result(this.processSnapshot);
     }
@@ -680,7 +693,9 @@ describe("DockerSandboxProvider", () => {
 
     expect(result).toMatchObject({ mode: "background" });
     const launch = runner.calls.find((call) => call.argv.includes("-d"));
-    const delivered = runner.calls.at(-1);
+    const delivered = runner.calls.find(
+      (call) => call.argv.includes("-i") && call.argv.join(" ").includes("cat >"),
+    );
     expect(launch?.argv).not.toContain("-i");
     expect(launch?.argv).toEqual(
       expect.arrayContaining([
@@ -700,6 +715,55 @@ describe("DockerSandboxProvider", () => {
       true,
     );
     expect(new TextDecoder().decode(delivered?.stdin)).toBe("scoped-launch-secret\n");
+  });
+
+  test("[#1055][SBX-PROC-001] waits until the exact detached process is observable before returning", async () => {
+    const runner = new CapturingRunner();
+    runner.backgroundStartObservations = ["pending", "pending", "running:73"];
+    const delays: number[] = [];
+    const provider = new DockerSandboxProvider({
+      isolation: "gvisor",
+      runner,
+      sleep: async (delayMs) => {
+        delays.push(delayMs);
+      },
+    });
+    await provider.provision(request);
+
+    await expect(
+      provider.exec({
+        sandboxId: "sbx_demo",
+        providerHandle: "appaloft-sbx_demo",
+        argv: ["agent", "run"],
+        background: true,
+      }),
+    ).resolves.toMatchObject({ mode: "background" });
+
+    expect(runner.backgroundStartObservationCalls).toBe(3);
+    expect(delays).toEqual([50, 50]);
+  });
+
+  test("[#1055][SBX-PROC-001] fails and cleans up when the exact detached process never becomes observable", async () => {
+    const runner = new CapturingRunner();
+    runner.backgroundStartObservations = ["pending"];
+    const provider = new DockerSandboxProvider({
+      isolation: "gvisor",
+      runner,
+      sleep: async () => {},
+    });
+    await provider.provision(request);
+
+    await expect(
+      provider.exec({
+        sandboxId: "sbx_demo",
+        providerHandle: "appaloft-sbx_demo",
+        argv: ["agent", "run"],
+        background: true,
+      }),
+    ).rejects.toThrow("docker_background_process_start_unobservable");
+
+    expect(runner.backgroundStartObservationCalls).toBe(20);
+    expect(runner.calls.at(-1)?.argv.join(" ")).toContain("appaloft-background-cleanup");
   });
 
   test("[SBX-PROC-001] cleans up a detached process when private input delivery fails", async () => {
