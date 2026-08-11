@@ -121,6 +121,25 @@ function parseRendererEvent(value: unknown): WorkspaceControlRendererEvent | und
             action: record.action,
           }
         : undefined;
+    case "snapshot-create":
+      return boundedText(record.workspaceId, 160) &&
+        (record.capability === "filesystem" || record.capability === "filesystem-memory") &&
+        (record.ttlDays === 1 || record.ttlDays === 7 || record.ttlDays === 30)
+        ? {
+            type: "snapshot-create",
+            workspaceId: record.workspaceId,
+            capability: record.capability,
+            ttlDays: record.ttlDays,
+          }
+        : undefined;
+    case "snapshot-delete":
+      return boundedText(record.workspaceId, 160) && boundedText(record.snapshotId, 160)
+        ? {
+            type: "snapshot-delete",
+            workspaceId: record.workspaceId,
+            snapshotId: record.snapshotId,
+          }
+        : undefined;
     case "preview-expose":
       return typeof record.workspaceId === "string" &&
         typeof record.port === "number" &&

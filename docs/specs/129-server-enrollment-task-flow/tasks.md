@@ -31,5 +31,5 @@
 
 - [x] Run focused CLI tests, lint, typecheck, full tests and build.
 - [x] Update localized docs/help, ADR verification, operation map and traceability.
-- [ ] Merge public implementation, close the Ticket and update the Cloud gitlink after independent
+- [x] Merge public implementation through PR #1038, close Ticket #1037 and update the Cloud gitlink after independent
   boundary review.

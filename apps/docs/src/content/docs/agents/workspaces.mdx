@@ -104,6 +104,9 @@ Workspace；它通过现有公开查询显示 Workspace、Agent Runtime、Previe
 - `d`：打开从当前 detail 推导的交付操作。可以创建默认 private、明确选择 1 小时/8 小时/24
   小时 TTL 的 Preview，撤销已有 Preview，批准或交付符合状态的 Task，以及接受/重试符合状态的
   Promotion；撤销、批准、Git/PR 交付和 Promotion 操作都需要单独按 `y` 确认；
+- `s`：打开恢复操作。可以用 `filesystem` 或 `filesystem-memory` capability 创建保留 1、7 或
+  30 天的 Snapshot，也可以删除当前 detail 中状态允许删除的精确 Snapshot；创建和删除都需要
+  单独按 `y` 确认；
 - `Ctrl+]`：把按键所有权从 Agent 交还给 Workspace 导航，不停止或 detach Agent；
 - `f`：在同一个 Terminal Session/本地 PTY 上切换 Focus Mode，不启动第二个 Agent；
 - `r`：刷新现有公开 read model；`R`：用同一 Session identity 手动重连；
@@ -111,7 +114,10 @@ Workspace；它通过现有公开查询显示 Workspace、Agent Runtime、Previe
 
 TUI 断开或退出只 detach 客户端。TUI 生命周期操作调用与显式 headless 子命令相同的公开命令；
 暂停或终止前会先 detach 当前 Agent viewport，之后重新读取 Workspace 状态，而不是在本地乐观
-修改状态。交付操作不会 detach 当前 Agent Session。带 deployment identity 的 Promotion 会查询
+修改状态。交付和 Snapshot 操作都不会 detach 当前 Agent Session。恢复区域还显示请求/实际隔离、
+provision attempts、暂停连续性和当前 Workspace 的 Snapshot。终止/过期 Workspace 的
+`Workspace-owned cleanup` 只根据有界 Runtime 与 Preview 查询判定 `clear` 或 `residual`；它不是
+主机或 provider 零残留证明。带 deployment identity 的 Promotion 会查询
 权威 Deployment Proof，并显示 verdict、mismatch 数和 unavailable evidence 数；Promotion status
 不会被伪装成 proof。交付失败会保留有界表单值供修改或重试，credential 不会进入 renderer
 协议。脚本、CI、无 TTY 环境或不希望加载 renderer 时使用：
@@ -123,7 +129,8 @@ appaloft workspace list
 ```
 
 等价的 headless 入口仍是 `workspace preview`、`sandbox port revoke`、`workspace task
-approve/deliver`、`sandbox promote accept/retry` 和 `deployment proof`。
+approve/deliver`、`sandbox promote accept/retry`、`deployment proof`，以及 `sandbox show`、
+`sandbox snapshot list/create/show/delete`。
 
 这些路径不会初始化 renderer，并返回稳定的 headless 状态或继续执行现有子命令。Windows 当前仅
 保证 help/headless 命令安全；嵌入模式需要独立的 release 与终端验收。

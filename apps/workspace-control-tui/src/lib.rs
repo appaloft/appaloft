@@ -80,6 +80,56 @@ pub struct DeploymentProofSummary {
     pub unavailable_evidence_count: usize,
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SuspensionSummary {
+    pub mode: String,
+    pub portability: String,
+    #[serde(default)]
+    pub recovery_family: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SnapshotSummary {
+    pub snapshot_id: String,
+    pub capability: String,
+    pub reason: String,
+    pub portability: String,
+    #[serde(default)]
+    pub recovery_family: Option<String>,
+    pub status: String,
+    pub created_at: String,
+    #[serde(default)]
+    pub expires_at: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupSummary {
+    pub state: String,
+    pub active_runtime_count: usize,
+    pub active_preview_count: usize,
+    pub scope: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoverySummary {
+    #[serde(default)]
+    pub requested_isolation: Option<String>,
+    #[serde(default)]
+    pub realized_isolation: Option<String>,
+    #[serde(default)]
+    pub provision_attempts: Option<usize>,
+    #[serde(default)]
+    pub suspension: Option<SuspensionSummary>,
+    #[serde(default)]
+    pub snapshots: Vec<SnapshotSummary>,
+    #[serde(default)]
+    pub cleanup: CleanupSummary,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct DetailMessage {
@@ -92,6 +142,8 @@ pub struct DetailMessage {
     pub tasks: Vec<TaskSummary>,
     #[serde(default)]
     pub promotions: Vec<PromotionSummary>,
+    #[serde(default)]
+    pub recovery: RecoverySummary,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
@@ -128,6 +180,43 @@ pub enum ActionDecision {
     None,
     Dispatch(LifecycleAction),
     AwaitConfirmation,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RecoveryAction {
+    CreateSnapshot,
+    DeleteSnapshot { snapshot_id: String },
+}
+
+impl RecoveryAction {
+    pub fn label(&self) -> String {
+        match self {
+            Self::CreateSnapshot => "Create Recovery Snapshot".to_owned(),
+            Self::DeleteSnapshot { snapshot_id } => {
+                format!("Delete Snapshot {snapshot_id}")
+            }
+        }
+    }
+}
+
+pub fn recovery_actions_for_detail(detail: &DetailMessage) -> Vec<RecoveryAction> {
+    let mut actions =
+        if detail.workspace.status == "terminated" || detail.workspace.status == "expired" {
+            Vec::new()
+        } else {
+            vec![RecoveryAction::CreateSnapshot]
+        };
+    actions.extend(
+        detail
+            .recovery
+            .snapshots
+            .iter()
+            .filter(|snapshot| snapshot.status != "deleting" && snapshot.status != "deleted")
+            .map(|snapshot| RecoveryAction::DeleteSnapshot {
+                snapshot_id: snapshot.snapshot_id.clone(),
+            }),
+    );
+    actions
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -267,6 +356,53 @@ pub enum DeliveryDecision {
     Dispatch(DeliverySubmission),
 }
 
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum SnapshotCapability {
+    Filesystem,
+    FilesystemMemory,
+}
+
+impl SnapshotCapability {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Filesystem => "filesystem",
+            Self::FilesystemMemory => "filesystem + memory",
+        }
+    }
+
+    fn next(self, delta: isize) -> Self {
+        let values = [Self::Filesystem, Self::FilesystemMemory];
+        let index = values.iter().position(|value| *value == self).unwrap_or(0) as isize;
+        values[(index + delta).rem_euclid(values.len() as isize) as usize]
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RecoveryForm {
+    pub capability: SnapshotCapability,
+    pub ttl_days: u8,
+    pub field: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RecoverySubmission {
+    CreateSnapshot {
+        capability: SnapshotCapability,
+        ttl_days: u8,
+    },
+    DeleteSnapshot {
+        snapshot_id: String,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RecoveryDecision {
+    None,
+    FormOpened,
+    AwaitConfirmation,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DeliveryForm {
     Preview {
@@ -311,6 +447,10 @@ pub enum ParentMessage {
         exit_code: Option<i32>,
     },
     DeliveryComplete {
+        #[serde(rename = "workspaceId")]
+        workspace_id: String,
+    },
+    RecoveryComplete {
         #[serde(rename = "workspaceId")]
         workspace_id: String,
     },
@@ -391,6 +531,19 @@ pub enum RendererEvent {
         #[serde(rename = "promotionId")]
         promotion_id: String,
     },
+    SnapshotCreate {
+        #[serde(rename = "workspaceId")]
+        workspace_id: String,
+        capability: SnapshotCapability,
+        #[serde(rename = "ttlDays")]
+        ttl_days: u8,
+    },
+    SnapshotDelete {
+        #[serde(rename = "workspaceId")]
+        workspace_id: String,
+        #[serde(rename = "snapshotId")]
+        snapshot_id: String,
+    },
     TerminalInput {
         data: String,
     },
@@ -448,6 +601,23 @@ impl RendererEvent {
             },
         }
     }
+
+    pub fn recovery(workspace_id: String, submission: RecoverySubmission) -> Self {
+        match submission {
+            RecoverySubmission::CreateSnapshot {
+                capability,
+                ttl_days,
+            } => Self::SnapshotCreate {
+                workspace_id,
+                capability,
+                ttl_days,
+            },
+            RecoverySubmission::DeleteSnapshot { snapshot_id } => Self::SnapshotDelete {
+                workspace_id,
+                snapshot_id,
+            },
+        }
+    }
 }
 
 pub struct AppState {
@@ -467,6 +637,11 @@ pub struct AppState {
     pub delivery_form: Option<DeliveryForm>,
     pub pending_delivery_confirmation: Option<DeliverySubmission>,
     pub delivery_busy: bool,
+    pub recovery_menu_open: bool,
+    pub recovery_selected: usize,
+    pub recovery_form: Option<RecoveryForm>,
+    pub pending_recovery_confirmation: Option<RecoverySubmission>,
+    pub recovery_busy: bool,
     pub status_line: String,
     pub terminal: vt100::Parser,
     pub terminal_size: (u16, u16),
@@ -491,6 +666,11 @@ impl Default for AppState {
             delivery_form: None,
             pending_delivery_confirmation: None,
             delivery_busy: false,
+            recovery_menu_open: false,
+            recovery_selected: 0,
+            recovery_form: None,
+            pending_recovery_confirmation: None,
+            recovery_busy: false,
             status_line: "Connecting to Appaloft…".to_owned(),
             terminal: vt100::Parser::new(24, 80, 10_000),
             terminal_size: (80, 24),
@@ -540,6 +720,9 @@ impl AppState {
                 self.delivery_busy = false;
                 self.delivery_form = None;
                 self.pending_delivery_confirmation = None;
+                self.recovery_busy = false;
+                self.recovery_form = None;
+                self.pending_recovery_confirmation = None;
             }
             ParentMessage::TerminalReady {
                 runtime_id,
@@ -570,6 +753,12 @@ impl AppState {
                 self.pending_delivery_confirmation = None;
                 self.status_line = format!("Workspace {workspace_id} delivery action completed");
             }
+            ParentMessage::RecoveryComplete { workspace_id } => {
+                self.recovery_busy = false;
+                self.recovery_form = None;
+                self.pending_recovery_confirmation = None;
+                self.status_line = format!("Workspace {workspace_id} recovery action completed");
+            }
             ParentMessage::Error {
                 code,
                 phase,
@@ -577,6 +766,7 @@ impl AppState {
             } => {
                 self.action_busy = false;
                 self.delivery_busy = false;
+                self.recovery_busy = false;
                 self.status_line = format!(
                     "{code} at {phase}{}",
                     if retryable { " — retry with r" } else { "" }
@@ -598,6 +788,9 @@ impl AppState {
         self.delivery_menu_open = false;
         self.delivery_form = None;
         self.pending_delivery_confirmation = None;
+        self.recovery_menu_open = false;
+        self.recovery_form = None;
+        self.pending_recovery_confirmation = None;
         self.selected_workspace_id().map(str::to_owned)
     }
 
@@ -937,6 +1130,135 @@ impl AppState {
         self.delivery_busy = true;
         Some(submission)
     }
+
+    pub fn available_recovery_actions(&self) -> Vec<RecoveryAction> {
+        self.detail
+            .as_ref()
+            .map(recovery_actions_for_detail)
+            .unwrap_or_default()
+    }
+
+    pub fn open_recovery_menu(&mut self) -> bool {
+        if self.recovery_busy || self.available_recovery_actions().is_empty() {
+            return false;
+        }
+        self.recovery_selected = 0;
+        self.recovery_menu_open = true;
+        self.recovery_form = None;
+        self.pending_recovery_confirmation = None;
+        true
+    }
+
+    pub fn close_recovery_surface(&mut self) {
+        if self.recovery_busy {
+            return;
+        }
+        self.recovery_menu_open = false;
+        self.recovery_form = None;
+        self.pending_recovery_confirmation = None;
+    }
+
+    pub fn move_recovery_selection(&mut self, delta: isize) {
+        let actions = self.available_recovery_actions();
+        if actions.is_empty() {
+            self.recovery_selected = 0;
+            return;
+        }
+        let last = actions.len().saturating_sub(1) as isize;
+        self.recovery_selected = (self.recovery_selected as isize + delta).clamp(0, last) as usize;
+    }
+
+    pub fn activate_selected_recovery_action(&mut self) -> RecoveryDecision {
+        if !self.recovery_menu_open || self.recovery_busy {
+            return RecoveryDecision::None;
+        }
+        let Some(action) = self
+            .available_recovery_actions()
+            .get(self.recovery_selected)
+            .cloned()
+        else {
+            return RecoveryDecision::None;
+        };
+        self.recovery_menu_open = false;
+        match action {
+            RecoveryAction::CreateSnapshot => {
+                self.recovery_form = Some(RecoveryForm {
+                    capability: SnapshotCapability::Filesystem,
+                    ttl_days: 1,
+                    field: 0,
+                });
+                RecoveryDecision::FormOpened
+            }
+            RecoveryAction::DeleteSnapshot { snapshot_id } => {
+                self.pending_recovery_confirmation =
+                    Some(RecoverySubmission::DeleteSnapshot { snapshot_id });
+                RecoveryDecision::AwaitConfirmation
+            }
+        }
+    }
+
+    pub fn recovery_form_next_field(&mut self) {
+        if let Some(form) = self.recovery_form.as_mut()
+            && !self.recovery_busy
+        {
+            form.field = (form.field + 1) % 2;
+        }
+    }
+
+    pub fn recovery_form_previous_field(&mut self) {
+        if let Some(form) = self.recovery_form.as_mut()
+            && !self.recovery_busy
+        {
+            form.field = (form.field + 1) % 2;
+        }
+    }
+
+    pub fn recovery_form_cycle_choice(&mut self, delta: isize) {
+        let Some(form) = self.recovery_form.as_mut() else {
+            return;
+        };
+        if self.recovery_busy {
+            return;
+        }
+        if form.field == 0 {
+            form.capability = form.capability.next(delta);
+        } else {
+            let values = [1_u8, 7, 30];
+            let index = values
+                .iter()
+                .position(|value| *value == form.ttl_days)
+                .unwrap_or(0) as isize;
+            form.ttl_days = values[(index + delta).rem_euclid(values.len() as isize) as usize];
+        }
+    }
+
+    pub fn submit_recovery_form(&mut self) -> RecoveryDecision {
+        if self.recovery_busy {
+            return RecoveryDecision::None;
+        }
+        let Some(form) = self.recovery_form.as_ref() else {
+            return RecoveryDecision::None;
+        };
+        self.pending_recovery_confirmation = Some(RecoverySubmission::CreateSnapshot {
+            capability: form.capability,
+            ttl_days: form.ttl_days,
+        });
+        RecoveryDecision::AwaitConfirmation
+    }
+
+    pub fn confirm_recovery_action(&mut self, confirmed: bool) -> Option<RecoverySubmission> {
+        if !confirmed {
+            self.pending_recovery_confirmation = None;
+            self.recovery_form = None;
+            return None;
+        }
+        if self.recovery_busy {
+            return None;
+        }
+        let submission = self.pending_recovery_confirmation.clone()?;
+        self.recovery_busy = true;
+        Some(submission)
+    }
 }
 
 pub fn terminal_key_bytes(key: KeyEvent) -> Option<String> {
@@ -1206,8 +1528,55 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
                 })
                 .collect::<Vec<_>>()
                 .join("\n");
+            let isolation = format!(
+                "{} -> {}  attempts:{}",
+                detail
+                    .recovery
+                    .requested_isolation
+                    .as_deref()
+                    .unwrap_or("unknown"),
+                detail
+                    .recovery
+                    .realized_isolation
+                    .as_deref()
+                    .unwrap_or("unknown"),
+                detail
+                    .recovery
+                    .provision_attempts
+                    .map(|attempts| attempts.to_string())
+                    .unwrap_or_else(|| "unknown".to_owned())
+            );
+            let suspension = detail
+                .recovery
+                .suspension
+                .as_ref()
+                .map(|suspension| {
+                    format!(
+                        "{}  {}  {}",
+                        suspension.mode,
+                        suspension.portability,
+                        suspension.recovery_family.as_deref().unwrap_or("no family")
+                    )
+                })
+                .unwrap_or_else(|| "not suspended".to_owned());
+            let snapshots = detail
+                .recovery
+                .snapshots
+                .iter()
+                .map(|snapshot| {
+                    format!(
+                        "{}  {}  {}  {}",
+                        snapshot.snapshot_id,
+                        snapshot.status,
+                        snapshot.capability,
+                        snapshot.portability
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            let cleanup = &detail.recovery.cleanup;
             format!(
-                "Workspace  {}\nStatus     {}\nProvider   {}\n\nAgent Runtime(s)\n{}\n\nPorts\n{}\n\nTasks\n{}\n\nPromotions\n{}",
+                "Workspace  {}\nStatus     {}\nProvider   {}\n\nRecovery\nIsolation  {}\nContinuity {}\nSnapshot(s)\n{}\nWorkspace-owned cleanup: {}\nactive runtimes:{}  previews:{}\nBounded readback; not host/provider proof\n\nAgent Runtime(s)\n{}\n\nPorts\n{}\n\nTasks\n{}\n\nPromotions\n{}",
                 detail.workspace.workspace_id,
                 detail.workspace.status,
                 detail
@@ -1215,6 +1584,16 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
                     .provider_key
                     .as_deref()
                     .unwrap_or("unknown"),
+                isolation,
+                suspension,
+                if snapshots.is_empty() {
+                    "none"
+                } else {
+                    &snapshots
+                },
+                cleanup.state,
+                cleanup.active_runtime_count,
+                cleanup.active_preview_count,
                 runtimes,
                 if ports.is_empty() { "none" } else { &ports },
                 if tasks.is_empty() { "none" } else { &tasks },
@@ -1245,7 +1624,7 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
     }
     frame.render_widget(
         Paragraph::new(format!(
-            " {}  │  ↑↓ select  Enter attach/focus  a lifecycle  d delivery  Ctrl+] release  f Focus Mode  r refresh  R reconnect  q quit ",
+            " {}  │  ↑↓ select  Enter attach/focus  a lifecycle  d delivery  s recovery  Ctrl+] release  f Focus Mode  r refresh  R reconnect  q quit ",
             state.status_line
         ))
         .style(Style::default().fg(Color::DarkGray)),
@@ -1301,6 +1680,118 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
         frame.render_widget(
             Paragraph::new("Terminate this Workspace and its Agent runtimes?\nPress y to confirm, n or Esc to cancel.")
                 .block(Block::default().title(" Confirm destructive action ").borders(Borders::ALL))
+                .wrap(Wrap { trim: false }),
+            dialog,
+        );
+    } else if state.recovery_menu_open {
+        let actions = state.available_recovery_actions();
+        let width = 68_u16.min(area.width.saturating_sub(2)).max(2);
+        let height = (actions.len() as u16 + 2)
+            .min(area.height.saturating_sub(2))
+            .max(3);
+        let menu = Rect::new(
+            area.x + area.width.saturating_sub(width) / 2,
+            area.y + area.height.saturating_sub(height) / 2,
+            width,
+            height,
+        );
+        frame.render_widget(Clear, menu);
+        frame.render_widget(
+            List::new(actions.iter().enumerate().map(|(index, action)| {
+                let marker = if index == state.recovery_selected {
+                    "›"
+                } else {
+                    " "
+                };
+                ListItem::new(format!("{marker} {}", action.label())).style(
+                    if index == state.recovery_selected {
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default()
+                    },
+                )
+            }))
+            .block(
+                Block::default()
+                    .title(" Recovery Actions ")
+                    .borders(Borders::ALL),
+            ),
+            menu,
+        );
+    } else if let Some(submission) = &state.pending_recovery_confirmation {
+        let description = match submission {
+            RecoverySubmission::CreateSnapshot {
+                capability,
+                ttl_days,
+            } => format!(
+                "Create a {} recovery Snapshot retained for {} day(s)?",
+                capability.label(),
+                ttl_days
+            ),
+            RecoverySubmission::DeleteSnapshot { snapshot_id } => {
+                format!("Delete recovery Snapshot {snapshot_id}?")
+            }
+        };
+        let width = 72_u16.min(area.width.saturating_sub(2)).max(2);
+        let height = 6_u16.min(area.height.saturating_sub(2)).max(3);
+        let dialog = Rect::new(
+            area.x + area.width.saturating_sub(width) / 2,
+            area.y + area.height.saturating_sub(height) / 2,
+            width,
+            height,
+        );
+        frame.render_widget(Clear, dialog);
+        frame.render_widget(
+            Paragraph::new(format!(
+                "{description}\nPress y to confirm, n or Esc to cancel.{}",
+                if state.recovery_busy {
+                    "\nWorking…"
+                } else {
+                    ""
+                }
+            ))
+            .block(
+                Block::default()
+                    .title(" Confirm recovery action ")
+                    .borders(Borders::ALL),
+            )
+            .wrap(Wrap { trim: false }),
+            dialog,
+        );
+    } else if let Some(form) = &state.recovery_form {
+        let lines = [
+            format!(
+                "{} Capability: {}",
+                if form.field == 0 { "›" } else { " " },
+                form.capability.label()
+            ),
+            format!(
+                "{} Retention: {} day(s)",
+                if form.field == 1 { "›" } else { " " },
+                form.ttl_days
+            ),
+            "Tab/Shift+Tab fields · ←→ choices · Enter review · Esc cancel".to_owned(),
+        ];
+        let width = 72_u16.min(area.width.saturating_sub(2)).max(2);
+        let height = (lines.len() as u16 + 2)
+            .min(area.height.saturating_sub(2))
+            .max(3);
+        let dialog = Rect::new(
+            area.x + area.width.saturating_sub(width) / 2,
+            area.y + area.height.saturating_sub(height) / 2,
+            width,
+            height,
+        );
+        frame.render_widget(Clear, dialog);
+        frame.render_widget(
+            Paragraph::new(lines.join("\n"))
+                .block(
+                    Block::default()
+                        .title(" Create Recovery Snapshot ")
+                        .borders(Borders::ALL),
+                )
                 .wrap(Wrap { trim: false }),
             dialog,
         );
@@ -1575,6 +2066,7 @@ mod tests {
                     }),
                     expires_at: None,
                 }],
+                recovery: RecoverySummary::default(),
             },
         });
         let backend = ratatui::backend::TestBackend::new(120, 32);
@@ -1617,6 +2109,264 @@ mod tests {
     }
 
     #[test]
+    fn ws_tui_recovery_palette_uses_only_current_snapshot_targets() {
+        let detail = DetailMessage {
+            workspace: WorkspaceSummary {
+                workspace_id: "sbx_1".to_owned(),
+                status: "ready".to_owned(),
+                provider_key: None,
+                source_kind: None,
+            },
+            runtimes: Vec::new(),
+            ports: Vec::new(),
+            tasks: Vec::new(),
+            promotions: Vec::new(),
+            recovery: RecoverySummary {
+                requested_isolation: Some("gvisor".to_owned()),
+                realized_isolation: Some("gvisor".to_owned()),
+                provision_attempts: Some(2),
+                suspension: None,
+                snapshots: vec![
+                    SnapshotSummary {
+                        snapshot_id: "ssn_ready".to_owned(),
+                        capability: "filesystem".to_owned(),
+                        reason: "manual".to_owned(),
+                        portability: "provider-local".to_owned(),
+                        recovery_family: None,
+                        status: "ready".to_owned(),
+                        created_at: "2026-08-11T00:00:00.000Z".to_owned(),
+                        expires_at: None,
+                    },
+                    SnapshotSummary {
+                        snapshot_id: "ssn_deleting".to_owned(),
+                        capability: "filesystem".to_owned(),
+                        reason: "manual".to_owned(),
+                        portability: "provider-local".to_owned(),
+                        recovery_family: None,
+                        status: "deleting".to_owned(),
+                        created_at: "2026-08-10T00:00:00.000Z".to_owned(),
+                        expires_at: None,
+                    },
+                ],
+                cleanup: CleanupSummary {
+                    state: "not-applicable".to_owned(),
+                    active_runtime_count: 0,
+                    active_preview_count: 0,
+                    scope: "workspace-owned-readback".to_owned(),
+                },
+            },
+        };
+
+        assert_eq!(
+            recovery_actions_for_detail(&detail),
+            vec![
+                RecoveryAction::CreateSnapshot,
+                RecoveryAction::DeleteSnapshot {
+                    snapshot_id: "ssn_ready".to_owned(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn ws_tui_recovery_form_confirmation_and_events_are_bounded() {
+        let mut state = AppState::default();
+        state.session_id = Some("term_same".to_owned());
+        state.runtime_id = Some("sar_same".to_owned());
+        state.detail = Some(DetailMessage {
+            workspace: WorkspaceSummary {
+                workspace_id: "sbx_1".to_owned(),
+                status: "ready".to_owned(),
+                provider_key: None,
+                source_kind: None,
+            },
+            runtimes: Vec::new(),
+            ports: Vec::new(),
+            tasks: Vec::new(),
+            promotions: Vec::new(),
+            recovery: RecoverySummary {
+                snapshots: vec![SnapshotSummary {
+                    snapshot_id: "ssn_1".to_owned(),
+                    capability: "filesystem".to_owned(),
+                    reason: "manual".to_owned(),
+                    portability: "provider-local".to_owned(),
+                    recovery_family: None,
+                    status: "ready".to_owned(),
+                    created_at: "2026-08-11T00:00:00.000Z".to_owned(),
+                    expires_at: None,
+                }],
+                ..RecoverySummary::default()
+            },
+        });
+
+        assert!(state.open_recovery_menu());
+        assert_eq!(
+            state.activate_selected_recovery_action(),
+            RecoveryDecision::FormOpened
+        );
+        state.recovery_form_cycle_choice(1);
+        state.recovery_form_next_field();
+        state.recovery_form_cycle_choice(1);
+        assert_eq!(
+            state.submit_recovery_form(),
+            RecoveryDecision::AwaitConfirmation
+        );
+        let create = state
+            .confirm_recovery_action(true)
+            .expect("confirm Snapshot create");
+        assert_eq!(
+            create,
+            RecoverySubmission::CreateSnapshot {
+                capability: SnapshotCapability::FilesystemMemory,
+                ttl_days: 7,
+            }
+        );
+        assert_eq!(state.session_id.as_deref(), Some("term_same"));
+        assert_eq!(state.runtime_id.as_deref(), Some("sar_same"));
+        assert_eq!(
+            serde_json::to_string(&RendererEvent::recovery("sbx_1".to_owned(), create))
+                .expect("serialize Snapshot create"),
+            r#"{"type":"snapshot-create","workspaceId":"sbx_1","capability":"filesystem-memory","ttlDays":7}"#
+        );
+
+        state.recovery_busy = false;
+        assert!(state.open_recovery_menu());
+        state.move_recovery_selection(1);
+        assert_eq!(
+            state.activate_selected_recovery_action(),
+            RecoveryDecision::AwaitConfirmation
+        );
+        let delete = state
+            .confirm_recovery_action(true)
+            .expect("confirm Snapshot delete");
+        assert_eq!(
+            serde_json::to_string(&RendererEvent::recovery("sbx_1".to_owned(), delete))
+                .expect("serialize Snapshot delete"),
+            r#"{"type":"snapshot-delete","workspaceId":"sbx_1","snapshotId":"ssn_1"}"#
+        );
+    }
+
+    #[test]
+    fn ws_tui_renders_recovery_capability_snapshot_and_bounded_cleanup_copy() {
+        let mut state = AppState::default();
+        state.detail = Some(DetailMessage {
+            workspace: WorkspaceSummary {
+                workspace_id: "sbx_1".to_owned(),
+                status: "terminated".to_owned(),
+                provider_key: Some("registered-server".to_owned()),
+                source_kind: Some("template".to_owned()),
+            },
+            runtimes: Vec::new(),
+            ports: Vec::new(),
+            tasks: Vec::new(),
+            promotions: Vec::new(),
+            recovery: RecoverySummary {
+                requested_isolation: Some("gvisor".to_owned()),
+                realized_isolation: Some("gvisor".to_owned()),
+                provision_attempts: Some(2),
+                suspension: Some(SuspensionSummary {
+                    mode: "compute-released".to_owned(),
+                    portability: "provider-family".to_owned(),
+                    recovery_family: Some("docker-linux-amd64".to_owned()),
+                }),
+                snapshots: vec![SnapshotSummary {
+                    snapshot_id: "ssn_1".to_owned(),
+                    capability: "filesystem".to_owned(),
+                    reason: "pre-termination".to_owned(),
+                    portability: "provider-family".to_owned(),
+                    recovery_family: Some("docker-linux-amd64".to_owned()),
+                    status: "ready".to_owned(),
+                    created_at: "2026-08-11T00:00:00.000Z".to_owned(),
+                    expires_at: Some("2026-08-18T00:00:00.000Z".to_owned()),
+                }],
+                cleanup: CleanupSummary {
+                    state: "clear".to_owned(),
+                    active_runtime_count: 0,
+                    active_preview_count: 0,
+                    scope: "workspace-owned-readback".to_owned(),
+                },
+            },
+        });
+        let backend = ratatui::backend::TestBackend::new(140, 38);
+        let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw recovery evidence");
+        let rendered =
+            terminal
+                .backend()
+                .buffer()
+                .content()
+                .iter()
+                .fold(String::new(), |mut output, cell| {
+                    output.push_str(cell.symbol());
+                    output
+                });
+        assert!(rendered.contains("gvisor"));
+        assert!(rendered.contains("compute-released"));
+        assert!(rendered.contains("ssn_1"));
+        assert!(rendered.contains("Workspace-owned cleanup: clear"));
+        assert!(rendered.contains("not host/provider"));
+    }
+
+    #[test]
+    fn ws_tui_renders_recovery_palette_and_bounded_create_form() {
+        let mut state = AppState::default();
+        state.detail = Some(DetailMessage {
+            workspace: WorkspaceSummary {
+                workspace_id: "sbx_1".to_owned(),
+                status: "ready".to_owned(),
+                provider_key: None,
+                source_kind: None,
+            },
+            runtimes: Vec::new(),
+            ports: Vec::new(),
+            tasks: Vec::new(),
+            promotions: Vec::new(),
+            recovery: RecoverySummary::default(),
+        });
+        assert!(state.open_recovery_menu());
+        let backend = ratatui::backend::TestBackend::new(100, 28);
+        let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw recovery palette");
+        let palette =
+            terminal
+                .backend()
+                .buffer()
+                .content()
+                .iter()
+                .fold(String::new(), |mut output, cell| {
+                    output.push_str(cell.symbol());
+                    output
+                });
+        assert!(palette.contains("Recovery Actions"));
+        assert!(palette.contains("Create Recovery Snapshot"));
+
+        assert_eq!(
+            state.activate_selected_recovery_action(),
+            RecoveryDecision::FormOpened
+        );
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw recovery form");
+        let form =
+            terminal
+                .backend()
+                .buffer()
+                .content()
+                .iter()
+                .fold(String::new(), |mut output, cell| {
+                    output.push_str(cell.symbol());
+                    output
+                });
+        assert!(form.contains("Create Recovery Snapshot"));
+        assert!(form.contains("filesystem"));
+        assert!(form.contains("1 day"));
+    }
+
+    #[test]
     fn ws_tui_terminate_requires_explicit_confirmation_and_cancel_is_safe() {
         let mut state = AppState::default();
         state.apply(ParentMessage::Workspaces {
@@ -1634,6 +2384,7 @@ mod tests {
                 ports: Vec::new(),
                 tasks: Vec::new(),
                 promotions: Vec::new(),
+                recovery: RecoverySummary::default(),
             },
         });
 
@@ -1736,6 +2487,7 @@ mod tests {
                     expires_at: None,
                 },
             ],
+            recovery: RecoverySummary::default(),
         };
 
         assert_eq!(
@@ -1867,6 +2619,7 @@ mod tests {
                     status: "approved".to_owned(),
                 }],
                 promotions: Vec::new(),
+                recovery: RecoverySummary::default(),
             },
         });
         state
