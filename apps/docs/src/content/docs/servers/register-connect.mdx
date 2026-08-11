@@ -14,10 +14,14 @@ searchAliases:
   - "连接测试"
   - "工作负载角色"
   - "通用服务器"
+  - "server enroll"
 relatedOperations:
   - "servers.register"
+  - "servers.configure-credential"
   - "servers.configure-workload-roles"
   - "servers.test-connectivity"
+  - "servers.prepare-runtime"
+  - "servers.show"
   - "servers.rename"
   - "servers.deactivate"
   - "servers.delete"
@@ -102,6 +106,34 @@ appaloft server configure-workload-roles srv_primary
 ## CLI 操作步骤
 
 <a id="server-connectivity-test" />
+
+推荐先用一条任务命令完成本机或 SSH 服务器接入：
+
+```bash
+# 本机 Mac/Linux direct target
+appaloft server enroll --local --name "Local machine"
+
+# 使用本地 SSH agent 接入 VPS
+appaloft server enroll ssh://deploy@203.0.113.10:22 --name primary
+
+# 或从本地文件读取私钥；私钥内容不会进入 argv、输出或 Server readback
+appaloft server enroll ssh://deploy@203.0.113.10 \
+  --private-key-file ~/.ssh/appaloft_deploy
+
+# 也可以复用已保存的 SSH credential
+appaloft server enroll ssh://deploy@203.0.113.10 \
+  --credential-id sshcred_primary
+```
+
+`enroll` 依次复用注册、凭据绑定、连接诊断、runtime prepare 和 Server show。注册成功后会先输出
+`server-enrollment-checkpoint/v1` 和 `serverId`；只有 runtime prepare 返回 `ready` 并完成真实 readback
+才输出 `server-enrollment/v1`。后续步骤失败时不会自动删除 Server，可用该 id 继续执行
+`server credential`、`server doctor`、`server runtime prepare` 或 `server show`。
+
+SSH target 只接受 `ssh://user@host[:port]`。含 password、path、query、fragment 或其他 scheme 的输入会在
+注册前被拒绝。
+
+以下粒度命令仍适合脚本和手动修复：
 
 ```bash
 # 注册一台 IPv4 服务器

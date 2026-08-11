@@ -180,6 +180,11 @@ Implemented operations:
   the canonical `deployment-runtime`, `artifact-builder`, and `sandbox-worker` vocabulary. Registration
   may omit roles; configuration atomically replaces the complete set; list/show return the normalized
   set; and `[]` means general-purpose/unrestricted by role.
+- `appaloft server enroll --local` and `appaloft server enroll ssh://user@host[:port]` are CLI task
+  presentation over existing `servers.register`, `servers.configure-credential`,
+  `servers.test-connectivity`, `servers.prepare-runtime`, and `servers.show` messages. Enrollment
+  adds no operation key, lifecycle, event, API, persistence, or Cloud-only state; granular commands
+  remain the repair and automation surface.
 - Server Workload Roles express new-placement intent independently of target kind, lifecycle,
   connectivity, readiness, provider capability, isolation, capacity, and private policy. Role
   changes do not drain, stop, move, cancel, or reinterpret existing workload bindings or accepted

@@ -3,11 +3,10 @@
 ## Status
 
 - Round: Spec
-- Artifact state: proposed for public review
-- Code changes allowed: no, until this Spec and ADR-108 are accepted and an actor-visible Ticket is
-  marked `ready-for-agent`
+- Artifact state: accepted and implemented under public Ticket #1037
+- Code changes allowed: yes, through the accepted Ticket and this governing contract
 - Compatibility: additive CLI task presentation over existing public operations
-- Governing decision: proposed ADR-108
+- Governing decision: accepted ADR-108
 
 ## Business Outcome
 

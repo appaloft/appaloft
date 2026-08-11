@@ -12,10 +12,14 @@ searchAliases:
   - "workload role"
   - "general purpose server"
   - "docker swarm"
+  - "server enroll"
 relatedOperations:
   - "servers.register"
+  - "servers.configure-credential"
   - "servers.configure-workload-roles"
   - "servers.test-connectivity"
+  - "servers.prepare-runtime"
+  - "servers.show"
   - "servers.rename"
   - "servers.deactivate"
   - "servers.delete"
@@ -98,6 +102,35 @@ Use `appaloft server list` or `appaloft server show <serverId>` to read the norm
 ## CLI steps
 
 <a id="server-connectivity-test" />
+
+Prefer the single task command when onboarding the local machine or an SSH server:
+
+```bash
+# Local Mac/Linux direct target
+appaloft server enroll --local --name "Local machine"
+
+# Enroll a VPS through the local SSH agent
+appaloft server enroll ssh://deploy@203.0.113.10:22 --name primary
+
+# Or read a private key from a local file; key bytes never enter argv, output, or Server readback
+appaloft server enroll ssh://deploy@203.0.113.10 \
+  --private-key-file ~/.ssh/appaloft_deploy
+
+# A stored SSH credential can also be reused
+appaloft server enroll ssh://deploy@203.0.113.10 \
+  --credential-id sshcred_primary
+```
+
+`enroll` reuses registration, credential attachment, connectivity diagnostics, runtime preparation,
+and Server show in order. After registration it first prints a `server-enrollment-checkpoint/v1`
+value with the `serverId`. It prints `server-enrollment/v1` only after runtime preparation reports
+`ready` and real readback completes. A later failure does not delete the Server; use that id with
+`server credential`, `server doctor`, `server runtime prepare`, or `server show` to repair and retry.
+
+The SSH target accepts only `ssh://user@host[:port]`. Passwords, paths, queries, fragments, and
+other schemes are rejected before registration.
+
+The granular commands below remain available for scripts and manual repair:
 
 ```bash
 # Register an IPv4 server

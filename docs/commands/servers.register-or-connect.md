@@ -54,6 +54,13 @@ This file defines only server/proxy command responsibilities and lifecycle seman
 | `servers.bootstrap-proxy` | Process manager, worker, CLI/API explicit repair | Lifecycle command for edge proxy bootstrap or repair | New proxy bootstrap attempt is accepted for an operable server. |
 | `servers.prepare-runtime` | Web, CLI, API, automation | Idempotent runtime readiness command | Docker/runtime prerequisites, edge proxy state, and final deployability checks have been attempted and reported. |
 
+`appaloft server enroll` is an additive CLI task flow over these existing operations. `--local`
+registers a `local-shell` target; `ssh://user@host[:port]` registers `generic-ssh`, attaches the
+selected existing credential form, diagnoses connectivity, prepares runtime, and reads
+`servers.show`. It prints the accepted Server id before later effects and never deletes that Server
+when credential, connectivity, preparation, or readback fails. It is not a `servers.enroll`
+operation and does not change the command success meanings above.
+
 If only one public command exists in a transitional implementation, the source-of-truth model still treats register, connect, and proxy bootstrap as separate responsibilities.
 
 ## Input Model
