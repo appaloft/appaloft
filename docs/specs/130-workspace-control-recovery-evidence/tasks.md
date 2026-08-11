@@ -31,5 +31,6 @@
 - [x] Run focused Rust, CLI and renderer protocol tests.
 - [x] Run public lint, typecheck, full test, build and release-boundary checks.
 - [x] Update localized docs/help, ADR links, operation map, registry and traceability.
-- [ ] Merge public implementation, close the Ticket and update the Cloud gitlink after independent
-  boundary review.
+- [x] Merge public implementation through PR #1041 and close Ticket #1040.
+- [x] Update Cloud PR #864 to the final hardened public SHA after an independent boundary review
+  returned `PASS` with no P0/P1/P2 findings.

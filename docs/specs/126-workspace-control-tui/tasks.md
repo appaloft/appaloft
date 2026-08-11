@@ -52,8 +52,10 @@
 - [x] Add a repeatable host-terminal smoke that records alternate-screen, mouse, bracketed-paste,
   restoration, Workspace rendering and focus-release evidence without Agent/provider calls.
 - [x] Verify the host-terminal smoke in macOS Terminal.app and the Codex xterm-compatible PTY.
-- [ ] Complete the supported host-terminal matrix in Terminal.app, iTerm2, Ghostty, VS Code
-  Terminal and a representative Linux terminal. Terminal.app is complete; iTerm2 and Ghostty are
-  not installed on the current host, VS Code automation lacks macOS Accessibility permission, and
-  the representative Linux terminal remains pending.
-- [ ] Sync ADR, Spec, tasks, Test Matrix, operation map, help, docs and release evidence.
+- [x] Verify the same smoke in a real VS Code 1.132.0 integrated terminal with isolated user data
+  and no installed extension or user-setting mutation.
+- [x] Complete the supported host-terminal matrix in Terminal.app, iTerm2, Ghostty, VS Code
+  Terminal and a representative Linux terminal. iTerm2 passed from a signed app copied only into
+  `/private/tmp/Applications`; the temporary process and app copy were removed, and the real
+  `/Applications` directory was never modified.
+- [x] Sync ADR, Spec, tasks, Test Matrix, operation map, help, docs and release evidence.

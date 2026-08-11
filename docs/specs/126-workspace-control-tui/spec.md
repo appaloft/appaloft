@@ -2,11 +2,14 @@
 
 ## Status
 
-- Round: Code
+- Round: Post-Implementation Sync / Verification
 - Artifact state: accepted through public PR
-  [#1025](https://github.com/appaloft/appaloft/pull/1025); implementation tracked by public Ticket
-  [#1026](https://github.com/appaloft/appaloft/issues/1026)
-- Code changes allowed: yes, within Ticket #1026 and this accepted boundary
+  [#1025](https://github.com/appaloft/appaloft/pull/1025); implementation merged through public PR
+  [#1029](https://github.com/appaloft/appaloft/pull/1029), with host-terminal hardening merged through
+  [#1043](https://github.com/appaloft/appaloft/pull/1043). Tickets
+  [#1026](https://github.com/appaloft/appaloft/issues/1026) and
+  [#1042](https://github.com/appaloft/appaloft/issues/1042) are closed.
+- Code changes allowed: only a separately ticketed defect or compatibility gap within this accepted boundary
 - Compatibility: additive presentation over existing public operations
 - Renderer decision: replaceable Rust/Ratatui sidecar; the OpenTUI candidate failed the released
   public-API gate recorded by closed Spike [#1024](https://github.com/appaloft/appaloft/issues/1024)
