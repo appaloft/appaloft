@@ -6,7 +6,7 @@
 - Owner decision: confirmed as part of the active `R1 Appaloft Workspace Alpha` objective
 - Proposed scope: public Workspace control presentation over existing Preview, Agent Task,
   Promotion and Deployment Proof operations
-- Code changes allowed: no, until this discovery and Spec are accepted and a Ticket exists
+- Code changes: accepted Spec 128 and public issue #1034 govern the active Code Round
 
 ## Business Outcome
 
@@ -75,4 +75,3 @@ gateway and audit ports. Public imports no Cloud package and Cloud adds no paral
 
 No question remains that changes ownership or the first implementation slice. Visual styling and
 additional delivery providers may evolve after R1 without changing the existing operation boundary.
-

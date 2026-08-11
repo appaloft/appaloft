@@ -80,8 +80,10 @@ control TUI also needs a durable ownership boundary before a terminal framework 
   new domain ownership decision.
 - The Appaloft release artifact, Linux CI and opt-in supported terminal/Agent matrix remain Spec 126
   completion gates.
-- Preview, Agent Task delivery, Promotion and Deployment Proof actions are governed by proposed
-  Spec 128 and must continue to dispatch their existing public operations.
+- Preview, Agent Task delivery, Promotion and Deployment Proof actions are implemented under
+  accepted Spec 128 and dispatch only their existing public operations. The Bun parent validates
+  targets against the latest selected detail and reads authoritative Deployment Proof; the Ratatui
+  renderer owns only bounded forms and confirmation state.
 - `--keep-awake` and exit-triggered removal require a separate Spec/Test Matrix update.
 
 ## Verification

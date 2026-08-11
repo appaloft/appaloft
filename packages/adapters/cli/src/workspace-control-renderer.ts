@@ -90,6 +90,12 @@ function tokenMatches(actual: unknown, expected: string): boolean {
   return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes);
 }
 
+function boundedText(value: unknown, max: number): value is string {
+  return (
+    typeof value === "string" && value.length > 0 && value.length <= max && !value.includes("\0")
+  );
+}
+
 function parseRendererEvent(value: unknown): WorkspaceControlRendererEvent | undefined {
   if (!value || typeof value !== "object") return undefined;
   const record = value as Record<string, unknown>;
@@ -113,6 +119,85 @@ function parseRendererEvent(value: unknown): WorkspaceControlRendererEvent | und
             type: "lifecycle-action",
             workspaceId: record.workspaceId,
             action: record.action,
+          }
+        : undefined;
+    case "preview-expose":
+      return typeof record.workspaceId === "string" &&
+        typeof record.port === "number" &&
+        Number.isInteger(record.port) &&
+        record.port >= 1 &&
+        record.port <= 65_535 &&
+        (record.visibility === "private" ||
+          record.visibility === "organization" ||
+          record.visibility === "public") &&
+        (record.ttlMinutes === 60 || record.ttlMinutes === 480 || record.ttlMinutes === 1440)
+        ? {
+            type: "preview-expose",
+            workspaceId: record.workspaceId,
+            port: record.port,
+            visibility: record.visibility,
+            ttlMinutes: record.ttlMinutes,
+          }
+        : undefined;
+    case "preview-revoke":
+      return boundedText(record.workspaceId, 160) && boundedText(record.exposureId, 160)
+        ? { type: "preview-revoke", workspaceId: record.workspaceId, exposureId: record.exposureId }
+        : undefined;
+    case "task-approve":
+      return boundedText(record.workspaceId, 160) && boundedText(record.taskRunId, 160)
+        ? { type: "task-approve", workspaceId: record.workspaceId, taskRunId: record.taskRunId }
+        : undefined;
+    case "task-deliver": {
+      if (
+        !boundedText(record.workspaceId, 160) ||
+        !boundedText(record.taskRunId, 160) ||
+        !boundedText(record.branch, 512) ||
+        !boundedText(record.commitMessage, 512) ||
+        !boundedText(record.remote, 120)
+      ) {
+        return undefined;
+      }
+      const pullRequest = record.pullRequest;
+      if (pullRequest !== undefined) {
+        if (!pullRequest || typeof pullRequest !== "object") return undefined;
+        const pr = pullRequest as Record<string, unknown>;
+        if (
+          !boundedText(pr.title, 256) ||
+          (pr.body !== undefined && (typeof pr.body !== "string" || pr.body.length > 16_384)) ||
+          (pr.base !== undefined && !boundedText(pr.base, 512))
+        ) {
+          return undefined;
+        }
+        return {
+          type: "task-deliver",
+          workspaceId: record.workspaceId,
+          taskRunId: record.taskRunId,
+          branch: record.branch,
+          commitMessage: record.commitMessage,
+          remote: record.remote,
+          pullRequest: {
+            title: pr.title,
+            ...(typeof pr.body === "string" ? { body: pr.body } : {}),
+            ...(typeof pr.base === "string" ? { base: pr.base } : {}),
+          },
+        };
+      }
+      return {
+        type: "task-deliver",
+        workspaceId: record.workspaceId,
+        taskRunId: record.taskRunId,
+        branch: record.branch,
+        commitMessage: record.commitMessage,
+        remote: record.remote,
+      };
+    }
+    case "promotion-accept":
+    case "promotion-retry":
+      return boundedText(record.workspaceId, 160) && boundedText(record.promotionId, 160)
+        ? {
+            type: record.type,
+            workspaceId: record.workspaceId,
+            promotionId: record.promotionId,
           }
         : undefined;
     case "terminal-input":
