@@ -236,6 +236,8 @@ const portableRecoveryHandlePrefix = "appaloft-docker-recovery:v1:";
 const portableSnapshotHandlePrefix = "appaloft-docker-snapshot:v1:";
 const concurrentRemovalReadbackAttempts = 20;
 const concurrentRemovalReadbackDelayMs = 250;
+const backgroundStartObservationAttempts = 20;
+const backgroundStartObservationDelayMs = 50;
 
 interface PortableRecoveryHandle {
   sandboxId: string;
@@ -862,9 +864,9 @@ export class DockerSandboxProvider implements SandboxProvider {
       const processId = `spr_${randomUUID().replaceAll("-", "")}`;
       const pidFile = `/workspace/.appaloft-process-${processId}.pid`;
       const exitFile = `/workspace/.appaloft-process-${processId}.exit`;
-      if (request.stdin) {
-        const inputPipe = `/tmp/appaloft-process-${processId}.stdin`;
-        try {
+      const inputPipe = `/tmp/appaloft-process-${processId}.stdin`;
+      try {
+        if (request.stdin) {
           await this.docker([
             "exec",
             request.providerHandle,
@@ -906,37 +908,38 @@ export class DockerSandboxProvider implements SandboxProvider {
               timeoutMs: Math.min(request.timeoutMs ?? 30_000, 30_000),
             },
           );
-        } catch (error) {
-          await this.runner.run([
-            "docker",
+        } else {
+          await this.docker([
             "exec",
+            "-d",
+            ...sandboxProcessDockerExecArgs,
+            "-w",
+            cwd,
             request.providerHandle,
             "sh",
             "-c",
-            `${terminateSandboxProcessGroupScript}; rm -f -- "$3"`,
-            "appaloft-background-cleanup",
+            'pid_file="$1"; exit_file="$2"; shift 2; ( exec setsid --wait "$@" ) & child=$!; printf "%s\\n" "$child" > "$pid_file"; wait "$child"; code=$?; printf "%s\\n" "$code" > "$exit_file"; rm -f -- "$pid_file"; exit "$code"',
+            "appaloft-background",
             pidFile,
-            inputPipe,
             exitFile,
+            ...request.argv,
           ]);
-          throw error;
         }
-      } else {
-        await this.docker([
+        await this.waitForBackgroundProcessStart(request.providerHandle, pidFile, exitFile);
+      } catch (error) {
+        await this.runner.run([
+          "docker",
           "exec",
-          "-d",
-          ...sandboxProcessDockerExecArgs,
-          "-w",
-          cwd,
           request.providerHandle,
           "sh",
           "-c",
-          'pid_file="$1"; exit_file="$2"; shift 2; ( exec setsid --wait "$@" ) & child=$!; printf "%s\\n" "$child" > "$pid_file"; wait "$child"; code=$?; printf "%s\\n" "$code" > "$exit_file"; rm -f -- "$pid_file"; exit "$code"',
-          "appaloft-background",
+          `${terminateSandboxProcessGroupScript}; rm -f -- "$3"`,
+          "appaloft-background-cleanup",
           pidFile,
+          inputPipe,
           exitFile,
-          ...request.argv,
         ]);
+        throw error;
       }
       return { mode: "background", processId };
     }
@@ -1044,6 +1047,34 @@ export class DockerSandboxProvider implements SandboxProvider {
       ]);
     }
     return processes;
+  }
+
+  private async waitForBackgroundProcessStart(
+    providerHandle: string,
+    pidFile: string,
+    exitFile: string,
+  ): Promise<void> {
+    for (let attempt = 0; attempt < backgroundStartObservationAttempts; attempt += 1) {
+      const observed = await this.docker([
+        "exec",
+        providerHandle,
+        "sh",
+        "-c",
+        'pid_file="$1"; exit_file="$2"; if [ -f "$exit_file" ]; then code="$(cat "$exit_file" 2>/dev/null || true)"; printf "terminal:%s\\n" "$code"; exit 0; fi; if [ -f "$pid_file" ]; then pid="$(cat "$pid_file" 2>/dev/null || true)"; if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then printf "running:%s\\n" "$pid"; exit 0; fi; fi; printf "pending\\n"',
+        "appaloft-background-start-observation",
+        pidFile,
+        exitFile,
+      ]);
+      const status = text(observed.stdout).trim();
+      if (/^running:\d+$/u.test(status) || /^terminal:-?\d+$/u.test(status)) return;
+      if (status !== "pending") {
+        throw new Error("docker_background_process_start_observation_invalid");
+      }
+      if (attempt + 1 < backgroundStartObservationAttempts) {
+        await this.sleep(backgroundStartObservationDelayMs);
+      }
+    }
+    throw new Error("docker_background_process_start_unobservable");
   }
 
   async terminateProcess(request: {
