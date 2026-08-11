@@ -3760,17 +3760,6 @@ export function registerApplicationServices(
                   ),
                 );
               }
-              if (
-                harnessRegistry.registerAlias({
-                  key: input.key,
-                  templateId: input.templateId,
-                  sandboxTemplateId: input.sandboxTemplateId,
-                  version: input.version,
-                  templateDigest: input.templateDigest,
-                })
-              ) {
-                return ok(undefined);
-              }
               const harnessDescriptor: CommandSandboxAgentDescriptor = {
                 key: input.key,
                 templateId: input.templateId,
@@ -3784,9 +3773,24 @@ export function registerApplicationServices(
                 ...(input.persistentPaths ? { persistentPaths: input.persistentPaths } : {}),
                 ...(input.healthcheck ? { healthcheck: input.healthcheck } : {}),
               };
-              harnessRegistry.register(
-                new CommandSandboxAgentHarness(sandboxService, harnessDescriptor),
+              const declarativeHarness = new CommandSandboxAgentHarness(
+                sandboxService,
+                harnessDescriptor,
               );
+              if (
+                harnessRegistry.registerAlias({
+                  key: input.key,
+                  templateId: input.templateId,
+                  sandboxTemplateId: input.sandboxTemplateId,
+                  version: input.version,
+                  templateDigest: input.templateDigest,
+                  interaction: declarativeHarness.interaction,
+                  capabilities: declarativeHarness.capabilities,
+                })
+              ) {
+                return ok(undefined);
+              }
+              harnessRegistry.register(declarativeHarness);
               return ok(undefined);
             } catch (cause) {
               return err(

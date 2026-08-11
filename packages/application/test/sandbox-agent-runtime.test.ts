@@ -20,6 +20,20 @@ const context = createExecutionContext({
 
 test("[WS-CREATE-PROFILE-009] an exact unique Profile pin aliases the reviewed native Agent harness", async () => {
   const executedTasks: string[] = [];
+  const preparedRuntimes: string[] = [];
+  const profileInteraction = {
+    transport: "managed-terminal" as const,
+    command: ["pi", "--provider", "openai", "--model", "deepseek-v4-flash"],
+    sessionRecovery: "managed-run-lineage" as const,
+  };
+  const profileCapabilities = {
+    taskMode: true,
+    interactive: true,
+    backgroundRuns: true,
+    nativeSession: false,
+    persistentPaths: ["/workspace/.appaloft-agent", "/workspace/.pi"],
+    healthcheck: { kind: "process" as const },
+  };
   const nativeHarness: SandboxAgentHarness = {
     key: "pi",
     templateId: "aht_pi_managed_v1",
@@ -49,6 +63,8 @@ test("[WS-CREATE-PROFILE-009] an exact unique Profile pin aliases the reviewed n
       sandboxTemplateId: "stp_pi_pinned",
       version: "1.0.0",
       templateDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      interaction: profileInteraction,
+      capabilities: profileCapabilities,
     }),
   ).toBe(true);
   expect(
@@ -64,7 +80,8 @@ test("[WS-CREATE-PROFILE-009] an exact unique Profile pin aliases the reviewed n
   const aliased = registry.resolve("declarative-pi-default-0123456789ab");
   expect(aliased?.key).toBe("declarative-pi-default-0123456789ab");
   expect(aliased?.templateId).toBe(nativeHarness.templateId);
-  expect(aliased?.capabilities).toEqual(nativeHarness.capabilities);
+  expect(aliased?.interaction).toEqual(profileInteraction);
+  expect(aliased?.capabilities).toEqual(profileCapabilities);
   expect(aliased?.admitSandbox?.({ kind: "template", templateId: "stp_pi_pinned" })).toBe(true);
   await aliased?.execute({
     executionContext: context,
@@ -77,6 +94,55 @@ test("[WS-CREATE-PROFILE-009] an exact unique Profile pin aliases the reviewed n
   });
   expect(executedTasks).toEqual(["Use brokered model access"]);
   expect(registry.resolve("declarative-unreviewed-0123456789ab")).toBeNull();
+
+  registry.register({
+    ...nativeHarness,
+    key: "opencode",
+    templateId: "aht_opencode_managed_v1",
+    sandboxTemplateId: "stp_opencode_pinned",
+    version: "1.18.4",
+    templateDigest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    interaction: {
+      transport: "native-attach",
+      command: ["opencode", "attach", "http://127.0.0.1:4096"],
+      sessionRecovery: "native-session-store",
+      clientHandoff: "local-client-exec",
+      serverPort: 4096,
+    },
+    prepareRuntime: async ({ runtimeId }) => {
+      preparedRuntimes.push(runtimeId);
+    },
+  });
+  const displayOnlyInteraction = {
+    transport: "native-attach" as const,
+    command: ["opencode", "attach", "http://127.0.0.1:4096"],
+    sessionRecovery: "native-session-store" as const,
+    clientHandoff: "display-only" as const,
+    serverPort: 4096,
+  };
+  expect(
+    registry.registerAlias({
+      key: "declarative-opencode-default-0123456789ab",
+      templateId: "aht_opencode_managed_v1",
+      sandboxTemplateId: "stp_opencode_pinned",
+      version: "1.18.4",
+      templateDigest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      interaction: displayOnlyInteraction,
+      capabilities: {
+        ...profileCapabilities,
+        nativeSession: true,
+        healthcheck: { kind: "http", port: 4096, path: "/global/health" },
+      },
+    }),
+  ).toBe(true);
+  const openCodeAlias = registry.resolve("declarative-opencode-default-0123456789ab");
+  expect(openCodeAlias?.interaction).toEqual(displayOnlyInteraction);
+  await openCodeAlias?.prepareRuntime?.({
+    executionContext: context,
+    sandboxId: "sbx_opencode",
+    runtimeId: "sar_opencode",
+  });
+  expect(preparedRuntimes).toEqual(["sar_opencode"]);
 
   registry.register({ ...nativeHarness, key: "pi-duplicate" });
   expect(() =>

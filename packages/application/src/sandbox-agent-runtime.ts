@@ -191,6 +191,8 @@ export class SandboxAgentHarnessRegistry {
     sandboxTemplateId: string;
     version: string;
     templateDigest: string;
+    interaction?: SandboxAgentHarnessInteraction | undefined;
+    capabilities?: SandboxAgentHarnessCapabilities | undefined;
   }): boolean {
     const matches = [...this.harnesses.values()].filter(
       (harness) =>
@@ -206,14 +208,20 @@ export class SandboxAgentHarnessRegistry {
     }
     if (matches.length === 0) return false;
     const source = matches[0] as SandboxAgentHarness;
+    const interaction = Object.hasOwn(input, "interaction")
+      ? input.interaction
+      : source.interaction;
+    const capabilities = Object.hasOwn(input, "capabilities")
+      ? input.capabilities
+      : source.capabilities;
     const alias: SandboxAgentHarness = {
       key: input.key,
       templateId: source.templateId,
       ...(source.sandboxTemplateId ? { sandboxTemplateId: source.sandboxTemplateId } : {}),
       version: source.version,
       templateDigest: source.templateDigest,
-      ...(source.interaction ? { interaction: source.interaction } : {}),
-      ...(source.capabilities ? { capabilities: source.capabilities } : {}),
+      ...(interaction ? { interaction } : {}),
+      ...(capabilities ? { capabilities } : {}),
       ...(source.admitSandbox
         ? { admitSandbox: (sandboxSource) => source.admitSandbox?.(sandboxSource) ?? false }
         : {}),
