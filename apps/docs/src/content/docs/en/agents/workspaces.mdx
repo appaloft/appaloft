@@ -81,6 +81,42 @@ Staged, unstaged, or untracked files; no upstream; an unpushed HEAD; or a remote
 differs from HEAD all fail before any remote creation. The error shows the exact HEAD SHA and safe
 clean/push guidance. V1 never performs implicit sync or patch upload.
 
+## Manage running Workspaces <a id="workspace-control-tui" />
+
+On a supported interactive macOS/Linux terminal, run the command without a subcommand:
+
+```bash
+appaloft workspace
+```
+
+This opens the Appaloft Workspace control TUI. Entering the TUI does not create, pause, resume, or
+terminate a Workspace. It reads existing public state for Workspaces, Agent Runtimes, Preview
+ports, Tasks, and Promotions. When a selected Runtime declares an attach capability, the Agent's
+own TUI is embedded as a native terminal byte stream. Appaloft does not parse conversations, tool
+calls, or hidden reasoning.
+
+- `↑` / `↓` or `j` / `k`: select a Workspace;
+- `Enter`: attach or focus an already connected Agent;
+- `Ctrl+]`: return input ownership to Workspace navigation without stopping or detaching the Agent;
+- `f`: toggle Focus Mode over the same Terminal Session/local PTY without starting another Agent;
+- `r`: refresh existing public read models; `R`: reconnect with the same Session identity;
+- `q`: quit only while Workspace navigation owns focus. Bare keys remain Agent-owned while the
+  Agent pane is focused.
+
+Leaving or disconnecting the TUI detaches only the client; explicit Workspace lifecycle commands
+still own pause, resume, and termination. For scripts, CI, a non-TTY environment, or when the
+renderer should not load, use:
+
+```bash
+appaloft workspace --no-tui
+appaloft workspace --json
+appaloft workspace list
+```
+
+These paths never initialize the renderer and return a stable headless status or continue through
+the existing subcommand. Windows currently guarantees safe help/headless behavior only; embedded
+mode needs separate release and terminal acceptance.
+
 ## Explicit Profile-aware creation
 
 For automation without local Git context, use a credential-free HTTPS repository and an explicit

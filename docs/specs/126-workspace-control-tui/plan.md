@@ -25,10 +25,12 @@
    Agent or create a second Workspace/Terminal lifecycle.
 7. Keep `--no-tui`, structured output and all subcommands outside the renderer module so missing
    native assets cannot break headless operation or help.
-8. Treat OpenTUI + its embedded terminal renderable as the preferred candidate only after the API
-   is released and the shared gates pass. A disposable Spike may test upstream main/PR evidence;
-   production code may not pin an unmerged commit. Keep Rust/Ratatui replaceable behind the same
-   presentation and byte-stream boundaries.
+8. Use a replaceable Rust/Ratatui sidecar for the production renderer. OpenTUI PR #1340 proved
+   host feasibility but its embedded terminal API remained unreleased and teardown failed the
+   bounded-process gate, so closed Spike #1024 selected the Ratatui fallback. The Bun parent still
+   owns operations, target resolution, credentials and terminal lifecycle; the sidecar receives
+   only safe presentation state and terminal bytes over an authenticated one-client loopback
+   channel.
 
 ## CQRS, Read Model And Event Impact
 
@@ -63,7 +65,8 @@
 1. Framework-neutral state/navigation model, `TerminalViewport` and headless-safe entry selection.
 2. Embedded managed `TerminalSession` and local `Bun.Terminal` adapters with deterministic focus,
    resize and cleanup tests.
-3. OpenTUI Workspace layout plus embedded Agent pane only after the dependency gate passes.
+3. Ratatui Workspace layout plus VT100-emulated embedded Agent pane behind the replaceable renderer
+   channel selected by Spike #1024.
 4. Same-session Focus Mode, reconnect, return refresh and failure restoration.
 5. macOS/Linux release matrix, all-published-artifact safety, terminal matrix, docs and Sync.
 
@@ -77,5 +80,5 @@ steps remain in `tasks.md`.
 - Stop if embedded and Focus modes create different Agent processes or Session identities.
 - Stop if a supported artifact cannot embed/load the native renderer safely.
 - Stop if terminal restoration cannot be proven on failure and signal paths.
-- Stop OpenTUI production adoption if the public embedded API is unreleased or any P0 gate fails;
-  compare/choose the Rust presentation without changing the product contract.
+- Keep OpenTUI out of production while its required embedded API remains unreleased or a P0 gate
+  fails; a future renderer swap must not change the product contract.

@@ -40,6 +40,141 @@ import {
 import { err, ok } from "@appaloft/core";
 
 describe("Agent Workspace CLI", () => {
+  test("[WS-TUI-ENTRY-001] interactive no-subcommand workspace starts the injected control presentation without mutation", async () => {
+    let presentationStarts = 0;
+    let commandCount = 0;
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async () => {
+          commandCount += 1;
+          return ok({});
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({}) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_workspace_tui_entry" }),
+      },
+      terminalIO: {
+        stdin: {
+          isTTY: true,
+          on: () => undefined,
+        },
+        stdout: {
+          isTTY: true,
+          write: () => true,
+        },
+        stderr: {
+          isTTY: true,
+          write: () => true,
+        },
+      },
+      workspaceControlPresentation: {
+        start: async () => {
+          presentationStarts += 1;
+        },
+      },
+    });
+
+    await program.parseAsync(["node", "appaloft", "workspace"]);
+
+    expect(presentationStarts).toBe(1);
+    expect(commandCount).toBe(0);
+  });
+
+  test("[WS-TUI-FALLBACK-009] headless flags, help and existing subcommands stay renderer-free", async () => {
+    let presentationStarts = 0;
+    const output: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const makeProgram = (interactive: boolean) =>
+      createCliProgram({
+        version: "0.1.0-test",
+        startServer: async () => {},
+        commandBus: { execute: async () => ok({}) } as unknown as CommandBus,
+        queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+        executionContextFactory: {
+          create: (input) =>
+            createExecutionContext({ ...input, requestId: "req_workspace_tui_fallback" }),
+        },
+        terminalIO: {
+          stdin: {
+            isTTY: interactive,
+            on: () => undefined,
+          },
+          stdout: {
+            isTTY: interactive,
+            write: (chunk) => {
+              output.push(String(chunk));
+              return true;
+            },
+          },
+          stderr: {
+            isTTY: interactive,
+            write: () => true,
+          },
+        },
+        workspaceControlPresentation: {
+          start: async () => {
+            presentationStarts += 1;
+          },
+        },
+      });
+
+    const processWrite = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await makeProgram(false).parseAsync(["node", "appaloft", "workspace"]);
+      await makeProgram(true).parseAsync(["node", "appaloft", "workspace", "--no-tui"]);
+      await makeProgram(true).parseAsync(["node", "appaloft", "workspace", "--json"]);
+      await makeProgram(true).parseAsync(["node", "appaloft", "workspace", "--help"]);
+      await makeProgram(true).parseAsync(["node", "appaloft", "workspace", "list"]);
+    } finally {
+      process.stdout.write = processWrite;
+    }
+
+    expect(presentationStarts).toBe(0);
+    expect(output.join("")).toContain("non-interactive-terminal");
+    expect(output.join("")).toContain("no-tui");
+    expect(output.join("")).toContain("structured-output");
+  });
+
+  test("[WS-TUI-ENTRY-001][WS-TUI-QUERY-002] remote Cloud target injects the same public Workspace presentation boundary", async () => {
+    let presentationStarts = 0;
+    const { createRemoteCliProgram } = await import("../src");
+    const program = createRemoteCliProgram({
+      version: "0.1.0-test",
+      profile: {
+        name: "cloud",
+        mode: "public-cloud",
+        baseUrl: "https://api.example.test",
+        auth: { kind: "bearer", token: "not-used-by-presentation-seam" },
+        createdAt: "2026-08-11T00:00:00.000Z",
+        updatedAt: "2026-08-11T00:00:00.000Z",
+      },
+      terminalIO: {
+        stdin: { isTTY: true, on: () => undefined },
+        stdout: { isTTY: true, write: () => true },
+        stderr: { isTTY: true, write: () => true },
+      },
+      workspaceControlPresentation: {
+        start: async (context) => {
+          presentationStarts += 1;
+          expect(context.terminalSessionGateway).toBeDefined();
+        },
+      },
+    });
+
+    await program.parseAsync(["node", "appaloft", "workspace"]);
+
+    expect(presentationStarts).toBe(1);
+  });
+
   test("[WS-CREATE-PROFILE-009][WS-OPEN-PROFILE-006][WS-OPEN-SURFACE-019] creates Profile-aware Workspaces without Agent-name branching", async () => {
     const commands: Command<unknown>[] = [];
     const commandBus = {

@@ -136,6 +136,28 @@ describe("public docs help registry", () => {
     );
   });
 
+  test("[WS-TUI-DOCS-013] Workspace control help resolves the bilingual TUI contract", () => {
+    const topic = publicDocsHelpTopics["agent.workspace-control"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe(
+      "/docs/agents/workspaces/#workspace-control-tui",
+    );
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/agents/workspaces/#workspace-control-tui",
+    );
+    expect(topic.surfaces).toEqual(["cli"]);
+    expect(topic.aliases).toEqual(
+      expect.arrayContaining(["appaloft workspace", "Workspace control TUI", "Focus Mode"]),
+    );
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/decisions/ADR-107-task-oriented-workspace-activation-presentation.md",
+        "docs/specs/126-workspace-control-tui/spec.md",
+        "docs/testing/workspace-control-tui-test-matrix.md",
+      ]),
+    );
+  });
+
   test("[TS-SDK-DOCS-001] TypeScript SDK help resolves to the SDK reference", () => {
     const topic = publicDocsHelpTopics["typescript-sdk.operation-client"];
 

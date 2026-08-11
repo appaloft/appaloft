@@ -149,6 +149,9 @@ exec "$SCRIPT_DIR/appaloft" "$@"
 }
 
 export function bundleReadme(input: { version: string; target: ReleaseBinaryTarget }): string {
+  const workspaceControlRenderer = input.target.workspaceControlTuiExecutableName
+    ? "- appaloft-workspace-tui: embedded Workspace control renderer"
+    : "- Workspace control TUI: unavailable on this target; use help/headless Workspace commands";
   return `Appaloft Binary Bundle
 
 Version: ${input.version}
@@ -156,6 +159,7 @@ Target: ${input.target.name}
 
 Contents:
 - appaloft: Bun-compiled backend/CLI executable
+${workspaceControlRenderer}
 - run-appaloft.sh: launcher that defaults to embedded PGlite
 
 The binary embeds:
@@ -199,6 +203,7 @@ export async function createBinaryBundle(input: {
   skipDocsBuild?: boolean;
   target?: ReleaseBinaryTarget;
   version?: string;
+  workspaceTuiBinaryPath?: string;
 }): Promise<void> {
   const target = input.target ?? detectHostReleaseBinaryTarget();
   const version = input.version ?? process.env.APPALOFT_APP_VERSION ?? "0.1.0";
@@ -278,6 +283,51 @@ export async function createBinaryBundle(input: {
   );
   if (target.os === "darwin") {
     await adHocSignDarwinExecutable(binaryPath);
+  }
+
+  if (target.workspaceControlTuiExecutableName) {
+    let workspaceTuiBinaryPath =
+      input.workspaceTuiBinaryPath ??
+      join(
+        input.root,
+        "apps",
+        "workspace-control-tui",
+        "target",
+        "release",
+        target.workspaceControlTuiExecutableName,
+      );
+    if (!(await Bun.file(workspaceTuiBinaryPath).exists()) && !input.workspaceTuiBinaryPath) {
+      const hostTarget = detectHostReleaseBinaryTarget();
+      if (hostTarget.name === target.name) {
+        await run(
+          [
+            "cargo",
+            "build",
+            "--locked",
+            "--release",
+            "--manifest-path",
+            join(input.root, "apps", "workspace-control-tui", "Cargo.toml"),
+          ],
+          input.root,
+        );
+        workspaceTuiBinaryPath = join(
+          input.root,
+          "apps",
+          "workspace-control-tui",
+          "target",
+          "release",
+          target.workspaceControlTuiExecutableName,
+        );
+      }
+    }
+    if (!(await Bun.file(workspaceTuiBinaryPath).exists())) {
+      throw new Error(
+        `Missing Workspace control renderer for ${target.name}: ${workspaceTuiBinaryPath}`,
+      );
+    }
+    const bundledWorkspaceTuiPath = join(input.outDir, target.workspaceControlTuiExecutableName);
+    await Bun.write(bundledWorkspaceTuiPath, Bun.file(workspaceTuiBinaryPath));
+    await chmodExecutable(bundledWorkspaceTuiPath);
   }
 
   await copyFileIfExists(join(input.root, ".env.example"), join(input.outDir, ".env.example"));

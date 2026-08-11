@@ -27,7 +27,7 @@ async function writePackageJson(path: string, value: Record<string, unknown>): P
   await Bun.write(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-async function extractBinary(target: ReleaseBinaryTarget): Promise<string> {
+async function extractBundle(target: ReleaseBinaryTarget): Promise<string> {
   const archiveBaseName = `appaloft-v${version}-${target.name}`;
   const archivePath = join(releaseDir, `${archiveBaseName}.${target.archiveFormat}`);
   const extractDir = join(tempDir, target.name);
@@ -49,7 +49,7 @@ async function extractBinary(target: ReleaseBinaryTarget): Promise<string> {
   if (!(await Bun.file(binaryPath).exists())) {
     throw new Error(`Missing extracted binary ${binaryPath}`);
   }
-  return binaryPath;
+  return join(extractDir, archiveBaseName);
 }
 
 async function preparePlatformPackage(target: ReleaseBinaryTarget): Promise<void> {
@@ -59,12 +59,22 @@ async function preparePlatformPackage(target: ReleaseBinaryTarget): Promise<void
   packageJson.version = version;
   await writePackageJson(packageJsonPath, packageJson);
 
-  const sourceBinaryPath = await extractBinary(target);
+  const sourceBundleDir = await extractBundle(target);
+  const sourceBinaryPath = join(sourceBundleDir, target.executableName);
   const targetBinDir = join(packageDir, "bin");
   const targetBinaryPath = join(targetBinDir, target.executableName);
   await resetDir(targetBinDir);
   await Bun.write(targetBinaryPath, Bun.file(sourceBinaryPath));
   await chmodExecutable(targetBinaryPath);
+  if (target.workspaceControlTuiExecutableName) {
+    const sourceWorkspaceTuiPath = join(sourceBundleDir, target.workspaceControlTuiExecutableName);
+    if (!(await Bun.file(sourceWorkspaceTuiPath).exists())) {
+      throw new Error(`Missing extracted Workspace renderer ${sourceWorkspaceTuiPath}`);
+    }
+    const targetWorkspaceTuiPath = join(targetBinDir, target.workspaceControlTuiExecutableName);
+    await Bun.write(targetWorkspaceTuiPath, Bun.file(sourceWorkspaceTuiPath));
+    await chmodExecutable(targetWorkspaceTuiPath);
+  }
 }
 
 async function prepareMainPackage(): Promise<void> {

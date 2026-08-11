@@ -200,6 +200,83 @@ jobs:
         if: ${{ always() && needs.changes.outputs.lightweight_only != 'true' }}
         run: docker rm --force appaloft-postgres || true
 
+  workspace-tui:
+    name: Workspace TUI (${{ matrix.target }})
+    needs: changes
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin-arm64
+            os: macos-14
+            bridge: true
+          - target: darwin-x64
+            os: macos-15-intel
+          - target: linux-arm64-gnu
+            os: ubuntu-24.04-arm
+          - target: linux-x64-gnu
+            os: ubuntu-22.04
+            bridge: true
+          - target: linux-arm64-musl
+            os: ubuntu-24.04-arm
+            musl: true
+            container_platform: linux/arm64
+          - target: linux-x64-musl
+            os: ubuntu-22.04
+            musl: true
+            container_platform: linux/amd64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - name: Skip Workspace TUI
+        if: ${{ needs.changes.outputs.lightweight_only == 'true' }}
+        run: echo "Lightweight-only change; skipping Workspace TUI checks."
+
+      - name: Check out code
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
+        uses: actions/checkout@v4
+
+      - name: Set up Bun and caches
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' && matrix.bridge == true }}
+        uses: ./.github/actions/setup-bun-turbo
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' && matrix.musl != true }}
+        with:
+          components: rustfmt
+
+      - name: Test and build native Workspace TUI
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' && matrix.musl != true }}
+        run: |
+          cargo fmt --check --manifest-path apps/workspace-control-tui/Cargo.toml
+          cargo test --locked --manifest-path apps/workspace-control-tui/Cargo.toml
+          cargo build --locked --release --manifest-path apps/workspace-control-tui/Cargo.toml
+          apps/workspace-control-tui/target/release/appaloft-workspace-tui --version
+
+      - name: Test and build native musl Workspace TUI
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' && matrix.musl == true }}
+        run: |
+          docker run --rm --platform "${{ matrix.container_platform }}" \
+            -v "$PWD:/work:ro" -w /work \
+            rust:1.97.1-alpine3.22@sha256:df4efa4e0cdfb5245fa06e3f431387b2bcc96782ce5681b7fb6b0297d745bc29 \
+            sh -c '
+              CARGO_TARGET_DIR=/tmp/appaloft-workspace-tui cargo test --locked --manifest-path apps/workspace-control-tui/Cargo.toml &&
+              CARGO_TARGET_DIR=/tmp/appaloft-workspace-tui cargo build --locked --release --manifest-path apps/workspace-control-tui/Cargo.toml &&
+              /tmp/appaloft-workspace-tui/release/appaloft-workspace-tui --version
+            '
+
+      - name: Test Workspace TUI parent bridge
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' && matrix.bridge == true }}
+        env:
+          APPALOFT_WORKSPACE_TUI_REQUIRED: "true"
+        run: |
+          bun test \
+            packages/adapters/cli/test/workspace-control-native-terminal.test.ts \
+            packages/adapters/cli/test/workspace-control-presentation.test.ts \
+            packages/adapters/cli/test/workspace-control-real-renderer.test.ts \
+            packages/adapters/cli/test/workspace-control-renderer.test.ts \
+            packages/adapters/cli/test/agent-workspace-command.test.ts
+
   build-smoke:
     name: Build And Smoke
     needs: changes
@@ -254,6 +331,9 @@ jobs:
         if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         run: |
           test ! -d dist/release/appaloft-binary-bundle/web-static
+          test -x dist/release/appaloft-binary-bundle/appaloft-workspace-tui
+          dist/release/appaloft-binary-bundle/appaloft-workspace-tui --version
+          bun run scripts/test/workspace-control-packaged-tui.ts dist/release/appaloft-binary-bundle
           mkdir -p .tmp-binary-smoke
           cd .tmp-binary-smoke
           APPALOFT_HTTP_PORT=3211 ../dist/release/appaloft-binary-bundle/run-appaloft.sh db migrate
@@ -303,6 +383,7 @@ jobs:
       - unit-tests
       - integration-tests
       - build-smoke
+      - workspace-tui
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -316,6 +397,7 @@ jobs:
           UNIT_TESTS_RESULT: ${{ needs.unit-tests.result }}
           INTEGRATION_TESTS_RESULT: ${{ needs.integration-tests.result }}
           BUILD_SMOKE_RESULT: ${{ needs.build-smoke.result }}
+          WORKSPACE_TUI_RESULT: ${{ needs.workspace-tui.result }}
         run: |
           set -euo pipefail
 
@@ -326,7 +408,8 @@ jobs:
             "Typecheck:${TYPECHECK_RESULT}" \
             "Unit Tests:${UNIT_TESTS_RESULT}" \
             "Integration Tests:${INTEGRATION_TESTS_RESULT}" \
-            "Build And Smoke:${BUILD_SMOKE_RESULT}"; do
+            "Build And Smoke:${BUILD_SMOKE_RESULT}" \
+            "Workspace TUI:${WORKSPACE_TUI_RESULT}"; do
             name="${check%%:*}"
             result="${check#*:}"
             echo "${name}: ${result}"

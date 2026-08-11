@@ -143,6 +143,9 @@
         "vitest": "^4.1.9",
       },
     },
+    "apps/workspace-control-tui": {
+      "name": "@appaloft/workspace-control-tui",
+    },
     "packages/adapters/cli": {
       "name": "@appaloft/adapter-cli",
       "dependencies": {
@@ -813,6 +816,8 @@
     "@appaloft/ui": ["@appaloft/ui@workspace:packages/ui"],
 
     "@appaloft/web": ["@appaloft/web@workspace:apps/web"],
+
+    "@appaloft/workspace-control-tui": ["@appaloft/workspace-control-tui@workspace:apps/workspace-control-tui"],
 
     "@astrojs/check": ["@astrojs/check@0.9.10", "", { "dependencies": { "@astrojs/language-server": "^2.16.7", "chokidar": "^4.0.3", "kleur": "^4.1.5", "yargs": "^18.0.0" }, "peerDependencies": { "typescript": "^5.0.0 || ^6.0.0" }, "bin": { "astro-check": "./bin/astro-check.js" } }, "sha512-zgx/UQMozdjOa3bOxjgeCFdtpE3c9rRX6xHwa+2QXvy8z8Akifu2AtubHyv/zzC2znO8dl8fFWL4K+Ba9kS8HQ=="],
 

@@ -100,7 +100,7 @@ describe("release build workflow", () => {
     expect(workflow).toContain("dist/release/install.sh");
     expect(workflow).toContain(["release-binary-", "$", "{{ matrix.target }}"].join(""));
     expect(workflow).toContain("Linux Binary Smoke");
-    expect(workflow).toContain("run-appaloft.sh doctor");
+    expect(workflow).toContain(['"', "$", '{bundle}/run-appaloft.sh" doctor'].join(""));
     expect(workflow).toContain("Build Desktop App");
     expect(workflow).toContain("docker/build-push-action");
     expect(workflow).toContain("publish_package packages/npm/mcp");
@@ -134,6 +134,44 @@ describe("release build workflow", () => {
     expect(updateReleaseNotesStepBody).toContain("GH_TOKEN");
     expect(updateReleaseNotesStepBody).toContain("APPALOFT_RELEASE_PRERELEASE");
     expect(updateReleaseNotesStepBody?.match(/^ {8}env:/gm)?.length).toBe(1);
+  });
+
+  test("[WS-TUI-PACKAGE-011][WS-TUI-TERMINAL-012] packages and smokes the Workspace renderer on every supported release family", async () => {
+    const workflow = await readText(".github/workflows/release-build.yml");
+
+    expect(workflow).toContain("workspace-tui-artifacts:");
+    for (const target of [
+      "darwin-arm64",
+      "darwin-x64",
+      "linux-arm64-gnu",
+      "linux-x64-gnu",
+      "linux-arm64-musl",
+      "linux-x64-musl",
+    ]) {
+      expect(workflow).toContain(`target: ${target}`);
+    }
+    expect(workflow).toContain("cargo test --locked");
+    expect(workflow).toContain("appaloft-workspace-tui --version");
+    expect(workflow).toContain("Verify Workspace TUI Bundle Shape");
+    expect(workflow).toContain("workspace --no-tui");
+    expect(workflow).toContain("scripts/test/workspace-control-packaged-tui.ts");
+    expect(workflow).toContain("use help/headless Workspace commands");
+  });
+
+  test("[WS-TUI-PACKAGE-011] PR CI builds every supported Workspace renderer target", async () => {
+    const workflow = await readText(".github/workflows/ci.yml");
+
+    for (const target of [
+      "darwin-arm64",
+      "darwin-x64",
+      "linux-arm64-gnu",
+      "linux-x64-gnu",
+      "linux-arm64-musl",
+      "linux-x64-musl",
+    ]) {
+      expect(workflow).toContain(`target: ${target}`);
+    }
+    expect(workflow).toContain("Test and build native musl Workspace TUI");
   });
 
   test("[RELEASE-HARDENING-006] keeps release-readiness smoke commands first-class", async () => {
