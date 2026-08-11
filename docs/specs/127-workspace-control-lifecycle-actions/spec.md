@@ -2,9 +2,10 @@
 
 ## Status
 
-- Round: Spec
-- Artifact state: owner-confirmed discovery; awaiting public Spec acceptance
-- Code changes allowed: no until this Spec is accepted and a public Ticket is ready
+- Round: Code
+- Artifact state: accepted through public PR [#1030](https://github.com/appaloft/appaloft/pull/1030);
+  implementation tracked by public Ticket [#1031](https://github.com/appaloft/appaloft/issues/1031)
+- Code changes allowed: yes, within Ticket #1031 and this accepted boundary
 - Compatibility: additive presentation over existing public operations
 
 ## Business Outcome
@@ -52,4 +53,3 @@ availability is guidance, not mutation admission.
 - Server enrollment, Workspace creation wizard or profile editing.
 - Provider-specific action branches.
 - TUI-owned optimistic lifecycle state.
-

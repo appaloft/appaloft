@@ -99,13 +99,16 @@ Workspace；它通过现有公开查询显示 Workspace、Agent Runtime、Previe
 
 - `↑` / `↓` 或 `j` / `k`：选择 Workspace；
 - `Enter`：attach 或重新聚焦已经连接的 Agent；
+- `a`：打开所选 Workspace 的生命周期操作。`ready` 状态可暂停或终止，`paused` 状态可恢复或
+  终止；终止还需要单独按 `y` 确认；
 - `Ctrl+]`：把按键所有权从 Agent 交还给 Workspace 导航，不停止或 detach Agent；
 - `f`：在同一个 Terminal Session/本地 PTY 上切换 Focus Mode，不启动第二个 Agent；
 - `r`：刷新现有公开 read model；`R`：用同一 Session identity 手动重连；
 - `q`：仅在 Workspace 导航获得焦点时退出；Agent 获得焦点时，普通按键仍发送给 Agent。
 
-TUI 断开或退出只 detach 客户端；它不会替代显式 Workspace 生命周期命令。脚本、CI、无 TTY
-环境或不希望加载 renderer 时使用：
+TUI 断开或退出只 detach 客户端。TUI 生命周期操作调用与显式 headless 子命令相同的公开命令；
+暂停或终止前会先 detach 当前 Agent viewport，之后重新读取 Workspace 状态，而不是在本地乐观
+修改状态。脚本、CI、无 TTY 环境或不希望加载 renderer 时使用：
 
 ```bash
 appaloft workspace --no-tui

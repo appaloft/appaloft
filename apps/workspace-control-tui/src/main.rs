@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
 use appaloft_workspace_control_tui::{
-    AppState, ParentMessage, RendererEvent, agent_area, render, terminal_key_bytes,
+    ActionDecision, AppState, ParentMessage, RendererEvent, agent_area, render, terminal_key_bytes,
     terminal_mouse_bytes,
 };
 use crossterm::event::{
@@ -150,8 +150,9 @@ fn main() -> Result<()> {
                 send(&mut writer, &RendererEvent::TerminalReconnect)?;
             }
             let selected = state.selected_workspace_id().map(str::to_owned);
-            if selected.is_some() && (before.is_none() || selected != last_selected) {
-                let workspace_id = selected.expect("selected Workspace should exist");
+            if let Some(workspace_id) = selected
+                && (before.is_none() || Some(&workspace_id) != last_selected.as_ref())
+            {
                 send(
                     &mut writer,
                     &RendererEvent::Select {
@@ -216,6 +217,52 @@ fn main() -> Result<()> {
                     send(&mut writer, &RendererEvent::TerminalInput { data })?;
                 }
             }
+            Event::Key(key)
+                if key.kind == KeyEventKind::Press && state.pending_confirmation.is_some() =>
+            {
+                match key.code {
+                    KeyCode::Char('y') | KeyCode::Char('Y') => {
+                        if let (Some(action), Some(workspace_id)) = (
+                            state.confirm_lifecycle_action(true),
+                            state.selected_workspace_id().map(str::to_owned),
+                        ) {
+                            send(
+                                &mut writer,
+                                &RendererEvent::LifecycleAction {
+                                    workspace_id,
+                                    action,
+                                },
+                            )?;
+                        }
+                    }
+                    KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                        state.confirm_lifecycle_action(false);
+                    }
+                    _ => {}
+                }
+            }
+            Event::Key(key) if key.kind == KeyEventKind::Press && state.action_menu_open => {
+                match key.code {
+                    KeyCode::Esc => state.close_action_menu(),
+                    KeyCode::Up | KeyCode::Char('k') => state.move_action_selection(-1),
+                    KeyCode::Down | KeyCode::Char('j') => state.move_action_selection(1),
+                    KeyCode::Enter => {
+                        if let ActionDecision::Dispatch(action) = state.activate_selected_action()
+                            && let Some(workspace_id) =
+                                state.selected_workspace_id().map(str::to_owned)
+                        {
+                            send(
+                                &mut writer,
+                                &RendererEvent::LifecycleAction {
+                                    workspace_id,
+                                    action,
+                                },
+                            )?;
+                        }
+                    }
+                    _ => {}
+                }
+            }
             Event::Key(key) if key.kind == KeyEventKind::Press => match key.code {
                 KeyCode::Char('q') => {
                     send(&mut writer, &RendererEvent::Quit)?;
@@ -229,6 +276,9 @@ fn main() -> Result<()> {
                 )?,
                 KeyCode::Char('R') => send(&mut writer, &RendererEvent::TerminalReconnect)?,
                 KeyCode::Char('f') => state.toggle_focus_mode(),
+                KeyCode::Char('a') => {
+                    state.open_action_menu();
+                }
                 KeyCode::Up | KeyCode::Char('k') => {
                     if let Some(workspace_id) = state.move_selection(-1) {
                         send(

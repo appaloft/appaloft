@@ -37,8 +37,6 @@ import {
   ShowWorkspaceCollaborationQuery,
   SteerAgentTaskRunCommand,
   StopAgentTaskRunCommand,
-  TerminateSandboxAgentRuntimeCommand,
-  TerminateSandboxCommand,
   TransferWorkspaceWriterLeaseCommand,
   type WorkspaceOpenResult,
 } from "@appaloft/application";
@@ -60,6 +58,7 @@ import {
   runQuery,
   runTerminalCommand,
 } from "../runtime.js";
+import { terminateWorkspaceWithRuntimes } from "../workspace-lifecycle-actions.js";
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const workspaceId = Args.text({ name: "workspaceId" });
@@ -359,33 +358,10 @@ const resume = EffectCommand.make("resume", { workspaceId }, ({ workspaceId }) =
 const terminate = EffectCommand.make("terminate", { workspaceId }, ({ workspaceId }) =>
   Effect.gen(function* () {
     const cli = yield* CliRuntime;
-    const runtimeQuery = yield* resultToEffect(
-      ListSandboxAgentRuntimesQuery.create({ sandboxId: workspaceId }),
+    const result = yield* resultToEffect(
+      yield* Effect.promise(() => terminateWorkspaceWithRuntimes(cli, workspaceId)),
     );
-    const runtimes = (yield* resultToEffect(
-      yield* Effect.promise(() => cli.executeQuery(runtimeQuery)),
-    )) as AgentRuntimeListResult;
-    const agents = yield* Effect.all(
-      runtimes.items
-        .filter((runtime) => runtime.status !== "terminated")
-        .map((runtime) =>
-          Effect.gen(function* () {
-            const command = yield* resultToEffect(
-              TerminateSandboxAgentRuntimeCommand.create({
-                sandboxId: workspaceId,
-                runtimeId: runtime.runtimeId,
-              }),
-            );
-            return yield* resultToEffect(yield* Effect.promise(() => cli.executeCommand(command)));
-          }),
-        ),
-      { concurrency: 4 },
-    );
-    const command = yield* resultToEffect(
-      TerminateSandboxCommand.create({ sandboxId: workspaceId }),
-    );
-    const sandbox = yield* resultToEffect(yield* Effect.promise(() => cli.executeCommand(command)));
-    yield* print({ workspaceId, agents, sandbox });
+    yield* print(result);
   }),
 );
 

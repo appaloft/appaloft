@@ -97,15 +97,18 @@ calls, or hidden reasoning.
 
 - `↑` / `↓` or `j` / `k`: select a Workspace;
 - `Enter`: attach or focus an already connected Agent;
+- `a`: open lifecycle actions for the selected Workspace. `ready` Workspaces can pause or terminate;
+  `paused` Workspaces can resume or terminate. Termination requires a separate `y` confirmation;
 - `Ctrl+]`: return input ownership to Workspace navigation without stopping or detaching the Agent;
 - `f`: toggle Focus Mode over the same Terminal Session/local PTY without starting another Agent;
 - `r`: refresh existing public read models; `R`: reconnect with the same Session identity;
 - `q`: quit only while Workspace navigation owns focus. Bare keys remain Agent-owned while the
   Agent pane is focused.
 
-Leaving or disconnecting the TUI detaches only the client; explicit Workspace lifecycle commands
-still own pause, resume, and termination. For scripts, CI, a non-TTY environment, or when the
-renderer should not load, use:
+Leaving or disconnecting the TUI detaches only the client. TUI lifecycle actions dispatch the same
+public commands as the explicit headless subcommands, detach an active Agent viewport before pause
+or terminate, and read the resulting Workspace state back instead of keeping an optimistic local
+copy. For scripts, CI, a non-TTY environment, or when the renderer should not load, use:
 
 ```bash
 appaloft workspace --no-tui
