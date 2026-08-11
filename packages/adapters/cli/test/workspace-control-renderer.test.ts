@@ -37,6 +37,13 @@ describe("Workspace control renderer channel", () => {
             parentMessages.push(message);
             if (message.type === "hello-ok") {
               client?.write(`${JSON.stringify({ type: "select", workspaceId: "sbx_1" })}\n`);
+              client?.write(
+                `${JSON.stringify({
+                  type: "lifecycle-action",
+                  workspaceId: "sbx_1",
+                  action: "resume",
+                })}\n`,
+              );
               client?.write(`${JSON.stringify({ type: "quit" })}\n`);
             }
             if (message.type === "shutdown") client?.end();
@@ -58,6 +65,10 @@ describe("Workspace control renderer channel", () => {
     expect(await events.next()).toEqual({
       done: false,
       value: { type: "select", workspaceId: "sbx_1" },
+    });
+    expect(await events.next()).toEqual({
+      done: false,
+      value: { type: "lifecycle-action", workspaceId: "sbx_1", action: "resume" },
     });
     expect(await events.next()).toEqual({ done: false, value: { type: "quit" } });
     await renderer.close();

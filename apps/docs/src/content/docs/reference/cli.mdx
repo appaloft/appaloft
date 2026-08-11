@@ -63,7 +63,8 @@ appaloft code . --no-attach
 
 `appaloft workspace` 在受支持的交互式 macOS/Linux 终端中打开 Workspace control TUI；它只消费
 现有公开 operations/read models。`Ctrl+]` 从嵌入的 Agent 释放焦点，`f` 在同一 Session 上切换
-Focus Mode。无 TTY、脚本或 Windows headless 场景使用 `--no-tui`、`--json` 或显式子命令；这些
+Focus Mode，`a` 打开由状态决定的暂停、恢复与二次确认终止操作，并复用 headless CLI 的公开
+命令。无 TTY、脚本或 Windows headless 场景使用 `--no-tui`、`--json` 或显式子命令；这些
 路径不会加载 renderer。完整按键和会话边界见
 [管理正在运行的 Workspace](/docs/agents/workspaces/#workspace-control-tui)。
 

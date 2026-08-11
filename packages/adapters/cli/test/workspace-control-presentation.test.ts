@@ -9,12 +9,16 @@ import {
   ListSandboxesQuery,
   ListSandboxPortsQuery,
   ListSandboxPromotionsQuery,
+  PauseSandboxCommand,
   type Query,
+  ResumeSandboxCommand,
   ShowSandboxQuery,
   type TerminalSession,
   type TerminalSessionFrame,
+  TerminateSandboxAgentRuntimeCommand,
+  TerminateSandboxCommand,
 } from "@appaloft/application";
-import { ok } from "@appaloft/core";
+import { domainError, err, ok } from "@appaloft/core";
 import {
   createBoundedWorkspaceControlPresentation,
   type WorkspaceControlRendererEvent,
@@ -442,5 +446,197 @@ describe("Workspace control presentation", () => {
       }),
     ).resolves.toBeUndefined();
     expect(closed).toBe(1);
+  });
+
+  test("[WS-TUI-ACTION-002][WS-TUI-ACTION-003][WS-TUI-ACTION-007] dispatches pause/resume once and reads public state back", async () => {
+    for (const action of ["pause", "resume"] as const) {
+      const renderer = new FakeRendererSession([
+        { type: "select", workspaceId: "sbx_1" },
+        { type: "lifecycle-action", workspaceId: "sbx_1", action } as WorkspaceControlRendererEvent,
+        { type: "quit" },
+      ]);
+      const commands: Command<unknown>[] = [];
+      const queries: Query<unknown>[] = [];
+      let mutated = false;
+      const presentation = createBoundedWorkspaceControlPresentation({
+        openRenderer: async () => renderer,
+      });
+
+      await presentation.start({
+        executeCommand: async <T>(command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          mutated = true;
+          return ok({ sandboxId: "sbx_1", status: action === "pause" ? "paused" : "ready" } as T);
+        },
+        executeQuery: async <T>(query: Query<T>) => {
+          queries.push(query as Query<unknown>);
+          if (query instanceof ListSandboxesQuery) {
+            return ok({
+              items: [
+                {
+                  sandboxId: "sbx_1",
+                  status: mutated
+                    ? action === "pause"
+                      ? "paused"
+                      : "ready"
+                    : action === "pause"
+                      ? "ready"
+                      : "paused",
+                },
+              ],
+            } as T);
+          }
+          if (query instanceof ShowSandboxQuery) {
+            return ok({
+              sandboxId: "sbx_1",
+              status: mutated
+                ? action === "pause"
+                  ? "paused"
+                  : "ready"
+                : action === "pause"
+                  ? "ready"
+                  : "paused",
+            } as T);
+          }
+          if (
+            query instanceof ListSandboxAgentRuntimesQuery ||
+            query instanceof ListSandboxPortsQuery ||
+            query instanceof ListSandboxPromotionsQuery
+          ) {
+            return ok({ items: [] } as T);
+          }
+          throw new Error(`unexpected query ${query.constructor.name}`);
+        },
+      });
+
+      expect(commands).toHaveLength(1);
+      expect(commands[0]).toBeInstanceOf(
+        action === "pause" ? PauseSandboxCommand : ResumeSandboxCommand,
+      );
+      expect(queries.filter((query) => query instanceof ListSandboxesQuery)).toHaveLength(2);
+      expect(queries.filter((query) => query instanceof ShowSandboxQuery)).toHaveLength(2);
+    }
+  });
+
+  test("[WS-TUI-ACTION-005][WS-TUI-ACTION-006] detaches before runtime-first confirmed termination", async () => {
+    const order: string[] = [];
+    const renderer = new FakeRendererSession([
+      { type: "select", workspaceId: "sbx_1" },
+      { type: "attach", workspaceId: "sbx_1", runtimeId: "sar_1" },
+      {
+        type: "lifecycle-action",
+        workspaceId: "sbx_1",
+        action: "terminate",
+      } as WorkspaceControlRendererEvent,
+      { type: "quit" },
+    ]);
+    const terminal = {
+      async *[Symbol.asyncIterator](): AsyncIterator<TerminalSessionFrame> {
+        yield { kind: "ready", sessionId: "term_1" };
+      },
+      write: () => Promise.resolve(),
+      resize: () => Promise.resolve(),
+      detach: () => {
+        order.push("detach");
+        return Promise.resolve();
+      },
+      close: () => Promise.resolve(),
+    } satisfies TerminalSession;
+    let terminated = false;
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+
+    await presentation.start({
+      executeCommand: async <T>(command: Command<T>) => {
+        if (command instanceof IssueSandboxAgentAttachAccessCommand) {
+          return ok({ transport: "managed-terminal", sessionId: "term_1" } as T);
+        }
+        if (command instanceof TerminateSandboxAgentRuntimeCommand) {
+          order.push("terminate-runtime");
+          return ok({ sandboxId: "sbx_1", runtimeId: "sar_1", status: "terminated" } as T);
+        }
+        if (command instanceof TerminateSandboxCommand) {
+          order.push("terminate-workspace");
+          terminated = true;
+          return ok({ sandboxId: "sbx_1", status: "terminated" } as T);
+        }
+        throw new Error(`unexpected command ${command.constructor.name}`);
+      },
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery) {
+          return ok({ items: [{ sandboxId: "sbx_1", status: "ready" }] } as T);
+        }
+        if (query instanceof ShowSandboxQuery) {
+          return ok({ sandboxId: "sbx_1", status: terminated ? "terminated" : "ready" } as T);
+        }
+        if (query instanceof ListSandboxAgentRuntimesQuery) {
+          return ok({
+            items: [{ sandboxId: "sbx_1", runtimeId: "sar_1", status: "ready" }],
+          } as T);
+        }
+        if (
+          query instanceof ListSandboxPortsQuery ||
+          query instanceof ListSandboxPromotionsQuery ||
+          query instanceof ListAgentTaskRunsQuery
+        ) {
+          return ok({ items: [] } as T);
+        }
+        throw new Error(`unexpected query ${query.constructor.name}`);
+      },
+      terminalSessionGateway: { attach: () => ok(terminal) },
+    });
+
+    expect(order).toEqual(["detach", "terminate-runtime", "terminate-workspace"]);
+  });
+
+  test("[WS-TUI-ACTION-008] lifecycle command failures preserve only stable safe presentation metadata", async () => {
+    const renderer = new FakeRendererSession([
+      { type: "select", workspaceId: "sbx_1" },
+      {
+        type: "lifecycle-action",
+        workspaceId: "sbx_1",
+        action: "pause",
+      },
+      { type: "quit" },
+    ]);
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+
+    await presentation.start({
+      executeCommand: async () =>
+        err(
+          domainError.conflict("token=must-not-cross", {
+            phase: "sandbox-pause",
+            credential: "must-not-cross",
+          }),
+        ),
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery) {
+          return ok({ items: [{ sandboxId: "sbx_1", status: "ready" }] } as T);
+        }
+        if (query instanceof ShowSandboxQuery) {
+          return ok({ sandboxId: "sbx_1", status: "ready" } as T);
+        }
+        if (
+          query instanceof ListSandboxAgentRuntimesQuery ||
+          query instanceof ListSandboxPortsQuery ||
+          query instanceof ListSandboxPromotionsQuery
+        ) {
+          return ok({ items: [] } as T);
+        }
+        throw new Error(`unexpected query ${query.constructor.name}`);
+      },
+    });
+
+    const error = renderer.messages.find((message) => message.type === "error");
+    expect(error).toMatchObject({
+      type: "error",
+      code: "conflict",
+      phase: "workspace-control-lifecycle-action",
+      retryable: false,
+    });
+    expect(JSON.stringify(renderer.messages)).not.toContain("must-not-cross");
   });
 });

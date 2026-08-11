@@ -3,7 +3,7 @@ use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Wrap};
+use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
@@ -86,6 +86,42 @@ pub struct DetailMessage {
     pub promotions: Vec<PromotionSummary>,
 }
 
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum LifecycleAction {
+    Pause,
+    Resume,
+    Terminate,
+}
+
+impl LifecycleAction {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Pause => "Pause Workspace",
+            Self::Resume => "Resume Workspace",
+            Self::Terminate => "Terminate Workspace",
+        }
+    }
+}
+
+pub fn lifecycle_actions_for_status(status: &str) -> Vec<LifecycleAction> {
+    match status {
+        "ready" => vec![LifecycleAction::Pause, LifecycleAction::Terminate],
+        "paused" => vec![LifecycleAction::Resume, LifecycleAction::Terminate],
+        "requested" | "provisioning" | "pausing" | "resuming" | "failed" => {
+            vec![LifecycleAction::Terminate]
+        }
+        _ => Vec::new(),
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ActionDecision {
+    None,
+    Dispatch(LifecycleAction),
+    AwaitConfirmation,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum ParentMessage {
@@ -142,6 +178,11 @@ pub enum RendererEvent {
         #[serde(rename = "runtimeId")]
         runtime_id: String,
     },
+    LifecycleAction {
+        #[serde(rename = "workspaceId")]
+        workspace_id: String,
+        action: LifecycleAction,
+    },
     TerminalInput {
         data: String,
     },
@@ -162,6 +203,10 @@ pub struct AppState {
     pub focus_mode: bool,
     pub session_id: Option<String>,
     pub runtime_id: Option<String>,
+    pub action_menu_open: bool,
+    pub action_selected: usize,
+    pub pending_confirmation: Option<LifecycleAction>,
+    pub action_busy: bool,
     pub status_line: String,
     pub terminal: vt100::Parser,
     pub terminal_size: (u16, u16),
@@ -177,6 +222,10 @@ impl Default for AppState {
             focus_mode: false,
             session_id: None,
             runtime_id: None,
+            action_menu_open: false,
+            action_selected: 0,
+            pending_confirmation: None,
+            action_busy: false,
             status_line: "Connecting to Appaloft…".to_owned(),
             terminal: vt100::Parser::new(24, 80, 10_000),
             terminal_size: (80, 24),
@@ -222,6 +271,7 @@ impl AppState {
             ParentMessage::Detail { detail } => {
                 self.status_line = format!("Workspace {}", detail.workspace.workspace_id);
                 self.detail = Some(detail);
+                self.action_busy = false;
             }
             ParentMessage::TerminalReady {
                 runtime_id,
@@ -238,6 +288,9 @@ impl AppState {
                 reason, exit_code, ..
             } => {
                 self.agent_focused = false;
+                self.focus_mode = false;
+                self.session_id = None;
+                self.runtime_id = None;
                 self.status_line = match exit_code {
                     Some(code) => format!("Agent terminal closed: {reason} ({code})"),
                     None => format!("Agent terminal closed: {reason}"),
@@ -248,6 +301,7 @@ impl AppState {
                 phase,
                 retryable,
             } => {
+                self.action_busy = false;
                 self.status_line = format!(
                     "{code} at {phase}{}",
                     if retryable { " — retry with r" } else { "" }
@@ -264,6 +318,8 @@ impl AppState {
         let last = self.workspaces.len().saturating_sub(1) as isize;
         self.selected = (self.selected as isize + delta).clamp(0, last) as usize;
         self.detail = None;
+        self.action_menu_open = false;
+        self.pending_confirmation = None;
         self.selected_workspace_id().map(str::to_owned)
     }
 
@@ -289,15 +345,76 @@ impl AppState {
         self.terminal_size = (cols, rows);
         true
     }
+
+    pub fn available_lifecycle_actions(&self) -> Vec<LifecycleAction> {
+        self.detail
+            .as_ref()
+            .map(|detail| lifecycle_actions_for_status(&detail.workspace.status))
+            .unwrap_or_default()
+    }
+
+    pub fn open_action_menu(&mut self) -> bool {
+        if self.action_busy || self.available_lifecycle_actions().is_empty() {
+            return false;
+        }
+        self.action_selected = 0;
+        self.pending_confirmation = None;
+        self.action_menu_open = true;
+        true
+    }
+
+    pub fn close_action_menu(&mut self) {
+        self.action_menu_open = false;
+        self.pending_confirmation = None;
+    }
+
+    pub fn move_action_selection(&mut self, delta: isize) {
+        let actions = self.available_lifecycle_actions();
+        if actions.is_empty() {
+            self.action_selected = 0;
+            return;
+        }
+        let last = actions.len().saturating_sub(1) as isize;
+        self.action_selected = (self.action_selected as isize + delta).clamp(0, last) as usize;
+    }
+
+    pub fn activate_selected_action(&mut self) -> ActionDecision {
+        if !self.action_menu_open || self.action_busy {
+            return ActionDecision::None;
+        }
+        let Some(action) = self
+            .available_lifecycle_actions()
+            .get(self.action_selected)
+            .copied()
+        else {
+            return ActionDecision::None;
+        };
+        self.action_menu_open = false;
+        if action == LifecycleAction::Terminate {
+            self.pending_confirmation = Some(action);
+            return ActionDecision::AwaitConfirmation;
+        }
+        self.action_busy = true;
+        ActionDecision::Dispatch(action)
+    }
+
+    pub fn confirm_lifecycle_action(&mut self, confirmed: bool) -> Option<LifecycleAction> {
+        let pending = self.pending_confirmation.take();
+        if confirmed && pending.is_some() {
+            self.action_busy = true;
+            return pending;
+        }
+        None
+    }
 }
 
 pub fn terminal_key_bytes(key: KeyEvent) -> Option<String> {
-    if key.modifiers.contains(KeyModifiers::CONTROL) {
-        if let KeyCode::Char(character) = key.code {
-            let lower = character.to_ascii_lowercase();
-            if lower.is_ascii_lowercase() {
-                return Some(char::from((lower as u8 - b'a') + 1).to_string());
-            }
+    if key.modifiers.contains(KeyModifiers::CONTROL)
+        && let KeyCode::Char(character) = key.code
+    {
+        let lower = character.to_ascii_lowercase();
+        if lower.is_ascii_lowercase() {
+            return Some(char::from((lower as u8 - b'a') + 1).to_string());
         }
     }
     match key.code {
@@ -587,12 +704,66 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
     }
     frame.render_widget(
         Paragraph::new(format!(
-            " {}  │  ↑↓ select  Enter attach/focus  Ctrl+] release  f Focus Mode  r refresh  R reconnect  q quit ",
+            " {}  │  ↑↓ select  Enter attach/focus  a actions  Ctrl+] release  f Focus Mode  r refresh  R reconnect  q quit ",
             state.status_line
         ))
         .style(Style::default().fg(Color::DarkGray)),
         footer,
     );
+    if state.action_menu_open {
+        let actions = state.available_lifecycle_actions();
+        let width = 38_u16.min(area.width.saturating_sub(2)).max(2);
+        let height = (actions.len() as u16 + 2)
+            .min(area.height.saturating_sub(2))
+            .max(3);
+        let menu = Rect::new(
+            area.x + area.width.saturating_sub(width) / 2,
+            area.y + area.height.saturating_sub(height) / 2,
+            width,
+            height,
+        );
+        frame.render_widget(Clear, menu);
+        frame.render_widget(
+            List::new(actions.iter().enumerate().map(|(index, action)| {
+                let marker = if index == state.action_selected {
+                    "›"
+                } else {
+                    " "
+                };
+                ListItem::new(format!("{marker} {}", action.label())).style(
+                    if index == state.action_selected {
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default()
+                    },
+                )
+            }))
+            .block(
+                Block::default()
+                    .title(" Workspace Actions ")
+                    .borders(Borders::ALL),
+            ),
+            menu,
+        );
+    } else if state.pending_confirmation == Some(LifecycleAction::Terminate) {
+        let width = 52_u16.min(area.width.saturating_sub(2)).max(2);
+        let height = 5_u16.min(area.height.saturating_sub(2)).max(3);
+        let dialog = Rect::new(
+            area.x + area.width.saturating_sub(width) / 2,
+            area.y + area.height.saturating_sub(height) / 2,
+            width,
+            height,
+        );
+        frame.render_widget(Clear, dialog);
+        frame.render_widget(
+            Paragraph::new("Terminate this Workspace and its Agent runtimes?\nPress y to confirm, n or Esc to cancel.")
+                .block(Block::default().title(" Confirm destructive action ").borders(Borders::ALL))
+                .wrap(Wrap { trim: false }),
+            dialog,
+        );
+    }
 }
 
 #[cfg(test)]
@@ -731,5 +902,91 @@ mod tests {
         assert!(rendered.contains("task_1"));
         assert!(rendered.contains("prm_1"));
         assert!(rendered.contains("verified"));
+    }
+
+    #[test]
+    fn ws_tui_action_palette_derives_only_valid_lifecycle_actions() {
+        assert_eq!(
+            lifecycle_actions_for_status("ready"),
+            vec![LifecycleAction::Pause, LifecycleAction::Terminate]
+        );
+        assert_eq!(
+            lifecycle_actions_for_status("paused"),
+            vec![LifecycleAction::Resume, LifecycleAction::Terminate]
+        );
+        assert_eq!(
+            lifecycle_actions_for_status("provisioning"),
+            vec![LifecycleAction::Terminate]
+        );
+        assert!(lifecycle_actions_for_status("terminated").is_empty());
+        assert!(lifecycle_actions_for_status("expired").is_empty());
+    }
+
+    #[test]
+    fn ws_tui_terminate_requires_explicit_confirmation_and_cancel_is_safe() {
+        let mut state = AppState::default();
+        state.apply(ParentMessage::Workspaces {
+            workspaces: vec![WorkspaceSummary {
+                workspace_id: "sbx_1".to_owned(),
+                status: "ready".to_owned(),
+                provider_key: None,
+                source_kind: None,
+            }],
+        });
+        state.apply(ParentMessage::Detail {
+            detail: DetailMessage {
+                workspace: state.workspaces[0].clone(),
+                runtimes: Vec::new(),
+                ports: Vec::new(),
+                tasks: Vec::new(),
+                promotions: Vec::new(),
+            },
+        });
+
+        assert!(state.open_action_menu());
+        state.move_action_selection(1);
+        assert_eq!(
+            state.activate_selected_action(),
+            ActionDecision::AwaitConfirmation
+        );
+        assert_eq!(state.confirm_lifecycle_action(false), None);
+
+        assert!(state.open_action_menu());
+        state.move_action_selection(1);
+        assert_eq!(
+            state.activate_selected_action(),
+            ActionDecision::AwaitConfirmation
+        );
+        assert_eq!(
+            state.confirm_lifecycle_action(true),
+            Some(LifecycleAction::Terminate)
+        );
+    }
+
+    #[test]
+    fn ws_tui_lifecycle_event_is_explicit_and_terminal_close_clears_focus_identity() {
+        assert_eq!(
+            serde_json::to_string(&RendererEvent::LifecycleAction {
+                workspace_id: "sbx_1".to_owned(),
+                action: LifecycleAction::Pause,
+            })
+            .expect("serialize lifecycle action"),
+            r#"{"type":"lifecycle-action","workspaceId":"sbx_1","action":"pause"}"#
+        );
+        let mut state = AppState::default();
+        state.apply(ParentMessage::TerminalReady {
+            workspace_id: "sbx_1".to_owned(),
+            runtime_id: "sar_1".to_owned(),
+            session_id: "term_1".to_owned(),
+        });
+        state.focus_mode = true;
+        state.apply(ParentMessage::TerminalClosed {
+            reason: "workspace-pause".to_owned(),
+            exit_code: None,
+        });
+        assert_eq!(state.session_id, None);
+        assert_eq!(state.runtime_id, None);
+        assert!(!state.agent_focused);
+        assert!(!state.focus_mode);
     }
 }

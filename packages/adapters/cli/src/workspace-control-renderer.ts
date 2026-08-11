@@ -106,6 +106,15 @@ function parseRendererEvent(value: unknown): WorkspaceControlRendererEvent | und
       return typeof record.workspaceId === "string" && typeof record.runtimeId === "string"
         ? { type: "attach", workspaceId: record.workspaceId, runtimeId: record.runtimeId }
         : undefined;
+    case "lifecycle-action":
+      return typeof record.workspaceId === "string" &&
+        (record.action === "pause" || record.action === "resume" || record.action === "terminate")
+        ? {
+            type: "lifecycle-action",
+            workspaceId: record.workspaceId,
+            action: record.action,
+          }
+        : undefined;
     case "terminal-input":
       return typeof record.data === "string"
         ? { type: "terminal-input", data: record.data }

@@ -6,12 +6,15 @@ import {
   ListSandboxesQuery,
   ListSandboxPortsQuery,
   ListSandboxPromotionsQuery,
+  PauseSandboxCommand,
   type Query,
+  ResumeSandboxCommand,
   ShowSandboxQuery,
   type TerminalSession,
   type TerminalSessionAttachmentGateway,
 } from "@appaloft/application";
 import { type Result } from "@appaloft/core";
+import { terminateWorkspaceWithRuntimes } from "./workspace-lifecycle-actions.js";
 
 export interface WorkspaceControlWorkspaceSummary {
   readonly workspaceId: string;
@@ -95,6 +98,11 @@ export type WorkspaceControlRendererEvent =
   | { readonly type: "select"; readonly workspaceId: string }
   | { readonly type: "refresh"; readonly workspaceId?: string }
   | { readonly type: "attach"; readonly workspaceId: string; readonly runtimeId: string }
+  | {
+      readonly type: "lifecycle-action";
+      readonly workspaceId: string;
+      readonly action: "pause" | "resume" | "terminate";
+    }
   | { readonly type: "terminal-input"; readonly data: string }
   | { readonly type: "terminal-resize"; readonly cols: number; readonly rows: number }
   | { readonly type: "terminal-reconnect" }
@@ -379,10 +387,15 @@ export function createBoundedWorkspaceControlPresentation(
         }
       };
 
-      const detachActiveTerminal = async () => {
+      const detachActiveTerminal = async (reason?: string) => {
         const terminal = activeTerminal;
         activeTerminal = undefined;
-        if (terminal) await terminal.session.detach();
+        if (terminal) {
+          await terminal.session.detach();
+          if (reason) {
+            await renderer.send({ type: "terminal-closed", reason });
+          }
+        }
       };
 
       const bindTerminal = async (attachment: {
@@ -508,6 +521,35 @@ export function createBoundedWorkspaceControlPresentation(
               } else {
                 throw new Error("Attach descriptor has an unsupported transport");
               }
+              continue;
+            }
+            if (event.type === "lifecycle-action") {
+              if (!selectedWorkspaceId || selectedWorkspaceId !== event.workspaceId) {
+                throw new Error("Workspace lifecycle action does not match the selected Workspace");
+              }
+              if (event.action === "pause" || event.action === "terminate") {
+                await detachActiveTerminal(`workspace-${event.action}`);
+              }
+              if (event.action === "pause") {
+                resultValue(
+                  await context.executeCommand(
+                    operationValue(PauseSandboxCommand.create({ sandboxId: event.workspaceId })),
+                  ),
+                );
+              } else if (event.action === "resume") {
+                resultValue(
+                  await context.executeCommand(
+                    operationValue(ResumeSandboxCommand.create({ sandboxId: event.workspaceId })),
+                  ),
+                );
+              } else {
+                resultValue(await terminateWorkspaceWithRuntimes(context, event.workspaceId));
+              }
+              await renderer.send({
+                type: "workspaces",
+                workspaces: await listWorkspaces(context),
+              });
+              await renderer.send(await loadDetail(context, event.workspaceId));
               continue;
             }
             if (event.type === "terminal-input") {
