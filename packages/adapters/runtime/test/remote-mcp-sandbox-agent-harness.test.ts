@@ -4,6 +4,7 @@ import {
   createOpenCodeSandboxConfig,
   createPiSandboxArgv,
   createPiSandboxMcpConfig,
+  createPiSandboxMcpToolName,
 } from "../src";
 
 const modelAccess = {
@@ -29,6 +30,7 @@ describe("Remote MCP Sandbox Agent configuration", () => {
   test("[MCP-ACCESS-HARNESS-005] renders an explicit pinned Pi extension without discovery", () => {
     const argv = createPiSandboxArgv({
       modelAccess,
+      mcpCapabilities: [mcpAccess],
       mcpExtensionPath: "/opt/appaloft/pi-mcp-extension/index.ts",
       prompt: "Inspect the project",
     });
@@ -44,6 +46,11 @@ describe("Remote MCP Sandbox Agent configuration", () => {
         "/opt/appaloft/pi-mcp-extension/index.ts",
       ]),
     );
+    expect(argv[argv.indexOf("--tools") + 1]).toBe(
+      "read,bash,edit,write,grep,find,ls,mcp_appaloft_tools_projects_list",
+    );
+    expect(JSON.stringify(argv)).not.toContain(mcpAccess.url);
+    expect(JSON.stringify(argv)).not.toContain(mcpAccess.accessToken);
     expect(config).toEqual({
       schemaVersion: "appaloft.pi-mcp/v1",
       servers: [
@@ -56,6 +63,18 @@ describe("Remote MCP Sandbox Agent configuration", () => {
         },
       ],
     });
+  });
+
+  test("[MCP-ACCESS-HARNESS-005][MCP-ACCESS-POLICY-006] derives bounded Pi MCP tool names", () => {
+    expect(createPiSandboxMcpToolName("appaloft-tools", "projects.list")).toBe(
+      "mcp_appaloft_tools_projects_list",
+    );
+    expect(
+      createPiSandboxMcpToolName("server with punctuation!", `${"x".repeat(140)}.read`),
+    ).toMatch(/^mcp_server_with_punctuation__x+$/u);
+    expect(
+      createPiSandboxMcpToolName("server with punctuation!", `${"x".repeat(140)}.read`),
+    ).toHaveLength(120);
   });
 
   test("[MCP-ACCESS-HARNESS-005][MCP-ACCESS-POLICY-006] renders OpenCode remote MCP config", () => {

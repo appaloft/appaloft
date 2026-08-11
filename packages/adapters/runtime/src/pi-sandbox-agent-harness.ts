@@ -108,16 +108,26 @@ export function createPiSandboxArgv(input: {
   executable?: string;
   offlineStartup?: boolean;
   modelAccess: PiSandboxModelAccess;
+  mcpCapabilities?: readonly SandboxAgentMcpAccessDescriptor[];
   mcpExtensionPath?: string;
   prompt: string;
 }): string[] {
+  const mcpToolNames = [
+    ...new Set(
+      (input.mcpCapabilities ?? []).flatMap((capability) =>
+        capability.effectiveTools.map((tool) =>
+          createPiSandboxMcpToolName(capability.serverName, tool),
+        ),
+      ),
+    ),
+  ];
   return [
     input.executable ?? "pi",
     "--mode",
     "json",
     "--no-session",
     "--tools",
-    "read,bash,edit,write,grep,find,ls",
+    ["read", "bash", "edit", "write", "grep", "find", "ls", ...mcpToolNames].join(","),
     "--no-extensions",
     ...(input.mcpExtensionPath ? ["--extension", input.mcpExtensionPath] : []),
     "--no-skills",
@@ -132,6 +142,10 @@ export function createPiSandboxArgv(input: {
     "--print",
     input.prompt,
   ];
+}
+
+export function createPiSandboxMcpToolName(serverName: string, upstreamTool: string): string {
+  return `mcp_${serverName}_${upstreamTool}`.replace(/[^A-Za-z0-9_]/gu, "_").slice(0, 120);
 }
 
 export function createPiSandboxMcpConfig(
@@ -343,7 +357,7 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
         : { offlineStartup: this.options.offlineStartup }),
       modelAccess,
       ...(mcpCapabilities.length > 0
-        ? { mcpExtensionPath: this.options.mcpExtensionPath }
+        ? { mcpCapabilities, mcpExtensionPath: this.options.mcpExtensionPath }
         : {}),
       prompt,
     });
