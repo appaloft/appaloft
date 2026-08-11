@@ -48,6 +48,8 @@ realRendererTest(
       expect(output).toContain("Ctrl+]");
       let exitCode: number | undefined;
       for (let attempt = 0; attempt < 50 && exitCode === undefined; attempt += 1) {
+        terminal.write("\x1d");
+        await Bun.sleep(20);
         terminal.write("q");
         const result = await Promise.race([
           child.exited.then((code) => ({ exited: true as const, code })),
