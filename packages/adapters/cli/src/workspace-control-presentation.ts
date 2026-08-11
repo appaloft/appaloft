@@ -4,6 +4,8 @@ import {
   AcceptSandboxPromotionCommand,
   ApproveAgentTaskRunCommand,
   type Command,
+  CreateSandboxSnapshotCommand,
+  DeleteSandboxSnapshotCommand,
   DeliverAgentTaskRunCommand,
   DeploymentProofQuery,
   ExposeSandboxPortCommand,
@@ -13,6 +15,7 @@ import {
   ListSandboxesQuery,
   ListSandboxPortsQuery,
   ListSandboxPromotionsQuery,
+  ListSandboxSnapshotsQuery,
   PauseSandboxCommand,
   type Query,
   ResumeSandboxCommand,
@@ -71,6 +74,35 @@ export interface WorkspaceControlPromotionSummary {
   readonly expiresAt?: string;
 }
 
+export interface WorkspaceControlSnapshotSummary {
+  readonly snapshotId: string;
+  readonly capability: "filesystem" | "filesystem-memory";
+  readonly reason: "manual" | "scheduled" | "pre-termination";
+  readonly portability: "provider-local" | "provider-family" | "portable";
+  readonly recoveryFamily?: string;
+  readonly status: string;
+  readonly createdAt: string;
+  readonly expiresAt?: string;
+}
+
+export interface WorkspaceControlRecoverySummary {
+  readonly requestedIsolation?: string;
+  readonly realizedIsolation?: string;
+  readonly provisionAttempts?: number;
+  readonly suspension?: {
+    readonly mode: string;
+    readonly portability: string;
+    readonly recoveryFamily?: string;
+  };
+  readonly snapshots: readonly WorkspaceControlSnapshotSummary[];
+  readonly cleanup: {
+    readonly state: "not-applicable" | "clear" | "residual";
+    readonly activeRuntimeCount: number;
+    readonly activePreviewCount: number;
+    readonly scope: "workspace-owned-readback";
+  };
+}
+
 export type WorkspaceControlRendererMessage =
   | {
       readonly type: "workspaces";
@@ -83,6 +115,7 @@ export type WorkspaceControlRendererMessage =
       readonly ports: readonly WorkspaceControlPortSummary[];
       readonly tasks: readonly WorkspaceControlTaskSummary[];
       readonly promotions: readonly WorkspaceControlPromotionSummary[];
+      readonly recovery: WorkspaceControlRecoverySummary;
     }
   | {
       readonly type: "terminal-ready";
@@ -101,6 +134,7 @@ export type WorkspaceControlRendererMessage =
       readonly exitCode?: number;
     }
   | { readonly type: "delivery-complete"; readonly workspaceId: string }
+  | { readonly type: "recovery-complete"; readonly workspaceId: string }
   | {
       readonly type: "error";
       readonly code: string;
@@ -145,6 +179,13 @@ export type WorkspaceControlRendererEvent =
       readonly promotionId: string;
     }
   | { readonly type: "promotion-retry"; readonly workspaceId: string; readonly promotionId: string }
+  | {
+      readonly type: "snapshot-create";
+      readonly workspaceId: string;
+      readonly capability: "filesystem" | "filesystem-memory";
+      readonly ttlDays: 1 | 7 | 30;
+    }
+  | { readonly type: "snapshot-delete"; readonly workspaceId: string; readonly snapshotId: string }
   | { readonly type: "terminal-input"; readonly data: string }
   | { readonly type: "terminal-resize"; readonly cols: number; readonly rows: number }
   | { readonly type: "terminal-reconnect" }
@@ -203,6 +244,27 @@ function operationValue<T>(result: Result<T>): T {
 function optionalString(record: Record<string, unknown>, key: string): string | undefined {
   const value = record[key];
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function optionalNonNegativeInteger(
+  record: Record<string, unknown>,
+  key: string,
+): number | undefined {
+  const value = record[key];
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : undefined;
+}
+
+function suspensionSummary(
+  record: Record<string, unknown>,
+): WorkspaceControlRecoverySummary["suspension"] {
+  const value = record.suspension;
+  if (!value || typeof value !== "object") return undefined;
+  const suspension = value as Record<string, unknown>;
+  const mode = optionalString(suspension, "mode");
+  const portability = optionalString(suspension, "portability");
+  if (!mode || !portability) return undefined;
+  const recoveryFamily = optionalString(suspension, "recoveryFamily");
+  return { mode, portability, ...(recoveryFamily ? { recoveryFamily } : {}) };
 }
 
 function workspaceSummary(record: Record<string, unknown>): WorkspaceControlWorkspaceSummary {
@@ -305,6 +367,41 @@ function promotionSummary(
   };
 }
 
+function snapshotSummary(
+  record: Record<string, unknown>,
+): WorkspaceControlSnapshotSummary | undefined {
+  const snapshotId = optionalString(record, "snapshotId");
+  const capability = optionalString(record, "capability");
+  const reason = optionalString(record, "reason");
+  const portability = optionalString(record, "portability");
+  const status = optionalString(record, "status");
+  const createdAt = optionalString(record, "createdAt");
+  if (
+    !snapshotId ||
+    (capability !== "filesystem" && capability !== "filesystem-memory") ||
+    (reason !== "manual" && reason !== "scheduled" && reason !== "pre-termination") ||
+    (portability !== "provider-local" &&
+      portability !== "provider-family" &&
+      portability !== "portable") ||
+    !status ||
+    !createdAt
+  ) {
+    return undefined;
+  }
+  const recoveryFamily = optionalString(record, "recoveryFamily");
+  const expiresAt = optionalString(record, "expiresAt");
+  return {
+    snapshotId,
+    capability,
+    reason,
+    portability,
+    status,
+    createdAt,
+    ...(recoveryFamily ? { recoveryFamily } : {}),
+    ...(expiresAt ? { expiresAt } : {}),
+  };
+}
+
 function safeError(error: unknown, phase: string): WorkspaceControlRendererMessage {
   if (error && typeof error === "object") {
     const record = error as Record<string, unknown>;
@@ -371,6 +468,11 @@ async function loadDetail(
       operationValue(ListSandboxPortsQuery.create({ sandboxId: workspaceId })),
     ),
   ) as ItemListResult;
+  const snapshots = resultValue(
+    await context.executeQuery(
+      operationValue(ListSandboxSnapshotsQuery.create({ limit: 100, offset: 0 })),
+    ),
+  ) as ItemListResult;
   const promotions = resultValue(
     await context.executeQuery(
       operationValue(ListSandboxPromotionsQuery.create({ sandboxId: workspaceId })),
@@ -418,16 +520,49 @@ async function loadDetail(
     const summary = promotionSummary(promotion, proof);
     if (summary) promotionSummaries.push(summary);
   }
+  const runtimeSummaries = runtimeResult.items.map(runtimeSummary);
+  const portSummaries = ports.items
+    .map(portSummary)
+    .filter((item): item is WorkspaceControlPortSummary => item !== undefined);
+  const snapshotSummaries = snapshots.items
+    .filter((snapshot) => optionalString(snapshot, "sourceSandboxId") === workspaceId)
+    .map(snapshotSummary)
+    .filter((item): item is WorkspaceControlSnapshotSummary => item !== undefined);
+  const activeRuntimeCount = runtimeSummaries.filter(
+    (runtime) => runtime.status !== "terminated",
+  ).length;
+  const activePreviewCount = portSummaries.length;
+  const terminalWorkspace = workspace.status === "terminated" || workspace.status === "expired";
+  const cleanupState: WorkspaceControlRecoverySummary["cleanup"]["state"] = terminalWorkspace
+    ? activeRuntimeCount === 0 && activePreviewCount === 0
+      ? "clear"
+      : "residual"
+    : "not-applicable";
+  const requestedIsolation = optionalString(workspace, "requestedIsolation");
+  const realizedIsolation = optionalString(workspace, "realizedIsolation");
+  const provisionAttempts = optionalNonNegativeInteger(workspace, "provisionAttempts");
+  const suspension = suspensionSummary(workspace);
   return {
     message: {
       type: "detail",
       workspace: workspaceSummary(workspace),
-      runtimes: runtimeResult.items.map(runtimeSummary),
-      ports: ports.items
-        .map(portSummary)
-        .filter((item): item is WorkspaceControlPortSummary => item !== undefined),
+      runtimes: runtimeSummaries,
+      ports: portSummaries,
       tasks,
       promotions: promotionSummaries,
+      recovery: {
+        ...(requestedIsolation ? { requestedIsolation } : {}),
+        ...(realizedIsolation ? { realizedIsolation } : {}),
+        ...(provisionAttempts === undefined ? {} : { provisionAttempts }),
+        ...(suspension ? { suspension } : {}),
+        snapshots: snapshotSummaries,
+        cleanup: {
+          state: cleanupState,
+          activeRuntimeCount,
+          activePreviewCount,
+          scope: "workspace-owned-readback",
+        },
+      },
     },
     promotionRecords: promotions.items,
   };
@@ -465,13 +600,18 @@ export function createBoundedWorkspaceControlPresentation(
         await sendSelectedDetail(workspaceId);
       };
 
+      const completeRecovery = async (workspaceId: string) => {
+        await renderer.send({ type: "recovery-complete", workspaceId });
+        await sendSelectedDetail(workspaceId);
+      };
+
       const requireSelectedWorkspace = (workspaceId: string) => {
         if (
           !selectedWorkspaceId ||
           selectedWorkspaceId !== workspaceId ||
           selectedDetail?.workspace.workspaceId !== workspaceId
         ) {
-          throw new Error("Delivery action does not match the selected Workspace");
+          throw new Error("Action does not match the selected Workspace");
         }
         return selectedDetail;
       };
@@ -649,6 +789,47 @@ export function createBoundedWorkspaceControlPresentation(
                 workspaces: await listWorkspaces(context),
               });
               await sendSelectedDetail(event.workspaceId);
+              continue;
+            }
+            if (event.type === "snapshot-create") {
+              const detail = requireSelectedWorkspace(event.workspaceId);
+              if (["terminated", "expired"].includes(detail.workspace.status)) {
+                throw new Error("A terminal Workspace cannot create a Snapshot");
+              }
+              const now = new Date(input.now?.() ?? new Date().toISOString());
+              const expiresAt = new Date(
+                now.getTime() + event.ttlDays * 24 * 60 * 60 * 1_000,
+              ).toISOString();
+              resultValue(
+                await context.executeCommand(
+                  operationValue(
+                    CreateSandboxSnapshotCommand.create({
+                      sandboxId: event.workspaceId,
+                      capability: event.capability,
+                      expiresAt,
+                    }),
+                  ),
+                ),
+              );
+              await completeRecovery(event.workspaceId);
+              continue;
+            }
+            if (event.type === "snapshot-delete") {
+              const detail = requireSelectedWorkspace(event.workspaceId);
+              const snapshot = detail.recovery.snapshots.find(
+                (candidate) => candidate.snapshotId === event.snapshotId,
+              );
+              if (!snapshot || snapshot.status === "deleting" || snapshot.status === "deleted") {
+                throw new Error("Snapshot is not deletable in the latest Workspace detail");
+              }
+              resultValue(
+                await context.executeCommand(
+                  operationValue(
+                    DeleteSandboxSnapshotCommand.create({ snapshotId: event.snapshotId }),
+                  ),
+                ),
+              );
+              await completeRecovery(event.workspaceId);
               continue;
             }
             if (event.type === "preview-expose") {

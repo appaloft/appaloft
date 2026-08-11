@@ -2,9 +2,9 @@
 
 ## Status
 
-- Round: Spec
-- Artifact state: proposed for public review
-- Code changes: blocked until accepted and linked from a ready public Ticket
+- Round: Sync
+- Artifact state: accepted through public PR #1039
+- Code changes: tracked by ready public issue #1040
 - Compatibility: additive presentation over existing public operations
 - Governing decision: accepted ADR-107 presentation boundary; no new ADR is required
 

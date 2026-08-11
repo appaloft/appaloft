@@ -8,8 +8,9 @@ use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
 use appaloft_workspace_control_tui::{
-    ActionDecision, AppState, DeliveryDecision, DeliverySubmission, ParentMessage, RendererEvent,
-    agent_area, render, terminal_key_bytes, terminal_mouse_bytes,
+    ActionDecision, AppState, DeliveryDecision, DeliverySubmission, ParentMessage,
+    RecoverySubmission, RendererEvent, agent_area, render, terminal_key_bytes,
+    terminal_mouse_bytes,
 };
 use crossterm::event::{
     DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture, Event,
@@ -66,6 +67,18 @@ fn send_delivery(
         .context("delivery action requires a selected Workspace")?
         .to_owned();
     send(stream, &RendererEvent::delivery(workspace_id, submission))
+}
+
+fn send_recovery(
+    stream: &mut TcpStream,
+    state: &AppState,
+    submission: RecoverySubmission,
+) -> Result<()> {
+    let workspace_id = state
+        .selected_workspace_id()
+        .context("recovery action requires a selected Workspace")?
+        .to_owned();
+    send(stream, &RendererEvent::recovery(workspace_id, submission))
 }
 
 fn read_handshake(reader: &mut BufReader<TcpStream>) -> Result<()> {
@@ -274,6 +287,46 @@ fn main() -> Result<()> {
                     _ => {}
                 }
             }
+            Event::Key(key)
+                if key.kind == KeyEventKind::Press
+                    && state.pending_recovery_confirmation.is_some() =>
+            {
+                match key.code {
+                    KeyCode::Char('y') | KeyCode::Char('Y') => {
+                        if let Some(submission) = state.confirm_recovery_action(true) {
+                            send_recovery(&mut writer, &state, submission)?;
+                        }
+                    }
+                    KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                        state.confirm_recovery_action(false);
+                    }
+                    _ => {}
+                }
+            }
+            Event::Key(key) if key.kind == KeyEventKind::Press && state.recovery_form.is_some() => {
+                match key.code {
+                    KeyCode::Esc => state.close_recovery_surface(),
+                    KeyCode::Tab => state.recovery_form_next_field(),
+                    KeyCode::BackTab => state.recovery_form_previous_field(),
+                    KeyCode::Left => state.recovery_form_cycle_choice(-1),
+                    KeyCode::Right => state.recovery_form_cycle_choice(1),
+                    KeyCode::Enter => {
+                        state.submit_recovery_form();
+                    }
+                    _ => {}
+                }
+            }
+            Event::Key(key) if key.kind == KeyEventKind::Press && state.recovery_menu_open => {
+                match key.code {
+                    KeyCode::Esc => state.close_recovery_surface(),
+                    KeyCode::Up | KeyCode::Char('k') => state.move_recovery_selection(-1),
+                    KeyCode::Down | KeyCode::Char('j') => state.move_recovery_selection(1),
+                    KeyCode::Enter => {
+                        state.activate_selected_recovery_action();
+                    }
+                    _ => {}
+                }
+            }
             Event::Key(key) if key.kind == KeyEventKind::Press && state.delivery_form.is_some() => {
                 match key.code {
                     KeyCode::Esc => state.close_delivery_surface(),
@@ -343,6 +396,9 @@ fn main() -> Result<()> {
                 }
                 KeyCode::Char('d') => {
                     state.open_delivery_menu();
+                }
+                KeyCode::Char('s') => {
+                    state.open_recovery_menu();
                 }
                 KeyCode::Up | KeyCode::Char('k') => {
                     if let Some(workspace_id) = state.move_selection(-1) {
