@@ -41,5 +41,8 @@ Both journeys must prove bounded output, no provider-console step, and zero owne
   the real PTY/loopback renderer tests for protocol `operate/v1`.
 - Public repository lint, typecheck, full test, build, locked Rust tests/release build and the
   docs-impact registry checks passed on the implementation branch.
-- The two composed-runtime journeys remain a Cloud acceptance obligation and are not implied by
-  the public fake-runtime or loopback evidence above.
+- Cloud PR #882 (`847f865946b193b1eca0f940e1a0c0646de17619`) completed both composed-runtime
+  journeys: a real local Docker rollback reached verified proof with zero labeled container
+  residual, and the public SQLite volume backup test restored content to an independent volume with
+  exact cleanup. This cross-repository evidence does not turn Cloud policy or custody into public
+  lifecycle ownership.
