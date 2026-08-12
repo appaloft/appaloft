@@ -20,6 +20,7 @@
 | OPR-ERROR-016 | contract | TUI/JSON safe error renderer | stable safe fields and no secret/provider payload |
 | OPR-CLEANUP-017 | protocol/process | listener/child/poll teardown | signal/exit/failure zero presentation residue |
 | OPR-COMPAT-018 | contract | catalog/API/CLI regression | no new business operation; existing schemas unchanged |
+| OPR-PACKAGE-019 | package/contract | narrow adapter-cli subpath | Operate presentation resolves without loading SDK-dependent CLI modules |
 
 Required R3 acceptance has two independent journeys in a composed runtime:
 
@@ -33,7 +34,7 @@ Both journeys must prove bounded output, no provider-console step, and zero owne
 ## Public Implementation Evidence
 
 - `OPR-SELECT-001` through `OPR-PARTIAL-003`, `OPR-HEADLESS-005` through
-  `OPR-PORTABILITY-015`, and `OPR-ERROR-016` through `OPR-COMPAT-018` are covered by the focused
+  `OPR-PORTABILITY-015`, and `OPR-ERROR-016` through `OPR-PACKAGE-019` are covered by the focused
   CLI presentation, command, renderer and control-plane tests under
   `packages/adapters/cli/test/`.
 - `OPR-TUI-004`, `OPR-CONFIRM-008` and `OPR-CLEANUP-017` are covered by the Rust module tests and
