@@ -195,6 +195,26 @@ function parseJsonEvents(stdout: string): SandboxAgentHarnessEvent[] {
   return events;
 }
 
+function readPiStructuredFailure(stdout: string): string | undefined {
+  for (const rawLine of stdout.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    try {
+      const value = JSON.parse(line) as Record<string, unknown>;
+      if (value.type !== "message_end") continue;
+      const message = value.message;
+      if (!message || typeof message !== "object" || Array.isArray(message)) continue;
+      if (!("stopReason" in message) || message.stopReason !== "error") continue;
+      return "errorMessage" in message && typeof message.errorMessage === "string"
+        ? message.errorMessage
+        : "pi_process_failed";
+    } catch {
+      // Non-JSON output remains available to the existing exit-code classifier.
+    }
+  }
+  return undefined;
+}
+
 async function emitJsonEvents(
   stdout: string,
   emitEvent: (event: SandboxAgentHarnessEvent) => Promise<void>,
@@ -241,15 +261,15 @@ export function classifyPiSandboxFailure(value: unknown): PiSandboxFailureCode {
   ) {
     return "pi_model_gateway_unreachable";
   }
+  if (/\b(?:401|403)\b|unauthorized|forbidden|invalid api key|authentication failed/i.test(message)) {
+    return "pi_model_unauthorized";
+  }
   if (
     /unknown (model|provider)|(model|provider).*(not found|not configured|unavailable)/i.test(
       message,
     )
   ) {
     return "pi_model_configuration_invalid";
-  }
-  if (/\b401\b|unauthorized|invalid api key|authentication failed/i.test(message)) {
-    return "pi_model_unauthorized";
   }
   if (/\b404\b|endpoint not found|route not found/i.test(message)) {
     return "pi_model_endpoint_not_found";
@@ -447,8 +467,9 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
       if (input.emitEvent) {
         await emitJsonEvents(stdout.slice(stdoutCursor), input.emitEvent);
       }
-      if (exitCode !== 0) {
-        throw new Error(classifyPiSandboxFailure(`${stderr}\n${stdout}`));
+      const structuredFailure = readPiStructuredFailure(stdout);
+      if (exitCode !== 0 || structuredFailure) {
+        throw new Error(classifyPiSandboxFailure(structuredFailure ?? `${stderr}\n${stdout}`));
       }
       return {
         events: input.emitEvent ? [] : parseJsonEvents(stdout),

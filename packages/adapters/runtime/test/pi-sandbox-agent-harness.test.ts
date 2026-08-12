@@ -338,6 +338,75 @@ describe("PiSandboxAgentHarness", () => {
     expect(JSON.stringify(emitted.at(-1))).not.toContain("must-not-leak");
   });
 
+  test("[AGENT-PI-008] rejects a structured provider error when Pi exits zero", async () => {
+    const emitted: Array<{ type: string; data: Record<string, unknown> }> = [];
+    const files = new Map([
+      [
+        ".appaloft-agent/srun_zero_exit/stdout.jsonl",
+        new TextEncoder().encode(
+          [
+            '{"type":"message_end","message":{"role":"user","content":[{"type":"text","text":"must-not-leak"}]}}',
+            '{"type":"message_end","message":{"role":"assistant","content":[],"stopReason":"error","errorMessage":"403: Model connection is unavailable","secret":"must-not-leak"}}',
+            "",
+          ].join("\n"),
+        ),
+      ],
+      [".appaloft-agent/srun_zero_exit/stderr.log", new Uint8Array()],
+      [".appaloft-agent/srun_zero_exit/exit-code", new TextEncoder().encode("0")],
+    ]);
+    const execution: PiSandboxExecutionPort = {
+      async exec() {
+        return ok({ mode: "background", processId: "spr_zero_exit" });
+      },
+      async listProcesses() {
+        return ok([{ processId: "spr_zero_exit", status: "exited", exitCode: 0 }]);
+      },
+      async terminateProcess() {
+        return ok(undefined);
+      },
+      async readFile(_context, _sandboxId, input) {
+        return ok(files.get(input.path) ?? new Uint8Array());
+      },
+      async writeFile(_context, _sandboxId, input) {
+        files.set(input.path, input.content);
+        return ok({ path: input.path, sizeBytes: input.content.byteLength });
+      },
+      async removeFile() {
+        return ok(undefined);
+      },
+    };
+    const harness = new PiSandboxAgentHarness(execution, {
+      templateId: "aht_pi_managed_v1",
+      sandboxTemplateId: "stp_pi_pinned",
+      version: "1.2.3",
+      templateDigest: `sha256:${"a".repeat(64)}`,
+      modelAccess,
+    });
+
+    await expect(
+      harness.execute({
+        executionContext: context,
+        sandboxId: "sbx_pi",
+        runtimeId: "sar_pi",
+        credentialBindings: [modelCredentialBinding],
+        runId: "srun_zero_exit",
+        task: "Build it",
+        context: { mode: "fresh" },
+        requestApproval: async () => "rejected",
+        emitEvent: async (event) => emitted.push(event),
+      }),
+    ).rejects.toThrow("pi_model_unauthorized");
+    expect(emitted.at(-1)).toEqual({
+      type: "run-error",
+      data: {
+        source: "pi",
+        code: "pi_model_unauthorized",
+        phase: "validate-process-result",
+      },
+    });
+    expect(JSON.stringify(emitted.at(-1))).not.toContain("must-not-leak");
+  });
+
   test("[MODEL-ACCESS-BIND-002][MODEL-ACCESS-BIND-003] fails before issue when the model binding is missing or ambiguous", async () => {
     let issueCalls = 0;
     const execution = {
