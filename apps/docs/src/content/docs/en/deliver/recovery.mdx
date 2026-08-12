@@ -21,6 +21,26 @@ A deployment failed, was canceled, or its observation stream (timeline) got inte
 | Default access URL fails | Proxy readiness or network profile configuration issue |
 | Custom domain fails | DNS/TLS configuration issue (confirm the default access URL works first) |
 
+## Operate and recover <a id="operate-and-recover" />
+
+After signing in to Appaloft, open one Resource-level operational surface from your local terminal instead of switching between provider consoles:
+
+```bash
+# An interactive terminal opens the native TUI; several Resources produce a bounded chooser
+appaloft operate
+
+# Select one Resource directly, optionally observing a particular Deployment
+appaloft operate res_web --deployment dep_123
+
+# Automation, pipes, and unsupported terminals receive the same bounded snapshot
+appaloft operate res_web --json
+appaloft operate res_web --no-tui
+```
+
+`operate` uses the same public entrypoint for a local control plane and a signed-in remote Cloud control plane. It is read-only by default and composes Resource, health, diagnostics, logs, monitoring, timeline, recovery readiness, deployment proof, storage backup, and portability evidence. An optional section failure stays visible as a stable error code; it does not turn the whole snapshot into a false success or bypass Appaloft to query a provider directly.
+
+Retry, redeploy, rollback, backup creation, and restore to an independent StorageVolume require a preview followed by an exact second confirmation against freshly read readiness. Rollback creates a new application-runtime attempt and never restores data. Restore always creates an independent volume and never overwrites the live volume. Portability is a read-only export-plan/artifact handoff to `appaloft instance portability export-plan`.
+
 ## How to inspect status, logs, events, or diagnostics <a id="deployment-recovery-readiness" />
 
 Before taking any recovery action, do a read-only check of recovery readiness first:

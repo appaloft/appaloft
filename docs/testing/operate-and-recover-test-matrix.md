@@ -29,3 +29,16 @@ Required R3 acceptance has two independent journeys in a composed runtime:
    readback, and clean only the created backup/restore/workload resources.
 
 Both journeys must prove bounded output, no provider-console step, and zero owned residuals.
+
+## Public Implementation Evidence
+
+- `OPR-SELECT-001` through `OPR-PARTIAL-003`, `OPR-HEADLESS-005` through
+  `OPR-PORTABILITY-015`, and `OPR-ERROR-016` through `OPR-COMPAT-018` are covered by the focused
+  CLI presentation, command, renderer and control-plane tests under
+  `packages/adapters/cli/test/`.
+- `OPR-TUI-004`, `OPR-CONFIRM-008` and `OPR-CLEANUP-017` are covered by the Rust module tests and
+  the real PTY/loopback renderer tests for protocol `operate/v1`.
+- Public repository lint, typecheck, full test, build, locked Rust tests/release build and the
+  docs-impact registry checks passed on the implementation branch.
+- The two composed-runtime journeys remain a Cloud acceptance obligation and are not implied by
+  the public fake-runtime or loopback evidence above.

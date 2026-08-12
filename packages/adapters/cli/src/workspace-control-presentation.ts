@@ -26,6 +26,7 @@ import {
   type TerminalSessionAttachmentGateway,
 } from "@appaloft/application";
 import { type Result } from "@appaloft/core";
+import { type OperateRendererEvent, type OperateRendererMessage } from "./operate-presentation.js";
 import { terminateWorkspaceWithRuntimes } from "./workspace-lifecycle-actions.js";
 
 export interface WorkspaceControlWorkspaceSummary {
@@ -125,6 +126,7 @@ export interface WorkspaceControlTargetSelectionSummary {
 }
 
 export type WorkspaceControlRendererMessage =
+  | OperateRendererMessage
   | {
       readonly type: "development";
       readonly protocol: "development/v1";
@@ -185,6 +187,7 @@ export type WorkspaceControlRendererMessage =
     };
 
 export type WorkspaceControlRendererEvent =
+  | OperateRendererEvent
   | { readonly type: "development-refresh" }
   | { readonly type: "development-restart" }
   | { readonly type: "development-stop" }

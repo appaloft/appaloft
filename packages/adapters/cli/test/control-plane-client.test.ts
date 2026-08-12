@@ -1755,10 +1755,11 @@ describe("CLI remote control-plane client", () => {
     });
   });
 
-  test("[WS-CODE-PARITY-002][WS-OPEN-REMOTE-018][CONTROL-PLANE-CLI-006] Profile-aware Workspace commands are remote-capable", async () => {
+  test("[WS-CODE-PARITY-002][WS-OPEN-REMOTE-018][OPR-COMPAT-018][CONTROL-PLANE-CLI-006] Profile-aware Workspace and Operate commands are remote-capable", async () => {
     for (const argv of [
       ["node", "appaloft", "code"],
       ["node", "appaloft", "workspace", "open", "."],
+      ["node", "appaloft", "operate", "res_api"],
       [
         "node",
         "appaloft",

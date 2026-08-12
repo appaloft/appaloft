@@ -94,6 +94,23 @@ export {
   type WorkspaceGitCommandOutput,
   type WorkspaceGitCommandRunner,
 } from "./local-git-workspace-context.js";
+export {
+  createBoundedOperatePresentation,
+  createOperateCoordinator,
+  listOperateResources,
+  type OperateAction,
+  type OperateActionConfirmation,
+  type OperateCoordinator,
+  type OperateHeadlessResult,
+  type OperatePresentation,
+  type OperatePresentationContext,
+  type OperateRendererEvent,
+  type OperateRendererMessage,
+  type OperateRendererSession,
+  type OperateSection,
+  type OperateSnapshot,
+  resolveOperateTarget,
+} from "./operate-presentation.js";
 export { createRemoteCliProgram } from "./remote-cli-program.js";
 export {
   createRemoteTerminalSessionAttachmentGateway,
@@ -132,6 +149,7 @@ export {
   type WorkspaceControlRendererSession,
 } from "./workspace-control-presentation.js";
 export {
+  createRatatuiOperatePresentation,
   createRatatuiWorkspaceControlPresentation,
   openLoopbackWorkspaceControlRenderer,
   resolveWorkspaceControlRendererBinary,

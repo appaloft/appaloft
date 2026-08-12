@@ -149,6 +149,7 @@ describe("CLI docs help links", () => {
     );
     expect(cliCommandDescriptions.deploymentPlan).toContain(cliDocsHrefs.deploymentPlanPreview);
     expect(cliCommandDescriptions.deploymentProof).toContain(cliDocsHrefs.deploymentProof);
+    expect(cliCommandDescriptions.operate).toContain(cliDocsHrefs.deploymentOperateAndRecover);
     expect(cliCommandDescriptions.sourceLinkRelink).toContain(cliDocsHrefs.deploymentSourceRelink);
     expect(cliCommandDescriptions.remoteStateLockInspect).toContain(cliDocsHrefs.remoteStateLock);
     expect(cliCommandDescriptions.remoteStateLockRecoverStale).toContain(

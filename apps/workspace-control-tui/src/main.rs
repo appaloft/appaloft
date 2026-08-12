@@ -7,6 +7,7 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 mod development;
+mod operate;
 
 use anyhow::{Context, Result, bail};
 use appaloft_workspace_control_tui::{
@@ -121,6 +122,9 @@ fn main() -> Result<()> {
 
     if env::var("APPALOFT_TUI_MODE").as_deref() == Ok("development") {
         return development::run(writer, reader);
+    }
+    if env::var("APPALOFT_TUI_MODE").as_deref() == Ok("operate") {
+        return operate::run(writer, reader);
     }
 
     let _restore = TerminalRestore::enter()?;

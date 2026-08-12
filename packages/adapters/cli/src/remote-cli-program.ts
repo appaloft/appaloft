@@ -18,6 +18,7 @@ import {
   requestControlPlaneStreamOperation,
 } from "./control-plane-client.js";
 import { type CliControlPlaneProfile } from "./control-plane-profile.js";
+import { type OperatePresentation } from "./operate-presentation.js";
 import {
   createRemoteTerminalSessionAttachmentGateway,
   type RemoteTerminalWebSocketFactory,
@@ -43,6 +44,7 @@ export interface RemoteCliProgramInput {
   readonly webSocketFactory?: RemoteTerminalWebSocketFactory;
   readonly readStdinText?: () => Promise<string>;
   readonly workspaceControlPresentation?: WorkspaceControlPresentation;
+  readonly operatePresentation?: OperatePresentation;
 }
 
 type RemoteOperationMessage = AppCommand<unknown> | AppQuery<unknown>;
@@ -467,6 +469,7 @@ export function createRemoteCliProgram(input: RemoteCliProgramInput): CliProgram
       ...(input.workspaceControlPresentation
         ? { workspaceControlPresentation: input.workspaceControlPresentation }
         : {}),
+      ...(input.operatePresentation ? { operatePresentation: input.operatePresentation } : {}),
       openNativeWorkspaceTerminal: openBunNativeWorkspaceTerminal,
     }),
   );

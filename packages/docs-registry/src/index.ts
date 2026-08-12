@@ -1242,6 +1242,36 @@ export const publicDocsHelpTopics = {
     ],
     webSurfaces: ["apps/web deployment detail recovery panel"],
   },
+  "deployment.operate-and-recover": {
+    id: "deployment.operate-and-recover",
+    title: "Operate and recover",
+    description:
+      "How to inspect one Resource through a bounded TUI or JSON snapshot and safely confirm retry, redeploy, rollback, backup, or independent restore actions.",
+    page: {
+      "zh-CN": "deliver/recovery",
+      "en-US": "en/deliver/recovery",
+    },
+    anchor: "operate-and-recover",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli"],
+    aliases: [
+      "appaloft operate",
+      "operate tui",
+      "resource recovery",
+      "backup restore",
+      "运维入口",
+      "资源恢复",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-112-operate-and-recover-presentation-boundary.md",
+      "docs/specs/134-operate-and-recover-presentation/spec.md",
+      "docs/workflows/operate-and-recover.md",
+      "docs/testing/operate-and-recover-test-matrix.md",
+    ],
+  },
   "deployment.preview-cleanup": {
     id: "deployment.preview-cleanup",
     title: "Preview cleanup",

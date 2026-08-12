@@ -33,6 +33,7 @@ import {
   type LocalGitWorkspaceContext,
   type RemoteGitWorkspaceRef,
 } from "./local-git-workspace-context.js";
+import { type OperatePresentation } from "./operate-presentation.js";
 import {
   type OpenedNativeWorkspaceTerminal,
   type OpenNativeWorkspaceTerminalInput,
@@ -99,6 +100,7 @@ export interface CliProgramInput {
   ) => Promise<RemoteGitWorkspaceRef>;
   launchNativeWorkspaceClient?: (argv: readonly string[]) => Promise<void>;
   workspaceControlPresentation?: WorkspaceControlPresentation;
+  operatePresentation?: OperatePresentation;
   openNativeWorkspaceTerminal?: (
     input: OpenNativeWorkspaceTerminalInput,
   ) => Promise<OpenedNativeWorkspaceTerminal>;
@@ -173,6 +175,7 @@ export class CliRuntime extends Context.Tag("CliRuntime")<
     ) => Promise<RemoteGitWorkspaceRef>;
     readonly launchNativeWorkspaceClient?: (argv: readonly string[]) => Promise<void>;
     readonly workspaceControlPresentation?: WorkspaceControlPresentation;
+    readonly operatePresentation?: OperatePresentation;
     readonly openNativeWorkspaceTerminal: (
       input: OpenNativeWorkspaceTerminalInput,
     ) => Promise<OpenedNativeWorkspaceTerminal>;
@@ -260,6 +263,7 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
     ...(input.workspaceControlPresentation
       ? { workspaceControlPresentation: input.workspaceControlPresentation }
       : {}),
+    ...(input.operatePresentation ? { operatePresentation: input.operatePresentation } : {}),
     openNativeWorkspaceTerminal:
       input.openNativeWorkspaceTerminal ?? openBunNativeWorkspaceTerminal,
   });

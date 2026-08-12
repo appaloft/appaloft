@@ -13,6 +13,7 @@ export const cliDocsHrefs = {
   productGradePreviews: resolvePublicDocsHelpHref("deployment.product-grade-previews"),
   deploymentSourceRelink: resolvePublicDocsHelpHref("deployment.source-relink"),
   deploymentRecoveryReadiness: resolvePublicDocsHelpHref("deployment.recovery-readiness"),
+  deploymentOperateAndRecover: resolvePublicDocsHelpHref("deployment.operate-and-recover"),
   projectLifecycle: resolvePublicDocsHelpHref("project.lifecycle"),
   serverDeploymentTarget: resolvePublicDocsHelpHref("server.deployment-target"),
   serverDockerSwarmTarget: resolvePublicDocsHelpHref("server.docker-swarm-target"),
@@ -75,6 +76,10 @@ export const cliDocsHrefs = {
 } as const;
 
 export const cliCommandDescriptions = {
+  operate: withDocs(
+    "Observe and recover one Resource without opening a provider console",
+    "deployment.operate-and-recover",
+  ),
   agentWorkspaceOpen: withDocs(
     "Create or resume a Profile-aware Workspace from clean, pushed local Git context",
     "agent.workspace",

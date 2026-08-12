@@ -29,6 +29,7 @@ import {
   versionCommand,
   workerCommand,
 } from "./lifecycle.js";
+import { operateCommand } from "./operate.js";
 import { operatorWorkCommand } from "./operator-work.js";
 import { organizationCommand } from "./organization.js";
 import { projectCommand } from "./project.js";
@@ -98,6 +99,7 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
     sandboxCommand,
     remoteStateCommand,
     operatorWorkCommand,
+    operateCommand,
     terminalSessionCommand,
     tunnelCommand,
     upgradeCommand,

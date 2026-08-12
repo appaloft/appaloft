@@ -38,6 +38,26 @@ sidebar:
 | 默认访问地址失败 | 代理就绪或网络 Profile 配置问题 |
 | 自定义域名失败 | DNS/TLS 配置问题（先确认默认访问地址正常） |
 
+## 统一运维与恢复入口 <a id="operate-and-recover" />
+
+已经登录 Appaloft 后，可以从本机终端打开一个 Resource 级的统一运维界面，不必再分别进入 Provider 控制台：
+
+```bash
+# 交互式终端会打开原生 TUI；多个 Resource 时先显示有界选择器
+appaloft operate
+
+# 直接选择一个 Resource，也可以固定观察某次 Deployment
+appaloft operate res_web --deployment dep_123
+
+# 自动化、管道或不支持 TUI 的终端使用同一份有界快照
+appaloft operate res_web --json
+appaloft operate res_web --no-tui
+```
+
+`operate` 在本地控制面和登录后的远端 Cloud 控制面使用同一个公共入口。默认只读取 Resource、健康状态、诊断、日志、监控、时间线、恢复就绪、部署证明、存储备份以及可移植性证据；某个可选分区失败时会显示稳定错误码，不会把整个快照伪装成成功或直接绕过 Appaloft 查询 Provider。
+
+Retry、redeploy、rollback、创建备份和恢复到独立 StorageVolume 都必须先预览，再对刚刚读取的最新就绪证据做第二次精确确认。Rollback 只创建新的应用运行时尝试，不会恢复数据；restore 永远创建独立卷，不会覆盖在线卷。需要迁移时，界面只提供只读 export-plan/产物证据，并交接到 `appaloft instance portability export-plan`。
+
 ## 如何检查状态、日志、事件或诊断 <a id="deployment-recovery-readiness" />
 
 在采取任何恢复动作之前，先只读检查恢复就绪状态：

@@ -6,6 +6,7 @@ import {
   activeControlPlaneProfile,
   createCliHelpProgram,
   createRatatuiDevelopmentPresentation,
+  createRatatuiOperatePresentation,
   createRatatuiWorkspaceControlPresentation,
   createRemoteCliProgram,
   type DevelopmentCommandRuntime,
@@ -644,6 +645,7 @@ export async function runShellCli(
       version: process.env.APPALOFT_APP_VERSION ?? "0.0.0",
       profile: target.profile,
       workspaceControlPresentation: createRatatuiWorkspaceControlPresentation(),
+      operatePresentation: createRatatuiOperatePresentation(),
       ...(capturedStdinText === undefined ? {} : { readStdinText: async () => capturedStdinText }),
     });
     let exitCode = 0;
