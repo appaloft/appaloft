@@ -132,7 +132,10 @@ jobs:
     name: Unit Tests
     needs: changes
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # A cold cache can spend more than ten minutes in the PGlite suites alone.
+    # Keep the full public test graph rather than silently dropping packages
+    # that do not expose a separate test:unit script.
+    timeout-minutes: 20
     steps:
       - name: Skip Unit Tests
         if: ${{ needs.changes.outputs.lightweight_only == 'true' }}

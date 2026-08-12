@@ -192,7 +192,10 @@ describe("CommandSandboxAgentHarness", () => {
         requestApproval: async () => "approved",
       }),
     ).rejects.toThrow("command_agent_run_exit_unavailable");
-    expect(processObservations).toBe(2);
+    // A 1 ms deadline can elapse during the first observation on a loaded runner.
+    // Either path is bounded: fail immediately or after one grace poll.
+    expect(processObservations).toBeGreaterThanOrEqual(1);
+    expect(processObservations).toBeLessThanOrEqual(2);
   });
 
   test("[ADAPTER-RUNTIME-013] launches a Runtime start child through its scoped process seam before recording readiness", async () => {

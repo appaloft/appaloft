@@ -178,6 +178,52 @@ appaloft server register \
   --target-kind orchestrator-cluster
 ```
 
+## Outbound Server Worker <a id="server-worker-outbound-relay" />
+
+When a Mac/VPS cannot or should not expose inbound SSH, the device can initiate one outbound mTLS
+Worker connection. It attaches to an existing public Server. Worker connection, generation, lease,
+and certificate state are separate readback; revoking a Worker never deletes or renames the Server.
+
+With an authenticated Cloud/self-hosted profile from `appaloft login`:
+
+```bash
+appaloft server worker enroll --server srv_primary --name "My Mac"
+appaloft server worker run
+```
+
+`enroll` uses the active authenticated profile to issue a short-lived one-time token, generates the
+private key/CSR on the device, and exchanges it for a short-lived mTLS certificate. The private key
+never leaves the device, and the token never enters argv, output, long-lived credentials, or Server
+readback. A self-hosted flow with an administrator-transferred token can still use stdin:
+
+```bash
+printf '%s' "$ONE_TIME_TOKEN" | appaloft server worker enroll \
+  --server srv_primary --name "Build VPS" --token-stdin
+```
+
+`server worker run` keeps the outbound connection in the foreground so the device's own service
+manager can supervise it. Docker/container execution is the default. If the device owner explicitly
+allows Appaloft to run Workspace/Dev host commands on that machine, set this only in the local Worker
+environment:
+
+```bash
+APPALOFT_SERVER_WORKER_ALLOW_HOST_SHELL=true appaloft server worker run
+```
+
+This opt-in is device-local and cannot be enabled remotely by Cloud. Use
+`APPALOFT_SERVER_WORKER_ROOTS` to further restrict accessible paths to owned roots separated by the
+platform path delimiter. Port forwarding also requires a short-lived single-target capability; the
+relay is not a general VPN.
+
+```bash
+appaloft server worker status --json
+appaloft server worker revoke
+```
+
+`revoke` closes the current connection, fences stale generations, and removes the local Worker
+credential. The Server and persistent Workspace data keep their own lifecycle. Once connected, run
+`appaloft dev . --server srv_primary`; see [Local Development Sessions](/docs/en/start/local-development/).
+
 ## Expected output and status
 
 The connectivity test checks: whether DNS/IP and the port are reachable, whether SSH credentials work, whether the target user has the permissions needed to deploy, whether the base runtime environment meets requirements, and where necessary returns proxy- or Docker-related diagnostics. The result distinguishes hostname resolution failures, network/host unreachable, authentication failures, and host-key verification failures instead of a single generic error.

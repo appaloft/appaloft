@@ -22,3 +22,14 @@
 
 Real acceptance must include one single web service, one multi-service graph, health transition,
 log follow, restart, Ctrl-C cleanup and an independent port/process/manifest zero-residual check.
+
+## 2026-08-12 implementation evidence (pre-merge)
+
+- Focused DEV tests and the Rust/Ratatui renderer tests pass, including plan parity, foreground and
+  detached supervision, watch/restart, health, HTTPS certificate SANs, TUI/headless rendering and
+  exact stop/reset cleanup.
+- Real local single-service and multi-service source-CLI runs passed with log follow, resume,
+  restart, Ctrl-C, port/process/manifest checks and zero owned residue.
+- Public repository gates pass: `bun run lint`, `bun run typecheck`, `bun run test` (37/37 Turbo
+  tasks outside the filesystem sandbox because loopback listen is required) and `bun run build`.
+- Final evidence remains pre-merge until the implementation PR lands on public `main`.

@@ -570,6 +570,24 @@ export const appaloftDeploymentHealthCheckConfigSchema = z
   .strict()
   .describe("Health-check profile fields.");
 
+export const appaloftDevelopmentWatchModes = ["native", "restart", "none"] as const;
+
+export const appaloftDevelopmentConfigSchema = z
+  .object({
+    command: nonEmptyStringSchema.optional(),
+    watch: z.enum(appaloftDevelopmentWatchModes).optional(),
+  })
+  .strict()
+  .refine((value) => value.command !== undefined || value.watch !== undefined, {
+    message: "development must declare command or watch",
+  })
+  .describe(
+    "Local development execution overlay. It never changes deployment identity or lifecycle.",
+  );
+
+export type AppaloftDevelopmentConfig = z.output<typeof appaloftDevelopmentConfigSchema>;
+export type AppaloftDevelopmentWatchMode = (typeof appaloftDevelopmentWatchModes)[number];
+
 const appaloftDeploymentRuntimeCommandConfigSchema = z
   .object({
     command: nonEmptyStringSchema,
@@ -962,6 +980,7 @@ export const appaloftDeploymentServiceConfigSchema = z
     runtime: appaloftDeploymentRuntimeConfigSchema.optional(),
     network: appaloftDeploymentNetworkConfigSchema.optional(),
     health: appaloftDeploymentHealthCheckConfigSchema.optional(),
+    development: appaloftDevelopmentConfigSchema.optional(),
     replicas: z
       .number()
       .int()
@@ -1011,6 +1030,7 @@ export const appaloftDeploymentApplicationConfigSchema = z
     runtime: appaloftDeploymentRuntimeConfigSchema.optional(),
     network: appaloftDeploymentNetworkConfigSchema.optional(),
     health: appaloftDeploymentHealthCheckConfigSchema.optional(),
+    development: appaloftDevelopmentConfigSchema.optional(),
     access: appaloftDeploymentAccessConfigSchema.optional(),
     replicas: z
       .number()
@@ -1464,6 +1484,7 @@ export const appaloftDeploymentConfigSchema = z
     network: appaloftDeploymentNetworkConfigSchema.optional(),
     retention: appaloftDeploymentRetentionConfigSchema.optional(),
     health: appaloftDeploymentHealthCheckConfigSchema.optional(),
+    development: appaloftDevelopmentConfigSchema.optional(),
     access: appaloftDeploymentAccessConfigSchema.optional(),
     monitoring: appaloftDeploymentMonitoringConfigSchema.optional(),
     preview: appaloftDeploymentPreviewConfigSchema.optional(),

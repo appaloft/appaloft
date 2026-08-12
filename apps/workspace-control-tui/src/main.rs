@@ -6,6 +6,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::time::Duration;
 
+mod development;
+
 use anyhow::{Context, Result, bail};
 use appaloft_workspace_control_tui::{
     ActionDecision, AppState, DeliveryDecision, DeliverySubmission, ParentMessage,
@@ -116,6 +118,10 @@ fn main() -> Result<()> {
     let mut reader = BufReader::new(writer.try_clone().context("clone presentation channel")?);
     send(&mut writer, &RendererEvent::Hello { token })?;
     read_handshake(&mut reader)?;
+
+    if env::var("APPALOFT_TUI_MODE").as_deref() == Ok("development") {
+        return development::run(writer, reader);
+    }
 
     let _restore = TerminalRestore::enter()?;
     let backend = CrosstermBackend::new(std::io::stdout());

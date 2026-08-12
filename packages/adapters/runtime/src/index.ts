@@ -105,6 +105,8 @@ export { HermeticSandboxProvider } from "./execution-sandbox-provider";
 export * from "./pi-sandbox-agent-harness";
 export * from "./opencode-sandbox-agent-harness";
 export * from "./command-sandbox-agent-harness";
+export * from "./development-session";
+export * from "./server-worker-relay-adapters";
 
 export { RuntimeServerConnectivityChecker } from "./server-connectivity";
 export { RuntimeDeploymentHealthChecker } from "./deployment-health";

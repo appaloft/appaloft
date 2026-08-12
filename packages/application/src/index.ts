@@ -36,6 +36,7 @@ export * from "./deployment-overlay-handlers";
 export * from "./deployment-overlay-messages";
 export * from "./deployment-progress";
 export * from "./deployment-progress-recorder";
+export * from "./development-session";
 export * from "./domain-binding-handlers";
 export * from "./domain-binding-messages";
 export * from "./domain-event-handlers";

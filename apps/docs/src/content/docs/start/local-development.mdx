@@ -1,0 +1,101 @@
+---
+title: "本地开发会话"
+description: "用部署配置启动可恢复、可观察、可精确清理的本地或远端开发会话。"
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: complete
+searchAliases:
+  - "appaloft dev"
+  - "local development"
+  - "dev server"
+  - "remote dev"
+  - "本地开发"
+  - "远端开发"
+relatedOperations: []
+sidebar:
+  order: 4
+---
+
+## 目标 <a id="local-development-session" />
+
+从当前仓库启动一组 Development Session 服务，复用部署配置中的运行时、网络、health、环境变量引用和服务身份，同时把开发命令与 watch 策略留在开发 overlay 中。
+
+## 快速开始
+
+```bash
+appaloft dev plan .
+appaloft dev .
+```
+
+交互式 macOS/Linux 终端默认打开原生 Development TUI；它显示服务状态、readiness、URL 和脱敏日志，并提供 refresh、restart、stop 与 detach。renderer 不可用时会明确告警并继续使用同一套 headless foreground 生命周期。
+
+脚本、CI 或无 TTY 环境使用结构化路径：
+
+```bash
+appaloft dev start . --detach --json
+appaloft dev status . --json
+appaloft dev logs . --tail 200 --json
+appaloft dev stop . --json
+appaloft dev reset . --yes --json
+```
+
+`stop` 保留持久数据和会话证据；`reset` 需要 `--yes`，只删除该 source identity 拥有的开发状态。重复启动同一份 plan 会恢复现有会话；配置或环境指纹不同则返回冲突，不会启动第二份 graph。
+
+## 配置开发命令 <a id="local-development-config" />
+
+```yaml
+runtime:
+  strategy: workspace-commands
+  startCommand: bun run start
+network:
+  internalPort: 3000
+health:
+  path: /health
+development:
+  command: bun run dev
+  watch: native
+```
+
+`development.command` 只替换本地执行命令；`watch` 可为 `native`、`restart` 或 `none`。多服务应用可在每个 service 下设置同名 overlay。完整字段见[配置文件参考](/docs/configuration/config-file/#config-development-overlay)。
+
+没有配置文件时，Appaloft 可以确定性使用 `package.json` 中的 `dev` script。无法安全表达的 substrate 或含 shell expansion/operator 的命令会在创建进程、listener 或状态文件之前失败。
+
+## 环境变量与 HTTPS
+
+```bash
+appaloft dev . \
+  --env-file .env.development \
+  --env PORT=4310 \
+  --https
+```
+
+显式优先级是配置环境 < `--env-file`（按出现顺序）< `--env`。值会进入子进程，但会从 Appaloft 日志中脱敏。不要把 Secret 值写入仓库配置或 argv；更适合从本机受控 env file 注入。
+
+`--https` 在会话状态目录生成短期本地证书。只有同时显式传入 `--trust` 才记录 trust confirmation；Appaloft 不会在未确认时修改系统 trust。
+
+## 在注册服务器上运行
+
+有 live outbound Server Worker 时，同一份计划可以改走目标 Server：
+
+```bash
+appaloft dev . --server srv_primary
+```
+
+source 会通过有界、ignore-aware archive 传输；Dev 生命周期仍由公开 Development Session contract 管理，Cloud 不创建另一份 Dev 状态。设备端默认只允许 Docker Compose/容器路径；执行本机 host 命令需要设备 owner 在启动 Worker 时显式 opt in。参见[出站 Server Worker](/docs/servers/register-connect/#server-worker-outbound-relay)。
+
+## 状态与恢复
+
+| 状态 / 症状 | 含义与下一步 |
+| --- | --- |
+| `running-unverified` | 进程已运行但没有声明 health check；这不等于 ready |
+| `ready` | 声明的 health check 已通过 |
+| `development_session_conflict` | 已有同 source、不同 plan/env 的会话；先 `status`/`stop` |
+| `development_process_failed` | 某个受管服务异常退出；同组 owned 进程会停止并保留失败证据 |
+| `development_health_failed` | 进程存在但声明的 readiness 未通过；查看 `dev logs` |
+
+## 相关任务
+
+- [配置文件参考](/docs/configuration/config-file/#config-development-overlay)
+- [注册并连接服务器](/docs/servers/register-connect/)
+- [第一次部署](/docs/start/first-deployment/)

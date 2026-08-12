@@ -1,0 +1,99 @@
+---
+title: "Local Development Sessions"
+description: "Run resumable, observable, exactly cleaned local or remote development from deployment config."
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: complete
+searchAliases:
+  - "appaloft dev"
+  - "local development"
+  - "dev server"
+  - "remote dev"
+relatedOperations: []
+sidebar:
+  order: 4
+---
+
+## Goal <a id="local-development-session" />
+
+Start a Development Session from the current repository. It reuses runtime, network, health, environment-reference, and service identity from deployment configuration while keeping development commands and watch behavior in a development-only overlay.
+
+## Quick start
+
+```bash
+appaloft dev plan .
+appaloft dev .
+```
+
+Interactive macOS/Linux terminals open the native Development TUI by default. It shows service state, readiness, URLs, and redacted logs, with refresh, restart, stop, and detach actions. If the renderer is unavailable, Appaloft warns clearly and continues through the same headless foreground lifecycle.
+
+Use the structured path for scripts, CI, and non-TTY environments:
+
+```bash
+appaloft dev start . --detach --json
+appaloft dev status . --json
+appaloft dev logs . --tail 200 --json
+appaloft dev stop . --json
+appaloft dev reset . --yes --json
+```
+
+`stop` preserves persistent data and session evidence. `reset` requires `--yes` and removes only development state owned by this source identity. Starting the same plan again resumes the active session; a different config or environment fingerprint returns a conflict instead of starting a duplicate graph.
+
+## Configure the development command <a id="local-development-config" />
+
+```yaml
+runtime:
+  strategy: workspace-commands
+  startCommand: bun run start
+network:
+  internalPort: 3000
+health:
+  path: /health
+development:
+  command: bun run dev
+  watch: native
+```
+
+`development.command` replaces only the local execution command. `watch` accepts `native`, `restart`, or `none`; multi-service applications can set the same overlay per service. See the [Configuration File Reference](/docs/en/configuration/config-file/#config-development-overlay) for the complete field contract.
+
+Without config, Appaloft can deterministically use the `dev` script in `package.json`. Unsupported substrates and commands containing shell expansion or operators fail before any process, listener, or state file is created.
+
+## Environment and HTTPS
+
+```bash
+appaloft dev . \
+  --env-file .env.development \
+  --env PORT=4310 \
+  --https
+```
+
+Explicit precedence is config environment < `--env-file` in argument order < `--env`. Values reach child processes but are redacted from Appaloft logs. Do not put secret values in repository config or argv; inject them from a controlled local env file instead.
+
+`--https` creates a short-lived local certificate inside the session state directory. Trust confirmation is recorded only when `--trust` is also explicit; Appaloft does not modify system trust without that confirmation.
+
+## Run on a registered server
+
+When a live outbound Server Worker is attached, the same plan can target its Server:
+
+```bash
+appaloft dev . --server srv_primary
+```
+
+Source is transferred through a bounded, ignore-aware archive. The public Development Session contract remains authoritative; Cloud does not create a second Dev state model. The device permits Docker Compose/container execution by default. Host commands require an explicit local opt-in by the device owner. See [Outbound Server Worker](/docs/en/servers/register-connect/#server-worker-outbound-relay).
+
+## State and recovery
+
+| State / symptom | Meaning and next action |
+| --- | --- |
+| `running-unverified` | The process runs without a declared health check; this is not ready |
+| `ready` | The declared health check passed |
+| `development_session_conflict` | The same source has a different active plan/env; inspect or stop it first |
+| `development_process_failed` | A managed service exited unexpectedly; sibling owned processes stop and failure evidence remains |
+| `development_health_failed` | The process exists but declared readiness failed; inspect `dev logs` |
+
+## Related tasks
+
+- [Configuration File Reference](/docs/en/configuration/config-file/#config-development-overlay)
+- [Register and Connect a Server](/docs/en/servers/register-connect/)
+- [Your First Deployment](/docs/en/start/first-deployment/)

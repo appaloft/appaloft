@@ -126,6 +126,25 @@ export interface WorkspaceControlTargetSelectionSummary {
 
 export type WorkspaceControlRendererMessage =
   | {
+      readonly type: "development";
+      readonly protocol: "development/v1";
+      readonly session: {
+        readonly state: string;
+        readonly sessionId?: string;
+        readonly sourceRoot: string;
+        readonly gatewayUrl?: string;
+        readonly services?: readonly {
+          readonly key: string;
+          readonly state: string;
+          readonly pid?: number;
+          readonly url?: string;
+          readonly readiness?: "ready" | "running-unverified" | "failed";
+          readonly watch?: "native" | "restart" | "none";
+        }[];
+      };
+    }
+  | { readonly type: "development-logs"; readonly lines: readonly string[] }
+  | {
       readonly type: "workspaces";
       readonly workspaces: readonly WorkspaceControlWorkspaceSummary[];
     }
@@ -166,6 +185,10 @@ export type WorkspaceControlRendererMessage =
     };
 
 export type WorkspaceControlRendererEvent =
+  | { readonly type: "development-refresh" }
+  | { readonly type: "development-restart" }
+  | { readonly type: "development-stop" }
+  | { readonly type: "development-detach" }
   | { readonly type: "select"; readonly workspaceId: string }
   | { readonly type: "refresh"; readonly workspaceId?: string }
   | { readonly type: "attach"; readonly workspaceId: string; readonly runtimeId: string }

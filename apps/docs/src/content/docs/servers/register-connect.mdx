@@ -181,6 +181,49 @@ appaloft server register \
   --target-kind orchestrator-cluster
 ```
 
+## 出站 Server Worker <a id="server-worker-outbound-relay" />
+
+如果 Mac/VPS 不能或不应该开放 inbound SSH，可以让设备主动建立一条 mTLS Worker 连接。它附着到
+现有 public Server；Worker 的连接、generation、lease 和证书状态是独立 readback，revoke Worker
+不会删除或重命名 Server。
+
+已通过 `appaloft login` 登录 Cloud/self-hosted profile 时：
+
+```bash
+appaloft server worker enroll --server srv_primary --name "My Mac"
+appaloft server worker run
+```
+
+`enroll` 通过当前 authenticated profile 申请一次性短期 token，在设备上生成 private key/CSR，
+再交换短期 mTLS certificate。private key 不离开设备；token 不进入 argv、输出、长期 credential
+或 Server readback。对于由管理员转交 token 的 self-hosted 流程，仍可从 stdin 输入：
+
+```bash
+printf '%s' "$ONE_TIME_TOKEN" | appaloft server worker enroll \
+  --server srv_primary --name "Build VPS" --token-stdin
+```
+
+`server worker run` 保持前台出站连接，适合交给设备自己的 service manager。默认只允许
+Docker/容器执行；如果设备 owner 确认允许 Appaloft 在该机器直接运行 Workspace/Dev host 命令，
+需要在启动 Worker 的本机环境显式设置：
+
+```bash
+APPALOFT_SERVER_WORKER_ALLOW_HOST_SHELL=true appaloft server worker run
+```
+
+这项 opt-in 只在设备本地生效，Cloud 不能远程打开。可用 `APPALOFT_SERVER_WORKER_ROOTS` 进一步把
+可访问路径限制为由平台 path delimiter 分隔的 owned roots。端口转发也只接受控制面签发的短期、
+单目标 capability，不是通用 VPN。
+
+```bash
+appaloft server worker status --json
+appaloft server worker revoke
+```
+
+`revoke` 会关闭当前连接、围栏旧 generation 并删除本机 Worker credential；Server 和持久 Workspace
+数据仍遵循各自生命周期。连接后可运行
+`appaloft dev . --server srv_primary`；完整 Dev 流程见[本地开发会话](/docs/start/local-development/)。
+
 ## 预期输出与状态
 
 连接测试会检查：DNS/IP 与端口是否可达、SSH 凭据是否可用、目标用户是否有部署所需权限、基础运行环境是否满足要求，必要时还会返回代理或 Docker 相关诊断。测试结果会区分主机名解析失败、网络/主机不可达、认证失败和 host-key 验证失败几类原因，而不是笼统报错。

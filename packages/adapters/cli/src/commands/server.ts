@@ -919,6 +919,27 @@ const terminalCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverTerminal));
 
+function uncomposedServerWorkerCommand(name: "enroll" | "run" | "status" | "revoke" | "upgrade") {
+  return EffectCommand.make(name, {}, () =>
+    Effect.fail(
+      domainError.infra("Outbound Server Worker runtime was not composed", {
+        phase: `server-worker-${name}`,
+      }),
+    ),
+  );
+}
+
+const serverWorkerCommand = EffectCommand.make("worker").pipe(
+  EffectCommand.withDescription("Manage an outbound mTLS Server Worker attachment"),
+  EffectCommand.withSubcommands([
+    uncomposedServerWorkerCommand("enroll"),
+    uncomposedServerWorkerCommand("run"),
+    uncomposedServerWorkerCommand("status"),
+    uncomposedServerWorkerCommand("revoke"),
+    uncomposedServerWorkerCommand("upgrade"),
+  ]),
+);
+
 export const serverCommand = EffectCommand.make("server").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.server),
   EffectCommand.withSubcommands([
@@ -944,5 +965,6 @@ export const serverCommand = EffectCommand.make("server").pipe(
     runtimeCommand,
     terminalCommand,
     proxyCommand,
+    serverWorkerCommand,
   ]),
 );

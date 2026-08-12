@@ -256,6 +256,7 @@ export const generatedSdkOperations = [
       method: "POST",
       path: "/agent-workspace-profiles/{installationId}/mcp-connections",
     },
+    docsHref: "/docs/agents/adapters/#agent-adapter-installations",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,

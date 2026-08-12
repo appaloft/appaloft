@@ -93,6 +93,7 @@
         "@appaloft/provider-generic-ssh": "workspace:*",
         "@appaloft/provider-local-shell": "workspace:*",
         "@appaloft/server": "workspace:*",
+        "@appaloft/server-worker-relay": "workspace:*",
         "nanoid": "^5.1.16",
         "reflect-metadata": "^0.2.2",
         "tsyringe": "^4.10.0",
@@ -157,6 +158,7 @@
         "@appaloft/deployment-config": "workspace:*",
         "@appaloft/docs-registry": "workspace:*",
         "@appaloft/sdk": "workspace:*",
+        "@appaloft/server-worker-relay": "workspace:*",
         "@effect/cli": "^0.75.2",
         "@effect/platform-node": "^0.107.0",
         "effect": "^3.21.4",
@@ -206,6 +208,7 @@
         "@appaloft/blueprints": "workspace:*",
         "@appaloft/core": "workspace:*",
         "@appaloft/i18n": "workspace:*",
+        "@appaloft/server-worker-relay": "workspace:*",
       },
       "devDependencies": {
         "@appaloft/testkit": "workspace:*",
@@ -635,6 +638,12 @@
         "tsyringe": "^4.10.0",
       },
     },
+    "packages/server-worker-relay": {
+      "name": "@appaloft/server-worker-relay",
+      "dependencies": {
+        "@appaloft/core": "workspace:*",
+      },
+    },
     "packages/static-artifact-upload-web": {
       "name": "@appaloft/static-artifact-upload-web",
       "version": "0.0.0",
@@ -807,6 +816,8 @@
     "@appaloft/sdk-generator": ["@appaloft/sdk-generator@workspace:packages/sdk-generator"],
 
     "@appaloft/server": ["@appaloft/server@workspace:packages/server"],
+
+    "@appaloft/server-worker-relay": ["@appaloft/server-worker-relay@workspace:packages/server-worker-relay"],
 
     "@appaloft/shell": ["@appaloft/shell@workspace:apps/shell"],
 

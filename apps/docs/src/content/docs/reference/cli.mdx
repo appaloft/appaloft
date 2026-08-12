@@ -33,9 +33,12 @@ appaloft login                                # 登录 Appaloft Cloud 或自托�
 appaloft context list                         # 查看本机已保存的 profile/context
 appaloft code                                 # 从当前 Git 仓库打开或恢复 Agent Workspace
 appaloft workspace                            # 管理 Workspace，并嵌入 Agent 原生 TUI
+appaloft dev                                  # 启动本地 Development TUI / foreground 会话
+appaloft dev . --server <serverId>            # 通过 live outbound Worker 远端开发
 
 appaloft projects list                        # 列出项目
 appaloft servers register --host <host>       # 注册服务器
+appaloft server worker enroll --server <id> --name <name> # 连接出站 Worker
 appaloft resources create --project <id>      # 创建资源
 
 appaloft deployments timeline <deploymentId>  # 查看部署时间线
@@ -67,6 +70,23 @@ Focus Mode，`a` 打开由状态决定的暂停、恢复与二次确认终止操
 命令。无 TTY、脚本或 Windows headless 场景使用 `--no-tui`、`--json` 或显式子命令；这些
 路径不会加载 renderer。完整按键和会话边界见
 [管理正在运行的 Workspace](/docs/agents/workspaces/#workspace-control-tui)。
+
+## Development Session 快速入口
+
+`appaloft dev [path]` 使用部署配置生成公开 Development Plan，并在交互式 macOS/Linux 终端
+打开原生 TUI。脚本使用 `--no-tui`、`--detach` 或 `--json`；`plan/status/logs/stop/reset`
+提供相同生命周期的可重放入口。renderer 缺失会明确告警并安全进入 headless foreground。
+
+```bash
+appaloft dev plan .
+appaloft dev . --env-file .env.development
+appaloft dev status . --json
+appaloft dev stop .
+appaloft dev reset . --yes
+```
+
+有 live outbound Server Worker 时添加 `--server <serverId>`，无需 inbound SSH。完整配置、状态、
+HTTPS、watch 和 cleanup 说明见[本地开发会话](/docs/start/local-development/#local-development-session)。
 
 ## 登录与 CLI Profile <a id="cli-remote-control-plane-login" />
 

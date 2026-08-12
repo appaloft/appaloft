@@ -100,6 +100,14 @@ function parseRendererEvent(value: unknown): WorkspaceControlRendererEvent | und
   if (!value || typeof value !== "object") return undefined;
   const record = value as Record<string, unknown>;
   switch (record.type) {
+    case "development-refresh":
+      return { type: "development-refresh" };
+    case "development-restart":
+      return { type: "development-restart" };
+    case "development-stop":
+      return { type: "development-stop" };
+    case "development-detach":
+      return { type: "development-detach" };
     case "select":
       return typeof record.workspaceId === "string"
         ? { type: "select", workspaceId: record.workspaceId }

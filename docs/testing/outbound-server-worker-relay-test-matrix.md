@@ -25,3 +25,15 @@ The terminal R2b acceptance is a real local CA + TLS relay + separate Worker pro
 must prove invalid-certificate denial, enroll/connect, R2a remote dev, port forward, existing
 Workspace PTY, snapshot/source-fork, reconnect, rotate, revoke, upgrade rollback and independent
 listener/process/credential/ticket/lease zero-residual cleanup. A real external VPS remains opt-in.
+
+## 2026-08-12 implementation evidence (pre-merge)
+
+- `@appaloft/server-worker-relay` real loopback TLS tests prove valid and invalid certificate paths,
+  scoped byte forwarding and PTY byte/resize behavior; protocol, dispatcher, request journal,
+  credential, rotation, revoke, source archive and signed-upgrade rollback tests also pass.
+- The relay Development and `SandboxDockerCommandRunner` adapters reuse the public R2a and Sandbox
+  contracts; Cloud's terminal packet runs real enrollment, mTLS Worker, source transfer, Dev
+  start/status/logs/stop/reset, reconnecting rotation, revoke and independent zero-residual checks.
+- Public repository lint/typecheck/test/build and Rust tests pass. The authorized external VPS smoke
+  was not rerun for R2; the governed loopback terminal packet is the merge gate.
+- Final public SHA and Ticket closure remain pending until the implementation PR merges.

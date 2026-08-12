@@ -79,6 +79,7 @@ const remoteCapableTopLevelCommands = new Set([
   "code",
   "default-access",
   "dependency",
+  "dev",
   "deploy",
   "deploy-token",
   "deployments",

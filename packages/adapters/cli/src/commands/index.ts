@@ -22,6 +22,7 @@ import { infrastructureCommand } from "./infrastructure.js";
 import { instanceCommand } from "./instance.js";
 import { githubCommand, pluginsCommand, providersCommand } from "./integrations.js";
 import {
+  devCommand,
   doctorCommand,
   initCommand,
   serveCommand,
@@ -57,6 +58,7 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
     workerCommand,
     initCommand,
     doctorCommand,
+    devCommand,
     loginCommand,
     logoutCommand,
     contextCommand,
