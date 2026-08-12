@@ -14,6 +14,8 @@
 - [x] RED exec/file/PTY/dev/forward/drain/upgrade dispatch tests.
 - [x] Implement public protocol package, device runtime and Server Worker CLI.
 - [x] Run relay `SandboxDockerCommandRunner` contract against in-memory transport.
+- [x] Add the #1076 readiness regression: `connected` is published only after relay request
+  registration, and post-registration hook failure closes the handshake.
 
 ## Cloud Test First And Implementation
 
@@ -27,6 +29,7 @@
 - [x] Real local mTLS two-process journey and zero-residual evidence packet.
 - [x] Public focused/full gates, docs-impact and packaging checks.
 - [ ] Cloud focused/full gates and composed-runtime packaging checks.
-- [ ] Merge public implementation, advance Cloud pin to final public main SHA, then run read-only
+- [x] Merge public implementation PR #1075 and close the original public Ticket #1074.
+- [ ] Merge public readiness fix #1076, advance Cloud pin to final public main SHA, then run read-only
   Public/Private Boundary Review.
 - [ ] Merge Cloud implementation, close Tickets and sync program/roadmap evidence.

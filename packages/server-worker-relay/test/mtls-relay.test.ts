@@ -156,12 +156,14 @@ describe("real loopback mTLS relay", () => {
     async () => {
       const certificates = createCertificates();
       const leases = new InMemoryServerWorkerLeaseRegistry({ leaseMs: 30_000 });
+      const lifecycle: string[] = [];
       const relay = new ServerWorkerRelayServer({
         tls: { ...certificates.server, ca: certificates.ca },
         leaseRegistry: leases,
         requiredCapabilities: ["process.exec"],
-        authorizePeer: ({ workerId, subject }) =>
-          workerId === "worker-1" && subject.CN === "worker-1"
+        authorizePeer: ({ workerId, subject }) => {
+          lifecycle.push("authorized");
+          return workerId === "worker-1" && subject.CN === "worker-1"
             ? ok(undefined)
             : err({
                 code: "server_worker_certificate_rejected",
@@ -169,7 +171,12 @@ describe("real loopback mTLS relay", () => {
                 message: "binding mismatch",
                 retryable: false,
                 details: { phase: "server-worker-mtls" },
-              }),
+              });
+        },
+        onConnect: () => {
+          lifecycle.push("connected");
+          return ok(undefined);
+        },
       });
       closers.push(() => relay.close());
       await relay.listen();
@@ -186,7 +193,7 @@ describe("real loopback mTLS relay", () => {
       });
       closers.push(() => client.close());
       expect((await client.connect()).isOk()).toBe(true);
-      await Bun.sleep(25);
+      expect(lifecycle).toEqual(["authorized", "connected"]);
       const response = await relay.request({
         workerId: "worker-1",
         generation: 1,
@@ -197,6 +204,53 @@ describe("real loopback mTLS relay", () => {
       expect(response.isOk()).toBe(true);
       if (response.isErr()) return;
       expect(response.value.stdout).toBe("relay-ok");
+    },
+    realLoopbackTestTimeoutMs,
+  );
+
+  test(
+    "[SWR-MTLS-003][SWR-STATUS-016][SWR-ERROR-017] fails the handshake closed when post-registration admission fails",
+    async () => {
+      const certificates = createCertificates();
+      const relay = new ServerWorkerRelayServer({
+        tls: { ...certificates.server, ca: certificates.ca },
+        leaseRegistry: new InMemoryServerWorkerLeaseRegistry({ leaseMs: 30_000 }),
+        authorizePeer: () => ok(undefined),
+        onConnect: () =>
+          err({
+            code: "server_worker_connection_rejected",
+            category: "user",
+            message: "hosted attachment was not ready",
+            retryable: false,
+            details: { phase: "server-worker-mtls" },
+          }),
+      });
+      closers.push(() => relay.close());
+      await relay.listen();
+      const client = new ServerWorkerRelayClient({
+        relay: { host: "127.0.0.1", port: relay.port, serverName: "relay.localhost" },
+        tls: { ...certificates.worker, ca: certificates.ca },
+        workerId: "worker-1",
+        generation: 1,
+        capabilities: ["process.exec"],
+        dispatcher: new ServerWorkerDispatcher({
+          roots: [certificates.root],
+          allowHostShell: true,
+        }),
+      });
+      closers.push(() => client.close());
+      expect((await client.connect()).isErr()).toBe(true);
+      expect(
+        (
+          await relay.request({
+            workerId: "worker-1",
+            generation: 1,
+            requestId: "rejected-request",
+            capability: "process.exec",
+            payload: { argv: ["printf", "must-not-run"], cwd: certificates.root },
+          })
+        ).isErr(),
+      ).toBe(true);
     },
     realLoopbackTestTimeoutMs,
   );

@@ -26,7 +26,7 @@ must prove invalid-certificate denial, enroll/connect, R2a remote dev, port forw
 Workspace PTY, snapshot/source-fork, reconnect, rotate, revoke, upgrade rollback and independent
 listener/process/credential/ticket/lease zero-residual cleanup. A real external VPS remains opt-in.
 
-## 2026-08-12 implementation evidence (pre-merge)
+## 2026-08-12 implementation evidence
 
 - `@appaloft/server-worker-relay` real loopback TLS tests prove valid and invalid certificate paths,
   scoped byte forwarding and PTY byte/resize behavior; protocol, dispatcher, request journal,
@@ -36,4 +36,6 @@ listener/process/credential/ticket/lease zero-residual cleanup. A real external 
   start/status/logs/stop/reset, reconnecting rotation, revoke and independent zero-residual checks.
 - Public repository lint/typecheck/test/build and Rust tests pass. The authorized external VPS smoke
   was not rerun for R2; the governed loopback terminal packet is the merge gate.
-- Final public SHA and Ticket closure remain pending until the implementation PR merges.
+- Public implementation PR #1075 merged and Ticket #1074 closed. Follow-up regression #1076 proves
+  the neutral relay invokes its post-registration hook before acknowledging hello, hook failure
+  fails closed, and Cloud can publish `connected` only when immediate request admission is ready.

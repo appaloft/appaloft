@@ -310,6 +310,11 @@ export class InMemoryServerWorkerLeaseRegistry {
         );
   }
 
+  disconnect(workerId: string, generation: number): void {
+    const lease = this.#leases.get(workerId);
+    if (lease?.generation === generation && !lease.revoked) this.#leases.delete(workerId);
+  }
+
   revoke(workerId: string): void {
     const lease = this.#leases.get(workerId);
     if (lease) lease.revoked = true;
@@ -638,6 +643,17 @@ export interface ServerWorkerRelayServerOptions {
     platform: string;
     version: string;
   }) => Result<void> | Promise<Result<void>>;
+  onConnect?: (input: {
+    workerId: string;
+    generation: number;
+    fingerprint256: string;
+    publicKeyFingerprint: string;
+    serialNumber: string;
+    subject: Record<string, string>;
+    capabilities: readonly ServerWorkerCapability[];
+    platform: string;
+    version: string;
+  }) => Result<void> | Promise<Result<void>>;
   onHeartbeat?: (input: { workerId: string; generation: number }) => Promise<void> | void;
   onDisconnect?: (input: { workerId: string; generation: number }) => Promise<void> | void;
   requestTimeoutMs?: number;
@@ -750,7 +766,7 @@ export class ServerWorkerRelayServer {
         );
         return;
       }
-      const authorized = await this.options.authorizePeer?.({
+      const peer = {
         workerId: frame.workerId,
         generation: frame.generation,
         fingerprint256: certificate.fingerprint256,
@@ -767,7 +783,8 @@ export class ServerWorkerRelayServer {
         capabilities: frame.capabilities,
         platform: frame.platform ?? "unknown",
         version: frame.version ?? "unknown",
-      });
+      };
+      const authorized = await this.options.authorizePeer?.(peer);
       if (authorized?.isErr()) {
         connection.socket.destroy(new Error(authorized.error.message));
         return;
@@ -787,6 +804,13 @@ export class ServerWorkerRelayServer {
       connection.workerId = frame.workerId;
       connection.capabilities = frame.capabilities;
       this.#connections.set(frame.workerId, connection);
+      const connected = await this.options.onConnect?.(peer);
+      if (connected?.isErr()) {
+        this.#connections.delete(frame.workerId);
+        this.options.leaseRegistry.disconnect(frame.workerId, frame.generation);
+        connection.socket.destroy(new Error(connected.error.message));
+        return;
+      }
       await writeFrame(connection.socket, {
         schema: serverWorkerRelaySchema,
         type: "response",
