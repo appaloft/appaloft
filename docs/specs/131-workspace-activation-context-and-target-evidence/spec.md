@@ -24,6 +24,7 @@ lifecycle ownership.
 | WS-ACT-LEGACY-006 | Existing entry lacks evidence | Readback reports `legacy-unclassified`; it never guesses managed/BYOS/local. |
 | WS-ACT-SAFE-007 | Result/error/audit is observed | Server id/host, provider handle, capacity probe and credentials are absent. |
 | WS-ACT-PARITY-008 | CLI/API/SDK/TUI consume result | All surfaces use the same operation/result schema and reason vocabulary. |
+| WS-ACT-AUDIT-009 | Workspace activation is audited | `workspaces.open` records the exact created or resumed Workspace aggregate without exposing target topology or credentials. |
 
 ## Ownership
 

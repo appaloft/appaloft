@@ -10,3 +10,4 @@
 | WS-ACT-LEGACY-006 | persistence/migration | `packages/persistence/pg/test/profile-aware-workspace-open-repository.test.ts` | passing |
 | WS-ACT-SAFE-007 | application/HTTP/SDK/CLI | `packages/application/test/agent-workspace-open.test.ts`; `packages/orpc/test/profile-aware-workspace.http.test.ts`; `packages/sdk/test/agent-workspace-handles.test.ts`; `packages/adapters/cli/test/workspace-control-presentation.test.ts` | passing |
 | WS-ACT-PARITY-008 | API/SDK/CLI/TUI | `packages/application/test/execution-sandbox-cqrs.test.ts`; `packages/orpc/test/profile-aware-workspace.http.test.ts`; `packages/sdk/test/agent-workspace-handles.test.ts`; `packages/adapters/cli/test/workspace-control-presentation.test.ts`; `apps/workspace-control-tui/src/lib.rs` | passing |
+| WS-ACT-AUDIT-009 | application/audit | `packages/application/test/operation-audit.test.ts` proves `workspaces.open` emits an operation audit record against the exact created Workspace aggregate | passing |

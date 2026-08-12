@@ -26,6 +26,7 @@ import {
   DefaultOperationAuditSink,
   InstallAgentAdapterCommand,
   InstallAgentWorkspaceProfileCommand,
+  OpenAgentWorkspaceCommand,
   type OperationAuditRecordInput,
   type OperationAuditSink,
   operationAuditRecordFromCommand,
@@ -73,6 +74,46 @@ class FixedResultUseCase<TResult extends { id: string }> {
 }
 
 describe("operation audit pipeline", () => {
+  test("[WS-ACT-AUDIT-009] records Workspace open against the exact created Workspace", () => {
+    const context = createExecutionContext({
+      requestId: "req_audit_workspace_open",
+      entrypoint: "http",
+      actor: { kind: "user", id: "usr_member" },
+      tenant: {
+        tenantId: "tenant_business",
+        organizationId: "org_business",
+        mode: "hosted",
+      },
+    });
+    const command = OpenAgentWorkspaceCommand.create({
+      repository: "https://github.com/appaloft/appaloft.git",
+      repositoryIdentity: "github.com/appaloft/appaloft",
+      ref: "main",
+      branch: "main",
+      commitSha: "a".repeat(40),
+      attach: true,
+    })._unsafeUnwrap();
+
+    expect(
+      operationAuditRecordFromCommand({
+        context,
+        command,
+        result: ok({ workspaceId: "sbx_workspace_open" }),
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        operationKey: "workspaces.open",
+        domain: "workspaces",
+        action: "open",
+        result: "success",
+        primaryTarget: {
+          resourceType: "workspace",
+          resourceId: "sbx_workspace_open",
+        },
+      }),
+    );
+  });
+
   test("[AUDIT-LIFECYCLE-PROJECT-001] command bus records project lifecycle audit intent", async () => {
     const child = container.createChildContainer();
     const projects = new MemoryProjectRepository();
