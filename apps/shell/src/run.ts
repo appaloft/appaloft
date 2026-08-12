@@ -1,15 +1,30 @@
 import { existsSync } from "node:fs";
 import { mkdir, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { homedir } from "node:os";
+import { delimiter, dirname, join } from "node:path";
 import {
+  activeControlPlaneProfile,
   createCliHelpProgram,
+  createRatatuiDevelopmentPresentation,
   createRatatuiWorkspaceControlPresentation,
   createRemoteCliProgram,
+  type DevelopmentCommandRuntime,
   defaultCliControlPlaneProfileStore,
+  defaultPublicCloudControlPlaneUrl,
+  developmentPlanFromSource,
   formatSafeCliError,
   resolveCliExecutionTarget,
   runStandaloneControlPlaneCli,
+  runStandaloneDevelopmentCli,
+  runStandaloneServerWorkerCli,
 } from "@appaloft/adapter-cli";
+import {
+  BunSandboxDockerCommandRunner,
+  ControlPlaneDevelopmentSessionRuntime,
+  createRelayDevelopmentHandler,
+  createRelaySandboxDockerHandler,
+  LocalDevelopmentSessionRuntime,
+} from "@appaloft/adapter-runtime";
 import {
   createAppaloftMcpServer,
   runAppaloftMcpRemoteStdioProxy,
@@ -17,6 +32,17 @@ import {
   startAppaloftMcpHttpServer,
 } from "@appaloft/ai-mcp";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
+import {
+  createServerWorkerNetworkForwardHandler,
+  createServerWorkerPtyHandler,
+  createServerWorkerRotationHandler,
+  FileSystemServerWorkerCredentialStore,
+  HttpServerWorkerEnrollmentPort,
+  ServerWorkerAtomicUpgrade,
+  ServerWorkerDeviceRuntime,
+  ServerWorkerDispatcher,
+  verifyServerWorkerReleaseSignature,
+} from "@appaloft/server-worker-relay";
 import { type AppComposition, createAppComposition, type ShellRuntimeOptions } from "./composition";
 import {
   prepareRemotePgliteStateSync,
@@ -293,6 +319,13 @@ function isHelpInvocation(argv: readonly string[]): boolean {
   return argv.includes("--help") || argv.includes("-h");
 }
 
+function developmentSupervisorEntrypoint(argv: readonly string[]): readonly string[] {
+  const sourceEntry = argv[1];
+  return sourceEntry && /\.(?:[cm]?[jt]s)$/.test(sourceEntry) && existsSync(sourceEntry)
+    ? [process.execPath, sourceEntry]
+    : [process.execPath];
+}
+
 function readOptionValue(args: readonly string[], name: string): string | null {
   const longName = `--${name}`;
   const equalsPrefix = `${longName}=`;
@@ -413,6 +446,130 @@ export async function runShellCli(
 ): Promise<void> {
   const argv = process.argv;
   const mcpCommand = isMcpCommand(argv);
+  const appaloftHome = process.env.APPALOFT_HOME?.trim() || join(homedir(), ".appaloft");
+  const workerRoots = (
+    process.env.APPALOFT_SERVER_WORKER_ROOTS?.split(delimiter) ?? [process.cwd()]
+  ).filter(Boolean);
+  const workerDevelopmentSources = join(appaloftHome, "server-worker", "development-sources");
+  const workerDevelopmentRuntime = new LocalDevelopmentSessionRuntime({
+    planResolver: developmentPlanFromSource,
+    supervisorEntrypoint: developmentSupervisorEntrypoint(argv),
+    environment: process.env,
+  });
+  const workerDockerRunner = new BunSandboxDockerCommandRunner();
+  const credentialStore = new FileSystemServerWorkerCredentialStore(
+    join(appaloftHome, "server-worker", "credential.json"),
+  );
+  const deviceRuntime = new ServerWorkerDeviceRuntime({
+    credentialStore,
+    enrollment: new HttpServerWorkerEnrollmentPort(
+      process.env.APPALOFT_SERVER_WORKER_ENROLLMENT_URL?.trim() ||
+        process.env.APPALOFT_CONTROL_PLANE_URL?.trim() ||
+        defaultPublicCloudControlPlaneUrl,
+      fetch,
+      async () => {
+        const profile = await activeControlPlaneProfile({
+          store: defaultCliControlPlaneProfileStore(process.env),
+        });
+        if (profile.isErr()) return err(profile.error);
+        if (!profile.value) {
+          return err(
+            domainError.validation(
+              "Worker management requires an authenticated control-plane profile",
+              { phase: "server-worker-enrollment" },
+            ),
+          );
+        }
+        return ok({
+          baseUrl: profile.value.baseUrl,
+          headers:
+            profile.value.auth.kind === "bearer"
+              ? { authorization: `Bearer ${profile.value.auth.token}` }
+              : { cookie: profile.value.auth.cookie },
+        });
+      },
+    ),
+    identityDirectory: join(appaloftHome, "server-worker", "pending-identity"),
+    version: process.env.APPALOFT_APP_VERSION ?? "0.0.0",
+    dispatcherFactory: () =>
+      new ServerWorkerDispatcher({
+        roots: workerRoots,
+        allowHostShell: process.env.APPALOFT_SERVER_WORKER_ALLOW_HOST_SHELL === "true",
+        handlers: {
+          "runtime.dev": createRelayDevelopmentHandler(workerDevelopmentRuntime, {
+            sourceRoot: workerDevelopmentSources,
+            allowHostShell: process.env.APPALOFT_SERVER_WORKER_ALLOW_HOST_SHELL === "true",
+          }),
+          "runtime.docker": createRelaySandboxDockerHandler(workerDockerRunner),
+          "worker.rotate": createServerWorkerRotationHandler({
+            credentialStore,
+            identityDirectory: join(appaloftHome, "server-worker", "rotation-identities"),
+          }),
+        },
+      }),
+    streamHandlersFactory: () => ({
+      "process.pty": createServerWorkerPtyHandler({
+        roots: workerRoots,
+        allowHostShell: process.env.APPALOFT_SERVER_WORKER_ALLOW_HOST_SHELL === "true",
+      }),
+      "network.forward": createServerWorkerNetworkForwardHandler({
+        authorizeTarget: ({ host }) => {
+          const allowed = new Set(
+            (process.env.APPALOFT_SERVER_WORKER_FORWARD_HOSTS ?? "127.0.0.1,localhost,::1")
+              .split(",")
+              .map((value) => value.trim())
+              .filter(Boolean),
+          );
+          return allowed.has(host);
+        },
+      }),
+    }),
+  });
+  const workerCli = await runStandaloneServerWorkerCli({
+    argv,
+    env: process.env,
+    ...(capturedStdinText === undefined ? {} : { stdinText: capturedStdinText }),
+    runtime: {
+      enroll: (input) => deviceRuntime.enroll(input),
+      run: (input) => deviceRuntime.run(input),
+      status: () => deviceRuntime.status(),
+      revoke: () => deviceRuntime.revoke(),
+      upgrade: async (input) => {
+        const publicKeyPem = process.env.APPALOFT_SERVER_WORKER_RELEASE_PUBLIC_KEY?.trim();
+        if (!publicKeyPem) {
+          return err({
+            code: "server_worker_upgrade_failed",
+            category: "user",
+            message: "Server Worker release public key is not configured",
+            retryable: false,
+            details: { phase: "server-worker-upgrade" },
+          } satisfies DomainError);
+        }
+        return new ServerWorkerAtomicUpgrade().apply({
+          currentExecutable: input.currentExecutable,
+          candidateExecutable: input.candidateExecutable,
+          verifySignature: (path) =>
+            verifyServerWorkerReleaseSignature({
+              candidateExecutable: path,
+              signatureFile: input.signatureFile,
+              publicKeyPem,
+            }),
+          health: async (path) => {
+            const child = Bun.spawn([path, "version"], {
+              stdin: "ignore",
+              stdout: "ignore",
+              stderr: "ignore",
+            });
+            return (await child.exited) === 0;
+          },
+        });
+      },
+    },
+  });
+  if (workerCli.handled) {
+    if (workerCli.exitCode !== 0) process.exit(workerCli.exitCode);
+    return;
+  }
   const controlPlaneCli = await runStandaloneControlPlaneCli({
     argv,
     env: process.env,
@@ -422,6 +579,52 @@ export async function runShellCli(
     if (controlPlaneCli.exitCode !== 0) {
       process.exit(controlPlaneCli.exitCode);
     }
+    return;
+  }
+
+  const localDevelopmentRuntime = new LocalDevelopmentSessionRuntime({
+    planResolver: developmentPlanFromSource,
+    supervisorEntrypoint: developmentSupervisorEntrypoint(argv),
+    environment: process.env,
+  });
+  let developmentRuntime: DevelopmentCommandRuntime = localDevelopmentRuntime;
+  let developmentArgv = argv;
+  const developmentServerId = argv.includes("dev") ? readOptionValue(argv, "server")?.trim() : null;
+  if (developmentServerId) {
+    const selected = await resolveCliExecutionTarget({ argv, env: process.env });
+    if (selected.isErr()) {
+      writeDomainError(selected.error);
+      process.exit(1);
+    }
+    if (selected.value.kind !== "remote") {
+      writeDomainError(
+        domainError.validation(
+          "Remote Development requires an authenticated Cloud or self-hosted control-plane profile",
+          { phase: "server-worker-development-target", serverId: developmentServerId },
+        ),
+      );
+      process.exit(1);
+    }
+    const profile = selected.value.profile;
+    developmentArgv = Array.from(selected.value.argv);
+    developmentRuntime = new ControlPlaneDevelopmentSessionRuntime({
+      baseUrl: profile.baseUrl,
+      serverId: developmentServerId,
+      headers:
+        profile.auth.kind === "bearer"
+          ? { authorization: `Bearer ${profile.auth.token}` }
+          : { cookie: profile.auth.cookie },
+      planResolver: developmentPlanFromSource,
+    });
+  }
+  const developmentCli = await runStandaloneDevelopmentCli({
+    argv: developmentArgv,
+    env: process.env,
+    runtime: developmentRuntime,
+    presentation: createRatatuiDevelopmentPresentation({ environment: process.env }),
+  });
+  if (developmentCli.handled) {
+    if (developmentCli.exitCode !== 0) process.exit(developmentCli.exitCode);
     return;
   }
 

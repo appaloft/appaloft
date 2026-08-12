@@ -10,6 +10,7 @@
 		"@appaloft/application": "workspace:*",
 		"@appaloft/blueprints": "workspace:*",
 		"@appaloft/core": "workspace:*",
+		"@appaloft/server-worker-relay": "workspace:*",
 		"@appaloft/i18n": "workspace:*"
 	},
 	"devDependencies": {

@@ -70,6 +70,40 @@ describe("public docs help registry", () => {
     "APPALOFT_PREVIEW_CLEANUP_RETRY_SCHEDULER_BATCH_SIZE",
   ];
 
+  test("[PUB-DOCS-010] Development and outbound Worker journeys resolve bilingual stable anchors", () => {
+    const expectations = [
+      {
+        id: "development.local-session" as const,
+        zh: "/docs/start/local-development/#local-development-session",
+        en: "/docs/en/start/local-development/#local-development-session",
+        aliases: ["appaloft dev", "remote dev"],
+      },
+      {
+        id: "development.config-overlay" as const,
+        zh: "/docs/configuration/config-file/#config-development-overlay",
+        en: "/docs/en/configuration/config-file/#config-development-overlay",
+        aliases: ["development.command", "development.watch"],
+      },
+      {
+        id: "server.worker-relay" as const,
+        zh: "/docs/servers/register-connect/#server-worker-outbound-relay",
+        en: "/docs/en/servers/register-connect/#server-worker-outbound-relay",
+        aliases: ["server worker enroll", "no inbound SSH"],
+      },
+    ];
+
+    for (const expected of expectations) {
+      const topic = publicDocsHelpTopics[expected.id];
+      expect(resolvePublicDocsHelpHref(expected.id)).toBe(expected.zh);
+      expect(resolvePublicDocsHelpHref(expected.id, { locale: "en-US" })).toBe(expected.en);
+      expect(topic.aliases).toEqual(expect.arrayContaining(expected.aliases));
+      expect(topic.surfaces).toEqual(expect.arrayContaining(["cli"]));
+      for (const page of [topic.page["zh-CN"], topic.page["en-US"]]) {
+        expect(pageHasAnchor(readFileSync(docsSourcePath(page), "utf8"), topic.anchor)).toBe(true);
+      }
+    }
+  });
+
   test("[PUB-DOCS-003] help topics use explicit stable public docs anchors", () => {
     const ids = new Set<string>();
 

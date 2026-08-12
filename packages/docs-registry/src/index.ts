@@ -191,6 +191,65 @@ export const publicDocsHelpTopics = {
       "docs/testing/workspace-control-recovery-evidence-test-matrix.md",
     ],
   },
+  "development.local-session": {
+    id: "development.local-session",
+    title: "Local Development Session",
+    description:
+      "How to plan, run, observe, resume, stop, and reset local or relay-backed development without creating a second deployment model.",
+    page: {
+      "zh-CN": "start/local-development",
+      "en-US": "en/start/local-development",
+    },
+    anchor: "local-development-session",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "repository-config"],
+    aliases: [
+      "appaloft dev",
+      "dev start",
+      "dev status",
+      "dev logs",
+      "remote dev",
+      "Development TUI",
+      "本地开发",
+      "远端开发",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-110-local-development-session-boundary.md",
+      "docs/specs/132-local-development-session/spec.md",
+      "docs/testing/local-development-session-test-matrix.md",
+    ],
+  },
+  "development.config-overlay": {
+    id: "development.config-overlay",
+    title: "Development configuration overlay",
+    description:
+      "How repository config changes development command/watch behavior while preserving the shared deployment graph.",
+    page: {
+      "zh-CN": "configuration/config-file",
+      "en-US": "en/configuration/config-file",
+    },
+    anchor: "config-development-overlay",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "repository-config"],
+    aliases: [
+      "development.command",
+      "development.watch",
+      "native watch",
+      "restart watch",
+      "Dev 配置",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-110-local-development-session-boundary.md",
+      "docs/specs/132-local-development-session/spec.md",
+      "docs/testing/local-development-session-test-matrix.md",
+    ],
+  },
   "agent.github-tasks": {
     id: "agent.github-tasks",
     title: "GitHub-driven Agent Tasks",
@@ -570,6 +629,36 @@ export const publicDocsHelpTopics = {
     ],
     webSurfaces: [
       "apps/web server list/detail and registration surfaces, including server list card reorder, server detail rename, runtime preparation/readiness, edge proxy configuration, typed deactivate, delete safety, and typed delete confirmation",
+    ],
+  },
+  "server.worker-relay": {
+    id: "server.worker-relay",
+    title: "Outbound Server Worker",
+    description:
+      "How a Mac or VPS attaches to an existing Server through outbound mTLS for bounded Dev, Workspace, terminal, snapshot, and port operations.",
+    page: {
+      "zh-CN": "servers/register-connect",
+      "en-US": "en/servers/register-connect",
+    },
+    anchor: "server-worker-outbound-relay",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli"],
+    aliases: [
+      "server worker enroll",
+      "server worker run",
+      "outbound worker",
+      "mTLS relay",
+      "no inbound SSH",
+      "远端 Worker",
+      "出站连接",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-111-outbound-server-worker-relay-boundary.md",
+      "docs/specs/133-outbound-server-worker-relay/spec.md",
+      "docs/testing/outbound-server-worker-relay-test-matrix.md",
     ],
   },
   "server.workload-roles": {

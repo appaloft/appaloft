@@ -65,6 +65,36 @@ controlPlane:
 
 `controlPlane.deploymentContext` 是一个**窄范围的高级字段**，只应该用于一次性 bootstrap、重新关联或支持/调试场景，把仓库显式绑定到已存在的 Project/Environment/Resource/Server。普通自托管部署不需要在配置文件中写这些 id——Server 应该优先从来源链接状态、Deploy Token 作用域或可信的仓库/ref 上下文自动解析目标。
 
+### `development` <a id="config-development-overlay" />
+
+```yaml
+runtime:
+  strategy: workspace-commands
+  startCommand: bun run start
+development:
+  command: bun run dev
+  watch: native
+services:
+  api:
+    runtime:
+      strategy: workspace-commands
+      startCommand: bun run api:start
+    development:
+      command: bun run api:dev
+      watch: restart
+```
+
+`development` 是公开的本地/远端开发 overlay，只能改变执行命令和 watch 策略，不会创建另一套 Resource、service、source、network 或 deployment identity。
+
+| 字段 | 值 | 含义 |
+| --- | --- | --- |
+| `command` | 非空、可移植 argv intent | Dev 执行命令；shell operator/expansion 会被拒绝 |
+| `watch` | `native` | 命令自己负责 reload |
+| `watch` | `restart` | Appaloft 在 source 变化后精确 stop/start 该 service |
+| `watch` | `none` | 不监听 source 变化 |
+
+root overlay 适用于单服务或默认 service；`services.<key>.development` 覆盖对应 service。Deploy 仍使用 `runtime.startCommand`，不会把 `development.command` 带进 deployment admission。任务流程见[本地开发会话](/docs/start/local-development/#local-development-session)。
+
 ## 输出字段与状态值
 
 配置文件本身不产生运行时输出；它作为部署输入的一部分参与 [部署生命周期](/docs/deliver/lifecycle/)的 detect/plan 阶段，最终值会体现在部署的 Profile 摘要中。
@@ -76,9 +106,11 @@ controlPlane:
 | 部署时报告"字段不应写入配置" | 配置文件中出现了 Token、SSH key 或数据库 URL 等敏感字段——应该改为 `secrets` 引用或使用 Web/CLI 单独配置 |
 | `controlPlane.url` 校验失败 | URL 带有凭据、路径、query 或 fragment；请只保留纯 origin |
 | Preview 部署没有读到 `{pr_number}` | 确认这次部署确实带上了 `--preview` 相关标志，见[预览与清理](/docs/deliver/previews/) |
+| Dev plan 拒绝 command/watch | 确认 `command` 非空且不含 shell expansion/operator，`watch` 只使用 `native`、`restart` 或 `none` |
 
 ## 相关任务
 
 - [配置部署来源](/docs/deliver/sources/)
 - [安全处理密钥](/docs/configuration/secrets/)
 - [预览与清理](/docs/deliver/previews/)
+- [本地开发会话](/docs/start/local-development/)

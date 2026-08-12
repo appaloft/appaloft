@@ -44,6 +44,7 @@
     "@appaloft/provider-generic-ssh": "workspace:*",
     "@appaloft/provider-local-shell": "workspace:*",
     "@appaloft/server": "workspace:*",
+    "@appaloft/server-worker-relay": "workspace:*",
     "nanoid": "^5.1.16",
     "reflect-metadata": "^0.2.2",
     "tsyringe": "^4.10.0"

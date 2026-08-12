@@ -2,6 +2,17 @@
 title: "Configuration File Reference"
 description: "Fields, validation, and precedence for the in-repository configuration file."
 docType: "reference"
+localeState:
+  zh-CN: complete
+  en-US: complete
+searchAliases:
+  - "config file"
+  - "appaloft config"
+  - "repository config"
+  - "appaloft.yml"
+relatedOperations: []
+sidebar:
+  order: 6
 ---
 
 ## Stable identifier
@@ -53,6 +64,36 @@ controlPlane:
 
 `controlPlane.deploymentContext` is a **narrow, advanced field** that should only be used for one-time bootstrap, relinking, or support/debugging scenarios where you're explicitly binding a repository to an existing Project/Environment/Resource/Server. Ordinary self-hosted deployments don't need these ids in config — the Server should resolve the target from source-link state, Deploy Token scope, or trusted repository/ref context first.
 
+### `development` <a id="config-development-overlay" />
+
+```yaml
+runtime:
+  strategy: workspace-commands
+  startCommand: bun run start
+development:
+  command: bun run dev
+  watch: native
+services:
+  api:
+    runtime:
+      strategy: workspace-commands
+      startCommand: bun run api:start
+    development:
+      command: bun run api:dev
+      watch: restart
+```
+
+`development` is the public local/remote development overlay. It may change only the execution command and watch policy; it does not create another Resource, service, source, network, or deployment identity.
+
+| Field | Value | Meaning |
+| --- | --- | --- |
+| `command` | non-empty portable argv intent | Dev execution command; shell operators and expansion are rejected |
+| `watch` | `native` | the command owns reload behavior |
+| `watch` | `restart` | Appaloft exactly stops/starts that service after source changes |
+| `watch` | `none` | source changes are not watched |
+
+The root overlay applies to a single/default service; `services.<key>.development` overrides that service. Deploy continues to use `runtime.startCommand` and never carries `development.command` into deployment admission. See [Local Development Sessions](/docs/en/start/local-development/#local-development-session).
+
 ## Output fields and status values
 
 The config file itself doesn't produce runtime output; it participates in the detect/plan phases of [Deployment Lifecycle](/docs/en/deliver/lifecycle/) as one of the deployment inputs, and the final values show up in the deployment's Profile summary.
@@ -64,9 +105,11 @@ The config file itself doesn't produce runtime output; it participates in the de
 | Deployment reports "this field should not be written to config" | The config file contains a token, SSH key, database URL, or other sensitive field — switch to a `secrets` reference or configure it separately through Web/CLI |
 | `controlPlane.url` validation fails | The URL carries credentials, a path, a query, or a fragment — keep only the plain origin |
 | A preview deployment isn't reading `{pr_number}` | Confirm the deployment actually carries the related `--preview` flags, see [Previews And Cleanup](/docs/en/deliver/previews/) |
+| Dev plan rejects command/watch | Keep `command` non-empty and free of shell expansion/operators; use only `native`, `restart`, or `none` for `watch` |
 
 ## Related tasks
 
 - [Configuring Deployment Sources](/docs/en/deliver/sources/)
 - [Handling Secrets Safely](/docs/en/configuration/secrets/)
 - [Previews And Cleanup](/docs/en/deliver/previews/)
+- [Local Development Sessions](/docs/en/start/local-development/)

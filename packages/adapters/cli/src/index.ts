@@ -74,6 +74,16 @@ export {
   resolveCliExecutionTarget,
 } from "./control-plane-target.js";
 export {
+  type DevelopmentPlanInput,
+  developmentPlanFromSource,
+} from "./development-plan.js";
+export {
+  createRatatuiDevelopmentPresentation,
+  type DevelopmentControlPresentation,
+  type DevelopmentPresentationInput,
+  type RatatuiDevelopmentPresentationOptions,
+} from "./development-presentation.js";
+export {
   type LocalGitWorkspaceContext,
   type NormalizedWorkspaceRepositoryRemote,
   normalizeWorkspaceRepositoryRemote,
@@ -96,6 +106,18 @@ export {
   safeCliErrorEvidence,
 } from "./runtime.js";
 export { runStandaloneControlPlaneCli } from "./standalone-control-plane.js";
+export {
+  type DevelopmentCommandRuntime,
+  runStandaloneDevelopmentCli,
+  type StandaloneDevelopmentCliInput,
+  type StandaloneDevelopmentCliResult,
+} from "./standalone-development.js";
+export {
+  runStandaloneServerWorkerCli,
+  type ServerWorkerCommandRuntime,
+  type StandaloneServerWorkerCliInput,
+  type StandaloneServerWorkerCliResult,
+} from "./standalone-server-worker.js";
 export {
   type OpenedNativeWorkspaceTerminal,
   type OpenNativeWorkspaceTerminalInput,

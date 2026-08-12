@@ -36,6 +36,7 @@ function shouldBootstrapOpenTelemetry(env: Record<string, string | undefined>): 
 const shouldBootstrapOtel = shouldBootstrapOpenTelemetry(process.env);
 const shouldCaptureStdin =
   process.argv.includes("--stdin") ||
+  process.argv.includes("--token-stdin") ||
   process.argv.includes("--connection-url-stdin") ||
   process.argv.includes("--passphrase-stdin");
 let capturedStdinText: string | undefined;

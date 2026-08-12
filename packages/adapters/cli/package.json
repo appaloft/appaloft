@@ -14,6 +14,7 @@
     "@appaloft/deployment-config": "workspace:*",
     "@appaloft/docs-registry": "workspace:*",
     "@appaloft/sdk": "workspace:*",
+    "@appaloft/server-worker-relay": "workspace:*",
     "@effect/cli": "^0.75.2",
     "@effect/platform-node": "^0.107.0",
     "effect": "^3.21.4"

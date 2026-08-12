@@ -393,6 +393,21 @@
       "additionalProperties": false,
       "description": "Health-check profile fields."
     },
+    "development": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "watch": {
+          "type": "string",
+          "enum": ["native", "restart", "none"]
+        }
+      },
+      "additionalProperties": false,
+      "description": "Local development execution overlay. It never changes deployment identity or lifecycle."
+    },
     "access": {
       "type": "object",
       "properties": {
@@ -1526,6 +1541,21 @@
             "additionalProperties": false,
             "description": "Health-check profile fields."
           },
+          "development": {
+            "type": "object",
+            "properties": {
+              "command": {
+                "type": "string",
+                "minLength": 1
+              },
+              "watch": {
+                "type": "string",
+                "enum": ["native", "restart", "none"]
+              }
+            },
+            "additionalProperties": false,
+            "description": "Local development execution overlay. It never changes deployment identity or lifecycle."
+          },
           "replicas": {
             "description": "Requested process replicas for this named service.",
             "type": "integer",
@@ -1842,6 +1872,21 @@
             },
             "additionalProperties": false,
             "description": "Health-check profile fields."
+          },
+          "development": {
+            "type": "object",
+            "properties": {
+              "command": {
+                "type": "string",
+                "minLength": 1
+              },
+              "watch": {
+                "type": "string",
+                "enum": ["native", "restart", "none"]
+              }
+            },
+            "additionalProperties": false,
+            "description": "Local development execution overlay. It never changes deployment identity or lifecycle."
           },
           "access": {
             "type": "object",
@@ -2224,6 +2269,21 @@
                   },
                   "additionalProperties": false,
                   "description": "Health-check profile fields."
+                },
+                "development": {
+                  "type": "object",
+                  "properties": {
+                    "command": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "watch": {
+                      "type": "string",
+                      "enum": ["native", "restart", "none"]
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Local development execution overlay. It never changes deployment identity or lifecycle."
                 },
                 "replicas": {
                   "description": "Requested process replicas for this named service.",

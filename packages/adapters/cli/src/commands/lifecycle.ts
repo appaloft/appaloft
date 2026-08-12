@@ -173,3 +173,11 @@ export const initCommand = EffectCommand.make(
 export const doctorCommand = EffectCommand.make("doctor", {}, () =>
   runQuery(DoctorQuery.create()),
 ).pipe(EffectCommand.withDescription("Run readiness diagnostics"));
+
+export const devCommand = EffectCommand.make("dev", {}, () =>
+  Effect.fail(
+    domainError.infra("Local Development Session runtime was not composed", {
+      phase: "development-start",
+    }),
+  ),
+).pipe(EffectCommand.withDescription("Plan and run a local Development Session"));
