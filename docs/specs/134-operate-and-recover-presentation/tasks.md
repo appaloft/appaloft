@@ -21,9 +21,12 @@
 ## Verification And Sync
 
 - [x] Run focused coordinator/CLI/protocol/Rust renderer tests.
-- [ ] Run failed-deployment rollback and independent restore composed acceptance.
+- [x] Run failed-deployment rollback and independent restore composed acceptance through Cloud PR
+  #882 (`847f865946b193b1eca0f940e1a0c0646de17619`).
 - [x] Run public lint, typecheck, test, build, packaging and docs-impact gates.
-- [ ] Sync ADR/Spec/tasks/Test Matrix/workflow/errors/docs/evidence and close the Ticket.
+- [x] Sync ADR/Spec/tasks/Test Matrix/workflow/errors/docs/evidence and close public Ticket #1079 and
+  Cloud Ticket #881.
 
-Public implementation delivery is PR #1080 for Ticket #1079. Cloud Ticket #881 owns the two
-composed-runtime journeys, final boundary review and final cross-repository sync.
+Public implementation delivery is PR #1080 with package follow-up #1081. Cloud PR #882 completed
+the two composed-runtime journeys, final Boundary Review and cross-repository acceptance; public
+Ticket #1079 and Cloud Ticket #881 are closed.
