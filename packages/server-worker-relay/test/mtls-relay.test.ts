@@ -145,205 +145,236 @@ function createCertificates() {
 }
 
 const closers: Array<() => void | Promise<void>> = [];
+const realLoopbackTestTimeoutMs = 15_000;
 afterEach(async () => {
   for (const close of closers.splice(0).reverse()) await close();
 });
 
 describe("real loopback mTLS relay", () => {
-  test("[SWR-MTLS-003][SWR-EXEC-006][SWR-LOCAL-018] authenticates and dispatches", async () => {
-    const certificates = createCertificates();
-    const leases = new InMemoryServerWorkerLeaseRegistry({ leaseMs: 30_000 });
-    const relay = new ServerWorkerRelayServer({
-      tls: { ...certificates.server, ca: certificates.ca },
-      leaseRegistry: leases,
-      requiredCapabilities: ["process.exec"],
-      authorizePeer: ({ workerId, subject }) =>
-        workerId === "worker-1" && subject.CN === "worker-1"
-          ? ok(undefined)
-          : err({
-              code: "server_worker_certificate_rejected",
-              category: "user",
-              message: "binding mismatch",
-              retryable: false,
-              details: { phase: "server-worker-mtls" },
-            }),
-    });
-    closers.push(() => relay.close());
-    await relay.listen();
-    const client = new ServerWorkerRelayClient({
-      relay: { host: "127.0.0.1", port: relay.port, serverName: "relay.localhost" },
-      tls: { ...certificates.worker, ca: certificates.ca },
-      workerId: "worker-1",
-      generation: 1,
-      capabilities: ["process.exec"],
-      dispatcher: new ServerWorkerDispatcher({ roots: [certificates.root], allowHostShell: true }),
-    });
-    closers.push(() => client.close());
-    expect((await client.connect()).isOk()).toBe(true);
-    await Bun.sleep(25);
-    const response = await relay.request({
-      workerId: "worker-1",
-      generation: 1,
-      requestId: "req-1",
-      capability: "process.exec",
-      payload: { argv: ["printf", "relay-ok"], cwd: certificates.root },
-    });
-    expect(response.isOk()).toBe(true);
-    if (response.isErr()) return;
-    expect(response.value.stdout).toBe("relay-ok");
-  });
-
-  test("[SWR-MTLS-003][SWR-ERROR-017] denies an untrusted client with a stable safe error", async () => {
-    const certificates = createCertificates();
-    const relay = new ServerWorkerRelayServer({
-      tls: { ...certificates.server, ca: certificates.ca },
-      leaseRegistry: new InMemoryServerWorkerLeaseRegistry({ leaseMs: 30_000 }),
-      authorizePeer: ({ workerId, subject }) =>
-        workerId === "worker-1" && subject.CN === "worker-1"
-          ? ok(undefined)
-          : err({
-              code: "server_worker_certificate_rejected",
-              category: "user",
-              message: "binding mismatch",
-              retryable: false,
-              details: { phase: "server-worker-mtls" },
-            }),
-    });
-    closers.push(() => relay.close());
-    await relay.listen();
-    const client = new ServerWorkerRelayClient({
-      relay: { host: "127.0.0.1", port: relay.port, serverName: "relay.localhost" },
-      tls: { ...certificates.bad, ca: certificates.ca },
-      workerId: "worker-bad",
-      generation: 1,
-      capabilities: [],
-      dispatcher: new ServerWorkerDispatcher({ roots: [certificates.root], allowHostShell: false }),
-    });
-    closers.push(() => client.close());
-    const connected = await client.connect();
-    expect(connected.isErr()).toBe(true);
-    if (connected.isErr()) {
-      expect(connected.error).toMatchObject({
-        code: expect.any(String),
-        category: expect.any(String),
-        retryable: expect.any(Boolean),
-        details: { phase: expect.any(String) },
+  test(
+    "[SWR-MTLS-003][SWR-EXEC-006][SWR-LOCAL-018] authenticates and dispatches",
+    async () => {
+      const certificates = createCertificates();
+      const leases = new InMemoryServerWorkerLeaseRegistry({ leaseMs: 30_000 });
+      const relay = new ServerWorkerRelayServer({
+        tls: { ...certificates.server, ca: certificates.ca },
+        leaseRegistry: leases,
+        requiredCapabilities: ["process.exec"],
+        authorizePeer: ({ workerId, subject }) =>
+          workerId === "worker-1" && subject.CN === "worker-1"
+            ? ok(undefined)
+            : err({
+                code: "server_worker_certificate_rejected",
+                category: "user",
+                message: "binding mismatch",
+                retryable: false,
+                details: { phase: "server-worker-mtls" },
+              }),
       });
-      expect(JSON.stringify(connected.error)).not.toContain(certificates.root);
-      expect(JSON.stringify(connected.error)).not.toContain("PRIVATE KEY");
-    }
-  });
-
-  test("[SWR-FORWARD-010][SWR-ORPHAN-015] multiplexes scoped bytes and closes the exact target socket on disconnect", async () => {
-    const sockets = new Set<Socket>();
-    const target = createTcpServer((socket) => {
-      sockets.add(socket);
-      socket.on("data", (data) => socket.write(Buffer.concat([Buffer.from("forward:"), data])));
-      socket.on("close", () => sockets.delete(socket));
-    });
-    await new Promise<void>((resolve) => target.listen(0, "127.0.0.1", resolve));
-    const targetAddress = target.address();
-    if (!targetAddress || typeof targetAddress === "string") throw new Error("missing target port");
-    closers.push(async () => {
-      for (const socket of sockets) socket.destroy();
-      await new Promise<void>((resolve) => target.close(() => resolve()));
-    });
-    const certificates = createCertificates();
-    const relay = new ServerWorkerRelayServer({
-      tls: { ...certificates.server, ca: certificates.ca },
-      leaseRegistry: new InMemoryServerWorkerLeaseRegistry({ leaseMs: 30_000 }),
-      requiredCapabilities: ["network.forward"],
-    });
-    closers.push(() => relay.close());
-    await relay.listen();
-    const client = new ServerWorkerRelayClient({
-      relay: { host: "127.0.0.1", port: relay.port, serverName: "relay.localhost" },
-      tls: { ...certificates.worker, ca: certificates.ca },
-      workerId: "worker-1",
-      generation: 1,
-      capabilities: ["network.forward"],
-      dispatcher: new ServerWorkerDispatcher({ roots: [certificates.root], allowHostShell: false }),
-      streamHandlers: {
-        "network.forward": createServerWorkerNetworkForwardHandler({
-          authorizeTarget: ({ host, port }) => host === "127.0.0.1" && port === targetAddress.port,
-        }),
-      },
-    });
-    closers.push(() => client.close());
-    expect((await client.connect()).isOk()).toBe(true);
-    const received: Uint8Array[] = [];
-    const opened = await relay.openStream({
-      workerId: "worker-1",
-      generation: 1,
-      streamId: "forward-1",
-      capability: "network.forward",
-      payload: { host: "127.0.0.1", port: targetAddress.port },
-      onData: (data) => {
-        received.push(data);
-      },
-    });
-    expect(opened.isOk()).toBe(true);
-    if (opened.isErr()) return;
-    expect((await opened.value.write(Buffer.from("hello"))).isOk()).toBe(true);
-    for (let attempts = 0; attempts < 100 && received.length === 0; attempts += 1)
-      await Bun.sleep(10);
-    expect(Buffer.concat(received).toString()).toBe("forward:hello");
-    await client.close();
-    for (let attempts = 0; attempts < 100 && sockets.size > 0; attempts += 1) await Bun.sleep(10);
-    expect(sockets.size).toBe(0);
-  });
-
-  test("[SWR-PTY-007] preserves opaque PTY bytes and resize control", async () => {
-    const certificates = createCertificates();
-    const relay = new ServerWorkerRelayServer({
-      tls: { ...certificates.server, ca: certificates.ca },
-      leaseRegistry: new InMemoryServerWorkerLeaseRegistry({ leaseMs: 30_000 }),
-      requiredCapabilities: ["process.pty"],
-    });
-    closers.push(() => relay.close());
-    await relay.listen();
-    const client = new ServerWorkerRelayClient({
-      relay: { host: "127.0.0.1", port: relay.port, serverName: "relay.localhost" },
-      tls: { ...certificates.worker, ca: certificates.ca },
-      workerId: "worker-1",
-      generation: 1,
-      capabilities: ["process.pty"],
-      dispatcher: new ServerWorkerDispatcher({ roots: [certificates.root], allowHostShell: true }),
-      streamHandlers: {
-        "process.pty": createServerWorkerPtyHandler({
+      closers.push(() => relay.close());
+      await relay.listen();
+      const client = new ServerWorkerRelayClient({
+        relay: { host: "127.0.0.1", port: relay.port, serverName: "relay.localhost" },
+        tls: { ...certificates.worker, ca: certificates.ca },
+        workerId: "worker-1",
+        generation: 1,
+        capabilities: ["process.exec"],
+        dispatcher: new ServerWorkerDispatcher({
           roots: [certificates.root],
           allowHostShell: true,
         }),
-      },
-    });
-    closers.push(() => client.close());
-    expect((await client.connect()).isOk()).toBe(true);
-    const received: Uint8Array[] = [];
-    const opened = await relay.openStream({
-      workerId: "worker-1",
-      generation: 1,
-      streamId: "pty-1",
-      capability: "process.pty",
-      payload: {
-        argv: ["sh", "-c", "read line; printf 'pty:%s' \"$line\""],
-        cwd: certificates.root,
-        rows: 24,
-        cols: 80,
-      },
-      onData: (data) => {
-        received.push(data);
-      },
-    });
-    expect(opened.isOk()).toBe(true);
-    if (opened.isErr()) return;
-    await opened.value.control({ kind: "resize", rows: 40, cols: 120 });
-    await opened.value.write(Buffer.from("hello\n"));
-    for (
-      let attempts = 0;
-      attempts < 100 && !Buffer.concat(received).toString().includes("pty:hello");
-      attempts += 1
-    )
-      await Bun.sleep(10);
-    expect(Buffer.concat(received).toString()).toContain("pty:hello");
-  });
+      });
+      closers.push(() => client.close());
+      expect((await client.connect()).isOk()).toBe(true);
+      await Bun.sleep(25);
+      const response = await relay.request({
+        workerId: "worker-1",
+        generation: 1,
+        requestId: "req-1",
+        capability: "process.exec",
+        payload: { argv: ["printf", "relay-ok"], cwd: certificates.root },
+      });
+      expect(response.isOk()).toBe(true);
+      if (response.isErr()) return;
+      expect(response.value.stdout).toBe("relay-ok");
+    },
+    realLoopbackTestTimeoutMs,
+  );
+
+  test(
+    "[SWR-MTLS-003][SWR-ERROR-017] denies an untrusted client with a stable safe error",
+    async () => {
+      const certificates = createCertificates();
+      const relay = new ServerWorkerRelayServer({
+        tls: { ...certificates.server, ca: certificates.ca },
+        leaseRegistry: new InMemoryServerWorkerLeaseRegistry({ leaseMs: 30_000 }),
+        authorizePeer: ({ workerId, subject }) =>
+          workerId === "worker-1" && subject.CN === "worker-1"
+            ? ok(undefined)
+            : err({
+                code: "server_worker_certificate_rejected",
+                category: "user",
+                message: "binding mismatch",
+                retryable: false,
+                details: { phase: "server-worker-mtls" },
+              }),
+      });
+      closers.push(() => relay.close());
+      await relay.listen();
+      const client = new ServerWorkerRelayClient({
+        relay: { host: "127.0.0.1", port: relay.port, serverName: "relay.localhost" },
+        tls: { ...certificates.bad, ca: certificates.ca },
+        workerId: "worker-bad",
+        generation: 1,
+        capabilities: [],
+        dispatcher: new ServerWorkerDispatcher({
+          roots: [certificates.root],
+          allowHostShell: false,
+        }),
+      });
+      closers.push(() => client.close());
+      const connected = await client.connect();
+      expect(connected.isErr()).toBe(true);
+      if (connected.isErr()) {
+        expect(connected.error).toMatchObject({
+          code: expect.any(String),
+          category: expect.any(String),
+          retryable: expect.any(Boolean),
+          details: { phase: expect.any(String) },
+        });
+        expect(JSON.stringify(connected.error)).not.toContain(certificates.root);
+        expect(JSON.stringify(connected.error)).not.toContain("PRIVATE KEY");
+      }
+    },
+    realLoopbackTestTimeoutMs,
+  );
+
+  test(
+    "[SWR-FORWARD-010][SWR-ORPHAN-015] multiplexes scoped bytes and closes the exact target socket on disconnect",
+    async () => {
+      const sockets = new Set<Socket>();
+      const target = createTcpServer((socket) => {
+        sockets.add(socket);
+        socket.on("data", (data) => socket.write(Buffer.concat([Buffer.from("forward:"), data])));
+        socket.on("close", () => sockets.delete(socket));
+      });
+      await new Promise<void>((resolve) => target.listen(0, "127.0.0.1", resolve));
+      const targetAddress = target.address();
+      if (!targetAddress || typeof targetAddress === "string")
+        throw new Error("missing target port");
+      closers.push(async () => {
+        for (const socket of sockets) socket.destroy();
+        await new Promise<void>((resolve) => target.close(() => resolve()));
+      });
+      const certificates = createCertificates();
+      const relay = new ServerWorkerRelayServer({
+        tls: { ...certificates.server, ca: certificates.ca },
+        leaseRegistry: new InMemoryServerWorkerLeaseRegistry({ leaseMs: 30_000 }),
+        requiredCapabilities: ["network.forward"],
+      });
+      closers.push(() => relay.close());
+      await relay.listen();
+      const client = new ServerWorkerRelayClient({
+        relay: { host: "127.0.0.1", port: relay.port, serverName: "relay.localhost" },
+        tls: { ...certificates.worker, ca: certificates.ca },
+        workerId: "worker-1",
+        generation: 1,
+        capabilities: ["network.forward"],
+        dispatcher: new ServerWorkerDispatcher({
+          roots: [certificates.root],
+          allowHostShell: false,
+        }),
+        streamHandlers: {
+          "network.forward": createServerWorkerNetworkForwardHandler({
+            authorizeTarget: ({ host, port }) =>
+              host === "127.0.0.1" && port === targetAddress.port,
+          }),
+        },
+      });
+      closers.push(() => client.close());
+      expect((await client.connect()).isOk()).toBe(true);
+      const received: Uint8Array[] = [];
+      const opened = await relay.openStream({
+        workerId: "worker-1",
+        generation: 1,
+        streamId: "forward-1",
+        capability: "network.forward",
+        payload: { host: "127.0.0.1", port: targetAddress.port },
+        onData: (data) => {
+          received.push(data);
+        },
+      });
+      expect(opened.isOk()).toBe(true);
+      if (opened.isErr()) return;
+      expect((await opened.value.write(Buffer.from("hello"))).isOk()).toBe(true);
+      for (let attempts = 0; attempts < 100 && received.length === 0; attempts += 1)
+        await Bun.sleep(10);
+      expect(Buffer.concat(received).toString()).toBe("forward:hello");
+      await client.close();
+      for (let attempts = 0; attempts < 100 && sockets.size > 0; attempts += 1) await Bun.sleep(10);
+      expect(sockets.size).toBe(0);
+    },
+    realLoopbackTestTimeoutMs,
+  );
+
+  test(
+    "[SWR-PTY-007] preserves opaque PTY bytes and resize control",
+    async () => {
+      const certificates = createCertificates();
+      const relay = new ServerWorkerRelayServer({
+        tls: { ...certificates.server, ca: certificates.ca },
+        leaseRegistry: new InMemoryServerWorkerLeaseRegistry({ leaseMs: 30_000 }),
+        requiredCapabilities: ["process.pty"],
+      });
+      closers.push(() => relay.close());
+      await relay.listen();
+      const client = new ServerWorkerRelayClient({
+        relay: { host: "127.0.0.1", port: relay.port, serverName: "relay.localhost" },
+        tls: { ...certificates.worker, ca: certificates.ca },
+        workerId: "worker-1",
+        generation: 1,
+        capabilities: ["process.pty"],
+        dispatcher: new ServerWorkerDispatcher({
+          roots: [certificates.root],
+          allowHostShell: true,
+        }),
+        streamHandlers: {
+          "process.pty": createServerWorkerPtyHandler({
+            roots: [certificates.root],
+            allowHostShell: true,
+          }),
+        },
+      });
+      closers.push(() => client.close());
+      expect((await client.connect()).isOk()).toBe(true);
+      const received: Uint8Array[] = [];
+      const opened = await relay.openStream({
+        workerId: "worker-1",
+        generation: 1,
+        streamId: "pty-1",
+        capability: "process.pty",
+        payload: {
+          argv: ["sh", "-c", "read line; printf 'pty:%s' \"$line\""],
+          cwd: certificates.root,
+          rows: 24,
+          cols: 80,
+        },
+        onData: (data) => {
+          received.push(data);
+        },
+      });
+      expect(opened.isOk()).toBe(true);
+      if (opened.isErr()) return;
+      await opened.value.control({ kind: "resize", rows: 40, cols: 120 });
+      await opened.value.write(Buffer.from("hello\n"));
+      for (
+        let attempts = 0;
+        attempts < 100 && !Buffer.concat(received).toString().includes("pty:hello");
+        attempts += 1
+      )
+        await Bun.sleep(10);
+      expect(Buffer.concat(received).toString()).toContain("pty:hello");
+    },
+    realLoopbackTestTimeoutMs,
+  );
 });
