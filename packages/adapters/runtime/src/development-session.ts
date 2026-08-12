@@ -204,7 +204,9 @@ async function processMatches(pid: number, stateDirectory: string): Promise<bool
   }
 
   try {
-    const processResult = Bun.spawn(["ps", "-o", "command=", "-p", String(pid)], {
+    // Linux ps truncates long command lines to the display width unless wide output is explicit.
+    // The state directory is the ownership proof and appears at the end of the supervisor argv.
+    const processResult = Bun.spawn(["ps", "-ww", "-o", "command=", "-p", String(pid)], {
       stdout: "pipe",
       stderr: "ignore",
     });
