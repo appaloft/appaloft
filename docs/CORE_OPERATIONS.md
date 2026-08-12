@@ -1102,6 +1102,10 @@ governing specs.
 `workspaces.open` is the atomic application operation for Profile-aware create-or-resume; it is not
 an aggregate command and its `workspaceId` remains the Sandbox id.
 
+ADR-109 / Spec 131 extend this operation with an optional activation-context initializer and safe
+persisted target-selection evidence. Default composition keeps missing Binding/Profile fail closed;
+hosted/local implementations own policy and inventory behind the public ports.
+
 | Workspace action | Canonical operations | CLI / SDK |
 | --- | --- | --- |
 | Open/create-or-resume | `workspaces.open` | current task entry `appaloft code [path]`; compatible `appaloft workspace open [path]`; `appaloft.workspaces.open(...)` |
