@@ -33,6 +33,7 @@ const auditedDomains = new Set([
   "storage-volumes",
   "credentials",
   "sandboxes",
+  "workspaces",
 ]);
 
 const ignoredOperationKeys = new Set([
@@ -60,6 +61,7 @@ const resourceTypeByDomain: Record<string, string> = {
   "storage-volumes": "storage_volume",
   credentials: "ssh_credential",
   sandboxes: "sandbox",
+  workspaces: "workspace",
 };
 
 const targetFieldByDomain: Record<string, readonly string[]> = {
@@ -75,6 +77,7 @@ const targetFieldByDomain: Record<string, readonly string[]> = {
   "storage-volumes": ["storageVolumeId", "id"],
   credentials: ["credentialId", "sshCredentialId", "id"],
   sandboxes: ["sandboxId", "snapshotId", "templateId", "id"],
+  workspaces: ["workspaceId", "sandboxId", "id"],
 };
 
 const relatedTargetFields: Record<string, string> = {

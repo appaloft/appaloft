@@ -611,6 +611,87 @@ describe("SandboxAgentDeliveryService", () => {
     expect(JSON.stringify(calls)).not.toContain("sk-test-secret-value");
   });
 
+  test("[WS-ATTACH-MANAGED-014] opens a managed terminal for a pinned credentialless Profile", async () => {
+    const { profilePlan } = credentialProfileFixture();
+    const credentiallessProfilePlan = {
+      ...profilePlan,
+      credentialRequirements: [],
+      credentialBindings: [],
+    };
+    let openedBindings: readonly unknown[] | undefined;
+    const { service } = fixture({
+      harness: {
+        key: "fake",
+        templateId: "aht_fake_1",
+        version: "1.0.0",
+        templateDigest: `sha256:${"a".repeat(64)}`,
+        interaction: {
+          transport: "managed-terminal",
+          command: ["pi", "--offline"],
+          sessionRecovery: "managed-run-lineage",
+        },
+        async execute() {
+          return { events: [], outcomeDigest: "sha256:credentialless-run-complete" };
+        },
+        async cancel() {},
+      },
+      workspaceProfileResolver: {
+        async compileForNewWorkspace() {
+          return ok(credentiallessProfilePlan);
+        },
+      },
+      processCredentialGrants: {
+        async admit() {
+          return ok(undefined);
+        },
+        async launch() {
+          return ok({ mode: "background", processId: "spr_pi" });
+        },
+        async openTerminal(_context, input) {
+          openedBindings = input.bindings;
+          return ok({
+            workspaceId: input.scope.sandboxId,
+            runtimeId: input.scope.runtimeId,
+            transport: "managed-terminal",
+            sessionId: "term_pi",
+            processId: "spr_pi_tui",
+            access: {
+              kind: "websocket",
+              path: "/api/terminal-sessions/term_pi/attach",
+              expiresAt: input.expiresAt,
+            },
+          });
+        },
+        async revoke() {
+          return ok(undefined);
+        },
+      },
+    });
+
+    const runtime = await service.createRuntime(context, {
+      sandboxId: "sbx_demo",
+      harnessKey: "fake",
+      harnessTemplateId: "aht_fake_1",
+      idempotencyKey: "runtime_credentialless_terminal",
+      profileInstallationId: "awpi_codex",
+      profilePlan: credentiallessProfilePlan,
+    });
+    expect(runtime.isOk()).toBe(true);
+
+    const attached = await service.issueAttachAccess(context, {
+      sandboxId: "sbx_demo",
+      runtimeId: "sar_test",
+      expiresAt: "2026-07-20T00:30:00.000Z",
+    });
+
+    expect(attached._unsafeUnwrap()).toMatchObject({
+      transport: "managed-terminal",
+      sessionId: "term_pi",
+      processId: "spr_pi_tui",
+    });
+    expect(openedBindings).toEqual([]);
+  });
+
   test("[ADAPTER-RUNTIME-013] creates a ready Runtime only after its credential-scoped start child launches", async () => {
     const calls: Array<{ kind: string; input: Record<string, unknown> }> = [];
     const { profilePlan } = credentialProfileFixture();

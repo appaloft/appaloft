@@ -960,13 +960,13 @@ function runtimeDescriptor(
   };
 }
 
-function credentialGrantScope(
+function profileRuntimeScope(
   context: ExecutionContext,
   record: SandboxAgentRuntimeRecord,
   runId?: string,
 ): SandboxAgentCredentialGrantScope | undefined {
   const pin = record.profilePin;
-  if (!pin || !record.credentialBindings?.length) return undefined;
+  if (!pin) return undefined;
   return {
     tenantId: context.tenant?.tenantId ?? "tenant_instance",
     ...(context.tenant?.organizationId ? { organizationId: context.tenant.organizationId } : {}),
@@ -979,6 +979,15 @@ function credentialGrantScope(
     runtimeId: record.runtime.id.value,
     ...(runId ? { runId } : {}),
   };
+}
+
+function credentialGrantScope(
+  context: ExecutionContext,
+  record: SandboxAgentRuntimeRecord,
+  runId?: string,
+): SandboxAgentCredentialGrantScope | undefined {
+  if (!record.credentialBindings?.length) return undefined;
+  return profileRuntimeScope(context, record, runId);
 }
 
 function runDescriptor(record: SandboxAgentRunRecord): SandboxAgentRunDescriptor {
@@ -1302,14 +1311,9 @@ export class SandboxAgentDeliveryService {
         input.runtimeId,
       );
       const scope = record
-        ? credentialGrantScope(context, record, `srun_terminal_${input.runtimeId}`)
+        ? profileRuntimeScope(context, record, `srun_terminal_${input.runtimeId}`)
         : undefined;
-      if (
-        !record ||
-        !scope?.runId ||
-        !record.credentialBindings?.length ||
-        !this.dependencies.processCredentialGrants
-      ) {
+      if (!record || !scope?.runId || !this.dependencies.processCredentialGrants) {
         return err(
           domainError.conflict(
             "Managed-terminal Agent credentials are unavailable for this Runtime",
@@ -1321,7 +1325,7 @@ export class SandboxAgentDeliveryService {
       }
       return this.dependencies.processCredentialGrants.openTerminal(context, {
         scope: { ...scope, runId: scope.runId },
-        bindings: record.credentialBindings,
+        bindings: record.credentialBindings ?? [],
         process: {
           argv: interaction.command,
           initialRows: 24,
