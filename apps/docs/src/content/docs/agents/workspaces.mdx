@@ -43,8 +43,7 @@ Sandbox 本身只是一个受控执行环境，不预设"应该跑什么"。Work
 
 ## 从本地仓库打开 Workspace <a id="agent-workspace-open" />
 
-完成 Repository Binding、Project 默认 Agent Profile、Server Pool 和 Profile Credential
-Connection 配置后，在 clean 且已经 push 的 Git branch 中运行：
+在 clean 且已经 push 的 Git branch 中运行：
 
 ```bash
 appaloft code
@@ -55,7 +54,15 @@ appaloft code
 root、upstream remote、branch 和 HEAD SHA，不会上传本地目录或未提交
 文件。它会把 remote 规范化为 Repository identity，通过 Repository Binding 找到 Project，
 选择显式 `--profile` 或 Project 默认 Profile，然后创建或恢复远端 Workspace。默认会直接进入
-Agent 自己的界面：
+Agent 自己的界面。
+
+`workspaces.open` 会先验证来源，再读取现有 Repository Binding 和 Project 默认 Profile。如果部署方
+组合了可选的 activation initializer，缺少的 Project、Binding 或默认 Profile 可以在同一次显式
+activation 中幂等创建或复用，随后必须重新读取公共权威状态；没有 initializer 的 Community/local
+部署继续 fail closed，并给出原有设置入口。initializer 必须在创建前完成其部署所需的授权与 admission，
+且不能覆盖已有、冲突、disabled 或未授权状态。
+
+attach 时：
 
 - managed-terminal Adapter 启动或重用 Agent TUI 的 Terminal Session，并立即连接；
 - native-attach Adapter 获取短期可撤销 capability，并按 Adapter 声明执行或展示本地 client
@@ -63,6 +70,18 @@ Agent 自己的界面：
 - 不支持 attach 的 Adapter 明确失败，不伪造连接信息。
 
 attach 行为只读取 Adapter capability，不根据 Pi、OpenCode 或其他 Agent 名称分支。
+
+成功结果和 Workspace detail 会返回安全的 activation 与目标选择证据：
+
+- activation 中的 Project、Repository Binding 和 Profile 分别标记为 `created` 或 `reused`；
+- target class 是 `managed`、`registered-server` 或 `local`，selection source 是
+  `platform-default`、`saved-policy` 或 `explicit`，并带稳定 reason；
+- 证据不包含 Server id、host、provider handle、容量探针或 credential。再次 open 恢复同一
+  Workspace 时会返回原证据，不重新 placement；旧 Workspace 无证据时明确显示
+  `legacy-unclassified`，不会猜测执行位置。
+
+部署方的 entitlement、target policy 或容量失败必须在 Sandbox/provider effect 前失败。错误可以提示
+等待、重试或显式接入其他执行位置，但 Appaloft 不会静默从 managed 切换到 registered Server 或本机。
 
 再次运行同一命令会恢复相同来源 SHA 的 preferred Workspace。需要新隔离环境时使用：
 
@@ -96,6 +115,9 @@ appaloft workspace
 Workspace；它通过现有公开查询显示 Workspace、Agent Runtime、Preview port、Task 和 Promotion
 摘要。选择带 attach capability 的 Runtime 后，Agent 自己的 TUI 会作为原生终端字节流嵌入右侧
 窗格，Appaloft 不解析对话、tool call 或 hidden reasoning。
+
+详情头部同时显示安全的 target class/source/reason 和 activation `created`/`reused` 状态；它与
+headless `sandbox show`、HTTP 和 SDK 使用同一 readback，不显示主机或 provider identity。
 
 - `↑` / `↓` 或 `j` / `k`：选择 Workspace；
 - `Enter`：attach 或重新聚焦已经连接的 Agent；
@@ -169,7 +191,12 @@ const workspace = await appaloft.workspaces.open({
   profile: "opencode-default",
 });
 
-console.log(workspace.workspaceId, workspace.agent.runtimeId);
+console.log(
+  workspace.workspaceId,
+  workspace.agent.runtimeId,
+  workspace.targetSelection,
+  workspace.activation,
+);
 ```
 
 如果 Sandbox identity 产生后的步骤失败，错误会包含精确 phase、已有的

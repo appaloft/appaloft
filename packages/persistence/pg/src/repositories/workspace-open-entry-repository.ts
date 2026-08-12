@@ -1,5 +1,7 @@
 import {
   type ExecutionContext,
+  validateWorkspaceActivationContextEvidence,
+  validateWorkspaceTargetSelectionEvidence,
   type WorkspaceOpenEntry,
   type WorkspaceOpenEntryRepository,
   type WorkspaceOpenKey,
@@ -30,12 +32,50 @@ function whereKey<
 
 function readEntry(row: WorkspaceOpenEntryRow): WorkspaceOpenEntry | undefined {
   if (!row.workspace_id) return undefined;
+  const parsedTargetSelection =
+    row.target_class && row.target_selection_source && row.target_selection_reason
+      ? validateWorkspaceTargetSelectionEvidence({
+          targetClass: row.target_class,
+          source: row.target_selection_source,
+          reason: row.target_selection_reason,
+        })
+      : undefined;
+  const targetSelection =
+    parsedTargetSelection?.isOk() === true
+      ? parsedTargetSelection.value
+      : {
+          targetClass: "legacy-unclassified" as const,
+          source: "legacy" as const,
+          reason: "workspace_target_legacy_unclassified" as const,
+        };
+  const parsedActivation =
+    row.activation_repository_binding_id &&
+    row.activation_project_disposition &&
+    row.activation_repository_binding_disposition &&
+    row.activation_profile_disposition
+      ? validateWorkspaceActivationContextEvidence({
+          project: {
+            projectId: row.project_id,
+            disposition: row.activation_project_disposition,
+          },
+          repositoryBinding: {
+            bindingId: row.activation_repository_binding_id,
+            disposition: row.activation_repository_binding_disposition,
+          },
+          profile: {
+            profileInstallationId: row.profile_installation_id,
+            disposition: row.activation_profile_disposition,
+          },
+        })
+      : undefined;
   return {
     workspaceId: row.workspace_id,
     ...(row.runtime_id ? { runtimeId: row.runtime_id } : {}),
     commitSha: row.commit_sha,
     profileInstallationId: row.profile_installation_id,
     status: row.status as WorkspaceOpenEntry["status"],
+    targetSelection,
+    ...(parsedActivation?.isOk() === true ? { activation: parsedActivation.value } : {}),
     ...(row.phase ? { phase: row.phase } : {}),
   };
 }
@@ -45,6 +85,39 @@ export class PgWorkspaceOpenEntryRepository implements WorkspaceOpenEntryReposit
     private readonly db: Kysely<Database>,
     private readonly now: () => string,
   ) {}
+
+  async findByWorkspaceIds(
+    context: ExecutionContext,
+    workspaceIds: readonly string[],
+  ): Promise<ReadonlyMap<string, WorkspaceOpenEntry>> {
+    const uniqueWorkspaceIds = [...new Set(workspaceIds)];
+    if (uniqueWorkspaceIds.length === 0) return new Map();
+    const rows = await this.db
+      .selectFrom("workspace_open_entries")
+      .selectAll()
+      .where("tenant_id", "=", tenantId(context))
+      .where("workspace_id", "in", uniqueWorkspaceIds)
+      .execute();
+    return new Map(
+      rows.flatMap((row) => {
+        const entry = readEntry(row);
+        return entry ? [[entry.workspaceId, entry] as const] : [];
+      }),
+    );
+  }
+
+  async findByWorkspaceId(
+    context: ExecutionContext,
+    workspaceId: string,
+  ): Promise<WorkspaceOpenEntry | undefined> {
+    const row = await this.db
+      .selectFrom("workspace_open_entries")
+      .selectAll()
+      .where("tenant_id", "=", tenantId(context))
+      .where("workspace_id", "=", workspaceId)
+      .executeTakeFirst();
+    return row ? readEntry(row) : undefined;
+  }
 
   async findPreferred(
     context: ExecutionContext,
@@ -70,11 +143,25 @@ export class PgWorkspaceOpenEntryRepository implements WorkspaceOpenEntryReposit
       commitSha: string;
       profileInstallationId: string;
       forceNew: boolean;
+      targetSelection: Parameters<WorkspaceOpenEntryRepository["begin"]>[2]["targetSelection"];
+      activation: Parameters<WorkspaceOpenEntryRepository["begin"]>[2]["activation"];
     },
   ): Promise<Result<{ workspaceId?: string; created: boolean }>> {
     if (key.tenantId !== tenantId(context)) {
       return err(domainError.resourceContextMismatch("Workspace open tenant scope does not match"));
     }
+    const targetSelection = validateWorkspaceTargetSelectionEvidence(input.targetSelection);
+    const activation = validateWorkspaceActivationContextEvidence(input.activation);
+    if (targetSelection.isErr() || targetSelection.value.targetClass === "legacy-unclassified") {
+      return err(
+        targetSelection.isErr()
+          ? targetSelection.error
+          : domainError.validation("New Workspace entry requires canonical target evidence", {
+              code: "workspace_target_selection_evidence_invalid",
+            }),
+      );
+    }
+    if (activation.isErr()) return err(activation.error);
     try {
       return await this.db.transaction().execute(async (transaction) => {
         const current = await whereKey(
@@ -110,6 +197,14 @@ export class PgWorkspaceOpenEntryRepository implements WorkspaceOpenEntryReposit
             generation: (current[0]?.generation ?? 0) + 1,
             commit_sha: input.commitSha,
             profile_installation_id: input.profileInstallationId,
+            target_class: input.targetSelection.targetClass,
+            target_selection_source: input.targetSelection.source,
+            target_selection_reason: input.targetSelection.reason,
+            activation_repository_binding_id: input.activation.repositoryBinding.bindingId,
+            activation_project_disposition: input.activation.project.disposition,
+            activation_repository_binding_disposition:
+              input.activation.repositoryBinding.disposition,
+            activation_profile_disposition: input.activation.profile.disposition,
             workspace_id: null,
             runtime_id: null,
             status: "partial",

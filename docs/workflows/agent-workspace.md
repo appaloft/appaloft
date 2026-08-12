@@ -7,6 +7,8 @@ provides the atomic application boundary for Profile-aware create-or-resume:
 
 ```text
 repository-bindings.show
+  -> optional activation-context initializer when Binding/default Profile is missing
+  -> canonical Binding/Project/Profile re-read
   -> projects.show + project default Profile resolution
   -> agent-workspace-profiles.compile
   -> immutable source resolution + admission/placement reservation
@@ -19,7 +21,9 @@ repository-bindings.show
   -> sandbox-ports.expose (optional)
 ```
 
-The returned `workspaceId` is the Sandbox id. No second Workspace record or lifecycle exists.
+The returned `workspaceId` is the Sandbox id. No second Workspace record or lifecycle exists. The
+coordination entry also retains safe activation and target-selection evidence for create/resume and
+status readback; it does not retain target topology or credentials.
 
 ## Task-Oriented Activation
 
@@ -54,6 +58,15 @@ installation/name or the Project default installation. Profile resolution, named
 Connection resolution, Adapter/Template/capability compatibility, authorization, immutable source
 resolution and a consumable admission/placement reservation all complete before Sandbox creation.
 
+When Binding or Project default Profile state is missing, a deployment may inject an optional
+activation-context initializer after source validation. The initializer must authorize and admit
+the activation before it mutates context. It may then idempotently create or reuse only public
+Project, Repository Binding and default Profile state, after which the workflow re-reads canonical
+repositories. Default composition keeps the existing fail-closed setup errors. Existing,
+conflicting, disabled, ambiguous or unauthorized state is never overwritten. Placement reservations
+carry validated target class/source/reason evidence. Public command input cannot provide target
+identity or forge that evidence.
+
 ## Create
 
 1. The caller reads `sandboxes.agents.harnesses.list` and selects a published adapter plus its
@@ -87,6 +100,10 @@ Workspace pinned to that resolved Profile within the same key, even if another P
 preferred. Omitting the selector keeps the global preference behavior.
 `--new` creates another isolated Sandbox and makes it preferred without mutating the previous one.
 A source SHA mismatch fails and directs the caller to `--new`; V1 never performs implicit Git sync.
+
+Resume returns the originally persisted target-selection and activation evidence and does not
+re-run placement or silently relocate the Workspace. A legacy coordination row without evidence is
+read as `legacy-unclassified`; no managed, registered-server or local ownership is inferred.
 
 For a managed-terminal Adapter, open reuses the current valid Agent-owned TUI Terminal Session.
 Only an expired, terminal, or unrecoverable session causes the exact process-grant path to launch a

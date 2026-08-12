@@ -121,7 +121,7 @@ describe("public docs help registry", () => {
     ).toBe("https://appaloft.com/docs/access/custom-domains/#domain-binding-purpose");
   });
 
-  test("[WS-CODE-DOCS-012] Workspace activation help keeps the task entry and compatibility contract", () => {
+  test("[WS-CODE-DOCS-012][WS-ACT-PARITY-008] Workspace activation help keeps the task entry, safe target evidence and compatibility contract", () => {
     const topic = publicDocsHelpTopics["agent.workspace"];
 
     expect(resolvePublicDocsHelpHref(topic.id)).toBe(
@@ -132,7 +132,12 @@ describe("public docs help registry", () => {
       expect.arrayContaining([
         "docs/specs/125-workspace-code-activation/spec.md",
         "docs/testing/workspace-code-activation-test-matrix.md",
+        "docs/specs/131-workspace-activation-context-and-target-evidence/spec.md",
+        "docs/testing/workspace-activation-target-evidence-test-matrix.md",
       ]),
+    );
+    expect(topic.aliases).toEqual(
+      expect.arrayContaining(["workspace activation", "target selection", "managed workspace"]),
     );
   });
 

@@ -73,11 +73,113 @@ export interface WorkspaceOpenOptions {
 
 export interface WorkspaceOpenReservation {
   readonly reservationId: string;
+  readonly targetSelection: WorkspaceTargetSelectionEvidence;
+}
+
+export type WorkspaceActivationContextDisposition = "created" | "reused";
+
+export interface WorkspaceActivationContextEvidence {
+  readonly project: {
+    readonly projectId: string;
+    readonly disposition: WorkspaceActivationContextDisposition;
+  };
+  readonly repositoryBinding: {
+    readonly bindingId: string;
+    readonly disposition: WorkspaceActivationContextDisposition;
+  };
+  readonly profile: {
+    readonly profileInstallationId: string;
+    readonly disposition: WorkspaceActivationContextDisposition;
+  };
+}
+
+export type WorkspaceTargetSelectionEvidence =
+  | {
+      readonly targetClass: "managed" | "registered-server" | "local";
+      readonly source: "platform-default" | "saved-policy" | "explicit";
+      readonly reason: string;
+    }
+  | {
+      readonly targetClass: "legacy-unclassified";
+      readonly source: "legacy";
+      readonly reason: "workspace_target_legacy_unclassified";
+    };
+
+const workspaceTargetSelectionReason = /^[a-z][a-z0-9_]{2,95}$/u;
+
+export function validateWorkspaceTargetSelectionEvidence(
+  value: unknown,
+): Result<WorkspaceTargetSelectionEvidence> {
+  if (!value || typeof value !== "object") {
+    return invalidWorkspaceTargetSelectionEvidence();
+  }
+  const candidate = value as Record<string, unknown>;
+  const targetClass = candidate.targetClass;
+  const source = candidate.source;
+  const reason = candidate.reason;
+  if (
+    typeof reason !== "string" ||
+    !workspaceTargetSelectionReason.test(reason) ||
+    (targetClass === "legacy-unclassified"
+      ? source !== "legacy" || reason !== "workspace_target_legacy_unclassified"
+      : (targetClass !== "managed" &&
+          targetClass !== "registered-server" &&
+          targetClass !== "local") ||
+        (source !== "platform-default" && source !== "saved-policy" && source !== "explicit"))
+  ) {
+    return invalidWorkspaceTargetSelectionEvidence();
+  }
+  return ok(candidate as unknown as WorkspaceTargetSelectionEvidence);
+}
+
+function invalidWorkspaceTargetSelectionEvidence(): Result<never> {
+  return err(
+    domainError.validation("Workspace target selection evidence is invalid", {
+      code: "workspace_target_selection_evidence_invalid",
+    }),
+  );
+}
+
+export function validateWorkspaceActivationContextEvidence(
+  value: unknown,
+): Result<WorkspaceActivationContextEvidence> {
+  if (!value || typeof value !== "object") return invalidWorkspaceActivationContextEvidence();
+  const candidate = value as Record<string, unknown>;
+  const project = candidate.project;
+  const repositoryBinding = candidate.repositoryBinding;
+  const profile = candidate.profile;
+  if (
+    !activationItem(project, "projectId") ||
+    !activationItem(repositoryBinding, "bindingId") ||
+    !activationItem(profile, "profileInstallationId")
+  ) {
+    return invalidWorkspaceActivationContextEvidence();
+  }
+  return ok(candidate as unknown as WorkspaceActivationContextEvidence);
+}
+
+function activationItem(value: unknown, idKey: string): boolean {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Record<string, unknown>;
+  return (
+    typeof item[idKey] === "string" &&
+    item[idKey].length > 0 &&
+    (item.disposition === "created" || item.disposition === "reused")
+  );
+}
+
+function invalidWorkspaceActivationContextEvidence(): Result<never> {
+  return err(
+    domainError.validation("Workspace activation context evidence is invalid", {
+      code: "workspace_activation_context_evidence_invalid",
+    }),
+  );
 }
 
 export interface WorkspaceOpenContext {
   readonly projectId: string;
   readonly profileInstallationId: string;
+  readonly activation: WorkspaceActivationContextEvidence;
 }
 
 export interface WorkspaceOpenPreflight extends WorkspaceOpenContext {
@@ -92,9 +194,19 @@ export interface WorkspaceOpenEntry {
   readonly profileInstallationId: string;
   readonly status: "partial" | "ready" | "terminal";
   readonly phase?: string;
+  readonly targetSelection: WorkspaceTargetSelectionEvidence;
+  readonly activation?: WorkspaceActivationContextEvidence;
 }
 
 export interface WorkspaceOpenEntryRepository {
+  findByWorkspaceIds(
+    context: ExecutionContext,
+    workspaceIds: readonly string[],
+  ): Promise<ReadonlyMap<string, WorkspaceOpenEntry>>;
+  findByWorkspaceId(
+    context: ExecutionContext,
+    workspaceId: string,
+  ): Promise<WorkspaceOpenEntry | undefined>;
   findPreferred(
     context: ExecutionContext,
     key: WorkspaceOpenKey,
@@ -109,6 +221,8 @@ export interface WorkspaceOpenEntryRepository {
       commitSha: string;
       profileInstallationId: string;
       forceNew: boolean;
+      targetSelection: WorkspaceTargetSelectionEvidence;
+      activation: WorkspaceActivationContextEvidence;
     },
   ): Promise<Result<{ workspaceId?: string; created: boolean }>>;
   complete(
@@ -157,6 +271,8 @@ export interface WorkspaceOpenResult {
   readonly profilePin: AgentWorkspaceProfileCompiledPlan["pin"];
   readonly sandbox: SandboxOpenDescriptor;
   readonly agent: SandboxAgentRuntimeDescriptor;
+  readonly activation: WorkspaceActivationContextEvidence;
+  readonly targetSelection: WorkspaceTargetSelectionEvidence;
   readonly attach?: SandboxAgentAttachDescriptor;
 }
 
@@ -500,6 +616,8 @@ export class AgentWorkspaceOpenService {
           sandbox.value,
           agent,
           true,
+          preferred.activation ?? resolved.value.activation,
+          preferred.targetSelection,
           attach,
         ),
       );
@@ -535,6 +653,8 @@ export class AgentWorkspaceOpenService {
       commitSha: input.commitSha,
       profileInstallationId: preflight.value.profileInstallationId,
       forceNew: input.forceNew ?? false,
+      targetSelection: preflight.value.reservation.targetSelection,
+      activation: preflight.value.activation,
     });
     if (begun.isErr()) {
       await this.dependencies.reservations.release(context, preflight.value.reservation);
@@ -720,6 +840,8 @@ export class AgentWorkspaceOpenService {
           sandbox.value,
           runtime.value,
           false,
+          preflight.value.activation,
+          preflight.value.reservation.targetSelection,
           attach,
         ),
       );
@@ -752,6 +874,8 @@ export class AgentWorkspaceOpenService {
     sandbox: SandboxOpenDescriptor,
     agent: SandboxAgentRuntimeDescriptor,
     resumed: boolean,
+    activation: WorkspaceActivationContextEvidence,
+    targetSelection: WorkspaceTargetSelectionEvidence,
     attach?: SandboxAgentAttachDescriptor,
   ): WorkspaceOpenResult {
     return {
@@ -768,6 +892,8 @@ export class AgentWorkspaceOpenService {
       profilePin,
       sandbox,
       agent,
+      activation,
+      targetSelection,
       ...(attach ? { attach } : {}),
     };
   }

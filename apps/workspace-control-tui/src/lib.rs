@@ -132,6 +132,43 @@ pub struct RecoverySummary {
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct ActivationProjectSummary {
+    pub project_id: String,
+    pub disposition: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivationRepositoryBindingSummary {
+    pub binding_id: String,
+    pub disposition: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivationProfileSummary {
+    pub profile_installation_id: String,
+    pub disposition: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivationSummary {
+    pub project: ActivationProjectSummary,
+    pub repository_binding: ActivationRepositoryBindingSummary,
+    pub profile: ActivationProfileSummary,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TargetSelectionSummary {
+    pub target_class: String,
+    pub source: String,
+    pub reason: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct DetailMessage {
     pub workspace: WorkspaceSummary,
     #[serde(default)]
@@ -142,6 +179,10 @@ pub struct DetailMessage {
     pub tasks: Vec<TaskSummary>,
     #[serde(default)]
     pub promotions: Vec<PromotionSummary>,
+    #[serde(default)]
+    pub activation: Option<ActivationSummary>,
+    #[serde(default)]
+    pub target_selection: Option<TargetSelectionSummary>,
     #[serde(default)]
     pub recovery: RecoverySummary,
 }
@@ -1575,15 +1616,43 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
                 .collect::<Vec<_>>()
                 .join("\n");
             let cleanup = &detail.recovery.cleanup;
+            let activation = detail
+                .activation
+                .as_ref()
+                .map(|activation| {
+                    format!(
+                        "Init project:{}\n     binding:{} profile:{}",
+                        activation.project.disposition,
+                        activation.repository_binding.disposition,
+                        activation.profile.disposition
+                    )
+                })
+                .unwrap_or_else(|| "Init unavailable".to_owned());
+            let target_selection = detail
+                .target_selection
+                .as_ref()
+                .map(|selection| {
+                    format!(
+                        "Target {}/{}\nReason {}",
+                        selection.target_class, selection.source, selection.reason
+                    )
+                })
+                .unwrap_or_else(|| {
+                    format!(
+                        "Provider {}",
+                        detail
+                            .workspace
+                            .provider_key
+                            .as_deref()
+                            .unwrap_or("unknown")
+                    )
+                });
             format!(
-                "Workspace  {}\nStatus     {}\nProvider   {}\n\nRecovery\nIsolation  {}\nContinuity {}\nSnapshot(s)\n{}\nWorkspace-owned cleanup: {}\nactive runtimes:{}  previews:{}\nBounded readback; not host/provider proof\n\nAgent Runtime(s)\n{}\n\nPorts\n{}\n\nTasks\n{}\n\nPromotions\n{}",
+                "Workspace {}  {}\n{}\n{}\nRecovery\nIsolation  {}\nContinuity {}\nSnapshot(s)\n{}\nWorkspace-owned cleanup: {}\nactive runtimes:{}  previews:{}\nBounded readback; not host/provider proof\nAgent Runtime(s)\n{}\nPorts\n{}\nTasks\n{}\nPromotions\n{}",
                 detail.workspace.workspace_id,
                 detail.workspace.status,
-                detail
-                    .workspace
-                    .provider_key
-                    .as_deref()
-                    .unwrap_or("unknown"),
+                target_selection,
+                activation,
                 isolation,
                 suspension,
                 if snapshots.is_empty() {
@@ -2066,6 +2135,25 @@ mod tests {
                     }),
                     expires_at: None,
                 }],
+                activation: Some(ActivationSummary {
+                    project: ActivationProjectSummary {
+                        project_id: "prj_web".to_owned(),
+                        disposition: "created".to_owned(),
+                    },
+                    repository_binding: ActivationRepositoryBindingSummary {
+                        binding_id: "rbd_web".to_owned(),
+                        disposition: "created".to_owned(),
+                    },
+                    profile: ActivationProfileSummary {
+                        profile_installation_id: "awpi_default".to_owned(),
+                        disposition: "reused".to_owned(),
+                    },
+                }),
+                target_selection: Some(TargetSelectionSummary {
+                    target_class: "managed".to_owned(),
+                    source: "platform-default".to_owned(),
+                    reason: "managed_entitlement_default".to_owned(),
+                }),
                 recovery: RecoverySummary::default(),
             },
         });
@@ -2088,6 +2176,9 @@ mod tests {
         assert!(rendered.contains("task_1"));
         assert!(rendered.contains("prm_1"));
         assert!(rendered.contains("verified"));
+        assert!(rendered.contains("project:created"));
+        assert!(rendered.contains("managed/platform-default"));
+        assert!(rendered.contains("managed_entitlement_default"));
     }
 
     #[test]
@@ -2121,6 +2212,8 @@ mod tests {
             ports: Vec::new(),
             tasks: Vec::new(),
             promotions: Vec::new(),
+            activation: None,
+            target_selection: None,
             recovery: RecoverySummary {
                 requested_isolation: Some("gvisor".to_owned()),
                 realized_isolation: Some("gvisor".to_owned()),
@@ -2184,6 +2277,8 @@ mod tests {
             ports: Vec::new(),
             tasks: Vec::new(),
             promotions: Vec::new(),
+            activation: None,
+            target_selection: None,
             recovery: RecoverySummary {
                 snapshots: vec![SnapshotSummary {
                     snapshot_id: "ssn_1".to_owned(),
@@ -2260,6 +2355,8 @@ mod tests {
             ports: Vec::new(),
             tasks: Vec::new(),
             promotions: Vec::new(),
+            activation: None,
+            target_selection: None,
             recovery: RecoverySummary {
                 requested_isolation: Some("gvisor".to_owned()),
                 realized_isolation: Some("gvisor".to_owned()),
@@ -2323,6 +2420,8 @@ mod tests {
             ports: Vec::new(),
             tasks: Vec::new(),
             promotions: Vec::new(),
+            activation: None,
+            target_selection: None,
             recovery: RecoverySummary::default(),
         });
         assert!(state.open_recovery_menu());
@@ -2384,6 +2483,8 @@ mod tests {
                 ports: Vec::new(),
                 tasks: Vec::new(),
                 promotions: Vec::new(),
+                activation: None,
+                target_selection: None,
                 recovery: RecoverySummary::default(),
             },
         });
@@ -2487,6 +2588,8 @@ mod tests {
                     expires_at: None,
                 },
             ],
+            activation: None,
+            target_selection: None,
             recovery: RecoverySummary::default(),
         };
 
@@ -2619,6 +2722,8 @@ mod tests {
                     status: "approved".to_owned(),
                 }],
                 promotions: Vec::new(),
+                activation: None,
+                target_selection: None,
                 recovery: RecoverySummary::default(),
             },
         });

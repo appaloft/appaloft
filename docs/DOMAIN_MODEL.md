@@ -472,14 +472,24 @@ Workspace-entry projection may coordinate the preferred `SandboxId` for tenant +
 lifecycle state and is not a repository-backed Workspace aggregate. A mismatched source pin fails
 closed and requires explicit `--new`.
 
+The public activation workflow may call an optional initializer only when Repository Binding or
+Project default Profile state is missing, then re-read the canonical public owners. The same
+Workspace-entry projection retains validated target class/source/reason plus safe `created`/`reused`
+activation evidence so create, resume and status agree. It never owns target policy, inventory,
+topology, entitlement or credentials; legacy rows read as `legacy-unclassified` rather than guessing
+ownership.
+
 Governing artifacts:
 - [ADR-094](./decisions/ADR-094-agent-workspace-entry-workflow.md)
 - [ADR-103](./decisions/ADR-103-profile-aware-workspace-open-and-attach.md)
+- [ADR-109](./decisions/ADR-109-workspace-activation-context-and-target-evidence.md)
 - [Spec 111](./specs/111-agent-workspace-entry-workflow/spec.md)
 - [Spec 120](./specs/120-profile-aware-workspace-open-and-attach/spec.md)
+- [Spec 131](./specs/131-workspace-activation-context-and-target-evidence/spec.md)
 - [Agent Workspace Workflow](./workflows/agent-workspace.md)
 - [Agent Workspace Test Matrix](./testing/agent-workspace-test-matrix.md)
 - [Profile-Aware Workspace Open Test Matrix](./testing/profile-aware-workspace-open-test-matrix.md)
+- [Workspace Activation Target Evidence Test Matrix](./testing/workspace-activation-target-evidence-test-matrix.md)
 - [ADR-105](./decisions/ADR-105-brokered-model-access-capability.md)
 - [Spec 123](./specs/123-brokered-model-access/spec.md)
 - [Brokered Model Access Test Matrix](./testing/brokered-model-access-test-matrix.md)

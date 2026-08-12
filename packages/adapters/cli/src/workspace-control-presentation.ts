@@ -103,6 +103,27 @@ export interface WorkspaceControlRecoverySummary {
   };
 }
 
+export interface WorkspaceControlActivationSummary {
+  readonly project: {
+    readonly projectId: string;
+    readonly disposition: "created" | "reused";
+  };
+  readonly repositoryBinding: {
+    readonly bindingId: string;
+    readonly disposition: "created" | "reused";
+  };
+  readonly profile: {
+    readonly profileInstallationId: string;
+    readonly disposition: "created" | "reused";
+  };
+}
+
+export interface WorkspaceControlTargetSelectionSummary {
+  readonly targetClass: "managed" | "registered-server" | "local" | "legacy-unclassified";
+  readonly source: "platform-default" | "saved-policy" | "explicit" | "legacy";
+  readonly reason: string;
+}
+
 export type WorkspaceControlRendererMessage =
   | {
       readonly type: "workspaces";
@@ -115,6 +136,8 @@ export type WorkspaceControlRendererMessage =
       readonly ports: readonly WorkspaceControlPortSummary[];
       readonly tasks: readonly WorkspaceControlTaskSummary[];
       readonly promotions: readonly WorkspaceControlPromotionSummary[];
+      readonly activation?: WorkspaceControlActivationSummary;
+      readonly targetSelection?: WorkspaceControlTargetSelectionSummary;
       readonly recovery: WorkspaceControlRecoverySummary;
     }
   | {
@@ -252,6 +275,84 @@ function optionalNonNegativeInteger(
 ): number | undefined {
   const value = record[key];
   return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : undefined;
+}
+
+function activationDisposition(value: unknown): "created" | "reused" | undefined {
+  return value === "created" || value === "reused" ? value : undefined;
+}
+
+function activationSummary(
+  record: Record<string, unknown>,
+): WorkspaceControlActivationSummary | undefined {
+  if (!record.activation || typeof record.activation !== "object") return undefined;
+  const activation = record.activation as Record<string, unknown>;
+  const project = activation.project;
+  const repositoryBinding = activation.repositoryBinding;
+  const profile = activation.profile;
+  if (
+    !project ||
+    typeof project !== "object" ||
+    !repositoryBinding ||
+    typeof repositoryBinding !== "object" ||
+    !profile ||
+    typeof profile !== "object"
+  ) {
+    return undefined;
+  }
+  const projectRecord = project as Record<string, unknown>;
+  const bindingRecord = repositoryBinding as Record<string, unknown>;
+  const profileRecord = profile as Record<string, unknown>;
+  const projectId = optionalString(projectRecord, "projectId");
+  const bindingId = optionalString(bindingRecord, "bindingId");
+  const profileInstallationId = optionalString(profileRecord, "profileInstallationId");
+  const projectDisposition = activationDisposition(projectRecord.disposition);
+  const bindingDisposition = activationDisposition(bindingRecord.disposition);
+  const profileDisposition = activationDisposition(profileRecord.disposition);
+  if (
+    !projectId ||
+    !bindingId ||
+    !profileInstallationId ||
+    !projectDisposition ||
+    !bindingDisposition ||
+    !profileDisposition
+  ) {
+    return undefined;
+  }
+  return {
+    project: { projectId, disposition: projectDisposition },
+    repositoryBinding: { bindingId, disposition: bindingDisposition },
+    profile: { profileInstallationId, disposition: profileDisposition },
+  };
+}
+
+function targetSelectionSummary(
+  record: Record<string, unknown>,
+): WorkspaceControlTargetSelectionSummary | undefined {
+  if (!record.targetSelection || typeof record.targetSelection !== "object") return undefined;
+  const selection = record.targetSelection as Record<string, unknown>;
+  const targetClass = optionalString(selection, "targetClass");
+  const source = optionalString(selection, "source");
+  const reason = optionalString(selection, "reason");
+  const canonicalTarget =
+    targetClass === "managed" || targetClass === "registered-server" || targetClass === "local";
+  const canonicalSource =
+    source === "platform-default" || source === "saved-policy" || source === "explicit";
+  const legacy =
+    targetClass === "legacy-unclassified" &&
+    source === "legacy" &&
+    reason === "workspace_target_legacy_unclassified";
+  if (
+    !reason ||
+    !/^[a-z][a-z0-9_]{2,95}$/u.test(reason) ||
+    (!legacy && (!canonicalTarget || !canonicalSource))
+  ) {
+    return undefined;
+  }
+  return {
+    targetClass: targetClass as WorkspaceControlTargetSelectionSummary["targetClass"],
+    source: source as WorkspaceControlTargetSelectionSummary["source"],
+    reason,
+  };
 }
 
 function suspensionSummary(
@@ -542,6 +643,8 @@ async function loadDetail(
   const realizedIsolation = optionalString(workspace, "realizedIsolation");
   const provisionAttempts = optionalNonNegativeInteger(workspace, "provisionAttempts");
   const suspension = suspensionSummary(workspace);
+  const activation = activationSummary(workspace);
+  const targetSelection = targetSelectionSummary(workspace);
   return {
     message: {
       type: "detail",
@@ -550,6 +653,8 @@ async function loadDetail(
       ports: portSummaries,
       tasks,
       promotions: promotionSummaries,
+      ...(activation ? { activation } : {}),
+      ...(targetSelection ? { targetSelection } : {}),
       recovery: {
         ...(requestedIsolation ? { requestedIsolation } : {}),
         ...(realizedIsolation ? { realizedIsolation } : {}),

@@ -1104,7 +1104,12 @@ an aggregate command and its `workspaceId` remains the Sandbox id.
 
 ADR-109 / Spec 131 extend this operation with an optional activation-context initializer and safe
 persisted target-selection evidence. Default composition keeps missing Binding/Profile fail closed;
-hosted/local implementations own policy and inventory behind the public ports.
+hosted/local implementations own policy and inventory behind the public ports. Initialization runs
+only after source validation; the injected initializer must perform its own authorization and
+admission before mutation, then the workflow re-reads canonical Project/Binding/Profile state.
+Create, resume, `sandbox show`, SDK and Workspace TUI return the same class/source/reason and
+`created`/`reused` evidence. Legacy rows return `legacy-unclassified`; public evidence never includes
+Server id/host, provider handle, capacity probes or credentials.
 
 | Workspace action | Canonical operations | CLI / SDK |
 | --- | --- | --- |

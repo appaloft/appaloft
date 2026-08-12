@@ -60,7 +60,7 @@ class FakeRendererSession implements WorkspaceControlRendererSession {
 }
 
 describe("Workspace control presentation", () => {
-  test("[WS-TUI-RECOVERY-001][WS-TUI-RECOVERY-002][WS-TUI-RECOVERY-007][WS-TUI-RECOVERY-008] presents exact bounded recovery and cleanup evidence", async () => {
+  test("[WS-TUI-RECOVERY-001][WS-TUI-RECOVERY-002][WS-TUI-RECOVERY-007][WS-TUI-RECOVERY-008][WS-ACT-PARITY-008][WS-ACT-SAFE-007] presents exact bounded recovery, activation and target evidence", async () => {
     const queries: Query<unknown>[] = [];
     const renderer = new FakeRendererSession([
       { type: "select", workspaceId: "sbx_1" },
@@ -88,6 +88,16 @@ describe("Workspace control presentation", () => {
               mode: "compute-released",
               portability: "provider-family",
               recoveryFamily: "docker-linux-amd64",
+            },
+            activation: {
+              project: { projectId: "prj_web", disposition: "created" },
+              repositoryBinding: { bindingId: "rbd_web", disposition: "created" },
+              profile: { profileInstallationId: "awpi_default", disposition: "reused" },
+            },
+            targetSelection: {
+              targetClass: "managed",
+              source: "platform-default",
+              reason: "managed_entitlement_default",
             },
           } as T);
         }
@@ -135,6 +145,16 @@ describe("Workspace control presentation", () => {
     const detail = renderer.messages.findLast((message) => message.type === "detail");
     expect(detail).toMatchObject({
       type: "detail",
+      activation: {
+        project: { projectId: "prj_web", disposition: "created" },
+        repositoryBinding: { bindingId: "rbd_web", disposition: "created" },
+        profile: { profileInstallationId: "awpi_default", disposition: "reused" },
+      },
+      targetSelection: {
+        targetClass: "managed",
+        source: "platform-default",
+        reason: "managed_entitlement_default",
+      },
       recovery: {
         requestedIsolation: "gvisor",
         realizedIsolation: "gvisor",
@@ -164,6 +184,50 @@ describe("Workspace control presentation", () => {
       },
     });
     expect(JSON.stringify(detail)).not.toContain("ssn_other");
+  });
+
+  test("[WS-ACT-SAFE-007] drops malformed target evidence before terminal rendering", async () => {
+    const renderer = new FakeRendererSession([
+      { type: "select", workspaceId: "sbx_1" },
+      { type: "quit" },
+    ]);
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+
+    await presentation.start({
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery) {
+          return ok({ items: [{ sandboxId: "sbx_1", status: "ready" }] } as T);
+        }
+        if (query instanceof ShowSandboxQuery) {
+          return ok({
+            sandboxId: "sbx_1",
+            status: "ready",
+            targetSelection: {
+              targetClass: "managed",
+              source: "platform-default",
+              reason: "managed\u001b[2Jspoofed",
+            },
+          } as T);
+        }
+        if (
+          query instanceof ListSandboxAgentRuntimesQuery ||
+          query instanceof ListSandboxPortsQuery ||
+          query instanceof ListSandboxSnapshotsQuery ||
+          query instanceof ListSandboxPromotionsQuery ||
+          query instanceof ListAgentTaskRunsQuery
+        ) {
+          return ok({ items: [] } as T);
+        }
+        throw new Error(`unexpected query ${query.constructor.name}`);
+      },
+    });
+
+    const detail = renderer.messages.findLast((message) => message.type === "detail");
+    expect(detail).not.toHaveProperty("targetSelection");
+    expect(JSON.stringify(detail)).not.toContain("spoofed");
   });
 
   test("[WS-TUI-RECOVERY-004][WS-TUI-RECOVERY-005][WS-TUI-RECOVERY-006][WS-TUI-RECOVERY-009] dispatches exact Snapshot actions without detaching the Agent", async () => {
