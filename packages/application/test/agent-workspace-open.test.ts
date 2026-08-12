@@ -19,7 +19,7 @@ const input = {
 };
 
 describe("Agent Workspace open application workflow", () => {
-  test("[WS-OPEN-CRED-007][WS-OPEN-ADMIT-008][WS-OPEN-CREATE-010][WS-OPEN-RESUME-011][WS-OPEN-SHA-013][WS-OPEN-PARTIAL-017][WS-OPEN-REMOTE-018][WS-OPEN-PROFILE-021] preflights before effects, preserves source pins, resumes, and releases failed placement", async () => {
+  test("[WS-OPEN-CRED-007][WS-OPEN-ADMIT-008][WS-OPEN-CREATE-010][WS-OPEN-RESUME-011][WS-OPEN-SHA-013][WS-OPEN-PARTIAL-017][WS-OPEN-REMOTE-018][WS-OPEN-PROFILE-021][WS-ACT-TARGET-003][WS-ACT-RESUME-005][WS-ACT-SAFE-007] preflights before effects, preserves source pins and activation evidence, resumes, and releases failed placement", async () => {
     const phases: string[] = [];
     let failSandboxCreate = false;
     let failSourceCredential = false;
@@ -35,6 +35,12 @@ describe("Agent Workspace open application workflow", () => {
       [];
     const executedCommands: Array<{ argv: string[]; stdin?: Uint8Array }> = [];
     const failedEntries: Array<{ workspaceId?: string; phase: string; code: string }> = [];
+    const activation = {
+      project: { projectId: "prj_web", disposition: "created" as const },
+      repositoryBinding: { bindingId: "rbd_web", disposition: "created" as const },
+      profile: { profileInstallationId: "awpi_default", disposition: "created" as const },
+    };
+    let pendingActivation = activation;
     let preferred:
       | {
           workspaceId: string;
@@ -42,6 +48,12 @@ describe("Agent Workspace open application workflow", () => {
           commitSha: string;
           profileInstallationId: string;
           status: "ready";
+          targetSelection: {
+            targetClass: "managed";
+            source: "platform-default";
+            reason: string;
+          };
+          activation: typeof activation;
         }
       | undefined;
     let profileWorkspace = preferred;
@@ -52,6 +64,7 @@ describe("Agent Workspace open application workflow", () => {
           return ok({
             projectId: "prj_web",
             profileInstallationId: "awpi_default",
+            activation,
           });
         },
         admit: async (_context, _resolved, options) => {
@@ -61,6 +74,7 @@ describe("Agent Workspace open application workflow", () => {
           return ok({
             projectId: "prj_web",
             profileInstallationId: "awpi_default",
+            activation,
             plan: {
               sandbox: {
                 source: { kind: "template", templateId: "sbt_agent" },
@@ -108,16 +122,33 @@ describe("Agent Workspace open application workflow", () => {
                 },
               },
             },
-            reservation: { reservationId: "res_1" },
+            reservation: {
+              reservationId: "res_1",
+              targetSelection: {
+                targetClass: "managed",
+                source: "platform-default",
+                reason: "managed_entitlement_default",
+              },
+            },
           });
         },
       },
       entries: {
+        findByWorkspaceIds: async (_context, workspaceIds) =>
+          new Map(
+            preferred && workspaceIds.includes(preferred.workspaceId)
+              ? [[preferred.workspaceId, preferred]]
+              : [],
+          ),
+        findByWorkspaceId: async () => preferred,
         findPreferred: async (_context, _key, selection?: { profileInstallationId?: string }) =>
           selection?.profileInstallationId === "awpi_default" && profileWorkspace
             ? profileWorkspace
             : preferred,
-        begin: async () => ok({ workspaceId: "sbx_1", created: true }),
+        begin: async (_context, _key, value) => {
+          pendingActivation = value.activation as typeof activation;
+          return ok({ workspaceId: "sbx_1", created: true });
+        },
         complete: async (_context, value) => {
           preferred = {
             workspaceId: value.workspaceId,
@@ -125,6 +156,12 @@ describe("Agent Workspace open application workflow", () => {
             commitSha: value.commitSha,
             profileInstallationId: "awpi_default",
             status: "ready",
+            targetSelection: {
+              targetClass: "managed",
+              source: "platform-default",
+              reason: "managed_entitlement_default",
+            },
+            activation: pendingActivation,
           };
           return ok(undefined);
         },
@@ -301,6 +338,12 @@ describe("Agent Workspace open application workflow", () => {
       commitSha: input.commitSha,
       profileInstallationId: "awpi_opencode",
       status: "ready",
+      targetSelection: {
+        targetClass: "managed",
+        source: "platform-default",
+        reason: "managed_entitlement_default",
+      },
+      activation,
     };
     const explicitlySelectedProfileResumed = await service.open(context, {
       ...input,
@@ -323,17 +366,41 @@ describe("Agent Workspace open application workflow", () => {
       workspaceId: "sbx_1",
       resumed: false,
       agent: { runtimeId: "sar_1" },
+      activation,
+      targetSelection: {
+        targetClass: "managed",
+        source: "platform-default",
+        reason: "managed_entitlement_default",
+      },
     });
     expect(resumed._unsafeUnwrap()).toMatchObject({
       workspaceId: "sbx_1",
       resumed: true,
       agent: { runtimeId: "sar_1" },
+      activation,
+      targetSelection: {
+        targetClass: "managed",
+        source: "platform-default",
+        reason: "managed_entitlement_default",
+      },
     });
     expect(explicitlySelectedProfileResumed._unsafeUnwrap()).toMatchObject({
       workspaceId: "sbx_1",
       resumed: true,
       agent: { runtimeId: "sar_1" },
     });
+    const publicEvidence = JSON.stringify(created._unsafeUnwrap());
+    for (const privateField of [
+      "serverId",
+      "host",
+      "providerHandle",
+      "providerKey",
+      "capacity",
+      "credential",
+      "token",
+    ]) {
+      expect(publicEvidence).not.toContain(`"${privateField}"`);
+    }
     expect(placementReservationIds).toEqual(["res_1", "res_1"]);
     expect(sandboxPlacement).toEqual([
       {

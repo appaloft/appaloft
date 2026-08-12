@@ -171,7 +171,7 @@ describe("Agent Workspace SDK handles", () => {
     });
   });
 
-  test("[PROFILE-PIN-010] creates a Workspace through the atomic Profile-aware open operation", async () => {
+  test("[PROFILE-PIN-010][WS-ACT-PARITY-008][WS-ACT-SAFE-007] creates a Workspace through the atomic Profile-aware open operation with safe activation evidence", async () => {
     const requests: Request[] = [];
     const appaloft = createAppaloftClient({
       baseUrl: "https://appaloft.example/api",
@@ -189,6 +189,16 @@ describe("Agent Workspace SDK handles", () => {
               harnessKey: "profile-opencode",
               harnessTemplateId: "command-agent",
               status: "ready",
+            },
+            activation: {
+              project: { projectId: "prj_web", disposition: "created" },
+              repositoryBinding: { bindingId: "rbd_web", disposition: "created" },
+              profile: { profileInstallationId: "awpi_opencode", disposition: "reused" },
+            },
+            targetSelection: {
+              targetClass: "managed",
+              source: "platform-default",
+              reason: "managed_entitlement_default",
             },
           });
         }
@@ -216,7 +226,18 @@ describe("Agent Workspace SDK handles", () => {
     expect(workspace).toMatchObject({
       sandboxId: "sbx_profile",
       agent: { runtimeId: "sar_profile", harnessKey: "profile-opencode" },
+      activation: {
+        project: { projectId: "prj_web", disposition: "created" },
+        repositoryBinding: { bindingId: "rbd_web", disposition: "created" },
+        profile: { profileInstallationId: "awpi_opencode", disposition: "reused" },
+      },
+      targetSelection: {
+        targetClass: "managed",
+        source: "platform-default",
+        reason: "managed_entitlement_default",
+      },
     });
+    expect(JSON.stringify(workspace)).not.toMatch(/serverId|host|providerCredential|ssh/i);
     expect(requests.map((request) => new URL(request.url).pathname)).toEqual([
       "/api/workspaces/open",
     ]);

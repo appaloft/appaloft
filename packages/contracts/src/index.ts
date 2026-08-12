@@ -262,6 +262,31 @@ export interface WorkspaceOpenResult {
     status: string;
   };
   agent: WorkspaceAgentRuntimeResponse;
+  activation: {
+    project: {
+      projectId: string;
+      disposition: "created" | "reused";
+    };
+    repositoryBinding: {
+      bindingId: string;
+      disposition: "created" | "reused";
+    };
+    profile: {
+      profileInstallationId: string;
+      disposition: "created" | "reused";
+    };
+  };
+  targetSelection:
+    | {
+        targetClass: "managed" | "registered-server" | "local";
+        source: "platform-default" | "saved-policy" | "explicit";
+        reason: string;
+      }
+    | {
+        targetClass: "legacy-unclassified";
+        source: "legacy";
+        reason: "workspace_target_legacy_unclassified";
+      };
   attach?: WorkspaceAgentAttachResponse;
 }
 

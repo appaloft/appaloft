@@ -155,8 +155,38 @@ export interface AppaloftWorkspace {
   readonly agent: AppaloftAgent;
   readonly tasks: AppaloftWorkspaceTasks;
   readonly resumed?: boolean;
+  readonly activation?: {
+    readonly project: {
+      readonly projectId: string;
+      readonly disposition: "created" | "reused";
+    };
+    readonly repositoryBinding: {
+      readonly bindingId: string;
+      readonly disposition: "created" | "reused";
+    };
+    readonly profile: {
+      readonly profileInstallationId: string;
+      readonly disposition: "created" | "reused";
+    };
+  };
+  readonly targetSelection?:
+    | {
+        readonly targetClass: "managed" | "registered-server" | "local";
+        readonly source: "platform-default" | "saved-policy" | "explicit";
+        readonly reason: string;
+      }
+    | {
+        readonly targetClass: "legacy-unclassified";
+        readonly source: "legacy";
+        readonly reason: "workspace_target_legacy_unclassified";
+      };
   readonly attach?: Readonly<Record<string, unknown>>;
   readonly terminate: <T = unknown>() => Promise<T>;
+}
+
+export interface AppaloftActivatedWorkspace extends AppaloftWorkspace {
+  readonly activation: NonNullable<AppaloftWorkspace["activation"]>;
+  readonly targetSelection: NonNullable<AppaloftWorkspace["targetSelection"]>;
 }
 
 export interface AppaloftWorkspaceDescriptor {
@@ -534,7 +564,7 @@ export type AppaloftClient = Omit<
     readonly create: (input: AppaloftSandboxCreateInput) => Promise<AppaloftSandbox>;
   };
   readonly workspaces: {
-    readonly open: (input: AppaloftWorkspaceOpenInput) => Promise<AppaloftWorkspace>;
+    readonly open: (input: AppaloftWorkspaceOpenInput) => Promise<AppaloftActivatedWorkspace>;
     readonly create: (input: AppaloftWorkspaceCreateInput) => Promise<AppaloftWorkspace>;
     readonly list: (input?: AppaloftWorkspaceListInput) => Promise<AppaloftWorkspaceList>;
     readonly show: (workspaceId: string) => Promise<AppaloftWorkspaceDescriptor>;
@@ -565,12 +595,16 @@ export function createAppaloftClient(options: AppaloftClientOptions): AppaloftCl
       return createSandboxHandle(operations, descriptor);
     },
   };
-  const openWorkspace = async (input: AppaloftWorkspaceOpenInput): Promise<AppaloftWorkspace> => {
+  const openWorkspace = async (
+    input: AppaloftWorkspaceOpenInput,
+  ): Promise<AppaloftActivatedWorkspace> => {
     const result = unwrapOperation<{
       readonly workspaceId: string;
       readonly resumed: boolean;
       readonly sandbox: AppaloftSandboxDescriptor;
       readonly agent: AppaloftAgentDescriptor;
+      readonly activation: NonNullable<AppaloftWorkspace["activation"]>;
+      readonly targetSelection: NonNullable<AppaloftWorkspace["targetSelection"]>;
       readonly attach?: Readonly<Record<string, unknown>>;
     }>(
       await operations.workspaces.open({
@@ -587,6 +621,8 @@ export function createAppaloftClient(options: AppaloftClientOptions): AppaloftCl
       agent,
       tasks: createAppaloftWorkspaceTasks(operations, result.workspaceId, agent.runtimeId),
       resumed: result.resumed,
+      activation: result.activation,
+      targetSelection: result.targetSelection,
       ...(result.attach ? { attach: result.attach } : {}),
       terminate: async <T>() => {
         await agent.terminate();

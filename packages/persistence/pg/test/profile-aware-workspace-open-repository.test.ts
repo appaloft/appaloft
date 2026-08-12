@@ -23,6 +23,7 @@ import {
   PgRepositoryBindingRepository,
   PgWorkspaceOpenEntryRepository,
 } from "../src";
+import { workspaceActivationTargetEvidenceMigration } from "../src/migrations/119_workspace_activation_target_evidence";
 
 const directories: string[] = [];
 
@@ -93,12 +94,24 @@ describe("Profile-aware Workspace open persistence", () => {
         repositoryIdentity: "github.com/Acme/Web",
         branch: "main",
       };
+      const managedSelection = {
+        targetClass: "managed" as const,
+        source: "platform-default" as const,
+        reason: "managed_entitlement_default",
+      };
+      const activation = {
+        project: { projectId: "prj_workspace_open", disposition: "created" as const },
+        repositoryBinding: { bindingId: "rbd_web", disposition: "created" as const },
+        profile: { profileInstallationId: "awpi_default", disposition: "created" as const },
+      };
       expect(
         (
           await entries.begin(tenantA, key, {
             commitSha: "a".repeat(40),
             profileInstallationId: "awpi_default",
             forceNew: false,
+            targetSelection: managedSelection,
+            activation,
           })
         )._unsafeUnwrap(),
       ).toEqual({ created: true });
@@ -117,6 +130,8 @@ describe("Profile-aware Workspace open persistence", () => {
         runtimeId: "sar_first",
         commitSha: "a".repeat(40),
         status: "ready",
+        targetSelection: managedSelection,
+        activation,
       });
       expect(
         (
@@ -124,6 +139,8 @@ describe("Profile-aware Workspace open persistence", () => {
             commitSha: "a".repeat(40),
             profileInstallationId: "awpi_default",
             forceNew: false,
+            targetSelection: managedSelection,
+            activation,
           })
         )._unsafeUnwrap(),
       ).toEqual({ workspaceId: "sbx_first", created: false });
@@ -133,6 +150,23 @@ describe("Profile-aware Workspace open persistence", () => {
             commitSha: "b".repeat(40),
             profileInstallationId: "awpi_opencode",
             forceNew: true,
+            targetSelection: {
+              targetClass: "registered-server",
+              source: "saved-policy",
+              reason: "registered_server_saved_policy",
+            },
+            activation: {
+              ...activation,
+              project: { ...activation.project, disposition: "reused" },
+              repositoryBinding: {
+                ...activation.repositoryBinding,
+                disposition: "reused",
+              },
+              profile: {
+                profileInstallationId: "awpi_opencode",
+                disposition: "reused",
+              },
+            },
           })
         )._unsafeUnwrap(),
       ).toEqual({ created: true });
@@ -181,9 +215,171 @@ describe("Profile-aware Workspace open persistence", () => {
             commitSha: "b".repeat(40),
             profileInstallationId: "awpi_default",
             forceNew: false,
+            targetSelection: managedSelection,
+            activation,
           })
         )._unsafeUnwrap(),
       ).toEqual({ created: true });
+    } finally {
+      await database.close();
+    }
+  });
+
+  test("[WS-ACT-LEGACY-006][WS-ACT-SAFE-007] reads nullable legacy target evidence without guessing and rejects legacy evidence for new entries", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "appaloft-workspace-open-legacy-pg-"));
+    directories.push(directory);
+    const database = await createDatabase({
+      driver: "pglite",
+      pgliteDataDir: directory,
+    });
+    try {
+      expect((await createMigrator(database.db).migrateToLatest()).error).toBeUndefined();
+      const tenant = context("tenant_legacy");
+      const legacyProject = Project.create({
+        id: ProjectId.rehydrate("prj_legacy"),
+        name: ProjectName.rehydrate("Legacy"),
+        createdAt: CreatedAt.rehydrate("2026-08-12T00:00:00.000Z"),
+      })._unsafeUnwrap();
+      await new PgProjectRepository(database.db).upsert(
+        toRepositoryContext(tenant),
+        legacyProject,
+        UpsertProjectSpec.fromProject(legacyProject),
+      );
+      const key = {
+        tenantId: "tenant_legacy",
+        subjectId: "usr_1",
+        projectId: "prj_legacy",
+        repositoryIdentity: "github.com/Acme/Legacy",
+        branch: "main",
+      };
+      await database.db
+        .insertInto("workspace_open_entries")
+        .values({
+          tenant_id: key.tenantId,
+          subject_id: key.subjectId,
+          project_id: key.projectId,
+          repository_identity: key.repositoryIdentity,
+          branch: key.branch,
+          generation: 1,
+          commit_sha: "a".repeat(40),
+          profile_installation_id: "awpi_legacy",
+          target_class: null,
+          target_selection_source: null,
+          target_selection_reason: null,
+          activation_repository_binding_id: null,
+          activation_project_disposition: null,
+          activation_repository_binding_disposition: null,
+          activation_profile_disposition: null,
+          workspace_id: "sbx_legacy",
+          runtime_id: "sar_legacy",
+          status: "ready",
+          phase: "workspace-open-ready",
+          error_code: null,
+          preferred: true,
+          created_at: "2026-08-12T00:00:00.000Z",
+          updated_at: "2026-08-12T00:00:00.000Z",
+        })
+        .execute();
+      const entries = new PgWorkspaceOpenEntryRepository(
+        database.db,
+        () => "2026-08-12T00:00:01.000Z",
+      );
+
+      expect(await entries.findPreferred(tenant, key)).toMatchObject({
+        workspaceId: "sbx_legacy",
+        targetSelection: {
+          targetClass: "legacy-unclassified",
+          source: "legacy",
+          reason: "workspace_target_legacy_unclassified",
+        },
+      });
+      const rejected = await entries.begin(tenant, key, {
+        commitSha: "b".repeat(40),
+        profileInstallationId: "awpi_legacy",
+        forceNew: true,
+        targetSelection: {
+          targetClass: "legacy-unclassified",
+          source: "legacy",
+          reason: "workspace_target_legacy_unclassified",
+        },
+        activation: {
+          project: { projectId: "prj_legacy", disposition: "reused" },
+          repositoryBinding: { bindingId: "rbd_legacy", disposition: "reused" },
+          profile: { profileInstallationId: "awpi_legacy", disposition: "reused" },
+        },
+      });
+      expect(rejected._unsafeUnwrapErr().details?.code).toBe(
+        "workspace_target_selection_evidence_invalid",
+      );
+    } finally {
+      await database.close();
+    }
+  });
+
+  test("[WS-ACT-LEGACY-006] upgrades a pre-evidence Workspace row without inferring target ownership", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "appaloft-workspace-open-upgrade-pg-"));
+    directories.push(directory);
+    const database = await createDatabase({
+      driver: "pglite",
+      pgliteDataDir: directory,
+    });
+    try {
+      expect((await createMigrator(database.db).migrateToLatest()).error).toBeUndefined();
+      await workspaceActivationTargetEvidenceMigration.down(database.db);
+
+      const tenant = context("tenant_upgrade");
+      const legacyProject = Project.create({
+        id: ProjectId.rehydrate("prj_upgrade"),
+        name: ProjectName.rehydrate("Upgrade"),
+        createdAt: CreatedAt.rehydrate("2026-08-12T00:00:00.000Z"),
+      })._unsafeUnwrap();
+      await new PgProjectRepository(database.db).upsert(
+        toRepositoryContext(tenant),
+        legacyProject,
+        UpsertProjectSpec.fromProject(legacyProject),
+      );
+      await database.db
+        .insertInto("workspace_open_entries")
+        .values({
+          tenant_id: "tenant_upgrade",
+          subject_id: "usr_1",
+          project_id: "prj_upgrade",
+          repository_identity: "github.com/Acme/Upgrade",
+          branch: "main",
+          generation: 1,
+          commit_sha: "c".repeat(40),
+          profile_installation_id: "awpi_upgrade",
+          workspace_id: "sbx_upgrade",
+          runtime_id: "sar_upgrade",
+          status: "ready",
+          phase: "workspace-open-ready",
+          error_code: null,
+          preferred: true,
+          created_at: "2026-08-12T00:00:00.000Z",
+          updated_at: "2026-08-12T00:00:00.000Z",
+        })
+        .execute();
+
+      await workspaceActivationTargetEvidenceMigration.up(database.db);
+      const upgraded = await new PgWorkspaceOpenEntryRepository(
+        database.db,
+        () => "2026-08-12T00:00:01.000Z",
+      ).findPreferred(tenant, {
+        tenantId: "tenant_upgrade",
+        subjectId: "usr_1",
+        projectId: "prj_upgrade",
+        repositoryIdentity: "github.com/Acme/Upgrade",
+        branch: "main",
+      });
+      expect(upgraded).toMatchObject({
+        workspaceId: "sbx_upgrade",
+        targetSelection: {
+          targetClass: "legacy-unclassified",
+          source: "legacy",
+          reason: "workspace_target_legacy_unclassified",
+        },
+      });
+      expect(upgraded?.activation).toBeUndefined();
     } finally {
       await database.close();
     }

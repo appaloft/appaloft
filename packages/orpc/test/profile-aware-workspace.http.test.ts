@@ -61,7 +61,7 @@ function request(path: string, init: RequestInit): Request {
 }
 
 describe("Profile-aware Workspace HTTP routes", () => {
-  test("[WS-OPEN-SURFACE-019][GH-AUTO-TENANT-022] dispatches open and configuration through the composed router", async () => {
+  test("[WS-OPEN-SURFACE-019][GH-AUTO-TENANT-022][WS-ACT-PARITY-008][WS-ACT-SAFE-007] dispatches open and safe activation evidence through the composed router", async () => {
     const commands: Command<unknown>[] = [];
     const queries: Query<unknown>[] = [];
     const dispatchedContexts: ExecutionContext[] = [];
@@ -94,6 +94,68 @@ describe("Profile-aware Workspace HTTP routes", () => {
         }
         if (command instanceof ConfigureAgentWorkspaceProfileMcpConnectionsCommand) {
           return ok(profile as T);
+        }
+        if (command instanceof OpenAgentWorkspaceCommand) {
+          return ok({
+            workspaceId: "sbx_workspace",
+            resumed: false,
+            projectId: "prj_web",
+            source: {
+              repositoryIdentity: "github.com/Acme/Web",
+              repository: "https://github.com/Acme/Web.git",
+              ref: "refs/heads/main",
+              branch: "main",
+              commitSha: "0123456789abcdef0123456789abcdef01234567",
+            },
+            profilePin: {
+              profileInstallationId: "awpi_default",
+              profileDefinitionDigest: `sha256:${"1".repeat(64)}`,
+              profileId: "pi-default",
+              profileVersion: "1.0.0",
+              adapterInstallationId: "aai_pi",
+              adapterDefinitionDigest: `sha256:${"2".repeat(64)}`,
+              adapterId: "pi",
+              adapterVersion: "1.0.0",
+              harnessKey: "pi",
+              harnessTemplateId: "pi-default",
+              sandboxTemplateId: "sbt_pi",
+              sandboxTemplateVersion: "1.0.0",
+              sandboxTemplateDigest: `sha256:${"3".repeat(64)}`,
+              capabilities: {
+                taskMode: true,
+                interactive: true,
+                backgroundRuns: true,
+                nativeSession: false,
+                persistentPaths: [],
+              },
+            },
+            sandbox: { sandboxId: "sbx_workspace", status: "ready" },
+            agent: {
+              runtimeId: "sar_workspace",
+              sandboxId: "sbx_workspace",
+              harnessKey: "pi",
+              harnessTemplateId: "pi-default",
+              status: "ready",
+              capabilities: {
+                taskMode: true,
+                interactive: true,
+                backgroundRuns: true,
+                nativeSession: false,
+                persistentPaths: [],
+              },
+              createdAt: "2026-08-12T00:00:00.000Z",
+            },
+            activation: {
+              project: { projectId: "prj_web", disposition: "created" },
+              repositoryBinding: { bindingId: "rbd_web", disposition: "created" },
+              profile: { profileInstallationId: "awpi_default", disposition: "reused" },
+            },
+            targetSelection: {
+              targetClass: "managed",
+              source: "platform-default",
+              reason: "managed_entitlement_default",
+            },
+          } as T);
         }
         return ok({ accepted: true } as T);
       },
@@ -177,6 +239,21 @@ describe("Profile-aware Workspace HTTP routes", () => {
     expect(responses.map((response) => response.status)).toEqual([
       202, 200, 200, 200, 200, 200, 200,
     ]);
+    const openResponse = await responses[0]?.json();
+    expect(openResponse).toMatchObject({
+      workspaceId: "sbx_workspace",
+      activation: {
+        project: { projectId: "prj_web", disposition: "created" },
+        repositoryBinding: { bindingId: "rbd_web", disposition: "created" },
+        profile: { profileInstallationId: "awpi_default", disposition: "reused" },
+      },
+      targetSelection: {
+        targetClass: "managed",
+        source: "platform-default",
+        reason: "managed_entitlement_default",
+      },
+    });
+    expect(JSON.stringify(openResponse)).not.toMatch(/serverId|host|providerCredential|ssh/i);
     expect(commands.some((command) => command instanceof OpenAgentWorkspaceCommand)).toBe(true);
     expect(
       commands.some((command) => command instanceof ConfigureProjectWorkspaceProfileCommand),

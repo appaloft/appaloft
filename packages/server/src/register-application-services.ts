@@ -712,6 +712,7 @@ import {
   UnsetResourceVariableUseCase,
   UpsertGitHubAppInstallationCommandHandler,
   UpsertGitHubAppInstallationUseCase,
+  type WorkspaceActivationContextInitializerPort,
   WorkspaceCollaborationCommandHandler,
   type WorkspaceCollaborationDependencies,
   WorkspaceCollaborationQueryHandler,
@@ -3946,6 +3947,14 @@ export function registerApplicationServices(
         placement: dependencyContainer.resolve<WorkspaceOpenPlacementPort>(
           tokens.workspaceOpenPlacement,
         ),
+        ...(dependencyContainer.isRegistered(tokens.workspaceActivationContextInitializer, true)
+          ? {
+              contextInitializer:
+                dependencyContainer.resolve<WorkspaceActivationContextInitializerPort>(
+                  tokens.workspaceActivationContextInitializer,
+                ),
+            }
+          : {}),
       });
     }),
   });

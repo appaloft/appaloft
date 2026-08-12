@@ -13,6 +13,7 @@ import {
   SandboxCommandHandler,
   SandboxQueryHandler,
   ShowSandboxProcessQuery,
+  ShowSandboxQuery,
   TerminateSandboxCommand,
   type WorkspaceOpenEntryRepository,
   WriteSandboxFileCommand,
@@ -34,6 +35,10 @@ function sandboxService() {
     async list(_context: unknown, input: unknown) {
       calls.push({ operation: "list", input });
       return ok({ items: [] });
+    },
+    async show(_context: unknown, sandboxId: string) {
+      calls.push({ operation: "show", input: { sandboxId } });
+      return ok({ sandboxId, status: "ready" });
     },
     async writeFile(_context: unknown, sandboxId: string, input: unknown) {
       calls.push({
@@ -174,5 +179,78 @@ describe("execution sandbox CQRS boundary", () => {
     expect(result.isOk()).toBe(true);
     expect(fake.calls).toEqual([{ operation: "terminate", input: { sandboxId: "sbx_workspace" } }]);
     expect(advanced).toEqual(["sbx_workspace"]);
+  });
+
+  test("[WS-ACT-PARITY-008][WS-ACT-SAFE-007] enriches Workspace list/show readback with persisted safe activation evidence", async () => {
+    const activation = {
+      project: { projectId: "prj_web", disposition: "created" as const },
+      repositoryBinding: { bindingId: "rbd_web", disposition: "created" as const },
+      profile: { profileInstallationId: "awpi_default", disposition: "reused" as const },
+    };
+    const targetSelection = {
+      targetClass: "managed" as const,
+      source: "platform-default" as const,
+      reason: "managed_entitlement_default",
+    };
+    const calls: string[] = [];
+    const service = {
+      async list() {
+        return ok({ items: [{ sandboxId: "sbx_1", status: "ready" }] });
+      },
+      async show() {
+        return ok({ sandboxId: "sbx_1", status: "ready" });
+      },
+    } as unknown as ExecutionSandboxService;
+    const entries = {
+      async findByWorkspaceId(_context: unknown, workspaceId: string) {
+        calls.push(`one:${workspaceId}`);
+        return {
+          workspaceId,
+          runtimeId: "sar_1",
+          commitSha: "a".repeat(40),
+          profileInstallationId: "awpi_default",
+          status: "ready",
+          activation,
+          targetSelection,
+        };
+      },
+      async findByWorkspaceIds(_context: unknown, workspaceIds: readonly string[]) {
+        calls.push(`many:${workspaceIds.join(",")}`);
+        return new Map(
+          workspaceIds.map((workspaceId) => [
+            workspaceId,
+            {
+              workspaceId,
+              runtimeId: "sar_1",
+              commitSha: "a".repeat(40),
+              profileInstallationId: "awpi_default",
+              status: "ready" as const,
+              activation,
+              targetSelection,
+            },
+          ]),
+        );
+      },
+    } as unknown as WorkspaceOpenEntryRepository;
+    const queries = new SandboxQueryHandler(service, entries);
+
+    const listed = await queries.handle(
+      context,
+      ListSandboxesQuery.create({ limit: 10 })._unsafeUnwrap(),
+    );
+    const shown = await queries.handle(
+      context,
+      ShowSandboxQuery.create({ sandboxId: "sbx_1" })._unsafeUnwrap(),
+    );
+    expect(listed._unsafeUnwrap()).toMatchObject({
+      items: [{ sandboxId: "sbx_1", activation, targetSelection }],
+    });
+    expect(shown._unsafeUnwrap()).toMatchObject({
+      sandboxId: "sbx_1",
+      activation,
+      targetSelection,
+    });
+    expect(calls).toEqual(["many:sbx_1", "one:sbx_1"]);
+    expect(JSON.stringify(shown._unsafeUnwrap())).not.toContain("providerHandle");
   });
 });

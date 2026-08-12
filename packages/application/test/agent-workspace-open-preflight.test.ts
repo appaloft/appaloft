@@ -30,9 +30,11 @@ import {
   InMemoryRepositoryBindingRepository,
   type ProjectRepository,
   toRepositoryContext,
+  type WorkspaceActivationContextInitializerPort,
   type WorkspaceOpenCredentialAdmissionPort,
   type WorkspaceOpenMcpAdmissionPort,
   type WorkspaceOpenPlacementPort,
+  type WorkspaceOpenReservation,
 } from "../src";
 
 const context = createExecutionContext({
@@ -123,6 +125,14 @@ async function fixture(
     admission?: WorkspaceOpenCredentialAdmissionPort;
     mcpAdmission?: WorkspaceOpenMcpAdmissionPort;
     staleProfile?: boolean;
+    omitBinding?: boolean;
+    omitDefaultProfile?: boolean;
+    placement?: WorkspaceOpenPlacementPort;
+    initializerFactory?: (state: {
+      project: Project;
+      binding: ProjectRepositoryBinding;
+      repositoryBindings: InMemoryRepositoryBindingRepository;
+    }) => WorkspaceActivationContextInitializerPort;
   } = {},
 ) {
   const profiles = new InMemoryAgentWorkspaceProfileRegistryRepository();
@@ -149,26 +159,28 @@ async function fixture(
     name: ProjectName.rehydrate("Web"),
     createdAt: CreatedAt.rehydrate("2026-07-28T00:00:00.000Z"),
   })._unsafeUnwrap();
-  project
-    .configureWorkspaceProfile({
-      profileInstallationId: AgentWorkspaceProfileInstallationId.rehydrate("awpi_default"),
-      configuredAt: UpdatedAt.rehydrate("2026-07-28T00:00:01.000Z"),
-    })
-    ._unsafeUnwrap();
+  if (!options.omitDefaultProfile) {
+    project
+      .configureWorkspaceProfile({
+        profileInstallationId: AgentWorkspaceProfileInstallationId.rehydrate("awpi_default"),
+        configuredAt: UpdatedAt.rehydrate("2026-07-28T00:00:01.000Z"),
+      })
+      ._unsafeUnwrap();
+  }
   const projects: ProjectRepository = {
     findOne: async () => project,
     upsert: async () => undefined,
   };
   const repositoryBindings = new InMemoryRepositoryBindingRepository();
-  await repositoryBindings.save(
-    toRepositoryContext(context),
-    ProjectRepositoryBinding.bind({
-      id: ProjectRepositoryBindingId.rehydrate("rbd_web"),
-      repositoryIdentity: RepositoryIdentity.rehydrate("github.com/Acme/Web"),
-      projectId: ProjectId.rehydrate("prj_web"),
-      createdAt: CreatedAt.rehydrate("2026-07-28T00:00:00.000Z"),
-    })._unsafeUnwrap(),
-  );
+  const binding = ProjectRepositoryBinding.bind({
+    id: ProjectRepositoryBindingId.rehydrate("rbd_web"),
+    repositoryIdentity: RepositoryIdentity.rehydrate("github.com/Acme/Web"),
+    projectId: ProjectId.rehydrate("prj_web"),
+    createdAt: CreatedAt.rehydrate("2026-07-28T00:00:00.000Z"),
+  })._unsafeUnwrap();
+  if (!options.omitBinding) {
+    await repositoryBindings.save(toRepositoryContext(context), binding);
+  }
   const compiled: string[] = [];
   const compiledCredentialReferences: Array<
     readonly { requirementId: string; connectionReference: string }[] | undefined
@@ -178,15 +190,27 @@ async function fixture(
   const admittedScopes: Array<
     Parameters<WorkspaceOpenCredentialAdmissionPort["admit"]>[1]["scope"]
   > = [];
-  const placement: WorkspaceOpenPlacementPort = {
+  const placement: WorkspaceOpenPlacementPort = options.placement ?? {
     reserve: async (_context, value) => {
       reserved.push(value.profileInstallationId);
       reservedProviderKeys.push(value.providerKey);
-      return ok({ reservationId: "wres_1" });
+      return ok({
+        reservationId: "wres_1",
+        targetSelection: {
+          targetClass: "local",
+          source: "explicit",
+          reason: "local_composition",
+        },
+      });
     },
     consume: async () => ok(undefined),
     release: async () => ok(undefined),
   };
+  const contextInitializer = options.initializerFactory?.({
+    project,
+    binding,
+    repositoryBindings,
+  });
   const service = new AgentWorkspaceOpenPreflightService({
     repositoryBindings,
     projects,
@@ -222,6 +246,7 @@ async function fixture(
         admit: async () => ok(undefined),
       } satisfies WorkspaceOpenMcpAdmissionPort),
     placement,
+    ...(contextInitializer ? { contextInitializer } : {}),
   });
   return {
     compiled,
@@ -433,5 +458,103 @@ describe("Agent Workspace open preflight", () => {
     expect(compiled).toEqual([]);
     expect(reserved).toEqual([]);
     expect(staleFixture.reserved).toEqual([]);
+  });
+
+  test("[WS-ACT-CONTEXT-001] initializes a missing Binding/default Profile once and re-reads canonical public state", async () => {
+    const calls: string[] = [];
+    const { service } = await fixture({
+      omitBinding: true,
+      omitDefaultProfile: true,
+      initializerFactory: ({ binding, project, repositoryBindings }) => ({
+        ensure: async (_context, initializeInput) => {
+          calls.push(initializeInput.missing);
+          project
+            .configureWorkspaceProfile({
+              profileInstallationId: AgentWorkspaceProfileInstallationId.rehydrate("awpi_default"),
+              configuredAt: UpdatedAt.rehydrate("2026-07-28T00:00:02.000Z"),
+            })
+            ._unsafeUnwrap();
+          await repositoryBindings.save(toRepositoryContext(context), binding);
+          return ok({ project: "reused", repositoryBinding: "created", profile: "created" });
+        },
+      }),
+    });
+
+    expect((await service.resolveContext(context, input))._unsafeUnwrap()).toEqual({
+      projectId: "prj_web",
+      profileInstallationId: "awpi_default",
+      activation: {
+        project: { projectId: "prj_web", disposition: "reused" },
+        repositoryBinding: { bindingId: "rbd_web", disposition: "created" },
+        profile: { profileInstallationId: "awpi_default", disposition: "created" },
+      },
+    });
+    expect(calls).toEqual(["repository-binding"]);
+  });
+
+  test("[WS-ACT-CONTEXT-002] reuses existing context, preserves fail-closed defaults, and rejects an initializer that does not repair canonical state", async () => {
+    let existingCalls = 0;
+    const existing = await fixture({
+      initializerFactory: () => ({
+        ensure: async () => {
+          existingCalls += 1;
+          return ok({ project: "created", repositoryBinding: "created", profile: "created" });
+        },
+      }),
+    });
+    expect(
+      (await existing.service.resolveContext(context, input))._unsafeUnwrap().activation,
+    ).toEqual({
+      project: { projectId: "prj_web", disposition: "reused" },
+      repositoryBinding: { bindingId: "rbd_web", disposition: "reused" },
+      profile: { profileInstallationId: "awpi_default", disposition: "reused" },
+    });
+    expect(existingCalls).toBe(0);
+
+    const defaultFailClosed = await fixture({ omitBinding: true });
+    const missing = await defaultFailClosed.service.resolveContext(context, input);
+    expect(missing._unsafeUnwrapErr().details?.code).toBe("workspace_open_repository_not_bound");
+
+    let conflictCalls = 0;
+    const conflict = await fixture({
+      omitBinding: true,
+      initializerFactory: () => ({
+        ensure: async () => {
+          conflictCalls += 1;
+          return ok({ project: "reused", repositoryBinding: "created", profile: "reused" });
+        },
+      }),
+    });
+    const conflicted = await conflict.service.resolveContext(context, input);
+    expect(conflicted._unsafeUnwrapErr().details?.code).toBe(
+      "workspace_activation_context_conflict",
+    );
+    expect(conflictCalls).toBe(1);
+  });
+
+  test("[WS-ACT-TARGET-003][WS-ACT-SAFE-007] rejects malformed or legacy placement evidence and releases the reservation", async () => {
+    const released: string[] = [];
+    const invalidPlacement: WorkspaceOpenPlacementPort = {
+      reserve: async () =>
+        ok({
+          reservationId: "wres_invalid",
+          targetSelection: {
+            targetClass: "managed",
+            source: "legacy",
+            reason: "raw_provider_handle",
+          } as unknown as WorkspaceOpenReservation["targetSelection"],
+        }),
+      consume: async () => ok(undefined),
+      release: async (_context, reservation) => {
+        released.push(reservation.reservationId);
+        return ok(undefined);
+      },
+    };
+    const { service } = await fixture({ placement: invalidPlacement });
+    const result = await service.resolve(context, input);
+    expect(result._unsafeUnwrapErr().details?.code).toBe(
+      "workspace_target_selection_evidence_invalid",
+    );
+    expect(released).toEqual(["wres_invalid"]);
   });
 });

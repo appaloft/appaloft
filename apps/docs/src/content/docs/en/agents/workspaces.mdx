@@ -42,8 +42,7 @@ A Sandbox by itself is just a controlled execution environment — it doesn't pr
 
 ## Open a Workspace from a local repository <a id="agent-workspace-open" />
 
-After configuring the Repository Binding, Project default Agent Profile, Server Pool, and Profile
-Credential Connections, run this from a clean, pushed Git branch:
+Run this from a clean, pushed Git branch:
 
 ```bash
 appaloft code
@@ -55,7 +54,17 @@ uses the path only to find the Git root, upstream remote, branch, and HEAD SHA. 
 upload the local directory or uncommitted files. It normalizes the remote to a Repository identity,
 finds the Project through its Repository Binding, selects `--profile` or the Project default
 Profile, then creates or resumes the remote Workspace. By default it enters the Agent-owned
-interface:
+interface.
+
+`workspaces.open` validates the source before reading the existing Repository Binding and Project
+default Profile. A deployment may compose the optional activation initializer so missing Project,
+Binding, or default Profile state is idempotently created or reused during the same explicit
+activation, followed by a canonical public-state re-read. Community/local deployments without an
+initializer keep the existing fail-closed setup guidance. The initializer must perform its
+deployment-specific authorization and admission before creating context, and it cannot overwrite
+existing, conflicting, disabled, or unauthorized state.
+
+When attaching:
 
 - a managed-terminal Adapter launches or reuses the Agent TUI Terminal Session and connects;
 - a native-attach Adapter obtains a short-lived revocable capability and executes or displays its
@@ -63,6 +72,19 @@ interface:
 - an Adapter without attach support returns an explicit capability error.
 
 Attach behavior comes only from Adapter capabilities, never Pi, OpenCode, or another Agent name.
+
+The successful result and Workspace detail return safe activation and target-selection evidence:
+
+- Project, Repository Binding, and Profile activation items each report `created` or `reused`;
+- target class is `managed`, `registered-server`, or `local`; selection source is
+  `platform-default`, `saved-policy`, or `explicit`; and a stable reason explains the choice;
+- evidence contains no Server id, host, provider handle, capacity probe, or credential. Reopening
+  the same Workspace returns the persisted evidence without rerunning placement. A legacy Workspace
+  without evidence explicitly reports `legacy-unclassified` rather than guessing its location.
+
+Deployment-specific entitlement, target-policy, or capacity failures must happen before any
+Sandbox/provider effect. Recovery may offer wait, retry, or explicit alternative enrollment, but
+Appaloft never silently changes a managed request to a registered Server or the local machine.
 
 The same command resumes the preferred Workspace when its source SHA still matches. Use `--new` for
 a new isolated Workspace, or `--no-attach` to return only the descriptor:
@@ -94,6 +116,10 @@ terminate a Workspace. It reads existing public state for Workspaces, Agent Runt
 ports, Tasks, and Promotions. When a selected Runtime declares an attach capability, the Agent's
 own TUI is embedded as a native terminal byte stream. Appaloft does not parse conversations, tool
 calls, or hidden reasoning.
+
+The detail header shows the same safe target class/source/reason and activation `created`/`reused`
+state returned by headless `sandbox show`, HTTP, and SDK surfaces. It never displays host or provider
+identity.
 
 - `↑` / `↓` or `j` / `k`: select a Workspace;
 - `Enter`: attach or focus an already connected Agent;
@@ -174,7 +200,12 @@ const workspace = await appaloft.workspaces.open({
   profile: "opencode-default",
 });
 
-console.log(workspace.workspaceId, workspace.agent.runtimeId);
+console.log(
+  workspace.workspaceId,
+  workspace.agent.runtimeId,
+  workspace.targetSelection,
+  workspace.activation,
+);
 ```
 
 If the runtime creation step fails, the SDK throws `AppaloftWorkspaceCreateError`, which still carries the already-created `workspaceId` (that is, `sandboxId`) — the caller can retry runtime creation, or explicitly terminate the Sandbox.

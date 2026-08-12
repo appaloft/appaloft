@@ -1603,6 +1603,13 @@ export interface WorkspaceOpenEntriesTable {
   generation: number;
   commit_sha: string;
   profile_installation_id: string;
+  target_class: string | null;
+  target_selection_source: string | null;
+  target_selection_reason: string | null;
+  activation_repository_binding_id: string | null;
+  activation_project_disposition: string | null;
+  activation_repository_binding_disposition: string | null;
+  activation_profile_disposition: string | null;
   workspace_id: string | null;
   runtime_id: string | null;
   status: string;

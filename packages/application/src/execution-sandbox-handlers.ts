@@ -236,13 +236,44 @@ export class SandboxQueryHandler implements QueryHandlerContract<SandboxQuery, u
   constructor(
     @inject(tokens.executionSandboxService)
     private readonly service: ExecutionSandboxService,
+    @inject(tokens.workspaceOpenEntryRepository, { isOptional: true })
+    private readonly workspaceOpenEntries?: WorkspaceOpenEntryRepository,
   ) {}
 
   async handle(context: ExecutionContext, query: SandboxQuery): Promise<Result<unknown>> {
     const input = query.input;
-    if (query instanceof ListSandboxesQuery) return this.service.list(context, input);
-    if (query instanceof ShowSandboxQuery)
-      return this.service.show(context, text(input, "sandboxId"));
+    if (query instanceof ListSandboxesQuery) {
+      const listed = await this.service.list(context, input);
+      if (listed.isErr() || !this.workspaceOpenEntries) return listed;
+      const entries = await this.workspaceOpenEntries.findByWorkspaceIds(
+        context,
+        listed.value.items.map((sandbox) => sandbox.sandboxId),
+      );
+      const items = listed.value.items.map((sandbox) => {
+        const entry = entries.get(sandbox.sandboxId);
+        return entry
+          ? {
+              ...sandbox,
+              ...(entry.activation ? { activation: entry.activation } : {}),
+              targetSelection: entry.targetSelection,
+            }
+          : sandbox;
+      });
+      return ok({ ...listed.value, items });
+    }
+    if (query instanceof ShowSandboxQuery) {
+      const sandboxId = text(input, "sandboxId");
+      const shown = await this.service.show(context, sandboxId);
+      if (shown.isErr() || !this.workspaceOpenEntries) return shown;
+      const entry = await this.workspaceOpenEntries.findByWorkspaceId(context, sandboxId);
+      return entry
+        ? ok({
+            ...shown.value,
+            ...(entry.activation ? { activation: entry.activation } : {}),
+            targetSelection: entry.targetSelection,
+          })
+        : shown;
+    }
     if (query instanceof StreamSandboxEventsQuery)
       return this.service.streamEvents(context, text(input, "sandboxId"), {
         ...(input as Parameters<ExecutionSandboxService["streamEvents"]>[2]),

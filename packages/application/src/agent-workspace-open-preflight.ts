@@ -8,6 +8,8 @@ import {
   type Result,
 } from "@appaloft/core";
 import {
+  validateWorkspaceTargetSelectionEvidence,
+  type WorkspaceActivationContextDisposition,
   type WorkspaceOpenContext,
   type WorkspaceOpenInput,
   type WorkspaceOpenOptions,
@@ -61,6 +63,23 @@ export interface WorkspaceOpenPlacementPort {
   release(context: ExecutionContext, reservation: WorkspaceOpenReservation): Promise<Result<void>>;
 }
 
+export interface WorkspaceActivationContextInitializerPort {
+  ensure(
+    context: ExecutionContext,
+    input: {
+      readonly repository: string;
+      readonly repositoryIdentity: string;
+      readonly missing: "repository-binding" | "default-profile";
+    },
+  ): Promise<
+    Result<{
+      readonly project: WorkspaceActivationContextDisposition;
+      readonly repositoryBinding: WorkspaceActivationContextDisposition;
+      readonly profile: WorkspaceActivationContextDisposition;
+    }>
+  >;
+}
+
 export class FailClosedWorkspaceOpenCredentialAdmission
   implements WorkspaceOpenCredentialAdmissionPort
 {
@@ -102,7 +121,14 @@ export class InMemoryWorkspaceOpenPlacementPort implements WorkspaceOpenPlacemen
   async reserve(): Promise<Result<WorkspaceOpenReservation>> {
     const reservationId = `wres_${++this.sequence}`;
     this.reservations.set(reservationId, "reserved");
-    return ok({ reservationId });
+    return ok({
+      reservationId,
+      targetSelection: {
+        targetClass: "local",
+        source: "explicit",
+        reason: "local_composition",
+      },
+    });
   }
 
   async consume(
@@ -146,6 +172,7 @@ export class AgentWorkspaceOpenPreflightService {
       readonly credentialAdmission: WorkspaceOpenCredentialAdmissionPort;
       readonly mcpAdmission: WorkspaceOpenMcpAdmissionPort;
       readonly placement: WorkspaceOpenPlacementPort;
+      readonly contextInitializer?: WorkspaceActivationContextInitializerPort;
     },
   ) {}
 
@@ -166,6 +193,51 @@ export class AgentWorkspaceOpenPreflightService {
         ),
       );
     }
+    const initial = await this.resolveCanonicalContext(context, input, {
+      project: "reused",
+      repositoryBinding: "reused",
+      profile: "reused",
+    });
+    if (initial.isOk() || !this.dependencies.contextInitializer) return initial;
+    const missing = missingActivationContext(initial.error);
+    if (!missing) return initial;
+    const initialized = await this.dependencies.contextInitializer.ensure(context, {
+      repository: input.repository,
+      repositoryIdentity: input.repositoryIdentity,
+      missing,
+    });
+    if (initialized.isErr()) return err(initialized.error);
+    if (!validActivationDispositions(initialized.value)) {
+      return err(
+        domainError.validation("Workspace activation initializer returned invalid evidence", {
+          code: "workspace_activation_context_evidence_invalid",
+        }),
+      );
+    }
+    const reread = await this.resolveCanonicalContext(context, input, initialized.value);
+    if (reread.isErr()) {
+      return err(
+        domainError.conflict(
+          "Workspace activation context is still unavailable after initialization",
+          {
+            code: "workspace_activation_context_conflict",
+            causeCode: reread.error.details?.code ?? reread.error.code,
+          },
+        ),
+      );
+    }
+    return reread;
+  }
+
+  private async resolveCanonicalContext(
+    context: ExecutionContext,
+    input: WorkspaceOpenInput,
+    dispositions: {
+      readonly project: WorkspaceActivationContextDisposition;
+      readonly repositoryBinding: WorkspaceActivationContextDisposition;
+      readonly profile: WorkspaceActivationContextDisposition;
+    },
+  ): Promise<Result<WorkspaceOpenContext>> {
     const repositoryContext = toRepositoryContext(context);
     const binding = await this.dependencies.repositoryBindings.findByIdentity(
       repositoryContext,
@@ -212,6 +284,17 @@ export class AgentWorkspaceOpenPreflightService {
     return ok({
       projectId,
       profileInstallationId: resolvedProfile.value,
+      activation: {
+        project: { projectId, disposition: dispositions.project },
+        repositoryBinding: {
+          bindingId: binding.binding.id.value,
+          disposition: dispositions.repositoryBinding,
+        },
+        profile: {
+          profileInstallationId: resolvedProfile.value,
+          disposition: dispositions.profile,
+        },
+      },
     });
   }
 
@@ -277,9 +360,23 @@ export class AgentWorkspaceOpenPreflightService {
       ...(options.placementProviderKey ? { providerKey: options.placementProviderKey } : {}),
     });
     if (reservation.isErr()) return err(reservation.error);
+    const targetSelection = validateWorkspaceTargetSelectionEvidence(
+      reservation.value.targetSelection,
+    );
+    if (targetSelection.isErr() || targetSelection.value.targetClass === "legacy-unclassified") {
+      await this.dependencies.placement.release(context, reservation.value);
+      return targetSelection.isErr()
+        ? err(targetSelection.error)
+        : err(
+            domainError.validation("New Workspace placement requires canonical target evidence", {
+              code: "workspace_target_selection_evidence_invalid",
+            }),
+          );
+    }
     return ok({
       projectId: resolved.projectId,
       profileInstallationId: resolved.profileInstallationId,
+      activation: resolved.activation,
       plan: plan.value,
       reservation: reservation.value,
     });
@@ -348,6 +445,27 @@ export class AgentWorkspaceOpenPreflightService {
       ? ok(candidate.id.value)
       : err(domainError.notFound("AgentWorkspaceProfileInstallation", selector));
   }
+}
+
+function missingActivationContext(error: {
+  readonly details?: Readonly<Record<string, unknown>>;
+}): "repository-binding" | "default-profile" | undefined {
+  const code = error.details?.code;
+  return code === "workspace_open_repository_not_bound"
+    ? "repository-binding"
+    : code === "workspace_open_profile_required"
+      ? "default-profile"
+      : undefined;
+}
+
+function validActivationDispositions(value: {
+  readonly project: WorkspaceActivationContextDisposition;
+  readonly repositoryBinding: WorkspaceActivationContextDisposition;
+  readonly profile: WorkspaceActivationContextDisposition;
+}): boolean {
+  return [value.project, value.repositoryBinding, value.profile].every(
+    (candidate) => candidate === "created" || candidate === "reused",
+  );
 }
 
 function repositoryIdentityFromSource(repository: string): Result<string> {

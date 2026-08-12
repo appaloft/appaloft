@@ -18,13 +18,16 @@ Profile selector, `forceNew`, and attach intent. It never receives a local path 
 
 Before Sandbox effects it resolves, in order:
 
-1. exact Repository Binding and visible Project;
-2. explicit Profile installation/id/name or Project default installation;
-3. enabled immutable Profile/Adapter definitions and Sandbox Template;
-4. installation-owned named Credential Connections;
-5. Adapter capabilities required by the request;
-6. immutable repository ref/commit equality;
-7. authorization plus a consumable admission/placement reservation.
+1. canonical Repository identity and immutable repository ref/commit equality;
+2. exact Repository Binding and visible Project plus explicit Profile or Project default Profile;
+3. only when Binding/default Profile is missing, an optional activation-context initializer after
+   repository source/identity validation; canonical repositories are re-read and conflicting state
+   fails closed; downstream compositions must perform their own entitlement/admission check before
+   the initializer creates context;
+4. enabled immutable Profile/Adapter definitions and Sandbox Template;
+5. installation-owned named Credential Connections;
+6. Adapter capabilities required by the request;
+7. a consumable admission/placement reservation with validated target-selection evidence.
 
 The workflow then coordinates tenant + subject + Project + Repository Identity + branch. A
 matching preferred Workspace is resumed/reconnected; `forceNew` creates a distinct Sandbox and
@@ -45,10 +48,15 @@ type OpenAgentWorkspaceCommandInput = {
 };
 ```
 
-The result contains safe Workspace/Runtime/Profile/source descriptors and a capability-derived
-attach handoff. Partial failure after Sandbox identity contains exact phase, ids, retryability,
-recovery, and terminate evidence. It never returns secret values, raw provider addresses, SSH
-material, or long-lived attach credentials.
+The result contains safe Workspace/Runtime/Profile/source descriptors, activation context evidence,
+persisted target-selection evidence and a capability-derived attach handoff. Each activation item
+reports `created` or `reused`. Target evidence reports class (`managed`, `registered-server`,
+`local`, or legacy `legacy-unclassified`), source (`platform-default`, `saved-policy`, `explicit`, or
+legacy `legacy`) and a stable reason. Create/resume and Workspace status return the same evidence;
+resume never re-runs placement. Partial failure after Sandbox identity contains exact phase, ids,
+retryability, recovery, and terminate evidence. Public evidence never returns Server id/host, raw
+provider addresses or handles, capacity probes, SSH material, credentials, or long-lived attach
+capabilities.
 
 ## Attach
 
@@ -74,8 +82,11 @@ material, or long-lived attach credentials.
 - [ADR-100](../decisions/ADR-100-agent-adapter-distribution-and-workspace-profile-boundary.md)
 - [ADR-103](../decisions/ADR-103-profile-aware-workspace-open-and-attach.md)
 - [ADR-107](../decisions/ADR-107-task-oriented-workspace-activation-presentation.md)
+- [ADR-109](../decisions/ADR-109-workspace-activation-context-and-target-evidence.md)
 - [Spec 120](../specs/120-profile-aware-workspace-open-and-attach/spec.md)
 - [Spec 125](../specs/125-workspace-code-activation/spec.md)
+- [Spec 131](../specs/131-workspace-activation-context-and-target-evidence/spec.md)
 - [Workflow](../workflows/agent-workspace.md)
 - [Profile-Aware Open Test Matrix](../testing/profile-aware-workspace-open-test-matrix.md)
 - [Workspace Code Activation Test Matrix](../testing/workspace-code-activation-test-matrix.md)
+- [Workspace Activation Target Evidence Test Matrix](../testing/workspace-activation-target-evidence-test-matrix.md)

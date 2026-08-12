@@ -2,7 +2,7 @@
 
 ## Status
 
-- Round: Spec complete
+- Round: Post-Implementation Sync complete; delivery PR/CI pending
 - Artifact state: accepted; Ticket/Code authorized
 - Compatibility: additive public minor surface
 
@@ -38,6 +38,38 @@ lifecycle ownership.
 - `appaloft code` command input remains unchanged.
 - Workspace status/TUI may render class/source/reason only.
 - Public Workspace docs gain activation and safe target readback guidance.
+
+## Error contract
+
+- Without an initializer, missing Binding/default Profile keeps the existing
+  `workspace_open_repository_not_bound` / `workspace_open_profile_required` behavior.
+- Invalid initializer evidence returns `workspace_activation_context_evidence_invalid`.
+- State that is still unavailable after initialization returns
+  `workspace_activation_context_conflict` with the canonical re-read cause code.
+- Invalid or legacy evidence on a new reservation returns
+  `workspace_target_selection_evidence_invalid`; the reservation is released before returning.
+- Downstream compositions own entitlement/admission errors and must emit them before their
+  initializer mutates public context.
+
+## Documentation impact
+
+User-facing additive change. The existing bilingual anchor
+`/docs/agents/workspaces/#agent-workspace-open`, SDK example, Workspace control TUI guidance,
+operation spec, docs registry and traceability map are updated. Existing rows require only the
+nullable migration and explicit `legacy-unclassified` readback; no user-authored migration is
+required.
+
+## Verification evidence
+
+- Focused matrix tests pass across application, Postgres migration/repository, HTTP/oRPC, SDK,
+  CLI presentation, docs registry and Rust TUI seams.
+- Public lint passes with warnings only; affected package typechecks and `cargo fmt --check` pass.
+- Full public build passes all 6 tasks, including 125 documentation pages in both locales and the
+  Web production build.
+- The local full test run reached 1302 pass / 3 skip with one unrelated architecture filesystem
+  scan exceeding its fixed 5-second timeout under load. The same unchanged assertion passes alone
+  with a 20-second runner timeout in 6.99 seconds. Delivery CI must still pass the canonical test
+  gate before merge.
 
 ## Non-goals
 
