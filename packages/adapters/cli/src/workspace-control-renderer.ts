@@ -7,6 +7,12 @@ import { fileURLToPath } from "node:url";
 
 import { domainError } from "@appaloft/core";
 import {
+  createBoundedOperatePresentation,
+  type OperateAction,
+  type OperatePresentation,
+  type OperateRendererSession,
+} from "./operate-presentation.js";
+import {
   createBoundedWorkspaceControlPresentation,
   type WorkspaceControlPresentation,
   type WorkspaceControlRendererEvent,
@@ -99,7 +105,78 @@ function boundedText(value: unknown, max: number): value is string {
 function parseRendererEvent(value: unknown): WorkspaceControlRendererEvent | undefined {
   if (!value || typeof value !== "object") return undefined;
   const record = value as Record<string, unknown>;
+  const operateAction = (): OperateAction | undefined => {
+    const action = record.action;
+    if (!action || typeof action !== "object") return undefined;
+    const candidate = action as Record<string, unknown>;
+    if (!boundedText(candidate.resourceId, 160) || !boundedText(candidate.kind, 40)) {
+      return undefined;
+    }
+    if (candidate.kind === "retry" || candidate.kind === "redeploy") {
+      return boundedText(candidate.deploymentId, 160)
+        ? {
+            kind: candidate.kind,
+            resourceId: candidate.resourceId,
+            deploymentId: candidate.deploymentId,
+          }
+        : undefined;
+    }
+    if (candidate.kind === "rollback") {
+      return boundedText(candidate.deploymentId, 160) &&
+        boundedText(candidate.candidateDeploymentId, 160)
+        ? {
+            kind: candidate.kind,
+            resourceId: candidate.resourceId,
+            deploymentId: candidate.deploymentId,
+            candidateDeploymentId: candidate.candidateDeploymentId,
+          }
+        : undefined;
+    }
+    if (candidate.kind === "backup-create") {
+      return boundedText(candidate.storageVolumeId, 160) && boundedText(candidate.policyId, 160)
+        ? {
+            kind: candidate.kind,
+            resourceId: candidate.resourceId,
+            storageVolumeId: candidate.storageVolumeId,
+            policyId: candidate.policyId,
+          }
+        : undefined;
+    }
+    if (candidate.kind === "restore-independent") {
+      return boundedText(candidate.backupId, 160) &&
+        (candidate.restoredVolumeName === undefined ||
+          boundedText(candidate.restoredVolumeName, 160))
+        ? {
+            kind: candidate.kind,
+            resourceId: candidate.resourceId,
+            backupId: candidate.backupId,
+            ...(typeof candidate.restoredVolumeName === "string"
+              ? { restoredVolumeName: candidate.restoredVolumeName }
+              : {}),
+          }
+        : undefined;
+    }
+    return undefined;
+  };
   switch (record.type) {
+    case "operate-select":
+      return boundedText(record.resourceId, 160)
+        ? { type: "operate-select", resourceId: record.resourceId }
+        : undefined;
+    case "operate-refresh":
+      return { type: "operate-refresh" };
+    case "operate-preview-action": {
+      const action = operateAction();
+      return action ? { type: "operate-preview-action", action } : undefined;
+    }
+    case "operate-confirm-action": {
+      const action = operateAction();
+      return action && boundedText(record.token, 160)
+        ? { type: "operate-confirm-action", token: record.token, action }
+        : undefined;
+    }
+    case "operate-quit":
+      return { type: "operate-quit" };
     case "development-refresh":
       return { type: "development-refresh" };
     case "development-restart":
@@ -470,6 +547,43 @@ export function createRatatuiWorkspaceControlPresentation(
           };
         },
       });
+    },
+  });
+}
+
+export function createRatatuiOperatePresentation(
+  input: RatatuiWorkspaceControlPresentationInput = {},
+): OperatePresentation {
+  return createBoundedOperatePresentation({
+    openRenderer: async () => {
+      const environment = input.environment ?? process.env;
+      const binaryPath = input.binaryPath ?? resolveWorkspaceControlRendererBinary(environment);
+      if (!binaryPath) {
+        throw rendererError("Operate renderer is unavailable", "binary-missing", {
+          platform: process.platform,
+          architecture: process.arch,
+        });
+      }
+      const renderer = await openLoopbackWorkspaceControlRenderer({
+        launch: async ({ port, token }) => {
+          const child = spawn(binaryPath, [], {
+            shell: false,
+            stdio: "inherit",
+            env: {
+              ...environment,
+              APPALOFT_TUI_MODE: "operate",
+              APPALOFT_WORKSPACE_TUI_PORT: String(port),
+              APPALOFT_WORKSPACE_TUI_TOKEN: token,
+            },
+          });
+          const exited = new Promise<void>((resolveExit, rejectExit) => {
+            child.once("error", rejectExit);
+            child.once("exit", () => resolveExit());
+          });
+          return { exited, terminate: () => child.kill("SIGTERM") };
+        },
+      });
+      return renderer as unknown as OperateRendererSession;
     },
   });
 }

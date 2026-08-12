@@ -79,4 +79,39 @@ describe("shell help without runtime composition", () => {
     expect(stdout).toContain("--help");
     expect(stderr).not.toContain("PGlite");
   });
+
+  test("[OPR-COMPAT-018] operate help does not initialize PGlite", async () => {
+    const temporaryRoot = await mkdtemp(join(tmpdir(), "appaloft-operate-help-no-runtime-"));
+    temporaryRoots.push(temporaryRoot);
+    const unusablePglitePath = join(temporaryRoot, "pglite-is-a-file");
+    await writeFile(unusablePglitePath, "help must not open this path");
+
+    const child = Bun.spawn(
+      ["bun", "run", "--cwd", "apps/shell", "src/index.ts", "operate", "--help"],
+      {
+        cwd: join(import.meta.dir, "../../.."),
+        env: {
+          ...process.env,
+          APPALOFT_HOME: join(temporaryRoot, "home"),
+          APPALOFT_PGLITE_DATA_DIR: unusablePglitePath,
+          OTEL_SDK_DISABLED: "true",
+        },
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
+
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("Observe and recover one Resource");
+    expect(stdout).toContain("--deployment");
+    expect(stdout).toContain("--no-tui");
+    expect(stdout).toContain("--json");
+    expect(stderr).not.toContain("PGlite");
+  });
 });
