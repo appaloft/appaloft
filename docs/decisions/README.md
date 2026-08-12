@@ -128,6 +128,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-109: Workspace Activation Context And Target Evidence](./ADR-109-workspace-activation-context-and-target-evidence.md) | Accepted | Adds an optional neutral activation-context initializer and safe persisted target-selection evidence without moving hosted policy or topology into public core. |
 | [ADR-110: Local Development Session Boundary](./ADR-110-local-development-session-boundary.md) | Accepted | Defines `appaloft dev` as public local runtime coordination over the existing deployment-config service graph, with no fake Deployment or Cloud Dev lifecycle. |
 | [ADR-111: Outbound Server Worker Relay Boundary](./ADR-111-outbound-server-worker-relay-boundary.md) | Accepted | Defines the public outbound mTLS Server Worker protocol/client and attachment boundary while keeping hosted relay, CA, tenancy and fleet operations injectable. |
+| [ADR-112: Operate And Recover Presentation Boundary](./ADR-112-operate-and-recover-presentation-boundary.md) | Accepted | Defines `appaloft operate` as ephemeral public presentation over existing observation, recovery, backup and portability operations, with fresh admission, explicit confirmation and no new lifecycle owner. |
 
 ## Authoring Rules
 
