@@ -306,8 +306,12 @@ describe("platform migration stateful workflow e2e", () => {
         workspace.cliOptions,
       );
       expectCliSuccess(shownDependencyBackup, "show imported Redis backup");
+      const dependencyBackupSummary = parseJson<{
+        backup: { failureCode?: string; failureMessage?: string; status: string };
+      }>(shownDependencyBackup.stdout).backup;
       expect(
-        parseJson<{ backup: { status: string } }>(shownDependencyBackup.stdout).backup.status,
+        dependencyBackupSummary.status,
+        dependencyBackupSummary.failureMessage ?? dependencyBackupSummary.failureCode,
       ).toBe("ready");
       const redisBackupArtifact = JSON.parse(
         await readFile(
