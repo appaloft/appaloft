@@ -34,7 +34,9 @@ import {
   type ConfigureResourceAutoDeployCommandInput,
   type ConfigureResourceHealthCommandInput,
   type ConfigureResourceNetworkCommandInput,
+  type ConfigureResourceRolloutCommandInput,
   type ConfigureResourceRuntimeCommandInput,
+  type ConfigureResourceScaleCommandInput,
   type ConfigureResourceSourceCommandInput,
   type ConfigureRuntimeMonitoringThresholdsCommandInput,
   type ConfigureScheduledRuntimePrunePolicyCommandInput,
@@ -317,7 +319,9 @@ import {
   type ConfigureResourceAutoDeployResponse,
   type ConfigureResourceHealthResponse,
   type ConfigureResourceNetworkResponse,
+  type ConfigureResourceRolloutResponse,
   type ConfigureResourceRuntimeResponse,
+  type ConfigureResourceScaleResponse,
   type ConfigureResourceSourceResponse,
   type ConfigureRuntimeMonitoringThresholdsResponse,
   type ConfigureScheduledRuntimePrunePolicyResponse,
@@ -1833,6 +1837,18 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ConfigureResourceRuntimeCommandInput,
       ConfigureResourceRuntimeResponse,
+      AppaloftClientError
+    >;
+    configureScale: Client<
+      AppaloftClientContext,
+      ConfigureResourceScaleCommandInput,
+      ConfigureResourceScaleResponse,
+      AppaloftClientError
+    >;
+    configureRollout: Client<
+      AppaloftClientContext,
+      ConfigureResourceRolloutCommandInput,
+      ConfigureResourceRolloutResponse,
       AppaloftClientError
     >;
     configureSource: Client<

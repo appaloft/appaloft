@@ -254,6 +254,8 @@ export const enUS = {
         "A source profile records the code, image, or directory used by future deployments.",
       resourceRuntimeProfile:
         "A runtime profile defines the commands, image, ports, and variables used to run a resource.",
+      resourceScaleRolloutProfile:
+        "Scale and rollout profiles define replicas, resource budgets, autoscaling, and rollout strategy.",
       resourceProfileDrift:
         "Profile drift means declared resource configuration no longer matches runtime state.",
       resourceRuntimeControls:
@@ -3020,6 +3022,33 @@ export const enUS = {
       runtimeStrategyPrebuiltImage: "Prebuilt image",
       runtimeStrategyStatic: "Static",
       runtimeStrategyWorkspaceCommands: "Workspace commands",
+      scaleCpuLimit: "CPU limit (millicores)",
+      scaleCpuRequest: "CPU request (millicores)",
+      scaleHorizontalEnabled: "Enable horizontal autoscaling",
+      scaleHorizontalMax: "Maximum replicas",
+      scaleHorizontalMin: "Minimum replicas",
+      scaleHorizontalTargetCpu: "Target CPU utilization (%)",
+      scaleMemoryLimit: "Memory limit (MiB)",
+      scaleMemoryRequest: "Memory request (MiB)",
+      scaleProfileDescription:
+        "Set portable replicas, compute resources, and optional CPU-based autoscaling for future deployments.",
+      scaleProfileSaveFailed: "Scale profile was not saved",
+      scaleProfileSaved: "Scale profile saved",
+      scaleProfileTitle: "Scale profile",
+      scaleReplicas: "Desired replicas",
+      rolloutCanaryInitial: "Initial traffic (%)",
+      rolloutCanaryInterval: "Step interval (seconds)",
+      rolloutCanaryProofNotice:
+        "Canary deployment requires a target with weighted traffic and promotion proof support. Unsupported targets block before workload mutation.",
+      rolloutCanaryStep: "Traffic step (%)",
+      rolloutMaxSurge: "Maximum surge",
+      rolloutMaxUnavailable: "Maximum unavailable",
+      rolloutProfileDescription:
+        "Choose the portable replacement policy used by future deployments.",
+      rolloutProfileSaveFailed: "Rollout profile was not saved",
+      rolloutProfileSaved: "Rollout profile saved",
+      rolloutProfileTitle: "Rollout profile",
+      rolloutStrategy: "Rollout strategy",
       serviceTopologyDescription: "Declared service boundaries inside this resource.",
       serviceTopologyTitle: "Service topology",
       previewPolicyAction: "Preview policy",

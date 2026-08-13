@@ -64,11 +64,13 @@ async function createCommandCaptureHarness(requestId: string) {
 
 async function parseCli(program: { parseAsync(args: string[]): Promise<unknown> }, args: string[]) {
   const writeStdout = process.stdout.write;
+  const exitCode = process.exitCode;
   try {
     process.stdout.write = (() => true) as typeof process.stdout.write;
     await program.parseAsync(args);
   } finally {
     process.stdout.write = writeStdout;
+    process.exitCode = exitCode;
   }
 }
 
@@ -78,6 +80,7 @@ async function parseCliWithOutput(
 ): Promise<string> {
   let output = "";
   const writeStdout = process.stdout.write;
+  const exitCode = process.exitCode;
   try {
     process.stdout.write = ((
       chunk: string | Uint8Array,
@@ -93,6 +96,7 @@ async function parseCliWithOutput(
     return output;
   } finally {
     process.stdout.write = writeStdout;
+    process.exitCode = exitCode;
   }
 }
 
@@ -209,6 +213,92 @@ describe("CLI resource commands", () => {
         buildTarget: "runner",
       },
     });
+  });
+
+  test("[K8S-SURFACE-017] resource scale and rollout commands dispatch portable profiles", async () => {
+    const { ConfigureResourceRolloutCommand, ConfigureResourceScaleCommand } = await import(
+      "@appaloft/application"
+    );
+    const { program, commands } = await createCommandCaptureHarness(
+      "req_cli_resource_scale_rollout_test",
+    );
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "configure-scale",
+      "res_demo",
+      "--replicas",
+      "3",
+      "--cpu-request-millicores",
+      "250",
+      "--memory-limit-mebibytes",
+      "512",
+      "--hpa-min-replicas",
+      "2",
+      "--hpa-max-replicas",
+      "8",
+      "--hpa-target-cpu-percent",
+      "70",
+    ]);
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "configure-rollout",
+      "res_demo",
+      "--strategy",
+      "rolling",
+      "--max-unavailable",
+      "1",
+      "--max-surge",
+      "2",
+    ]);
+
+    expect(commands[0]).toBeInstanceOf(ConfigureResourceScaleCommand);
+    expect(commands[0]).toMatchObject({
+      resourceId: "res_demo",
+      scaleProfile: {
+        replicas: 3,
+        cpuRequestMillicores: 250,
+        memoryLimitMebibytes: 512,
+        horizontal: {
+          minReplicas: 2,
+          maxReplicas: 8,
+          targetCpuUtilizationPercent: 70,
+        },
+      },
+    });
+    expect(commands[1]).toBeInstanceOf(ConfigureResourceRolloutCommand);
+    expect(commands[1]).toMatchObject({
+      resourceId: "res_demo",
+      rolloutProfile: { strategy: "rolling", maxUnavailable: 1, maxSurge: 2 },
+    });
+  });
+
+  test("[K8S-SURFACE-017] incomplete autoscaling and canary option groups fail closed", async () => {
+    const { validateCompleteOptionalNumberGroup } = await import("../src/commands/resource");
+
+    const incomplete = validateCompleteOptionalNumberGroup(
+      [2, undefined, undefined],
+      "Horizontal autoscaling options must be complete",
+    );
+    const absent = validateCompleteOptionalNumberGroup(
+      [undefined, undefined, undefined],
+      "Horizontal autoscaling options must be complete",
+    );
+    const complete = validateCompleteOptionalNumberGroup(
+      [2, 8, 70],
+      "Horizontal autoscaling options must be complete",
+    );
+
+    expect(incomplete.isErr()).toBe(true);
+    expect(incomplete.isErr() ? incomplete.error.message : "").toBe(
+      "Horizontal autoscaling options must be complete",
+    );
+    expect(absent.isOk()).toBe(true);
+    expect(complete.isOk()).toBe(true);
   });
 
   test("[RES-PROFILE-ENTRY-003] resource archive dispatches the application command", async () => {

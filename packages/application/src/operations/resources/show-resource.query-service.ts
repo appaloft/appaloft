@@ -9,7 +9,9 @@ import {
   type ResourceHealthCheckPolicyState,
   ResourceId,
   type ResourceNetworkProfileState,
+  type ResourceRolloutProfileState,
   type ResourceRuntimeProfileState,
+  type ResourceScaleProfileState,
   type ResourceSourceBindingState,
   type ResourceState,
   type Result,
@@ -31,7 +33,9 @@ import {
   type ResourceDetailIdentity,
   type ResourceDetailNetworkProfile,
   type ResourceDetailProfileDiagnostic,
+  type ResourceDetailRolloutProfile,
   type ResourceDetailRuntimeProfile,
+  type ResourceDetailScaleProfile,
   type ResourceDetailSourceProfile,
   type ResourceRepository,
   type ResourceStorageAttachmentSummary,
@@ -227,6 +231,27 @@ function networkProfileFromState(
     exposureMode: profile.exposureMode.value,
     ...(profile.targetServiceName ? { targetServiceName: profile.targetServiceName.value } : {}),
     ...(profile.hostPort ? { hostPort: profile.hostPort.value } : {}),
+  };
+}
+
+function scaleProfileFromState(
+  profile: ResourceScaleProfileState | undefined,
+): ResourceDetailScaleProfile | undefined {
+  if (!profile) return undefined;
+  return {
+    ...profile,
+    replicas: profile.replicas.value,
+    ...(profile.horizontal ? { horizontal: { ...profile.horizontal } } : {}),
+  };
+}
+
+function rolloutProfileFromState(
+  profile: ResourceRolloutProfileState | undefined,
+): ResourceDetailRolloutProfile | undefined {
+  if (!profile) return undefined;
+  return {
+    ...profile,
+    ...(profile.canary ? { canary: { ...profile.canary } } : {}),
   };
 }
 
@@ -471,6 +496,8 @@ export class ShowResourceQueryService {
       const source = sourceProfileFromState(state.sourceBinding);
       const autoDeployPolicy = autoDeployPolicyFromState(state.autoDeployPolicy);
       const runtimeProfile = runtimeProfileFromState(state.runtimeProfile);
+      const scaleProfile = scaleProfileFromState(state.scaleProfile);
+      const rolloutProfile = rolloutProfileFromState(state.rolloutProfile);
       const networkProfile = networkProfileFromState(state.networkProfile);
       const accessProfile = accessProfileFromState(state.accessProfile);
       const storageAttachments = await storageAttachmentsFromState(
@@ -489,6 +516,8 @@ export class ShowResourceQueryService {
         ...(source ? { source } : {}),
         ...(autoDeployPolicy ? { autoDeployPolicy } : {}),
         ...(runtimeProfile ? { runtimeProfile } : {}),
+        ...(scaleProfile ? { scaleProfile } : {}),
+        ...(rolloutProfile ? { rolloutProfile } : {}),
         ...(networkProfile ? { networkProfile } : {}),
         ...(accessProfile ? { accessProfile } : {}),
         ...(storageAttachments.length > 0 ? { storageAttachments } : {}),

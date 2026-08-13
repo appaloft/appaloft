@@ -209,7 +209,9 @@ appaloft.resources.configureAccess -> resources.configure-access POST /resources
 appaloft.resources.configureAutoDeploy -> resources.configure-auto-deploy POST /resources/{resourceId}/auto-deploy
 appaloft.resources.configureHealth -> resources.configure-health POST /resources/{resourceId}/health-policy
 appaloft.resources.configureNetwork -> resources.configure-network POST /resources/{resourceId}/network-profile
+appaloft.resources.configureRollout -> resources.configure-rollout POST /resources/{resourceId}/rollout-profile
 appaloft.resources.configureRuntime -> resources.configure-runtime POST /resources/{resourceId}/runtime-profile
+appaloft.resources.configureScale -> resources.configure-scale POST /resources/{resourceId}/scale-profile
 appaloft.resources.configureSource -> resources.configure-source POST /resources/{resourceId}/source
 appaloft.resources.count -> resources.count GET /resources/count
 appaloft.resources.create -> resources.create POST /resources

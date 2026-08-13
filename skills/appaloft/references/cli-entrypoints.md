@@ -231,6 +231,8 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft resource configure-source <resourceId>` - `resources.configure-source`
 - `appaloft resource configure-runtime <resourceId>` - `resources.configure-runtime`
 - `appaloft resource configure-network <resourceId>` - `resources.configure-network`
+- `appaloft resource configure-scale <resourceId>` - `resources.configure-scale`
+- `appaloft resource configure-rollout <resourceId>` - `resources.configure-rollout`
 - `appaloft resource configure-access <resourceId>` - `resources.configure-access`
 - `appaloft resource auto-deploy <resourceId>` - `resources.configure-auto-deploy`
 - `appaloft resource storage attach <resourceId>` - `resources.attach-storage`

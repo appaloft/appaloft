@@ -13,9 +13,9 @@
 
 ## R5b Scale And Rollout
 
-- [ ] RED `SCALE-PROFILE-009`–`ROLLOUT-PROFILE-011` and `K8S-COMPOSE-012`.
-- [ ] Implement portable scale/rollout profiles, capability negotiation and service graph translation.
-- [ ] Prove convergence, failed rollout preservation and no-effect unsupported targets.
+- [x] RED `SCALE-PROFILE-009`–`ROLLOUT-PROFILE-011` and `K8S-COMPOSE-012`.
+- [x] Implement portable scale/rollout profiles, capability negotiation and service graph translation.
+- [x] Prove convergence, failed rollout preservation and no-effect unsupported targets.
 
 ## R5c Stateful And Packaging
 

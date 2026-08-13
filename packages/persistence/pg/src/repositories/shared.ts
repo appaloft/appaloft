@@ -465,6 +465,28 @@ export interface SerializedResourceRuntimeProfile extends Record<string, unknown
   replicas?: number;
   healthCheckPath?: string;
   healthCheck?: SerializedHealthCheckPolicy;
+  scaleProfile?: {
+    replicas: number;
+    cpuRequestMillicores?: number;
+    cpuLimitMillicores?: number;
+    memoryRequestMebibytes?: number;
+    memoryLimitMebibytes?: number;
+    horizontal?: {
+      minReplicas: number;
+      maxReplicas: number;
+      targetCpuUtilizationPercent: number;
+    };
+  };
+  rolloutProfile?: {
+    strategy: "recreate" | "rolling" | "canary";
+    maxUnavailable?: number;
+    maxSurge?: number;
+    canary?: {
+      initialTrafficPercent: number;
+      stepTrafficPercent: number;
+      intervalSeconds: number;
+    };
+  };
 }
 
 export interface SerializedResourceNetworkProfile extends Record<string, unknown> {
@@ -1752,6 +1774,27 @@ export function rehydrateResourceRow(
               : {}),
             ...(runtimeProfile.healthCheck
               ? { healthCheck: rehydrateHealthCheckPolicy(runtimeProfile.healthCheck) }
+              : {}),
+          },
+        }
+      : {}),
+    ...(runtimeProfile?.scaleProfile
+      ? {
+          scaleProfile: {
+            ...runtimeProfile.scaleProfile,
+            replicas: ReplicaCount.rehydrate(runtimeProfile.scaleProfile.replicas),
+            ...(runtimeProfile.scaleProfile.horizontal
+              ? { horizontal: { ...runtimeProfile.scaleProfile.horizontal } }
+              : {}),
+          },
+        }
+      : {}),
+    ...(runtimeProfile?.rolloutProfile
+      ? {
+          rolloutProfile: {
+            ...runtimeProfile.rolloutProfile,
+            ...(runtimeProfile.rolloutProfile.canary
+              ? { canary: { ...runtimeProfile.rolloutProfile.canary } }
               : {}),
           },
         }

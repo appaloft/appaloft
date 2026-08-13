@@ -127,8 +127,10 @@ import {
   ConfigureResourceHealthUseCase,
   ConfigureResourceNetworkCommandHandler,
   ConfigureResourceNetworkUseCase,
+  ConfigureResourceRolloutUseCase,
   ConfigureResourceRuntimeCommandHandler,
   ConfigureResourceRuntimeUseCase,
+  ConfigureResourceScaleUseCase,
   ConfigureResourceSourceCommandHandler,
   ConfigureResourceSourceUseCase,
   ConfigureRetentionDefaultsCommandHandler,
@@ -4332,6 +4334,11 @@ export function registerApplicationServices(
   container.registerSingleton(
     tokens.configureResourceNetworkUseCase,
     ConfigureResourceNetworkUseCase,
+  );
+  container.registerSingleton(tokens.configureResourceScaleUseCase, ConfigureResourceScaleUseCase);
+  container.registerSingleton(
+    tokens.configureResourceRolloutUseCase,
+    ConfigureResourceRolloutUseCase,
   );
   container.registerSingleton(
     tokens.configureResourceRuntimeUseCase,

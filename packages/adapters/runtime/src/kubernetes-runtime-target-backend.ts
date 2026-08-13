@@ -38,6 +38,7 @@ import { toRepositoryContext } from "@appaloft/application";
 import { requireServerBackedDeploymentState } from "./deployment-target";
 import { resolveDependencyRuntimeEnvironment } from "./dependency-runtime-secrets";
 import {
+  renderKubernetesCanaryRouteManifest,
   renderKubernetesCleanupPlan,
   renderKubernetesRuntimeIntent,
   renderKubernetesRuntimeManifest,
@@ -263,6 +264,67 @@ export interface KubernetesProcessRunner {
   run(input: KubernetesProcessRunnerInput): Promise<Result<KubernetesCommandRunnerResult>>;
 }
 
+export interface KubernetesRolloutClock {
+  wait(milliseconds: number): Promise<void>;
+}
+
+export interface KubernetesCanaryRouteProbe {
+  prove(input: {
+    intent: KubernetesRuntimeIntent;
+    expectedDeploymentId: string;
+  }): Promise<Result<void>>;
+}
+
+class SystemKubernetesRolloutClock implements KubernetesRolloutClock {
+  async wait(milliseconds: number): Promise<void> {
+    await new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+  }
+}
+
+class FetchKubernetesCanaryRouteProbe implements KubernetesCanaryRouteProbe {
+  async prove(input: {
+    intent: KubernetesRuntimeIntent;
+    expectedDeploymentId: string;
+  }): Promise<Result<void>> {
+    const route = input.intent.routes[0];
+    const domain = route?.domains[0];
+    if (!route || !domain) {
+      return err(
+        domainError.runtimeTargetUnsupported("Kubernetes canary route is unavailable", {
+          phase: "kubernetes-canary-route-proof",
+        }),
+      );
+    }
+    const protocol = route.tlsMode === "disabled" ? "http" : "https";
+    const url = new URL(route.pathPrefix, `${protocol}://${domain}`);
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      try {
+        const response = await fetch(url, {
+          redirect: "manual",
+          signal: AbortSignal.timeout(1_000),
+        });
+        if (
+          response.ok &&
+          response.headers.get("x-appaloft-deployment-id") === input.expectedDeploymentId
+        ) {
+          await response.body?.cancel();
+          return ok(undefined);
+        }
+        await response.body?.cancel();
+      } catch {
+        // The route may still be converging in the ingress controller.
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 250));
+    }
+    return err(
+      domainError.infra("Kubernetes canary route did not converge", {
+        phase: "kubernetes-canary-route-proof",
+        expectedDeploymentId: input.expectedDeploymentId,
+      }),
+    );
+  }
+}
+
 class BunKubernetesProcessRunner implements KubernetesProcessRunner {
   async run(input: KubernetesProcessRunnerInput): Promise<Result<KubernetesCommandRunnerResult>> {
     try {
@@ -339,6 +401,12 @@ function blockedChecks(reasonCode: string, message?: string): RuntimeTargetReadi
 
 function commandReady(result: KubernetesCommandRunnerResult): boolean {
   return result.exitCode === 0 && result.stdout.trim().toLowerCase() === "yes";
+}
+
+function discoveredResource(stdout: string, resourceName: string): boolean {
+  return stdout
+    .split(/\s+/)
+    .some((name) => name === resourceName || name.startsWith(`${resourceName}.`));
 }
 
 function versionFrom(stdout: string): string | undefined {
@@ -444,6 +512,9 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
       "runtime.cleanup",
       "runtime.logs",
       "runtime.health",
+      "runtime.scale",
+      "runtime.autoscale",
+      "runtime.rollout",
       "proxy.route",
     ],
   };
@@ -456,6 +527,9 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
     private readonly controlPlaneSecretProtector?: ControlPlaneSecretProtector,
     private readonly routingPolicyResolver: KubernetesRoutingPolicyResolver =
       new BuiltinKubernetesRoutingPolicyResolver(),
+    private readonly rolloutClock: KubernetesRolloutClock = new SystemKubernetesRolloutClock(),
+    private readonly canaryRouteProbe: KubernetesCanaryRouteProbe =
+      new FetchKubernetesCanaryRouteProbe(),
   ) {}
 
   async inspectReadiness(
@@ -683,12 +757,40 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
     );
     if (manifestResult.isErr()) return err(manifestResult.error);
 
+    if (intent.scale.horizontal) {
+      const autoscaleCapability = await this.inspectAutoscaleCapability(
+        context,
+        state.serverId.value,
+        connectionResult.value,
+      );
+      if (autoscaleCapability.isErr()) return err(autoscaleCapability.error);
+    }
+    const canaryPlan =
+      intent.rollout.strategy === "canary"
+        ? await this.prepareCanary(
+            context,
+            deployment,
+            intent,
+            connectionResult.value,
+            routingPolicyResult.value,
+          )
+        : ok<
+            | {
+                stableIntent: KubernetesRuntimeIntent;
+                trafficSteps: number[];
+              }
+            | undefined
+          >(undefined);
+    if (canaryPlan.isErr()) return err(canaryPlan.error);
+
     const timeline: DeploymentTimelineJournalEntry[] = [];
+    const workloadNames = intent.services?.map((service) => service.workloadName) ?? [intent.workloadName];
     const steps: Array<{
       phase: "deploy" | "verify";
       step: string;
       args: string[];
       stdin?: string;
+      workloadIndex?: number;
     }> = [
       {
         phase: "deploy",
@@ -696,33 +798,60 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
         args: ["apply", "--server-side=true", "--field-manager=appaloft", "-f", "-"],
         stdin: JSON.stringify(manifestResult.value),
       },
-      {
-        phase: "verify",
-        step: "wait-candidate-rollout",
-        args: [
-          "rollout",
-          "status",
-          `deployment/${intent.workloadName}`,
-          "--namespace",
-          intent.namespace,
-          "--timeout=180s",
-        ],
-      },
-      {
-        phase: "verify",
-        step: "observe-candidate-deployment",
-        args: [
-          "get",
-          "deployment",
-          intent.workloadName,
-          "--namespace",
-          intent.namespace,
-          "-o",
-          "json",
-        ],
-      },
+      ...workloadNames.flatMap((workloadName, index) => [
+        {
+          phase: "verify" as const,
+          step:
+            workloadNames.length === 1
+              ? "wait-candidate-rollout"
+              : `wait-candidate-rollout:${workloadName}`,
+          args: [
+            "rollout",
+            "status",
+            `deployment/${workloadName}`,
+            "--namespace",
+            intent.namespace,
+            "--timeout=180s",
+          ],
+        },
+        {
+          phase: "verify" as const,
+          step:
+            workloadNames.length === 1
+              ? "observe-candidate-deployment"
+              : `observe-candidate-deployment:${workloadName}`,
+          args: [
+            "get",
+            "deployment",
+            workloadName,
+            "--namespace",
+            intent.namespace,
+            "-o",
+            "json",
+          ],
+          workloadIndex: index,
+        },
+      ]),
+      ...(intent.scale.horizontal
+        ? [
+            {
+              phase: "verify" as const,
+              step: "observe-candidate-autoscaler",
+              args: [
+                "get",
+                "horizontalpodautoscaler",
+                intent.workloadName,
+                "--namespace",
+                intent.namespace,
+                "-o",
+                "json",
+              ],
+            },
+          ]
+        : []),
     ];
 
+    let scaleObservation: ReturnType<KubernetesRuntimeTargetBackend["deploymentObservation"]>;
     for (const step of steps) {
       timeline.push(phaseLog(step.phase, step.step));
       const result = await this.run(
@@ -734,9 +863,26 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
         step.stdin,
       );
       const failed = result.isErr() || result.value.exitCode !== 0;
-      if (!failed && step.step === "observe-candidate-deployment") {
-        const observation = this.deploymentObservationReady(result.value.stdout);
-        if (!observation) {
+      if (!failed && step.step.startsWith("observe-candidate-deployment")) {
+        const workloadIndex = step.workloadIndex ?? 0;
+        const expectedReplicas = intent.services?.[workloadIndex]?.replicas ?? intent.scale.replicas;
+        const observation = this.deploymentObservation(
+          result.value.stdout,
+          intent,
+          expectedReplicas,
+        );
+        scaleObservation = observation
+          ? {
+              desiredReplicas:
+                (scaleObservation?.desiredReplicas ?? 0) + observation.desiredReplicas,
+              currentReplicas:
+                (scaleObservation?.currentReplicas ?? 0) + observation.currentReplicas,
+              readyReplicas: (scaleObservation?.readyReplicas ?? 0) + observation.readyReplicas,
+              ready: (scaleObservation?.ready ?? true) && observation.ready,
+              metricDecision: observation.metricDecision,
+            }
+          : undefined;
+        if (!observation?.ready) {
           timeline.push(phaseLog("verify", "candidate deployment is not available", "error"));
           await this.cleanupFailedCandidate(
             context,
@@ -751,9 +897,18 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
             retryable: true,
             timeline,
             errorCode: "kubernetes_candidate_not_ready",
-            metadata: this.executionMetadata(intent),
+            metadata: {
+              ...this.executionMetadata(intent),
+              ...(observation ? this.scaleObservationMetadata(observation) : {}),
+            },
           });
         }
+      }
+      if (!failed && step.step === "observe-candidate-autoscaler" && scaleObservation) {
+        scaleObservation.metricDecision = this.autoscaleMetricDecision(
+          result.value.stdout,
+          intent.scale.horizontal?.targetCpuUtilizationPercent ?? 0,
+        );
       }
       if (failed) {
         timeline.push(phaseLog(step.phase, `Kubernetes command failed at ${step.step}`, "error"));
@@ -775,13 +930,51 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
       }
     }
 
+    let rolloutMetadata: Record<string, string> = {};
+    if (canaryPlan.value) {
+      const promotion = await this.promoteCanary(
+        context,
+        state.serverId.value,
+        connectionResult.value,
+        intent,
+        canaryPlan.value,
+        timeline,
+      );
+      if (promotion.isErr()) {
+        timeline.push(phaseLog("verify", "Kubernetes canary promotion proof failed", "error"));
+        await this.cleanupFailedCandidate(
+          context,
+          state.serverId.value,
+          connectionResult.value,
+          intent,
+          timeline,
+        );
+        return applyExecutionResult(deployment, {
+          status: "failed",
+          exitCode: 1,
+          retryable: true,
+          timeline,
+          errorCode: "kubernetes_canary_promotion_failed",
+          metadata: {
+            ...this.executionMetadata(intent),
+            "runtime.rollout.stableNamespace": canaryPlan.value.stableIntent.namespace,
+          },
+        });
+      }
+      rolloutMetadata = promotion.value;
+    }
+
     timeline.push(phaseLog("deploy", `Kubernetes candidate ${intent.workloadName} converged`));
     return applyExecutionResult(deployment, {
       status: "succeeded",
       exitCode: 0,
       retryable: false,
       timeline,
-      metadata: this.executionMetadata(intent),
+      metadata: {
+        ...this.executionMetadata(intent),
+        ...rolloutMetadata,
+        ...(scaleObservation ? this.scaleObservationMetadata(scaleObservation) : {}),
+      },
     });
   }
 
@@ -913,20 +1106,472 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
     });
   }
 
-  private deploymentObservationReady(stdout: string): boolean {
+  private deploymentObservation(
+    stdout: string,
+    intent: KubernetesRuntimeIntent,
+    expectedReplicas = intent.scale.replicas,
+  ):
+    | {
+        desiredReplicas: number;
+        currentReplicas: number;
+        readyReplicas: number;
+        ready: boolean;
+        metricDecision: "disabled" | "below-target" | "at-target" | "above-target" | "unknown";
+      }
+    | undefined {
     try {
       const deployment = JSON.parse(stdout) as {
         spec?: { replicas?: number };
-        status?: { availableReplicas?: number; observedGeneration?: number };
+        status?: {
+          replicas?: number;
+          readyReplicas?: number;
+          availableReplicas?: number;
+          observedGeneration?: number;
+        };
         metadata?: { generation?: number };
       };
-      const desired = deployment.spec?.replicas ?? 1;
-      return (
-        (deployment.status?.availableReplicas ?? 0) >= desired &&
-        (deployment.status?.observedGeneration ?? 0) >= (deployment.metadata?.generation ?? 1)
+      const desiredReplicas = deployment.spec?.replicas ?? expectedReplicas;
+      const currentReplicas = deployment.status?.replicas ?? 0;
+      const readyReplicas = deployment.status?.readyReplicas ?? deployment.status?.availableReplicas ?? 0;
+      return {
+        desiredReplicas,
+        currentReplicas,
+        readyReplicas,
+        ready:
+          readyReplicas >= desiredReplicas &&
+          (deployment.status?.observedGeneration ?? 0) >= (deployment.metadata?.generation ?? 1),
+        metricDecision: intent.scale.horizontal ? "unknown" : "disabled",
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async inspectAutoscaleCapability(
+    context: ExecutionContext,
+    targetId: string,
+    connection: KubernetesResolvedConnection,
+  ): Promise<Result<void>> {
+    const hpa = await this.run(context, targetId, connection, "check-autoscale-api", [
+      "api-resources",
+      "--api-group=autoscaling",
+      "-o",
+      "name",
+    ]);
+    const metrics = await this.run(context, targetId, connection, "check-metrics-api", [
+      "get",
+      "--raw",
+      "/apis/metrics.k8s.io/v1beta1",
+    ]);
+    if (
+      hpa.isErr() ||
+      hpa.value.exitCode !== 0 ||
+      !discoveredResource(hpa.value.stdout, "horizontalpodautoscalers") ||
+      metrics.isErr() ||
+      metrics.value.exitCode !== 0
+    ) {
+      return err(
+        domainError.runtimeTargetUnsupported(
+          "Kubernetes target does not provide the required autoscaling and metrics APIs",
+          {
+            phase: "kubernetes-autoscale-capability",
+            missingCapability: "horizontal-autoscaling-metrics",
+          },
+        ),
       );
+    }
+    return ok(undefined);
+  }
+
+  private async prepareCanary(
+    context: ExecutionContext,
+    deployment: Deployment,
+    intent: KubernetesRuntimeIntent,
+    connection: KubernetesResolvedConnection,
+    routingPolicy: KubernetesResolvedRoutingPolicy | undefined,
+  ): Promise<
+    Result<{
+      stableIntent: KubernetesRuntimeIntent;
+      trafficSteps: number[];
+    }>
+  > {
+    const state = requireServerBackedDeploymentState(deployment, "kubernetes canary preparation");
+    const supersedesDeploymentId = state.supersedesDeploymentId?.value;
+    const canary = intent.rollout.canary;
+    if (!supersedesDeploymentId || !canary || !routingPolicy) {
+      return err(
+        domainError.runtimeTargetUnsupported(
+          "Kubernetes canary requires a prior runtime, complete traffic policy, and routing policy",
+          {
+            phase: "kubernetes-canary-capability",
+            missingCapability: "canary-promotion-proof",
+          },
+        ),
+      );
+    }
+    const stableIntent = renderKubernetesRuntimeIntent({
+      runtimePlan: state.runtimePlan,
+      environmentSnapshot: state.environmentSnapshot,
+      dependencyBindingReferences: state.dependencyBindingReferences,
+      identity: {
+        organizationId: organizationId(context),
+        projectId: state.projectId.value,
+        environmentId: state.environmentId.value,
+        resourceId: state.resourceId.value,
+        deploymentId: supersedesDeploymentId,
+        targetId: state.serverId.value,
+      },
+    });
+    if (stableIntent.isErr()) return err(stableIntent.error);
+    const resources = await this.run(
+      context,
+      state.serverId.value,
+      connection,
+      "check-canary-routing-api",
+      ["api-resources", "--api-group=traefik.io", "-o", "name"],
+    );
+    const endpointSliceResources = await this.run(
+      context,
+      state.serverId.value,
+      connection,
+      "check-canary-endpointslice-api",
+      ["api-resources", "--api-group=discovery.k8s.io", "-o", "name"],
+    );
+    const proxyAuthorization = await this.run(
+      context,
+      state.serverId.value,
+      connection,
+      "check-canary-proof-authorization",
+      ["auth", "can-i", "get", "endpoints", "--all-namespaces"],
+    );
+    const resourceNames =
+      resources.isOk() && resources.value.exitCode === 0
+        ? new Set(resources.value.stdout.split(/\s+/).filter(Boolean))
+        : new Set<string>();
+    const endpointSliceResourceNames =
+      endpointSliceResources.isOk() && endpointSliceResources.value.exitCode === 0
+        ? new Set(endpointSliceResources.value.stdout.split(/\s+/).filter(Boolean))
+        : new Set<string>();
+    if (
+      !resourceNames.has("ingressroutes.traefik.io") ||
+      !resourceNames.has("traefikservices.traefik.io") ||
+      !resourceNames.has("middlewares.traefik.io") ||
+      !endpointSliceResourceNames.has("endpointslices.discovery.k8s.io") ||
+      proxyAuthorization.isErr() ||
+      !commandReady(proxyAuthorization.value)
+    ) {
+      return err(
+        domainError.runtimeTargetUnsupported(
+          "Kubernetes target does not provide canary routing and proof capabilities",
+          {
+            phase: "kubernetes-canary-capability",
+            missingCapability: "traefik-weighted-routing-or-endpoint-readback",
+          },
+        ),
+      );
+    }
+
+    const stableEndpoints = await this.run(
+      context,
+      state.serverId.value,
+      connection,
+      "verify-stable-endpoints",
+      [
+        "get",
+        "endpoints",
+        stableIntent.value.workloadName,
+        "--namespace",
+        stableIntent.value.namespace,
+        "-o",
+        "json",
+      ],
+    );
+    if (
+      stableEndpoints.isErr() ||
+      stableEndpoints.value.exitCode !== 0 ||
+      !this.endpointsReady(stableEndpoints.value.stdout)
+    ) {
+      return err(
+        domainError.runtimeTargetUnsupported(
+          "Kubernetes canary requires a prior runtime with ready endpoints",
+          {
+            phase: "kubernetes-canary-capability",
+            missingCapability: "stable-runtime-endpoints",
+          },
+        ),
+      );
+    }
+    const stableEndpointAddresses = this.endpointAddresses(stableEndpoints.value.stdout);
+    const initialRoute = renderKubernetesCanaryRouteManifest({
+      intent,
+      stableNamespace: stableIntent.value.namespace,
+      stableWorkloadName: stableIntent.value.workloadName,
+      stableEndpointAddresses,
+      candidateTrafficPercent: canary.initialTrafficPercent,
+    });
+    if (initialRoute.isErr()) return err(initialRoute.error);
+
+    const trafficSteps: number[] = [];
+    for (
+      let traffic = canary.initialTrafficPercent;
+      traffic < 100;
+      traffic = Math.min(100, traffic + canary.stepTrafficPercent)
+    ) {
+      trafficSteps.push(traffic);
+    }
+    if (trafficSteps.at(-1) !== 100) trafficSteps.push(100);
+    return ok({ stableIntent: stableIntent.value, trafficSteps });
+  }
+
+  private endpointsReady(stdout: string): boolean {
+    return this.endpointAddresses(stdout).length > 0;
+  }
+
+  private endpointAddresses(stdout: string): string[] {
+    try {
+      const endpoints = JSON.parse(stdout) as {
+        subsets?: Array<{ addresses?: Array<{ ip?: unknown }>; ports?: unknown[] }>;
+      };
+      return [
+        ...new Set(
+          (endpoints.subsets ?? []).flatMap((subset) =>
+            (subset.ports?.length ?? 0) > 0
+              ? (subset.addresses ?? []).flatMap((address) =>
+                  typeof address.ip === "string" ? [address.ip] : [],
+                )
+              : [],
+          ),
+        ),
+      ];
+    } catch {
+      return [];
+    }
+  }
+
+  private canaryRouteReady(
+    stdout: string,
+    candidateServiceName: string,
+    candidateTrafficPercent: number,
+  ): boolean {
+    try {
+      const route = JSON.parse(stdout) as {
+        spec?: { weighted?: { services?: Array<{ name?: string; weight?: number }> } };
+      };
+      const services = route.spec?.weighted?.services ?? [];
+      const candidate = services.find((service) => service.name === candidateServiceName);
+      if (candidate?.weight !== candidateTrafficPercent) return false;
+      if (services.reduce((total, service) => total + (service.weight ?? 0), 0) !== 100) {
+        return false;
+      }
+      return candidateTrafficPercent < 100
+        ? services.some(
+            (service) =>
+              service.name !== candidateServiceName &&
+              service.weight === 100 - candidateTrafficPercent,
+          )
+        : services.length === 1;
     } catch {
       return false;
+    }
+  }
+
+  private async promoteCanary(
+    context: ExecutionContext,
+    targetId: string,
+    connection: KubernetesResolvedConnection,
+    intent: KubernetesRuntimeIntent,
+    plan: { stableIntent: KubernetesRuntimeIntent; trafficSteps: number[] },
+    timeline: DeploymentTimelineJournalEntry[],
+  ): Promise<Result<Record<string, string>>> {
+    const canary = intent.rollout.canary;
+    if (!canary || !intent.health) {
+      return err(
+        domainError.runtimeTargetUnsupported("Kubernetes canary promotion proof is unavailable", {
+          phase: "kubernetes-canary-promotion",
+        }),
+      );
+    }
+
+    const candidateProofArgs = [
+      "get",
+      "endpoints",
+      intent.workloadName,
+      "--namespace",
+      intent.namespace,
+      "-o",
+      "json",
+    ];
+    const candidateProof = await this.run(
+      context,
+      targetId,
+      connection,
+      "prove-canary-candidate",
+      candidateProofArgs,
+    );
+    if (
+      candidateProof.isErr() ||
+      candidateProof.value.exitCode !== 0 ||
+      !this.endpointsReady(candidateProof.value.stdout)
+    ) {
+      return err(
+        domainError.infra("Kubernetes canary candidate proof failed", {
+          phase: "kubernetes-canary-promotion",
+        }),
+      );
+    }
+    timeline.push(phaseLog("verify", "prove-canary-candidate"));
+
+    for (const [index, candidateTrafficPercent] of plan.trafficSteps.entries()) {
+      if (index > 0) {
+        await this.rolloutClock.wait(canary.intervalSeconds * 1_000);
+      }
+      const stableEndpoints = await this.run(
+        context,
+        targetId,
+        connection,
+        `refresh-stable-endpoints:${candidateTrafficPercent}`,
+        [
+          "get",
+          "endpoints",
+          plan.stableIntent.workloadName,
+          "--namespace",
+          plan.stableIntent.namespace,
+          "-o",
+          "json",
+        ],
+      );
+      if (
+        stableEndpoints.isErr() ||
+        stableEndpoints.value.exitCode !== 0 ||
+        !this.endpointsReady(stableEndpoints.value.stdout)
+      ) {
+        return err(
+          domainError.infra("Kubernetes canary stable endpoints became unavailable", {
+            phase: "kubernetes-canary-promotion",
+            candidateTrafficPercent,
+          }),
+        );
+      }
+      const routeManifest = renderKubernetesCanaryRouteManifest({
+        intent,
+        stableNamespace: plan.stableIntent.namespace,
+        stableWorkloadName: plan.stableIntent.workloadName,
+        stableEndpointAddresses: this.endpointAddresses(stableEndpoints.value.stdout),
+        candidateTrafficPercent,
+      });
+      if (routeManifest.isErr()) return err(routeManifest.error);
+      const weightedRoute = routeManifest.value.items.find(
+        (resource) => resource.kind === "TraefikService",
+      );
+      const weightedRouteName = weightedRoute?.metadata.name;
+      if (typeof weightedRouteName !== "string" || weightedRouteName.length === 0) {
+        return err(
+          domainError.infra("Kubernetes canary route identity is unavailable", {
+            phase: "kubernetes-canary-promotion",
+            candidateTrafficPercent,
+          }),
+        );
+      }
+      const apply = await this.run(
+        context,
+        targetId,
+        connection,
+        `apply-canary-traffic:${candidateTrafficPercent}`,
+        ["apply", "--server-side=true", "--field-manager=appaloft", "-f", "-"],
+        JSON.stringify(routeManifest.value),
+      );
+      if (apply.isErr() || apply.value.exitCode !== 0) {
+        return err(
+          domainError.infra("Kubernetes canary traffic update failed", {
+            phase: "kubernetes-canary-promotion",
+            candidateTrafficPercent,
+          }),
+        );
+      }
+      timeline.push(phaseLog("deploy", `canary-traffic:${candidateTrafficPercent}`));
+      const proof = await this.run(
+        context,
+        targetId,
+        connection,
+        `prove-canary-traffic:${candidateTrafficPercent}`,
+        [
+          "get",
+          "traefikservice",
+          weightedRouteName,
+          "--namespace",
+          intent.namespace,
+          "-o",
+          "json",
+        ],
+      );
+      if (
+        proof.isErr() ||
+        proof.value.exitCode !== 0 ||
+        !this.canaryRouteReady(
+          proof.value.stdout,
+          intent.workloadName,
+          candidateTrafficPercent,
+        )
+      ) {
+        return err(
+          domainError.infra("Kubernetes canary promotion proof failed", {
+            phase: "kubernetes-canary-promotion",
+            candidateTrafficPercent,
+          }),
+        );
+      }
+      timeline.push(phaseLog("verify", `prove-canary-traffic:${candidateTrafficPercent}`));
+      const routeProof = await this.canaryRouteProbe.prove({
+        intent,
+        expectedDeploymentId: intent.annotations["appaloft.io/deployment-id"] ?? "",
+      });
+      if (routeProof.isErr()) return err(routeProof.error);
+      timeline.push(phaseLog("verify", `prove-canary-route:${candidateTrafficPercent}`));
+    }
+
+    return ok({
+      "runtime.rollout.strategy": "canary",
+      "runtime.rollout.candidateTrafficPercent": "100",
+      "runtime.rollout.stableNamespace": plan.stableIntent.namespace,
+      "runtime.rollout.promotionProof": "passed",
+    });
+  }
+
+  private scaleObservationMetadata(observation: {
+    desiredReplicas: number;
+    currentReplicas: number;
+    readyReplicas: number;
+    metricDecision: string;
+  }): Record<string, string> {
+    return {
+      "runtime.scale.desiredReplicas": String(observation.desiredReplicas),
+      "runtime.scale.currentReplicas": String(observation.currentReplicas),
+      "runtime.scale.readyReplicas": String(observation.readyReplicas),
+      "runtime.scale.metricDecision": observation.metricDecision,
+    };
+  }
+
+  private autoscaleMetricDecision(
+    stdout: string,
+    targetCpuUtilizationPercent: number,
+  ): "below-target" | "at-target" | "above-target" | "unknown" {
+    try {
+      const hpa = JSON.parse(stdout) as {
+        status?: {
+          currentMetrics?: Array<{
+            resource?: { name?: string; current?: { averageUtilization?: number } };
+          }>;
+        };
+      };
+      const current = hpa.status?.currentMetrics?.find(
+        (metric) => metric.resource?.name === "cpu",
+      )?.resource?.current?.averageUtilization;
+      if (current === undefined) return "unknown";
+      if (current < targetCpuUtilizationPercent) return "below-target";
+      if (current > targetCpuUtilizationPercent) return "above-target";
+      return "at-target";
+    } catch {
+      return "unknown";
     }
   }
 
@@ -936,6 +1581,9 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
       "kubernetes.workloadName": intent.workloadName,
       "kubernetes.receipt": intent.receipt,
       "kubernetes.intentSchemaVersion": intent.schemaVersion,
+      "runtime.scale.desiredReplicas": String(intent.scale.replicas),
+      "runtime.scale.metricDecision": intent.scale.horizontal ? "unknown" : "disabled",
+      "runtime.rollout.strategy": intent.rollout.strategy,
     };
   }
 

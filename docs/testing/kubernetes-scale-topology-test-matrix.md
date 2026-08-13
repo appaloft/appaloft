@@ -10,17 +10,17 @@
 | K8S-ISO-006 | security/e2e | tenant/project namespace/RBAC/network/cleanup isolation | exact routing policy/NetworkPolicy tests plus real packet | passed |
 | K8S-ROLLBACK-007 | integration/e2e | failed candidate preservation and verified rollback | backend failure test plus real failed-candidate packet | passed |
 | K8S-CLEAN-008 | integration/e2e | label/receipt-owned cleanup and no collateral deletion | receipt mismatch tests plus independent zero-residual readback | passed |
-| SCALE-PROFILE-009 | domain/app/contract | portable replicas/resources/HPA policy and blockers | planned | planned |
-| SCALE-CONVERGE-010 | adapter/e2e | desired/current/ready and metric decision convergence | planned | planned |
-| ROLLOUT-PROFILE-011 | domain/adapter/e2e | recreate/rolling/canary gates and rollback | planned | planned |
-| K8S-COMPOSE-012 | adapter/e2e | service graph/private network/dependency translation | planned | planned |
+| SCALE-PROFILE-009 | domain/app/contract | portable replicas/resources/HPA policy and blockers | core/application/persistence/contracts and API/CLI/Web tests | passed |
+| SCALE-CONVERGE-010 | adapter/e2e | desired/current/ready and metric decision convergence | Kubernetes adapter tests plus real metrics-server/HPA packet | passed |
+| ROLLOUT-PROFILE-011 | domain/adapter/e2e | recreate/rolling/canary gates and rollback | staged route/readback/proof tests plus real weighted-traffic packet | passed |
+| K8S-COMPOSE-012 | adapter/e2e | service graph/private network/dependency translation | Kubernetes intent service-graph translation tests | passed |
 | K8S-HELM-013 | adapter/e2e | chart plan/diff/apply/upgrade/rollback/cleanup/secret safety | planned | planned |
 | K8S-STATEFUL-014 | adapter/e2e | PVC/data/backup/independent restore/cleanup | planned | planned |
 | K8S-MULTI-015 | application/e2e | deterministic placement/failover/no silent fallback/orphans | planned | planned |
 | K8S-MANAGED-016 | connector/Cloud e2e | managed provisioning composition and custody | planned | planned |
 | K8S-SURFACE-017 | contract | CLI/API/SDK/Web/MCP parity and docs | operation catalog, CLI, oRPC, SDK, Web, MCP and docs registry tests | passed |
 | K8S-E2E-018 | real cluster | R5a zero-residual packet | 2026-08-13 disposable k3d success/failure/cleanup packet | passed |
-| K8S-E2E-019 | real cluster | R5b/R5c scale/stateful/Helm packet | planned disposable cluster | planned |
+| K8S-E2E-019 | real cluster | R5b/R5c scale/stateful/Helm packet | 2026-08-13 R5b scale/canary packet passed; R5c stateful/Helm remains | partial |
 | K8S-E2E-020 | real managed/design partner | R5d provision/failover/recover/cleanup packet | explicit authorization required | planned |
 
 R5 total completion requires every row passing; a missing managed/design-partner packet is a real
@@ -34,3 +34,15 @@ controller NetworkPolicy source, routed deployment identity, normalized health/p
 failed candidate with exact receipt cleanup, preservation of the first healthy route, final cleanup,
 and an independent zero-owned-namespace readback. The packet passed 21 assertions. The cluster,
 network, attached image volume, and isolated kubeconfig were deleted after verification.
+
+## R5b Real Packet Evidence
+
+On 2026-08-13 `kubernetes-scale-rollout.smoke.test.ts` ran against a disposable two-node k3d
+cluster with k3s Traefik and the official metrics-server v0.8.1 manifest. It proved two ready
+candidate replicas, CPU/memory requests and limits, a real HPA and metrics API, stable endpoint
+preservation, distinct length-safe Kubernetes route identities, 10/40/70/100 Traefik weights,
+external route-identity convergence at every step, mixed stable/candidate traffic before promotion,
+candidate-only traffic at 100%, exact cleanup of both receipt-owned namespaces, and zero residual
+Appaloft namespaces. The packet passed 17 assertions. The cluster, network, attached image volume,
+and isolated kubeconfig were deleted after verification. R5c stateful/Helm evidence remains open,
+so `K8S-E2E-019` is partial rather than passed.

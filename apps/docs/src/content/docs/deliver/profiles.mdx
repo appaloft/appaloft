@@ -1,10 +1,10 @@
 ---
-title: "运行时 / 健康 / 网络 Profile"
-description: "运行时、健康检查与网络 Profile 的字段与默认值。"
+title: "运行时 / 扩缩容 / 发布 / 健康 / 网络 Profile"
+description: "运行时、扩缩容、发布、健康检查与网络 Profile 的字段与默认值。"
 docType: "reference"
 localeState:
   zh-CN: complete
-  en-US: needs-update
+  en-US: complete
 searchAliases:
   - "runtime profile"
   - "health check"
@@ -14,6 +14,8 @@ searchAliases:
   - "健康检查"
 relatedOperations:
   - "resources.configure-runtime"
+  - "resources.configure-scale"
+  - "resources.configure-rollout"
   - "resources.configure-health"
   - "resources.configure-network"
 sidebar:
@@ -24,7 +26,7 @@ sidebar:
 
 ## 标识
 
-一个 Resource 拥有三类持久化 Profile：Runtime Profile、Health Profile、Network Profile。它们都属于 Resource 本身，不是某一次部署的临时参数——保存 Profile 不会立即重启运行中的工作负载，只影响后续部署使用的规划输入。
+一个 Resource 拥有持久化的 Runtime、Scale、Rollout、Health 与 Network Profile。它们都属于 Resource 本身，不是某一次部署的临时参数——保存 Profile 不会立即重启运行中的工作负载，只影响后续部署使用的规划输入。
 
 ## Runtime Profile <a id="resource-runtime-profile" />
 
@@ -43,6 +45,12 @@ appaloft resource configure-runtime res_web \
   --build-command "bun run build" \
   --publish-directory dist
 ```
+
+### Scale 与 Rollout Profile <a id="resource-scale-rollout-profile" />
+
+`resources.configure-scale` 保存副本数、CPU/内存 requests/limits，以及可选 HPA 的最小/最大副本数和 CPU 目标；`resources.configure-rollout` 保存 `recreate`、`rolling` 或 `canary` 发布意图。目标 adapter 必须在任何工作负载写入前验证能力，不支持 HPA 指标或 canary promotion proof 时会明确拒绝，不能静默降级。
+
+`resources.show` 会读回两个 Profile。Kubernetes 支持固定副本、资源预算、HPA、recreate、rolling，以及单个健康检查 Traefik 工作负载的分阶段 canary。Canary 会保留稳定版本，在每一步刷新稳定 endpoints、写入并读回权重，再等待外部 route identity 收敛；任何一步失败只清理候选。Service graph canary、缺少 metrics/EndpointSlice/Traefik CRD 或无法证明公网 route 时会在相应边界明确失败，不会静默降级。
 
 ## Health Profile <a id="resource-health-profile" />
 

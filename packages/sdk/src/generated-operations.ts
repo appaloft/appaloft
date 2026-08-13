@@ -4042,6 +4042,25 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "resources.configure-rollout",
+    operationGroup: "resources",
+    operationMethod: "configureRollout",
+    facadePath: ["resources", "configureRollout"],
+    operationId: "resources.configureRollout",
+    kind: "command",
+    domain: "resources",
+    messageName: "ConfigureResourceRolloutCommand",
+    route: {
+      method: "POST",
+      path: "/resources/{resourceId}/rollout-profile",
+    },
+    docsHref: "/docs/deliver/profiles/#resource-runtime-profile",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "resources.configure-runtime",
     operationGroup: "resources",
     operationMethod: "configureRuntime",
@@ -4053,6 +4072,25 @@ export const generatedSdkOperations = [
     route: {
       method: "POST",
       path: "/resources/{resourceId}/runtime-profile",
+    },
+    docsHref: "/docs/deliver/profiles/#resource-runtime-profile",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "resources.configure-scale",
+    operationGroup: "resources",
+    operationMethod: "configureScale",
+    facadePath: ["resources", "configureScale"],
+    operationId: "resources.configureScale",
+    kind: "command",
+    domain: "resources",
+    messageName: "ConfigureResourceScaleCommand",
+    route: {
+      method: "POST",
+      path: "/resources/{resourceId}/scale-profile",
     },
     docsHref: "/docs/deliver/profiles/#resource-runtime-profile",
     authPolicy: "product-session",
@@ -8329,7 +8367,9 @@ export interface GeneratedAppaloftClient {
     readonly configureAutoDeploy: AppaloftSdkFacadeMethod;
     readonly configureHealth: AppaloftSdkFacadeMethod;
     readonly configureNetwork: AppaloftSdkFacadeMethod;
+    readonly configureRollout: AppaloftSdkFacadeMethod;
     readonly configureRuntime: AppaloftSdkFacadeMethod;
+    readonly configureScale: AppaloftSdkFacadeMethod;
     readonly configureSource: AppaloftSdkFacadeMethod;
     readonly count: AppaloftSdkFacadeMethod;
     readonly create: AppaloftSdkFacadeMethod;

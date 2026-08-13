@@ -1,6 +1,6 @@
 ---
-title: "Runtime, Health, and Network Profiles"
-description: "Fields and defaults for runtime, health-check, and network profiles."
+title: "Runtime, Scale, Rollout, Health, and Network Profiles"
+description: "Fields and defaults for runtime, scaling, rollout, health-check, and network profiles."
 docType: "reference"
 ---
 <a id="resource-source-profile" />
@@ -8,7 +8,7 @@ docType: "reference"
 
 ## Stable identifier
 
-A Resource owns three kinds of persistent profiles: Runtime Profile, Health Profile, and Network Profile. They all belong to the Resource itself, not to any single deployment's temporary parameters — saving a profile does not immediately restart a running workload, it only affects the planning input used by future deployments.
+A Resource owns persistent Runtime, Scale, Rollout, Health, and Network Profiles. They belong to the Resource itself, not to any single deployment's temporary parameters — saving a profile does not immediately restart a running workload, it only affects the planning input used by future deployments.
 
 ## Runtime Profile <a id="resource-runtime-profile" />
 
@@ -27,6 +27,12 @@ appaloft resource configure-runtime res_web \
   --build-command "bun run build" \
   --publish-directory dist
 ```
+
+### Scale and Rollout Profiles <a id="resource-scale-rollout-profile" />
+
+`resources.configure-scale` stores replicas, CPU/memory requests and limits, plus optional HPA minimum/maximum replicas and a CPU target. `resources.configure-rollout` stores `recreate`, `rolling`, or `canary` intent. A target adapter must validate capability before any workload mutation; unsupported HPA metrics or canary promotion proof fails explicitly without silent fallback.
+
+`resources.show` reads both profiles back. Kubernetes supports fixed replicas, resource budgets, HPA, recreate, rolling, and staged canary for one health-checked Traefik workload. Canary preserves the stable runtime, refreshes stable endpoints, applies and reads back each weight, then waits for external route identity convergence; any failed step cleans only the candidate. Service-graph canary, missing metrics/EndpointSlice/Traefik CRDs, or an unprovable public route fail explicitly without fallback.
 
 ## Health Profile <a id="resource-health-profile" />
 

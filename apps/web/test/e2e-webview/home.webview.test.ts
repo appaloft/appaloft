@@ -2526,6 +2526,16 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         id: "res_demo",
       },
     },
+    "/api/rpc/resources/configureScale": {
+      json: {
+        id: "res_demo",
+      },
+    },
+    "/api/rpc/resources/configureRollout": {
+      json: {
+        id: "res_demo",
+      },
+    },
     "/api/rpc/resources/configureSource": {
       json: {
         id: "res_demo",
@@ -8513,6 +8523,98 @@ describe.serial("console e2e with Bun.WebView", () => {
         (request) => request.pathname === "/api/rpc/resources/configureRuntime",
       ),
     ).toBe(false);
+  }, 30_000);
+
+  test("[K8S-SURFACE-017] configures portable scale and rollout profiles", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration&section=profile`);
+    await ensureResourceSection(view, {
+      tab: "configuration",
+      section: "profile",
+      sectionSelector: "#resource-configuration-profile",
+    });
+
+    await expectAnyText(view, ["Scale profile", "伸缩配置"]);
+    await expectAnyText(view, ["Rollout profile", "发布策略"]);
+    await view.evaluate(`document.querySelector("[data-resource-scale-profile-edit]")?.click()`);
+    const scaleSubmitted = await waitFor(
+      () =>
+        view.evaluate<boolean>(`(() => {
+          const scaleForm = document.querySelector("[data-resource-scale-profile-form]");
+          const scaleButton = scaleForm?.querySelector('button[type="submit"]');
+          if (
+            !(scaleForm instanceof HTMLFormElement) ||
+            !(scaleButton instanceof HTMLButtonElement) ||
+            scaleButton.disabled
+          ) {
+            return false;
+          }
+          scaleForm.requestSubmit();
+          return true;
+        })()`),
+      Boolean,
+      "Expected enabled scale profile dialog form",
+    );
+    expect(scaleSubmitted).toBe(true);
+
+    await waitFor(
+      async () =>
+        recordedApiRequests.filter(
+          (request) => request.pathname === "/api/rpc/resources/configureScale",
+        ).length,
+      (count) => count === 1,
+      "Expected scale profile operation request",
+    );
+
+    await view.evaluate(`document.querySelector("[data-resource-rollout-profile-edit]")?.click()`);
+    const rolloutSubmitted = await waitFor(
+      () =>
+        view.evaluate<boolean>(`(() => {
+          const rolloutForm = document.querySelector("[data-resource-rollout-profile-form]");
+          const rolloutButton = rolloutForm?.querySelector('button[type="submit"]');
+          if (
+            !(rolloutForm instanceof HTMLFormElement) ||
+            !(rolloutButton instanceof HTMLButtonElement) ||
+            rolloutButton.disabled
+          ) {
+            return false;
+          }
+          rolloutForm.requestSubmit();
+          return true;
+        })()`),
+      Boolean,
+      "Expected enabled rollout profile dialog form",
+    );
+    expect(rolloutSubmitted).toBe(true);
+
+    await waitFor(
+      async () =>
+        recordedApiRequests.filter((request) =>
+          ["/api/rpc/resources/configureScale", "/api/rpc/resources/configureRollout"].includes(
+            request.pathname,
+          ),
+        ).length,
+      (count) => count === 2,
+      "Expected scale and rollout operation requests",
+    );
+
+    const scaleInput = recordedApiRequests
+      .filter((request) => request.pathname === "/api/rpc/resources/configureScale")
+      .map((request) => readOrpcJsonPayload(request.body))[0];
+    const rolloutInput = recordedApiRequests
+      .filter((request) => request.pathname === "/api/rpc/resources/configureRollout")
+      .map((request) => readOrpcJsonPayload(request.body))[0];
+    expect(scaleInput).toEqual({
+      resourceId: "res_demo",
+      scaleProfile: { replicas: 1 },
+    });
+    expect(rolloutInput).toEqual({
+      resourceId: "res_demo",
+      rolloutProfile: { strategy: "rolling", maxUnavailable: 1, maxSurge: 1 },
+    });
   }, 30_000);
 
   test("[RES-PROFILE-ENTRY-002] shows resource variable overrides without inline mutation form", async () => {

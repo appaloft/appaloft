@@ -139,6 +139,36 @@ export interface ResourceRuntimeProfileState {
   healthCheck?: ResourceHealthCheckPolicyState;
 }
 
+export interface ResourceHorizontalScalePolicyState {
+  minReplicas: number;
+  maxReplicas: number;
+  targetCpuUtilizationPercent: number;
+}
+
+export interface ResourceScaleProfileState {
+  replicas: ReplicaCount;
+  cpuRequestMillicores?: number;
+  cpuLimitMillicores?: number;
+  memoryRequestMebibytes?: number;
+  memoryLimitMebibytes?: number;
+  horizontal?: ResourceHorizontalScalePolicyState;
+}
+
+export type ResourceRolloutStrategy = "recreate" | "rolling" | "canary";
+
+export interface ResourceCanaryPolicyState {
+  initialTrafficPercent: number;
+  stepTrafficPercent: number;
+  intervalSeconds: number;
+}
+
+export interface ResourceRolloutProfileState {
+  strategy: ResourceRolloutStrategy;
+  maxUnavailable?: number;
+  maxSurge?: number;
+  canary?: ResourceCanaryPolicyState;
+}
+
 export interface ResourceDeploymentHealthCheck {
   enabled: boolean;
   type: "http" | "command";
@@ -488,6 +518,8 @@ export interface ResourceState {
   sourceBinding?: ResourceSourceBindingState;
   autoDeployPolicy?: ResourceAutoDeployPolicyState;
   runtimeProfile?: ResourceRuntimeProfileState;
+  scaleProfile?: ResourceScaleProfileState;
+  rolloutProfile?: ResourceRolloutProfileState;
   networkProfile?: ResourceNetworkProfileState;
   accessProfile?: ResourceAccessProfileState;
   storageAttachments: ResourceStorageAttachmentState[];
@@ -518,6 +550,24 @@ function cloneResourceRuntimeProfileState(
     ...(profile.healthCheck
       ? { healthCheck: cloneResourceHealthCheckPolicyState(profile.healthCheck) }
       : {}),
+  };
+}
+
+function cloneResourceScaleProfileState(
+  profile: ResourceScaleProfileState,
+): ResourceScaleProfileState {
+  return {
+    ...profile,
+    ...(profile.horizontal ? { horizontal: { ...profile.horizontal } } : {}),
+  };
+}
+
+function cloneResourceRolloutProfileState(
+  profile: ResourceRolloutProfileState,
+): ResourceRolloutProfileState {
+  return {
+    ...profile,
+    ...(profile.canary ? { canary: { ...profile.canary } } : {}),
   };
 }
 
@@ -727,6 +777,195 @@ function serializedRuntimeProfile(profile: ResourceRuntimeProfileState): Record<
   };
 }
 
+function validatePositiveInteger(
+  value: number | undefined,
+  field: string,
+  phase: string,
+): Result<void> {
+  if (value !== undefined && (!Number.isInteger(value) || value <= 0)) {
+    return err(
+      domainError.validation("Profile value must be a positive integer", { phase, field }),
+    );
+  }
+  return ok(undefined);
+}
+
+function validateResourceScaleProfile(profile: ResourceScaleProfileState): Result<void> {
+  const phase = "resource-scale-profile-validation";
+  for (const [field, value] of [
+    ["cpuRequestMillicores", profile.cpuRequestMillicores],
+    ["cpuLimitMillicores", profile.cpuLimitMillicores],
+    ["memoryRequestMebibytes", profile.memoryRequestMebibytes],
+    ["memoryLimitMebibytes", profile.memoryLimitMebibytes],
+  ] as const) {
+    const validation = validatePositiveInteger(value, field, phase);
+    if (validation.isErr()) return err(validation.error);
+  }
+  if (
+    profile.cpuRequestMillicores !== undefined &&
+    profile.cpuLimitMillicores !== undefined &&
+    profile.cpuRequestMillicores > profile.cpuLimitMillicores
+  ) {
+    return err(
+      domainError.validation("CPU request cannot exceed CPU limit", {
+        phase,
+        reason: "cpu-request-exceeds-limit",
+      }),
+    );
+  }
+  if (
+    profile.memoryRequestMebibytes !== undefined &&
+    profile.memoryLimitMebibytes !== undefined &&
+    profile.memoryRequestMebibytes > profile.memoryLimitMebibytes
+  ) {
+    return err(
+      domainError.validation("Memory request cannot exceed memory limit", {
+        phase,
+        reason: "memory-request-exceeds-limit",
+      }),
+    );
+  }
+  if (profile.horizontal) {
+    const { minReplicas, maxReplicas, targetCpuUtilizationPercent } = profile.horizontal;
+    for (const [field, value] of [
+      ["horizontal.minReplicas", minReplicas],
+      ["horizontal.maxReplicas", maxReplicas],
+      ["horizontal.targetCpuUtilizationPercent", targetCpuUtilizationPercent],
+    ] as const) {
+      const validation = validatePositiveInteger(value, field, phase);
+      if (validation.isErr()) return err(validation.error);
+    }
+    if (minReplicas > maxReplicas) {
+      return err(
+        domainError.validation("Horizontal scale minimum cannot exceed maximum", {
+          phase,
+          reason: "invalid-horizontal-range",
+        }),
+      );
+    }
+    if (targetCpuUtilizationPercent > 100) {
+      return err(
+        domainError.validation("Horizontal CPU target cannot exceed 100 percent", {
+          phase,
+          reason: "invalid-horizontal-target",
+        }),
+      );
+    }
+  }
+  return ok(undefined);
+}
+
+function validateResourceRolloutProfile(profile: ResourceRolloutProfileState): Result<void> {
+  const phase = "resource-rollout-profile-validation";
+  if (
+    profile.strategy !== "recreate" &&
+    profile.strategy !== "rolling" &&
+    profile.strategy !== "canary"
+  ) {
+    return err(domainError.validation("Unsupported rollout strategy", { phase }));
+  }
+  for (const [field, value] of [
+    ["maxUnavailable", profile.maxUnavailable],
+    ["maxSurge", profile.maxSurge],
+  ] as const) {
+    const validation = validatePositiveInteger(value, field, phase);
+    if (validation.isErr()) return err(validation.error);
+  }
+  if (profile.strategy !== "rolling" && (profile.maxUnavailable || profile.maxSurge)) {
+    return err(
+      domainError.validation("Surge controls require the rolling strategy", {
+        phase,
+        reason: "strategy-control-mismatch",
+      }),
+    );
+  }
+  if (profile.strategy === "canary" && !profile.canary) {
+    return err(
+      domainError.validation("Canary rollout requires promotion policy", {
+        phase,
+        reason: "canary-policy-required",
+      }),
+    );
+  }
+  if (profile.strategy !== "canary" && profile.canary) {
+    return err(
+      domainError.validation("Canary policy requires canary strategy", {
+        phase,
+        reason: "strategy-control-mismatch",
+      }),
+    );
+  }
+  if (profile.canary) {
+    const { initialTrafficPercent, stepTrafficPercent, intervalSeconds } = profile.canary;
+    if (
+      !Number.isInteger(initialTrafficPercent) ||
+      initialTrafficPercent <= 0 ||
+      initialTrafficPercent >= 100 ||
+      !Number.isInteger(stepTrafficPercent) ||
+      stepTrafficPercent <= 0 ||
+      stepTrafficPercent > 100 ||
+      !Number.isInteger(intervalSeconds) ||
+      intervalSeconds <= 0
+    ) {
+      return err(
+        domainError.validation("Canary promotion policy is invalid", {
+          phase,
+          reason: "invalid-canary-policy",
+        }),
+      );
+    }
+  }
+  return ok(undefined);
+}
+
+function scaleAndRolloutRuntimeMetadata(input: {
+  scaleProfile?: ResourceScaleProfileState;
+  rolloutProfile?: ResourceRolloutProfileState;
+}): Record<string, string> {
+  const scale = input.scaleProfile;
+  const rollout = input.rolloutProfile;
+  return {
+    ...(scale ? { "appaloft.scale.replicas": String(scale.replicas.value) } : {}),
+    ...(scale?.cpuRequestMillicores !== undefined
+      ? { "appaloft.scale.cpuRequestMillicores": String(scale.cpuRequestMillicores) }
+      : {}),
+    ...(scale?.cpuLimitMillicores !== undefined
+      ? { "appaloft.scale.cpuLimitMillicores": String(scale.cpuLimitMillicores) }
+      : {}),
+    ...(scale?.memoryRequestMebibytes !== undefined
+      ? { "appaloft.scale.memoryRequestMebibytes": String(scale.memoryRequestMebibytes) }
+      : {}),
+    ...(scale?.memoryLimitMebibytes !== undefined
+      ? { "appaloft.scale.memoryLimitMebibytes": String(scale.memoryLimitMebibytes) }
+      : {}),
+    ...(scale?.horizontal
+      ? {
+          "appaloft.scale.hpa.minReplicas": String(scale.horizontal.minReplicas),
+          "appaloft.scale.hpa.maxReplicas": String(scale.horizontal.maxReplicas),
+          "appaloft.scale.hpa.targetCpuUtilizationPercent": String(
+            scale.horizontal.targetCpuUtilizationPercent,
+          ),
+        }
+      : {}),
+    ...(rollout ? { "appaloft.rollout.strategy": rollout.strategy } : {}),
+    ...(rollout?.maxUnavailable !== undefined
+      ? { "appaloft.rollout.maxUnavailable": String(rollout.maxUnavailable) }
+      : {}),
+    ...(rollout?.maxSurge !== undefined
+      ? { "appaloft.rollout.maxSurge": String(rollout.maxSurge) }
+      : {}),
+    ...(rollout?.canary
+      ? {
+          "appaloft.rollout.canary.initialTrafficPercent": String(
+            rollout.canary.initialTrafficPercent,
+          ),
+          "appaloft.rollout.canary.stepTrafficPercent": String(rollout.canary.stepTrafficPercent),
+          "appaloft.rollout.canary.intervalSeconds": String(rollout.canary.intervalSeconds),
+        }
+      : {}),
+  };
+}
+
 function deploymentHealthCheckFromPolicy(
   policy: ResourceHealthCheckPolicyState,
 ): ResourceDeploymentHealthCheck {
@@ -841,6 +1080,8 @@ export class Resource extends AggregateRoot<ResourceState> {
     services?: ResourceServiceState[];
     sourceBinding?: ResourceSourceBindingState;
     runtimeProfile?: ResourceRuntimeProfileState;
+    scaleProfile?: ResourceScaleProfileState;
+    rolloutProfile?: ResourceRolloutProfileState;
     networkProfile?: ResourceNetworkProfileState;
     accessProfile?: ResourceAccessProfileState;
     variables?: ResourceVariableState[];
@@ -887,6 +1128,14 @@ export class Resource extends AggregateRoot<ResourceState> {
           return err(runtimeProfileValidation.error);
         }
       }
+      if (input.scaleProfile) {
+        const validation = validateResourceScaleProfile(input.scaleProfile);
+        if (validation.isErr()) return err(validation.error);
+      }
+      if (input.rolloutProfile) {
+        const validation = validateResourceRolloutProfile(input.rolloutProfile);
+        if (validation.isErr()) return err(validation.error);
+      }
 
       const resource = new Resource({
         id: input.id,
@@ -904,6 +1153,12 @@ export class Resource extends AggregateRoot<ResourceState> {
           : {}),
         ...(input.runtimeProfile
           ? { runtimeProfile: cloneResourceRuntimeProfileState(input.runtimeProfile) }
+          : {}),
+        ...(input.scaleProfile
+          ? { scaleProfile: cloneResourceScaleProfileState(input.scaleProfile) }
+          : {}),
+        ...(input.rolloutProfile
+          ? { rolloutProfile: cloneResourceRolloutProfileState(input.rolloutProfile) }
           : {}),
         ...(input.networkProfile
           ? { networkProfile: cloneResourceNetworkProfileState(input.networkProfile) }
@@ -974,6 +1229,12 @@ export class Resource extends AggregateRoot<ResourceState> {
         : {}),
       ...(state.runtimeProfile
         ? { runtimeProfile: cloneResourceRuntimeProfileState(state.runtimeProfile) }
+        : {}),
+      ...(state.scaleProfile
+        ? { scaleProfile: cloneResourceScaleProfileState(state.scaleProfile) }
+        : {}),
+      ...(state.rolloutProfile
+        ? { rolloutProfile: cloneResourceRolloutProfileState(state.rolloutProfile) }
         : {}),
       ...(state.networkProfile
         ? { networkProfile: cloneResourceNetworkProfileState(state.networkProfile) }
@@ -1522,6 +1783,16 @@ export class Resource extends AggregateRoot<ResourceState> {
       );
     }
 
+    const runtimeMetadata = {
+      ...(runtimeProfile?.runtimeName
+        ? { "resource.runtimeName": runtimeProfile.runtimeName.value }
+        : {}),
+      ...scaleAndRolloutRuntimeMetadata({
+        ...(this.state.scaleProfile ? { scaleProfile: this.state.scaleProfile } : {}),
+        ...(this.state.rolloutProfile ? { rolloutProfile: this.state.rolloutProfile } : {}),
+      }),
+    };
+
     return ok({
       method,
       ...(runtimeProfile?.installCommand
@@ -1529,9 +1800,7 @@ export class Resource extends AggregateRoot<ResourceState> {
         : {}),
       ...(runtimeProfile?.buildCommand ? { buildCommand: runtimeProfile.buildCommand.value } : {}),
       ...(runtimeProfile?.startCommand ? { startCommand: runtimeProfile.startCommand.value } : {}),
-      ...(runtimeProfile?.runtimeName
-        ? { runtimeMetadata: { "resource.runtimeName": runtimeProfile.runtimeName.value } }
-        : {}),
+      ...(Object.keys(runtimeMetadata).length > 0 ? { runtimeMetadata } : {}),
       ...(sourceAccessMetadata ? { accessRouteMetadata: sourceAccessMetadata } : {}),
       ...(runtimeProfile?.publishDirectory
         ? { publishDirectory: runtimeProfile.publishDirectory.value }
@@ -1543,7 +1812,11 @@ export class Resource extends AggregateRoot<ResourceState> {
         ? { dockerComposeFilePath: runtimeProfile.dockerComposeFilePath.value }
         : {}),
       ...(runtimeProfile?.buildTarget ? { buildTarget: runtimeProfile.buildTarget.value } : {}),
-      ...(runtimeProfile?.replicas ? { replicas: runtimeProfile.replicas.value } : {}),
+      ...(this.state.scaleProfile
+        ? { replicas: this.state.scaleProfile.replicas.value }
+        : runtimeProfile?.replicas
+          ? { replicas: runtimeProfile.replicas.value }
+          : {}),
       ...(internalPort ? { port: internalPort } : {}),
       ...(networkProfile
         ? {
@@ -1925,6 +2198,40 @@ export class Resource extends AggregateRoot<ResourceState> {
     return ok(undefined);
   }
 
+  configureScaleProfile(input: {
+    scaleProfile: ResourceScaleProfileState;
+    configuredAt: UpdatedAt;
+  }): Result<void> {
+    const lifecycleGuard = this.rejectInactiveResource("resources.configure-scale");
+    if (lifecycleGuard.isErr()) return err(lifecycleGuard.error);
+    const validation = validateResourceScaleProfile(input.scaleProfile);
+    if (validation.isErr()) return err(validation.error);
+    this.state.scaleProfile = cloneResourceScaleProfileState(input.scaleProfile);
+    this.recordDomainEvent("resource-scale-profile-configured", input.configuredAt, {
+      resourceId: this.state.id.value,
+      replicas: input.scaleProfile.replicas.value,
+      configuredAt: input.configuredAt.value,
+    });
+    return ok(undefined);
+  }
+
+  configureRolloutProfile(input: {
+    rolloutProfile: ResourceRolloutProfileState;
+    configuredAt: UpdatedAt;
+  }): Result<void> {
+    const lifecycleGuard = this.rejectInactiveResource("resources.configure-rollout");
+    if (lifecycleGuard.isErr()) return err(lifecycleGuard.error);
+    const validation = validateResourceRolloutProfile(input.rolloutProfile);
+    if (validation.isErr()) return err(validation.error);
+    this.state.rolloutProfile = cloneResourceRolloutProfileState(input.rolloutProfile);
+    this.recordDomainEvent("resource-rollout-profile-configured", input.configuredAt, {
+      resourceId: this.state.id.value,
+      strategy: input.rolloutProfile.strategy,
+      configuredAt: input.configuredAt.value,
+    });
+    return ok(undefined);
+  }
+
   hasService(serviceName: ResourceServiceName): boolean {
     return this.state.services.some((service) => service.name.equals(serviceName));
   }
@@ -2199,6 +2506,12 @@ export class Resource extends AggregateRoot<ResourceState> {
         : {}),
       ...(this.state.runtimeProfile
         ? { runtimeProfile: cloneResourceRuntimeProfileState(this.state.runtimeProfile) }
+        : {}),
+      ...(this.state.scaleProfile
+        ? { scaleProfile: cloneResourceScaleProfileState(this.state.scaleProfile) }
+        : {}),
+      ...(this.state.rolloutProfile
+        ? { rolloutProfile: cloneResourceRolloutProfileState(this.state.rolloutProfile) }
         : {}),
       ...(this.state.networkProfile
         ? { networkProfile: cloneResourceNetworkProfileState(this.state.networkProfile) }
