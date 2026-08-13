@@ -676,6 +676,20 @@ new rollback variants, source binding, health policy, storage, webhooks, or reso
 
 ## Current Implementation Notes And Governed Follow-Ups
 
+R4 Platform Migration is positioned as an accepted future task presentation over existing public
+operations. ADR-113 and Spec 135 govern a versioned secret-safe Migration Bundle, vendor source
+adapters, digest-bound no-effect planning, receipt-backed apply/status/verify/cleanup and the
+web/Compose/stateful acceptance gate. Code Round may add migration task operations and entrypoints,
+but it must not add a Migration aggregate/table or bypass existing Project, Environment, Resource,
+Deployment, DomainBinding, DependencyResource or StorageVolume owners.
+
+R5 Kubernetes and Scale Topology is positioned as a sequence of accepted future runtime-target
+profiles under ADR-023, ADR-114 and Spec 136. `deployments.create` remains ids-only. Runtime Target
+Profile, Resource Scale Profile and Resource Rollout Profile operations must be cataloged before
+implementation; Kubernetes rendering, manifests, namespaces, client types and provider responses
+remain adapter-owned. R5a existing-cluster stateless OCI, R5b scale/rollout, R5c stateful/Helm and
+R5d managed/multi-cluster each require their own actor-visible evidence before total R5 completion.
+
 `CORE_OPERATIONS.md` remains the authoritative active operation list. This map adds relationship and
 gating semantics and must be kept in sync whenever a behavior changes state.
 

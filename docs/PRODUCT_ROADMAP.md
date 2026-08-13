@@ -2991,6 +2991,11 @@ External baseline research points to this practical minimum:
 ## Immediate Spec-Round Todo
 
 Recommended next Spec Rounds before broad Code Rounds:
+- [x] R4 Platform Migration Journey: govern the public `appaloft migrate` task coordinator,
+  secret-safe source adapters and web/Compose/stateful evidence gate in ADR-113 and Spec 135.
+- [x] R5 Kubernetes and Scale Topology: govern R5a existing-cluster OCI, R5b scale/rollout, R5c
+  stateful/Helm and R5d managed/multi-cluster boundaries in ADR-114 and Spec 136; Code proceeds in
+  that order and total R5 remains open until every real packet passes.
 - [x] URL-first deployment entry experience: categorize low-friction deployment lessons as
   user-layer Quick Deploy/first-deploy work, keep BYOS/runtime boundaries unchanged, and record
   follow-up tests/docs in

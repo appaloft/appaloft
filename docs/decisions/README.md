@@ -129,6 +129,8 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-110: Local Development Session Boundary](./ADR-110-local-development-session-boundary.md) | Accepted | Defines `appaloft dev` as public local runtime coordination over the existing deployment-config service graph, with no fake Deployment or Cloud Dev lifecycle. |
 | [ADR-111: Outbound Server Worker Relay Boundary](./ADR-111-outbound-server-worker-relay-boundary.md) | Accepted | Defines the public outbound mTLS Server Worker protocol/client and attachment boundary while keeping hosted relay, CA, tenancy and fleet operations injectable. |
 | [ADR-112: Operate And Recover Presentation Boundary](./ADR-112-operate-and-recover-presentation-boundary.md) | Accepted | Defines `appaloft operate` as ephemeral public presentation over existing observation, recovery, backup and portability operations, with fresh admission, explicit confirmation and no new lifecycle owner. |
+| [ADR-113: Platform Migration Presentation Boundary](./ADR-113-platform-migration-presentation-boundary.md) | Accepted | Defines a secret-safe Migration Bundle and `appaloft migrate` as receipt-backed coordination over existing operation owners, without a vendor mirror or Migration lifecycle. |
+| [ADR-114: Kubernetes Runtime Target And Scale Policy Boundary](./ADR-114-kubernetes-runtime-target-and-scale-policy-boundary.md) | Accepted | Defines provider-neutral target/scale/rollout profiles, an adapter-owned Kubernetes backend, ids-only deployment admission, and public connector/private managed-cluster composition. |
 
 ## Authoring Rules
 
