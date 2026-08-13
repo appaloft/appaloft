@@ -208,6 +208,9 @@
         "@appaloft/core": "workspace:*",
         "zod": "^4.4.3",
       },
+      "devDependencies": {
+        "reflect-metadata": "^0.2.2",
+      },
     },
     "packages/adapters/runtime": {
       "name": "@appaloft/adapter-runtime",
