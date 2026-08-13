@@ -564,6 +564,8 @@ function highValueToolSummary(): JsonObject[] {
     "resources.create",
     "resources.configure-source",
     "resources.configure-runtime",
+    "resources.configure-scale",
+    "resources.configure-rollout",
     "resources.configure-network",
     "resources.configure-health",
     "resources.configure-access",

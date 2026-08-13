@@ -473,6 +473,8 @@ export const tokens = {
   configureResourceHealthUseCase: Symbol.for("appaloft.configure_resource_health_use_case"),
   resetResourceHealthUseCase: Symbol.for("appaloft.reset_resource_health_use_case"),
   configureResourceNetworkUseCase: Symbol.for("appaloft.configure_resource_network_use_case"),
+  configureResourceScaleUseCase: Symbol.for("appaloft.configure_resource_scale_use_case"),
+  configureResourceRolloutUseCase: Symbol.for("appaloft.configure_resource_rollout_use_case"),
   configureResourceRuntimeUseCase: Symbol.for("appaloft.configure_resource_runtime_use_case"),
   createResourceSecretReferenceUseCase: Symbol.for(
     "appaloft.create_resource_secret_reference_use_case",

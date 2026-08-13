@@ -86,6 +86,7 @@ import {
   ProjectId,
   ProjectName,
   ProviderKey,
+  ReplicaCount,
   Resource,
   ResourceByIdSpec,
   ResourceExposureModeValue,
@@ -1372,6 +1373,21 @@ describe("pglite persistence integration", () => {
           generatedAccessMode: ResourceGeneratedAccessModeValue.rehydrate("disabled"),
           pathPrefix: RoutePathPrefix.rehydrate("/internal"),
         },
+        scaleProfile: {
+          replicas: ReplicaCount.rehydrate(3),
+          cpuRequestMillicores: 250,
+          memoryLimitMebibytes: 512,
+          horizontal: {
+            minReplicas: 2,
+            maxReplicas: 8,
+            targetCpuUtilizationPercent: 70,
+          },
+        },
+        rolloutProfile: {
+          strategy: "rolling",
+          maxUnavailable: 1,
+          maxSurge: 2,
+        },
         createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
       })._unsafeUnwrap();
 
@@ -1506,6 +1522,17 @@ describe("pglite persistence integration", () => {
         "disabled",
       );
       expect(persistedResource?.toState().accessProfile?.pathPrefix.value).toBe("/internal");
+      expect(persistedResource?.toState().scaleProfile?.replicas.value).toBe(3);
+      expect(persistedResource?.toState().scaleProfile?.horizontal).toEqual({
+        minReplicas: 2,
+        maxReplicas: 8,
+        targetCpuUtilizationPercent: 70,
+      });
+      expect(persistedResource?.toState().rolloutProfile).toEqual({
+        strategy: "rolling",
+        maxUnavailable: 1,
+        maxSurge: 2,
+      });
       expect(resourceSummary?.accessProfile).toEqual({
         generatedAccessMode: "disabled",
         pathPrefix: "/internal",

@@ -1125,6 +1125,25 @@ describe("console page structure", () => {
     expect(latestDeploymentSummarySource).not.toContain("border-red");
   });
 
+  test("[SCALE-PROFILE-WEB-013][ROLLOUT-PROFILE-WEB-014] keeps profile summaries display-first and edits in dialogs", () => {
+    const resourceProfileSectionSource = sourceBetween(
+      resourceDetailPageSource,
+      '{:else if activeResourceSection === "profile"}',
+      '{:else if activeResourceSection === "configuration"}',
+    );
+
+    expect(resourceProfileSectionSource).toContain("data-resource-scale-profile-summary");
+    expect(resourceProfileSectionSource).toContain("data-resource-rollout-profile-summary");
+    expect(resourceProfileSectionSource).not.toContain("data-resource-scale-profile-form");
+    expect(resourceProfileSectionSource).not.toContain("data-resource-rollout-profile-form");
+    expect(resourceDetailPageSource).toContain("<Dialog.Root bind:open={scaleProfileDialogOpen}>");
+    expect(resourceDetailPageSource).toContain(
+      "<Dialog.Root bind:open={rolloutProfileDialogOpen}>",
+    );
+    expect(resourceDetailPageSource).toContain("data-resource-scale-profile-form");
+    expect(resourceDetailPageSource).toContain("data-resource-rollout-profile-form");
+  });
+
   test("[RESOURCE-DETAIL-IA-001C] keeps monitor, logs, terminal, and job creation at the right layer", () => {
     const resourceJobsTabSource = sourceBetween(
       resourceDetailPageSource,

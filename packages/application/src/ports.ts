@@ -3521,6 +3521,30 @@ export interface ResourceDetailRuntimeProfile {
   healthCheck?: RequestedDeploymentHealthCheck;
 }
 
+export interface ResourceDetailScaleProfile {
+  replicas: number;
+  cpuRequestMillicores?: number;
+  cpuLimitMillicores?: number;
+  memoryRequestMebibytes?: number;
+  memoryLimitMebibytes?: number;
+  horizontal?: {
+    minReplicas: number;
+    maxReplicas: number;
+    targetCpuUtilizationPercent: number;
+  };
+}
+
+export interface ResourceDetailRolloutProfile {
+  strategy: "recreate" | "rolling" | "canary";
+  maxUnavailable?: number;
+  maxSurge?: number;
+  canary?: {
+    initialTrafficPercent: number;
+    stepTrafficPercent: number;
+    intervalSeconds: number;
+  };
+}
+
 export interface ResourceDetailNetworkProfile {
   internalPort: number;
   upstreamProtocol: ResourceNetworkProtocol;
@@ -3611,6 +3635,8 @@ export interface ResourceDetail {
   source?: ResourceDetailSourceProfile;
   autoDeployPolicy?: ResourceDetailAutoDeployPolicy;
   runtimeProfile?: ResourceDetailRuntimeProfile;
+  scaleProfile?: ResourceDetailScaleProfile;
+  rolloutProfile?: ResourceDetailRolloutProfile;
   networkProfile?: ResourceDetailNetworkProfile;
   accessProfile?: ResourceAccessProfile;
   healthPolicy?: ResourceDetailHealthPolicy;
@@ -10492,6 +10518,9 @@ export type RuntimeTargetCapability =
   | "runtime.health"
   | "runtime.cleanup"
   | "runtime.capacity"
+  | "runtime.scale"
+  | "runtime.autoscale"
+  | "runtime.rollout"
   | "proxy.route";
 
 export interface RuntimeTargetBackendDescriptor {

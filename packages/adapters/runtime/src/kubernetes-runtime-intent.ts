@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 
-import { deploymentProofConfigurationFingerprint } from "@appaloft/application";
+import {
+  deploymentProofConfigurationFingerprint,
+  type RequestedDeploymentServiceConfig,
+} from "@appaloft/application";
 
 import {
   domainError,
@@ -47,6 +50,7 @@ export interface KubernetesRuntimeRouteIntent {
   proxyKind: string;
   tlsMode: string;
   targetPort: number;
+  targetServiceName?: string;
 }
 
 export interface KubernetesRuntimeHealthIntent {
@@ -56,6 +60,50 @@ export interface KubernetesRuntimeHealthIntent {
   timeoutSeconds: number;
   failureThreshold: number;
   initialDelaySeconds: number;
+}
+
+export interface KubernetesRuntimeResourceBudgetIntent {
+  requests?: {
+    cpuMillicores?: number;
+    memoryMebibytes?: number;
+  };
+  limits?: {
+    cpuMillicores?: number;
+    memoryMebibytes?: number;
+  };
+}
+
+export interface KubernetesRuntimeHorizontalScaleIntent {
+  minReplicas: number;
+  maxReplicas: number;
+  targetCpuUtilizationPercent: number;
+}
+
+export interface KubernetesRuntimeScaleIntent {
+  replicas: number;
+  resources?: KubernetesRuntimeResourceBudgetIntent;
+  horizontal?: KubernetesRuntimeHorizontalScaleIntent;
+}
+
+export interface KubernetesRuntimeRolloutIntent {
+  strategy: "recreate" | "rolling" | "canary";
+  maxUnavailable?: number;
+  maxSurge?: number;
+  canary?: {
+    initialTrafficPercent: number;
+    stepTrafficPercent: number;
+    intervalSeconds: number;
+  };
+}
+
+export interface KubernetesRuntimeServiceIntent {
+  name: string;
+  workloadName: string;
+  image: string;
+  port?: number;
+  replicas: number;
+  command?: string;
+  environment: KubernetesRuntimeEnvironmentIntent[];
 }
 
 export interface KubernetesIngressControllerSource {
@@ -78,8 +126,262 @@ export interface KubernetesRuntimeIntent {
   environment: KubernetesRuntimeEnvironmentIntent[];
   routes: KubernetesRuntimeRouteIntent[];
   health?: KubernetesRuntimeHealthIntent;
+  scale: KubernetesRuntimeScaleIntent;
+  rollout: KubernetesRuntimeRolloutIntent;
+  services?: KubernetesRuntimeServiceIntent[];
   labels: Record<string, string>;
   annotations: Record<string, string>;
+}
+
+function serviceGraphFromMetadata(
+  metadata: Readonly<Record<string, string>> | undefined,
+): RequestedDeploymentServiceConfig[] {
+  if (metadata?.["serviceGraph.enabled"] !== "true") return [];
+  try {
+    const parsed = JSON.parse(metadata["serviceGraph.services"] ?? "[]");
+    return Array.isArray(parsed) ? (parsed as RequestedDeploymentServiceConfig[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function serviceWorkloadName(workloadName: string, serviceName: string): string {
+  return kubernetesName(`${workloadName}-${serviceName}`, "appaloft-service");
+}
+
+function optionalPositiveInteger(
+  metadata: Readonly<Record<string, string>> | undefined,
+  key: string,
+): Result<number | undefined> {
+  const raw = metadata?.[key];
+  if (raw === undefined) return ok(undefined);
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    return err(
+      domainError.validation("Kubernetes scale profile contains an invalid positive integer", {
+        phase: "kubernetes-scale-profile-resolution",
+        field: key,
+      }),
+    );
+  }
+  return ok(value);
+}
+
+function optionalPercentage(
+  metadata: Readonly<Record<string, string>> | undefined,
+  key: string,
+): Result<number | undefined> {
+  return optionalPositiveInteger(metadata, key).andThen((value) =>
+    value !== undefined && value > 100
+      ? err(
+          domainError.validation("Kubernetes scale profile percentage exceeds 100", {
+            phase: "kubernetes-scale-profile-resolution",
+            field: key,
+          }),
+        )
+      : ok(value),
+  );
+}
+
+function resolveScaleAndRollout(metadata: Readonly<Record<string, string>> | undefined): Result<{
+  scale: KubernetesRuntimeScaleIntent;
+  rollout: KubernetesRuntimeRolloutIntent;
+}> {
+  const replicas = optionalPositiveInteger(metadata, "appaloft.scale.replicas");
+  if (replicas.isErr()) return err(replicas.error);
+  const cpuRequest = optionalPositiveInteger(metadata, "appaloft.scale.cpuRequestMillicores");
+  if (cpuRequest.isErr()) return err(cpuRequest.error);
+  const cpuLimit = optionalPositiveInteger(metadata, "appaloft.scale.cpuLimitMillicores");
+  if (cpuLimit.isErr()) return err(cpuLimit.error);
+  const memoryRequest = optionalPositiveInteger(metadata, "appaloft.scale.memoryRequestMebibytes");
+  if (memoryRequest.isErr()) return err(memoryRequest.error);
+  const memoryLimit = optionalPositiveInteger(metadata, "appaloft.scale.memoryLimitMebibytes");
+  if (memoryLimit.isErr()) return err(memoryLimit.error);
+  const minReplicas = optionalPositiveInteger(metadata, "appaloft.scale.hpa.minReplicas");
+  if (minReplicas.isErr()) return err(minReplicas.error);
+  const maxReplicas = optionalPositiveInteger(metadata, "appaloft.scale.hpa.maxReplicas");
+  if (maxReplicas.isErr()) return err(maxReplicas.error);
+  const targetCpu = optionalPercentage(
+    metadata,
+    "appaloft.scale.hpa.targetCpuUtilizationPercent",
+  );
+  if (targetCpu.isErr()) return err(targetCpu.error);
+
+  const horizontalFields = [minReplicas.value, maxReplicas.value, targetCpu.value];
+  if (horizontalFields.some((value) => value !== undefined)) {
+    if (horizontalFields.some((value) => value === undefined)) {
+      return err(
+        domainError.validation("Kubernetes horizontal scale profile is incomplete", {
+          phase: "kubernetes-scale-profile-resolution",
+          reason: "incomplete-horizontal-profile",
+        }),
+      );
+    }
+    if ((minReplicas.value ?? 0) > (maxReplicas.value ?? 0)) {
+      return err(
+        domainError.validation("Kubernetes horizontal scale range is invalid", {
+          phase: "kubernetes-scale-profile-resolution",
+          reason: "invalid-horizontal-range",
+        }),
+      );
+    }
+  }
+  if (
+    cpuRequest.value !== undefined &&
+    cpuLimit.value !== undefined &&
+    cpuRequest.value > cpuLimit.value
+  ) {
+    return err(
+      domainError.validation("Kubernetes CPU request exceeds limit", {
+        phase: "kubernetes-scale-profile-resolution",
+        reason: "cpu-request-exceeds-limit",
+      }),
+    );
+  }
+  if (
+    memoryRequest.value !== undefined &&
+    memoryLimit.value !== undefined &&
+    memoryRequest.value > memoryLimit.value
+  ) {
+    return err(
+      domainError.validation("Kubernetes memory request exceeds limit", {
+        phase: "kubernetes-scale-profile-resolution",
+        reason: "memory-request-exceeds-limit",
+      }),
+    );
+  }
+
+  const strategy = metadata?.["appaloft.rollout.strategy"] ?? "rolling";
+  if (strategy !== "recreate" && strategy !== "rolling" && strategy !== "canary") {
+    return err(
+      domainError.validation("Kubernetes rollout strategy is unsupported", {
+        phase: "kubernetes-rollout-profile-resolution",
+        strategy,
+      }),
+    );
+  }
+  const maxUnavailable = optionalPositiveInteger(
+    metadata,
+    "appaloft.rollout.maxUnavailable",
+  );
+  if (maxUnavailable.isErr()) return err(maxUnavailable.error);
+  const maxSurge = optionalPositiveInteger(metadata, "appaloft.rollout.maxSurge");
+  if (maxSurge.isErr()) return err(maxSurge.error);
+  const canaryInitialTraffic = optionalPercentage(
+    metadata,
+    "appaloft.rollout.canary.initialTrafficPercent",
+  );
+  if (canaryInitialTraffic.isErr()) return err(canaryInitialTraffic.error);
+  const canaryStepTraffic = optionalPercentage(
+    metadata,
+    "appaloft.rollout.canary.stepTrafficPercent",
+  );
+  if (canaryStepTraffic.isErr()) return err(canaryStepTraffic.error);
+  const canaryInterval = optionalPositiveInteger(
+    metadata,
+    "appaloft.rollout.canary.intervalSeconds",
+  );
+  if (canaryInterval.isErr()) return err(canaryInterval.error);
+  if (strategy !== "rolling" && (maxUnavailable.value || maxSurge.value)) {
+    return err(
+      domainError.validation("Rollout surge controls require the rolling strategy", {
+        phase: "kubernetes-rollout-profile-resolution",
+        strategy,
+      }),
+    );
+  }
+  const canaryFields = [
+    canaryInitialTraffic.value,
+    canaryStepTraffic.value,
+    canaryInterval.value,
+  ];
+  if (strategy === "canary" && canaryFields.some((value) => value === undefined)) {
+    return err(
+      domainError.validation("Kubernetes canary rollout profile is incomplete", {
+        phase: "kubernetes-rollout-profile-resolution",
+        reason: "incomplete-canary-profile",
+      }),
+    );
+  }
+  if (strategy !== "canary" && canaryFields.some((value) => value !== undefined)) {
+    return err(
+      domainError.validation("Canary traffic controls require the canary strategy", {
+        phase: "kubernetes-rollout-profile-resolution",
+        strategy,
+      }),
+    );
+  }
+  if (canaryInitialTraffic.value === 100) {
+    return err(
+      domainError.validation("Kubernetes canary initial traffic must be below 100 percent", {
+        phase: "kubernetes-rollout-profile-resolution",
+        reason: "invalid-canary-initial-traffic",
+      }),
+    );
+  }
+
+  const hasRequests = cpuRequest.value !== undefined || memoryRequest.value !== undefined;
+  const hasLimits = cpuLimit.value !== undefined || memoryLimit.value !== undefined;
+  return ok({
+    scale: {
+      replicas: replicas.value ?? 1,
+      ...(hasRequests || hasLimits
+        ? {
+            resources: {
+              ...(hasRequests
+                ? {
+                    requests: {
+                      ...(cpuRequest.value !== undefined
+                        ? { cpuMillicores: cpuRequest.value }
+                        : {}),
+                      ...(memoryRequest.value !== undefined
+                        ? { memoryMebibytes: memoryRequest.value }
+                        : {}),
+                    },
+                  }
+                : {}),
+              ...(hasLimits
+                ? {
+                    limits: {
+                      ...(cpuLimit.value !== undefined
+                        ? { cpuMillicores: cpuLimit.value }
+                        : {}),
+                      ...(memoryLimit.value !== undefined
+                        ? { memoryMebibytes: memoryLimit.value }
+                        : {}),
+                    },
+                  }
+                : {}),
+            },
+          }
+        : {}),
+      ...(minReplicas.value !== undefined &&
+      maxReplicas.value !== undefined &&
+      targetCpu.value !== undefined
+        ? {
+            horizontal: {
+              minReplicas: minReplicas.value,
+              maxReplicas: maxReplicas.value,
+              targetCpuUtilizationPercent: targetCpu.value,
+            },
+          }
+        : {}),
+    },
+    rollout: {
+      strategy,
+      ...(maxUnavailable.value !== undefined ? { maxUnavailable: maxUnavailable.value } : {}),
+      ...(maxSurge.value !== undefined ? { maxSurge: maxSurge.value } : {}),
+      ...(strategy === "canary"
+        ? {
+            canary: {
+              initialTrafficPercent: canaryInitialTraffic.value as number,
+              stepTrafficPercent: canaryStepTraffic.value as number,
+              intervalSeconds: canaryInterval.value as number,
+            },
+          }
+        : {}),
+    },
+  });
 }
 
 export interface KubernetesManifestResource {
@@ -114,6 +416,14 @@ function kubernetesName(value: string, fallback: string, maxLength = 63): string
   return safe.length <= maxLength
     ? safe
     : safe.slice(0, maxLength).replace(/-+$/g, "") || fallback;
+}
+
+function derivedKubernetesName(base: string, purpose: string, fallback: string): string {
+  const readable = `${base}-${purpose}`;
+  if (readable.length <= 63) return kubernetesName(readable, fallback);
+  const suffix = `${purpose}-${digest(readable, 8)}`;
+  const prefix = kubernetesName(base, fallback, 63 - suffix.length - 1);
+  return `${prefix}-${suffix}`;
 }
 
 function namespaceFor(identity: KubernetesRuntimeIdentityInput): string {
@@ -179,11 +489,14 @@ export function renderKubernetesRuntimeIntent(
   const execution = runtimePlan.execution.toState();
   const artifact = runtimePlan.runtimeArtifact?.toState();
   const image = artifact?.image?.value ?? execution.image?.value;
+  const serviceGraph = serviceGraphFromMetadata(execution.metadata);
+  const isServiceGraph =
+    execution.kind.value === "docker-compose-stack" && serviceGraph.length > 0;
   const isStatelessImage =
     execution.kind.value === "docker-container" &&
     artifact?.kind.value !== "compose-project" &&
     Boolean(image);
-  if (!isStatelessImage || !image) {
+  if ((!isStatelessImage || !image) && !isServiceGraph) {
     return err(
       domainError.runtimeTargetUnsupported(
         "Kubernetes R5a requires a stateless prebuilt OCI image",
@@ -208,6 +521,9 @@ export function renderKubernetesRuntimeIntent(
       }),
     );
   }
+
+  const scaleAndRollout = resolveScaleAndRollout(execution.metadata);
+  if (scaleAndRollout.isErr()) return err(scaleAndRollout.error);
 
   const environmentState = input.environmentSnapshot?.toState();
   const snapshotEnvironment =
@@ -237,6 +553,50 @@ export function renderKubernetesRuntimeIntent(
   const environment = [...snapshotEnvironment, ...dependencyEnvironment].sort((left, right) =>
     left.name.localeCompare(right.name),
   );
+  const workloadName = workloadNameFor(input.identity);
+  const services = isServiceGraph
+    ? serviceGraph
+        .map((service): KubernetesRuntimeServiceIntent | undefined => {
+          const serviceImage = service.source?.image;
+          if (!serviceImage) return undefined;
+          const serviceEnvironment: KubernetesRuntimeEnvironmentIntent[] = [
+            ...snapshotEnvironment,
+            ...Object.entries(service.env ?? {}).map(([name, value]) => ({
+              name,
+              secret: false,
+              value: String(value),
+            })),
+            ...dependencyEnvironment.filter(
+              (variable) => variable.name in (service.secrets ?? {}),
+            ),
+          ].sort((left, right) => left.name.localeCompare(right.name));
+          return {
+            name: service.name,
+            workloadName: serviceWorkloadName(workloadName, service.name),
+            image: serviceImage,
+            ...(service.network?.internalPort
+              ? { port: service.network.internalPort }
+              : {}),
+            replicas: service.replicas && service.replicas > 0 ? service.replicas : 1,
+            ...(service.runtime?.startCommand
+              ? { command: service.runtime.startCommand }
+              : {}),
+            environment: serviceEnvironment,
+          };
+        })
+        .filter((service): service is KubernetesRuntimeServiceIntent => Boolean(service))
+    : undefined;
+  if (isServiceGraph && services?.length !== serviceGraph.length) {
+    return err(
+      domainError.runtimeTargetUnsupported(
+        "Kubernetes service graph requires a prebuilt OCI image for every service",
+        {
+          phase: "kubernetes-service-graph-resolution",
+          missingCapability: "service-image",
+        },
+      ),
+    );
+  }
   const routes =
     execution.accessRoutes?.filter((route) => route.proxyKind !== "none").map((route) => ({
       domains: route.domains,
@@ -244,6 +604,7 @@ export function renderKubernetesRuntimeIntent(
       proxyKind: route.proxyKind,
       tlsMode: route.tlsMode,
       targetPort: route.targetPort ?? port,
+      ...(route.targetServiceName ? { targetServiceName: route.targetServiceName } : {}),
     })) ?? [];
   const httpHealth = execution.healthCheck?.http;
   const health =
@@ -287,13 +648,16 @@ export function renderKubernetesRuntimeIntent(
   return ok({
     schemaVersion: "kubernetes.runtime-intent/v1",
     namespace: namespaceFor(input.identity),
-    workloadName: workloadNameFor(input.identity),
+    workloadName,
     receipt,
-    image,
+    image: image ?? services?.[0]?.image ?? "",
     port,
     environment,
     routes,
     ...(health ? { health } : {}),
+    scale: scaleAndRollout.value.scale,
+    rollout: scaleAndRollout.value.rollout,
+    ...(services ? { services } : {}),
     labels: identityLabels(input.identity, receipt),
     annotations,
   });
@@ -349,16 +713,17 @@ export function renderKubernetesRuntimeManifest(
     ...intent.labels,
     "appaloft.io/workload": intent.workloadName,
   };
-  const env = intent.environment.map((variable) =>
-    variable.secret
-      ? {
-          name: variable.name,
-          valueFrom: {
-            secretKeyRef: { name: intent.workloadName, key: variable.name },
-          },
-        }
-      : { name: variable.name, value: variable.value ?? "" },
-  );
+  const environmentEntries = (variables: KubernetesRuntimeEnvironmentIntent[]) =>
+    variables.map((variable) =>
+      variable.secret
+        ? {
+            name: variable.name,
+            valueFrom: {
+              secretKeyRef: { name: intent.workloadName, key: variable.name },
+            },
+          }
+        : { name: variable.name, value: variable.value ?? "" },
+    );
   const probe = intent.health
     ? {
         httpGet: { path: intent.health.path, port: intent.health.port },
@@ -366,6 +731,34 @@ export function renderKubernetesRuntimeManifest(
         timeoutSeconds: intent.health.timeoutSeconds,
         failureThreshold: intent.health.failureThreshold,
         initialDelaySeconds: intent.health.initialDelaySeconds,
+      }
+      : undefined;
+  const containerResources = intent.scale.resources
+    ? {
+        ...(intent.scale.resources.requests
+          ? {
+              requests: {
+                ...(intent.scale.resources.requests.cpuMillicores !== undefined
+                  ? { cpu: `${intent.scale.resources.requests.cpuMillicores}m` }
+                  : {}),
+                ...(intent.scale.resources.requests.memoryMebibytes !== undefined
+                  ? { memory: `${intent.scale.resources.requests.memoryMebibytes}Mi` }
+                  : {}),
+              },
+            }
+          : {}),
+        ...(intent.scale.resources.limits
+          ? {
+              limits: {
+                ...(intent.scale.resources.limits.cpuMillicores !== undefined
+                  ? { cpu: `${intent.scale.resources.limits.cpuMillicores}m` }
+                  : {}),
+                ...(intent.scale.resources.limits.memoryMebibytes !== undefined
+                  ? { memory: `${intent.scale.resources.limits.memoryMebibytes}Mi` }
+                  : {}),
+              },
+            }
+          : {}),
       }
     : undefined;
   const items: KubernetesManifestResource[] = [
@@ -421,28 +814,79 @@ export function renderKubernetesRuntimeManifest(
     });
   }
 
-  items.push(
-    {
+  const workloads =
+    intent.services ??
+    [
+      {
+        name: "app",
+        workloadName: intent.workloadName,
+        image: intent.image,
+        port: intent.port,
+        replicas: intent.scale.replicas,
+        environment: intent.environment,
+      },
+    ];
+  for (const workload of workloads) {
+    const workloadMetadata = metadata(intent);
+    workloadMetadata.name = workload.workloadName;
+    workloadMetadata.labels = {
+      ...workloadMetadata.labels,
+      "appaloft.io/service": labelValue(workload.name),
+    };
+    const workloadPodLabels = {
+      ...podLabels,
+      "appaloft.io/workload": workload.workloadName,
+      "appaloft.io/service": labelValue(workload.name),
+    };
+    const selector = {
+      "appaloft.io/receipt": intent.receipt,
+      "appaloft.io/service": labelValue(workload.name),
+    };
+    items.push({
       apiVersion: "apps/v1",
       kind: "Deployment",
-      metadata: metadata(intent),
+      metadata: workloadMetadata,
       spec: {
-        replicas: 1,
-        selector: { matchLabels: { "appaloft.io/receipt": intent.receipt } },
-        strategy: { type: "RollingUpdate" },
+        replicas: workload.replicas,
+        selector: { matchLabels: selector },
+        strategy:
+          intent.rollout.strategy === "recreate"
+            ? { type: "Recreate" }
+            : {
+                type: "RollingUpdate",
+                ...(intent.rollout.maxUnavailable !== undefined ||
+                intent.rollout.maxSurge !== undefined
+                  ? {
+                      rollingUpdate: {
+                        ...(intent.rollout.maxUnavailable !== undefined
+                          ? { maxUnavailable: intent.rollout.maxUnavailable }
+                          : {}),
+                        ...(intent.rollout.maxSurge !== undefined
+                          ? { maxSurge: intent.rollout.maxSurge }
+                          : {}),
+                      },
+                    }
+                  : {}),
+              },
         template: {
-          metadata: { labels: podLabels, annotations: { ...intent.annotations } },
+          metadata: { labels: workloadPodLabels, annotations: { ...intent.annotations } },
           spec: {
             serviceAccountName: intent.workloadName,
             automountServiceAccountToken: false,
             containers: [
               {
                 name: "app",
-                image: intent.image,
+                image: workload.image,
                 imagePullPolicy: "IfNotPresent",
-                ports: [{ name: "http", containerPort: intent.port }],
-                env,
-                ...(probe ? { readinessProbe: probe, livenessProbe: probe } : {}),
+                ...(workload.port
+                  ? { ports: [{ name: "http", containerPort: workload.port }] }
+                  : {}),
+                env: environmentEntries(workload.environment),
+                ...(workload.command ? { command: ["sh", "-lc", workload.command] } : {}),
+                ...(containerResources ? { resources: containerResources } : {}),
+                ...(probe && workload.port
+                  ? { readinessProbe: probe, livenessProbe: probe }
+                  : {}),
                 securityContext: {
                   allowPrivilegeEscalation: false,
                   capabilities: { drop: ["ALL"] },
@@ -452,20 +896,51 @@ export function renderKubernetesRuntimeManifest(
           },
         },
       },
-    },
-    {
-      apiVersion: "v1",
-      kind: "Service",
+    });
+    if (workload.port) {
+      items.push({
+        apiVersion: "v1",
+        kind: "Service",
+        metadata: workloadMetadata,
+        spec: {
+          type: "ClusterIP",
+          selector,
+          ports: [{ name: "http", port: workload.port, targetPort: "http" }],
+        },
+      });
+    }
+  }
+
+  if (intent.scale.horizontal) {
+    items.push({
+      apiVersion: "autoscaling/v2",
+      kind: "HorizontalPodAutoscaler",
       metadata: metadata(intent),
       spec: {
-        type: "ClusterIP",
-        selector: { "appaloft.io/receipt": intent.receipt },
-        ports: [{ name: "http", port: intent.port, targetPort: "http" }],
+        scaleTargetRef: {
+          apiVersion: "apps/v1",
+          kind: "Deployment",
+          name: intent.workloadName,
+        },
+        minReplicas: intent.scale.horizontal.minReplicas,
+        maxReplicas: intent.scale.horizontal.maxReplicas,
+        metrics: [
+          {
+            type: "Resource",
+            resource: {
+              name: "cpu",
+              target: {
+                type: "Utilization",
+                averageUtilization: intent.scale.horizontal.targetCpuUtilizationPercent,
+              },
+            },
+          },
+        ],
       },
-    },
-  );
+    });
+  }
 
-  if (intent.routes.length > 0) {
+  if (intent.routes.length > 0 && intent.rollout.strategy !== "canary") {
     const traefikRoutes = intent.routes.filter((route) => route.proxyKind === "traefik");
     if (traefikRoutes.length > 0) {
       items.push({
@@ -509,7 +984,10 @@ export function renderKubernetesRuntimeManifest(
                   pathType: "Prefix",
                   backend: {
                     service: {
-                      name: intent.workloadName,
+                      name:
+                        intent.services?.find(
+                          (service) => service.name === route.targetServiceName,
+                        )?.workloadName ?? intent.services?.[0]?.workloadName ?? intent.workloadName,
                       port: { number: route.targetPort },
                     },
                   },
@@ -527,6 +1005,154 @@ export function renderKubernetesRuntimeManifest(
       },
     });
   }
+
+  return ok({ apiVersion: "v1", kind: "List", items });
+}
+
+export function renderKubernetesCanaryRouteManifest(input: {
+  intent: KubernetesRuntimeIntent;
+  stableNamespace: string;
+  stableWorkloadName: string;
+  stableEndpointAddresses: readonly string[];
+  candidateTrafficPercent: number;
+}): Result<KubernetesRuntimeManifest> {
+  const { intent } = input;
+  if (
+    intent.rollout.strategy !== "canary" ||
+    !intent.rollout.canary ||
+    !intent.health ||
+    intent.routes.length === 0 ||
+    intent.services !== undefined ||
+    intent.routes.some((route) => route.proxyKind !== "traefik")
+  ) {
+    return err(
+      domainError.runtimeTargetUnsupported(
+        "Kubernetes canary routing requires one health-checked Traefik-routed workload",
+        {
+          phase: "kubernetes-canary-route-render",
+          missingCapability: "canary-promotion-proof",
+        },
+      ),
+    );
+  }
+  if (
+    input.stableEndpointAddresses.length === 0 ||
+    input.stableEndpointAddresses.some((address) => !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(address))
+  ) {
+    return err(
+      domainError.runtimeTargetUnsupported(
+        "Kubernetes canary requires ready stable IPv4 endpoints",
+        {
+          phase: "kubernetes-canary-route-render",
+          missingCapability: "stable-runtime-endpoints",
+        },
+      ),
+    );
+  }
+  if (
+    !Number.isInteger(input.candidateTrafficPercent) ||
+    input.candidateTrafficPercent <= 0 ||
+    input.candidateTrafficPercent > 100
+  ) {
+    return err(domainError.validation("Kubernetes canary traffic percentage is invalid"));
+  }
+
+  const stableAliasName = derivedKubernetesName(
+    intent.workloadName,
+    "stable",
+    "appaloft-stable",
+  );
+  const weightedServiceName = derivedKubernetesName(
+    intent.workloadName,
+    "weighted",
+    "appaloft-weighted",
+  );
+  const routePort = intent.routes[0]?.targetPort ?? intent.port;
+  const stableWeight = 100 - input.candidateTrafficPercent;
+  const canaryMetadata = metadata(intent);
+  const items: KubernetesManifestResource[] = [
+    {
+      apiVersion: "v1",
+      kind: "Service",
+      metadata: { ...canaryMetadata, name: stableAliasName },
+      spec: {
+        ports: [{ name: "http", port: routePort, targetPort: routePort }],
+      },
+    },
+    {
+      apiVersion: "discovery.k8s.io/v1",
+      kind: "EndpointSlice",
+      metadata: {
+        ...canaryMetadata,
+        name: stableAliasName,
+        labels: {
+          ...canaryMetadata.labels,
+          "kubernetes.io/service-name": stableAliasName,
+        },
+        annotations: {
+          ...canaryMetadata.annotations,
+          "appaloft.io/stable-namespace": input.stableNamespace,
+          "appaloft.io/stable-workload": input.stableWorkloadName,
+        },
+      },
+      addressType: "IPv4",
+      endpoints: input.stableEndpointAddresses.map((address) => ({
+        addresses: [address],
+        conditions: { ready: true },
+      })),
+      ports: [{ name: "http", protocol: "TCP", port: routePort }],
+    },
+    {
+      apiVersion: "traefik.io/v1alpha1",
+      kind: "TraefikService",
+      metadata: { ...canaryMetadata, name: weightedServiceName },
+      spec: {
+        weighted: {
+          services: [
+            ...(stableWeight > 0
+              ? [{ name: stableAliasName, port: routePort, weight: stableWeight }]
+              : []),
+            {
+              name: intent.workloadName,
+              port: routePort,
+              weight: input.candidateTrafficPercent,
+            },
+          ],
+        },
+      },
+    },
+    {
+      apiVersion: "traefik.io/v1alpha1",
+      kind: "Middleware",
+      metadata: canaryMetadata,
+      spec: {
+        headers: {
+          customResponseHeaders: {
+            "X-Appaloft-Deployment-Id": intent.annotations["appaloft.io/deployment-id"],
+          },
+        },
+      },
+    },
+    {
+      apiVersion: "traefik.io/v1alpha1",
+      kind: "IngressRoute",
+      metadata: canaryMetadata,
+      spec: {
+        routes: intent.routes.flatMap((route) =>
+          route.domains.map((host) => ({
+            match: `Host(\`${host}\`) && PathPrefix(\`${route.pathPrefix}\`)`,
+            kind: "Rule",
+            priority: 10_000,
+            services: [{ name: weightedServiceName, kind: "TraefikService" }],
+            middlewares: [{ name: intent.workloadName }],
+          })),
+        ),
+        ...(intent.routes.some((route) => route.tlsMode !== "disabled")
+          ? { tls: { secretName: `${intent.workloadName}-tls`.slice(0, 63) } }
+          : {}),
+      },
+    },
+  ];
 
   return ok({ apiVersion: "v1", kind: "List", items });
 }

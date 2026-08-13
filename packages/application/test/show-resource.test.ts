@@ -272,6 +272,23 @@ function detailedResource(): Resource {
         },
       },
     },
+    scaleProfile: {
+      replicas: ReplicaCount.rehydrate(3),
+      cpuRequestMillicores: 250,
+      cpuLimitMillicores: 1000,
+      memoryRequestMebibytes: 256,
+      memoryLimitMebibytes: 512,
+      horizontal: {
+        minReplicas: 2,
+        maxReplicas: 8,
+        targetCpuUtilizationPercent: 70,
+      },
+    },
+    rolloutProfile: {
+      strategy: "rolling",
+      maxUnavailable: 1,
+      maxSurge: 2,
+    },
     networkProfile: {
       internalPort: PortNumber.rehydrate(3000),
       upstreamProtocol: ResourceNetworkProtocolValue.rehydrate("http"),
@@ -523,6 +540,23 @@ describe("ShowResourceQueryService", () => {
       startCommand: "bun run start",
       replicas: 4,
       healthCheckPath: "/health",
+    });
+    expect(detail.scaleProfile).toEqual({
+      replicas: 3,
+      cpuRequestMillicores: 250,
+      cpuLimitMillicores: 1000,
+      memoryRequestMebibytes: 256,
+      memoryLimitMebibytes: 512,
+      horizontal: {
+        minReplicas: 2,
+        maxReplicas: 8,
+        targetCpuUtilizationPercent: 70,
+      },
+    });
+    expect(detail.rolloutProfile).toEqual({
+      strategy: "rolling",
+      maxUnavailable: 1,
+      maxSurge: 2,
     });
     expect(detail.networkProfile).toEqual({
       internalPort: 3000,

@@ -233,7 +233,9 @@ import { configureResourceAccessCommandInputSchema } from "./operations/resource
 import { configureResourceAutoDeployCommandInputSchema } from "./operations/resources/configure-resource-auto-deploy.command";
 import { configureResourceHealthCommandInputSchema } from "./operations/resources/configure-resource-health.command";
 import { configureResourceNetworkCommandInputSchema } from "./operations/resources/configure-resource-network.command";
+import { configureResourceRolloutCommandInputSchema } from "./operations/resources/configure-resource-rollout.command";
 import { configureResourceRuntimeCommandInputSchema } from "./operations/resources/configure-resource-runtime.command";
+import { configureResourceScaleCommandInputSchema } from "./operations/resources/configure-resource-scale.command";
 import { configureResourceSourceCommandInputSchema } from "./operations/resources/configure-resource-source.command";
 import { countResourcesQueryInputSchema } from "./operations/resources/count-resources.query";
 import { createResourceCommandInputSchema } from "./operations/resources/create-resource.command";
@@ -2088,6 +2090,34 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource configure-access <resourceId>",
       orpc: { method: "POST", path: "/api/resources/{resourceId}/access-profile" },
+    },
+  },
+  {
+    key: "resources.configure-scale",
+    kind: "command",
+    domain: "resources",
+    messageName: "ConfigureResourceScaleCommand",
+    handlerName: "ConfigureResourceScaleCommandHandler",
+    serviceName: "ConfigureResourceScaleUseCase",
+    inputSchema: configureResourceScaleCommandInputSchema,
+    serviceToken: tokens.configureResourceScaleUseCase,
+    transports: {
+      cli: "appaloft resource configure-scale <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/scale-profile" },
+    },
+  },
+  {
+    key: "resources.configure-rollout",
+    kind: "command",
+    domain: "resources",
+    messageName: "ConfigureResourceRolloutCommand",
+    handlerName: "ConfigureResourceRolloutCommandHandler",
+    serviceName: "ConfigureResourceRolloutUseCase",
+    inputSchema: configureResourceRolloutCommandInputSchema,
+    serviceToken: tokens.configureResourceRolloutUseCase,
+    transports: {
+      cli: "appaloft resource configure-rollout <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/rollout-profile" },
     },
   },
   {

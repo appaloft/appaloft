@@ -144,8 +144,76 @@ class KyselyResourceMutationVisitor
           ...(spec.state.runtimeProfile.healthCheck
             ? { healthCheck: serializeHealthCheckPolicy(spec.state.runtimeProfile.healthCheck) }
             : {}),
+          ...(spec.state.scaleProfile
+            ? {
+                scaleProfile: {
+                  replicas: spec.state.scaleProfile.replicas.value,
+                  ...(spec.state.scaleProfile.cpuRequestMillicores !== undefined
+                    ? { cpuRequestMillicores: spec.state.scaleProfile.cpuRequestMillicores }
+                    : {}),
+                  ...(spec.state.scaleProfile.cpuLimitMillicores !== undefined
+                    ? { cpuLimitMillicores: spec.state.scaleProfile.cpuLimitMillicores }
+                    : {}),
+                  ...(spec.state.scaleProfile.memoryRequestMebibytes !== undefined
+                    ? { memoryRequestMebibytes: spec.state.scaleProfile.memoryRequestMebibytes }
+                    : {}),
+                  ...(spec.state.scaleProfile.memoryLimitMebibytes !== undefined
+                    ? { memoryLimitMebibytes: spec.state.scaleProfile.memoryLimitMebibytes }
+                    : {}),
+                  ...(spec.state.scaleProfile.horizontal
+                    ? { horizontal: { ...spec.state.scaleProfile.horizontal } }
+                    : {}),
+                },
+              }
+            : {}),
+          ...(spec.state.rolloutProfile
+            ? {
+                rolloutProfile: {
+                  ...spec.state.rolloutProfile,
+                  ...(spec.state.rolloutProfile.canary
+                    ? { canary: { ...spec.state.rolloutProfile.canary } }
+                    : {}),
+                },
+              }
+            : {}),
         } satisfies SerializedResourceRuntimeProfile)
-      : null;
+      : spec.state.scaleProfile || spec.state.rolloutProfile
+        ? ({
+            strategy: "auto",
+            ...(spec.state.scaleProfile
+              ? {
+                  scaleProfile: {
+                    replicas: spec.state.scaleProfile.replicas.value,
+                    ...(spec.state.scaleProfile.cpuRequestMillicores !== undefined
+                      ? { cpuRequestMillicores: spec.state.scaleProfile.cpuRequestMillicores }
+                      : {}),
+                    ...(spec.state.scaleProfile.cpuLimitMillicores !== undefined
+                      ? { cpuLimitMillicores: spec.state.scaleProfile.cpuLimitMillicores }
+                      : {}),
+                    ...(spec.state.scaleProfile.memoryRequestMebibytes !== undefined
+                      ? { memoryRequestMebibytes: spec.state.scaleProfile.memoryRequestMebibytes }
+                      : {}),
+                    ...(spec.state.scaleProfile.memoryLimitMebibytes !== undefined
+                      ? { memoryLimitMebibytes: spec.state.scaleProfile.memoryLimitMebibytes }
+                      : {}),
+                    ...(spec.state.scaleProfile.horizontal
+                      ? { horizontal: { ...spec.state.scaleProfile.horizontal } }
+                      : {}),
+                  },
+                }
+              : {}),
+            ...(spec.state.rolloutProfile
+              ? {
+                  rolloutProfile: {
+                    ...spec.state.rolloutProfile,
+                    ...(spec.state.rolloutProfile.canary
+                      ? { canary: { ...spec.state.rolloutProfile.canary } }
+                      : {}),
+                  },
+                }
+              : {}),
+          } satisfies SerializedResourceRuntimeProfile)
+        : null;
     const networkProfile = spec.state.networkProfile
       ? ({
           internalPort: spec.state.networkProfile.internalPort.value,

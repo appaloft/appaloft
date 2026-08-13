@@ -3329,6 +3329,34 @@ export const resourceDetailRuntimeProfileSchema = z.object({
   healthCheck: requestedDeploymentHealthCheckSchema.optional(),
 });
 
+export const resourceScaleProfileSchema = z.object({
+  replicas: z.number().int().positive(),
+  cpuRequestMillicores: z.number().int().positive().optional(),
+  cpuLimitMillicores: z.number().int().positive().optional(),
+  memoryRequestMebibytes: z.number().int().positive().optional(),
+  memoryLimitMebibytes: z.number().int().positive().optional(),
+  horizontal: z
+    .object({
+      minReplicas: z.number().int().positive(),
+      maxReplicas: z.number().int().positive(),
+      targetCpuUtilizationPercent: z.number().int().positive().max(100),
+    })
+    .optional(),
+});
+
+export const resourceRolloutProfileSchema = z.object({
+  strategy: z.enum(["recreate", "rolling", "canary"]),
+  maxUnavailable: z.number().int().positive().optional(),
+  maxSurge: z.number().int().positive().optional(),
+  canary: z
+    .object({
+      initialTrafficPercent: z.number().int().positive().max(99),
+      stepTrafficPercent: z.number().int().positive().max(100),
+      intervalSeconds: z.number().int().positive(),
+    })
+    .optional(),
+});
+
 export const resourceDetailDeploymentContextSchema = resourceHealthDeploymentContextSchema.omit({
   lastError: true,
 });
@@ -3395,6 +3423,8 @@ export const resourceDetailSchema = z.object({
   source: resourceDetailSourceProfileSchema.optional(),
   autoDeployPolicy: resourceAutoDeployPolicySummarySchema.optional(),
   runtimeProfile: resourceDetailRuntimeProfileSchema.optional(),
+  scaleProfile: resourceScaleProfileSchema.optional(),
+  rolloutProfile: resourceRolloutProfileSchema.optional(),
   networkProfile: resourceNetworkProfileSchema.optional(),
   accessProfile: resourceAccessProfileSchema.optional(),
   healthPolicy: requestedDeploymentHealthCheckSchema.optional(),
@@ -4418,6 +4448,24 @@ export const configureResourceRuntimeInputSchema = z.object({
 });
 
 export const configureResourceRuntimeResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const configureResourceScaleInputSchema = z.object({
+  resourceId: z.string().min(1),
+  scaleProfile: resourceScaleProfileSchema,
+});
+
+export const configureResourceScaleResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const configureResourceRolloutInputSchema = z.object({
+  resourceId: z.string().min(1),
+  rolloutProfile: resourceRolloutProfileSchema,
+});
+
+export const configureResourceRolloutResponseSchema = z.object({
   id: z.string(),
 });
 
@@ -8265,6 +8313,14 @@ export type DetachResourceStorageResponse = z.infer<typeof detachResourceStorage
 export type ConfigureResourceRuntimeInput = z.infer<typeof configureResourceRuntimeInputSchema>;
 export type ConfigureResourceRuntimeResponse = z.infer<
   typeof configureResourceRuntimeResponseSchema
+>;
+export type ResourceScaleProfile = z.infer<typeof resourceScaleProfileSchema>;
+export type ResourceRolloutProfile = z.infer<typeof resourceRolloutProfileSchema>;
+export type ConfigureResourceScaleInput = z.infer<typeof configureResourceScaleInputSchema>;
+export type ConfigureResourceScaleResponse = z.infer<typeof configureResourceScaleResponseSchema>;
+export type ConfigureResourceRolloutInput = z.infer<typeof configureResourceRolloutInputSchema>;
+export type ConfigureResourceRolloutResponse = z.infer<
+  typeof configureResourceRolloutResponseSchema
 >;
 export type ConfigureResourceSourceInput = z.infer<typeof configureResourceSourceInputSchema>;
 export type ConfigureResourceSourceResponse = z.infer<typeof configureResourceSourceResponseSchema>;

@@ -1496,6 +1496,11 @@ export const publicDocsHelpTopics = {
     specReferences: [
       "docs/decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md",
       "docs/commands/resources.configure-runtime.md",
+      "docs/commands/resources.configure-scale.md",
+      "docs/commands/resources.configure-rollout.md",
+      "docs/decisions/ADR-114-kubernetes-runtime-target-and-scale-policy-boundary.md",
+      "docs/specs/136-kubernetes-and-scale-topology/spec.md",
+      "docs/testing/kubernetes-scale-topology-test-matrix.md",
       "docs/workflows/resource-profile-lifecycle.md",
       "docs/testing/resource-profile-lifecycle-test-matrix.md",
       "docs/specs/008-resource-detail-profile-editing/spec.md",
@@ -1503,6 +1508,42 @@ export const publicDocsHelpTopics = {
     ],
     webSurfaces: [
       "apps/web/src/routes/resources/[resourceId=consoleObjectId]/+page.svelte: resource runtime profile form",
+    ],
+  },
+  "resource.scale-rollout-profile": {
+    id: "resource.scale-rollout-profile",
+    title: "Resource scale and rollout profiles",
+    description:
+      "How replicas, resource budgets, autoscaling, and rollout strategies shape future deployments.",
+    page: {
+      "zh-CN": "deliver/profiles",
+      "en-US": "en/deliver/profiles",
+    },
+    anchor: "resource-scale-rollout-profile",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "repository-config", "mcp"],
+    relatedOperation: "resources.configure-scale",
+    aliases: [
+      "scale profile",
+      "rollout profile",
+      "replicas",
+      "horizontal pod autoscaler",
+      "canary rollout",
+      "扩缩容",
+      "灰度发布",
+    ],
+    specReferences: [
+      "docs/commands/resources.configure-scale.md",
+      "docs/commands/resources.configure-rollout.md",
+      "docs/decisions/ADR-114-kubernetes-runtime-target-and-scale-policy-boundary.md",
+      "docs/specs/136-kubernetes-and-scale-topology/spec.md",
+      "docs/testing/kubernetes-scale-topology-test-matrix.md",
+    ],
+    webSurfaces: [
+      "apps/web/src/routes/resources/[resourceId=consoleObjectId]/+page.svelte: scale and rollout profile summaries and edit dialogs",
     ],
   },
   "resource.profile-drift": {
@@ -3892,6 +3933,16 @@ export const publicDocsOperationCoverage = [
     operationKey: "resources.configure-network",
     status: "documented",
     topicId: "resource.network-profile",
+  },
+  {
+    operationKey: "resources.configure-scale",
+    status: "documented",
+    topicId: "resource.scale-rollout-profile",
+  },
+  {
+    operationKey: "resources.configure-rollout",
+    status: "documented",
+    topicId: "resource.scale-rollout-profile",
   },
   {
     operationKey: "resources.configure-access",

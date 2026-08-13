@@ -10,7 +10,9 @@ import {
   type ConfigureResourceAutoDeployCommandInput,
   ConfigureResourceHealthCommand,
   ConfigureResourceNetworkCommand,
+  ConfigureResourceRolloutCommand,
   ConfigureResourceRuntimeCommand,
+  ConfigureResourceScaleCommand,
   ConfigureResourceSourceCommand,
   CreateResourceCommand,
   CreateResourceSecretReferenceCommand,
@@ -105,6 +107,28 @@ const accessFailurePathOption = Options.text("path").pipe(Options.optional);
 const confirmSlugOption = Options.text("confirm-slug");
 const internalPortOption = Options.text("internal-port").pipe(Options.optional);
 const configureNetworkInternalPortOption = Options.text("internal-port");
+const scaleReplicasOption = Options.text("replicas");
+const cpuRequestMillicoresOption = Options.text("cpu-request-millicores").pipe(Options.optional);
+const cpuLimitMillicoresOption = Options.text("cpu-limit-millicores").pipe(Options.optional);
+const memoryRequestMebibytesOption = Options.text("memory-request-mebibytes").pipe(
+  Options.optional,
+);
+const memoryLimitMebibytesOption = Options.text("memory-limit-mebibytes").pipe(Options.optional);
+const hpaMinReplicasOption = Options.text("hpa-min-replicas").pipe(Options.optional);
+const hpaMaxReplicasOption = Options.text("hpa-max-replicas").pipe(Options.optional);
+const hpaTargetCpuOption = Options.text("hpa-target-cpu-percent").pipe(Options.optional);
+const rolloutStrategyOption = Options.choice("strategy", [
+  "recreate",
+  "rolling",
+  "canary",
+] as const);
+const rolloutMaxUnavailableOption = Options.text("max-unavailable").pipe(Options.optional);
+const rolloutMaxSurgeOption = Options.text("max-surge").pipe(Options.optional);
+const canaryInitialTrafficOption = Options.text("canary-initial-traffic-percent").pipe(
+  Options.optional,
+);
+const canaryStepTrafficOption = Options.text("canary-step-traffic-percent").pipe(Options.optional);
+const canaryIntervalOption = Options.text("canary-interval-seconds").pipe(Options.optional);
 const sourceKindOption = Options.choice("kind", sourceKinds);
 const sourceLocatorOption = Options.text("locator");
 const sourceDisplayNameOption = Options.text("display-name").pipe(Options.optional);
@@ -119,6 +143,17 @@ const sourceImageNameOption = Options.text("image-name").pipe(Options.optional);
 const sourceImageTagOption = Options.text("image-tag").pipe(Options.optional);
 const sourceImageDigestOption = Options.text("image-digest").pipe(Options.optional);
 const sourceVersionOption = Options.text("version").pipe(Options.optional);
+
+export function validateCompleteOptionalNumberGroup(
+  values: readonly (number | undefined)[],
+  message: string,
+): Result<void> {
+  const hasConfiguredValue = values.some((value) => value !== undefined);
+  const hasMissingValue = values.some((value) => value === undefined);
+  return hasConfiguredValue && hasMissingValue
+    ? err(domainError.validation(message))
+    : ok(undefined);
+}
 const sourceVersionKindOption = Options.choice("version-kind", versionReferenceKinds).pipe(
   Options.optional,
 );
@@ -1205,6 +1240,130 @@ const configureAccessCommand = EffectCommand.make(
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceConfigureAccess));
 
+const configureScaleCommand = EffectCommand.make(
+  "configure-scale",
+  {
+    resourceId: resourceIdArg,
+    replicas: scaleReplicasOption,
+    cpuRequestMillicores: cpuRequestMillicoresOption,
+    cpuLimitMillicores: cpuLimitMillicoresOption,
+    memoryRequestMebibytes: memoryRequestMebibytesOption,
+    memoryLimitMebibytes: memoryLimitMebibytesOption,
+    hpaMinReplicas: hpaMinReplicasOption,
+    hpaMaxReplicas: hpaMaxReplicasOption,
+    hpaTargetCpu: hpaTargetCpuOption,
+    json: jsonOption,
+  },
+  ({
+    cpuLimitMillicores,
+    cpuRequestMillicores,
+    hpaMaxReplicas,
+    hpaMinReplicas,
+    hpaTargetCpu,
+    json,
+    memoryLimitMebibytes,
+    memoryRequestMebibytes,
+    replicas,
+    resourceId,
+  }) => {
+    void json;
+    const minReplicas = optionalNumber(hpaMinReplicas);
+    const maxReplicas = optionalNumber(hpaMaxReplicas);
+    const targetCpuUtilizationPercent = optionalNumber(hpaTargetCpu);
+    const horizontalValues = [minReplicas, maxReplicas, targetCpuUtilizationPercent];
+    const horizontalValidation = validateCompleteOptionalNumberGroup(
+      horizontalValues,
+      "Horizontal autoscaling requires --hpa-min-replicas, --hpa-max-replicas, and --hpa-target-cpu-percent together",
+    );
+    if (horizontalValidation.isErr()) {
+      return runCommand(err(horizontalValidation.error));
+    }
+    const horizontal =
+      minReplicas !== undefined &&
+      maxReplicas !== undefined &&
+      targetCpuUtilizationPercent !== undefined
+        ? { minReplicas, maxReplicas, targetCpuUtilizationPercent }
+        : undefined;
+    return runCommand(
+      ConfigureResourceScaleCommand.create({
+        resourceId,
+        scaleProfile: {
+          replicas: Number(replicas),
+          ...(optionalNumber(cpuRequestMillicores) !== undefined
+            ? { cpuRequestMillicores: optionalNumber(cpuRequestMillicores) }
+            : {}),
+          ...(optionalNumber(cpuLimitMillicores) !== undefined
+            ? { cpuLimitMillicores: optionalNumber(cpuLimitMillicores) }
+            : {}),
+          ...(optionalNumber(memoryRequestMebibytes) !== undefined
+            ? { memoryRequestMebibytes: optionalNumber(memoryRequestMebibytes) }
+            : {}),
+          ...(optionalNumber(memoryLimitMebibytes) !== undefined
+            ? { memoryLimitMebibytes: optionalNumber(memoryLimitMebibytes) }
+            : {}),
+          ...(horizontal ? { horizontal } : {}),
+        },
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceConfigureScale));
+
+const configureRolloutCommand = EffectCommand.make(
+  "configure-rollout",
+  {
+    resourceId: resourceIdArg,
+    strategy: rolloutStrategyOption,
+    maxUnavailable: rolloutMaxUnavailableOption,
+    maxSurge: rolloutMaxSurgeOption,
+    canaryInitialTraffic: canaryInitialTrafficOption,
+    canaryStepTraffic: canaryStepTrafficOption,
+    canaryInterval: canaryIntervalOption,
+    json: jsonOption,
+  },
+  ({
+    canaryInitialTraffic,
+    canaryInterval,
+    canaryStepTraffic,
+    json,
+    maxSurge,
+    maxUnavailable,
+    resourceId,
+    strategy,
+  }) => {
+    void json;
+    const initialTrafficPercent = optionalNumber(canaryInitialTraffic);
+    const stepTrafficPercent = optionalNumber(canaryStepTraffic);
+    const intervalSeconds = optionalNumber(canaryInterval);
+    const canaryValues = [initialTrafficPercent, stepTrafficPercent, intervalSeconds];
+    const canaryValidation = validateCompleteOptionalNumberGroup(
+      canaryValues,
+      "Canary rollout requires --canary-initial-traffic-percent, --canary-step-traffic-percent, and --canary-interval-seconds together",
+    );
+    if (canaryValidation.isErr()) {
+      return runCommand(err(canaryValidation.error));
+    }
+    const canary =
+      initialTrafficPercent !== undefined &&
+      stepTrafficPercent !== undefined &&
+      intervalSeconds !== undefined
+        ? { initialTrafficPercent, stepTrafficPercent, intervalSeconds }
+        : undefined;
+    return runCommand(
+      ConfigureResourceRolloutCommand.create({
+        resourceId,
+        rolloutProfile: {
+          strategy,
+          ...(optionalNumber(maxUnavailable) !== undefined
+            ? { maxUnavailable: optionalNumber(maxUnavailable) }
+            : {}),
+          ...(optionalNumber(maxSurge) !== undefined ? { maxSurge: optionalNumber(maxSurge) } : {}),
+          ...(canary ? { canary } : {}),
+        },
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceConfigureRollout));
+
 const configureAutoDeployCommand = EffectCommand.make(
   "auto-deploy",
   {
@@ -1482,6 +1641,8 @@ export const resourceCommand = EffectCommand.make("resource").pipe(
     configureHealthCommand,
     resetHealthCommand,
     configureNetworkCommand,
+    configureScaleCommand,
+    configureRolloutCommand,
     configureAccessCommand,
     configureAutoDeployCommand,
     storageCommand,

@@ -17,6 +17,7 @@ import {
   ok,
   PortNumber,
   ProjectId,
+  ReplicaCount,
   Resource,
   ResourceAutoDeployPathPolicy,
   ResourceAutoDeploySecretRef,
@@ -50,6 +51,74 @@ const baseInput = {
 };
 
 describe("Resource", () => {
+  test("[SCALE-PROFILE-009][ROLLOUT-PROFILE-011] owns portable scale and rollout profiles", () => {
+    const resource = Resource.create({
+      ...baseInput,
+      kind: ResourceKindValue.rehydrate("external"),
+      scaleProfile: {
+        replicas: ReplicaCount.rehydrate(3),
+        cpuRequestMillicores: 250,
+        cpuLimitMillicores: 1000,
+        memoryRequestMebibytes: 256,
+        memoryLimitMebibytes: 512,
+        horizontal: {
+          minReplicas: 2,
+          maxReplicas: 8,
+          targetCpuUtilizationPercent: 70,
+        },
+      },
+      rolloutProfile: {
+        strategy: "rolling",
+        maxUnavailable: 1,
+        maxSurge: 2,
+      },
+    })._unsafeUnwrap();
+
+    const state = resource.toState();
+    expect(state.scaleProfile?.replicas.value).toBe(3);
+    expect(state.scaleProfile?.horizontal).toEqual({
+      minReplicas: 2,
+      maxReplicas: 8,
+      targetCpuUtilizationPercent: 70,
+    });
+    expect(state.rolloutProfile).toEqual({
+      strategy: "rolling",
+      maxUnavailable: 1,
+      maxSurge: 2,
+    });
+
+    const deploymentProfile = resource.resolveDeploymentProfile()._unsafeUnwrap();
+    expect(deploymentProfile.replicas).toBe(3);
+    expect(deploymentProfile.runtimeMetadata).toMatchObject({
+      "appaloft.scale.replicas": "3",
+      "appaloft.scale.cpuRequestMillicores": "250",
+      "appaloft.scale.hpa.maxReplicas": "8",
+      "appaloft.rollout.strategy": "rolling",
+      "appaloft.rollout.maxSurge": "2",
+    });
+  });
+
+  test("[SCALE-PROFILE-009] rejects an invalid horizontal range", () => {
+    const resource = Resource.create({
+      ...baseInput,
+      kind: ResourceKindValue.rehydrate("application"),
+      scaleProfile: {
+        replicas: ReplicaCount.rehydrate(2),
+        horizontal: {
+          minReplicas: 6,
+          maxReplicas: 3,
+          targetCpuUtilizationPercent: 70,
+        },
+      },
+    });
+
+    expect(resource.isErr()).toBe(true);
+    expect(resource._unsafeUnwrapErr().details).toMatchObject({
+      phase: "resource-scale-profile-validation",
+      reason: "invalid-horizontal-range",
+    });
+  });
+
   test("allows compose-stack resources to contain multiple services", () => {
     expect(ResourceKindValue.rehydrate("compose-stack").allowsMultipleServices()).toBe(true);
 

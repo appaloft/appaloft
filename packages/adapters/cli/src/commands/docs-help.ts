@@ -641,6 +641,14 @@ export const cliCommandDescriptions = {
     "Configure resource network profile",
     "resource.network-profile",
   ),
+  resourceConfigureScale: withDocs(
+    "Configure resource scale profile",
+    "resource.scale-rollout-profile",
+  ),
+  resourceConfigureRollout: withDocs(
+    "Configure resource rollout profile",
+    "resource.scale-rollout-profile",
+  ),
   resourceConfigureAccess: withDocs(
     "Configure resource generated access profile",
     "resource.access-profile",

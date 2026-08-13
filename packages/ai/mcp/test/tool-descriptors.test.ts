@@ -143,6 +143,8 @@ describe("MCP tool descriptors", () => {
   test("[OP-INPUT-MCP-004] deployment-critical write tools publish closed JSON schemas", () => {
     const selectedOperationKeys = [
       "resources.configure-network",
+      "resources.configure-scale",
+      "resources.configure-rollout",
       "domain-bindings.create",
       "domain-bindings.configure-route",
       "domain-bindings.confirm-ownership",

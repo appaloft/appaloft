@@ -90,7 +90,9 @@ import {
   ConfigureResourceAutoDeployCommand,
   ConfigureResourceHealthCommand,
   ConfigureResourceNetworkCommand,
+  ConfigureResourceRolloutCommand,
   ConfigureResourceRuntimeCommand,
+  ConfigureResourceScaleCommand,
   ConfigureResourceSourceCommand,
   ConfigureRetentionDefaultsCommand,
   ConfigureRuntimeMonitoringThresholdsCommand,
@@ -178,7 +180,9 @@ import {
   configureResourceAutoDeployCommandInputSchema,
   configureResourceHealthCommandInputSchema,
   configureResourceNetworkCommandInputSchema,
+  configureResourceRolloutCommandInputSchema,
   configureResourceRuntimeCommandInputSchema,
+  configureResourceScaleCommandInputSchema,
   configureResourceSourceCommandInputSchema,
   configureRetentionDefaultsCommandInputSchema,
   configureRuntimeMonitoringThresholdsCommandInputSchema,
@@ -961,7 +965,9 @@ import {
   configureResourceAutoDeployResponseSchema,
   configureResourceHealthResponseSchema,
   configureResourceNetworkResponseSchema,
+  configureResourceRolloutResponseSchema,
   configureResourceRuntimeResponseSchema,
+  configureResourceScaleResponseSchema,
   configureResourceSourceResponseSchema,
   configureRetentionDefaultsResponseSchema,
   configureRuntimeMonitoringThresholdsResponseSchema,
@@ -2019,6 +2025,14 @@ export const apiRouteDescriptions = {
   ),
   configureResourceRuntime: routeDescription(
     "Configures runtime settings such as strategy, commands, and publish directory.",
+    "resource.runtime-profile",
+  ),
+  configureResourceScale: routeDescription(
+    "Configures portable replicas, compute resources, and horizontal autoscaling intent.",
+    "resource.runtime-profile",
+  ),
+  configureResourceRollout: routeDescription(
+    "Configures a portable recreate, rolling, or canary replacement policy.",
     "resource.runtime-profile",
   ),
   resourceRuntimeControl: routeDescription(
@@ -5142,6 +5156,32 @@ export const configureResourceRuntimeProcedure = base
   .output(configureResourceRuntimeResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, ConfigureResourceRuntimeCommand.create(input)),
+  );
+
+export const configureResourceScaleProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/scale-profile",
+    description: apiRouteDescriptions.configureResourceScale,
+    successStatus: 200,
+  })
+  .input(configureResourceScaleCommandInputSchema)
+  .output(configureResourceScaleResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureResourceScaleCommand.create(input)),
+  );
+
+export const configureResourceRolloutProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/rollout-profile",
+    description: apiRouteDescriptions.configureResourceRollout,
+    successStatus: 200,
+  })
+  .input(configureResourceRolloutCommandInputSchema)
+  .output(configureResourceRolloutResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureResourceRolloutCommand.create(input)),
   );
 
 export const configureResourceSourceProcedure = base
@@ -9080,6 +9120,8 @@ export const appaloftOrpcRouter = {
     attachStorage: attachResourceStorageProcedure,
     detachStorage: detachResourceStorageProcedure,
     configureRuntime: configureResourceRuntimeProcedure,
+    configureScale: configureResourceScaleProcedure,
+    configureRollout: configureResourceRolloutProcedure,
     configureSource: configureResourceSourceProcedure,
     setVariable: setResourceVariableProcedure,
     secrets: {
@@ -12001,6 +12043,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources/:resourceId/network-profile",
     "/api/resources/:resourceId/access-profile",
     "/api/resources/:resourceId/runtime-profile",
+    "/api/resources/:resourceId/scale-profile",
+    "/api/resources/:resourceId/rollout-profile",
     "/api/resources/:resourceId/auto-deploy",
     "/api/resources/:resourceId/storage-attachments",
     "/api/resources/:resourceId/storage-attachments/:attachmentId",

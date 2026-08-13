@@ -296,6 +296,9 @@
   type NetworkExposureMode = NetworkProfileInput["exposureMode"];
   type RuntimeProfileInput = ConfigureResourceRuntimeInput["runtimeProfile"];
   type RuntimePlanStrategy = NonNullable<RuntimeProfileInput["strategy"]>;
+  type ConfigureResourceScaleInput = Parameters<typeof orpcClient.resources.configureScale>[0];
+  type ConfigureResourceRolloutInput = Parameters<typeof orpcClient.resources.configureRollout>[0];
+  type RolloutStrategy = ConfigureResourceRolloutInput["rolloutProfile"]["strategy"];
   type AccessProfileInput = ConfigureResourceAccessInput["accessProfile"];
   type GeneratedAccessMode = AccessProfileInput["generatedAccessMode"];
   type SourceProfileInput = ConfigureResourceSourceInput["source"];
@@ -695,6 +698,8 @@
             operationKey: "resources.configure-runtime",
             resourceRefs: resourceCapabilityRefs,
           },
+          { operationKey: "resources.configure-scale", resourceRefs: resourceCapabilityRefs },
+          { operationKey: "resources.configure-rollout", resourceRefs: resourceCapabilityRefs },
           { operationKey: "resources.runtime.stop", resourceRefs: resourceCapabilityRefs },
           { operationKey: "resources.runtime.start", resourceRefs: resourceCapabilityRefs },
           { operationKey: "resources.runtime.restart", resourceRefs: resourceCapabilityRefs },
@@ -710,6 +715,22 @@
     resourceCapabilityRefs
       ? capabilityKey({
           operationKey: "resources.configure-runtime",
+          resourceRefs: resourceCapabilityRefs,
+        })
+      : "",
+  );
+  const configureScaleCapabilityKey = $derived(
+    resourceCapabilityRefs
+      ? capabilityKey({
+          operationKey: "resources.configure-scale",
+          resourceRefs: resourceCapabilityRefs,
+        })
+      : "",
+  );
+  const configureRolloutCapabilityKey = $derived(
+    resourceCapabilityRefs
+      ? capabilityKey({
+          operationKey: "resources.configure-rollout",
           resourceRefs: resourceCapabilityRefs,
         })
       : "",
@@ -767,6 +788,16 @@
   const canConfigureRuntimeByCapability = $derived(
     configureRuntimeCapabilityKey
       ? $capabilities.capabilities[configureRuntimeCapabilityKey]?.allowed === true
+      : false,
+  );
+  const canConfigureScaleByCapability = $derived(
+    configureScaleCapabilityKey
+      ? $capabilities.capabilities[configureScaleCapabilityKey]?.allowed === true
+      : false,
+  );
+  const canConfigureRolloutByCapability = $derived(
+    configureRolloutCapabilityKey
+      ? $capabilities.capabilities[configureRolloutCapabilityKey]?.allowed === true
       : false,
   );
   const canStopRuntimeByCapability = $derived(
@@ -1297,6 +1328,18 @@
     title: string;
     detail: string;
   } | null>(null);
+  let scaleFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  let scaleProfileDialogOpen = $state(false);
+  let rolloutProfileDialogOpen = $state(false);
+  let rolloutFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
   let runtimeControlFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -1382,6 +1425,22 @@
   let runtimeDockerfilePath = $state("");
   let runtimeDockerComposeFilePath = $state("");
   let runtimeBuildTarget = $state("");
+  let scaleRolloutFormResourceId = $state("");
+  let scaleReplicas = $state("1");
+  let scaleCpuRequestMillicores = $state("");
+  let scaleCpuLimitMillicores = $state("");
+  let scaleMemoryRequestMebibytes = $state("");
+  let scaleMemoryLimitMebibytes = $state("");
+  let scaleHorizontalEnabled = $state(false);
+  let scaleHorizontalMinReplicas = $state("1");
+  let scaleHorizontalMaxReplicas = $state("3");
+  let scaleHorizontalTargetCpuPercent = $state("70");
+  let rolloutStrategy = $state<RolloutStrategy>("rolling");
+  let rolloutMaxUnavailable = $state("1");
+  let rolloutMaxSurge = $state("1");
+  let rolloutCanaryInitialTrafficPercent = $state("10");
+  let rolloutCanaryStepTrafficPercent = $state("20");
+  let rolloutCanaryIntervalSeconds = $state("60");
   let networkFormResourceId = $state("");
   let networkInternalPort = $state("");
   let networkUpstreamProtocol = $state<NetworkProtocol>("http");
@@ -1826,6 +1885,46 @@
         (runtimeStrategy !== "static" || runtimePublishDirectory.trim()) &&
         (runtimeStrategy !== "dockerfile" || runtimeDockerfilePath.trim()) &&
         (runtimeStrategy !== "docker-compose" || runtimeDockerComposeFilePath.trim()),
+    ),
+  );
+  const canConfigureScale = $derived(
+    Boolean(
+      resource &&
+        canConfigureScaleByCapability &&
+        !isResourceArchived &&
+        isPositiveIntegerText(scaleReplicas) &&
+        optionalPositiveIntegerText(scaleCpuRequestMillicores) &&
+        optionalPositiveIntegerText(scaleCpuLimitMillicores) &&
+        optionalPositiveIntegerText(scaleMemoryRequestMebibytes) &&
+        optionalPositiveIntegerText(scaleMemoryLimitMebibytes) &&
+        (!scaleCpuRequestMillicores.trim() ||
+          !scaleCpuLimitMillicores.trim() ||
+          Number(scaleCpuRequestMillicores) <= Number(scaleCpuLimitMillicores)) &&
+        (!scaleMemoryRequestMebibytes.trim() ||
+          !scaleMemoryLimitMebibytes.trim() ||
+          Number(scaleMemoryRequestMebibytes) <= Number(scaleMemoryLimitMebibytes)) &&
+        (!scaleHorizontalEnabled ||
+          (isPositiveIntegerText(scaleHorizontalMinReplicas) &&
+            isPositiveIntegerText(scaleHorizontalMaxReplicas) &&
+            Number(scaleHorizontalMinReplicas) <= Number(scaleHorizontalMaxReplicas) &&
+            isPositiveIntegerText(scaleHorizontalTargetCpuPercent) &&
+            Number(scaleHorizontalTargetCpuPercent) <= 100)),
+    ),
+  );
+  const canConfigureRollout = $derived(
+    Boolean(
+      resource &&
+        canConfigureRolloutByCapability &&
+        !isResourceArchived &&
+        (rolloutStrategy !== "rolling" ||
+          (optionalPositiveIntegerText(rolloutMaxUnavailable) &&
+            optionalPositiveIntegerText(rolloutMaxSurge))) &&
+        (rolloutStrategy !== "canary" ||
+          (isPositiveIntegerText(rolloutCanaryInitialTrafficPercent) &&
+            Number(rolloutCanaryInitialTrafficPercent) < 100 &&
+            isPositiveIntegerText(rolloutCanaryStepTrafficPercent) &&
+            Number(rolloutCanaryStepTrafficPercent) <= 100 &&
+            isPositiveIntegerText(rolloutCanaryIntervalSeconds))),
     ),
   );
   const canConfigureNetwork = $derived(
@@ -3082,6 +3181,46 @@
       runtimeFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.resources.runtimeProfileSaveFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const configureResourceScaleMutation = createMutation(() => ({
+    mutationFn: (input: ConfigureResourceScaleInput) =>
+      orpcClient.resources.configureScale(input),
+    onSuccess: (result) => {
+      scaleProfileDialogOpen = false;
+      scaleFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.scaleProfileSaved),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+    },
+    onError: (error) => {
+      scaleFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.scaleProfileSaveFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const configureResourceRolloutMutation = createMutation(() => ({
+    mutationFn: (input: ConfigureResourceRolloutInput) =>
+      orpcClient.resources.configureRollout(input),
+    onSuccess: (result) => {
+      rolloutProfileDialogOpen = false;
+      rolloutFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.rolloutProfileSaved),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+    },
+    onError: (error) => {
+      rolloutFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.rolloutProfileSaveFailed),
         detail: readErrorMessage(error),
       };
     },
@@ -4619,6 +4758,37 @@
   });
 
   $effect(() => {
+    if (!browser || !resource || scaleRolloutFormResourceId === resource.id) {
+      return;
+    }
+
+    const scaleProfile = resourceDetail?.scaleProfile;
+    const rolloutProfile = resourceDetail?.rolloutProfile;
+    scaleRolloutFormResourceId = resource.id;
+    scaleReplicas = String(scaleProfile?.replicas ?? 1);
+    scaleCpuRequestMillicores = optionalNumberText(scaleProfile?.cpuRequestMillicores);
+    scaleCpuLimitMillicores = optionalNumberText(scaleProfile?.cpuLimitMillicores);
+    scaleMemoryRequestMebibytes = optionalNumberText(scaleProfile?.memoryRequestMebibytes);
+    scaleMemoryLimitMebibytes = optionalNumberText(scaleProfile?.memoryLimitMebibytes);
+    scaleHorizontalEnabled = Boolean(scaleProfile?.horizontal);
+    scaleHorizontalMinReplicas = String(scaleProfile?.horizontal?.minReplicas ?? 1);
+    scaleHorizontalMaxReplicas = String(scaleProfile?.horizontal?.maxReplicas ?? 3);
+    scaleHorizontalTargetCpuPercent = String(
+      scaleProfile?.horizontal?.targetCpuUtilizationPercent ?? 70,
+    );
+    rolloutStrategy = rolloutProfile?.strategy ?? "rolling";
+    rolloutMaxUnavailable = optionalNumberText(rolloutProfile?.maxUnavailable, "1");
+    rolloutMaxSurge = optionalNumberText(rolloutProfile?.maxSurge, "1");
+    rolloutCanaryInitialTrafficPercent = String(
+      rolloutProfile?.canary?.initialTrafficPercent ?? 10,
+    );
+    rolloutCanaryStepTrafficPercent = String(rolloutProfile?.canary?.stepTrafficPercent ?? 20);
+    rolloutCanaryIntervalSeconds = String(rolloutProfile?.canary?.intervalSeconds ?? 60);
+    scaleFeedback = null;
+    rolloutFeedback = null;
+  });
+
+  $effect(() => {
     if (!browser || !resource || !resourceHealth) {
       return;
     }
@@ -5080,6 +5250,14 @@
     return Number.isInteger(parsed) && parsed > 0;
   }
 
+  function optionalPositiveIntegerText(value: string): boolean {
+    return value.trim().length === 0 || isPositiveIntegerText(value);
+  }
+
+  function optionalNumberText(value: number | undefined, fallback = ""): string {
+    return value === undefined ? fallback : String(value);
+  }
+
   function isPortNumberText(value: string): boolean {
     const parsed = Number(value);
     return Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535;
@@ -5467,6 +5645,80 @@
     configureResourceRuntimeMutation.mutate({
       resourceId: resource.id,
       runtimeProfile,
+    });
+  }
+
+  function configureResourceScale(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!resource || !canConfigureScale || configureResourceScaleMutation.isPending) {
+      return;
+    }
+
+    const optionalPositiveInteger = (value: string): number | undefined =>
+      value.trim() ? Number(value) : undefined;
+    const horizontal = scaleHorizontalEnabled
+      ? {
+          minReplicas: Number(scaleHorizontalMinReplicas),
+          maxReplicas: Number(scaleHorizontalMaxReplicas),
+          targetCpuUtilizationPercent: Number(scaleHorizontalTargetCpuPercent),
+        }
+      : undefined;
+
+    scaleFeedback = null;
+    configureResourceScaleMutation.mutate({
+      resourceId: resource.id,
+      scaleProfile: {
+        replicas: Number(scaleReplicas),
+        ...(optionalPositiveInteger(scaleCpuRequestMillicores) !== undefined
+          ? { cpuRequestMillicores: optionalPositiveInteger(scaleCpuRequestMillicores) }
+          : {}),
+        ...(optionalPositiveInteger(scaleCpuLimitMillicores) !== undefined
+          ? { cpuLimitMillicores: optionalPositiveInteger(scaleCpuLimitMillicores) }
+          : {}),
+        ...(optionalPositiveInteger(scaleMemoryRequestMebibytes) !== undefined
+          ? { memoryRequestMebibytes: optionalPositiveInteger(scaleMemoryRequestMebibytes) }
+          : {}),
+        ...(optionalPositiveInteger(scaleMemoryLimitMebibytes) !== undefined
+          ? { memoryLimitMebibytes: optionalPositiveInteger(scaleMemoryLimitMebibytes) }
+          : {}),
+        ...(horizontal ? { horizontal } : {}),
+      },
+    });
+  }
+
+  function configureResourceRollout(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!resource || !canConfigureRollout || configureResourceRolloutMutation.isPending) {
+      return;
+    }
+
+    const optionalPositiveInteger = (value: string): number | undefined =>
+      value.trim() ? Number(value) : undefined;
+    const canary =
+      rolloutStrategy === "canary"
+        ? {
+            initialTrafficPercent: Number(rolloutCanaryInitialTrafficPercent),
+            stepTrafficPercent: Number(rolloutCanaryStepTrafficPercent),
+            intervalSeconds: Number(rolloutCanaryIntervalSeconds),
+          }
+        : undefined;
+
+    rolloutFeedback = null;
+    configureResourceRolloutMutation.mutate({
+      resourceId: resource.id,
+      rolloutProfile: {
+        strategy: rolloutStrategy,
+        ...(rolloutStrategy === "rolling" &&
+        optionalPositiveInteger(rolloutMaxUnavailable) !== undefined
+          ? { maxUnavailable: optionalPositiveInteger(rolloutMaxUnavailable) }
+          : {}),
+        ...(rolloutStrategy === "rolling" && optionalPositiveInteger(rolloutMaxSurge) !== undefined
+          ? { maxSurge: optionalPositiveInteger(rolloutMaxSurge) }
+          : {}),
+        ...(canary ? { canary } : {}),
+      },
     });
   }
 
@@ -10129,6 +10381,78 @@
                       </dl>
                     </section>
 
+                    <div class="grid gap-4 xl:grid-cols-2" data-resource-scale-rollout-surface>
+                      <section class="rounded-md border bg-background p-4" data-resource-scale-profile-summary>
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div class="flex items-center gap-2">
+                              <h2 class="text-lg font-semibold">{$t(i18nKeys.console.resources.scaleProfileTitle)}</h2>
+                              <DocsHelpLink
+                                href={webDocsHrefs.resourceScaleRolloutProfile}
+                                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                              />
+                            </div>
+                            <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                              {$t(i18nKeys.console.resources.scaleProfileDescription)}
+                            </p>
+                          </div>
+                          <Badge variant={resourceDetail?.scaleProfile ? "default" : "outline"}>
+                            {resourceDetail?.scaleProfile
+                              ? $t(i18nKeys.common.status.configured)
+                              : $t(i18nKeys.common.status.notConfigured)}
+                          </Badge>
+                        </div>
+                        <p class="mt-4 text-sm font-medium">
+                          {$t(i18nKeys.console.resources.scaleReplicas)} · {resourceDetail?.scaleProfile?.replicas ?? 1}
+                        </p>
+                        <div class="mt-4 flex justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            data-resource-scale-profile-edit
+                            onclick={() => (scaleProfileDialogOpen = true)}
+                          >
+                            {$t(i18nKeys.common.actions.edit)}
+                          </Button>
+                        </div>
+                      </section>
+
+                      <section class="rounded-md border bg-background p-4" data-resource-rollout-profile-summary>
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div class="flex items-center gap-2">
+                              <h2 class="text-lg font-semibold">{$t(i18nKeys.console.resources.rolloutProfileTitle)}</h2>
+                              <DocsHelpLink
+                                href={webDocsHrefs.resourceScaleRolloutProfile}
+                                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                              />
+                            </div>
+                            <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                              {$t(i18nKeys.console.resources.rolloutProfileDescription)}
+                            </p>
+                          </div>
+                          <Badge variant={resourceDetail?.rolloutProfile ? "default" : "outline"}>
+                            {resourceDetail?.rolloutProfile
+                              ? $t(i18nKeys.common.status.configured)
+                              : $t(i18nKeys.common.status.notConfigured)}
+                          </Badge>
+                        </div>
+                        <p class="mt-4 text-sm font-medium">
+                          {$t(i18nKeys.console.resources.rolloutStrategy)} · {resourceDetail?.rolloutProfile?.strategy ?? "rolling"}
+                        </p>
+                        <div class="mt-4 flex justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            data-resource-rollout-profile-edit
+                            onclick={() => (rolloutProfileDialogOpen = true)}
+                          >
+                            {$t(i18nKeys.common.actions.edit)}
+                          </Button>
+                        </div>
+                      </section>
+                    </div>
+
                     <section
                       class="rounded-md border bg-background p-4"
                       data-resource-source-link-surface
@@ -11366,6 +11690,165 @@
           </div>
         {/if}
       </div>
+
+      <Dialog.Root bind:open={scaleProfileDialogOpen}>
+        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-3xl">
+          <Dialog.Header>
+            <Dialog.Title>{$t(i18nKeys.console.resources.scaleProfileTitle)}</Dialog.Title>
+            <Dialog.Description>
+              {$t(i18nKeys.console.resources.scaleProfileDescription)}
+            </Dialog.Description>
+          </Dialog.Header>
+          <form class="space-y-4 px-5 pb-5" data-resource-scale-profile-form onsubmit={configureResourceScale}>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <label class="space-y-1.5 text-sm font-medium">
+                <span>{$t(i18nKeys.console.resources.scaleReplicas)}</span>
+                <Input type="number" min="1" step="1" bind:value={scaleReplicas} />
+              </label>
+              <label class="space-y-1.5 text-sm font-medium">
+                <span>{$t(i18nKeys.console.resources.scaleCpuRequest)}</span>
+                <Input type="number" min="1" step="1" bind:value={scaleCpuRequestMillicores} placeholder="250" />
+              </label>
+              <label class="space-y-1.5 text-sm font-medium">
+                <span>{$t(i18nKeys.console.resources.scaleCpuLimit)}</span>
+                <Input type="number" min="1" step="1" bind:value={scaleCpuLimitMillicores} placeholder="1000" />
+              </label>
+              <label class="space-y-1.5 text-sm font-medium">
+                <span>{$t(i18nKeys.console.resources.scaleMemoryRequest)}</span>
+                <Input type="number" min="1" step="1" bind:value={scaleMemoryRequestMebibytes} placeholder="256" />
+              </label>
+              <label class="space-y-1.5 text-sm font-medium">
+                <span>{$t(i18nKeys.console.resources.scaleMemoryLimit)}</span>
+                <Input type="number" min="1" step="1" bind:value={scaleMemoryLimitMebibytes} placeholder="512" />
+              </label>
+              <label class="flex items-center gap-2 self-end rounded-md border px-3 py-2 text-sm font-medium">
+                <input type="checkbox" bind:checked={scaleHorizontalEnabled} />
+                <span>{$t(i18nKeys.console.resources.scaleHorizontalEnabled)}</span>
+              </label>
+            </div>
+
+            {#if scaleHorizontalEnabled}
+              <div class="grid gap-4 rounded-md border bg-muted/20 p-3 sm:grid-cols-3">
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.console.resources.scaleHorizontalMin)}</span>
+                  <Input type="number" min="1" step="1" bind:value={scaleHorizontalMinReplicas} />
+                </label>
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.console.resources.scaleHorizontalMax)}</span>
+                  <Input type="number" min="1" step="1" bind:value={scaleHorizontalMaxReplicas} />
+                </label>
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.console.resources.scaleHorizontalTargetCpu)}</span>
+                  <Input type="number" min="1" max="100" step="1" bind:value={scaleHorizontalTargetCpuPercent} />
+                </label>
+              </div>
+            {/if}
+
+            {#if scaleFeedback}
+              <div
+                class={[
+                  "rounded-md border px-3 py-2 text-sm",
+                  scaleFeedback.kind === "success"
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
+                    : "border-destructive/30 bg-destructive/5 text-destructive",
+                ]}
+              >
+                <p class="font-medium">{scaleFeedback.title}</p>
+                <p class="mt-1 break-all text-xs">{scaleFeedback.detail}</p>
+              </div>
+            {/if}
+
+            <Dialog.Footer class="px-0 pb-0">
+              <Button type="button" variant="outline" onclick={() => (scaleProfileDialogOpen = false)}>
+                {$t(i18nKeys.common.actions.cancel)}
+              </Button>
+              <Button type="submit" disabled={!canConfigureScale || configureResourceScaleMutation.isPending}>
+                {$t(i18nKeys.common.actions.save)}
+              </Button>
+            </Dialog.Footer>
+          </form>
+        </Dialog.Content>
+      </Dialog.Root>
+
+      <Dialog.Root bind:open={rolloutProfileDialogOpen}>
+        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-2xl">
+          <Dialog.Header>
+            <Dialog.Title>{$t(i18nKeys.console.resources.rolloutProfileTitle)}</Dialog.Title>
+            <Dialog.Description>
+              {$t(i18nKeys.console.resources.rolloutProfileDescription)}
+            </Dialog.Description>
+          </Dialog.Header>
+          <form class="space-y-4 px-5 pb-5" data-resource-rollout-profile-form onsubmit={configureResourceRollout}>
+            <label class="block space-y-1.5 text-sm font-medium">
+              <span>{$t(i18nKeys.console.resources.rolloutStrategy)}</span>
+              <Select.Root bind:value={rolloutStrategy} type="single">
+                <Select.Trigger class="w-full">{rolloutStrategy}</Select.Trigger>
+                <Select.Content>
+                  <Select.Item value="recreate">recreate</Select.Item>
+                  <Select.Item value="rolling">rolling</Select.Item>
+                  <Select.Item value="canary">canary</Select.Item>
+                </Select.Content>
+              </Select.Root>
+            </label>
+
+            {#if rolloutStrategy === "rolling"}
+              <div class="grid gap-4 sm:grid-cols-2">
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.console.resources.rolloutMaxUnavailable)}</span>
+                  <Input type="number" min="1" step="1" bind:value={rolloutMaxUnavailable} />
+                </label>
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.console.resources.rolloutMaxSurge)}</span>
+                  <Input type="number" min="1" step="1" bind:value={rolloutMaxSurge} />
+                </label>
+              </div>
+            {:else if rolloutStrategy === "canary"}
+              <div class="space-y-3 rounded-md border bg-muted/20 p-3">
+                <p class="text-xs leading-5 text-muted-foreground">
+                  {$t(i18nKeys.console.resources.rolloutCanaryProofNotice)}
+                </p>
+                <div class="grid gap-4 sm:grid-cols-3">
+                  <label class="space-y-1.5 text-sm font-medium">
+                    <span>{$t(i18nKeys.console.resources.rolloutCanaryInitial)}</span>
+                    <Input type="number" min="1" max="99" step="1" bind:value={rolloutCanaryInitialTrafficPercent} />
+                  </label>
+                  <label class="space-y-1.5 text-sm font-medium">
+                    <span>{$t(i18nKeys.console.resources.rolloutCanaryStep)}</span>
+                    <Input type="number" min="1" max="100" step="1" bind:value={rolloutCanaryStepTrafficPercent} />
+                  </label>
+                  <label class="space-y-1.5 text-sm font-medium">
+                    <span>{$t(i18nKeys.console.resources.rolloutCanaryInterval)}</span>
+                    <Input type="number" min="1" step="1" bind:value={rolloutCanaryIntervalSeconds} />
+                  </label>
+                </div>
+              </div>
+            {/if}
+
+            {#if rolloutFeedback}
+              <div
+                class={[
+                  "rounded-md border px-3 py-2 text-sm",
+                  rolloutFeedback.kind === "success"
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
+                    : "border-destructive/30 bg-destructive/5 text-destructive",
+                ]}
+              >
+                <p class="font-medium">{rolloutFeedback.title}</p>
+                <p class="mt-1 break-all text-xs">{rolloutFeedback.detail}</p>
+              </div>
+            {/if}
+
+            <Dialog.Footer class="px-0 pb-0">
+              <Button type="button" variant="outline" onclick={() => (rolloutProfileDialogOpen = false)}>
+                {$t(i18nKeys.common.actions.cancel)}
+              </Button>
+              <Button type="submit" disabled={!canConfigureRollout || configureResourceRolloutMutation.isPending}>
+                {$t(i18nKeys.common.actions.save)}
+              </Button>
+            </Dialog.Footer>
+          </form>
+        </Dialog.Content>
+      </Dialog.Root>
 
       {#if resourceDetail?.source && sourceSupportsAutoDeploy}
         <Dialog.Root bind:open={autoDeployDialogOpen}>
