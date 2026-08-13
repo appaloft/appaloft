@@ -281,10 +281,18 @@ describe("platform migration stateful workflow e2e", () => {
         "before-backup",
       ]);
       expect(seeded.exitCode, seeded.stderr).toBe(0);
-      const directDump = Bun.spawnSync(["redis-cli", "-u", redisUrl, "--raw", "DUMP", stateKey], {
-        stdout: "pipe",
-        stderr: "pipe",
-      }).stdout;
+      const directDumpResult = Bun.spawnSync(
+        ["docker", "exec", externalRedisName, "redis-cli", "--raw", "DUMP", stateKey],
+        {
+          stdout: "pipe",
+          stderr: "pipe",
+        },
+      );
+      expect(
+        directDumpResult.exitCode,
+        new TextDecoder().decode(directDumpResult.stderr ?? new Uint8Array()),
+      ).toBe(0);
+      const directDump = directDumpResult.stdout;
       const expectedDump =
         directDump[directDump.length - 1] === 10 ? directDump.slice(0, -1) : directDump;
       const dependencyBackup = runShellCli(
@@ -321,7 +329,7 @@ describe("platform migration stateful workflow e2e", () => {
       );
       const probeKey = `${stateKey}:probe`;
       const probedRestore = Bun.spawnSync(
-        ["redis-cli", "-u", redisUrl, "-x", "RESTORE", probeKey, "0"],
+        ["docker", "exec", "-i", externalRedisName, "redis-cli", "-x", "RESTORE", probeKey, "0"],
         {
           stdin: Buffer.from(stateDump?.dumpBase64 ?? "", "base64"),
           stdout: "pipe",

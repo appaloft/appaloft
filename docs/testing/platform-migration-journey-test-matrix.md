@@ -24,7 +24,7 @@ No R4 completion claim is permitted until `MIG-WEB-010`, `MIG-COMPOSE-011` and
 
 - `MIG-WEB-010`: 1 pass, 16 assertions, fresh local Docker deployment, rollback and exact cleanup.
 - `MIG-COMPOSE-011`: 1 pass, 20 assertions, multi-service recovery and exact cleanup.
-- `MIG-STATEFUL-012`: 1 pass, 83 assertions, Redis backup/restore, storage runtime realization,
+- `MIG-STATEFUL-012`: 1 pass, 84 assertions, Redis backup/restore, storage runtime realization,
   domain/TLS evidence and exact cleanup after explicit backup prune.
 - Public gates: `bun run lint`, `bun run typecheck`, `bun run test`, and `bun run build` passed.
 - Docs-impact outcome: new complete bilingual task page and stable anchor
