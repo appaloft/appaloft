@@ -1,3 +1,5 @@
+import "../../../application/node_modules/reflect-metadata/Reflect.js";
+
 import { expect, test } from "bun:test";
 import { openBunNativeWorkspaceTerminal } from "../src/workspace-control-native-terminal";
 

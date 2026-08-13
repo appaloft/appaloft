@@ -1,3 +1,5 @@
+import "../../../application/node_modules/reflect-metadata/Reflect.js";
+
 import { expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { createServer, type Socket } from "node:net";
