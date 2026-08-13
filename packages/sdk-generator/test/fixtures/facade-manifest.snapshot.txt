@@ -338,6 +338,7 @@ appaloft.servers.capacity.inspect -> servers.capacity.inspect GET /servers/{serv
 appaloft.servers.capacity.prune -> servers.capacity.prune POST /servers/{serverId}/capacity/prune
 appaloft.servers.configureCredential -> servers.configure-credential POST /servers/{serverId}/credentials
 appaloft.servers.configureEdgeProxy -> servers.configure-edge-proxy POST /servers/{serverId}/edge-proxy/configuration
+appaloft.servers.configureRuntimeTargetProfile -> servers.configure-runtime-target-profile POST /servers/{serverId}/runtime-target-profile
 appaloft.servers.configureWorkloadRoles -> servers.configure-workload-roles POST /servers/{serverId}/workload-roles
 appaloft.servers.count -> servers.count GET /servers/count
 appaloft.servers.deactivate -> servers.deactivate POST /servers/{serverId}/deactivate
@@ -348,6 +349,7 @@ appaloft.servers.prepareRuntime -> servers.prepare-runtime POST /servers/{server
 appaloft.servers.register -> servers.register POST /servers
 appaloft.servers.rename -> servers.rename POST /servers/{serverId}/rename
 appaloft.servers.reorder -> servers.reorder POST /servers/reorder
+appaloft.servers.runtimeReadiness -> servers.runtime-readiness GET /servers/{serverId}/runtime-readiness
 appaloft.servers.show -> servers.show GET /servers/{serverId}
 appaloft.servers.testConnectivity -> servers.test-connectivity POST /servers/{serverId}/connectivity-tests
 appaloft.servers.testDraftConnectivity -> servers.test-draft-connectivity POST /servers/connectivity-tests
