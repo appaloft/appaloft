@@ -93,6 +93,7 @@ class KyselyServerMutationVisitor
         credential_username: spec.state.credential?.username?.value ?? null,
         credential_public_key: spec.state.credential?.publicKey?.value ?? null,
         credential_private_key: spec.state.credential?.privateKey?.value ?? null,
+        runtime_target_profile: spec.state.runtimeTargetProfile?.toSnapshot() ?? null,
         display_order: spec.state.displayOrder.value,
         created_at: spec.state.createdAt.value,
       },
@@ -151,6 +152,7 @@ export class PgServerRepository implements ServerRepository {
               credential_username: mutation.values.credential_username,
               credential_public_key: mutation.values.credential_public_key,
               credential_private_key: mutation.values.credential_private_key,
+              runtime_target_profile: mutation.values.runtime_target_profile,
               display_order: mutation.values.display_order,
             }),
           )

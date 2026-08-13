@@ -1,3 +1,5 @@
+import "../../../application/node_modules/reflect-metadata/Reflect.js";
+
 import { describe, expect, test } from "bun:test";
 import type {
   AppSpan,
@@ -18,9 +20,12 @@ import {
   HostAddress,
   PortNumber,
   ProviderKey,
+  RuntimeTargetProfile,
   Server,
   SshPrivateKeyText,
   TargetKindValue,
+  UpdatedAt,
+  ok,
   DeploymentTargetUsername,
 } from "@appaloft/core";
 
@@ -266,7 +271,10 @@ function deploymentSummary(input?: {
               }),
       },
       target: {
-        kind: input?.providerKey === "docker-swarm" ? "orchestrator-cluster" : "single-server",
+        kind:
+          input?.providerKey === "docker-swarm" || input?.providerKey === "kubernetes"
+            ? "orchestrator-cluster"
+            : "single-server",
         providerKey: input?.providerKey ?? "local-shell",
         serverIds: ["srv_ssh"],
         metadata: input?.targetMetadata ?? {},
@@ -327,7 +335,83 @@ function sshServer(): Server {
   });
 }
 
+function kubernetesServer(): Server {
+  const server = Server.rehydrate({
+    id: DeploymentTargetId.rehydrate("srv_ssh"),
+    name: DeploymentTargetName.rehydrate("Kubernetes cluster"),
+    host: HostAddress.rehydrate("kubernetes.invalid"),
+    port: PortNumber.rehydrate(6443),
+    providerKey: ProviderKey.rehydrate("kubernetes"),
+    targetKind: TargetKindValue.rehydrate("orchestrator-cluster"),
+    runtimeTargetProfile: RuntimeTargetProfile.create({
+      connectionReference: "connection://cluster/r5a",
+      credentialReference: "secret://cluster/r5a",
+    })._unsafeUnwrap(),
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  });
+  server
+    .configureRuntimeTargetProfile({
+      profile: RuntimeTargetProfile.create({
+        connectionReference: "connection://cluster/r5a",
+        credentialReference: "secret://cluster/r5a",
+      })._unsafeUnwrap(),
+      configuredAt: UpdatedAt.rehydrate("2026-01-01T00:01:00.000Z"),
+    })
+    ._unsafeUnwrap();
+  return server;
+}
+
 describe("RuntimeResourceRuntimeLogReader", () => {
+  test("[K8S-OBS-005] streams bounded Kubernetes deployment logs through the target profile", async () => {
+    ensureReflectMetadata();
+    const calls: SpawnCall[] = [];
+    const { RuntimeResourceRuntimeLogReader } = await import("../src");
+    const reader = new RuntimeResourceRuntimeLogReader(
+      new StaticServerRepository(kubernetesServer()),
+      createSpawn(calls, ["kubernetes-ready\n"]),
+      {},
+      {
+        resolve: async () =>
+          ok({ kubeconfigPath: "/private/tmp/r5a.kubeconfig", contextName: "r5a" }),
+      },
+    );
+
+    const result = await reader.open(
+      createTestExecutionContext(),
+      logContext({
+        providerKey: "kubernetes",
+        executionMetadata: {
+          "kubernetes.namespace": "appaloft-org-prj-env-receipt",
+          "kubernetes.workloadName": "appaloft-res-dep",
+        },
+      }),
+      request({ tailLines: 40, follow: false }),
+      new AbortController().signal,
+    );
+
+    expect(result.isOk()).toBe(true);
+    const events = await collectEvents(result._unsafeUnwrap());
+    expect(calls[0]?.args).toEqual([
+      "kubectl",
+      "--kubeconfig",
+      "/private/tmp/r5a.kubeconfig",
+      "--context",
+      "r5a",
+      "logs",
+      "--namespace",
+      "appaloft-org-prj-env-receipt",
+      "deployment/appaloft-res-dep",
+      "--tail",
+      "40",
+    ]);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        kind: "line",
+        line: expect.objectContaining({ message: "kubernetes-ready" }),
+      }),
+    );
+  });
+
   test("waits for process output before closing bounded local Docker logs", async () => {
     const calls: SpawnCall[] = [];
     const tracer = new RecordingAppTracer();

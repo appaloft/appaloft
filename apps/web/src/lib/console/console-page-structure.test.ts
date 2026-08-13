@@ -144,6 +144,10 @@ const serverDetailPageSource = readFileSync(
   ),
   "utf8",
 );
+const serverRuntimeTargetPanelSource = readFileSync(
+  fileURLToPath(new URL("../components/console/ServerRuntimeTargetPanel.svelte", import.meta.url)),
+  "utf8",
+);
 const serverDetailRouteSource = readFileSync(
   fileURLToPath(
     new URL("../../routes/servers/[serverId=consoleObjectId]/+page.ts", import.meta.url),
@@ -2261,6 +2265,20 @@ describe("console page structure", () => {
     expect(serverOverviewSource).not.toContain("openCapacityPruneDialog");
     expect(serverOverviewSource).not.toContain("<Trash2");
     expect(serverOverviewSource).not.toContain("capacityPruneTitle");
+  });
+
+  test("[K8S-SURFACE-017] exposes cluster profile configuration and normalized readiness", () => {
+    expect(serverDetailPageSource).toContain("ServerRuntimeTargetPanel");
+    expect(serverDetailPageSource).toContain('server.targetKind === "orchestrator-cluster"');
+    expect(serverDetailPageSource).toContain("profile={server.runtimeTargetProfile}");
+    expect(serverRuntimeTargetPanelSource).toContain("data-server-runtime-target-panel");
+    expect(serverRuntimeTargetPanelSource).toContain(
+      "orpcClient.servers.configureRuntimeTargetProfile",
+    );
+    expect(serverRuntimeTargetPanelSource).toContain("orpc.servers.runtimeReadiness.queryOptions");
+    expect(serverRuntimeTargetPanelSource).toContain("data-server-runtime-readiness-checks");
+    expect(serverRuntimeTargetPanelSource).not.toContain("kubeconfigYaml");
+    expect(serverRuntimeTargetPanelSource).not.toContain("credentialValue");
   });
 
   test("[SERVER-DETAIL-IA-001C] keeps connectivity tests on the connectivity surface", () => {

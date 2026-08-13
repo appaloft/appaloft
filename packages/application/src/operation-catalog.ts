@@ -296,6 +296,7 @@ import { checkServerDeleteSafetyQueryInputSchema } from "./operations/servers/ch
 import { configureScheduledRuntimePrunePolicyCommandInputSchema } from "./operations/servers/configure-scheduled-runtime-prune-policy.command";
 import { configureServerCredentialCommandInputSchema } from "./operations/servers/configure-server-credential.command";
 import { configureServerEdgeProxyCommandInputSchema } from "./operations/servers/configure-server-edge-proxy.command";
+import { configureServerRuntimeTargetProfileCommandInputSchema } from "./operations/servers/configure-server-runtime-target-profile.command";
 import { configureServerWorkloadRolesCommandInputSchema } from "./operations/servers/configure-server-workload-roles.command";
 import { countServersQueryInputSchema } from "./operations/servers/count-servers.query";
 import { createSshCredentialCommandInputSchema } from "./operations/servers/create-ssh-credential.command";
@@ -303,6 +304,7 @@ import { deactivateServerCommandInputSchema } from "./operations/servers/deactiv
 import { deleteServerCommandInputSchema } from "./operations/servers/delete-server.command";
 import { deleteSshCredentialCommandInputSchema } from "./operations/servers/delete-ssh-credential.command";
 import { inspectServerCapacityQueryInputSchema } from "./operations/servers/inspect-server-capacity.query";
+import { inspectServerRuntimeReadinessQueryInputSchema } from "./operations/servers/inspect-server-runtime-readiness.query";
 import { listScheduledRuntimePrunePoliciesQueryInputSchema } from "./operations/servers/list-scheduled-runtime-prune-policies.query";
 import { listServersQueryInputSchema } from "./operations/servers/list-servers.query";
 import { listSshCredentialsQueryInputSchema } from "./operations/servers/list-ssh-credentials.query";
@@ -1461,6 +1463,20 @@ export const operationCatalog = [
     },
   },
   {
+    key: "servers.configure-runtime-target-profile",
+    kind: "command",
+    domain: "servers",
+    messageName: "ConfigureServerRuntimeTargetProfileCommand",
+    handlerName: "ConfigureServerRuntimeTargetProfileCommandHandler",
+    serviceName: "ConfigureServerRuntimeTargetProfileUseCase",
+    inputSchema: configureServerRuntimeTargetProfileCommandInputSchema,
+    serviceToken: tokens.configureServerRuntimeTargetProfileUseCase,
+    transports: {
+      cli: "appaloft server configure-runtime-target-profile <serverId> --connection-reference <ref>",
+      orpc: { method: "POST", path: "/api/servers/{serverId}/runtime-target-profile" },
+    },
+  },
+  {
     key: "servers.configure-credential",
     kind: "command",
     domain: "servers",
@@ -1598,6 +1614,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft server capacity inspect <serverId>",
       orpc: { method: "GET", path: "/api/servers/{serverId}/capacity" },
+    },
+  },
+  {
+    key: "servers.runtime-readiness",
+    kind: "query",
+    domain: "servers",
+    messageName: "InspectServerRuntimeReadinessQuery",
+    handlerName: "InspectServerRuntimeReadinessQueryHandler",
+    serviceName: "InspectServerRuntimeReadinessQueryService",
+    inputSchema: inspectServerRuntimeReadinessQueryInputSchema,
+    serviceToken: tokens.inspectServerRuntimeReadinessQueryService,
+    transports: {
+      cli: "appaloft server readiness <serverId>",
+      orpc: { method: "GET", path: "/api/servers/{serverId}/runtime-readiness" },
     },
   },
   {

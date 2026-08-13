@@ -26,12 +26,17 @@ import {
   appaloftTraceAttributes,
 } from "@appaloft/application";
 import { deriveRuntimeInstanceNames } from "./runtime-instance-names";
+import {
+  FileKubernetesConnectionResolver,
+  type KubernetesConnectionResolver,
+} from "./kubernetes-runtime-target-backend";
 
 type RuntimeLogCloseReason = "completed" | "cancelled" | "source-ended";
 type RuntimeLogCommandKind =
   | "docker_logs"
   | "docker_compose_logs"
   | "docker_swarm_service_logs"
+  | "kubernetes_logs"
   | "ssh_docker_logs"
   | "ssh_compose_logs";
 type RuntimeLogSpawnOptions = {
@@ -843,6 +848,8 @@ export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader
     private readonly spawnProcess: RuntimeLogSpawn = (args, options) =>
       Bun.spawn(args, options),
     options: RuntimeResourceRuntimeLogReaderOptions = {},
+    private readonly kubernetesConnectionResolver: KubernetesConnectionResolver =
+      new FileKubernetesConnectionResolver(),
   ) {
     this.boundedProcessTimeoutMs =
       options.boundedProcessTimeoutMs ?? defaultBoundedProcessTimeoutMs;
@@ -879,6 +886,79 @@ export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader
         });
       }
       case "docker-container": {
+        if (logContext.deployment.runtimePlan.target.providerKey === "kubernetes") {
+          const namespace = metadataValue(logContext, "kubernetes.namespace");
+          const workloadName = metadataValue(logContext, "kubernetes.workloadName");
+          const serverId = logContext.deployment.runtimePlan.target.serverIds[0];
+          if (!namespace || !workloadName || !serverId || !this.serverRepository) {
+            return err(
+              domainError.resourceRuntimeLogsUnavailable(
+                "Kubernetes runtime log identity is not available",
+                {
+                  phase: "runtime-instance-resolution",
+                  step: "kubernetes-runtime-log-identity",
+                  resourceId: logContext.resource.id,
+                  deploymentId: logContext.deployment.id,
+                  runtimeKind: execution.kind,
+                },
+              ),
+            );
+          }
+          const target = await this.serverRepository.findOne(
+            toRepositoryContext(context),
+            DeploymentTargetByIdSpec.create(DeploymentTargetId.rehydrate(serverId)),
+          );
+          const profile = target?.toState().runtimeTargetProfile?.toSnapshot();
+          if (!profile) {
+            return err(
+              domainError.resourceRuntimeLogsUnavailable(
+                "Kubernetes runtime target profile is not available",
+                {
+                  phase: "runtime-instance-resolution",
+                  step: "kubernetes-runtime-target-profile",
+                  resourceId: logContext.resource.id,
+                  deploymentId: logContext.deployment.id,
+                  runtimeKind: execution.kind,
+                },
+              ),
+            );
+          }
+          const connection = await this.kubernetesConnectionResolver.resolve({
+            connectionReference: profile.connectionReference,
+            ...(profile.credentialReference
+              ? { credentialReference: profile.credentialReference }
+              : {}),
+          });
+          if (connection.isErr()) return err(connection.error);
+          return ok(
+            createProcessRuntimeLogStream({
+              args: [
+                "kubectl",
+                "--kubeconfig",
+                connection.value.kubeconfigPath,
+                ...(connection.value.contextName
+                  ? ["--context", connection.value.contextName]
+                  : []),
+                "logs",
+                "--namespace",
+                namespace,
+                `deployment/${workloadName}`,
+                "--tail",
+                String(request.tailLines),
+                ...(request.since ? [`--since-time=${request.since}`] : []),
+                ...(request.follow ? ["--follow"] : []),
+              ],
+              command: "kubernetes_logs",
+              context: logContext,
+              executionContext: context,
+              request,
+              signal,
+              spawnProcess: this.spawnProcess,
+              boundedProcessTimeoutMs: this.boundedProcessTimeoutMs,
+            }),
+          );
+        }
+
         if (isDockerSwarmRuntime(logContext)) {
           const serviceName = metadataValue(logContext, "swarm.serviceName");
           if (!serviceName) {

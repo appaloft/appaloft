@@ -12,9 +12,11 @@ import {
   ok,
   PortNumber,
   ProviderKey,
+  RuntimeTargetProfile,
   Server,
   SshPrivateKeyText,
   TargetKindValue,
+  UpdatedAt,
 } from "@appaloft/core";
 import { RuntimeResourceHealthProbeRunner } from "../src/resource-health-probes";
 
@@ -54,6 +56,28 @@ function sshServer(): Server {
   });
 }
 
+function kubernetesServer(): Server {
+  const target = Server.rehydrate({
+    id: DeploymentTargetId.rehydrate("srv_kubernetes"),
+    name: DeploymentTargetName.rehydrate("Kubernetes cluster"),
+    host: HostAddress.rehydrate("kubernetes.invalid"),
+    port: PortNumber.rehydrate(6443),
+    providerKey: ProviderKey.rehydrate("kubernetes"),
+    targetKind: TargetKindValue.rehydrate("orchestrator-cluster"),
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  });
+  target
+    .configureRuntimeTargetProfile({
+      profile: RuntimeTargetProfile.create({
+        connectionReference: "connection://cluster/r5a",
+        credentialReference: "secret://cluster/r5a",
+      })._unsafeUnwrap(),
+      configuredAt: UpdatedAt.rehydrate("2026-01-01T00:01:00.000Z"),
+    })
+    ._unsafeUnwrap();
+  return target;
+}
+
 function probeRequest(input: { targetServerId?: string } = {}) {
   return {
     resourceId: "res_web",
@@ -84,10 +108,90 @@ function containerProbeRequest(input: { targetServerId?: string } = {}) {
   };
 }
 
+function kubernetesProbeRequest() {
+  return {
+    resourceId: "res_web",
+    deploymentId: "dep_web",
+    targetServerId: "srv_kubernetes",
+    runtimeKind: "docker-container" as const,
+    targetKind: "orchestrator-cluster" as const,
+    providerKey: "kubernetes",
+    runtimeMetadata: {
+      "kubernetes.namespace": "appaloft-org-prj-env-receipt",
+      "kubernetes.workloadName": "appaloft-res-web-dep-web",
+    },
+    timeoutSeconds: 5,
+  };
+}
+
 describe("RuntimeResourceHealthProbeRunner", () => {
   const context = createExecutionContext({
     requestId: "req_swarm_health",
     entrypoint: "system",
+  });
+
+  test("[K8S-OBS-005] normalizes Kubernetes Deployment availability through the target profile", async () => {
+    const runner = new RuntimeResourceHealthProbeRunner(
+      async (input) => {
+        expect(input.args).toEqual([
+          "kubectl",
+          "--kubeconfig",
+          "/private/tmp/r5a.kubeconfig",
+          "--context",
+          "r5a",
+          "get",
+          "deployment",
+          "appaloft-res-web-dep-web",
+          "--namespace",
+          "appaloft-org-prj-env-receipt",
+          "-o",
+          "json",
+        ]);
+        return ok({
+          exitCode: 0,
+          stdout: JSON.stringify({
+            metadata: { generation: 3 },
+            spec: { replicas: 2 },
+            status: {
+              observedGeneration: 3,
+              replicas: 2,
+              readyReplicas: 2,
+              availableReplicas: 2,
+            },
+          }),
+        });
+      },
+      new StaticServerRepository(kubernetesServer()),
+      {
+        resolve: async () =>
+          ok({ kubeconfigPath: "/private/tmp/r5a.kubeconfig", contextName: "r5a" }),
+      },
+    );
+
+    const result = await runner.probeRuntime(context, kubernetesProbeRequest());
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      lifecycle: "running",
+      health: "healthy",
+      reasonCode: "kubernetes_deployment_available",
+      check: {
+        name: "runtime-service",
+        target: "container",
+        status: "passed",
+        reasonCode: "kubernetes_deployment_available",
+        phase: "runtime-live-probe",
+        metadata: {
+          providerKey: "kubernetes",
+          runtimeKind: "docker-container",
+          namespace: "appaloft-org-prj-env-receipt",
+          workloadName: "appaloft-res-web-dep-web",
+          desiredReplicas: "2",
+          readyReplicas: "2",
+          availableReplicas: "2",
+        },
+      },
+    });
   });
 
   test("[SWARM-TARGET-OBS-002] normalizes healthy Docker Swarm service tasks", async () => {

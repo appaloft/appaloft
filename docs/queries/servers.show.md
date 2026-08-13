@@ -43,6 +43,7 @@ This query inherits:
 - [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
 - [ADR-026: Aggregate Mutation Command Boundary](../decisions/ADR-026-aggregate-mutation-command-boundary.md)
 - [ADR-101: Server Workload Role Admission](../decisions/ADR-101-server-workload-role-admission.md)
+- [ADR-114: Kubernetes Runtime Target And Scale Policy Boundary](../decisions/ADR-114-kubernetes-runtime-target-and-scale-policy-boundary.md)
 - [Server Workload Roles Spec](../specs/118-server-workload-roles/spec.md)
 - [Server Workload Role Test Matrix](../testing/server-workload-role-test-matrix.md)
 - [Deployment Target Lifecycle Workflow](../workflows/deployment-target-lifecycle.md)
@@ -102,6 +103,10 @@ type ServerDetail = {
 
 `server` includes existing server identity, host/port, provider key, credential summary with masked
 secret booleans, edge proxy kind/status, and last safe proxy error metadata.
+For an attached cluster target it also exposes the persisted `runtimeTargetProfile` using opaque
+reference values only. It never resolves or embeds the referenced kubeconfig, credential, provider
+payload, Kubernetes API object, or secret. Live cluster checks remain the separate read-only
+`servers.runtime-readiness` query.
 It also includes `workloadRoles: ServerWorkloadRole[]` as the normalized declaration of placement
 intent. Values are exactly `deployment-runtime`, `artifact-builder`, and `sandbox-worker`, in that
 canonical order when present. The field is never omitted: `[]` explicitly means

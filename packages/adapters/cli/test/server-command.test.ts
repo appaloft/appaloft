@@ -241,6 +241,119 @@ describe("CLI server commands", () => {
     expect(stdout).toContain("General purpose (all workload types)");
   });
 
+  test("[K8S-SURFACE-017] server profile command dispatches only opaque references", async () => {
+    ensureReflectMetadata();
+    const { ConfigureServerRuntimeTargetProfileCommand, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({ profile: {}, changed: true } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_runtime_target_profile_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "server",
+        "configure-runtime-target-profile",
+        "srv_r5a_cluster",
+        "--connection-reference",
+        "file:///tmp/appaloft-r5a.kubeconfig",
+        "--credential-reference",
+        "secret://cluster/r5a",
+        "--placement-policy-reference",
+        "policy://placement/default",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(ConfigureServerRuntimeTargetProfileCommand);
+    expect(commands[0]).toMatchObject({
+      input: {
+        serverId: "srv_r5a_cluster",
+        connectionReference: "file:///tmp/appaloft-r5a.kubeconfig",
+        credentialReference: "secret://cluster/r5a",
+        placementPolicyReference: "policy://placement/default",
+      },
+    });
+  });
+
+  test("[K8S-SURFACE-017] server readiness dispatches the normalized application query", async () => {
+    ensureReflectMetadata();
+    const { InspectServerRuntimeReadinessQuery, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const queries: AppQuery<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, _command: AppCommand<T>) => ok({} as T),
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        queries.push(query as AppQuery<unknown>);
+        return ok({
+          schemaVersion: "servers.runtime-readiness/v1",
+          serverId: "srv_r5a_cluster",
+          targetKind: "orchestrator-cluster",
+          status: "ready",
+          checks: [],
+          checkedAt: "2026-08-13T00:00:00.000Z",
+        } as T);
+      },
+    } as unknown as QueryBus;
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({
+            ...input,
+            requestId: "req_cli_runtime_readiness_test",
+          }),
+      },
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync(["node", "appaloft", "server", "readiness", "srv_r5a_cluster"]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(InspectServerRuntimeReadinessQuery);
+    expect(queries[0]).toMatchObject({ serverId: "srv_r5a_cluster" });
+  });
+
   test("[RUNTIME-CAPACITY-INSPECT-001] server capacity inspect dispatches the application query", async () => {
     ensureReflectMetadata();
     const { InspectServerCapacityQuery, createExecutionContext } = await import(

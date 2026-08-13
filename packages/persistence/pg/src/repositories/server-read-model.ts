@@ -125,6 +125,7 @@ function toServerSummary(
           },
         }
       : {}),
+    ...(row.runtime_target_profile ? { runtimeTargetProfile: row.runtime_target_profile } : {}),
     displayOrder: row.display_order ?? 0,
     createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
   };

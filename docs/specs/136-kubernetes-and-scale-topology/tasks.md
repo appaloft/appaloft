@@ -2,14 +2,14 @@
 
 ## Governance
 
-- [ ] Merge ADR-114, Spec 136 and the `K8S-*`/`SCALE-*`/`ROLLOUT-*` Test Matrix.
-- [ ] Create R5a–R5d actor-visible public Tickets and mark the ready frontier `ready-for-agent`.
+- [x] Merge ADR-114, Spec 136 and the `K8S-*`/`SCALE-*`/`ROLLOUT-*` Test Matrix.
+- [x] Create R5a–R5d actor-visible public Tickets and mark the ready frontier `ready-for-agent`.
 
 ## R5a Existing Cluster
 
-- [ ] RED `K8S-PROFILE-001`–`K8S-CLEAN-008`, `K8S-SURFACE-017`, `K8S-E2E-018`.
-- [ ] Implement target profile/readiness, stateless OCI backend, normalized observation and cleanup.
-- [ ] Run disposable real-cluster packet and exact residual check.
+- [x] RED `K8S-PROFILE-001`–`K8S-CLEAN-008`, `K8S-SURFACE-017`, `K8S-E2E-018`.
+- [x] Implement target profile/readiness, stateless OCI backend, normalized observation and cleanup.
+- [x] Run disposable real-cluster packet and exact residual check.
 
 ## R5b Scale And Rollout
 

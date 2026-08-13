@@ -7,6 +7,7 @@ import {
   type Command,
   type CommandBus,
   ConfigureServerEdgeProxyCommand,
+  ConfigureServerRuntimeTargetProfileCommand,
   ConfigureServerWorkloadRolesCommand,
   createExecutionContext,
   DeactivateServerCommand,
@@ -14,6 +15,7 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   InspectServerCapacityQuery,
+  InspectServerRuntimeReadinessQuery,
   type ProductSessionAuthorizationPort,
   PruneServerCapacityCommand,
   type Query,
@@ -542,6 +544,92 @@ describe("server show HTTP route", () => {
       serverId: "srv_primary",
       workloadRoles: ["sandbox-worker", "deployment-runtime"],
     });
+  });
+
+  test("[K8S-SURFACE-017] dispatches opaque runtime target profile configuration through HTTP", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const profile = {
+      schemaVersion: "runtime-target-profile/v1" as const,
+      connectionReference: "file:///tmp/appaloft-r5a.kubeconfig",
+      credentialReference: "secret://cluster/r5a",
+    };
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ profile, changed: true } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountServerShowRoutes({ commandBus, queryBus });
+
+    const response = await app.handle(
+      serverShowRequest("http://localhost/api/servers/srv_r5a_cluster/runtime-target-profile", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          connectionReference: profile.connectionReference,
+          credentialReference: profile.credentialReference,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ profile, changed: true });
+    expect(capturedCommand).toBeInstanceOf(ConfigureServerRuntimeTargetProfileCommand);
+    expect(capturedCommand).toMatchObject({
+      input: {
+        serverId: "srv_r5a_cluster",
+        connectionReference: profile.connectionReference,
+        credentialReference: profile.credentialReference,
+      },
+    });
+  });
+
+  test("[K8S-SURFACE-017] dispatches normalized runtime target readiness through HTTP", async () => {
+    let capturedQuery: Query<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, _command: Command<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        capturedQuery = query as Query<unknown>;
+        return ok({
+          schemaVersion: "servers.runtime-readiness/v1",
+          serverId: "srv_r5a_cluster",
+          targetKind: "orchestrator-cluster",
+          status: "ready",
+          checks: [
+            { capability: "api-reachability", status: "ready" },
+            { capability: "version", status: "ready", message: "Kubernetes v1.31.2" },
+            { capability: "authorization", status: "ready" },
+            { capability: "namespace-isolation", status: "ready" },
+            { capability: "routing", status: "ready" },
+            { capability: "storage", status: "ready" },
+          ],
+          checkedAt: "2026-08-13T00:02:00.000Z",
+        } as T);
+      },
+    } as QueryBus;
+    const app = mountServerShowRoutes({ commandBus, queryBus });
+
+    const response = await app.handle(
+      serverShowRequest("http://localhost/api/servers/srv_r5a_cluster/runtime-readiness", {
+        method: "GET",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      schemaVersion: "servers.runtime-readiness/v1",
+      serverId: "srv_r5a_cluster",
+      status: "ready",
+    });
+    expect(capturedQuery).toBeInstanceOf(InspectServerRuntimeReadinessQuery);
+    expect(capturedQuery).toMatchObject({ serverId: "srv_r5a_cluster" });
   });
 
   test("[SRV-LIFE-ENTRY-008] dispatches CheckServerDeleteSafetyQuery through HTTP", async () => {

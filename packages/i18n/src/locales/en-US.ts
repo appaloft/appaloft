@@ -232,6 +232,8 @@ export const enUS = {
         "A deployment target server is a server Appaloft can connect to and run resources on.",
       serverDockerSwarmTarget:
         "A Docker Swarm target is the server mode that runs resources through Swarm orchestration.",
+      serverRuntimeTargetProfile:
+        "A runtime target profile selects a deployment backend and stores only opaque references to its connection and routing policy.",
       serverSshCredential:
         "An SSH credential is the identity material Appaloft uses to connect to a server.",
       serverConnectivityTest:
@@ -3709,6 +3711,24 @@ export const enUS = {
       runtimeSurfaceDescription:
         "Inspect server-level monitor signals or open a server terminal without creating a deployment.",
       runtimeSurfaceTitle: "Runtime observation",
+      runtimeTargetCapabilityPolicyReference: "Capability policy reference",
+      runtimeTargetConfigure: "Save target profile",
+      runtimeTargetConfigureFailed: "Unable to save runtime target profile",
+      runtimeTargetConfigureSucceeded: "Runtime target profile saved",
+      runtimeTargetConfiguring: "Saving target profile…",
+      runtimeTargetConnectionReference: "Connection reference",
+      runtimeTargetCredentialReference: "Credential reference",
+      runtimeTargetDescription:
+        "Connect this cluster through opaque references, then inspect non-mutating readiness before placement.",
+      runtimeTargetOptionalReferenceHint: "Optional opaque reference",
+      runtimeTargetPlacementPolicyReference: "Placement policy reference",
+      runtimeTargetReadiness: "Runtime readiness",
+      runtimeTargetReadinessBlocked: "Blocked",
+      runtimeTargetReadinessFailed: "Unable to inspect runtime readiness",
+      runtimeTargetReadinessReady: "Ready",
+      runtimeTargetRegistryCredentialReference: "Registry credential reference",
+      runtimeTargetRoutingPolicyReference: "Routing policy reference",
+      runtimeTargetTitle: "Cluster runtime target",
       serverIdLabel: "Server ID",
       settingsDescription:
         "Change the display name without changing the server id, host, provider, credential, proxy, lifecycle, or deployment history.",

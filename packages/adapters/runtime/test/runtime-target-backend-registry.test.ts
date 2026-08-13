@@ -1,3 +1,5 @@
+import "../../../application/node_modules/reflect-metadata/Reflect.js";
+
 import { describe, expect, test } from "bun:test";
 import {
   type ExecutionBackend,
@@ -295,6 +297,49 @@ describe("DefaultRuntimeTargetBackendRegistry", () => {
       targetKinds: ["orchestrator-cluster"],
     });
   });
+
+  test("[K8S-ADM-003][K8S-OBS-005] resolves an explicitly composed Kubernetes backend without fallback", async () => {
+    ensureReflectMetadata();
+    const {
+      createDefaultRuntimeTargetBackendRegistry,
+      KubernetesRuntimeTargetBackend,
+    } = await import("../src");
+    const registry = createDefaultRuntimeTargetBackendRegistry({
+      localBackend: new RecordingExecutionBackend("local"),
+      sshBackend: new RecordingExecutionBackend("ssh"),
+      kubernetesBackend: new KubernetesRuntimeTargetBackend(
+        {
+          async run() {
+            return ok({ exitCode: 0, stdout: "", stderr: "" });
+          },
+        },
+        {
+          async resolve() {
+            return ok({ kubeconfigPath: "/private/tmp/r5a.kubeconfig" });
+          },
+        },
+      ),
+    });
+
+    const result = registry.find({
+      targetKind: "orchestrator-cluster",
+      providerKey: "kubernetes",
+      requiredCapabilities: [
+        "runtime.apply",
+        "runtime.verify",
+        "runtime.logs",
+        "runtime.health",
+        "proxy.route",
+      ],
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().descriptor).toMatchObject({
+      key: "kubernetes",
+      providerKey: "kubernetes",
+      targetKinds: ["orchestrator-cluster"],
+    });
+  });
 });
 
 describe("RoutingExecutionBackend", () => {
@@ -326,5 +371,40 @@ describe("RoutingExecutionBackend", () => {
     expect(localBackend.calls).toEqual(["local:execute"]);
     expect(sshBackend.calls).toEqual(["ssh:rollback"]);
     expect(fallbackBackend.calls).toEqual(["fallback:cancel"]);
+  });
+
+  test("[K8S-ADM-003] explicit cluster targets fail closed without invoking the legacy fallback", async () => {
+    ensureReflectMetadata();
+    const { createDefaultRuntimeTargetBackendRegistry, RoutingExecutionBackend } =
+      await import("../src");
+    const fallbackBackend = new RecordingExecutionBackend("fallback");
+    const routingBackend = new RoutingExecutionBackend(
+      createDefaultRuntimeTargetBackendRegistry({
+        localBackend: new RecordingExecutionBackend("local"),
+        sshBackend: new RecordingExecutionBackend("ssh"),
+      }),
+      fallbackBackend,
+    );
+
+    const result = await routingBackend.execute(
+      createContext(),
+      deploymentFor({
+        providerKey: "kubernetes",
+        targetKind: "orchestrator-cluster",
+      }),
+    );
+
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error).toMatchObject({
+        code: "runtime_target_unsupported",
+        details: {
+          phase: "runtime-target-resolution",
+          targetKind: "orchestrator-cluster",
+          providerKey: "kubernetes",
+        },
+      });
+    }
+    expect(fallbackBackend.calls).toEqual([]);
   });
 });

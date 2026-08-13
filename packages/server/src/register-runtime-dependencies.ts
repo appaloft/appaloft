@@ -21,7 +21,10 @@ import {
   DockerCliCertificateRouteRuntime,
   DockerSwarmExecutionBackend,
   DockerSwarmShellCommandRunner,
+  FileKubernetesConnectionResolver,
   InMemoryExecutionBackend,
+  KubernetesRuntimeTargetBackend,
+  KubernetesShellCommandRunner,
   LocalAgentTunnelProvider,
   LocalExecutionBackend,
   LocalSshCertificateRouteCommandRunner,
@@ -1912,6 +1915,13 @@ export function registerRuntimeDependencies(
               ),
             }
           : {}),
+        kubernetesBackend: new KubernetesRuntimeTargetBackend(
+          new KubernetesShellCommandRunner(),
+          new FileKubernetesConnectionResolver(),
+          dependencyContainer.resolve(tokens.serverRepository),
+          dependencyContainer.resolve(tokens.dependencyResourceSecretStore),
+          dependencyContainer.resolve(tokens.controlPlaneSecretProtector),
+        ),
       }),
     ),
   });

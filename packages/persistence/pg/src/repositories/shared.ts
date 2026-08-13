@@ -163,6 +163,7 @@ import {
   RuntimePlanId,
   RuntimePlanStrategyValue,
   type RuntimePlan as RuntimePlanType,
+  RuntimeTargetProfile,
   RuntimeVerificationStep,
   RuntimeVerificationStepKindValue,
   SourceApplicationShapeValue,
@@ -1225,6 +1226,9 @@ export function rehydrateDeploymentTarget(row: Selectable<Database["servers"]>) 
               : {}),
           },
         }
+      : {}),
+    ...(row.runtime_target_profile
+      ? { runtimeTargetProfile: RuntimeTargetProfile.rehydrate(row.runtime_target_profile) }
       : {}),
     displayOrder: DeploymentTargetDisplayOrder.rehydrate(row.display_order ?? 0),
     createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),

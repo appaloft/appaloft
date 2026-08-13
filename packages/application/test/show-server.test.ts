@@ -255,6 +255,30 @@ describe("ShowServerQueryService", () => {
     expect(unrestrictedResult._unsafeUnwrap().server.workloadRoles).toEqual([]);
   });
 
+  test("[K8S-PROFILE-001] servers.show reads back only the opaque runtime target profile", async () => {
+    const profile = {
+      schemaVersion: "runtime-target-profile/v1" as const,
+      connectionReference: "file:///tmp/appaloft-r5a.kubeconfig",
+      credentialReference: "secret://cluster/r5a",
+      placementPolicyReference: "policy://placement/default",
+    };
+    const { service } = createService({
+      servers: [
+        serverSummary({
+          providerKey: "kubernetes",
+          targetKind: "orchestrator-cluster",
+          runtimeTargetProfile: profile,
+        }),
+      ],
+    });
+
+    const result = await service.execute(createTestContext(), createQuery());
+
+    expect(result._unsafeUnwrap().server.runtimeTargetProfile).toEqual(profile);
+    expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("apiVersion");
+    expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("PRIVATE KEY");
+  });
+
   test("[SRV-LIFE-SHOW-002] servers.show returns not_found for a missing server", async () => {
     const { service } = createService({ servers: [] });
 

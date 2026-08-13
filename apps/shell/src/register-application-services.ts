@@ -106,6 +106,8 @@ import {
   ConfigureServerCredentialUseCase,
   ConfigureServerEdgeProxyCommandHandler,
   ConfigureServerEdgeProxyUseCase,
+  ConfigureServerRuntimeTargetProfileCommandHandler,
+  ConfigureServerRuntimeTargetProfileUseCase,
   ConfigureServerWorkloadRolesCommandHandler,
   ConfigureServerWorkloadRolesUseCase,
   ConfigureStorageVolumeBackupPolicyCommandHandler,
@@ -245,6 +247,8 @@ import {
   InspectRuntimeUsageQueryHandler,
   InspectServerCapacityQueryHandler,
   InspectServerCapacityQueryService,
+  InspectServerRuntimeReadinessQueryHandler,
+  InspectServerRuntimeReadinessQueryService,
   InviteOrganizationMemberCommandHandler,
   InviteOrganizationMemberUseCase,
   IssueCertificateOnCertificateRequestedHandler,
@@ -1731,6 +1735,7 @@ export function registerApplicationServices(
   container.registerSingleton(ShowDefaultAccessDomainPolicyQueryHandler);
   container.registerSingleton(ConfigureServerEdgeProxyCommandHandler);
   container.registerSingleton(ConfigureServerWorkloadRolesCommandHandler);
+  container.registerSingleton(ConfigureServerRuntimeTargetProfileCommandHandler);
   container.registerSingleton(ConfigureDomainBindingCertificatePolicyCommandHandler);
   container.registerSingleton(ConfigureDomainBindingRouteCommandHandler);
   container.registerSingleton(ConfigureResourceAccessCommandHandler);
@@ -1861,6 +1866,7 @@ export function registerApplicationServices(
   container.registerSingleton(ShowDomainBindingQueryHandler);
   container.registerSingleton(ShowSshCredentialQueryHandler);
   container.registerSingleton(InspectServerCapacityQueryHandler);
+  container.registerSingleton(InspectServerRuntimeReadinessQueryHandler);
   container.registerSingleton(PruneServerCapacityCommandHandler);
   container.registerSingleton(ConfigureScheduledRuntimePrunePolicyCommandHandler);
   container.registerSingleton(ListScheduledRuntimePrunePoliciesQueryHandler);
@@ -2431,6 +2437,10 @@ export function registerApplicationServices(
     tokens.configureServerWorkloadRolesUseCase,
     ConfigureServerWorkloadRolesUseCase,
   );
+  container.registerSingleton(
+    tokens.configureServerRuntimeTargetProfileUseCase,
+    ConfigureServerRuntimeTargetProfileUseCase,
+  );
   container.registerSingleton(tokens.createSshCredentialUseCase, CreateSshCredentialUseCase);
   container.registerSingleton(tokens.countServersQueryService, CountServersQueryService);
   container.registerSingleton(
@@ -2440,6 +2450,10 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.showSshCredentialQueryService, ShowSshCredentialQueryService);
   container.registerSingleton(tokens.listServersQueryService, ListServersQueryService);
   container.registerSingleton(tokens.showServerQueryService, ShowServerQueryService);
+  container.registerSingleton(
+    tokens.inspectServerRuntimeReadinessQueryService,
+    InspectServerRuntimeReadinessQueryService,
+  );
   container.registerSingleton(
     tokens.inspectServerCapacityQueryService,
     InspectServerCapacityQueryService,

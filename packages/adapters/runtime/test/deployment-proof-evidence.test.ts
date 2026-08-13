@@ -15,9 +15,12 @@ import {
   HostAddress,
   PortNumber,
   ProviderKey,
+  RuntimeTargetProfile,
   Server,
   SshPrivateKeyText,
   TargetKindValue,
+  UpdatedAt,
+  ok,
 } from "@appaloft/core";
 import {
   deploymentProofEvidenceFromDockerInspect,
@@ -65,6 +68,28 @@ function sshServer(): Server {
     },
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
   });
+}
+
+function kubernetesServer(): Server {
+  const target = Server.rehydrate({
+    id: DeploymentTargetId.rehydrate("srv_kubernetes"),
+    name: DeploymentTargetName.rehydrate("Kubernetes cluster"),
+    host: HostAddress.rehydrate("kubernetes.invalid"),
+    port: PortNumber.rehydrate(6443),
+    providerKey: ProviderKey.rehydrate("kubernetes"),
+    targetKind: TargetKindValue.rehydrate("orchestrator-cluster"),
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  });
+  target
+    .configureRuntimeTargetProfile({
+      profile: RuntimeTargetProfile.create({
+        connectionReference: "connection://cluster/r5a",
+        credentialReference: "secret://cluster/r5a",
+      })._unsafeUnwrap(),
+      configuredAt: UpdatedAt.rehydrate("2026-01-01T00:01:00.000Z"),
+    })
+    ._unsafeUnwrap();
+  return target;
 }
 
 describe("deployment proof runtime evidence", () => {
@@ -576,6 +601,112 @@ describe("deployment proof runtime evidence", () => {
     expect(calls[0]?.at(-1)).toContain("label=appaloft.deployment-id=dep_v2");
     expect(calls[0]?.at(-1)).toContain("label=com.docker.compose.service=web");
     expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("runtime-marker");
+  });
+
+  test("[K8S-OBS-005] reads Kubernetes Deployment proof without exposing environment values", async () => {
+    const calls: string[][] = [];
+    const configurationFingerprint = deploymentProofConfigurationFingerprint(variables);
+    const reader = new RuntimeDeploymentProofEvidenceReader(
+      new StaticServerRepository(kubernetesServer()),
+      async (args) => {
+        calls.push(args);
+        return {
+          ok: true,
+          stdout: JSON.stringify({
+            metadata: {
+              uid: "3cc2b293-a56c-4d8e-9dde-e21b13067f6d",
+              name: "appaloft-res-web-dep-v2",
+              namespace: "appaloft-org-prj-env-receipt",
+              generation: 4,
+              creationTimestamp: "2026-08-13T00:00:00.000Z",
+              annotations: {
+                "appaloft.io/deployment-id": "dep_v2",
+                "appaloft.io/configuration-fingerprint": configurationFingerprint,
+              },
+            },
+            spec: {
+              replicas: 1,
+              template: {
+                spec: {
+                  containers: [
+                    {
+                      image: "registry.example.test/app@sha256:abc123",
+                      env: [{ name: "APP_VERSION" }, { name: "TOKEN" }],
+                    },
+                  ],
+                },
+              },
+            },
+            status: {
+              observedGeneration: 4,
+              replicas: 1,
+              readyReplicas: 1,
+              availableReplicas: 1,
+            },
+          }),
+        };
+      },
+      async () => new Response(null, { status: 200 }),
+      {
+        resolve: async () =>
+          ok({ kubeconfigPath: "/private/tmp/r5a.kubeconfig", contextName: "r5a" }),
+      },
+    );
+    const result = await reader.read({} as never, {
+      ...deployment,
+      runtimePlan: {
+        ...deployment.runtimePlan,
+        execution: {
+          ...deployment.runtimePlan.execution,
+          metadata: {
+            "kubernetes.namespace": "appaloft-org-prj-env-receipt",
+            "kubernetes.workloadName": "appaloft-res-web-dep-v2",
+          },
+        },
+        target: {
+          kind: "orchestrator-cluster",
+          providerKey: "kubernetes",
+          serverIds: ["srv_kubernetes"],
+        },
+      },
+    } as DeploymentSummary);
+
+    expect(result._unsafeUnwrap()).toMatchObject({
+      available: true,
+      artifact: {
+        available: true,
+        reference: "registry.example.test/app@sha256:abc123",
+      },
+      workload: {
+        available: true,
+        identity: "3cc2b293-a56c-4d8e-9dde-e21b13067f6d",
+        generation: "dep_v2",
+      },
+      configuration: {
+        matchesPlanned: true,
+        matchesPlannedKeySet: true,
+        keyCount: 2,
+        plannedKeyCount: 2,
+      },
+      health: { status: "passed" },
+    });
+    expect(calls).toEqual([
+      [
+        "kubectl",
+        "--kubeconfig",
+        "/private/tmp/r5a.kubeconfig",
+        "--context",
+        "r5a",
+        "get",
+        "deployment",
+        "appaloft-res-web-dep-v2",
+        "--namespace",
+        "appaloft-org-prj-env-receipt",
+        "-o",
+        "json",
+      ],
+    ]);
+    expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("do-not-return");
   });
 
   test("[DEP-PROOF-ADAPTER-002] generic SSH fails closed without a governed private key", async () => {

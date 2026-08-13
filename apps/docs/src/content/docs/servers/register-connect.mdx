@@ -19,6 +19,8 @@ relatedOperations:
   - "servers.register"
   - "servers.configure-credential"
   - "servers.configure-workload-roles"
+  - "servers.configure-runtime-target-profile"
+  - "servers.runtime-readiness"
   - "servers.test-connectivity"
   - "servers.prepare-runtime"
   - "servers.show"
@@ -180,6 +182,47 @@ appaloft server register \
   --provider docker-swarm \
   --target-kind orchestrator-cluster
 ```
+
+## 现有 Kubernetes 集群 <a id="server-runtime-target-profile" />
+
+Kubernetes 集群也是 `orchestrator-cluster`，但连接信息由 Runtime Target Profile 独立持有。Profile
+只保存 URI 形式的不透明引用，不接受 kubeconfig YAML、token、certificate、namespace 或 manifest
+作为注册/部署输入。
+
+先注册集群目标，再配置连接引用：
+
+```bash
+appaloft server register \
+  --name production-cluster \
+  --host kubernetes.invalid \
+  --port 6443 \
+  --provider kubernetes \
+  --target-kind orchestrator-cluster
+
+appaloft server configure-runtime-target-profile srv_cluster \
+  --connection-reference file:///absolute/path/to/kubeconfig \
+  --routing-policy-reference builtin://kubernetes/ingress-controller/traefik-k3s
+```
+
+公共本机 composition 默认只解析绝对 `file://` kubeconfig 引用；它不会把文件内容复制进 Server
+readback。需要独立凭据保管时，可同时配置 `--credential-reference secret://...`，但运行时必须注入
+能够解析该引用的 credential-aware adapter；否则 readiness 和部署都会 fail closed，不会回退到本机
+Docker 或其他目标。
+
+需要路由的 workload 还必须配置明确的 routing policy reference。上面的 public 内置引用只允许
+`kube-system` 中 Pod selector 精确等于 `app.kubernetes.io/name=traefik` 的 controller 入站，不允许
+通配 namespace、Pod selector 或 CIDR。使用其他 ingress topology 的集群需要为自己的不透明策略
+引用注入 resolver；缺失、未知或非法策略都会在 apply 前保持 blocked。
+
+配置后执行无副作用的 readiness 检查：
+
+```bash
+appaloft server readiness srv_cluster
+```
+
+结果固定返回 API reachability、版本、授权、namespace isolation、routing 与 storage 六项规范化检查，
+不会返回 Kubernetes API DTO 或原始凭据。Web 的 Server 详情页对 cluster target 提供相同的 Profile
+配置对话框与 readiness readback；HTTP/API、SDK 和 MCP 使用相同 operation schema。
 
 ## 出站 Server Worker <a id="server-worker-outbound-relay" />
 

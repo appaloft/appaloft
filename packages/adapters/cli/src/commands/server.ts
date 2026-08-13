@@ -4,12 +4,14 @@ import {
   CheckServerDeleteSafetyQuery,
   ConfigureScheduledRuntimePrunePolicyCommand,
   ConfigureServerCredentialCommand,
+  ConfigureServerRuntimeTargetProfileCommand,
   ConfigureServerWorkloadRolesCommand,
   CreateSshCredentialCommand,
   DeactivateServerCommand,
   DeleteServerCommand,
   DeleteSshCredentialCommand,
   InspectServerCapacityQuery,
+  InspectServerRuntimeReadinessQuery,
   ListScheduledRuntimePrunePoliciesQuery,
   ListServersQuery,
   ListSshCredentialsQuery,
@@ -69,6 +71,20 @@ const credentialKindOption = Options.choice("kind", deploymentTargetCredentialKi
 );
 const workloadRoleOption = Options.choice("workload-role", serverWorkloadRoles).pipe(
   Options.repeated,
+);
+const connectionReferenceOption = Options.text("connection-reference");
+const credentialReferenceOption = Options.text("credential-reference").pipe(Options.optional);
+const placementPolicyReferenceOption = Options.text("placement-policy-reference").pipe(
+  Options.optional,
+);
+const routingPolicyReferenceOption = Options.text("routing-policy-reference").pipe(
+  Options.optional,
+);
+const registryCredentialReferenceOption = Options.text("registry-credential-reference").pipe(
+  Options.optional,
+);
+const capabilityPolicyReferenceOption = Options.text("capability-policy-reference").pipe(
+  Options.optional,
 );
 const usernameOption = Options.text("username").pipe(Options.optional);
 const publicKeyOption = Options.text("public-key").pipe(Options.optional);
@@ -487,6 +503,67 @@ const configureWorkloadRolesCommand = EffectCommand.make(
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverConfigureWorkloadRoles));
+
+const runtimeReadinessCommand = EffectCommand.make(
+  "readiness",
+  {
+    serverId: serverIdArg,
+  },
+  ({ serverId }) =>
+    runQuery(
+      InspectServerRuntimeReadinessQuery.create({
+        serverId,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverRuntimeReadiness));
+
+const configureRuntimeTargetProfileCommand = EffectCommand.make(
+  "configure-runtime-target-profile",
+  {
+    serverId: serverIdArg,
+    connectionReference: connectionReferenceOption,
+    credentialReference: credentialReferenceOption,
+    placementPolicyReference: placementPolicyReferenceOption,
+    routingPolicyReference: routingPolicyReferenceOption,
+    registryCredentialReference: registryCredentialReferenceOption,
+    capabilityPolicyReference: capabilityPolicyReferenceOption,
+  },
+  ({
+    capabilityPolicyReference,
+    connectionReference,
+    credentialReference,
+    placementPolicyReference,
+    registryCredentialReference,
+    routingPolicyReference,
+    serverId,
+  }) => {
+    const credentialReferenceValue = optionalValue(credentialReference);
+    const placementPolicyReferenceValue = optionalValue(placementPolicyReference);
+    const routingPolicyReferenceValue = optionalValue(routingPolicyReference);
+    const registryCredentialReferenceValue = optionalValue(registryCredentialReference);
+    const capabilityPolicyReferenceValue = optionalValue(capabilityPolicyReference);
+
+    return runCommand(
+      ConfigureServerRuntimeTargetProfileCommand.create({
+        serverId,
+        connectionReference,
+        ...(credentialReferenceValue ? { credentialReference: credentialReferenceValue } : {}),
+        ...(placementPolicyReferenceValue
+          ? { placementPolicyReference: placementPolicyReferenceValue }
+          : {}),
+        ...(routingPolicyReferenceValue
+          ? { routingPolicyReference: routingPolicyReferenceValue }
+          : {}),
+        ...(registryCredentialReferenceValue
+          ? { registryCredentialReference: registryCredentialReferenceValue }
+          : {}),
+        ...(capabilityPolicyReferenceValue
+          ? { capabilityPolicyReference: capabilityPolicyReferenceValue }
+          : {}),
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverConfigureRuntimeTargetProfile));
 
 const renameCommand = EffectCommand.make(
   "rename",
@@ -948,6 +1025,8 @@ export const serverCommand = EffectCommand.make("server").pipe(
     listCommand,
     showCommand,
     configureWorkloadRolesCommand,
+    configureRuntimeTargetProfileCommand,
+    runtimeReadinessCommand,
     renameCommand,
     reorderCommand,
     deactivateCommand,

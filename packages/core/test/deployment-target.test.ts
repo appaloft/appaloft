@@ -15,6 +15,8 @@ import {
   MessageText,
   PortNumber,
   ProviderKey,
+  RuntimeTargetProfile,
+  RuntimeTargetProfileReference,
   ServerWorkloadRoleValue,
   TargetKindValue,
   UpdatedAt,
@@ -130,6 +132,94 @@ describe("DeploymentTarget workload roles", () => {
         workloadRoles: ["sandbox-worker"],
       });
     }
+  });
+});
+
+describe("DeploymentTarget runtime target profile", () => {
+  test("[K8S-PROFILE-001] persists only opaque provider-neutral references and emits redacted change facts", () => {
+    const deploymentTarget = DeploymentTarget.rehydrate({
+      id: DeploymentTargetId.rehydrate("srv_cluster"),
+      name: DeploymentTargetName.rehydrate("existing-cluster"),
+      host: HostAddress.rehydrate("kubernetes.invalid"),
+      port: PortNumber.rehydrate(6443),
+      providerKey: ProviderKey.rehydrate("kubernetes"),
+      targetKind: TargetKindValue.rehydrate("orchestrator-cluster"),
+      createdAt: CreatedAt.rehydrate("2026-08-13T00:00:00.000Z"),
+    });
+
+    const profile = RuntimeTargetProfile.create({
+      connectionReference: "file:///tmp/appaloft-r5a.kubeconfig",
+      credentialReference: "secret://cluster/r5a",
+      placementPolicyReference: "policy://placement/default",
+      routingPolicyReference: "policy://routing/gateway-api",
+      registryCredentialReference: "secret://registry/default",
+      capabilityPolicyReference: "policy://capabilities/r5a",
+    })._unsafeUnwrap();
+
+    const configured = deploymentTarget
+      .configureRuntimeTargetProfile({
+        profile,
+        configuredAt: UpdatedAt.rehydrate("2026-08-13T00:01:00.000Z"),
+      })
+      ._unsafeUnwrap();
+
+    expect(configured.changed).toBe(true);
+    expect(deploymentTarget.toState().runtimeTargetProfile?.toSnapshot()).toEqual({
+      schemaVersion: "runtime-target-profile/v1",
+      connectionReference: "file:///tmp/appaloft-r5a.kubeconfig",
+      credentialReference: "secret://cluster/r5a",
+      placementPolicyReference: "policy://placement/default",
+      routingPolicyReference: "policy://routing/gateway-api",
+      registryCredentialReference: "secret://registry/default",
+      capabilityPolicyReference: "policy://capabilities/r5a",
+    });
+
+    expect(deploymentTarget.pullDomainEvents()).toEqual([
+      expect.objectContaining({
+        type: "deployment_target.runtime_target_profile_configured",
+        aggregateId: "srv_cluster",
+        payload: {
+          providerKey: "kubernetes",
+          targetKind: "orchestrator-cluster",
+          configuredReferences: [
+            "connection",
+            "credential",
+            "placement-policy",
+            "routing-policy",
+            "registry-credential",
+            "capability-policy",
+          ],
+        },
+      }),
+    ]);
+
+    expect(
+      deploymentTarget
+        .configureRuntimeTargetProfile({
+          profile,
+          configuredAt: UpdatedAt.rehydrate("2026-08-13T00:02:00.000Z"),
+        })
+        ._unsafeUnwrap().changed,
+    ).toBe(false);
+    expect(deploymentTarget.pullDomainEvents()).toEqual([]);
+
+    expect(RuntimeTargetProfileReference.create("apiVersion: v1\nclusters: []").isErr()).toBe(true);
+    expect(RuntimeTargetProfileReference.create("-----BEGIN PRIVATE KEY-----").isErr()).toBe(true);
+    expect(RuntimeTargetProfileReference.create("plain-kubeconfig-payload").isErr()).toBe(true);
+
+    const singleServer = target();
+    const unsupported = singleServer.configureRuntimeTargetProfile({
+      profile,
+      configuredAt: UpdatedAt.rehydrate("2026-08-13T00:03:00.000Z"),
+    });
+    expect(unsupported.isErr()).toBe(true);
+    if (unsupported.isErr()) {
+      expect(unsupported.error.details).toMatchObject({
+        phase: "runtime-target-profile-admission",
+        targetKind: "single-server",
+      });
+    }
+    expect(singleServer.pullDomainEvents()).toEqual([]);
   });
 });
 

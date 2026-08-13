@@ -99,6 +99,7 @@ import {
   ConfigureScheduledTaskCommand,
   ConfigureServerCredentialCommand,
   ConfigureServerEdgeProxyCommand,
+  ConfigureServerRuntimeTargetProfileCommand,
   ConfigureServerWorkloadRolesCommand,
   ConfigureStorageVolumeBackupPolicyCommand,
   ConfirmActionPreviewRouteCommand,
@@ -186,6 +187,7 @@ import {
   configureScheduledTaskCommandInputSchema,
   configureServerCredentialCommandInputSchema,
   configureServerEdgeProxyCommandInputSchema,
+  configureServerRuntimeTargetProfileCommandInputSchema,
   configureServerWorkloadRolesCommandInputSchema,
   configureStorageVolumeBackupPolicyCommandInputSchema,
   confirmDomainBindingOwnershipCommandInputSchema,
@@ -357,6 +359,7 @@ import {
   InspectRuntimeUsageQuery,
   type InspectRuntimeUsageQueryInput,
   InspectServerCapacityQuery,
+  InspectServerRuntimeReadinessQuery,
   InstallAgentAdapterCommand,
   InstallAgentWorkspaceProfileCommand,
   InviteOrganizationMemberCommand,
@@ -372,6 +375,7 @@ import {
   inspectDomainBindingDnsReadinessQueryInputSchema,
   inspectRuntimeUsageQueryInputSchema,
   inspectServerCapacityQueryInputSchema,
+  inspectServerRuntimeReadinessQueryInputSchema,
   installAgentAdapterInputSchema,
   installAgentAdapterResponseSchema,
   installAgentWorkspaceProfileInputSchema,
@@ -963,6 +967,7 @@ import {
   configureRuntimeMonitoringThresholdsResponseSchema,
   configureScheduledRuntimePrunePolicyResponseSchema,
   configureServerEdgeProxyResponseSchema,
+  configureServerRuntimeTargetProfileResponseSchema,
   configureServerWorkloadRolesResponseSchema,
   configureStorageVolumeBackupPolicyResponseSchema,
   confirmDomainBindingOwnershipResponseSchema,
@@ -1024,6 +1029,7 @@ import {
   inspectDependencyResourceResponseSchema,
   inspectRuntimeUsageResponseSchema,
   inspectServerCapacityResponseSchema,
+  inspectServerRuntimeReadinessResponseSchema,
   inviteOrganizationMemberResponseSchema,
   issueOrRenewCertificateResponseSchema,
   listAccountSessionsResponseSchema,
@@ -1800,6 +1806,7 @@ export const apiDocsHrefs = {
   serverCredential: resolvePublicDocsHelpHref("server.ssh-credential"),
   serverConnectivity: resolvePublicDocsHelpHref("server.connectivity-test"),
   serverDeploymentTarget: resolvePublicDocsHelpHref("server.deployment-target"),
+  serverRuntimeTargetProfile: resolvePublicDocsHelpHref("server.runtime-target-profile"),
   serverDockerSwarmTarget: resolvePublicDocsHelpHref("server.docker-swarm-target"),
   serverProxyReadiness: resolvePublicDocsHelpHref("server.proxy-readiness"),
   environmentVariablePrecedence: resolvePublicDocsHelpHref("environment.variable-precedence"),
@@ -1881,6 +1888,10 @@ export const apiRouteDescriptions = {
   serverCapacity: routeDescription(
     "Inspects disk, inode, Docker, memory, CPU, and Appaloft runtime capacity without pruning or mutating server state.",
     "diagnostics.runtime-target-capacity",
+  ),
+  serverRuntimeReadiness: routeDescription(
+    "Inspects Kubernetes target readiness without mutating cluster workloads.",
+    "server.runtime-target-profile",
   ),
   runtimeUsageInspect: routeDescription(
     "Inspects runtime usage attribution for one scope without pruning, quota enforcement, sample persistence, or state mutation.",
@@ -4378,6 +4389,19 @@ export const inspectServerCapacityProcedure = base
     executeQuery(context, InspectServerCapacityQuery.create(input)),
   );
 
+export const inspectServerRuntimeReadinessProcedure = base
+  .route({
+    method: "GET",
+    path: "/servers/{serverId}/runtime-readiness",
+    description: apiRouteDescriptions.serverRuntimeReadiness,
+    successStatus: 200,
+  })
+  .input(inspectServerRuntimeReadinessQueryInputSchema)
+  .output(inspectServerRuntimeReadinessResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, InspectServerRuntimeReadinessQuery.create(input)),
+  );
+
 export const inspectRuntimeUsageProcedure = base
   .route({
     method: "GET",
@@ -4594,6 +4618,18 @@ export const configureServerWorkloadRolesProcedure = base
   .output(configureServerWorkloadRolesResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, ConfigureServerWorkloadRolesCommand.create(input)),
+  );
+
+export const configureServerRuntimeTargetProfileProcedure = base
+  .route({
+    method: "POST",
+    path: "/servers/{serverId}/runtime-target-profile",
+    successStatus: 200,
+  })
+  .input(configureServerRuntimeTargetProfileCommandInputSchema)
+  .output(configureServerRuntimeTargetProfileResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureServerRuntimeTargetProfileCommand.create(input)),
   );
 
 export const deactivateServerProcedure = base
@@ -8953,6 +8989,7 @@ export const appaloftOrpcRouter = {
     count: countServersProcedure,
     list: listServersProcedure,
     show: showServerProcedure,
+    runtimeReadiness: inspectServerRuntimeReadinessProcedure,
     capacity: {
       inspect: inspectServerCapacityProcedure,
       prune: pruneServerCapacityProcedure,
@@ -8966,6 +9003,7 @@ export const appaloftOrpcRouter = {
     reorder: reorderServersProcedure,
     configureEdgeProxy: configureServerEdgeProxyProcedure,
     configureWorkloadRoles: configureServerWorkloadRolesProcedure,
+    configureRuntimeTargetProfile: configureServerRuntimeTargetProfileProcedure,
     deactivate: deactivateServerProcedure,
     deleteCheck: checkServerDeleteSafetyProcedure,
     delete: deleteServerProcedure,
@@ -11814,6 +11852,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/retention-defaults",
     "/api/retention-defaults/:category",
     "/api/servers/:serverId/capacity",
+    "/api/servers/:serverId/runtime-readiness",
     "/api/servers/:serverId/capacity/prune",
     "/api/runtime-usage/inspect",
     "/api/runtime-monitoring/samples",
@@ -11915,6 +11954,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/servers/reorder",
     "/api/servers/:serverId/edge-proxy/configuration",
     "/api/servers/:serverId/workload-roles",
+    "/api/servers/:serverId/runtime-target-profile",
     "/api/servers/:serverId/deactivate",
     "/api/servers/:serverId/delete-check",
     "/api/servers/connectivity-tests",

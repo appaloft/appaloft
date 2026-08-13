@@ -21,6 +21,10 @@ import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ash } from "@appaloft/ash";
+import {
+  FileKubernetesConnectionResolver,
+  type KubernetesConnectionResolver,
+} from "./kubernetes-runtime-target-backend";
 
 const responsePreviewLimit = 4096;
 const runtimeHealthProbeTimeoutExitCode = 124;
@@ -622,6 +626,8 @@ export class RuntimeResourceHealthProbeRunner implements ResourceHealthProbeRunn
     private readonly runRuntimeHealthCommand: RuntimeHealthCommandRunner =
       defaultRuntimeHealthCommandRunner,
     private readonly serverRepository?: ServerRepository,
+    private readonly kubernetesConnectionResolver: KubernetesConnectionResolver =
+      new FileKubernetesConnectionResolver(),
   ) {}
 
   async probe(
@@ -714,6 +720,10 @@ export class RuntimeResourceHealthProbeRunner implements ResourceHealthProbeRunn
     context: ExecutionContext,
     request: ResourceRuntimeHealthProbeRequest,
   ): Promise<Result<ResourceRuntimeHealthProbeResult, DomainError>> {
+    if (request.providerKey === "kubernetes") {
+      return await this.probeKubernetesRuntime(context, request);
+    }
+
     if (request.providerKey === "docker-swarm") {
       return this.probeDockerSwarmRuntime(context, request);
     }
@@ -729,6 +739,138 @@ export class RuntimeResourceHealthProbeRunner implements ResourceHealthProbeRunn
         providerKey: request.providerKey,
       }),
     );
+  }
+
+  private async probeKubernetesRuntime(
+    context: ExecutionContext,
+    request: ResourceRuntimeHealthProbeRequest,
+  ): Promise<Result<ResourceRuntimeHealthProbeResult, DomainError>> {
+    const namespace = request.runtimeMetadata?.["kubernetes.namespace"];
+    const workloadName = request.runtimeMetadata?.["kubernetes.workloadName"];
+    if (!namespace || !workloadName || !request.targetServerId || !this.serverRepository) {
+      return err(
+        domainError.resourceHealthUnavailable("Kubernetes runtime identity is not available", {
+          phase: "runtime-live-probe",
+          providerKey: request.providerKey,
+          resourceId: request.resourceId,
+          deploymentId: request.deploymentId,
+        }),
+      );
+    }
+    const target = await this.serverRepository.findOne(
+      toRepositoryContext(context),
+      DeploymentTargetByIdSpec.create(DeploymentTargetId.rehydrate(request.targetServerId)),
+    );
+    const profile = target?.toState().runtimeTargetProfile?.toSnapshot();
+    if (!profile) {
+      return err(
+        domainError.resourceHealthUnavailable(
+          "Kubernetes runtime target profile is not available",
+          {
+            phase: "runtime-live-probe",
+            providerKey: request.providerKey,
+          },
+        ),
+      );
+    }
+    const connection = await this.kubernetesConnectionResolver.resolve({
+      connectionReference: profile.connectionReference,
+      ...(profile.credentialReference
+        ? { credentialReference: profile.credentialReference }
+        : {}),
+    });
+    if (connection.isErr()) return err(connection.error);
+
+    const startedAt = Date.now();
+    const observed = await this.runRuntimeHealthCommand({
+      args: [
+        "kubectl",
+        "--kubeconfig",
+        connection.value.kubeconfigPath,
+        ...(connection.value.contextName ? ["--context", connection.value.contextName] : []),
+        "get",
+        "deployment",
+        workloadName,
+        "--namespace",
+        namespace,
+        "-o",
+        "json",
+      ],
+      timeoutMs: Math.max(1, request.timeoutSeconds) * 1000,
+    });
+    const observedAt = new Date().toISOString();
+    const durationMs = Date.now() - startedAt;
+    if (observed.isErr()) return err(observed.error);
+    if (observed.value.exitCode !== 0) {
+      return ok(
+        failedRuntimeProbe({
+          request,
+          serviceName: workloadName,
+          observedAt,
+          durationMs,
+          exitCode: observed.value.exitCode,
+          reasonCode: "kubernetes_deployment_probe_failed",
+          message: "Kubernetes deployment could not be inspected.",
+        }),
+      );
+    }
+    try {
+      const deployment = JSON.parse(observed.value.stdout ?? "") as {
+        metadata?: { generation?: number };
+        spec?: { replicas?: number };
+        status?: {
+          availableReplicas?: number;
+          observedGeneration?: number;
+          readyReplicas?: number;
+          replicas?: number;
+          unavailableReplicas?: number;
+        };
+      };
+      const desired = deployment.spec?.replicas ?? 1;
+      const ready = deployment.status?.readyReplicas ?? 0;
+      const available = deployment.status?.availableReplicas ?? 0;
+      const current = deployment.status?.replicas ?? 0;
+      const observedGeneration = deployment.status?.observedGeneration ?? 0;
+      const generation = deployment.metadata?.generation ?? 1;
+      const healthy =
+        ready >= desired && available >= desired && current >= desired && observedGeneration >= generation;
+      const reasonCode = healthy
+        ? "kubernetes_deployment_available"
+        : "kubernetes_deployment_not_available";
+      return ok({
+        lifecycle: healthy ? "running" : current > 0 ? "starting" : "stopped",
+        health: healthy ? "healthy" : "unhealthy",
+        observedAt,
+        reasonCode,
+        ...(!healthy ? { message: "Kubernetes deployment has not converged." } : {}),
+        check: {
+          name: "runtime-service",
+          target: "container",
+          status: healthy ? "passed" : "failed",
+          observedAt,
+          durationMs,
+          reasonCode,
+          phase: "runtime-live-probe",
+          retriable: !healthy,
+          metadata: {
+            providerKey: request.providerKey,
+            runtimeKind: request.runtimeKind,
+            namespace,
+            workloadName,
+            desiredReplicas: String(desired),
+            readyReplicas: String(ready),
+            availableReplicas: String(available),
+          },
+        },
+      });
+    } catch {
+      return err(
+        domainError.resourceHealthUnavailable("Kubernetes deployment response is invalid", {
+          phase: "runtime-live-probe",
+          providerKey: request.providerKey,
+        }),
+      );
+    }
   }
 
   private async probeDockerSwarmRuntime(
