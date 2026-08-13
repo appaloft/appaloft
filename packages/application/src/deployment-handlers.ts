@@ -1,6 +1,7 @@
 export * from "./operations/deployments/apply-action-preview-route.handler";
 export * from "./operations/deployments/archive-deployment.handler";
 export * from "./operations/deployments/cancel-deployment.handler";
+export * from "./operations/deployments/cleanup-deployment-runtime.handler";
 export * from "./operations/deployments/cleanup-preview.handler";
 export * from "./operations/deployments/confirm-action-preview-route.handler";
 export * from "./operations/deployments/count-deployments.handler";

@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@appaloft/application": "workspace:*",
+    "@appaloft/adapter-railway-migration": "workspace:*",
     "@appaloft/ash": "workspace:*",
     "@appaloft/cli-logging": "workspace:*",
     "@appaloft/contracts": "workspace:*",

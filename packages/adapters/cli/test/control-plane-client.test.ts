@@ -1760,6 +1760,7 @@ describe("CLI remote control-plane client", () => {
       ["node", "appaloft", "code"],
       ["node", "appaloft", "workspace", "open", "."],
       ["node", "appaloft", "operate", "res_api"],
+      ["node", "appaloft", "migrate", "plan", "--input", "bundle.json"],
       [
         "node",
         "appaloft",

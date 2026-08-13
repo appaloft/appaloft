@@ -138,6 +138,7 @@ import { rotateDeployTokenCommandInputSchema } from "./operations/deploy-tokens/
 import { showDeployTokenQueryInputSchema } from "./operations/deploy-tokens/show-deploy-token.schema";
 import { archiveDeploymentCommandInputSchema } from "./operations/deployments/archive-deployment.command";
 import { cancelDeploymentCommandInputSchema } from "./operations/deployments/cancel-deployment.command";
+import { cleanupDeploymentRuntimeCommandInputSchema } from "./operations/deployments/cleanup-deployment-runtime.command";
 import { cleanupPreviewCommandInputSchema } from "./operations/deployments/cleanup-preview.command";
 import { countDeploymentsQueryInputSchema } from "./operations/deployments/count-deployments.query";
 import { createDeploymentCommandInputSchema } from "./operations/deployments/create-deployment.command";
@@ -380,6 +381,12 @@ import {
   showTunnelSessionQueryInputSchema,
   startTunnelCommandInputSchema,
 } from "./operations/tunnels/tunnel-session";
+import {
+  applyPlatformMigrationCommandInputSchema,
+  cleanupPlatformMigrationCommandInputSchema,
+  migrationReadbackQueryInputSchema,
+  planPlatformMigrationQueryInputSchema,
+} from "./platform-migration-messages";
 import { type ProductOrganizationRole } from "./ports";
 import {
   bindProjectRepositoryInputSchema,
@@ -482,7 +489,8 @@ type OperationDomain =
   | "github-agent"
   | "repository-bindings"
   | "workspaces"
-  | "workspace-collaborations";
+  | "workspace-collaborations"
+  | "migrations";
 
 export interface OperationCatalogEntry {
   key: string;
@@ -520,6 +528,81 @@ export interface OperationCatalogEntry {
 // Source of truth for business operations.
 // CLI, oRPC, HTTP, and future MCP tools must dispatch these messages instead of bypassing application handlers.
 export const operationCatalog = [
+  {
+    key: "migrations.plan",
+    kind: "query",
+    domain: "migrations",
+    messageName: "PlanPlatformMigrationQuery",
+    handlerName: "PlanPlatformMigrationQueryHandler",
+    serviceName: "PlatformMigrationCoordinator",
+    inputSchema: planPlatformMigrationQueryInputSchema,
+    serviceToken: tokens.platformMigrationCoordinator,
+    transportAccess: { productSession: { minRole: "member" } },
+    transports: {
+      cli: "appaloft migrate plan --input <bundle.json>",
+      orpc: { method: "POST", path: "/api/migrations/plan" },
+    },
+  },
+  {
+    key: "migrations.apply",
+    kind: "command",
+    domain: "migrations",
+    messageName: "ApplyPlatformMigrationCommand",
+    handlerName: "ApplyPlatformMigrationCommandHandler",
+    serviceName: "PlatformMigrationCoordinator",
+    inputSchema: applyPlatformMigrationCommandInputSchema,
+    serviceToken: tokens.platformMigrationCoordinator,
+    transportAccess: { productSession: { minRole: "member" } },
+    transports: {
+      cli: "appaloft migrate apply (--plan <plan.json> | --task <task.json>) --confirm <digest>",
+      orpc: { method: "POST", path: "/api/migrations/apply" },
+    },
+  },
+  {
+    key: "migrations.status",
+    kind: "query",
+    domain: "migrations",
+    messageName: "StatusPlatformMigrationQuery",
+    handlerName: "StatusPlatformMigrationQueryHandler",
+    serviceName: "PlatformMigrationCoordinator",
+    inputSchema: migrationReadbackQueryInputSchema,
+    serviceToken: tokens.platformMigrationCoordinator,
+    transportAccess: { productSession: { minRole: "member" } },
+    transports: {
+      cli: "appaloft migrate status --task <task.json>",
+      orpc: { method: "POST", path: "/api/migrations/status" },
+    },
+  },
+  {
+    key: "migrations.verify",
+    kind: "query",
+    domain: "migrations",
+    messageName: "VerifyPlatformMigrationQuery",
+    handlerName: "VerifyPlatformMigrationQueryHandler",
+    serviceName: "PlatformMigrationCoordinator",
+    inputSchema: migrationReadbackQueryInputSchema,
+    serviceToken: tokens.platformMigrationCoordinator,
+    transportAccess: { productSession: { minRole: "member" } },
+    transports: {
+      cli: "appaloft migrate verify --task <task.json>",
+      orpc: { method: "POST", path: "/api/migrations/verify" },
+    },
+  },
+  {
+    key: "migrations.cleanup",
+    kind: "command",
+    domain: "migrations",
+    messageName: "CleanupPlatformMigrationCommand",
+    handlerName: "CleanupPlatformMigrationCommandHandler",
+    serviceName: "PlatformMigrationCoordinator",
+    inputSchema: cleanupPlatformMigrationCommandInputSchema,
+    serviceToken: tokens.platformMigrationCoordinator,
+    transportAccess: { productSession: { minRole: "owner" } },
+    transports: {
+      cli: "appaloft migrate cleanup --task <task.json> --confirm <digest>",
+      orpc: { method: "POST", path: "/api/migrations/cleanup" },
+    },
+  },
   {
     key: "auth.bootstrap-status",
     kind: "query",
@@ -3457,6 +3540,24 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft deployments reconcile-stale <deploymentId> --state-version <stateVersion> --confirm <deploymentId>",
       orpc: { method: "POST", path: "/api/deployments/{deploymentId}/reconcile-stale" },
+    },
+  },
+  {
+    key: "deployments.cleanup-runtime",
+    kind: "command",
+    domain: "deployments",
+    messageName: "CleanupDeploymentRuntimeCommand",
+    handlerName: "CleanupDeploymentRuntimeCommandHandler",
+    serviceName: "CleanupDeploymentRuntimeUseCase",
+    inputSchema: cleanupDeploymentRuntimeCommandInputSchema,
+    serviceToken: tokens.cleanupDeploymentRuntimeUseCase,
+    transportAccess: {
+      productSession: {
+        minRole: "owner",
+      },
+    },
+    transports: {
+      cli: "appaloft deployments cleanup-runtime <deploymentId> --confirm <deploymentId>",
     },
   },
   {

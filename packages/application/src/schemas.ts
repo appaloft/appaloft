@@ -85,6 +85,7 @@ export {
 export * from "./operations/deployment-overlays/deployment-overlay.schema";
 export * from "./operations/deployments/archive-deployment.schema";
 export * from "./operations/deployments/cancel-deployment.schema";
+export * from "./operations/deployments/cleanup-deployment-runtime.schema";
 export * from "./operations/deployments/cleanup-preview.schema";
 export * from "./operations/deployments/count-deployments.query";
 export * from "./operations/deployments/create-deployment.schema";
@@ -185,6 +186,28 @@ export {
   type TransferOrganizationOwnerCommandInput,
   transferOrganizationOwnerCommandInputSchema,
 } from "./operations/organizations/transfer-organization-owner.command";
+export {
+  type ApplyPlatformMigrationCommandInput,
+  applyPlatformMigrationCommandInputSchema,
+  type MigrationApplyResult,
+  type MigrationStepReceipt,
+  migrationApplyResultSchema,
+  migrationStepReceiptSchema,
+} from "./operations/platform-migrations/migration-apply";
+export {
+  type MigrationCleanupResult,
+  migrationCleanupResultSchema,
+} from "./operations/platform-migrations/migration-cleanup";
+export {
+  type MigrationPlan,
+  migrationPlanSchema,
+} from "./operations/platform-migrations/migration-plan";
+export {
+  type MigrationStatusResult,
+  type MigrationVerificationResult,
+  migrationStatusResultSchema,
+  migrationVerificationResultSchema,
+} from "./operations/platform-migrations/migration-readback";
 export {
   type ConfigurePreviewPolicyCommandInput,
   configurePreviewPolicyCommandInputSchema,
@@ -341,4 +364,12 @@ export * from "./operations/system/start-connection.command";
 export * from "./operations/terminal-sessions/open-terminal-session.schema";
 export * from "./operations/terminal-sessions/terminal-session-lifecycle.schema";
 export * from "./operations/tunnels/tunnel-session";
+export {
+  type CleanupPlatformMigrationCommandInput,
+  cleanupPlatformMigrationCommandInputSchema,
+  type MigrationReadbackQueryInput,
+  migrationReadbackQueryInputSchema,
+  type PlanPlatformMigrationQueryInput,
+  planPlatformMigrationQueryInputSchema,
+} from "./platform-migration-messages";
 export type { DomainBindingDnsReadiness } from "./ports";

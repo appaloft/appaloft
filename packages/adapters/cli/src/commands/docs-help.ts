@@ -228,6 +228,10 @@ export const cliCommandDescriptions = {
     "Archive a terminal deployment attempt",
     "deployment.recovery-readiness",
   ),
+  deploymentCleanupRuntime: withDocs(
+    "Owner-confirm and remove retained runtime artifacts for a deployment",
+    "deployment.recovery-readiness",
+  ),
   deploymentPrune: withDocs(
     "Dry-run or prune archived deployment attempts",
     "deployment.recovery-readiness",

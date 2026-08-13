@@ -13,6 +13,7 @@
     LogIn,
     Package,
     ArrowRight,
+    ArrowRightLeft,
     Rocket,
     Server,
     ServerCrash,
@@ -123,6 +124,11 @@
     },
     { href: "/domain-bindings", labelKey: i18nKeys.console.nav.domainBindings, icon: Globe2 },
     { href: "/deployments", labelKey: i18nKeys.console.nav.deployments, icon: Rocket },
+    {
+      href: "/migrate/platform",
+      labelKey: i18nKeys.console.nav.platformMigration,
+      icon: ArrowRightLeft,
+    },
   ] as const;
 
   let { title, breadcrumbs = [], quickDeployModalEnabled = true, children }: Props = $props();

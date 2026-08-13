@@ -128,7 +128,11 @@ class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
   }
 }
 
-function runtimePlan(input: { id: string; includeArtifact?: boolean }) {
+function runtimePlan(input: {
+  id: string;
+  includeArtifact?: boolean;
+  executionImageMetadata?: string;
+}) {
   return RuntimePlan.rehydrate({
     id: RuntimePlanId.rehydrate(input.id),
     source: SourceDescriptor.rehydrate({
@@ -140,6 +144,9 @@ function runtimePlan(input: { id: string; includeArtifact?: boolean }) {
     packagingMode: PackagingModeValue.rehydrate("all-in-one-docker"),
     execution: RuntimeExecutionPlan.rehydrate({
       kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
+      ...(input.executionImageMetadata
+        ? { metadata: { image: input.executionImageMetadata } }
+        : {}),
     }),
     ...(input.includeArtifact
       ? {
@@ -167,6 +174,7 @@ function deploymentRecord(input: {
   createdAt: string;
   finishedAt?: string;
   includeArtifact?: boolean;
+  executionImageMetadata?: string;
 }) {
   return Deployment.rehydrate({
     id: DeploymentId.rehydrate(input.id),
@@ -179,6 +187,9 @@ function deploymentRecord(input: {
     runtimePlan: runtimePlan({
       id: `rpl_${input.id}`,
       ...(input.includeArtifact ? { includeArtifact: true } : {}),
+      ...(input.executionImageMetadata
+        ? { executionImageMetadata: input.executionImageMetadata }
+        : {}),
     }),
     environmentSnapshot: EnvironmentConfigSnapshot.rehydrate({
       id: EnvironmentSnapshotId.rehydrate(`snap_${input.id}`),
@@ -317,6 +328,28 @@ describe("RollbackDeploymentUseCase", () => {
         rollbackCandidateDeploymentId: "dep_success",
       },
     });
+  });
+
+  test("[DEP-ROLLBACK-001] accepts the concrete image recorded by a successful build", async () => {
+    const candidate = deploymentRecord({
+      id: "dep_success",
+      status: "succeeded",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      finishedAt: "2026-01-01T00:00:05.000Z",
+      executionImageMetadata: "appaloft-image-dep_success",
+    });
+    const { context, repository, useCase } = createUseCase({ candidate });
+
+    const result = await useCase.execute(context, {
+      deploymentId: "dep_failed",
+      rollbackCandidateDeploymentId: "dep_success",
+    });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) throw result.error;
+    expect(
+      repository.items.get(result.value.id)?.toState().runtimePlan.execution.metadata?.image,
+    ).toBe("appaloft-image-dep_success");
   });
 
   test("[DEP-ROLLBACK-001] [PROC-DELIVERY-004] records retriable rollback execution failure visibility", async () => {

@@ -6,6 +6,7 @@ import {
   type Query as AppQuery,
   ArchiveDeploymentCommand,
   CancelDeploymentCommand,
+  CleanupDeploymentRuntimeCommand,
   type CommandBus,
   createExecutionContext,
   type ExecutionContextFactory,
@@ -144,6 +145,52 @@ describe("CLI deployment cancel command", () => {
     expect(commands[0]).toMatchObject({
       deploymentId: "dep_archive",
       confirm: "dep_archive",
+      resourceId: "res_demo",
+    });
+  });
+
+  test("[MIG-CLEAN-008] deployments cleanup-runtime dispatches the owner-confirmed command", async () => {
+    ensureReflectMetadata();
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+          commands.push(command as AppCommand<unknown>);
+          return ok({ id: "dep_cleanup", runtimeCleaned: true } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async <T>() => ok({} as T) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_cleanup_runtime" }),
+      },
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "deployments",
+        "cleanup-runtime",
+        "dep_cleanup",
+        "--confirm",
+        "dep_cleanup",
+        "--resource",
+        "res_demo",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(CleanupDeploymentRuntimeCommand);
+    expect(commands[0]).toMatchObject({
+      deploymentId: "dep_cleanup",
+      confirm: "dep_cleanup",
       resourceId: "res_demo",
     });
   });

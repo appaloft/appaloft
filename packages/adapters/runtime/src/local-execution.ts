@@ -1580,13 +1580,18 @@ export class LocalExecutionBackend implements ExecutionBackend {
       deploymentId: state.id.value,
       metadata: state.runtimePlan.execution.metadata,
     });
-    let image = state.runtimePlan.execution.image;
+    const rollbackImage =
+      state.triggerKind.value === "rollback"
+        ? state.runtimePlan.execution.metadata?.image
+        : undefined;
+    let image = state.runtimePlan.execution.image ?? rollbackImage;
     const containerName = runtimeInstanceNames.containerName;
 
     const shouldBuildImage =
-      state.runtimePlan.buildStrategy === "dockerfile" ||
-      state.runtimePlan.buildStrategy === "workspace-commands" ||
-      state.runtimePlan.buildStrategy === "static-artifact";
+      !rollbackImage &&
+      (state.runtimePlan.buildStrategy === "dockerfile" ||
+        state.runtimePlan.buildStrategy === "workspace-commands" ||
+        state.runtimePlan.buildStrategy === "static-artifact");
     const forceRedeploy = isForceRedeployDeployment(state);
 
     if (shouldBuildImage) {

@@ -13,6 +13,7 @@ import {
   type AppLogger,
   ApplyActionPreviewRouteCommand,
   ApplyConnectorCapabilityCommand,
+  ApplyPlatformMigrationCommand,
   ApproveAgentTaskRunCommand,
   ArchiveDeploymentCommand,
   ArchiveEnvironmentCommand,
@@ -31,6 +32,7 @@ import {
   addWorkspaceCollaborationLaneInputSchema,
   addWorkspaceCollaborationParticipantInputSchema,
   applyConnectorCapabilityCommandInputSchema,
+  applyPlatformMigrationCommandInputSchema,
   approveAgentTaskRunInputSchema,
   archiveDeploymentCommandInputSchema,
   archiveEnvironmentCommandInputSchema,
@@ -65,6 +67,7 @@ import {
   CheckProjectDeleteSafetyQuery,
   CheckResourceDeleteSafetyQuery,
   CheckServerDeleteSafetyQuery,
+  CleanupPlatformMigrationCommand,
   CleanupPreviewCommand,
   CleanupStorageVolumeRuntimeCommand,
   CloneEnvironmentCommand,
@@ -150,6 +153,7 @@ import {
   checkProjectDeleteSafetyQueryInputSchema,
   checkResourceDeleteSafetyQueryInputSchema,
   checkServerDeleteSafetyQueryInputSchema,
+  cleanupPlatformMigrationCommandInputSchema,
   cleanupPreviewCommandInputSchema,
   cleanupStorageVolumeRuntimeCommandInputSchema,
   cloneEnvironmentCommandInputSchema,
@@ -525,6 +529,12 @@ import {
   lockEnvironmentCommandInputSchema,
   MarkOperatorWorkRecoveredCommand,
   markOperatorWorkRecoveredCommandInputSchema,
+  migrationApplyResultSchema,
+  migrationCleanupResultSchema,
+  migrationPlanSchema,
+  migrationReadbackQueryInputSchema,
+  migrationStatusResultSchema,
+  migrationVerificationResultSchema,
   OfferWorkspaceCollaborationHandoffCommand,
   OpenAgentWorkspaceCommand,
   OpenTerminalSessionCommand,
@@ -540,6 +550,7 @@ import {
   PlanConnectorCapabilityQuery,
   PlanDomainBindingDnsQuery,
   PlanDuplicateEnvironmentQuery,
+  PlanPlatformMigrationQuery,
   PlanSandboxPromotionCommand,
   PrepareServerRuntimeCommand,
   type ProductOrganizationRole,
@@ -562,6 +573,7 @@ import {
   PublishStaticArtifactPayloadCommand,
   planDomainBindingDnsQueryInputSchema,
   planDuplicateEnvironmentQueryInputSchema,
+  planPlatformMigrationQueryInputSchema,
   planSandboxPromotionInputSchema,
   prepareServerRuntimeCommandInputSchema,
   promoteEnvironmentCommandInputSchema,
@@ -773,6 +785,7 @@ import {
   StartResourceRuntimeCommand,
   StartTunnelCommand,
   type StaticArtifactPublicationSummary,
+  StatusPlatformMigrationQuery,
   SteerAgentTaskRunCommand,
   StopAgentTaskRunCommand,
   StopResourceRuntimeCommand,
@@ -894,6 +907,7 @@ import {
   unsetResourceVariableCommandInputSchema,
   ValidateAgentAdapterQuery,
   ValidateAgentWorkspaceProfileQuery,
+  VerifyPlatformMigrationQuery,
   validateAgentAdapterInputSchema,
   validateAgentAdapterResponseSchema,
   validateAgentWorkspaceProfileInputSchema,
@@ -4084,6 +4098,66 @@ export const createProjectProcedure = base
   .output(createProjectResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, CreateProjectCommand.create(input)),
+  );
+
+export const planPlatformMigrationProcedure = base
+  .route({
+    method: "POST",
+    path: "/migrations/plan",
+    successStatus: 200,
+  })
+  .input(planPlatformMigrationQueryInputSchema)
+  .output(migrationPlanSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, PlanPlatformMigrationQuery.create(input)),
+  );
+
+export const applyPlatformMigrationProcedure = base
+  .route({
+    method: "POST",
+    path: "/migrations/apply",
+    successStatus: 200,
+  })
+  .input(applyPlatformMigrationCommandInputSchema)
+  .output(migrationApplyResultSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ApplyPlatformMigrationCommand.create(input)),
+  );
+
+export const statusPlatformMigrationProcedure = base
+  .route({
+    method: "POST",
+    path: "/migrations/status",
+    successStatus: 200,
+  })
+  .input(migrationReadbackQueryInputSchema)
+  .output(migrationStatusResultSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, StatusPlatformMigrationQuery.create(input)),
+  );
+
+export const verifyPlatformMigrationProcedure = base
+  .route({
+    method: "POST",
+    path: "/migrations/verify",
+    successStatus: 200,
+  })
+  .input(migrationReadbackQueryInputSchema)
+  .output(migrationVerificationResultSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, VerifyPlatformMigrationQuery.create(input)),
+  );
+
+export const cleanupPlatformMigrationProcedure = base
+  .route({
+    method: "POST",
+    path: "/migrations/cleanup",
+    successStatus: 200,
+  })
+  .input(cleanupPlatformMigrationCommandInputSchema)
+  .output(migrationCleanupResultSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CleanupPlatformMigrationCommand.create(input)),
   );
 
 export const listBlueprintsProcedure = base
@@ -8617,6 +8691,13 @@ export const unbindRepositoryProcedure = base
   );
 
 export const appaloftOrpcRouter = {
+  migrations: {
+    plan: planPlatformMigrationProcedure,
+    apply: applyPlatformMigrationProcedure,
+    status: statusPlatformMigrationProcedure,
+    verify: verifyPlatformMigrationProcedure,
+    cleanup: cleanupPlatformMigrationProcedure,
+  },
   auth: {
     bootstrapStatus: authBootstrapStatusProcedure,
     bootstrapFirstAdmin: authBootstrapFirstAdminProcedure,
@@ -11668,6 +11749,11 @@ export function mountAppaloftOrpcRoutes(
   };
 
   const routes = [
+    "/api/migrations/plan",
+    "/api/migrations/apply",
+    "/api/migrations/status",
+    "/api/migrations/verify",
+    "/api/migrations/cleanup",
     "/api/bootstrap/auth/status",
     "/api/bootstrap/auth/first-admin",
     "/api/capabilities/query",

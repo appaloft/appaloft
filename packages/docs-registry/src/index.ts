@@ -222,6 +222,40 @@ export const publicDocsHelpTopics = {
       "docs/testing/local-development-session-test-matrix.md",
     ],
   },
+  "migration.platform": {
+    id: "migration.platform",
+    title: "Platform Migration",
+    description:
+      "How to translate Railway exports, review a digest-bound plan, apply and resume through existing operations, verify evidence, and exactly clean receipt-owned state.",
+    page: {
+      "zh-CN": "migrate/platform",
+      "en-US": "en/migrate/platform",
+    },
+    anchor: "platform-migration",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api"],
+    relatedOperation: "migrations.plan",
+    aliases: [
+      "appaloft migrate",
+      "Railway migration",
+      "migration bundle",
+      "migration receipt",
+      "platform import",
+      "平台迁移",
+      "Railway 迁移",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-113-platform-migration-presentation-boundary.md",
+      "docs/specs/135-platform-migration-journey/spec.md",
+      "docs/testing/platform-migration-journey-test-matrix.md",
+    ],
+    webSurfaces: [
+      "apps/web/src/routes/migrate/platform: bundle import, blocker and digest review, apply/resume receipts, status, verification, and owner-confirmed cleanup",
+    ],
+  },
   "development.config-overlay": {
     id: "development.config-overlay",
     title: "Development configuration overlay",
@@ -3353,6 +3387,18 @@ export type PublicDocsOperationCoverage =
     };
 
 export const publicDocsOperationCoverage = [
+  ...[
+    "migrations.plan",
+    "migrations.apply",
+    "migrations.status",
+    "migrations.verify",
+    "migrations.cleanup",
+    "deployments.cleanup-runtime",
+  ].map((operationKey) => ({
+    operationKey,
+    status: "documented" as const,
+    topicId: "migration.platform" as const,
+  })),
   ...[
     "agent-adapters.validate",
     "agent-adapters.install",

@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
@@ -13,6 +13,7 @@ import {
   ApplyConnectorCapabilityUseCase,
   ApplyInstanceUpgradeCommandHandler,
   ApplyInstanceUpgradeUseCase,
+  ApplyPlatformMigrationCommandHandler,
   ArchiveDeploymentCommandHandler,
   ArchiveDeploymentUseCase,
   ArchiveEnvironmentCommandHandler,
@@ -58,6 +59,9 @@ import {
   CheckResourceDeleteSafetyQueryService,
   CheckServerDeleteSafetyQueryHandler,
   CheckServerDeleteSafetyQueryService,
+  CleanupDeploymentRuntimeCommandHandler,
+  CleanupDeploymentRuntimeUseCase,
+  CleanupPlatformMigrationCommandHandler,
   CleanupPreviewCommandHandler,
   CleanupPreviewUseCase,
   CleanupStorageVolumeRuntimeCommandHandler,
@@ -343,6 +347,8 @@ import {
   PlanConnectorCapabilityQueryService,
   PlanDuplicateEnvironmentQueryHandler,
   PlanDuplicateEnvironmentQueryService,
+  PlanPlatformMigrationQueryHandler,
+  PlatformMigrationCoordinator,
   PreviewCleanupRetryScheduler,
   PreviewDeploymentProcessManager,
   PreviewEnvironmentCleanupService,
@@ -565,6 +571,7 @@ import {
   StartConnectionUseCase,
   StartResourceRuntimeCommandHandler,
   StartTunnelCommandHandler,
+  StatusPlatformMigrationQueryHandler,
   StopResourceRuntimeCommandHandler,
   StorageVolumeBackupAutomationService,
   StreamDeploymentTimelineQueryHandler,
@@ -585,6 +592,7 @@ import {
   UnsetEnvironmentVariableUseCase,
   UnsetResourceVariableCommandHandler,
   UnsetResourceVariableUseCase,
+  VerifyPlatformMigrationQueryHandler,
 } from "@appaloft/application";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 import { type DependencyContainer, instanceCachingFactory } from "tsyringe";
@@ -1256,7 +1264,7 @@ export class BunDependencyResourceNativeCommandRunner
     let started: ReturnType<typeof Bun.spawnSync>;
     try {
       started = Bun.spawnSync(command, {
-        env: process.env,
+        env: process.env.PATH ? { PATH: process.env.PATH } : {},
         ...(options.stdin ? { stdin: options.stdin } : {}),
         stdout: "pipe",
         stderr: "pipe",
@@ -1451,6 +1459,30 @@ export class ShellDependencyResourceBackupProvider implements DependencyResource
     return ok({ completedAt: input.requestedAt });
   }
 
+  async pruneBackup(
+    _context: ExecutionContext,
+    input: Parameters<NonNullable<DependencyResourceBackupProviderPort["pruneBackup"]>>[1],
+  ): Promise<Result<{ prunedAt: string }, DomainError>> {
+    const directory = this.backupArtifactDir(input.dependencyResourceId);
+    const prefix = `${shellBackupArtifactSegment(input.backupId)}.`;
+    try {
+      const entries = await readdir(directory).catch(() => [] as string[]);
+      for (const entry of entries) {
+        if (
+          entry === `${shellBackupArtifactSegment(input.backupId)}.json` ||
+          entry.startsWith(prefix)
+        ) {
+          await rm(join(directory, entry), { force: true });
+        }
+      }
+      return ok({ prunedAt: input.requestedAt });
+    } catch (cause) {
+      return err(
+        shellBackupProviderError("Dependency backup artifacts could not be pruned", input, cause),
+      );
+    }
+  }
+
   private backupArtifactDir(dependencyResourceId: string): string {
     return join(
       this.dataDir,
@@ -1642,6 +1674,12 @@ export function registerApplicationServices(
   container: DependencyContainer,
   input: RegisterApplicationServicesInput = {},
 ): void {
+  container.registerSingleton(tokens.platformMigrationCoordinator, PlatformMigrationCoordinator);
+  container.registerSingleton(PlanPlatformMigrationQueryHandler);
+  container.registerSingleton(ApplyPlatformMigrationCommandHandler);
+  container.registerSingleton(StatusPlatformMigrationQueryHandler);
+  container.registerSingleton(VerifyPlatformMigrationQueryHandler);
+  container.registerSingleton(CleanupPlatformMigrationCommandHandler);
   container.registerSingleton(BootstrapServerEdgeProxyOnTargetRegisteredHandler);
   container.registerSingleton(MarkDomainReadyOnDomainBoundHandler);
   container.registerSingleton(ReconcileDomainCertificateUseCase);
@@ -1758,6 +1796,7 @@ export function registerApplicationServices(
   container.registerSingleton(ReconcileStaleDeploymentCommandHandler);
   container.registerSingleton(ListStaleDeploymentAttemptsQueryHandler);
   container.registerSingleton(ArchiveDeploymentCommandHandler);
+  container.registerSingleton(CleanupDeploymentRuntimeCommandHandler);
   container.registerSingleton(PruneDeploymentsCommandHandler);
   container.registerSingleton(DeploymentTimelineQueryHandler);
   container.registerSingleton(StreamDeploymentTimelineQueryHandler);
@@ -2561,6 +2600,10 @@ export function registerApplicationServices(
     ReconcileStaleDeploymentUseCase,
   );
   container.registerSingleton(tokens.archiveDeploymentUseCase, ArchiveDeploymentUseCase);
+  container.registerSingleton(
+    tokens.cleanupDeploymentRuntimeUseCase,
+    CleanupDeploymentRuntimeUseCase,
+  );
   container.registerSingleton(tokens.cleanupPreviewUseCase, CleanupPreviewUseCase);
   container.registerSingleton(tokens.createDomainBindingUseCase, CreateDomainBindingUseCase);
   container.registerSingleton(

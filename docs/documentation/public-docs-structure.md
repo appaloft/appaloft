@@ -59,7 +59,7 @@ The public docs structure must have at least two levels: a user task or product-
 pages that own stable help anchors. Public docs pages must live under the canonical product-area
 groups; top-level pages are limited to locale landing pages such as `index.md`.
 
-IA v3 regroups IA v2's eleven product-area groups around ten pain-point-oriented groups. Two changes
+IA v3 regroups IA v2's eleven product-area groups around eleven pain-point-oriented groups. Two changes
 motivated the redesign: `Deploy`, `Projects And Resources`, and `Integrations` overlapped heavily in
 practice (a user configuring a source and a runtime profile was already mid-deployment), and Agent
 Workspace/Sandbox content existed as real pages without a home in the governing group description.
@@ -79,7 +79,8 @@ The canonical IA v3 groups are:
 | 7 | Agent 与 Sandbox · Agents | Full Appaloft skill, agent deploy subprotocol, Agent Workspace lifecycle, Sandbox model, Workspace Collaboration, terminal/TUI attach, and future tool/skill protocols. | Explain how AI agents and agent-hosting Workspaces use existing Appaloft entrypoints safely. | Agent authors, automation users, and Agent Workspace operators |
 | 8 | 参考 · Reference | CLI, HTTP API, Web console, errors, statuses, configuration reference. | Provide exact commands, routes, fields, and status contracts. | Automation authors and integrators |
 | 9 | 自托管 · Self-Hosting | Binary bundle, Docker image, static asset overrides, database status/migration, backup/restore, upgrade. | Explain operating Appaloft itself. | Self-hosters and platform operators |
-| 10 | Cloud | Cloud-only reference pages (permissions/RBAC, managed Sandbox, billing, hosted-only operations). Placeholder pages in open-source builds; real pages injected only in the official build. | Explain Cloud-exclusive behavior without pretending it exists in self-hosted builds, and without hiding that it exists. | Cloud users; self-hosters evaluating Cloud |
+| 10 | 平台迁移 · Migrate | Import from Railway and other platforms, review digest-bound plans, apply/resume, verify, and exactly clean receipt-owned state. | Explain how to leave another platform without inventing a second Appaloft lifecycle or bypassing existing safety guards. | Operators migrating existing applications |
+| 11 | Cloud | Cloud-only reference pages (permissions/RBAC, managed Sandbox, billing, hosted-only operations). Placeholder pages in open-source builds; real pages injected only in the official build. | Explain Cloud-exclusive behavior without pretending it exists in self-hosted builds, and without hiding that it exists. | Cloud users; self-hosters evaluating Cloud |
 
 Each group may keep an overview page as an orientation entry, but the overview must not be the only
 page. Groups that own user input, recovery, or reference semantics must split those concerns into
@@ -102,7 +103,7 @@ verbatim from IA v2 pages.
 
 ## Cloud-Only Content
 
-The Cloud group (IA v3 group 10) is visible in every build, including open-source self-hosted
+The Cloud group (IA v3 group 11) is visible in every build, including open-source self-hosted
 builds. Its content differs by build:
 
 - **Open-source build**: every page in the Cloud group that has no Cloud-injected replacement

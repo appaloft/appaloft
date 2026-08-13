@@ -1,0 +1,16 @@
+services:
+  web:
+    image: ${APPALOFT_MIGRATION_COMPOSE_IMAGE}
+    pull_policy: never
+    environment:
+      SERVICE_ROLE: web
+      PRIVATE_API_URL: http://api:3000/health
+    expose:
+      - "3000"
+  api:
+    image: ${APPALOFT_MIGRATION_COMPOSE_IMAGE}
+    pull_policy: never
+    environment:
+      SERVICE_ROLE: api
+    expose:
+      - "3000"

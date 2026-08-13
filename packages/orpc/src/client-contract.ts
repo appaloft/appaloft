@@ -4,6 +4,7 @@ import {
   type AcceptConnectorCapabilityPlanCommandInput,
   type AcceptDependencyResourceProvisioningPlanInput,
   type ApplyConnectorCapabilityCommandInput,
+  type ApplyPlatformMigrationCommandInput,
   type ArchiveDeploymentCommandInput,
   type ArchiveEnvironmentCommandInput,
   type ArchiveProjectCommandInput,
@@ -19,6 +20,7 @@ import {
   type CheckProjectDeleteSafetyQueryInput,
   type CheckResourceDeleteSafetyQueryInput,
   type CheckServerDeleteSafetyQueryInput,
+  type CleanupPlatformMigrationCommandInput,
   type CleanupPreviewCommandInput,
   type CloneEnvironmentCommandInput,
   type CloseTerminalSessionCommandInput,
@@ -150,8 +152,15 @@ import {
   type ListTunnelSessionsQueryInput,
   type ListTunnelSessionsResponse,
   type LockEnvironmentCommandInput,
+  type MigrationApplyResult,
+  type MigrationCleanupResult,
+  type MigrationPlan,
+  type MigrationReadbackQueryInput,
+  type MigrationStatusResult,
+  type MigrationVerificationResult,
   type OpenTerminalSessionCommandInput,
   type PlanDomainBindingDnsQueryInput,
+  type PlanPlatformMigrationQueryInput,
   type PrepareServerRuntimeCommandInput,
   type PromoteEnvironmentCommandInput,
   type ProvisionDependencyResourceCommandInput,
@@ -600,6 +609,38 @@ type SandboxAgentTaskInput = {
 };
 
 export type AppaloftOrpcClientContract = {
+  migrations: {
+    plan: Client<
+      AppaloftClientContext,
+      PlanPlatformMigrationQueryInput,
+      MigrationPlan,
+      AppaloftClientError
+    >;
+    apply: Client<
+      AppaloftClientContext,
+      ApplyPlatformMigrationCommandInput,
+      MigrationApplyResult,
+      AppaloftClientError
+    >;
+    status: Client<
+      AppaloftClientContext,
+      MigrationReadbackQueryInput,
+      MigrationStatusResult,
+      AppaloftClientError
+    >;
+    verify: Client<
+      AppaloftClientContext,
+      MigrationReadbackQueryInput,
+      MigrationVerificationResult,
+      AppaloftClientError
+    >;
+    cleanup: Client<
+      AppaloftClientContext,
+      CleanupPlatformMigrationCommandInput,
+      MigrationCleanupResult,
+      AppaloftClientError
+    >;
+  };
   auth: {
     bootstrapStatus: Client<
       AppaloftClientContext,

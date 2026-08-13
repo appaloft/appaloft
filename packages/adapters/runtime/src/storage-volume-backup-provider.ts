@@ -116,6 +116,11 @@ export interface StorageBackupRuntimeCommandRenderer {
 const backupManifestPrefix = "appaloft-storage-volume-backup://";
 const defaultTimeoutMs = 120_000;
 const defaultStorageBackupWorkingRoot = "/var/lib/appaloft/backups/.work";
+const defaultLocalStorageBackupWorkingRoot = join(
+  tmpdir(),
+  "appaloft-storage-backups",
+  ".work",
+);
 const defaultSqliteHelperImage = "keinos/sqlite3:latest";
 
 export interface StorageBackupRuntimeProviderOptions {
@@ -124,6 +129,16 @@ export interface StorageBackupRuntimeProviderOptions {
   commandRenderers?: readonly StorageBackupRuntimeCommandRenderer[];
   workingRoot?: string;
   objectTransferBroker?: StorageBackupObjectTransferBrokerPort;
+}
+
+function storageBackupWorkingRoot(
+  runtimeTarget: DeploymentTargetState | undefined,
+  configuredWorkingRoot: string | undefined,
+): string {
+  if (configuredWorkingRoot) return configuredWorkingRoot;
+  return !runtimeTarget || runtimeTarget.providerKey.value === "local-shell"
+    ? defaultLocalStorageBackupWorkingRoot
+    : defaultStorageBackupWorkingRoot;
 }
 
 function hostWithUsername(host: string, username?: string): string {
@@ -811,7 +826,7 @@ export class DockerTarStorageBackupSourceAdapter implements StorageBackupSourceA
       dockerVolumeName: volumeName.value,
       backupId: input.backupId,
       attemptId: input.attemptId,
-      workingRoot: this.options.workingRoot ?? defaultStorageBackupWorkingRoot,
+      workingRoot: storageBackupWorkingRoot(input.runtimeTarget, this.options.workingRoot),
     });
     const result = await runStorageBackupScript(input.runtimeTarget, script);
     if (result.failed) {
@@ -864,7 +879,7 @@ export class DockerSqliteOnlineStorageBackupSourceAdapter implements StorageBack
       backupId: input.backupId,
       attemptId: input.attemptId,
       sqliteHelperImage: this.options.sqliteHelperImage ?? defaultSqliteHelperImage,
-      workingRoot: this.options.workingRoot ?? defaultStorageBackupWorkingRoot,
+      workingRoot: storageBackupWorkingRoot(input.runtimeTarget, this.options.workingRoot),
     });
     const result = await runStorageBackupScript(input.runtimeTarget, script);
     if (result.failed) {
@@ -1139,7 +1154,7 @@ export class S3CompatibleStorageBackupTargetProvider implements StorageBackupTar
       ...(input.expectedChecksum ? { expectedChecksum: input.expectedChecksum } : {}),
       backupId: input.backupId,
       restoreAttemptId: input.restoreAttemptId,
-      workingRoot: this.options.workingRoot ?? defaultStorageBackupWorkingRoot,
+      workingRoot: storageBackupWorkingRoot(input.runtimeTarget, this.options.workingRoot),
       targetStorageVolumeId: input.targetStorageVolumeId,
       targetDockerVolumeName: targetVolumeName.value,
     });

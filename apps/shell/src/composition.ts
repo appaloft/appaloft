@@ -6,6 +6,7 @@ import {
   createCliProgram,
   createRatatuiOperatePresentation,
   createRatatuiWorkspaceControlPresentation,
+  ProcessEnvironmentMigrationSecretResolver,
   SshRemoteStateLifecycle,
   sshRemoteStateTargetFromDecision,
 } from "@appaloft/adapter-cli";
@@ -32,6 +33,7 @@ import { type AppConfig } from "@appaloft/config";
 import { domainError, err, ok } from "@appaloft/core";
 import {
   type AppaloftServer,
+  type AppaloftServerExtension,
   type AppaloftServerOptions,
   createAppaloftServer,
 } from "@appaloft/server";
@@ -51,6 +53,22 @@ export interface ShellRuntimeOptions
 
 function resolveToken<T>(dependencyContainer: DependencyContainer, token: symbol): T {
   return dependencyContainer.resolve(token as never) as T;
+}
+
+export function createShellMigrationSecretResolverExtension(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): AppaloftServerExtension {
+  return {
+    name: "shell-migration-secret-resolver",
+    configureRuntime({ container }) {
+      if (!container.isRegistered(tokens.migrationSecretResolver, true)) {
+        container.registerInstance(
+          tokens.migrationSecretResolver,
+          new ProcessEnvironmentMigrationSecretResolver(environment),
+        );
+      }
+    },
+  };
 }
 
 function createCliSourceLinkStore(repository: SourceLinkRepository): CliSourceLinkStore {
@@ -246,6 +264,7 @@ export async function createAppComposition(
   const server = await createAppaloftServer({
     ...options,
     ...(flags ? { flags } : {}),
+    extensions: [...(options?.extensions ?? []), createShellMigrationSecretResolverExtension()],
   });
   const commandBus = resolveToken<CommandBus>(server.container, tokens.commandBus);
   const queryBus = resolveToken<QueryBus>(server.container, tokens.queryBus);

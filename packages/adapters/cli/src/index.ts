@@ -97,6 +97,10 @@ export {
   type WorkspaceGitCommandRunner,
 } from "./local-git-workspace-context.js";
 export {
+  type MigrationSecretEnvironment,
+  ProcessEnvironmentMigrationSecretResolver,
+} from "./migration-secret-resolver.js";
+export {
   createBoundedOperatePresentation,
   createOperateCoordinator,
   listOperateResources,

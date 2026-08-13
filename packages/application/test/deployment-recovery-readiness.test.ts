@@ -357,6 +357,35 @@ describe("DeploymentRecoveryReadinessQueryService", () => {
     );
   });
 
+  test("[DEP-RECOVERY-READINESS-007] accepts a concrete image recorded after a source build", async () => {
+    const readiness = unwrap(
+      await createService({
+        deployments: [
+          deploymentSummary(),
+          deploymentSummary({
+            id: "dep_success_built",
+            status: "succeeded",
+            finishedAt: "2026-01-01T00:00:04.000Z",
+            runtimePlan: {
+              ...deploymentSummary().runtimePlan,
+              execution: {
+                ...deploymentSummary().runtimePlan.execution,
+                metadata: { image: "appaloft-image-dep_success_built" },
+              },
+            },
+          }),
+        ],
+      }).execute(createTestContext(), createQuery()),
+    );
+
+    expect(readiness.rollbackReady).toBe(true);
+    expect(readiness.rollback.candidates[0]).toMatchObject({
+      deploymentId: "dep_success_built",
+      rollbackReady: true,
+      artifactSummary: "appaloft-image-dep_success_built",
+    });
+  });
+
   test("[DEP-RECOVERY-READINESS-008] blocks successful rollback candidates on target mismatch", async () => {
     const readiness = unwrap(
       await createService({

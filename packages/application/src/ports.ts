@@ -9786,6 +9786,15 @@ export interface DependencyResourceRestoreProviderResult {
   completedAt: string;
 }
 
+export interface DependencyResourceBackupPruneInput {
+  backupId: string;
+  dependencyResourceId: string;
+  dependencyKind: DependencyResourceKind;
+  providerKey: string;
+  providerArtifactHandle?: string;
+  requestedAt: string;
+}
+
 export interface DependencyResourceProviderConnectionContext {
   host?: string;
   port?: number;
@@ -9812,6 +9821,10 @@ export interface DependencyResourceBackupProviderPort {
     context: ExecutionContext,
     input: DependencyResourceRestoreProviderInput,
   ): Promise<Result<DependencyResourceRestoreProviderResult, DomainError>>;
+  pruneBackup?(
+    context: ExecutionContext,
+    input: DependencyResourceBackupPruneInput,
+  ): Promise<Result<{ prunedAt: string }, DomainError>>;
 }
 
 export interface ManagedDependencySingleServerTarget {

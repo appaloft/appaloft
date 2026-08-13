@@ -1,0 +1,123 @@
+---
+title: "Migrate from Railway and other platforms"
+description: "Translate a platform export into a reviewable plan, then apply, verify, resume, and exactly clean it through existing Appaloft operations."
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: complete
+searchAliases:
+  - "appaloft migrate"
+  - "Railway migration"
+  - "migration bundle"
+relatedOperations:
+  - "migrations.plan"
+  - "migrations.apply"
+  - "migrations.status"
+  - "migrations.verify"
+  - "migrations.cleanup"
+  - "deployments.cleanup-runtime"
+sidebar:
+  order: 1
+---
+
+## Platform migration <a id="platform-migration" />
+
+Platform migration is a bounded task, not another Project, Environment, Resource, or Deployment lifecycle. After migration, every resulting object remains owned by existing Appaloft operations. Removing the coordinator does not strand the application.
+
+The complete flow is read-only export → neutral Migration Bundle → no-effect plan → digest confirmation → apply/resume → status → verify → optional exact cleanup.
+
+## Translate a Railway export
+
+The Railway adapter accepts a versioned local read-only collector/export file. It stores no Railway token and does not leak Railway DTOs into the Appaloft core:
+
+```bash
+appaloft migrate plan \
+  --from railway \
+  --input railway-project-export.json
+```
+
+Services, Git or image sources, runtime commands, variables, domains, dependencies, and volumes map into the neutral bundle. Capabilities R4 cannot safely express, including replicas and cron, become explicit blockers instead of being silently dropped.
+
+Secrets must not appear as plaintext in the export or bundle. Use a local `secretRef`; the target profile's controlled resolver injects it during apply:
+
+```json
+{
+  "key": "DATABASE_URL",
+  "secretRef": "env://APPALOFT_MIGRATION_DATABASE_URL",
+  "exposure": "runtime",
+  "secret": true
+}
+```
+
+## Review and apply
+
+```bash
+appaloft migrate plan --input migration-bundle.json > migration-plan.json
+appaloft migrate apply \
+  --plan migration-plan.json \
+  --confirm sha256:REPLACE_WITH_EXACT_PLAN_DIGEST
+```
+
+`plan` has no external effects. It lists existing operations, dependencies, warnings, blockers, cleanup ownership, and a digest over the complete plan. `apply` requires that exact digest. A modified plan, a blocker, or a mismatched confirmation is rejected before any CommandBus effect.
+
+Apply stops at the first failed dependency, returning safe receipts, remaining steps, and cleanup candidates. Preserve a task file containing the plan and the returned `receipts`; resume does not repeat its completed prefix:
+
+```json
+{
+  "plan": { "protocol": "platform-migration/v1" },
+  "receipts": []
+}
+```
+
+```bash
+appaloft migrate status --task migration-task.json
+appaloft migrate verify --task migration-task.json
+```
+
+If apply partially fails, resume with the same task file and original digest. The CLI validates that receipts form a contiguous plan prefix and continues from the first incomplete step:
+
+```bash
+appaloft migrate apply \
+  --task migration-task.json \
+  --confirm sha256:REPLACE_WITH_EXACT_PLAN_DIGEST
+```
+
+## Verify outcomes, not command acceptance
+
+`status` uses existing list/show/effective-config queries. `verify` uses live health, deployment proof, effective config, domain, dependency, and backup queries. Output is a bounded allow-listed summary: secrets, provider credentials, and raw logs are not returned.
+
+`passed` means the currently readable evidence has no failure signal. It does not replace real rollback, TLS, backup, and independent-restore acceptance. Preserve separate evidence packets for representative Web, Compose, and stateful workloads before cutover.
+
+The Web Console at `/migrate/platform` uses the same bundle, plan, apply/resume, status, verify, and cleanup contract.
+
+## Exact cleanup
+
+Cleanup processes only receipts with `ownership: created`, preserves reused or user-owned state, and reuses existing unset, unbind, detach, archive, and delete operations in reverse dependency order. It requires the owner role and a second exact digest confirmation:
+
+```bash
+appaloft migrate cleanup \
+  --task migration-task.json \
+  --confirm sha256:REPLACE_WITH_EXACT_PLAN_DIGEST
+```
+
+If a lifecycle guard or external runtime cleanup blocks deletion, cleanup returns a partial result, completed actions, and exact remaining steps. Do not bypass guards by writing the database or deleting provider resources directly.
+
+Migration cleanup uses the existing `deployments.cleanup-runtime` operation for receipt-owned deployment runtime state. To retry that exact step independently, run `appaloft deployments cleanup-runtime <deploymentId> --confirm <deploymentId>`; it requires an exact deployment id confirmation and never performs a broad runtime prune.
+
+## HTTP / oRPC / SDK
+
+The same contract is available at:
+
+- `POST /api/migrations/plan`
+- `POST /api/migrations/apply`
+- `POST /api/migrations/status`
+- `POST /api/migrations/verify`
+- `POST /api/migrations/cleanup`
+
+Plan/status/verify are Queries; apply/cleanup are Commands. Cleanup requires owner; the other surfaces require at least member. The SDK exposes the same inputs and results under `migrations.*`.
+
+## Next steps
+
+- [Register and Connect a Server](/docs/en/servers/register-connect/)
+- [Your First Deployment](/docs/en/start/first-deployment/)
+- [Custom Domains](/docs/en/access/custom-domains/)

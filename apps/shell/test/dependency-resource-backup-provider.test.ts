@@ -743,20 +743,16 @@ describe("ShellDependencyResourceBackupProvider", () => {
       join(binDir, "redis-cli"),
       `#!/usr/bin/env bash
 set -euo pipefail
-printf '%s\\n' "$*" >> "$APPALOFT_TEST_REDIS_CLI_ARGS_LOG"
+printf '%s\\n' "$*" >> '${argsLog}'
 if [[ "$*" == *" -x RESTORE "* ]]; then
-  cat > "$APPALOFT_TEST_REDIS_CLI_STDIN_LOG"
+  cat > '${stdinLog}'
 fi
 `,
     );
     await chmod(join(binDir, "redis-cli"), 0o755);
 
     const previousPath = process.env.PATH;
-    const previousArgsLog = process.env.APPALOFT_TEST_REDIS_CLI_ARGS_LOG;
-    const previousStdinLog = process.env.APPALOFT_TEST_REDIS_CLI_STDIN_LOG;
     process.env.PATH = `${binDir}:${previousPath ?? ""}`;
-    process.env.APPALOFT_TEST_REDIS_CLI_ARGS_LOG = argsLog;
-    process.env.APPALOFT_TEST_REDIS_CLI_STDIN_LOG = stdinLog;
     try {
       const restored = await new BunDependencyResourceNativeCommandRunner().run({
         operation: "redis-restore",
@@ -774,16 +770,6 @@ fi
       expect(await readFile(stdinLog, "utf8")).toBe("serialized-redis-dump");
     } finally {
       process.env.PATH = previousPath;
-      if (previousArgsLog === undefined) {
-        delete process.env.APPALOFT_TEST_REDIS_CLI_ARGS_LOG;
-      } else {
-        process.env.APPALOFT_TEST_REDIS_CLI_ARGS_LOG = previousArgsLog;
-      }
-      if (previousStdinLog === undefined) {
-        delete process.env.APPALOFT_TEST_REDIS_CLI_STDIN_LOG;
-      } else {
-        process.env.APPALOFT_TEST_REDIS_CLI_STDIN_LOG = previousStdinLog;
-      }
     }
   });
 });

@@ -115,7 +115,9 @@ function hasRollbackArtifact(deployment: DeploymentSummary): boolean {
     deployment.runtimePlan.runtimeArtifact?.image ||
       deployment.runtimePlan.runtimeArtifact?.composeFile ||
       deployment.runtimePlan.execution.image ||
-      deployment.runtimePlan.execution.composeFile,
+      deployment.runtimePlan.execution.composeFile ||
+      deployment.runtimePlan.execution.metadata?.image ||
+      deployment.runtimePlan.execution.metadata?.composeFile,
   );
 }
 
@@ -130,7 +132,9 @@ function artifactSummary(deployment: DeploymentSummary): string | undefined {
     deployment.runtimePlan.runtimeArtifact?.image ??
     deployment.runtimePlan.runtimeArtifact?.composeFile ??
     deployment.runtimePlan.execution.image ??
-    deployment.runtimePlan.execution.composeFile
+    deployment.runtimePlan.execution.composeFile ??
+    deployment.runtimePlan.execution.metadata?.image ??
+    deployment.runtimePlan.execution.metadata?.composeFile
   );
 }
 

@@ -343,6 +343,27 @@ export class RoutedDependencyResourceBackupProvider
       : this.fallbackProvider;
     return provider.restoreBackup(context, input);
   }
+
+  pruneBackup(
+    context: ExecutionContext,
+    input: Parameters<NonNullable<DependencyResourceBackupProviderPort["pruneBackup"]>>[1],
+  ): Promise<Result<{ prunedAt: string }, DomainError>> {
+    if (!this.fallbackProvider.pruneBackup) {
+      return Promise.resolve(
+        err(
+          domainError.providerCapabilityUnsupported(
+            "Provider does not support dependency backup pruning",
+            {
+              phase: "dependency-resource-backup-prune",
+              providerKey: input.providerKey,
+              dependencyKind: input.dependencyKind,
+            },
+          ),
+        ),
+      );
+    }
+    return this.fallbackProvider.pruneBackup(context, input);
+  }
 }
 
 function renderBackupPathSetup(path: string): AshScript {

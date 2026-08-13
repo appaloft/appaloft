@@ -693,6 +693,7 @@ export const tokens = {
   cancelDeploymentUseCase: Symbol.for("appaloft.cancel_deployment_use_case"),
   reconcileStaleDeploymentUseCase: Symbol.for("appaloft.reconcile_stale_deployment_use_case"),
   archiveDeploymentUseCase: Symbol.for("appaloft.archive_deployment_use_case"),
+  cleanupDeploymentRuntimeUseCase: Symbol.for("appaloft.cleanup_deployment_runtime_use_case"),
   pruneDeploymentsUseCase: Symbol.for("appaloft.prune_deployments_use_case"),
   pruneResourceRuntimeControlAttemptsUseCase: Symbol.for(
     "appaloft.prune_resource_runtime_control_attempts_use_case",
@@ -823,4 +824,6 @@ export const tokens = {
   diagnostics: Symbol.for("appaloft.diagnostics"),
   commandBus: Symbol.for("appaloft.command_bus"),
   queryBus: Symbol.for("appaloft.query_bus"),
+  platformMigrationCoordinator: Symbol.for("appaloft.platform_migration_coordinator"),
+  migrationSecretResolver: Symbol.for("appaloft.migration_secret_resolver"),
 } as const;

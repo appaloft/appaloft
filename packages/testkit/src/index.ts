@@ -642,6 +642,9 @@ export class FakeManagedRedisProvider implements ManagedRedisProviderPort {
 export class FakeDependencyResourceBackupProvider implements DependencyResourceBackupProviderPort {
   readonly backups: DependencyResourceBackupProviderInput[] = [];
   readonly restores: DependencyResourceRestoreProviderInput[] = [];
+  readonly prunes: Parameters<
+    NonNullable<DependencyResourceBackupProviderPort["pruneBackup"]>
+  >[1][] = [];
   private supported = new Set([
     "appaloft-managed-postgres:postgres",
     "appaloft-managed-redis:redis",
@@ -708,6 +711,14 @@ export class FakeDependencyResourceBackupProvider implements DependencyResourceB
     void context;
     this.restores.push(input);
     return this.restoreResult ?? ok({ completedAt: input.requestedAt });
+  }
+
+  async pruneBackup(
+    _context: ExecutionContext,
+    input: Parameters<NonNullable<DependencyResourceBackupProviderPort["pruneBackup"]>>[1],
+  ): Promise<Result<{ prunedAt: string }, DomainError>> {
+    this.prunes.push(input);
+    return ok({ prunedAt: input.requestedAt });
   }
 }
 
