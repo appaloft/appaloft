@@ -1,6 +1,7 @@
 export * from "./operations/deployments/apply-action-preview-route.command";
 export * from "./operations/deployments/archive-deployment.command";
 export * from "./operations/deployments/cancel-deployment.command";
+export * from "./operations/deployments/cleanup-deployment-runtime.command";
 export * from "./operations/deployments/cleanup-preview.command";
 export * from "./operations/deployments/confirm-action-preview-route.command";
 export * from "./operations/deployments/count-deployments.query";

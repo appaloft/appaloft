@@ -1,0 +1,124 @@
+---
+title: "从 Railway 等平台迁移"
+description: "把平台导出翻译成可审阅计划，经现有 Appaloft 操作执行、验证、恢复和精确清理。"
+docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: complete
+searchAliases:
+  - "appaloft migrate"
+  - "Railway migration"
+  - "migration bundle"
+  - "平台迁移"
+relatedOperations:
+  - "migrations.plan"
+  - "migrations.apply"
+  - "migrations.status"
+  - "migrations.verify"
+  - "migrations.cleanup"
+  - "deployments.cleanup-runtime"
+sidebar:
+  order: 1
+---
+
+## 平台迁移 <a id="platform-migration" />
+
+平台迁移是一次有边界的任务，不是新的 Project、Environment、Resource 或 Deployment 生命周期。迁移结束后，所有状态仍由现有 Appaloft operation 持有；移除迁移协调器不会让应用失去管理入口。
+
+完整流程是：只读导出 → 中性 Migration Bundle → 无副作用计划 → digest 确认 → apply/resume → status → verify → 可选精确 cleanup。
+
+## 从 Railway 导出翻译
+
+Railway adapter 接受版本化的本地只读 collector/export 文件，不保存 Railway token，也不会把 Railway DTO 写入 Appaloft 核心：
+
+```bash
+appaloft migrate plan \
+  --from railway \
+  --input railway-project-export.json
+```
+
+服务、Git 或镜像 source、运行命令、变量、域名、依赖和 volumes 会翻译到中性 bundle。R4 尚不能安全表达的能力（例如多副本和 cron）会成为明确 blocker；不会静默丢弃。
+
+Secret 不得以明文出现在 export 或 bundle 中。使用本地 `secretRef`，由目标 profile 的受控 resolver 在 apply 时注入：
+
+```json
+{
+  "key": "DATABASE_URL",
+  "secretRef": "env://APPALOFT_MIGRATION_DATABASE_URL",
+  "exposure": "runtime",
+  "secret": true
+}
+```
+
+## 审阅并执行
+
+```bash
+appaloft migrate plan --input migration-bundle.json > migration-plan.json
+appaloft migrate apply \
+  --plan migration-plan.json \
+  --confirm sha256:REPLACE_WITH_EXACT_PLAN_DIGEST
+```
+
+`plan` 不产生外部效果。它只列出既有 operation、依赖、warning、blocker、清理归属和完整 digest。`apply` 必须确认同一个 digest；计划被修改、含 blocker 或确认值不一致时，在任何 CommandBus effect 之前拒绝。
+
+apply 在依赖顺序中停止于第一个失败步骤，返回安全 receipts、剩余步骤和可清理步骤。保留完整 task 文件（`plan` + apply 返回的 `receipts`），即可恢复而不重复已完成步骤：
+
+```json
+{
+  "plan": { "protocol": "platform-migration/v1" },
+  "receipts": []
+}
+```
+
+```bash
+appaloft migrate status --task migration-task.json
+appaloft migrate verify --task migration-task.json
+```
+
+若 apply 部分失败，使用同一个 task 文件和原 digest 恢复；CLI 会验证 receipts 是计划的连续前缀，并从第一个未完成步骤继续：
+
+```bash
+appaloft migrate apply \
+  --task migration-task.json \
+  --confirm sha256:REPLACE_WITH_EXACT_PLAN_DIGEST
+```
+
+## 验证结果，而不是命令接受
+
+`status` 使用现有 list/show/effective-config 查询读取已创建状态；`verify` 使用 live health、deployment proof、effective config、domain、dependency 和 backup 查询。输出只包含白名单摘要，不返回 Secret、provider credential 或 raw log。
+
+状态 `passed` 表示当前可读证据没有失败信号；它不替代真实场景的 rollback、TLS、backup 和独立 restore 验收。对 Web、Compose 和 stateful workload，应在切流前分别保存验证包。
+
+Web Console 的 `/migrate/platform` 提供同一套 bundle、plan、apply/resume、status、verify 和 cleanup contract。
+
+## 精确清理
+
+cleanup 只处理 `ownership: created` 的 receipts，跳过 reused 或用户已有状态，并按逆依赖顺序复用 unset、unbind、detach、archive 和 delete operation。它要求 owner 权限和第二次完整 digest 确认：
+
+```bash
+appaloft migrate cleanup \
+  --task migration-task.json \
+  --confirm sha256:REPLACE_WITH_EXACT_PLAN_DIGEST
+```
+
+若生命周期 guard 或外部 runtime cleanup 阻止删除，cleanup 返回 partial、已完成 actions 和精确 remaining steps；不要绕过 guard 直接写数据库或删除 provider 资源。
+
+迁移 cleanup 会通过既有的 `deployments.cleanup-runtime` operation 清理 receipt 所属的部署运行时。需要单独重试该步骤时，使用 `appaloft deployments cleanup-runtime <deploymentId> --confirm <deploymentId>`；它只接受精确 deployment id 确认，不执行宽泛 runtime prune。
+
+## HTTP / oRPC / SDK
+
+同一 contract 暴露为：
+
+- `POST /api/migrations/plan`
+- `POST /api/migrations/apply`
+- `POST /api/migrations/status`
+- `POST /api/migrations/verify`
+- `POST /api/migrations/cleanup`
+
+plan/status/verify 是 Query；apply/cleanup 是 Command。cleanup 需要 owner，其余入口至少需要 member。SDK 的 `migrations.*` 使用相同输入和结果类型。
+
+## 下一步
+
+- [注册并连接服务器](/docs/servers/register-connect/)
+- [第一次部署](/docs/start/first-deployment/)
+- [自定义域名](/docs/access/custom-domains/)

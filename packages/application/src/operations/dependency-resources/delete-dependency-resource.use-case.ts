@@ -1,5 +1,6 @@
 import {
   DeletedAt,
+  DependencyResourceBackupsByDependencyResourceSpec,
   type DependencyResourceDeleteBlockerState,
   DependencyResourceProviderRealizationAttemptId,
   domainError,
@@ -11,6 +12,7 @@ import {
   ResourceInstanceId,
   type Result,
   safeTry,
+  UpsertDependencyResourceBackupSpec,
   UpsertResourceInstanceSpec,
 } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
@@ -19,6 +21,8 @@ import { type ExecutionContext, toRepositoryContext } from "../../execution-cont
 import {
   type AppLogger,
   type Clock,
+  type DependencyResourceBackupProviderPort,
+  type DependencyResourceBackupRepository,
   type DependencyResourceDeleteSafetyReader,
   type DependencyResourceRepository,
   type EventBus,
@@ -51,6 +55,10 @@ export class DeleteDependencyResourceUseCase {
     private readonly managedDependencyProvider: ManagedDependencyProviderPort,
     @inject(tokens.processAttemptRecorder)
     private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
+    @inject(tokens.dependencyResourceBackupRepository, { isOptional: true })
+    private readonly dependencyResourceBackupRepository?: DependencyResourceBackupRepository,
+    @inject(tokens.dependencyResourceBackupProvider, { isOptional: true })
+    private readonly dependencyResourceBackupProvider?: DependencyResourceBackupProviderPort,
   ) {}
 
   async execute(
@@ -63,6 +71,8 @@ export class DeleteDependencyResourceUseCase {
     const {
       clock,
       dependencyResourceDeleteSafetyReader,
+      dependencyResourceBackupProvider,
+      dependencyResourceBackupRepository,
       dependencyResourceRepository,
       eventBus,
       idGenerator,
@@ -88,7 +98,7 @@ export class DeleteDependencyResourceUseCase {
       if (blockersResult.isErr()) {
         return err(blockersResult.error);
       }
-      const blockers: DependencyResourceDeleteBlockerState[] = blockersResult.value.map(
+      let blockers: DependencyResourceDeleteBlockerState[] = blockersResult.value.map(
         (blocker) => ({
           kind: blocker.kind,
           ...(blocker.relatedEntityId ? { relatedEntityId: blocker.relatedEntityId } : {}),
@@ -96,6 +106,62 @@ export class DeleteDependencyResourceUseCase {
           ...(blocker.count ? { count: blocker.count } : {}),
         }),
       );
+      if (
+        input.confirmBackupRetentionRelease === true &&
+        blockers.some((blocker) => blocker.kind === "dependency-resource-backup")
+      ) {
+        if (!dependencyResourceBackupRepository || !dependencyResourceBackupProvider?.pruneBackup) {
+          return err(
+            domainError.providerCapabilityUnsupported(
+              "Dependency backup retention release is not configured",
+              {
+                phase: "dependency-resource-backup-retention-release",
+                dependencyResourceId: dependencyResourceId.value,
+              },
+            ),
+          );
+        }
+        const backups = await dependencyResourceBackupRepository.findMany(
+          repositoryContext,
+          DependencyResourceBackupsByDependencyResourceSpec.create(dependencyResourceId),
+        );
+        for (const backup of backups) {
+          const backupState = backup.toState();
+          if (!backupState.retentionStatus.blocksDelete()) continue;
+          if (
+            backupState.dependencyKind.value !== "postgres" &&
+            backupState.dependencyKind.value !== "redis"
+          ) {
+            return err(
+              domainError.providerCapabilityUnsupported("Dependency backup kind cannot be pruned", {
+                phase: "dependency-resource-backup-retention-release",
+                backupId: backupState.id.value,
+                dependencyKind: backupState.dependencyKind.value,
+              }),
+            );
+          }
+          const prunedAt = clock.now();
+          const pruned = await dependencyResourceBackupProvider.pruneBackup(context, {
+            backupId: backupState.id.value,
+            dependencyResourceId: dependencyResourceId.value,
+            dependencyKind: backupState.dependencyKind.value,
+            providerKey: backupState.providerKey.value,
+            ...(backupState.providerArtifactHandle
+              ? { providerArtifactHandle: backupState.providerArtifactHandle.value }
+              : {}),
+            requestedAt: prunedAt,
+          });
+          if (pruned.isErr()) return err(pruned.error);
+          yield* backup.releaseRetention({ releasedAt: yield* OccurredAt.create(prunedAt) });
+          await dependencyResourceBackupRepository.upsert(
+            repositoryContext,
+            backup,
+            UpsertDependencyResourceBackupSpec.fromDependencyResourceBackup(backup),
+          );
+          await publishDomainEventsAndReturn(context, eventBus, logger, backup, undefined);
+        }
+        blockers = blockers.filter((blocker) => blocker.kind !== "dependency-resource-backup");
+      }
       const dependencyState = dependencyResource.toState();
       const dependencyKind = isManagedDependencyResourceKind(dependencyState.kind.value)
         ? dependencyState.kind.value

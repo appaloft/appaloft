@@ -150,6 +150,7 @@
     "packages/adapters/cli": {
       "name": "@appaloft/adapter-cli",
       "dependencies": {
+        "@appaloft/adapter-railway-migration": "workspace:*",
         "@appaloft/application": "workspace:*",
         "@appaloft/ash": "workspace:*",
         "@appaloft/cli-logging": "workspace:*",
@@ -199,6 +200,17 @@
     },
     "packages/adapters/packaging": {
       "name": "@appaloft/adapter-packaging",
+    },
+    "packages/adapters/railway-migration": {
+      "name": "@appaloft/adapter-railway-migration",
+      "dependencies": {
+        "@appaloft/application": "workspace:*",
+        "@appaloft/core": "workspace:*",
+        "zod": "^4.4.3",
+      },
+      "devDependencies": {
+        "reflect-metadata": "^0.2.2",
+      },
     },
     "packages/adapters/runtime": {
       "name": "@appaloft/adapter-runtime",
@@ -712,6 +724,8 @@
     "@appaloft/adapter-http-elysia": ["@appaloft/adapter-http-elysia@workspace:packages/adapters/http-elysia"],
 
     "@appaloft/adapter-packaging": ["@appaloft/adapter-packaging@workspace:packages/adapters/packaging"],
+
+    "@appaloft/adapter-railway-migration": ["@appaloft/adapter-railway-migration@workspace:packages/adapters/railway-migration"],
 
     "@appaloft/adapter-runtime": ["@appaloft/adapter-runtime@workspace:packages/adapters/runtime"],
 

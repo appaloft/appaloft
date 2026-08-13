@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -45,6 +45,7 @@ import {
   ApplyConnectorCapabilityUseCase,
   ApplyInstanceUpgradeCommandHandler,
   ApplyInstanceUpgradeUseCase,
+  ApplyPlatformMigrationCommandHandler,
   ArchiveDeploymentCommandHandler,
   ArchiveDeploymentUseCase,
   ArchiveEnvironmentCommandHandler,
@@ -91,6 +92,9 @@ import {
   CheckResourceDeleteSafetyQueryService,
   CheckServerDeleteSafetyQueryHandler,
   CheckServerDeleteSafetyQueryService,
+  CleanupDeploymentRuntimeCommandHandler,
+  CleanupDeploymentRuntimeUseCase,
+  CleanupPlatformMigrationCommandHandler,
   CleanupPreviewCommandHandler,
   CleanupPreviewUseCase,
   CleanupStorageVolumeRuntimeCommandHandler,
@@ -431,6 +435,8 @@ import {
   PlanDomainBindingDnsQueryService,
   PlanDuplicateEnvironmentQueryHandler,
   PlanDuplicateEnvironmentQueryService,
+  PlanPlatformMigrationQueryHandler,
+  PlatformMigrationCoordinator,
   PrepareServerRuntimeCommandHandler,
   PrepareServerRuntimeUseCase,
   PreviewCleanupRetryScheduler,
@@ -685,6 +691,7 @@ import {
   StartConnectionUseCase,
   StartResourceRuntimeCommandHandler,
   StartTunnelCommandHandler,
+  StatusPlatformMigrationQueryHandler,
   StopResourceRuntimeCommandHandler,
   StorageVolumeBackupAutomationService,
   StreamDeploymentTimelineQueryHandler,
@@ -712,6 +719,7 @@ import {
   UnsetResourceVariableUseCase,
   UpsertGitHubAppInstallationCommandHandler,
   UpsertGitHubAppInstallationUseCase,
+  VerifyPlatformMigrationQueryHandler,
   type WorkspaceActivationContextInitializerPort,
   WorkspaceCollaborationCommandHandler,
   type WorkspaceCollaborationDependencies,
@@ -2314,10 +2322,11 @@ export class BunDependencyResourceNativeCommandRunner
         return err(dump.error);
       }
       const ttlMs = Number.parseInt(new TextDecoder().decode(ttl.value).trim(), 10);
+      const dumpPayload = this.redisCliBulkPayload(dump.value);
       backupKeys.push({
         key,
         ttlMs: Number.isFinite(ttlMs) ? ttlMs : -1,
-        dumpBase64: Buffer.from(dump.value).toString("base64"),
+        dumpBase64: Buffer.from(dumpPayload).toString("base64"),
       });
     }
 
@@ -2370,7 +2379,7 @@ export class BunDependencyResourceNativeCommandRunner
       }
       const payload = Buffer.from(entry.dumpBase64, "base64");
       const ttlMs = entry.ttlMs > 0 ? String(entry.ttlMs) : "0";
-      const restored = this.runRedisCli(input, ["-x", "RESTORE", entry.key, ttlMs, "REPLACE"], {
+      const restored = this.runRedisCli(input, ["-x", "RESTORE", entry.key, ttlMs], {
         stdin: payload,
       });
       if (restored.isErr()) {
@@ -2389,6 +2398,7 @@ export class BunDependencyResourceNativeCommandRunner
     let started: ReturnType<typeof Bun.spawnSync>;
     try {
       started = Bun.spawnSync(command, {
+        env: process.env.PATH ? { PATH: process.env.PATH } : {},
         ...(options.stdin ? { stdin: options.stdin } : {}),
         stdout: "pipe",
         stderr: "pipe",
@@ -2402,7 +2412,17 @@ export class BunDependencyResourceNativeCommandRunner
       );
     }
     if (started.success) {
-      return ok(started.stdout ? Uint8Array.from(started.stdout) : new Uint8Array());
+      const stdout = started.stdout ? Uint8Array.from(started.stdout) : new Uint8Array();
+      const output = new TextDecoder().decode(stdout).trimStart();
+      if (output.startsWith("ERR ") || output.startsWith("WRONGTYPE ")) {
+        return err(
+          redisLogicalBackupError("Redis native backup command failed", input, {
+            tool: "redis-cli",
+            exitCode: started.exitCode,
+          }),
+        );
+      }
+      return ok(stdout);
     }
 
     return err(
@@ -2411,6 +2431,13 @@ export class BunDependencyResourceNativeCommandRunner
         exitCode: started.exitCode,
       }),
     );
+  }
+
+  private redisCliBulkPayload(value: Uint8Array): Uint8Array {
+    if (value.length > 0 && value[value.length - 1] === 10) {
+      return value.slice(0, -1);
+    }
+    return value;
   }
 }
 
@@ -2594,6 +2621,30 @@ export class ShellDependencyResourceBackupProvider implements DependencyResource
     }
 
     return ok({ completedAt: input.requestedAt });
+  }
+
+  async pruneBackup(
+    _context: ExecutionContext,
+    input: Parameters<NonNullable<DependencyResourceBackupProviderPort["pruneBackup"]>>[1],
+  ): Promise<Result<{ prunedAt: string }, DomainError>> {
+    const directory = this.backupArtifactDir(input.dependencyResourceId);
+    const prefix = `${shellBackupArtifactSegment(input.backupId)}.`;
+    try {
+      const entries = await readdir(directory).catch(() => [] as string[]);
+      for (const entry of entries) {
+        if (
+          entry === `${shellBackupArtifactSegment(input.backupId)}.json` ||
+          entry.startsWith(prefix)
+        ) {
+          await rm(join(directory, entry), { force: true });
+        }
+      }
+      return ok({ prunedAt: input.requestedAt });
+    } catch (cause) {
+      return err(
+        shellBackupProviderError("Dependency backup artifacts could not be pruned", input, cause),
+      );
+    }
   }
 
   private async createDockerManagedBackup(
@@ -3042,6 +3093,12 @@ export function registerApplicationServices(
   container: DependencyContainer,
   input: RegisterApplicationServicesInput = {},
 ): void {
+  container.registerSingleton(tokens.platformMigrationCoordinator, PlatformMigrationCoordinator);
+  container.registerSingleton(PlanPlatformMigrationQueryHandler);
+  container.registerSingleton(ApplyPlatformMigrationCommandHandler);
+  container.registerSingleton(StatusPlatformMigrationQueryHandler);
+  container.registerSingleton(VerifyPlatformMigrationQueryHandler);
+  container.registerSingleton(CleanupPlatformMigrationCommandHandler);
   container.registerSingleton(BootstrapServerEdgeProxyOnTargetRegisteredHandler);
   container.registerSingleton(MarkDomainReadyOnDomainBoundHandler);
   container.registerSingleton(ReconcileDomainCertificateUseCase);
@@ -3172,6 +3229,7 @@ export function registerApplicationServices(
   container.registerSingleton(CancelDeploymentCommandHandler);
   container.registerSingleton(ReconcileStaleDeploymentCommandHandler);
   container.registerSingleton(ArchiveDeploymentCommandHandler);
+  container.registerSingleton(CleanupDeploymentRuntimeCommandHandler);
   container.registerSingleton(PruneDeploymentsCommandHandler);
   container.registerSingleton(StopResourceRuntimeCommandHandler);
   container.registerSingleton(StartResourceRuntimeCommandHandler);
@@ -4795,6 +4853,10 @@ export function registerApplicationServices(
     ReconcileStaleDeploymentUseCase,
   );
   container.registerSingleton(tokens.archiveDeploymentUseCase, ArchiveDeploymentUseCase);
+  container.registerSingleton(
+    tokens.cleanupDeploymentRuntimeUseCase,
+    CleanupDeploymentRuntimeUseCase,
+  );
   container.registerSingleton(tokens.pruneDeploymentsUseCase, PruneDeploymentsUseCase);
   container.registerSingleton(tokens.cleanupPreviewUseCase, CleanupPreviewUseCase);
   container.registerSingleton(tokens.createDomainBindingUseCase, CreateDomainBindingUseCase);

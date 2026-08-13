@@ -1217,6 +1217,7 @@ export const zhCN = {
       home: "首页",
       instance: "实例",
       organization: "组织",
+      platformMigration: "平台迁移",
       previewEnvironments: "预览环境",
       previewPolicies: "预览策略",
       projects: "项目",

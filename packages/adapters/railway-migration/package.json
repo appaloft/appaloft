@@ -1,0 +1,21 @@
+{
+  "name": "@appaloft/adapter-railway-migration",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@appaloft/application": "workspace:*",
+    "@appaloft/core": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "reflect-metadata": "^0.2.2"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "test": "bun test --preload reflect-metadata",
+    "typecheck": "tsc -p tsconfig.json --noEmit --checkers 4"
+  }
+}

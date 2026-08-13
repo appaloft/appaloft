@@ -107,12 +107,14 @@ export function renderStorageRuntimeCleanupScript(input: {
   retainedSnapshotCount: number;
   rollbackCandidateCount: number;
 }): AshScript {
+  const beforeEpochSeconds = Math.floor(Date.parse(input.before) / 1000);
   return ash`
     set +e
     ${ash.env("APPALOFT_STORAGE_VOLUME_ID", input.storageVolumeId)}
     ${ash.env("APPALOFT_STORAGE_VOLUME_KIND", input.storageVolumeKind)}
     ${ash.env("APPALOFT_DOCKER_VOLUME_NAME", input.volumeName)}
     ${ash.env("APPALOFT_STORAGE_CLEANUP_BEFORE", input.before)}
+    ${ash.env("APPALOFT_STORAGE_CLEANUP_BEFORE_EPOCH", beforeEpochSeconds)}
     ${ash.env("APPALOFT_STORAGE_CLEANUP_DRY_RUN", input.dryRun ? "1" : "0")}
     ${ash.env("APPALOFT_STORAGE_ACTIVE_ATTACHMENT_COUNT", input.activeAttachmentCount)}
     ${ash.env("APPALOFT_STORAGE_BACKUP_RETENTION_REQUIRED", input.backupRetentionRequired ? "1" : "0")}
@@ -124,10 +126,20 @@ export function renderStorageRuntimeCleanupScript(input: {
       id="$1"; kind="$2"; target="$3"; updated_at="$4"; action="$5"; reason="$6"
       printf 'STORAGE_CLEANUP_CANDIDATE\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' "$id" "$kind" "$target" "$updated_at" "$action" "$reason"
     }
+    timestamp_to_epoch() {
+      timestamp_value="$1"
+      if timestamp_epoch=$(date -u -d "$timestamp_value" +%s 2>/dev/null); then
+        printf '%s\\n' "$timestamp_epoch"
+        return 0
+      fi
+      timestamp_normalized=$(printf '%s' "$timestamp_value" | sed -E -e 's/\\.[0-9]+//' -e 's/Z$/+0000/' -e 's/([+-][0-9]{2}):([0-9]{2})$/\\1\\2/')
+      date -j -u -f '%Y-%m-%dT%H:%M:%S%z' "$timestamp_normalized" '+%s' 2>/dev/null
+    }
     older_than_cutoff() {
       candidate_time="$1"
-      [ -n "$candidate_time" ] || return 1
-      [ "$candidate_time" \\< "$APPALOFT_STORAGE_CLEANUP_BEFORE" ]
+      [ -n "$candidate_time" ] || return 2
+      candidate_epoch=$(timestamp_to_epoch "$candidate_time") || return 2
+      [ "$candidate_epoch" -lt "$APPALOFT_STORAGE_CLEANUP_BEFORE_EPOCH" ]
     }
     if [ "$APPALOFT_STORAGE_VOLUME_KIND" = "bind-mount" ]; then
       emit_candidate "$APPALOFT_STORAGE_VOLUME_ID" bind-mount "$APPALOFT_STORAGE_VOLUME_ID" "" blocked bind-mount-unsupported
@@ -172,7 +184,13 @@ export function renderStorageRuntimeCleanupScript(input: {
       emit_candidate "$APPALOFT_DOCKER_VOLUME_NAME" named-volume "$APPALOFT_DOCKER_VOLUME_NAME" "$created_at" blocked backup-retention
       exit 0
     fi
-    if ! older_than_cutoff "$created_at"; then
+    older_than_cutoff "$created_at"
+    cutoff_result="$?"
+    if [ "$cutoff_result" = "2" ]; then
+      emit_candidate "$APPALOFT_DOCKER_VOLUME_NAME" named-volume "$APPALOFT_DOCKER_VOLUME_NAME" "$created_at" blocked safety-evidence-missing
+      exit 0
+    fi
+    if [ "$cutoff_result" != "0" ]; then
       emit_candidate "$APPALOFT_DOCKER_VOLUME_NAME" named-volume "$APPALOFT_DOCKER_VOLUME_NAME" "$created_at" skipped cutoff-not-reached
       exit 0
     fi

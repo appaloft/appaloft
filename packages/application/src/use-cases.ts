@@ -60,6 +60,7 @@ export * from "./operations/deploy-tokens/show-deploy-token.query-service";
 export * from "./operations/deployments/apply-action-preview-route.use-case";
 export * from "./operations/deployments/archive-deployment.use-case";
 export * from "./operations/deployments/cancel-deployment.use-case";
+export * from "./operations/deployments/cleanup-deployment-runtime.use-case";
 export * from "./operations/deployments/cleanup-preview.use-case";
 export * from "./operations/deployments/confirm-action-preview-route.use-case";
 export * from "./operations/deployments/count-deployments.query-service";

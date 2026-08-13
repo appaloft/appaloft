@@ -91,7 +91,9 @@ function hasRollbackArtifact(state: DeploymentState): boolean {
     runtimeArtifact?.image ||
       runtimeArtifact?.composeFile ||
       execution.image ||
-      execution.composeFile,
+      execution.composeFile ||
+      execution.metadata?.image ||
+      execution.metadata?.composeFile,
   );
 }
 

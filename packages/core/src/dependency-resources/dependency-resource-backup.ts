@@ -368,6 +368,25 @@ export class DependencyResourceBackup extends AggregateRoot<DependencyResourceBa
     return ok(undefined);
   }
 
+  releaseRetention(input: { releasedAt: OccurredAt }): Result<void> {
+    if (this.state.status.value === "pending") {
+      return err(
+        domainError.dependencyResourceBackupBlocked("Pending backup retention cannot be released", {
+          phase: "dependency-resource-backup-retention-release",
+          backupId: this.state.id.value,
+        }),
+      );
+    }
+    if (!this.state.retentionStatus.blocksDelete()) return ok(undefined);
+    this.state.retentionStatus = DependencyResourceBackupRetentionStatusValue.none();
+    delete this.state.providerArtifactHandle;
+    this.recordDomainEvent("dependency-resource-backup-retention-released", input.releasedAt, {
+      backupId: this.state.id.value,
+      dependencyResourceId: this.state.dependencyResourceId.value,
+    });
+    return ok(undefined);
+  }
+
   startRestore(input: {
     attemptId: DependencyResourceRestoreAttemptId;
     requestedAt: OccurredAt;

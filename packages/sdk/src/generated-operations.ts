@@ -2997,6 +2997,101 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "migrations.apply",
+    operationGroup: "migrations",
+    operationMethod: "apply",
+    facadePath: ["migrations", "apply"],
+    operationId: "migrations.apply",
+    kind: "command",
+    domain: "migrations",
+    messageName: "ApplyPlatformMigrationCommand",
+    route: {
+      method: "POST",
+      path: "/migrations/apply",
+    },
+    docsHref: "/docs/migrate/platform/#platform-migration",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "migrations.cleanup",
+    operationGroup: "migrations",
+    operationMethod: "cleanup",
+    facadePath: ["migrations", "cleanup"],
+    operationId: "migrations.cleanup",
+    kind: "command",
+    domain: "migrations",
+    messageName: "CleanupPlatformMigrationCommand",
+    route: {
+      method: "POST",
+      path: "/migrations/cleanup",
+    },
+    docsHref: "/docs/migrate/platform/#platform-migration",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "migrations.plan",
+    operationGroup: "migrations",
+    operationMethod: "plan",
+    facadePath: ["migrations", "plan"],
+    operationId: "migrations.plan",
+    kind: "query",
+    domain: "migrations",
+    messageName: "PlanPlatformMigrationQuery",
+    route: {
+      method: "POST",
+      path: "/migrations/plan",
+    },
+    docsHref: "/docs/migrate/platform/#platform-migration",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "migrations.status",
+    operationGroup: "migrations",
+    operationMethod: "status",
+    facadePath: ["migrations", "status"],
+    operationId: "migrations.status",
+    kind: "query",
+    domain: "migrations",
+    messageName: "StatusPlatformMigrationQuery",
+    route: {
+      method: "POST",
+      path: "/migrations/status",
+    },
+    docsHref: "/docs/migrate/platform/#platform-migration",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "migrations.verify",
+    operationGroup: "migrations",
+    operationMethod: "verify",
+    facadePath: ["migrations", "verify"],
+    operationId: "migrations.verify",
+    kind: "query",
+    domain: "migrations",
+    messageName: "VerifyPlatformMigrationQuery",
+    route: {
+      method: "POST",
+      path: "/migrations/verify",
+    },
+    docsHref: "/docs/migrate/platform/#platform-migration",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "operator-work.cancel",
     operationGroup: "operator-work",
     operationMethod: "cancel",
@@ -8120,6 +8215,13 @@ export interface GeneratedAppaloftClient {
       readonly create: AppaloftSdkFacadeMethod;
       readonly list: AppaloftSdkFacadeMethod;
     };
+  };
+  readonly migrations: {
+    readonly apply: AppaloftSdkFacadeMethod;
+    readonly cleanup: AppaloftSdkFacadeMethod;
+    readonly plan: AppaloftSdkFacadeMethod;
+    readonly status: AppaloftSdkFacadeMethod;
+    readonly verify: AppaloftSdkFacadeMethod;
   };
   readonly operatorWork: {
     readonly cancel: AppaloftSdkFacadeMethod;

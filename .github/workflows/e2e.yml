@@ -52,6 +52,11 @@ jobs:
         with:
           bun-version-file: .bun-version
 
+      - name: Install redis-cli
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y redis-tools
+
       - name: Install
         run: bun install --frozen-lockfile
 

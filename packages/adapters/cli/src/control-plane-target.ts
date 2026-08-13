@@ -93,6 +93,7 @@ const remoteCapableTopLevelCommands = new Set([
   "infrastructure",
   "instance",
   "logs",
+  "migrate",
   "operator-work",
   "operate",
   "organization",

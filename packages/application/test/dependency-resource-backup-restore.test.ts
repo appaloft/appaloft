@@ -239,6 +239,9 @@ async function createHarness() {
       eventBus,
       logger,
       managedDependencyProvider,
+      processAttemptRecorder,
+      backups,
+      backupProvider,
     ),
     dependencyResources,
     eventBus,
@@ -936,6 +939,43 @@ describe("dependency resource backup and restore use cases", () => {
         deletionBlockers: expect.stringContaining("dependency-resource-backup"),
       },
     });
+  });
+
+  test("[DEP-RES-BACKUP-010] explicit retention release prunes exact artifacts before deletion", async () => {
+    const {
+      backupProvider,
+      context,
+      createBackup,
+      deleteDependencyResource,
+      provisionDependencyResource,
+      showBackup,
+    } = await createHarness();
+    const dependencyResourceId = (
+      await provisionDependencyResource.execute(context, {
+        kind: "postgres",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Main DB",
+      })
+    )._unsafeUnwrap().id;
+    const backupId = (await createBackup.execute(context, { dependencyResourceId }))._unsafeUnwrap()
+      .id;
+
+    const deleted = await deleteDependencyResource.execute(context, {
+      dependencyResourceId,
+      confirmBackupRetentionRelease: true,
+    });
+
+    expect(deleted.isOk()).toBe(true);
+    expect(backupProvider.prunes).toEqual([
+      expect.objectContaining({ backupId, dependencyResourceId }),
+    ]);
+    const backup = await showBackup.execute(
+      context,
+      ShowDependencyResourceBackupQuery.create({ backupId })._unsafeUnwrap(),
+    );
+    expect(backup._unsafeUnwrap().backup.retentionStatus).toBe("none");
+    expect(backup._unsafeUnwrap().backup.providerArtifactHandle).toBeUndefined();
   });
 
   test("[DEP-RES-BACKUP-010] provider-independent backups do not block verified source deletion", async () => {

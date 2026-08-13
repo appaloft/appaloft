@@ -1189,6 +1189,7 @@ export const i18nKeys = {
       home: "console:nav.home",
       instance: "console:nav.instance",
       organization: "console:nav.organization",
+      platformMigration: "console:nav.platformMigration",
       previewEnvironments: "console:nav.previewEnvironments",
       previewPolicies: "console:nav.previewPolicies",
       projects: "console:nav.projects",

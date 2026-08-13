@@ -3,6 +3,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 import {
   ArchiveDeploymentCommand,
   CancelDeploymentCommand,
+  CleanupDeploymentRuntimeCommand,
   CleanupPreviewCommand,
   CreateDeploymentCommand,
   type CreateDeploymentCommandInput,
@@ -2351,6 +2352,23 @@ const archiveDeploymentCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentArchive));
 
+const cleanupDeploymentRuntimeCommand = EffectCommand.make(
+  "cleanup-runtime",
+  {
+    deploymentId: deploymentIdArg,
+    confirm: confirmDeploymentArchiveOption,
+    resource: resourceOption,
+  },
+  ({ confirm, deploymentId, resource }) =>
+    runCommand(
+      CleanupDeploymentRuntimeCommand.create({
+        deploymentId,
+        confirm,
+        resourceId: optionalValue(resource),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentCleanupRuntime));
+
 const pruneDeploymentsCommand = EffectCommand.make(
   "prune",
   {
@@ -2429,6 +2447,7 @@ export const deploymentsCommand = EffectCommand.make("deployments").pipe(
     rollbackDeploymentCommand,
     cancelDeploymentCommand,
     reconcileStaleDeploymentCommand,
+    cleanupDeploymentRuntimeCommand,
     archiveDeploymentCommand,
     pruneDeploymentsCommand,
     logsCommand,

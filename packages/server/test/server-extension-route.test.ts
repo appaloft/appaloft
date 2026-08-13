@@ -16,6 +16,7 @@ import {
   type OperationGuardDecision,
   type OperationGuardPort,
   operationCatalog,
+  PlanPlatformMigrationQuery,
   PublishStaticArtifactCommand,
   type QueryBus,
   type TerminalSession,
@@ -114,6 +115,71 @@ describe("createAppaloftServer", () => {
       });
 
       expect(missing).toEqual([]);
+    } finally {
+      await server.shutdown();
+    }
+  }, 45_000);
+
+  test("[MIG-COMPOSE-014] executes migration planning through the composed QueryBus", async () => {
+    const dataDir = await createTempDataDir();
+    const server = await createAppaloftServer({
+      flags: {
+        appVersion: "0.1.0-test",
+        authProvider: "none",
+        dataDir,
+        docsStaticDir: "",
+        httpHost: "localhost",
+        httpPort: 3001,
+        pgliteDataDir: join(dataDir, "pglite"),
+        webStaticDir: "",
+        workerRuntime: {
+          mode: "disabled",
+          queueBackend: "database",
+          workerCount: 0,
+          workerGroup: "test-worker",
+        },
+      },
+      authRuntime: createTestAuthRuntime(),
+    });
+
+    try {
+      const query = PlanPlatformMigrationQuery.create({
+        bundle: {
+          apiVersion: "appaloft.io/migration/v1",
+          kind: "MigrationBundle",
+          metadata: { name: "Composed migration" },
+          spec: {
+            project: { name: "Composed migration" },
+            environment: { name: "production", kind: "production" },
+            target: { deploymentTargetId: "srv_composed" },
+            resources: [
+              {
+                ref: "web",
+                name: "Web",
+                source: { kind: "docker-image", locator: "ghcr.io/example/web:latest" },
+              },
+            ],
+          },
+        },
+      });
+      if (query.isErr()) throw query.error;
+
+      const queryBus = server.container.resolve<QueryBus>(tokens.queryBus);
+      const result = await queryBus.execute(
+        server.executionContextFactory.create({ entrypoint: "system" }),
+        query.value,
+      );
+
+      expect(result.isOk()).toBe(true);
+      if (result.isOk()) {
+        expect(result.value.state).toBe("ready");
+        expect(result.value.steps.map((step) => step.operationKey)).toEqual([
+          "projects.create",
+          "environments.create",
+          "resources.create",
+          "deployments.create",
+        ]);
+      }
     } finally {
       await server.shutdown();
     }

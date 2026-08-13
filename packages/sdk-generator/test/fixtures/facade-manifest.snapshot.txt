@@ -155,6 +155,11 @@ appaloft.githubAgent.automationRules.disable -> github-agent.automation-rules.di
 appaloft.githubAgent.automationRules.list -> github-agent.automation-rules.list GET /github-agent/automation-rules
 appaloft.githubAgent.repositoryBindings.create -> github-agent.repository-bindings.create POST /github-agent/repository-bindings
 appaloft.githubAgent.repositoryBindings.list -> github-agent.repository-bindings.list GET /github-agent/repository-bindings
+appaloft.migrations.apply -> migrations.apply POST /migrations/apply
+appaloft.migrations.cleanup -> migrations.cleanup POST /migrations/cleanup
+appaloft.migrations.plan -> migrations.plan POST /migrations/plan
+appaloft.migrations.status -> migrations.status POST /migrations/status
+appaloft.migrations.verify -> migrations.verify POST /migrations/verify
 appaloft.operatorWork.cancel -> operator-work.cancel POST /operator-work/{workId}/cancel
 appaloft.operatorWork.deadLetter -> operator-work.dead-letter POST /operator-work/{workId}/dead-letter
 appaloft.operatorWork.list -> operator-work.list GET /operator-work

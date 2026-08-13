@@ -1328,6 +1328,7 @@ export const enUS = {
       home: "Home",
       instance: "Instance",
       organization: "Organization",
+      platformMigration: "Platform migration",
       previewEnvironments: "Preview environments",
       previewPolicies: "Preview policies",
       projects: "Projects",

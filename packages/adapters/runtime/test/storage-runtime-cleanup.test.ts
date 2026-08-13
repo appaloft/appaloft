@@ -196,6 +196,10 @@ describe("storage runtime cleanup adapter", () => {
 
     expect(script).toMatchSnapshot();
     expect(script).toContain("APPALOFT_STORAGE_CLEANUP_V1");
+    expect(script).toContain("APPALOFT_STORAGE_CLEANUP_BEFORE_EPOCH='1767225900'");
+    expect(script).toContain('date -u -d "$timestamp_value" +%s');
+    expect(script).toContain("date -j -u -f '%Y-%m-%dT%H:%M:%S%z'");
+    expect(script).toContain("blocked safety-evidence-missing");
     expect(script).toContain('docker volume rm "$APPALOFT_DOCKER_VOLUME_NAME"');
     expect(script).toContain('docker ps -aq --filter "volume=$APPALOFT_DOCKER_VOLUME_NAME"');
     expect(script).toContain('{{ index .Labels "appaloft.storage-volume-id" }}');

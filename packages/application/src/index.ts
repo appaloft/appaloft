@@ -62,6 +62,11 @@ export * from "./operation-audit";
 export * from "./operation-audit-domain-event-projector";
 export * from "./operation-catalog";
 export * from "./operation-guard";
+export * from "./operations/platform-migrations/migration-apply";
+export * from "./operations/platform-migrations/migration-bundle";
+export * from "./operations/platform-migrations/migration-cleanup";
+export * from "./operations/platform-migrations/migration-plan";
+export * from "./operations/platform-migrations/migration-readback";
 export {
   type OperationInputValidationPhase,
   operationInputValidationDetails,
@@ -73,6 +78,9 @@ export * from "./operator-work-handlers";
 export * from "./operator-work-messages";
 export * from "./organization-handlers";
 export * from "./organization-messages";
+export * from "./platform-migration-coordinator";
+export * from "./platform-migration-handlers";
+export * from "./platform-migration-messages";
 export * from "./ports";
 export * from "./preview-policy-handlers";
 export * from "./preview-policy-messages";

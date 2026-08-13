@@ -47,6 +47,11 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 
 ## Catalog
 
+- `appaloft migrate plan --input <bundle.json>` - `migrations.plan`
+- `appaloft migrate apply (--plan <plan.json> | --task <task.json>) --confirm <digest>` - `migrations.apply`
+- `appaloft migrate status --task <task.json>` - `migrations.status`
+- `appaloft migrate verify --task <task.json>` - `migrations.verify`
+- `appaloft migrate cleanup --task <task.json> --confirm <digest>` - `migrations.cleanup`
 - `appaloft agent-adapter validate <manifest>` - `agent-adapters.validate`
 - `appaloft agent-adapter install <manifest>` - `agent-adapters.install`
 - `appaloft agent-adapter list` - `agent-adapters.list`
@@ -361,6 +366,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft deployments cancel <deploymentId> --confirm <deploymentId>` - `deployments.cancel`
 - `appaloft deployments reconcile-stale <deploymentId> --state-version <stateVersion> --confirm <deploymentId>` - `deployments.reconcile-stale`
 - `appaloft deployments archive <deploymentId> --confirm <deploymentId>` - `deployments.archive`
+- `appaloft deployments cleanup-runtime <deploymentId> --confirm <deploymentId>` - `deployments.cleanup-runtime`
 - `appaloft deployments prune --before <iso>` - `deployments.prune`
 - `appaloft resource runtime stop [resourceId] [--preview <previewEnvironmentId>]` - `resources.runtime.stop`
 - `appaloft resource runtime start [resourceId] [--preview <previewEnvironmentId>]` - `resources.runtime.start`

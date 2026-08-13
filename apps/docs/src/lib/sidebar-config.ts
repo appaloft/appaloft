@@ -17,6 +17,7 @@ import { type SidebarConfigItem } from "@cloudflare/nimbus-docs/types";
 const IA_V3_GROUPS: ReadonlyArray<{ directory: string; zh: string; en: string }> = [
   { directory: "start", zh: "开始 · Start", en: "Start" },
   { directory: "deliver", zh: "日常交付 · Deliver", en: "Deliver" },
+  { directory: "migrate", zh: "平台迁移 · Migrate", en: "Migrate" },
   { directory: "servers", zh: "目标机器 · Servers", en: "Servers" },
   { directory: "configuration", zh: "配置与环境 · Configuration", en: "Configuration" },
   { directory: "access", zh: "域名与访问 · Access", en: "Access" },
