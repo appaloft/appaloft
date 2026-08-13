@@ -48,7 +48,9 @@ Agent conversation/session semantics remain inside the Adapter-owned PTY or atta
 ## Preflight
 
 Local Git inspection stays in the CLI adapter. It resolves Git root, configured upstream remote,
-branch and HEAD SHA without reading or uploading file contents. Staged, unstaged, or untracked
+branch and HEAD SHA without reading or uploading file contents. Before contacting the remote, the
+CLI prints a progress line. Remote `ls-remote` is bounded; a hang or unreachable Git host fails
+closed with recovery guidance instead of waiting silently. Staged, unstaged, or untracked
 changes; detached HEAD; missing upstream; and a remote branch tip different from HEAD all fail
 before a control-plane mutation.
 

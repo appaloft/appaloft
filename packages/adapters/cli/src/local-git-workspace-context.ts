@@ -42,6 +42,32 @@ export interface RemoteGitWorkspaceRef {
 
 const execFileAsync = promisify(execFile);
 
+export const WORKSPACE_GIT_COMMAND_TIMEOUT_MS = 15_000;
+
+export interface ResolveGitWorkspaceProgress {
+  readonly onProgress?: (message: string) => void;
+}
+
+function isGitTimeoutError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  const record = error as { killed?: unknown; code?: unknown; details?: { code?: unknown } };
+  return (
+    record.killed === true ||
+    record.code === "ETIMEDOUT" ||
+    record.details?.code === "workspace_git_remote_timeout"
+  );
+}
+
+function remoteGitTimeoutError(gitCommand: string) {
+  return domainError.infra("Timed out contacting the remote Git repository", {
+    code: "workspace_git_remote_timeout",
+    gitCommand,
+    guidance: "Check network, VPN, or Git hosting access, then retry.",
+  });
+}
+
 const defaultWorkspaceGitCommandRunner: WorkspaceGitCommandRunner = async ({ args, cwd }) => {
   try {
     const result = await execFileAsync("git", [...args], {
@@ -52,12 +78,17 @@ const defaultWorkspaceGitCommandRunner: WorkspaceGitCommandRunner = async ({ arg
         GIT_TERMINAL_PROMPT: "0",
       },
       maxBuffer: 1024 * 1024,
+      timeout: WORKSPACE_GIT_COMMAND_TIMEOUT_MS,
+      killSignal: "SIGKILL",
     });
     return {
       stdout: result.stdout,
       stderr: result.stderr,
     };
   } catch (error) {
+    if (isGitTimeoutError(error)) {
+      throw remoteGitTimeoutError(args[0] ?? "git");
+    }
     const failure = error as { stderr?: unknown; message?: unknown };
     throw domainError.validation("Unable to resolve local Git Workspace context", {
       code: "workspace_git_context_unavailable",
@@ -78,7 +109,10 @@ async function gitText(
   try {
     const result = await runGit({ cwd, args });
     return result.stdout.trim();
-  } catch {
+  } catch (error) {
+    if (isGitTimeoutError(error)) {
+      throw remoteGitTimeoutError(args[0] ?? "git");
+    }
     throw domainError.validation(message, {
       code,
       ...(guidance ? { guidance } : {}),
@@ -174,6 +208,7 @@ export function normalizeWorkspaceRepositoryRemote(
 export async function resolveLocalGitWorkspaceContext(
   path = ".",
   runGit: WorkspaceGitCommandRunner = defaultWorkspaceGitCommandRunner,
+  options: ResolveGitWorkspaceProgress = {},
 ): Promise<LocalGitWorkspaceContext> {
   const selectedPath = path.trim();
   if (!selectedPath || selectedPath.includes("\0") || /[\r\n]/u.test(selectedPath)) {
@@ -256,12 +291,14 @@ export async function resolveLocalGitWorkspaceContext(
     "Current Git upstream remote has no repository URL",
   );
   const normalizedRemoteValue = normalizeWorkspaceRepositoryRemote(remote);
+  options.onProgress?.("Checking the remote Git branch…");
   const remoteTip = await gitText(
     runGit,
     root,
     ["ls-remote", "--exit-code", remoteName, ref],
     "workspace_git_remote_ref_unavailable",
     "Remote Git branch cannot be resolved without prompting",
+    "Check network, VPN, or Git hosting access, then retry.",
   );
   const remoteSha = exactGitSha(
     remoteTip.split(/\s+/u)[0] ?? "",
@@ -295,6 +332,7 @@ export async function resolveRemoteGitWorkspaceRef(
   repository: string,
   ref: string,
   runGit: WorkspaceGitCommandRunner = defaultWorkspaceGitCommandRunner,
+  options: ResolveGitWorkspaceProgress = {},
 ): Promise<RemoteGitWorkspaceRef> {
   const normalized = normalizeWorkspaceRepositoryRemote(repository);
   if (normalized.credentialFreeHttps !== repository.trim()) {
@@ -315,12 +353,14 @@ export async function resolveRemoteGitWorkspaceRef(
       code: "workspace_git_ref_invalid",
     });
   }
+  options.onProgress?.("Checking the remote Git ref…");
   const remoteTip = await gitText(
     runGit,
     process.cwd(),
     ["ls-remote", "--exit-code", normalized.credentialFreeHttps, selectedRef],
     "workspace_git_remote_ref_unavailable",
     "Remote Git ref cannot be resolved without prompting",
+    "Check network, VPN, or Git hosting access, then retry.",
   );
   const lines = remoteTip.split("\n").filter(Boolean);
   if (lines.length !== 1) {

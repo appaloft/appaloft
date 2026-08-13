@@ -40,6 +40,7 @@ import {
   TransferWorkspaceWriterLeaseCommand,
   type WorkspaceOpenResult,
 } from "@appaloft/application";
+import { createCliLogRenderer } from "@appaloft/cli-logging";
 import { type DomainError, domainError } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
@@ -221,7 +222,7 @@ const create = EffectCommand.make(
       const cli = yield* CliRuntime;
       const source = yield* Effect.tryPromise({
         try: () =>
-          (cli.resolveRemoteWorkspaceGitRef ?? resolveRemoteGitWorkspaceRef)(repository, ref),
+          (cli.resolveRemoteWorkspaceGitRef ?? resolveCreateWorkspaceGitRef)(repository, ref),
         catch: (error) => workspaceCliError(error, "workspace-create-git-ref"),
       });
       const command = yield* resultToEffect(
@@ -247,6 +248,22 @@ const create = EffectCommand.make(
   ),
 );
 
+function reportWorkspaceGitProgress(message: string): void {
+  createCliLogRenderer().plain({ level: "info", message });
+}
+
+function resolveOpenWorkspaceGitContext(path: string) {
+  return resolveLocalGitWorkspaceContext(path, undefined, {
+    onProgress: reportWorkspaceGitProgress,
+  });
+}
+
+function resolveCreateWorkspaceGitRef(repository: string, ref: string) {
+  return resolveRemoteGitWorkspaceRef(repository, ref, undefined, {
+    onProgress: reportWorkspaceGitProgress,
+  });
+}
+
 function makeWorkspaceOpenCommand(name: "code" | "open") {
   return EffectCommand.make(
     name,
@@ -260,7 +277,7 @@ function makeWorkspaceOpenCommand(name: "code" | "open") {
       Effect.gen(function* () {
         const cli = yield* CliRuntime;
         const source = yield* Effect.tryPromise({
-          try: () => (cli.resolveLocalWorkspaceGitContext ?? resolveLocalGitWorkspaceContext)(path),
+          try: () => (cli.resolveLocalWorkspaceGitContext ?? resolveOpenWorkspaceGitContext)(path),
           catch: (error) => workspaceCliError(error, "workspace-open-git-context"),
         });
         const attach = !noAttach;
