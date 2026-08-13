@@ -15,7 +15,7 @@
 | MIG-COMPOSE-011 | real e2e | multi-service migration/recovery/cleanup | `apps/shell/test/e2e/platform-migration-compose.workflow.e2e.ts` | passing |
 | MIG-STATEFUL-012 | real e2e | dependency/volume/domain/TLS/backup/restore/exit | `apps/shell/test/e2e/platform-migration-stateful.workflow.e2e.ts` | passing |
 | MIG-AUTH-013 | integration | role/tenant/entitlement/secret safety | `packages/orpc/test/platform-migration.http.test.ts`; `packages/adapters/cli/test/migration-secret-resolver.test.ts`; Cloud composed authz/entitlement tests | passing |
-| MIG-COMPAT-014 | contract | existing operation compatibility/no duplicate lifecycle | operation catalog, docs registry, full public gates; final public/private Boundary Review still required before Cloud delivery | partial |
+| MIG-COMPAT-014 | contract | existing operation compatibility/no duplicate lifecycle | operation catalog, docs registry, full public gates and final public/private Boundary Review | passing |
 
 No R4 completion claim is permitted until `MIG-WEB-010`, `MIG-COMPOSE-011` and
 `MIG-STATEFUL-012` have current real evidence with exact cleanup.
@@ -29,5 +29,9 @@ No R4 completion claim is permitted until `MIG-WEB-010`, `MIG-COMPOSE-011` and
 - Public gates: `bun run lint`, `bun run typecheck`, `bun run test`, and `bun run build` passed.
 - Docs-impact outcome: new complete bilingual task page and stable anchor
   `/docs/migrate/platform/#platform-migration`, registered as `migration.platform`; no migration gap.
-- `MIG-COMPAT-014` remains `partial` until the public PR is merged, Cloud pins its final `main` SHA,
-  and the independent public/private Boundary Review returns `PASS`.
+- Public implementation PR #1090 merged at `c4a0a4203759380566034c53fa77d420b9a0fe3e` after
+  Biome, typecheck, unit/integration, two E2E shards, build/smoke and six native Workspace TUI target
+  checks passed.
+- Cloud pinned that public `main` SHA; composed authz/admission/secret tests passed, and the
+  independent Public/Private Boundary Review returned `PASS`. It found no private migration type,
+  table, operation, adapter, DTO, repository or service and no P0/P1/P2 finding.
