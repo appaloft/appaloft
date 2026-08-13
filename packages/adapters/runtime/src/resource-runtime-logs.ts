@@ -924,6 +924,7 @@ export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader
             );
           }
           const connection = await this.kubernetesConnectionResolver.resolve({
+            context,
             connectionReference: profile.connectionReference,
             ...(profile.credentialReference
               ? { credentialReference: profile.credentialReference }

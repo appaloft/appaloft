@@ -774,6 +774,7 @@ export class RuntimeResourceHealthProbeRunner implements ResourceHealthProbeRunn
       );
     }
     const connection = await this.kubernetesConnectionResolver.resolve({
+      context,
       connectionReference: profile.connectionReference,
       ...(profile.credentialReference
         ? { credentialReference: profile.credentialReference }

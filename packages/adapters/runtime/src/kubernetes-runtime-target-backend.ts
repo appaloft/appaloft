@@ -56,6 +56,7 @@ export interface KubernetesResolvedConnection {
 }
 
 export interface KubernetesConnectionResolverInput {
+  context: ExecutionContext;
   connectionReference: string;
   credentialReference?: string;
 }
@@ -472,6 +473,7 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
     }
 
     const resolved = await this.connectionResolver.resolve({
+      context,
       connectionReference: profile.connectionReference,
       ...(profile.credentialReference
         ? { credentialReference: profile.credentialReference }
@@ -641,7 +643,7 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
   ): Promise<Result<{ deployment: Deployment }>> {
     const targetResult = await this.targetForDeployment(context, deployment);
     if (targetResult.isErr()) return err(targetResult.error);
-    const connectionResult = await this.resolveConnection(targetResult.value);
+    const connectionResult = await this.resolveConnection(context, targetResult.value);
     if (connectionResult.isErr()) return err(connectionResult.error);
 
     const state = requireServerBackedDeploymentState(deployment, "kubernetes execution");
@@ -789,7 +791,7 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
   ): Promise<Result<{ timeline: DeploymentTimelineJournalEntry[] }>> {
     const targetResult = await this.targetForDeployment(context, deployment);
     if (targetResult.isErr()) return err(targetResult.error);
-    const connectionResult = await this.resolveConnection(targetResult.value);
+    const connectionResult = await this.resolveConnection(context, targetResult.value);
     if (connectionResult.isErr()) return err(connectionResult.error);
     const state = requireServerBackedDeploymentState(deployment, "kubernetes cleanup");
     const cleanupIdentity = this.cleanupIdentity(context, deployment);
@@ -853,6 +855,7 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
   }
 
   private async resolveConnection(
+    context: ExecutionContext,
     target: DeploymentTargetState,
   ): Promise<Result<KubernetesResolvedConnection>> {
     const profile = target.runtimeTargetProfile?.toSnapshot();
@@ -864,6 +867,7 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
       );
     }
     return await this.connectionResolver.resolve({
+      context,
       connectionReference: profile.connectionReference,
       ...(profile.credentialReference
         ? { credentialReference: profile.credentialReference }

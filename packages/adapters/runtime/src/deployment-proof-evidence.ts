@@ -773,6 +773,7 @@ export class RuntimeDeploymentProofEvidenceReader implements DeploymentProofRunt
         return ok(unavailable(deployment, "kubernetes_runtime_target_profile_unavailable"));
       }
       const connection = await this.kubernetesConnectionResolver.resolve({
+        context,
         connectionReference: profile.connectionReference,
         ...(profile.credentialReference
           ? { credentialReference: profile.credentialReference }
