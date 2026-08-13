@@ -84,6 +84,41 @@ describe("local Git Workspace context", () => {
     expect(commands.some((command) => command.startsWith("ls-remote"))).toBe(false);
   });
 
+  test("[WS-OPEN-GIT-004] rejects a detached HEAD before inspecting remotes", async () => {
+    const commands: string[] = [];
+    const runGit: WorkspaceGitCommandRunner = async ({ args }) => {
+      const key = args.join(" ");
+      commands.push(key);
+      if (key === "rev-parse --show-toplevel") {
+        return { stdout: "/work/repository\n", stderr: "" };
+      }
+      if (key === "rev-parse HEAD") {
+        return {
+          stdout: "0123456789abcdef0123456789abcdef01234567\n",
+          stderr: "",
+        };
+      }
+      if (key === "status --porcelain=v1 --untracked-files=all") {
+        return { stdout: "", stderr: "" };
+      }
+      if (key === "symbolic-ref --quiet --short HEAD") {
+        throw new Error("fatal: ref HEAD is not a symbolic ref");
+      }
+      throw new Error(`Unexpected git command: ${key}`);
+    };
+
+    await expect(resolveLocalGitWorkspaceContext(".", runGit)).rejects.toMatchObject({
+      code: "validation_error",
+      message: "Git HEAD is detached; check out a pushed branch before opening a Workspace",
+      details: {
+        code: "workspace_git_detached",
+        guidance: "Check out a pushed branch, then retry workspace open.",
+      },
+    });
+    expect(commands.some((command) => command.startsWith("ls-remote"))).toBe(false);
+    expect(commands.some((command) => command.startsWith("config --get remote."))).toBe(false);
+  });
+
   test("[WS-OPEN-GIT-004] rejects a local HEAD that differs from the upstream tip", async () => {
     const localSha = "0123456789abcdef0123456789abcdef01234567";
     const remoteSha = "1123456789abcdef0123456789abcdef01234567";

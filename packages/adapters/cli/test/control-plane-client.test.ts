@@ -2568,8 +2568,8 @@ describe("CLI remote control-plane client", () => {
     expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
       ["GET /api/version", "GET /api/organizations/current-context", "GET /api/projects"],
     );
-    expect(output.stderr).toContain("product_auth_missing");
-    expect(output.stderr).toContain("remote-operation-dispatch");
+    expect(output.stderr).toContain("login required");
+    expect(output.stderr).not.toContain("product_auth_missing");
   });
 
   test("[CONTROL-PLANE-MODE-002][CONTROL-PLANE-MODE-005] explicit none and config none preserve pure local mode even with an active profile", async () => {

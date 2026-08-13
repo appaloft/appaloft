@@ -361,6 +361,33 @@ export function formatSafeCliError(error: unknown): string {
   return `${JSON.stringify(safeCliErrorEvidence(error))}\n`;
 }
 
+function humanErrorGuidance(error: DomainError): string | null {
+  const guidance = error.details?.guidance;
+  if (typeof guidance === "string") {
+    const trimmed = guidance.trim();
+    if (trimmed && trimmed !== error.message.trim()) {
+      return trimmed;
+    }
+  }
+
+  const firstSafeRemedy = error.knowledge?.remedies?.find((remedy) => remedy.safeByDefault);
+  const remedy = firstSafeRemedy?.label?.trim();
+  return remedy && remedy !== error.message.trim() ? remedy : null;
+}
+
+export function formatHumanCliError(error: unknown): string {
+  if (isDomainError(error)) {
+    const lines = [error.message.trim()].filter((line) => line.length > 0);
+    const guidance = humanErrorGuidance(error);
+    if (guidance) {
+      lines.push(guidance);
+    }
+    return `${lines.join("\n")}\n`;
+  }
+
+  return "Command failed\n";
+}
+
 export const resultToEffect = <T>(result: Result<T>): Effect.Effect<T, DomainError> =>
   result.match<Effect.Effect<T, DomainError>>(
     (value) => Effect.succeed(value),
@@ -921,16 +948,8 @@ export const printCliError = (error: unknown) =>
     }
 
     createCliLogRenderer().plain({
-      label: "error",
       level: "error",
-      message:
-        JSON.stringify(
-          {
-            error,
-          },
-          null,
-          2,
-        ) ?? String(error),
+      message: formatHumanCliError(error).trimEnd(),
     });
     process.exitCode = 1;
   });

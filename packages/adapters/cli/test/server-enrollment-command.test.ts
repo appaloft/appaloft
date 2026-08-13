@@ -323,8 +323,8 @@ describe("CLI server enrollment", () => {
 
     expect(stdout).toContain('"schemaVersion": "server-enrollment-checkpoint/v1"');
     expect(stdout).toContain('"serverId": "srv_recover"');
-    expect(stderr).toContain('"code": "infra_error"');
-    expect(stderr).toContain('"phase": "server-connectivity"');
+    expect(stderr).toContain("SSH connectivity failed");
+    expect(stderr).not.toContain('"code": "infra_error"');
     expect(commands.some((command) => command.constructor.name === "DeleteServerCommand")).toBe(
       false,
     );

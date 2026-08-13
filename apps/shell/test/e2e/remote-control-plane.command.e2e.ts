@@ -250,7 +250,7 @@ describe("remote control-plane CLI e2e", () => {
         cliOptions,
       );
       expectStructuredCliFailure(missingDeployment, "deployment show missing id");
-      expect(missingDeployment.stderr).toContain("not_found");
+      expect(missingDeployment.stderr).toContain("was not found");
       expect(missingDeployment.stderr).toContain("dep_missing_remote_cli_route");
     } finally {
       await server.stop();
@@ -284,14 +284,7 @@ describe("remote control-plane CLI e2e", () => {
       );
 
       expect(result.exitCode).not.toBe(0);
-      expect(result.stderr).toContain("control_plane_unexpected_html_response");
-      expect(result.stderr).toContain("method");
-      expect(result.stderr).toContain("GET");
-      expect(result.stderr).toContain(`${baseUrl}/api/version`);
-      expect(result.stderr).toContain("status");
-      expect(result.stderr).toContain("200");
-      expect(result.stderr).toContain("contentType");
-      expect(result.stderr).toContain("text/html");
+      expect(result.stderr).toContain("Control plane returned HTML instead of JSON");
       expect(result.stderr).not.toContain("<!doctype html>");
       expect(result.stderr).not.toContain("<html");
       expect(result.stdout).not.toContain("<!doctype html>");

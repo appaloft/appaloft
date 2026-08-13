@@ -22,13 +22,13 @@ afterEach(() => {
   }
 });
 
-function expectCliDomainBlocker(result: CliResult, label: string, code: string): void {
+function expectCliDomainBlocker(result: CliResult, label: string, message: string): void {
   expect(
     result.exitCode,
     `${label}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
   ).not.toBe(0);
   const output = `${result.stdout}\n${result.stderr}`;
-  expect(output, label).toContain(code);
+  expect(output, label).toContain(message);
   expect(output, label).not.toContain("server_error");
   expect(output, label).not.toContain("internal_server_error");
   expect(output, label).not.toContain("<!doctype html>");
@@ -172,7 +172,7 @@ describe("archive and delete lifecycle CLI e2e", () => {
           cliOptions,
         ),
         "active server delete",
-        "server_delete_blocked",
+        "Server deletion is blocked by retained state",
       );
 
       const historyProject = runRemoteCli(
@@ -310,12 +310,12 @@ describe("archive and delete lifecycle CLI e2e", () => {
       expectCliDomainBlocker(
         historyServerDelete,
         "inactive server with deployment history delete",
-        "server_delete_blocked",
+        "Server deletion is blocked by retained state",
       );
       expectCliOutputContains(
         historyServerDelete,
         "inactive server with deployment history delete",
-        "deployment-history",
+        "Server deletion is blocked by retained state",
       );
 
       const archivedProject = runRemoteCli(
@@ -355,7 +355,7 @@ describe("archive and delete lifecycle CLI e2e", () => {
           cliOptions,
         ),
         "archived project with resource delete",
-        "project_delete_blocked",
+        "Project deletion is blocked by retained state",
       );
 
       expectCliDomainBlocker(
@@ -365,7 +365,7 @@ describe("archive and delete lifecycle CLI e2e", () => {
           cliOptions,
         ),
         "active resource delete",
-        "resource_delete_blocked",
+        "Resource deletion is blocked by retained state",
       );
 
       const archivedResource = runRemoteCli(
