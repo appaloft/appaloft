@@ -303,7 +303,8 @@ describe("KubernetesRuntimeTargetBackend readiness", () => {
     const runner = new RecordingKubernetesCommandRunner();
     const resolver: KubernetesConnectionResolver = {
       resolve: async (input) => {
-        expect(input).toEqual({
+        expect(input).toMatchObject({
+          context: expect.objectContaining({ requestId: "req_r5a_ready" }),
           connectionReference: "connection://cluster/r5a",
           credentialReference: "secret://cluster/r5a",
         });

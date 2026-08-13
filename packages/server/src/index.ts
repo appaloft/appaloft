@@ -8,6 +8,7 @@ import {
   type SshRemoteStateTarget,
 } from "@appaloft/adapter-cli";
 import { createHttpApp } from "@appaloft/adapter-http-elysia";
+import { type KubernetesConnectionResolver } from "@appaloft/adapter-runtime";
 import {
   type ActionDeployTokenAuthorizationPort,
   type AppLogger,
@@ -283,6 +284,7 @@ export interface AppaloftServerOptions {
   authRuntime?: AuthRuntime;
   extensions?: readonly AppaloftServerExtension[];
   systemPlugins?: readonly SystemPluginDefinition[];
+  kubernetesConnectionResolver?: KubernetesConnectionResolver;
 }
 
 interface RequestContextRunnerOptions {
@@ -1715,6 +1717,9 @@ export async function createAppaloftServer(
         }
       : {}),
     resourceAccessFailureRenderer: () => resourceAccessFailureRendererTarget,
+    ...(options.kubernetesConnectionResolver
+      ? { kubernetesConnectionResolver: options.kubernetesConnectionResolver }
+      : {}),
   });
 
   const containerContext: AppaloftServerContainerContext = {

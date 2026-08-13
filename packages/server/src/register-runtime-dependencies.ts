@@ -23,6 +23,7 @@ import {
   DockerSwarmShellCommandRunner,
   FileKubernetesConnectionResolver,
   InMemoryExecutionBackend,
+  type KubernetesConnectionResolver,
   KubernetesRuntimeTargetBackend,
   KubernetesShellCommandRunner,
   LocalAgentTunnelProvider,
@@ -977,6 +978,7 @@ export interface RegisterRuntimeDependenciesInput {
   storageVolumeBackupPolicyRepository?: StorageVolumeBackupPolicyRepository;
   resourceAccessFailureRenderer?: () => ResourceAccessFailureRendererTarget | undefined;
   systemPlugins?: readonly SystemPluginDefinition[];
+  kubernetesConnectionResolver?: KubernetesConnectionResolver;
 }
 
 export function registerRuntimeDependencies(
@@ -1917,7 +1919,7 @@ export function registerRuntimeDependencies(
           : {}),
         kubernetesBackend: new KubernetesRuntimeTargetBackend(
           new KubernetesShellCommandRunner(),
-          new FileKubernetesConnectionResolver(),
+          input.kubernetesConnectionResolver ?? new FileKubernetesConnectionResolver(),
           dependencyContainer.resolve(tokens.serverRepository),
           dependencyContainer.resolve(tokens.dependencyResourceSecretStore),
           dependencyContainer.resolve(tokens.controlPlaneSecretProtector),
@@ -1942,13 +1944,21 @@ export function registerRuntimeDependencies(
       (dependencyContainer) =>
         new RuntimeDeploymentProofEvidenceReader(
           dependencyContainer.resolve(tokens.serverRepository),
+          undefined,
+          undefined,
+          input.kubernetesConnectionResolver ?? new FileKubernetesConnectionResolver(),
         ),
     ),
   });
   container.register(tokens.resourceRuntimeLogReader, {
     useFactory: instanceCachingFactory(
       (dependencyContainer) =>
-        new RuntimeResourceRuntimeLogReader(dependencyContainer.resolve(tokens.serverRepository)),
+        new RuntimeResourceRuntimeLogReader(
+          dependencyContainer.resolve(tokens.serverRepository),
+          undefined,
+          {},
+          input.kubernetesConnectionResolver ?? new FileKubernetesConnectionResolver(),
+        ),
     ),
   });
   container.register(tokens.resourceRuntimeControlTargetPort, {
@@ -1981,6 +1991,7 @@ export function registerRuntimeDependencies(
         new RuntimeResourceHealthProbeRunner(
           undefined,
           dependencyContainer.resolve(tokens.serverRepository),
+          input.kubernetesConnectionResolver ?? new FileKubernetesConnectionResolver(),
         ),
     ),
   });
