@@ -107,11 +107,14 @@ export * from "./opencode-sandbox-agent-harness";
 export * from "./command-sandbox-agent-harness";
 export * from "./development-session";
 export * from "./server-worker-relay-adapters";
+export * from "./kubernetes-runtime-target-backend";
+export * from "./kubernetes-runtime-intent";
 
 export { RuntimeServerConnectivityChecker } from "./server-connectivity";
 export { RuntimeDeploymentHealthChecker } from "./deployment-health";
 export {
   deploymentProofEvidenceFromDockerInspect,
+  deploymentProofEvidenceFromKubernetesDeployment,
   readDeploymentProofManagedRouteEvidence,
   runDeploymentProofCommand,
   RuntimeDeploymentProofEvidenceReader,
@@ -119,6 +122,7 @@ export {
   type DeploymentProofCommandRunner,
   type DeploymentProofIdentityFileOperations,
   type DockerInspectState,
+  type KubernetesDeploymentState,
   type DeploymentProofRouteFetch,
 } from "./deployment-proof-evidence";
 export { RuntimeResourceHealthProbeRunner } from "./resource-health-probes";
@@ -1784,6 +1788,7 @@ export function createDefaultRuntimeTargetBackendRegistry(input: {
   localBackend: ExecutionBackend;
   sshBackend: ExecutionBackend;
   swarmBackend?: RuntimeTargetBackend;
+  kubernetesBackend?: RuntimeTargetBackend;
 }): RuntimeTargetBackendRegistry {
   return new DefaultRuntimeTargetBackendRegistry([
     new ExecutionBackendRuntimeTargetAdapter(
@@ -1805,6 +1810,7 @@ export function createDefaultRuntimeTargetBackendRegistry(input: {
       input.sshBackend,
     ),
     ...(input.swarmBackend ? [input.swarmBackend] : []),
+    ...(input.kubernetesBackend ? [input.kubernetesBackend] : []),
   ]);
 }
 
@@ -1817,7 +1823,7 @@ export class RoutingExecutionBackend implements ExecutionBackend {
   private backendFor(
     deployment: Deployment,
     requiredCapabilities: RuntimeTargetCapability[],
-  ): ExecutionBackend {
+  ): Result<ExecutionBackend> {
     const target = deployment.toState().runtimePlan.target;
     const backend = this.registry.find({
       targetKind: target.kind,
@@ -1826,27 +1832,36 @@ export class RoutingExecutionBackend implements ExecutionBackend {
     });
 
     if (backend.isOk()) {
-      return backend.value;
+      return ok(backend.value);
     }
 
-    return this.fallbackBackend;
+    if (target.kind === "single-server") {
+      return ok(this.fallbackBackend);
+    }
+
+    return err(backend.error);
   }
 
   async execute(
     context: ExecutionContext,
     deployment: Deployment,
   ): Promise<Result<{ deployment: Deployment }>> {
-    return await this.backendFor(deployment, ["runtime.apply", "runtime.verify"]).execute(
-      context,
-      deployment,
-    );
+    const backend = this.backendFor(deployment, ["runtime.apply", "runtime.verify"]);
+    if (backend.isErr()) {
+      return err(backend.error);
+    }
+    return await backend.value.execute(context, deployment);
   }
 
   async cancel(
     context: ExecutionContext,
     deployment: Deployment,
   ): Promise<Result<{ timeline: DeploymentTimelineJournalEntry[] }>> {
-    return await this.backendFor(deployment, ["runtime.cleanup"]).cancel(context, deployment);
+    const backend = this.backendFor(deployment, ["runtime.cleanup"]);
+    if (backend.isErr()) {
+      return err(backend.error);
+    }
+    return await backend.value.cancel(context, deployment);
   }
 
   async rollback(
@@ -1854,11 +1869,11 @@ export class RoutingExecutionBackend implements ExecutionBackend {
     deployment: Deployment,
     plan: RollbackPlan,
   ): Promise<Result<{ deployment: Deployment }>> {
-    return await this.backendFor(deployment, ["runtime.cleanup"]).rollback(
-      context,
-      deployment,
-      plan,
-    );
+    const backend = this.backendFor(deployment, ["runtime.cleanup"]);
+    if (backend.isErr()) {
+      return err(backend.error);
+    }
+    return await backend.value.rollback(context, deployment, plan);
   }
 }
 

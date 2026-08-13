@@ -387,6 +387,9 @@ export const tokens = {
   configureServerWorkloadRolesUseCase: Symbol.for(
     "appaloft.configure_server_workload_roles_use_case",
   ),
+  configureServerRuntimeTargetProfileUseCase: Symbol.for(
+    "appaloft.configure_server_runtime_target_profile_use_case",
+  ),
   createSshCredentialUseCase: Symbol.for("appaloft.create_ssh_credential_use_case"),
   countServersQueryService: Symbol.for("appaloft.count_servers_query_service"),
   reorderServersUseCase: Symbol.for("appaloft.reorder_servers_use_case"),
@@ -395,6 +398,9 @@ export const tokens = {
   listServersQueryService: Symbol.for("appaloft.list_servers_query_service"),
   showServerQueryService: Symbol.for("appaloft.show_server_query_service"),
   inspectServerCapacityQueryService: Symbol.for("appaloft.inspect_server_capacity_query_service"),
+  inspectServerRuntimeReadinessQueryService: Symbol.for(
+    "appaloft.inspect_server_runtime_readiness_query_service",
+  ),
   runtimeUsageInspectionQueryService: Symbol.for("appaloft.runtime_usage_inspection_query_service"),
   listRuntimeMonitoringSamplesQueryService: Symbol.for(
     "appaloft.list_runtime_monitoring_samples_query_service",

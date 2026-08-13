@@ -926,6 +926,25 @@ export const serverWorkloadRoleSchema = z.enum([
   "sandbox-worker",
 ]);
 
+export const runtimeTargetProfileReferenceSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(512)
+  .regex(/^[a-z][a-z0-9+.-]*:\/\/\S+$/i);
+
+export const runtimeTargetProfileSchema = z
+  .object({
+    schemaVersion: z.literal("runtime-target-profile/v1"),
+    connectionReference: runtimeTargetProfileReferenceSchema,
+    credentialReference: runtimeTargetProfileReferenceSchema.optional(),
+    placementPolicyReference: runtimeTargetProfileReferenceSchema.optional(),
+    routingPolicyReference: runtimeTargetProfileReferenceSchema.optional(),
+    registryCredentialReference: runtimeTargetProfileReferenceSchema.optional(),
+    capabilityPolicyReference: runtimeTargetProfileReferenceSchema.optional(),
+  })
+  .strict();
+
 export const serverSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -954,6 +973,7 @@ export const serverSummarySchema = z.object({
       message: z.string().optional(),
     })
     .optional(),
+  runtimeTargetProfile: runtimeTargetProfileSchema.optional(),
   displayOrder: z.number().int().nonnegative().optional(),
   credential: z
     .object({
@@ -1049,6 +1069,56 @@ export const configureServerWorkloadRolesResponseSchema = z.object({
   workloadRoles: z.array(serverWorkloadRoleSchema),
   changed: z.boolean(),
 });
+
+export const configureServerRuntimeTargetProfileInputSchema = z
+  .object({
+    serverId: z.string().trim().min(1),
+    connectionReference: runtimeTargetProfileReferenceSchema,
+    credentialReference: runtimeTargetProfileReferenceSchema.optional(),
+    placementPolicyReference: runtimeTargetProfileReferenceSchema.optional(),
+    routingPolicyReference: runtimeTargetProfileReferenceSchema.optional(),
+    registryCredentialReference: runtimeTargetProfileReferenceSchema.optional(),
+    capabilityPolicyReference: runtimeTargetProfileReferenceSchema.optional(),
+  })
+  .strict();
+
+export const configureServerRuntimeTargetProfileResponseSchema = z.object({
+  profile: runtimeTargetProfileSchema,
+  changed: z.boolean(),
+});
+
+export const inspectServerRuntimeReadinessInputSchema = z
+  .object({
+    serverId: z.string().trim().min(1),
+  })
+  .strict();
+
+export const runtimeTargetReadinessCheckSchema = z
+  .object({
+    capability: z.enum([
+      "api-reachability",
+      "version",
+      "authorization",
+      "namespace-isolation",
+      "routing",
+      "storage",
+    ]),
+    status: z.enum(["ready", "blocked", "unsupported"]),
+    reasonCode: z.string().trim().min(1).optional(),
+    message: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
+export const inspectServerRuntimeReadinessResponseSchema = z
+  .object({
+    schemaVersion: z.literal("servers.runtime-readiness/v1"),
+    serverId: z.string().trim().min(1),
+    targetKind: z.literal("orchestrator-cluster"),
+    status: z.enum(["ready", "blocked"]),
+    checks: z.array(runtimeTargetReadinessCheckSchema),
+    checkedAt: z.string().datetime(),
+  })
+  .strict();
 
 export const deactivateServerInputSchema = z.object({
   serverId: z.string().min(1),
@@ -7938,6 +8008,12 @@ export type ConfigureServerEdgeProxyInput = z.infer<typeof configureServerEdgePr
 export type ConfigureServerWorkloadRolesInput = z.infer<
   typeof configureServerWorkloadRolesInputSchema
 >;
+export type ConfigureServerRuntimeTargetProfileInput = z.infer<
+  typeof configureServerRuntimeTargetProfileInputSchema
+>;
+export type InspectServerRuntimeReadinessInput = z.infer<
+  typeof inspectServerRuntimeReadinessInputSchema
+>;
 export type DeactivateServerInput = z.infer<typeof deactivateServerInputSchema>;
 export type DeleteServerInput = z.infer<typeof deleteServerInputSchema>;
 export type CheckServerDeleteSafetyInput = z.infer<typeof checkServerDeleteSafetyInputSchema>;
@@ -8041,6 +8117,13 @@ export type ConfigureServerEdgeProxyResponse = z.infer<
 >;
 export type ConfigureServerWorkloadRolesResponse = z.infer<
   typeof configureServerWorkloadRolesResponseSchema
+>;
+export type RuntimeTargetProfile = z.infer<typeof runtimeTargetProfileSchema>;
+export type ConfigureServerRuntimeTargetProfileResponse = z.infer<
+  typeof configureServerRuntimeTargetProfileResponseSchema
+>;
+export type InspectServerRuntimeReadinessResponse = z.infer<
+  typeof inspectServerRuntimeReadinessResponseSchema
 >;
 export type DeactivateServerResponse = z.infer<typeof deactivateServerResponseSchema>;
 export type DeleteServerResponse = z.infer<typeof deleteServerResponseSchema>;

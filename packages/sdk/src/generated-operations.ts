@@ -6481,6 +6481,25 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "servers.configure-runtime-target-profile",
+    operationGroup: "servers",
+    operationMethod: "configureRuntimeTargetProfile",
+    facadePath: ["servers", "configureRuntimeTargetProfile"],
+    operationId: "servers.configureRuntimeTargetProfile",
+    kind: "command",
+    domain: "servers",
+    messageName: "ConfigureServerRuntimeTargetProfileCommand",
+    route: {
+      method: "POST",
+      path: "/servers/{serverId}/runtime-target-profile",
+    },
+    docsHref: "/docs/servers/register-connect/#server-runtime-target-profile",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "servers.configure-workload-roles",
     operationGroup: "servers",
     operationMethod: "configureWorkloadRoles",
@@ -6665,6 +6684,25 @@ export const generatedSdkOperations = [
       path: "/servers/reorder",
     },
     docsHref: "/docs/servers/register-connect/#server-deployment-target",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "servers.runtime-readiness",
+    operationGroup: "servers",
+    operationMethod: "runtimeReadiness",
+    facadePath: ["servers", "runtimeReadiness"],
+    operationId: "servers.runtimeReadiness",
+    kind: "query",
+    domain: "servers",
+    messageName: "InspectServerRuntimeReadinessQuery",
+    route: {
+      method: "GET",
+      path: "/servers/{serverId}/runtime-readiness",
+    },
+    docsHref: "/docs/servers/register-connect/#server-runtime-target-profile",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -8488,6 +8526,7 @@ export interface GeneratedAppaloftClient {
     };
     readonly configureCredential: AppaloftSdkFacadeMethod;
     readonly configureEdgeProxy: AppaloftSdkFacadeMethod;
+    readonly configureRuntimeTargetProfile: AppaloftSdkFacadeMethod;
     readonly configureWorkloadRoles: AppaloftSdkFacadeMethod;
     readonly count: AppaloftSdkFacadeMethod;
     readonly deactivate: AppaloftSdkFacadeMethod;
@@ -8498,6 +8537,7 @@ export interface GeneratedAppaloftClient {
     readonly register: AppaloftSdkFacadeMethod;
     readonly rename: AppaloftSdkFacadeMethod;
     readonly reorder: AppaloftSdkFacadeMethod;
+    readonly runtimeReadiness: AppaloftSdkFacadeMethod;
     readonly show: AppaloftSdkFacadeMethod;
     readonly testConnectivity: AppaloftSdkFacadeMethod;
     readonly testDraftConnectivity: AppaloftSdkFacadeMethod;

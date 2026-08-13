@@ -467,6 +467,14 @@ export const cliCommandDescriptions = {
     "Replace the complete server workload role set for new placement; repeat --workload-role with deployment-runtime, artifact-builder, or sandbox-worker, or omit it for General purpose (all workload types)",
     "server.workload-roles",
   ),
+  serverConfigureRuntimeTargetProfile: withDocs(
+    "Configure an existing cluster using opaque connection, credential, placement, routing, registry, and capability references",
+    "server.runtime-target-profile",
+  ),
+  serverRuntimeReadiness: withDocs(
+    "Inspect Kubernetes API, version, authorization, namespace, routing, and storage readiness without mutating workloads",
+    "server.runtime-target-profile",
+  ),
   serverRename: withDocs("Rename a server deployment target", "server.deployment-target"),
   serverReorder: withDocs("Reorder servers for server list display", "server.deployment-target"),
   serverDeactivate: withDocs("Deactivate a server deployment target", "server.deployment-target"),

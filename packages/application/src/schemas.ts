@@ -296,6 +296,7 @@ export {
 } from "./operations/servers/configure-scheduled-runtime-prune-policy.command";
 export * from "./operations/servers/configure-server-credential.schema";
 export * from "./operations/servers/configure-server-edge-proxy.schema";
+export * from "./operations/servers/configure-server-runtime-target-profile.schema";
 export * from "./operations/servers/configure-server-workload-roles.schema";
 export * from "./operations/servers/count-servers.query";
 export * from "./operations/servers/create-ssh-credential.schema";
@@ -306,6 +307,7 @@ export {
   type InspectServerCapacityQueryInput,
   inspectServerCapacityQueryInputSchema,
 } from "./operations/servers/inspect-server-capacity.schema";
+export * from "./operations/servers/inspect-server-runtime-readiness.schema";
 export {
   type ListServersQueryInput,
   listServersQueryInputSchema,

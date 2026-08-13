@@ -40,6 +40,7 @@
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import RuntimeMonitorPanel from "$lib/components/console/RuntimeMonitorPanel.svelte";
+  import ServerRuntimeTargetPanel from "$lib/components/console/ServerRuntimeTargetPanel.svelte";
   import TerminalSessionPanel from "$lib/components/console/TerminalSessionPanel.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
@@ -1267,6 +1268,13 @@
               <p class="mt-2 font-semibold">{serverRollups.domains.total}</p>
             </div>
           </div>
+        {/if}
+
+        {#if server.targetKind === "orchestrator-cluster"}
+          <ServerRuntimeTargetPanel
+            serverId={server.id}
+            profile={server.runtimeTargetProfile}
+          />
         {/if}
 
         <section class="grid gap-4 xl:grid-cols-4" data-server-overview-operational-surfaces>

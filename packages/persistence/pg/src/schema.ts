@@ -51,8 +51,23 @@ export interface ServersTable {
   credential_username: string | null;
   credential_public_key: string | null;
   credential_private_key: string | null;
+  runtime_target_profile: ColumnType<
+    RuntimeTargetProfileRow | null,
+    RuntimeTargetProfileRow | null | undefined,
+    RuntimeTargetProfileRow | null
+  >;
   display_order: ColumnType<number, number | undefined, number>;
   created_at: TimestampColumn;
+}
+
+export interface RuntimeTargetProfileRow {
+  schemaVersion: "runtime-target-profile/v1";
+  connectionReference: string;
+  credentialReference?: string;
+  placementPolicyReference?: string;
+  routingPolicyReference?: string;
+  registryCredentialReference?: string;
+  capabilityPolicyReference?: string;
 }
 
 export interface SshCredentialsTable {

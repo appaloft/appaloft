@@ -188,6 +188,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft blueprint installation show` - `blueprints.installation.show`
 - `appaloft server register` - `servers.register`
 - `appaloft server configure-workload-roles <serverId> --workload-role <role>` - `servers.configure-workload-roles`
+- `appaloft server configure-runtime-target-profile <serverId> --connection-reference <ref> [--routing-policy-reference <ref>]` - `servers.configure-runtime-target-profile`; for public k3s Traefik use `builtin://kubernetes/ingress-controller/traefik-k3s`, which permits only the exact `kube-system` + `app.kubernetes.io/name=traefik` ingress source
 - `appaloft server credential <serverId>` - `servers.configure-credential`
 - `appaloft server credential-create` - `credentials.create-ssh`
 - `appaloft server credential-list` - `credentials.list-ssh`
@@ -197,6 +198,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft server list` - `servers.list`
 - `appaloft server count` - `servers.count`
 - `appaloft server show <serverId>` - `servers.show`
+- `appaloft server readiness <serverId>` - `servers.runtime-readiness`
 - `appaloft server capacity inspect <serverId>` - `servers.capacity.inspect`
 - `appaloft runtime-usage inspect <scope>` - `runtime-usage.inspect`
 - `appaloft runtime-monitoring samples <scope> --from <iso> --to <iso>` - `runtime-monitoring.samples.list`

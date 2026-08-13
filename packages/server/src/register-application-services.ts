@@ -142,6 +142,7 @@ import {
   ConfigureServerCredentialUseCase,
   ConfigureServerEdgeProxyCommandHandler,
   ConfigureServerEdgeProxyUseCase,
+  ConfigureServerRuntimeTargetProfileUseCase,
   ConfigureServerWorkloadRolesUseCase,
   ConfigureStorageVolumeBackupPolicyCommandHandler,
   ConfigureStorageVolumeBackupPolicyUseCase,
@@ -314,6 +315,8 @@ import {
   InspectRuntimeUsageQueryHandler,
   InspectServerCapacityQueryHandler,
   InspectServerCapacityQueryService,
+  InspectServerRuntimeReadinessQueryHandler,
+  InspectServerRuntimeReadinessQueryService,
   InviteOrganizationMemberCommandHandler,
   InviteOrganizationMemberUseCase,
   IssueCertificateOnCertificateRequestedHandler,
@@ -3301,6 +3304,7 @@ export function registerApplicationServices(
   container.registerSingleton(PlanDomainBindingDnsQueryHandler);
   container.registerSingleton(ShowSshCredentialQueryHandler);
   container.registerSingleton(InspectServerCapacityQueryHandler);
+  container.registerSingleton(InspectServerRuntimeReadinessQueryHandler);
   container.registerSingleton(PruneServerCapacityCommandHandler);
   container.registerSingleton(ConfigureScheduledRuntimePrunePolicyCommandHandler);
   container.registerSingleton(ListScheduledRuntimePrunePoliciesQueryHandler);
@@ -4644,6 +4648,10 @@ export function registerApplicationServices(
     ConfigureServerWorkloadRolesUseCase,
   );
   container.registerSingleton(
+    tokens.configureServerRuntimeTargetProfileUseCase,
+    ConfigureServerRuntimeTargetProfileUseCase,
+  );
+  container.registerSingleton(
     tokens.configureServerCredentialUseCase,
     ConfigureServerCredentialUseCase,
   );
@@ -4656,6 +4664,10 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.showSshCredentialQueryService, ShowSshCredentialQueryService);
   container.registerSingleton(tokens.listServersQueryService, ListServersQueryService);
   container.registerSingleton(tokens.showServerQueryService, ShowServerQueryService);
+  container.registerSingleton(
+    tokens.inspectServerRuntimeReadinessQueryService,
+    InspectServerRuntimeReadinessQueryService,
+  );
   container.registerSingleton(
     tokens.inspectServerCapacityQueryService,
     InspectServerCapacityQueryService,

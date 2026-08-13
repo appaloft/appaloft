@@ -41,6 +41,7 @@ import {
   type ConfigureScheduledTaskCommandInput,
   type ConfigureServerCredentialCommandInput,
   type ConfigureServerEdgeProxyCommandInput,
+  type ConfigureServerRuntimeTargetProfileCommandInput,
   type ConfigureServerWorkloadRolesCommandInput,
   type ConfigureStorageVolumeBackupPolicyCommandInput,
   type ConfigureStorageVolumeBackupPolicyResponse,
@@ -110,6 +111,7 @@ import {
   type InspectDomainBindingDnsReadinessQueryInput,
   type InspectRuntimeUsageQueryInput,
   type InspectServerCapacityQueryInput,
+  type InspectServerRuntimeReadinessQueryInput,
   type InviteOrganizationMemberCommandInput,
   type IssueOrRenewCertificateCommandInput,
   type ListAccountSessionsQueryInput,
@@ -320,6 +322,7 @@ import {
   type ConfigureRuntimeMonitoringThresholdsResponse,
   type ConfigureScheduledRuntimePrunePolicyResponse,
   type ConfigureServerEdgeProxyResponse,
+  type ConfigureServerRuntimeTargetProfileResponse,
   type ConfigureServerWorkloadRolesResponse,
   type ConfirmDomainBindingOwnershipResponse,
   type ConnectorCapabilityApplyResponse,
@@ -373,6 +376,7 @@ import {
   type ImportResourceVariablesResponse,
   type InspectRuntimeUsageResponse,
   type InspectServerCapacityResponse,
+  type InspectServerRuntimeReadinessResponse,
   type InviteOrganizationMemberResponse,
   type IssueOrRenewCertificateResponse,
   type ListAccountSessionsResponse,
@@ -1469,6 +1473,12 @@ export type AppaloftOrpcClientContract = {
       ShowServerResponse,
       AppaloftClientError
     >;
+    runtimeReadiness: Client<
+      AppaloftClientContext,
+      InspectServerRuntimeReadinessQueryInput,
+      InspectServerRuntimeReadinessResponse,
+      AppaloftClientError
+    >;
     capacity: {
       inspect: Client<
         AppaloftClientContext,
@@ -1525,6 +1535,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ConfigureServerWorkloadRolesCommandInput,
       ConfigureServerWorkloadRolesResponse,
+      AppaloftClientError
+    >;
+    configureRuntimeTargetProfile: Client<
+      AppaloftClientContext,
+      ConfigureServerRuntimeTargetProfileCommandInput,
+      ConfigureServerRuntimeTargetProfileResponse,
       AppaloftClientError
     >;
     deactivate: Client<

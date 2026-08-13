@@ -728,6 +728,39 @@ export const publicDocsHelpTopics = {
     ],
     webSurfaces: ["apps/web server registration, list, and detail workload-role surfaces"],
   },
+  "server.runtime-target-profile": {
+    id: "server.runtime-target-profile",
+    title: "Runtime target profile",
+    description:
+      "Connect an existing cluster through opaque references and inspect provider-neutral readiness without exposing provider payloads.",
+    page: {
+      "zh-CN": "servers/register-connect",
+      "en-US": "en/servers/register-connect",
+    },
+    anchor: "server-runtime-target-profile",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "servers.configure-runtime-target-profile",
+    aliases: [
+      "runtime target profile",
+      "existing kubernetes cluster",
+      "cluster connection reference",
+      "kubernetes readiness",
+      "现有 Kubernetes 集群",
+      "运行目标配置",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-114-kubernetes-runtime-target-and-scale-policy-boundary.md",
+      "docs/specs/136-kubernetes-and-scale-topology/spec.md",
+      "docs/commands/servers.configure-runtime-target-profile.md",
+      "docs/queries/servers.runtime-readiness.md",
+      "docs/testing/kubernetes-scale-topology-test-matrix.md",
+    ],
+    webSurfaces: ["apps/web server detail runtime target profile and readiness panel"],
+  },
   "blueprint.deploy-handoff": {
     id: "blueprint.deploy-handoff",
     title: "Blueprint deploy handoff",
@@ -3569,6 +3602,16 @@ export const publicDocsOperationCoverage = [
     operationKey: "servers.configure-workload-roles",
     status: "documented",
     topicId: "server.workload-roles",
+  },
+  {
+    operationKey: "servers.configure-runtime-target-profile",
+    status: "documented",
+    topicId: "server.runtime-target-profile",
+  },
+  {
+    operationKey: "servers.runtime-readiness",
+    status: "documented",
+    topicId: "server.runtime-target-profile",
   },
   {
     operationKey: "servers.configure-credential",

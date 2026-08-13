@@ -1788,6 +1788,15 @@ export interface ServerSummary {
     reasonCodes: string[];
     message?: string;
   };
+  runtimeTargetProfile?: {
+    schemaVersion: "runtime-target-profile/v1";
+    connectionReference: string;
+    credentialReference?: string;
+    placementPolicyReference?: string;
+    routingPolicyReference?: string;
+    registryCredentialReference?: string;
+    capabilityPolicyReference?: string;
+  };
   displayOrder?: number;
   credential?: {
     kind: "local-ssh-agent" | "ssh-private-key";
@@ -10474,6 +10483,7 @@ export interface ExecutionBackend {
 }
 
 export type RuntimeTargetCapability =
+  | "runtime.readiness"
   | "runtime.plan-target"
   | "runtime.apply"
   | "runtime.verify"
@@ -10493,6 +10503,10 @@ export interface RuntimeTargetBackendDescriptor {
 
 export interface RuntimeTargetBackend extends ExecutionBackend {
   readonly descriptor: RuntimeTargetBackendDescriptor;
+  inspectReadiness?(
+    context: ExecutionContext,
+    target: DeploymentTargetState,
+  ): Promise<Result<RuntimeTargetReadinessBackendInspection>>;
 }
 
 export interface RuntimeTargetBackendSelection {
@@ -10503,6 +10517,35 @@ export interface RuntimeTargetBackendSelection {
 
 export interface RuntimeTargetBackendRegistry {
   find(input: RuntimeTargetBackendSelection): Result<RuntimeTargetBackend>;
+}
+
+export type RuntimeTargetReadinessCapability =
+  | "api-reachability"
+  | "version"
+  | "authorization"
+  | "namespace-isolation"
+  | "routing"
+  | "storage";
+
+export type RuntimeTargetReadinessCheckStatus = "ready" | "blocked" | "unsupported";
+
+export interface RuntimeTargetReadinessCheck {
+  capability: RuntimeTargetReadinessCapability;
+  status: RuntimeTargetReadinessCheckStatus;
+  reasonCode?: string;
+  message?: string;
+}
+
+export interface RuntimeTargetReadinessBackendInspection {
+  checks: RuntimeTargetReadinessCheck[];
+}
+
+export interface RuntimeTargetReadinessInspection extends RuntimeTargetReadinessBackendInspection {
+  schemaVersion: "servers.runtime-readiness/v1";
+  serverId: string;
+  targetKind: "orchestrator-cluster";
+  status: "ready" | "blocked";
+  checkedAt: string;
 }
 
 export interface ProviderDescriptor {

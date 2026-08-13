@@ -17,6 +17,8 @@ relatedOperations:
   - "servers.register"
   - "servers.configure-credential"
   - "servers.configure-workload-roles"
+  - "servers.configure-runtime-target-profile"
+  - "servers.runtime-readiness"
   - "servers.test-connectivity"
   - "servers.prepare-runtime"
   - "servers.show"
@@ -177,6 +179,51 @@ appaloft server register \
   --provider docker-swarm \
   --target-kind orchestrator-cluster
 ```
+
+## Existing Kubernetes clusters <a id="server-runtime-target-profile" />
+
+A Kubernetes cluster is also an `orchestrator-cluster`, while its connection information is owned
+separately by a Runtime Target Profile. The profile persists URI-shaped opaque references only. It
+does not accept kubeconfig YAML, tokens, certificates, namespaces, or manifests as registration or
+deployment input.
+
+Register the cluster target, then configure its connection reference:
+
+```bash
+appaloft server register \
+  --name production-cluster \
+  --host kubernetes.invalid \
+  --port 6443 \
+  --provider kubernetes \
+  --target-kind orchestrator-cluster
+
+appaloft server configure-runtime-target-profile srv_cluster \
+  --connection-reference file:///absolute/path/to/kubeconfig \
+  --routing-policy-reference builtin://kubernetes/ingress-controller/traefik-k3s
+```
+
+The public local composition resolves absolute `file://` kubeconfig references by default and does
+not copy file contents into Server readback. To keep credentials separately, also configure a
+`--credential-reference secret://...` and inject a credential-aware adapter that can resolve it.
+Without that adapter, readiness and deployment fail closed instead of falling back to local Docker
+or another target.
+
+Routed workloads also require an explicit routing policy reference. The public built-in reference
+above allows ingress only from Pods in `kube-system` whose exact selector is
+`app.kubernetes.io/name=traefik`; it does not allow a wildcard namespace, Pod selector, or CIDR.
+Clusters with another ingress topology must inject a resolver for their own opaque policy
+reference. An absent, unknown, or invalid policy remains blocked before apply.
+
+Run the non-mutating readiness inspection after configuration:
+
+```bash
+appaloft server readiness srv_cluster
+```
+
+The response always normalizes API reachability, version, authorization, namespace isolation,
+routing, and storage checks without returning Kubernetes API DTOs or raw credentials. The Web
+Server detail page exposes the same profile dialog and readiness readback for cluster targets;
+HTTP/API, SDK, and MCP consume the same operation schemas.
 
 ## Outbound Server Worker <a id="server-worker-outbound-relay" />
 

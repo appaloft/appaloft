@@ -25,6 +25,10 @@ import {
   type Result,
 } from "@appaloft/core";
 import { runBufferedProcess } from "./buffered-process";
+import {
+  FileKubernetesConnectionResolver,
+  type KubernetesConnectionResolver,
+} from "./kubernetes-runtime-target-backend";
 
 export interface DockerInspectState {
   Id?: string;
@@ -37,6 +41,34 @@ export interface DockerInspectState {
     TaskTemplate?: { ContainerSpec?: { Image?: string; Env?: string[] } };
   };
   UpdatedAt?: string;
+}
+
+export interface KubernetesDeploymentState {
+  metadata?: {
+    annotations?: Record<string, string>;
+    creationTimestamp?: string;
+    generation?: number;
+    name?: string;
+    namespace?: string;
+    uid?: string;
+  };
+  spec?: {
+    replicas?: number;
+    template?: {
+      spec?: {
+        containers?: Array<{
+          env?: Array<{ name?: string }>;
+          image?: string;
+        }>;
+      };
+    };
+  };
+  status?: {
+    availableReplicas?: number;
+    observedGeneration?: number;
+    readyReplicas?: number;
+    replicas?: number;
+  };
 }
 
 export type DeploymentProofRouteFetch = (
@@ -646,11 +678,76 @@ export function deploymentProofEvidenceFromDockerInspect(
   };
 }
 
+export function deploymentProofEvidenceFromKubernetesDeployment(
+  deployment: DeploymentSummary,
+  observed: KubernetesDeploymentState,
+): DeploymentProofRuntimeEvidence {
+  const annotations = observed.metadata?.annotations ?? {};
+  const container = observed.spec?.template?.spec?.containers?.[0];
+  const desiredReplicas = observed.spec?.replicas ?? 1;
+  const currentReplicas = observed.status?.replicas ?? 0;
+  const readyReplicas = observed.status?.readyReplicas ?? 0;
+  const availableReplicas = observed.status?.availableReplicas ?? 0;
+  const generation = observed.metadata?.generation ?? 1;
+  const observedGeneration = observed.status?.observedGeneration ?? 0;
+  const available =
+    currentReplicas >= desiredReplicas &&
+    readyReplicas >= desiredReplicas &&
+    availableReplicas >= desiredReplicas &&
+    observedGeneration >= generation;
+  const workloadIdentity =
+    observed.metadata?.uid ??
+    (observed.metadata?.namespace && observed.metadata.name
+      ? `${observed.metadata.namespace}/${observed.metadata.name}`
+      : undefined);
+  const evidence = deploymentProofEvidenceFromDockerInspect(deployment, {
+    ...(workloadIdentity ? { Id: workloadIdentity } : {}),
+    ...(container?.image ? { Image: container.image } : {}),
+    ...(observed.metadata?.creationTimestamp
+      ? { Created: observed.metadata.creationTimestamp }
+      : {}),
+    State: {
+      Running: available,
+      Health: { Status: available ? "healthy" : "unhealthy" },
+    },
+    Config: {
+      ...(container?.image ? { Image: container.image } : {}),
+      Env: (container?.env ?? [])
+        .map((entry) => entry.name)
+        .filter((name): name is string => Boolean(name))
+        .map((name) => `${name}=`),
+      Labels: {
+        ...(annotations["appaloft.io/deployment-id"]
+          ? { "appaloft.deployment-id": annotations["appaloft.io/deployment-id"] }
+          : {}),
+        ...(annotations["appaloft.io/configuration-fingerprint"]
+          ? {
+              "appaloft.configuration-fingerprint":
+                annotations["appaloft.io/configuration-fingerprint"],
+            }
+          : {}),
+      },
+    },
+  });
+
+  return {
+    ...evidence,
+    health: {
+      status: available ? "passed" : "failed",
+      summary: available
+        ? "Observed Kubernetes Deployment is available"
+        : "Observed Kubernetes Deployment has not converged",
+    },
+  };
+}
+
 export class RuntimeDeploymentProofEvidenceReader implements DeploymentProofRuntimeEvidenceReader {
   constructor(
     private readonly serverRepository?: ServerRepository,
     private readonly commandRunner: DeploymentProofCommandRunner = runDeploymentProofCommand,
     private readonly routeFetch: DeploymentProofRouteFetch = directManagedRouteFetch,
+    private readonly kubernetesConnectionResolver: KubernetesConnectionResolver =
+      new FileKubernetesConnectionResolver(),
   ) {}
 
   async read(
@@ -659,6 +756,65 @@ export class RuntimeDeploymentProofEvidenceReader implements DeploymentProofRunt
     input: DeploymentProofRuntimeEvidenceInput = { currentManagedRoutes: [] },
   ): Promise<Result<DeploymentProofRuntimeEvidence>> {
     const provider = deployment.runtimePlan.target.providerKey;
+    if (provider === "kubernetes") {
+      const serverId = deployment.runtimePlan.target.serverIds[0];
+      const namespace = deployment.runtimePlan.execution.metadata?.["kubernetes.namespace"];
+      const workloadName =
+        deployment.runtimePlan.execution.metadata?.["kubernetes.workloadName"];
+      if (!serverId || !namespace || !workloadName || !this.serverRepository) {
+        return ok(unavailable(deployment, "kubernetes_runtime_readback_unavailable"));
+      }
+      const server = await this.serverRepository.findOne(
+        toRepositoryContext(context),
+        DeploymentTargetByIdSpec.create(DeploymentTargetId.rehydrate(serverId)),
+      );
+      const profile = server?.toState().runtimeTargetProfile?.toSnapshot();
+      if (!profile) {
+        return ok(unavailable(deployment, "kubernetes_runtime_target_profile_unavailable"));
+      }
+      const connection = await this.kubernetesConnectionResolver.resolve({
+        connectionReference: profile.connectionReference,
+        ...(profile.credentialReference
+          ? { credentialReference: profile.credentialReference }
+          : {}),
+      });
+      if (connection.isErr()) {
+        return ok(unavailable(deployment, "kubernetes_connection_reference_unresolved"));
+      }
+      const inspected = await this.commandRunner([
+        "kubectl",
+        "--kubeconfig",
+        connection.value.kubeconfigPath,
+        ...(connection.value.contextName ? ["--context", connection.value.contextName] : []),
+        "get",
+        "deployment",
+        workloadName,
+        "--namespace",
+        namespace,
+        "-o",
+        "json",
+      ]);
+      if (!inspected.ok) {
+        return ok(unavailable(deployment, "kubernetes_deployment_readback_unavailable"));
+      }
+      try {
+        const evidence = deploymentProofEvidenceFromKubernetesDeployment(
+          deployment,
+          JSON.parse(inspected.stdout) as KubernetesDeploymentState,
+        );
+        return ok({
+          ...evidence,
+          access: await readDeploymentProofManagedRouteEvidence(
+            deployment,
+            this.routeFetch,
+            input.currentManagedRoutes,
+          ),
+        });
+      } catch {
+        return ok(unavailable(deployment, "kubernetes_deployment_readback_invalid"));
+      }
+    }
+
     if (provider === "generic-ssh") {
       const serverId = deployment.runtimePlan.target.serverIds[0];
       if (!serverId || !this.serverRepository) {

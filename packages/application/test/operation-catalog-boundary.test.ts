@@ -48,6 +48,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       "environments.promote",
       "servers.register",
       "servers.configure-workload-roles",
+      "servers.configure-runtime-target-profile",
       "servers.configure-credential",
       "credentials.create-ssh",
       "credentials.list-ssh",
@@ -401,6 +402,44 @@ describe("operation catalog aggregate mutation boundary", () => {
     ).toEqual({
       serverId: "srv_primary",
       workloadRoles: ["deployment-runtime", "sandbox-worker"],
+    });
+  });
+
+  test("[K8S-SURFACE-017] runtime target profile configuration is cataloged once", () => {
+    const entries = operationCatalog.filter(
+      (candidate) => candidate.key === "servers.configure-runtime-target-profile",
+    );
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      kind: "command",
+      domain: "servers",
+      messageName: "ConfigureServerRuntimeTargetProfileCommand",
+      handlerName: "ConfigureServerRuntimeTargetProfileCommandHandler",
+      serviceName: "ConfigureServerRuntimeTargetProfileUseCase",
+      transports: {
+        cli: "appaloft server configure-runtime-target-profile <serverId> --connection-reference <ref>",
+        orpc: { method: "POST", path: "/api/servers/{serverId}/runtime-target-profile" },
+      },
+    });
+  });
+
+  test("[K8S-SURFACE-017] runtime target readiness is cataloged once", () => {
+    const entries = operationCatalog.filter(
+      (candidate) => candidate.key === "servers.runtime-readiness",
+    );
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      kind: "query",
+      domain: "servers",
+      messageName: "InspectServerRuntimeReadinessQuery",
+      handlerName: "InspectServerRuntimeReadinessQueryHandler",
+      serviceName: "InspectServerRuntimeReadinessQueryService",
+      transports: {
+        cli: "appaloft server readiness <serverId>",
+        orpc: { method: "GET", path: "/api/servers/{serverId}/runtime-readiness" },
+      },
     });
   });
 

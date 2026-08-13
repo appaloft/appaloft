@@ -27,6 +27,7 @@ import {
   type SshPrivateKeyText,
   type SshPublicKeyText,
 } from "../shared/text-values";
+import { type RuntimeTargetProfile } from "./runtime-target-profile";
 import {
   DeploymentTargetWorkloadRoles,
   type ServerWorkloadRoleValue,
@@ -86,6 +87,7 @@ export interface DeploymentTargetState {
   deactivationReason?: DeactivationReason;
   credential?: DeploymentTargetCredentialState;
   edgeProxy?: DeploymentTargetEdgeProxyState;
+  runtimeTargetProfile?: RuntimeTargetProfile;
   displayOrder: DeploymentTargetDisplayOrder;
   createdAt: CreatedAt;
 }
@@ -200,6 +202,45 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
     this.recordDomainEvent("deployment_target.workload_roles_configured", input.configuredAt, {
       workloadRoles: input.workloadRoles.toJSON(),
     });
+
+    return ok({ changed: true });
+  }
+
+  configureRuntimeTargetProfile(input: {
+    profile: RuntimeTargetProfile;
+    configuredAt: UpdatedAt;
+  }): Result<{ changed: boolean }> {
+    if (
+      !this.state.lifecycleStatus.isActive() ||
+      this.state.targetKind.value !== "orchestrator-cluster"
+    ) {
+      return err(
+        domainError.invariant(
+          "Runtime target profiles can only be configured on active orchestrator clusters",
+          {
+            phase: "runtime-target-profile-admission",
+            serverId: this.state.id.value,
+            lifecycleStatus: this.state.lifecycleStatus.value,
+            targetKind: this.state.targetKind.value,
+          },
+        ),
+      );
+    }
+
+    if (this.state.runtimeTargetProfile?.equals(input.profile)) {
+      return ok({ changed: false });
+    }
+
+    this.state.runtimeTargetProfile = input.profile;
+    this.recordDomainEvent(
+      "deployment_target.runtime_target_profile_configured",
+      input.configuredAt,
+      {
+        providerKey: this.state.providerKey.value,
+        targetKind: this.state.targetKind.value,
+        configuredReferences: input.profile.configuredReferenceKinds(),
+      },
+    );
 
     return ok({ changed: true });
   }
