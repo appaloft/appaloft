@@ -73,12 +73,16 @@ async function gitText(
   args: readonly string[],
   code: string,
   message: string,
+  guidance?: string,
 ): Promise<string> {
   try {
     const result = await runGit({ cwd, args });
     return result.stdout.trim();
   } catch {
-    throw domainError.validation(message, { code });
+    throw domainError.validation(message, {
+      code,
+      ...(guidance ? { guidance } : {}),
+    });
   }
 }
 
@@ -220,6 +224,7 @@ export async function resolveLocalGitWorkspaceContext(
     ["symbolic-ref", "--quiet", "--short", "HEAD"],
     "workspace_git_detached",
     "Git HEAD is detached; check out a pushed branch before opening a Workspace",
+    "Check out a pushed branch, then retry workspace open.",
   );
   const remoteName = await gitText(
     runGit,

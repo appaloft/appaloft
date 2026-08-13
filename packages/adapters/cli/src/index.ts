@@ -118,6 +118,7 @@ export {
 } from "./remote-terminal-session-gateway.js";
 export type { CliSourceLinkStore } from "./runtime.js";
 export {
+  formatHumanCliError,
   formatSafeCliError,
   type SafeCliErrorEvidence,
   safeCliErrorEvidence,

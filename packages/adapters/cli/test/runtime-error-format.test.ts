@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { type DomainError } from "@appaloft/core";
-import { formatSafeCliError, safeCliErrorEvidence } from "../src/runtime";
+import { formatHumanCliError, formatSafeCliError, safeCliErrorEvidence } from "../src/runtime";
 
 describe("CLI safe error evidence", () => {
   test("[CPS-SAFE-016] emits an exact machine-readable allowlist", () => {
@@ -110,5 +110,38 @@ describe("CLI safe error evidence", () => {
       sandboxId: "sbx_partial",
     });
     expect(output).not.toContain("secret-provider-handle");
+  });
+
+  test("prints a human DomainError instead of a JSON dump", () => {
+    const output = formatHumanCliError({
+      code: "validation_error",
+      category: "user",
+      message: "Git HEAD is detached; check out a pushed branch before opening a Workspace",
+      retryable: false,
+      details: {
+        code: "workspace_git_detached",
+        guidance: "Check out a pushed branch, then retry workspace open.",
+      },
+    } satisfies DomainError);
+
+    expect(output).toBe(
+      [
+        "Git HEAD is detached; check out a pushed branch before opening a Workspace",
+        "Check out a pushed branch, then retry workspace open.",
+        "",
+      ].join("\n"),
+    );
+    expect(output).not.toContain('"error"');
+    expect(output).not.toContain("validation_error");
+  });
+
+  test("does not serialize unknown failures in human CLI output", () => {
+    const output = formatHumanCliError(
+      new Error("secret-value ciphertext-value /private/operator/key"),
+    );
+
+    expect(output).toBe("Command failed\n");
+    expect(output).not.toContain("secret-value");
+    expect(output).not.toContain("/private/operator/key");
   });
 });
