@@ -1,3 +1,5 @@
+import "reflect-metadata";
+
 import { describe, expect, test } from "bun:test";
 
 import { createMigrationPlan } from "@appaloft/application";
