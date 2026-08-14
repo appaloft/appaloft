@@ -60,6 +60,33 @@ export interface ManagedClusterPlacementDecisionSnapshot {
   }[];
 }
 
+export type ManagedClusterReplacementReadinessStatus = "ready" | "blocked";
+
+export interface ManagedClusterReplacementReadinessSnapshot {
+  poolId: string;
+  workloadRef: string;
+  currentTargetId: string;
+  currentPlacementEpoch: number;
+  status: ManagedClusterReplacementReadinessStatus;
+  requiredCapabilities: string[];
+  requiredFailureDomainKinds: ManagedClusterFailureDomainKind[];
+  selectedTargetId?: string;
+  selectedProviderKey?: string;
+  selectedRegion?: string;
+  selectedFailureDomains?: ManagedClusterFailureDomainSnapshot[];
+  selectedEstimatedMonthlyCostUsd?: number;
+  selectedSupportLevel?: ManagedClusterSupportLevel;
+  eligibleReplacementTargetIds: string[];
+  totalEligibleReplacementCapacity: number;
+  reasonCodes: string[];
+  consideredTargets: {
+    targetId: string;
+    eligible: boolean;
+    availableCapacity: number;
+    reasons: string[];
+  }[];
+}
+
 function requiredText(value: string, label: string): Result<string> {
   const normalized = value.trim();
   return normalized ? ok(normalized) : err(domainError.validation(`${label} is required`));
@@ -168,6 +195,14 @@ class ManagedClusterTargetCandidate {
 
   estimatedMonthlyCostUsd(): number | undefined {
     return this.snapshot.estimatedMonthlyCostUsd;
+  }
+
+  availableCapacity(): number {
+    return this.snapshot.availableCapacity;
+  }
+
+  supportLevel(): ManagedClusterSupportLevel {
+    return this.snapshot.supportLevel;
   }
 
   failureDomainKey(kind: ManagedClusterFailureDomainKind): string | undefined {
@@ -357,6 +392,37 @@ export class ManagedClusterPlacementDecision {
   }
 }
 
+export class ManagedClusterReplacementReadiness {
+  private constructor(private readonly snapshot: ManagedClusterReplacementReadinessSnapshot) {}
+
+  static rehydrate(
+    snapshot: ManagedClusterReplacementReadinessSnapshot,
+  ): ManagedClusterReplacementReadiness {
+    return new ManagedClusterReplacementReadiness(snapshot);
+  }
+
+  toJSON(): ManagedClusterReplacementReadinessSnapshot {
+    return {
+      ...this.snapshot,
+      requiredCapabilities: [...this.snapshot.requiredCapabilities],
+      requiredFailureDomainKinds: [...this.snapshot.requiredFailureDomainKinds],
+      ...(this.snapshot.selectedFailureDomains
+        ? {
+            selectedFailureDomains: this.snapshot.selectedFailureDomains.map((domain) => ({
+              ...domain,
+            })),
+          }
+        : {}),
+      eligibleReplacementTargetIds: [...this.snapshot.eligibleReplacementTargetIds],
+      reasonCodes: [...this.snapshot.reasonCodes],
+      consideredTargets: this.snapshot.consideredTargets.map((target) => ({
+        ...target,
+        reasons: [...target.reasons],
+      })),
+    };
+  }
+}
+
 export class ManagedClusterTargetPool {
   private constructor(
     private readonly poolIdValue: string,
@@ -483,6 +549,122 @@ export class ManagedClusterTargetPool {
           eligible: reasons.length === 0,
           reasons,
         })),
+      }),
+    );
+  }
+
+  checkReplacementReadiness(
+    intent: ManagedClusterPlacementIntent,
+  ): Result<ManagedClusterReplacementReadiness> {
+    const currentTargetId = intent.currentTargetId();
+    if (!currentTargetId) {
+      return err(
+        domainError.validation("Managed cluster replacement readiness requires a current target"),
+      );
+    }
+    const currentTarget = this.targetsValue.find((target) => target.id() === currentTargetId);
+    if (!currentTarget) {
+      return ok(
+        ManagedClusterReplacementReadiness.rehydrate({
+          poolId: this.poolIdValue,
+          workloadRef: intent.workloadRef(),
+          currentTargetId,
+          currentPlacementEpoch: intent.currentPlacementEpoch(),
+          status: "blocked",
+          requiredCapabilities: [...intent.requiredCapabilities()],
+          requiredFailureDomainKinds: [...intent.requiredFailureDomainKinds()],
+          eligibleReplacementTargetIds: [],
+          totalEligibleReplacementCapacity: 0,
+          reasonCodes: ["replacement:current-target-missing"],
+          consideredTargets: [],
+        }),
+      );
+    }
+
+    const considered = this.targetsValue
+      .map((target) => ({
+        target,
+        reasons:
+          target.id() === currentTargetId
+            ? ["failover:previous-target"]
+            : target.eligibilityReasons(intent, "failover", currentTarget),
+      }))
+      .sort((left, right) => left.target.id().localeCompare(right.target.id()));
+    const eligible = considered
+      .filter((candidate) => candidate.reasons.length === 0)
+      .map((candidate) => candidate.target)
+      .sort((left, right) => this.compareCandidates(left, right, intent));
+    const selected = eligible[0];
+    const consideredTargets = considered.map(({ target, reasons }) => ({
+      targetId: target.id(),
+      eligible: reasons.length === 0,
+      availableCapacity: target.availableCapacity(),
+      reasons,
+    }));
+    const totalEligibleReplacementCapacity = eligible.reduce(
+      (total, target) => total + target.availableCapacity(),
+      0,
+    );
+
+    if (!selected) {
+      const reasons = [
+        ...new Set(
+          considered
+            .filter(({ target }) => target.id() !== currentTargetId)
+            .flatMap(({ reasons: candidateReasons }) => candidateReasons),
+        ),
+      ].sort((left, right) => left.localeCompare(right));
+      return ok(
+        ManagedClusterReplacementReadiness.rehydrate({
+          poolId: this.poolIdValue,
+          workloadRef: intent.workloadRef(),
+          currentTargetId,
+          currentPlacementEpoch: intent.currentPlacementEpoch(),
+          status: "blocked",
+          requiredCapabilities: [...intent.requiredCapabilities()],
+          requiredFailureDomainKinds: [...intent.requiredFailureDomainKinds()],
+          eligibleReplacementTargetIds: [],
+          totalEligibleReplacementCapacity,
+          reasonCodes: ["replacement:no-eligible-target", ...reasons],
+          consideredTargets,
+        }),
+      );
+    }
+
+    const cost = selected.estimatedMonthlyCostUsd();
+    const lowestCost = eligible.every(
+      (candidate) =>
+        candidate.estimatedMonthlyCostUsd() === undefined ||
+        cost === undefined ||
+        cost <= (candidate.estimatedMonthlyCostUsd() as number),
+    );
+    const selectedSnapshot = selected.toJSON();
+    return ok(
+      ManagedClusterReplacementReadiness.rehydrate({
+        poolId: this.poolIdValue,
+        workloadRef: intent.workloadRef(),
+        currentTargetId,
+        currentPlacementEpoch: intent.currentPlacementEpoch(),
+        status: "ready",
+        requiredCapabilities: [...intent.requiredCapabilities()],
+        requiredFailureDomainKinds: [...intent.requiredFailureDomainKinds()],
+        selectedTargetId: selected.id(),
+        selectedProviderKey: selected.providerKey(),
+        selectedRegion: selected.region(),
+        ...(selectedSnapshot.failureDomains
+          ? { selectedFailureDomains: selectedSnapshot.failureDomains }
+          : {}),
+        ...(cost !== undefined ? { selectedEstimatedMonthlyCostUsd: cost } : {}),
+        selectedSupportLevel: selected.supportLevel(),
+        eligibleReplacementTargetIds: eligible.map((candidate) => candidate.id()),
+        totalEligibleReplacementCapacity,
+        reasonCodes: [
+          "replacement:ready",
+          ...intent.requiredFailureDomainKinds().map((kind) => `failure-domain:${kind}:separated`),
+          ...(lowestCost ? ["cost:lowest-eligible"] : []),
+          "tie-break:target-id",
+        ],
+        consideredTargets,
       }),
     );
   }

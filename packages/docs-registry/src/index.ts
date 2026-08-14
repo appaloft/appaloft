@@ -931,6 +931,36 @@ export const publicDocsHelpTopics = {
       "docs/testing/kubernetes-scale-topology-test-matrix.md",
     ],
   },
+  "integration.managed-cluster-replacement-readiness": {
+    id: "integration.managed-cluster-replacement-readiness",
+    title: "Managed-cluster replacement readiness",
+    description:
+      "How to inspect typed ready or blocked independent replacement capacity without acceptance, fencing, reservation, or provider mutation.",
+    page: {
+      "zh-CN": "deliver/integrations",
+      "en-US": "en/deliver/integrations",
+    },
+    anchor: "managed-cluster-replacement-readiness",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "connections.capability.plan",
+    aliases: [
+      "infrastructure.cluster.readiness",
+      "replacement readiness",
+      "replacement capacity",
+      "failover capacity",
+      "替代容量",
+      "故障转移就绪",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-115-managed-capacity-failure-domain-boundary.md",
+      "docs/specs/137-production-failure-domain-resilience/spec.md",
+      "docs/testing/production-failure-domain-resilience-test-matrix.md",
+    ],
+  },
   "agent.deploy-skill": {
     id: "agent.deploy-skill",
     title: "Agent deploy skill",

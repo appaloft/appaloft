@@ -538,6 +538,7 @@ export const zhCN = {
       managedClusterCurrentTarget: "当前目标 ID",
       managedClusterDescription:
         "通过共享连接器契约规划和管理托管集群容量。供应商凭据与策略仍由 Cloud 控制面保管。",
+      managedClusterEligibleCapacity: "可用替代容量",
       managedClusterExcludedTargets: "排除的目标 ID（逗号分隔）",
       managedClusterFormInvalid: "请填写必填字段，并使用有效的非负整数。",
       managedClusterName: "集群名称",
@@ -547,6 +548,7 @@ export const zhCN = {
       managedClusterPlanTitle: "评审计划",
       managedClusterPlanning: "正在生成计划",
       managedClusterReadbackTitle: "托管集群回读",
+      managedClusterReadinessReasons: "就绪原因",
       managedClusterRef: "集群引用",
       managedClusterRegion: "选中区域",
       managedClusterRequiredCapabilities: "所需能力（逗号分隔）",

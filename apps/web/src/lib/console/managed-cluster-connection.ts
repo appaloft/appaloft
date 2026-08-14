@@ -1,6 +1,7 @@
 export const managedClusterCapabilityKeys = [
   "infrastructure.cluster.provision",
   "infrastructure.cluster.inspect",
+  "infrastructure.cluster.readiness",
   "infrastructure.cluster.place",
   "infrastructure.cluster.failover",
   "infrastructure.cluster.recover",
@@ -68,9 +69,22 @@ export function buildManagedClusterParameters(
   if (currentPlacementEpoch === undefined) {
     return { ok: false, field: "currentPlacementEpoch" };
   }
+  const currentTargetId = requiredText(form.currentTargetId);
+  if (capabilityKey === "infrastructure.cluster.readiness") {
+    if (!currentTargetId) return { ok: false, field: "currentTargetId" };
+    return {
+      ok: true,
+      parameters: {
+        workloadRef,
+        requiredCapabilities: normalizedList(form.requiredCapabilities),
+        excludedTargetIds: normalizedList(form.excludedTargetIds),
+        currentTargetId,
+        currentPlacementEpoch,
+      },
+    };
+  }
   const attempt = nonnegativeInteger(form.attempt);
   if (attempt === undefined) return { ok: false, field: "attempt" };
-  const currentTargetId = requiredText(form.currentTargetId);
   if (
     (capabilityKey === "infrastructure.cluster.failover" ||
       capabilityKey === "infrastructure.cluster.recover") &&

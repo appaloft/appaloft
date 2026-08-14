@@ -423,4 +423,215 @@ describe("Managed cluster topology", () => {
       ]),
     });
   });
+
+  test("[RESIL-READY-004] reports deterministic independent replacement readiness without fencing", () => {
+    const pool = ManagedClusterTargetPool.create({
+      poolId: "pool_readiness",
+      targets: [
+        {
+          targetId: "target_current",
+          providerKey: "provider-a",
+          region: "ewr",
+          failureDomains: [
+            { kind: "provider", key: "provider-a" },
+            { kind: "region", key: "provider-a:ewr" },
+          ],
+          status: "ready",
+          capabilities: ["kubernetes", "stateful"],
+          availableCapacity: 8,
+          estimatedMonthlyCostUsd: 80,
+          supportLevel: "standard",
+        },
+        {
+          targetId: "target_z",
+          providerKey: "provider-c",
+          region: "fra",
+          failureDomains: [
+            { kind: "provider", key: "provider-c" },
+            { kind: "region", key: "provider-c:fra" },
+          ],
+          status: "ready",
+          capabilities: ["kubernetes", "stateful"],
+          availableCapacity: 5,
+          estimatedMonthlyCostUsd: 120,
+          supportLevel: "premium",
+        },
+        {
+          targetId: "target_a",
+          providerKey: "provider-b",
+          region: "sin",
+          failureDomains: [
+            { kind: "provider", key: "provider-b" },
+            { kind: "region", key: "provider-b:sin" },
+          ],
+          status: "ready",
+          capabilities: ["stateful", "kubernetes"],
+          availableCapacity: 3,
+          estimatedMonthlyCostUsd: 100,
+          supportLevel: "premium",
+        },
+      ],
+    })._unsafeUnwrap();
+    const intent = ManagedClusterPlacementIntent.create({
+      workloadRef: "resource:res_readiness",
+      requiredCapabilities: ["stateful", "kubernetes"],
+      preferredRegions: ["sin", "fra"],
+      excludedTargetIds: [],
+      currentTargetId: "target_current",
+      currentPlacementEpoch: 9,
+      maxFailoverAttempts: 2,
+      requiredFailureDomainKinds: ["provider", "region"],
+    })._unsafeUnwrap();
+
+    const first = pool.checkReplacementReadiness(intent)._unsafeUnwrap().toJSON();
+    const second = pool.checkReplacementReadiness(intent)._unsafeUnwrap().toJSON();
+
+    expect(first).toEqual(second);
+    expect(first).toEqual({
+      poolId: "pool_readiness",
+      workloadRef: "resource:res_readiness",
+      currentTargetId: "target_current",
+      currentPlacementEpoch: 9,
+      status: "ready",
+      requiredCapabilities: ["kubernetes", "stateful"],
+      requiredFailureDomainKinds: ["provider", "region"],
+      selectedTargetId: "target_a",
+      selectedProviderKey: "provider-b",
+      selectedRegion: "sin",
+      selectedFailureDomains: [
+        { kind: "provider", key: "provider-b" },
+        { kind: "region", key: "provider-b:sin" },
+      ],
+      selectedEstimatedMonthlyCostUsd: 100,
+      selectedSupportLevel: "premium",
+      eligibleReplacementTargetIds: ["target_a", "target_z"],
+      totalEligibleReplacementCapacity: 8,
+      reasonCodes: [
+        "replacement:ready",
+        "failure-domain:provider:separated",
+        "failure-domain:region:separated",
+        "cost:lowest-eligible",
+        "tie-break:target-id",
+      ],
+      consideredTargets: [
+        {
+          targetId: "target_a",
+          eligible: true,
+          availableCapacity: 3,
+          reasons: [],
+        },
+        {
+          targetId: "target_current",
+          eligible: false,
+          availableCapacity: 8,
+          reasons: ["failover:previous-target"],
+        },
+        {
+          targetId: "target_z",
+          eligible: true,
+          availableCapacity: 5,
+          reasons: [],
+        },
+      ],
+    });
+    expect(first).not.toHaveProperty("placementEpoch");
+    expect(first).not.toHaveProperty("fencingToken");
+  });
+
+  test("[RESIL-READY-004] returns typed blocked evidence and validates an exact current placement", () => {
+    const pool = ManagedClusterTargetPool.create({
+      poolId: "pool_blocked",
+      targets: [
+        {
+          targetId: "target_current",
+          providerKey: "provider-a",
+          region: "ewr",
+          failureDomains: [{ kind: "provider", key: "provider-a" }],
+          status: "ready",
+          capabilities: ["kubernetes"],
+          availableCapacity: 2,
+          supportLevel: "standard",
+        },
+        {
+          targetId: "target_shared",
+          providerKey: "provider-a",
+          region: "sin",
+          failureDomains: [{ kind: "provider", key: "provider-a" }],
+          status: "ready",
+          capabilities: ["kubernetes"],
+          availableCapacity: 2,
+          supportLevel: "standard",
+        },
+        {
+          targetId: "target_empty",
+          providerKey: "provider-b",
+          region: "fra",
+          failureDomains: [{ kind: "provider", key: "provider-b" }],
+          status: "ready",
+          capabilities: ["kubernetes"],
+          availableCapacity: 0,
+          supportLevel: "community",
+        },
+      ],
+    })._unsafeUnwrap();
+    const intent = ManagedClusterPlacementIntent.create({
+      workloadRef: "resource:res_blocked",
+      requiredCapabilities: ["kubernetes"],
+      preferredRegions: ["sin", "fra"],
+      excludedTargetIds: [],
+      currentTargetId: "target_current",
+      currentPlacementEpoch: 3,
+      maxFailoverAttempts: 1,
+      requiredFailureDomainKinds: ["provider"],
+    })._unsafeUnwrap();
+
+    const blocked = pool.checkReplacementReadiness(intent)._unsafeUnwrap().toJSON();
+
+    expect(blocked).toMatchObject({
+      status: "blocked",
+      eligibleReplacementTargetIds: [],
+      totalEligibleReplacementCapacity: 0,
+      reasonCodes: [
+        "replacement:no-eligible-target",
+        "capacity:unavailable",
+        "failure-domain:shared:provider",
+      ],
+    });
+    expect(blocked.consideredTargets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          targetId: "target_shared",
+          eligible: false,
+          reasons: ["failure-domain:shared:provider"],
+        }),
+        expect.objectContaining({
+          targetId: "target_empty",
+          eligible: false,
+          reasons: ["capacity:unavailable"],
+        }),
+      ]),
+    );
+
+    const missingCurrent = pool.checkReplacementReadiness(
+      ManagedClusterPlacementIntent.create({
+        ...intent.toJSON(),
+        currentTargetId: "target_missing",
+      })._unsafeUnwrap(),
+    );
+    expect(missingCurrent._unsafeUnwrap().toJSON()).toMatchObject({
+      status: "blocked",
+      reasonCodes: ["replacement:current-target-missing"],
+      eligibleReplacementTargetIds: [],
+      totalEligibleReplacementCapacity: 0,
+    });
+
+    const { currentTargetId: _currentTargetId, ...withoutCurrentTarget } = intent.toJSON();
+    const noCurrent = pool.checkReplacementReadiness(
+      ManagedClusterPlacementIntent.create(withoutCurrentTarget)._unsafeUnwrap(),
+    );
+    expect(noCurrent.isErr()).toBe(true);
+    expect(noCurrent._unsafeUnwrapErr().message).toBe(
+      "Managed cluster replacement readiness requires a current target",
+    );
+  });
 });

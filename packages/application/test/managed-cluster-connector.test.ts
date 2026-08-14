@@ -23,6 +23,7 @@ function managedConnectorDefinition() {
     capabilities: [
       "infrastructure.cluster.provision",
       "infrastructure.cluster.inspect",
+      "infrastructure.cluster.readiness",
       "infrastructure.cluster.delete",
       "infrastructure.cluster.place",
       "infrastructure.cluster.failover",
@@ -515,6 +516,123 @@ describe("managed cluster connector protocol", () => {
           "target_candidate:failure-domain:shared:provider",
         ]),
       },
+    });
+  });
+
+  test("[RESIL-READY-004] plans typed readiness without acceptance or an apply path", async () => {
+    const registry = new InMemoryConnectorRegistry([managedConnectorDefinition()]);
+    const adapter = new FakeInfrastructureConnectorProviderAdapter({
+      connectorKey: "managed-kubernetes",
+      providerKey: "provider-a",
+      providerTitle: "Managed Kubernetes",
+    });
+    const adapters = new InMemoryConnectorProviderAdapterRegistry([adapter]);
+    const acceptedStore = new InMemoryAcceptedConnectionCapabilityPlanStore();
+    const planService = new PlanConnectorCapabilityQueryService(registry, adapters);
+    const applyService = new ApplyConnectorCapabilityUseCase(registry, adapters, acceptedStore);
+    const context = createExecutionContext({ entrypoint: "system" });
+    const parameters = {
+      targetPool: {
+        poolId: "pool_readiness",
+        targets: [
+          {
+            targetId: "target_current",
+            providerKey: "provider-a",
+            region: "ewr",
+            failureDomains: [{ kind: "provider", key: "provider-a" }],
+            status: "ready",
+            capabilities: ["kubernetes"],
+            availableCapacity: 2,
+            supportLevel: "standard",
+          },
+          {
+            targetId: "target_next",
+            providerKey: "provider-b",
+            region: "sin",
+            failureDomains: [{ kind: "provider", key: "provider-b" }],
+            status: "ready",
+            capabilities: ["kubernetes"],
+            availableCapacity: 3,
+            estimatedMonthlyCostUsd: 120,
+            supportLevel: "premium",
+          },
+        ],
+      },
+      placementIntent: {
+        workloadRef: "resource:res_api",
+        requiredCapabilities: ["kubernetes"],
+        preferredRegions: ["sin"],
+        excludedTargetIds: [],
+        currentTargetId: "target_current",
+        currentPlacementEpoch: 4,
+        maxFailoverAttempts: 2,
+        requiredFailureDomainKinds: ["provider"],
+      },
+    };
+
+    const plan = (
+      await planService.execute(context, {
+        connectorKey: "managed-kubernetes",
+        capabilityKey: "infrastructure.cluster.readiness",
+        ownerRef,
+        parameters,
+      })
+    )._unsafeUnwrap();
+
+    expect(plan).toMatchObject({
+      riskLevel: "low",
+      requiresExplicitAcceptance: false,
+      cleanup: { supported: false },
+      effects: [{ kind: "infrastructure.cluster.readiness", title: expect.any(String) }],
+      providerPlan: {
+        kind: "managed-cluster-replacement-readiness",
+        managedClusterReplacementReadiness: {
+          status: "ready",
+          currentTargetId: "target_current",
+          currentPlacementEpoch: 4,
+          selectedTargetId: "target_next",
+          eligibleReplacementTargetIds: ["target_next"],
+          totalEligibleReplacementCapacity: 3,
+        },
+      },
+    });
+    expect(JSON.stringify(plan)).not.toContain("fencingToken");
+    expect(JSON.stringify(plan)).not.toContain("credential");
+    expect(adapter.canApply("infrastructure.cluster.readiness")).toBe(false);
+
+    const apply = await applyService.execute(context, {
+      connectorKey: "managed-kubernetes",
+      capabilityKey: "infrastructure.cluster.readiness",
+      ownerRef,
+      parameters,
+    });
+    expect(apply.isErr()).toBe(true);
+
+    const blocked = (
+      await planService.execute(context, {
+        connectorKey: "managed-kubernetes",
+        capabilityKey: "infrastructure.cluster.readiness",
+        ownerRef,
+        parameters: {
+          ...parameters,
+          targetPool: {
+            ...parameters.targetPool,
+            targets: parameters.targetPool.targets.map((target) =>
+              target.targetId === "target_next"
+                ? {
+                    ...target,
+                    providerKey: "provider-a",
+                    failureDomains: [{ kind: "provider", key: "provider-a" }],
+                  }
+                : target,
+            ),
+          },
+        },
+      })
+    )._unsafeUnwrap();
+    expect(blocked.providerPlan?.managedClusterReplacementReadiness).toMatchObject({
+      status: "blocked",
+      reasonCodes: expect.arrayContaining(["failure-domain:shared:provider"]),
     });
   });
 });

@@ -4,6 +4,7 @@ import {
   connectorCapabilityApplyResultSchema,
   connectorCapabilityPlanPreviewSchema,
   managedClusterPlacementIntentSchema,
+  managedClusterReplacementReadinessSchema,
   managedClusterTargetPoolSchema,
 } from "../src";
 
@@ -116,5 +117,61 @@ describe("managed cluster connector contracts", () => {
     });
     expect(JSON.stringify(result)).not.toContain("must-not-survive-contract");
     expect(JSON.stringify(result)).not.toContain("credential");
+  });
+
+  test("[RESIL-READY-004] preserves typed replacement readiness without mutation fields", () => {
+    const readiness = managedClusterReplacementReadinessSchema.parse({
+      poolId: "pool_prod",
+      workloadRef: "resource:res_api",
+      currentTargetId: "target_ewr",
+      currentPlacementEpoch: 4,
+      status: "ready",
+      requiredCapabilities: ["kubernetes"],
+      requiredFailureDomainKinds: ["provider"],
+      selectedTargetId: "target_sin",
+      selectedProviderKey: "provider-b",
+      selectedRegion: "sin",
+      selectedFailureDomains: [{ kind: "provider", key: "provider-b" }],
+      selectedEstimatedMonthlyCostUsd: 120,
+      selectedSupportLevel: "premium",
+      eligibleReplacementTargetIds: ["target_sin"],
+      totalEligibleReplacementCapacity: 3,
+      reasonCodes: ["replacement:ready", "failure-domain:provider:separated"],
+      consideredTargets: [
+        {
+          targetId: "target_ewr",
+          eligible: false,
+          availableCapacity: 2,
+          reasons: ["failover:previous-target"],
+        },
+        {
+          targetId: "target_sin",
+          eligible: true,
+          availableCapacity: 3,
+          reasons: [],
+        },
+      ],
+      placementEpoch: 5,
+      fencingToken: "must-not-survive-contract",
+      credential: "must-not-survive-contract",
+    });
+    const preview = connectorCapabilityPlanPreviewSchema.parse({
+      planId: "clusterplan_readiness",
+      connectorKey: "managed-kubernetes",
+      capabilityKey: "infrastructure.cluster.readiness",
+      riskLevel: "low",
+      requiresExplicitAcceptance: false,
+      summary: "Replacement ready",
+      effects: [{ kind: "infrastructure.cluster.readiness", title: "Ready" }],
+      providerPlan: {
+        kind: "managed-cluster-replacement-readiness",
+        managedClusterReplacementReadiness: readiness,
+      },
+    });
+
+    expect(preview.providerPlan?.managedClusterReplacementReadiness).toEqual(readiness);
+    expect(JSON.stringify(preview)).not.toContain("fencingToken");
+    expect(JSON.stringify(preview)).not.toContain("credential");
+    expect(JSON.stringify(preview)).not.toContain("must-not-survive-contract");
   });
 });

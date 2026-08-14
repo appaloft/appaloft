@@ -527,6 +527,7 @@ export const i18nKeys = {
       managedClusterCost: "console:accountSettings.managedClusterCost",
       managedClusterCurrentTarget: "console:accountSettings.managedClusterCurrentTarget",
       managedClusterDescription: "console:accountSettings.managedClusterDescription",
+      managedClusterEligibleCapacity: "console:accountSettings.managedClusterEligibleCapacity",
       managedClusterExcludedTargets: "console:accountSettings.managedClusterExcludedTargets",
       managedClusterFormInvalid: "console:accountSettings.managedClusterFormInvalid",
       managedClusterName: "console:accountSettings.managedClusterName",
@@ -536,6 +537,7 @@ export const i18nKeys = {
       managedClusterPlanTitle: "console:accountSettings.managedClusterPlanTitle",
       managedClusterPlanning: "console:accountSettings.managedClusterPlanning",
       managedClusterReadbackTitle: "console:accountSettings.managedClusterReadbackTitle",
+      managedClusterReadinessReasons: "console:accountSettings.managedClusterReadinessReasons",
       managedClusterRef: "console:accountSettings.managedClusterRef",
       managedClusterRegion: "console:accountSettings.managedClusterRegion",
       managedClusterRequiredCapabilities:
