@@ -36,6 +36,8 @@
 - [x] Implement provider-neutral traffic contracts and exact connector plan/accept/apply/status.
 - [x] Publish the `managed-traffic-handoff` help anchor and complete docs impact classification:
   existing bilingual integrations page, registry topic and high-confusion traceability row.
+- [x] Merge public R6c implementation PR #1117 to final `main` `2545cc82`, pass public CI, and
+  verify the Cloud injected-port handoff/status/replay/failback/failure packet without external traffic.
 - [ ] Implement state eligibility and DR evidence `RESIL-STATE-007`.
 - [ ] Prove the remaining R6d/real-packet portion of exact rollback/cleanup `RESIL-CLEAN-008`.
 
