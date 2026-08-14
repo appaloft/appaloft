@@ -29,12 +29,13 @@
 - [x] Publish the managed capacity-cell task/help anchor and complete docs impact classification.
 - [x] Accept the R6c Grill and define exact endpoints/epochs/token, bounded health, ordered fencing,
   route verification, explicit failback, rollback outcomes and plan-only status readback.
-- [ ] Create the public R6c actor-visible Ticket and bind `RESIL-FENCE-005`, `RESIL-ROUTE-006` and
-  the R6c portion of `RESIL-CLEAN-008` before Code Round.
-- [ ] RED core/contract/fake connector/Web tests for handoff/status/failback, stale/no-health
+- [x] Create the public R6c actor-visible Ticket #1116 and bind `RESIL-FENCE-005`,
+  `RESIL-ROUTE-006` and the R6c portion of `RESIL-CLEAN-008` before Code Round.
+- [x] RED core/contract/fake connector/Web tests for handoff/status/failback, stale/no-health
   no-effect, pre-move preservation, post-move rollback and zero residuals.
-- [ ] Implement provider-neutral traffic contracts and exact connector plan/accept/apply/status.
-- [ ] Publish the managed traffic handoff help anchor and complete docs impact classification.
+- [x] Implement provider-neutral traffic contracts and exact connector plan/accept/apply/status.
+- [x] Publish the `managed-traffic-handoff` help anchor and complete docs impact classification:
+  existing bilingual integrations page, registry topic and high-confusion traceability row.
 - [ ] Implement state eligibility and DR evidence `RESIL-STATE-007`.
 - [ ] Prove the remaining R6d/real-packet portion of exact rollback/cleanup `RESIL-CLEAN-008`.
 

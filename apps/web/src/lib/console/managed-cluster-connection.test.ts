@@ -17,6 +17,16 @@ const baseForm: ManagedClusterForm = {
   currentTargetId: "target_current",
   currentPlacementEpoch: "4",
   attempt: "1",
+  routeRef: "route:api.example.com",
+  currentEndpointRef: "endpoint:ewr",
+  replacementEndpointRef: "endpoint:sin",
+  replacementTargetId: "target_sin",
+  currentFencingToken: "fence_epoch_4",
+  nextFencingToken: "fence_epoch_5",
+  healthProofRef: "health-proof:sin:42",
+  healthObservedAt: "2026-08-14T12:00:00.000Z",
+  healthValidUntil: "2026-08-14T12:05:00.000Z",
+  plannedAt: "2026-08-14T12:01:00.000Z",
 };
 
 describe("managed cluster connection form", () => {
@@ -95,6 +105,49 @@ describe("managed cluster connection form", () => {
         currentTargetId: " ",
       }),
     ).toEqual({ ok: false, field: "currentTargetId" });
+  });
+
+  test("[RESIL-FENCE-005][RESIL-ROUTE-006] builds exact safe handoff and plan-only status parameters", () => {
+    expect(
+      buildManagedClusterParameters("infrastructure.cluster.handoff-traffic", baseForm),
+    ).toEqual({
+      ok: true,
+      parameters: {
+        action: "handoff",
+        currentRoute: {
+          routeRef: "route:api.example.com",
+          workloadRef: "resource:api",
+          activeEndpointRef: "endpoint:ewr",
+          activeTargetId: "target_current",
+          placementEpoch: 4,
+          fencingToken: "fence_epoch_4",
+        },
+        currentEndpoint: {
+          endpointRef: "endpoint:ewr",
+          workloadRef: "resource:api",
+          targetId: "target_current",
+        },
+        replacementEndpoint: {
+          endpointRef: "endpoint:sin",
+          workloadRef: "resource:api",
+          targetId: "target_sin",
+        },
+        replacementHealth: {
+          endpointRef: "endpoint:sin",
+          status: "healthy",
+          observedAt: "2026-08-14T12:00:00.000Z",
+          validUntil: "2026-08-14T12:05:00.000Z",
+          proofRef: "health-proof:sin:42",
+        },
+        nextPlacementEpoch: 5,
+        nextFencingToken: "fence_epoch_5",
+        rollbackEndpointRef: "endpoint:ewr",
+        plannedAt: "2026-08-14T12:01:00.000Z",
+      },
+    });
+    expect(
+      buildManagedClusterParameters("infrastructure.cluster.traffic-status", baseForm),
+    ).toEqual({ ok: true, parameters: { routeRef: "route:api.example.com" } });
   });
 
   test("[K8S-SURFACE-017] fails closed on missing or invalid actor input", () => {

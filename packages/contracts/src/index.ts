@@ -7804,6 +7804,56 @@ export const managedClusterReplacementReadinessSchema = z.object({
   ),
 });
 
+export const managedTrafficEndpointSchema = z.object({
+  endpointRef: z.string().trim().min(1),
+  workloadRef: z.string().trim().min(1),
+  targetId: z.string().trim().min(1),
+});
+
+export const managedTrafficRouteSchema = z.object({
+  routeRef: z.string().trim().min(1),
+  workloadRef: z.string().trim().min(1),
+  activeEndpointRef: z.string().trim().min(1),
+  activeTargetId: z.string().trim().min(1),
+  placementEpoch: z.number().int().nonnegative(),
+  fencingToken: z.string().trim().min(1),
+});
+
+export const managedTrafficHealthEvidenceSchema = z.object({
+  endpointRef: z.string().trim().min(1),
+  status: z.enum(["healthy", "unhealthy"]),
+  observedAt: z.string().datetime(),
+  validUntil: z.string().datetime(),
+  proofRef: z.string().trim().min(1),
+});
+
+export const managedTrafficHandoffPlanSchema = z.object({
+  action: z.enum(["handoff", "failback"]),
+  currentRoute: managedTrafficRouteSchema,
+  currentEndpoint: managedTrafficEndpointSchema,
+  replacementEndpoint: managedTrafficEndpointSchema,
+  replacementHealth: managedTrafficHealthEvidenceSchema,
+  nextPlacementEpoch: z.number().int().positive(),
+  nextFencingToken: z.string().trim().min(1),
+  rollbackEndpointRef: z.string().trim().min(1),
+  plannedAt: z.string().datetime(),
+});
+
+export const managedTrafficHandoffReceiptSchema = z.object({
+  operationId: z.string().trim().min(1),
+  action: z.enum(["handoff", "failback"]),
+  outcome: z.enum(["moved", "preserved", "rolled-back", "manual-intervention"]),
+  previousRoute: managedTrafficRouteSchema,
+  finalRoute: managedTrafficRouteSchema.optional(),
+  healthEvidence: managedTrafficHealthEvidenceSchema,
+  executionSteps: z.array(z.string().trim().min(1)),
+  rollbackAttempts: z.number().int().min(0).max(1),
+  cleanup: z.object({
+    residualOwnedResources: z.number().int().nonnegative(),
+    transientResourceRefs: z.array(z.string().trim().min(1)),
+  }),
+});
+
 export const managedCapacityCellSchema = z
   .object({
     clusterRef: z.string().trim().min(1),
@@ -7971,6 +8021,8 @@ export const connectorCapabilityPlanPreviewSchema = z.object({
       managedClusterReceipt: managedClusterCapabilityReceiptSchema.optional(),
       managedClusterPlacement: managedClusterPlacementDecisionSchema.optional(),
       managedClusterReplacementReadiness: managedClusterReplacementReadinessSchema.optional(),
+      managedTrafficRoute: managedTrafficRouteSchema.optional(),
+      managedTrafficHandoffPlan: managedTrafficHandoffPlanSchema.optional(),
       notificationMessage: notificationMessageSchema.optional(),
       sourceRepositoryAccess: sourceRepositoryAccessSchema.optional(),
     })
@@ -8024,6 +8076,7 @@ export const connectorCapabilityApplyResultSchema = z.object({
       domainConnectApply: domainConnectApplySchema.optional(),
       notificationDelivery: notificationMessageDeliverySchema.optional(),
       managedClusterReceipt: managedClusterCapabilityReceiptSchema.optional(),
+      managedTrafficHandoffReceipt: managedTrafficHandoffReceiptSchema.optional(),
     })
     .optional(),
 });
@@ -8260,6 +8313,11 @@ export type ManagedClusterReplacementReadiness = z.infer<
 export type ManagedCapacityCell = z.infer<typeof managedCapacityCellSchema>;
 export type ManagedClusterCapabilityPlan = z.infer<typeof managedClusterCapabilityPlanSchema>;
 export type ManagedClusterCapabilityReceipt = z.infer<typeof managedClusterCapabilityReceiptSchema>;
+export type ManagedTrafficEndpoint = z.infer<typeof managedTrafficEndpointSchema>;
+export type ManagedTrafficRoute = z.infer<typeof managedTrafficRouteSchema>;
+export type ManagedTrafficHealthEvidence = z.infer<typeof managedTrafficHealthEvidenceSchema>;
+export type ManagedTrafficHandoffPlan = z.infer<typeof managedTrafficHandoffPlanSchema>;
+export type ManagedTrafficHandoffReceipt = z.infer<typeof managedTrafficHandoffReceiptSchema>;
 export type NotificationMessage = z.infer<typeof notificationMessageSchema>;
 export type NotificationMessageDelivery = z.infer<typeof notificationMessageDeliverySchema>;
 export type ConnectorCapabilityPlanPreview = z.infer<typeof connectorCapabilityPlanPreviewSchema>;

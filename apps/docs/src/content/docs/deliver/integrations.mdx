@@ -106,7 +106,7 @@ appaloft dns plan <domain> --hostname <host> --target <target> --connector cloud
 
 DNS 类连接需要经过三层校验才能自动配置：公开 DNS 发现（不需要授权，只是根据域名推断可能的托管商）、Connector 授权（证明你能访问某个 Provider 账号）、Zone 归属匹配（授权账号里必须真的存在覆盖该域名的 Zone）。三层都满足后，Appaloft 才会生成并应用 DNS 变更计划；任何一层不满足都会 fail closed 并提示手动配置。
 
-托管 Kubernetes 与多集群容量也复用同一套 Connector 协议。具体 Connector 可以声明 `infrastructure.cluster.provision`、`import`、`inspect`、`readiness`、`drain`、`delete`、`place`、`failover`、`recover` 和 `cleanup-orphans` 能力。公共合同只返回目标池、确定性的放置理由、placement epoch、fencing token、成本/支持级别和残留资源计数；Provider 凭证、计费、配额、租户策略和商业拓扑由组合该 Connector 的 Cloud/Enterprise 实现持有。
+托管 Kubernetes 与多集群容量也复用同一套 Connector 协议。具体 Connector 可以声明 `infrastructure.cluster.provision`、`import`、`inspect`、`readiness`、`drain`、`delete`、`place`、`failover`、`recover`、`cleanup-orphans`、`handoff-traffic`、`failback-traffic` 和 `traffic-status` 能力。公共合同只返回目标池、确定性的放置理由、placement epoch、fencing token、安全路由/端点/健康证明、成本/支持级别和残留资源计数；Provider 凭证、计费、配额、租户策略和商业拓扑由组合该 Connector 的 Cloud/Enterprise 实现持有。
 
 创建、删除和故障转移属于外部基础设施变更：先运行 `connectors plan`，检查成本、支持和 cleanup 证据，再接受该精确 plan 并将返回的 `acceptedPlanId` 传给 `connectors apply`。应用参数若与已接受的 plan 不一致会在 Provider 副作用前失败；容量不足或 failover 次数超限也不会静默回退到其他拓扑。
 
@@ -124,7 +124,15 @@ Web Console 在“账号设置 → 连接”中显示这些操作。Import 需�
 
 这个检查不需要接受计划，也没有 `connectors apply` 路径；它不会预留容量、增加 placement epoch、生成 fencing token 或更改集群、工作负载、Provider、路由和 DNS。结果只说明该不可变快照在检查时是否存在替代容量，真正的流量切换仍需重新检查新鲜状态、完成 fencing 并接受精确的切换计划。
 
-Cloud 组合提供托管集群 Connector 时，Web Console 的“账号设置 → 连接”会从 Connector 目录发现这些能力。变更能力提供 plan → 接受 → apply 流程；`readiness` 只提供 plan/readback。Web 只提交集群/工作负载引用、所需能力和放置意图；Provider 凭据、binding 与目标池不会进入表单。修改任何计划绑定输入都会立即废弃旧接受状态，apply 在新的精确计划被接受前保持禁用。计划和回读只显示成本、支持等级、选中区域/目标、placement epoch、状态、替代容量/原因和残留自有资源等安全字段。
+### Fenced 流量切换与显式 failback <a id="managed-traffic-handoff" />
+
+`infrastructure.cluster.handoff-traffic` 把一份精确的当前路由权威、安全端点引用、新鲜健康证明、当前和下一 placement epoch、轮换后的 fencing token 与回滚端点绑定进高风险计划。接受后，Connector 在任何副作用前重新读取当前路由与替代端点健康：路由、目标、epoch、token、端点或健康有效期任一漂移都会 fail closed。
+
+执行顺序固定为读取路由、读取健康、fence 旧 actor、移动路由、验证新权威、清理临时资源。移动前失败必须保持旧路由；移动后验证失败只能尝试一次回滚，并且只有回滚也被验证后才能返回 `rolled-back`。无法证明回滚时返回 `manual-intervention`，绝不把不确定状态报告为成功。`infrastructure.cluster.traffic-status` 只有 plan/readback；`infrastructure.cluster.failback-traffic` 不是旧 receipt 的反向重放，而是必须重新规划并接受更晚 epoch 与新 fencing token 的独立变更。
+
+公共响应只包含路由、端点、健康证明引用、执行步骤、结果、回滚次数和残留自有资源。凭据、Provider binding、账号/Zone 标识与原始 Provider 响应不进入公共合同。真正的 DNS、负载均衡或 CDN 写入仍取决于具体 Connector 是否获准 apply。
+
+Cloud 组合提供托管集群 Connector 时，Web Console 的“账号设置 → 连接”会从 Connector 目录发现这些能力。变更能力提供 plan → 接受 → apply 流程；`readiness` 与 `traffic-status` 只提供 plan/readback。Web 只提交安全的集群/工作负载/路由/端点引用、健康证明、所需能力和放置意图；Provider 凭据、私有 binding 与原始 Provider 对象不会进入表单。修改任何计划绑定输入都会立即废弃旧接受状态，apply 在新的精确计划被接受前保持禁用。计划和回读只显示成本、支持等级、选中区域/目标、placement epoch、流量结果/回滚、状态、替代容量/原因和残留自有资源等安全字段。
 
 ## 常见误区
 

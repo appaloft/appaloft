@@ -8,6 +8,9 @@
     ManagedClusterCapabilityReceipt,
     ManagedClusterPlacementDecision,
     ManagedClusterReplacementReadiness,
+    ManagedTrafficHandoffPlan,
+    ManagedTrafficHandoffReceipt,
+    ManagedTrafficRoute,
   } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
@@ -43,6 +46,16 @@
   let currentTargetId = $state("");
   let currentPlacementEpoch = $state("0");
   let attempt = $state("0");
+  let routeRef = $state("");
+  let currentEndpointRef = $state("");
+  let replacementEndpointRef = $state("");
+  let replacementTargetId = $state("");
+  let currentFencingToken = $state("");
+  let nextFencingToken = $state("");
+  let healthProofRef = $state("");
+  let healthObservedAt = $state("");
+  let healthValidUntil = $state("");
+  let plannedAt = $state("");
   let plan = $state<ConnectorCapabilityPlanResponse | null>(null);
   let acceptedPlanId = $state("");
   let applyResult = $state<ConnectorCapabilityApplyResponse | null>(null);
@@ -60,6 +73,16 @@
     currentTargetId,
     currentPlacementEpoch,
     attempt,
+    routeRef,
+    currentEndpointRef,
+    replacementEndpointRef,
+    replacementTargetId,
+    currentFencingToken,
+    nextFencingToken,
+    healthProofRef,
+    healthObservedAt,
+    healthValidUntil,
+    plannedAt,
   });
   const formFingerprint = $derived(managedClusterFormFingerprint(capabilityKey, form));
   const selectedCapability = $derived(
@@ -78,8 +101,14 @@
   );
   const isPlacementAction = $derived(!isCellCreation && !isReferenceAction);
   const isReadiness = $derived(capabilityKey === "infrastructure.cluster.readiness");
+  const isTrafficStatus = $derived(capabilityKey === "infrastructure.cluster.traffic-status");
+  const isTrafficMutation = $derived(
+    capabilityKey === "infrastructure.cluster.handoff-traffic" ||
+      capabilityKey === "infrastructure.cluster.failback-traffic",
+  );
+  const isTrafficAction = $derived(isTrafficStatus || isTrafficMutation);
   const isMutation = $derived(
-    capabilityKey !== "infrastructure.cluster.inspect" && !isReadiness,
+    capabilityKey !== "infrastructure.cluster.inspect" && !isReadiness && !isTrafficStatus,
   );
   const connectorAvailable = $derived(connector.availability.status === "available");
   const exactPlanIsCurrent = $derived(Boolean(plan && plannedFingerprint === formFingerprint));
@@ -104,6 +133,16 @@
   const applyReceipt = $derived<ManagedClusterCapabilityReceipt | null>(
     applyResult?.providerResult?.managedClusterReceipt ?? null,
   );
+  const trafficPlan = $derived<ManagedTrafficHandoffPlan | null>(
+    plan?.providerPlan?.managedTrafficHandoffPlan ?? null,
+  );
+  const trafficPlanRoute = $derived<ManagedTrafficRoute | null>(
+    plan?.providerPlan?.managedTrafficRoute ?? trafficPlan?.currentRoute ?? null,
+  );
+  const trafficReceipt = $derived<ManagedTrafficHandoffReceipt | null>(
+    applyResult?.providerResult?.managedTrafficHandoffReceipt ?? null,
+  );
+  const visibleTrafficRoute = $derived(trafficReceipt?.finalRoute ?? trafficPlanRoute);
   const visibleReceipt = $derived(applyReceipt ?? planReceipt);
   const visibleCell = $derived(visibleReceipt?.capacityCell ?? managedPlan?.capacityCell ?? null);
   const visiblePlacement = $derived(applyReceipt?.placement ?? planPlacement);
@@ -252,6 +291,63 @@
       <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedClusterRef)}</span>
       <Input bind:value={clusterRef} placeholder="cluster_..." />
     </label>
+  {:else if isTrafficAction}
+    <div class="grid gap-4 md:grid-cols-2" data-managed-traffic-inputs>
+      <label class="space-y-1.5 text-sm font-medium md:col-span-2">
+        <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedTrafficRouteRef)}</span>
+        <Input bind:value={routeRef} placeholder="route:api.example.com" />
+      </label>
+      {#if isTrafficMutation}
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedClusterWorkloadRef)}</span>
+          <Input bind:value={workloadRef} placeholder="resource:..." />
+        </label>
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedClusterCurrentTarget)}</span>
+          <Input bind:value={currentTargetId} placeholder="target_current" />
+        </label>
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedTrafficCurrentEndpoint)}</span>
+          <Input bind:value={currentEndpointRef} placeholder="endpoint:current" />
+        </label>
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedTrafficReplacementEndpoint)}</span>
+          <Input bind:value={replacementEndpointRef} placeholder="endpoint:replacement" />
+        </label>
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedTrafficReplacementTarget)}</span>
+          <Input bind:value={replacementTargetId} placeholder="target_replacement" />
+        </label>
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedClusterPlacementEpoch)}</span>
+          <Input bind:value={currentPlacementEpoch} inputmode="numeric" />
+        </label>
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedTrafficCurrentFence)}</span>
+          <Input bind:value={currentFencingToken} placeholder="fence_epoch_4" />
+        </label>
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedTrafficNextFence)}</span>
+          <Input bind:value={nextFencingToken} placeholder="fence_epoch_5" />
+        </label>
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedTrafficHealthProof)}</span>
+          <Input bind:value={healthProofRef} placeholder="health-proof:..." />
+        </label>
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedTrafficHealthObservedAt)}</span>
+          <Input bind:value={healthObservedAt} placeholder="2026-08-14T12:00:00.000Z" />
+        </label>
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedTrafficHealthValidUntil)}</span>
+          <Input bind:value={healthValidUntil} placeholder="2026-08-14T12:05:00.000Z" />
+        </label>
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedTrafficPlannedAt)}</span>
+          <Input bind:value={plannedAt} placeholder="2026-08-14T12:01:00.000Z" />
+        </label>
+      {/if}
+    </div>
   {:else if isPlacementAction}
     <div class="grid gap-4 md:grid-cols-2">
       <label class="space-y-1.5 text-sm font-medium">
@@ -279,7 +375,7 @@
     </div>
   {/if}
 
-  {#if isCellCreation || isPlacementAction}
+  {#if isCellCreation || (isPlacementAction && !isTrafficAction)}
     <label class="block space-y-1.5 text-sm font-medium">
       <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedClusterRequiredCapabilities)}</span>
       <Input bind:value={requiredCapabilities} placeholder="kubernetes, helm" />
@@ -332,13 +428,20 @@
           <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterCleanup)}</dt><dd class="font-medium">{managedPlan.cleanupSupported ? $t(i18nKeys.console.accountSettings.managedClusterCleanupSupported) : $t(i18nKeys.console.accountSettings.managedClusterCleanupUnavailable)}</dd></div>
         </dl>
       {/if}
+      {#if trafficPlan}
+        <dl class="grid gap-3 text-sm sm:grid-cols-3">
+          <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedTrafficRouteRef)}</dt><dd class="break-all font-medium">{trafficPlan.currentRoute.routeRef}</dd></div>
+          <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedTrafficReplacementTarget)}</dt><dd class="break-all font-medium">{trafficPlan.replacementEndpoint.targetId}</dd></div>
+          <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterPlacementEpoch)}</dt><dd class="font-medium">{trafficPlan.nextPlacementEpoch}</dd></div>
+        </dl>
+      {/if}
       {#if acceptedPlanId}
         <div class="flex items-center gap-2 text-sm text-primary"><CheckCircle2 class="size-4" />{$t(i18nKeys.console.accountSettings.managedClusterPlanAccepted)}</div>
       {/if}
     </div>
   {/if}
 
-  {#if applyResult || visibleReceipt || visiblePlacement || replacementReadiness}
+  {#if applyResult || visibleReceipt || visiblePlacement || replacementReadiness || visibleTrafficRoute}
     <div class="space-y-3 rounded-md border bg-card p-4" data-managed-cluster-readback>
       <h3 class="text-sm font-semibold">{$t(i18nKeys.console.accountSettings.managedClusterReadbackTitle)}</h3>
       {#if applyResult}<p class="text-sm text-muted-foreground">{applyResult.summary}</p>{/if}
@@ -368,6 +471,16 @@
           {/if}
           <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterEligibleCapacity)}</dt><dd class="font-medium">{replacementReadiness.totalEligibleReplacementCapacity}</dd></div>
           <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterReadinessReasons)}</dt><dd class="break-words font-medium">{replacementReadiness.reasonCodes.join(", ")}</dd></div>
+        {/if}
+        {#if trafficReceipt}
+          <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedTrafficOutcome)}</dt><dd class="font-medium">{trafficReceipt.outcome}</dd></div>
+          <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedTrafficRollbackAttempts)}</dt><dd class="font-medium">{trafficReceipt.rollbackAttempts}</dd></div>
+          <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterResidualResources)}</dt><dd class="font-medium">{trafficReceipt.cleanup.residualOwnedResources}</dd></div>
+        {/if}
+        {#if visibleTrafficRoute}
+          <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedTrafficRouteRef)}</dt><dd class="break-all font-medium">{visibleTrafficRoute.routeRef}</dd></div>
+          <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedTrafficActiveEndpoint)}</dt><dd class="break-all font-medium">{visibleTrafficRoute.activeEndpointRef}</dd></div>
+          <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterPlacementEpoch)}</dt><dd class="font-medium">{visibleTrafficRoute.placementEpoch}</dd></div>
         {/if}
       </dl>
     </div>

@@ -993,6 +993,39 @@ export const publicDocsHelpTopics = {
     ],
     webSurfaces: ["Account settings → Connections → Managed Kubernetes"],
   },
+  "integration.managed-traffic-handoff": {
+    id: "integration.managed-traffic-handoff",
+    title: "Fenced traffic handoff and explicit failback",
+    description:
+      "How to bind fresh health, route authority, fencing, verified cutover, one-shot rollback, status readback, and a newly planned explicit failback.",
+    page: {
+      "zh-CN": "deliver/integrations",
+      "en-US": "en/deliver/integrations",
+    },
+    anchor: "managed-traffic-handoff",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "connections.capability.plan",
+    aliases: [
+      "infrastructure.cluster.handoff-traffic",
+      "infrastructure.cluster.failback-traffic",
+      "infrastructure.cluster.traffic-status",
+      "traffic cutover",
+      "explicit failback",
+      "fenced handoff",
+      "流量切换",
+      "显式回切",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-115-managed-capacity-failure-domain-boundary.md",
+      "docs/specs/137-production-failure-domain-resilience/spec.md",
+      "docs/testing/production-failure-domain-resilience-test-matrix.md",
+    ],
+    webSurfaces: ["Account settings → Connections → Managed Kubernetes"],
+  },
   "agent.deploy-skill": {
     id: "agent.deploy-skill",
     title: "Agent deploy skill",
