@@ -25,8 +25,12 @@
 
 ## R5d Managed And Multi-Cluster
 
-- [ ] RED `K8S-MULTI-015`, `K8S-MANAGED-016`, `K8S-E2E-020`.
-- [ ] Implement public connector/placement/failover protocol; adopt through Cloud/Enterprise adapters.
+- [x] RED and GREEN public automated coverage for `K8S-MULTI-015`, `K8S-MANAGED-016` and the R5d
+  portion of `K8S-SURFACE-017`.
+- [x] Implement provider-neutral target-pool placement/failover/fencing and typed managed-cluster
+  connector plan/apply/readback/delete contracts with exact accepted-plan binding.
+- [ ] Adopt the public protocol through Cloud/Enterprise custody, policy, entitlement and provider
+  adapters, including the managed-cluster Web surface.
 - [ ] Run authorized managed/design-partner isolation, failover, recovery, cost/support and cleanup packet.
 
 ## Final Sync

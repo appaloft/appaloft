@@ -60,6 +60,9 @@ import {
   type ExecutionStrategyKind,
   type InfrastructureServerProposalSnapshot,
   type LogLevel,
+  type ManagedClusterCapabilityPlanSnapshot,
+  type ManagedClusterCapabilityReceiptSnapshot,
+  type ManagedClusterPlacementDecisionSnapshot,
   type NotificationMessageDeliverySnapshot,
   type NotificationMessageSnapshot,
   type PackagingMode,
@@ -10861,6 +10864,9 @@ export interface ConnectorCapabilityPlanPreview {
     dnsRecords?: DnsRecordPlanSnapshot;
     domainConnectSetup?: DomainConnectSetupSnapshot;
     infrastructureServerProposal?: InfrastructureServerProposalSnapshot;
+    managedClusterPlan?: ManagedClusterCapabilityPlanSnapshot;
+    managedClusterReceipt?: ManagedClusterCapabilityReceiptSnapshot;
+    managedClusterPlacement?: ManagedClusterPlacementDecisionSnapshot;
     notificationMessage?: NotificationMessageSnapshot;
     sourceRepositoryAccess?: SourceRepositoryAccessSnapshot;
   };
@@ -10874,6 +10880,8 @@ export interface ConnectorCapabilityApplyInput {
     id: string;
   };
   acceptedPlanId?: string;
+  /** Internal accepted snapshot used by adapters to bind mutations to the exact reviewed plan. */
+  acceptedPlan?: AcceptedConnectionCapabilityPlanSnapshot;
   parameters?: Record<string, unknown>;
 }
 
@@ -10895,6 +10903,7 @@ export interface ConnectorCapabilityApplyResult {
     dnsRecords?: DnsRecordApplySnapshot;
     domainConnectApply?: DomainConnectApplySnapshot;
     notificationDelivery?: NotificationMessageDeliverySnapshot;
+    managedClusterReceipt?: ManagedClusterCapabilityReceiptSnapshot;
   };
 }
 

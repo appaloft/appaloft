@@ -78,12 +78,19 @@ appaloft connectors catalog
 appaloft connectors list
 appaloft connectors connect <connector>
 appaloft connectors revoke <connectionId>
+appaloft connectors plan --connector <connector> --capability <key> --parameters-json '<json>'
+appaloft connectors accept --connector <connector> --capability <key> --plan-id <planId> --risk <risk> --summary <summary> --effects-json '<json>'
+appaloft connectors apply --connector <connector> --capability <key> --parameters-json '<json>' --accepted-plan-id <acceptedPlanId>
 
 # Capability-scoped shortcuts (still the same underlying Connection model)
 appaloft dns plan <domain> --hostname <host> --target <target> --connector cloudflare-dns
 ```
 
 DNS-type connections require passing three layers of validation before automatic configuration is possible: public DNS discovery (no authorization needed — it just infers a likely host provider from the domain), Connector authorization (proves you can access a particular Provider account), and Zone ownership matching (the authorized account must actually own a Zone covering that domain). Only once all three layers pass will Appaloft generate and apply a DNS change plan; failing any layer fails closed and points you to manual configuration.
+
+Managed Kubernetes and multi-cluster capacity reuse the same Connector protocol. A concrete Connector can declare `infrastructure.cluster.provision`, `inspect`, `delete`, `place`, `failover`, `recover`, and `cleanup-orphans` capabilities. The public contracts return only the target pool, deterministic placement reasons, placement epoch, fencing token, cost/support level, and residual-resource counts. Provider credentials, billing, quota, tenant policy, and commercial topology remain owned by the Cloud/Enterprise implementation that composes the Connector.
+
+Provisioning, deletion, and failover mutate external infrastructure. Run `connectors plan` first, inspect cost, support, and cleanup evidence, accept that exact plan, and pass the returned `acceptedPlanId` to `connectors apply`. Parameters that drift from the accepted plan fail before provider effects. Insufficient capacity or an exhausted failover bound also fails explicitly instead of silently selecting a different topology.
 
 ## Common mistakes
 

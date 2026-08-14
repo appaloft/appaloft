@@ -5,6 +5,8 @@ export * from "./dns-connection";
 export * from "./dns-provider-discovery";
 export * from "./infrastructure-connection";
 export * from "./integration-connection";
+export * from "./managed-cluster-connection";
+export * from "./managed-cluster-topology";
 export * from "./notification-connection";
 export * from "./plugin-installation";
 export * from "./provider-connection";

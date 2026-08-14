@@ -7717,6 +7717,109 @@ export const infrastructureServerProposalSchema = z.object({
   tags: z.array(z.string()),
 });
 
+export const managedClusterSupportLevelSchema = z.enum(["community", "standard", "premium"]);
+
+export const managedClusterTargetCandidateSchema = z.object({
+  targetId: z.string(),
+  providerKey: z.string(),
+  region: z.string(),
+  status: z.enum(["ready", "degraded", "unavailable"]),
+  capabilities: z.array(z.string()),
+  availableCapacity: z.number().int().nonnegative(),
+  estimatedMonthlyCostUsd: z.number().nonnegative().optional(),
+  supportLevel: managedClusterSupportLevelSchema,
+});
+
+export const managedClusterTargetPoolSchema = z.object({
+  poolId: z.string(),
+  targets: z.array(managedClusterTargetCandidateSchema).min(1),
+});
+
+export const managedClusterPlacementIntentSchema = z.object({
+  workloadRef: z.string(),
+  requiredCapabilities: z.array(z.string()),
+  preferredRegions: z.array(z.string()),
+  excludedTargetIds: z.array(z.string()),
+  currentTargetId: z.string().optional(),
+  currentPlacementEpoch: z.number().int().nonnegative(),
+  maxFailoverAttempts: z.number().int().min(0).max(10),
+});
+
+export const managedClusterPlacementDecisionSchema = z.object({
+  poolId: z.string(),
+  workloadRef: z.string(),
+  mode: z.enum(["initial", "failover", "recovery"]),
+  attempt: z.number().int().nonnegative(),
+  selectedTargetId: z.string(),
+  selectedProviderKey: z.string(),
+  selectedRegion: z.string(),
+  previousTargetId: z.string().optional(),
+  placementEpoch: z.number().int().positive(),
+  fencingToken: z.string(),
+  rankedEligibleTargetIds: z.array(z.string()),
+  reasonCodes: z.array(z.string()),
+  consideredTargets: z.array(
+    z.object({
+      targetId: z.string(),
+      eligible: z.boolean(),
+      reasons: z.array(z.string()),
+    }),
+  ),
+});
+
+export const managedClusterCapabilityActionSchema = z.enum([
+  "provision",
+  "inspect",
+  "delete",
+  "place",
+  "failover",
+  "recover",
+  "cleanup-orphans",
+]);
+
+export const managedClusterCapabilityPlanSchema = z.object({
+  action: managedClusterCapabilityActionSchema,
+  providerKey: z.string(),
+  clusterName: z.string().optional(),
+  clusterRef: z.string().optional(),
+  region: z.string().optional(),
+  clusterClass: z.string().optional(),
+  targetPoolId: z.string().optional(),
+  estimatedMonthlyCostUsd: z.number().nonnegative().optional(),
+  currency: z.literal("USD"),
+  supportLevel: managedClusterSupportLevelSchema,
+  cleanupSupported: z.boolean(),
+  requiredCapabilities: z.array(z.string()),
+  placement: managedClusterPlacementDecisionSchema.optional(),
+});
+
+export const managedClusterCapabilityReceiptSchema = z.object({
+  operationId: z.string(),
+  action: managedClusterCapabilityActionSchema,
+  providerKey: z.string(),
+  clusterRef: z.string(),
+  clusterName: z.string().optional(),
+  status: z.enum(["planned", "ready", "deleted", "not-found", "failed"]),
+  region: z.string().optional(),
+  clusterClass: z.string().optional(),
+  targetPoolId: z.string().optional(),
+  targetId: z.string().optional(),
+  support: z.object({
+    level: managedClusterSupportLevelSchema,
+    reference: z.string().optional(),
+  }),
+  cost: z.object({
+    currency: z.literal("USD"),
+    estimatedMonthlyAmount: z.number().nonnegative().optional(),
+  }),
+  cleanup: z.object({
+    supported: z.boolean(),
+    residualOwnedResources: z.number().int().nonnegative(),
+    orphanResourceRefs: z.array(z.string()),
+  }),
+  placement: managedClusterPlacementDecisionSchema.optional(),
+});
+
 export const notificationMessageSchema = z.object({
   providerKey: z.string(),
   channelRef: z.string(),
@@ -7780,6 +7883,9 @@ export const connectorCapabilityPlanPreviewSchema = z.object({
       dnsRecords: dnsRecordPlanSchema.optional(),
       domainConnectSetup: domainConnectSetupSchema.optional(),
       infrastructureServerProposal: infrastructureServerProposalSchema.optional(),
+      managedClusterPlan: managedClusterCapabilityPlanSchema.optional(),
+      managedClusterReceipt: managedClusterCapabilityReceiptSchema.optional(),
+      managedClusterPlacement: managedClusterPlacementDecisionSchema.optional(),
       notificationMessage: notificationMessageSchema.optional(),
       sourceRepositoryAccess: sourceRepositoryAccessSchema.optional(),
     })
@@ -7832,6 +7938,7 @@ export const connectorCapabilityApplyResultSchema = z.object({
       dnsRecords: dnsRecordApplySchema.optional(),
       domainConnectApply: domainConnectApplySchema.optional(),
       notificationDelivery: notificationMessageDeliverySchema.optional(),
+      managedClusterReceipt: managedClusterCapabilityReceiptSchema.optional(),
     })
     .optional(),
 });
@@ -8057,6 +8164,11 @@ export type SourceRepositorySummary = z.infer<typeof sourceRepositorySummarySche
 export type ProviderAppTokenLease = z.infer<typeof providerAppTokenLeaseSchema>;
 export type SourceRepositoryAccess = z.infer<typeof sourceRepositoryAccessSchema>;
 export type InfrastructureServerProposal = z.infer<typeof infrastructureServerProposalSchema>;
+export type ManagedClusterTargetPool = z.infer<typeof managedClusterTargetPoolSchema>;
+export type ManagedClusterPlacementIntent = z.infer<typeof managedClusterPlacementIntentSchema>;
+export type ManagedClusterPlacementDecision = z.infer<typeof managedClusterPlacementDecisionSchema>;
+export type ManagedClusterCapabilityPlan = z.infer<typeof managedClusterCapabilityPlanSchema>;
+export type ManagedClusterCapabilityReceipt = z.infer<typeof managedClusterCapabilityReceiptSchema>;
 export type NotificationMessage = z.infer<typeof notificationMessageSchema>;
 export type NotificationMessageDelivery = z.infer<typeof notificationMessageDeliverySchema>;
 export type ConnectorCapabilityPlanPreview = z.infer<typeof connectorCapabilityPlanPreviewSchema>;

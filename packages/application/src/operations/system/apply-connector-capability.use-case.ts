@@ -1,5 +1,6 @@
 import {
   AcceptedConnectionCapabilityPlan,
+  type AcceptedConnectionCapabilityPlanSnapshot,
   ConnectionCapabilityKey,
   ConnectorDefinition,
   domainError,
@@ -65,13 +66,15 @@ export class ApplyConnectorCapabilityUseCase {
       );
     }
 
+    let acceptedPlanSnapshot: AcceptedConnectionCapabilityPlanSnapshot | undefined;
     if (input.acceptedPlanId) {
-      const acceptedPlan = this.acceptedPlanStore?.findById(input.acceptedPlanId);
-      if (!acceptedPlan) {
+      const foundAcceptedPlan = this.acceptedPlanStore?.findById(input.acceptedPlanId);
+      if (!foundAcceptedPlan) {
         return err(domainError.notFound("AcceptedConnectionCapabilityPlan", input.acceptedPlanId));
       }
+      acceptedPlanSnapshot = foundAcceptedPlan;
       if (
-        !AcceptedConnectionCapabilityPlan.rehydrate(acceptedPlan).matches({
+        !AcceptedConnectionCapabilityPlan.rehydrate(acceptedPlanSnapshot).matches({
           connectorKey: input.connectorKey,
           capabilityKey: input.capabilityKey,
           ...(input.ownerRef ? { ownerRef: input.ownerRef } : {}),
@@ -92,6 +95,7 @@ export class ApplyConnectorCapabilityUseCase {
       capabilityKey: input.capabilityKey,
       ...(input.ownerRef ? { ownerRef: input.ownerRef } : {}),
       ...(input.acceptedPlanId ? { acceptedPlanId: input.acceptedPlanId } : {}),
+      ...(acceptedPlanSnapshot ? { acceptedPlan: acceptedPlanSnapshot } : {}),
       ...(input.parameters ? { parameters: input.parameters } : {}),
     });
   }
