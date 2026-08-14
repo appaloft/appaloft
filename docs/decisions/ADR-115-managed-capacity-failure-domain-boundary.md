@@ -34,6 +34,14 @@ placement engine.
 7. Cloud/Enterprise owns provider bindings, tenant policy, credentials, capacity, cost, support,
    traffic-provider composition and operational SLO. Public Appaloft owns only neutral intent,
    decision evidence and lifecycle contracts.
+8. A public `Managed Capacity Cell` is the neutral lifecycle view of one managed-cluster target.
+   It records explicit `provisioned|imported` origin and `accepting|draining|drained|deleted|failed`
+   lifecycle status. Provision/import/drain/delete reuse exact connector plan acceptance; inspect is
+   read-only. Drain prevents new placement, and delete requires a drained cell with zero active
+   placements.
+9. Imported cells retain their external provider resource when Appaloft management is deleted.
+   Provider-owned provisioned cells may delete provider resources only when the accepted plan and
+   receipt explicitly select that disposition. Provider-specific documents remain adapter-local.
 
 ## Consequences
 
@@ -42,6 +50,8 @@ placement engine.
   API documents.
 - Existing target snapshots require an additive field during the pre-1.0 Code Round; all fixtures,
   schemas and entrypoints must be synchronized directly rather than adding compatibility fallbacks.
+- Capacity-cell lifecycle readback makes active placement count and provider-resource disposition
+  explicit so drain/delete safety is observable without leaking provider bindings.
 - A production claim still requires real independent-domain, traffic, state-safety and cleanup
   evidence. Unit tests cannot close the external packet.
 

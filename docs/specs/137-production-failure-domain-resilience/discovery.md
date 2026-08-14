@@ -72,6 +72,23 @@ decisions are accepted for R6b1 and do not weaken the broader R6b managed-cell l
 | Q19. Does this complete R6b? | No. Cell import/provision, inspect, drain/delete and external provider evidence remain R6b2. | `R6-CLOUD-CELLS-005` stays open until the lifecycle and provider packet pass. |
 | Q20. Is another ADR required? | ADR-115 already owns the later readiness query and public/private boundary; update it with the explicit typed/no-effect semantics rather than add a competing ADR. | Canonical language remains `independent replacement readiness`. |
 
+## R6b2 Accepted Grill Decisions
+
+The owner asked the agent to complete R6b2 and retained the authorization for the agent to accept
+its recommended Grill answers. These decisions define the managed capacity-cell lifecycle slice;
+they do not authorize paid provider mutation or pull R6c traffic handoff into this round.
+
+| Question | Recommended and accepted decision | Consequence |
+| --- | --- | --- |
+| Q21. What is the canonical resource? | A **Managed Capacity Cell** is one independently identifiable managed-cluster target that contributes schedulable capacity to one target pool. Existing `infrastructure.cluster.*` capability keys remain the transport vocabulary. | Add no Cloud-only cluster model and do not rename existing compatibility surfaces. |
+| Q22. How can a cell enter management? | `provision` creates a provider-owned cell; `import` adopts an existing cluster reference without claiming ownership of the provider resource. Both require explicit topology, capacity, support and cleanup semantics. | Import is not a disguised provider create and cannot infer failure domains from a name or region label. |
+| Q23. What does inspect return? | `inspect` is read-only and returns a safe exact cell snapshot: origin, lifecycle status, target/pool identity, declared failure domains, available capacity, active placement count, cost/support and provider-resource disposition. | Provider binding, credentials, raw provider objects and private support references remain outside the public contract. |
+| Q24. What does drain mean? | An accepted `drain` plan first stops new placement. It returns `draining` while active placements remain and `drained` only when the active placement count is zero. | Drain is a lifecycle transition, not a best-effort label; placement must treat non-accepting cells as unavailable. |
+| Q25. When may delete run? | `delete` requires an exact accepted plan over a drained cell with zero active placements. Provisioned cells may delete owned provider resources; imported cells only leave Appaloft management and retain the external resource. | Delete-before-drain and imported-resource destruction fail before provider effects. |
+| Q26. How is exact-plan safety preserved? | Import, provision, drain and delete all reuse `connections.capability.plan -> accept -> apply`; apply parameters must reproduce the accepted plan. Inspect remains plan-only. | No hidden provider endpoint or direct repository mutation is introduced. |
+| Q27. What closes the internal R6b2 gate? | Two explicit cells with different required domain keys complete provision/import, inspect, drain/delete and independent readiness in a deterministic dry-run/readback packet, including cost/support and zero Appaloft-owned residual evidence. | Fake or dry-run evidence can close internal contract/composition rows but not the real regional provider packet. |
+| Q28. What DigitalOcean work is allowed now? | Cloud may implement a DOKS-specific redacted planning/readback adapter and use read-only provider options/inventory. It must not create, resize or delete DOKS resources without a separately approved target, cost ceiling and cleanup packet. | R6b2 code can be complete while `RESIL-E2E-009` remains blocked on external approval. |
+
 ## Open Operational Questions
 
 These do not block the provider-neutral first Code slice, but they block the paid production packet:
