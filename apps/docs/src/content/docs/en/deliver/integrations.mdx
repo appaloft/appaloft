@@ -92,6 +92,8 @@ Managed Kubernetes and multi-cluster capacity reuse the same Connector protocol.
 
 Provisioning, deletion, and failover mutate external infrastructure. Run `connectors plan` first, inspect cost, support, and cleanup evidence, accept that exact plan, and pass the returned `acceptedPlanId` to `connectors apply`. Parameters that drift from the accepted plan fail before provider effects. Insufficient capacity or an exhausted failover bound also fails explicitly instead of silently selecting a different topology.
 
+When the Cloud composition provides a managed-cluster Connector, the Web Console discovers these capabilities from **Account settings → Connections** and exposes the same plan → accept → apply flow. The Web form submits only cluster/workload references, required capabilities, and placement intent; Provider credentials, bindings, and target pools never enter the form. Changing any plan-bound input immediately invalidates the prior acceptance, and apply stays disabled until the new exact plan is accepted. Plan and readback surfaces show only safe cost, support, selected region/target, placement epoch, status, and residual-owned-resource fields.
+
 ## Common mistakes
 
 - **Treating a GitHub login as repository access authorization**: login only represents identity — browsing repositories, receiving webhooks, or writing back deployment status all require completing GitHub integration authorization separately.

@@ -1,15 +1,19 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { createQuery } from "@tanstack/svelte-query";
   import { Link2 } from "@lucide/svelte";
 
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
   import GitHubIcon from "$lib/components/console/GitHubIcon.svelte";
+  import ManagedClusterConnectionPanel from "$lib/components/console/ManagedClusterConnectionPanel.svelte";
   import SettingsShell from "$lib/components/console/SettingsShell.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { accountSettingsItems } from "$lib/console/settings-nav";
+  import { canRunProductQueries } from "$lib/console/auth-query-gate";
   import { createConsoleQueries, defaultAuthSession } from "$lib/console/queries";
   import { i18nKeys, t } from "$lib/i18n";
+  import { orpc } from "$lib/orpc";
 
   const { authSessionQuery } = createConsoleQueries(browser, {
     readiness: false,
@@ -24,6 +28,23 @@
     providers: false,
     projects: false,
   });
+  const productQueriesEnabled = $derived(browser && canRunProductQueries(authSessionQuery.data));
+  const organizationContextQuery = createQuery(() =>
+    orpc.organizations.currentContext.queryOptions({
+      input: {},
+      enabled: productQueriesEnabled,
+      retry: 0,
+      staleTime: 30_000,
+    }),
+  );
+  const connectorCatalogQuery = createQuery(() =>
+    orpc.connections.catalog.list.queryOptions({
+      input: { category: "infrastructure", includeUnavailable: true },
+      enabled: productQueriesEnabled,
+      retry: 0,
+      staleTime: 30_000,
+    }),
+  );
 
   let operationError = $state("");
   let linkingGitHub = $state(false);
@@ -50,6 +71,14 @@
   });
   const canLinkGitHub = $derived(
     Boolean(githubProvider?.configured && authSession.session && !githubConnected && !linkingGitHub),
+  );
+  const currentOrganization = $derived(
+    organizationContextQuery.data?.currentOrganization ?? null,
+  );
+  const managedClusterConnector = $derived(
+    connectorCatalogQuery.data?.items.find(
+      (connector) => connector.key === "managed-kubernetes",
+    ) ?? null,
   );
 
   async function connectGitHub(): Promise<void> {
@@ -150,6 +179,21 @@
               ? $t(i18nKeys.common.status.connected)
               : $t(i18nKeys.console.accountSettings.linkGitHubAccount)}
         </Button>
+      </div>
+    {/if}
+
+    {#if connectorCatalogQuery.isPending || organizationContextQuery.isPending}
+      <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-4 text-sm text-muted-foreground">
+        {$t(i18nKeys.common.status.loading)}
+      </div>
+    {:else if managedClusterConnector && currentOrganization}
+      <ManagedClusterConnectionPanel
+        connector={managedClusterConnector}
+        organizationId={currentOrganization.organizationId}
+      />
+    {:else if productQueriesEnabled}
+      <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-4 text-sm text-muted-foreground">
+        {$t(i18nKeys.console.accountSettings.managedClusterUnavailable)}
       </div>
     {/if}
 

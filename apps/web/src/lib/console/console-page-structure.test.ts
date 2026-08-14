@@ -262,6 +262,12 @@ const accountConnectionsPageSource = readFileSync(
   fileURLToPath(new URL("../../routes/account/connections/+page.svelte", import.meta.url)),
   "utf8",
 );
+const managedClusterConnectionPanelSource = readFileSync(
+  fileURLToPath(
+    new URL("../components/console/ManagedClusterConnectionPanel.svelte", import.meta.url),
+  ),
+  "utf8",
+);
 const accountSessionsPageSource = readFileSync(
   fileURLToPath(new URL("../../routes/account/sessions/+page.svelte", import.meta.url)),
   "utf8",
@@ -3420,6 +3426,25 @@ describe("console page structure", () => {
     expect(accountConnectionsPageSource).toContain("githubProvider?.accountLabel");
     expect(accountConnectionsPageSource).toContain("linkGitHubAccount");
     expect(consoleShellSource).not.toContain("/api/auth/link-social");
+  });
+
+  test("[K8S-SURFACE-017] exposes managed cluster plan, acceptance, apply, and safe readback", () => {
+    expect(accountConnectionsPageSource).toContain("orpc.connections.catalog.list.queryOptions");
+    expect(accountConnectionsPageSource).toContain('connector.key === "managed-kubernetes"');
+    expect(accountConnectionsPageSource).toContain("ManagedClusterConnectionPanel");
+    expect(managedClusterConnectionPanelSource).toContain("orpcClient.connections.capability.plan");
+    expect(managedClusterConnectionPanelSource).toContain(
+      "orpcClient.connections.capability.accept",
+    );
+    expect(managedClusterConnectionPanelSource).toContain(
+      "orpcClient.connections.capability.apply",
+    );
+    expect(managedClusterConnectionPanelSource).toContain("managedClusterPlan");
+    expect(managedClusterConnectionPanelSource).toContain("managedClusterReceipt");
+    expect(managedClusterConnectionPanelSource).toContain("acceptedPlanId");
+    expect(managedClusterConnectionPanelSource).toContain("disabled={!canApplyPlan}");
+    expect(managedClusterConnectionPanelSource).not.toContain("credentialReference");
+    expect(managedClusterConnectionPanelSource).not.toContain("providerBindingRef");
   });
 
   test("[ACCOUNT-SETTINGS-IA-002] keeps account security forms behind intent dialogs", () => {

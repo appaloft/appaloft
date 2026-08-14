@@ -280,7 +280,7 @@ import {
   type UnlockEnvironmentCommandInput,
   type UnsetEnvironmentVariableCommandInput,
   type UnsetResourceVariableCommandInput,
-} from "@appaloft/application/schemas";
+} from "@appaloft/application/client-types";
 import {
   type AcceptConnectorCapabilityPlanResponse,
   type AccountProfileResponse,
