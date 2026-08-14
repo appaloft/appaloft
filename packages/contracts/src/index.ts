@@ -2755,7 +2755,9 @@ export const resourceHealthSummarySchema = z.object({
     ]),
     health: z.enum(["healthy", "unhealthy", "unknown", "not-configured"]),
     observedAt: z.string().optional(),
-    runtimeKind: z.enum(["docker-container", "docker-compose-stack", "host-process"]).optional(),
+    runtimeKind: z
+      .enum(["docker-container", "docker-compose-stack", "host-process", "helm-release"])
+      .optional(),
     reasonCode: z.string().optional(),
     message: z.string().optional(),
   }),
@@ -3217,6 +3219,7 @@ export const resourceDetailSourceProfileSchema = z.object({
     "docker-compose-inline",
     "docker-image",
     "compose",
+    "helm-chart",
   ]),
   locator: z.string(),
   displayName: z.string(),
@@ -3233,6 +3236,14 @@ export const resourceDetailSourceProfileSchema = z.object({
   imageDigest: z.string().optional(),
   version: z.string().optional(),
   versionKind: z.enum(versionReferenceKinds).optional(),
+  helmChart: z
+    .object({
+      version: z.string(),
+      valuesSecretReferences: z.array(z.string()),
+      hookPolicy: z.enum(["disabled", "bounded"]),
+      timeoutSeconds: z.number().int().min(30).max(900),
+    })
+    .optional(),
   metadata: z.record(z.string(), z.string()).optional(),
 });
 
@@ -3250,36 +3261,62 @@ export const resourceAutoDeployPolicySummarySchema = z.object({
   updatedAt: z.string(),
 });
 
-export const resourceSourceBindingInputSchema = z.object({
-  kind: z.enum([
-    "local-folder",
-    "local-git",
-    "remote-git",
-    "git-public",
-    "git-github-app",
-    "git-deploy-key",
-    "zip-artifact",
-    "dockerfile-inline",
-    "docker-compose-inline",
-    "docker-image",
-    "compose",
-  ]),
-  locator: z.string().min(1),
-  displayName: z.string().min(1).optional(),
-  gitRef: z.string().min(1).optional(),
-  commitSha: z.string().min(1).optional(),
-  baseDirectory: z.string().min(1).optional(),
-  originalLocator: z.string().min(1).optional(),
-  repositoryId: z.string().min(1).optional(),
-  repositoryFullName: z.string().min(1).optional(),
-  defaultBranch: z.string().min(1).optional(),
-  imageName: z.string().min(1).optional(),
-  imageTag: z.string().min(1).optional(),
-  imageDigest: z.string().min(1).optional(),
-  version: z.string().min(1).optional(),
-  versionKind: z.enum(versionReferenceKinds).optional(),
-  metadata: z.record(z.string(), z.string()).optional(),
-});
+export const resourceSourceBindingInputSchema = z
+  .object({
+    kind: z.enum([
+      "local-folder",
+      "local-git",
+      "remote-git",
+      "git-public",
+      "git-github-app",
+      "git-deploy-key",
+      "zip-artifact",
+      "dockerfile-inline",
+      "docker-compose-inline",
+      "docker-image",
+      "compose",
+      "helm-chart",
+    ]),
+    locator: z.string().min(1),
+    displayName: z.string().min(1).optional(),
+    gitRef: z.string().min(1).optional(),
+    commitSha: z.string().min(1).optional(),
+    baseDirectory: z.string().min(1).optional(),
+    originalLocator: z.string().min(1).optional(),
+    repositoryId: z.string().min(1).optional(),
+    repositoryFullName: z.string().min(1).optional(),
+    defaultBranch: z.string().min(1).optional(),
+    imageName: z.string().min(1).optional(),
+    imageTag: z.string().min(1).optional(),
+    imageDigest: z.string().min(1).optional(),
+    version: z.string().min(1).optional(),
+    versionKind: z.enum(versionReferenceKinds).optional(),
+    helmChart: z
+      .object({
+        version: z.string().min(1),
+        valuesSecretReferences: z.array(z.string().min(1)).max(16).default([]),
+        hookPolicy: z.enum(["disabled", "bounded"]).default("disabled"),
+        timeoutSeconds: z.number().int().min(30).max(900).default(300),
+      })
+      .optional(),
+    metadata: z.record(z.string(), z.string()).optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.kind === "helm-chart" && !value.helmChart) {
+      context.addIssue({
+        code: "custom",
+        path: ["helmChart"],
+        message: "Helm chart sources require Helm chart configuration",
+      });
+    }
+    if (value.kind !== "helm-chart" && value.helmChart) {
+      context.addIssue({
+        code: "custom",
+        path: ["helmChart"],
+        message: "Helm chart configuration requires a Helm chart source",
+      });
+    }
+  });
 
 export const resourceRuntimeProfileInputSchema = z
   .object({
@@ -3291,6 +3328,7 @@ export const resourceRuntimeProfileInputSchema = z
         "prebuilt-image",
         "workspace-commands",
         "static",
+        "helm",
       ])
       .default("auto"),
     installCommand: z.string().min(1).optional(),
@@ -3315,6 +3353,7 @@ export const resourceDetailRuntimeProfileSchema = z.object({
     "prebuilt-image",
     "workspace-commands",
     "static",
+    "helm",
   ]),
   installCommand: z.string().optional(),
   buildCommand: z.string().optional(),
@@ -5551,6 +5590,7 @@ export const runtimePlanSchema = z.object({
       "docker-compose-inline",
       "docker-image",
       "compose",
+      "helm-chart",
     ]),
     locator: z.string(),
     displayName: z.string(),
@@ -5712,6 +5752,7 @@ export const runtimePlanSchema = z.object({
     "static-artifact",
     "prebuilt-image",
     "workspace-commands",
+    "helm-package",
   ]),
   packagingMode: z.enum([
     "split-deploy",
@@ -5719,18 +5760,19 @@ export const runtimePlanSchema = z.object({
     "compose-bundle",
     "host-process-runtime",
     "optional-future-binary",
+    "helm-chart",
   ]),
   runtimeArtifact: z
     .object({
-      kind: z.enum(["image", "compose-project"]),
-      intent: z.enum(["build-image", "prebuilt-image", "compose-project"]),
+      kind: z.enum(["image", "compose-project", "helm-chart"]),
+      intent: z.enum(["build-image", "prebuilt-image", "compose-project", "helm-chart"]),
       image: z.string().optional(),
       composeFile: z.string().optional(),
       metadata: z.record(z.string(), z.string()).optional(),
     })
     .optional(),
   execution: z.object({
-    kind: z.enum(["docker-container", "docker-compose-stack", "host-process"]),
+    kind: z.enum(["docker-container", "docker-compose-stack", "host-process", "helm-release"]),
     workingDirectory: z.string().optional(),
     installCommand: z.string().optional(),
     buildCommand: z.string().optional(),
@@ -6451,7 +6493,9 @@ export const deploymentPlanResponseSchema = z.object({
         override: z.enum(["none", "allowed", "blocked"]),
         blockedBuilders: z.array(z.string()),
       }),
-      artifactIntent: z.enum(["build-image", "prebuilt-image", "compose-project"]).optional(),
+      artifactIntent: z
+        .enum(["build-image", "prebuilt-image", "compose-project", "helm-chart"])
+        .optional(),
       limitations: z.array(
         z.object({
           code: z.string(),
@@ -6469,9 +6513,12 @@ export const deploymentPlanResponseSchema = z.object({
       "prebuilt-image",
       "custom-command-image",
       "workspace-image",
+      "helm-chart",
     ]),
-    runtimeArtifactKind: z.enum(["image", "compose-project"]).optional(),
-    runtimeArtifactIntent: z.enum(["build-image", "prebuilt-image", "compose-project"]).optional(),
+    runtimeArtifactKind: z.enum(["image", "compose-project", "helm-chart"]).optional(),
+    runtimeArtifactIntent: z
+      .enum(["build-image", "prebuilt-image", "compose-project", "helm-chart"])
+      .optional(),
     image: z.string().optional(),
     composeFile: z.string().optional(),
     metadata: z.record(z.string(), z.string()).optional(),
@@ -6670,7 +6717,7 @@ export const deploymentProofResponseSchema = z.object({
   planned: z.object({
     source: z.object({ reference: z.string(), revision: z.string().optional() }),
     artifact: z.object({
-      intent: z.enum(["build-image", "prebuilt-image", "compose-project"]).optional(),
+      intent: z.enum(["build-image", "prebuilt-image", "compose-project", "helm-chart"]).optional(),
       reference: z.string().optional(),
     }),
     resourceProfile: z.object({ fingerprint: z.string() }),
@@ -7255,7 +7302,9 @@ export const resourceDiagnosticContextSchema = z.object({
   ]),
   destinationId: z.string().optional(),
   serverId: z.string().optional(),
-  runtimeStrategy: z.enum(["docker-container", "docker-compose-stack", "host-process"]).optional(),
+  runtimeStrategy: z
+    .enum(["docker-container", "docker-compose-stack", "host-process", "helm-release"])
+    .optional(),
   buildStrategy: z
     .enum([
       "dockerfile",
@@ -7264,6 +7313,7 @@ export const resourceDiagnosticContextSchema = z.object({
       "static-artifact",
       "prebuilt-image",
       "workspace-commands",
+      "helm-package",
     ])
     .optional(),
   packagingMode: z
@@ -7273,6 +7323,7 @@ export const resourceDiagnosticContextSchema = z.object({
       "compose-bundle",
       "host-process-runtime",
       "optional-future-binary",
+      "helm-chart",
     ])
     .optional(),
   targetKind: z.enum(["single-server", "orchestrator-cluster"]).optional(),
@@ -7326,6 +7377,7 @@ export const resourceDiagnosticDeploymentSchema = z.object({
     "docker-compose-inline",
     "docker-image",
     "compose",
+    "helm-chart",
   ]),
   sourceDisplayName: z.string(),
   serverId: z.string().optional(),

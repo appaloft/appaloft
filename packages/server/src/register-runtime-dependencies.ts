@@ -26,6 +26,7 @@ import {
   type KubernetesConnectionResolver,
   KubernetesRuntimeTargetBackend,
   KubernetesShellCommandRunner,
+  KubernetesStorageBackupExecutor,
   LocalAgentTunnelProvider,
   LocalExecutionBackend,
   LocalSshCertificateRouteCommandRunner,
@@ -1159,7 +1160,15 @@ export function registerRuntimeDependencies(
     ),
   });
   container.register(tokens.storageVolumeBackupProviderRegistry, {
-    useFactory: instanceCachingFactory(() => new RuntimeStorageBackupProviderRegistry()),
+    useFactory: instanceCachingFactory(
+      () =>
+        new RuntimeStorageBackupProviderRegistry({
+          kubernetesExecutor: new KubernetesStorageBackupExecutor(
+            undefined,
+            input.kubernetesConnectionResolver ?? new FileKubernetesConnectionResolver(),
+          ),
+        }),
+    ),
   });
   container.register(tokens.staticArtifactPayloadReaderPort, {
     useFactory: instanceCachingFactory(() => new FileSystemStaticArtifactPayloadReader()),

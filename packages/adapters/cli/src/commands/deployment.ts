@@ -91,6 +91,15 @@ const deploymentIdArg = Args.text({ name: "deploymentId" });
 const resourceIdArg = Args.text({ name: "resourceId" });
 
 const sourceBaseDirectoryOption = Options.text("source-base-directory").pipe(Options.optional);
+const helmChartVersionOption = Options.text("helm-chart-version").pipe(Options.optional);
+const helmValuesSecretReferenceOption = Options.text("helm-values-secret-ref").pipe(
+  Options.repeated,
+);
+const helmHookPolicyOption = Options.choice("helm-hook-policy", [
+  "disabled",
+  "bounded",
+] as const).pipe(Options.optional);
+const helmTimeoutSecondsOption = Options.text("helm-timeout-seconds").pipe(Options.optional);
 const projectOption = Options.text("project").pipe(Options.optional);
 const deploymentCreateProjectOption = Options.text("project");
 const serverOption = Options.text("server").pipe(Options.optional);
@@ -1459,6 +1468,10 @@ export const deployCommand = EffectCommand.make(
     runtimeName: runtimeNameOption,
     publishDir: publishDirOption,
     sourceBaseDirectory: sourceBaseDirectoryOption,
+    helmChartVersion: helmChartVersionOption,
+    helmValuesSecretReference: helmValuesSecretReferenceOption,
+    helmHookPolicy: helmHookPolicyOption,
+    helmTimeoutSeconds: helmTimeoutSecondsOption,
     dockerfilePath: dockerfilePathOption,
     dockerComposeFilePath: dockerComposeFilePathOption,
     buildTarget: buildTargetOption,
@@ -1520,6 +1533,10 @@ export const deployCommand = EffectCommand.make(
     serverSshPublicKey,
     serverSshUsername,
     sourceBaseDirectory,
+    helmChartVersion,
+    helmValuesSecretReference,
+    helmHookPolicy,
+    helmTimeoutSeconds,
     start,
     stateBackend,
     targetServiceName,
@@ -1567,6 +1584,9 @@ export const deployCommand = EffectCommand.make(
       const runtimeNameValue = optionalValue(runtimeName);
       const publishDirectory = urlFirstEntry.publishDirectory;
       const sourceBaseDirectoryValue = optionalValue(sourceBaseDirectory);
+      const helmChartVersionValue = optionalValue(helmChartVersion);
+      const helmHookPolicyValue = optionalValue(helmHookPolicy);
+      const helmTimeoutSecondsValue = optionalNumber(helmTimeoutSeconds);
       const dockerfilePathValue = optionalValue(dockerfilePath);
       const dockerComposeFilePathValue = optionalValue(dockerComposeFilePath);
       const buildTargetValue = optionalValue(buildTarget);
@@ -1613,6 +1633,10 @@ export const deployCommand = EffectCommand.make(
           runtimeNameValue ||
           publishDirectory ||
           sourceBaseDirectoryValue ||
+          helmChartVersionValue ||
+          helmValuesSecretReference.length > 0 ||
+          helmHookPolicyValue ||
+          helmTimeoutSecondsValue !== undefined ||
           dockerfilePathValue ||
           dockerComposeFilePathValue ||
           buildTargetValue ||
@@ -1748,6 +1772,53 @@ export const deployCommand = EffectCommand.make(
         : [];
       const environmentVariables = [...configEnvironmentVariables, ...flagEnvironmentVariables];
       const deploymentMethod = requestedDeploymentMethod ?? configSeed.deploymentMethod;
+      if (
+        deploymentMethod === "helm" &&
+        !helmChartVersionValue &&
+        !configSeed.sourceProfile?.helmChart
+      ) {
+        return yield* Effect.fail(
+          domainError.validation(
+            "Helm deploy requires --helm-chart-version or source.version in config",
+            { phase: "helm-source-resolution" },
+          ),
+        );
+      }
+      if (
+        deploymentMethod !== "helm" &&
+        (helmChartVersionValue ||
+          helmValuesSecretReference.length > 0 ||
+          helmHookPolicyValue ||
+          helmTimeoutSecondsValue !== undefined)
+      ) {
+        return yield* Effect.fail(
+          domainError.validation("Helm source options require --method helm", {
+            phase: "helm-source-resolution",
+          }),
+        );
+      }
+      if (
+        helmTimeoutSecondsValue !== undefined &&
+        (!Number.isInteger(helmTimeoutSecondsValue) ||
+          helmTimeoutSecondsValue < 30 ||
+          helmTimeoutSecondsValue > 900)
+      ) {
+        return yield* Effect.fail(
+          domainError.validation("Helm timeout must be between 30 and 900 seconds", {
+            phase: "helm-source-resolution",
+          }),
+        );
+      }
+      const invalidHelmValuesReference = helmValuesSecretReference.find(
+        (reference) => !/^[a-z][a-z0-9+.-]*:\/\/[^\s]{1,480}$/i.test(reference),
+      );
+      if (invalidHelmValuesReference) {
+        return yield* Effect.fail(
+          domainError.validation("Helm values references must be opaque URIs", {
+            phase: "helm-source-resolution",
+          }),
+        );
+      }
       const configAnchoredSourceLocator =
         effectiveConfig?.source?.type === "image" && configSeed.sourceLocator
           ? configSeed.sourceLocator
@@ -1856,6 +1927,17 @@ export const deployCommand = EffectCommand.make(
       const sourceProfile = {
         ...configSeed.sourceProfile,
         ...(sourceBaseDirectoryValue ? { baseDirectory: sourceBaseDirectoryValue } : {}),
+        ...(deploymentMethod === "helm" && helmChartVersionValue
+          ? {
+              kind: "helm-chart" as const,
+              helmChart: {
+                version: helmChartVersionValue,
+                valuesSecretReferences: helmValuesSecretReference,
+                hookPolicy: helmHookPolicyValue ?? "disabled",
+                timeoutSeconds: helmTimeoutSecondsValue ?? 300,
+              },
+            }
+          : {}),
       };
 
       const stateSession = yield* prepareDeploymentStateSessionIfNeeded(stateBackendDecision);

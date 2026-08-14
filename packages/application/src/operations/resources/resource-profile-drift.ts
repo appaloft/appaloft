@@ -361,6 +361,8 @@ function buildStrategyToDeploymentMethod(
       return "static";
     case "buildpack":
       return "auto";
+    case "helm-package":
+      return "helm";
     default:
       return buildStrategy;
   }

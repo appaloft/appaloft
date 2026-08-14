@@ -13,6 +13,10 @@ import {
   EnvironmentKindValue,
   EnvironmentName,
   GitRefText,
+  HelmChartVersion,
+  HelmHookPolicyValue,
+  HelmTimeoutSeconds,
+  HelmValuesSecretReference,
   Project,
   ProjectId,
   ProjectName,
@@ -34,6 +38,90 @@ import {
 } from "@appaloft/core";
 
 describe("resource auto-deploy policy persistence", () => {
+  test("[K8S-HELM-013] persists typed Helm chart source configuration", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "appaloft-resource-helm-source-"));
+    const {
+      createDatabase,
+      createMigrator,
+      PgEnvironmentRepository,
+      PgProjectRepository,
+      PgResourceRepository,
+    } = await import("../src");
+    const database = await createDatabase({ driver: "pglite", pgliteDataDir: dataDir });
+
+    try {
+      const migrationResult = await createMigrator(database.db).migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+      const context = toRepositoryContext(
+        createExecutionContext({
+          requestId: "req_resource_helm_pglite_test",
+          entrypoint: "system",
+        }),
+      );
+      const projects = new PgProjectRepository(database.db);
+      const environments = new PgEnvironmentRepository(database.db);
+      const resources = new PgResourceRepository(database.db);
+      const createdAt = CreatedAt.rehydrate("2026-08-13T00:00:00.000Z");
+      const project = Project.create({
+        id: ProjectId.rehydrate("prj_helm"),
+        name: ProjectName.rehydrate("Helm"),
+        createdAt,
+      })._unsafeUnwrap();
+      const environment = Environment.create({
+        id: EnvironmentId.rehydrate("env_helm"),
+        projectId: ProjectId.rehydrate("prj_helm"),
+        name: EnvironmentName.rehydrate("Production"),
+        kind: EnvironmentKindValue.rehydrate("production"),
+        createdAt,
+      })._unsafeUnwrap();
+      const resource = Resource.create({
+        id: ResourceId.rehydrate("res_helm"),
+        projectId: ProjectId.rehydrate("prj_helm"),
+        environmentId: EnvironmentId.rehydrate("env_helm"),
+        name: ResourceName.rehydrate("Storefront"),
+        kind: ResourceKindValue.rehydrate("application"),
+        sourceBinding: {
+          kind: SourceKindValue.rehydrate("helm-chart"),
+          locator: SourceLocator.rehydrate("oci://registry.example.com/charts/storefront"),
+          displayName: DisplayNameText.rehydrate("storefront"),
+          helmChart: {
+            version: HelmChartVersion.rehydrate("1.7.3"),
+            valuesSecretReferences: [
+              HelmValuesSecretReference.rehydrate("secret://helm/storefront/production"),
+            ],
+            hookPolicy: HelmHookPolicyValue.rehydrate("bounded"),
+            timeoutSeconds: HelmTimeoutSeconds.rehydrate(300),
+          },
+        },
+        createdAt,
+      })._unsafeUnwrap();
+
+      await projects.upsert(context, project, UpsertProjectSpec.fromProject(project));
+      await environments.upsert(
+        context,
+        environment,
+        UpsertEnvironmentSpec.fromEnvironment(environment),
+      );
+      await resources.upsert(context, resource, UpsertResourceSpec.fromResource(resource));
+      const persisted = await resources.findOne(
+        context,
+        ResourceByIdSpec.create(ResourceId.rehydrate("res_helm")),
+      );
+      const source = persisted?.toState().sourceBinding;
+
+      expect(source?.kind.value).toBe("helm-chart");
+      expect(source?.helmChart?.version.value).toBe("1.7.3");
+      expect(source?.helmChart?.valuesSecretReferences.map((reference) => reference.value)).toEqual(
+        ["secret://helm/storefront/production"],
+      );
+      expect(source?.helmChart?.hookPolicy.value).toBe("bounded");
+      expect(source?.helmChart?.timeoutSeconds.value).toBe(300);
+    } finally {
+      await database.close();
+      rmSync(dataDir, { force: true, recursive: true });
+    }
+  });
+
   test("[SRC-AUTO-POLICY-001] [SRC-AUTO-POLICY-003] [SRC-AUTO-ROUNDTRIP-001] persists Resource auto-deploy policy state", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "appaloft-resource-auto-deploy-"));
     const {

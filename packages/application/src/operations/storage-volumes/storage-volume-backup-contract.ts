@@ -9,6 +9,7 @@ import {
   type StorageVolumeBackupTargetProviderKey as StorageBackupTargetProviderKey,
   type StorageVolumeBackupDataFormat,
 } from "@appaloft/core";
+import { type ExecutionContext } from "../../execution-context";
 
 export type {
   StorageBackupConsistencyLevel,
@@ -96,6 +97,7 @@ export interface StorageBackupTargetProviderPort {
 }
 
 export interface StorageBackupExecutionRequest {
+  context: ExecutionContext;
   backupId: string;
   attemptId: string;
   requestedAt: string;
@@ -110,6 +112,7 @@ export interface StorageBackupSourceResult {
 }
 
 export interface StorageBackupTargetStoreRequest {
+  context: ExecutionContext;
   backupId: string;
   attemptId: string;
   requestedAt: string;
@@ -156,6 +159,7 @@ export interface StorageBackupObjectTransferBrokerPort {
 }
 
 export interface StorageBackupRestoreRequest {
+  context: ExecutionContext;
   backupId: string;
   restoreAttemptId: string;
   requestedAt: string;
@@ -169,12 +173,15 @@ export interface StorageBackupRestoreSourceResult {
 }
 
 export interface StorageBackupTargetRestoreRequest {
+  context: ExecutionContext;
   backupId: string;
   restoreAttemptId: string;
   requestedAt: string;
   artifactHandle: string;
   expectedChecksum?: string;
   targetStorageVolumeId: string;
+  sourceStorageVolumeId: string;
+  resourceId?: string;
   runtimeTarget?: DeploymentTargetState | undefined;
 }
 

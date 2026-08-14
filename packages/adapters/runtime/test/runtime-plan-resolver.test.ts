@@ -699,6 +699,55 @@ describe("DefaultRuntimePlanResolver", () => {
     ]);
   });
 
+  test("[K8S-HELM-013] plans a typed Helm chart source without materializing secret values", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_helm_chart",
+      source: createSource({
+        kind: "helm-chart",
+        locator: "oci://registry.example.com/charts/storefront",
+        displayName: "storefront",
+        metadata: {
+          "appaloft.helm.chartVersion": "1.7.3",
+          "appaloft.helm.valuesSecretReferences": JSON.stringify([
+            "secret://helm/storefront/production",
+          ]),
+          "appaloft.helm.hookPolicy": "bounded",
+          "appaloft.helm.timeoutSeconds": "300",
+        },
+      }),
+      server: {
+        id: "srv_kubernetes",
+        providerKey: "kubernetes",
+        targetKind: "orchestrator-cluster",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_helm_chart"),
+      detectedReasoning: ["typed Helm chart source"],
+      requestedDeployment: {
+        method: "auto",
+      },
+      generatedAt: "2026-08-13T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.buildStrategy).toBe("helm-package");
+    expect(plan.packagingMode).toBe("helm-chart");
+    expect(plan.execution.kind).toBe("helm-release");
+    expect(plan.execution.metadata).toMatchObject({
+      "helm.chartReference": "oci://registry.example.com/charts/storefront",
+      "helm.chartVersion": "1.7.3",
+      "helm.valuesSecretReferences": '["secret://helm/storefront/production"]',
+      "helm.hookPolicy": "bounded",
+      "helm.timeoutSeconds": "300",
+    });
+    expect(JSON.stringify(plan.toState())).not.toContain("password");
+  });
+
   test("[WF-PLAN-DET-007][WF-PLAN-DET-013][WF-PLAN-CAT-002] packages detected Next.js static export as static artifact", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");

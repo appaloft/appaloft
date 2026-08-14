@@ -4,6 +4,7 @@ import { describe, expect, test } from "bun:test";
 import {
   AccessRoute,
   BuildStrategyKindValue,
+  CommandText,
   ConfigKey,
   ConfigScopeValue,
   ConfigValueText,
@@ -154,6 +155,31 @@ function scaledRuntimePlan(): RuntimePlan {
   });
 }
 
+function statefulRuntimePlan(): RuntimePlan {
+  const state = runtimePlan().toState();
+  return RuntimePlan.rehydrate({
+    ...state,
+    execution: RuntimeExecutionPlan.rehydrate({
+      ...state.execution.toState(),
+      startCommand: CommandText.rehydrate(
+        "test -f /var/lib/app/data/value || echo durable > /var/lib/app/data/value; sleep 3600",
+      ),
+      metadata: {
+        "appaloft.rollout.strategy": "recreate",
+        "storage.mounts": JSON.stringify([
+          {
+            attachmentId: "rsa_data",
+            storageVolumeId: "stv_data",
+            storageVolumeKind: "named-volume",
+            destinationPath: "/var/lib/app/data",
+            mountMode: "read-write",
+          },
+        ]),
+      },
+    }),
+  });
+}
+
 function serviceGraphRuntimePlan(): RuntimePlan {
   const state = runtimePlan().toState();
   return RuntimePlan.rehydrate({
@@ -219,6 +245,132 @@ function environmentSnapshot(): EnvironmentConfigSnapshot {
 }
 
 describe("Kubernetes runtime intent", () => {
+  test("[K8S-STATEFUL-014] keeps one StorageVolume realization stable across Deployment receipts", () => {
+    const first = renderKubernetesRuntimeIntent({
+      runtimePlan: statefulRuntimePlan(),
+      identity: {
+        organizationId: "org_acme",
+        projectId: "prj_shop",
+        environmentId: "env_prod",
+        resourceId: "res_database",
+        deploymentId: "dep_stateful_1",
+        targetId: "srv_r5c_cluster",
+      },
+    })._unsafeUnwrap();
+    const replacement = renderKubernetesRuntimeIntent({
+      runtimePlan: statefulRuntimePlan(),
+      identity: {
+        organizationId: "org_acme",
+        projectId: "prj_shop",
+        environmentId: "env_prod",
+        resourceId: "res_database",
+        deploymentId: "dep_stateful_2",
+        targetId: "srv_r5c_cluster",
+      },
+    })._unsafeUnwrap();
+
+    expect(first.namespace).toBe(replacement.namespace);
+    expect(first.receipt).not.toBe(replacement.receipt);
+    expect(first.storageScopeReceipt).toBe(replacement.storageScopeReceipt);
+    expect(first.storage).toEqual([
+      expect.objectContaining({
+        storageVolumeId: "stv_data",
+        claimName: expect.stringMatching(/^appaloft-stv-data-/),
+        destinationPath: "/var/lib/app/data",
+        readOnly: false,
+      }),
+    ]);
+
+    const firstStatefulSet = renderKubernetesRuntimeManifest(first, {}, routingPolicy)._unsafeUnwrap().items.find(
+      (item) => item.kind === "StatefulSet",
+    );
+    const replacementStatefulSet = renderKubernetesRuntimeManifest(replacement, {}, routingPolicy)._unsafeUnwrap().items.find(
+      (item) => item.kind === "StatefulSet",
+    );
+    expect(firstStatefulSet?.spec).toMatchObject({
+      selector: {
+        matchLabels: {
+          "appaloft.io/storage-scope-receipt": first.storageScopeReceipt,
+        },
+      },
+    });
+    expect((firstStatefulSet?.spec as { selector?: unknown }).selector).toEqual(
+      (replacementStatefulSet?.spec as { selector?: unknown }).selector,
+    );
+  });
+
+  test("[K8S-STATEFUL-014] renders a storage-scoped StatefulSet over a storage-owned PVC", () => {
+    const intent = renderKubernetesRuntimeIntent({
+      runtimePlan: statefulRuntimePlan(),
+      identity: {
+        organizationId: "org_acme",
+        projectId: "prj_shop",
+        environmentId: "env_prod",
+        resourceId: "res_database",
+        deploymentId: "dep_stateful_1",
+        targetId: "srv_r5c_cluster",
+      },
+    })._unsafeUnwrap();
+
+    const manifest = renderKubernetesRuntimeManifest(intent, {}, routingPolicy)._unsafeUnwrap();
+    const namespace = manifest.items.find((item) => item.kind === "Namespace");
+    const pvc = manifest.items.find((item) => item.kind === "PersistentVolumeClaim");
+    const statefulSet = manifest.items.find((item) => item.kind === "StatefulSet");
+
+    expect(namespace?.metadata.labels["appaloft.io/storage-scope-receipt"]).toBe(
+      intent.storageScopeReceipt,
+    );
+    expect(namespace?.metadata.labels["appaloft.io/receipt"]).toBeUndefined();
+    expect(pvc).toMatchObject({
+      metadata: {
+        name: intent.storage[0]?.claimName,
+        labels: {
+          "appaloft.io/storage-volume-id": "stv-data",
+          "appaloft.io/storage-scope-receipt": intent.storageScopeReceipt,
+        },
+      },
+      spec: {
+        accessModes: ["ReadWriteOnce"],
+      },
+    });
+    expect(statefulSet).toMatchObject({
+      apiVersion: "apps/v1",
+      kind: "StatefulSet",
+      spec: {
+        replicas: 1,
+        updateStrategy: { type: "RollingUpdate" },
+        template: {
+          spec: {
+            containers: [
+              expect.objectContaining({
+                command: [
+                  "sh",
+                  "-lc",
+                  "test -f /var/lib/app/data/value || echo durable > /var/lib/app/data/value; sleep 3600",
+                ],
+                volumeMounts: [
+                  {
+                    name: intent.storage[0]?.mountName,
+                    mountPath: "/var/lib/app/data",
+                    readOnly: false,
+                  },
+                ],
+              }),
+            ],
+            volumes: [
+              {
+                name: intent.storage[0]?.mountName,
+                persistentVolumeClaim: { claimName: intent.storage[0]?.claimName },
+              },
+            ],
+          },
+        },
+      },
+    });
+    expect((statefulSet?.spec as { strategy?: unknown }).strategy).toBeUndefined();
+    expect(manifest.items.some((item) => item.kind === "Deployment")).toBe(false);
+  });
+
   test("[K8S-COMPOSE-012] translates an image-backed service graph with private services and dependency secrets", () => {
     const intent = renderKubernetesRuntimeIntent({
       runtimePlan: serviceGraphRuntimePlan(),

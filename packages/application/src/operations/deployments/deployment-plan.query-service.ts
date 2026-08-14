@@ -1358,6 +1358,8 @@ function artifactKind(
       return plannerKey === "custom" ? "custom-command-image" : "workspace-image";
     case "buildpack":
       return "workspace-image";
+    case "helm-package":
+      return "helm-chart";
   }
 }
 

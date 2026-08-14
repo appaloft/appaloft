@@ -1,8 +1,39 @@
 import { describe, expect, test } from "bun:test";
+import { ResourceSourceBinding } from "@appaloft/core";
 
 import { resourceSourceBindingFromInput } from "../src/operations/resources/resource-source-binding.mapper";
 
 describe("resource source binding version reference", () => {
+  test("[K8S-HELM-013] maps a typed Helm chart source without accepting inline values", () => {
+    const result = resourceSourceBindingFromInput({
+      kind: "helm-chart",
+      locator: "oci://registry.example.com/charts/storefront",
+      helmChart: {
+        version: "1.7.3",
+        valuesSecretReferences: ["secret://helm/storefront/production"],
+        hookPolicy: "bounded",
+        timeoutSeconds: 300,
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().helmChart?.version.value).toBe("1.7.3");
+    expect(
+      result._unsafeUnwrap().helmChart?.valuesSecretReferences.map((reference) => reference.value),
+    ).toEqual(["secret://helm/storefront/production"]);
+    expect(result._unsafeUnwrap().helmChart?.hookPolicy.value).toBe("bounded");
+    expect(result._unsafeUnwrap().helmChart?.timeoutSeconds.value).toBe(300);
+
+    const nextVersion = resourceSourceBindingFromInput({
+      kind: "helm-chart",
+      locator: "oci://registry.example.com/charts/storefront",
+      helmChart: { version: "1.7.4" },
+    })._unsafeUnwrap();
+    expect(ResourceSourceBinding.rehydrate(result._unsafeUnwrap()).fingerprint().value).not.toBe(
+      ResourceSourceBinding.rehydrate(nextVersion).fingerprint().value,
+    );
+  });
+
   test("uses optional Git version kind hints to disambiguate requested versions", () => {
     const result = resourceSourceBindingFromInput({
       kind: "git-public",

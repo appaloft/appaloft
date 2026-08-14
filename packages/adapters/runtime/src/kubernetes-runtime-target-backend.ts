@@ -38,6 +38,13 @@ import { toRepositoryContext } from "@appaloft/application";
 import { requireServerBackedDeploymentState } from "./deployment-target";
 import { resolveDependencyRuntimeEnvironment } from "./dependency-runtime-secrets";
 import {
+  FileKubernetesHelmValuesResolver,
+  HelmShellCommandRunner,
+  KubernetesHelmLifecycle,
+  renderKubernetesHelmIntent,
+  type KubernetesHelmIntent,
+} from "./kubernetes-helm-lifecycle";
+import {
   renderKubernetesCanaryRouteManifest,
   renderKubernetesCleanupPlan,
   renderKubernetesRuntimeIntent,
@@ -493,7 +500,10 @@ function ownedNamespace(result: KubernetesCommandRunnerResult, plan: KubernetesC
     };
     return (
       namespace.metadata?.labels?.["appaloft.io/managed-by"] === "appaloft" &&
-      namespace.metadata.labels["appaloft.io/receipt"] === plan.receipt
+      (plan.storageScopeReceipt
+        ? namespace.metadata.labels["appaloft.io/storage-scope-receipt"] ===
+          plan.storageScopeReceipt
+        : namespace.metadata.labels["appaloft.io/receipt"] === plan.receipt)
     );
   } catch {
     return false;
@@ -515,6 +525,8 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
       "runtime.scale",
       "runtime.autoscale",
       "runtime.rollout",
+      "runtime.stateful",
+      "runtime.helm",
       "proxy.route",
     ],
   };
@@ -530,6 +542,10 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
     private readonly rolloutClock: KubernetesRolloutClock = new SystemKubernetesRolloutClock(),
     private readonly canaryRouteProbe: KubernetesCanaryRouteProbe =
       new FetchKubernetesCanaryRouteProbe(),
+    private readonly helmLifecycle: KubernetesHelmLifecycle = new KubernetesHelmLifecycle(
+      new HelmShellCommandRunner(),
+      new FileKubernetesHelmValuesResolver(),
+    ),
   ) {}
 
   async inspectReadiness(
@@ -721,6 +737,14 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
     if (connectionResult.isErr()) return err(connectionResult.error);
 
     const state = requireServerBackedDeploymentState(deployment, "kubernetes execution");
+    if (state.runtimePlan.execution.kind === "helm-release") {
+      return await this.executeHelm(
+        context,
+        deployment,
+        state.serverId.value,
+        connectionResult.value,
+      );
+    }
     const intentResult = renderKubernetesRuntimeIntent({
       runtimePlan: state.runtimePlan,
       environmentSnapshot: state.environmentSnapshot,
@@ -785,6 +809,7 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
 
     const timeline: DeploymentTimelineJournalEntry[] = [];
     const workloadNames = intent.services?.map((service) => service.workloadName) ?? [intent.workloadName];
+    const workloadKind = intent.storage?.length ? "statefulset" : "deployment";
     const steps: Array<{
       phase: "deploy" | "verify";
       step: string;
@@ -803,12 +828,14 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
           phase: "verify" as const,
           step:
             workloadNames.length === 1
-              ? "wait-candidate-rollout"
+              ? intent.storage?.length
+                ? "wait-candidate-statefulset-rollout"
+                : "wait-candidate-rollout"
               : `wait-candidate-rollout:${workloadName}`,
           args: [
             "rollout",
             "status",
-            `deployment/${workloadName}`,
+            `${workloadKind}/${workloadName}`,
             "--namespace",
             intent.namespace,
             "--timeout=180s",
@@ -818,11 +845,13 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
           phase: "verify" as const,
           step:
             workloadNames.length === 1
-              ? "observe-candidate-deployment"
+              ? intent.storage?.length
+                ? "observe-candidate-statefulset"
+                : "observe-candidate-deployment"
               : `observe-candidate-deployment:${workloadName}`,
           args: [
             "get",
-            "deployment",
+            workloadKind,
             workloadName,
             "--namespace",
             intent.namespace,
@@ -863,7 +892,11 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
         step.stdin,
       );
       const failed = result.isErr() || result.value.exitCode !== 0;
-      if (!failed && step.step.startsWith("observe-candidate-deployment")) {
+      if (
+        !failed &&
+        (step.step.startsWith("observe-candidate-deployment") ||
+          step.step === "observe-candidate-statefulset")
+      ) {
         const workloadIndex = step.workloadIndex ?? 0;
         const expectedReplicas = intent.services?.[workloadIndex]?.replicas ?? intent.scale.replicas;
         const observation = this.deploymentObservation(
@@ -987,6 +1020,18 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
     const connectionResult = await this.resolveConnection(context, targetResult.value);
     if (connectionResult.isErr()) return err(connectionResult.error);
     const state = requireServerBackedDeploymentState(deployment, "kubernetes cleanup");
+    if (state.runtimePlan.execution.kind === "helm-release") {
+      const intent = this.helmIntent(context, deployment);
+      if (intent.isErr()) return err(intent.error);
+      const cleanup = await this.helmLifecycle.uninstall({
+        context,
+        targetId: state.serverId.value,
+        connection: connectionResult.value,
+        intent: intent.value,
+      });
+      if (cleanup.isErr()) return err(cleanup.error);
+      return ok({ timeline: [phaseLog("rollback", "Helm release uninstalled")] });
+    }
     const cleanupIdentity = this.cleanupIdentity(context, deployment);
     if (cleanupIdentity.isErr()) return err(cleanupIdentity.error);
     return await this.cleanupExact(
@@ -1002,6 +1047,32 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
     deployment: Deployment,
     _plan: RollbackPlan,
   ): Promise<Result<{ deployment: Deployment }>> {
+    const state = requireServerBackedDeploymentState(deployment, "kubernetes rollback");
+    if (state.runtimePlan.execution.kind === "helm-release") {
+      const targetResult = await this.targetForDeployment(context, deployment);
+      if (targetResult.isErr()) return err(targetResult.error);
+      const connectionResult = await this.resolveConnection(context, targetResult.value);
+      if (connectionResult.isErr()) return err(connectionResult.error);
+      const intent = this.helmIntent(context, deployment);
+      if (intent.isErr()) return err(intent.error);
+      const rollback = await this.helmLifecycle.rollback({
+        context,
+        targetId: state.serverId.value,
+        connection: connectionResult.value,
+        intent: intent.value,
+      });
+      if (rollback.isErr()) return err(rollback.error);
+      return applyExecutionResult(deployment, {
+        status: "rolled-back",
+        exitCode: 0,
+        retryable: false,
+        timeline: [phaseLog("rollback", "Helm release rollback verified")],
+        metadata: {
+          ...this.helmExecutionMetadata(intent.value),
+          ...(rollback.value ? { "helm.rollbackRevision": String(rollback.value) } : {}),
+        },
+      });
+    }
     const cleanup = await this.cancel(context, deployment);
     if (cleanup.isErr()) return err(cleanup.error);
     return applyExecutionResult(deployment, {
@@ -1009,6 +1080,104 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
       exitCode: 0,
       retryable: false,
       timeline: cleanup.value.timeline,
+    });
+  }
+
+  private helmIntent(
+    context: ExecutionContext,
+    deployment: Deployment,
+  ): Result<KubernetesHelmIntent> {
+    const state = requireServerBackedDeploymentState(deployment, "kubernetes Helm intent");
+    return renderKubernetesHelmIntent({
+      runtimePlan: state.runtimePlan,
+      identity: {
+        organizationId: organizationId(context),
+        projectId: state.projectId.value,
+        environmentId: state.environmentId.value,
+        resourceId: state.resourceId.value,
+        deploymentId: state.id.value,
+        targetId: state.serverId.value,
+      },
+    });
+  }
+
+  private helmExecutionMetadata(intent: KubernetesHelmIntent): Record<string, string> {
+    return {
+      "kubernetes.namespace": intent.namespace,
+      "kubernetes.receipt": intent.receipt,
+      "helm.releaseName": intent.releaseName,
+      "helm.chartReference": intent.chartReference,
+      "helm.chartVersion": intent.chartVersion,
+      "helm.intentSchemaVersion": intent.schemaVersion,
+    };
+  }
+
+  private async executeHelm(
+    context: ExecutionContext,
+    deployment: Deployment,
+    targetId: string,
+    connection: KubernetesResolvedConnection,
+  ): Promise<Result<{ deployment: Deployment }>> {
+    const intent = this.helmIntent(context, deployment);
+    if (intent.isErr()) return err(intent.error);
+    const timeline = [phaseLog("deploy", "Render redacted Helm release diff")];
+    const result = await this.helmLifecycle.deploy({
+      context,
+      targetId,
+      connection,
+      intent: intent.value,
+    });
+    if (result.isErr()) {
+      timeline.push(phaseLog("deploy", "Helm release execution failed", "error"));
+      return applyExecutionResult(deployment, {
+        status: "failed",
+        exitCode: 1,
+        retryable: true,
+        timeline,
+        errorCode: "kubernetes_helm_execution_failed",
+        metadata: this.helmExecutionMetadata(intent.value),
+      });
+    }
+    const metadata = {
+      ...this.helmExecutionMetadata(intent.value),
+      "helm.renderedDigest": result.value.renderedDigest,
+      "helm.renderedDocumentCount": String(result.value.renderedDocumentCount),
+      "helm.rollbackVerified": String(result.value.rollbackVerified),
+      ...(result.value.previousRevision
+        ? { "helm.previousRevision": String(result.value.previousRevision) }
+        : {}),
+      ...(result.value.currentRevision
+        ? { "helm.currentRevision": String(result.value.currentRevision) }
+        : {}),
+    };
+    if (result.value.status === "failed") {
+      timeline.push(
+        phaseLog(
+          "rollback",
+          result.value.rollbackVerified
+            ? "Helm atomic rollback verified"
+            : "Helm release failed without rollback proof",
+          result.value.rollbackVerified ? "warn" : "error",
+        ),
+      );
+      return applyExecutionResult(deployment, {
+        status: "failed",
+        exitCode: 1,
+        retryable: !result.value.rollbackVerified,
+        timeline,
+        errorCode: result.value.rollbackVerified
+          ? "kubernetes_helm_upgrade_rolled_back"
+          : "kubernetes_helm_upgrade_failed",
+        metadata,
+      });
+    }
+    timeline.push(phaseLog("verify", "Helm release converged"));
+    return applyExecutionResult(deployment, {
+      status: "succeeded",
+      exitCode: 0,
+      retryable: false,
+      timeline,
+      metadata,
     });
   }
 
@@ -1584,19 +1753,28 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
       "runtime.scale.desiredReplicas": String(intent.scale.replicas),
       "runtime.scale.metricDecision": intent.scale.horizontal ? "unknown" : "disabled",
       "runtime.rollout.strategy": intent.rollout.strategy,
+      ...(intent.storageScopeReceipt
+        ? { "kubernetes.storageScopeReceipt": intent.storageScopeReceipt }
+        : {}),
+      ...(intent.storage?.length
+        ? { "kubernetes.storageClaims": intent.storage.map((storage) => storage.claimName).join(",") }
+        : {}),
     };
   }
 
   private cleanupIdentity(
     context: ExecutionContext,
     deployment: Deployment,
-  ): Result<{ namespace: string; receipt: string }> {
+  ): Result<{ namespace: string; receipt: string; storageScopeReceipt?: string }> {
     const state = requireServerBackedDeploymentState(deployment, "kubernetes cleanup identity");
     const metadata = state.runtimePlan.execution.metadata;
     if (metadata?.["kubernetes.namespace"] && metadata["kubernetes.receipt"]) {
       return ok({
         namespace: metadata["kubernetes.namespace"],
         receipt: metadata["kubernetes.receipt"],
+        ...(metadata["kubernetes.storageScopeReceipt"]
+          ? { storageScopeReceipt: metadata["kubernetes.storageScopeReceipt"] }
+          : {}),
       });
     }
     return renderKubernetesRuntimeIntent({
@@ -1610,7 +1788,13 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
         deploymentId: state.id.value,
         targetId: state.serverId.value,
       },
-    }).map((intent) => ({ namespace: intent.namespace, receipt: intent.receipt }));
+    }).map((intent) => ({
+      namespace: intent.namespace,
+      receipt: intent.receipt,
+      ...(intent.storageScopeReceipt
+        ? { storageScopeReceipt: intent.storageScopeReceipt }
+        : {}),
+    }));
   }
 
   private async cleanupFailedCandidate(
@@ -1665,14 +1849,17 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
         }),
       );
     }
+    const deleteStep = plan.storageScopeReceipt
+      ? "delete-candidate-receipt-resources"
+      : "delete-candidate-namespace";
     const deletion = await this.run(
       context,
       targetId,
       connection,
-      "delete-candidate-namespace",
+      deleteStep,
       plan.deleteArgs,
     );
-    timeline.push(phaseLog("rollback", "delete-candidate-namespace"));
+    timeline.push(phaseLog("rollback", deleteStep));
     if (deletion.isErr()) return err(deletion.error);
     if (deletion.value.exitCode !== 0) {
       return err(
@@ -1681,6 +1868,26 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
           namespace: plan.namespace,
         }),
       );
+    }
+    if (plan.residualArgs) {
+      const residual = await this.run(
+        context,
+        targetId,
+        connection,
+        "verify-candidate-receipt-residual",
+        plan.residualArgs,
+      );
+      timeline.push(phaseLog("rollback", "verify-candidate-receipt-residual"));
+      if (residual.isErr()) return err(residual.error);
+      if (residual.value.exitCode !== 0 || residual.value.stdout.trim().length > 0) {
+        return err(
+          domainError.conflict("Kubernetes receipt cleanup left owned residual resources", {
+            phase: "kubernetes-cleanup-residual",
+            namespace: plan.namespace,
+            receipt: plan.receipt,
+          }),
+        );
+      }
     }
     return ok({ timeline });
   }

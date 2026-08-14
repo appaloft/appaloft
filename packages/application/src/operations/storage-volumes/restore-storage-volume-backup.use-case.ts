@@ -243,12 +243,15 @@ export class RestoreStorageVolumeBackupUseCase {
         serverRepository,
       });
       const restoreResult = await targetProvider.restore({
+        context,
         backupId: backupId.value,
         restoreAttemptId: restoreAttemptId.value,
         requestedAt: requestedAt.value,
         artifactHandle: backupState.artifactHandle.value,
         ...(backupState.checksum ? { expectedChecksum: backupState.checksum.value } : {}),
         targetStorageVolumeId: restoredVolumeId.value,
+        sourceStorageVolumeId: backupState.storageVolumeId.value,
+        ...(backupState.resourceId ? { resourceId: backupState.resourceId.value } : {}),
         ...(runtimeTarget ? { runtimeTarget } : {}),
       });
       if (restoreResult.isOk()) {

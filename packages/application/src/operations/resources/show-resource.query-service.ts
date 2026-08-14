@@ -125,6 +125,18 @@ function sourceProfileFromState(
           versionKind: source.versionReference.referenceKind,
         }
       : {}),
+    ...(source.helmChart
+      ? {
+          helmChart: {
+            version: source.helmChart.version.value,
+            valuesSecretReferences: source.helmChart.valuesSecretReferences.map(
+              (reference) => reference.value,
+            ),
+            hookPolicy: source.helmChart.hookPolicy.value,
+            timeoutSeconds: source.helmChart.timeoutSeconds.value,
+          },
+        }
+      : {}),
     ...(metadata ? { metadata } : {}),
   };
 }

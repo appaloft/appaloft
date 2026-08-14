@@ -7,6 +7,10 @@ import {
   err,
   GitCommitShaText,
   GitRefText,
+  HelmChartVersion,
+  HelmHookPolicyValue,
+  HelmTimeoutSeconds,
+  HelmValuesSecretReference,
   ok,
   type ResourceSourceBindingState,
   type Result,
@@ -320,6 +324,11 @@ export function resourceSourceBindingFromInput(
     const versionKind =
       normalizedSourceInput.versionKind ??
       (metadata?.versionKind as VersionReferenceKind | undefined);
+    const helmChart = normalizedSourceInput.helmChart;
+    const helmValuesSecretReferences: HelmValuesSecretReference[] = [];
+    for (const reference of helmChart?.valuesSecretReferences ?? []) {
+      helmValuesSecretReferences.push(yield* HelmValuesSecretReference.create(reference));
+    }
 
     return ok({
       kind: sourceKind,
@@ -346,6 +355,16 @@ export function resourceSourceBindingFromInput(
               ...(versionKind ? { referenceKind: versionKind } : {}),
               value: versionValue,
             }),
+          }
+        : {}),
+      ...(helmChart
+        ? {
+            helmChart: {
+              version: yield* HelmChartVersion.create(helmChart.version),
+              valuesSecretReferences: helmValuesSecretReferences,
+              hookPolicy: yield* HelmHookPolicyValue.create(helmChart.hookPolicy ?? "disabled"),
+              timeoutSeconds: yield* HelmTimeoutSeconds.create(helmChart.timeoutSeconds ?? 300),
+            },
           }
         : {}),
       ...(metadata ? { metadata: { ...metadata } } : {}),

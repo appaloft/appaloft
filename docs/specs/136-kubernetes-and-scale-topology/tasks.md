@@ -19,9 +19,9 @@
 
 ## R5c Stateful And Packaging
 
-- [ ] RED `K8S-HELM-013`, `K8S-STATEFUL-014`, `K8S-E2E-019`.
-- [ ] Implement bounded Helm lifecycle and Kubernetes storage/dependency realization.
-- [ ] Prove backup, independent restore, upgrade/rollback and exact cleanup.
+- [x] RED `K8S-HELM-013`, `K8S-STATEFUL-014`, `K8S-E2E-019`.
+- [x] Implement bounded Helm lifecycle and Kubernetes storage/dependency realization.
+- [x] Prove backup, independent restore, upgrade/rollback and exact cleanup.
 
 ## R5d Managed And Multi-Cluster
 

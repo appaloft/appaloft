@@ -119,9 +119,9 @@
       "type": "object",
       "properties": {
         "type": {
-          "description": "Repository source kind.",
+          "description": "Repository, image, or Helm chart source kind.",
           "type": "string",
-          "enum": ["git", "github", "image"]
+          "enum": ["git", "github", "image", "helm"]
         },
         "repository": {
           "description": "Git repository URL to deploy from.",
@@ -130,6 +130,11 @@
         },
         "image": {
           "description": "Docker/OCI image reference to deploy as a prebuilt image.",
+          "type": "string",
+          "minLength": 1
+        },
+        "chart": {
+          "description": "Helm chart reference. Inline chart content is not accepted.",
           "type": "string",
           "minLength": 1
         },
@@ -167,6 +172,25 @@
             "release",
             "literal"
           ]
+        },
+        "valuesSecretReferences": {
+          "description": "Secret references for Helm values files. Raw inline values are not accepted.",
+          "maxItems": 16,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9+.-]*:\\/\\/[^\\s]{1,480}$"
+          }
+        },
+        "hookPolicy": {
+          "type": "string",
+          "enum": ["disabled", "bounded"]
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 30,
+          "maximum": 900
         }
       },
       "additionalProperties": false,
@@ -189,7 +213,8 @@
             "docker-compose",
             "prebuilt-image",
             "workspace-commands",
-            "static"
+            "static",
+            "helm"
           ]
         },
         "installCommand": {
@@ -619,7 +644,8 @@
                         "docker-compose",
                         "prebuilt-image",
                         "workspace-commands",
-                        "static"
+                        "static",
+                        "helm"
                       ]
                     },
                     "installCommand": {
@@ -948,7 +974,8 @@
                   "docker-compose",
                   "prebuilt-image",
                   "workspace-commands",
-                  "static"
+                  "static",
+                  "helm"
                 ]
               },
               "installCommand": {
@@ -1314,9 +1341,9 @@
             "type": "object",
             "properties": {
               "type": {
-                "description": "Repository source kind.",
+                "description": "Repository, image, or Helm chart source kind.",
                 "type": "string",
-                "enum": ["git", "github", "image"]
+                "enum": ["git", "github", "image", "helm"]
               },
               "repository": {
                 "description": "Git repository URL to deploy from.",
@@ -1325,6 +1352,11 @@
               },
               "image": {
                 "description": "Docker/OCI image reference to deploy as a prebuilt image.",
+                "type": "string",
+                "minLength": 1
+              },
+              "chart": {
+                "description": "Helm chart reference. Inline chart content is not accepted.",
                 "type": "string",
                 "minLength": 1
               },
@@ -1362,6 +1394,25 @@
                   "release",
                   "literal"
                 ]
+              },
+              "valuesSecretReferences": {
+                "description": "Secret references for Helm values files. Raw inline values are not accepted.",
+                "maxItems": 16,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[a-z][a-z0-9+.-]*:\\/\\/[^\\s]{1,480}$"
+                }
+              },
+              "hookPolicy": {
+                "type": "string",
+                "enum": ["disabled", "bounded"]
+              },
+              "timeoutSeconds": {
+                "type": "integer",
+                "minimum": 30,
+                "maximum": 900
               }
             },
             "additionalProperties": false,
@@ -1384,7 +1435,8 @@
                   "docker-compose",
                   "prebuilt-image",
                   "workspace-commands",
-                  "static"
+                  "static",
+                  "helm"
                 ]
               },
               "installCommand": {
@@ -1646,9 +1698,9 @@
             "type": "object",
             "properties": {
               "type": {
-                "description": "Repository source kind.",
+                "description": "Repository, image, or Helm chart source kind.",
                 "type": "string",
-                "enum": ["git", "github", "image"]
+                "enum": ["git", "github", "image", "helm"]
               },
               "repository": {
                 "description": "Git repository URL to deploy from.",
@@ -1657,6 +1709,11 @@
               },
               "image": {
                 "description": "Docker/OCI image reference to deploy as a prebuilt image.",
+                "type": "string",
+                "minLength": 1
+              },
+              "chart": {
+                "description": "Helm chart reference. Inline chart content is not accepted.",
                 "type": "string",
                 "minLength": 1
               },
@@ -1694,6 +1751,25 @@
                   "release",
                   "literal"
                 ]
+              },
+              "valuesSecretReferences": {
+                "description": "Secret references for Helm values files. Raw inline values are not accepted.",
+                "maxItems": 16,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[a-z][a-z0-9+.-]*:\\/\\/[^\\s]{1,480}$"
+                }
+              },
+              "hookPolicy": {
+                "type": "string",
+                "enum": ["disabled", "bounded"]
+              },
+              "timeoutSeconds": {
+                "type": "integer",
+                "minimum": 30,
+                "maximum": 900
               }
             },
             "additionalProperties": false,
@@ -1716,7 +1792,8 @@
                   "docker-compose",
                   "prebuilt-image",
                   "workspace-commands",
-                  "static"
+                  "static",
+                  "helm"
                 ]
               },
               "installCommand": {
@@ -2043,9 +2120,9 @@
                   "type": "object",
                   "properties": {
                     "type": {
-                      "description": "Repository source kind.",
+                      "description": "Repository, image, or Helm chart source kind.",
                       "type": "string",
-                      "enum": ["git", "github", "image"]
+                      "enum": ["git", "github", "image", "helm"]
                     },
                     "repository": {
                       "description": "Git repository URL to deploy from.",
@@ -2054,6 +2131,11 @@
                     },
                     "image": {
                       "description": "Docker/OCI image reference to deploy as a prebuilt image.",
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "chart": {
+                      "description": "Helm chart reference. Inline chart content is not accepted.",
                       "type": "string",
                       "minLength": 1
                     },
@@ -2091,6 +2173,25 @@
                         "release",
                         "literal"
                       ]
+                    },
+                    "valuesSecretReferences": {
+                      "description": "Secret references for Helm values files. Raw inline values are not accepted.",
+                      "maxItems": 16,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "^[a-z][a-z0-9+.-]*:\\/\\/[^\\s]{1,480}$"
+                      }
+                    },
+                    "hookPolicy": {
+                      "type": "string",
+                      "enum": ["disabled", "bounded"]
+                    },
+                    "timeoutSeconds": {
+                      "type": "integer",
+                      "minimum": 30,
+                      "maximum": 900
                     }
                   },
                   "additionalProperties": false,
@@ -2113,7 +2214,8 @@
                         "docker-compose",
                         "prebuilt-image",
                         "workspace-commands",
-                        "static"
+                        "static",
+                        "helm"
                       ]
                     },
                     "installCommand": {

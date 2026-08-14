@@ -1156,6 +1156,78 @@ export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader
           }),
         );
       }
+      case "helm-release": {
+        const namespace = metadataValue(logContext, "kubernetes.namespace");
+        const releaseName = metadataValue(logContext, "helm.releaseName");
+        const serverId = logContext.deployment.runtimePlan.target.serverIds[0];
+        if (!namespace || !releaseName || !serverId || !this.serverRepository) {
+          return err(
+            domainError.resourceRuntimeLogsUnavailable("Helm runtime log identity is not available", {
+              phase: "runtime-instance-resolution",
+              step: "helm-runtime-log-identity",
+              resourceId: logContext.resource.id,
+              deploymentId: logContext.deployment.id,
+              runtimeKind: execution.kind,
+            }),
+          );
+        }
+        const target = await this.serverRepository.findOne(
+          toRepositoryContext(context),
+          DeploymentTargetByIdSpec.create(DeploymentTargetId.rehydrate(serverId)),
+        );
+        const profile = target?.toState().runtimeTargetProfile?.toSnapshot();
+        if (!profile) {
+          return err(
+            domainError.resourceRuntimeLogsUnavailable(
+              "Kubernetes runtime target profile is not available",
+              {
+                phase: "runtime-instance-resolution",
+                step: "helm-runtime-target-profile",
+                resourceId: logContext.resource.id,
+                deploymentId: logContext.deployment.id,
+                runtimeKind: execution.kind,
+              },
+            ),
+          );
+        }
+        const connection = await this.kubernetesConnectionResolver.resolve({
+          context,
+          connectionReference: profile.connectionReference,
+          ...(profile.credentialReference
+            ? { credentialReference: profile.credentialReference }
+            : {}),
+        });
+        if (connection.isErr()) return err(connection.error);
+        return ok(
+          createProcessRuntimeLogStream({
+            args: [
+              "kubectl",
+              "--kubeconfig",
+              connection.value.kubeconfigPath,
+              ...(connection.value.contextName
+                ? ["--context", connection.value.contextName]
+                : []),
+              "logs",
+              "--namespace",
+              namespace,
+              "--selector",
+              `app.kubernetes.io/instance=${releaseName}`,
+              "--all-containers=true",
+              "--tail",
+              String(request.tailLines),
+              ...(request.since ? [`--since-time=${request.since}`] : []),
+              ...(request.follow ? ["--follow"] : []),
+            ],
+            command: "kubernetes_logs",
+            context: logContext,
+            executionContext: context,
+            request,
+            signal,
+            spawnProcess: this.spawnProcess,
+            boundedProcessTimeoutMs: this.boundedProcessTimeoutMs,
+          }),
+        );
+      }
     }
   }
 

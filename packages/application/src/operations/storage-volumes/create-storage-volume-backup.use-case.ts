@@ -253,6 +253,7 @@ export class CreateStorageVolumeBackupUseCase {
       await publishDomainEventsAndReturn(context, eventBus, logger, backup, undefined);
 
       const sourceResult = await sourceAdapter.createBackup({
+        context,
         backupId: backupId.value,
         attemptId: attemptId.value,
         requestedAt: requestedAt.value,
@@ -262,6 +263,7 @@ export class CreateStorageVolumeBackupUseCase {
       });
       if (sourceResult.isOk()) {
         const targetResult = await targetProvider.store({
+          context,
           backupId: backupId.value,
           attemptId: attemptId.value,
           requestedAt: requestedAt.value,
