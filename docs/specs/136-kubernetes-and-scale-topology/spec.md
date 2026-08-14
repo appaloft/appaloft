@@ -66,6 +66,11 @@ exact narrower claim.
   Profiles; readiness remains a Query; deployment remains ids-only.
 - CLI/Web/API/SDK/MCP: shared operations and normalized observations.
 - Provider adapter: Kubernetes implementation plus connector protocol for cluster provisioning.
+- Managed connector protocol: `infrastructure.cluster.provision|inspect|delete|place|failover|recover|cleanup-orphans`
+  uses typed plans/readback/receipts. Target pools rank eligible targets deterministically by policy,
+  and failover/recovery carries a bounded attempt, monotonic placement epoch and fencing token.
+- Mutating managed-cluster apply must be bound to the exact accepted plan; missing acceptance or
+  parameter drift fails before provider effects.
 - Repository config: portable scale/rollout and Helm source only after capability validation; never
   raw manifests, kubeconfig, arbitrary namespace, provider API objects or secret values.
 - Docs: `/docs/servers/kubernetes/#kubernetes-runtime-target` and scaling/rollout/stateful sections.

@@ -903,7 +903,7 @@ export const publicDocsHelpTopics = {
     id: "integration.connections",
     title: "Connections and connectors",
     description:
-      "How Appaloft connects source, DNS, infrastructure, notification, and future provider capabilities.",
+      "How Appaloft connects source, DNS, infrastructure, notification, and managed-cluster capabilities through plan, acceptance, apply, and safe readback.",
     page: {
       "zh-CN": "deliver/integrations",
       "en-US": "en/deliver/integrations",
@@ -915,8 +915,21 @@ export const publicDocsHelpTopics = {
     },
     surfaces: ["web", "cli", "http-api", "mcp"],
     relatedOperation: "connections.catalog.list",
-    aliases: ["connections", "connectors", "dns connector", "cloudflare dns", "连接"],
-    specReferences: ["docs/specs/099-appaloft-connections/spec.md"],
+    aliases: [
+      "connections",
+      "connectors",
+      "dns connector",
+      "cloudflare dns",
+      "managed kubernetes connector",
+      "multi-cluster placement",
+      "连接",
+      "托管 Kubernetes",
+    ],
+    specReferences: [
+      "docs/specs/099-appaloft-connections/spec.md",
+      "docs/specs/136-kubernetes-and-scale-topology/spec.md",
+      "docs/testing/kubernetes-scale-topology-test-matrix.md",
+    ],
   },
   "agent.deploy-skill": {
     id: "agent.deploy-skill",

@@ -2040,6 +2040,13 @@ Current boundary:
   changes or introduce DNS as a sibling model to `Connection` or `ConnectorDefinition`.
 - DNS apply must use the shared connector `connections.capability.accept` and
   `connections.capability.apply` flow with an accepted-plan id when provider mutation is required.
+- Managed cluster provisioning and multi-cluster placement reuse the same connector capability
+  operations with concrete capabilities under `infrastructure.cluster.*`. Public plans and receipts
+  expose provider-neutral cost, support, cleanup, placement epoch, fencing and deterministic target
+  evidence; provider credentials, billing, quotas and tenant policy remain injected composition.
+- Infrastructure mutations that require acceptance bind apply parameters to the exact accepted plan
+  id. Missing acceptance or parameter drift fails before provider effects; exhausted placement bounds
+  and empty eligible target pools fail explicitly and never select an undeclared fallback topology.
 - `domain-bindings.configure-route` is the explicit route-behavior update operation for switching
   between serving traffic and redirecting to an existing served canonical binding in the same
   owner/path scope; generic `domain-bindings.update` remains forbidden

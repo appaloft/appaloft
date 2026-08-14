@@ -234,6 +234,80 @@ describe("connections HTTP routes", () => {
     expect(capturedQuery).toBeInstanceOf(PlanConnectorCapabilityQuery);
   });
 
+  test("[K8S-SURFACE-017] exposes managed-cluster placement evidence through HTTP/oRPC", async () => {
+    let capturedQuery: Query<unknown> | undefined;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus: noopCommandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus: queryBusFor((query) => {
+        capturedQuery = query;
+        return {
+          planId: "clusterplan_test",
+          connectorKey: "managed-kubernetes",
+          capabilityKey: "infrastructure.cluster.failover",
+          riskLevel: "high",
+          requiresExplicitAcceptance: true,
+          summary: "Fail over resource:res_api to target_sin.",
+          effects: [{ kind: "infrastructure.cluster.failover", title: "Fail over" }],
+          cleanup: { supported: true },
+          providerPlan: {
+            kind: "managed-cluster-placement",
+            managedClusterPlacement: {
+              poolId: "pool_prod",
+              workloadRef: "resource:res_api",
+              mode: "failover",
+              attempt: 1,
+              selectedTargetId: "target_sin",
+              selectedProviderKey: "provider-b",
+              selectedRegion: "sin",
+              previousTargetId: "target_ewr",
+              placementEpoch: 5,
+              fencingToken: "fence_12345678",
+              rankedEligibleTargetIds: ["target_sin"],
+              reasonCodes: ["region-rank:1"],
+              consideredTargets: [
+                {
+                  targetId: "target_ewr",
+                  eligible: false,
+                  reasons: ["failover:previous-target"],
+                },
+                { targetId: "target_sin", eligible: true, reasons: [] },
+              ],
+            },
+          },
+        };
+      }),
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/connections/capabilities/plan", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          connectorKey: "managed-kubernetes",
+          capabilityKey: "infrastructure.cluster.failover",
+          parameters: { targetPoolId: "pool_prod", workloadRef: "resource:res_api" },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      planId: "clusterplan_test",
+      providerPlan: {
+        kind: "managed-cluster-placement",
+        managedClusterPlacement: {
+          selectedTargetId: "target_sin",
+          previousTargetId: "target_ewr",
+          placementEpoch: 5,
+          fencingToken: "fence_12345678",
+        },
+      },
+    });
+    expect(capturedQuery).toBeInstanceOf(PlanConnectorCapabilityQuery);
+  });
+
   test("[APP-CONN-014][APP-CONN-004] plans domain binding DNS through HTTP/oRPC", async () => {
     let capturedQuery: Query<unknown> | undefined;
     const app = mountAppaloftOrpcRoutes(new Elysia(), {

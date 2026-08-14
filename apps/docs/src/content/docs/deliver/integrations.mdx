@@ -96,12 +96,19 @@ appaloft connectors catalog
 appaloft connectors list
 appaloft connectors connect <connector>
 appaloft connectors revoke <connectionId>
+appaloft connectors plan --connector <connector> --capability <key> --parameters-json '<json>'
+appaloft connectors accept --connector <connector> --capability <key> --plan-id <planId> --risk <risk> --summary <summary> --effects-json '<json>'
+appaloft connectors apply --connector <connector> --capability <key> --parameters-json '<json>' --accepted-plan-id <acceptedPlanId>
 
 # 按能力分类的快捷命令（底层仍是同一套 Connection 模型）
 appaloft dns plan <domain> --hostname <host> --target <target> --connector cloudflare-dns
 ```
 
 DNS 类连接需要经过三层校验才能自动配置：公开 DNS 发现（不需要授权，只是根据域名推断可能的托管商）、Connector 授权（证明你能访问某个 Provider 账号）、Zone 归属匹配（授权账号里必须真的存在覆盖该域名的 Zone）。三层都满足后，Appaloft 才会生成并应用 DNS 变更计划；任何一层不满足都会 fail closed 并提示手动配置。
+
+托管 Kubernetes 与多集群容量也复用同一套 Connector 协议。具体 Connector 可以声明 `infrastructure.cluster.provision`、`inspect`、`delete`、`place`、`failover`、`recover` 和 `cleanup-orphans` 能力。公共合同只返回目标池、确定性的放置理由、placement epoch、fencing token、成本/支持级别和残留资源计数；Provider 凭证、计费、配额、租户策略和商业拓扑由组合该 Connector 的 Cloud/Enterprise 实现持有。
+
+创建、删除和故障转移属于外部基础设施变更：先运行 `connectors plan`，检查成本、支持和 cleanup 证据，再接受该精确 plan 并将返回的 `acceptedPlanId` 传给 `connectors apply`。应用参数若与已接受的 plan 不一致会在 Provider 副作用前失败；容量不足或 failover 次数超限也不会静默回退到其他拓扑。
 
 ## 常见误区
 
