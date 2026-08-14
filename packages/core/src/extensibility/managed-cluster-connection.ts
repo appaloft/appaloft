@@ -276,6 +276,11 @@ function clonePlacement(
     ...input,
     rankedEligibleTargetIds: [...input.rankedEligibleTargetIds],
     reasonCodes: [...input.reasonCodes],
+    ...(input.selectedFailureDomains
+      ? {
+          selectedFailureDomains: input.selectedFailureDomains.map((domain) => ({ ...domain })),
+        }
+      : {}),
     consideredTargets: input.consideredTargets.map((target) => ({
       ...target,
       reasons: [...target.reasons],

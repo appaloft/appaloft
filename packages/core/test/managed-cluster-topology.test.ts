@@ -192,4 +192,235 @@ describe("Managed cluster topology", () => {
     });
     expect(unbounded.isErr()).toBe(true);
   });
+
+  test("[RESIL-PLACE-002] rejects failover targets that share a required failure domain", () => {
+    const pool = ManagedClusterTargetPool.create({
+      poolId: "pool_regional",
+      targets: [
+        {
+          targetId: "target_current",
+          providerKey: "provider-a",
+          region: "ewr",
+          failureDomains: [
+            { kind: "provider", key: "provider-a" },
+            { kind: "region", key: "provider-a:ewr" },
+          ],
+          status: "ready",
+          capabilities: ["kubernetes"],
+          availableCapacity: 2,
+          supportLevel: "standard",
+        },
+        {
+          targetId: "target_replacement",
+          providerKey: "provider-a",
+          region: "sin",
+          failureDomains: [
+            { kind: "provider", key: "provider-a" },
+            { kind: "region", key: "provider-a:sin" },
+          ],
+          status: "ready",
+          capabilities: ["kubernetes"],
+          availableCapacity: 2,
+          supportLevel: "standard",
+        },
+      ],
+    })._unsafeUnwrap();
+    const intent = ManagedClusterPlacementIntent.create({
+      workloadRef: "resource:res_regional",
+      requiredCapabilities: ["kubernetes"],
+      preferredRegions: ["sin", "ewr"],
+      excludedTargetIds: [],
+      currentTargetId: "target_current",
+      currentPlacementEpoch: 2,
+      maxFailoverAttempts: 1,
+      requiredFailureDomainKinds: ["provider"],
+    })._unsafeUnwrap();
+
+    const result = pool.decidePlacement(intent, { mode: "failover", attempt: 1 });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "conflict",
+      details: expect.objectContaining({
+        ineligibilityReasons: expect.arrayContaining([
+          "target_replacement:failure-domain:shared:provider",
+        ]),
+      }),
+    });
+  });
+
+  test("[RESIL-FD-001] rejects duplicate failure-domain kinds on one target", () => {
+    const result = ManagedClusterTargetPool.create({
+      poolId: "pool_duplicate_domain",
+      targets: [
+        {
+          targetId: "target_duplicate_domain",
+          providerKey: "provider-a",
+          region: "ewr",
+          failureDomains: [
+            { kind: "region", key: "provider-a:ewr" },
+            { kind: "region", key: "provider-a:ewr-duplicate" },
+          ],
+          status: "ready",
+          capabilities: ["kubernetes"],
+          availableCapacity: 1,
+          supportLevel: "standard",
+        },
+      ],
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().message).toBe(
+      "Managed cluster failure domain kinds must be unique",
+    );
+  });
+
+  test("[RESIL-FD-001] rejects unsupported failure-domain kinds", () => {
+    const result = ManagedClusterTargetPool.create({
+      poolId: "pool_unsupported_domain",
+      targets: [
+        {
+          targetId: "target_unsupported_domain",
+          providerKey: "provider-a",
+          region: "ewr",
+          failureDomains: [{ kind: "rack" as never, key: "rack-1" }],
+          status: "ready",
+          capabilities: ["kubernetes"],
+          availableCapacity: 1,
+          supportLevel: "standard",
+        },
+      ],
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().message).toBe(
+      "Unsupported managed cluster failure domain rack",
+    );
+  });
+
+  test("[RESIL-FD-001] rejects empty failure-domain keys", () => {
+    const result = ManagedClusterTargetPool.create({
+      poolId: "pool_empty_domain",
+      targets: [
+        {
+          targetId: "target_empty_domain",
+          providerKey: "provider-a",
+          region: "ewr",
+          failureDomains: [{ kind: "region", key: "   " }],
+          status: "ready",
+          capabilities: ["kubernetes"],
+          availableCapacity: 1,
+          supportLevel: "standard",
+        },
+      ],
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().message).toBe(
+      "Managed cluster failure domain key is required",
+    );
+  });
+
+  test("[RESIL-FD-001] rejects duplicate required failure-domain kinds", () => {
+    const result = ManagedClusterPlacementIntent.create({
+      workloadRef: "resource:res_duplicate_requirement",
+      requiredCapabilities: ["kubernetes"],
+      preferredRegions: ["ewr"],
+      excludedTargetIds: [],
+      currentTargetId: "target_current",
+      currentPlacementEpoch: 1,
+      maxFailoverAttempts: 1,
+      requiredFailureDomainKinds: ["region", "region"],
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().message).toBe(
+      "Managed cluster required failure domains must not contain duplicates",
+    );
+  });
+
+  test("[RESIL-FD-001] rejects unsupported required failure-domain kinds", () => {
+    const result = ManagedClusterPlacementIntent.create({
+      workloadRef: "resource:res_unsupported_requirement",
+      requiredCapabilities: ["kubernetes"],
+      preferredRegions: ["ewr"],
+      excludedTargetIds: [],
+      currentTargetId: "target_current",
+      currentPlacementEpoch: 1,
+      maxFailoverAttempts: 1,
+      requiredFailureDomainKinds: ["rack" as never],
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().message).toBe(
+      "Unsupported managed cluster failure domain rack",
+    );
+  });
+
+  test("[RESIL-DECIDE-003] returns deterministic selected-domain evidence", () => {
+    const pool = ManagedClusterTargetPool.create({
+      poolId: "pool_independent",
+      targets: [
+        {
+          targetId: "target_current",
+          providerKey: "provider-a",
+          region: "ewr",
+          failureDomains: [
+            { kind: "provider", key: "provider-a" },
+            { kind: "region", key: "provider-a:ewr" },
+          ],
+          status: "ready",
+          capabilities: ["kubernetes"],
+          availableCapacity: 2,
+          supportLevel: "standard",
+        },
+        {
+          targetId: "target_independent",
+          providerKey: "provider-b",
+          region: "sin",
+          failureDomains: [
+            { kind: "provider", key: "provider-b" },
+            { kind: "region", key: "provider-b:sin" },
+          ],
+          status: "ready",
+          capabilities: ["kubernetes"],
+          availableCapacity: 2,
+          supportLevel: "standard",
+        },
+      ],
+    })._unsafeUnwrap();
+    const intent = ManagedClusterPlacementIntent.create({
+      workloadRef: "resource:res_independent",
+      requiredCapabilities: ["kubernetes"],
+      preferredRegions: ["sin", "ewr"],
+      excludedTargetIds: [],
+      currentTargetId: "target_current",
+      currentPlacementEpoch: 4,
+      maxFailoverAttempts: 1,
+      requiredFailureDomainKinds: ["provider", "region"],
+    })._unsafeUnwrap();
+
+    const first = pool
+      .decidePlacement(intent, { mode: "failover", attempt: 1 })
+      ._unsafeUnwrap()
+      .toJSON();
+    const second = pool
+      .decidePlacement(intent, { mode: "failover", attempt: 1 })
+      ._unsafeUnwrap()
+      .toJSON();
+
+    expect(first).toEqual(second);
+    expect(first).toMatchObject({
+      selectedTargetId: "target_independent",
+      selectedFailureDomains: [
+        { kind: "provider", key: "provider-b" },
+        { kind: "region", key: "provider-b:sin" },
+      ],
+      placementEpoch: 5,
+      reasonCodes: expect.arrayContaining([
+        "failure-domain:provider:separated",
+        "failure-domain:region:separated",
+      ]),
+    });
+  });
 });

@@ -7,9 +7,9 @@
 
 ## R6a Failure-Domain Admission
 
-- [ ] RED `RESIL-FD-001`–`RESIL-DECIDE-003` for validation, missing/shared-domain blockers and deterministic evidence.
-- [ ] Implement public target/intent/decision failure-domain contracts and placement rules.
-- [ ] Synchronize contracts, fake connector and all affected fixtures without compatibility inference.
+- [x] RED `RESIL-FD-001`–`RESIL-DECIDE-003` for validation, missing/shared-domain blockers and deterministic evidence.
+- [x] Implement public target/intent/decision failure-domain contracts and placement rules.
+- [x] Synchronize contracts, fake connector and all affected fixtures without compatibility inference.
 - [ ] Adopt through Cloud policy/readback/persistence and run public/private Boundary Review.
 
 ## R6b–R6d
