@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
-import { connectorCapabilityApplyResultSchema, connectorCapabilityPlanPreviewSchema } from "../src";
+import {
+  connectorCapabilityApplyResultSchema,
+  connectorCapabilityPlanPreviewSchema,
+  managedClusterPlacementIntentSchema,
+  managedClusterTargetPoolSchema,
+} from "../src";
 
 const placement = {
   poolId: "pool_prod",
@@ -22,6 +27,42 @@ const placement = {
 };
 
 describe("managed cluster connector contracts", () => {
+  test("[RESIL-FD-001] preserves failure-domain identities and placement requirements", () => {
+    const pool = managedClusterTargetPoolSchema.parse({
+      poolId: "pool_prod",
+      targets: [
+        {
+          targetId: "target_sin",
+          providerKey: "provider-b",
+          region: "sin",
+          failureDomains: [
+            { kind: "provider", key: "provider-b" },
+            { kind: "region", key: "provider-b:sin" },
+          ],
+          status: "ready",
+          capabilities: ["kubernetes"],
+          availableCapacity: 3,
+          supportLevel: "premium",
+        },
+      ],
+    });
+    const intent = managedClusterPlacementIntentSchema.parse({
+      workloadRef: "resource:res_api",
+      requiredCapabilities: ["kubernetes"],
+      preferredRegions: ["sin"],
+      excludedTargetIds: [],
+      currentPlacementEpoch: 4,
+      maxFailoverAttempts: 2,
+      requiredFailureDomainKinds: ["provider", "region"],
+    });
+
+    expect(pool.targets[0]?.failureDomains).toEqual([
+      { kind: "provider", key: "provider-b" },
+      { kind: "region", key: "provider-b:sin" },
+    ]);
+    expect(intent.requiredFailureDomainKinds).toEqual(["provider", "region"]);
+  });
+
   test("[K8S-SURFACE-017] preserves typed placement evidence through plan responses", () => {
     const result = connectorCapabilityPlanPreviewSchema.parse({
       planId: "clusterplan_12345678",

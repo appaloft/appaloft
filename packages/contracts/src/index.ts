@@ -7719,10 +7719,18 @@ export const infrastructureServerProposalSchema = z.object({
 
 export const managedClusterSupportLevelSchema = z.enum(["community", "standard", "premium"]);
 
+export const managedClusterFailureDomainKindSchema = z.enum(["provider", "region", "zone", "host"]);
+
+export const managedClusterFailureDomainSchema = z.object({
+  kind: managedClusterFailureDomainKindSchema,
+  key: z.string().trim().min(1),
+});
+
 export const managedClusterTargetCandidateSchema = z.object({
   targetId: z.string(),
   providerKey: z.string(),
   region: z.string(),
+  failureDomains: z.array(managedClusterFailureDomainSchema).optional(),
   status: z.enum(["ready", "degraded", "unavailable"]),
   capabilities: z.array(z.string()),
   availableCapacity: z.number().int().nonnegative(),
@@ -7743,6 +7751,7 @@ export const managedClusterPlacementIntentSchema = z.object({
   currentTargetId: z.string().optional(),
   currentPlacementEpoch: z.number().int().nonnegative(),
   maxFailoverAttempts: z.number().int().min(0).max(10),
+  requiredFailureDomainKinds: z.array(managedClusterFailureDomainKindSchema).optional(),
 });
 
 export const managedClusterPlacementDecisionSchema = z.object({
@@ -7753,6 +7762,7 @@ export const managedClusterPlacementDecisionSchema = z.object({
   selectedTargetId: z.string(),
   selectedProviderKey: z.string(),
   selectedRegion: z.string(),
+  selectedFailureDomains: z.array(managedClusterFailureDomainSchema).optional(),
   previousTargetId: z.string().optional(),
   placementEpoch: z.number().int().positive(),
   fencingToken: z.string(),
@@ -8164,6 +8174,8 @@ export type SourceRepositorySummary = z.infer<typeof sourceRepositorySummarySche
 export type ProviderAppTokenLease = z.infer<typeof providerAppTokenLeaseSchema>;
 export type SourceRepositoryAccess = z.infer<typeof sourceRepositoryAccessSchema>;
 export type InfrastructureServerProposal = z.infer<typeof infrastructureServerProposalSchema>;
+export type ManagedClusterFailureDomainKind = z.infer<typeof managedClusterFailureDomainKindSchema>;
+export type ManagedClusterFailureDomain = z.infer<typeof managedClusterFailureDomainSchema>;
 export type ManagedClusterTargetPool = z.infer<typeof managedClusterTargetPoolSchema>;
 export type ManagedClusterPlacementIntent = z.infer<typeof managedClusterPlacementIntentSchema>;
 export type ManagedClusterPlacementDecision = z.infer<typeof managedClusterPlacementDecisionSchema>;

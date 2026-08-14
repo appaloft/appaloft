@@ -317,6 +317,10 @@ describe("managed cluster connector protocol", () => {
             targetId: "target_current",
             providerKey: "provider-a",
             region: "ewr",
+            failureDomains: [
+              { kind: "provider", key: "provider-a" },
+              { kind: "region", key: "provider-a:ewr" },
+            ],
             status: "ready",
             capabilities: ["kubernetes", "helm"],
             availableCapacity: 4,
@@ -326,6 +330,10 @@ describe("managed cluster connector protocol", () => {
             targetId: "target_next",
             providerKey: "provider-b",
             region: "sin",
+            failureDomains: [
+              { kind: "provider", key: "provider-b" },
+              { kind: "region", key: "provider-b:sin" },
+            ],
             status: "ready",
             capabilities: ["kubernetes", "helm"],
             availableCapacity: 3,
@@ -341,6 +349,7 @@ describe("managed cluster connector protocol", () => {
         currentTargetId: "target_current",
         currentPlacementEpoch: 4,
         maxFailoverAttempts: 2,
+        requiredFailureDomainKinds: ["provider", "region"],
       },
       mode: "failover",
       attempt: 1,
@@ -365,6 +374,10 @@ describe("managed cluster connector protocol", () => {
           placementEpoch: 5,
           mode: "failover",
           attempt: 1,
+          selectedFailureDomains: [
+            { kind: "provider", key: "provider-b" },
+            { kind: "region", key: "provider-b:sin" },
+          ],
         },
       },
     });
@@ -435,5 +448,73 @@ describe("managed cluster connector protocol", () => {
     });
     expect(exhausted.isErr()).toBe(true);
     expect(exhausted._unsafeUnwrapErr().code).toBe("conflict");
+  });
+
+  test("[RESIL-PLACE-002] rejects a shared failure domain before a placement plan exists", async () => {
+    const registry = new InMemoryConnectorRegistry([managedConnectorDefinition()]);
+    const adapter = new FakeInfrastructureConnectorProviderAdapter({
+      connectorKey: "managed-kubernetes",
+      providerKey: "provider-a",
+      providerTitle: "Managed Kubernetes",
+    });
+    const planService = new PlanConnectorCapabilityQueryService(
+      registry,
+      new InMemoryConnectorProviderAdapterRegistry([adapter]),
+    );
+
+    const result = await planService.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "managed-kubernetes",
+      capabilityKey: "infrastructure.cluster.failover",
+      ownerRef,
+      parameters: {
+        targetPool: {
+          poolId: "pool_shared_provider",
+          targets: [
+            {
+              targetId: "target_current",
+              providerKey: "provider-a",
+              region: "ewr",
+              failureDomains: [{ kind: "provider", key: "provider-a" }],
+              status: "ready",
+              capabilities: ["kubernetes"],
+              availableCapacity: 2,
+              supportLevel: "standard",
+            },
+            {
+              targetId: "target_candidate",
+              providerKey: "provider-a",
+              region: "sin",
+              failureDomains: [{ kind: "provider", key: "provider-a" }],
+              status: "ready",
+              capabilities: ["kubernetes"],
+              availableCapacity: 2,
+              supportLevel: "standard",
+            },
+          ],
+        },
+        placementIntent: {
+          workloadRef: "resource:res_api",
+          requiredCapabilities: ["kubernetes"],
+          preferredRegions: ["sin"],
+          excludedTargetIds: [],
+          currentTargetId: "target_current",
+          currentPlacementEpoch: 2,
+          maxFailoverAttempts: 2,
+          requiredFailureDomainKinds: ["provider"],
+        },
+        mode: "failover",
+        attempt: 1,
+      },
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "conflict",
+      details: {
+        ineligibilityReasons: expect.arrayContaining([
+          "target_candidate:failure-domain:shared:provider",
+        ]),
+      },
+    });
   });
 });

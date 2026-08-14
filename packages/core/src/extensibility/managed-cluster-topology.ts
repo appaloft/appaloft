@@ -4,11 +4,18 @@ import { err, ok, type Result } from "../shared/result";
 export type ManagedClusterTargetStatus = "ready" | "degraded" | "unavailable";
 export type ManagedClusterSupportLevel = "community" | "standard" | "premium";
 export type ManagedClusterPlacementMode = "initial" | "failover" | "recovery";
+export type ManagedClusterFailureDomainKind = "provider" | "region" | "zone" | "host";
+
+export interface ManagedClusterFailureDomainSnapshot {
+  kind: ManagedClusterFailureDomainKind;
+  key: string;
+}
 
 export interface ManagedClusterTargetCandidateSnapshot {
   targetId: string;
   providerKey: string;
   region: string;
+  failureDomains?: ManagedClusterFailureDomainSnapshot[];
   status: ManagedClusterTargetStatus;
   capabilities: string[];
   availableCapacity: number;
@@ -29,6 +36,7 @@ export interface ManagedClusterPlacementIntentSnapshot {
   currentTargetId?: string;
   currentPlacementEpoch: number;
   maxFailoverAttempts: number;
+  requiredFailureDomainKinds?: ManagedClusterFailureDomainKind[];
 }
 
 export interface ManagedClusterPlacementDecisionSnapshot {
@@ -39,6 +47,7 @@ export interface ManagedClusterPlacementDecisionSnapshot {
   selectedTargetId: string;
   selectedProviderKey: string;
   selectedRegion: string;
+  selectedFailureDomains?: ManagedClusterFailureDomainSnapshot[];
   previousTargetId?: string;
   placementEpoch: number;
   fencingToken: string;
@@ -89,6 +98,22 @@ class ManagedClusterTargetCandidate {
     if (providerKey.isErr()) return err(providerKey.error);
     const region = requiredText(input.region, "Managed cluster region");
     if (region.isErr()) return err(region.error);
+    const failureDomains: ManagedClusterFailureDomainSnapshot[] = [];
+    const failureDomainKinds = new Set<ManagedClusterFailureDomainKind>();
+    for (const domain of input.failureDomains ?? []) {
+      if (!(managedClusterFailureDomainKinds as readonly string[]).includes(domain.kind)) {
+        return err(
+          domainError.validation(`Unsupported managed cluster failure domain ${domain.kind}`),
+        );
+      }
+      if (failureDomainKinds.has(domain.kind)) {
+        return err(domainError.validation("Managed cluster failure domain kinds must be unique"));
+      }
+      const key = requiredText(domain.key, "Managed cluster failure domain key");
+      if (key.isErr()) return err(key.error);
+      failureDomainKinds.add(domain.kind);
+      failureDomains.push({ kind: domain.kind, key: key.value });
+    }
     if (!(["ready", "degraded", "unavailable"] as const).includes(input.status)) {
       return err(domainError.validation(`Unsupported managed cluster status ${input.status}`));
     }
@@ -117,6 +142,7 @@ class ManagedClusterTargetCandidate {
         targetId: targetId.value,
         providerKey: providerKey.value,
         region: region.value,
+        ...(failureDomains.length > 0 ? { failureDomains } : {}),
         status: input.status,
         capabilities: capabilities.value,
         availableCapacity: input.availableCapacity,
@@ -144,9 +170,14 @@ class ManagedClusterTargetCandidate {
     return this.snapshot.estimatedMonthlyCostUsd;
   }
 
+  failureDomainKey(kind: ManagedClusterFailureDomainKind): string | undefined {
+    return this.snapshot.failureDomains?.find((domain) => domain.kind === kind)?.key;
+  }
+
   eligibilityReasons(
     intent: ManagedClusterPlacementIntent,
     mode: ManagedClusterPlacementMode,
+    currentTarget?: ManagedClusterTargetCandidate,
   ): string[] {
     const reasons: string[] = [];
     if (this.snapshot.status !== "ready") reasons.push(`status:${this.snapshot.status}`);
@@ -160,6 +191,20 @@ class ManagedClusterTargetCandidate {
         reasons.push(`capability:missing:${required}`);
       }
     }
+    for (const requiredKind of intent.requiredFailureDomainKinds()) {
+      const candidateKey = this.failureDomainKey(requiredKind);
+      if (!candidateKey) {
+        reasons.push(`failure-domain:missing:${requiredKind}`);
+        continue;
+      }
+      if (mode === "initial") continue;
+      const currentKey = currentTarget?.failureDomainKey(requiredKind);
+      if (!currentKey) {
+        reasons.push(`failure-domain:current-missing:${requiredKind}`);
+      } else if (currentKey === candidateKey) {
+        reasons.push(`failure-domain:shared:${requiredKind}`);
+      }
+    }
     return reasons;
   }
 
@@ -167,6 +212,9 @@ class ManagedClusterTargetCandidate {
     return {
       ...this.snapshot,
       capabilities: [...this.snapshot.capabilities],
+      ...(this.snapshot.failureDomains
+        ? { failureDomains: this.snapshot.failureDomains.map((domain) => ({ ...domain })) }
+        : {}),
     };
   }
 }
@@ -196,6 +244,10 @@ export class ManagedClusterPlacementIntent {
       { sort: true },
     );
     if (excludedTargetIds.isErr()) return err(excludedTargetIds.error);
+    const requiredFailureDomainKinds = normalizedUniqueFailureDomainKinds(
+      input.requiredFailureDomainKinds ?? [],
+    );
+    if (requiredFailureDomainKinds.isErr()) return err(requiredFailureDomainKinds.error);
     const currentTargetId = input.currentTargetId
       ? requiredText(input.currentTargetId, "Managed cluster current target id")
       : undefined;
@@ -220,6 +272,9 @@ export class ManagedClusterPlacementIntent {
         requiredCapabilities: requiredCapabilities.value,
         preferredRegions: preferredRegions.value,
         excludedTargetIds: excludedTargetIds.value,
+        ...(requiredFailureDomainKinds.value.length > 0
+          ? { requiredFailureDomainKinds: requiredFailureDomainKinds.value }
+          : {}),
         ...(currentTargetId?.isOk() ? { currentTargetId: currentTargetId.value } : {}),
         currentPlacementEpoch: input.currentPlacementEpoch,
         maxFailoverAttempts: input.maxFailoverAttempts,
@@ -247,6 +302,10 @@ export class ManagedClusterPlacementIntent {
     return this.snapshot.maxFailoverAttempts;
   }
 
+  requiredFailureDomainKinds(): readonly ManagedClusterFailureDomainKind[] {
+    return this.snapshot.requiredFailureDomainKinds ?? [];
+  }
+
   excludes(targetId: string): boolean {
     return this.snapshot.excludedTargetIds.includes(targetId);
   }
@@ -262,6 +321,9 @@ export class ManagedClusterPlacementIntent {
       requiredCapabilities: [...this.snapshot.requiredCapabilities],
       preferredRegions: [...this.snapshot.preferredRegions],
       excludedTargetIds: [...this.snapshot.excludedTargetIds],
+      ...(this.snapshot.requiredFailureDomainKinds
+        ? { requiredFailureDomainKinds: [...this.snapshot.requiredFailureDomainKinds] }
+        : {}),
     };
   }
 }
@@ -280,6 +342,13 @@ export class ManagedClusterPlacementDecision {
       ...this.snapshot,
       rankedEligibleTargetIds: [...this.snapshot.rankedEligibleTargetIds],
       reasonCodes: [...this.snapshot.reasonCodes],
+      ...(this.snapshot.selectedFailureDomains
+        ? {
+            selectedFailureDomains: this.snapshot.selectedFailureDomains.map((domain) => ({
+              ...domain,
+            })),
+          }
+        : {}),
       consideredTargets: this.snapshot.consideredTargets.map((target) => ({
         ...target,
         reasons: [...target.reasons],
@@ -341,8 +410,14 @@ export class ManagedClusterTargetPool {
       return err(domainError.validation("Managed cluster failover requires a current target"));
     }
 
+    const currentTarget = intent.currentTargetId()
+      ? this.targetsValue.find((target) => target.id() === intent.currentTargetId())
+      : undefined;
     const considered = this.targetsValue
-      .map((target) => ({ target, reasons: target.eligibilityReasons(intent, input.mode) }))
+      .map((target) => ({
+        target,
+        reasons: target.eligibilityReasons(intent, input.mode, currentTarget),
+      }))
       .sort((left, right) => left.target.id().localeCompare(right.target.id()));
     const eligible = considered
       .filter((candidate) => candidate.reasons.length === 0)
@@ -379,6 +454,9 @@ export class ManagedClusterTargetPool {
     );
     const reasonCodes = [
       `region-rank:${intent.regionRank(selected.region())}`,
+      ...(input.mode !== "initial"
+        ? intent.requiredFailureDomainKinds().map((kind) => `failure-domain:${kind}:separated`)
+        : []),
       ...(lowestCost ? ["cost:lowest-eligible"] : []),
       "tie-break:target-id",
     ];
@@ -392,6 +470,9 @@ export class ManagedClusterTargetPool {
         selectedTargetId: selected.id(),
         selectedProviderKey: selected.providerKey(),
         selectedRegion: selected.region(),
+        ...(selected.toJSON().failureDomains
+          ? { selectedFailureDomains: selected.toJSON().failureDomains }
+          : {}),
         ...(previousTargetId ? { previousTargetId } : {}),
         placementEpoch,
         fencingToken,
@@ -425,6 +506,27 @@ export class ManagedClusterTargetPool {
       targets: this.targetsValue.map((target) => target.toJSON()),
     };
   }
+}
+
+const managedClusterFailureDomainKinds = ["provider", "region", "zone", "host"] as const;
+
+function normalizedUniqueFailureDomainKinds(
+  values: readonly ManagedClusterFailureDomainKind[],
+): Result<ManagedClusterFailureDomainKind[]> {
+  const unsupported = values.find(
+    (value) => !(managedClusterFailureDomainKinds as readonly string[]).includes(value),
+  );
+  if (unsupported) {
+    return err(domainError.validation(`Unsupported managed cluster failure domain ${unsupported}`));
+  }
+  if (new Set(values).size !== values.length) {
+    return err(
+      domainError.validation(
+        "Managed cluster required failure domains must not contain duplicates",
+      ),
+    );
+  }
+  return ok([...values]);
 }
 
 function stableHash(value: unknown): string {
