@@ -7804,10 +7804,54 @@ export const managedClusterReplacementReadinessSchema = z.object({
   ),
 });
 
+export const managedCapacityCellSchema = z
+  .object({
+    clusterRef: z.string().trim().min(1),
+    targetId: z.string().trim().min(1),
+    targetPoolId: z.string().trim().min(1),
+    providerKey: z.string().trim().min(1),
+    clusterName: z.string().trim().min(1).optional(),
+    region: z.string().trim().min(1),
+    failureDomains: z.array(managedClusterFailureDomainSchema).min(1),
+    origin: z.enum(["provisioned", "imported"]),
+    lifecycleStatus: z.enum(["accepting", "draining", "drained", "deleted", "failed"]),
+    providerResourceDisposition: z.enum(["delete", "retain"]),
+    capabilities: z.array(z.string().trim().min(1)),
+    availableCapacity: z.number().int().nonnegative(),
+    activePlacementCount: z.number().int().nonnegative(),
+    estimatedMonthlyCostUsd: z.number().nonnegative().optional(),
+    supportLevel: managedClusterSupportLevelSchema,
+  })
+  .superRefine((cell, context) => {
+    if (cell.origin === "imported" && cell.providerResourceDisposition !== "retain") {
+      context.addIssue({
+        code: "custom",
+        message: "Imported managed capacity cells must retain their provider resource",
+        path: ["providerResourceDisposition"],
+      });
+    }
+    if (!["accepting", "failed"].includes(cell.lifecycleStatus) && cell.availableCapacity !== 0) {
+      context.addIssue({
+        code: "custom",
+        message: "A non-accepting managed capacity cell must expose zero available capacity",
+        path: ["availableCapacity"],
+      });
+    }
+    if (["drained", "deleted"].includes(cell.lifecycleStatus) && cell.activePlacementCount !== 0) {
+      context.addIssue({
+        code: "custom",
+        message: "A drained or deleted managed capacity cell must have zero active placements",
+        path: ["activePlacementCount"],
+      });
+    }
+  });
+
 export const managedClusterCapabilityActionSchema = z.enum([
   "provision",
+  "import",
   "inspect",
   "readiness",
+  "drain",
   "delete",
   "place",
   "failover",
@@ -7828,6 +7872,7 @@ export const managedClusterCapabilityPlanSchema = z.object({
   supportLevel: managedClusterSupportLevelSchema,
   cleanupSupported: z.boolean(),
   requiredCapabilities: z.array(z.string()),
+  capacityCell: managedCapacityCellSchema.optional(),
   placement: managedClusterPlacementDecisionSchema.optional(),
 });
 
@@ -7855,6 +7900,7 @@ export const managedClusterCapabilityReceiptSchema = z.object({
     residualOwnedResources: z.number().int().nonnegative(),
     orphanResourceRefs: z.array(z.string()),
   }),
+  capacityCell: managedCapacityCellSchema.optional(),
   placement: managedClusterPlacementDecisionSchema.optional(),
 });
 
@@ -8211,6 +8257,7 @@ export type ManagedClusterPlacementDecision = z.infer<typeof managedClusterPlace
 export type ManagedClusterReplacementReadiness = z.infer<
   typeof managedClusterReplacementReadinessSchema
 >;
+export type ManagedCapacityCell = z.infer<typeof managedCapacityCellSchema>;
 export type ManagedClusterCapabilityPlan = z.infer<typeof managedClusterCapabilityPlanSchema>;
 export type ManagedClusterCapabilityReceipt = z.infer<typeof managedClusterCapabilityReceiptSchema>;
 export type NotificationMessage = z.infer<typeof notificationMessageSchema>;

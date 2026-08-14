@@ -23,10 +23,10 @@
 ## R6b2–R6d
 
 - [x] Accept the R6b2 Grill and define managed capacity-cell origin, lifecycle, drain/delete and external-resource retention semantics.
-- [ ] Create the public R6b2 actor-visible Ticket and bind `RESIL-CELL-010` / `RESIL-CELLS-011` before Code Round.
-- [ ] RED managed-cell import/provision, inspect, drain/delete, exact-plan drift and two-cell dry-run/readback.
-- [ ] Implement the provider-neutral lifecycle contract, fake adapter, shared schema and Web affordance.
-- [ ] Publish the managed capacity-cell task/help anchor and complete docs impact classification.
+- [x] Create the public R6b2 actor-visible Ticket #1113 and bind `RESIL-CELL-010` / `RESIL-CELLS-011` before Code Round.
+- [x] RED managed-cell import/provision, inspect, drain/delete, exact-plan drift and two-cell dry-run/readback.
+- [x] Implement the provider-neutral lifecycle contract, fake adapter, shared schema and Web affordance.
+- [x] Publish the managed capacity-cell task/help anchor and complete docs impact classification.
 - [ ] Implement accepted-plan fenced traffic handoff `RESIL-FENCE-005`–`RESIL-ROUTE-006`.
 - [ ] Implement state eligibility and DR evidence `RESIL-STATE-007`.
 - [ ] Prove exact rollback/cleanup `RESIL-CLEAN-008`.

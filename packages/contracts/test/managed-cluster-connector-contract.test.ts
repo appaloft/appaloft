@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   connectorCapabilityApplyResultSchema,
   connectorCapabilityPlanPreviewSchema,
+  managedCapacityCellSchema,
   managedClusterPlacementIntentSchema,
   managedClusterReplacementReadinessSchema,
   managedClusterTargetPoolSchema,
@@ -28,6 +29,43 @@ const placement = {
 };
 
 describe("managed cluster connector contracts", () => {
+  test("[RESIL-CELL-010] preserves only the safe managed capacity-cell snapshot", () => {
+    const cell = managedCapacityCellSchema.parse({
+      clusterRef: "cluster:customer-regional-b",
+      targetId: "target_regional_b",
+      targetPoolId: "pool_production",
+      providerKey: "digitalocean",
+      clusterName: "regional-b",
+      region: "sfo3",
+      failureDomains: [
+        { kind: "provider", key: "digitalocean" },
+        { kind: "region", key: "digitalocean:sfo3" },
+      ],
+      origin: "imported",
+      lifecycleStatus: "drained",
+      providerResourceDisposition: "retain",
+      capabilities: ["kubernetes"],
+      availableCapacity: 0,
+      activePlacementCount: 0,
+      estimatedMonthlyCostUsd: 48,
+      supportLevel: "community",
+      credentialRef: "secret:do-token",
+      providerBindingRef: "binding:private",
+      providerObject: { id: "raw-provider-id" },
+    });
+
+    expect(cell).toMatchObject({
+      origin: "imported",
+      lifecycleStatus: "drained",
+      providerResourceDisposition: "retain",
+      failureDomains: [{ kind: "provider" }, { kind: "region" }],
+      activePlacementCount: 0,
+    });
+    expect(JSON.stringify(cell)).not.toContain("secret:do-token");
+    expect(JSON.stringify(cell)).not.toContain("binding:private");
+    expect(JSON.stringify(cell)).not.toContain("raw-provider-id");
+  });
+
   test("[RESIL-FD-001] preserves failure-domain identities and placement requirements", () => {
     const pool = managedClusterTargetPoolSchema.parse({
       poolId: "pool_prod",
