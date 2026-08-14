@@ -131,6 +131,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-112: Operate And Recover Presentation Boundary](./ADR-112-operate-and-recover-presentation-boundary.md) | Accepted | Defines `appaloft operate` as ephemeral public presentation over existing observation, recovery, backup and portability operations, with fresh admission, explicit confirmation and no new lifecycle owner. |
 | [ADR-113: Platform Migration Presentation Boundary](./ADR-113-platform-migration-presentation-boundary.md) | Accepted | Defines a secret-safe Migration Bundle and `appaloft migrate` as receipt-backed coordination over existing operation owners, without a vendor mirror or Migration lifecycle. |
 | [ADR-114: Kubernetes Runtime Target And Scale Policy Boundary](./ADR-114-kubernetes-runtime-target-and-scale-policy-boundary.md) | Accepted | Defines provider-neutral target/scale/rollout profiles, an adapter-owned Kubernetes backend, ids-only deployment admission, and public connector/private managed-cluster composition. |
+| [ADR-115: Managed Capacity Failure-Domain Boundary](./ADR-115-managed-capacity-failure-domain-boundary.md) | Accepted | Defines provider-neutral failure-domain identity, required separation, fail-closed placement and safe resilience evidence without moving hosted policy into public core. |
 
 ## Authoring Rules
 

@@ -683,12 +683,13 @@ web/Compose/stateful acceptance gate. Code Round may add migration task operatio
 but it must not add a Migration aggregate/table or bypass existing Project, Environment, Resource,
 Deployment, DomainBinding, DependencyResource or StorageVolume owners.
 
-R5 Kubernetes and Scale Topology is positioned as a sequence of accepted future runtime-target
-profiles under ADR-023, ADR-114 and Spec 136. `deployments.create` remains ids-only. Runtime Target
-Profile, Resource Scale Profile and Resource Rollout Profile operations must be cataloged before
-implementation; Kubernetes rendering, manifests, namespaces, client types and provider responses
-remain adapter-owned. R5a existing-cluster stateless OCI, R5b scale/rollout, R5c stateful/Helm and
-R5d managed/multi-cluster each require their own actor-visible evidence before total R5 completion.
+R5 Kubernetes and Scale Topology is complete under ADR-023, ADR-114 and Spec 136.
+`deployments.create` remains ids-only; Kubernetes rendering, manifests, namespaces, client types and
+provider responses remain adapter-owned. R6 Production Failure-Domain Resilience is governed by
+ADR-115 and Spec 137. Its first slice extends the existing managed target-pool decision capability
+with neutral failure-domain admission and safe readback; it does not add a public command, a new
+aggregate, or a Cloud-only placement engine. Later traffic handoff continues to use existing route
+owners and connector plan/accept/apply boundaries.
 
 `CORE_OPERATIONS.md` remains the authoritative active operation list. This map adds relationship and
 gating semantics and must be kept in sync whenever a behavior changes state.
