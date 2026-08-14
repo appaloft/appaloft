@@ -65,6 +65,7 @@ import { MemoryServerRepository } from "@appaloft/testkit";
 
 import {
   BuiltinKubernetesRoutingPolicyResolver,
+  createKubernetesRuntimeTargetBackend,
   K3S_TRAEFIK_ROUTING_POLICY_REFERENCE,
   KubernetesRuntimeTargetBackend,
   type KubernetesCommandRunner,
@@ -233,7 +234,9 @@ function statefulKubernetesRuntimePlan(): RuntimePlan {
   });
 }
 
-function helmKubernetesRuntimePlan(): RuntimePlan {
+function helmKubernetesRuntimePlan(
+  valuesSecretReferences: string[] = [],
+): RuntimePlan {
   return RuntimePlan.rehydrate({
     id: RuntimePlanId.rehydrate("rtp_kubernetes_helm"),
     source: SourceDescriptor.rehydrate({
@@ -248,7 +251,7 @@ function helmKubernetesRuntimePlan(): RuntimePlan {
       metadata: {
         "helm.chartReference": "oci://registry.example.com/charts/storefront",
         "helm.chartVersion": "1.7.3",
-        "helm.valuesSecretReferences": "[]",
+        "helm.valuesSecretReferences": JSON.stringify(valuesSecretReferences),
         "helm.hookPolicy": "disabled",
         "helm.timeoutSeconds": "300",
       },
@@ -829,6 +832,50 @@ class SuccessfulHelmRunner implements HelmCommandRunner {
 }
 
 describe("KubernetesRuntimeTargetBackend execution", () => {
+  test("[K8S-HELM-013] factory composes a credential-aware Helm values resolver", async () => {
+    const context = createExecutionContext({
+      requestId: "req_r5c_helm_values",
+      entrypoint: "system",
+      tenant: { tenantId: "org_acme", organizationId: "org_acme" },
+    });
+    const repository = new MemoryServerRepository();
+    const target = cluster();
+    await repository.upsert(
+      toRepositoryContext(context),
+      target,
+      UpsertServerSpec.fromServer(target),
+    );
+    const resolvedReferences: readonly string[][] = [];
+    const helmRunner = new SuccessfulHelmRunner();
+    const backend = createKubernetesRuntimeTargetBackend({
+      runner: new SuccessfulExecutionRunner(),
+      connectionResolver: {
+        resolve: async () =>
+          ok({ kubeconfigPath: "/private/tmp/r5c.kubeconfig", contextName: "r5c" }),
+      },
+      serverRepository: repository,
+      helmCommandRunner: helmRunner,
+      helmValuesResolver: {
+        resolve: async (input) => {
+          (resolvedReferences as string[][]).push([...input.references]);
+          return ok({
+            filePaths: ["/private/tmp/materialized-values.yaml"],
+            dispose: async () => undefined,
+          });
+        },
+      },
+    });
+    const deployment = runningDeployment(
+      helmKubernetesRuntimePlan(["secret://helm/storefront/production"]),
+    );
+
+    expect((await backend.execute(context, deployment)).isOk()).toBe(true);
+    expect(resolvedReferences).toEqual([["secret://helm/storefront/production"]]);
+    const applied = helmRunner.calls.find((call) => call.step === "apply-helm-release");
+    expect(applied?.args).toContain("/private/tmp/materialized-values.yaml");
+    expect(applied?.args.join(" ")).not.toContain("secret://helm/storefront/production");
+  });
+
   test("[K8S-HELM-013] routes Helm plans through render, atomic apply, readback, and exact uninstall", async () => {
     const helmRunner = new SuccessfulHelmRunner();
     const lifecycle = new KubernetesHelmLifecycle(helmRunner, {
