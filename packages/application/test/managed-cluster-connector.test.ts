@@ -590,6 +590,15 @@ describe("managed cluster connector protocol", () => {
       },
       mode: "failover",
       attempt: 1,
+      stateEligibility: {
+        workloadRef: "resource:res_api",
+        currentTargetId: "target_current",
+        replacementTargetId: "target_next",
+        mode: "stateless",
+        status: "eligible",
+        evaluatedAt: "2026-08-14T12:00:00.000Z",
+        reasonCodes: ["state_stateless"],
+      },
     };
 
     const plan = (

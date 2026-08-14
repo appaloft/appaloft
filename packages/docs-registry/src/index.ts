@@ -1026,6 +1026,39 @@ export const publicDocsHelpTopics = {
     ],
     webSurfaces: ["Account settings → Connections → Managed Kubernetes"],
   },
+  "integration.managed-workload-state-eligibility": {
+    id: "integration.managed-workload-state-eligibility",
+    title: "Managed workload state eligibility",
+    description:
+      "How explicit state modes, RPO/RTO objectives, fresh durability or restore evidence, and local-PVC blockers gate managed failover before effects.",
+    page: {
+      "zh-CN": "deliver/integrations",
+      "en-US": "en/deliver/integrations",
+    },
+    anchor: "managed-workload-state-eligibility",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "connections.capability.plan",
+    aliases: [
+      "infrastructure.cluster.state-eligibility",
+      "stateful failover",
+      "RPO",
+      "RTO",
+      "restore rehearsal",
+      "local PVC",
+      "状态资格",
+      "恢复演练",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-115-managed-capacity-failure-domain-boundary.md",
+      "docs/specs/137-production-failure-domain-resilience/spec.md",
+      "docs/testing/production-failure-domain-resilience-test-matrix.md",
+    ],
+    webSurfaces: ["Account settings → Connections → Managed Kubernetes"],
+  },
   "agent.deploy-skill": {
     id: "agent.deploy-skill",
     title: "Agent deploy skill",

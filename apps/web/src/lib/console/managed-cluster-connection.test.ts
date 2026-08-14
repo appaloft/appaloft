@@ -27,6 +27,19 @@ const baseForm: ManagedClusterForm = {
   healthObservedAt: "2026-08-14T12:00:00.000Z",
   healthValidUntil: "2026-08-14T12:05:00.000Z",
   plannedAt: "2026-08-14T12:01:00.000Z",
+  stateMode: "restorable",
+  maximumRecoveryPointAgeSeconds: "300",
+  maximumRecoveryTimeSeconds: "600",
+  stateEvidenceKind: "restore-rehearsal",
+  durabilityEvidenceRef: "",
+  backupEvidenceRef: "backup:svb_20260814",
+  restoreEvidenceRef: "restore:sra_20260814",
+  stateEvidenceObservedAt: "2026-08-14T12:00:00.000Z",
+  stateEvidenceValidUntil: "2026-08-14T13:00:00.000Z",
+  observedRecoveryPointAgeSeconds: "120",
+  observedRecoveryTimeSeconds: "240",
+  stateSourceTargetId: "target_current",
+  stateRecoveryTargetId: "target_sin",
 };
 
 describe("managed cluster connection form", () => {
@@ -105,6 +118,43 @@ describe("managed cluster connection form", () => {
         currentTargetId: " ",
       }),
     ).toEqual({ ok: false, field: "currentTargetId" });
+  });
+
+  test("[RESIL-STATE-007] builds an exact plan-only state eligibility profile", () => {
+    expect(
+      buildManagedClusterParameters("infrastructure.cluster.state-eligibility", baseForm),
+    ).toEqual({
+      ok: true,
+      parameters: {
+        stateProfile: {
+          workloadRef: "resource:api",
+          currentTargetId: "target_current",
+          replacementTargetId: "target_sin",
+          mode: "restorable",
+          objectives: {
+            maximumRecoveryPointAgeSeconds: 300,
+            maximumRecoveryTimeSeconds: 600,
+          },
+          evidence: {
+            kind: "restore-rehearsal",
+            backupEvidenceRef: "backup:svb_20260814",
+            restoreEvidenceRef: "restore:sra_20260814",
+            sourceTargetId: "target_current",
+            recoveryTargetId: "target_sin",
+            observedAt: "2026-08-14T12:00:00.000Z",
+            validUntil: "2026-08-14T13:00:00.000Z",
+            observedRecoveryPointAgeSeconds: 120,
+            observedRecoveryTimeSeconds: 240,
+          },
+        },
+      },
+    });
+    expect(
+      buildManagedClusterParameters("infrastructure.cluster.state-eligibility", {
+        ...baseForm,
+        maximumRecoveryTimeSeconds: "-1",
+      }),
+    ).toEqual({ ok: false, field: "maximumRecoveryTimeSeconds" });
   });
 
   test("[RESIL-FENCE-005][RESIL-ROUTE-006] builds exact safe handoff and plan-only status parameters", () => {

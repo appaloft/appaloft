@@ -11,6 +11,7 @@
     ManagedTrafficHandoffPlan,
     ManagedTrafficHandoffReceipt,
     ManagedTrafficRoute,
+    ManagedWorkloadStateEligibility,
   } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
@@ -56,6 +57,19 @@
   let healthObservedAt = $state("");
   let healthValidUntil = $state("");
   let plannedAt = $state("");
+  let stateMode = $state("stateless");
+  let maximumRecoveryPointAgeSeconds = $state("");
+  let maximumRecoveryTimeSeconds = $state("");
+  let stateEvidenceKind = $state("restore-rehearsal");
+  let durabilityEvidenceRef = $state("");
+  let backupEvidenceRef = $state("");
+  let restoreEvidenceRef = $state("");
+  let stateEvidenceObservedAt = $state("");
+  let stateEvidenceValidUntil = $state("");
+  let observedRecoveryPointAgeSeconds = $state("");
+  let observedRecoveryTimeSeconds = $state("");
+  let stateSourceTargetId = $state("");
+  let stateRecoveryTargetId = $state("");
   let plan = $state<ConnectorCapabilityPlanResponse | null>(null);
   let acceptedPlanId = $state("");
   let applyResult = $state<ConnectorCapabilityApplyResponse | null>(null);
@@ -83,6 +97,19 @@
     healthObservedAt,
     healthValidUntil,
     plannedAt,
+    stateMode,
+    maximumRecoveryPointAgeSeconds,
+    maximumRecoveryTimeSeconds,
+    stateEvidenceKind,
+    durabilityEvidenceRef,
+    backupEvidenceRef,
+    restoreEvidenceRef,
+    stateEvidenceObservedAt,
+    stateEvidenceValidUntil,
+    observedRecoveryPointAgeSeconds,
+    observedRecoveryTimeSeconds,
+    stateSourceTargetId,
+    stateRecoveryTargetId,
   });
   const formFingerprint = $derived(managedClusterFormFingerprint(capabilityKey, form));
   const selectedCapability = $derived(
@@ -101,6 +128,9 @@
   );
   const isPlacementAction = $derived(!isCellCreation && !isReferenceAction);
   const isReadiness = $derived(capabilityKey === "infrastructure.cluster.readiness");
+  const isStateEligibility = $derived(
+    capabilityKey === "infrastructure.cluster.state-eligibility",
+  );
   const isTrafficStatus = $derived(capabilityKey === "infrastructure.cluster.traffic-status");
   const isTrafficMutation = $derived(
     capabilityKey === "infrastructure.cluster.handoff-traffic" ||
@@ -108,7 +138,10 @@
   );
   const isTrafficAction = $derived(isTrafficStatus || isTrafficMutation);
   const isMutation = $derived(
-    capabilityKey !== "infrastructure.cluster.inspect" && !isReadiness && !isTrafficStatus,
+    capabilityKey !== "infrastructure.cluster.inspect" &&
+      !isReadiness &&
+      !isStateEligibility &&
+      !isTrafficStatus,
   );
   const connectorAvailable = $derived(connector.availability.status === "available");
   const exactPlanIsCurrent = $derived(Boolean(plan && plannedFingerprint === formFingerprint));
@@ -141,6 +174,9 @@
   );
   const trafficReceipt = $derived<ManagedTrafficHandoffReceipt | null>(
     applyResult?.providerResult?.managedTrafficHandoffReceipt ?? null,
+  );
+  const stateEligibility = $derived<ManagedWorkloadStateEligibility | null>(
+    plan?.providerPlan?.managedWorkloadStateEligibility ?? null,
   );
   const visibleTrafficRoute = $derived(trafficReceipt?.finalRoute ?? trafficPlanRoute);
   const visibleReceipt = $derived(applyReceipt ?? planReceipt);
@@ -291,6 +327,92 @@
       <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedClusterRef)}</span>
       <Input bind:value={clusterRef} placeholder="cluster_..." />
     </label>
+  {:else if isStateEligibility}
+    <div class="grid gap-4 md:grid-cols-2" data-managed-state-eligibility-inputs>
+      <label class="space-y-1.5 text-sm font-medium">
+        <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedClusterWorkloadRef)}</span>
+        <Input bind:value={workloadRef} placeholder="resource:..." />
+      </label>
+      <label class="space-y-1.5 text-sm font-medium">
+        <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedStateMode)}</span>
+        <Select.Root bind:value={stateMode} type="single">
+          <Select.Trigger class="w-full">{stateMode}</Select.Trigger>
+          <Select.Content>
+            <Select.Item value="stateless">stateless</Select.Item>
+            <Select.Item value="external-durable">external-durable</Select.Item>
+            <Select.Item value="restorable">restorable</Select.Item>
+            <Select.Item value="local-pvc">local-pvc</Select.Item>
+          </Select.Content>
+        </Select.Root>
+      </label>
+      <label class="space-y-1.5 text-sm font-medium">
+        <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedClusterCurrentTarget)}</span>
+        <Input bind:value={currentTargetId} placeholder="target_current" />
+      </label>
+      <label class="space-y-1.5 text-sm font-medium">
+        <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedTrafficReplacementTarget)}</span>
+        <Input bind:value={replacementTargetId} placeholder="target_replacement" />
+      </label>
+      {#if stateMode === "external-durable" || stateMode === "restorable"}
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedStateRpoObjective)}</span>
+          <Input bind:value={maximumRecoveryPointAgeSeconds} inputmode="numeric" placeholder="300" />
+        </label>
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedStateRtoObjective)}</span>
+          <Input bind:value={maximumRecoveryTimeSeconds} inputmode="numeric" placeholder="600" />
+        </label>
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedStateEvidenceKind)}</span>
+          <Select.Root bind:value={stateEvidenceKind} type="single">
+            <Select.Trigger class="w-full">{stateEvidenceKind}</Select.Trigger>
+            <Select.Content>
+              <Select.Item value="external-durability">external-durability</Select.Item>
+              <Select.Item value="restore-rehearsal">restore-rehearsal</Select.Item>
+            </Select.Content>
+          </Select.Root>
+        </label>
+        {#if stateMode === "external-durable"}
+          <label class="space-y-1.5 text-sm font-medium">
+            <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedStateDurabilityEvidence)}</span>
+            <Input bind:value={durabilityEvidenceRef} placeholder="durability:..." />
+          </label>
+        {:else}
+          <label class="space-y-1.5 text-sm font-medium">
+            <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedStateBackupEvidence)}</span>
+            <Input bind:value={backupEvidenceRef} placeholder="backup:..." />
+          </label>
+          <label class="space-y-1.5 text-sm font-medium">
+            <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedStateRestoreEvidence)}</span>
+            <Input bind:value={restoreEvidenceRef} placeholder="restore:..." />
+          </label>
+        {/if}
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedStateSourceTarget)}</span>
+          <Input bind:value={stateSourceTargetId} placeholder="target_current" />
+        </label>
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedStateRecoveryTarget)}</span>
+          <Input bind:value={stateRecoveryTargetId} placeholder="target_replacement" />
+        </label>
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedStateEvidenceObservedAt)}</span>
+          <Input bind:value={stateEvidenceObservedAt} placeholder="2026-08-14T12:00:00.000Z" />
+        </label>
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedStateEvidenceValidUntil)}</span>
+          <Input bind:value={stateEvidenceValidUntil} placeholder="2026-08-14T13:00:00.000Z" />
+        </label>
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedStateObservedRpo)}</span>
+          <Input bind:value={observedRecoveryPointAgeSeconds} inputmode="numeric" placeholder="120" />
+        </label>
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedStateObservedRto)}</span>
+          <Input bind:value={observedRecoveryTimeSeconds} inputmode="numeric" placeholder="240" />
+        </label>
+      {/if}
+    </div>
   {:else if isTrafficAction}
     <div class="grid gap-4 md:grid-cols-2" data-managed-traffic-inputs>
       <label class="space-y-1.5 text-sm font-medium md:col-span-2">
@@ -375,7 +497,7 @@
     </div>
   {/if}
 
-  {#if isCellCreation || (isPlacementAction && !isTrafficAction)}
+  {#if isCellCreation || (isPlacementAction && !isTrafficAction && !isStateEligibility)}
     <label class="block space-y-1.5 text-sm font-medium">
       <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedClusterRequiredCapabilities)}</span>
       <Input bind:value={requiredCapabilities} placeholder="kubernetes, helm" />
@@ -441,7 +563,7 @@
     </div>
   {/if}
 
-  {#if applyResult || visibleReceipt || visiblePlacement || replacementReadiness || visibleTrafficRoute}
+  {#if applyResult || visibleReceipt || visiblePlacement || replacementReadiness || visibleTrafficRoute || stateEligibility}
     <div class="space-y-3 rounded-md border bg-card p-4" data-managed-cluster-readback>
       <h3 class="text-sm font-semibold">{$t(i18nKeys.console.accountSettings.managedClusterReadbackTitle)}</h3>
       {#if applyResult}<p class="text-sm text-muted-foreground">{applyResult.summary}</p>{/if}
@@ -471,6 +593,15 @@
           {/if}
           <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterEligibleCapacity)}</dt><dd class="font-medium">{replacementReadiness.totalEligibleReplacementCapacity}</dd></div>
           <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterReadinessReasons)}</dt><dd class="break-words font-medium">{replacementReadiness.reasonCodes.join(", ")}</dd></div>
+        {/if}
+        {#if stateEligibility}
+          <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedStateMode)}</dt><dd class="font-medium">{stateEligibility.mode}</dd></div>
+          <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterStatus)}</dt><dd class="font-medium">{stateEligibility.status}</dd></div>
+          <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedStateReasons)}</dt><dd class="break-words font-medium">{stateEligibility.reasonCodes.join(", ")}</dd></div>
+          {#if stateEligibility.objectives}
+            <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedStateRpoObjective)}</dt><dd class="font-medium">{stateEligibility.objectives.maximumRecoveryPointAgeSeconds}s</dd></div>
+            <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedStateRtoObjective)}</dt><dd class="font-medium">{stateEligibility.objectives.maximumRecoveryTimeSeconds}s</dd></div>
+          {/if}
         {/if}
         {#if trafficReceipt}
           <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedTrafficOutcome)}</dt><dd class="font-medium">{trafficReceipt.outcome}</dd></div>
