@@ -35,5 +35,5 @@
 
 ## Final Sync
 
-- [ ] Run public full gates, Cloud composed gates, docs-impact and final Boundary Review.
-- [ ] Sync all subprofile claims/evidence; close total R5 only after R5a–R5d pass.
+- [x] Run public full gates, Cloud composed gates, docs-impact and final Boundary Review.
+- [x] Sync all subprofile claims/evidence; close total R5 only after R5a–R5d pass.
