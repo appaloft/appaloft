@@ -109,6 +109,10 @@ import {
   HealthCheckStartPeriodSeconds,
   HealthCheckTimeoutSeconds,
   HealthCheckTypeValue,
+  HelmChartVersion,
+  HelmHookPolicyValue,
+  HelmTimeoutSeconds,
+  HelmValuesSecretReference,
   HostAddress,
   IdempotencyKeyValue,
   ImageReference,
@@ -449,6 +453,12 @@ export interface SerializedResourceSourceBinding extends Record<string, unknown>
   imageName?: string;
   imageTag?: string;
   imageDigest?: string;
+  helmChart?: {
+    version: string;
+    valuesSecretReferences: string[];
+    hookPolicy: "disabled" | "bounded";
+    timeoutSeconds: number;
+  };
   metadata?: Record<string, string>;
 }
 
@@ -1724,6 +1734,20 @@ export function rehydrateResourceRow(
                   imageDigest: DockerImageDigest.rehydrate(
                     sourceBinding.imageDigest ?? sourceBinding.metadata?.imageDigest ?? "",
                   ),
+                }
+              : {}),
+            ...(sourceBinding.helmChart
+              ? {
+                  helmChart: {
+                    version: HelmChartVersion.rehydrate(sourceBinding.helmChart.version),
+                    valuesSecretReferences: sourceBinding.helmChart.valuesSecretReferences.map(
+                      (reference) => HelmValuesSecretReference.rehydrate(reference),
+                    ),
+                    hookPolicy: HelmHookPolicyValue.rehydrate(sourceBinding.helmChart.hookPolicy),
+                    timeoutSeconds: HelmTimeoutSeconds.rehydrate(
+                      sourceBinding.helmChart.timeoutSeconds,
+                    ),
+                  },
                 }
               : {}),
             ...(sourceBinding.metadata ? { metadata: { ...sourceBinding.metadata } } : {}),

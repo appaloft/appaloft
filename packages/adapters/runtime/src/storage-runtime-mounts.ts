@@ -8,7 +8,7 @@ import {
 } from "@appaloft/core";
 import type { DockerRunMountInput } from "./runtime-commands";
 
-interface RuntimeStorageMountMetadata {
+export interface RuntimeStorageMountMetadata {
   attachmentId: string;
   storageVolumeId: string;
   storageVolumeKind: "named-volume" | "bind-mount";
@@ -67,7 +67,7 @@ export function dockerVolumeNameForStorageVolumeId(storageVolumeId: string): Res
   return ok(candidate);
 }
 
-function storageMountMetadataFromRuntimeMetadata(
+export function runtimeStorageMountsFromRuntimeMetadata(
   metadata: Record<string, string> | undefined,
 ): Result<RuntimeStorageMountMetadata[]> {
   const serialized = metadata?.["storage.mounts"];
@@ -111,7 +111,7 @@ function dockerStorageVolumeLabels(input: {
 export function dockerStorageVolumeRealizationsFromRuntimeMetadata(
   metadata: Record<string, string> | undefined,
 ): Result<DockerStorageVolumeRealization[]> {
-  const parsed = storageMountMetadataFromRuntimeMetadata(metadata);
+  const parsed = runtimeStorageMountsFromRuntimeMetadata(metadata);
   if (parsed.isErr()) {
     return err(parsed.error);
   }
@@ -162,7 +162,7 @@ export function renderDockerVolumeRealizationScript(input: {
 export function dockerStorageMountsFromRuntimeMetadata(
   metadata: Record<string, string> | undefined,
 ): Result<DockerRunMountInput[]> {
-  const parsed = storageMountMetadataFromRuntimeMetadata(metadata);
+  const parsed = runtimeStorageMountsFromRuntimeMetadata(metadata);
   if (parsed.isErr()) {
     return err(parsed.error);
   }

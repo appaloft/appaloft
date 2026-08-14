@@ -418,6 +418,7 @@ describe("SourceDescriptor and inspection", () => {
       dockerComposeInline: () => "docker-compose-inline",
       dockerImage: () => "docker-image",
       compose: () => "compose",
+      helmChart: () => "helm-chart",
     });
 
     expect(seen).toBe("git-public:/workspace/app");

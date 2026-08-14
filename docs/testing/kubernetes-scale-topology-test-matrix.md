@@ -14,13 +14,13 @@
 | SCALE-CONVERGE-010 | adapter/e2e | desired/current/ready and metric decision convergence | Kubernetes adapter tests plus real metrics-server/HPA packet | passed |
 | ROLLOUT-PROFILE-011 | domain/adapter/e2e | recreate/rolling/canary gates and rollback | staged route/readback/proof tests plus real weighted-traffic packet | passed |
 | K8S-COMPOSE-012 | adapter/e2e | service graph/private network/dependency translation | Kubernetes intent service-graph translation tests | passed |
-| K8S-HELM-013 | adapter/e2e | chart plan/diff/apply/upgrade/rollback/cleanup/secret safety | planned | planned |
-| K8S-STATEFUL-014 | adapter/e2e | PVC/data/backup/independent restore/cleanup | planned | planned |
+| K8S-HELM-013 | adapter/e2e | chart plan/diff/apply/upgrade/rollback/cleanup/secret safety | typed source/persistence/contracts, lifecycle/backend tests and real Helm packet | passed |
+| K8S-STATEFUL-014 | adapter/e2e | PVC/data/backup/independent restore/cleanup | stable storage-scope intent, backup/restore tests and real PVC packet | passed |
 | K8S-MULTI-015 | application/e2e | deterministic placement/failover/no silent fallback/orphans | planned | planned |
 | K8S-MANAGED-016 | connector/Cloud e2e | managed provisioning composition and custody | planned | planned |
 | K8S-SURFACE-017 | contract | CLI/API/SDK/Web/MCP parity and docs | operation catalog, CLI, oRPC, SDK, Web, MCP and docs registry tests | passed |
 | K8S-E2E-018 | real cluster | R5a zero-residual packet | 2026-08-13 disposable k3d success/failure/cleanup packet | passed |
-| K8S-E2E-019 | real cluster | R5b/R5c scale/stateful/Helm packet | 2026-08-13 R5b scale/canary packet passed; R5c stateful/Helm remains | partial |
+| K8S-E2E-019 | real cluster | R5b/R5c scale/stateful/Helm packet | 2026-08-13 R5b scale/canary and R5c stateful/Helm packets passed | passed |
 | K8S-E2E-020 | real managed/design partner | R5d provision/failover/recover/cleanup packet | explicit authorization required | planned |
 
 R5 total completion requires every row passing; a missing managed/design-partner packet is a real
@@ -44,5 +44,15 @@ preservation, distinct length-safe Kubernetes route identities, 10/40/70/100 Tra
 external route-identity convergence at every step, mixed stable/candidate traffic before promotion,
 candidate-only traffic at 100%, exact cleanup of both receipt-owned namespaces, and zero residual
 Appaloft namespaces. The packet passed 17 assertions. The cluster, network, attached image volume,
-and isolated kubeconfig were deleted after verification. R5c stateful/Helm evidence remains open,
-so `K8S-E2E-019` is partial rather than passed.
+and isolated kubeconfig were deleted after verification.
+
+## R5c Real Packet Evidence
+
+On 2026-08-13 `kubernetes-stateful-helm.smoke.test.ts` ran against a disposable k3d cluster. It
+proved stable StatefulSet/PVC identity across two Deployment receipts, durable data readback,
+cleanup of the old receipt without deleting the current workload or PVC, a tar backup through a
+read-only PVC helper, independent restore to a new canonical PVC, and restored data readback. The
+same packet installed and upgraded a typed local Helm chart, forced a bounded failed upgrade,
+verified atomic rollback by redacted manifest digest and live v2 data, then used foreground
+uninstall and independently confirmed zero Appaloft-owned residual resources. The packet passed 56
+assertions. Its namespaces, PVCs, cluster, network, volume and isolated kubeconfig were deleted.

@@ -6782,6 +6782,8 @@
         return $t(i18nKeys.console.resources.sourceKindCompose);
       case "docker-image":
         return $t(i18nKeys.console.resources.sourceKindDockerImage);
+      case "helm-chart":
+        return $t(i18nKeys.console.resources.sourceKindHelmChart);
       case "git-public":
         return $t(i18nKeys.console.resources.sourceKindGitPublic);
       case "local-folder":
@@ -7094,6 +7096,8 @@
         return $t(i18nKeys.console.resources.runtimeStrategyWorkspaceCommands);
       case "static":
         return $t(i18nKeys.console.resources.runtimeStrategyStatic);
+      case "helm":
+        return $t(i18nKeys.console.resources.runtimeStrategyHelm);
     }
   }
 

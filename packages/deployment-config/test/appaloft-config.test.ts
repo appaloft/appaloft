@@ -576,6 +576,51 @@ describe("Appaloft deployment config schema", () => {
     expect(explicitStrategy.success).toBe(true);
   });
 
+  test("[K8S-HELM-013] accepts typed Helm sources without inline values", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      source: {
+        type: "helm",
+        chart: "oci://registry.example.com/charts/storefront",
+        version: "1.7.3",
+        valuesSecretReferences: ["secret://helm/storefront/production"],
+        hookPolicy: "bounded",
+        timeoutSeconds: 420,
+      },
+      runtime: { strategy: "helm" },
+    });
+
+    expect(parsed).toMatchObject({
+      success: true,
+      data: {
+        source: {
+          type: "helm",
+          chart: "oci://registry.example.com/charts/storefront",
+          version: "1.7.3",
+          valuesSecretReferences: ["secret://helm/storefront/production"],
+          hookPolicy: "bounded",
+          timeoutSeconds: 420,
+        },
+      },
+    });
+
+    expect(
+      parseAppaloftDeploymentConfig({
+        source: { type: "helm", chart: "oci://registry.example.com/charts/storefront" },
+        runtime: { strategy: "helm" },
+      }).success,
+    ).toBe(false);
+    expect(
+      parseAppaloftDeploymentConfig({
+        source: {
+          type: "helm",
+          chart: "oci://registry.example.com/charts/storefront",
+          version: "1.7.3",
+        },
+        runtime: { strategy: "dockerfile" },
+      }).success,
+    ).toBe(false);
+  });
+
   test("[CONFIG-FILE-GITHUB-SOURCE-001] accepts explicit GitHub App repository sources", () => {
     const parsed = parseAppaloftDeploymentConfig({
       source: {

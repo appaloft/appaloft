@@ -1,6 +1,6 @@
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import {
   type StorageBackupExecutionRequest,
   type StorageBackupProviderRegistryPort,
@@ -19,6 +19,7 @@ import { type AshScript, ash } from "@appaloft/ash";
 import { type DeploymentTargetState, domainError, err, ok, type Result } from "@appaloft/core";
 import { runBufferedProcess, shellCommand } from "./buffered-process";
 import { dockerVolumeNameForStorageVolumeId } from "./storage-runtime-mounts";
+import { KubernetesStorageBackupExecutor } from "./kubernetes-storage-backup";
 
 interface PreparedSshArgs {
   args: string[];
@@ -129,6 +130,21 @@ export interface StorageBackupRuntimeProviderOptions {
   commandRenderers?: readonly StorageBackupRuntimeCommandRenderer[];
   workingRoot?: string;
   objectTransferBroker?: StorageBackupObjectTransferBrokerPort;
+  kubernetesExecutor?: KubernetesStorageBackupExecutor;
+}
+
+function isKubernetesRuntimeTarget(target: DeploymentTargetState | undefined): boolean {
+  return target?.providerKey.value === "kubernetes" && target.targetKind.value === "orchestrator-cluster";
+}
+
+function cleanupKubernetesSourceRef(sourceRef: string): void {
+  const directory = dirname(sourceRef);
+  if (
+    directory.startsWith(`${tmpdir()}/`) &&
+    directory.split("/").at(-1)?.startsWith("appaloft-k8s-storage-backup-")
+  ) {
+    rmSync(directory, { recursive: true, force: true });
+  }
 }
 
 function storageBackupWorkingRoot(
@@ -812,6 +828,10 @@ export class DockerTarStorageBackupSourceAdapter implements StorageBackupSourceA
   async createBackup(
     input: StorageBackupExecutionRequest,
   ): Promise<Result<StorageBackupSourceResult>> {
+    if (isKubernetesRuntimeTarget(input.runtimeTarget)) {
+      return await (this.options.kubernetesExecutor ?? new KubernetesStorageBackupExecutor())
+        .createBackup(input);
+    }
     const commandRenderer = resolveRuntimeCommandRenderer(input.runtimeTarget, this.options);
     if (commandRenderer.isErr()) {
       return err(commandRenderer.error);
@@ -918,7 +938,11 @@ export class LocalFilesystemStorageBackupTargetProvider implements StorageBackup
   async store(
     input: StorageBackupTargetStoreRequest,
   ): Promise<Result<StorageBackupTargetStoreResult>> {
-    const commandRenderer = resolveRuntimeCommandRenderer(input.runtimeTarget, this.options);
+    const kubernetesRuntime = isKubernetesRuntimeTarget(input.runtimeTarget);
+    const commandRenderer = resolveRuntimeCommandRenderer(
+      kubernetesRuntime ? undefined : input.runtimeTarget,
+      this.options,
+    );
     if (commandRenderer.isErr()) {
       return err(commandRenderer.error);
     }
@@ -930,7 +954,8 @@ export class LocalFilesystemStorageBackupTargetProvider implements StorageBackup
       targetRef: input.target.targetRef,
       retentionMaxCount: input.plan.retention.maxCount,
     });
-    const result = await runStorageBackupScript(input.runtimeTarget, script);
+    const result = await runStorageBackupScript(kubernetesRuntime ? undefined : input.runtimeTarget, script);
+    if (kubernetesRuntime) cleanupKubernetesSourceRef(input.sourceResult.sourceRef);
     if (result.failed) {
       return err(
         backupCommandError("Storage volume backup target command failed", {
@@ -953,6 +978,17 @@ export class LocalFilesystemStorageBackupTargetProvider implements StorageBackup
   async restore(
     input: StorageBackupTargetRestoreRequest,
   ): Promise<Result<StorageBackupTargetRestoreResult>> {
+    if (isKubernetesRuntimeTarget(input.runtimeTarget)) {
+      const artifactHandle = sourceRefFromArtifactHandle(input.artifactHandle);
+      if (!artifactHandle) {
+        return err(domainError.validation("Storage volume backup artifact handle is required", {
+          phase: "storage-volume-restore-target",
+          backupId: input.backupId,
+        }));
+      }
+      return await (this.options.kubernetesExecutor ?? new KubernetesStorageBackupExecutor())
+        .restoreLocalBackup({ ...input, artifactHandle });
+    }
     const commandRenderer = resolveRuntimeCommandRenderer(input.runtimeTarget, this.options);
     if (commandRenderer.isErr()) {
       return err(commandRenderer.error);

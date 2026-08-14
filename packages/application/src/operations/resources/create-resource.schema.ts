@@ -19,24 +19,53 @@ export const createResourceServiceInputSchema = z.object({
   kind: z.enum(resourceServiceKinds),
 });
 
-const createResourceSourceBindingInputBaseSchema = z.object({
-  kind: z.enum(sourceKinds),
-  locator: nonEmptyTrimmedString("Source locator"),
-  displayName: nonEmptyTrimmedString("Source display name").optional(),
-  gitRef: nonEmptyTrimmedString("Git ref").optional(),
-  commitSha: nonEmptyTrimmedString("Git commit SHA").optional(),
-  baseDirectory: nonEmptyTrimmedString("Source base directory").optional(),
-  originalLocator: nonEmptyTrimmedString("Original source locator").optional(),
-  repositoryId: nonEmptyTrimmedString("Repository id").optional(),
-  repositoryFullName: nonEmptyTrimmedString("Repository full name").optional(),
-  defaultBranch: nonEmptyTrimmedString("Default branch").optional(),
-  imageName: nonEmptyTrimmedString("Docker image name").optional(),
-  imageTag: nonEmptyTrimmedString("Docker image tag").optional(),
-  imageDigest: nonEmptyTrimmedString("Docker image digest").optional(),
-  version: nonEmptyTrimmedString("Source version").optional(),
-  versionKind: z.enum(versionReferenceKinds).optional(),
-  metadata: z.record(z.string(), z.string()).optional(),
-});
+const createResourceSourceBindingInputBaseSchema = z
+  .object({
+    kind: z.enum(sourceKinds),
+    locator: nonEmptyTrimmedString("Source locator"),
+    displayName: nonEmptyTrimmedString("Source display name").optional(),
+    gitRef: nonEmptyTrimmedString("Git ref").optional(),
+    commitSha: nonEmptyTrimmedString("Git commit SHA").optional(),
+    baseDirectory: nonEmptyTrimmedString("Source base directory").optional(),
+    originalLocator: nonEmptyTrimmedString("Original source locator").optional(),
+    repositoryId: nonEmptyTrimmedString("Repository id").optional(),
+    repositoryFullName: nonEmptyTrimmedString("Repository full name").optional(),
+    defaultBranch: nonEmptyTrimmedString("Default branch").optional(),
+    imageName: nonEmptyTrimmedString("Docker image name").optional(),
+    imageTag: nonEmptyTrimmedString("Docker image tag").optional(),
+    imageDigest: nonEmptyTrimmedString("Docker image digest").optional(),
+    version: nonEmptyTrimmedString("Source version").optional(),
+    versionKind: z.enum(versionReferenceKinds).optional(),
+    helmChart: z
+      .object({
+        version: nonEmptyTrimmedString("Helm chart version"),
+        valuesSecretReferences: z
+          .array(nonEmptyTrimmedString("Helm values secret reference"))
+          .max(16)
+          .default([]),
+        hookPolicy: z.enum(["disabled", "bounded"]).default("disabled"),
+        timeoutSeconds: z.number().int().min(30).max(900).default(300),
+      })
+      .strict()
+      .optional(),
+    metadata: z.record(z.string(), z.string()).optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.kind === "helm-chart" && !value.helmChart) {
+      context.addIssue({
+        code: "custom",
+        path: ["helmChart"],
+        message: "Helm chart sources require Helm chart configuration",
+      });
+    }
+    if (value.kind !== "helm-chart" && value.helmChart) {
+      context.addIssue({
+        code: "custom",
+        path: ["helmChart"],
+        message: "Helm chart configuration requires a Helm chart source",
+      });
+    }
+  });
 
 export const localFolderResourceSourceBindingExample = {
   kind: "local-folder",

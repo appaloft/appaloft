@@ -70,6 +70,13 @@ class KyselyResourceMutationVisitor
     const sourceBindingMetadata = spec.state.sourceBinding
       ? ResourceSourceBinding.metadataFromState(spec.state.sourceBinding)
       : undefined;
+    const persistedSourceBindingMetadata = sourceBindingMetadata
+      ? Object.fromEntries(
+          Object.entries(sourceBindingMetadata).filter(
+            ([key]) => !key.startsWith("appaloft.helm."),
+          ),
+        )
+      : undefined;
     const sourceBinding = spec.state.sourceBinding
       ? ({
           kind: spec.state.sourceBinding.kind.value,
@@ -105,7 +112,23 @@ class KyselyResourceMutationVisitor
           ...(spec.state.sourceBinding.imageDigest
             ? { imageDigest: spec.state.sourceBinding.imageDigest.value }
             : {}),
-          ...(sourceBindingMetadata ? { metadata: sourceBindingMetadata } : {}),
+          ...(spec.state.sourceBinding.helmChart
+            ? {
+                helmChart: {
+                  version: spec.state.sourceBinding.helmChart.version.value,
+                  valuesSecretReferences:
+                    spec.state.sourceBinding.helmChart.valuesSecretReferences.map(
+                      (reference) => reference.value,
+                    ),
+                  hookPolicy: spec.state.sourceBinding.helmChart.hookPolicy.value,
+                  timeoutSeconds: spec.state.sourceBinding.helmChart.timeoutSeconds.value,
+                },
+              }
+            : {}),
+          ...(persistedSourceBindingMetadata &&
+          Object.keys(persistedSourceBindingMetadata).length > 0
+            ? { metadata: persistedSourceBindingMetadata }
+            : {}),
         } satisfies SerializedResourceSourceBinding)
       : null;
     const runtimeProfile = spec.state.runtimeProfile

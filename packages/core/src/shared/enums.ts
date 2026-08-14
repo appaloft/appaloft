@@ -26,6 +26,7 @@ export const sourceKinds = [
   "docker-compose-inline",
   "docker-image",
   "compose",
+  "helm-chart",
 ] as const;
 
 export type SourceKind = (typeof sourceKinds)[number];
@@ -37,6 +38,7 @@ export const runtimePlanStrategies = [
   "prebuilt-image",
   "workspace-commands",
   "static",
+  "helm",
 ] as const;
 
 export type RuntimePlanStrategy = (typeof runtimePlanStrategies)[number];
@@ -48,6 +50,7 @@ export const buildStrategyKinds = [
   "static-artifact",
   "prebuilt-image",
   "workspace-commands",
+  "helm-package",
 ] as const;
 
 export type BuildStrategyKind = (typeof buildStrategyKinds)[number];
@@ -58,6 +61,7 @@ export const packagingModes = [
   "compose-bundle",
   "host-process-runtime",
   "optional-future-binary",
+  "helm-chart",
 ] as const;
 
 export type PackagingMode = (typeof packagingModes)[number];
@@ -66,6 +70,7 @@ export const executionStrategyKinds = [
   "docker-container",
   "docker-compose-stack",
   "host-process",
+  "helm-release",
 ] as const;
 
 export type ExecutionStrategyKind = (typeof executionStrategyKinds)[number];

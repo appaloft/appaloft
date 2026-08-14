@@ -16,6 +16,95 @@ const gitSourceKinds = [
 
 type GitSourceKind = (typeof gitSourceKinds)[number];
 
+export type HelmHookPolicy = "disabled" | "bounded";
+
+const helmChartVersionBrand: unique symbol = Symbol("HelmChartVersion");
+export class HelmChartVersion extends ScalarValueObject<string> {
+  private [helmChartVersionBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<HelmChartVersion> {
+    return validateRequiredText(value, "Helm chart version").andThen((normalized) =>
+      /^[0-9A-Za-z][0-9A-Za-z.+_-]{0,127}$/.test(normalized)
+        ? ok(new HelmChartVersion(normalized))
+        : err(sourceResolutionError("Helm chart version has an unsupported format")),
+    );
+  }
+
+  static rehydrate(value: string): HelmChartVersion {
+    return new HelmChartVersion(value.trim());
+  }
+}
+
+const helmValuesSecretReferenceBrand: unique symbol = Symbol("HelmValuesSecretReference");
+export class HelmValuesSecretReference extends ScalarValueObject<string> {
+  private [helmValuesSecretReferenceBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<HelmValuesSecretReference> {
+    return validateRequiredText(value, "Helm values secret reference").andThen((normalized) =>
+      /^[a-z][a-z0-9+.-]*:\/\/[^\s]{1,480}$/i.test(normalized)
+        ? ok(new HelmValuesSecretReference(normalized))
+        : err(sourceResolutionError("Helm values secret reference must be an opaque URI")),
+    );
+  }
+
+  static rehydrate(value: string): HelmValuesSecretReference {
+    return new HelmValuesSecretReference(value.trim());
+  }
+}
+
+const helmHookPolicyBrand: unique symbol = Symbol("HelmHookPolicyValue");
+export class HelmHookPolicyValue extends ScalarValueObject<HelmHookPolicy> {
+  private [helmHookPolicyBrand]!: void;
+
+  private constructor(value: HelmHookPolicy) {
+    super(value);
+  }
+
+  static create(value: string): Result<HelmHookPolicyValue> {
+    return value === "disabled" || value === "bounded"
+      ? ok(new HelmHookPolicyValue(value))
+      : err(sourceResolutionError("Helm hook policy must be disabled or bounded"));
+  }
+
+  static rehydrate(value: HelmHookPolicy): HelmHookPolicyValue {
+    return new HelmHookPolicyValue(value);
+  }
+}
+
+const helmTimeoutSecondsBrand: unique symbol = Symbol("HelmTimeoutSeconds");
+export class HelmTimeoutSeconds extends ScalarValueObject<number> {
+  private [helmTimeoutSecondsBrand]!: void;
+
+  private constructor(value: number) {
+    super(value);
+  }
+
+  static create(value: number): Result<HelmTimeoutSeconds> {
+    return Number.isInteger(value) && value >= 30 && value <= 900
+      ? ok(new HelmTimeoutSeconds(value))
+      : err(sourceResolutionError("Helm timeout must be between 30 and 900 seconds"));
+  }
+
+  static rehydrate(value: number): HelmTimeoutSeconds {
+    return new HelmTimeoutSeconds(value);
+  }
+}
+
+export interface HelmChartSourceConfigurationState {
+  version: HelmChartVersion;
+  valuesSecretReferences: HelmValuesSecretReference[];
+  hookPolicy: HelmHookPolicyValue;
+  timeoutSeconds: HelmTimeoutSeconds;
+}
+
 function isGitSourceKind(kind: SourceKind): kind is GitSourceKind {
   return gitSourceKinds.includes(kind as GitSourceKind);
 }
@@ -180,6 +269,7 @@ function versionSourceKindForSourceKind(kind: SourceKind): VersionSourceKind {
     case "dockerfile-inline":
     case "docker-compose-inline":
     case "compose":
+    case "helm-chart":
       return "generic";
   }
 
@@ -400,6 +490,7 @@ export interface ResourceSourceBindingState {
   imageTag?: DockerImageTag;
   imageDigest?: DockerImageDigest;
   versionReference?: VersionReference;
+  helmChart?: HelmChartSourceConfigurationState;
   metadata?: Record<string, string>;
 }
 
@@ -419,6 +510,20 @@ export class ResourceSourceBinding extends ValueObject<ResourceSourceBindingStat
   static create(input: ResourceSourceBindingState): Result<ResourceSourceBinding> {
     return safeTry(function* () {
       const kind = input.kind.value;
+      if (kind === "helm-chart" && !input.helmChart) {
+        return err(sourceResolutionError("Helm chart source configuration is required"));
+      }
+      if (kind !== "helm-chart" && input.helmChart) {
+        return err(sourceResolutionError("Helm chart configuration requires a Helm chart source"));
+      }
+      if (
+        kind === "helm-chart" &&
+        Object.keys(input.metadata ?? {}).some((key) => /(?:^|\.)helm(?:\.|$)/i.test(key))
+      ) {
+        return err(
+          sourceResolutionError("Helm source metadata must not contain raw Helm configuration"),
+        );
+      }
       if (isGitSourceKind(kind) && isGitHubTreeLocator(input.locator.value)) {
         return err(
           sourceResolutionError(
@@ -503,6 +608,16 @@ export class ResourceSourceBinding extends ValueObject<ResourceSourceBindingStat
             versionReference: state.versionReference.value,
           }
         : {}),
+      ...(state.helmChart
+        ? {
+            "appaloft.helm.chartVersion": state.helmChart.version.value,
+            "appaloft.helm.valuesSecretReferences": JSON.stringify(
+              state.helmChart.valuesSecretReferences.map((reference) => reference.value),
+            ),
+            "appaloft.helm.hookPolicy": state.helmChart.hookPolicy.value,
+            "appaloft.helm.timeoutSeconds": String(state.helmChart.timeoutSeconds.value),
+          }
+        : {}),
     };
 
     return Object.keys(metadata).length > 0 ? metadata : undefined;
@@ -546,6 +661,11 @@ function hashSourceBindingState(state: ResourceSourceBindingState): string {
     state.repositoryId?.value ?? "",
     state.repositoryFullName?.value ?? "",
     state.defaultBranch?.value ?? "",
+    state.helmChart?.version.value ?? "",
+    state.helmChart?.valuesSecretReferences.map((reference) => reference.value).join("\u001e") ??
+      "",
+    state.helmChart?.hookPolicy.value ?? "",
+    state.helmChart ? String(state.helmChart.timeoutSeconds.value) : "",
   ].join("\u001f");
   let hash = 0x811c9dc5;
 
@@ -575,6 +695,16 @@ export function cloneResourceSourceBindingState(
     ...(state.imageTag ? { imageTag: state.imageTag } : {}),
     ...(state.imageDigest ? { imageDigest: state.imageDigest } : {}),
     ...(state.versionReference ? { versionReference: state.versionReference } : {}),
+    ...(state.helmChart
+      ? {
+          helmChart: {
+            version: state.helmChart.version,
+            valuesSecretReferences: [...state.helmChart.valuesSecretReferences],
+            hookPolicy: state.helmChart.hookPolicy,
+            timeoutSeconds: state.helmChart.timeoutSeconds,
+          },
+        }
+      : {}),
     ...(state.metadata ? { metadata: { ...state.metadata } } : {}),
   };
 }

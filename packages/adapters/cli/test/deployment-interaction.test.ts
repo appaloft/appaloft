@@ -88,6 +88,50 @@ describe("CLI quick deploy draft mapping", () => {
     });
   });
 
+  test("[K8S-HELM-013] maps typed Helm CLI and config source input", async () => {
+    ensureReflectMetadata();
+    const {
+      deploymentPromptSeedFromConfig,
+      runtimeProfileFromDeploymentInput,
+      sourceBindingForDeploymentInput,
+    } = await import("../src/commands/deployment-interaction");
+
+    const helmChart = {
+      version: "1.7.3",
+      valuesSecretReferences: ["secret://helm/storefront/production"],
+      hookPolicy: "bounded" as const,
+      timeoutSeconds: 420,
+    };
+    expect(
+      sourceBindingForDeploymentInput("oci://registry.example.com/charts/storefront", "helm", {
+        helmChart,
+      }),
+    ).toEqual({
+      kind: "helm-chart",
+      locator: "oci://registry.example.com/charts/storefront",
+      displayName: "storefront",
+      helmChart,
+    });
+    expect(runtimeProfileFromDeploymentInput("helm", {})).toEqual({ strategy: "helm" });
+    expect(
+      deploymentPromptSeedFromConfig({
+        source: {
+          type: "helm",
+          chart: "oci://registry.example.com/charts/storefront",
+          version: "1.7.3",
+          valuesSecretReferences: ["secret://helm/storefront/production"],
+          hookPolicy: "bounded",
+          timeoutSeconds: 420,
+        },
+        runtime: { strategy: "helm" },
+      }),
+    ).toMatchObject({
+      sourceLocator: "oci://registry.example.com/charts/storefront",
+      deploymentMethod: "helm",
+      sourceProfile: { kind: "helm-chart", helmChart },
+    });
+  });
+
   test("[QUICK-DEPLOY-ENTRY-013][WF-PLAN-ENTRY-005] maps non-static CLI framework draft fields to resource profiles", async () => {
     ensureReflectMetadata();
     const {

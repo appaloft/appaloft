@@ -7,7 +7,8 @@ export type DeploymentMethod =
   | "docker-compose"
   | "prebuilt-image"
   | "static"
-  | "workspace-commands";
+  | "workspace-commands"
+  | "helm";
 
 export const deploymentMethods = [
   "auto",
@@ -16,11 +17,12 @@ export const deploymentMethods = [
   "prebuilt-image",
   "static",
   "workspace-commands",
+  "helm",
 ] as const satisfies readonly DeploymentMethod[];
 
 export function isRemoteOrImageSource(locator: string): boolean {
   return (
-    /^(https?|ssh|git):\/\//.test(locator) ||
+    /^(https?|ssh|git|oci):\/\//.test(locator) ||
     /^[^/\\]+@[^/\\]+:/.test(locator) ||
     locator.startsWith("docker://") ||
     locator.startsWith("image://")
@@ -28,7 +30,12 @@ export function isRemoteOrImageSource(locator: string): boolean {
 }
 
 export function normalizeCliPathOrSource(locator: string, method: DeploymentMethod): string {
-  if (method === "prebuilt-image" || isRemoteOrImageSource(locator) || isAbsolute(locator)) {
+  if (
+    method === "prebuilt-image" ||
+    method === "helm" ||
+    isRemoteOrImageSource(locator) ||
+    isAbsolute(locator)
+  ) {
     return locator;
   }
 

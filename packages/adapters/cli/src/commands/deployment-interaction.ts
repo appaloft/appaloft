@@ -171,6 +171,7 @@ export interface DeploymentPromptSeed {
       | "repositoryFullName"
       | "version"
       | "versionKind"
+      | "helmChart"
     >
   >;
   sourceFingerprint?: string;
@@ -453,6 +454,10 @@ export function sourceKindForDeploymentInput(
     return "compose";
   }
 
+  if (deploymentMethod === "helm") {
+    return "helm-chart";
+  }
+
   if (/^(https?|ssh):\/\//.test(sourceLocator) || sourceLocator.endsWith(".git")) {
     return "git-public";
   }
@@ -501,6 +506,7 @@ export function sourceBindingForDeploymentInput(
       | "repositoryFullName"
       | "version"
       | "versionKind"
+      | "helmChart"
     >
   > = {},
 ): ResourceSourceInput {
@@ -514,6 +520,7 @@ export function sourceBindingForDeploymentInput(
     ...(profile.repositoryFullName ? { repositoryFullName: profile.repositoryFullName } : {}),
     ...(profile.version ? { version: profile.version } : {}),
     ...(profile.versionKind ? { versionKind: profile.versionKind } : {}),
+    ...(profile.helmChart ? { helmChart: profile.helmChart } : {}),
   };
 }
 
@@ -662,11 +669,17 @@ function sourceFromServiceConfig(
     ...(source.type ? { type: source.type } : {}),
     ...(source.repository ? { repository: source.repository } : {}),
     ...(source.image ? { image: source.image } : {}),
+    ...(source.chart ? { chart: source.chart } : {}),
     ...(source.gitRef ? { gitRef: source.gitRef } : {}),
     ...(source.commitSha ? { commitSha: source.commitSha } : {}),
     ...(source.baseDirectory ? { baseDirectory: source.baseDirectory } : {}),
     ...(source.version ? { version: source.version } : {}),
     ...(source.versionKind ? { versionKind: source.versionKind } : {}),
+    ...(source.valuesSecretReferences
+      ? { valuesSecretReferences: source.valuesSecretReferences }
+      : {}),
+    ...(source.hookPolicy ? { hookPolicy: source.hookPolicy } : {}),
+    ...(source.timeoutSeconds ? { timeoutSeconds: source.timeoutSeconds } : {}),
   };
 }
 
@@ -740,6 +753,7 @@ export function deploymentPromptSeedFromConfig(
   config: AppaloftDeploymentConfig,
 ): DeploymentPromptSeed {
   const sourceIsImage = config.source?.type === "image";
+  const sourceIsHelm = config.source?.type === "helm";
   const sourceIsGitHub = config.source?.type === "github";
   const githubRepositoryFullName = sourceIsGitHub
     ? githubRepositoryFullNameFromLocator(config.source?.repository)
@@ -760,6 +774,17 @@ export function deploymentPromptSeedFromConfig(
     ...(!sourceIsImage && config.source?.commitSha ? { commitSha: config.source.commitSha } : {}),
     ...(config.source?.version ? { version: config.source.version } : {}),
     ...(config.source?.versionKind ? { versionKind: config.source.versionKind } : {}),
+    ...(sourceIsHelm && config.source?.version
+      ? {
+          kind: "helm-chart" as const,
+          helmChart: {
+            version: config.source.version,
+            valuesSecretReferences: config.source.valuesSecretReferences ?? [],
+            hookPolicy: config.source.hookPolicy ?? "disabled",
+            timeoutSeconds: config.source.timeoutSeconds ?? 300,
+          },
+        }
+      : {}),
   };
   const healthCheck = healthCheckFromConfig(config);
   const serverAppliedRoutes = config.access?.domains?.map((domain) => ({
@@ -948,17 +973,21 @@ export function deploymentPromptSeedFromConfig(
   return {
     ...(sourceIsImage && config.source?.image
       ? { sourceLocator: config.source.image }
-      : config.source?.repository
-        ? { sourceLocator: config.source.repository }
-        : {}),
+      : sourceIsHelm && config.source?.chart
+        ? { sourceLocator: config.source.chart }
+        : config.source?.repository
+          ? { sourceLocator: config.source.repository }
+          : {}),
     ...(Object.keys(sourceProfile).length > 0 ? { sourceProfile } : {}),
     ...(config.runtime?.strategy
       ? { deploymentMethod: config.runtime.strategy }
       : sourceIsImage
         ? { deploymentMethod: "prebuilt-image" as const }
-        : config.runtime?.type === "node"
-          ? { deploymentMethod: "workspace-commands" as const }
-          : {}),
+        : sourceIsHelm
+          ? { deploymentMethod: "helm" as const }
+          : config.runtime?.type === "node"
+            ? { deploymentMethod: "workspace-commands" as const }
+            : {}),
     ...(config.runtime?.installCommand ? { installCommand: config.runtime.installCommand } : {}),
     ...(buildCommand ? { buildCommand } : {}),
     ...(startCommand ? { startCommand } : {}),
@@ -1708,6 +1737,7 @@ function sourceProfilesMatch(input: {
     ...(input.current.gitRef ? { gitRef: input.current.gitRef } : {}),
     ...(input.current.commitSha ? { commitSha: input.current.commitSha } : {}),
     ...(input.current.baseDirectory ? { baseDirectory: input.current.baseDirectory } : {}),
+    ...(input.current.helmChart ? { helmChart: input.current.helmChart } : {}),
   };
   const desired = {
     kind: input.desired.kind,
@@ -1716,6 +1746,7 @@ function sourceProfilesMatch(input: {
     ...(input.desired.gitRef ? { gitRef: input.desired.gitRef } : {}),
     ...(input.desired.commitSha ? { commitSha: input.desired.commitSha } : {}),
     ...(input.desired.baseDirectory ? { baseDirectory: input.desired.baseDirectory } : {}),
+    ...(input.desired.helmChart ? { helmChart: input.desired.helmChart } : {}),
   };
 
   return JSON.stringify(current) === JSON.stringify(desired);
@@ -1729,6 +1760,7 @@ export function shouldConfigureReusableResourceSource(input: {
   return Boolean(
     input.deploymentMethod === "prebuilt-image" ||
       input.deploymentMethod === "docker-compose" ||
+      input.deploymentMethod === "helm" ||
       isRemoteOrImageSource(input.sourceLocator) ||
       input.seed.sourceProfile?.gitRef ||
       input.seed.sourceProfile?.commitSha ||

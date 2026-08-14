@@ -120,6 +120,12 @@ const sourceImageRuntimeTypeError =
   "config_source_resolution: source.type image must not combine with runtime.type";
 const sourceImageVersionKindError =
   "config_source_resolution: source.type image requires versionKind image-tag or image-digest when versionKind is supplied";
+const sourceHelmChartRequiredError =
+  "config_source_resolution: source.chart is required when source.type is helm";
+const sourceHelmVersionRequiredError =
+  "config_source_resolution: source.version is required when source.type is helm";
+const sourceHelmRuntimeStrategyError =
+  "config_source_resolution: source.type helm requires runtime.strategy helm";
 const previewDomainTemplateError =
   "preview_config: preview.pullRequest.domainTemplate must be a host template using only {preview_id} and {pr_number}";
 const previewPolicyMaxActivePreviewsError =
@@ -262,7 +268,7 @@ const secretLikeKeyPattern =
   /(?:secret|password|passwd|token|api[_-]?key|database[_-]?url|connection[_-]?string|private[_-]?key|ssh[_-]?key|credential|certificate|cert)/i;
 const rawSecretValuePattern =
   /-----BEGIN [A-Z ]*(?:PRIVATE KEY|CERTIFICATE)-----|(?:ssh-rsa|ssh-ed25519) [A-Za-z0-9+/=]+/;
-const allowedSecretLikeConfigFields = new Set(["secretBackedPreviews"]);
+const allowedSecretLikeConfigFields = new Set(["secretBackedPreviews", "valuesSecretReferences"]);
 const nonSecretTokenAuthMethodPattern = /(?:^|[_-])token[_-]?auth(?:entication)?[_-]?method$/i;
 
 export type AppaloftDeploymentConfigViolationCode =
@@ -463,7 +469,10 @@ function isSafeDockerImageReference(value: string): boolean {
 
 export const appaloftDeploymentSourceConfigSchema = z
   .object({
-    type: z.enum(["git", "github", "image"]).optional().describe("Repository source kind."),
+    type: z
+      .enum(["git", "github", "image", "helm"])
+      .optional()
+      .describe("Repository, image, or Helm chart source kind."),
     repository: nonEmptyStringSchema
       .refine(isSafeGitRepositoryUrl, sourceRepositoryUrlError)
       .optional()
@@ -472,6 +481,13 @@ export const appaloftDeploymentSourceConfigSchema = z
       .refine(isSafeDockerImageReference, sourceImageReferenceError)
       .optional()
       .describe("Docker/OCI image reference to deploy as a prebuilt image."),
+    chart: nonEmptyStringSchema
+      .refine(
+        (value) => /^(?:oci|https|file):\/\//.test(value) && !/^https?:\/\/[^/]*@/.test(value),
+        "config_source_resolution: source.chart must be an OCI, HTTPS, or absolute file URI without credentials",
+      )
+      .optional()
+      .describe("Helm chart reference. Inline chart content is not accepted."),
     baseDirectory: safeRelativePathSchema
       .optional()
       .describe("Relative workspace directory to use as the deployable source root."),
@@ -495,6 +511,18 @@ export const appaloftDeploymentSourceConfigSchema = z
       ])
       .optional()
       .describe("Version reference kind for source.version."),
+    valuesSecretReferences: z
+      .array(
+        nonEmptyStringSchema.regex(
+          /^[a-z][a-z0-9+.-]*:\/\/[^\s]{1,480}$/i,
+          "config_source_resolution: Helm values references must be opaque URIs",
+        ),
+      )
+      .max(16)
+      .optional()
+      .describe("Secret references for Helm values files. Raw inline values are not accepted."),
+    hookPolicy: z.enum(["disabled", "bounded"]).optional(),
+    timeoutSeconds: z.number().int().min(30).max(900).optional(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -549,11 +577,58 @@ export const appaloftDeploymentSourceConfigSchema = z
       }
     }
 
+    if (value.type === "helm") {
+      if (!value.chart) {
+        context.addIssue({
+          code: "custom",
+          path: ["chart"],
+          message: sourceHelmChartRequiredError,
+        });
+      }
+      if (!value.version) {
+        context.addIssue({
+          code: "custom",
+          path: ["version"],
+          message: sourceHelmVersionRequiredError,
+        });
+      }
+      if (
+        value.repository ||
+        value.image ||
+        value.gitRef ||
+        value.commitSha ||
+        value.baseDirectory
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["chart"],
+          message: "config_source_resolution: source.type helm rejects Git and image fields",
+        });
+      }
+    }
+
     if (value.type !== "image" && value.image) {
       context.addIssue({
         code: "custom",
         path: ["type"],
         message: "config_source_resolution: source.image requires source.type image",
+      });
+    }
+    if (value.type !== "helm" && value.chart) {
+      context.addIssue({
+        code: "custom",
+        path: ["type"],
+        message: "config_source_resolution: source.chart requires source.type helm",
+      });
+    }
+    if (
+      value.type !== "helm" &&
+      (value.valuesSecretReferences || value.hookPolicy || value.timeoutSeconds)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["type"],
+        message: "config_source_resolution: Helm policy fields require source.type helm",
       });
     }
   })
@@ -992,23 +1067,37 @@ export const appaloftDeploymentServiceConfigSchema = z
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.source?.type !== "image") {
-      return;
-    }
-
-    if (value.runtime?.type) {
+    if (value.source?.type === "helm") {
       context.addIssue({
         code: "custom",
-        path: ["runtime", "type"],
-        message: sourceImageRuntimeTypeError,
+        path: ["source", "type"],
+        message:
+          "config_source_resolution: Helm packages must be application sources, not service sources",
       });
     }
+    if (value.source?.type === "image") {
+      if (value.runtime?.type) {
+        context.addIssue({
+          code: "custom",
+          path: ["runtime", "type"],
+          message: sourceImageRuntimeTypeError,
+        });
+      }
 
-    if (value.runtime?.strategy && value.runtime.strategy !== "prebuilt-image") {
+      if (value.runtime?.strategy && value.runtime.strategy !== "prebuilt-image") {
+        context.addIssue({
+          code: "custom",
+          path: ["runtime", "strategy"],
+          message: sourceImageRuntimeStrategyError,
+        });
+      }
+    }
+
+    if (value.source?.type === "helm" && value.runtime?.strategy !== "helm") {
       context.addIssue({
         code: "custom",
         path: ["runtime", "strategy"],
-        message: sourceImageRuntimeStrategyError,
+        message: sourceHelmRuntimeStrategyError,
       });
     }
   })
@@ -1065,23 +1154,29 @@ export const appaloftDeploymentApplicationConfigSchema = z
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.source?.type !== "image") {
-      return;
-    }
-
-    if (value.runtime?.type) {
+    if (value.source?.type === "image" && value.runtime?.type) {
       context.addIssue({
         code: "custom",
         path: ["runtime", "type"],
         message: sourceImageRuntimeTypeError,
       });
     }
-
-    if (value.runtime?.strategy && value.runtime.strategy !== "prebuilt-image") {
+    if (
+      value.source?.type === "image" &&
+      value.runtime?.strategy &&
+      value.runtime.strategy !== "prebuilt-image"
+    ) {
       context.addIssue({
         code: "custom",
         path: ["runtime", "strategy"],
         message: sourceImageRuntimeStrategyError,
+      });
+    }
+    if (value.source?.type === "helm" && value.runtime?.strategy !== "helm") {
+      context.addIssue({
+        code: "custom",
+        path: ["runtime", "strategy"],
+        message: sourceHelmRuntimeStrategyError,
       });
     }
   })
@@ -1625,23 +1720,29 @@ export const appaloftDeploymentConfigSchema = z
       }
     }
 
-    if (value.source?.type !== "image") {
-      return;
-    }
-
-    if (value.runtime?.type) {
+    if (value.source?.type === "image" && value.runtime?.type) {
       context.addIssue({
         code: "custom",
         path: ["runtime", "type"],
         message: sourceImageRuntimeTypeError,
       });
     }
-
-    if (value.runtime?.strategy && value.runtime.strategy !== "prebuilt-image") {
+    if (
+      value.source?.type === "image" &&
+      value.runtime?.strategy &&
+      value.runtime.strategy !== "prebuilt-image"
+    ) {
       context.addIssue({
         code: "custom",
         path: ["runtime", "strategy"],
         message: sourceImageRuntimeStrategyError,
+      });
+    }
+    if (value.source?.type === "helm" && value.runtime?.strategy !== "helm") {
+      context.addIssue({
+        code: "custom",
+        path: ["runtime", "strategy"],
+        message: sourceHelmRuntimeStrategyError,
       });
     }
   })

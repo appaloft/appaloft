@@ -3489,6 +3489,12 @@ export interface ResourceDetailSourceProfile {
   imageDigest?: string;
   version?: string;
   versionKind?: VersionReferenceKind;
+  helmChart?: {
+    version: string;
+    valuesSecretReferences: string[];
+    hookPolicy: "disabled" | "bounded";
+    timeoutSeconds: number;
+  };
   metadata?: Record<string, string>;
 }
 
@@ -5908,7 +5914,8 @@ export interface DeploymentPlanPreview {
       | "compose-project"
       | "prebuilt-image"
       | "custom-command-image"
-      | "workspace-image";
+      | "workspace-image"
+      | "helm-chart";
     runtimeArtifactKind?: RuntimeArtifactKind;
     runtimeArtifactIntent?: RuntimeArtifactIntent;
     image?: string;
@@ -9957,7 +9964,8 @@ export type RequestedDeploymentMethod =
   | "docker-compose"
   | "prebuilt-image"
   | "workspace-commands"
-  | "static";
+  | "static"
+  | "helm";
 
 export interface RequestedAccessRouteConfig {
   proxyKind: EdgeProxyKind;
@@ -10053,14 +10061,18 @@ export interface RequestedDeploymentStorageMount {
 }
 
 export interface RequestedDeploymentServiceSource {
-  type?: "git" | "github" | "image";
+  type?: "git" | "github" | "image" | "helm";
   repository?: string;
   image?: string;
+  chart?: string;
   gitRef?: string;
   commitSha?: string;
   baseDirectory?: string;
   version?: string;
   versionKind?: string;
+  valuesSecretReferences?: string[];
+  hookPolicy?: "disabled" | "bounded";
+  timeoutSeconds?: number;
 }
 
 export interface RequestedDeploymentServiceRuntime {
@@ -10271,14 +10283,18 @@ export interface DeploymentConfiguredResource {
 }
 
 export interface DeploymentConfiguredSource {
-  type?: "git" | "github" | "image";
+  type?: "git" | "github" | "image" | "helm";
   repository?: string;
   image?: string;
+  chart?: string;
   gitRef?: string;
   commitSha?: string;
   baseDirectory?: string;
   version?: string;
   versionKind?: string;
+  valuesSecretReferences?: string[];
+  hookPolicy?: "disabled" | "bounded";
+  timeoutSeconds?: number;
 }
 
 export interface DeploymentConfiguredApplication {
@@ -10521,6 +10537,8 @@ export type RuntimeTargetCapability =
   | "runtime.scale"
   | "runtime.autoscale"
   | "runtime.rollout"
+  | "runtime.stateful"
+  | "runtime.helm"
   | "proxy.route";
 
 export interface RuntimeTargetBackendDescriptor {

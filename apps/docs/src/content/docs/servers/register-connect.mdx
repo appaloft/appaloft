@@ -224,6 +224,43 @@ appaloft server readiness srv_cluster
 不会返回 Kubernetes API DTO 或原始凭据。Web 的 Server 详情页对 cluster target 提供相同的 Profile
 配置对话框与 readiness readback；HTTP/API、SDK 和 MCP 使用相同 operation schema。
 
+当 Resource 绑定命名 `StorageVolume` 时，Kubernetes backend 使用稳定 storage scope 创建
+StatefulSet 与 PVC。新的 Deployment receipt 会复用同一 workload/PVC，清理旧 receipt 不会删除
+持久卷；现有 StorageVolume backup/restore operation 可备份该 PVC，并默认恢复到新的独立 PVC。
+
+`helm-chart` source 通过同一个 deployment operation 进入 typed Helm lifecycle，而不是接受原始
+manifest。Chart reference、version、values secret references、hook policy 与 timeout 都属于 source
+binding；执行先做脱敏 render，再使用 atomic upgrade/wait，失败后必须证明回到上一份 manifest。
+cleanup 使用精确 release identity 和 foreground uninstall。例如：
+
+```bash
+appaloft deploy oci://registry.example.com/charts/storefront \
+  --method helm \
+  --helm-chart-version 1.7.3 \
+  --helm-values-secret-ref secret://helm/storefront/production \
+  --helm-hook-policy bounded \
+  --helm-timeout-seconds 420
+```
+
+也可以在仓库中提交不含原始 values 的同等配置：
+
+```yaml
+source:
+  type: helm
+  chart: oci://registry.example.com/charts/storefront
+  version: 1.7.3
+  valuesSecretReferences:
+    - secret://helm/storefront/production
+  hookPolicy: bounded
+  timeoutSeconds: 420
+runtime:
+  strategy: helm
+```
+
+公共 Helm lifecycle 接受绝对 `file://`、OCI 或 HTTPS chart 引用。默认本机 values resolver 只接受
+绝对 `file://` 引用；Cloud/Enterprise 可为托管 secret reference 注入 credential-aware values
+resolver。
+
 ## 出站 Server Worker <a id="server-worker-outbound-relay" />
 
 如果 Mac/VPS 不能或不应该开放 inbound SSH，可以让设备主动建立一条 mTLS Worker 连接。它附着到

@@ -225,6 +225,45 @@ routing, and storage checks without returning Kubernetes API DTOs or raw credent
 Server detail page exposes the same profile dialog and readiness readback for cluster targets;
 HTTP/API, SDK, and MCP consume the same operation schemas.
 
+When a Resource mounts a named `StorageVolume`, the Kubernetes backend creates a StatefulSet and
+PVC under a stable storage scope. A new Deployment receipt reuses the same workload and PVC, while
+cleanup of the old receipt leaves durable storage intact. Existing StorageVolume backup/restore
+operations can back up that PVC and restore it to a new independent PVC by default.
+
+A `helm-chart` source enters a typed Helm lifecycle through the same deployment operation rather
+than accepting raw manifests. Chart reference, version, values secret references, hook policy, and
+timeout belong to the source binding. Execution renders a redacted review, performs an atomic
+upgrade/wait, and must prove the previous manifest after a failed upgrade. Cleanup uses the exact
+release identity and a foreground uninstall. For example:
+
+```bash
+appaloft deploy oci://registry.example.com/charts/storefront \
+  --method helm \
+  --helm-chart-version 1.7.3 \
+  --helm-values-secret-ref secret://helm/storefront/production \
+  --helm-hook-policy bounded \
+  --helm-timeout-seconds 420
+```
+
+The same profile can be committed without raw values:
+
+```yaml
+source:
+  type: helm
+  chart: oci://registry.example.com/charts/storefront
+  version: 1.7.3
+  valuesSecretReferences:
+    - secret://helm/storefront/production
+  hookPolicy: bounded
+  timeoutSeconds: 420
+runtime:
+  strategy: helm
+```
+
+The public Helm lifecycle accepts absolute `file://`, OCI, or HTTPS chart references. Its default
+local values resolver accepts absolute `file://` references; Cloud/Enterprise can inject a
+credential-aware values resolver for managed secret references.
+
 ## Outbound Server Worker <a id="server-worker-outbound-relay" />
 
 When a Mac/VPS cannot or should not expose inbound SSH, the device can initiate one outbound mTLS

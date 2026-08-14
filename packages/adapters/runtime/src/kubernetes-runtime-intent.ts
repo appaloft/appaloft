@@ -14,7 +14,9 @@ import {
   type EnvironmentSnapshot,
   type Result,
   type RuntimePlanState,
+  StorageDestinationPath,
 } from "@appaloft/core";
+import { runtimeStorageMountsFromRuntimeMetadata } from "./storage-runtime-mounts";
 
 type RuntimePlanLike = { toState(): RuntimePlanState };
 type EnvironmentSnapshotLike =
@@ -106,6 +108,15 @@ export interface KubernetesRuntimeServiceIntent {
   environment: KubernetesRuntimeEnvironmentIntent[];
 }
 
+export interface KubernetesRuntimeStorageIntent {
+  attachmentId: string;
+  storageVolumeId: string;
+  claimName: string;
+  mountName: string;
+  destinationPath: string;
+  readOnly: boolean;
+}
+
 export interface KubernetesIngressControllerSource {
   namespace: string;
   podSelector: Readonly<Record<string, string>>;
@@ -122,12 +133,15 @@ export interface KubernetesRuntimeIntent {
   workloadName: string;
   receipt: string;
   image: string;
+  command?: string;
   port: number;
   environment: KubernetesRuntimeEnvironmentIntent[];
   routes: KubernetesRuntimeRouteIntent[];
   health?: KubernetesRuntimeHealthIntent;
   scale: KubernetesRuntimeScaleIntent;
   rollout: KubernetesRuntimeRolloutIntent;
+  storageScopeReceipt?: string;
+  storage?: KubernetesRuntimeStorageIntent[];
   services?: KubernetesRuntimeServiceIntent[];
   labels: Record<string, string>;
   annotations: Record<string, string>;
@@ -426,25 +440,101 @@ function derivedKubernetesName(base: string, purpose: string, fallback: string):
   return `${prefix}-${suffix}`;
 }
 
-function namespaceFor(identity: KubernetesRuntimeIdentityInput): string {
-  const scope = [
-    identity.organizationId,
-    identity.projectId,
-    identity.environmentId,
-    identity.deploymentId,
-  ].join(":");
+function namespaceFor(identity: KubernetesRuntimeIdentityInput, stateful: boolean): string {
+  const scope = stateful
+    ? [
+        identity.organizationId,
+        identity.projectId,
+        identity.environmentId,
+        identity.resourceId,
+      ].join(":")
+    : [
+        identity.organizationId,
+        identity.projectId,
+        identity.environmentId,
+        identity.deploymentId,
+      ].join(":");
   const readable = kubernetesName(
-    `appaloft-${identity.organizationId}-${identity.projectId}-${identity.environmentId}`,
+    stateful
+      ? `appaloft-${identity.organizationId}-${identity.projectId}-${identity.environmentId}-${identity.resourceId}`
+      : `appaloft-${identity.organizationId}-${identity.projectId}-${identity.environmentId}`,
     "appaloft-runtime",
     52,
   );
   return `${readable}-${digest(scope, 10)}`;
 }
 
-function workloadNameFor(identity: KubernetesRuntimeIdentityInput): string {
-  const suffix = digest(`${identity.resourceId}:${identity.deploymentId}`, 8);
+function storageScopeReceipt(identity: KubernetesRuntimeIdentityInput): string {
+  return digest(
+    [
+      identity.organizationId,
+      identity.projectId,
+      identity.environmentId,
+      identity.resourceId,
+      identity.targetId,
+      "storage",
+    ].join(":"),
+    16,
+  );
+}
+
+function resolveStorageIntent(
+  metadata: Readonly<Record<string, string>> | undefined,
+  identity: KubernetesRuntimeIdentityInput,
+): Result<KubernetesRuntimeStorageIntent[]> {
+  const mounts = runtimeStorageMountsFromRuntimeMetadata(metadata ? { ...metadata } : undefined);
+  if (mounts.isErr()) return err(mounts.error);
+
+  const storage: KubernetesRuntimeStorageIntent[] = [];
+  for (const mount of mounts.value) {
+    if (mount.storageVolumeKind !== "named-volume") {
+      return err(
+        domainError.runtimeTargetUnsupported(
+          "Kubernetes stateful workloads require portable named StorageVolumes",
+          {
+            phase: "kubernetes-storage-realization",
+            storageVolumeId: mount.storageVolumeId,
+            missingCapability: "portable-named-storage-volume",
+          },
+        ),
+      );
+    }
+    const destinationPath = StorageDestinationPath.create(mount.destinationPath);
+    if (destinationPath.isErr()) return err(destinationPath.error);
+    storage.push({
+      attachmentId: mount.attachmentId,
+      storageVolumeId: mount.storageVolumeId,
+      claimName: kubernetesStorageClaimName(identity.resourceId, mount.storageVolumeId),
+      mountName: kubernetesName(
+        `storage-${mount.attachmentId}-${digest(mount.storageVolumeId, 6)}`,
+        "storage-volume",
+      ),
+      destinationPath: destinationPath.value.value,
+      readOnly: mount.mountMode === "read-only",
+    });
+  }
+  return ok(storage);
+}
+
+export function kubernetesStorageClaimName(resourceId: string, storageVolumeId: string): string {
+  return kubernetesName(
+    `appaloft-${storageVolumeId}-${digest(`${resourceId}:${storageVolumeId}`, 8)}`,
+    "appaloft-storage",
+  );
+}
+
+function workloadNameFor(
+  identity: KubernetesRuntimeIdentityInput,
+  stateful = false,
+): string {
+  const identityKey = stateful
+    ? `${identity.resourceId}:${identity.targetId}:stateful`
+    : `${identity.resourceId}:${identity.deploymentId}`;
+  const suffix = digest(identityKey, 8);
   const readable = kubernetesName(
-    `appaloft-${identity.resourceId}-${identity.deploymentId}`,
+    stateful
+      ? `appaloft-${identity.resourceId}`
+      : `appaloft-${identity.resourceId}-${identity.deploymentId}`,
     "appaloft-workload",
     54,
   );
@@ -453,6 +543,10 @@ function workloadNameFor(identity: KubernetesRuntimeIdentityInput): string {
 
 function labelValue(value: string): string {
   return kubernetesName(value, "unknown");
+}
+
+export function kubernetesStorageVolumeLabelValue(storageVolumeId: string): string {
+  return labelValue(storageVolumeId);
 }
 
 function identityLabels(
@@ -524,6 +618,35 @@ export function renderKubernetesRuntimeIntent(
 
   const scaleAndRollout = resolveScaleAndRollout(execution.metadata);
   if (scaleAndRollout.isErr()) return err(scaleAndRollout.error);
+  const storage = resolveStorageIntent(execution.metadata, input.identity);
+  if (storage.isErr()) return err(storage.error);
+  if (storage.value.length > 0 && isServiceGraph) {
+    return err(
+      domainError.runtimeTargetUnsupported(
+        "Kubernetes storage attachments require one explicit Resource workload",
+        {
+          phase: "kubernetes-storage-realization",
+          missingCapability: "service-specific-storage-attachment",
+        },
+      ),
+    );
+  }
+  if (
+    storage.value.length > 0 &&
+    (scaleAndRollout.value.scale.replicas !== 1 ||
+      scaleAndRollout.value.scale.horizontal ||
+      scaleAndRollout.value.rollout.strategy === "canary")
+  ) {
+    return err(
+      domainError.runtimeTargetUnsupported(
+        "Kubernetes ReadWriteOnce storage requires one replica without HPA or canary rollout",
+        {
+          phase: "kubernetes-storage-realization",
+          missingCapability: "multi-replica-shared-storage",
+        },
+      ),
+    );
+  }
 
   const environmentState = input.environmentSnapshot?.toState();
   const snapshotEnvironment =
@@ -553,7 +676,7 @@ export function renderKubernetesRuntimeIntent(
   const environment = [...snapshotEnvironment, ...dependencyEnvironment].sort((left, right) =>
     left.name.localeCompare(right.name),
   );
-  const workloadName = workloadNameFor(input.identity);
+  const workloadName = workloadNameFor(input.identity, storage.value.length > 0);
   const services = isServiceGraph
     ? serviceGraph
         .map((service): KubernetesRuntimeServiceIntent | undefined => {
@@ -647,16 +770,23 @@ export function renderKubernetesRuntimeIntent(
 
   return ok({
     schemaVersion: "kubernetes.runtime-intent/v1",
-    namespace: namespaceFor(input.identity),
+    namespace: namespaceFor(input.identity, storage.value.length > 0),
     workloadName,
     receipt,
     image: image ?? services?.[0]?.image ?? "",
+    ...(execution.startCommand ? { command: execution.startCommand.value } : {}),
     port,
     environment,
     routes,
     ...(health ? { health } : {}),
     scale: scaleAndRollout.value.scale,
     rollout: scaleAndRollout.value.rollout,
+    ...(storage.value.length > 0
+      ? {
+          storageScopeReceipt: storageScopeReceipt(input.identity),
+          storage: storage.value,
+        }
+      : {}),
     ...(services ? { services } : {}),
     labels: identityLabels(input.identity, receipt),
     annotations,
@@ -709,6 +839,11 @@ export function renderKubernetesRuntimeManifest(
 
   const namespaceMetadata = metadata(intent, false);
   namespaceMetadata.name = intent.namespace;
+  if (intent.storageScopeReceipt) {
+    delete namespaceMetadata.labels["appaloft.io/receipt"];
+    namespaceMetadata.labels["appaloft.io/storage-scope-receipt"] =
+      intent.storageScopeReceipt;
+  }
   const podLabels = {
     ...intent.labels,
     "appaloft.io/workload": intent.workloadName,
@@ -814,6 +949,32 @@ export function renderKubernetesRuntimeManifest(
     });
   }
 
+  for (const storage of intent.storage ?? []) {
+    items.push({
+      apiVersion: "v1",
+      kind: "PersistentVolumeClaim",
+      metadata: {
+        name: storage.claimName,
+        namespace: intent.namespace,
+        labels: {
+          "appaloft.io/managed-by": "appaloft",
+          "appaloft.io/storage-volume-id": kubernetesStorageVolumeLabelValue(
+            storage.storageVolumeId,
+          ),
+          "appaloft.io/storage-scope-receipt": intent.storageScopeReceipt ?? "unknown",
+        },
+        annotations: {
+          "appaloft.io/storage-volume-id": storage.storageVolumeId,
+          "appaloft.io/resource-id": intent.annotations["appaloft.io/resource-id"] ?? "",
+        },
+      },
+      spec: {
+        accessModes: ["ReadWriteOnce"],
+        resources: { requests: { storage: "1Gi" } },
+      },
+    });
+  }
+
   const workloads =
     intent.services ??
     [
@@ -821,6 +982,7 @@ export function renderKubernetesRuntimeManifest(
         name: "app",
         workloadName: intent.workloadName,
         image: intent.image,
+        ...(intent.command ? { command: intent.command } : {}),
         port: intent.port,
         replicas: intent.scale.replicas,
         environment: intent.environment,
@@ -833,41 +995,54 @@ export function renderKubernetesRuntimeManifest(
       ...workloadMetadata.labels,
       "appaloft.io/service": labelValue(workload.name),
     };
-    const workloadPodLabels = {
+    const workloadPodLabels: Record<string, string> = {
       ...podLabels,
       "appaloft.io/workload": workload.workloadName,
       "appaloft.io/service": labelValue(workload.name),
     };
-    const selector = {
-      "appaloft.io/receipt": intent.receipt,
-      "appaloft.io/service": labelValue(workload.name),
-    };
+    const selector = intent.storageScopeReceipt
+      ? {
+          "appaloft.io/storage-scope-receipt": intent.storageScopeReceipt,
+          "appaloft.io/service": labelValue(workload.name),
+        }
+      : {
+          "appaloft.io/receipt": intent.receipt,
+          "appaloft.io/service": labelValue(workload.name),
+        };
+    if (intent.storageScopeReceipt) {
+      workloadPodLabels["appaloft.io/storage-scope-receipt"] = intent.storageScopeReceipt;
+    }
     items.push({
       apiVersion: "apps/v1",
-      kind: "Deployment",
+      kind: intent.storage?.length ? "StatefulSet" : "Deployment",
       metadata: workloadMetadata,
       spec: {
         replicas: workload.replicas,
+        ...(intent.storage?.length ? { serviceName: workload.workloadName } : {}),
         selector: { matchLabels: selector },
-        strategy:
-          intent.rollout.strategy === "recreate"
-            ? { type: "Recreate" }
-            : {
-                type: "RollingUpdate",
-                ...(intent.rollout.maxUnavailable !== undefined ||
-                intent.rollout.maxSurge !== undefined
-                  ? {
-                      rollingUpdate: {
-                        ...(intent.rollout.maxUnavailable !== undefined
-                          ? { maxUnavailable: intent.rollout.maxUnavailable }
-                          : {}),
-                        ...(intent.rollout.maxSurge !== undefined
-                          ? { maxSurge: intent.rollout.maxSurge }
-                          : {}),
-                      },
-                    }
-                  : {}),
-              },
+        ...(intent.storage?.length
+          ? { updateStrategy: { type: "RollingUpdate" } }
+          : {
+              strategy:
+                intent.rollout.strategy === "recreate"
+                  ? { type: "Recreate" }
+                  : {
+                      type: "RollingUpdate",
+                      ...(intent.rollout.maxUnavailable !== undefined ||
+                      intent.rollout.maxSurge !== undefined
+                        ? {
+                            rollingUpdate: {
+                              ...(intent.rollout.maxUnavailable !== undefined
+                                ? { maxUnavailable: intent.rollout.maxUnavailable }
+                                : {}),
+                              ...(intent.rollout.maxSurge !== undefined
+                                ? { maxSurge: intent.rollout.maxSurge }
+                                : {}),
+                            },
+                          }
+                        : {}),
+                    },
+            }),
         template: {
           metadata: { labels: workloadPodLabels, annotations: { ...intent.annotations } },
           spec: {
@@ -884,6 +1059,15 @@ export function renderKubernetesRuntimeManifest(
                 env: environmentEntries(workload.environment),
                 ...(workload.command ? { command: ["sh", "-lc", workload.command] } : {}),
                 ...(containerResources ? { resources: containerResources } : {}),
+                ...(intent.storage?.length
+                  ? {
+                      volumeMounts: intent.storage.map((storage) => ({
+                        name: storage.mountName,
+                        mountPath: storage.destinationPath,
+                        readOnly: storage.readOnly,
+                      })),
+                    }
+                  : {}),
                 ...(probe && workload.port
                   ? { readinessProbe: probe, livenessProbe: probe }
                   : {}),
@@ -893,6 +1077,14 @@ export function renderKubernetesRuntimeManifest(
                 },
               },
             ],
+            ...(intent.storage?.length
+              ? {
+                  volumes: intent.storage.map((storage) => ({
+                    name: storage.mountName,
+                    persistentVolumeClaim: { claimName: storage.claimName },
+                  })),
+                }
+              : {}),
           },
         },
       },
@@ -1160,14 +1352,45 @@ export function renderKubernetesCanaryRouteManifest(input: {
 export interface KubernetesCleanupPlan {
   namespace: string;
   receipt: string;
+  storageScopeReceipt?: string;
   verifyArgs: string[];
   deleteArgs: string[];
+  residualArgs?: string[];
 }
 
 export function renderKubernetesCleanupPlan(input: {
   namespace: string;
   receipt: string;
+  storageScopeReceipt?: string;
 }): KubernetesCleanupPlan {
+  if (input.storageScopeReceipt) {
+    return {
+      namespace: input.namespace,
+      receipt: input.receipt,
+      storageScopeReceipt: input.storageScopeReceipt,
+      verifyArgs: ["get", "namespace", input.namespace, "-o", "json"],
+      deleteArgs: [
+        "delete",
+        "all,secret,serviceaccount,networkpolicy,ingress,configmap",
+        "--namespace",
+        input.namespace,
+        "--selector",
+        `appaloft.io/receipt=${input.receipt}`,
+        "--ignore-not-found=true",
+        "--wait=true",
+      ],
+      residualArgs: [
+        "get",
+        "all,secret,serviceaccount,networkpolicy,ingress,configmap",
+        "--namespace",
+        input.namespace,
+        "--selector",
+        `appaloft.io/receipt=${input.receipt}`,
+        "-o",
+        "name",
+      ],
+    };
+  }
   return {
     namespace: input.namespace,
     receipt: input.receipt,

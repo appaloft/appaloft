@@ -75,6 +75,12 @@ import {
   type KubernetesRoutingPolicyResolver,
   type KubernetesRolloutClock,
 } from "../src/kubernetes-runtime-target-backend";
+import {
+  KubernetesHelmLifecycle,
+  type HelmCommandRunner,
+  type HelmCommandRunnerInput,
+  type HelmCommandRunnerResult,
+} from "../src/kubernetes-helm-lifecycle";
 
 class RecordingKubernetesCommandRunner implements KubernetesCommandRunner {
   readonly calls: KubernetesCommandRunnerInput[] = [];
@@ -205,6 +211,63 @@ function scaledKubernetesRuntimePlan(): RuntimePlan {
   });
 }
 
+function statefulKubernetesRuntimePlan(): RuntimePlan {
+  const state = kubernetesRuntimePlan().toState();
+  return RuntimePlan.rehydrate({
+    ...state,
+    execution: RuntimeExecutionPlan.rehydrate({
+      ...state.execution.toState(),
+      metadata: {
+        "appaloft.rollout.strategy": "recreate",
+        "storage.mounts": JSON.stringify([
+          {
+            attachmentId: "rsa_data",
+            storageVolumeId: "stv_data",
+            storageVolumeKind: "named-volume",
+            destinationPath: "/var/lib/app/data",
+            mountMode: "read-write",
+          },
+        ]),
+      },
+    }),
+  });
+}
+
+function helmKubernetesRuntimePlan(): RuntimePlan {
+  return RuntimePlan.rehydrate({
+    id: RuntimePlanId.rehydrate("rtp_kubernetes_helm"),
+    source: SourceDescriptor.rehydrate({
+      kind: SourceKindValue.rehydrate("helm-chart"),
+      locator: SourceLocator.rehydrate("oci://registry.example.com/charts/storefront"),
+      displayName: DisplayNameText.rehydrate("storefront"),
+    }),
+    buildStrategy: BuildStrategyKindValue.rehydrate("helm-package"),
+    packagingMode: PackagingModeValue.rehydrate("helm-chart"),
+    execution: RuntimeExecutionPlan.rehydrate({
+      kind: ExecutionStrategyKindValue.rehydrate("helm-release"),
+      metadata: {
+        "helm.chartReference": "oci://registry.example.com/charts/storefront",
+        "helm.chartVersion": "1.7.3",
+        "helm.valuesSecretReferences": "[]",
+        "helm.hookPolicy": "disabled",
+        "helm.timeoutSeconds": "300",
+      },
+    }),
+    runtimeArtifact: RuntimeArtifactSnapshot.rehydrate({
+      kind: RuntimeArtifactKindValue.rehydrate("helm-chart"),
+      intent: RuntimeArtifactIntentValue.rehydrate("helm-chart"),
+    }),
+    target: DeploymentTargetDescriptor.rehydrate({
+      kind: TargetKindValue.rehydrate("orchestrator-cluster"),
+      providerKey: ProviderKey.rehydrate("kubernetes"),
+      serverIds: [DeploymentTargetId.rehydrate("srv_r5a_cluster")],
+    }),
+    detectSummary: DetectSummary.rehydrate("Typed Helm chart"),
+    steps: [PlanStepText.rehydrate("Apply Helm release")],
+    generatedAt,
+  });
+}
+
 function canaryKubernetesRuntimePlan(): RuntimePlan {
   const state = kubernetesRuntimePlan().toState();
   return RuntimePlan.rehydrate({
@@ -276,6 +339,7 @@ async function executionHarness(
   canaryRouteProbe: KubernetesCanaryRouteProbe = {
     prove: async () => ok(undefined),
   },
+  helmLifecycle?: KubernetesHelmLifecycle,
 ) {
   const context = createExecutionContext({
     requestId: "req_r5a_execute",
@@ -296,6 +360,7 @@ async function executionHarness(
     routingPolicyResolver,
     rolloutClock,
     canaryRouteProbe,
+    helmLifecycle,
   );
   return { backend, context };
 }
@@ -342,6 +407,64 @@ class SuccessfulExecutionRunner implements KubernetesCommandRunner {
       });
     }
     return ok({ exitCode: 0, stdout: "ok", stderr: "" });
+  }
+}
+
+class StatefulExecutionRunner extends SuccessfulExecutionRunner {
+  storageScopeReceipt = "";
+  workloadReceipt = "";
+  claimName = "";
+
+  override async run(
+    input: KubernetesCommandRunnerInput,
+  ): Promise<Result<KubernetesCommandRunnerResult>> {
+    if (input.step === "apply-candidate-manifest") {
+      this.calls.push(input);
+      const manifest = JSON.parse(input.stdin ?? "{}") as {
+        items: Array<{ kind: string; metadata: { name: string; labels: Record<string, string> } }>;
+      };
+      const namespace = manifest.items.find((item) => item.kind === "Namespace");
+      const workload = manifest.items.find((item) => item.kind === "StatefulSet");
+      const pvc = manifest.items.find((item) => item.kind === "PersistentVolumeClaim");
+      this.namespace = namespace?.metadata.name ?? "";
+      this.storageScopeReceipt =
+        namespace?.metadata.labels["appaloft.io/storage-scope-receipt"] ?? "";
+      this.workloadReceipt = workload?.metadata.labels["appaloft.io/receipt"] ?? "";
+      this.claimName = pvc?.metadata.name ?? "";
+      return ok({ exitCode: 0, stdout: "applied", stderr: "" });
+    }
+    if (input.step === "observe-candidate-statefulset") {
+      this.calls.push(input);
+      return ok({
+        exitCode: 0,
+        stdout: JSON.stringify({
+          metadata: { generation: 1 },
+          spec: { replicas: 1 },
+          status: { readyReplicas: 1, observedGeneration: 1 },
+        }),
+        stderr: "",
+      });
+    }
+    if (input.step === "verify-candidate-namespace-ownership") {
+      this.calls.push(input);
+      return ok({
+        exitCode: 0,
+        stdout: JSON.stringify({
+          metadata: {
+            labels: {
+              "appaloft.io/managed-by": "appaloft",
+              "appaloft.io/storage-scope-receipt": this.storageScopeReceipt,
+            },
+          },
+        }),
+        stderr: "",
+      });
+    }
+    if (input.step === "verify-candidate-receipt-residual") {
+      this.calls.push(input);
+      return ok({ exitCode: 0, stdout: "", stderr: "" });
+    }
+    return await super.run(input);
   }
 }
 
@@ -486,6 +609,8 @@ describe("KubernetesRuntimeTargetBackend readiness", () => {
       "runtime.scale",
       "runtime.autoscale",
       "runtime.rollout",
+      "runtime.stateful",
+      "runtime.helm",
       "proxy.route",
     ]);
 
@@ -677,7 +802,75 @@ describe("KubernetesRuntimeTargetBackend readiness", () => {
   });
 });
 
+class SuccessfulHelmRunner implements HelmCommandRunner {
+  readonly calls: HelmCommandRunnerInput[] = [];
+
+  async run(input: HelmCommandRunnerInput): Promise<Result<HelmCommandRunnerResult>> {
+    this.calls.push(input);
+    switch (input.step) {
+      case "read-helm-history":
+        return ok({ exitCode: 0, stdout: "[]", stderr: "" });
+      case "render-helm-diff":
+        return ok({ exitCode: 0, stdout: "kind: Service\n", stderr: "" });
+      case "apply-helm-release":
+        return ok({ exitCode: 0, stdout: "", stderr: "" });
+      case "verify-helm-release":
+        return ok({
+          exitCode: 0,
+          stdout: JSON.stringify({ info: { status: "deployed" }, version: 1 }),
+          stderr: "",
+        });
+      case "uninstall-helm-release":
+        return ok({ exitCode: 0, stdout: "", stderr: "" });
+      default:
+        throw new Error(`Unexpected Helm step ${input.step}`);
+    }
+  }
+}
+
 describe("KubernetesRuntimeTargetBackend execution", () => {
+  test("[K8S-HELM-013] routes Helm plans through render, atomic apply, readback, and exact uninstall", async () => {
+    const helmRunner = new SuccessfulHelmRunner();
+    const lifecycle = new KubernetesHelmLifecycle(helmRunner, {
+      resolve: async () => ok({ filePaths: [], dispose: async () => undefined }),
+    });
+    const { backend, context } = await executionHarness(
+      new SuccessfulExecutionRunner(),
+      cluster(),
+      undefined,
+      undefined,
+      undefined,
+      lifecycle,
+    );
+    const deployment = runningDeployment(helmKubernetesRuntimePlan());
+
+    const executed = await backend.execute(context, deployment);
+
+    expect(executed.isOk()).toBe(true);
+    const state = executed._unsafeUnwrap().deployment.toState();
+    expect(state.status.value).toBe("succeeded");
+    expect(state.runtimePlan.execution.metadata).toMatchObject({
+      "helm.releaseName": expect.stringMatching(/^appaloft-/),
+      "helm.chartVersion": "1.7.3",
+      "helm.currentRevision": "1",
+      "helm.rollbackVerified": "false",
+    });
+    expect(helmRunner.calls.map((call) => call.step)).toEqual([
+      "read-helm-history",
+      "render-helm-diff",
+      "apply-helm-release",
+      "verify-helm-release",
+    ]);
+    const applied = helmRunner.calls.find((call) => call.step === "apply-helm-release");
+    expect(applied?.args).toContain("--atomic");
+    expect(applied?.args).toContain("--wait");
+    expect(applied?.args).toContain("--no-hooks");
+
+    const canceled = await backend.cancel(context, deployment);
+    expect(canceled.isOk()).toBe(true);
+    expect(helmRunner.calls.at(-1)?.step).toBe("uninstall-helm-release");
+  });
+
   test("[SCALE-PROFILE-009] rejects HPA before mutation when metrics capability is unavailable", async () => {
     const runner = new SuccessfulExecutionRunner();
     const { backend, context } = await executionHarness(runner);
@@ -948,6 +1141,43 @@ describe("KubernetesRuntimeTargetBackend execution", () => {
       "--ignore-not-found=true",
       "--wait=true",
     ]);
+  });
+
+  test("[K8S-STATEFUL-014] converges a StatefulSet and cleans only its Deployment receipt", async () => {
+    const runner = new StatefulExecutionRunner();
+    const { backend, context } = await executionHarness(runner);
+    const deployment = runningDeployment(statefulKubernetesRuntimePlan());
+
+    const executed = await backend.execute(context, deployment);
+
+    expect(executed.isOk()).toBe(true);
+    expect(runner.calls.map((call) => call.step)).toEqual([
+      "apply-candidate-manifest",
+      "wait-candidate-statefulset-rollout",
+      "observe-candidate-statefulset",
+    ]);
+    expect(runner.claimName).toMatch(/^appaloft-stv-data-/);
+    expect(executed._unsafeUnwrap().deployment.toState().runtimePlan.execution.metadata).toMatchObject({
+      "kubernetes.namespace": runner.namespace,
+      "kubernetes.receipt": runner.workloadReceipt,
+      "kubernetes.storageScopeReceipt": runner.storageScopeReceipt,
+      "kubernetes.storageClaims": runner.claimName,
+    });
+
+    const cleaned = await backend.cancel(context, deployment);
+
+    expect(cleaned.isOk()).toBe(true);
+    expect(runner.calls.slice(3).map((call) => call.step)).toEqual([
+      "verify-candidate-namespace-ownership",
+      "delete-candidate-receipt-resources",
+      "verify-candidate-receipt-residual",
+    ]);
+    const deletion = runner.calls.find(
+      (call) => call.step === "delete-candidate-receipt-resources",
+    );
+    expect(deletion?.args).toContain(`appaloft.io/receipt=${runner.workloadReceipt}`);
+    expect(deletion?.args).not.toContain("namespace");
+    expect(deletion?.args.join(" ")).not.toContain(runner.claimName);
   });
 
   test("[K8S-ROLLBACK-007] failed rollout deletes only the candidate receipt namespace", async () => {

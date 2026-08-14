@@ -1756,11 +1756,17 @@ function toDeploymentConfiguredSource(
     ...(source.type ? { type: source.type } : {}),
     ...(source.repository ? { repository: source.repository } : {}),
     ...(source.image ? { image: source.image } : {}),
+    ...(source.chart ? { chart: source.chart } : {}),
     ...(source.gitRef ? { gitRef: source.gitRef } : {}),
     ...(source.commitSha ? { commitSha: source.commitSha } : {}),
     ...(source.baseDirectory ? { baseDirectory: source.baseDirectory } : {}),
     ...(source.version ? { version: source.version } : {}),
     ...(source.versionKind ? { versionKind: source.versionKind } : {}),
+    ...(source.valuesSecretReferences
+      ? { valuesSecretReferences: source.valuesSecretReferences }
+      : {}),
+    ...(source.hookPolicy ? { hookPolicy: source.hookPolicy } : {}),
+    ...(source.timeoutSeconds ? { timeoutSeconds: source.timeoutSeconds } : {}),
   };
 }
 

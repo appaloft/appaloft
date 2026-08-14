@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import {
   AccessRoute,
   BuildStrategyKindValue,
@@ -108,6 +110,8 @@ export * from "./command-sandbox-agent-harness";
 export * from "./development-session";
 export * from "./server-worker-relay-adapters";
 export * from "./kubernetes-runtime-target-backend";
+export * from "./kubernetes-helm-lifecycle";
+export * from "./kubernetes-storage-backup";
 export * from "./kubernetes-runtime-intent";
 
 export { RuntimeServerConnectivityChecker } from "./server-connectivity";
@@ -432,6 +436,82 @@ function autoDeploymentMethodFor(
     dockerComposeInline: () => "docker-compose",
     dockerImage: () => "prebuilt-image",
     compose: () => "docker-compose",
+    helmChart: () => "helm",
+  });
+}
+
+function helmChartPlanMetadata(source: SourceDescriptor): Result<Record<string, string>> {
+  const metadata = source.metadata ?? {};
+  const chartVersion = metadata["appaloft.helm.chartVersion"]?.trim();
+  const valuesSecretReferences = metadata["appaloft.helm.valuesSecretReferences"];
+  const hookPolicy = metadata["appaloft.helm.hookPolicy"];
+  const timeoutSeconds = Number(metadata["appaloft.helm.timeoutSeconds"]);
+  const localFileReference = (() => {
+    try {
+      const url = new URL(source.locator);
+      return url.protocol === "file:" && fileURLToPath(url).startsWith("/");
+    } catch {
+      return false;
+    }
+  })();
+  if (
+    !/^oci:\/\/[^\s]+$/i.test(source.locator) &&
+    !/^https:\/\/[^\s]+$/i.test(source.locator) &&
+    !localFileReference
+  ) {
+    return err(
+      domainError.validation("Helm chart reference must use an OCI, HTTPS, or absolute file locator", {
+        phase: "helm-chart-plan-resolution",
+      }),
+    );
+  }
+  if (!chartVersion) {
+    return err(
+      domainError.validation("Helm chart version is required", {
+        phase: "helm-chart-plan-resolution",
+      }),
+    );
+  }
+  let references: unknown;
+  try {
+    references = JSON.parse(valuesSecretReferences ?? "[]");
+  } catch {
+    references = undefined;
+  }
+  if (
+    !Array.isArray(references) ||
+    references.length > 16 ||
+    references.some(
+      (reference) =>
+        typeof reference !== "string" || !/^[a-z][a-z0-9+.-]*:\/\/[^\s]+$/i.test(reference),
+    )
+  ) {
+    return err(
+      domainError.validation("Helm values secret references have an unsupported shape", {
+        phase: "helm-chart-plan-resolution",
+      }),
+    );
+  }
+  if (hookPolicy !== "disabled" && hookPolicy !== "bounded") {
+    return err(
+      domainError.validation("Helm hook policy is unsupported", {
+        phase: "helm-chart-plan-resolution",
+      }),
+    );
+  }
+  if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 30 || timeoutSeconds > 900) {
+    return err(
+      domainError.validation("Helm timeout is outside the bounded range", {
+        phase: "helm-chart-plan-resolution",
+      }),
+    );
+  }
+  return ok({
+    "helm.chartReference": source.locator,
+    "helm.chartVersion": chartVersion,
+    "helm.valuesSecretReferences": JSON.stringify(references),
+    "helm.hookPolicy": hookPolicy,
+    "helm.timeoutSeconds": String(timeoutSeconds),
   });
 }
 
@@ -844,6 +924,41 @@ function chooseStrategies(input: {
     requestedDeployment.method === "auto"
       ? autoDeploymentMethodFor(source, requestedDeployment)
       : requestedDeployment.method;
+
+  if (requestedMethod === "helm") {
+    if (source.kind !== "helm-chart") {
+      return err(
+        domainError.validation("Helm deployments require a Helm chart source", {
+          phase: "runtime-artifact-resolution",
+          sourceKind: source.kind,
+          runtimePlanStrategy: "helm",
+        }),
+      );
+    }
+    const helmMetadata = helmChartPlanMetadata(source);
+    if (helmMetadata.isErr()) return err(helmMetadata.error);
+    const execution = RuntimeExecutionPlan.rehydrate({
+      kind: ExecutionStrategyKindValue.rehydrate("helm-release"),
+      metadata: helmMetadata.value,
+    });
+    return withRequestedAccessRoutes({
+      requestedDeployment,
+      buildStrategy: BuildStrategyKindValue.rehydrate("helm-package"),
+      packagingMode: PackagingModeValue.rehydrate("helm-chart"),
+      execution,
+      runtimeArtifact: RuntimeArtifactSnapshot.rehydrate({
+        kind: RuntimeArtifactKindValue.rehydrate("helm-chart"),
+        intent: RuntimeArtifactIntentValue.rehydrate("helm-chart"),
+        metadata: { ...helmMetadata.value },
+      }),
+      steps: [
+        PlanStepText.rehydrate("Resolve Helm chart source"),
+        PlanStepText.rehydrate("Render redacted Helm diff"),
+        PlanStepText.rehydrate("Apply Helm release"),
+        PlanStepText.rehydrate("Verify Helm release"),
+      ],
+    });
+  }
 
   if (requestedMethod === "docker-compose") {
     const { composeFile, workingDirectory } = composeSourcePaths(source, requestedDeployment);

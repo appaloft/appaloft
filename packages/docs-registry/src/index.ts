@@ -732,7 +732,7 @@ export const publicDocsHelpTopics = {
     id: "server.runtime-target-profile",
     title: "Runtime target profile",
     description:
-      "Connect an existing cluster through opaque references and inspect provider-neutral readiness without exposing provider payloads.",
+      "Connect an existing cluster through opaque references, inspect provider-neutral readiness, and run stateless, stateful, or typed Helm workloads without exposing provider payloads.",
     page: {
       "zh-CN": "servers/register-connect",
       "en-US": "en/servers/register-connect",
@@ -749,6 +749,8 @@ export const publicDocsHelpTopics = {
       "existing kubernetes cluster",
       "cluster connection reference",
       "kubernetes readiness",
+      "kubernetes statefulset pvc",
+      "helm chart atomic rollback",
       "现有 Kubernetes 集群",
       "运行目标配置",
     ],

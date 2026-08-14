@@ -70,8 +70,13 @@ import {
 } from "../shared/version";
 
 export const runtimeVerificationStepKinds = ["internal-http", "public-http"] as const;
-export const runtimeArtifactKinds = ["image", "compose-project"] as const;
-export const runtimeArtifactIntents = ["build-image", "prebuilt-image", "compose-project"] as const;
+export const runtimeArtifactKinds = ["image", "compose-project", "helm-chart"] as const;
+export const runtimeArtifactIntents = [
+  "build-image",
+  "prebuilt-image",
+  "compose-project",
+  "helm-chart",
+] as const;
 export const sourceRuntimeFamilies = [
   "custom",
   "dotnet",
@@ -372,6 +377,7 @@ export interface SourceDescriptorVisitor<TResult> {
   dockerComposeInline(source: SourceDescriptor): TResult;
   dockerImage(source: SourceDescriptor): TResult;
   compose(source: SourceDescriptor): TResult;
+  helmChart(source: SourceDescriptor): TResult;
 }
 
 function versionSourceKindForSourceKind(sourceKind: SourceKindValue): VersionSourceKind {
@@ -390,6 +396,8 @@ function versionSourceKindForSourceKind(sourceKind: SourceKindValue): VersionSou
     case "dockerfile-inline":
     case "docker-compose-inline":
     case "compose":
+      return "generic";
+    case "helm-chart":
       return "generic";
   }
 
@@ -736,6 +744,8 @@ export class SourceDescriptor extends ValueObject<SourceDescriptorState> {
         return visitor.dockerImage(this);
       case "compose":
         return visitor.compose(this);
+      case "helm-chart":
+        return visitor.helmChart(this);
     }
 
     const unhandled: never = this.kind;
