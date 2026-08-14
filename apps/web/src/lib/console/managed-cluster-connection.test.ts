@@ -61,6 +61,25 @@ describe("managed cluster connection form", () => {
     });
   });
 
+  test("[RESIL-READY-004] builds an exact plan-only replacement readiness request", () => {
+    expect(buildManagedClusterParameters("infrastructure.cluster.readiness", baseForm)).toEqual({
+      ok: true,
+      parameters: {
+        workloadRef: "resource:api",
+        requiredCapabilities: ["helm", "kubernetes"],
+        excludedTargetIds: ["target_degraded"],
+        currentTargetId: "target_current",
+        currentPlacementEpoch: 4,
+      },
+    });
+    expect(
+      buildManagedClusterParameters("infrastructure.cluster.readiness", {
+        ...baseForm,
+        currentTargetId: " ",
+      }),
+    ).toEqual({ ok: false, field: "currentTargetId" });
+  });
+
   test("[K8S-SURFACE-017] fails closed on missing or invalid actor input", () => {
     expect(
       buildManagedClusterParameters("infrastructure.cluster.provision", {

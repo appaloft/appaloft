@@ -8,6 +8,7 @@ import {
 export type ManagedClusterCapabilityAction =
   | "provision"
   | "inspect"
+  | "readiness"
   | "delete"
   | "place"
   | "failover"
@@ -89,6 +90,7 @@ function validAction(value: string): value is ManagedClusterCapabilityAction {
   return [
     "provision",
     "inspect",
+    "readiness",
     "delete",
     "place",
     "failover",

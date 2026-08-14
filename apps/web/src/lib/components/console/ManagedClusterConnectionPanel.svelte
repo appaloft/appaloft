@@ -7,6 +7,7 @@
     ManagedClusterCapabilityPlan,
     ManagedClusterCapabilityReceipt,
     ManagedClusterPlacementDecision,
+    ManagedClusterReplacementReadiness,
   } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
@@ -73,7 +74,10 @@
     ].includes(capabilityKey),
   );
   const isPlacementAction = $derived(!isProvision && !isReferenceAction);
-  const isMutation = $derived(capabilityKey !== "infrastructure.cluster.inspect");
+  const isReadiness = $derived(capabilityKey === "infrastructure.cluster.readiness");
+  const isMutation = $derived(
+    capabilityKey !== "infrastructure.cluster.inspect" && !isReadiness,
+  );
   const connectorAvailable = $derived(connector.availability.status === "available");
   const exactPlanIsCurrent = $derived(Boolean(plan && plannedFingerprint === formFingerprint));
   const canAcceptPlan = $derived(
@@ -90,6 +94,9 @@
   );
   const planPlacement = $derived<ManagedClusterPlacementDecision | null>(
     plan?.providerPlan?.managedClusterPlacement ?? managedPlan?.placement ?? null,
+  );
+  const replacementReadiness = $derived<ManagedClusterReplacementReadiness | null>(
+    plan?.providerPlan?.managedClusterReplacementReadiness ?? null,
   );
   const applyReceipt = $derived<ManagedClusterCapabilityReceipt | null>(
     applyResult?.providerResult?.managedClusterReceipt ?? null,
@@ -249,10 +256,12 @@
         <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedClusterPlacementEpoch)}</span>
         <Input bind:value={currentPlacementEpoch} inputmode="numeric" />
       </label>
-      <label class="space-y-1.5 text-sm font-medium">
-        <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedClusterAttempt)}</span>
-        <Input bind:value={attempt} inputmode="numeric" />
-      </label>
+      {#if !isReadiness}
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedClusterAttempt)}</span>
+          <Input bind:value={attempt} inputmode="numeric" />
+        </label>
+      {/if}
       <label class="space-y-1.5 text-sm font-medium md:col-span-2">
         <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedClusterExcludedTargets)}</span>
         <Input bind:value={excludedTargetIds} placeholder="target_a, target_b" />
@@ -319,7 +328,7 @@
     </div>
   {/if}
 
-  {#if applyResult || visibleReceipt || visiblePlacement}
+  {#if applyResult || visibleReceipt || visiblePlacement || replacementReadiness}
     <div class="space-y-3 rounded-md border bg-card p-4" data-managed-cluster-readback>
       <h3 class="text-sm font-semibold">{$t(i18nKeys.console.accountSettings.managedClusterReadbackTitle)}</h3>
       {#if applyResult}<p class="text-sm text-muted-foreground">{applyResult.summary}</p>{/if}
@@ -334,6 +343,14 @@
           <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterSelectedTarget)}</dt><dd class="break-all font-medium">{visiblePlacement.selectedTargetId}</dd></div>
           <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterRegion)}</dt><dd class="font-medium">{visiblePlacement.selectedRegion}</dd></div>
           <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterPlacementEpoch)}</dt><dd class="font-medium">{visiblePlacement.placementEpoch}</dd></div>
+        {/if}
+        {#if replacementReadiness}
+          <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterStatus)}</dt><dd class="font-medium">{replacementReadiness.status}</dd></div>
+          {#if replacementReadiness.selectedTargetId}
+            <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterSelectedTarget)}</dt><dd class="break-all font-medium">{replacementReadiness.selectedTargetId}</dd></div>
+          {/if}
+          <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterEligibleCapacity)}</dt><dd class="font-medium">{replacementReadiness.totalEligibleReplacementCapacity}</dd></div>
+          <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterReadinessReasons)}</dt><dd class="break-words font-medium">{replacementReadiness.reasonCodes.join(", ")}</dd></div>
         {/if}
       </dl>
     </div>

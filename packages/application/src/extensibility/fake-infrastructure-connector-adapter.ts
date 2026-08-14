@@ -11,6 +11,7 @@ import {
   ManagedClusterPlacementIntent,
   type ManagedClusterPlacementIntentSnapshot,
   type ManagedClusterPlacementMode,
+  type ManagedClusterReplacementReadinessSnapshot,
   type ManagedClusterSupportLevel,
   ManagedClusterTargetPool,
   type ManagedClusterTargetPoolSnapshot,
@@ -81,7 +82,7 @@ export class FakeInfrastructureConnectorProviderAdapter implements ConnectorProv
 
   canApply(capabilityKey: string): boolean {
     const action = managedClusterAction(capabilityKey);
-    return action !== null && action !== "inspect";
+    return action !== null && action !== "inspect" && action !== "readiness";
   }
 
   async applyCapability(
@@ -90,7 +91,7 @@ export class FakeInfrastructureConnectorProviderAdapter implements ConnectorProv
   ): Promise<Result<ConnectorCapabilityApplyResult>> {
     void context;
     const action = managedClusterAction(input.capabilityKey);
-    if (!action || action === "inspect") {
+    if (!action || action === "inspect" || action === "readiness") {
       return err(
         domainError.validation(
           `Connector ${this.connectorKey} cannot apply ${input.capabilityKey}`,
@@ -123,6 +124,37 @@ export class FakeInfrastructureConnectorProviderAdapter implements ConnectorProv
     input: ConnectorCapabilityPlanInput,
     action: ManagedClusterCapabilityAction,
   ): Result<ConnectorCapabilityPlanPreview> {
+    if (action === "readiness") {
+      const readiness = parseReplacementReadiness(input.parameters ?? {});
+      if (readiness.isErr()) return err(readiness.error);
+      return ok({
+        planId: managedPlanId(input, readiness.value),
+        connectorKey: input.connectorKey,
+        capabilityKey: input.capabilityKey,
+        riskLevel: "low",
+        requiresExplicitAcceptance: false,
+        summary: `${this.providerTitle}: replacement capacity is ${readiness.value.status} for ${readiness.value.workloadRef}.`,
+        effects: [
+          {
+            kind: "infrastructure.cluster.readiness",
+            title: `Replacement capacity ${readiness.value.status}`,
+            description:
+              readiness.value.status === "ready"
+                ? `${readiness.value.totalEligibleReplacementCapacity} capacity units are eligible across ${readiness.value.eligibleReplacementTargetIds.length} replacement targets.`
+                : readiness.value.reasonCodes.join(", "),
+          },
+        ],
+        cleanup: {
+          supported: false,
+          description: "Readiness planning does not create or reserve resources.",
+        },
+        providerPlan: {
+          kind: "managed-cluster-replacement-readiness",
+          managedClusterReplacementReadiness: readiness.value,
+        },
+      });
+    }
+
     if (action === "inspect") {
       const clusterRef = requiredParameter(input.parameters?.clusterRef, "Managed cluster ref");
       if (clusterRef.isErr()) return err(clusterRef.error);
@@ -214,7 +246,7 @@ export class FakeInfrastructureConnectorProviderAdapter implements ConnectorProv
 
   private applyManagedCluster(
     input: ConnectorCapabilityApplyInput,
-    action: Exclude<ManagedClusterCapabilityAction, "inspect">,
+    action: Exclude<ManagedClusterCapabilityAction, "inspect" | "readiness">,
   ): Result<ConnectorCapabilityApplyResult> {
     if (["place", "failover", "recover"].includes(action)) {
       const placement = parsePlacement(input.parameters ?? {}, action);
@@ -386,6 +418,7 @@ function managedClusterAction(capabilityKey: string): ManagedClusterCapabilityAc
   return [
     "provision",
     "inspect",
+    "readiness",
     "delete",
     "place",
     "failover",
@@ -501,6 +534,34 @@ function parsePlacement(
     attempt,
   });
   return decision.map((value) => value.toJSON());
+}
+
+function parseReplacementReadiness(
+  parameters: Record<string, unknown>,
+): Result<ManagedClusterReplacementReadinessSnapshot> {
+  if (
+    !parameters.targetPool ||
+    typeof parameters.targetPool !== "object" ||
+    Array.isArray(parameters.targetPool)
+  ) {
+    return err(domainError.validation("Managed cluster target pool is required"));
+  }
+  if (
+    !parameters.placementIntent ||
+    typeof parameters.placementIntent !== "object" ||
+    Array.isArray(parameters.placementIntent)
+  ) {
+    return err(domainError.validation("Managed cluster placement intent is required"));
+  }
+  const pool = ManagedClusterTargetPool.create(
+    parameters.targetPool as ManagedClusterTargetPoolSnapshot,
+  );
+  if (pool.isErr()) return err(pool.error);
+  const intent = ManagedClusterPlacementIntent.create(
+    parameters.placementIntent as ManagedClusterPlacementIntentSnapshot,
+  );
+  if (intent.isErr()) return err(intent.error);
+  return pool.value.checkReplacementReadiness(intent.value).map((value) => value.toJSON());
 }
 
 function managedPlanId(input: ConnectorCapabilityPlanInput, providerPlan: unknown): string {

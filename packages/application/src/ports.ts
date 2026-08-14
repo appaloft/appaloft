@@ -63,6 +63,7 @@ import {
   type ManagedClusterCapabilityPlanSnapshot,
   type ManagedClusterCapabilityReceiptSnapshot,
   type ManagedClusterPlacementDecisionSnapshot,
+  type ManagedClusterReplacementReadinessSnapshot,
   type NotificationMessageDeliverySnapshot,
   type NotificationMessageSnapshot,
   type PackagingMode,
@@ -10867,6 +10868,7 @@ export interface ConnectorCapabilityPlanPreview {
     managedClusterPlan?: ManagedClusterCapabilityPlanSnapshot;
     managedClusterReceipt?: ManagedClusterCapabilityReceiptSnapshot;
     managedClusterPlacement?: ManagedClusterPlacementDecisionSnapshot;
+    managedClusterReplacementReadiness?: ManagedClusterReplacementReadinessSnapshot;
     notificationMessage?: NotificationMessageSnapshot;
     sourceRepositoryAccess?: SourceRepositoryAccessSnapshot;
   };

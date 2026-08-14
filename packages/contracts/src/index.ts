@@ -7777,9 +7777,37 @@ export const managedClusterPlacementDecisionSchema = z.object({
   ),
 });
 
+export const managedClusterReplacementReadinessSchema = z.object({
+  poolId: z.string(),
+  workloadRef: z.string(),
+  currentTargetId: z.string(),
+  currentPlacementEpoch: z.number().int().nonnegative(),
+  status: z.enum(["ready", "blocked"]),
+  requiredCapabilities: z.array(z.string()),
+  requiredFailureDomainKinds: z.array(managedClusterFailureDomainKindSchema),
+  selectedTargetId: z.string().optional(),
+  selectedProviderKey: z.string().optional(),
+  selectedRegion: z.string().optional(),
+  selectedFailureDomains: z.array(managedClusterFailureDomainSchema).optional(),
+  selectedEstimatedMonthlyCostUsd: z.number().nonnegative().optional(),
+  selectedSupportLevel: managedClusterSupportLevelSchema.optional(),
+  eligibleReplacementTargetIds: z.array(z.string()),
+  totalEligibleReplacementCapacity: z.number().int().nonnegative(),
+  reasonCodes: z.array(z.string()),
+  consideredTargets: z.array(
+    z.object({
+      targetId: z.string(),
+      eligible: z.boolean(),
+      availableCapacity: z.number().int().nonnegative(),
+      reasons: z.array(z.string()),
+    }),
+  ),
+});
+
 export const managedClusterCapabilityActionSchema = z.enum([
   "provision",
   "inspect",
+  "readiness",
   "delete",
   "place",
   "failover",
@@ -7896,6 +7924,7 @@ export const connectorCapabilityPlanPreviewSchema = z.object({
       managedClusterPlan: managedClusterCapabilityPlanSchema.optional(),
       managedClusterReceipt: managedClusterCapabilityReceiptSchema.optional(),
       managedClusterPlacement: managedClusterPlacementDecisionSchema.optional(),
+      managedClusterReplacementReadiness: managedClusterReplacementReadinessSchema.optional(),
       notificationMessage: notificationMessageSchema.optional(),
       sourceRepositoryAccess: sourceRepositoryAccessSchema.optional(),
     })
@@ -8179,6 +8208,9 @@ export type ManagedClusterFailureDomain = z.infer<typeof managedClusterFailureDo
 export type ManagedClusterTargetPool = z.infer<typeof managedClusterTargetPoolSchema>;
 export type ManagedClusterPlacementIntent = z.infer<typeof managedClusterPlacementIntentSchema>;
 export type ManagedClusterPlacementDecision = z.infer<typeof managedClusterPlacementDecisionSchema>;
+export type ManagedClusterReplacementReadiness = z.infer<
+  typeof managedClusterReplacementReadinessSchema
+>;
 export type ManagedClusterCapabilityPlan = z.infer<typeof managedClusterCapabilityPlanSchema>;
 export type ManagedClusterCapabilityReceipt = z.infer<typeof managedClusterCapabilityReceiptSchema>;
 export type NotificationMessage = z.infer<typeof notificationMessageSchema>;

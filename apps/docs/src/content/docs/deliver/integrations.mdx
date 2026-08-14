@@ -106,11 +106,17 @@ appaloft dns plan <domain> --hostname <host> --target <target> --connector cloud
 
 DNS 类连接需要经过三层校验才能自动配置：公开 DNS 发现（不需要授权，只是根据域名推断可能的托管商）、Connector 授权（证明你能访问某个 Provider 账号）、Zone 归属匹配（授权账号里必须真的存在覆盖该域名的 Zone）。三层都满足后，Appaloft 才会生成并应用 DNS 变更计划；任何一层不满足都会 fail closed 并提示手动配置。
 
-托管 Kubernetes 与多集群容量也复用同一套 Connector 协议。具体 Connector 可以声明 `infrastructure.cluster.provision`、`inspect`、`delete`、`place`、`failover`、`recover` 和 `cleanup-orphans` 能力。公共合同只返回目标池、确定性的放置理由、placement epoch、fencing token、成本/支持级别和残留资源计数；Provider 凭证、计费、配额、租户策略和商业拓扑由组合该 Connector 的 Cloud/Enterprise 实现持有。
+托管 Kubernetes 与多集群容量也复用同一套 Connector 协议。具体 Connector 可以声明 `infrastructure.cluster.provision`、`inspect`、`readiness`、`delete`、`place`、`failover`、`recover` 和 `cleanup-orphans` 能力。公共合同只返回目标池、确定性的放置理由、placement epoch、fencing token、成本/支持级别和残留资源计数；Provider 凭证、计费、配额、租户策略和商业拓扑由组合该 Connector 的 Cloud/Enterprise 实现持有。
 
 创建、删除和故障转移属于外部基础设施变更：先运行 `connectors plan`，检查成本、支持和 cleanup 证据，再接受该精确 plan 并将返回的 `acceptedPlanId` 传给 `connectors apply`。应用参数若与已接受的 plan 不一致会在 Provider 副作用前失败；容量不足或 failover 次数超限也不会静默回退到其他拓扑。
 
-Cloud 组合提供托管集群 Connector 时，Web Console 的“账号设置 → 连接”会从 Connector 目录发现这些能力，并提供相同的 plan → 接受 → apply 流程。Web 只提交集群/工作负载引用、所需能力和放置意图；Provider 凭据、binding 与目标池不会进入表单。修改任何计划绑定输入都会立即废弃旧接受状态，apply 在新的精确计划被接受前保持禁用。计划和回读只显示成本、支持等级、选中区域/目标、placement epoch、状态和残留自有资源等安全字段。
+### 独立替代容量就绪检查 <a id="managed-cluster-replacement-readiness" />
+
+`infrastructure.cluster.readiness` 是只读的 `connectors plan` 能力。它针对精确的当前目标、placement epoch、工作负载策略与目标池快照，返回类型化的 `ready` 或 `blocked` 结果。结果包含可用候选、独立 failure domain、总可用容量、预计成本、支持等级和稳定原因码；当前目标缺失、共享/缺少 failure domain、容量为零、状态非 ready、缺少能力或被策略排除都属于可诊断的 `blocked` 数据，而不是传输错误。
+
+这个检查不需要接受计划，也没有 `connectors apply` 路径；它不会预留容量、增加 placement epoch、生成 fencing token 或更改集群、工作负载、Provider、路由和 DNS。结果只说明该不可变快照在检查时是否存在替代容量，真正的流量切换仍需重新检查新鲜状态、完成 fencing 并接受精确的切换计划。
+
+Cloud 组合提供托管集群 Connector 时，Web Console 的“账号设置 → 连接”会从 Connector 目录发现这些能力。变更能力提供 plan → 接受 → apply 流程；`readiness` 只提供 plan/readback。Web 只提交集群/工作负载引用、所需能力和放置意图；Provider 凭据、binding 与目标池不会进入表单。修改任何计划绑定输入都会立即废弃旧接受状态，apply 在新的精确计划被接受前保持禁用。计划和回读只显示成本、支持等级、选中区域/目标、placement epoch、状态、替代容量/原因和残留自有资源等安全字段。
 
 ## 常见误区
 

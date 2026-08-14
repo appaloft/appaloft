@@ -587,6 +587,7 @@ export const enUS = {
       managedClusterCurrentTarget: "Current target ID",
       managedClusterDescription:
         "Plan and manage hosted cluster capacity through the shared connector contract. Provider credentials and policy remain in the hosted control plane.",
+      managedClusterEligibleCapacity: "Eligible replacement capacity",
       managedClusterExcludedTargets: "Excluded target IDs (comma separated)",
       managedClusterFormInvalid: "Complete the required fields with valid non-negative numbers.",
       managedClusterName: "Cluster name",
@@ -596,6 +597,7 @@ export const enUS = {
       managedClusterPlanTitle: "Review plan",
       managedClusterPlanning: "Generating plan",
       managedClusterReadbackTitle: "Managed cluster readback",
+      managedClusterReadinessReasons: "Readiness reasons",
       managedClusterRef: "Cluster reference",
       managedClusterRegion: "Selected region",
       managedClusterRequiredCapabilities: "Required capabilities (comma separated)",
