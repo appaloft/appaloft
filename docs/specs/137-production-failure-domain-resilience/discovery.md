@@ -89,6 +89,24 @@ they do not authorize paid provider mutation or pull R6c traffic handoff into th
 | Q27. What closes the internal R6b2 gate? | Two explicit cells with different required domain keys complete provision/import, inspect, drain/delete and independent readiness in a deterministic dry-run/readback packet, including cost/support and zero Appaloft-owned residual evidence. | Fake or dry-run evidence can close internal contract/composition rows but not the real regional provider packet. |
 | Q28. What DigitalOcean work is allowed now? | Cloud may implement a DOKS-specific redacted planning/readback adapter and use read-only provider options/inventory. It must not create, resize or delete DOKS resources without a separately approved target, cost ceiling and cleanup packet. | R6b2 code can be complete while `RESIL-E2E-009` remains blocked on external approval. |
 
+## R6c Accepted Grill Decisions
+
+The owner asked for the complete R6c slice. The existing authorization to accept the recommended
+R6 decisions therefore applies to the internal provider-neutral contract and composed fixture
+packet below. It does not authorize paid load balancing, DNS changes or production traffic.
+
+| Question | Recommended and accepted decision | Consequence |
+| --- | --- | --- |
+| Q29. Which capabilities expose traffic continuity? | Reuse `connections.capability.plan -> accept -> apply` with `infrastructure.cluster.handoff-traffic` and `infrastructure.cluster.failback-traffic`; add plan-only `infrastructure.cluster.traffic-status` for observable provider readback. | No new first-class command, hidden route mutation endpoint or failover aggregate is added. |
+| Q30. What identity is exact-plan bound? | A safe route ref, workload ref, current and replacement endpoint refs/target ids, current and next placement epochs, the new fencing token, replacement-health proof and rollback endpoint are immutable plan inputs. | Provider bindings, credentials and raw load-balancer objects stay adapter-local. |
+| Q31. When is health evidence usable? | Replacement evidence is `healthy`, names the exact endpoint, has an observed time, an expiry time and a safe proof ref. Apply re-reads provider health and rejects expired, unhealthy or endpoint-mismatched evidence before fencing or route mutation. | A previously healthy plan cannot authorize a later blind cutover. |
+| Q32. How is split brain prevented? | Live route authority must still match the planned current endpoint and epoch; the placement decision must advance exactly one epoch and supply the fencing token. The previous actor is fenced before route authority moves. | Stale plans, epochs, tokens and endpoint drift have stable no-effect failures. |
+| Q33. What is the mutation order? | Re-read route and target health, fence the previous placement, move route authority, verify endpoint identity, then clean receipt-owned transient artifacts. | Provider adapters expose ordered ports; the domain contract owns the invariant, not provider-specific branches. |
+| Q34. What happens when a step fails? | Failure before route mutation preserves the observed old healthy route. Failure after route mutation triggers one exact rollback to the planned previous endpoint and verifies it. Receipt readback distinguishes `moved`, `preserved`, `rolled-back` and `manual-intervention` with the actual observed authority. | No success claim is made when rollback cannot be proven. |
+| Q35. How does failback work? | Failback is a new exact plan over the current live authority, fresh health and a later placement epoch/token. Old failover plans or receipts cannot be replayed. | Recovery flapping and silent reversal are excluded. |
+| Q36. What closes internal R6c? | Public core/contract/Web/fake tests and Cloud composed/provider-port tests prove happy handoff, explicit failback, stale/no-health no-effect, pre-move preservation, post-move rollback, status readback and zero receipt-owned residuals. | Internal evidence closes `RESIL-FENCE-005`, `RESIL-ROUTE-006` and the R6c portion of `RESIL-CLEAN-008`, not the real regional packet. |
+| Q37. What external work is allowed? | A Cloudflare-or-equivalent adapter may expose redacted deterministic plan/readback and a disabled apply path. | Paid LB, DNS and real traffic still require a separate exact target/cost/impact/cleanup approval. |
+
 ## Open Operational Questions
 
 These do not block the provider-neutral first Code slice, but they block the paid production packet:
@@ -96,6 +114,6 @@ These do not block the provider-neutral first Code slice, but they block the pai
 1. exact DOKS regions, worker sizes/counts and control-plane HA selection;
 2. Cloudflare Load Balancing plan and measured monthly/temporary test cost;
 3. production versus disposable acceptance environment and maximum allowed spend;
-4. traffic health threshold, failover/failback change window and rollback owner;
+4. exact production traffic health threshold, failover/failback change window and human rollback owner;
 5. RPO/RTO and eligible state backend for the stateful packet;
 6. cleanup policy for disposable resources or retention policy for accepted production cells.

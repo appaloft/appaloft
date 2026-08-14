@@ -42,6 +42,15 @@ placement engine.
 9. Imported cells retain their external provider resource when Appaloft management is deleted.
    Provider-owned provisioned cells may delete provider resources only when the accepted plan and
    receipt explicitly select that disposition. Provider-specific documents remain adapter-local.
+10. Managed traffic handoff reuses the connector exact plan/accept/apply boundary. The public
+    contract owns safe route/endpoint identity, bounded health proof, placement epoch/fencing,
+    outcome, rollback and receipt-owned cleanup evidence. Provider route objects and credentials
+    remain adapter-local; existing route/domain owners remain authoritative and no failover
+    aggregate or route table is added.
+11. Apply re-reads live route authority and replacement health, rejects drift before effect, fences
+    the previous placement before moving authority, verifies the new endpoint, and performs one
+    exact verified rollback after a post-move verification failure. Failback is a fresh accepted
+    plan with a later epoch/token. Unproven rollback is `manual-intervention`, never success.
 
 ## Consequences
 

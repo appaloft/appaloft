@@ -8,10 +8,10 @@
 | RESIL-READY-004 | core/contract/query/Web/Cloud integration | typed ready/blocked independent replacement capacity, deterministic safe evidence and no mutation/apply path | public #1110 / `def417be`; Cloud #908 / `db83448a`; target-pool, connector, contract, Web and composed credential/provider-spy tests | verified |
 | RESIL-CELL-010 | core/application/contract/Web | provision/import, safe inspect, drain-before-delete, imported-resource retention and exact accepted-plan binding | public #1113; core lifecycle, connector, contract and Web transport tests | verified |
 | RESIL-CELLS-011 | application/Cloud integration | two independently identified cells complete deterministic dry-run/readback, readiness, survivor preservation and zero Appaloft-owned residual | public #1113 fake two-cell packet; Cloud provider-plan/readback remains separately tracked | public verified |
-| RESIL-FENCE-005 | application/integration | stale epoch/token cannot move writer or route authority | accepted-plan/fencing tests | planned |
-| RESIL-ROUTE-006 | connector/e2e | replacement health then exact traffic handoff/rollback | route connector plus real endpoints | planned |
+| RESIL-FENCE-005 | core/application/integration | live route/current endpoint/epoch drift, stale token or expired/unhealthy replacement fails before fence/route effects; valid handoff fences before move | handoff value objects plus accepted-plan/provider-spy ordering tests | planned |
+| RESIL-ROUTE-006 | contract/connector/Web/Cloud integration | exact route/endpoints/health/epoch/token handoff, plan-only status readback and explicit fresh-plan failback | shared schemas, fake connector, Web form/readback and Cloud composed adapter tests | planned |
 | RESIL-STATE-007 | policy/e2e | local state blocked or verified durable-state evidence | workload eligibility and restore/failover packet | planned |
-| RESIL-CLEAN-008 | integration/e2e | receipt-owned rollback/cleanup, healthy owner preserved | failure injection and residual readback | planned |
+| RESIL-CLEAN-008 | integration/e2e | pre-move failure preserves old authority; post-move proof failure rolls back or reports manual intervention; receipt-owned transient cleanup is exact | fake/Cloud provider failure injection plus residual readback; real packet remains pending | planned |
 | RESIL-E2E-009 | real provider | independent regional failure/failover/recovery/cost/cleanup | separately authorized managed-provider packet | blocked on external approval |
 
 Automated or same-host evidence may close internal rows but cannot close `RESIL-E2E-009`.

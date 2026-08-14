@@ -24,6 +24,12 @@
    `inspect` is query-only and returns the same safe lifecycle snapshot used by receipts.
 8. Make origin and provider-resource disposition explicit so imported-cell deletion can unregister
    Appaloft capacity without destroying the external cluster.
+9. Add provider-neutral managed traffic route, endpoint, bounded health, handoff plan and handoff
+   receipt value objects. Route/provider state remains external readback; no new public aggregate,
+   repository, table or event is introduced.
+10. Extend the managed connector with exact-plan handoff/failback and plan-only status. Adapters
+    execute `re-read -> health -> fence -> move -> verify -> cleanup`, with one verified rollback
+    after a post-move verification failure.
 
 ## CQRS, Read Model And Event Impact
 
@@ -33,6 +39,8 @@
   plan/accept/apply operations.
 - Any durable route handoff state must remain with existing route/domain owners and accepted plan
   receipts, not a new failover aggregate.
+- `traffic-status` is query-shaped provider readback. Handoff/failback are synchronous accepted-plan
+  connector effects and do not introduce a second CommandBus operation or event stream.
 
 ## Test-First Order
 
@@ -45,6 +53,10 @@
    behavior, contracts, Web parameters and deterministic two-cell dry-run/readback.
 7. R6b2 Cloud composition and provider-specific redacted plan/readback, followed by the separately
    authorized regional managed-provider packet.
+8. R6c RED `RESIL-FENCE-005`, `RESIL-ROUTE-006` and `RESIL-CLEAN-008` at core/contract, fake
+   connector, Web parameter/readback and Cloud composed provider-port seams.
+9. R6c GREEN happy handoff/status/failback, stale/no-health no-effect, pre-move preservation,
+   post-move rollback and zero transient residual evidence.
 
 ## Risks
 
