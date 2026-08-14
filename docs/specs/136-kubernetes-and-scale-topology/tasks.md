@@ -29,9 +29,9 @@
   portion of `K8S-SURFACE-017`.
 - [x] Implement provider-neutral target-pool placement/failover/fencing and typed managed-cluster
   connector plan/apply/readback/delete contracts with exact accepted-plan binding.
-- [ ] Adopt the public protocol through Cloud/Enterprise custody, policy, entitlement and provider
+- [x] Adopt the public protocol through Cloud/Enterprise custody, policy, entitlement and provider
   adapters, including the managed-cluster Web surface.
-- [ ] Run authorized managed/design-partner isolation, failover, recovery, cost/support and cleanup packet.
+- [x] Run authorized managed/design-partner isolation, failover, recovery, cost/support and cleanup packet.
 
 ## Final Sync
 

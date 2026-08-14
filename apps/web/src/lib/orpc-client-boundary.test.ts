@@ -9,6 +9,8 @@ describe("browser ORPC client boundary", () => {
     );
 
     expect(contractSource).not.toContain('from "@appaloft/application"');
+    expect(contractSource).not.toContain('from "@appaloft/application/schemas"');
+    expect(contractSource).toContain('from "@appaloft/application/client-types"');
     expect(contractSource).toContain('from "@appaloft/contracts"');
   });
 });
