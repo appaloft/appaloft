@@ -11,7 +11,9 @@
 1. Add bounded failure-domain identity and required-separation intent to public managed topology.
 2. Make target-pool eligibility compare the current and candidate domain keys and return stable
    safe reasons/evidence.
-3. Add a read-only independent replacement readiness result over the same placement model.
+3. Add a read-only independent replacement readiness result over the same placement model. Expose
+   it through `connections.capability.plan` as `infrastructure.cluster.readiness`; blocked capacity
+   is typed evidence, while malformed input remains an error.
 4. Keep hosted inventory/policy in Cloud and pass only neutral candidate/intent snapshots inward.
 5. Reuse accepted connector plans for managed cell lifecycle and route handoff; keep provider SDKs
    in adapters.
@@ -33,7 +35,9 @@
 2. GREEN deterministic domain-aware placement and safe decision evidence.
 3. Contract/schema/adapter fixture parity.
 4. Cloud composed policy and persistence adoption.
-5. Disposable multi-host packet, then explicitly authorized regional managed-provider packet.
+5. R6b1 public readiness core/contract/application/Web plus Cloud composed no-effect adoption.
+6. R6b2 managed-cell lifecycle dry-run and disposable multi-host packet, then the explicitly
+   authorized regional managed-provider packet.
 
 ## Risks
 

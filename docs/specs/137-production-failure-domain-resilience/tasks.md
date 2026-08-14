@@ -3,18 +3,26 @@
 ## Governance
 
 - [x] Complete owner-authorized Grill and accept ADR-115, Spec 137, plan and Test Matrix.
-- [ ] Merge governance and create actor-visible public/Cloud tracking Tickets.
+- [x] Merge R6 governance and create actor-visible public/Cloud R6a tracking Tickets.
 
 ## R6a Failure-Domain Admission
 
 - [x] RED `RESIL-FD-001`–`RESIL-DECIDE-003` for validation, missing/shared-domain blockers and deterministic evidence.
 - [x] Implement public target/intent/decision failure-domain contracts and placement rules.
 - [x] Synchronize contracts, fake connector and all affected fixtures without compatibility inference.
-- [ ] Adopt through Cloud policy/readback/persistence and run public/private Boundary Review.
+- [x] Adopt through Cloud policy/readback/persistence and run public/private Boundary Review.
 
-## R6b–R6d
+## R6b1 Independent Replacement Readiness
 
-- [ ] Implement `RESIL-READY-004` independent replacement readiness.
+- [ ] Merge the R6b1 Grill/Spec/ADR/Test Matrix clarification and create public/Cloud `ready-for-agent` Tickets.
+- [ ] RED `RESIL-READY-004` at the public target-pool, connector plan, contract and Web seams.
+- [ ] Implement typed `ready`/`blocked` evidence and a plan-only `infrastructure.cluster.readiness` capability.
+- [ ] Adopt through Cloud tenant policy/inventory composition without provider or mutation effects.
+- [ ] Merge public first, update the Cloud pin, run full gates and independent Boundary Review.
+
+## R6b2–R6d
+
+- [ ] Implement managed-cell import/provision, inspect, drain/delete and exact capacity dry-run/readback.
 - [ ] Implement accepted-plan fenced traffic handoff `RESIL-FENCE-005`–`RESIL-ROUTE-006`.
 - [ ] Implement state eligibility and DR evidence `RESIL-STATE-007`.
 - [ ] Prove exact rollback/cleanup `RESIL-CLEAN-008`.
