@@ -15,6 +15,7 @@ import {
 } from "@appaloft/adapter-filesystem";
 import {
   createDefaultRuntimeTargetBackendRegistry,
+  createKubernetesRuntimeTargetBackend,
   DefaultRuntimePlanResolver,
   DirectOriginTlsCertificateObserver,
   DockerCertificateRouteActivator,
@@ -24,7 +25,7 @@ import {
   FileKubernetesConnectionResolver,
   InMemoryExecutionBackend,
   type KubernetesConnectionResolver,
-  KubernetesRuntimeTargetBackend,
+  type KubernetesHelmValuesResolver,
   KubernetesShellCommandRunner,
   KubernetesStorageBackupExecutor,
   LocalAgentTunnelProvider,
@@ -980,6 +981,7 @@ export interface RegisterRuntimeDependenciesInput {
   resourceAccessFailureRenderer?: () => ResourceAccessFailureRendererTarget | undefined;
   systemPlugins?: readonly SystemPluginDefinition[];
   kubernetesConnectionResolver?: KubernetesConnectionResolver;
+  kubernetesHelmValuesResolver?: KubernetesHelmValuesResolver;
 }
 
 export function registerRuntimeDependencies(
@@ -1926,13 +1928,21 @@ export function registerRuntimeDependencies(
               ),
             }
           : {}),
-        kubernetesBackend: new KubernetesRuntimeTargetBackend(
-          new KubernetesShellCommandRunner(),
-          input.kubernetesConnectionResolver ?? new FileKubernetesConnectionResolver(),
-          dependencyContainer.resolve(tokens.serverRepository),
-          dependencyContainer.resolve(tokens.dependencyResourceSecretStore),
-          dependencyContainer.resolve(tokens.controlPlaneSecretProtector),
-        ),
+        kubernetesBackend: createKubernetesRuntimeTargetBackend({
+          runner: new KubernetesShellCommandRunner(),
+          connectionResolver:
+            input.kubernetesConnectionResolver ?? new FileKubernetesConnectionResolver(),
+          serverRepository: dependencyContainer.resolve(tokens.serverRepository),
+          dependencyResourceSecretStore: dependencyContainer.resolve(
+            tokens.dependencyResourceSecretStore,
+          ),
+          controlPlaneSecretProtector: dependencyContainer.resolve(
+            tokens.controlPlaneSecretProtector,
+          ),
+          ...(input.kubernetesHelmValuesResolver
+            ? { helmValuesResolver: input.kubernetesHelmValuesResolver }
+            : {}),
+        }),
       }),
     ),
   });

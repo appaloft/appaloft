@@ -42,7 +42,9 @@ import {
   HelmShellCommandRunner,
   KubernetesHelmLifecycle,
   renderKubernetesHelmIntent,
+  type HelmCommandRunner,
   type KubernetesHelmIntent,
+  type KubernetesHelmValuesResolver,
 } from "./kubernetes-helm-lifecycle";
 import {
   renderKubernetesCanaryRouteManifest,
@@ -1891,4 +1893,40 @@ export class KubernetesRuntimeTargetBackend implements RuntimeTargetBackend {
     }
     return ok({ timeline });
   }
+}
+
+export interface CreateKubernetesRuntimeTargetBackendOptions {
+  runner: KubernetesCommandRunner;
+  connectionResolver: KubernetesConnectionResolver;
+  serverRepository?: ServerRepository;
+  dependencyResourceSecretStore?: DependencyResourceSecretStore;
+  controlPlaneSecretProtector?: ControlPlaneSecretProtector;
+  routingPolicyResolver?: KubernetesRoutingPolicyResolver;
+  rolloutClock?: KubernetesRolloutClock;
+  canaryRouteProbe?: KubernetesCanaryRouteProbe;
+  helmLifecycle?: KubernetesHelmLifecycle;
+  helmCommandRunner?: HelmCommandRunner;
+  helmValuesResolver?: KubernetesHelmValuesResolver;
+}
+
+export function createKubernetesRuntimeTargetBackend(
+  options: CreateKubernetesRuntimeTargetBackendOptions,
+): KubernetesRuntimeTargetBackend {
+  const helmLifecycle =
+    options.helmLifecycle ??
+    new KubernetesHelmLifecycle(
+      options.helmCommandRunner ?? new HelmShellCommandRunner(),
+      options.helmValuesResolver ?? new FileKubernetesHelmValuesResolver(),
+    );
+  return new KubernetesRuntimeTargetBackend(
+    options.runner,
+    options.connectionResolver,
+    options.serverRepository,
+    options.dependencyResourceSecretStore,
+    options.controlPlaneSecretProtector,
+    options.routingPolicyResolver,
+    options.rolloutClock,
+    options.canaryRouteProbe,
+    helmLifecycle,
+  );
 }

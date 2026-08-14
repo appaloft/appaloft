@@ -14,7 +14,7 @@
 | SCALE-CONVERGE-010 | adapter/e2e | desired/current/ready and metric decision convergence | Kubernetes adapter tests plus real metrics-server/HPA packet | passed |
 | ROLLOUT-PROFILE-011 | domain/adapter/e2e | recreate/rolling/canary gates and rollback | staged route/readback/proof tests plus real weighted-traffic packet | passed |
 | K8S-COMPOSE-012 | adapter/e2e | service graph/private network/dependency translation | Kubernetes intent service-graph translation tests | passed |
-| K8S-HELM-013 | adapter/e2e | chart plan/diff/apply/upgrade/rollback/cleanup/secret safety | typed source/persistence/contracts, lifecycle/backend tests and real Helm packet | passed |
+| K8S-HELM-013 | adapter/e2e | chart plan/diff/apply/upgrade/rollback/cleanup/secret safety | typed source/persistence/contracts, credential-aware server composition, lifecycle/backend tests and real Helm packet | passed |
 | K8S-STATEFUL-014 | adapter/e2e | PVC/data/backup/independent restore/cleanup | stable storage-scope intent, backup/restore tests and real PVC packet | passed |
 | K8S-MULTI-015 | application/e2e | deterministic placement/failover/no silent fallback/orphans | planned | planned |
 | K8S-MANAGED-016 | connector/Cloud e2e | managed provisioning composition and custody | planned | planned |
@@ -56,3 +56,7 @@ same packet installed and upgraded a typed local Helm chart, forced a bounded fa
 verified atomic rollback by redacted manifest digest and live v2 data, then used foreground
 uninstall and independently confirmed zero Appaloft-owned residual resources. The packet passed 56
 assertions. Its namespaces, PVCs, cluster, network, volume and isolated kubeconfig were deleted.
+The server composition also forwards an injected `KubernetesHelmValuesResolver` through an
+options-based backend factory while retaining file references as the Community default. Regression
+coverage proves opaque values references reach the injected resolver and only materialized file
+paths reach Helm argv.
