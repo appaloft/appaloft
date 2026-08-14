@@ -688,8 +688,11 @@ R5 Kubernetes and Scale Topology is complete under ADR-023, ADR-114 and Spec 136
 provider responses remain adapter-owned. R6 Production Failure-Domain Resilience is governed by
 ADR-115 and Spec 137. Its first slice extends the existing managed target-pool decision capability
 with neutral failure-domain admission and safe readback; it does not add a public command, a new
-aggregate, or a Cloud-only placement engine. Later traffic handoff continues to use existing route
-owners and connector plan/accept/apply boundaries.
+aggregate, or a Cloud-only placement engine. R6c traffic handoff continues to use existing route
+owners and the connector `plan -> accept -> apply` boundary through
+`infrastructure.cluster.handoff-traffic` and `infrastructure.cluster.failback-traffic`;
+`infrastructure.cluster.traffic-status` is read-only provider readback. These are connector
+capabilities, not new first-class commands.
 
 `CORE_OPERATIONS.md` remains the authoritative active operation list. This map adds relationship and
 gating semantics and must be kept in sync whenever a behavior changes state.

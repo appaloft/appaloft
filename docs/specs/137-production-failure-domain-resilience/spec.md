@@ -34,10 +34,10 @@ itself claim Appaloft control-plane high availability or cross-provider outage t
 | RESIL-READY-004 | independent replacement readiness | a pool, current placement and workload policy exist | `infrastructure.cluster.readiness` is planned | valid input returns typed `ready` or `blocked` evidence over the exact snapshot; it exposes deterministic candidate/capacity/cost/support reasons without cluster, workload, provider, route or DNS mutation, capacity reservation, a next epoch or a fencing token. |
 | RESIL-CELL-010 | managed capacity-cell lifecycle | an operator has an entitled target pool and an exact provider-neutral cell plan | the cell is provisioned or imported, inspected, drained and deleted | the accepted-plan-bound lifecycle returns safe origin/status/topology/capacity/cost/support/disposition receipts; drain blocks new placement, delete requires zero active placements, and imported provider resources are retained. |
 | RESIL-CELLS-011 | exact two-cell dry-run | two explicit cells declare different required failure-domain keys | the lifecycle and readiness packet runs | both cells have deterministic plan/readback, one is independently replacement-ready, drain/delete preserves the surviving cell, and zero Appaloft-owned residual evidence is returned without paid provider mutation. |
-| RESIL-FENCE-005 | one writer/route owner | replacement is ready | traffic handoff is accepted | previous placement is fenced before route authority moves; stale epochs/tokens cannot mutate. |
-| RESIL-ROUTE-006 | explicit traffic handoff | two endpoints have health evidence | handoff runs | accepted plan binds exact endpoints/policy, verifies replacement, moves traffic and returns rollback/failback evidence. |
+| RESIL-FENCE-005 | one writer/route owner | replacement is ready and the live route still names the planned current endpoint/epoch | traffic handoff is applied | fresh health is re-read, the previous placement is fenced before route authority moves, and stale route identity/epochs/tokens fail before provider effects. |
+| RESIL-ROUTE-006 | explicit traffic handoff | two endpoints have bounded health evidence | handoff or failback runs | the accepted plan binds exact route/workload/endpoints/epochs/token/proof, verifies replacement, moves and re-verifies route authority, and a plan-only status query returns the observed authority. Failback requires a new accepted plan. |
 | RESIL-STATE-007 | state safety | workload uses local or external durable state | failover is planned | unsupported local state fails closed; supported state declares evidence refs and bounded RPO/RTO. |
-| RESIL-CLEAN-008 | exact rollback and cleanup | failover succeeds or aborts | cleanup runs | only receipt-owned candidate/route artifacts are removed and the healthy owner remains. |
+| RESIL-CLEAN-008 | exact rollback and cleanup | failover succeeds or aborts | cleanup runs | pre-move failure preserves the old healthy route; post-move verification failure performs one exact rollback and verifies actual authority; only receipt-owned transient route artifacts are removed. Unproven rollback is reported as manual intervention, never success. |
 | RESIL-E2E-009 | real independent-domain packet | two authorized regional managed cells exist | failure/failover/recovery/cleanup runs | workload identity, traffic continuity, fencing, cost/support and independent residual readback pass. |
 
 ## Public Surface
@@ -52,6 +52,13 @@ itself claim Appaloft control-plane high availability or cross-provider outage t
   provider-resource disposition evidence.
 - Reuse `connections.capability.plan` for `infrastructure.cluster.readiness`; this capability is
   plan-only, returns safe typed replacement-capacity evidence and has no apply path.
+- Add exact-plan mutations `infrastructure.cluster.handoff-traffic` and
+  `infrastructure.cluster.failback-traffic`, plus plan-only
+  `infrastructure.cluster.traffic-status`. Their provider-neutral contracts expose safe endpoint,
+  health, fencing, route-authority, rollback and cleanup evidence without raw provider objects.
+- A traffic apply must re-read live route authority and replacement health. It may move authority
+  only after fencing the previous placement. Apply returns `moved`, `preserved`, `rolled-back` or
+  `manual-intervention` evidence; failback always uses a fresh plan, epoch and fencing token.
 - Keep `deployments.create` ids-only and reuse existing logs, health, proof, route and recovery
   contracts.
 - Surface safe topology/readiness evidence through shared contracts consumed by CLI/API/SDK/Web/MCP.
