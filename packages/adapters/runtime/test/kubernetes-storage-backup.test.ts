@@ -1,8 +1,9 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { createExecutionContext } from "@appaloft/application";
 import { ok, type Result } from "@appaloft/core";
 
@@ -107,33 +108,37 @@ describe("Kubernetes storage backup executor", () => {
     const executor = new KubernetesStorageBackupExecutor(runner, {
       resolve: async () => ok({ kubeconfigPath: "/private/tmp/kubeconfig" }),
     });
-    const artifactHandle = "/private/tmp/appaloft-backups/storage-volume/stv_data/svb_demo.tar.gz";
-    mkdirSync(dirname(artifactHandle), { recursive: true });
-    writeFileSync(artifactHandle, "stateful-data");
-    const result = await executor.restoreLocalBackup({
-      context,
-      backupId: "svb_demo",
-      restoreAttemptId: "sra_demo",
-      requestedAt: "2026-08-13T00:00:00.000Z",
-      artifactHandle,
-      targetStorageVolumeId: "stv_restored",
-      sourceStorageVolumeId: "stv_data",
-      resourceId: "res_app",
-      runtimeTarget: target,
-    });
+    const fixtureDirectory = mkdtempSync(join(tmpdir(), "appaloft-k8s-storage-restore-test-"));
+    try {
+      const artifactHandle = join(fixtureDirectory, "svb_demo.tar.gz");
+      writeFileSync(artifactHandle, "stateful-data");
+      const result = await executor.restoreLocalBackup({
+        context,
+        backupId: "svb_demo",
+        restoreAttemptId: "sra_demo",
+        requestedAt: "2026-08-13T00:00:00.000Z",
+        artifactHandle,
+        targetStorageVolumeId: "stv_restored",
+        sourceStorageVolumeId: "stv_data",
+        resourceId: "res_app",
+        runtimeTarget: target,
+      });
 
-    expect(result.isOk()).toBe(true);
-    const manifestCall = runner.calls.find((call) => call.step === "apply-restore-helper");
-    expect(manifestCall?.stdin).toContain('"kind":"PersistentVolumeClaim"');
-    expect(manifestCall?.stdin).toContain('"appaloft.io/storage-volume-id":"stv-restored"');
-    expect(runner.calls.map((call) => call.step)).toEqual([
-      "discover-source-pvc",
-      "apply-restore-helper",
-      "wait-restore-helper",
-      "copy-restore-artifact",
-      "extract-restore-artifact",
-      "delete-restore-helper",
-    ]);
-    expect(runner.calls.at(-1)?.args.join(" ")).not.toContain("persistentvolumeclaim");
+      expect(result.isOk()).toBe(true);
+      const manifestCall = runner.calls.find((call) => call.step === "apply-restore-helper");
+      expect(manifestCall?.stdin).toContain('"kind":"PersistentVolumeClaim"');
+      expect(manifestCall?.stdin).toContain('"appaloft.io/storage-volume-id":"stv-restored"');
+      expect(runner.calls.map((call) => call.step)).toEqual([
+        "discover-source-pvc",
+        "apply-restore-helper",
+        "wait-restore-helper",
+        "copy-restore-artifact",
+        "extract-restore-artifact",
+        "delete-restore-helper",
+      ]);
+      expect(runner.calls.at(-1)?.args.join(" ")).not.toContain("persistentvolumeclaim");
+    } finally {
+      rmSync(fixtureDirectory, { recursive: true, force: true });
+    }
   });
 });
