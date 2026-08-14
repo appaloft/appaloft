@@ -22,8 +22,10 @@ function managedConnectorDefinition() {
     providerKey: "provider-a",
     capabilities: [
       "infrastructure.cluster.provision",
+      "infrastructure.cluster.import",
       "infrastructure.cluster.inspect",
       "infrastructure.cluster.readiness",
+      "infrastructure.cluster.drain",
       "infrastructure.cluster.delete",
       "infrastructure.cluster.place",
       "infrastructure.cluster.failover",
@@ -70,6 +72,203 @@ async function acceptedPlan(input: {
 }
 
 describe("managed cluster connector protocol", () => {
+  test("[RESIL-CELL-010][RESIL-CELLS-011] runs an exact two-cell lifecycle and retains imported infrastructure", async () => {
+    const registry = new InMemoryConnectorRegistry([managedConnectorDefinition()]);
+    const adapter = new FakeInfrastructureConnectorProviderAdapter({
+      connectorKey: "managed-kubernetes",
+      providerKey: "provider-a",
+      providerTitle: "Managed Kubernetes",
+    });
+    const adapters = new InMemoryConnectorProviderAdapterRegistry([adapter]);
+    const acceptedStore = new InMemoryAcceptedConnectionCapabilityPlanStore();
+    const planService = new PlanConnectorCapabilityQueryService(registry, adapters);
+    const applyService = new ApplyConnectorCapabilityUseCase(registry, adapters, acceptedStore);
+    const context = createExecutionContext({ entrypoint: "system" });
+
+    const provisionParameters = {
+      clusterName: "regional-a",
+      targetId: "target_regional_a",
+      targetPoolId: "pool_production",
+      region: "nyc3",
+      clusterClass: "standard-3",
+      failureDomains: [
+        { kind: "provider", key: "provider-a" },
+        { kind: "region", key: "provider-a:nyc3" },
+      ],
+      availableCapacity: 3,
+      activePlacementCount: 0,
+      estimatedMonthlyCostUsd: 72,
+      supportLevel: "standard",
+      requiredCapabilities: ["kubernetes"],
+    };
+    const provisionPlan = (
+      await planService.execute(context, {
+        connectorKey: "managed-kubernetes",
+        capabilityKey: "infrastructure.cluster.provision",
+        ownerRef,
+        parameters: provisionParameters,
+      })
+    )._unsafeUnwrap();
+    const acceptedProvision = await acceptedPlan({ store: acceptedStore, plan: provisionPlan });
+    const provisioned = (
+      await applyService.execute(context, {
+        connectorKey: "managed-kubernetes",
+        capabilityKey: "infrastructure.cluster.provision",
+        ownerRef,
+        acceptedPlanId: acceptedProvision.acceptedPlanId,
+        parameters: provisionParameters,
+      })
+    )._unsafeUnwrap();
+    const provisionedRef = provisioned.providerResult?.managedClusterReceipt?.clusterRef;
+
+    const importParameters = {
+      clusterRef: "cluster:customer-regional-b",
+      clusterName: "regional-b",
+      targetId: "target_regional_b",
+      targetPoolId: "pool_production",
+      region: "sfo3",
+      failureDomains: [
+        { kind: "provider", key: "provider-a" },
+        { kind: "region", key: "provider-a:sfo3" },
+      ],
+      availableCapacity: 2,
+      activePlacementCount: 0,
+      estimatedMonthlyCostUsd: 48,
+      supportLevel: "community",
+      requiredCapabilities: ["kubernetes"],
+    };
+    const importPlan = (
+      await planService.execute(context, {
+        connectorKey: "managed-kubernetes",
+        capabilityKey: "infrastructure.cluster.import",
+        ownerRef,
+        parameters: importParameters,
+      })
+    )._unsafeUnwrap();
+    const acceptedImport = await acceptedPlan({ store: acceptedStore, plan: importPlan });
+    const imported = (
+      await applyService.execute(context, {
+        connectorKey: "managed-kubernetes",
+        capabilityKey: "infrastructure.cluster.import",
+        ownerRef,
+        acceptedPlanId: acceptedImport.acceptedPlanId,
+        parameters: importParameters,
+      })
+    )._unsafeUnwrap();
+
+    expect(provisioned.providerResult?.managedClusterReceipt).toMatchObject({
+      capacityCell: {
+        origin: "provisioned",
+        lifecycleStatus: "accepting",
+        providerResourceDisposition: "delete",
+        targetId: "target_regional_a",
+        availableCapacity: 3,
+      },
+    });
+    expect(imported.providerResult?.managedClusterReceipt).toMatchObject({
+      clusterRef: "cluster:customer-regional-b",
+      capacityCell: {
+        origin: "imported",
+        lifecycleStatus: "accepting",
+        providerResourceDisposition: "retain",
+        targetId: "target_regional_b",
+        availableCapacity: 2,
+      },
+    });
+    expect(JSON.stringify(imported)).not.toContain("credential");
+    expect(JSON.stringify(imported)).not.toContain("providerBinding");
+
+    const prematureDelete = await planService.execute(context, {
+      connectorKey: "managed-kubernetes",
+      capabilityKey: "infrastructure.cluster.delete",
+      ownerRef,
+      parameters: { clusterRef: "cluster:customer-regional-b" },
+    });
+    expect(prematureDelete.isErr()).toBe(true);
+    expect(prematureDelete._unsafeUnwrapErr().code).toBe("conflict");
+
+    const drainPlan = (
+      await planService.execute(context, {
+        connectorKey: "managed-kubernetes",
+        capabilityKey: "infrastructure.cluster.drain",
+        ownerRef,
+        parameters: { clusterRef: "cluster:customer-regional-b" },
+      })
+    )._unsafeUnwrap();
+    const acceptedDrain = await acceptedPlan({ store: acceptedStore, plan: drainPlan });
+    const driftedDrain = await applyService.execute(context, {
+      connectorKey: "managed-kubernetes",
+      capabilityKey: "infrastructure.cluster.drain",
+      ownerRef,
+      acceptedPlanId: acceptedDrain.acceptedPlanId,
+      parameters: { clusterRef: provisionedRef },
+    });
+    expect(driftedDrain.isErr()).toBe(true);
+    expect(driftedDrain._unsafeUnwrapErr().code).toBe("conflict");
+
+    const drained = (
+      await applyService.execute(context, {
+        connectorKey: "managed-kubernetes",
+        capabilityKey: "infrastructure.cluster.drain",
+        ownerRef,
+        acceptedPlanId: acceptedDrain.acceptedPlanId,
+        parameters: { clusterRef: "cluster:customer-regional-b" },
+      })
+    )._unsafeUnwrap();
+    expect(drained.providerResult?.managedClusterReceipt).toMatchObject({
+      action: "drain",
+      capacityCell: {
+        lifecycleStatus: "drained",
+        availableCapacity: 0,
+        activePlacementCount: 0,
+      },
+    });
+
+    const deletePlan = (
+      await planService.execute(context, {
+        connectorKey: "managed-kubernetes",
+        capabilityKey: "infrastructure.cluster.delete",
+        ownerRef,
+        parameters: { clusterRef: "cluster:customer-regional-b" },
+      })
+    )._unsafeUnwrap();
+    const acceptedDelete = await acceptedPlan({ store: acceptedStore, plan: deletePlan });
+    const deleted = (
+      await applyService.execute(context, {
+        connectorKey: "managed-kubernetes",
+        capabilityKey: "infrastructure.cluster.delete",
+        ownerRef,
+        acceptedPlanId: acceptedDelete.acceptedPlanId,
+        parameters: { clusterRef: "cluster:customer-regional-b" },
+      })
+    )._unsafeUnwrap();
+    expect(deleted.providerResult?.managedClusterReceipt).toMatchObject({
+      action: "delete",
+      capacityCell: {
+        origin: "imported",
+        lifecycleStatus: "deleted",
+        providerResourceDisposition: "retain",
+      },
+      cleanup: { residualOwnedResources: 0, orphanResourceRefs: [] },
+    });
+
+    const survivor = (
+      await planService.execute(context, {
+        connectorKey: "managed-kubernetes",
+        capabilityKey: "infrastructure.cluster.inspect",
+        ownerRef,
+        parameters: { clusterRef: provisionedRef },
+      })
+    )._unsafeUnwrap();
+    expect(survivor.providerPlan?.managedClusterReceipt).toMatchObject({
+      capacityCell: {
+        targetId: "target_regional_a",
+        lifecycleStatus: "accepting",
+        availableCapacity: 3,
+      },
+    });
+  });
+
   test("[K8S-MANAGED-016] fails before provider effects when acceptance is missing or parameters drift", async () => {
     const registry = new InMemoryConnectorRegistry([managedConnectorDefinition()]);
     const adapter = new FakeInfrastructureConnectorProviderAdapter({
@@ -84,9 +283,16 @@ describe("managed cluster connector protocol", () => {
     const context = createExecutionContext({ entrypoint: "system" });
     const parameters = {
       clusterName: "appaloft-prod",
+      targetId: "target_appaloft_prod",
       region: "ewr",
+      failureDomains: [
+        { kind: "provider", key: "provider-a" },
+        { kind: "region", key: "provider-a:ewr" },
+      ],
       clusterClass: "standard-3",
       targetPoolId: "pool_prod",
+      availableCapacity: 3,
+      activePlacementCount: 0,
       estimatedMonthlyCostUsd: 180,
       supportLevel: "premium",
       requiredCapabilities: ["kubernetes"],
@@ -141,9 +347,16 @@ describe("managed cluster connector protocol", () => {
         ownerRef,
         parameters: {
           clusterName: "appaloft-prod",
+          targetId: "target_appaloft_prod",
           region: "ewr",
+          failureDomains: [
+            { kind: "provider", key: "provider-a" },
+            { kind: "region", key: "provider-a:ewr" },
+          ],
           clusterClass: "standard-3",
           targetPoolId: "pool_prod",
+          availableCapacity: 3,
+          activePlacementCount: 0,
           estimatedMonthlyCostUsd: 180,
           supportLevel: "premium",
           requiredCapabilities: ["kubernetes", "stateful", "helm"],
@@ -257,6 +470,29 @@ describe("managed cluster connector protocol", () => {
           cleanup: { residualOwnedResources: 0, orphanResourceRefs: [] },
         },
       },
+    });
+
+    const drainPlan = (
+      await planService.execute(context, {
+        connectorKey: "managed-kubernetes",
+        capabilityKey: "infrastructure.cluster.drain",
+        ownerRef,
+        parameters: { clusterRef },
+      })
+    )._unsafeUnwrap();
+    const acceptedDrain = await acceptedPlan({ store: acceptedStore, plan: drainPlan });
+    const drained = (
+      await applyService.execute(context, {
+        connectorKey: "managed-kubernetes",
+        capabilityKey: "infrastructure.cluster.drain",
+        ownerRef,
+        acceptedPlanId: acceptedDrain.acceptedPlanId,
+        parameters: { clusterRef },
+      })
+    )._unsafeUnwrap();
+    expect(drained.providerResult?.managedClusterReceipt?.capacityCell).toMatchObject({
+      lifecycleStatus: "drained",
+      availableCapacity: 0,
     });
 
     const deletePlan = (

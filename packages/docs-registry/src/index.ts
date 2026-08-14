@@ -961,6 +961,38 @@ export const publicDocsHelpTopics = {
       "docs/testing/production-failure-domain-resilience-test-matrix.md",
     ],
   },
+  "integration.managed-capacity-cell-lifecycle": {
+    id: "integration.managed-capacity-cell-lifecycle",
+    title: "Managed capacity-cell lifecycle",
+    description:
+      "How to provision or import, safely inspect, drain, and delete one managed capacity cell with explicit external-resource retention.",
+    page: {
+      "zh-CN": "deliver/integrations",
+      "en-US": "en/deliver/integrations",
+    },
+    anchor: "managed-capacity-cell-lifecycle",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "connections.capability.plan",
+    aliases: [
+      "managed capacity cell",
+      "infrastructure.cluster.import",
+      "infrastructure.cluster.drain",
+      "drain before delete",
+      "imported cluster retention",
+      "托管容量 Cell",
+      "集群排空",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-115-managed-capacity-failure-domain-boundary.md",
+      "docs/specs/137-production-failure-domain-resilience/spec.md",
+      "docs/testing/production-failure-domain-resilience-test-matrix.md",
+    ],
+    webSurfaces: ["Account settings → Connections → Managed Kubernetes"],
+  },
   "agent.deploy-skill": {
     id: "agent.deploy-skill",
     title: "Agent deploy skill",

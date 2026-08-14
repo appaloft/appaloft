@@ -66,14 +66,17 @@
     implementedCapabilities.find((capability) => capability.key === capabilityKey) ?? null,
   );
   const isProvision = $derived(capabilityKey === "infrastructure.cluster.provision");
+  const isImport = $derived(capabilityKey === "infrastructure.cluster.import");
+  const isCellCreation = $derived(isProvision || isImport);
   const isReferenceAction = $derived(
     [
       "infrastructure.cluster.inspect",
+      "infrastructure.cluster.drain",
       "infrastructure.cluster.delete",
       "infrastructure.cluster.cleanup-orphans",
     ].includes(capabilityKey),
   );
-  const isPlacementAction = $derived(!isProvision && !isReferenceAction);
+  const isPlacementAction = $derived(!isCellCreation && !isReferenceAction);
   const isReadiness = $derived(capabilityKey === "infrastructure.cluster.readiness");
   const isMutation = $derived(
     capabilityKey !== "infrastructure.cluster.inspect" && !isReadiness,
@@ -102,6 +105,7 @@
     applyResult?.providerResult?.managedClusterReceipt ?? null,
   );
   const visibleReceipt = $derived(applyReceipt ?? planReceipt);
+  const visibleCell = $derived(visibleReceipt?.capacityCell ?? managedPlan?.capacityCell ?? null);
   const visiblePlacement = $derived(applyReceipt?.placement ?? planPlacement);
 
   $effect(() => {
@@ -226,8 +230,14 @@
     </Select.Root>
   </label>
 
-  {#if isProvision}
+  {#if isCellCreation}
     <div class="grid gap-4 md:grid-cols-2">
+      {#if isImport}
+        <label class="space-y-1.5 text-sm font-medium md:col-span-2">
+          <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedClusterRef)}</span>
+          <Input bind:value={clusterRef} placeholder="cluster_..." />
+        </label>
+      {/if}
       <label class="space-y-1.5 text-sm font-medium">
         <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedClusterName)}</span>
         <Input bind:value={clusterName} placeholder="appaloft-prod" />
@@ -269,7 +279,7 @@
     </div>
   {/if}
 
-  {#if isProvision || isPlacementAction}
+  {#if isCellCreation || isPlacementAction}
     <label class="block space-y-1.5 text-sm font-medium">
       <span class="console-field-label">{$t(i18nKeys.console.accountSettings.managedClusterRequiredCapabilities)}</span>
       <Input bind:value={requiredCapabilities} placeholder="kubernetes, helm" />
@@ -338,6 +348,13 @@
           <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterRef)}</dt><dd class="break-all font-medium">{visibleReceipt.clusterRef}</dd></div>
           <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterSupport)}</dt><dd class="font-medium">{visibleReceipt.support.level}</dd></div>
           <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterResidualResources)}</dt><dd class="font-medium">{visibleReceipt.cleanup.residualOwnedResources}</dd></div>
+        {/if}
+        {#if visibleCell}
+          <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterOrigin)}</dt><dd class="font-medium">{visibleCell.origin}</dd></div>
+          <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterLifecycle)}</dt><dd class="font-medium">{visibleCell.lifecycleStatus}</dd></div>
+          <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterProviderDisposition)}</dt><dd class="font-medium">{visibleCell.providerResourceDisposition}</dd></div>
+          <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterAvailableCapacity)}</dt><dd class="font-medium">{visibleCell.availableCapacity}</dd></div>
+          <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterActivePlacements)}</dt><dd class="font-medium">{visibleCell.activePlacementCount}</dd></div>
         {/if}
         {#if visiblePlacement}
           <div><dt class="text-muted-foreground">{$t(i18nKeys.console.accountSettings.managedClusterSelectedTarget)}</dt><dd class="break-all font-medium">{visiblePlacement.selectedTargetId}</dd></div>

@@ -1,5 +1,6 @@
 import { domainError } from "../shared/errors";
 import { err, ok, type Result } from "../shared/result";
+import { ManagedCapacityCell, type ManagedCapacityCellSnapshot } from "./managed-capacity-cell";
 import {
   type ManagedClusterPlacementDecisionSnapshot,
   type ManagedClusterSupportLevel,
@@ -7,8 +8,10 @@ import {
 
 export type ManagedClusterCapabilityAction =
   | "provision"
+  | "import"
   | "inspect"
   | "readiness"
+  | "drain"
   | "delete"
   | "place"
   | "failover"
@@ -35,6 +38,7 @@ export interface ManagedClusterCapabilityPlanSnapshot {
   supportLevel: ManagedClusterSupportLevel;
   cleanupSupported: boolean;
   requiredCapabilities: string[];
+  capacityCell?: ManagedCapacityCellSnapshot;
   placement?: ManagedClusterPlacementDecisionSnapshot;
 }
 
@@ -62,6 +66,7 @@ export interface ManagedClusterCapabilityReceiptSnapshot {
     residualOwnedResources: number;
     orphanResourceRefs: string[];
   };
+  capacityCell?: ManagedCapacityCellSnapshot;
   placement?: ManagedClusterPlacementDecisionSnapshot;
 }
 
@@ -89,8 +94,10 @@ function uniqueTextList(values: readonly string[], label: string): Result<string
 function validAction(value: string): value is ManagedClusterCapabilityAction {
   return [
     "provision",
+    "import",
     "inspect",
     "readiness",
+    "drain",
     "delete",
     "place",
     "failover",
@@ -156,6 +163,38 @@ export class ManagedClusterCapabilityPlan {
       "Managed cluster required capabilities",
     );
     if (requiredCapabilities.isErr()) return err(requiredCapabilities.error);
+    const capacityCell = input.capacityCell
+      ? ManagedCapacityCell.create(input.capacityCell)
+      : undefined;
+    if (capacityCell?.isErr()) return err(capacityCell.error);
+    if (["provision", "import", "drain", "delete"].includes(input.action) && !capacityCell) {
+      return err(
+        domainError.validation(`Managed cluster ${input.action} requires a capacity cell snapshot`),
+      );
+    }
+    if (capacityCell?.isOk()) {
+      const cell = capacityCell.value.toJSON();
+      if (cell.providerKey !== providerKey.value) {
+        return err(domainError.conflict("Managed cluster plan provider does not match its cell"));
+      }
+      if (clusterRef.value && cell.clusterRef !== clusterRef.value) {
+        return err(domainError.conflict("Managed cluster plan ref does not match its cell"));
+      }
+      if (input.action === "provision" && cell.origin !== "provisioned") {
+        return err(domainError.conflict("Managed cluster provision requires a provisioned cell"));
+      }
+      if (input.action === "import" && cell.origin !== "imported") {
+        return err(domainError.conflict("Managed cluster import requires an imported cell"));
+      }
+      if (input.action === "delete" && cell.lifecycleStatus !== "drained") {
+        return err(
+          domainError.conflict("Managed cluster delete requires a drained capacity cell", {
+            targetId: cell.targetId,
+            lifecycleStatus: cell.lifecycleStatus,
+          }),
+        );
+      }
+    }
 
     return ok(
       new ManagedClusterCapabilityPlan({
@@ -173,6 +212,7 @@ export class ManagedClusterCapabilityPlan {
         supportLevel: input.supportLevel,
         cleanupSupported: input.cleanupSupported,
         requiredCapabilities: requiredCapabilities.value,
+        ...(capacityCell?.isOk() ? { capacityCell: capacityCell.value.toJSON() } : {}),
         ...(input.placement ? { placement: input.placement } : {}),
       }),
     );
@@ -182,6 +222,9 @@ export class ManagedClusterCapabilityPlan {
     return {
       ...this.snapshot,
       requiredCapabilities: [...this.snapshot.requiredCapabilities],
+      ...(this.snapshot.capacityCell
+        ? { capacityCell: cloneCapacityCell(this.snapshot.capacityCell) }
+        : {}),
       ...(this.snapshot.placement ? { placement: clonePlacement(this.snapshot.placement) } : {}),
     };
   }
@@ -242,6 +285,30 @@ export class ManagedClusterCapabilityReceipt {
         domainError.conflict("Deleted managed cluster receipt must prove zero residual resources"),
       );
     }
+    const capacityCell = input.capacityCell
+      ? ManagedCapacityCell.create(input.capacityCell)
+      : undefined;
+    if (capacityCell?.isErr()) return err(capacityCell.error);
+    if (["provision", "import", "drain", "delete"].includes(input.action) && !capacityCell) {
+      return err(
+        domainError.validation(
+          `Managed cluster ${input.action} receipt requires a capacity cell snapshot`,
+        ),
+      );
+    }
+    if (capacityCell?.isOk()) {
+      const cell = capacityCell.value.toJSON();
+      if (cell.clusterRef !== clusterRef.value || cell.providerKey !== providerKey.value) {
+        return err(
+          domainError.conflict("Managed cluster receipt identity does not match its capacity cell"),
+        );
+      }
+      if (input.action === "delete" && cell.lifecycleStatus !== "deleted") {
+        return err(
+          domainError.conflict("Managed cluster delete receipt requires a deleted capacity cell"),
+        );
+      }
+    }
 
     return ok(
       new ManagedClusterCapabilityReceipt({
@@ -252,6 +319,7 @@ export class ManagedClusterCapabilityReceipt {
         support: { ...input.support },
         cost: { ...input.cost },
         cleanup: { ...input.cleanup, orphanResourceRefs: orphanResourceRefs.value },
+        ...(capacityCell?.isOk() ? { capacityCell: capacityCell.value.toJSON() } : {}),
         ...(input.placement ? { placement: clonePlacement(input.placement) } : {}),
       }),
     );
@@ -266,9 +334,20 @@ export class ManagedClusterCapabilityReceipt {
         ...this.snapshot.cleanup,
         orphanResourceRefs: [...this.snapshot.cleanup.orphanResourceRefs],
       },
+      ...(this.snapshot.capacityCell
+        ? { capacityCell: cloneCapacityCell(this.snapshot.capacityCell) }
+        : {}),
       ...(this.snapshot.placement ? { placement: clonePlacement(this.snapshot.placement) } : {}),
     };
   }
+}
+
+function cloneCapacityCell(input: ManagedCapacityCellSnapshot): ManagedCapacityCellSnapshot {
+  return {
+    ...input,
+    failureDomains: input.failureDomains.map((domain) => ({ ...domain })),
+    capabilities: [...input.capabilities],
+  };
 }
 
 function clonePlacement(

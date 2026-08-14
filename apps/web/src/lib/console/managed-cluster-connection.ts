@@ -1,7 +1,9 @@
 export const managedClusterCapabilityKeys = [
   "infrastructure.cluster.provision",
+  "infrastructure.cluster.import",
   "infrastructure.cluster.inspect",
   "infrastructure.cluster.readiness",
+  "infrastructure.cluster.drain",
   "infrastructure.cluster.place",
   "infrastructure.cluster.failover",
   "infrastructure.cluster.recover",
@@ -37,14 +39,22 @@ export function buildManagedClusterParameters(
   capabilityKey: ManagedClusterCapabilityKey,
   form: ManagedClusterForm,
 ): ManagedClusterParameterResult {
-  if (capabilityKey === "infrastructure.cluster.provision") {
+  if (
+    capabilityKey === "infrastructure.cluster.provision" ||
+    capabilityKey === "infrastructure.cluster.import"
+  ) {
     const clusterName = requiredText(form.clusterName);
     if (!clusterName) return { ok: false, field: "clusterName" };
     const clusterClass = requiredText(form.clusterClass);
     if (!clusterClass) return { ok: false, field: "clusterClass" };
+    const clusterRef = requiredText(form.clusterRef);
+    if (capabilityKey === "infrastructure.cluster.import" && !clusterRef) {
+      return { ok: false, field: "clusterRef" };
+    }
     return {
       ok: true,
       parameters: {
+        ...(clusterRef && capabilityKey === "infrastructure.cluster.import" ? { clusterRef } : {}),
         clusterName,
         clusterClass,
         requiredCapabilities: normalizedList(form.requiredCapabilities),
@@ -54,6 +64,7 @@ export function buildManagedClusterParameters(
 
   if (
     capabilityKey === "infrastructure.cluster.inspect" ||
+    capabilityKey === "infrastructure.cluster.drain" ||
     capabilityKey === "infrastructure.cluster.delete" ||
     capabilityKey === "infrastructure.cluster.cleanup-orphans"
   ) {

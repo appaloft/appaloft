@@ -3,6 +3,9 @@ import {
   err,
   InfrastructureServerProposal,
   type InfrastructureServerProposalSnapshot,
+  ManagedCapacityCell,
+  type ManagedCapacityCellProviderResourceDisposition,
+  type ManagedCapacityCellSnapshot,
   type ManagedClusterCapabilityAction,
   ManagedClusterCapabilityPlan,
   ManagedClusterCapabilityReceipt,
@@ -279,6 +282,7 @@ export class FakeInfrastructureConnectorProviderAdapter implements ConnectorProv
     if (plan.isErr()) return err(plan.error);
     const snapshot = plan.value.toJSON();
     const clusterRef =
+      snapshot.capacityCell?.clusterRef ??
       snapshot.clusterRef ??
       `cluster_${stableHash({ providerKey: snapshot.providerKey, clusterName: snapshot.clusterName, region: snapshot.region })}`;
     const operationId = `clusterop_${stableHash({ ...input, clusterRef })}`;
@@ -286,16 +290,43 @@ export class FakeInfrastructureConnectorProviderAdapter implements ConnectorProv
     if (action === "delete") {
       const previous = this.managedClusters.get(clusterRef);
       if (!previous) return err(domainError.notFound("ManagedCluster", clusterRef));
+      const cell = previous.capacityCell
+        ? ManagedCapacityCell.create(previous.capacityCell)
+        : err(domainError.conflict("Managed cluster has no capacity cell lifecycle snapshot"));
+      if (cell.isErr()) return err(cell.error);
+      const deletedCell = cell.value.delete();
+      if (deletedCell.isErr()) return err(deletedCell.error);
       const receipt = ManagedClusterCapabilityReceipt.create({
         ...previous,
         operationId,
         action,
         status: "deleted",
+        capacityCell: cell.value.toJSON(),
         cleanup: { supported: true, residualOwnedResources: 0, orphanResourceRefs: [] },
       });
       if (receipt.isErr()) return err(receipt.error);
       this.managedClusters.delete(clusterRef);
       return ok(this.toManagedApplyResult(input, receipt.value.toJSON(), "cleaned-up"));
+    }
+
+    if (action === "drain") {
+      const previous = this.managedClusters.get(clusterRef);
+      if (!previous) return err(domainError.notFound("ManagedCluster", clusterRef));
+      const cell = previous.capacityCell
+        ? ManagedCapacityCell.create(previous.capacityCell)
+        : err(domainError.conflict("Managed cluster has no capacity cell lifecycle snapshot"));
+      if (cell.isErr()) return err(cell.error);
+      const drained = cell.value.startDrain();
+      if (drained.isErr()) return err(drained.error);
+      const receipt = ManagedClusterCapabilityReceipt.create({
+        ...previous,
+        operationId,
+        action,
+        capacityCell: cell.value.toJSON(),
+      });
+      if (receipt.isErr()) return err(receipt.error);
+      this.managedClusters.set(clusterRef, receipt.value.toJSON());
+      return ok(this.toManagedApplyResult(input, receipt.value.toJSON(), "applied"));
     }
 
     if (action === "cleanup-orphans") {
@@ -334,6 +365,7 @@ export class FakeInfrastructureConnectorProviderAdapter implements ConnectorProv
         residualOwnedResources: 0,
         orphanResourceRefs: [],
       },
+      ...(snapshot.capacityCell ? { capacityCell: snapshot.capacityCell } : {}),
     });
     if (receipt.isErr()) return err(receipt.error);
     this.managedClusters.set(clusterRef, receipt.value.toJSON());
@@ -417,8 +449,10 @@ function managedClusterAction(capabilityKey: string): ManagedClusterCapabilityAc
   const action = capabilityKey.slice(prefix.length);
   return [
     "provision",
+    "import",
     "inspect",
     "readiness",
+    "drain",
     "delete",
     "place",
     "failover",
@@ -436,7 +470,7 @@ function parseManagedClusterPlan(
   clusters: ReadonlyMap<string, ManagedClusterCapabilityReceiptSnapshot>,
 ): Result<ManagedClusterCapabilityPlan> {
   const clusterRef = optionalParameter(parameters.clusterRef);
-  if (["delete", "cleanup-orphans"].includes(action)) {
+  if (["drain", "delete", "cleanup-orphans"].includes(action)) {
     const requiredClusterRef = requiredParameter(clusterRef, "Managed cluster ref");
     if (requiredClusterRef.isErr()) return err(requiredClusterRef.error);
     const existing = clusters.get(requiredClusterRef.value);
@@ -456,6 +490,7 @@ function parseManagedClusterPlan(
       supportLevel: existing.support.level,
       cleanupSupported: existing.cleanup.supported,
       requiredCapabilities: [],
+      ...(existing.capacityCell ? { capacityCell: existing.capacityCell } : {}),
     });
   }
 
@@ -472,11 +507,108 @@ function parseManagedClusterPlan(
   const clusterClass = optionalParameter(parameters.clusterClass);
   const targetPoolId = optionalParameter(parameters.targetPoolId);
 
+  let capacityCell: ManagedCapacityCellSnapshot | undefined;
+  if (action === "provision" || action === "import") {
+    if (
+      parameters.capacityCell &&
+      typeof parameters.capacityCell === "object" &&
+      !Array.isArray(parameters.capacityCell)
+    ) {
+      const suppliedCell = ManagedCapacityCell.create(
+        parameters.capacityCell as ManagedCapacityCellSnapshot,
+      );
+      if (suppliedCell.isErr()) return err(suppliedCell.error);
+      const suppliedSnapshot = suppliedCell.value.toJSON();
+      if (
+        suppliedSnapshot.providerKey !== providerKey ||
+        suppliedSnapshot.origin !== (action === "import" ? "imported" : "provisioned")
+      ) {
+        return err(
+          domainError.conflict("Managed capacity cell does not match the requested capability"),
+        );
+      }
+      capacityCell = suppliedSnapshot;
+    }
+  }
+  if ((action === "provision" || action === "import") && !capacityCell) {
+    const targetId = requiredParameter(parameters.targetId, "Managed capacity cell target id");
+    if (targetId.isErr()) return err(targetId.error);
+    const requiredTargetPoolId = requiredParameter(
+      targetPoolId,
+      "Managed capacity cell target pool id",
+    );
+    if (requiredTargetPoolId.isErr()) return err(requiredTargetPoolId.error);
+    const requiredRegion = requiredParameter(region, "Managed capacity cell region");
+    if (requiredRegion.isErr()) return err(requiredRegion.error);
+    const failureDomains = parseFailureDomains(parameters.failureDomains);
+    if (failureDomains.isErr()) return err(failureDomains.error);
+    const availableCapacity = optionalIntegerParameter(
+      parameters.availableCapacity,
+      "Managed capacity cell available capacity",
+      0,
+    );
+    if (availableCapacity.isErr()) return err(availableCapacity.error);
+    const activePlacementCount = optionalIntegerParameter(
+      parameters.activePlacementCount,
+      "Managed capacity cell active placement count",
+      0,
+    );
+    if (activePlacementCount.isErr()) return err(activePlacementCount.error);
+    const requiredClusterRef =
+      action === "import"
+        ? requiredParameter(clusterRef, "Managed cluster ref")
+        : ok(
+            `cluster_${stableHash({
+              providerKey,
+              clusterName,
+              region: requiredRegion.value,
+              targetId: targetId.value,
+            })}`,
+          );
+    if (requiredClusterRef.isErr()) return err(requiredClusterRef.error);
+    const requestedDisposition =
+      optionalParameter(parameters.providerResourceDisposition) ??
+      (action === "import" ? "retain" : "delete");
+    if (!(["delete", "retain"] as const).includes(requestedDisposition as never)) {
+      return err(
+        domainError.validation(
+          `Unsupported managed capacity cell provider resource disposition ${requestedDisposition}`,
+        ),
+      );
+    }
+    const cell = ManagedCapacityCell.create({
+      clusterRef: requiredClusterRef.value,
+      targetId: targetId.value,
+      targetPoolId: requiredTargetPoolId.value,
+      providerKey,
+      ...(clusterName ? { clusterName } : {}),
+      region: requiredRegion.value,
+      failureDomains: failureDomains.value,
+      origin: action === "import" ? "imported" : "provisioned",
+      lifecycleStatus: "accepting",
+      providerResourceDisposition:
+        requestedDisposition as ManagedCapacityCellProviderResourceDisposition,
+      capabilities: requiredCapabilities.value,
+      availableCapacity: availableCapacity.value,
+      activePlacementCount: activePlacementCount.value,
+      ...(estimatedMonthlyCostUsd.value !== undefined
+        ? { estimatedMonthlyCostUsd: estimatedMonthlyCostUsd.value }
+        : {}),
+      supportLevel: supportLevel as ManagedClusterSupportLevel,
+    });
+    if (cell.isErr()) return err(cell.error);
+    capacityCell = cell.value.toJSON();
+  }
+
   return ManagedClusterCapabilityPlan.create({
     action,
     providerKey,
     ...(clusterName ? { clusterName } : {}),
-    ...(clusterRef ? { clusterRef } : {}),
+    ...(capacityCell?.clusterRef
+      ? { clusterRef: capacityCell.clusterRef }
+      : clusterRef
+        ? { clusterRef }
+        : {}),
     ...(region ? { region } : {}),
     ...(clusterClass ? { clusterClass } : {}),
     ...(targetPoolId ? { targetPoolId } : {}),
@@ -487,7 +619,36 @@ function parseManagedClusterPlan(
     supportLevel: supportLevel as ManagedClusterSupportLevel,
     cleanupSupported: parameters.cleanupSupported !== false,
     requiredCapabilities: requiredCapabilities.value,
+    ...(capacityCell ? { capacityCell } : {}),
   });
+}
+
+function parseFailureDomains(
+  value: unknown,
+): Result<ManagedCapacityCellSnapshot["failureDomains"]> {
+  if (!Array.isArray(value)) {
+    return err(domainError.validation("Managed capacity cell failure domains are required"));
+  }
+  if (
+    value.some(
+      (entry) =>
+        !entry ||
+        typeof entry !== "object" ||
+        Array.isArray(entry) ||
+        typeof (entry as { kind?: unknown }).kind !== "string" ||
+        typeof (entry as { key?: unknown }).key !== "string",
+    )
+  ) {
+    return err(domainError.validation("Managed capacity cell failure domains are invalid"));
+  }
+  return ok(value as ManagedCapacityCellSnapshot["failureDomains"]);
+}
+
+function optionalIntegerParameter(value: unknown, label: string, fallback: number): Result<number> {
+  if (value === undefined) return ok(fallback);
+  return typeof value === "number" && Number.isInteger(value) && value >= 0
+    ? ok(value)
+    : err(domainError.validation(`${label} must be a non-negative integer`));
 }
 
 function parsePlacement(

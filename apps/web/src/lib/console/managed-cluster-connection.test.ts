@@ -31,8 +31,25 @@ describe("managed cluster connection form", () => {
     });
   });
 
+  test("[RESIL-CELL-010] builds provider-neutral import and drain parameters", () => {
+    expect(buildManagedClusterParameters("infrastructure.cluster.import", baseForm)).toEqual({
+      ok: true,
+      parameters: {
+        clusterRef: "cluster_appaloft_prod",
+        clusterName: "appaloft-prod",
+        clusterClass: "managed-standard",
+        requiredCapabilities: ["helm", "kubernetes"],
+      },
+    });
+    expect(buildManagedClusterParameters("infrastructure.cluster.drain", baseForm)).toEqual({
+      ok: true,
+      parameters: { clusterRef: "cluster_appaloft_prod" },
+    });
+  });
+
   test.each([
     "infrastructure.cluster.inspect",
+    "infrastructure.cluster.drain",
     "infrastructure.cluster.delete",
     "infrastructure.cluster.cleanup-orphans",
   ] as const)("[K8S-SURFACE-017] builds %s with an opaque cluster reference", (capabilityKey) => {
