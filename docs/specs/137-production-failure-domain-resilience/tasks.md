@@ -17,8 +17,8 @@
 - [x] Merge the R6b1 Grill/Spec/ADR/Test Matrix clarification and create public/Cloud `ready-for-agent` Tickets (#1109 / Cloud #907).
 - [x] RED `RESIL-READY-004` at the public target-pool, connector plan, contract and Web seams.
 - [x] Implement typed `ready`/`blocked` evidence and a plan-only `infrastructure.cluster.readiness` capability.
-- [ ] Adopt through Cloud tenant policy/inventory composition without provider or mutation effects.
-- [ ] Merge public first, update the Cloud pin, run full gates and independent Boundary Review.
+- [x] Adopt through Cloud tenant policy/inventory composition without provider or mutation effects; Cloud PR #908 merged to `db83448a`.
+- [x] Merge public first, pin Cloud to public `def417be`, run full gates and independent Boundary Review (PASS; no P0/P1/P2).
 
 ## R6b2–R6d
 
