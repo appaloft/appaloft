@@ -7854,6 +7854,36 @@ export const managedTrafficHandoffReceiptSchema = z.object({
   }),
 });
 
+export const managedWorkloadRecoveryObjectivesSchema = z.object({
+  maximumRecoveryPointAgeSeconds: z.number().int().nonnegative(),
+  maximumRecoveryTimeSeconds: z.number().int().nonnegative(),
+});
+
+export const managedWorkloadStateEvidenceSchema = z.object({
+  kind: z.enum(["external-durability", "restore-rehearsal"]),
+  durabilityEvidenceRef: z.string().trim().min(1).optional(),
+  backupEvidenceRef: z.string().trim().min(1).optional(),
+  restoreEvidenceRef: z.string().trim().min(1).optional(),
+  sourceTargetId: z.string().trim().min(1).optional(),
+  recoveryTargetId: z.string().trim().min(1).optional(),
+  observedAt: z.string().datetime(),
+  validUntil: z.string().datetime(),
+  observedRecoveryPointAgeSeconds: z.number().int().nonnegative().optional(),
+  observedRecoveryTimeSeconds: z.number().int().nonnegative().optional(),
+});
+
+export const managedWorkloadStateEligibilitySchema = z.object({
+  workloadRef: z.string().trim().min(1),
+  currentTargetId: z.string().trim().min(1),
+  replacementTargetId: z.string().trim().min(1),
+  mode: z.enum(["stateless", "external-durable", "restorable", "local-pvc"]),
+  objectives: managedWorkloadRecoveryObjectivesSchema.optional(),
+  evidence: managedWorkloadStateEvidenceSchema.optional(),
+  status: z.enum(["eligible", "blocked"]),
+  evaluatedAt: z.string().datetime(),
+  reasonCodes: z.array(z.string().trim().min(1)),
+});
+
 export const managedCapacityCellSchema = z
   .object({
     clusterRef: z.string().trim().min(1),
@@ -8023,6 +8053,7 @@ export const connectorCapabilityPlanPreviewSchema = z.object({
       managedClusterReplacementReadiness: managedClusterReplacementReadinessSchema.optional(),
       managedTrafficRoute: managedTrafficRouteSchema.optional(),
       managedTrafficHandoffPlan: managedTrafficHandoffPlanSchema.optional(),
+      managedWorkloadStateEligibility: managedWorkloadStateEligibilitySchema.optional(),
       notificationMessage: notificationMessageSchema.optional(),
       sourceRepositoryAccess: sourceRepositoryAccessSchema.optional(),
     })
@@ -8318,6 +8349,11 @@ export type ManagedTrafficRoute = z.infer<typeof managedTrafficRouteSchema>;
 export type ManagedTrafficHealthEvidence = z.infer<typeof managedTrafficHealthEvidenceSchema>;
 export type ManagedTrafficHandoffPlan = z.infer<typeof managedTrafficHandoffPlanSchema>;
 export type ManagedTrafficHandoffReceipt = z.infer<typeof managedTrafficHandoffReceiptSchema>;
+export type ManagedWorkloadRecoveryObjectives = z.infer<
+  typeof managedWorkloadRecoveryObjectivesSchema
+>;
+export type ManagedWorkloadStateEvidence = z.infer<typeof managedWorkloadStateEvidenceSchema>;
+export type ManagedWorkloadStateEligibility = z.infer<typeof managedWorkloadStateEligibilitySchema>;
 export type NotificationMessage = z.infer<typeof notificationMessageSchema>;
 export type NotificationMessageDelivery = z.infer<typeof notificationMessageDeliverySchema>;
 export type ConnectorCapabilityPlanPreview = z.infer<typeof connectorCapabilityPlanPreviewSchema>;

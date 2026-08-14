@@ -67,6 +67,7 @@ import {
   type ManagedTrafficHandoffPlanSnapshot,
   type ManagedTrafficHandoffReceiptSnapshot,
   type ManagedTrafficRouteSnapshot,
+  type ManagedWorkloadStateEligibilitySnapshot,
   type NotificationMessageDeliverySnapshot,
   type NotificationMessageSnapshot,
   type PackagingMode,
@@ -10874,6 +10875,7 @@ export interface ConnectorCapabilityPlanPreview {
     managedClusterReplacementReadiness?: ManagedClusterReplacementReadinessSnapshot;
     managedTrafficRoute?: ManagedTrafficRouteSnapshot;
     managedTrafficHandoffPlan?: ManagedTrafficHandoffPlanSnapshot;
+    managedWorkloadStateEligibility?: ManagedWorkloadStateEligibilitySnapshot;
     notificationMessage?: NotificationMessageSnapshot;
     sourceRepositoryAccess?: SourceRepositoryAccessSnapshot;
   };

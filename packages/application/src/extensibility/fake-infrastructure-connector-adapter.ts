@@ -25,6 +25,9 @@ import {
   type ManagedTrafficHandoffReceiptSnapshot,
   ManagedTrafficHealthEvidence,
   type ManagedTrafficRouteSnapshot,
+  ManagedWorkloadStateEligibility,
+  type ManagedWorkloadStateEligibilitySnapshot,
+  type ManagedWorkloadStateProfileSnapshot,
   ok,
   type Result,
 } from "@appaloft/core";
@@ -70,6 +73,7 @@ export class FakeInfrastructureConnectorProviderAdapter implements ConnectorProv
   canPlan(capabilityKey: string): boolean {
     return (
       capabilityKey === "infrastructure.server.propose" ||
+      capabilityKey === "infrastructure.cluster.state-eligibility" ||
       managedTrafficAction(capabilityKey) !== null ||
       managedClusterAction(capabilityKey) !== null
     );
@@ -91,6 +95,10 @@ export class FakeInfrastructureConnectorProviderAdapter implements ConnectorProv
       return this.planManagedTraffic(input, trafficAction);
     }
 
+    if (input.capabilityKey === "infrastructure.cluster.state-eligibility") {
+      return this.planManagedWorkloadStateEligibility(input);
+    }
+
     const managedAction = managedClusterAction(input.capabilityKey);
     if (managedAction) {
       return this.planManagedCluster(input, managedAction);
@@ -108,6 +116,7 @@ export class FakeInfrastructureConnectorProviderAdapter implements ConnectorProv
   }
 
   canApply(capabilityKey: string): boolean {
+    if (capabilityKey === "infrastructure.cluster.state-eligibility") return false;
     const trafficAction = managedTrafficAction(capabilityKey);
     if (trafficAction) return trafficAction !== "status";
     const action = managedClusterAction(capabilityKey);
@@ -119,6 +128,13 @@ export class FakeInfrastructureConnectorProviderAdapter implements ConnectorProv
     input: ConnectorCapabilityApplyInput,
   ): Promise<Result<ConnectorCapabilityApplyResult>> {
     void context;
+    if (input.capabilityKey === "infrastructure.cluster.state-eligibility") {
+      return err(
+        domainError.validation(
+          `Connector ${this.connectorKey} cannot apply ${input.capabilityKey}`,
+        ),
+      );
+    }
     const trafficAction = managedTrafficAction(input.capabilityKey);
     if (trafficAction) {
       if (trafficAction === "status") {
@@ -430,7 +446,7 @@ export class FakeInfrastructureConnectorProviderAdapter implements ConnectorProv
     }
 
     if (["place", "failover", "recover"].includes(action)) {
-      const placement = parsePlacement(input.parameters ?? {}, action);
+      const placement = parsePlacement(input.parameters ?? {}, action, this.now());
       if (placement.isErr()) return err(placement.error);
       return ok({
         planId: managedPlanId(input, placement.value),
@@ -502,7 +518,7 @@ export class FakeInfrastructureConnectorProviderAdapter implements ConnectorProv
     action: Exclude<ManagedClusterCapabilityAction, "inspect" | "readiness">,
   ): Result<ConnectorCapabilityApplyResult> {
     if (["place", "failover", "recover"].includes(action)) {
-      const placement = parsePlacement(input.parameters ?? {}, action);
+      const placement = parsePlacement(input.parameters ?? {}, action, this.now());
       if (placement.isErr()) return err(placement.error);
       const operationId = `clusterop_${stableHash({ ...input, placement: placement.value })}`;
       const receipt = ManagedClusterCapabilityReceipt.create({
@@ -620,6 +636,44 @@ export class FakeInfrastructureConnectorProviderAdapter implements ConnectorProv
     if (receipt.isErr()) return err(receipt.error);
     this.managedClusters.set(clusterRef, receipt.value.toJSON());
     return ok(this.toManagedApplyResult(input, receipt.value.toJSON(), "applied"));
+  }
+
+  private planManagedWorkloadStateEligibility(
+    input: ConnectorCapabilityPlanInput,
+  ): Result<ConnectorCapabilityPlanPreview> {
+    const profile = parseStateProfile(input.parameters ?? {});
+    if (profile.isErr()) return err(profile.error);
+    const eligibility = ManagedWorkloadStateEligibility.evaluate(profile.value, this.now());
+    if (eligibility.isErr()) return err(eligibility.error);
+    const snapshot = eligibility.value.toJSON();
+    return ok({
+      planId: `stateplan_${stableHash({
+        connectorKey: input.connectorKey,
+        capabilityKey: input.capabilityKey,
+        ownerRef: input.ownerRef,
+        eligibility: snapshot,
+      })}`,
+      connectorKey: input.connectorKey,
+      capabilityKey: input.capabilityKey,
+      riskLevel: "low",
+      requiresExplicitAcceptance: false,
+      summary: `${this.providerTitle}: state is ${snapshot.status} for ${snapshot.workloadRef}.`,
+      effects: [
+        {
+          kind: "infrastructure.cluster.state-eligibility",
+          title: `State ${snapshot.status}`,
+          description: snapshot.reasonCodes.join(", "),
+        },
+      ],
+      cleanup: {
+        supported: false,
+        description: "State eligibility planning performs no backup, restore, or provider effect.",
+      },
+      providerPlan: {
+        kind: "managed-workload-state-eligibility",
+        managedWorkloadStateEligibility: snapshot,
+      },
+    });
   }
 
   private toManagedApplyResult(
@@ -913,6 +967,7 @@ function optionalIntegerParameter(value: unknown, label: string, fallback: numbe
 function parsePlacement(
   parameters: Record<string, unknown>,
   action: ManagedClusterCapabilityAction,
+  evaluatedAt: string,
 ): Result<ManagedClusterPlacementDecisionSnapshot> {
   if (!["place", "failover", "recover"].includes(action)) {
     return err(domainError.validation(`Managed cluster ${action} is not a placement action`));
@@ -953,7 +1008,50 @@ function parsePlacement(
     mode: mode as ManagedClusterPlacementMode,
     attempt,
   });
-  return decision.map((value) => value.toJSON());
+  if (decision.isErr()) return err(decision.error);
+  const snapshot = decision.value.toJSON();
+  if (action === "failover" || action === "recover") {
+    const stateEligibility = parseStateEligibility(parameters.stateEligibility);
+    if (stateEligibility.isErr()) return err(stateEligibility.error);
+    const stateSafe = stateEligibility.value.isEligibleFor({
+      workloadRef: snapshot.workloadRef,
+      currentTargetId: snapshot.previousTargetId ?? "",
+      replacementTargetId: snapshot.selectedTargetId,
+      at: evaluatedAt,
+    });
+    if (!stateSafe) {
+      return err(
+        domainError.conflict("Managed cluster placement requires fresh eligible state evidence", {
+          code: "managed_cluster_state_ineligible",
+          workloadRef: snapshot.workloadRef,
+          currentTargetId: snapshot.previousTargetId ?? "",
+          replacementTargetId: snapshot.selectedTargetId,
+        }),
+      );
+    }
+  }
+  return ok(snapshot);
+}
+
+function parseStateProfile(
+  parameters: Record<string, unknown>,
+): Result<ManagedWorkloadStateProfileSnapshot> {
+  const value = parameters.stateProfile;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return err(domainError.validation("Managed workload state profile is required"));
+  }
+  return ok(value as ManagedWorkloadStateProfileSnapshot);
+}
+
+function parseStateEligibility(value: unknown): Result<ManagedWorkloadStateEligibility> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return err(
+      domainError.conflict("Managed cluster failover requires state eligibility evidence", {
+        code: "managed_cluster_state_eligibility_missing",
+      }),
+    );
+  }
+  return ManagedWorkloadStateEligibility.create(value as ManagedWorkloadStateEligibilitySnapshot);
 }
 
 function parseReplacementReadiness(

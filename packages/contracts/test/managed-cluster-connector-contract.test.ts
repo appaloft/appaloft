@@ -7,6 +7,7 @@ import {
   managedClusterPlacementIntentSchema,
   managedClusterReplacementReadinessSchema,
   managedClusterTargetPoolSchema,
+  managedWorkloadStateEligibilitySchema,
 } from "../src";
 
 const placement = {
@@ -211,5 +212,53 @@ describe("managed cluster connector contracts", () => {
     expect(JSON.stringify(preview)).not.toContain("fencingToken");
     expect(JSON.stringify(preview)).not.toContain("credential");
     expect(JSON.stringify(preview)).not.toContain("must-not-survive-contract");
+  });
+
+  test("[RESIL-STATE-007] preserves safe typed state eligibility and strips private fields", () => {
+    const eligibility = managedWorkloadStateEligibilitySchema.parse({
+      workloadRef: "resource:api",
+      currentTargetId: "target_ewr",
+      replacementTargetId: "target_sin",
+      mode: "restorable",
+      objectives: {
+        maximumRecoveryPointAgeSeconds: 300,
+        maximumRecoveryTimeSeconds: 600,
+      },
+      evidence: {
+        kind: "restore-rehearsal",
+        backupEvidenceRef: "backup:svb_20260814",
+        restoreEvidenceRef: "restore:sra_20260814",
+        sourceTargetId: "target_ewr",
+        recoveryTargetId: "target_sin",
+        observedAt: "2026-08-14T12:00:00.000Z",
+        validUntil: "2026-08-14T13:00:00.000Z",
+        observedRecoveryPointAgeSeconds: 120,
+        observedRecoveryTimeSeconds: 240,
+        credential: "must-not-survive-contract",
+        providerObject: { id: "raw-backup-object" },
+      },
+      status: "eligible",
+      evaluatedAt: "2026-08-14T12:10:00.000Z",
+      reasonCodes: ["state_restore_rehearsal_verified"],
+      credential: "must-not-survive-contract",
+    });
+    const preview = connectorCapabilityPlanPreviewSchema.parse({
+      planId: "stateplan_12345678",
+      connectorKey: "managed-kubernetes",
+      capabilityKey: "infrastructure.cluster.state-eligibility",
+      riskLevel: "low",
+      requiresExplicitAcceptance: false,
+      summary: "State is eligible",
+      effects: [{ kind: "infrastructure.cluster.state-eligibility", title: "Eligible" }],
+      cleanup: { supported: false },
+      providerPlan: {
+        kind: "managed-workload-state-eligibility",
+        managedWorkloadStateEligibility: eligibility,
+      },
+    });
+
+    expect(preview.providerPlan?.managedWorkloadStateEligibility).toEqual(eligibility);
+    expect(JSON.stringify(preview)).not.toContain("must-not-survive-contract");
+    expect(JSON.stringify(preview)).not.toContain("raw-backup-object");
   });
 });

@@ -9,6 +9,7 @@ export * from "./managed-capacity-cell";
 export * from "./managed-cluster-connection";
 export * from "./managed-cluster-topology";
 export * from "./managed-traffic-handoff";
+export * from "./managed-workload-state-eligibility";
 export * from "./notification-connection";
 export * from "./plugin-installation";
 export * from "./provider-connection";

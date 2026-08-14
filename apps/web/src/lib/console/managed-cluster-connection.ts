@@ -3,6 +3,7 @@ export const managedClusterCapabilityKeys = [
   "infrastructure.cluster.import",
   "infrastructure.cluster.inspect",
   "infrastructure.cluster.readiness",
+  "infrastructure.cluster.state-eligibility",
   "infrastructure.cluster.drain",
   "infrastructure.cluster.place",
   "infrastructure.cluster.failover",
@@ -36,6 +37,19 @@ export interface ManagedClusterForm {
   readonly healthObservedAt: string;
   readonly healthValidUntil: string;
   readonly plannedAt: string;
+  readonly stateMode: string;
+  readonly maximumRecoveryPointAgeSeconds: string;
+  readonly maximumRecoveryTimeSeconds: string;
+  readonly stateEvidenceKind: string;
+  readonly durabilityEvidenceRef: string;
+  readonly backupEvidenceRef: string;
+  readonly restoreEvidenceRef: string;
+  readonly stateEvidenceObservedAt: string;
+  readonly stateEvidenceValidUntil: string;
+  readonly observedRecoveryPointAgeSeconds: string;
+  readonly observedRecoveryTimeSeconds: string;
+  readonly stateSourceTargetId: string;
+  readonly stateRecoveryTargetId: string;
 }
 
 export type ManagedClusterFormField = keyof ManagedClusterForm;
@@ -55,6 +69,119 @@ export function buildManagedClusterParameters(
   if (capabilityKey === "infrastructure.cluster.traffic-status") {
     const routeRef = requiredText(form.routeRef);
     return routeRef ? { ok: true, parameters: { routeRef } } : { ok: false, field: "routeRef" };
+  }
+
+  if (capabilityKey === "infrastructure.cluster.state-eligibility") {
+    const workloadRef = requiredText(form.workloadRef);
+    if (!workloadRef) return { ok: false, field: "workloadRef" };
+    const currentTargetId = requiredText(form.currentTargetId);
+    if (!currentTargetId) return { ok: false, field: "currentTargetId" };
+    const replacementTargetId = requiredText(form.replacementTargetId);
+    if (!replacementTargetId) return { ok: false, field: "replacementTargetId" };
+    if (
+      !(["stateless", "external-durable", "restorable", "local-pvc"] as const).includes(
+        form.stateMode as "stateless",
+      )
+    ) {
+      return { ok: false, field: "stateMode" };
+    }
+    const mode = form.stateMode as "stateless" | "external-durable" | "restorable" | "local-pvc";
+    const maximumRecoveryPointAgeSeconds = optionalNonnegativeInteger(
+      form.maximumRecoveryPointAgeSeconds,
+    );
+    if (maximumRecoveryPointAgeSeconds === null) {
+      return { ok: false, field: "maximumRecoveryPointAgeSeconds" };
+    }
+    const maximumRecoveryTimeSeconds = optionalNonnegativeInteger(form.maximumRecoveryTimeSeconds);
+    if (maximumRecoveryTimeSeconds === null) {
+      return { ok: false, field: "maximumRecoveryTimeSeconds" };
+    }
+    const evidenceKind = requiredText(form.stateEvidenceKind);
+    if (
+      evidenceKind &&
+      evidenceKind !== "external-durability" &&
+      evidenceKind !== "restore-rehearsal"
+    ) {
+      return { ok: false, field: "stateEvidenceKind" };
+    }
+    const observedRecoveryPointAgeSeconds = optionalNonnegativeInteger(
+      form.observedRecoveryPointAgeSeconds,
+    );
+    if (observedRecoveryPointAgeSeconds === null) {
+      return { ok: false, field: "observedRecoveryPointAgeSeconds" };
+    }
+    const observedRecoveryTimeSeconds = optionalNonnegativeInteger(
+      form.observedRecoveryTimeSeconds,
+    );
+    if (observedRecoveryTimeSeconds === null) {
+      return { ok: false, field: "observedRecoveryTimeSeconds" };
+    }
+    const observedAt = requiredText(form.stateEvidenceObservedAt);
+    if (observedAt && !isIsoInstant(observedAt)) {
+      return { ok: false, field: "stateEvidenceObservedAt" };
+    }
+    const validUntil = requiredText(form.stateEvidenceValidUntil);
+    if (validUntil && !isIsoInstant(validUntil)) {
+      return { ok: false, field: "stateEvidenceValidUntil" };
+    }
+    const hasEvidence = Boolean(
+      evidenceKind ||
+        observedAt ||
+        validUntil ||
+        requiredText(form.durabilityEvidenceRef) ||
+        requiredText(form.backupEvidenceRef) ||
+        requiredText(form.restoreEvidenceRef),
+    );
+    return {
+      ok: true,
+      parameters: {
+        stateProfile: {
+          workloadRef,
+          currentTargetId,
+          replacementTargetId,
+          mode,
+          ...(maximumRecoveryPointAgeSeconds !== undefined &&
+          maximumRecoveryTimeSeconds !== undefined
+            ? {
+                objectives: {
+                  maximumRecoveryPointAgeSeconds,
+                  maximumRecoveryTimeSeconds,
+                },
+              }
+            : {}),
+          ...(hasEvidence && evidenceKind && observedAt && validUntil
+            ? {
+                evidence: {
+                  kind: evidenceKind,
+                  ...(requiredText(form.durabilityEvidenceRef)
+                    ? { durabilityEvidenceRef: requiredText(form.durabilityEvidenceRef) }
+                    : {}),
+                  ...(requiredText(form.backupEvidenceRef)
+                    ? { backupEvidenceRef: requiredText(form.backupEvidenceRef) }
+                    : {}),
+                  ...(requiredText(form.restoreEvidenceRef)
+                    ? { restoreEvidenceRef: requiredText(form.restoreEvidenceRef) }
+                    : {}),
+                  ...(requiredText(form.stateSourceTargetId)
+                    ? { sourceTargetId: requiredText(form.stateSourceTargetId) }
+                    : {}),
+                  ...(requiredText(form.stateRecoveryTargetId)
+                    ? { recoveryTargetId: requiredText(form.stateRecoveryTargetId) }
+                    : {}),
+                  observedAt,
+                  validUntil,
+                  ...(observedRecoveryPointAgeSeconds !== undefined
+                    ? { observedRecoveryPointAgeSeconds }
+                    : {}),
+                  ...(observedRecoveryTimeSeconds !== undefined
+                    ? { observedRecoveryTimeSeconds }
+                    : {}),
+                },
+              }
+            : {}),
+        },
+      },
+    };
   }
 
   if (
@@ -242,6 +369,11 @@ function nonnegativeInteger(value: string): number | undefined {
   if (!/^\d+$/.test(value.trim())) return undefined;
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) ? parsed : undefined;
+}
+
+function optionalNonnegativeInteger(value: string): number | undefined | null {
+  if (!value.trim()) return undefined;
+  return nonnegativeInteger(value) ?? null;
 }
 
 function isIsoInstant(value: string): boolean {
