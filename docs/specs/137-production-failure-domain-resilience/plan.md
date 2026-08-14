@@ -30,6 +30,12 @@
 10. Extend the managed connector with exact-plan handoff/failback and plan-only status. Adapters
     execute `re-read -> health -> fence -> move -> verify -> cleanup`, with one verified rollback
     after a post-move verification failure.
+11. Add a provider-neutral state profile and eligibility decision. The evaluator accepts explicit
+    stateless profiles, validates fresh external-durability or independent restore-rehearsal
+    evidence against declared RPO/RTO objectives, and returns typed stable blockers.
+12. Expose the decision through plan-only `infrastructure.cluster.state-eligibility`. Bind
+    failover/recover and hosted traffic handoff to a fresh exact decision while leaving backup and
+    restore execution with the existing Storage Volume operations.
 
 ## CQRS, Read Model And Event Impact
 
@@ -57,6 +63,10 @@
    connector, Web parameter/readback and Cloud composed provider-port seams.
 9. R6c GREEN happy handoff/status/failback, stale/no-health no-effect, pre-move preservation,
    post-move rollback and zero transient residual evidence.
+10. R6d RED core/contract/fake/Web tests for explicit state modes, objective/observed RPO/RTO,
+    evidence freshness/independence, local-PVC no-effect and exact decision binding.
+11. R6d GREEN stateless, external-durable and restorable decisions plus a deterministic composed
+    restore/failover packet; blocked paths prove zero provider/fence/route calls.
 
 ## Risks
 

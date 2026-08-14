@@ -38,7 +38,12 @@
   existing bilingual integrations page, registry topic and high-confusion traceability row.
 - [x] Merge public R6c implementation PR #1117 to final `main` `2545cc82`, pass public CI, and
   verify the Cloud injected-port handoff/status/replay/failback/failure packet without external traffic.
-- [ ] Implement state eligibility and DR evidence `RESIL-STATE-007`.
+- [x] Accept the R6d Grill and define explicit state modes, plan-only eligibility, evidence
+  freshness/independence, objective-versus-observed RPO/RTO and local-PVC no-effect semantics.
+- [ ] Create the public R6d actor-visible Ticket and bind `RESIL-STATE-007` before Code Round.
+- [ ] RED core/contract/fake/Web tests for state decisions and exact failover/recover binding.
+- [ ] Implement state eligibility and DR evidence `RESIL-STATE-007` without duplicating Storage
+  Volume backup/restore lifecycle.
 - [ ] Prove the remaining R6d/real-packet portion of exact rollback/cleanup `RESIL-CLEAN-008`.
 
 ## External Acceptance And Sync
