@@ -36,7 +36,7 @@ itself claim Appaloft control-plane high availability or cross-provider outage t
 | RESIL-CELLS-011 | exact two-cell dry-run | two explicit cells declare different required failure-domain keys | the lifecycle and readiness packet runs | both cells have deterministic plan/readback, one is independently replacement-ready, drain/delete preserves the surviving cell, and zero Appaloft-owned residual evidence is returned without paid provider mutation. |
 | RESIL-FENCE-005 | one writer/route owner | replacement is ready and the live route still names the planned current endpoint/epoch | traffic handoff is applied | fresh health is re-read, the previous placement is fenced before route authority moves, and stale route identity/epochs/tokens fail before provider effects. |
 | RESIL-ROUTE-006 | explicit traffic handoff | two endpoints have bounded health evidence | handoff or failback runs | the accepted plan binds exact route/workload/endpoints/epochs/token/proof, verifies replacement, moves and re-verifies route authority, and a plan-only status query returns the observed authority. Failback requires a new accepted plan. |
-| RESIL-STATE-007 | state safety | workload uses local or external durable state | failover is planned | unsupported local state fails closed; supported state declares evidence refs and bounded RPO/RTO. |
+| RESIL-STATE-007 | state safety | an explicit stateless, external-durable, restorable or local-PVC profile exists | `infrastructure.cluster.state-eligibility` is planned and failover/recover/handoff is attempted | valid input returns typed eligible/blocked evidence; external/restorable state proves fresh independent refs and observed RPO/RTO within objectives; local PVC, missing/expired/shared-target/over-SLO evidence fails before provider, fence or route effects. |
 | RESIL-CLEAN-008 | exact rollback and cleanup | failover succeeds or aborts | cleanup runs | pre-move failure preserves the old healthy route; post-move verification failure performs one exact rollback and verifies actual authority; only receipt-owned transient route artifacts are removed. Unproven rollback is reported as manual intervention, never success. |
 | RESIL-E2E-009 | real independent-domain packet | two authorized regional managed cells exist | failure/failover/recovery/cleanup runs | workload identity, traffic continuity, fencing, cost/support and independent residual readback pass. |
 
@@ -59,6 +59,13 @@ itself claim Appaloft control-plane high availability or cross-provider outage t
 - A traffic apply must re-read live route authority and replacement health. It may move authority
   only after fencing the previous placement. Apply returns `moved`, `preserved`, `rolled-back` or
   `manual-intervention` evidence; failback always uses a fresh plan, epoch and fencing token.
+- Add plan-only `infrastructure.cluster.state-eligibility`. Its public value object owns explicit
+  state mode, objective/observed RPO/RTO, evidence freshness, independent restore target and stable
+  reason codes. It performs no backup, restore, provider or route mutation and has no apply path.
+- Reuse existing Storage Volume backup/restore operations as restore truth. Eligibility carries
+  safe backup/restore evidence refs only. Failover/recover and hosted handoff require a fresh
+  eligible decision for the exact workload/current/replacement pair; omitted state is not a
+  stateless fallback.
 - Keep `deployments.create` ids-only and reuse existing logs, health, proof, route and recovery
   contracts.
 - Surface safe topology/readiness evidence through shared contracts consumed by CLI/API/SDK/Web/MCP.

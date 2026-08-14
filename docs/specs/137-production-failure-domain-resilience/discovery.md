@@ -107,6 +107,24 @@ packet below. It does not authorize paid load balancing, DNS changes or producti
 | Q36. What closes internal R6c? | Public core/contract/Web/fake tests and Cloud composed/provider-port tests prove happy handoff, explicit failback, stale/no-health no-effect, pre-move preservation, post-move rollback, status readback and zero receipt-owned residuals. | Internal evidence closes `RESIL-FENCE-005`, `RESIL-ROUTE-006` and the R6c portion of `RESIL-CLEAN-008`, not the real regional packet. |
 | Q37. What external work is allowed? | A Cloudflare-or-equivalent adapter may expose redacted deterministic plan/readback and a disabled apply path. | Paid LB, DNS and real traffic still require a separate exact target/cost/impact/cleanup approval. |
 
+## R6d Accepted Grill Decisions
+
+The owner asked for the complete R6d slice and retained the authorization to accept recommended
+R6 decisions. These decisions cover provider-neutral state admission and deterministic restore
+evidence. They do not authorize a paid backup service, provider mutation or production failover.
+
+| Question | Recommended and accepted decision | Consequence |
+| --- | --- | --- |
+| Q38. What is the state vocabulary? | One workload declares exactly one of `stateless`, `external-durable`, `restorable` or `local-pvc`. | Compute placement never infers durability from a volume name, storage class, target id or provider label. |
+| Q39. Which public surface evaluates it? | Add plan-only `infrastructure.cluster.state-eligibility` on the existing connector protocol. Valid input returns typed `eligible` or `blocked` evidence and has no apply path. | Do not add a second restore command, failover aggregate, table or Cloud-only eligibility model. |
+| Q40. What proves external or restorable state? | External state requires time-bounded independent-durability evidence. Restorable state requires both backup and completed restore-rehearsal refs, an independent recovery target and time-bounded observation. | Reuse existing Storage Volume backup/restore lifecycle; refs are evidence, not a duplicate storage state machine. |
+| Q41. What do RPO and RTO mean here? | The profile declares maximum recovery-point age and maximum recovery time. Evidence declares observed values; both must be finite non-negative seconds and at or below the objectives. | Targets are objectives and observations are facts; neither is synthesized as zero or success. |
+| Q42. When is evidence fresh and independent? | Stateful evidence has an observed instant and validity deadline; planning time must be within that interval. Restorable evidence must name different source and recovery target ids, and all refs are non-empty secret-free tokens. | Expired, missing, target-shared or over-objective evidence is typed blocked output. |
+| Q43. How is local PVC handled? | `local-pvc` always returns stable blocker `state_local_pvc_not_portable`; failover, recover and hosted traffic handoff reject it before provider, fencing or route effects. | A local backup on the same target cannot upgrade the workload to eligible. |
+| Q44. How is a mutation bound to eligibility? | Failover/recover and hosted handoff use a freshly evaluated exact state decision for the same workload/current/replacement targets. Stateless is explicit, never an omitted fallback; failback requires a fresh decision. | Old, mismatched, missing or blocked state decisions cannot authorize effects. |
+| Q45. What remains private? | Cloud resolves the tenant-authoritative state profile and safe evidence refs through an injected read port. Public core owns validation and eligibility reasons. | Cloud stores no duplicate public lifecycle and exposes no credential, raw backup object or provider binding. |
+| Q46. What closes internal R6d? | Core/contract/fake/Web and Cloud composed tests prove stateless, external-durable and independent restore eligibility; missing/expired/over-SLO/shared-target/local-PVC blockers; exact mutation binding; and zero provider/route calls for every blocked path. | Internal evidence closes `RESIL-STATE-007`; only the separately approved real regional packet can close `RESIL-E2E-009`. |
+
 ## Open Operational Questions
 
 These do not block the provider-neutral first Code slice, but they block the paid production packet:
@@ -115,5 +133,5 @@ These do not block the provider-neutral first Code slice, but they block the pai
 2. Cloudflare Load Balancing plan and measured monthly/temporary test cost;
 3. production versus disposable acceptance environment and maximum allowed spend;
 4. exact production traffic health threshold, failover/failback change window and human rollback owner;
-5. RPO/RTO and eligible state backend for the stateful packet;
+5. exact RPO/RTO objectives and eligible external state backend for the paid stateful packet;
 6. cleanup policy for disposable resources or retention policy for accepted production cells.

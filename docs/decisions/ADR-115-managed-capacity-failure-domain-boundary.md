@@ -51,6 +51,17 @@ placement engine.
     the previous placement before moving authority, verifies the new endpoint, and performs one
     exact verified rollback after a post-move verification failure. Failback is a fresh accepted
     plan with a later epoch/token. Unproven rollback is `manual-intervention`, never success.
+12. Stateful admission uses the plan-only `infrastructure.cluster.state-eligibility` capability.
+    The public contract distinguishes `stateless`, `external-durable`, `restorable` and
+    `local-pvc`, returns typed `eligible|blocked` evidence, and has no apply path. Omitted state is
+    not interpreted as stateless.
+13. External-durable and restorable profiles declare bounded RPO/RTO objectives and time-bounded
+    observed evidence. Restorable evidence names existing backup and completed restore-rehearsal
+    refs plus distinct source/recovery targets. The existing Storage Volume backup/restore
+    lifecycle remains authoritative; eligibility stores or recreates none of it.
+14. Local PVC, missing or expired evidence, shared recovery target and observed RPO/RTO above the
+    objective fail closed before provider, fencing or route effects. Failover/recover and hosted
+    handoff bind a fresh eligibility decision to the same workload and target pair.
 
 ## Consequences
 
@@ -61,6 +72,9 @@ placement engine.
   schemas and entrypoints must be synchronized directly rather than adding compatibility fallbacks.
 - Capacity-cell lifecycle readback makes active placement count and provider-resource disposition
   explicit so drain/delete safety is observable without leaking provider bindings.
+- State eligibility exposes safe reason codes and evidence refs, not raw backup/provider objects.
+  Cloud/Enterprise may resolve an authoritative tenant profile through an injected port but may not
+  copy the public eligibility rules or storage lifecycle.
 - A production claim still requires real independent-domain, traffic, state-safety and cleanup
   evidence. Unit tests cannot close the external packet.
 
