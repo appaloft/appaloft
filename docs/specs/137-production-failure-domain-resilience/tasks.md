@@ -42,8 +42,10 @@
   freshness/independence, objective-versus-observed RPO/RTO and local-PVC no-effect semantics.
 - [x] Create public R6d actor-visible Ticket #1120 and bind `RESIL-STATE-007` before Code Round.
 - [x] RED core/contract/fake/Web tests for state decisions and exact failover/recover binding.
-- [ ] Implement state eligibility and DR evidence `RESIL-STATE-007` without duplicating Storage
+- [x] Implement state eligibility and DR evidence `RESIL-STATE-007` without duplicating Storage
   Volume backup/restore lifecycle.
+- [x] Merge public R6d implementation PR #1121 to final `main` `223f2d7f` and verify the Cloud
+  tenant-authoritative reader, failover/recover/handoff no-effect packet tracked by Cloud #917.
 - [ ] Prove the remaining R6d/real-packet portion of exact rollback/cleanup `RESIL-CLEAN-008`.
 
 ## External Acceptance And Sync
