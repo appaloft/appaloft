@@ -21,9 +21,11 @@ placement engine.
 3. Failover and recovery compare candidates with the current target inside the public
    `ManagedClusterTargetPool`. Decisions return safe selected-domain evidence and stable reason
    codes for missing or shared domains.
-4. Initial placement with required domain kinds accepts only targets that declare those kinds. A
-   later readiness query may prove that a pool has at least one independent replacement without
-   performing provider effects.
+4. Initial placement with required domain kinds accepts only targets that declare those kinds.
+   Independent replacement readiness reuses the same target-pool eligibility and ranking rules,
+   requires one exact current target, and returns typed `ready` or `blocked` evidence through the
+   existing connector plan query. It does not reserve capacity, increment an epoch, emit a fencing
+   token, expose private bindings, or perform cluster, workload, provider, route or DNS mutation.
 5. Placement epochs and fencing tokens remain authoritative. Failure-domain separation does not
    itself move traffic, replicate data, or prove recovery; those require explicit provider-neutral
    handoff/readiness receipts.

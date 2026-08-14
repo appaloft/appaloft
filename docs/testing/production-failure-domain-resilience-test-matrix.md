@@ -5,7 +5,7 @@
 | RESIL-FD-001 | core/contract | bounded failure-domain identity validation | managed topology core and schema tests | verified |
 | RESIL-PLACE-002 | core/application | required missing/shared domain fails before provider effect | target-pool and connector no-effect tests | verified |
 | RESIL-DECIDE-003 | core/contract | deterministic selected-domain evidence, epoch and fencing | repeated placement snapshots | verified |
-| RESIL-READY-004 | query/integration | independent replacement readiness without mutation | readiness query and provider-spy negatives | planned |
+| RESIL-READY-004 | core/contract/query/Web/Cloud integration | typed ready/blocked independent replacement capacity, deterministic safe evidence and no mutation/apply path | target-pool tests; connector plan test; contract test; Web parameter/readback test; Cloud composed provider-spy negative | planned |
 | RESIL-FENCE-005 | application/integration | stale epoch/token cannot move writer or route authority | accepted-plan/fencing tests | planned |
 | RESIL-ROUTE-006 | connector/e2e | replacement health then exact traffic handoff/rollback | route connector plus real endpoints | planned |
 | RESIL-STATE-007 | policy/e2e | local state blocked or verified durable-state evidence | workload eligibility and restore/failover packet | planned |

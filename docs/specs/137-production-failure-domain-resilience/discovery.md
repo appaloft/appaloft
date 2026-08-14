@@ -56,6 +56,22 @@ what was fenced, whether traffic moved, what data-safety class applied, and what
 - Equating healthy secondary compute with completed DNS/traffic handoff.
 - Claiming platform/control-plane HA from a workload-only packet.
 
+## R6b1 Accepted Grill Decisions
+
+The owner authorized the agent to accept the recommended Grill for the next slice. The following
+decisions are accepted for R6b1 and do not weaken the broader R6b managed-cell lifecycle gate.
+
+| Question | Recommended and accepted decision | Consequence |
+| --- | --- | --- |
+| Q13. What closes the first R6b vertical slice? | An operator can ask whether one exact current placement has at least one independently identified, ready replacement with capacity. | R6b1 closes replacement-capacity readiness only; it does not close managed-cell lifecycle or the real packet. |
+| Q14. Which surface owns the query? | Reuse `connections.capability.plan` with the neutral capability `infrastructure.cluster.readiness`. | No second placement operation, aggregate, table or hidden write path is added. |
+| Q15. Is blocked readiness an error? | Valid input returns a typed `ready` or `blocked` result. Missing current target, no independent candidate, zero capacity, non-ready status, excluded target or missing capability appear as stable safe reasons. | Operators can diagnose capacity without converting an expected unavailable state into a transport failure. |
+| Q16. What evidence is safe and sufficient? | Return the exact pool/workload/current target and epoch, required domains/capabilities, deterministic considered and eligible target ids, selected target topology, total eligible replacement capacity, estimated cost and support level. | Provider binding, credentials and private support references never cross the public contract. |
+| Q17. Does readiness reserve capacity or fence placement? | No. It evaluates one immutable target-pool snapshot and emits neither a next placement epoch nor a fencing token. | R6c must bind a later mutation to fresh readiness, fencing and an exact accepted plan. |
+| Q18. Which effects are allowed? | The query performs no cluster, workload, route, DNS or provider mutation and has no apply path. | `canApply` is false; provider-spy tests prove no mutation. |
+| Q19. Does this complete R6b? | No. Cell import/provision, inspect, drain/delete and external provider evidence remain R6b2. | `R6-CLOUD-CELLS-005` stays open until the lifecycle and provider packet pass. |
+| Q20. Is another ADR required? | ADR-115 already owns the later readiness query and public/private boundary; update it with the explicit typed/no-effect semantics rather than add a competing ADR. | Canonical language remains `independent replacement readiness`. |
+
 ## Open Operational Questions
 
 These do not block the provider-neutral first Code slice, but they block the paid production packet:
