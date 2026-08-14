@@ -32,6 +32,8 @@ itself claim Appaloft control-plane high availability or cross-provider outage t
 | RESIL-PLACE-002 | independent failover admission | current and candidate targets share or omit a required domain | failover/recovery placement runs | candidate is ineligible before provider effects with stable missing/shared reason codes. |
 | RESIL-DECIDE-003 | deterministic safe evidence | more than one independent candidate is eligible | placement runs repeatedly | target, domain evidence, ranked candidates, epoch, fencing token and reasons are deterministic. |
 | RESIL-READY-004 | independent replacement readiness | a pool, current placement and workload policy exist | `infrastructure.cluster.readiness` is planned | valid input returns typed `ready` or `blocked` evidence over the exact snapshot; it exposes deterministic candidate/capacity/cost/support reasons without cluster, workload, provider, route or DNS mutation, capacity reservation, a next epoch or a fencing token. |
+| RESIL-CELL-010 | managed capacity-cell lifecycle | an operator has an entitled target pool and an exact provider-neutral cell plan | the cell is provisioned or imported, inspected, drained and deleted | the accepted-plan-bound lifecycle returns safe origin/status/topology/capacity/cost/support/disposition receipts; drain blocks new placement, delete requires zero active placements, and imported provider resources are retained. |
+| RESIL-CELLS-011 | exact two-cell dry-run | two explicit cells declare different required failure-domain keys | the lifecycle and readiness packet runs | both cells have deterministic plan/readback, one is independently replacement-ready, drain/delete preserves the surviving cell, and zero Appaloft-owned residual evidence is returned without paid provider mutation. |
 | RESIL-FENCE-005 | one writer/route owner | replacement is ready | traffic handoff is accepted | previous placement is fenced before route authority moves; stale epochs/tokens cannot mutate. |
 | RESIL-ROUTE-006 | explicit traffic handoff | two endpoints have health evidence | handoff runs | accepted plan binds exact endpoints/policy, verifies replacement, moves traffic and returns rollback/failback evidence. |
 | RESIL-STATE-007 | state safety | workload uses local or external durable state | failover is planned | unsupported local state fails closed; supported state declares evidence refs and bounded RPO/RTO. |
@@ -44,11 +46,18 @@ itself claim Appaloft control-plane high availability or cross-provider outage t
   add a second placement command or Cloud-only topology model.
 - Reuse `connections.capability.plan|accept|apply` for provider lifecycle and future traffic handoff
   capabilities. Mutation remains bound to the exact accepted plan.
+- Extend that protocol with `infrastructure.cluster.import` and `infrastructure.cluster.drain`.
+  `provision|import|drain|delete` require plan acceptance; `inspect` is read-only. A managed capacity
+  cell exposes only provider-neutral origin, lifecycle, topology, capacity, cost/support and
+  provider-resource disposition evidence.
 - Reuse `connections.capability.plan` for `infrastructure.cluster.readiness`; this capability is
   plan-only, returns safe typed replacement-capacity evidence and has no apply path.
 - Keep `deployments.create` ids-only and reuse existing logs, health, proof, route and recovery
   contracts.
 - Surface safe topology/readiness evidence through shared contracts consumed by CLI/API/SDK/Web/MCP.
+- A cell may be `provisioned` or `imported`, and may move through `accepting -> draining -> drained ->
+  deleted` (or `failed`). Imported-cell deletion removes Appaloft management only and must report
+  that the external provider resource is retained.
 
 ## Non-Goals
 

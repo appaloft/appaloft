@@ -19,6 +19,11 @@
    in adapters.
 6. Gate stateful failover on existing backup/restore or external durability evidence rather than
    copying storage lifecycle.
+7. Model a provider-neutral managed capacity-cell lifecycle inside the existing managed-cluster
+   connector contract. `provision|import|drain|delete` are exact accepted-plan mutations;
+   `inspect` is query-only and returns the same safe lifecycle snapshot used by receipts.
+8. Make origin and provider-resource disposition explicit so imported-cell deletion can unregister
+   Appaloft capacity without destroying the external cluster.
 
 ## CQRS, Read Model And Event Impact
 
@@ -36,7 +41,9 @@
 3. Contract/schema/adapter fixture parity.
 4. Cloud composed policy and persistence adoption.
 5. R6b1 public readiness core/contract/application/Web plus Cloud composed no-effect adoption.
-6. R6b2 managed-cell lifecycle dry-run and disposable multi-host packet, then the explicitly
+6. R6b2 RED `RESIL-CELL-010` and `RESIL-CELLS-011` across core lifecycle, connector exact-plan
+   behavior, contracts, Web parameters and deterministic two-cell dry-run/readback.
+7. R6b2 Cloud composition and provider-specific redacted plan/readback, followed by the separately
    authorized regional managed-provider packet.
 
 ## Risks
