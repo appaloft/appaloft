@@ -18,6 +18,13 @@ import {
   type ManagedClusterSupportLevel,
   ManagedClusterTargetPool,
   type ManagedClusterTargetPoolSnapshot,
+  type ManagedTrafficHandoffAction,
+  ManagedTrafficHandoffPlan,
+  type ManagedTrafficHandoffPlanSnapshot,
+  ManagedTrafficHandoffReceipt,
+  type ManagedTrafficHandoffReceiptSnapshot,
+  ManagedTrafficHealthEvidence,
+  type ManagedTrafficRouteSnapshot,
   ok,
   type Result,
 } from "@appaloft/core";
@@ -35,6 +42,9 @@ export interface FakeInfrastructureConnectorProviderAdapterOptions {
   connectorKey: string;
   providerKey: string;
   providerTitle: string;
+  trafficRoutes?: readonly ManagedTrafficRouteSnapshot[];
+  now?: () => string;
+  trafficFailureMode?: "before-move" | "after-move" | "rollback-unverified";
 }
 
 export class FakeInfrastructureConnectorProviderAdapter implements ConnectorProviderAdapter {
@@ -42,16 +52,25 @@ export class FakeInfrastructureConnectorProviderAdapter implements ConnectorProv
   private readonly providerKey: string;
   private readonly providerTitle: string;
   private readonly managedClusters = new Map<string, ManagedClusterCapabilityReceiptSnapshot>();
+  private readonly trafficRoutes = new Map<string, ManagedTrafficRouteSnapshot>();
+  private readonly now: () => string;
+  private readonly trafficFailureMode?: FakeInfrastructureConnectorProviderAdapterOptions["trafficFailureMode"];
 
   constructor(options: FakeInfrastructureConnectorProviderAdapterOptions) {
     this.connectorKey = options.connectorKey;
     this.providerKey = options.providerKey;
     this.providerTitle = options.providerTitle;
+    this.now = options.now ?? (() => new Date().toISOString());
+    this.trafficFailureMode = options.trafficFailureMode;
+    for (const route of options.trafficRoutes ?? []) {
+      this.trafficRoutes.set(route.routeRef, { ...route });
+    }
   }
 
   canPlan(capabilityKey: string): boolean {
     return (
       capabilityKey === "infrastructure.server.propose" ||
+      managedTrafficAction(capabilityKey) !== null ||
       managedClusterAction(capabilityKey) !== null
     );
   }
@@ -65,6 +84,11 @@ export class FakeInfrastructureConnectorProviderAdapter implements ConnectorProv
       return err(
         domainError.validation(`Connector ${this.connectorKey} cannot plan ${input.capabilityKey}`),
       );
+    }
+
+    const trafficAction = managedTrafficAction(input.capabilityKey);
+    if (trafficAction) {
+      return this.planManagedTraffic(input, trafficAction);
     }
 
     const managedAction = managedClusterAction(input.capabilityKey);
@@ -84,6 +108,8 @@ export class FakeInfrastructureConnectorProviderAdapter implements ConnectorProv
   }
 
   canApply(capabilityKey: string): boolean {
+    const trafficAction = managedTrafficAction(capabilityKey);
+    if (trafficAction) return trafficAction !== "status";
     const action = managedClusterAction(capabilityKey);
     return action !== null && action !== "inspect" && action !== "readiness";
   }
@@ -93,6 +119,42 @@ export class FakeInfrastructureConnectorProviderAdapter implements ConnectorProv
     input: ConnectorCapabilityApplyInput,
   ): Promise<Result<ConnectorCapabilityApplyResult>> {
     void context;
+    const trafficAction = managedTrafficAction(input.capabilityKey);
+    if (trafficAction) {
+      if (trafficAction === "status") {
+        return err(
+          domainError.validation(
+            `Connector ${this.connectorKey} cannot apply ${input.capabilityKey}`,
+          ),
+        );
+      }
+      if (!input.acceptedPlanId || !input.acceptedPlan) {
+        return err(
+          domainError.conflict("Managed traffic mutation requires an accepted plan", {
+            connectorKey: input.connectorKey,
+            capabilityKey: input.capabilityKey,
+          }),
+        );
+      }
+      const reboundPlan = this.planManagedTraffic(input, trafficAction);
+      if (reboundPlan.isErr()) return err(reboundPlan.error);
+      if (reboundPlan.value.planId !== input.acceptedPlan.planId) {
+        return err(
+          domainError.conflict("Managed traffic apply parameters do not match the accepted plan", {
+            acceptedPlanId: input.acceptedPlanId,
+            acceptedPlanRef: input.acceptedPlan.planId,
+            currentPlanRef: reboundPlan.value.planId,
+          }),
+        );
+      }
+      const plan = ManagedTrafficHandoffPlan.create(
+        reboundPlan.value.providerPlan
+          ?.managedTrafficHandoffPlan as ManagedTrafficHandoffPlanSnapshot,
+      );
+      if (plan.isErr()) return err(plan.error);
+      return this.applyManagedTraffic(input, plan.value);
+    }
+
     const action = managedClusterAction(input.capabilityKey);
     if (!action || action === "inspect" || action === "readiness") {
       return err(
@@ -121,6 +183,194 @@ export class FakeInfrastructureConnectorProviderAdapter implements ConnectorProv
       );
     }
     return this.applyManagedCluster(input, action);
+  }
+
+  private planManagedTraffic(
+    input: ConnectorCapabilityPlanInput,
+    action: ManagedTrafficHandoffAction | "status",
+  ): Result<ConnectorCapabilityPlanPreview> {
+    if (action === "status") {
+      const routeRef = requiredParameter(input.parameters?.routeRef, "Managed traffic route ref");
+      if (routeRef.isErr()) return err(routeRef.error);
+      const route = this.trafficRoutes.get(routeRef.value);
+      if (!route) return err(domainError.notFound("ManagedTrafficRoute", routeRef.value));
+      return ok({
+        planId: `trafficplan_${stableHash({ ...input, route })}`,
+        connectorKey: input.connectorKey,
+        capabilityKey: input.capabilityKey,
+        riskLevel: "low",
+        requiresExplicitAcceptance: false,
+        summary: `${this.providerTitle}: ${route.routeRef} routes to ${route.activeEndpointRef} at epoch ${route.placementEpoch}.`,
+        effects: [
+          {
+            kind: "infrastructure.cluster.traffic-status",
+            title: `Read ${route.routeRef} traffic authority`,
+            description: "Status planning performs no traffic mutation.",
+          },
+        ],
+        cleanup: { supported: false, description: "Status planning creates no resources." },
+        providerPlan: { kind: "managed-traffic-route", managedTrafficRoute: { ...route } },
+      });
+    }
+
+    const plan = ManagedTrafficHandoffPlan.create({
+      ...(input.parameters as unknown as ManagedTrafficHandoffPlanSnapshot),
+      action,
+    });
+    if (plan.isErr()) return err(plan.error);
+    const snapshot = plan.value.toJSON();
+    const liveRoute = this.trafficRoutes.get(snapshot.currentRoute.routeRef);
+    if (!liveRoute || !plan.value.matchesLiveRoute(liveRoute)) {
+      return err(
+        domainError.conflict("Managed traffic route authority changed before planning", {
+          routeRef: snapshot.currentRoute.routeRef,
+        }),
+      );
+    }
+    return ok({
+      planId: `trafficplan_${stableHash({
+        connectorKey: input.connectorKey,
+        capabilityKey: input.capabilityKey,
+        ownerRef: input.ownerRef,
+        plan: snapshot,
+      })}`,
+      connectorKey: input.connectorKey,
+      capabilityKey: input.capabilityKey,
+      riskLevel: "high",
+      requiresExplicitAcceptance: true,
+      summary: `${this.providerTitle}: ${action} ${snapshot.currentRoute.routeRef} to ${snapshot.replacementEndpoint.endpointRef}.`,
+      effects: [
+        {
+          kind: `infrastructure.cluster.${action === "handoff" ? "handoff-traffic" : "failback-traffic"}`,
+          title: `${action} ${snapshot.currentRoute.routeRef}`,
+          description: `Fence epoch ${snapshot.currentRoute.placementEpoch}; move and verify epoch ${snapshot.nextPlacementEpoch}.`,
+        },
+      ],
+      cleanup: {
+        supported: true,
+        description: "Rollback and cleanup are bounded to the accepted route and endpoint refs.",
+      },
+      providerPlan: { kind: "managed-traffic-handoff", managedTrafficHandoffPlan: snapshot },
+    });
+  }
+
+  private applyManagedTraffic(
+    input: ConnectorCapabilityApplyInput,
+    plan: ManagedTrafficHandoffPlan,
+  ): Result<ConnectorCapabilityApplyResult> {
+    const snapshot = plan.toJSON();
+    const liveRoute = this.trafficRoutes.get(snapshot.currentRoute.routeRef);
+    if (!liveRoute || !plan.matchesLiveRoute(liveRoute)) {
+      return err(
+        domainError.conflict("Managed traffic live route does not match the accepted plan", {
+          routeRef: snapshot.currentRoute.routeRef,
+        }),
+      );
+    }
+    const health = ManagedTrafficHealthEvidence.create(snapshot.replacementHealth);
+    if (health.isErr()) return err(health.error);
+    if (!health.value.isHealthy() || !health.value.isFreshAt(this.now())) {
+      return err(
+        domainError.conflict("Managed traffic replacement health is no longer fresh", {
+          routeRef: snapshot.currentRoute.routeRef,
+          endpointRef: snapshot.replacementEndpoint.endpointRef,
+        }),
+      );
+    }
+    const operationId = `trafficop_${stableHash({ ...input, plan: snapshot })}`;
+    const baseSteps = ["route-read", "health-read"];
+    if (this.trafficFailureMode === "before-move") {
+      return this.toTrafficApplyResult(
+        input,
+        ManagedTrafficHandoffReceipt.create({
+          operationId,
+          action: snapshot.action,
+          outcome: "preserved",
+          previousRoute: liveRoute,
+          finalRoute: liveRoute,
+          healthEvidence: snapshot.replacementHealth,
+          executionSteps: [...baseSteps, "move-precondition-failed", "cleanup-complete"],
+          rollbackAttempts: 0,
+          cleanup: { residualOwnedResources: 0, transientResourceRefs: [] },
+        })
+          ._unsafeUnwrap()
+          .toJSON(),
+      );
+    }
+
+    const movedRoute = plan.movedRoute();
+    this.trafficRoutes.set(movedRoute.routeRef, movedRoute);
+    const movedSteps = [...baseSteps, "previous-fenced", "route-moved"];
+    if (
+      this.trafficFailureMode === "after-move" ||
+      this.trafficFailureMode === "rollback-unverified"
+    ) {
+      const rollbackVerified = this.trafficFailureMode === "after-move";
+      if (rollbackVerified) this.trafficRoutes.set(liveRoute.routeRef, { ...liveRoute });
+      const receipt = ManagedTrafficHandoffReceipt.create({
+        operationId,
+        action: snapshot.action,
+        outcome: rollbackVerified ? "rolled-back" : "manual-intervention",
+        previousRoute: liveRoute,
+        ...(rollbackVerified ? { finalRoute: liveRoute } : {}),
+        healthEvidence: snapshot.replacementHealth,
+        executionSteps: [
+          ...movedSteps,
+          "authority-verification-failed",
+          "rollback-moved",
+          rollbackVerified ? "rollback-verified" : "rollback-verification-failed",
+          "cleanup-complete",
+        ],
+        rollbackAttempts: 1,
+        cleanup: { residualOwnedResources: 0, transientResourceRefs: [] },
+      });
+      if (receipt.isErr()) return err(receipt.error);
+      return this.toTrafficApplyResult(input, receipt.value.toJSON());
+    }
+
+    const observedRoute = this.trafficRoutes.get(movedRoute.routeRef);
+    if (!observedRoute || JSON.stringify(observedRoute) !== JSON.stringify(movedRoute)) {
+      return err(domainError.conflict("Managed traffic authority verification failed"));
+    }
+    const receipt = ManagedTrafficHandoffReceipt.create({
+      operationId,
+      action: snapshot.action,
+      outcome: "moved",
+      previousRoute: liveRoute,
+      finalRoute: observedRoute,
+      healthEvidence: snapshot.replacementHealth,
+      executionSteps: [...movedSteps, "authority-verified", "cleanup-complete"],
+      rollbackAttempts: 0,
+      cleanup: { residualOwnedResources: 0, transientResourceRefs: [] },
+    });
+    if (receipt.isErr()) return err(receipt.error);
+    return this.toTrafficApplyResult(input, receipt.value.toJSON());
+  }
+
+  private toTrafficApplyResult(
+    input: ConnectorCapabilityApplyInput,
+    receipt: ManagedTrafficHandoffReceiptSnapshot,
+  ): Result<ConnectorCapabilityApplyResult> {
+    const verified = receipt.outcome === "moved";
+    return ok({
+      operationId: receipt.operationId,
+      connectorKey: input.connectorKey,
+      capabilityKey: input.capabilityKey,
+      status: verified ? "verified" : "conflict",
+      summary: `${this.providerTitle}: traffic handoff outcome is ${receipt.outcome}.`,
+      effects: [
+        {
+          kind: `traffic.handoff.${receipt.outcome}`,
+          title: `Traffic ${receipt.outcome}`,
+          description: `Rollback attempts: ${receipt.rollbackAttempts}; residual owned resources: ${receipt.cleanup.residualOwnedResources}.`,
+          managed: true,
+        },
+      ],
+      providerResult: {
+        kind: "managed-traffic-handoff-receipt",
+        managedTrafficHandoffReceipt: receipt,
+      },
+    });
   }
 
   private planManagedCluster(
@@ -461,6 +711,15 @@ function managedClusterAction(capabilityKey: string): ManagedClusterCapabilityAc
   ].includes(action)
     ? (action as ManagedClusterCapabilityAction)
     : null;
+}
+
+function managedTrafficAction(
+  capabilityKey: string,
+): ManagedTrafficHandoffAction | "status" | null {
+  if (capabilityKey === "infrastructure.cluster.handoff-traffic") return "handoff";
+  if (capabilityKey === "infrastructure.cluster.failback-traffic") return "failback";
+  if (capabilityKey === "infrastructure.cluster.traffic-status") return "status";
+  return null;
 }
 
 function parseManagedClusterPlan(

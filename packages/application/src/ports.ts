@@ -64,6 +64,9 @@ import {
   type ManagedClusterCapabilityReceiptSnapshot,
   type ManagedClusterPlacementDecisionSnapshot,
   type ManagedClusterReplacementReadinessSnapshot,
+  type ManagedTrafficHandoffPlanSnapshot,
+  type ManagedTrafficHandoffReceiptSnapshot,
+  type ManagedTrafficRouteSnapshot,
   type NotificationMessageDeliverySnapshot,
   type NotificationMessageSnapshot,
   type PackagingMode,
@@ -10869,6 +10872,8 @@ export interface ConnectorCapabilityPlanPreview {
     managedClusterReceipt?: ManagedClusterCapabilityReceiptSnapshot;
     managedClusterPlacement?: ManagedClusterPlacementDecisionSnapshot;
     managedClusterReplacementReadiness?: ManagedClusterReplacementReadinessSnapshot;
+    managedTrafficRoute?: ManagedTrafficRouteSnapshot;
+    managedTrafficHandoffPlan?: ManagedTrafficHandoffPlanSnapshot;
     notificationMessage?: NotificationMessageSnapshot;
     sourceRepositoryAccess?: SourceRepositoryAccessSnapshot;
   };
@@ -10906,6 +10911,7 @@ export interface ConnectorCapabilityApplyResult {
     domainConnectApply?: DomainConnectApplySnapshot;
     notificationDelivery?: NotificationMessageDeliverySnapshot;
     managedClusterReceipt?: ManagedClusterCapabilityReceiptSnapshot;
+    managedTrafficHandoffReceipt?: ManagedTrafficHandoffReceiptSnapshot;
   };
 }
 

@@ -9,6 +9,9 @@ export const managedClusterCapabilityKeys = [
   "infrastructure.cluster.recover",
   "infrastructure.cluster.delete",
   "infrastructure.cluster.cleanup-orphans",
+  "infrastructure.cluster.handoff-traffic",
+  "infrastructure.cluster.failback-traffic",
+  "infrastructure.cluster.traffic-status",
 ] as const;
 
 export type ManagedClusterCapabilityKey = (typeof managedClusterCapabilityKeys)[number];
@@ -23,6 +26,16 @@ export interface ManagedClusterForm {
   readonly currentTargetId: string;
   readonly currentPlacementEpoch: string;
   readonly attempt: string;
+  readonly routeRef: string;
+  readonly currentEndpointRef: string;
+  readonly replacementEndpointRef: string;
+  readonly replacementTargetId: string;
+  readonly currentFencingToken: string;
+  readonly nextFencingToken: string;
+  readonly healthProofRef: string;
+  readonly healthObservedAt: string;
+  readonly healthValidUntil: string;
+  readonly plannedAt: string;
 }
 
 export type ManagedClusterFormField = keyof ManagedClusterForm;
@@ -39,6 +52,85 @@ export function buildManagedClusterParameters(
   capabilityKey: ManagedClusterCapabilityKey,
   form: ManagedClusterForm,
 ): ManagedClusterParameterResult {
+  if (capabilityKey === "infrastructure.cluster.traffic-status") {
+    const routeRef = requiredText(form.routeRef);
+    return routeRef ? { ok: true, parameters: { routeRef } } : { ok: false, field: "routeRef" };
+  }
+
+  if (
+    capabilityKey === "infrastructure.cluster.handoff-traffic" ||
+    capabilityKey === "infrastructure.cluster.failback-traffic"
+  ) {
+    const requiredFields = [
+      "routeRef",
+      "workloadRef",
+      "currentEndpointRef",
+      "currentTargetId",
+      "replacementEndpointRef",
+      "replacementTargetId",
+      "currentFencingToken",
+      "nextFencingToken",
+      "healthProofRef",
+      "healthObservedAt",
+      "healthValidUntil",
+      "plannedAt",
+    ] as const;
+    const values = Object.fromEntries(
+      requiredFields.map((field) => [field, requiredText(form[field])]),
+    ) as Record<(typeof requiredFields)[number], string | undefined>;
+    const missing = requiredFields.find((field) => !values[field]);
+    if (missing) return { ok: false, field: missing };
+    const currentPlacementEpoch = nonnegativeInteger(form.currentPlacementEpoch);
+    if (currentPlacementEpoch === undefined) {
+      return { ok: false, field: "currentPlacementEpoch" };
+    }
+    for (const field of ["healthObservedAt", "healthValidUntil", "plannedAt"] as const) {
+      if (!isIsoInstant(values[field] as string)) return { ok: false, field };
+    }
+    const routeRef = values.routeRef as string;
+    const workloadRef = values.workloadRef as string;
+    const currentEndpointRef = values.currentEndpointRef as string;
+    const currentTargetId = values.currentTargetId as string;
+    const replacementEndpointRef = values.replacementEndpointRef as string;
+    const replacementTargetId = values.replacementTargetId as string;
+    return {
+      ok: true,
+      parameters: {
+        action:
+          capabilityKey === "infrastructure.cluster.failback-traffic" ? "failback" : "handoff",
+        currentRoute: {
+          routeRef,
+          workloadRef,
+          activeEndpointRef: currentEndpointRef,
+          activeTargetId: currentTargetId,
+          placementEpoch: currentPlacementEpoch,
+          fencingToken: values.currentFencingToken as string,
+        },
+        currentEndpoint: {
+          endpointRef: currentEndpointRef,
+          workloadRef,
+          targetId: currentTargetId,
+        },
+        replacementEndpoint: {
+          endpointRef: replacementEndpointRef,
+          workloadRef,
+          targetId: replacementTargetId,
+        },
+        replacementHealth: {
+          endpointRef: replacementEndpointRef,
+          status: "healthy",
+          observedAt: values.healthObservedAt as string,
+          validUntil: values.healthValidUntil as string,
+          proofRef: values.healthProofRef as string,
+        },
+        nextPlacementEpoch: currentPlacementEpoch + 1,
+        nextFencingToken: values.nextFencingToken as string,
+        rollbackEndpointRef: currentEndpointRef,
+        plannedAt: values.plannedAt as string,
+      },
+    };
+  }
+
   if (
     capabilityKey === "infrastructure.cluster.provision" ||
     capabilityKey === "infrastructure.cluster.import"
@@ -150,4 +242,8 @@ function nonnegativeInteger(value: string): number | undefined {
   if (!/^\d+$/.test(value.trim())) return undefined;
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) ? parsed : undefined;
+}
+
+function isIsoInstant(value: string): boolean {
+  return !Number.isNaN(Date.parse(value));
 }
