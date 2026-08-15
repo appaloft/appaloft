@@ -1095,16 +1095,21 @@ export function createHttpApp(input: {
       },
     };
 
-    return ok(
-      input.executionContextFactory.create({
-        actor: authorized.actor,
-        entrypoint: "mcp",
-        locale: context.locale,
-        principal,
-        ...(context.requestSecurity ? { requestSecurity: context.requestSecurity } : {}),
-        requestId: context.requestId,
-      }),
-    );
+    const authorizedContext = input.executionContextFactory.create({
+      actor: authorized.actor,
+      entrypoint: "mcp",
+      locale: context.locale,
+      principal,
+      ...(context.requestSecurity ? { requestSecurity: context.requestSecurity } : {}),
+      requestId: context.requestId,
+    });
+    if (!input.tenantContextResolver) {
+      return ok(authorizedContext);
+    }
+    return ok({
+      ...authorizedContext,
+      tenant: await input.tenantContextResolver.resolveTenantContext(authorizedContext),
+    });
   }
 
   function staticAssetResponse(pathname: string, source: StaticAssetSource): Response | null {
