@@ -67,6 +67,8 @@ function provider(
   let snapshotCaptureCalls = 0;
   const deletedSnapshotIds: string[] = [];
   let updatedNetworkMode: "deny" | "allowlist" | undefined;
+  let networkPolicyCalls = 0;
+
   const runtimeHomeCalls: string[] = [];
   let lastProvisionSource: Parameters<SandboxProvider["provision"]>[0]["source"] | undefined;
   let lastProvisionOwner:
@@ -178,6 +180,7 @@ function provider(
       deletedSnapshotIds.push(request.snapshotId);
     },
     async updateNetworkPolicy(request) {
+      networkPolicyCalls += 1;
       updatedNetworkMode = request.networkPolicy.mode;
     },
   };
@@ -189,6 +192,8 @@ function provider(
     snapshotCaptureCalls: () => snapshotCaptureCalls,
     deletedSnapshotIds: () => [...deletedSnapshotIds],
     updatedNetworkMode: () => updatedNetworkMode,
+    networkPolicyCalls: () => networkPolicyCalls,
+
     runtimeHomeCalls: () => [...runtimeHomeCalls],
     lastProvisionSource: () => lastProvisionSource,
     lastProvisionOwner: () => lastProvisionOwner,
@@ -1160,6 +1165,47 @@ describe("ExecutionSandboxService", () => {
       });
     }
     expect((await app.show(context, "sbx_test"))._unsafeUnwrap().status).toBe("ready");
+  });
+
+  test("[WS-REMOTE-RESUME-EGRESS-020] reapplies allowlist egress when a ready occupancy Sandbox resumes", async () => {
+    const fake = provider({ networkPolicy: ["deny", "allowlist"] });
+    const app = service(fake.adapter);
+    await app.createAndReconcile(context, {
+      ...createInput,
+      networkPolicy: {
+        mode: "allowlist",
+        rules: [{ kind: "domain", value: "opencode.ai", ports: [443] }],
+      },
+    });
+
+    const resumed = await app.resume(context, "sbx_test");
+    expect(resumed._unsafeUnwrap().status).toBe("ready");
+    expect(fake.networkPolicyCalls()).toBe(1);
+    expect(fake.updatedNetworkMode()).toBe("allowlist");
+  });
+
+  test("[WS-REMOTE-RESUME-EGRESS-020] fail-closes ready occupancy resume when egress cannot be reapplied", async () => {
+    const fake = provider({ networkPolicy: ["deny", "allowlist"] });
+    fake.adapter.updateNetworkPolicy = async () => {
+      throw new Error("Sandbox egress gateway failed with HTTP 503");
+    };
+    const app = service(fake.adapter);
+    await app.createAndReconcile(context, {
+      ...createInput,
+      networkPolicy: {
+        mode: "allowlist",
+        rules: [{ kind: "domain", value: "opencode.ai", ports: [443] }],
+      },
+    });
+
+    const resumed = await app.resume(context, "sbx_test");
+    expect(resumed.isErr()).toBe(true);
+    if (resumed.isErr()) {
+      expect(resumed.error).toMatchObject({
+        code: "sandbox_provider_operation_failed",
+        details: { phase: "execution-sandbox-resume-ready-egress" },
+      });
+    }
   });
 
   test("[HIB-APP-004] auto-suspends only idle compute-released Sandboxes", async () => {

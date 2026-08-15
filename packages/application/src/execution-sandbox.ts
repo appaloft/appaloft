@@ -2563,6 +2563,26 @@ export class ExecutionSandboxService {
           }),
         );
       }
+      const networkPolicy = state.networkPolicy.toState();
+      if (networkPolicy.mode === "allowlist") {
+        if (!provider.capabilities.networkPolicy.includes("allowlist")) {
+          return err(
+            domainError.conflict("Sandbox provider does not support the network policy", {
+              code: "sandbox_resume_egress_unsupported",
+              phase: "execution-sandbox-resume-ready-egress",
+              sandboxId,
+            }),
+          );
+        }
+        const applied = await this.providerOperation("execution-sandbox-resume-ready-egress", () =>
+          provider.updateNetworkPolicy({
+            sandboxId,
+            providerHandle: readyHandle,
+            networkPolicy,
+          }),
+        );
+        if (applied.isErr()) return err(applied.error);
+      }
       return ok(descriptor(stored));
     }
     if (state.status.value !== "paused" || !state.providerHandle || !state.suspension) {

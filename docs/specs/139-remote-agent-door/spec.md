@@ -50,6 +50,8 @@ enrolled Server. Source is the remote Binding SHA. The laptop tree is not upload
 
 | WS-REMOTE-RESUME-SERVE-018 | Resume restarts serve | preferred Sandbox exists but OpenCode serve is gone | `appaloft code --no-attach` | occupancy resumes the same workspaceId and `ensureRuntime` starts serve before exit 0. |
 | WS-REMOTE-TEMPLATE-019 | Occupancy template is automatic | login + Server, no `APPALOFT_OPENCODE_SANDBOX_TEMPLATE_ID` | `appaloft code --no-attach` | Community/Cloud register OpenCode against reserved `stp_appaloft_remote_opencode`, ensure that tenant template with `COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY`, then occupy. Explicit env still pins a different template id. Mismatch fail-closes; no local/BYOS fallback. |
+| WS-REMOTE-RESUME-EGRESS-020 | Ready occupancy resume reapplies egress | preferred allowlist Sandbox is already `ready` | `appaloft code --no-attach` | resume probes the provider runtime, then reapplies the stored allowlist via `updateNetworkPolicy` so a replaced Sandbox Gateway still has the occupancy egress policy. Gateway 5xx fail-closes; deny-mode Sandboxes skip reapply. |
+
 
 
 ## Slice Scope
