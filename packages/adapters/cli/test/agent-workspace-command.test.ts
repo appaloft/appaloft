@@ -362,7 +362,7 @@ describe("Agent Workspace CLI", () => {
     });
   });
 
-  test("[WS-CODE-CLI-001][WS-CODE-PARITY-002][WS-CODE-PROFILE-005][WS-CODE-RESUME-007][WS-CODE-OPTIONS-008][WS-CODE-COMPAT-010] code delegates to the workspace open contract", async () => {
+  test("[WS-CODE-CLI-001][WS-CODE-PARITY-002][WS-CODE-COMPAT-010] code native-attaches after remote door; workspace open stays Git-safe", async () => {
     const commands: OpenAgentWorkspaceCommand[] = [];
     const output: string[] = [];
     const resolvedPaths: string[] = [];
@@ -383,6 +383,21 @@ describe("Agent Workspace CLI", () => {
         create: (input) =>
           createExecutionContext({ ...input, requestId: "req_workspace_code_cli" }),
       },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/Acme/Web.git",
+        repositoryIdentity: "github.com/Acme/Web",
+        ref: "refs/heads/feature/code",
+        branch: "feature/code",
+        commitSha: "0123456789abcdef0123456789abcdef01234567",
+        projectId: "prj_web",
+        serverName: "mac-mini",
+      }),
+      resolveScratchHarness: async () => ({
+        kind: "opencode",
+        name: "opencode",
+        argv: ["opencode"],
+        skillOffered: true,
+      }),
       resolveLocalWorkspaceGitContext: async (path) => {
         resolvedPaths.push(path);
         return {
@@ -403,15 +418,7 @@ describe("Agent Workspace CLI", () => {
       return true;
     }) as typeof process.stdout.write;
     try {
-      await program.parseAsync([
-        "node",
-        "appaloft",
-        "code",
-        "--profile",
-        "opencode-default",
-        "--new",
-        "--no-attach",
-      ]);
+      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
       await program.parseAsync([
         "node",
         "appaloft",
@@ -427,10 +434,12 @@ describe("Agent Workspace CLI", () => {
       process.stdout.write = write;
     }
 
-    expect(resolvedPaths).toEqual([".", "."]);
-    expect(commands).toHaveLength(2);
-    expect(commands[0]?.input).toEqual(commands[1]?.input);
-    expect(output.join("")).toContain('"resumed": true');
+    expect(resolvedPaths).toEqual(["."]);
+    expect(commands).toHaveLength(1);
+    expect(output.join("")).toContain(
+      "Remote · prj_web · github.com/Acme/Web@0123456 · mac-mini · my sandbox",
+    );
+    expect(output.join("")).toContain("opencode · Appaloft skill offered");
     expect(commands[0]).toMatchObject({
       input: {
         repository: "https://github.com/Acme/Web.git",
@@ -494,7 +503,7 @@ describe("Agent Workspace CLI", () => {
     expect(commandDispatched).toBeFalse();
   });
 
-  test("[WS-SCRATCH-CLI-001][WS-SCRATCH-EMPTY-002][WS-SCRATCH-DIRTY-003][WS-SCRATCH-LOGGED-OUT-004][WS-SCRATCH-BANNER-005][WS-SCRATCH-HARNESS-006][WS-SCRATCH-NO-ATTACH-009][WS-SCRATCH-NO-STATE-012][WS-SCRATCH-UPGRADE-014][WS-SCRATCH-PROFILE-016] default code is scratch without Git or workspaces.open", async () => {
+  test("[WS-SCRATCH-CLI-001][WS-SCRATCH-EMPTY-002][WS-SCRATCH-DIRTY-003][WS-SCRATCH-LOGGED-OUT-004][WS-SCRATCH-BANNER-005][WS-SCRATCH-HARNESS-006][WS-SCRATCH-NO-ATTACH-009][WS-SCRATCH-NO-STATE-012][WS-SCRATCH-PROFILE-016][WS-REMOTE-LOCAL-010] --local code is scratch without Git or workspaces.open", async () => {
     const scratchDir = await mkdtemp(join(tmpdir(), "appaloft-scratch-empty-"));
     const commands: Command<unknown>[] = [];
     const launched: string[][] = [];
@@ -533,7 +542,7 @@ describe("Agent Workspace CLI", () => {
       return true;
     }) as typeof process.stdout.write;
     try {
-      await program.parseAsync(["node", "appaloft", "code", scratchDir, "--no-attach"]);
+      await program.parseAsync(["node", "appaloft", "code", "--local", scratchDir, "--no-attach"]);
     } finally {
       process.stdout.write = write;
       await rm(scratchDir, { recursive: true, force: true });
@@ -544,6 +553,222 @@ describe("Agent Workspace CLI", () => {
     expect(launched).toEqual([]);
     expect(output.join("")).toContain("Local scratch · this Mac · not saved remotely");
     expect(output.join("")).toContain("opencode");
+  });
+
+  test("[WS-REMOTE-LOGIN-001] default code fails closed when logged out", async () => {
+    const commands: Command<unknown>[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_remote_login" }),
+      },
+      resolveRemoteCodeDoor: async () => {
+        throw {
+          code: "workspace_remote_login_required",
+          category: "conflict",
+          message: "Sign in before opening a remote Agent session",
+          retryable: false,
+          details: { phase: "remote-code-login" },
+        };
+      },
+    });
+    const originalExitCode = process.exitCode;
+    const write = process.stderr.write;
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
+      throw new Error("Expected login-required remote code to fail");
+    } catch (error) {
+      expect(String(error)).toContain('"code":"workspace_remote_login_required"');
+    } finally {
+      process.stderr.write = write;
+      process.exitCode = originalExitCode ?? 0;
+    }
+    expect(commands).toEqual([]);
+  });
+
+  test("[WS-REMOTE-PROFILE-008] missing Profile still native-attaches after door resolution", async () => {
+    const commands: Command<unknown>[] = [];
+    const output: string[] = [];
+    const launched: Array<{ readonly argv: readonly string[]; readonly cwd: string }> = [];
+    const { createCliProgram } = await import("../src");
+    const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_remote_profile" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        projectId: "prj_web",
+        serverName: "mac-mini",
+      }),
+      resolveScratchHarness: async () => ({
+        kind: "opencode",
+        name: "opencode",
+        argv: ["opencode"],
+        skillOffered: true,
+      }),
+      launchScratchAgent: async (input) => {
+        launched.push(input);
+      },
+    });
+    const write = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
+    } finally {
+      process.stdout.write = write;
+    }
+    expect(commands.some((command) => command instanceof OpenAgentWorkspaceCommand)).toBeFalse();
+    expect(launched).toEqual([]);
+    expect(output.join("")).toContain(
+      "Remote · prj_web · github.com/acme/api@aaaaaaa · mac-mini · my sandbox",
+    );
+    expect(output.join("")).toContain("opencode · Appaloft skill offered");
+  });
+
+  test("[WS-REMOTE-OPEN-003][WS-REMOTE-NO-UPLOAD-006][WS-REMOTE-BANNER-014] default code native-attaches after remote door without local Git fail-closed", async () => {
+    const commands: Command<unknown>[] = [];
+    const output: string[] = [];
+    let localGitResolved = false;
+    const { createCliProgram } = await import("../src");
+    const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_remote_open" }),
+      },
+      resolveLocalWorkspaceGitContext: async () => {
+        localGitResolved = true;
+        throw new Error("remote code must not use dirty-tree Git preflight");
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        projectId: "prj_billing",
+        serverName: "mac-mini",
+      }),
+      resolveScratchHarness: async () => ({
+        kind: "opencode",
+        name: "opencode",
+        argv: ["opencode"],
+        skillOffered: true,
+      }),
+    });
+    const write = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
+    } finally {
+      process.stdout.write = write;
+    }
+
+    expect(localGitResolved).toBeFalse();
+    expect(commands.some((command) => command instanceof OpenAgentWorkspaceCommand)).toBeFalse();
+    expect(output.join("")).toContain(
+      "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox",
+    );
+    expect(output.join("")).toContain("opencode · Appaloft skill offered");
+    expect(output.join("")).not.toContain("Local scratch · this Mac · not saved remotely");
+  });
+
+  test("[WS-REMOTE-PROFILE-008] local-shell Server native-attaches without Profile", async () => {
+    const commands: Command<unknown>[] = [];
+    const output: string[] = [];
+    const launched: Array<{ readonly argv: readonly string[]; readonly cwd: string }> = [];
+    const { createCliProgram } = await import("../src");
+    const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_local_shell" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        projectId: "prj_billing",
+        serverName: "this-mac",
+        serverProviderKey: "local-shell",
+      }),
+      resolveScratchHarness: async () => ({
+        kind: "opencode",
+        name: "opencode",
+        argv: ["opencode"],
+        skillOffered: true,
+      }),
+      launchScratchAgent: async (input) => {
+        launched.push(input);
+      },
+    });
+    const write = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code"]);
+    } finally {
+      process.stdout.write = write;
+    }
+
+    expect(commands.some((command) => command instanceof OpenAgentWorkspaceCommand)).toBeFalse();
+    expect(launched).toHaveLength(1);
+    expect(launched[0]?.argv).toEqual(["opencode"]);
+    expect(launched[0]?.cwd).toBe(process.cwd());
+    expect(output.join("")).toContain(
+      "Remote · prj_billing · github.com/acme/api@aaaaaaa · this-mac · my sandbox",
+    );
+    expect(output.join("")).toContain("opencode · Appaloft skill offered");
   });
 
   test("[WS-SCRATCH-INSTALL-007] refused install is the only hard scratch failure", async () => {
@@ -577,7 +802,7 @@ describe("Agent Workspace CLI", () => {
     const write = process.stderr.write;
     process.stderr.write = (() => true) as typeof process.stderr.write;
     try {
-      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
+      await program.parseAsync(["node", "appaloft", "code", "--local", "--no-attach"]);
       throw new Error("Expected refused install to fail");
     } catch (error) {
       const errorText = String(error);
@@ -624,7 +849,7 @@ describe("Agent Workspace CLI", () => {
     });
 
     try {
-      await program.parseAsync(["node", "appaloft", "code", scratchDir]);
+      await program.parseAsync(["node", "appaloft", "code", "--local", scratchDir]);
     } finally {
       await rm(scratchDir, { recursive: true, force: true });
     }
@@ -712,6 +937,15 @@ describe("Agent Workspace CLI", () => {
         stdout: { write: (data) => output.push(String(data)) },
         stderr: { write: () => {} },
       },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/Acme/Web.git",
+        repositoryIdentity: "github.com/Acme/Web",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "0123456789abcdef0123456789abcdef01234567",
+        projectId: "prj_web",
+        serverName: "mac-mini",
+      }),
       resolveLocalWorkspaceGitContext: async () => ({
         root: "/work/repository",
         remoteName: "origin",
@@ -724,10 +958,9 @@ describe("Agent Workspace CLI", () => {
       }),
     });
 
-    await program.parseAsync(["node", "appaloft", "code", "--new"]);
-
+    await program.parseAsync(["node", "appaloft", "workspace", "open", ".", "--new"]);
     expect(attached).toEqual(["term_pi"]);
-    expect(output.join("")).toBe("Pi ready\n");
+    expect(output.join("")).toContain("Pi ready\n");
   });
 
   test("[WS-CODE-ATTACH-006][WS-ATTACH-NATIVE-015] executes the Adapter-declared native client handoff without a shell", async () => {
@@ -769,6 +1002,15 @@ describe("Agent Workspace CLI", () => {
         create: (input) =>
           createExecutionContext({ ...input, requestId: "req_workspace_native_attach_cli" }),
       },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/Acme/Web.git",
+        repositoryIdentity: "github.com/Acme/Web",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "0123456789abcdef0123456789abcdef01234567",
+        projectId: "prj_web",
+        serverName: "mac-mini",
+      }),
       resolveLocalWorkspaceGitContext: async () => ({
         root: "/work/repository",
         remoteName: "origin",
@@ -784,7 +1026,7 @@ describe("Agent Workspace CLI", () => {
       },
     });
 
-    await program.parseAsync(["node", "appaloft", "code", "--new"]);
+    await program.parseAsync(["node", "appaloft", "workspace", "open", ".", "--new"]);
 
     expect(launched).toEqual([
       ["opencode", "attach", "https://attach.example.test/capability", "--dir", "/workspace"],

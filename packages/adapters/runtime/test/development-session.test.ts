@@ -16,7 +16,8 @@ async function waitForSession(
   sourceRoot: string,
   predicate: (value: Record<string, unknown>) => boolean,
 ): Promise<Record<string, unknown>> {
-  for (let attempt = 0; attempt < 200; attempt += 1) {
+  // Real supervisor + filesystem watch; fake timers cannot advance the child process.
+  for (let attempt = 0; attempt < 800; attempt += 1) {
     const status = await runtime.status({ sourceRoot });
     if (status.isOk() && status.value && typeof status.value === "object") {
       const value = status.value as Record<string, unknown>;

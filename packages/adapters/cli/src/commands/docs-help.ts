@@ -86,7 +86,7 @@ export const cliCommandDescriptions = {
     "agent.workspace",
   ),
   agentScratch: withDocs(
-    "Open a local scratch Agent session on this Mac without Git, login, or Cloud",
+    "Open a remote Agent session on the default Server, or this-Mac scratch with --local",
     "agent.scratch",
   ),
   agentAdapter: withDocs(

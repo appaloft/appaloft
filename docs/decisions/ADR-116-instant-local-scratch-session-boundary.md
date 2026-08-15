@@ -1,6 +1,6 @@
 # ADR-116: Instant Local Scratch Session Boundary
 
-Status: Accepted
+Status: Accepted for Scratch (`code --local`). Default `code` door superseded by ADR-117.
 
 Date: 2026-08-15
 

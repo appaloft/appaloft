@@ -27,15 +27,17 @@ status readback; it does not retain target topology or credentials.
 
 ## Task-Oriented Activation
 
-Default `appaloft code [path]` is a Scratch session on this Mac (ADR-116 / Spec 138). It does not
-run this durable workflow, does not inspect Git for fail-closed upload safety, and creates no
-Sandbox, Binding, Profile or Cloud row. The banner is `Local scratch · this Mac · not saved
-remotely`. `--no-attach` resolves scratch without spawning the native TUI.
+Default `appaloft code` is the remote Agent door (ADR-117 / Spec 139). After login it requires a
+default enrolled Server and a Project Binding, resolves the Binding remote SHA, and runs this
+workflow. Laptop Git is a locator only; dirty trees are not uploaded and do not fail closed. The
+banner is `Remote · <project> · <repo@sha> · <server> · my sandbox`.
 
-`appaloft workspace open [path]` remains the durable Profile-aware door over this exact workflow.
-`--profile`, `--new` and `--no-attach` map to the existing Workspace-open input. `appaloft code
---profile` / `--new` keep that durable meaning and therefore keep Git fail-closed. Neither
-command adds an operation, query, projection or local Profile preference.
+`appaloft code --local` remains the Scratch session on this Mac (ADR-116 / Spec 138). It does not
+run this durable workflow and creates no Sandbox, Binding, Profile or Cloud row.
+
+`appaloft workspace open [path]` remains the durable Profile-aware door over this exact workflow
+with local Git fail-closed. `--profile` and `--new` on `code` keep remote-open meaning and do not
+inspect a dirty laptop tree.
 
 Control-plane target selection for durable open happens before dispatch through the existing CLI
 resolver. With no trusted remote selection, activation uses local dispatch; explicit remote

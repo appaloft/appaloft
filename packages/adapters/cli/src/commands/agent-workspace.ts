@@ -20,6 +20,7 @@ import {
   ListSandboxAgentHarnessesQuery,
   ListSandboxAgentRuntimesQuery,
   ListSandboxesQuery,
+  ListServersQuery,
   ListWorkspaceCollaborationsQuery,
   OfferWorkspaceCollaborationHandoffCommand,
   OpenAgentWorkspaceCommand,
@@ -32,6 +33,7 @@ import {
   ResumeAgentTaskRunCommand,
   ResumeSandboxCommand,
   ShowAgentTaskRunQuery,
+  ShowRepositoryBindingQuery,
   ShowSandboxQuery,
   ShowTerminalSessionQuery,
   ShowWorkspaceCollaborationQuery,
@@ -54,6 +56,7 @@ import {
   resolveScratchSession,
   SCRATCH_BANNER,
 } from "../local-scratch-session.js";
+import { formatRemoteCodeBanner, resolveDefaultRemoteCodeDoor } from "../remote-code-session.js";
 import {
   attachTerminalSession,
   CliRuntime,
@@ -313,48 +316,79 @@ export const workspaceCodeCommand = EffectCommand.make(
   "code",
   {
     path: Args.text({ name: "path" }).pipe(Args.withDefault(".")),
-    profile: Options.text("profile").pipe(Options.optional),
-    forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
     noAttach: Options.boolean("no-attach").pipe(Options.withDefault(false)),
+    local: Options.boolean("local").pipe(Options.withDefault(false)),
   },
-  ({ forceNew, noAttach, path, profile }) =>
+  ({ local, noAttach, path }) =>
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
-      if (optionalValue(profile) || forceNew) {
-        const source = yield* Effect.tryPromise({
-          try: () => (cli.resolveLocalWorkspaceGitContext ?? resolveOpenWorkspaceGitContext)(path),
-          catch: (error) => workspaceCliError(error, "workspace-open-git-context"),
+      if (local) {
+        const session = yield* Effect.tryPromise({
+          try: () =>
+            resolveScratchSession(path, cli.resolveScratchHarness ?? resolveDefaultScratchHarness),
+          catch: (error) => workspaceCliError(error, "scratch-harness"),
         });
-        const attach = !noAttach;
-        const command = yield* resultToEffect(
-          OpenAgentWorkspaceCommand.create({
-            repository: source.credentialFreeHttpsRepository,
-            repositoryIdentity: source.repositoryIdentity,
-            ref: source.ref,
-            branch: source.branch,
-            commitSha: source.headSha,
-            ...(optionalValue(profile) ? { profile: optionalValue(profile) } : {}),
-            forceNew,
-            attach,
-          }),
+        process.stdout.write(`${SCRATCH_BANNER}\n`);
+        process.stdout.write(
+          `${session.harness.name}${session.harness.skillOffered ? " · Appaloft skill offered" : ""}\n`,
         );
-        const result = yield* resultToEffect(
-          yield* Effect.promise(() => cli.executeCommand(command)),
-        );
-        yield* completeWorkspaceOpen(result, attach, cli.launchNativeWorkspaceClient);
+        if (noAttach) return;
+        const launch = cli.launchScratchAgent ?? launchScratchAgent;
+        yield* Effect.tryPromise({
+          try: () =>
+            launch({
+              argv: session.harness.argv,
+              cwd: session.path,
+              ...(session.harness.env ? { env: session.harness.env } : {}),
+            }),
+          catch: (error) => workspaceCliError(error, "scratch-harness"),
+        });
         return;
       }
 
+      const door = yield* Effect.tryPromise({
+        try: () =>
+          (
+            cli.resolveRemoteCodeDoor ??
+            ((selectedPath?: string) =>
+              resolveDefaultRemoteCodeDoor(
+                {
+                  ...(cli.environment ? { env: cli.environment } : {}),
+                  localComposition: cli.executionTarget !== "remote",
+                  listServers: async () => {
+                    const query = ListServersQuery.create();
+                    if (query.isErr()) throw query.error;
+                    const listed = await cli.executeQuery(query.value);
+                    if (listed.isErr()) throw listed.error;
+                    return listed.value.items;
+                  },
+                  showBinding: async (repositoryIdentity) => {
+                    const query = ShowRepositoryBindingQuery.create({ repositoryIdentity });
+                    if (query.isErr()) throw query.error;
+                    const shown = await cli.executeQuery(query.value);
+                    if (shown.isErr()) return null;
+                    return shown.value;
+                  },
+                  ...(cli.resolveRemoteWorkspaceGitRef
+                    ? { resolveRemoteRef: cli.resolveRemoteWorkspaceGitRef }
+                    : {}),
+                },
+                selectedPath ?? ".",
+              ))
+          )(path),
+        catch: (error) => workspaceCliError(error, "remote-code-door"),
+      });
+      const attach = !noAttach;
       const session = yield* Effect.tryPromise({
         try: () =>
           resolveScratchSession(path, cli.resolveScratchHarness ?? resolveDefaultScratchHarness),
         catch: (error) => workspaceCliError(error, "scratch-harness"),
       });
-      process.stdout.write(`${SCRATCH_BANNER}\n`);
+      process.stdout.write(`${formatRemoteCodeBanner(door)}\n`);
       process.stdout.write(
         `${session.harness.name}${session.harness.skillOffered ? " · Appaloft skill offered" : ""}\n`,
       );
-      if (noAttach) return;
+      if (!attach) return;
       const launch = cli.launchScratchAgent ?? launchScratchAgent;
       yield* Effect.tryPromise({
         try: () =>
