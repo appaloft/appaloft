@@ -8,6 +8,7 @@ import {
   resolveAppaloftSkillPath,
   resolveDefaultScratchHarness,
   resolveLocalAppaloftCli,
+  resolveNativeOpenCodeAttachEnv,
   resolveScratchPath,
   resolveScratchSession,
   SCRATCH_BANNER,
@@ -158,6 +159,24 @@ describe("local scratch session", () => {
       });
       expect(harness.argv).toEqual(["/bin/pi", "--skill", skillDir]);
       expect(harness.skillOffered).toBe(true);
+    });
+  });
+
+  test("[WS-REMOTE-SKILL-017] occupancy attach env offers the public skill and local MCP", async () => {
+    await withTempDir("appaloft-occupancy-attach-skill-", async (root) => {
+      const skillDir = join(root, "skills", "appaloft");
+      await mkdir(skillDir, { recursive: true });
+      await writeFile(join(skillDir, "SKILL.md"), "---\nname: appaloft\ndescription: test\n---\n");
+      const env = resolveNativeOpenCodeAttachEnv({
+        resolveSkillPath: () => skillDir,
+        resolveAppaloftCli: () => ["/opt/appaloftdev", "mcp", "stdio"],
+      });
+      const config = JSON.parse(env?.OPENCODE_CONFIG_CONTENT ?? "{}") as {
+        skills?: { paths?: string[] };
+        mcp?: { appaloft?: { command?: string[] } };
+      };
+      expect(config.skills?.paths).toEqual([dirname(skillDir)]);
+      expect(config.mcp?.appaloft?.command).toEqual(["/opt/appaloftdev", "mcp", "stdio"]);
     });
   });
 

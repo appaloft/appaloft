@@ -1316,6 +1316,37 @@ export class SandboxAgentDeliveryService {
     );
   }
 
+  async ensureRuntime(
+    context: ExecutionContext,
+    input: { sandboxId: string; runtimeId: string },
+  ): Promise<Result<void>> {
+    const runtime = await this.showRuntime(context, input.sandboxId, input.runtimeId);
+    if (runtime.isErr()) return err(runtime.error);
+    const harness = resolveRuntimeHarness(this.dependencies.harnessRegistry, {
+      harnessKey: runtime.value.harnessKey,
+      ...(runtime.value.profilePin ? { profilePin: runtime.value.profilePin } : {}),
+    });
+    if (!harness?.prepareRuntime) return ok(undefined);
+    try {
+      const record = await this.dependencies.repository.findRuntime(
+        toRepositoryContext(context),
+        input.runtimeId,
+      );
+      const launchProcess = record ? this.runtimeStartProcessLauncher(context, record) : undefined;
+      await harness.prepareRuntime({
+        executionContext: context,
+        sandboxId: input.sandboxId,
+        runtimeId: input.runtimeId,
+        credentialBindings: record?.credentialBindings ?? [],
+        mcpBindings: record?.mcpBindings ?? [],
+        ...(launchProcess ? { launchProcess } : {}),
+      });
+      return ok(undefined);
+    } catch (error) {
+      return err(infrastructureError(error));
+    }
+  }
+
   async issueAttachAccess(
     context: ExecutionContext,
     input: { sandboxId: string; runtimeId: string; expiresAt: string },
@@ -1382,22 +1413,11 @@ export class SandboxAgentDeliveryService {
         }),
       );
     }
-    try {
-      const record = await this.dependencies.repository.findRuntime(
-        toRepositoryContext(context),
-        input.runtimeId,
-      );
-      const launchProcess = record ? this.runtimeStartProcessLauncher(context, record) : undefined;
-      await harness.prepareRuntime?.({
-        executionContext: context,
-        sandboxId: input.sandboxId,
-        runtimeId: input.runtimeId,
-        credentialBindings: record?.credentialBindings ?? [],
-        ...(launchProcess ? { launchProcess } : {}),
-      });
-    } catch (error) {
-      return err(infrastructureError(error));
-    }
+    const ensured = await this.ensureRuntime(context, {
+      sandboxId: input.sandboxId,
+      runtimeId: input.runtimeId,
+    });
+    if (ensured.isErr()) return err(ensured.error);
     const access = await this.dependencies.sandboxAccess.exposePort(context, input.sandboxId, {
       port: interaction.serverPort,
       visibility: "private",

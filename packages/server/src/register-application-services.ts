@@ -4140,6 +4140,7 @@ export function registerApplicationServices(
           showRuntime: (context, input) =>
             agentService.showRuntime(context, input.sandboxId, input.runtimeId),
           createRuntime: (context, input) => agentService.createRuntime(context, input),
+          ensureRuntime: (context, input) => agentService.ensureRuntime(context, input),
           attach: (context, input) => agentService.issueAttachAccess(context, input),
         },
         reservations: placement,

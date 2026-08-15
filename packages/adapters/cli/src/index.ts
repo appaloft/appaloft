@@ -102,6 +102,7 @@ export {
   resolveAppaloftSkillPath,
   resolveDefaultScratchHarness,
   resolveLocalAppaloftCli,
+  resolveNativeOpenCodeAttachEnv,
   resolveScratchPath,
   resolveScratchSession,
   SCRATCH_BANNER,

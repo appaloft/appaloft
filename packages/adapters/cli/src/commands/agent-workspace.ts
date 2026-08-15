@@ -54,6 +54,7 @@ import {
 import {
   launchScratchAgent,
   resolveDefaultScratchHarness,
+  resolveNativeOpenCodeAttachEnv,
   resolveScratchSession,
   SCRATCH_BANNER,
 } from "../local-scratch-session.js";
@@ -178,9 +179,11 @@ function launchNativeWorkspaceClient(argv: readonly string[]): Promise<void> {
     );
   }
   return new Promise((resolve, reject) => {
+    const attachEnv = resolveNativeOpenCodeAttachEnv();
     const child = spawn(argv[0] as string, argv.slice(1), {
       stdio: "inherit",
       shell: false,
+      ...(attachEnv ? { env: { ...process.env, ...attachEnv } } : {}),
     });
     child.once("error", (error) => reject(error));
     child.once("exit", (code, signal) => {

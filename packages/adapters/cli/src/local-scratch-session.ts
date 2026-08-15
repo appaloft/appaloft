@@ -143,6 +143,20 @@ export function buildScratchHarness(
   };
 }
 
+export function resolveNativeOpenCodeAttachEnv(
+  probe: Pick<ScratchHarnessProbe, "resolveSkillPath" | "resolveAppaloftCli" | "which"> = {},
+): Readonly<Record<string, string>> | undefined {
+  const which = probe.which ?? ((name: string) => Bun.which(name));
+  const skillPath = probe.resolveSkillPath ? probe.resolveSkillPath() : resolveAppaloftSkillPath();
+  const appaloftCli = probe.resolveAppaloftCli
+    ? probe.resolveAppaloftCli()
+    : resolveLocalAppaloftCli(which);
+  return buildScratchHarness("opencode", "opencode", {
+    ...(skillPath ? { skillPath } : {}),
+    ...(appaloftCli ? { appaloftCli } : {}),
+  }).env;
+}
+
 async function confirmScratchInstall(): Promise<boolean> {
   const readline = createInterface({
     input: process.stdin,
