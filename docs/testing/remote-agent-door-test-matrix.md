@@ -16,6 +16,8 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-AUTH-009 | runtime / CLI | automated | no model binding starts vendor-login OpenCode; `COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY` includes `opencode.ai`; `sandbox template create --network-policy remote-default` registers that exact allowlist; mismatched occupancy templates fail closed with that recovery command; teammate OAuth is not copied | `packages/server/test/community-remote-default-profile.test.ts`; `packages/adapters/cli/test/execution-sandbox-command.test.ts`; `packages/core/test/execution-sandbox-template.test.ts` |
 | WS-REMOTE-LOCAL-010 | CLI | automated + `appaloftdev` | `--local` Scratch |
 | WS-REMOTE-OPEN-COMPAT-011 | smoke | `appaloftdev workspace open` | non-git still `workspace_git_*` |
+| WS-REMOTE-TEMPLATE-019 | application / runtime | automated | reserved `stp_appaloft_remote_opencode` is ensured on occupancy create; matching reuse; mismatch fail-closed; Cloud/Community register OpenCode without env | `packages/application/test/execution-sandbox-operations.test.ts`; `apps/cloud-runtime/test/cloud-execution-sandbox-api.test.ts`; `apps/cloud-runtime/test/cloud-workspace-activation-context-initializer.test.ts` |
+
 | WS-REMOTE-CAPACITY-012 | application | this slice | no-capacity ≠ Scratch ≠ other Server |
 | WS-REMOTE-DOCS-013 | help | this slice | occupy default + `--local` |
 | WS-REMOTE-TARGET-015 | application | this slice | `targetServerId` is reserved |

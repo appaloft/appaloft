@@ -6,7 +6,9 @@ import { join } from "node:path";
 import {
   type CommandSandboxAgentDescriptor,
   CommandSandboxAgentHarness,
+  OpenCodeSandboxAgentHarness,
 } from "@appaloft/adapter-runtime";
+
 import {
   agentAdapterApiVersion,
   agentAdapterHostCapabilities,
@@ -103,6 +105,9 @@ import {
   CloneEnvironmentCommandHandler,
   CloneEnvironmentUseCase,
   CloseTerminalSessionCommandHandler,
+  COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_DIGEST,
+  COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID,
+  COMMUNITY_OCCUPANCY_OPENCODE_VERSION,
   type CommunityRemoteWorkspaceDefaultProfileConfig,
   CommunityWorkspaceActivationContextInitializer,
   CompleteConnectionCallbackCommandHandler,
@@ -3576,9 +3581,22 @@ export function registerApplicationServices(
   });
   if (!container.isRegistered(tokens.sandboxAgentHarnessRegistry, true)) {
     container.register(tokens.sandboxAgentHarnessRegistry, {
-      useValue: new SandboxAgentHarnessRegistry(),
+      useFactory: instanceCachingFactory((dependencyContainer) => {
+        const sandboxes = dependencyContainer.resolve<ExecutionSandboxService>(
+          tokens.executionSandboxService,
+        );
+        return new SandboxAgentHarnessRegistry([
+          new OpenCodeSandboxAgentHarness(sandboxes, {
+            templateId: "aht_opencode_managed_v1",
+            sandboxTemplateId: COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID,
+            version: COMMUNITY_OCCUPANCY_OPENCODE_VERSION,
+            templateDigest: COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_DIGEST,
+          }),
+        ]);
+      }),
     });
   }
+
   container.register(tokens.agentAdapterInstallationService, {
     useFactory: instanceCachingFactory((dependencyContainer) => {
       const harnesses = dependencyContainer

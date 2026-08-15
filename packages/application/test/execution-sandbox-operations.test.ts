@@ -54,6 +54,7 @@ class DetachedSandboxRepository extends InMemorySandboxRepository {
 function provider(
   input: {
     isolation?: "container-trusted" | "gvisor";
+    networkPolicy?: Array<"deny" | "allowlist">;
     runtimeHome?: boolean;
     runtimeHomeCleanupFailure?: boolean;
     readFileMissing?: boolean;
@@ -81,7 +82,8 @@ function provider(
       processes: true,
       files: true,
       ports: true,
-      networkPolicy: ["deny"],
+      networkPolicy: input.networkPolicy ?? ["deny"],
+
       credentialBroker: false,
     },
     async provision(request) {
@@ -659,6 +661,145 @@ describe("ExecutionSandboxService", () => {
     expect((await app.deleteTemplate(context, "stp_test")).isErr()).toBe(true);
     await app.terminate(context, "sbx_test");
     expect((await app.deleteTemplate(context, "stp_test")).isOk()).toBe(true);
+  });
+
+  test("[WS-REMOTE-TEMPLATE-019] auto-creates the reserved occupancy OpenCode template", async () => {
+    const fake = provider({ isolation: "container-trusted", networkPolicy: ["deny", "allowlist"] });
+    const app = service(fake.adapter);
+
+    const sandbox = await app.createAndReconcile(context, {
+      source: { kind: "template", templateId: "stp_appaloft_remote_opencode" },
+      requestedIsolation: "container-trusted",
+      limits: {
+        cpuMillis: 2_000,
+        memoryBytes: 4_294_967_296,
+        diskBytes: 21_474_836_480,
+        maxProcesses: 128,
+      },
+      networkPolicy: {
+        mode: "allowlist",
+        rules: [
+          { kind: "domain", value: "github.com", ports: [443] },
+          { kind: "domain", value: "api.github.com", ports: [443] },
+          { kind: "domain", value: "api.openai.com", ports: [443] },
+          { kind: "domain", value: "api.anthropic.com", ports: [443] },
+          { kind: "domain", value: "openrouter.ai", ports: [443] },
+          { kind: "domain", value: "api.deepseek.com", ports: [443] },
+          { kind: "domain", value: "api.x.ai", ports: [443] },
+          { kind: "domain", value: "opencode.ai", ports: [443] },
+        ],
+      },
+    });
+    expect(sandbox._unsafeUnwrap()).toMatchObject({
+      sourceKind: "template",
+      status: "ready",
+    });
+    expect(
+      (await app.showTemplate(context, "stp_appaloft_remote_opencode"))._unsafeUnwrap(),
+    ).toMatchObject({
+      templateId: "stp_appaloft_remote_opencode",
+      image: "ghcr.io/appaloft/agent-workspace-opencode:1.18.4",
+    });
+  });
+
+  test("[WS-REMOTE-TEMPLATE-019] reuses a matching reserved occupancy template", async () => {
+    const fake = provider();
+    const app = service(fake.adapter);
+    const first = await app.ensureTemplate(context, {
+      templateId: "stp_appaloft_remote_opencode",
+      name: "appaloft-remote-opencode",
+
+      image: "ghcr.io/appaloft/agent-workspace-opencode:1.18.4",
+      minimumIsolation: "container-trusted",
+      limits: {
+        cpuMillis: 2_000,
+        memoryBytes: 4_294_967_296,
+        diskBytes: 21_474_836_480,
+        maxProcesses: 128,
+      },
+      networkPolicy: {
+        mode: "allowlist",
+        rules: [
+          { kind: "domain", value: "github.com", ports: [443] },
+          { kind: "domain", value: "api.github.com", ports: [443] },
+          { kind: "domain", value: "api.openai.com", ports: [443] },
+          { kind: "domain", value: "api.anthropic.com", ports: [443] },
+          { kind: "domain", value: "openrouter.ai", ports: [443] },
+          { kind: "domain", value: "api.deepseek.com", ports: [443] },
+          { kind: "domain", value: "api.x.ai", ports: [443] },
+          { kind: "domain", value: "opencode.ai", ports: [443] },
+        ],
+      },
+    });
+    const second = await app.ensureTemplate(context, {
+      templateId: "stp_appaloft_remote_opencode",
+      name: "appaloft-remote-opencode",
+
+      image: "ghcr.io/appaloft/agent-workspace-opencode:1.18.4",
+      minimumIsolation: "container-trusted",
+      limits: {
+        cpuMillis: 2_000,
+        memoryBytes: 4_294_967_296,
+        diskBytes: 21_474_836_480,
+        maxProcesses: 128,
+      },
+      networkPolicy: {
+        mode: "allowlist",
+        rules: [
+          { kind: "domain", value: "github.com", ports: [443] },
+          { kind: "domain", value: "api.github.com", ports: [443] },
+          { kind: "domain", value: "api.openai.com", ports: [443] },
+          { kind: "domain", value: "api.anthropic.com", ports: [443] },
+          { kind: "domain", value: "openrouter.ai", ports: [443] },
+          { kind: "domain", value: "api.deepseek.com", ports: [443] },
+          { kind: "domain", value: "api.x.ai", ports: [443] },
+          { kind: "domain", value: "opencode.ai", ports: [443] },
+        ],
+      },
+    });
+    expect(first._unsafeUnwrap().templateId).toBe("stp_appaloft_remote_opencode");
+    expect(second._unsafeUnwrap().createdAt).toBe(first._unsafeUnwrap().createdAt);
+  });
+
+  test("[WS-REMOTE-TEMPLATE-019] fail-closes when the reserved occupancy template mismatches", async () => {
+    const fake = provider();
+    const app = service(fake.adapter);
+    await app.ensureTemplate(context, {
+      templateId: "stp_appaloft_remote_opencode",
+      name: "appaloft-remote-opencode",
+
+      image: "ghcr.io/appaloft/agent-workspace-opencode:1.18.4",
+      minimumIsolation: "container-trusted",
+      limits: {
+        cpuMillis: 2_000,
+        memoryBytes: 4_294_967_296,
+        diskBytes: 21_474_836_480,
+        maxProcesses: 128,
+      },
+      networkPolicy: { mode: "deny", rules: [] },
+    });
+    const mismatched = await app.ensureTemplate(context, {
+      templateId: "stp_appaloft_remote_opencode",
+      name: "appaloft-remote-opencode",
+
+      image: "ghcr.io/appaloft/agent-workspace-opencode:1.18.4",
+      minimumIsolation: "container-trusted",
+      limits: {
+        cpuMillis: 2_000,
+        memoryBytes: 4_294_967_296,
+        diskBytes: 21_474_836_480,
+        maxProcesses: 128,
+      },
+      networkPolicy: {
+        mode: "allowlist",
+        rules: [{ kind: "domain", value: "opencode.ai", ports: [443] }],
+      },
+    });
+    expect(mismatched.isErr()).toBe(true);
+    if (mismatched.isOk()) return;
+    expect(mismatched.error.details).toMatchObject({
+      code: "sandbox_template_network_policy_immutable",
+    });
   });
 
   test("[SBX-TTL-001] maintenance terminates provider runtime before durable expiry", async () => {
