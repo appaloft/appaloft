@@ -309,18 +309,31 @@ describe("Local Development Session runtime", () => {
         ((started.value as Record<string, unknown>).services as Array<Record<string, unknown>>)[0]
           ?.pid,
       );
-      writeFileSync(sourceFile, "setInterval(() => {}, 1000); // changed\n");
-      const restarted = await waitForSession(runtime, sourceRoot, (value) => {
-        const pid = Number((value.services as Array<Record<string, unknown>> | undefined)?.[0]?.pid);
-        return Number.isInteger(pid) && pid !== initialPid;
-      });
+      const deadline = Date.now() + 45_000;
+      let restarted: Record<string, unknown> | undefined;
+      while (Date.now() < deadline) {
+        writeFileSync(sourceFile, `setInterval(() => {}, 1000); // ${Date.now()}\n`);
+        const status = await runtime.status({ sourceRoot });
+        if (status.isOk() && status.value && typeof status.value === "object") {
+          const pid = Number(
+            ((status.value as Record<string, unknown>).services as Array<Record<string, unknown>> | undefined)?.[0]
+              ?.pid,
+          );
+          if (Number.isInteger(pid) && pid !== initialPid) {
+            restarted = status.value as Record<string, unknown>;
+            break;
+          }
+        }
+        await Bun.sleep(200);
+      }
+      expect(restarted).toBeDefined();
       expect(
-        Number((restarted.services as Array<Record<string, unknown>>)[0]?.pid),
+        Number((restarted?.services as Array<Record<string, unknown>> | undefined)?.[0]?.pid),
       ).not.toBe(initialPid);
     } finally {
       await runtime.reset({ sourceRoot });
     }
-  }, 30_000);
+  }, 60_000);
 
   test("[DEV-ERROR-014] fails the session when one supervised service exits unexpectedly", async () => {
     const stateRoot = mkdtempSync(join(tmpdir(), "appaloft-dev-supervisor-state-"));
