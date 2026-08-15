@@ -44,4 +44,16 @@ describe("HostAddress", () => {
     expect(HostAddress.rehydrate("2001:db8::1").formatWithPort(22)).toBe("[2001:db8::1]:22");
     expect(HostAddress.rehydrate("example.com").formatWithPort(22)).toBe("example.com:22");
   });
+
+  test("[SERVER-BOOT-HOST-009] treats loopback names as one reusable this-Mac endpoint", () => {
+    const localhost = HostAddress.rehydrate("localhost");
+    const loopback = HostAddress.rehydrate("127.0.0.1");
+
+    expect(localhost.isLoopback()).toBe(true);
+    expect(loopback.isLoopback()).toBe(true);
+    expect(localhost.matchesReusableEndpoint(loopback)).toBe(true);
+    expect(localhost.matchesReusableEndpoint("127.0.0.1")).toBe(true);
+    expect(localhost.matchesReusableEndpoint("example.com")).toBe(false);
+    expect(HostAddress.rehydrate("example.com").isLoopback()).toBe(false);
+  });
 });

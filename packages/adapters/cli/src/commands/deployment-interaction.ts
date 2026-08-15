@@ -1266,16 +1266,32 @@ function findProject(projects: ProjectSummary[], name: string): ProjectSummary |
   return projects.find((project) => project.slug === slug || slugify(project.name) === slug);
 }
 
-function findServer(
+export function findServer(
   servers: ServerSummary[],
   input: { host: string; port: number; providerKey: string },
 ): ServerSummary | undefined {
-  return servers.find(
+  const requestedHost = HostAddress.rehydrate(input.host);
+  const exact = servers.find(
     (server) =>
-      server.host === HostAddress.rehydrate(input.host).value &&
+      requestedHost.matchesReusableEndpoint(server.host) &&
       server.port === input.port &&
       server.providerKey === input.providerKey,
   );
+  if (exact) {
+    return exact;
+  }
+
+  if (input.providerKey !== "local-shell" || !requestedHost.isLoopback()) {
+    return undefined;
+  }
+
+  const localShellLoopbacks = servers.filter(
+    (server) =>
+      server.providerKey === "local-shell" &&
+      (server.lifecycleStatus ?? "active") === "active" &&
+      HostAddress.rehydrate(server.host).isLoopback(),
+  );
+  return localShellLoopbacks.length === 1 ? localShellLoopbacks[0] : undefined;
 }
 
 function findEnvironment(

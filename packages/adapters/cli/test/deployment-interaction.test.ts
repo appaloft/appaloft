@@ -198,4 +198,29 @@ describe("CLI quick deploy draft mapping", () => {
       }),
     ).toBe(false);
   });
+
+  test("[QUICK-DEPLOY-WF-067] reuses an enrolled localhost local-shell instead of registering 127.0.0.1", async () => {
+    ensureReflectMetadata();
+    const { findServer } = await import("../src/commands/deployment-interaction");
+
+    const occupancyMac = {
+      id: "srv_uil9cpctplou",
+      name: "occupancy-mac",
+      host: "localhost",
+      port: 22,
+      providerKey: "local-shell",
+      targetKind: "single-server" as const,
+      workloadRoles: [],
+      lifecycleStatus: "active" as const,
+      createdAt: "2026-08-15T00:00:00.000Z",
+    };
+
+    expect(
+      findServer([occupancyMac], {
+        host: "127.0.0.1",
+        port: 22,
+        providerKey: "local-shell",
+      })?.id,
+    ).toBe("srv_uil9cpctplou");
+  });
 });

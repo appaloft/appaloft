@@ -751,6 +751,13 @@ function normalizeExplicitHostAddress(value: string): Result<string> {
   return ok(username ? `${username}@${normalizedHost}` : normalizedHost);
 }
 
+const loopbackHostValues = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0"]);
+
+function hostWithoutUsername(value: string): string {
+  const at = value.lastIndexOf("@");
+  return at >= 0 ? value.slice(at + 1) : value;
+}
+
 export class HostAddress extends NonEmptyTextValue {
   private [hostAddressBrand]!: void;
 
@@ -765,6 +772,15 @@ export class HostAddress extends NonEmptyTextValue {
   static rehydrate(value: string): HostAddress {
     const normalized = normalizeExplicitHostAddress(value);
     return new HostAddress(normalized.isOk() ? normalized.value : rehydrateRequiredText(value));
+  }
+
+  isLoopback(): boolean {
+    return loopbackHostValues.has(hostWithoutUsername(this.value));
+  }
+
+  matchesReusableEndpoint(other: HostAddress | string): boolean {
+    const candidate = typeof other === "string" ? HostAddress.rehydrate(other) : other;
+    return this.value === candidate.value || (this.isLoopback() && candidate.isLoopback());
   }
 
   formatWithPort(port: number): string {

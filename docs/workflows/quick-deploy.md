@@ -275,7 +275,7 @@ hidden Quick Deploy workflow command.
 
 The Web QuickDeploy wizard must collect project context immediately after source selection. When no project exists, the project step may stay on the new-project path and use the default first-project name if the user does not override it. When projects exist, the project step must default to selecting an existing project and still allow the user to switch to creating a new project.
 
-The server step follows the same existing-first rule: when servers exist, default to selecting an existing server; when none exist, default to registering a new server.
+The server step follows the same existing-first rule: when servers exist, default to selecting an existing server; when none exist, default to registering a new server. Headless CLI deploy must treat `localhost`, `127.0.0.1`, `::1`, and `0.0.0.0` as the same this-Mac `local-shell` endpoint, so an enrolled occupancy Server is reused instead of registering a second loopback Server.
 
 Input collection remains entry-owned. The shared workflow program receives normalized references:
 
