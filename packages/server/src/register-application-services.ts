@@ -326,6 +326,7 @@ import {
   InspectServerCapacityQueryService,
   InspectServerRuntimeReadinessQueryHandler,
   InspectServerRuntimeReadinessQueryService,
+  type IntegrationAuthPort,
   InviteOrganizationMemberCommandHandler,
   InviteOrganizationMemberUseCase,
   IssueCertificateOnCertificateRequestedHandler,
@@ -3591,6 +3592,16 @@ export function registerApplicationServices(
             sandboxTemplateId: COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID,
             version: COMMUNITY_OCCUPANCY_OPENCODE_VERSION,
             templateDigest: COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_DIGEST,
+            ...(dependencyContainer.isRegistered(tokens.integrationAuthPort)
+              ? {
+                  githubAccess: {
+                    getAccessToken: async (input) =>
+                      dependencyContainer
+                        .resolve<IntegrationAuthPort>(tokens.integrationAuthPort)
+                        .getProviderAccessToken(input.executionContext, "github"),
+                  },
+                }
+              : {}),
           }),
         ]);
       }),

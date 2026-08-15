@@ -60,6 +60,14 @@ export interface OpenCodeSandboxExecutionPort {
 
 export type OpenCodeSandboxModelAccessProvider = SandboxAgentModelAccessProvider;
 
+export interface OpenCodeSandboxGitHubAccessProvider {
+  getAccessToken(input: {
+    readonly executionContext: ExecutionContext;
+    readonly sandboxId: string;
+    readonly runtimeId: string;
+  }): Promise<string | null>;
+}
+
 export interface OpenCodeSandboxAgentHarnessOptions {
   templateId: string;
   sandboxTemplateId: string;
@@ -73,6 +81,7 @@ export interface OpenCodeSandboxAgentHarnessOptions {
   startupPollIntervalMs?: number;
   modelAccess?: OpenCodeSandboxModelAccessProvider;
   mcpAccess?: SandboxAgentMcpAccessProvider;
+  githubAccess?: OpenCodeSandboxGitHubAccessProvider;
 }
 
 type OpenCodeSandboxModelCapability = Awaited<
@@ -287,8 +296,9 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
     const modelAccess = this.options.modelAccess;
     if (credentialBinding && !modelAccess) throw new Error("opencode_model_access_unavailable");
     const mcpBindings = withOccupancyFirstPartyMcpDiscovery(input.mcpBindings ?? []);
-
     const mcpBindingDigest = await sha256(JSON.stringify(mcpBindings));
+    const githubToken = await this.resolveGitHubAccessToken(input);
+    const githubAccessDigest = await sha256(githubToken ? "bound" : "unbound");
     const markerPath = this.serverMarkerPath(input.runtimeId);
     const marked = await this.readServerMarker(
       input.executionContext,
@@ -306,6 +316,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
         !credentialBinding &&
         marker?.schemaVersion === "opencode-server-marker/v4" &&
         marker.mcpBindingDigest === mcpBindingDigest &&
+        marker.githubAccessDigest === githubAccessDigest &&
         marker.mcpCapabilities.every(
           (capability) =>
             new Date(capability.expiresAt).getTime() > Date.now() + this.capabilitySafetyWindowMs(),
@@ -315,12 +326,15 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
         marker &&
         (marker.schemaVersion === "opencode-server-marker/v3"
           ? marker.mcpBindingDigest === mcpBindingDigest &&
+            marker.githubAccessDigest === githubAccessDigest &&
             marker.mcpCapabilities.every(
               (capability) =>
                 new Date(capability.expiresAt).getTime() >
                 Date.now() + this.capabilitySafetyWindowMs(),
             )
-          : marker.schemaVersion === "opencode-server-marker/v2" && mcpBindings.length === 0) &&
+          : marker.schemaVersion === "opencode-server-marker/v2" &&
+            mcpBindings.length === 0 &&
+            !githubToken) &&
         marker.provider &&
         marker.model &&
         new Date(marker.expiresAt).getTime() > Date.now() + this.capabilitySafetyWindowMs();
@@ -446,7 +460,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       argv: [
         "sh",
         "-c",
-        'IFS= read -r config; IFS= read -r token; export OPENCODE_CONFIG_CONTENT="$config"; export APPALOFT_MODEL_ACCESS_TOKEN="$token"; exec "$@"',
+        'IFS= read -r config; IFS= read -r token; IFS= read -r github; export OPENCODE_CONFIG_CONTENT="$config"; export APPALOFT_MODEL_ACCESS_TOKEN="$token"; if [ -n "$github" ]; then export GH_TOKEN="$github" GH_HOST=github.com GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=credential.https://github.com.helper GIT_CONFIG_VALUE_0="!gh auth git-credential"; fi; exec "$@"',
         "appaloft-opencode-server",
         ...sandboxWorkspaceProcessArgv([
           this.executable,
@@ -459,7 +473,9 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       ],
       ...(this.cwd === "." ? {} : { cwd: this.cwd }),
       background: true,
-      stdin: new TextEncoder().encode(`${config}\n${capability?.accessToken ?? ""}\n`),
+      stdin: new TextEncoder().encode(
+        `${config}\n${capability?.accessToken ?? ""}\n${githubToken ?? ""}\n`,
+      ),
     });
     if (started.isErr() || started.value.mode !== "background") {
       await this.revokePreparedCapabilities(input, capability?.capabilityId, mcpCapabilities);
@@ -493,6 +509,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
                 ? { provider: capability.provider, model: capability.model }
                 : {}),
               mcpBindingDigest,
+              githubAccessDigest,
               mcpCapabilities: mcpCapabilities.map((mcpCapability) => ({
                 capabilityId: mcpCapability.capabilityId,
                 expiresAt: mcpCapability.expiresAt,
@@ -809,6 +826,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
     provider?: string;
     model?: string;
     mcpBindingDigest?: string;
+    githubAccessDigest?: string;
     mcpCapabilities: Array<{ capabilityId: string; expiresAt: string }>;
   } | null {
     try {
@@ -831,6 +849,9 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
           ...(typeof parsed.model === "string" ? { model: parsed.model } : {}),
           ...(typeof parsed.mcpBindingDigest === "string"
             ? { mcpBindingDigest: parsed.mcpBindingDigest }
+            : {}),
+          ...(typeof parsed.githubAccessDigest === "string"
+            ? { githubAccessDigest: parsed.githubAccessDigest }
             : {}),
           mcpCapabilities: Array.isArray(parsed.mcpCapabilities)
             ? parsed.mcpCapabilities.flatMap((candidate) => {
@@ -858,6 +879,16 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       return null;
     }
     return null;
+  }
+
+  private async resolveGitHubAccessToken(input: {
+    readonly executionContext: ExecutionContext;
+    readonly sandboxId: string;
+    readonly runtimeId: string;
+  }): Promise<string | undefined> {
+    const token = (await this.options.githubAccess?.getAccessToken(input))?.trim();
+    if (!token || token.length > 4_096 || /[\r\n\0]/u.test(token)) return undefined;
+    return token;
   }
 
 

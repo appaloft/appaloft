@@ -588,6 +588,8 @@ describe("OpenCodeSandboxAgentHarness", () => {
       model: "coding-model",
       mcpBindingDigest:
         "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      githubAccessDigest:
+        "sha256:0e2a58cbed86012305595b865bcee8336c718c4f6658a667354dbb26f5f5662f",
       mcpCapabilities: [],
     });
   });
@@ -1180,6 +1182,96 @@ describe("OpenCodeSandboxAgentHarness", () => {
     expect(marker).toBeDefined();
     expect(JSON.parse(new TextDecoder().decode(marker)).capabilityId).toBe("vendor-login");
   });
+
+  test("[WS-REMOTE-GITHUB-DELIVERY-022] injects GH_TOKEN into occupancy OpenCode serve without argv leakage", async () => {
+    const files = new Map<string, Uint8Array>();
+    const calls: Parameters<OpenCodeSandboxExecutionPort["exec"]>[2][] = [];
+    const execution: OpenCodeSandboxExecutionPort = {
+      async exec(_context, _sandboxId, input) {
+        calls.push(input);
+        if (input.argv.includes("--version")) {
+          return ok({
+            mode: "foreground",
+            frames: [
+              { kind: "stdout", sequence: 1, data: "1.1.60\n" },
+              { kind: "exit", sequence: 2, exitCode: 0 },
+            ],
+          } satisfies SandboxExecResult);
+        }
+        if (input.argv.includes("debug") && input.argv.includes("config")) {
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
+          } satisfies SandboxExecResult);
+        }
+        if (input.argv.includes("serve")) {
+          return ok({ mode: "background", processId: "spr_server" });
+        }
+        if (isHealthProbe(input)) {
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
+          } satisfies SandboxExecResult);
+        }
+        throw new Error("unexpected command");
+      },
+      async listProcesses() {
+        return ok([{ processId: "spr_server", status: "running" }]);
+      },
+      async terminateProcess() {
+        return ok(undefined);
+      },
+      async readFile(_context, _sandboxId, input) {
+        const value = files.get(input.path);
+        return value
+          ? ok(value)
+          : err({
+              code: "sandbox_file_not_found",
+              category: "user",
+              message: "missing",
+              retryable: false,
+              details: {},
+            });
+      },
+      async writeFile(_context, _sandboxId, input) {
+        files.set(input.path, input.content);
+        return ok({ path: input.path, sizeBytes: input.content.byteLength });
+      },
+      async removeFile(_context, _sandboxId, input) {
+        files.delete(input.path);
+        return ok(undefined);
+      },
+    };
+    const harness = new OpenCodeSandboxAgentHarness(execution, {
+      templateId: "aht_opencode_managed_v1",
+      sandboxTemplateId: "stp_opencode_pinned",
+      version: "1.1.60",
+      templateDigest: `sha256:${"b".repeat(64)}`,
+      startupPollAttempts: 1,
+      startupPollIntervalMs: 0,
+      githubAccess: {
+        async getAccessToken() {
+          return "gho_occupancy-delivery-token";
+        },
+      },
+    });
+
+    await harness.prepareRuntime?.({
+      executionContext: context,
+      sandboxId: "sbx_open",
+      runtimeId: "sar_open",
+    });
+
+    const serve = calls.find((call) => call.argv.includes("serve"));
+    expect(JSON.stringify(serve?.argv)).not.toContain("gho_occupancy-delivery-token");
+    expect(new TextDecoder().decode(serve?.stdin)).toContain("gho_occupancy-delivery-token");
+    expect(serve?.argv.some((argument) => argument.includes("GH_TOKEN"))).toBe(true);
+    const marker = JSON.parse(
+      new TextDecoder().decode(files.get(".appaloft-agent/sar_open/opencode-process-id")),
+    ) as { githubAccessDigest?: string };
+    expect(marker.githubAccessDigest).toMatch(/^sha256:/);
+  });
+
 
   test("[R8-OCC-TASK-004] attaches occupancy headless run to the vendor-login OpenCode server", async () => {
     const files = new Map<string, Uint8Array>();
