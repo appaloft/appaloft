@@ -59,6 +59,7 @@ import {
 } from "../local-scratch-session.js";
 import {
   formatRemoteCodeBanner,
+  nativeAttachRequiresInteractiveTerminal,
   REMOTE_CODE_MODEL_HINT,
   resolveDefaultRemoteCodeDoor,
 } from "../remote-code-session.js";
@@ -158,6 +159,14 @@ function launchNativeWorkspaceClient(argv: readonly string[]): Promise<void> {
     return Promise.reject(
       domainError.conflict("Adapter returned an invalid native attach handoff", {
         code: "agent_workspace_native_attach_handoff_invalid",
+      }),
+    );
+  }
+  if (!nativeAttachRequiresInteractiveTerminal()) {
+    return Promise.reject(
+      domainError.conflict("Native Agent attach requires an interactive terminal", {
+        code: "agent_workspace_native_attach_tty_required",
+        recovery: "Run appaloft code from a TTY, or use --no-attach.",
       }),
     );
   }

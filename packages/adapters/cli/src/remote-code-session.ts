@@ -10,6 +10,14 @@ import {
 export const REMOTE_CODE_BANNER_PREFIX = "Remote ·";
 export const REMOTE_CODE_MODEL_HINT =
   "Connect a model in the attached OpenCode session before running a Task.";
+
+export function nativeAttachRequiresInteractiveTerminal(
+  stdin: { readonly isTTY?: boolean } = process.stdin,
+  stdout: { readonly isTTY?: boolean } = process.stdout,
+): boolean {
+  return Boolean(stdin.isTTY && stdout.isTTY);
+}
+
 export interface RemoteCodeDoorResolution {
   readonly repository: string;
   readonly repositoryIdentity: string;

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   formatRemoteCodeBanner,
+  nativeAttachRequiresInteractiveTerminal,
   resolveDefaultRemoteCodeDoor,
   selectDefaultRemoteCodeServer,
 } from "../src/remote-code-session.js";
@@ -140,5 +141,11 @@ describe("remote code door", () => {
     });
     expect(door.commitSha).toBe("b".repeat(40));
     expect(door.serverId).toBe("srv_1");
+  });
+
+  test("[R8-OCC-ATTACH-010] native attach requires an interactive terminal", () => {
+    expect(nativeAttachRequiresInteractiveTerminal({ isTTY: true }, { isTTY: true })).toBe(true);
+    expect(nativeAttachRequiresInteractiveTerminal({ isTTY: false }, { isTTY: true })).toBe(false);
+    expect(nativeAttachRequiresInteractiveTerminal({ isTTY: true }, { isTTY: false })).toBe(false);
   });
 });
