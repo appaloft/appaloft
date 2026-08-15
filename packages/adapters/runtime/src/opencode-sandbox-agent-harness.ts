@@ -158,12 +158,15 @@ function validModelCapability(
   );
 }
 
+export const APPALOFT_SANDBOX_SKILL_PATHS = ["/workspace/skills", "/workspace/.agents/skills"] as const;
+
 export function createOpenCodeSandboxConfig(
   capability?: OpenCodeSandboxModelCapability,
   mcpCapabilities: readonly SandboxAgentMcpAccessDescriptor[] = [],
 ): string {
   return JSON.stringify({
     snapshot: false,
+    skills: { paths: [...APPALOFT_SANDBOX_SKILL_PATHS] },
     ...(capability
       ? {
           model: `${capability.provider}/${capability.model}`,

@@ -46,6 +46,7 @@ enrolled Server. Source is the remote Binding SHA. The laptop tree is not upload
 | WS-REMOTE-BANNER-014 | Identity after occupy | `workspaces.open` succeeds | attach or `--no-attach` | stdout has one banner: `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>`. No live deploy stream. |
 | WS-REMOTE-TARGET-015 | Door Server is placement | door selected Server S | `code` dispatches open | command includes `targetServerId=S`; placement reserves S. |
 | WS-REMOTE-NO-ATTACH-016 | Occupy without attach | `--no-attach` | `appaloft code --no-attach` | Sandbox is created or resumed; CLI does not attach; exit 0; `sandbox list` shows my occupancy. |
+| WS-REMOTE-SKILL-017 | Occupancy offers Appaloft skill | occupancy OpenCode starts or attaches | harness config is prepared | Sandbox serve offers `/workspace/skills` and `/workspace/.agents/skills`; native attach offers the public Appaloft skill plus local `appaloft mcp stdio` when the source CLI exists. Vendor TUI text is not parsed. |
 
 ## Slice Scope
 

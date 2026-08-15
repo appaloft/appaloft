@@ -77,11 +77,13 @@ describe("Remote MCP Sandbox Agent configuration", () => {
     ).toHaveLength(120);
   });
 
-  test("[MCP-ACCESS-HARNESS-005][MCP-ACCESS-POLICY-006] renders OpenCode remote MCP config", () => {
+  test("[WS-REMOTE-SKILL-017][MCP-ACCESS-HARNESS-005] renders OpenCode skill paths and remote MCP", () => {
     const config = JSON.parse(createOpenCodeSandboxConfig(modelAccess, [mcpAccess])) as {
+      skills?: { paths?: string[] };
       mcp: Record<string, Record<string, unknown>>;
     };
 
+    expect(config.skills?.paths).toEqual(["/workspace/skills", "/workspace/.agents/skills"]);
     expect(config.mcp).toEqual({
       "appaloft-tools": {
         type: "remote",
