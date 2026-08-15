@@ -174,9 +174,168 @@ test("[WS-CREATE-PROFILE-009] an exact unique Profile pin aliases the reviewed n
   expect(registry.resolve("declarative-ambiguous-0123456789ab")).toBeNull();
 });
 
+test("[R8-OCC-TASK-001] resolves a missing declarative alias to the unique native template after restart", () => {
+  const registry = new SandboxAgentHarnessRegistry();
+  registry.register({
+    key: "opencode",
+    templateId: "aht_opencode_managed_v1",
+    sandboxTemplateId: "stp_opencode_pinned",
+    version: "1.18.4",
+    templateDigest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    capabilities: {
+      taskMode: true,
+      interactive: true,
+      backgroundRuns: true,
+      nativeSession: true,
+      persistentPaths: ["/workspace/.appaloft-agent"],
+    },
+    async execute() {
+      return { events: [], outcomeDigest: "sha256:opencode" };
+    },
+    async cancel() {},
+  });
+
+  expect(registry.resolve("declarative-appaloft-remote-fff987d41dde")).toBeNull();
+  expect(
+    registry.resolve("declarative-appaloft-remote-fff987d41dde", {
+      templateId: "aht_opencode_managed_v1",
+    })?.key,
+  ).toBe("opencode");
+});
+
+test("[R8-OCC-TASK-002] reconciles an occupancy run after restart without the declarative alias", async () => {
+  const executed: string[] = [];
+  const native: SandboxAgentHarness = {
+    key: "opencode",
+    templateId: "aht_opencode_managed_v1",
+    sandboxTemplateId: "stp_opencode_pinned",
+    version: "1.18.4",
+    templateDigest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    capabilities: {
+      taskMode: true,
+      interactive: true,
+      backgroundRuns: true,
+      nativeSession: true,
+      persistentPaths: ["/workspace/.appaloft-agent"],
+    },
+    async execute(input) {
+      executed.push(input.task);
+      return { events: [], outcomeDigest: "sha256:occupancy" };
+    },
+    async cancel() {},
+  };
+  const alias = {
+    key: "declarative-appaloft-remote-fff987d41dde",
+    templateId: "aht_opencode_managed_v1",
+    sandboxTemplateId: "stp_opencode_pinned",
+    version: "1.0.0",
+    templateDigest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    runtimeRequirements: [{ id: "opencode", version: ">=1.18.0 <2.0.0" }],
+  };
+  const pin = {
+    ...credentialProfileFixture().pin,
+    harnessKey: alias.key,
+    harnessTemplateId: "aht_opencode_managed_v1",
+    sandboxTemplateId: "stp_opencode_pinned",
+  };
+  const profilePlan = {
+    ...credentialProfileFixture().profilePlan,
+    sandbox: {
+      ...credentialProfileFixture().profilePlan.sandbox,
+      source: { kind: "template" as const, templateId: "stp_opencode_pinned" },
+    },
+    runtime: {
+      harnessKey: alias.key,
+      harnessTemplateId: "aht_opencode_managed_v1",
+      declarativeHarness: {},
+    },
+    credentialRequirements: [],
+    credentialBindings: [],
+    pin,
+  };
+  const started = fixture({
+    harness: native,
+    alias,
+    workspaceProfileResolver: {
+      async compileForNewWorkspace() {
+        return ok(profilePlan);
+      },
+    },
+  });
+  const runtime = await started.service.createRuntime(context, {
+    sandboxId: "sbx_demo",
+    harnessKey: alias.key,
+    harnessTemplateId: "aht_opencode_managed_v1",
+    idempotencyKey: "runtime_occupancy_restart",
+    profileInstallationId: pin.profileInstallationId,
+    profilePlan,
+  });
+  if (runtime.isErr()) throw new Error(JSON.stringify(runtime.error));
+  const created = await started.service.createRun(context, {
+    sandboxId: "sbx_demo",
+    runtimeId: "sar_test",
+    task: "open a PR",
+    context: { mode: "fresh" },
+    idempotencyKey: "run_occupancy_restart",
+  });
+  expect(created.isOk()).toBe(true);
+
+  const restarted = fixture({
+    harness: native,
+    repository: started.repository,
+  });
+  const reconciled = await restarted.service.reconcileRun(context, "srun_test");
+  expect(reconciled.isOk()).toBe(true);
+  expect(reconciled._unsafeUnwrap().status).toBe("completed");
+  expect(executed).toEqual(["open a PR"]);
+});
+
+test("[R8-OCC-TASK-003] fails a headless occupancy run when no model is bound", async () => {
+  const { service } = fixture({
+    harness: {
+      key: "opencode",
+      templateId: "aht_opencode_managed_v1",
+      version: "1.18.4",
+      templateDigest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      async execute() {
+        throw new Error("sandbox_agent_model_connection_binding_missing");
+      },
+      async cancel() {},
+    },
+  });
+  const runtime = await service.createRuntime(context, {
+    sandboxId: "sbx_demo",
+    harnessKey: "opencode",
+    harnessTemplateId: "aht_opencode_managed_v1",
+    idempotencyKey: "runtime_occupancy_no_model",
+  });
+  if (runtime.isErr()) throw new Error(JSON.stringify(runtime.error));
+  const created = await service.createRun(context, {
+    sandboxId: "sbx_demo",
+    runtimeId: "sar_test",
+    task: "open a PR",
+    context: { mode: "fresh" },
+    idempotencyKey: "run_occupancy_no_model",
+  });
+  if (created.isErr()) throw new Error(JSON.stringify(created.error));
+  expect(created._unsafeUnwrap().status).toBe("accepted");
+
+  const reconciled = await service.reconcileRun(context, "srun_test");
+  expect(reconciled.isErr()).toBe(true);
+  expect((await service.showRun(context, "sar_test", "srun_test"))._unsafeUnwrap()).toMatchObject({
+    status: "failed",
+    failure: {
+      code: "sandbox_agent_model_connection_binding_missing",
+      summary: "sandbox_agent_model_connection_binding_missing",
+    },
+  });
+});
+
 function fixture(
   options: {
     harness?: SandboxAgentHarness;
+    alias?: Parameters<SandboxAgentHarnessRegistry["registerAlias"]>[0];
+    repository?: InMemorySandboxAgentDeliveryRepository;
     readProof?: () => Promise<{ verdict: "verified" | "failed" | "pending"; reasonCode?: string }>;
     workspaceProfileResolver?: SandboxAgentDeliveryDependencies["workspaceProfileResolver"];
     processCredentialGrants?: SandboxAgentDeliveryDependencies["processCredentialGrants"];
@@ -208,7 +367,9 @@ function fixture(
     async cancel() {},
   };
   const queued: Array<{ kind: string; id: string }> = [];
-  const repository = new InMemorySandboxAgentDeliveryRepository();
+  const repository = options.repository ?? new InMemorySandboxAgentDeliveryRepository();
+  const harnessRegistry = new SandboxAgentHarnessRegistry([harness]);
+  if (options.alias) expect(harnessRegistry.registerAlias(options.alias)).toBe(true);
   const service = new SandboxAgentDeliveryService({
     repository,
     sandboxReader: {
@@ -233,7 +394,7 @@ function fixture(
         });
       },
     },
-    harnessRegistry: new SandboxAgentHarnessRegistry([harness]),
+    harnessRegistry,
     ...(options.workspaceProfileResolver
       ? { workspaceProfileResolver: options.workspaceProfileResolver }
       : {}),
