@@ -83,7 +83,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft repository-binding bind` - `repository-bindings.bind`
 - `appaloft repository-binding show` - `repository-bindings.show`
 - `appaloft repository-binding unbind` - `repository-bindings.unbind`
-- `appaloft code` - remote Agent identity door; native-attaches OpenCode/Pi; `--local` is Scratch
+- `appaloft code` - occupy my Sandbox via `workspaces.open`; `--local` is Scratch
 - `appaloft workspace open [path]` - `workspaces.open` with local Git fail-closed
 - `appaloft sandbox create` - `sandboxes.create`
 - `appaloft sandbox list` - `sandboxes.list`
