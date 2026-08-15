@@ -1094,11 +1094,105 @@ describe("OpenCodeSandboxAgentHarness", () => {
     ]);
   });
 
-  test("[MODEL-ACCESS-BIND-002][MODEL-ACCESS-BIND-003] fails before native startup when the model binding is missing or ambiguous", async () => {
+  test("[WS-REMOTE-PROFILE-008] starts OpenCode occupancy without a required model binding", async () => {
+    const files = new Map<string, Uint8Array>();
+    let issueCalls = 0;
+    const execution: OpenCodeSandboxExecutionPort = {
+      async exec(_context, _sandboxId, input) {
+        if (input.argv.includes("--version")) {
+          return ok({
+            mode: "foreground",
+            frames: [
+              { kind: "stdout", sequence: 1, data: "1.1.60\n" },
+              { kind: "exit", sequence: 2, exitCode: 0 },
+            ],
+          } satisfies SandboxExecResult);
+        }
+        if (input.argv.includes("debug") && input.argv.includes("config")) {
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
+          } satisfies SandboxExecResult);
+        }
+        if (input.argv.includes("serve")) {
+          return ok({ mode: "background", processId: "spr_server" });
+        }
+        if (isHealthProbe(input)) {
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
+          } satisfies SandboxExecResult);
+        }
+        throw new Error("unexpected command");
+      },
+      async listProcesses() {
+        return ok([{ processId: "spr_server", status: "running" }]);
+      },
+      async terminateProcess() {
+        return ok(undefined);
+      },
+      async readFile(_context, _sandboxId, input) {
+        const value = files.get(input.path);
+        return value
+          ? ok(value)
+          : err({
+              code: "sandbox_file_not_found",
+              category: "user",
+              message: "missing",
+              retryable: false,
+              details: {},
+            });
+      },
+      async writeFile(_context, _sandboxId, input) {
+        files.set(input.path, input.content);
+        return ok({ path: input.path, sizeBytes: input.content.byteLength });
+      },
+      async removeFile(_context, _sandboxId, input) {
+        files.delete(input.path);
+        return ok(undefined);
+      },
+    };
+    const harness = new OpenCodeSandboxAgentHarness(execution, {
+      templateId: "aht_opencode_managed_v1",
+      sandboxTemplateId: "stp_opencode_pinned",
+      version: "1.1.60",
+      templateDigest: `sha256:${"b".repeat(64)}`,
+      startupPollAttempts: 1,
+      startupPollIntervalMs: 0,
+      modelAccess: {
+        async issue() {
+          issueCalls += 1;
+          return modelAccess.issue();
+        },
+        async revoke() {},
+      },
+    });
+
+    await harness.prepareRuntime?.({
+      executionContext: context,
+      sandboxId: "sbx_open",
+      runtimeId: "sar_open",
+    });
+
+    expect(issueCalls).toBe(0);
+    const marker = files.get(".appaloft-agent/sar_open/opencode-process-id");
+    expect(marker).toBeDefined();
+    expect(JSON.parse(new TextDecoder().decode(marker)).capabilityId).toBe("vendor-login");
+  });
+
+
+  test("[MODEL-ACCESS-BIND-003] fails before native startup when the model binding is ambiguous", async () => {
+    const context = createExecutionContext({ requestId: "req_open" });
     let issueCalls = 0;
     const execution = {
       async exec() {
-        throw new Error("child_must_not_start");
+        issueCalls += 1;
+        return ok({
+          mode: "foreground" as const,
+          exitCode: 0,
+          stdout: new TextEncoder().encode("1.1.60"),
+          stderr: new Uint8Array(),
+        });
       },
       async listProcesses() {
         return ok([]);
@@ -1107,16 +1201,10 @@ describe("OpenCodeSandboxAgentHarness", () => {
         return ok(undefined);
       },
       async readFile() {
-        return err({
-          code: "sandbox_file_not_found",
-          category: "user" as const,
-          message: "missing",
-          retryable: false,
-          details: {},
-        });
+        return err({ message: "missing", retryable: false });
       },
-      async writeFile(_context: unknown, _sandboxId: string, input: { path: string; content: Uint8Array }) {
-        return ok({ path: input.path, sizeBytes: input.content.byteLength });
+      async writeFile() {
+        return ok({ path: "unused", sizeBytes: 0 });
       },
       async removeFile() {
         return ok(undefined);
@@ -1141,9 +1229,6 @@ describe("OpenCodeSandboxAgentHarness", () => {
       runtimeId: "sar_open",
     };
 
-    await expect(harness.prepareRuntime?.(baseInput)).rejects.toThrow(
-      "sandbox_agent_model_connection_binding_missing",
-    );
     await expect(
       harness.prepareRuntime?.({
         ...baseInput,
@@ -1155,6 +1240,7 @@ describe("OpenCodeSandboxAgentHarness", () => {
     ).rejects.toThrow("sandbox_agent_model_connection_binding_ambiguous");
     expect(issueCalls).toBe(0);
   });
+
 
   test("[AGENT-WS-OPEN-008] cancellation stops the headless child and runtime termination stops the native server", async () => {
     const terminated: string[] = [];

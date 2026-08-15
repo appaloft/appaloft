@@ -97,17 +97,25 @@ export interface SandboxAgentModelAccessProvider {
   }): Promise<void>;
 }
 
-export function requireSandboxAgentModelCredentialBinding(
+export function selectSandboxAgentModelCredentialBinding(
   bindings: readonly AgentWorkspaceCredentialBinding[] = [],
-): AgentWorkspaceCredentialBinding {
+): AgentWorkspaceCredentialBinding | undefined {
   const modelBindings = bindings.filter((binding) => binding.kind === "model-api");
-  if (modelBindings.length === 0) {
-    throw new Error("sandbox_agent_model_connection_binding_missing");
-  }
+  if (modelBindings.length === 0) return undefined;
   if (modelBindings.length !== 1) {
     throw new Error("sandbox_agent_model_connection_binding_ambiguous");
   }
   return modelBindings[0] as AgentWorkspaceCredentialBinding;
+}
+
+export function requireSandboxAgentModelCredentialBinding(
+  bindings: readonly AgentWorkspaceCredentialBinding[] = [],
+): AgentWorkspaceCredentialBinding {
+  const selected = selectSandboxAgentModelCredentialBinding(bindings);
+  if (!selected) {
+    throw new Error("sandbox_agent_model_connection_binding_missing");
+  }
+  return selected;
 }
 
 export type SandboxAgentSandboxSource =
