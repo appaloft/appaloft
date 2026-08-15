@@ -1115,7 +1115,8 @@ Server id/host, provider handle, capacity probes or credentials.
 
 | Workspace action | Canonical operations | CLI / SDK |
 | --- | --- | --- |
-| Open/create-or-resume | `workspaces.open` | current task entry `appaloft code [path]`; compatible `appaloft workspace open [path]`; `appaloft.workspaces.open(...)` |
+| Open local scratch | none | default `appaloft code [path]` |
+| Open/create-or-resume | `workspaces.open` | durable `appaloft workspace open [path]`; `appaloft code --profile` / `--new`; `appaloft.workspaces.open(...)` |
 | Profile-aware create | `workspaces.open(forceNew=true)` | `appaloft workspace create --profile ...`; `appaloft.workspaces.create(...)` |
 | Adapter catalog | `sandboxes.agents.harnesses.list` | `appaloft workspace harness list`; Console capability-driven creation |
 | List/show | `sandboxes.list/show` + `sandboxes.agents.runtimes.list` | `appaloft workspace list/show`; `appaloft.workspaces.list/show` |
@@ -1161,11 +1162,11 @@ create provider-specific operation names. See
 [Spec 120](./specs/120-profile-aware-workspace-open-and-attach/spec.md), and
 [Agent Workspace Workflow](./workflows/agent-workspace.md).
 
-The active `appaloft code` command is the task-oriented CLI presentation governed by
-[ADR-107](./decisions/ADR-107-task-oriented-workspace-activation-presentation.md) and
-[Spec 125](./specs/125-workspace-code-activation/spec.md). It adds no operation-catalog entry,
-message, projection or lifecycle. The first slice reuses the existing Profile selection, target
-resolver, Git preflight, `workspaces.open` result/error contract and capability-driven attach.
+Default `appaloft code` is the Scratch presentation governed by
+[ADR-116](./decisions/ADR-116-instant-local-scratch-session-boundary.md) and
+[Spec 138](./specs/138-instant-local-scratch/spec.md). It adds no operation-catalog entry. Durable
+`appaloft workspace open` and `appaloft code --profile` / `--new` remain
+`workspaces.open` presentation under ADR-107 / Spec 125.
 
 Brokered model access adds no secret-bearing operation. The existing Profile configuration binds
 one safe `model-api` Connection reference; `workspaces.open` carries the compiled binding into the

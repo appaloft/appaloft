@@ -27,17 +27,21 @@ status readback; it does not retain target topology or credentials.
 
 ## Task-Oriented Activation
 
-`appaloft code [path]` is the CLI presentation over this exact workflow. The default
-path is `.`, and `--profile`, `--new` and `--no-attach` map to the existing Workspace-open input.
-It adds no operation, query, projection or local Profile preference. `appaloft workspace open
-[path]` remains supported for compatibility and explicit resource-oriented use after that command
-ships.
+Default `appaloft code [path]` is a Scratch session on this Mac (ADR-116 / Spec 138). It does not
+run this durable workflow, does not inspect Git for fail-closed upload safety, and creates no
+Sandbox, Binding, Profile or Cloud row. The banner is `Local scratch · this Mac · not saved
+remotely`. `--no-attach` resolves scratch without spawning the native TUI.
 
-Control-plane target selection happens before dispatch through the existing CLI resolver. With no
-trusted remote selection, activation uses local dispatch; explicit remote selection continues to
-use `--control-plane-profile` and the catalog-backed `workspaces.open` contract. The Agent
-Workspace Profile selector remains `--profile` and must not be confused with the control-plane
-profile.
+`appaloft workspace open [path]` remains the durable Profile-aware door over this exact workflow.
+`--profile`, `--new` and `--no-attach` map to the existing Workspace-open input. `appaloft code
+--profile` / `--new` keep that durable meaning and therefore keep Git fail-closed. Neither
+command adds an operation, query, projection or local Profile preference.
+
+Control-plane target selection for durable open happens before dispatch through the existing CLI
+resolver. With no trusted remote selection, activation uses local dispatch; explicit remote
+selection continues to use `--control-plane-profile` and the catalog-backed `workspaces.open`
+contract. The Agent Workspace Profile selector remains `--profile` and must not be confused with
+the control-plane profile. Scratch does not consult that resolver.
 
 The no-subcommand `appaloft workspace` control TUI renders this workflow and its existing read
 models. Its lifecycle and delivery actions dispatch the same public operations as the headless
@@ -47,12 +51,13 @@ Agent conversation/session semantics remain inside the Adapter-owned PTY or atta
 
 ## Preflight
 
-Local Git inspection stays in the CLI adapter. It resolves Git root, configured upstream remote,
-branch and HEAD SHA without reading or uploading file contents. Before contacting the remote, the
-CLI prints a progress line. Remote `ls-remote` is bounded; a hang or unreachable Git host fails
-closed with recovery guidance instead of waiting silently. Staged, unstaged, or untracked
-changes; detached HEAD; missing upstream; and a remote branch tip different from HEAD all fail
-before a control-plane mutation.
+Local Git inspection stays in the CLI adapter for durable `workspace open` / `workspace create`.
+It resolves Git root, configured upstream remote, branch and HEAD SHA without reading or uploading
+file contents. Before contacting the remote, the CLI prints a progress line. Remote `ls-remote` is
+bounded; a hang or unreachable Git host fails closed with recovery guidance instead of waiting
+silently. Staged, unstaged, or untracked changes; detached HEAD; missing upstream; and a remote
+branch tip different from HEAD all fail before a control-plane mutation. Default Scratch `code`
+does not run this preflight.
 
 Repository locators normalize to a connector-neutral Repository Identity. `workspaces.open` uses
 the exact tenant-scoped Repository Binding to find the Project, then resolves an explicit Profile

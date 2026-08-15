@@ -49,6 +49,12 @@ import {
   resolveRemoteGitWorkspaceRef,
 } from "../local-git-workspace-context.js";
 import {
+  launchScratchAgent,
+  resolveDefaultScratchHarness,
+  resolveScratchSession,
+  SCRATCH_BANNER,
+} from "../local-scratch-session.js";
+import {
   attachTerminalSession,
   CliRuntime,
   optionalNumber,
@@ -264,9 +270,9 @@ function resolveCreateWorkspaceGitRef(repository: string, ref: string) {
   });
 }
 
-function makeWorkspaceOpenCommand(name: "code" | "open") {
+function makeWorkspaceOpenCommand() {
   return EffectCommand.make(
-    name,
+    "open",
     {
       path: Args.text({ name: "path" }).pipe(Args.withDefault(".")),
       profile: Options.text("profile").pipe(Options.optional),
@@ -301,9 +307,66 @@ function makeWorkspaceOpenCommand(name: "code" | "open") {
   ).pipe(EffectCommand.withDescription(cliCommandDescriptions.agentWorkspaceOpen));
 }
 
-const open = makeWorkspaceOpenCommand("open");
+const open = makeWorkspaceOpenCommand();
 
-export const workspaceCodeCommand = makeWorkspaceOpenCommand("code");
+export const workspaceCodeCommand = EffectCommand.make(
+  "code",
+  {
+    path: Args.text({ name: "path" }).pipe(Args.withDefault(".")),
+    profile: Options.text("profile").pipe(Options.optional),
+    forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
+    noAttach: Options.boolean("no-attach").pipe(Options.withDefault(false)),
+  },
+  ({ forceNew, noAttach, path, profile }) =>
+    Effect.gen(function* () {
+      const cli = yield* CliRuntime;
+      if (optionalValue(profile) || forceNew) {
+        const source = yield* Effect.tryPromise({
+          try: () => (cli.resolveLocalWorkspaceGitContext ?? resolveOpenWorkspaceGitContext)(path),
+          catch: (error) => workspaceCliError(error, "workspace-open-git-context"),
+        });
+        const attach = !noAttach;
+        const command = yield* resultToEffect(
+          OpenAgentWorkspaceCommand.create({
+            repository: source.credentialFreeHttpsRepository,
+            repositoryIdentity: source.repositoryIdentity,
+            ref: source.ref,
+            branch: source.branch,
+            commitSha: source.headSha,
+            ...(optionalValue(profile) ? { profile: optionalValue(profile) } : {}),
+            forceNew,
+            attach,
+          }),
+        );
+        const result = yield* resultToEffect(
+          yield* Effect.promise(() => cli.executeCommand(command)),
+        );
+        yield* completeWorkspaceOpen(result, attach, cli.launchNativeWorkspaceClient);
+        return;
+      }
+
+      const session = yield* Effect.tryPromise({
+        try: () =>
+          resolveScratchSession(path, cli.resolveScratchHarness ?? resolveDefaultScratchHarness),
+        catch: (error) => workspaceCliError(error, "scratch-harness"),
+      });
+      process.stdout.write(`${SCRATCH_BANNER}\n`);
+      process.stdout.write(
+        `${session.harness.name}${session.harness.skillOffered ? " · Appaloft skill offered" : ""}\n`,
+      );
+      if (noAttach) return;
+      const launch = cli.launchScratchAgent ?? launchScratchAgent;
+      yield* Effect.tryPromise({
+        try: () =>
+          launch({
+            argv: session.harness.argv,
+            cwd: session.path,
+            ...(session.harness.env ? { env: session.harness.env } : {}),
+          }),
+        catch: (error) => workspaceCliError(error, "scratch-harness"),
+      });
+    }),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.agentScratch));
 
 const list = EffectCommand.make(
   "list",

@@ -155,6 +155,28 @@ export const publicDocsHelpTopics = {
       "apps/web/src/routes/workspaces and workspace-collaborations: create, reconnect, collaborate, preview, review, and deliver",
     ],
   },
+  "agent.scratch": {
+    id: "agent.scratch",
+    title: "Local scratch session",
+    description:
+      "How to open a local OpenCode or Pi scratch session on this Mac without Git, login, Binding, or Cloud.",
+    page: {
+      "zh-CN": "agents/workspaces",
+      "en-US": "en/agents/workspaces",
+    },
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli"],
+    anchor: "agent-workspace-open",
+    aliases: ["appaloft code", "local scratch", "scratch session", "instant local scratch"],
+    specReferences: [
+      "docs/specs/138-instant-local-scratch/spec.md",
+      "docs/testing/instant-local-scratch-test-matrix.md",
+      "docs/decisions/ADR-116-instant-local-scratch-session-boundary.md",
+    ],
+  },
   "agent.workspace-control": {
     id: "agent.workspace-control",
     title: "Workspace control TUI",

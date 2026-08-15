@@ -1,8 +1,12 @@
 # Workspace Code Activation Test Matrix
 
+Historical Spec 125 rows. After ADR-116 / Spec 138, default `appaloft code` is Scratch
+(`docs/testing/instant-local-scratch-test-matrix.md`). These `WS-CODE-*` rows now govern
+`appaloft workspace open` and `appaloft code --profile` / `--new` only.
+
 | ID | Layer | Scenario | Expected evidence | Planned automated binding | Status |
 | --- | --- | --- | --- | --- | --- |
-| WS-CODE-CLI-001 | CLI/unit | `appaloft code` defaults path to `.` | Top-level command resolves repository context without an internal Workspace id. | `packages/adapters/cli/test/agent-workspace-command.test.ts` | passing |
+| WS-CODE-CLI-001 | CLI/unit | `appaloft workspace open` defaults path to `.` | Top-level durable command resolves repository context without an internal Workspace id. | `packages/adapters/cli/test/agent-workspace-command.test.ts` | passing |
 | WS-CODE-PARITY-002 | CLI/contract | `code` and `workspace open` receive equivalent input | Both paths construct the same `workspaces.open` command and attach handling; no `code.*` operation exists. | `packages/adapters/cli/test/agent-workspace-command.test.ts`; `packages/application/test/operation-catalog-boundary.test.ts` | passing |
 | WS-CODE-LOCAL-003 | CLI/integration | No remote control-plane target is selected | Existing resolver chooses local dispatch without remote handshake, SSH state sync or target registration. | `packages/adapters/cli/test/control-plane-client.test.ts` | passing |
 | WS-CODE-PREFLIGHT-004 | CLI/unit | Dirty, detached, missing/mismatched upstream, unpushed repository, or remote Git timeout | Existing Git error and guidance return before application dispatch. Remote inspection prints progress and fails closed on timeout. | `packages/adapters/cli/test/local-git-workspace-context.test.ts`; `packages/adapters/cli/test/agent-workspace-command.test.ts` | passing |

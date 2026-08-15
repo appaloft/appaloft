@@ -33,6 +33,7 @@ import {
   type LocalGitWorkspaceContext,
   type RemoteGitWorkspaceRef,
 } from "./local-git-workspace-context.js";
+import { type ScratchAgentLauncher, type ScratchHarnessResolver } from "./local-scratch-session.js";
 import { type OperatePresentation } from "./operate-presentation.js";
 import {
   type OpenedNativeWorkspaceTerminal,
@@ -98,6 +99,8 @@ export interface CliProgramInput {
     repository: string,
     ref: string,
   ) => Promise<RemoteGitWorkspaceRef>;
+  resolveScratchHarness?: ScratchHarnessResolver;
+  launchScratchAgent?: ScratchAgentLauncher;
   launchNativeWorkspaceClient?: (argv: readonly string[]) => Promise<void>;
   workspaceControlPresentation?: WorkspaceControlPresentation;
   operatePresentation?: OperatePresentation;
@@ -173,6 +176,8 @@ export class CliRuntime extends Context.Tag("CliRuntime")<
       repository: string,
       ref: string,
     ) => Promise<RemoteGitWorkspaceRef>;
+    readonly resolveScratchHarness?: ScratchHarnessResolver;
+    readonly launchScratchAgent?: ScratchAgentLauncher;
     readonly launchNativeWorkspaceClient?: (argv: readonly string[]) => Promise<void>;
     readonly workspaceControlPresentation?: WorkspaceControlPresentation;
     readonly operatePresentation?: OperatePresentation;
@@ -257,6 +262,8 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
     ...(input.resolveRemoteWorkspaceGitRef
       ? { resolveRemoteWorkspaceGitRef: input.resolveRemoteWorkspaceGitRef }
       : {}),
+    ...(input.resolveScratchHarness ? { resolveScratchHarness: input.resolveScratchHarness } : {}),
+    ...(input.launchScratchAgent ? { launchScratchAgent: input.launchScratchAgent } : {}),
     ...(input.launchNativeWorkspaceClient
       ? { launchNativeWorkspaceClient: input.launchNativeWorkspaceClient }
       : {}),

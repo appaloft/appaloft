@@ -41,67 +41,47 @@ flowchart LR
 
 Sandbox 本身只是一个受控执行环境，不预设"应该跑什么"。Workspace 把 Sandbox 和一个具体的 Agent Runtime、仓库源码、Terminal Session 组合起来，变成一个用户可以直接远程开发、随时断线重连的环境——这是大多数"让 AI Agent 帮我改代码"场景真正需要的抽象层级。
 
-## 从本地仓库打开 Workspace <a id="agent-workspace-open" />
+## 从本地目录打开 Agent <a id="agent-workspace-open" />
 
-在 clean 且已经 push 的 Git branch 中运行：
+在任意目录运行：
 
 ```bash
 appaloft code
 ```
 
-`appaloft code [path]` 是面向任务的主入口，path 默认为 `.`；它与兼容命令
-`appaloft workspace open [path]` 委托给同一个 `workspaces.open` 操作。CLI 只用 path 查找 Git
-root、upstream remote、branch 和 HEAD SHA，不会上传本地目录或未提交
-文件。它会把 remote 规范化为 Repository identity，通过 Repository Binding 找到 Project，
-选择显式 `--profile` 或 Project 默认 Profile，然后创建或恢复远端 Workspace。默认会直接进入
-Agent 自己的界面。
+默认 `appaloft code [path]` 打开本机 Scratch 会话，path 默认为 `.`。空目录、脏工作树、detached
+HEAD、未 push、未登录、没有 Binding/Profile/Cloud 都可以进入。CLI 不会调用 `workspaces.open`，
+也不会上传本地文件。横幅是：
+
+```text
+Local scratch · this Mac · not saved remotely
+```
+
+默认先找本机 `opencode`，否则 `pi`。都没有时提示安装；拒绝安装是 attach 前唯一硬失败。
+Scratch 会向本机 Agent 提供公共 Appaloft skill，不会改所选目录里的项目文件。
+`--no-attach` 只解析 scratch、打印横幅和 harness，然后退出。
+
+durable Workspace 仍用：
+
+```bash
+appaloft workspace open
+appaloft code . --profile <workspace-profile>
+appaloft code . --new
+```
+
+这些路径继续走 `workspaces.open`：只用 path 查找 Git root、upstream、branch 和 HEAD SHA，要求
+clean 且已 push。`--profile` 选择 Agent Workspace Profile，不同于全局
+`--control-plane-profile`。脏树、detached、缺 upstream 或 remote tip 不一致会在任何远端创建前
+失败。V1 不做隐式 sync 或 patch upload。
 
 `workspaces.open` 会先验证来源，再读取现有 Repository Binding 和 Project 默认 Profile。如果部署方
 组合了可选的 activation initializer，缺少的 Project、Binding 或默认 Profile 可以在同一次显式
 activation 中幂等创建或复用，随后必须重新读取公共权威状态；没有 initializer 的 Community/local
-部署继续 fail closed，并给出原有设置入口。initializer 必须在创建前完成其部署所需的授权与 admission，
-且不能覆盖已有、冲突、disabled 或未授权状态。
+部署继续 fail closed。initializer 必须在创建前完成授权与 admission，且不能覆盖已有、冲突、
+disabled 或未授权状态。
 
-attach 时：
-
-- managed-terminal Adapter 启动或重用 Agent TUI 的 Terminal Session，并立即连接；
-- native-attach Adapter 获取短期可撤销 capability，并按 Adapter 声明执行或展示本地 client
-  handoff；
-- 不支持 attach 的 Adapter 明确失败，不伪造连接信息。
-
-attach 行为只读取 Adapter capability，不根据 Pi、OpenCode 或其他 Agent 名称分支。
-
-成功结果和 Workspace detail 会返回安全的 activation 与目标选择证据：
-
-- activation 中的 Project、Repository Binding 和 Profile 分别标记为 `created` 或 `reused`；
-- target class 是 `managed`、`registered-server` 或 `local`，selection source 是
-  `platform-default`、`saved-policy` 或 `explicit`，并带稳定 reason；
-- 证据不包含 Server id、host、provider handle、容量探针或 credential。再次 open 恢复同一
-  Workspace 时会返回原证据，不重新 placement；旧 Workspace 无证据时明确显示
-  `legacy-unclassified`，不会猜测执行位置。
-
-部署方的 entitlement、target policy 或容量失败必须在 Sandbox/provider effect 前失败。错误可以提示
-等待、重试或显式接入其他执行位置，但 Appaloft 不会静默从 managed 切换到 registered Server 或本机。
-
-再次运行同一命令会恢复相同来源 SHA 的 preferred Workspace。需要新隔离环境时使用：
-
-```bash
-appaloft code . --new
-```
-
-只创建/恢复并输出 descriptor，不进入 Agent 界面：
-
-```bash
-appaloft code . --no-attach
-```
-
-`--profile` 选择 Agent Workspace Profile；它不同于全局
-`--control-plane-profile`（后者选择本机保存的控制面连接配置）。第一版不提供
-`--keep-awake` 或自动删除快捷参数，暂停、恢复和终止仍使用显式 Workspace 生命周期命令。
-
-如果 worktree 有 staged、unstaged 或 untracked 文件，或当前 branch 没有 upstream、HEAD 未
-push、remote branch tip 与 HEAD 不一致，CLI 会在任何远端创建前失败，显示将使用的 HEAD SHA
-和安全的 clean/push 提示。V1 不做隐式 sync 或 patch upload。
+deploy 方的 entitlement、target policy 或容量失败必须在 Sandbox/provider effect 前失败。错误可以
+提示等待、重试或显式接入其他执行位置，但 Appaloft 不会把一次 managed 请求静默改成本机 Scratch。
 
 ## 管理正在运行的 Workspace <a id="workspace-control-tui" />
 

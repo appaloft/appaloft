@@ -31,7 +31,7 @@ appaloft init                                 # 在当前目录初始化 appalof
 appaloft deploy .                             # 部署当前目录
 appaloft login                                # 登录 Appaloft Cloud 或自托管实例
 appaloft context list                         # 查看本机已保存的 profile/context
-appaloft code                                 # 从当前 Git 仓库打开或恢复 Agent Workspace
+appaloft code                                 # 在本机打开本地 Scratch Agent 会话
 appaloft workspace                            # 管理 Workspace，并嵌入 Agent 原生 TUI
 appaloft dev                                  # 启动本地 Development TUI / foreground 会话
 appaloft dev . --server <serverId>            # 通过 live outbound Worker 远端开发
@@ -50,19 +50,18 @@ appaloft deployments recovery-readiness <deploymentId>  # 查询恢复就绪状�
 
 ## Workspace 快速入口
 
-在 clean 且已经 push 的 Git branch 中运行 `appaloft code [path]`，会通过既有
-`workspaces.open` 操作创建或恢复 Profile-aware Workspace，并在 Adapter 支持时进入 Agent
-自己的 TUI 或 native client。path 默认为 `.`。
+`appaloft code [path]` 在本机打开 Scratch 会话。不要求 Git、登录、Binding 或 Cloud。path 默认为
+`.`。`--no-attach` 只打印 scratch 横幅，不启动 Agent TUI。
 
 ```bash
 appaloft code
-appaloft code . --profile <workspace-profile> --new
 appaloft code . --no-attach
+appaloft workspace open . --profile <workspace-profile> --new
 ```
 
-`--profile` 选择 Agent Workspace Profile；全局 `--control-plane-profile` 选择本机保存的控制面
-连接。已有自动化可继续使用 `appaloft workspace open .`，其语义和机器可读行为不变。完整的
-前置条件、恢复方式与安全失败说明见 [从本地仓库打开 Workspace](/docs/agents/workspaces/#agent-workspace-open)。
+`--profile` 和 `--new` 仍是 durable `workspaces.open`，要求 clean 且已 push 的 Git branch。已有
+自动化可继续使用 `appaloft workspace open .`。完整说明见
+[从本地目录打开 Agent](/docs/agents/workspaces/#agent-workspace-open)。
 
 `appaloft workspace` 在受支持的交互式 macOS/Linux 终端中打开 Workspace control TUI；它只消费
 现有公开 operations/read models。`Ctrl+]` 从嵌入的 Agent 释放焦点，`f` 在同一 Session 上切换

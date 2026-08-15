@@ -97,6 +97,22 @@ export {
   type WorkspaceGitCommandRunner,
 } from "./local-git-workspace-context.js";
 export {
+  buildScratchHarness,
+  launchScratchAgent,
+  resolveAppaloftSkillPath,
+  resolveDefaultScratchHarness,
+  resolveLocalAppaloftCli,
+  resolveScratchPath,
+  resolveScratchSession,
+  SCRATCH_BANNER,
+  type ScratchAgentLauncher,
+  type ScratchHarnessName,
+  type ScratchHarnessProbe,
+  type ScratchHarnessResolution,
+  type ScratchHarnessResolver,
+  type ScratchSession,
+} from "./local-scratch-session.js";
+export {
   type MigrationSecretEnvironment,
   ProcessEnvironmentMigrationSecretResolver,
 } from "./migration-secret-resolver.js";

@@ -70,7 +70,7 @@ capabilities.
 
 | Surface | Mapping |
 | --- | --- |
-| CLI | Current task-oriented `appaloft code [path]`, compatible `appaloft workspace open [path]`, and Profile-aware `workspace create` |
+| CLI | Durable `appaloft workspace open [path]`, Profile-aware `workspace create`, and `appaloft code` only when `--profile` / `--new` select durable open. Default `appaloft code` is Scratch (ADR-116 / Spec 138) and does not dispatch this command. |
 | SDK | `appaloft.workspaces.open(...)`; Profile-aware `workspaces.create(...)` |
 | oRPC / HTTP | Catalog-backed application command |
 | Console | Workspace create/resume entry |
@@ -83,10 +83,13 @@ capabilities.
 - [ADR-103](../decisions/ADR-103-profile-aware-workspace-open-and-attach.md)
 - [ADR-107](../decisions/ADR-107-task-oriented-workspace-activation-presentation.md)
 - [ADR-109](../decisions/ADR-109-workspace-activation-context-and-target-evidence.md)
+- [ADR-116](../decisions/ADR-116-instant-local-scratch-session-boundary.md)
 - [Spec 120](../specs/120-profile-aware-workspace-open-and-attach/spec.md)
 - [Spec 125](../specs/125-workspace-code-activation/spec.md)
 - [Spec 131](../specs/131-workspace-activation-context-and-target-evidence/spec.md)
+- [Spec 138](../specs/138-instant-local-scratch/spec.md)
 - [Workflow](../workflows/agent-workspace.md)
 - [Profile-Aware Open Test Matrix](../testing/profile-aware-workspace-open-test-matrix.md)
 - [Workspace Code Activation Test Matrix](../testing/workspace-code-activation-test-matrix.md)
+- [Instant Local Scratch Test Matrix](../testing/instant-local-scratch-test-matrix.md)
 - [Workspace Activation Target Evidence Test Matrix](../testing/workspace-activation-target-evidence-test-matrix.md)

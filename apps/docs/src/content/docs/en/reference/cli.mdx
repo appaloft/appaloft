@@ -30,7 +30,7 @@ appaloft init                                 # Initialize appaloft.yml in the c
 appaloft deploy .                             # Deploy the current directory
 appaloft login                                # Log in to Appaloft Cloud or a self-hosted instance
 appaloft context list                         # View saved local profiles/contexts
-appaloft code                                 # Open or resume an Agent Workspace from this Git repository
+appaloft code                                 # Open a local scratch Agent session on this Mac
 appaloft workspace                            # Manage Workspaces with an embedded native Agent TUI
 appaloft dev                                  # Start the local Development TUI / foreground session
 appaloft dev . --server <serverId>            # Develop remotely through a live outbound Worker
@@ -49,21 +49,20 @@ Every command supports `--help` for the full argument list; interactive prompts 
 
 ## Workspace quick entry
 
-From a clean, pushed Git branch, `appaloft code [path]` creates or resumes a Profile-aware
-Workspace through the existing `workspaces.open` operation. When the Adapter supports attach, it
-enters the Agent-owned TUI or native client. The path defaults to `.`.
+`appaloft code [path]` opens a local Scratch session on this Mac. Git, login, Binding, and Cloud
+are not required. The path defaults to `.`. Use `--no-attach` to print the scratch banner without
+spawning the Agent TUI.
 
 ```bash
 appaloft code
-appaloft code . --profile <workspace-profile> --new
 appaloft code . --no-attach
+appaloft workspace open . --profile <workspace-profile> --new
 ```
 
-`--profile` selects an Agent Workspace Profile; the global `--control-plane-profile` selects a
-saved local control-plane connection. Existing automation can keep using
-`appaloft workspace open .` with unchanged semantics and machine-readable behavior. See
-[Open a Workspace from a local repository](/docs/en/agents/workspaces/#agent-workspace-open) for
-prerequisites, reconnection, and safe failure guidance.
+`--profile` and `--new` keep durable `workspaces.open` meaning and still require a clean, pushed
+Git branch. Existing automation can keep using `appaloft workspace open .`. See
+[Open an Agent from a local directory](/docs/en/agents/workspaces/#agent-workspace-open) for
+scratch versus durable-open guidance.
 
 `appaloft workspace` opens the Workspace control TUI on supported interactive macOS/Linux
 terminals and consumes only existing public operations/read models. `Ctrl+]` releases Agent focus;
