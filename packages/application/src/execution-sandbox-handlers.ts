@@ -1,6 +1,6 @@
 import { domainError, err, ok, type Result } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
-import { type WorkspaceOpenEntryRepository } from "./agent-workspace-open";
+import { type WorkspaceOpenEntry, type WorkspaceOpenEntryRepository } from "./agent-workspace-open";
 import {
   CommandHandler,
   type CommandHandlerContract,
@@ -43,6 +43,15 @@ import {
   WriteSandboxFileCommand,
 } from "./execution-sandbox-messages";
 import { tokens } from "./tokens";
+
+function occupancySource(entry: WorkspaceOpenEntry) {
+  if (!entry.repositoryIdentity || !entry.commitSha) return undefined;
+  return {
+    repositoryIdentity: entry.repositoryIdentity,
+    commitSha: entry.commitSha,
+    ...(entry.branch ? { branch: entry.branch } : {}),
+  };
+}
 
 type SandboxCommand =
   | CreateSandboxCommand
@@ -255,6 +264,7 @@ export class SandboxQueryHandler implements QueryHandlerContract<SandboxQuery, u
           ? {
               ...sandbox,
               ...(entry.activation ? { activation: entry.activation } : {}),
+              ...(occupancySource(entry) ? { occupancy: occupancySource(entry) } : {}),
               targetSelection: entry.targetSelection,
             }
           : sandbox;
@@ -270,6 +280,7 @@ export class SandboxQueryHandler implements QueryHandlerContract<SandboxQuery, u
         ? ok({
             ...shown.value,
             ...(entry.activation ? { activation: entry.activation } : {}),
+            ...(occupancySource(entry) ? { occupancy: occupancySource(entry) } : {}),
             targetSelection: entry.targetSelection,
           })
         : shown;

@@ -102,6 +102,13 @@ const collaborationPurpose = Options.choice("purpose", [
 interface SandboxResult {
   readonly sandboxId: string;
   readonly status: string;
+  readonly lastActivityAt?: string;
+  readonly updatedAt?: string;
+  readonly occupancy?: {
+    readonly repositoryIdentity: string;
+    readonly commitSha: string;
+    readonly branch?: string;
+  };
   readonly [key: string]: unknown;
 }
 
@@ -377,6 +384,35 @@ export const workspaceCodeCommand = EffectCommand.make(
                     if (listed.isErr()) throw listed.error;
                     return listed.value.items;
                   },
+                  listOccupancies: async () => {
+                    const query = ListSandboxesQuery.create({ limit: 100, offset: 0 });
+                    if (query.isErr()) throw query.error;
+                    const listed = await cli.executeQuery(query.value);
+                    if (listed.isErr()) throw listed.error;
+                    const items = (listed.value as SandboxListResult).items;
+                    return items.map((item) => ({
+                      sandboxId: item.sandboxId,
+                      status: item.status,
+                      ...(typeof item.lastActivityAt === "string"
+                        ? { lastActivityAt: item.lastActivityAt }
+                        : {}),
+                      ...(typeof item.updatedAt === "string" ? { updatedAt: item.updatedAt } : {}),
+                      ...(item.occupancy &&
+                      typeof item.occupancy === "object" &&
+                      typeof item.occupancy.repositoryIdentity === "string" &&
+                      typeof item.occupancy.commitSha === "string"
+                        ? {
+                            occupancy: {
+                              repositoryIdentity: item.occupancy.repositoryIdentity,
+                              commitSha: item.occupancy.commitSha,
+                              ...(typeof item.occupancy.branch === "string"
+                                ? { branch: item.occupancy.branch }
+                                : {}),
+                            },
+                          }
+                        : {}),
+                    }));
+                  },
                   showBinding: async (repositoryIdentity) => {
                     const query = ShowRepositoryBindingQuery.create({ repositoryIdentity });
                     if (query.isErr()) throw query.error;
@@ -431,7 +467,7 @@ export const workspaceCodeCommand = EffectCommand.make(
         const workspaceId =
           typeof details?.workspaceId === "string" ? details.workspaceId : result.workspaceId;
         process.stdout.write(
-          `Pinned · ${workspaceId} @ ${pinnedSha.slice(0, 7)} · local HEAD ${door.commitSha.slice(0, 7)} · use --new for an isolated Workspace\n`,
+          `Pinned · ${workspaceId} @ ${pinnedSha.slice(0, 7)} · requested ${door.commitSha.slice(0, 7)} · use --new for an isolated Workspace\n`,
         );
       }
       process.stdout.write(

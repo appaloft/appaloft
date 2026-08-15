@@ -210,6 +210,8 @@ describe("execution sandbox CQRS boundary", () => {
           commitSha: "a".repeat(40),
           profileInstallationId: "awpi_default",
           status: "ready",
+          repositoryIdentity: "github.com/acme/api",
+          branch: "main",
           activation,
           targetSelection,
         };
@@ -225,6 +227,8 @@ describe("execution sandbox CQRS boundary", () => {
               commitSha: "a".repeat(40),
               profileInstallationId: "awpi_default",
               status: "ready" as const,
+              repositoryIdentity: "github.com/acme/api",
+              branch: "main",
               activation,
               targetSelection,
             },
@@ -243,12 +247,28 @@ describe("execution sandbox CQRS boundary", () => {
       ShowSandboxQuery.create({ sandboxId: "sbx_1" })._unsafeUnwrap(),
     );
     expect(listed._unsafeUnwrap()).toMatchObject({
-      items: [{ sandboxId: "sbx_1", activation, targetSelection }],
+      items: [
+        {
+          sandboxId: "sbx_1",
+          activation,
+          targetSelection,
+          occupancy: {
+            repositoryIdentity: "github.com/acme/api",
+            commitSha: "a".repeat(40),
+            branch: "main",
+          },
+        },
+      ],
     });
     expect(shown._unsafeUnwrap()).toMatchObject({
       sandboxId: "sbx_1",
       activation,
       targetSelection,
+      occupancy: {
+        repositoryIdentity: "github.com/acme/api",
+        commitSha: "a".repeat(40),
+        branch: "main",
+      },
     });
     expect(calls).toEqual(["many:sbx_1", "one:sbx_1"]);
     expect(JSON.stringify(shown._unsafeUnwrap())).not.toContain("providerHandle");

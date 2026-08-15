@@ -46,12 +46,25 @@ export interface RemoteCodeBinding {
   readonly status: string;
 }
 
+export interface RemoteCodeOccupancy {
+  readonly sandboxId: string;
+  readonly status: string;
+  readonly occupancy?: {
+    readonly repositoryIdentity: string;
+    readonly commitSha: string;
+    readonly branch?: string;
+  };
+  readonly lastActivityAt?: string;
+  readonly updatedAt?: string;
+}
+
 export interface RemoteCodeDoorProbe {
   readonly env?: NodeJS.ProcessEnv;
   readonly localComposition?: boolean;
   readonly readActiveProfile?: () => Promise<{ readonly auth?: unknown } | null>;
   readonly listServers?: () => Promise<readonly RemoteCodeServerSummary[]>;
   readonly showBinding?: (repositoryIdentity: string) => Promise<RemoteCodeBinding | null>;
+  readonly listOccupancies?: () => Promise<readonly RemoteCodeOccupancy[]>;
   readonly resolveLocator?: () => Promise<{
     readonly repository: string;
     readonly repositoryIdentity: string;
@@ -107,6 +120,25 @@ export function selectDefaultRemoteCodeServer(
   );
   return active.find((server) => server.runtimeAvailability?.status === "available") ?? active[0];
 }
+
+export function selectResumeOccupancy(
+  occupancies: readonly RemoteCodeOccupancy[] | undefined,
+): RemoteCodeOccupancy | undefined {
+  return [...(occupancies ?? [])]
+    .filter(
+      (item) =>
+        item.status !== "terminated" &&
+        item.status !== "failed" &&
+        Boolean(item.occupancy?.repositoryIdentity) &&
+        Boolean(item.occupancy?.commitSha),
+    )
+    .sort((left, right) => {
+      const leftAt = left.lastActivityAt ?? left.updatedAt ?? "";
+      const rightAt = right.lastActivityAt ?? right.updatedAt ?? "";
+      return rightAt.localeCompare(leftAt);
+    })[0];
+}
+
 export async function resolveDefaultRemoteCodeDoor(
   probe: RemoteCodeDoorProbe = {},
   path = ".",
@@ -142,14 +174,48 @@ export async function resolveDefaultRemoteCodeDoor(
       },
     );
   }
-  const locator = probe.resolveLocator
-    ? await probe.resolveLocator()
-    : await resolveRemoteCodeLocator(path, probe.runGit);
+  let locator: {
+    readonly repository: string;
+    readonly repositoryIdentity: string;
+    readonly ref: string;
+    readonly branch: string;
+  };
+  let occupancyResume: RemoteCodeOccupancy["occupancy"];
+  try {
+    locator = probe.resolveLocator
+      ? await probe.resolveLocator()
+      : await resolveRemoteCodeLocator(path, probe.runGit);
+  } catch (error) {
+    const occupancies = probe.listOccupancies ? await probe.listOccupancies() : [];
+    const occupancy = selectResumeOccupancy(occupancies);
+    if (!occupancy?.occupancy) throw error;
+    occupancyResume = occupancy.occupancy;
+    const normalized = normalizeWorkspaceRepositoryRemote(
+      `https://${occupancy.occupancy.repositoryIdentity.replace(/\.git$/u, "")}.git`,
+    );
+    locator = {
+      repository: normalized.credentialFreeHttps,
+      repositoryIdentity: occupancy.occupancy.repositoryIdentity,
+      ref: `refs/heads/${occupancy.occupancy.branch?.trim() || "main"}`,
+      branch: occupancy.occupancy.branch?.trim() || "main",
+    };
+  }
   const binding = probe.showBinding ? await probe.showBinding(locator.repositoryIdentity) : null;
-  const remote =
-    probe.resolveRemoteRef === undefined
-      ? await resolveRemoteCodeRef(locator, probe.runGit)
-      : await probe.resolveRemoteRef(locator.repository, locator.ref);
+  let remote: RemoteGitWorkspaceRef;
+  try {
+    remote =
+      probe.resolveRemoteRef === undefined
+        ? await resolveRemoteCodeRef(locator, probe.runGit)
+        : await probe.resolveRemoteRef(locator.repository, locator.ref);
+  } catch (error) {
+    if (!occupancyResume) throw error;
+    remote = {
+      repositoryIdentity: locator.repositoryIdentity,
+      credentialFreeHttpsRepository: locator.repository,
+      ref: locator.ref,
+      commitSha: occupancyResume.commitSha,
+    };
+  }
 
   return {
     repository: remote.credentialFreeHttpsRepository,

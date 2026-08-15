@@ -5,6 +5,7 @@ import {
   nativeAttachRequiresInteractiveTerminal,
   resolveDefaultRemoteCodeDoor,
   selectDefaultRemoteCodeServer,
+  selectResumeOccupancy,
 } from "../src/remote-code-session.js";
 
 describe("remote code door", () => {
@@ -141,6 +142,50 @@ describe("remote code door", () => {
     });
     expect(door.commitSha).toBe("b".repeat(40));
     expect(door.serverId).toBe("srv_1");
+  });
+
+  test("[WS-REMOTE-NO-UPLOAD-006] resumes last occupancy when the local path has no origin", async () => {
+    const door = await resolveDefaultRemoteCodeDoor({
+      env: { APPALOFT_TOKEN: "token" },
+      listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
+      listOccupancies: async () => [
+        {
+          sandboxId: "sbx_old",
+          status: "terminated",
+          occupancy: {
+            repositoryIdentity: "github.com/acme/old",
+            commitSha: "c".repeat(40),
+            branch: "main",
+          },
+          lastActivityAt: "2026-08-15T12:00:00.000Z",
+        },
+        {
+          sandboxId: "sbx_live",
+          status: "ready",
+          occupancy: {
+            repositoryIdentity: "github.com/acme/api",
+            commitSha: "d".repeat(40),
+            branch: "main",
+          },
+          lastActivityAt: "2026-08-15T12:30:00.000Z",
+        },
+      ],
+      resolveLocator: async () => {
+        throw Object.assign(new Error("missing origin"), {
+          code: "workspace_remote_repository_missing",
+        });
+      },
+      resolveRemoteRef: async () => ({
+        repositoryIdentity: "github.com/acme/api",
+        credentialFreeHttpsRepository: "https://github.com/acme/api.git",
+        ref: "refs/heads/main",
+        commitSha: "e".repeat(40),
+      }),
+    });
+    expect(door.repositoryIdentity).toBe("github.com/acme/api");
+    expect(door.repository).toBe("https://github.com/acme/api.git");
+    expect(door.commitSha).toBe("e".repeat(40));
+    expect(selectResumeOccupancy([])).toBeUndefined();
   });
 
   test("[R8-OCC-ATTACH-010] native attach requires an interactive terminal", () => {

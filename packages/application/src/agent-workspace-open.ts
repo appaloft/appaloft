@@ -196,6 +196,8 @@ export interface WorkspaceOpenEntry {
   readonly profileInstallationId: string;
   readonly status: "partial" | "ready" | "terminal";
   readonly phase?: string;
+  readonly repositoryIdentity?: string;
+  readonly branch?: string;
   readonly targetSelection: WorkspaceTargetSelectionEvidence;
   readonly activation?: WorkspaceActivationContextEvidence;
 }

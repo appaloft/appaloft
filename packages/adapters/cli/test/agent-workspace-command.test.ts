@@ -750,7 +750,7 @@ describe("Agent Workspace CLI", () => {
     });
   });
 
-  test("[R8-OCC-CODE-008] code resumes the pinned occupancy Workspace when local HEAD moved", async () => {
+  test("[R8-OCC-CODE-008] code resumes the pinned occupancy Workspace when requested SHA moved", async () => {
     const commands: Command<unknown>[] = [];
     const output: string[] = [];
     const { createCliProgram } = await import("../src");
@@ -816,7 +816,7 @@ describe("Agent Workspace CLI", () => {
       forceNew: false,
     });
     expect(output.join("")).toContain(
-      "Pinned · sbx_h1swq765kcgw @ aaaaaaa · local HEAD bbbbbbb · use --new for an isolated Workspace",
+      "Pinned · sbx_h1swq765kcgw @ aaaaaaa · requested bbbbbbb · use --new for an isolated Workspace",
     );
     expect(output.join("")).toContain(
       "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · sbx_h1swq765kcgw",
