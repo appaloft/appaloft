@@ -101,4 +101,51 @@ describe("SandboxTemplate", () => {
         .isOk(),
     ).toBe(true);
   });
+
+  test("[WS-REMOTE-AUTH-009] names the remote-default template command when allowlists differ", () => {
+    const limits = SandboxResourceLimits.create({
+      cpuMillis: 1_000,
+      memoryBytes: 512 * 1024 * 1024,
+      diskBytes: 2 * 1024 * 1024 * 1024,
+      maxProcesses: 32,
+    })._unsafeUnwrap();
+    const template = SandboxTemplate.create({
+      id: SandboxTemplateId.rehydrate("stp_github_only"),
+      name: SandboxTemplateName.rehydrate("occupancy-opencode"),
+      image: "ghcr.io/appaloft/agent-workspace-opencode:1.18.4",
+      minimumIsolation: SandboxIsolationLevel.containerTrusted(),
+      limits,
+      networkPolicy: SandboxNetworkPolicy.rehydrate({
+        mode: "allowlist",
+        rules: [
+          { kind: "domain", value: "github.com", ports: [443] },
+          { kind: "domain", value: "api.github.com", ports: [443] },
+        ],
+      }),
+      overridePolicy: {
+        isolation: "strengthen-only",
+        limits: "decrease-only",
+        network: "immutable",
+      },
+      createdAt: CreatedAt.rehydrate("2026-08-15T00:00:00.000Z"),
+    })._unsafeUnwrap();
+    const wider = SandboxNetworkPolicy.rehydrate({
+      mode: "allowlist",
+      rules: [
+        { kind: "domain", value: "github.com", ports: [443] },
+        { kind: "domain", value: "api.github.com", ports: [443] },
+        { kind: "domain", value: "opencode.ai", ports: [443] },
+      ],
+    });
+    const denied = template.resolveCreatePolicy({
+      requestedIsolation: SandboxIsolationLevel.containerTrusted(),
+      limits,
+      networkPolicy: wider,
+    });
+    expect(denied.isErr()).toBe(true);
+    expect(denied._unsafeUnwrapErr().details).toMatchObject({
+      code: "sandbox_template_network_policy_immutable",
+      recovery: expect.stringContaining("--network-policy remote-default"),
+    });
+  });
 });

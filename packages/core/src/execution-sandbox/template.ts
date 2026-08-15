@@ -95,6 +95,9 @@ export class SandboxTemplate extends AggregateRoot<SandboxTemplateState, Sandbox
         domainError.conflict("Sandbox template network policy is immutable", {
           phase: "execution-sandbox-template-override",
           field: "networkPolicy",
+          code: "sandbox_template_network_policy_immutable",
+          recovery:
+            "Register a matching template with `appaloft sandbox template create --network-policy remote-default`, then set APPALOFT_OPENCODE_SANDBOX_TEMPLATE_ID to that template id.",
         }),
       );
     }
