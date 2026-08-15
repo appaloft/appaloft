@@ -43,8 +43,14 @@ export const OCCUPANCY_FIRST_PARTY_MCP_DISCOVERY_TOOLS = [
   "resources_list",
   "resources_show",
   "servers_list",
+  "deployments_list",
+  "deployments_plan",
   "deployments_create",
   "deployments_show",
+  "preview_environments_list",
+  "preview_environments_show",
+  "sandbox_ports_expose",
+  "sandboxes_agent_tasks_deliver",
 ] as const;
 
 export function withOccupancyFirstPartyMcpDiscovery(
