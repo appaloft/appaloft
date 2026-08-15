@@ -180,6 +180,7 @@ function fixture(
     readProof?: () => Promise<{ verdict: "verified" | "failed" | "pending"; reasonCode?: string }>;
     workspaceProfileResolver?: SandboxAgentDeliveryDependencies["workspaceProfileResolver"];
     processCredentialGrants?: SandboxAgentDeliveryDependencies["processCredentialGrants"];
+    attachUrl?: string;
   } = {},
 ) {
   const counters = { resources: 0, deployments: 0 };
@@ -227,7 +228,7 @@ function fixture(
           exposureId: "sbp_attach",
           port: input.port,
           visibility: input.visibility,
-          url: "https://attach.example.test/capability",
+          url: options.attachUrl ?? "https://attach.example.test/capability",
           expiresAt: input.expiresAt,
         });
       },
@@ -1177,6 +1178,92 @@ describe("SandboxAgentDeliveryService", () => {
       ],
       clientHandoff: "display-only",
     });
+  });
+
+  test("[WS-ATTACH-NATIVE-015] accepts a signed loopback gateway attach URL", async () => {
+    const { service } = fixture({
+      attachUrl: "http://127.0.0.1:8788/s/sexp_attach/capability",
+      harness: {
+        key: "opencode",
+        templateId: "aht_opencode_managed_v1",
+        version: "1.2.3",
+        templateDigest: `sha256:${"a".repeat(64)}`,
+        interaction: {
+          transport: "native-attach",
+          command: ["opencode", "attach", "http://127.0.0.1:4096"],
+          sessionRecovery: "native-session-store",
+          serverPort: 4096,
+        },
+        async execute() {
+          return { events: [], outcomeDigest: "sha256:complete" };
+        },
+        async cancel() {},
+      },
+    });
+    const runtime = (
+      await service.createRuntime(context, {
+        sandboxId: "sbx_loopback",
+        harnessKey: "opencode",
+        harnessTemplateId: "aht_opencode_managed_v1",
+        idempotencyKey: "runtime_loopback_attach",
+      })
+    )._unsafeUnwrap();
+
+    const attach = (
+      await service.issueAttachAccess(context, {
+        sandboxId: "sbx_loopback",
+        runtimeId: runtime.runtimeId,
+        expiresAt: "2026-07-20T01:00:00.000Z",
+      })
+    )._unsafeUnwrap();
+    expect(attach.transport).toBe("native-attach");
+    if (attach.transport !== "native-attach") return;
+    expect(attach.access.url).toBe("http://127.0.0.1:8788/s/sexp_attach/capability");
+    expect(attach.clientCommand).toEqual([
+      "opencode",
+      "attach",
+      "http://127.0.0.1:8788/s/sexp_attach/capability",
+    ]);
+  });
+
+  test("[WS-ATTACH-NATIVE-015] rejects a raw loopback OpenCode port as attach access", async () => {
+    const { service } = fixture({
+      attachUrl: "http://127.0.0.1:4096",
+      harness: {
+        key: "opencode",
+        templateId: "aht_opencode_managed_v1",
+        version: "1.2.3",
+        templateDigest: `sha256:${"a".repeat(64)}`,
+        interaction: {
+          transport: "native-attach",
+          command: ["opencode", "attach", "http://127.0.0.1:4096"],
+          sessionRecovery: "native-session-store",
+          serverPort: 4096,
+        },
+        async execute() {
+          return { events: [], outcomeDigest: "sha256:complete" };
+        },
+        async cancel() {},
+      },
+    });
+    const runtime = (
+      await service.createRuntime(context, {
+        sandboxId: "sbx_raw_loopback",
+        harnessKey: "opencode",
+        harnessTemplateId: "aht_opencode_managed_v1",
+        idempotencyKey: "runtime_raw_loopback_attach",
+      })
+    )._unsafeUnwrap();
+
+    const attach = await service.issueAttachAccess(context, {
+      sandboxId: "sbx_raw_loopback",
+      runtimeId: runtime.runtimeId,
+      expiresAt: "2026-07-20T01:00:00.000Z",
+    });
+    expect(attach.isErr()).toBe(true);
+    if (attach.isErr()) {
+      expect(attach.error.details?.code).toBe("agent_workspace_native_attach_access_unsafe");
+    }
   });
 
   test("[WS-ATTACH-UNSUPPORTED-016] fails closed when the Adapter declares no attach transport", async () => {

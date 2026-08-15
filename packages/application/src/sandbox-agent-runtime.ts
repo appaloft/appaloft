@@ -1386,11 +1386,17 @@ export class SandboxAgentDeliveryService {
         }),
       );
     }
-    if (
-      access.value.visibility !== "private" ||
+    const loopback =
       accessUrl.hostname === "localhost" ||
       accessUrl.hostname === "127.0.0.1" ||
-      accessUrl.hostname === "::1"
+      accessUrl.hostname === "::1";
+    const signedGatewayPath = /^\/s\/[A-Za-z0-9._~-]+(?:\/[A-Za-z0-9._~-]+)?$/u.test(
+      accessUrl.pathname,
+    );
+    if (
+      access.value.visibility !== "private" ||
+      (loopback && !signedGatewayPath) ||
+      (!loopback && accessUrl.protocol !== "https:")
     ) {
       return err(
         domainError.conflict("Sandbox provider returned unsafe native attach access", {
