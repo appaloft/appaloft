@@ -189,13 +189,8 @@ describe("local scratch session", () => {
         mcp?: { appaloft?: { command?: string[] } };
       };
       expect(config.skills?.paths).toEqual([dirname(skillDir)]);
-      expect(config.mcp?.appaloft?.command).toEqual([
-        "env",
-        "APPALOFT_CONTROL_PLANE_MODE=none",
-        "/opt/appaloftdev",
-        "mcp",
-        "remote-stdio",
-      ]);
+      expect(config.mcp?.appaloft?.command).toEqual(["/opt/appaloftdev", "mcp", "remote-stdio"]);
+
       expect(env?.XDG_CONFIG_HOME).toBe(isolatedOpenCodeConfigHome());
     });
   });
