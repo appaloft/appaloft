@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./community-remote-default-profile": "./src/community-remote-default-profile.ts"
   },
   "dependencies": {
     "@appaloft/adapter-cli": "workspace:*",
