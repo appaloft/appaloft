@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { createCommunityRemoteDefaultProfile } from "../src/community-remote-default-profile";
+import {
+  COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY,
+  createCommunityRemoteDefaultProfile,
+} from "../src/community-remote-default-profile";
 
 describe("community remote default profile", () => {
   test("[WS-REMOTE-PROFILE-008] builds appaloft-remote for OpenCode", () => {
@@ -44,17 +47,19 @@ describe("community remote default profile", () => {
       id: "appaloft-remote",
       harnessTemplateId: "aht_opencode_managed_v1",
       sandbox: {
-        networkPolicy: {
-          mode: "allowlist",
-          rules: expect.arrayContaining([
-            { kind: "domain", value: "github.com", ports: [443] },
-            { kind: "domain", value: "api.openai.com", ports: [443] },
-            { kind: "domain", value: "api.anthropic.com", ports: [443] },
-            { kind: "domain", value: "opencode.ai", ports: [443] },
-          ]),
-        },
+        networkPolicy: COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY,
       },
     });
+    expect(COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY.rules.map((rule) => rule.value)).toEqual([
+      "github.com",
+      "api.github.com",
+      "api.openai.com",
+      "api.anthropic.com",
+      "openrouter.ai",
+      "api.deepseek.com",
+      "api.x.ai",
+      "opencode.ai",
+    ]);
   });
 
   test("[WS-REMOTE-PROFILE-008] builds terminal appaloft-remote for Pi", () => {
