@@ -74,6 +74,19 @@ export function createCommunityRemoteDefaultProfile(input: {
         delivery: { kind: "stdin" },
       },
     ],
+    mcpServers: [
+      {
+        id: "appaloft-tools",
+        required: false,
+        purpose: "Deploy and inspect Appaloft from occupancy",
+        requestedTools: [
+          "projects_list",
+          "resources_show",
+          "deployments_create",
+          "deployments_show",
+        ],
+      },
+    ],
   };
   const validatedAdapter = validateAgentAdapterManifest(adapterManifest);
   if (!validatedAdapter.ok) return undefined;
