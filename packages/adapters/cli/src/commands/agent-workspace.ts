@@ -381,26 +381,51 @@ export const workspaceCodeCommand = EffectCommand.make(
         catch: (error) => workspaceCliError(error, "remote-code-door"),
       });
       const attach = !noAttach;
-      const command = yield* resultToEffect(
-        OpenAgentWorkspaceCommand.create({
-          repository: door.repository,
-          repositoryIdentity: door.repositoryIdentity,
-          ref: door.ref,
-          branch: door.branch,
-          commitSha: door.commitSha,
-          targetServerId: door.serverId,
-          attach,
-          forceNew,
-        }),
-      );
-      const result = (yield* resultToEffect(
-        yield* Effect.promise(() => cli.executeCommand(command)),
-      )) as WorkspaceOpenResult;
+      const openInput = {
+        repository: door.repository,
+        repositoryIdentity: door.repositoryIdentity,
+        ref: door.ref,
+        branch: door.branch,
+        commitSha: door.commitSha,
+        targetServerId: door.serverId,
+        attach,
+        forceNew,
+      };
+      const command = yield* resultToEffect(OpenAgentWorkspaceCommand.create(openInput));
+      const opened = yield* Effect.promise(() => cli.executeCommand(command));
+      let result: WorkspaceOpenResult;
+      let bannerCommitSha = door.commitSha;
+      if (opened.isOk()) {
+        result = opened.value;
+      } else {
+        const details = opened.error.details;
+        const pinnedSha =
+          !forceNew &&
+          details?.code === "workspace_open_source_pin_mismatch" &&
+          typeof details.workspaceCommitSha === "string"
+            ? details.workspaceCommitSha
+            : undefined;
+        if (!pinnedSha) return yield* Effect.fail(opened.error);
+        const retry = yield* resultToEffect(
+          OpenAgentWorkspaceCommand.create({
+            ...openInput,
+            commitSha: pinnedSha,
+            forceNew: false,
+          }),
+        );
+        result = yield* resultToEffect(yield* Effect.promise(() => cli.executeCommand(retry)));
+        bannerCommitSha = pinnedSha;
+        const workspaceId =
+          typeof details?.workspaceId === "string" ? details.workspaceId : result.workspaceId;
+        process.stdout.write(
+          `Pinned · ${workspaceId} @ ${pinnedSha.slice(0, 7)} · local HEAD ${door.commitSha.slice(0, 7)} · use --new for an isolated Workspace\n`,
+        );
+      }
       process.stdout.write(
         `${formatRemoteCodeBanner({
           projectId: result.projectId || door.projectId,
           repositoryIdentity: door.repositoryIdentity,
-          commitSha: door.commitSha,
+          commitSha: bannerCommitSha,
           serverName: door.serverName,
           workspaceId: result.workspaceId,
         })}\n`,
