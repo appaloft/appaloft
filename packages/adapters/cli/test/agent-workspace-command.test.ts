@@ -706,6 +706,9 @@ describe("Agent Workspace CLI", () => {
     expect(output.join("")).toContain(
       "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · sbx_billing",
     );
+    expect(output.join("")).toContain(
+      "Connect a model in the attached OpenCode session before running a Task.",
+    );
     expect(output.join("")).not.toContain("Local scratch · this Mac · not saved remotely");
   });
 
@@ -817,6 +820,9 @@ describe("Agent Workspace CLI", () => {
     );
     expect(output.join("")).toContain(
       "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · sbx_h1swq765kcgw",
+    );
+    expect(output.join("")).toContain(
+      "Connect a model in the attached OpenCode session before running a Task.",
     );
   });
 

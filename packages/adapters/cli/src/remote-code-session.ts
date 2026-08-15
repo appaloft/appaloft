@@ -8,7 +8,8 @@ import {
 } from "./local-git-workspace-context.js";
 
 export const REMOTE_CODE_BANNER_PREFIX = "Remote ·";
-
+export const REMOTE_CODE_MODEL_HINT =
+  "Connect a model in the attached OpenCode session before running a Task.";
 export interface RemoteCodeDoorResolution {
   readonly repository: string;
   readonly repositoryIdentity: string;

@@ -57,7 +57,11 @@ import {
   resolveScratchSession,
   SCRATCH_BANNER,
 } from "../local-scratch-session.js";
-import { formatRemoteCodeBanner, resolveDefaultRemoteCodeDoor } from "../remote-code-session.js";
+import {
+  formatRemoteCodeBanner,
+  REMOTE_CODE_MODEL_HINT,
+  resolveDefaultRemoteCodeDoor,
+} from "../remote-code-session.js";
 import {
   attachTerminalSession,
   CliRuntime,
@@ -430,6 +434,7 @@ export const workspaceCodeCommand = EffectCommand.make(
           workspaceId: result.workspaceId,
         })}\n`,
       );
+      process.stdout.write(`${REMOTE_CODE_MODEL_HINT}\n`);
       if (!attach) return;
       yield* completeWorkspaceOpen(result, true, cli.launchNativeWorkspaceClient);
     }),
@@ -618,6 +623,7 @@ const nativeAttach = EffectCommand.make(
         yield* print(access);
         return;
       }
+      process.stdout.write(`${REMOTE_CODE_MODEL_HINT}\n`);
       if (access.transport === "managed-terminal") {
         yield* attachTerminalSession(
           ShowTerminalSessionQuery.create({ sessionId: access.sessionId }),
