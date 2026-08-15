@@ -377,6 +377,7 @@ export const workspaceCodeCommand = EffectCommand.make(
                 {
                   ...(cli.environment ? { env: cli.environment } : {}),
                   localComposition: cli.executionTarget !== "remote",
+                  forceNew,
                   listServers: async () => {
                     const query = ListServersQuery.create();
                     if (query.isErr()) throw query.error;

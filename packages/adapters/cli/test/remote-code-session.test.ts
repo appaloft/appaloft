@@ -188,6 +188,74 @@ describe("remote code door", () => {
     expect(selectResumeOccupancy([])).toBeUndefined();
   });
 
+  test("[WS-REMOTE-RESUME-004] resumes last occupancy when cwd origin differs", async () => {
+    const door = await resolveDefaultRemoteCodeDoor({
+      env: { APPALOFT_TOKEN: "token" },
+      listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
+      listOccupancies: async () => [
+        {
+          sandboxId: "sbx_live",
+          status: "ready",
+          occupancy: {
+            repositoryIdentity: "github.com/acme/api",
+            commitSha: "d".repeat(40),
+            branch: "main",
+          },
+          lastActivityAt: "2026-08-15T12:30:00.000Z",
+        },
+      ],
+      resolveLocator: async () => ({
+        repository: "https://github.com/appaloft/appaloft-cloud.git",
+        repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+        ref: "refs/heads/main",
+        branch: "main",
+      }),
+      resolveRemoteRef: async (repository) => ({
+        repositoryIdentity: repository.includes("appaloft-cloud")
+          ? "github.com/appaloft/appaloft-cloud"
+          : "github.com/acme/api",
+        credentialFreeHttpsRepository: repository,
+        ref: "refs/heads/main",
+        commitSha: repository.includes("appaloft-cloud") ? "f".repeat(40) : "e".repeat(40),
+      }),
+    });
+    expect(door.repositoryIdentity).toBe("github.com/acme/api");
+    expect(door.commitSha).toBe("e".repeat(40));
+  });
+
+  test("[WS-REMOTE-OPEN-003] --new occupies the cwd origin instead of last occupancy", async () => {
+    const door = await resolveDefaultRemoteCodeDoor({
+      env: { APPALOFT_TOKEN: "token" },
+      forceNew: true,
+      listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
+      listOccupancies: async () => [
+        {
+          sandboxId: "sbx_live",
+          status: "ready",
+          occupancy: {
+            repositoryIdentity: "github.com/acme/api",
+            commitSha: "d".repeat(40),
+            branch: "main",
+          },
+        },
+      ],
+      resolveLocator: async () => ({
+        repository: "https://github.com/appaloft/appaloft-cloud.git",
+        repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+        ref: "refs/heads/main",
+        branch: "main",
+      }),
+      resolveRemoteRef: async () => ({
+        repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+        credentialFreeHttpsRepository: "https://github.com/appaloft/appaloft-cloud.git",
+        ref: "refs/heads/main",
+        commitSha: "f".repeat(40),
+      }),
+    });
+    expect(door.repositoryIdentity).toBe("github.com/appaloft/appaloft-cloud");
+    expect(door.commitSha).toBe("f".repeat(40));
+  });
+
   test("[R8-OCC-ATTACH-010] native attach requires an interactive terminal", () => {
     expect(nativeAttachRequiresInteractiveTerminal({ isTTY: true }, { isTTY: true })).toBe(true);
     expect(nativeAttachRequiresInteractiveTerminal({ isTTY: false }, { isTTY: true })).toBe(false);

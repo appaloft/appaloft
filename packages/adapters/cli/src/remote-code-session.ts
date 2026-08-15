@@ -61,6 +61,7 @@ export interface RemoteCodeOccupancy {
 export interface RemoteCodeDoorProbe {
   readonly env?: NodeJS.ProcessEnv;
   readonly localComposition?: boolean;
+  readonly forceNew?: boolean;
   readonly readActiveProfile?: () => Promise<{ readonly auth?: unknown } | null>;
   readonly listServers?: () => Promise<readonly RemoteCodeServerSummary[]>;
   readonly showBinding?: (repositoryIdentity: string) => Promise<RemoteCodeBinding | null>;
@@ -174,6 +175,32 @@ export async function resolveDefaultRemoteCodeDoor(
       },
     );
   }
+  const occupancies = probe.listOccupancies ? await probe.listOccupancies() : [];
+  const latestOccupancy = selectResumeOccupancy(occupancies);
+  let localLocator:
+    | {
+        readonly repository: string;
+        readonly repositoryIdentity: string;
+        readonly ref: string;
+        readonly branch: string;
+      }
+    | undefined;
+  let localLocatorError: unknown;
+  try {
+    localLocator = probe.resolveLocator
+      ? await probe.resolveLocator()
+      : await resolveRemoteCodeLocator(path, probe.runGit);
+  } catch (error) {
+    localLocatorError = error;
+  }
+  const matchingOccupancy = localLocator
+    ? selectResumeOccupancy(
+        occupancies.filter(
+          (item) => item.occupancy?.repositoryIdentity === localLocator?.repositoryIdentity,
+        ),
+      )
+    : undefined;
+  const occupancy = probe.forceNew ? undefined : (matchingOccupancy ?? latestOccupancy);
   let locator: {
     readonly repository: string;
     readonly repositoryIdentity: string;
@@ -181,14 +208,7 @@ export async function resolveDefaultRemoteCodeDoor(
     readonly branch: string;
   };
   let occupancyResume: RemoteCodeOccupancy["occupancy"];
-  try {
-    locator = probe.resolveLocator
-      ? await probe.resolveLocator()
-      : await resolveRemoteCodeLocator(path, probe.runGit);
-  } catch (error) {
-    const occupancies = probe.listOccupancies ? await probe.listOccupancies() : [];
-    const occupancy = selectResumeOccupancy(occupancies);
-    if (!occupancy?.occupancy) throw error;
+  if (occupancy?.occupancy) {
     occupancyResume = occupancy.occupancy;
     const normalized = normalizeWorkspaceRepositoryRemote(
       `https://${occupancy.occupancy.repositoryIdentity.replace(/\.git$/u, "")}.git`,
@@ -199,6 +219,10 @@ export async function resolveDefaultRemoteCodeDoor(
       ref: `refs/heads/${occupancy.occupancy.branch?.trim() || "main"}`,
       branch: occupancy.occupancy.branch?.trim() || "main",
     };
+  } else if (localLocator) {
+    locator = localLocator;
+  } else {
+    throw localLocatorError;
   }
   const binding = probe.showBinding ? await probe.showBinding(locator.repositoryIdentity) : null;
   let remote: RemoteGitWorkspaceRef;
