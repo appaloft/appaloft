@@ -84,7 +84,10 @@ export function createCommunityRemoteDefaultProfile(input: {
         purpose: "Deploy and inspect Appaloft from occupancy",
         requestedTools: [
           "projects_list",
+          "environments_list",
+          "resources_list",
           "resources_show",
+          "servers_list",
           "deployments_create",
           "deployments_show",
         ],
