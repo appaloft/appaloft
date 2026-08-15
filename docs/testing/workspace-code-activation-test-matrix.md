@@ -1,19 +1,19 @@
 # Workspace Code Activation Test Matrix
 
-Historical Spec 125 rows. After ADR-116 / Spec 138, default `appaloft code` is Scratch
-(`docs/testing/instant-local-scratch-test-matrix.md`). These `WS-CODE-*` rows now govern
-`appaloft workspace open` and `appaloft code --profile` / `--new` only.
+Historical Spec 125 rows. After ADR-117 / Spec 139, default `appaloft code` is the
+remote identity door (`docs/testing/remote-agent-door-test-matrix.md`). These
+`WS-CODE-*` rows now govern `appaloft workspace open` only.
 
 | ID | Layer | Scenario | Expected evidence | Planned automated binding | Status |
 | --- | --- | --- | --- | --- | --- |
 | WS-CODE-CLI-001 | CLI/unit | `appaloft workspace open` defaults path to `.` | Top-level durable command resolves repository context without an internal Workspace id. | `packages/adapters/cli/test/agent-workspace-command.test.ts` | passing |
-| WS-CODE-PARITY-002 | CLI/contract | `code` and `workspace open` receive equivalent input | Both paths construct the same `workspaces.open` command and attach handling; no `code.*` operation exists. | `packages/adapters/cli/test/agent-workspace-command.test.ts`; `packages/application/test/operation-catalog-boundary.test.ts` | passing |
+| WS-CODE-PARITY-002 | CLI/contract | `workspace open` remains the durable `workspaces.open` path | Default `code` no longer constructs `workspaces.open`; durable open/create still do. | `packages/adapters/cli/test/agent-workspace-command.test.ts`; `packages/application/test/operation-catalog-boundary.test.ts` | passing |
 | WS-CODE-LOCAL-003 | CLI/integration | No remote control-plane target is selected | Existing resolver chooses local dispatch without remote handshake, SSH state sync or target registration. | `packages/adapters/cli/test/control-plane-client.test.ts` | passing |
 | WS-CODE-PREFLIGHT-004 | CLI/unit | Dirty, detached, missing/mismatched upstream, unpushed repository, or remote Git timeout | Existing Git error and guidance return before application dispatch. Remote inspection prints progress and fails closed on timeout. | `packages/adapters/cli/test/local-git-workspace-context.test.ts`; `packages/adapters/cli/test/agent-workspace-command.test.ts` | passing |
 | WS-CODE-PROFILE-005 | CLI/application | Explicit or Project-default Agent Workspace Profile | Existing exact Profile resolution runs; no second preference file is written. | `packages/adapters/cli/test/agent-workspace-command.test.ts`; `packages/application/test/agent-workspace-open-preflight.test.ts` | passing |
 | WS-CODE-ATTACH-006 | CLI/terminal | Managed-terminal or native attach capability is returned | Existing native Agent interface opens without name branching, shell injection or terminal scraping. | `packages/adapters/cli/test/agent-workspace-command.test.ts` | passing |
 | WS-CODE-RESUME-007 | CLI/application | Matching preferred Workspace and Terminal Session exist | Repeated activation resumes the same Workspace/Runtime and bounded replay path. | `packages/adapters/cli/test/agent-workspace-command.test.ts`; `packages/application/test/agent-workspace-open.test.ts` | passing |
-| WS-CODE-OPTIONS-008 | CLI/unit | `--profile`, `--new` or `--no-attach` is supplied | Options map exactly to existing Workspace open input and invalid combinations fail before mutation. | `packages/adapters/cli/test/agent-workspace-command.test.ts` | passing |
+| WS-CODE-OPTIONS-008 | CLI/unit | `--profile`, `--new` or `--no-attach` is supplied to `workspace open` | Options map exactly to existing Workspace open input and invalid combinations fail before mutation. | `packages/adapters/cli/test/agent-workspace-command.test.ts` | passing |
 | WS-CODE-ERROR-009 | CLI/contract | Pre-effect or post-identity failure occurs | Existing structured error/evidence passes through with no secret, raw host or credential disclosure. | `packages/adapters/cli/test/agent-workspace-command.test.ts` | passing |
 | WS-CODE-COMPAT-010 | CLI/regression | Existing Workspace commands are invoked | `workspace open/create/list/show/connect/attach/...` keep their current registration and behavior. | `packages/adapters/cli/test/agent-workspace-command.test.ts` | passing |
 | WS-CODE-PACKAGE-011 | packaging/CLI | Supported packaged artifact is executed | `appaloft code --help` starts without persistence/runtime composition and documents the first-slice options. | `apps/shell/test/help-without-runtime.test.ts`; host release-bundle smoke | passing |
