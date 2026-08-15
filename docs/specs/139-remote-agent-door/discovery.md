@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Code. Owner-confirmed by goal: login → remote code → workspace.
+- Round: Spec. Slice 1 identity door shipped `4f237698`. Slice 2 occupancy owner-confirmed by goal: login → my Sandbox.
 - Date: 2026-08-15.
-- Predecessor: Spec 138 / ADR-116 Instant Local Scratch shipped as public #1125.
-- Code changes allowed: yes for the remote `code` door. `workspace` as `ca` remains later.
+- Predecessor: Spec 138 / ADR-116 Instant Local Scratch shipped as public #1125; ADR-117 identity door shipped as public #1127.
+- Code changes allowed: yes for occupancy after the slice-2 ticket is `ready-for-agent`. `workspace` as `ca` remains later.
 
 ## Actor And Observable Outcome
 
@@ -74,39 +74,37 @@ Sandbox on that Server, not one VM per person.
 | Skills sync from laptop | Project/Profile skill injection on the Server |
 | Personal `auth.json` copied to my VM | Personal login inside my Sandbox; optional later team Connection |
 
-## First Slice (after Spec + Ticket)
+## Slice 1 (shipped)
+
+Logged-in user, team has an enrolled Server: `appaloft code` printed a Remote banner
+and native-attached this-laptop OpenCode. No Sandbox. That is **not** Railway-like.
+
+## Slice 2 (this ticket)
 
 Logged-in user, team has an enrolled Server:
 
 ```text
 appaloft login
-appaloft code
-# Remote · <project> · <repo@sha> · <server> · my sandbox
-# OpenCode, else Pi, else Oh My Pi
-# no Adapter / Profile / Sandbox required
-# no laptop Git fail-closed, no dirty upload
+appaloft code --no-attach
+# Remote · <project> · <repo@sha> · <server> · my sandbox · sbx_…
+# EXIT 0
+appaloft sandbox list
+# one Sandbox for this subject
 ```
 
 Not logged in → login guidance, no Scratch.
-No Server → enroll / pick Server via `workspace`, no Scratch.
-Durable Sandbox attach stays `appaloft workspace open`.
-Later slices are **not this ticket**. Complete Railway-like chain, one vertical each:
+No Server → enroll guidance, no Scratch.
+No capacity on that Server → fail closed, no Scratch, no other Server, no managed substitution.
 
-1. **Remote `code` door** (this spec). Login + default Server + native OpenCode/Pi.
-2. **Occupancy**. Preference key is subject+Server+Binding. Teammate never resumes my disk.
-3. **`workspace` as `ca`**. Same TUI (Spec 126) grows a navigator: Server → my Sandboxes →
-   Project/Environment. No new lifecycle. Spec 126 explicitly deferred `ca`; this reopens
-   presentation only.
-4. **Deployment as first-class in that TUI**. List/show/logs/rollback of existing
-   `deployments.*` / Resource / proof. Today TUI only surfaces Deployment as Promotion
-   aftermath of an Agent Task (Spec 128). Catalog already treats Deployment as a first-class
-   aggregate; the gap is the shell, not a new deploy engine.
-5. **GitHub as source surface**. Binding, default branch, open PR, product-grade preview
-   (Spec 046) appear in the same navigator. GitHub App / PR comments stay Cloud enablement.
-6. **Optional team Connection**. Spec 123 / Cloud 053. Personal OAuth remains default.
-7. **Cloud managed as default Server** when no BYOS exists. No Scratch fallback.
+Later slices stay out of this ticket:
 
-Do not implement 3–7 in the same PR as 1.
+1. Remote identity door (slice 1, shipped).
+2. **Occupancy** (this ticket).
+3. `workspace` as `ca`.
+4. Deployment as first-class in that TUI.
+5. GitHub as source surface.
+6. Optional team Connection.
+7. Cloud managed as default Server when no BYOS exists.
 
 ## Delivery chrome (owner 2026-08-15)
 

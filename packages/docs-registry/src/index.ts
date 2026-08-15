@@ -159,7 +159,7 @@ export const publicDocsHelpTopics = {
     id: "agent.scratch",
     title: "Remote Agent door and local scratch",
     description:
-      "How default appaloft code opens a remote Sandbox after login, and how --local opens this-Mac scratch.",
+      "How default appaloft code occupies my Sandbox after login, and how --local opens this-Mac scratch.",
     page: {
       "zh-CN": "agents/workspaces",
       "en-US": "en/agents/workspaces",
@@ -174,6 +174,7 @@ export const publicDocsHelpTopics = {
     specReferences: [
       "docs/specs/139-remote-agent-door/spec.md",
       "docs/testing/remote-agent-door-test-matrix.md",
+      "docs/decisions/ADR-118-remote-code-occupancy.md",
       "docs/decisions/ADR-117-remote-agent-door.md",
       "docs/specs/138-instant-local-scratch/spec.md",
     ],

@@ -38,10 +38,11 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `--preview <previewEnvironmentId>` on logs, health, diagnostics, effective config, runtime
   control, and terminal commands when the user is operating a preview rather than its parent
   resource.
-- `appaloft code [path]` is the remote Agent door after login. It requires a default
-  enrolled Server, prints `Remote · <project> · <repo@sha> · <server> · my sandbox`,
-  then native-attaches OpenCode/Pi/omp on this laptop. It does not create a Sandbox
-  and does not call `workspaces.open`. Missing login or Server fails closed and never
+- `appaloft code [path]` occupies my Sandbox after login. It requires a default
+  enrolled Server, dispatches `workspaces.open` with the remote SHA and
+  `targetServerId`, then prints
+  `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>`.
+  Laptop Git is not uploaded. Missing login or Server fails closed and never
   becomes Scratch.
 - `appaloft code --local [path]` is a local Scratch session on this Mac. It does not
   require Git, login, Binding, Profile or Cloud, creates no Sandbox, and prints

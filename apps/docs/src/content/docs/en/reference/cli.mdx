@@ -30,7 +30,7 @@ appaloft init                                 # Initialize appaloft.yml in the c
 appaloft deploy .                             # Deploy the current directory
 appaloft login                                # Log in to Appaloft Cloud or a self-hosted instance
 appaloft context list                         # View saved local profiles/contexts
-appaloft code                                 # Open a remote Agent session on the default Server
+appaloft code                                 # Occupy my Sandbox on the default Server
 appaloft workspace                            # Manage Workspaces with an embedded native Agent TUI
 appaloft dev                                  # Start the local Development TUI / foreground session
 appaloft dev . --server <serverId>            # Develop remotely through a live outbound Worker
@@ -49,9 +49,10 @@ Every command supports `--help` for the full argument list; interactive prompts 
 
 ## Workspace quick entry
 
-`appaloft code` opens a remote identity door after login. It requires an enrolled Server,
-then native-attaches OpenCode/Pi on this laptop. Adapter, Profile, and Sandbox are not
-required. Dirty files are not uploaded. Use `--no-attach` to print the identity banner
+`appaloft code` occupies **my Sandbox** on the team's default enrolled Server
+after login. Source is the remote SHA. Missing Adapter/Profile create the
+invisible `appaloft-remote`. The laptop path is not Workspace truth, and dirty
+files are not uploaded. Use `--no-attach` to print the occupancy banner
 without attaching. Use `--local` for this-Mac Scratch.
 
 ```bash

@@ -50,12 +50,12 @@ appaloft login
 appaloft code
 ```
 
-默认 `appaloft code` 先解析团队默认已注册 Server 和 Binding 远端 SHA，再在本机 native-attach
-OpenCode（否则 Pi，否则 Oh My Pi）。不要求 Adapter、Profile 或 Sandbox。笔记本路径不是
-Workspace 真相，脏树也不会上传。横幅是：
+默认 `appaloft code` 占用团队默认已注册 Server 上的 **我的 Sandbox**。源是远端 SHA。
+缺少 Adapter/Profile 时会创建不可见的 `appaloft-remote`。笔记本路径不是 Workspace
+真相，脏树也不会上传。横幅是：
 
 ```text
-Remote · <project> · <repo@sha> · <server> · my sandbox
+Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>
 ```
 
 未登录或没有 Server 会 fail closed 并给出下一步，不会变成 Scratch。本机 Scratch 必须显式指定：

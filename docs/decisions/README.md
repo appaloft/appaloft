@@ -133,7 +133,8 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-114: Kubernetes Runtime Target And Scale Policy Boundary](./ADR-114-kubernetes-runtime-target-and-scale-policy-boundary.md) | Accepted | Defines provider-neutral target/scale/rollout profiles, an adapter-owned Kubernetes backend, ids-only deployment admission, and public connector/private managed-cluster composition. |
 | [ADR-115: Managed Capacity Failure-Domain Boundary](./ADR-115-managed-capacity-failure-domain-boundary.md) | Accepted | Defines provider-neutral failure-domain identity, required separation, fail-closed placement and safe resilience evidence without moving hosted policy into public core. |
 | [ADR-116: Instant Local Scratch Session Boundary](./ADR-116-instant-local-scratch-session-boundary.md) | Accepted (Scratch only) | Scratch contract for `appaloft code --local`. Default door superseded by ADR-117. |
-| [ADR-117: Remote Agent Door](./ADR-117-remote-agent-door.md) | Accepted | Default `appaloft code` is remote my-Sandbox; `workspace` `ca` later; personal model login. |
+| [ADR-117: Remote Agent Door](./ADR-117-remote-agent-door.md) | Accepted (identity door; occupancy superseded by ADR-118) | Default `appaloft code` requires login + default Server; Scratch is `--local`. |
+| [ADR-118: Remote Code Occupancy](./ADR-118-remote-code-occupancy.md) | Accepted | Default `code` occupies my Sandbox via `workspaces.open` + optional `targetServerId`. |
 
 ## Authoring Rules
 

@@ -23,6 +23,7 @@ export * from "./capability-handlers";
 export * from "./capability-messages";
 export * from "./certificate-handlers";
 export * from "./certificate-messages";
+export * from "./community-workspace-activation-context-initializer";
 export * from "./cqrs";
 export * from "./default-access-domain-policy-handlers";
 export * from "./default-access-domain-policy-messages";

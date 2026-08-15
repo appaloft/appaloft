@@ -45,6 +45,7 @@ type OpenAgentWorkspaceCommandInput = {
   profile?: string;
   forceNew?: boolean;
   attach?: boolean;
+  targetServerId?: string;
 };
 ```
 
@@ -70,7 +71,7 @@ capabilities.
 
 | Surface | Mapping |
 | --- | --- |
-| CLI | Durable `appaloft workspace open [path]`, Profile-aware `workspace create`, and `appaloft code` only when `--profile` / `--new` select durable open. Default `appaloft code` is Scratch (ADR-116 / Spec 138) and does not dispatch this command. |
+| CLI | Durable `appaloft workspace open [path]`, Profile-aware `workspace create`, and default `appaloft code` occupancy (ADR-118). `code` supplies remote SHA + optional `targetServerId` and does not run laptop Git fail-closed. |
 | SDK | `appaloft.workspaces.open(...)`; Profile-aware `workspaces.create(...)` |
 | oRPC / HTTP | Catalog-backed application command |
 | Console | Workspace create/resume entry |
@@ -84,6 +85,7 @@ capabilities.
 - [ADR-107](../decisions/ADR-107-task-oriented-workspace-activation-presentation.md)
 - [ADR-109](../decisions/ADR-109-workspace-activation-context-and-target-evidence.md)
 - [ADR-116](../decisions/ADR-116-instant-local-scratch-session-boundary.md)
+- [ADR-118](../decisions/ADR-118-remote-code-occupancy.md)
 - [Spec 120](../specs/120-profile-aware-workspace-open-and-attach/spec.md)
 - [Spec 125](../specs/125-workspace-code-activation/spec.md)
 - [Spec 131](../specs/131-workspace-activation-context-and-target-evidence/spec.md)

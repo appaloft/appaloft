@@ -6,15 +6,17 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | --- | --- | --- | --- |
 | WS-REMOTE-LOGIN-001 | unit / CLI | automated | `remote-code-session.test.ts`, `agent-workspace-command.test.ts` |
 | WS-REMOTE-SERVER-002 | unit | automated | `remote-code-session.test.ts` |
-| WS-REMOTE-OPEN-003 | CLI | automated + `appaloftdev` | default `code` prints Remote banner and native-attaches; no `workspaces.open` |
-| WS-REMOTE-RESUME-004 | later | deferred | subject+Server+Binding occupancy on `workspace open` |
-| WS-REMOTE-OCCUPY-005 | later | deferred | second subject gets another Sandbox |
-| WS-REMOTE-NO-UPLOAD-006 | CLI | automated | local Git fail-closed not used |
-| WS-REMOTE-BINDING-007 | unit / smoke | automated + `appaloftdev` | missing Binding still native-attaches |
-| WS-REMOTE-BANNER-014 | CLI | automated | identity banner, no deploy HUD |
-| WS-REMOTE-PROFILE-008 | CLI | automated | default `code` does not require tenant Profile |
+| WS-REMOTE-OPEN-003 | CLI / application | this slice | default `code` dispatches `workspaces.open` with remote SHA + `targetServerId` |
+| WS-REMOTE-RESUME-004 | application | this slice | same subject resumes preferred Sandbox |
+| WS-REMOTE-OCCUPY-005 | application / persistence | this slice | second subject gets another preferred Sandbox |
+| WS-REMOTE-NO-UPLOAD-006 | CLI | automated | local Git fail-closed not used on `code` |
+| WS-REMOTE-BINDING-007 | application / smoke | this slice | missing Binding is initialized, then occupy |
+| WS-REMOTE-BANNER-014 | CLI | this slice | identity banner includes `workspaceId` |
+| WS-REMOTE-PROFILE-008 | application | this slice | missing default Profile installs `appaloft-remote` |
 | WS-REMOTE-AUTH-009 | later | deferred | no teammate OAuth copy |
 | WS-REMOTE-LOCAL-010 | CLI | automated + `appaloftdev` | `--local` Scratch |
 | WS-REMOTE-OPEN-COMPAT-011 | smoke | `appaloftdev workspace open` | non-git still `workspace_git_*` |
-| WS-REMOTE-CAPACITY-012 | later | deferred | no-capacity ≠ Scratch |
-| WS-REMOTE-DOCS-013 | help | automated + `appaloftdev code --help` | remote default + `--local` |
+| WS-REMOTE-CAPACITY-012 | application | this slice | no-capacity ≠ Scratch ≠ other Server |
+| WS-REMOTE-DOCS-013 | help | this slice | occupy default + `--local` |
+| WS-REMOTE-TARGET-015 | application | this slice | `targetServerId` is reserved |
+| WS-REMOTE-NO-ATTACH-016 | CLI + `appaloftdev` | this slice | occupy without attach; sandbox list non-empty |
