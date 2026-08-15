@@ -100,6 +100,11 @@ export function createCommunityRemoteDefaultProfile(input: {
         rules: [
           { kind: "domain", value: "github.com", ports: [443] },
           { kind: "domain", value: "api.github.com", ports: [443] },
+          { kind: "domain", value: "api.openai.com", ports: [443] },
+          { kind: "domain", value: "api.anthropic.com", ports: [443] },
+          { kind: "domain", value: "openrouter.ai", ports: [443] },
+          { kind: "domain", value: "api.deepseek.com", ports: [443] },
+          { kind: "domain", value: "api.x.ai", ports: [443] },
         ],
       },
     },
