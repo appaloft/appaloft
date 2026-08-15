@@ -52,6 +52,8 @@ import {
   TerminateSandboxProcessCommand,
   WriteSandboxFileCommand,
 } from "@appaloft/application";
+import { COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY } from "@appaloft/application/community-remote-default-network-policy";
+
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 
 import {
@@ -360,15 +362,21 @@ const templateCreate = EffectCommand.make(
     memoryBytes: Options.integer("memory-bytes"),
     diskBytes: Options.integer("disk-bytes"),
     maxProcesses: Options.integer("max-processes"),
+    networkPolicy: Options.choice("network-policy", ["deny", "remote-default"] as const).pipe(
+      Options.withDefault("deny" as const),
+    ),
   },
-  ({ cpuMillis, diskBytes, image, isolation, maxProcesses, memoryBytes, name }) =>
+  ({ cpuMillis, diskBytes, image, isolation, maxProcesses, memoryBytes, name, networkPolicy }) =>
     runCommand(
       CreateSandboxTemplateCommand.create({
         name,
         image,
         minimumIsolation: isolation,
         limits: { cpuMillis, memoryBytes, diskBytes, maxProcesses },
-        networkPolicy: { mode: "deny", rules: [] },
+        networkPolicy:
+          networkPolicy === "remote-default"
+            ? COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY
+            : { mode: "deny", rules: [] },
       }),
     ),
 );
