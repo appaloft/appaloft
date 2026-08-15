@@ -59,6 +59,12 @@ surface available in the session.
 
 ## Common Workflows
 
+- Occupancy session: after `appaloft login` and an enrolled Server, `appaloft code` occupies
+  my Sandbox. From inside OpenCode/Pi, use first-party `appaloft-tools` to list/plan/create
+  deployments, inspect preview environments, expose a sandbox port, or deliver a Task as a
+  pull request. Do not ask the user for project/environment/resource/server ids when those
+  list/show tools are bound. Do not scrape vendor TUI text for PR or deploy state.
+
 - First deployment: inspect source safely, create or select project/server/environment/resource,
   plan when useful, deploy, watch progress, read `deployments.proof`, and return URL plus
   diagnostics. A terminal deployment status or green CI run is not machine-verifiable success.
