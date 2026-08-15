@@ -357,6 +357,10 @@ export interface WorkspaceOpenDependencies {
         profilePlan: AgentWorkspaceProfileCompiledPlan;
       },
     ): Promise<Result<SandboxAgentRuntimeDescriptor>>;
+    ensureRuntime(
+      context: ExecutionContext,
+      input: { sandboxId: string; runtimeId: string },
+    ): Promise<Result<void>>;
     attach(
       context: ExecutionContext,
       input: { sandboxId: string; runtimeId: string; expiresAt: string },
@@ -595,6 +599,11 @@ export class AgentWorkspaceOpenService {
       });
       if (shownRuntime.isErr()) return err(shownRuntime.error);
       const agent = shownRuntime.value;
+      const ensured = await this.dependencies.agents.ensureRuntime(context, {
+        sandboxId: preferred.workspaceId,
+        runtimeId: preferred.runtimeId,
+      });
+      if (ensured.isErr()) return err(ensured.error);
       if (agent.profilePin?.profileInstallationId !== resolved.value.profileInstallationId) {
         return err(
           domainError.conflict("Preferred Workspace Runtime Profile pin is inconsistent", {

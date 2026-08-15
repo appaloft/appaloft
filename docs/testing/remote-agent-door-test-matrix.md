@@ -21,3 +21,4 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-TARGET-015 | application | this slice | `targetServerId` is reserved |
 | WS-REMOTE-NO-ATTACH-016 | CLI + `appaloftdev` | this slice | occupy without attach; sandbox list non-empty |
 | WS-REMOTE-SKILL-017 | CLI / runtime | this slice | occupancy OpenCode serve config includes workspace skill paths; native attach env offers public skill + local MCP |
+| WS-REMOTE-RESUME-SERVE-018 | application | this slice | resume `code --no-attach` calls `ensureRuntime` so OpenCode serve is healthy |

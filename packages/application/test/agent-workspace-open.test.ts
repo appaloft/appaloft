@@ -41,6 +41,7 @@ describe("Agent Workspace open application workflow", () => {
       profile: { profileInstallationId: "awpi_default", disposition: "created" as const },
     };
     let pendingActivation = activation;
+    const ensuredRuntimes: Array<{ sandboxId: string; runtimeId: string }> = [];
     let preferred:
       | {
           workspaceId: string;
@@ -288,6 +289,10 @@ describe("Agent Workspace open application workflow", () => {
             },
             createdAt: "2026-07-28T00:00:00.000Z",
           }),
+        ensureRuntime: async (_context, value) => {
+          ensuredRuntimes.push(value);
+          return ok(undefined);
+        },
         attach: async () => {
           throw new Error("attach should not run");
         },
@@ -384,6 +389,10 @@ describe("Agent Workspace open application workflow", () => {
         reason: "managed_entitlement_default",
       },
     });
+    expect(ensuredRuntimes).toEqual([
+      { sandboxId: "sbx_1", runtimeId: "sar_1" },
+      { sandboxId: "sbx_1", runtimeId: "sar_1" },
+    ]);
     expect(explicitlySelectedProfileResumed._unsafeUnwrap()).toMatchObject({
       workspaceId: "sbx_1",
       resumed: true,
