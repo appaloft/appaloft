@@ -32,6 +32,7 @@ import {
   ResolveWorkspaceCollaborationHandoffCommand,
   ResumeAgentTaskRunCommand,
   ResumeSandboxCommand,
+  type SandboxAgentAttachDescriptor,
   ShowAgentTaskRunQuery,
   ShowRepositoryBindingQuery,
   ShowSandboxQuery,
@@ -551,8 +552,9 @@ const nativeAttach = EffectCommand.make(
   {
     workspaceId,
     expiresAt: Options.text("expires-at").pipe(Options.optional),
+    noAttach: Options.boolean("no-attach").pipe(Options.withDefault(false)),
   },
-  ({ expiresAt, workspaceId }) =>
+  ({ expiresAt, noAttach, workspaceId }) =>
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
       const runtimeQuery = yield* resultToEffect(
@@ -581,10 +583,33 @@ const nativeAttach = EffectCommand.make(
           expiresAt: optionalValue(expiresAt) ?? defaultExpiry,
         }),
       );
-      const access = yield* resultToEffect(
+      const issued = yield* resultToEffect(
         yield* Effect.promise(() => cli.executeCommand(command)),
       );
-      yield* print(access);
+      const access = issued as SandboxAgentAttachDescriptor;
+      if (noAttach) {
+        yield* print(access);
+        return;
+      }
+      if (access.transport === "managed-terminal") {
+        yield* attachTerminalSession(
+          ShowTerminalSessionQuery.create({ sessionId: access.sessionId }),
+          {
+            initialRows: 24,
+            initialCols: 80,
+          },
+        );
+        return;
+      }
+      if (access.clientHandoff === "display-only") {
+        yield* print(access);
+        return;
+      }
+      yield* Effect.tryPromise({
+        try: () =>
+          (cli.launchNativeWorkspaceClient ?? launchNativeWorkspaceClient)(access.clientCommand),
+        catch: (error) => workspaceCliError(error, "workspace-native-client-handoff"),
+      });
     }),
 ).pipe(
   EffectCommand.withDescription(

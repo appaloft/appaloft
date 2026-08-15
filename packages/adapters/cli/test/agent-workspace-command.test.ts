@@ -1663,4 +1663,65 @@ describe("Agent Workspace CLI", () => {
     });
     expect(commands.some((command) => command instanceof ExecuteSandboxCommand)).toBeFalse();
   });
+
+  test("[R8-OCC-ATTACH-006] workspace attach launches the native OpenCode client", async () => {
+    const launched: string[][] = [];
+    const { createCliProgram } = await import("../src");
+    const { IssueSandboxAgentAttachAccessCommand } = await import("@appaloft/application");
+    const commands: Command<unknown>[] = [];
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return ok({
+            workspaceId: "sbx_occupancy",
+            runtimeId: "sar_occupancy",
+            transport: "native-attach",
+            access: {
+              exposureId: "sexp_occupancy",
+              port: 4096,
+              visibility: "private",
+              url: "https://attach.example.test/capability",
+              expiresAt: "2026-08-15T13:00:00.000Z",
+            },
+            clientCommand: [
+              "opencode",
+              "attach",
+              "https://attach.example.test/capability",
+              "--dir",
+              "/workspace",
+            ],
+            clientHandoff: "local-client-exec",
+          } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: {
+        execute: async () =>
+          ok({
+            items: [
+              {
+                runtimeId: "sar_occupancy",
+                interaction: { transport: "native-attach", serverPort: 4096 },
+              },
+            ],
+          }),
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_workspace_attach_launch" }),
+      },
+      launchNativeWorkspaceClient: async (argv) => {
+        launched.push([...argv]);
+      },
+    });
+
+    await program.parseAsync(["node", "appaloft", "workspace", "attach", "sbx_occupancy"]);
+
+    expect(commands[0]).toBeInstanceOf(IssueSandboxAgentAttachAccessCommand);
+    expect(launched).toEqual([
+      ["opencode", "attach", "https://attach.example.test/capability", "--dir", "/workspace"],
+    ]);
+  });
 });
