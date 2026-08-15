@@ -113,6 +113,7 @@ export function createCommunityRemoteDefaultProfile(input: {
           { kind: "domain", value: "openrouter.ai", ports: [443] },
           { kind: "domain", value: "api.deepseek.com", ports: [443] },
           { kind: "domain", value: "api.x.ai", ports: [443] },
+          { kind: "domain", value: "opencode.ai", ports: [443] },
         ],
       },
     },

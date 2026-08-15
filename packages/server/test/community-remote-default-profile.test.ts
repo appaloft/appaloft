@@ -38,6 +38,7 @@ describe("community remote default profile", () => {
             { kind: "domain", value: "github.com", ports: [443] },
             { kind: "domain", value: "api.openai.com", ports: [443] },
             { kind: "domain", value: "api.anthropic.com", ports: [443] },
+            { kind: "domain", value: "opencode.ai", ports: [443] },
           ]),
         },
       },
