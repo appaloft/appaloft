@@ -632,7 +632,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
     const argv = [
       "sh",
       "-c",
-      'IFS= read -r config; IFS= read -r token; export OPENCODE_CONFIG_CONTENT="$config"; export APPALOFT_MODEL_ACCESS_TOKEN="$token"; mkdir -p "$1"; out="$2"; err="$3"; status="$4"; shift 4; "$@" >"$out" 2>"$err"; code=$?; printf "%s" "$code" >"$status"',
+      'IFS= read -r config; IFS= read -r token; if [ -n "$config" ]; then export OPENCODE_CONFIG_CONTENT="$config"; fi; if [ -n "$token" ]; then export APPALOFT_MODEL_ACCESS_TOKEN="$token"; fi; mkdir -p "$1"; out="$2"; err="$3"; status="$4"; shift 4; "$@" >"$out" 2>"$err"; code=$?; printf "%s" "$code" >"$status"',
       "appaloft-opencode-run",
       outputRoot,
       stdoutPath,
@@ -657,7 +657,9 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       argv,
       ...(this.cwd === "." ? {} : { cwd: this.cwd }),
       background: true,
-      stdin: new TextEncoder().encode(`${config}\n${capability?.accessToken ?? ""}\n`),
+      stdin: new TextEncoder().encode(
+        `${capability ? config : ""}\n${capability?.accessToken ?? ""}\n`,
+      ),
     });
     const revokeExecute = async () => {
       if (capability) {

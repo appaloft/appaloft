@@ -1170,9 +1170,16 @@ function agentRunFailureDiagnostic(
   });
   const joined = redactedLines.join("\n").trim();
   const sanitized = joined.length <= 1_024 ? joined : `${joined.slice(0, 1_011)}\n[TRUNCATED]`;
+  const code = admittedCode ?? harnessCode ?? "sandbox_agent_harness_failed";
+  const recovery =
+    code === "opencode_empty_run_result" || code === "opencode_model_not_configured"
+      ? "Connect a model in the attached OpenCode session, then retry the Task."
+      : code === "sandbox_agent_model_connection_binding_missing"
+        ? "Connect a model in the Agent session, then retry the Task."
+        : undefined;
   return {
-    code: admittedCode ?? harnessCode ?? "sandbox_agent_harness_failed",
-    summary: sanitized || "Agent harness execution failed",
+    code,
+    summary: recovery ?? (sanitized || "Agent harness execution failed"),
   };
 }
 

@@ -1285,9 +1285,7 @@ describe("OpenCodeSandboxAgentHarness", () => {
       expect.arrayContaining(["run", "--attach", "http://127.0.0.1:4096", "--format", "json", "--auto", "open a PR"]),
     );
     expect(run?.argv).not.toContain("--model");
-    expect(JSON.parse(new TextDecoder().decode(run?.stdin).split("\n")[0] ?? "null")).toEqual({
-      snapshot: false,
-    });
+    expect(new TextDecoder().decode(run?.stdin)).toBe("\n\n");
   });
 
   test("[R8-OCC-TASK-005] fails closed when vendor-login OpenCode exits empty", async () => {

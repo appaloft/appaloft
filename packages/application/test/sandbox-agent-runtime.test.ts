@@ -326,7 +326,7 @@ test("[R8-OCC-TASK-003] fails a headless occupancy run when no model is bound", 
     status: "failed",
     failure: {
       code: "sandbox_agent_model_connection_binding_missing",
-      summary: "sandbox_agent_model_connection_binding_missing",
+      summary: "Connect a model in the Agent session, then retry the Task.",
     },
   });
 });
