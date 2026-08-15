@@ -196,6 +196,8 @@ export interface WorkspaceOpenEntry {
   readonly profileInstallationId: string;
   readonly status: "partial" | "ready" | "terminal";
   readonly phase?: string;
+  readonly repositoryIdentity?: string;
+  readonly branch?: string;
   readonly targetSelection: WorkspaceTargetSelectionEvidence;
   readonly activation?: WorkspaceActivationContextEvidence;
 }
@@ -556,7 +558,8 @@ export class AgentWorkspaceOpenService {
             workspaceId: preferred.workspaceId,
             requestedCommitSha: input.commitSha,
             workspaceCommitSha: preferred.commitSha,
-            guidance: "Use --new to create an isolated Workspace for the new commit.",
+            guidance:
+              "Use appaloft code --new or workspace open --new to create an isolated Workspace for the new commit.",
           }),
         );
       }

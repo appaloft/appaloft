@@ -467,7 +467,10 @@ const enrollCommand = EffectCommand.make(
       ...(credentialIdValue ? { credentialId: credentialIdValue } : {}),
       ...(privateKeyFileValue ? { privateKeyFile: privateKeyFileValue } : {}),
       runtimeMode,
-      workloadRoles,
+      workloadRoles:
+        local && workloadRoles.length === 0
+          ? ["sandbox-worker", "deployment-runtime"]
+          : workloadRoles,
     });
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverEnroll));

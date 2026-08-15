@@ -75,6 +75,8 @@ function readEntry(row: WorkspaceOpenEntryRow): WorkspaceOpenEntry | undefined {
     profileInstallationId: row.profile_installation_id,
     status: row.status as WorkspaceOpenEntry["status"],
     targetSelection,
+    ...(row.repository_identity ? { repositoryIdentity: row.repository_identity } : {}),
+    ...(row.branch ? { branch: row.branch } : {}),
     ...(parsedActivation?.isOk() === true ? { activation: parsedActivation.value } : {}),
     ...(row.phase ? { phase: row.phase } : {}),
   };

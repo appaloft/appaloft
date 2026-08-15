@@ -97,17 +97,25 @@ export interface SandboxAgentModelAccessProvider {
   }): Promise<void>;
 }
 
-export function requireSandboxAgentModelCredentialBinding(
+export function selectSandboxAgentModelCredentialBinding(
   bindings: readonly AgentWorkspaceCredentialBinding[] = [],
-): AgentWorkspaceCredentialBinding {
+): AgentWorkspaceCredentialBinding | undefined {
   const modelBindings = bindings.filter((binding) => binding.kind === "model-api");
-  if (modelBindings.length === 0) {
-    throw new Error("sandbox_agent_model_connection_binding_missing");
-  }
+  if (modelBindings.length === 0) return undefined;
   if (modelBindings.length !== 1) {
     throw new Error("sandbox_agent_model_connection_binding_ambiguous");
   }
   return modelBindings[0] as AgentWorkspaceCredentialBinding;
+}
+
+export function requireSandboxAgentModelCredentialBinding(
+  bindings: readonly AgentWorkspaceCredentialBinding[] = [],
+): AgentWorkspaceCredentialBinding {
+  const selected = selectSandboxAgentModelCredentialBinding(bindings);
+  if (!selected) {
+    throw new Error("sandbox_agent_model_connection_binding_missing");
+  }
+  return selected;
 }
 
 export type SandboxAgentSandboxSource =
@@ -245,13 +253,31 @@ export class SandboxAgentHarnessRegistry {
     return true;
   }
 
-  resolve(key: string): SandboxAgentHarness | null {
-    return this.harnesses.get(key) ?? null;
+  resolve(key: string, options: { templateId?: string } = {}): SandboxAgentHarness | null {
+    const exact = this.harnesses.get(key);
+    if (exact) return exact;
+    const templateId = options.templateId;
+    if (!templateId) return null;
+    const natives = [...this.harnesses.values()].filter(
+      (harness) => !this.aliases.has(harness.key) && harness.templateId === templateId,
+    );
+    return natives.length === 1 ? (natives[0] ?? null) : null;
   }
 
   list(): readonly SandboxAgentHarness[] {
     return [...this.harnesses.values()].sort((left, right) => left.key.localeCompare(right.key));
   }
+}
+
+function resolveRuntimeHarness(
+  registry: SandboxAgentHarnessRegistry,
+  record: Pick<SandboxAgentRuntimeRecord, "harnessKey" | "profilePin">,
+): SandboxAgentHarness | null {
+  return registry.resolve(record.harnessKey, {
+    ...(record.profilePin?.harnessTemplateId
+      ? { templateId: record.profilePin.harnessTemplateId }
+      : {}),
+  });
 }
 
 export interface SandboxAgentRuntimeRecord {
@@ -1144,9 +1170,16 @@ function agentRunFailureDiagnostic(
   });
   const joined = redactedLines.join("\n").trim();
   const sanitized = joined.length <= 1_024 ? joined : `${joined.slice(0, 1_011)}\n[TRUNCATED]`;
+  const code = admittedCode ?? harnessCode ?? "sandbox_agent_harness_failed";
+  const recovery =
+    code === "opencode_empty_run_result" || code === "opencode_model_not_configured"
+      ? "Connect a model in the attached OpenCode session, then retry the Task."
+      : code === "sandbox_agent_model_connection_binding_missing"
+        ? "Connect a model in the Agent session, then retry the Task."
+        : undefined;
   return {
-    code: admittedCode ?? harnessCode ?? "sandbox_agent_harness_failed",
-    summary: sanitized || "Agent harness execution failed",
+    code,
+    summary: recovery ?? (sanitized || "Agent harness execution failed"),
   };
 }
 
@@ -1303,7 +1336,10 @@ export class SandboxAgentDeliveryService {
     }
     const runtime = await this.showRuntime(context, input.sandboxId, input.runtimeId);
     if (runtime.isErr()) return err(runtime.error);
-    const harness = this.dependencies.harnessRegistry.resolve(runtime.value.harnessKey);
+    const harness = resolveRuntimeHarness(this.dependencies.harnessRegistry, {
+      harnessKey: runtime.value.harnessKey,
+      ...(runtime.value.profilePin ? { profilePin: runtime.value.profilePin } : {}),
+    });
     const interaction = harness?.interaction;
     if (harness && interaction?.transport === "managed-terminal") {
       const record = await this.dependencies.repository.findRuntime(
@@ -1378,11 +1414,17 @@ export class SandboxAgentDeliveryService {
         }),
       );
     }
-    if (
-      access.value.visibility !== "private" ||
+    const loopback =
       accessUrl.hostname === "localhost" ||
       accessUrl.hostname === "127.0.0.1" ||
-      accessUrl.hostname === "::1"
+      accessUrl.hostname === "::1";
+    const signedGatewayPath = /^\/s\/[A-Za-z0-9._~-]+(?:\/[A-Za-z0-9._~-]+)?$/u.test(
+      accessUrl.pathname,
+    );
+    if (
+      access.value.visibility !== "private" ||
+      (loopback && !signedGatewayPath) ||
+      (!loopback && accessUrl.protocol !== "https:")
     ) {
       return err(
         domainError.conflict("Sandbox provider returned unsafe native attach access", {
@@ -1434,12 +1476,9 @@ export class SandboxAgentDeliveryService {
           ),
         );
       }
+      const existingHarness = resolveRuntimeHarness(this.dependencies.harnessRegistry, existing);
       return ok(
-        runtimeDescriptor(
-          existing,
-          this.dependencies.harnessRegistry.resolve(existing.harnessKey)?.interaction,
-          this.dependencies.harnessRegistry.resolve(existing.harnessKey)?.capabilities,
-        ),
+        runtimeDescriptor(existing, existingHarness?.interaction, existingHarness?.capabilities),
       );
     }
     const sandbox = await this.dependencies.sandboxReader.show(context, input.sandboxId);
@@ -1570,7 +1609,7 @@ export class SandboxAgentDeliveryService {
         input.idempotencyKey,
       );
       if (!raced) return err(infrastructureError(error));
-      const racedHarness = this.dependencies.harnessRegistry.resolve(raced.harnessKey);
+      const racedHarness = resolveRuntimeHarness(this.dependencies.harnessRegistry, raced);
       return ok(runtimeDescriptor(raced, racedHarness?.interaction, racedHarness?.capabilities));
     }
     return ok(runtimeDescriptor(record, harness.interaction, harness.capabilities));
@@ -1585,13 +1624,10 @@ export class SandboxAgentDeliveryService {
       sandboxId,
     );
     return ok({
-      items: items.map((record) =>
-        runtimeDescriptor(
-          record,
-          this.dependencies.harnessRegistry.resolve(record.harnessKey)?.interaction,
-          this.dependencies.harnessRegistry.resolve(record.harnessKey)?.capabilities,
-        ),
-      ),
+      items: items.map((record) => {
+        const harness = resolveRuntimeHarness(this.dependencies.harnessRegistry, record);
+        return runtimeDescriptor(record, harness?.interaction, harness?.capabilities);
+      }),
     });
   }
 
@@ -1607,7 +1643,7 @@ export class SandboxAgentDeliveryService {
     if (!record || record.runtime.toState().sandboxId.value !== sandboxId) {
       return err(domainError.notFound("SandboxAgentRuntime", runtimeId));
     }
-    const harness = this.dependencies.harnessRegistry.resolve(record.harnessKey);
+    const harness = resolveRuntimeHarness(this.dependencies.harnessRegistry, record);
     return ok(runtimeDescriptor(record, harness?.interaction, harness?.capabilities));
   }
 
@@ -1626,7 +1662,7 @@ export class SandboxAgentDeliveryService {
       const cancelled = await this.cancelRun(context, runtimeId, state.activeRunId.value);
       if (cancelled.isErr()) return err(cancelled.error);
     }
-    const harness = this.dependencies.harnessRegistry.resolve(record.harnessKey);
+    const harness = resolveRuntimeHarness(this.dependencies.harnessRegistry, record);
     if (harness?.terminateRuntime) {
       try {
         await harness.terminateRuntime({
@@ -1891,7 +1927,7 @@ export class SandboxAgentDeliveryService {
     );
     if (!runtimeRecord)
       return err(domainError.notFound("SandboxAgentRuntime", record.run.toState().runtimeId.value));
-    const harness = this.dependencies.harnessRegistry.resolve(runtimeRecord.harnessKey);
+    const harness = resolveRuntimeHarness(this.dependencies.harnessRegistry, runtimeRecord);
     if (!harness) return err(domainError.notFound("SandboxAgentHarness", runtimeRecord.harnessKey));
     const at = asUpdatedAt(this.dependencies.clock.now());
     if (at.isErr()) return err(at.error);
@@ -2093,7 +2129,7 @@ export class SandboxAgentDeliveryService {
       runtimeId,
     );
     if (!runtimeRecord) return err(domainError.notFound("SandboxAgentRuntime", runtimeId));
-    const harness = this.dependencies.harnessRegistry.resolve(runtimeRecord.harnessKey);
+    const harness = resolveRuntimeHarness(this.dependencies.harnessRegistry, runtimeRecord);
     if (harness && !record.run.toState().status.isTerminal()) {
       try {
         await harness.cancel({ sandboxId: record.sandboxId, runtimeId, runId });

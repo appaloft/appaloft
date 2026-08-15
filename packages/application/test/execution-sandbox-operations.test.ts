@@ -996,6 +996,31 @@ describe("ExecutionSandboxService", () => {
     expect(fake.resumeCalls()).toBe(1);
   });
 
+  test("[R8-OCC-RESUME-001] fails closed when a ready Sandbox has no provider runtime", async () => {
+    const fake = provider();
+    fake.adapter.listProcesses = async () => {
+      throw new Error("Docker container is not owned by the requested Sandbox");
+    };
+    const app = service(fake.adapter);
+    await app.createAndReconcile(context, createInput);
+
+    const resumed = await app.resume(context, "sbx_test");
+    expect(resumed.isErr()).toBe(true);
+    if (resumed.isErr()) {
+      expect(resumed.error).toMatchObject({
+        code: "conflict",
+        category: "user",
+        retryable: false,
+        details: {
+          code: "sandbox_provider_runtime_missing",
+          phase: "execution-sandbox-resume-ready-probe",
+          sandboxId: "sbx_test",
+        },
+      });
+    }
+    expect((await app.show(context, "sbx_test"))._unsafeUnwrap().status).toBe("ready");
+  });
+
   test("[HIB-APP-004] auto-suspends only idle compute-released Sandboxes", async () => {
     let current = "2026-07-20T00:00:00.000Z";
     const released = provider();

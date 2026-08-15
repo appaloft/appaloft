@@ -22,6 +22,16 @@ describe("community remote default profile", () => {
     expect(profile?.profileManifest).toMatchObject({
       id: "appaloft-remote",
       harnessTemplateId: "aht_opencode_managed_v1",
+      sandbox: {
+        networkPolicy: {
+          mode: "allowlist",
+          rules: expect.arrayContaining([
+            { kind: "domain", value: "github.com", ports: [443] },
+            { kind: "domain", value: "api.openai.com", ports: [443] },
+            { kind: "domain", value: "api.anthropic.com", ports: [443] },
+          ]),
+        },
+      },
     });
   });
 

@@ -4113,12 +4113,7 @@ export function registerApplicationServices(
             }));
           },
           async resume(context, workspaceId) {
-            const shown = await sandboxService.show(context, workspaceId);
-            if (shown.isErr()) return shown;
-            const resumed =
-              shown.value.status === "paused"
-                ? await sandboxService.resume(context, workspaceId)
-                : shown;
+            const resumed = await sandboxService.resume(context, workspaceId);
             return resumed.map((sandbox) => ({
               sandboxId: sandbox.sandboxId,
               status: sandbox.status,

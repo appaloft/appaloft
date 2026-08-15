@@ -32,6 +32,7 @@ import {
   ResolveWorkspaceCollaborationHandoffCommand,
   ResumeAgentTaskRunCommand,
   ResumeSandboxCommand,
+  type SandboxAgentAttachDescriptor,
   ShowAgentTaskRunQuery,
   ShowRepositoryBindingQuery,
   ShowSandboxQuery,
@@ -56,7 +57,12 @@ import {
   resolveScratchSession,
   SCRATCH_BANNER,
 } from "../local-scratch-session.js";
-import { formatRemoteCodeBanner, resolveDefaultRemoteCodeDoor } from "../remote-code-session.js";
+import {
+  formatRemoteCodeBanner,
+  nativeAttachRequiresInteractiveTerminal,
+  REMOTE_CODE_MODEL_HINT,
+  resolveDefaultRemoteCodeDoor,
+} from "../remote-code-session.js";
 import {
   attachTerminalSession,
   CliRuntime,
@@ -96,6 +102,13 @@ const collaborationPurpose = Options.choice("purpose", [
 interface SandboxResult {
   readonly sandboxId: string;
   readonly status: string;
+  readonly lastActivityAt?: string;
+  readonly updatedAt?: string;
+  readonly occupancy?: {
+    readonly repositoryIdentity: string;
+    readonly commitSha: string;
+    readonly branch?: string;
+  };
   readonly [key: string]: unknown;
 }
 
@@ -153,6 +166,14 @@ function launchNativeWorkspaceClient(argv: readonly string[]): Promise<void> {
     return Promise.reject(
       domainError.conflict("Adapter returned an invalid native attach handoff", {
         code: "agent_workspace_native_attach_handoff_invalid",
+      }),
+    );
+  }
+  if (!nativeAttachRequiresInteractiveTerminal()) {
+    return Promise.reject(
+      domainError.conflict("Native Agent attach requires an interactive terminal", {
+        code: "agent_workspace_native_attach_tty_required",
+        recovery: "Run appaloft code from a TTY, or use --no-attach.",
       }),
     );
   }
@@ -318,8 +339,9 @@ export const workspaceCodeCommand = EffectCommand.make(
     path: Args.text({ name: "path" }).pipe(Args.withDefault(".")),
     noAttach: Options.boolean("no-attach").pipe(Options.withDefault(false)),
     local: Options.boolean("local").pipe(Options.withDefault(false)),
+    forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
   },
-  ({ local, noAttach, path }) =>
+  ({ forceNew, local, noAttach, path }) =>
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
       if (local) {
@@ -362,6 +384,35 @@ export const workspaceCodeCommand = EffectCommand.make(
                     if (listed.isErr()) throw listed.error;
                     return listed.value.items;
                   },
+                  listOccupancies: async () => {
+                    const query = ListSandboxesQuery.create({ limit: 100, offset: 0 });
+                    if (query.isErr()) throw query.error;
+                    const listed = await cli.executeQuery(query.value);
+                    if (listed.isErr()) throw listed.error;
+                    const items = (listed.value as SandboxListResult).items;
+                    return items.map((item) => ({
+                      sandboxId: item.sandboxId,
+                      status: item.status,
+                      ...(typeof item.lastActivityAt === "string"
+                        ? { lastActivityAt: item.lastActivityAt }
+                        : {}),
+                      ...(typeof item.updatedAt === "string" ? { updatedAt: item.updatedAt } : {}),
+                      ...(item.occupancy &&
+                      typeof item.occupancy === "object" &&
+                      typeof item.occupancy.repositoryIdentity === "string" &&
+                      typeof item.occupancy.commitSha === "string"
+                        ? {
+                            occupancy: {
+                              repositoryIdentity: item.occupancy.repositoryIdentity,
+                              commitSha: item.occupancy.commitSha,
+                              ...(typeof item.occupancy.branch === "string"
+                                ? { branch: item.occupancy.branch }
+                                : {}),
+                            },
+                          }
+                        : {}),
+                    }));
+                  },
                   showBinding: async (repositoryIdentity) => {
                     const query = ShowRepositoryBindingQuery.create({ repositoryIdentity });
                     if (query.isErr()) throw query.error;
@@ -379,29 +430,56 @@ export const workspaceCodeCommand = EffectCommand.make(
         catch: (error) => workspaceCliError(error, "remote-code-door"),
       });
       const attach = !noAttach;
-      const command = yield* resultToEffect(
-        OpenAgentWorkspaceCommand.create({
-          repository: door.repository,
-          repositoryIdentity: door.repositoryIdentity,
-          ref: door.ref,
-          branch: door.branch,
-          commitSha: door.commitSha,
-          targetServerId: door.serverId,
-          attach,
-        }),
-      );
-      const result = (yield* resultToEffect(
-        yield* Effect.promise(() => cli.executeCommand(command)),
-      )) as WorkspaceOpenResult;
+      const openInput = {
+        repository: door.repository,
+        repositoryIdentity: door.repositoryIdentity,
+        ref: door.ref,
+        branch: door.branch,
+        commitSha: door.commitSha,
+        targetServerId: door.serverId,
+        attach,
+        forceNew,
+      };
+      const command = yield* resultToEffect(OpenAgentWorkspaceCommand.create(openInput));
+      const opened = yield* Effect.promise(() => cli.executeCommand(command));
+      let result: WorkspaceOpenResult;
+      let bannerCommitSha = door.commitSha;
+      if (opened.isOk()) {
+        result = opened.value;
+      } else {
+        const details = opened.error.details;
+        const pinnedSha =
+          !forceNew &&
+          details?.code === "workspace_open_source_pin_mismatch" &&
+          typeof details.workspaceCommitSha === "string"
+            ? details.workspaceCommitSha
+            : undefined;
+        if (!pinnedSha) return yield* Effect.fail(opened.error);
+        const retry = yield* resultToEffect(
+          OpenAgentWorkspaceCommand.create({
+            ...openInput,
+            commitSha: pinnedSha,
+            forceNew: false,
+          }),
+        );
+        result = yield* resultToEffect(yield* Effect.promise(() => cli.executeCommand(retry)));
+        bannerCommitSha = pinnedSha;
+        const workspaceId =
+          typeof details?.workspaceId === "string" ? details.workspaceId : result.workspaceId;
+        process.stdout.write(
+          `Pinned · ${workspaceId} @ ${pinnedSha.slice(0, 7)} · requested ${door.commitSha.slice(0, 7)} · use --new for an isolated Workspace\n`,
+        );
+      }
       process.stdout.write(
         `${formatRemoteCodeBanner({
           projectId: result.projectId || door.projectId,
           repositoryIdentity: door.repositoryIdentity,
-          commitSha: door.commitSha,
+          commitSha: bannerCommitSha,
           serverName: door.serverName,
           workspaceId: result.workspaceId,
         })}\n`,
       );
+      process.stdout.write(`${REMOTE_CODE_MODEL_HINT}\n`);
       if (!attach) return;
       yield* completeWorkspaceOpen(result, true, cli.launchNativeWorkspaceClient);
     }),
@@ -551,8 +629,9 @@ const nativeAttach = EffectCommand.make(
   {
     workspaceId,
     expiresAt: Options.text("expires-at").pipe(Options.optional),
+    noAttach: Options.boolean("no-attach").pipe(Options.withDefault(false)),
   },
-  ({ expiresAt, workspaceId }) =>
+  ({ expiresAt, noAttach, workspaceId }) =>
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
       const runtimeQuery = yield* resultToEffect(
@@ -581,10 +660,34 @@ const nativeAttach = EffectCommand.make(
           expiresAt: optionalValue(expiresAt) ?? defaultExpiry,
         }),
       );
-      const access = yield* resultToEffect(
+      const issued = yield* resultToEffect(
         yield* Effect.promise(() => cli.executeCommand(command)),
       );
-      yield* print(access);
+      const access = issued as SandboxAgentAttachDescriptor;
+      if (noAttach) {
+        yield* print(access);
+        return;
+      }
+      process.stdout.write(`${REMOTE_CODE_MODEL_HINT}\n`);
+      if (access.transport === "managed-terminal") {
+        yield* attachTerminalSession(
+          ShowTerminalSessionQuery.create({ sessionId: access.sessionId }),
+          {
+            initialRows: 24,
+            initialCols: 80,
+          },
+        );
+        return;
+      }
+      if (access.clientHandoff === "display-only") {
+        yield* print(access);
+        return;
+      }
+      yield* Effect.tryPromise({
+        try: () =>
+          (cli.launchNativeWorkspaceClient ?? launchNativeWorkspaceClient)(access.clientCommand),
+        catch: (error) => workspaceCliError(error, "workspace-native-client-handoff"),
+      });
     }),
 ).pipe(
   EffectCommand.withDescription(

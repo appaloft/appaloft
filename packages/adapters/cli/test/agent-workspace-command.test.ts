@@ -706,7 +706,197 @@ describe("Agent Workspace CLI", () => {
     expect(output.join("")).toContain(
       "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · sbx_billing",
     );
+    expect(output.join("")).toContain(
+      "Connect a model in the attached OpenCode session before running a Task.",
+    );
     expect(output.join("")).not.toContain("Local scratch · this Mac · not saved remotely");
+  });
+
+  test("[R8-OCC-CODE-007] code --new isolates a new occupancy Workspace", async () => {
+    const commands: Command<unknown>[] = [];
+    const { createCliProgram } = await import("../src");
+    const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return ok({ workspaceId: "sbx_new", projectId: "prj_billing" } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_new" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        projectId: "prj_billing",
+        serverId: "srv_1",
+        serverName: "mac-mini",
+      }),
+    });
+
+    await program.parseAsync(["node", "appaloft", "code", "--new", "--no-attach"]);
+
+    expect((commands[0] as OpenAgentWorkspaceCommand).input).toMatchObject({
+      forceNew: true,
+      attach: false,
+      targetServerId: "srv_1",
+    });
+  });
+
+  test("[R8-OCC-CODE-008] code resumes the pinned occupancy Workspace when requested SHA moved", async () => {
+    const commands: Command<unknown>[] = [];
+    const output: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
+    const { domainError } = await import("@appaloft/core");
+    let attempts = 0;
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          attempts += 1;
+          if (attempts === 1) {
+            return err(
+              domainError.conflict("Preferred Workspace is pinned to another Git commit", {
+                code: "workspace_open_source_pin_mismatch",
+                workspaceId: "sbx_h1swq765kcgw",
+                requestedCommitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                workspaceCommitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              }),
+            );
+          }
+          return ok({
+            workspaceId: "sbx_h1swq765kcgw",
+            projectId: "prj_billing",
+            source: { commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+          } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_resume" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        projectId: "prj_billing",
+        serverId: "srv_1",
+        serverName: "mac-mini",
+      }),
+    });
+    const write = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
+    } finally {
+      process.stdout.write = write;
+    }
+
+    expect(commands).toHaveLength(2);
+    expect((commands[0] as OpenAgentWorkspaceCommand).input.commitSha).toBe(
+      "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    );
+    expect((commands[1] as OpenAgentWorkspaceCommand).input).toMatchObject({
+      commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      forceNew: false,
+    });
+    expect(output.join("")).toContain(
+      "Pinned · sbx_h1swq765kcgw @ aaaaaaa · requested bbbbbbb · use --new for an isolated Workspace",
+    );
+    expect(output.join("")).toContain(
+      "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · sbx_h1swq765kcgw",
+    );
+    expect(output.join("")).toContain(
+      "Connect a model in the attached OpenCode session before running a Task.",
+    );
+  });
+
+  test("[R8-OCC-CODE-009] code attach after pin mismatch launches the native OpenCode client", async () => {
+    const commands: Command<unknown>[] = [];
+    const launched: string[][] = [];
+    const { createCliProgram } = await import("../src");
+    const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
+    const { domainError } = await import("@appaloft/core");
+    let attempts = 0;
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          attempts += 1;
+          if (attempts === 1) {
+            return err(
+              domainError.conflict("Preferred Workspace is pinned to another Git commit", {
+                code: "workspace_open_source_pin_mismatch",
+                workspaceId: "sbx_h1swq765kcgw",
+                requestedCommitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                workspaceCommitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              }),
+            );
+          }
+          return ok({
+            workspaceId: "sbx_h1swq765kcgw",
+            projectId: "prj_billing",
+            attach: {
+              transport: "native-attach",
+              clientHandoff: "local-client-exec",
+              clientCommand: [
+                "opencode",
+                "attach",
+                "https://attach.example.test/capability",
+                "--dir",
+                "/workspace",
+              ],
+            },
+          } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_code_resume_attach" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        projectId: "prj_billing",
+        serverId: "srv_1",
+        serverName: "mac-mini",
+      }),
+      launchNativeWorkspaceClient: async (argv) => {
+        launched.push([...argv]);
+      },
+    });
+
+    await program.parseAsync(["node", "appaloft", "code"]);
+
+    expect((commands[1] as OpenAgentWorkspaceCommand).input).toMatchObject({
+      commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      attach: true,
+      forceNew: false,
+    });
+    expect(launched).toEqual([
+      ["opencode", "attach", "https://attach.example.test/capability", "--dir", "/workspace"],
+    ]);
   });
 
   test("[WS-REMOTE-TARGET-015] local-shell Server occupies with targetServerId", async () => {
@@ -1662,5 +1852,66 @@ describe("Agent Workspace CLI", () => {
       },
     });
     expect(commands.some((command) => command instanceof ExecuteSandboxCommand)).toBeFalse();
+  });
+
+  test("[R8-OCC-ATTACH-006] workspace attach launches the native OpenCode client", async () => {
+    const launched: string[][] = [];
+    const { createCliProgram } = await import("../src");
+    const { IssueSandboxAgentAttachAccessCommand } = await import("@appaloft/application");
+    const commands: Command<unknown>[] = [];
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return ok({
+            workspaceId: "sbx_occupancy",
+            runtimeId: "sar_occupancy",
+            transport: "native-attach",
+            access: {
+              exposureId: "sexp_occupancy",
+              port: 4096,
+              visibility: "private",
+              url: "https://attach.example.test/capability",
+              expiresAt: "2026-08-15T13:00:00.000Z",
+            },
+            clientCommand: [
+              "opencode",
+              "attach",
+              "https://attach.example.test/capability",
+              "--dir",
+              "/workspace",
+            ],
+            clientHandoff: "local-client-exec",
+          } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: {
+        execute: async () =>
+          ok({
+            items: [
+              {
+                runtimeId: "sar_occupancy",
+                interaction: { transport: "native-attach", serverPort: 4096 },
+              },
+            ],
+          }),
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_workspace_attach_launch" }),
+      },
+      launchNativeWorkspaceClient: async (argv) => {
+        launched.push([...argv]);
+      },
+    });
+
+    await program.parseAsync(["node", "appaloft", "workspace", "attach", "sbx_occupancy"]);
+
+    expect(commands[0]).toBeInstanceOf(IssueSandboxAgentAttachAccessCommand);
+    expect(launched).toEqual([
+      ["opencode", "attach", "https://attach.example.test/capability", "--dir", "/workspace"],
+    ]);
   });
 });

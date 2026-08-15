@@ -35,7 +35,7 @@ enrolled Server. Source is the remote Binding SHA. The laptop tree is not upload
 | WS-REMOTE-OPEN-003 | Default code occupies | logged in, default Server exists | `appaloft code` | CLI does not inspect laptop Git as Workspace truth; dispatches `workspaces.open` with remote SHA + `targetServerId`; prints Remote banner with real `workspaceId`; attaches via existing handoff. |
 | WS-REMOTE-RESUME-004 | Same person reconnect | I already have a non-terminal preferred Sandbox for this Binding | `appaloft code` | resumes that Sandbox; does not create a duplicate unless `--new`. |
 | WS-REMOTE-OCCUPY-005 | One disk each | teammate B is logged in on the same Server/Binding | B runs `appaloft code` | B gets B’s Sandbox; A’s files and auth paths are not mounted. |
-| WS-REMOTE-NO-UPLOAD-006 | No laptop upload | laptop tree is dirty / missing / not a repo | `appaloft code` | still occupies from remote SHA when origin exists; no file content upload; no `workspace_git_dirty`. Missing origin still fail-closes `workspace_remote_repository_missing`. |
+| WS-REMOTE-NO-UPLOAD-006 | No laptop upload | laptop tree is dirty / missing / not a repo | `appaloft code` | still occupies from remote SHA when origin exists; no file content upload; no `workspace_git_dirty`. Missing origin resumes the latest non-terminal occupancy when one exists; otherwise fail-closes `workspace_remote_repository_missing`. |
 | WS-REMOTE-BINDING-007 | Binding optional at CLI | logged in + Server, no Project Binding | `appaloft code` | Community initializer creates/reuses Project + Binding + invisible `appaloft-remote` Profile; occupancy proceeds. |
 | WS-REMOTE-PROFILE-008 | Shared harness pin | Project has no default Profile | `appaloft code` occupies | initializer installs OpenCode-else-Pi `appaloft-remote` with no required model credential. Existing default Profile is reused, never overwritten. |
 | WS-REMOTE-AUTH-009 | Personal model login | no team Connection; I never signed in inside my Sandbox | Agent starts | vendor TUI may prompt **me** to log in; no teammate OAuth file is copied. |
@@ -88,7 +88,7 @@ occupancy metrics.
 | --- | --- |
 | `workspace_remote_login_required` | not logged in |
 | `workspace_remote_server_missing` | no default Server |
-| `workspace_remote_repository_missing` | no Git origin for remote SHA |
+| `workspace_remote_repository_missing` | no Git origin and no resumable occupancy |
 | `workspace_open_target_server_unavailable` | `targetServerId` is not tenant-visible or not reservable |
 | existing `workspace_git_*` | `workspace open` / `workspace create` only |
 | Spec 138 scratch codes | `--local` only |

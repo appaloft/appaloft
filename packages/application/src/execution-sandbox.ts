@@ -2524,6 +2524,39 @@ export class ExecutionSandboxService {
     if (!stored) return err(domainError.notFound("Sandbox", sandboxId));
     const state = stored.sandbox.toState();
     if (state.status.value === "ready") {
+      const readyHandle = state.providerHandle;
+      if (!readyHandle) {
+        return err(
+          domainError.conflict("Sandbox provider runtime is missing", {
+            code: "sandbox_provider_runtime_missing",
+            phase: "execution-sandbox-resume-ready-probe",
+            sandboxId,
+            recovery: `appaloft workspace show ${sandboxId}`,
+            retry: "After inspection or cleanup, run appaloft workspace open . --new --no-attach",
+            terminate: `appaloft workspace terminate ${sandboxId}`,
+          }),
+        );
+      }
+      const provider = this.providerRegistry.get(stored.providerKey);
+      if (!provider) return err(domainError.infra("Sandbox provider is unavailable"));
+      const probe = await this.providerOperation("execution-sandbox-resume-ready-probe", () =>
+        provider.listProcesses({
+          sandboxId,
+          providerHandle: readyHandle,
+        }),
+      );
+      if (probe.isErr()) {
+        return err(
+          domainError.conflict("Sandbox provider runtime is missing", {
+            code: "sandbox_provider_runtime_missing",
+            phase: "execution-sandbox-resume-ready-probe",
+            sandboxId,
+            recovery: `appaloft workspace show ${sandboxId}`,
+            retry: "After inspection or cleanup, run appaloft workspace open . --new --no-attach",
+            terminate: `appaloft workspace terminate ${sandboxId}`,
+          }),
+        );
+      }
       return ok(descriptor(stored));
     }
     if (state.status.value !== "paused" || !state.providerHandle || !state.suspension) {
