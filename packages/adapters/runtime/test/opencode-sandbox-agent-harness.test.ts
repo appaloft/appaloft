@@ -542,6 +542,7 @@ describe("OpenCodeSandboxAgentHarness", () => {
     expect(JSON.parse(new TextDecoder().decode(run?.stdin).split("\n")[0] ?? "null")).toEqual({
       model: "appaloft/coding-model",
       snapshot: false,
+      skills: { paths: ["/workspace/skills", "/workspace/.agents/skills"] },
       provider: {
         appaloft: {
           npm: "@ai-sdk/openai-compatible",
