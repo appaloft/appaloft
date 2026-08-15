@@ -24,6 +24,7 @@ function createTestApp(input: {
   authRuntime?: Parameters<typeof createHttpApp>[0]["authRuntime"];
   commandBus?: CommandBus;
   queryBus?: QueryBus;
+  tenantContextResolver?: Parameters<typeof createHttpApp>[0]["tenantContextResolver"];
 }) {
   return createHttpApp({
     config: resolveConfig({
@@ -44,6 +45,7 @@ function createTestApp(input: {
       },
     },
     ...(input.authRuntime ? { authRuntime: input.authRuntime } : {}),
+    ...(input.tenantContextResolver ? { tenantContextResolver: input.tenantContextResolver } : {}),
   });
 }
 
@@ -274,6 +276,114 @@ describe("MCP HTTP transport", () => {
       authorizationHeader: "Bearer signed-session-token",
       path: "/mcp",
       requiredRole: "member",
+    });
+  });
+
+  test("[WS-REMOTE-MCP-TENANT-023] remaps occupancy MCP tenant before sandbox-ports.expose", async () => {
+    let capturedContext: ExecutionContext | undefined;
+    const commandBus = {
+      execute: async <T>(context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedContext = context;
+        expect(command.constructor.name).toBe("ExposeSandboxPortCommand");
+        return ok({
+          exposureId: "sxp_mcp",
+          sandboxId: "sbx_occupancy",
+          port: 4096,
+          visibility: "private",
+        } as T);
+      },
+    } as CommandBus;
+    const authRuntime: Parameters<typeof createHttpApp>[0]["authRuntime"] = {
+      authorizeProductSession: async (_context, input) =>
+        ok({
+          actor: {
+            kind: "user",
+            id: "usr_occupancy",
+            label: "occupancy@example.com",
+          },
+          email: "occupancy@example.com",
+          organizationId: "org_self_hosted",
+          role: input.requiredRole,
+          userId: "usr_occupancy",
+        }),
+      getPublicConfig: () => ({
+        provider: "better-auth",
+        loginRequired: true,
+        deferredAuth: false,
+        providers: [],
+      }),
+      getSessionStatus: async () => ({
+        accountSecurity: {
+          enabled: true,
+          passwordState: "set",
+        },
+        accountRecovery: {
+          enabled: false,
+        },
+        enabled: true,
+        emailVerification: {
+          enabled: false,
+          otpEnabled: false,
+          required: false,
+        },
+        provider: "better-auth",
+        loginRequired: true,
+        deferredAuth: false,
+        session: null,
+        providers: [],
+      }),
+      handle: () => new Response("not used", { status: 404 }),
+    };
+    const app = createTestApp({
+      authRuntime,
+      commandBus,
+      tenantContextResolver: {
+        async resolveTenantContext(context) {
+          const organizationId = context.principal?.activeOrganization?.organizationId;
+          return {
+            tenantId: organizationId ? `tenant_${organizationId}` : "tenant_instance",
+            ...(organizationId ? { organizationId } : {}),
+            source: "active-organization",
+            mode: "hosted",
+          };
+        },
+      },
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/mcp", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer occupancy-first-party",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "expose-1",
+          method: "tools/call",
+          params: {
+            name: "sandbox_ports_expose",
+            arguments: {
+              sandboxId: "sbx_occupancy",
+              port: 4096,
+            },
+          },
+        }),
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.result.structuredContent).toMatchObject({
+      exposureId: "sxp_mcp",
+      sandboxId: "sbx_occupancy",
+    });
+    expect(capturedContext).toMatchObject({
+      entrypoint: "mcp",
+      tenant: {
+        tenantId: "tenant_org_self_hosted",
+        organizationId: "org_self_hosted",
+      },
     });
   });
 
