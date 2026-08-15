@@ -49,9 +49,10 @@ Every command supports `--help` for the full argument list; interactive prompts 
 
 ## Workspace quick entry
 
-`appaloft code` opens a remote Agent session after login. It requires an enrolled Server and a
-Project Binding. The laptop path is only a locator; dirty files are not uploaded. Use
-`--no-attach` to print the identity banner without attaching. Use `--local` for this-Mac Scratch.
+`appaloft code` opens a remote identity door after login. It requires an enrolled Server,
+then native-attaches OpenCode/Pi on this laptop. Adapter, Profile, and Sandbox are not
+required. Dirty files are not uploaded. Use `--no-attach` to print the identity banner
+without attaching. Use `--local` for this-Mac Scratch.
 
 ```bash
 appaloft login
@@ -61,8 +62,8 @@ appaloft code --local
 appaloft workspace open . --profile <workspace-profile> --new
 ```
 
-`--profile` and `--new` keep remote `workspaces.open` meaning and do not inspect a dirty laptop
-tree. `appaloft workspace open` still requires a clean, pushed Git branch. See
+`appaloft workspace open` still requires a clean, pushed Git branch and dispatches
+`workspaces.open`. See
 [Open an Agent from a local directory](/docs/en/agents/workspaces/#agent-workspace-open) for
 scratch versus durable-open guidance.
 

@@ -316,8 +316,6 @@ export const workspaceCodeCommand = EffectCommand.make(
   "code",
   {
     path: Args.text({ name: "path" }).pipe(Args.withDefault(".")),
-    profile: Options.text("profile").pipe(Options.optional),
-    forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
     noAttach: Options.boolean("no-attach").pipe(Options.withDefault(false)),
     local: Options.boolean("local").pipe(Options.withDefault(false)),
   },

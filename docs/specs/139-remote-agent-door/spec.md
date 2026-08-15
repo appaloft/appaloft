@@ -60,7 +60,7 @@ installed Adapter + default Profile on the target control plane.
 
 ## Public Surfaces
 
-- CLI: default `appaloft code [--new] [--no-attach] [--local]`. Path is not a Git
+- CLI: default `appaloft code [--no-attach] [--local]`. Path is not a Git
   locator for the default door.
 - No new catalog operation. Durable remote open remains `workspaces.open` on
   `workspace open`.

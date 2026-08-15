@@ -50,8 +50,9 @@ appaloft deployments recovery-readiness <deploymentId>  # 查询恢复就绪状�
 
 ## Workspace 快速入口
 
-`appaloft code` 登录后打开远端 Agent 会话，需要已注册 Server 和 Project Binding。笔记本路径只
-用来定位 Binding，脏文件不会上传。`--no-attach` 只打印身份横幅。`--local` 才是本机 Scratch。
+`appaloft code` 登录后打开远端身份门，需要已注册 Server。解析 Server 和 Binding SHA 后，
+本机 native-attach OpenCode/Pi。不要求 Adapter、Profile 或 Sandbox。脏文件不会上传。
+`--no-attach` 只打印身份横幅。`--local` 才是本机 Scratch。
 
 ```bash
 appaloft login
@@ -61,8 +62,7 @@ appaloft code --local
 appaloft workspace open . --profile <workspace-profile> --new
 ```
 
-`--profile` 和 `--new` 仍走远端 `workspaces.open`，不检查脏笔记本树。`workspace open` 仍要求
-clean 且已 push 的 Git branch。完整说明见
+`workspace open` 仍要求 clean 且已 push 的 Git branch，并走 `workspaces.open`。完整说明见
 [从本地目录打开 Agent](/docs/agents/workspaces/#agent-workspace-open)。
 `appaloft workspace` 在受支持的交互式 macOS/Linux 终端中打开 Workspace control TUI；它只消费
 现有公开 operations/read models。`Ctrl+]` 从嵌入的 Agent 释放焦点，`f` 在同一 Session 上切换
