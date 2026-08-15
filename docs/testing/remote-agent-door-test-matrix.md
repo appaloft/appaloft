@@ -25,3 +25,5 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-SKILL-017 | CLI / runtime | automated | occupancy OpenCode serve config includes workspace skill paths; `appaloft-remote` declares optional `appaloft-tools`; native attach uses `mcp remote-stdio` against the selected control plane without wrapping `APPALOFT_CONTROL_PLANE_MODE=none`, and isolates `XDG_CONFIG_HOME` from a broken host `opencode.json` | `packages/adapters/cli/test/local-scratch-session.test.ts` |
 
 | WS-REMOTE-RESUME-SERVE-018 | application | this slice | resume `code --no-attach` calls `ensureRuntime` so OpenCode serve is healthy |
+| WS-REMOTE-RESUME-EGRESS-020 | application | automated | ready allowlist occupancy resume reapplies stored egress; gateway failure fail-closes | `packages/application/test/execution-sandbox-operations.test.ts` |
+
