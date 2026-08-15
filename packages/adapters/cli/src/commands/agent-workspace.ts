@@ -319,8 +319,9 @@ export const workspaceCodeCommand = EffectCommand.make(
     path: Args.text({ name: "path" }).pipe(Args.withDefault(".")),
     noAttach: Options.boolean("no-attach").pipe(Options.withDefault(false)),
     local: Options.boolean("local").pipe(Options.withDefault(false)),
+    forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
   },
-  ({ local, noAttach, path }) =>
+  ({ forceNew, local, noAttach, path }) =>
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
       if (local) {
@@ -389,6 +390,7 @@ export const workspaceCodeCommand = EffectCommand.make(
           commitSha: door.commitSha,
           targetServerId: door.serverId,
           attach,
+          forceNew,
         }),
       );
       const result = (yield* resultToEffect(

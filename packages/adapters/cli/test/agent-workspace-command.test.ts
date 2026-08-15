@@ -709,6 +709,44 @@ describe("Agent Workspace CLI", () => {
     expect(output.join("")).not.toContain("Local scratch · this Mac · not saved remotely");
   });
 
+  test("[R8-OCC-CODE-007] code --new isolates a new occupancy Workspace", async () => {
+    const commands: Command<unknown>[] = [];
+    const { createCliProgram } = await import("../src");
+    const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return ok({ workspaceId: "sbx_new", projectId: "prj_billing" } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_new" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        projectId: "prj_billing",
+        serverId: "srv_1",
+        serverName: "mac-mini",
+      }),
+    });
+
+    await program.parseAsync(["node", "appaloft", "code", "--new", "--no-attach"]);
+
+    expect((commands[0] as OpenAgentWorkspaceCommand).input).toMatchObject({
+      forceNew: true,
+      attach: false,
+      targetServerId: "srv_1",
+    });
+  });
+
   test("[WS-REMOTE-TARGET-015] local-shell Server occupies with targetServerId", async () => {
     const commands: Command<unknown>[] = [];
     const output: string[] = [];

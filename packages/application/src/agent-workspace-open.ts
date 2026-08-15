@@ -556,7 +556,8 @@ export class AgentWorkspaceOpenService {
             workspaceId: preferred.workspaceId,
             requestedCommitSha: input.commitSha,
             workspaceCommitSha: preferred.commitSha,
-            guidance: "Use --new to create an isolated Workspace for the new commit.",
+            guidance:
+              "Use appaloft code --new or workspace open --new to create an isolated Workspace for the new commit.",
           }),
         );
       }
