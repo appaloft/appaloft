@@ -1,6 +1,6 @@
 # ADR-117: Remote Agent Door
 
-Status: Accepted
+Status: Accepted (identity door; occupancy superseded by ADR-118)
 
 Date: 2026-08-15
 

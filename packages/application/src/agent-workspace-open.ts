@@ -26,6 +26,7 @@ export interface WorkspaceOpenInput {
   readonly profile?: string;
   readonly forceNew?: boolean;
   readonly attach?: boolean;
+  readonly targetServerId?: string;
 }
 
 export interface WorkspaceOpenSourceMaterializerPort {
@@ -67,6 +68,7 @@ export interface WorkspaceOpenOptions {
     readonly serverPoolId: string;
   };
   readonly placementProviderKey?: string;
+  readonly targetServerId?: string;
   readonly expiresAt?: string;
   readonly sourceMaterializer?: WorkspaceOpenSourceMaterializerPort;
 }
@@ -305,6 +307,7 @@ export interface WorkspaceOpenDependencies {
         | "precompiledProfilePlan"
         | "credentialAdmissionScope"
         | "placementProviderKey"
+        | "targetServerId"
       >,
     ): Promise<Result<WorkspaceOpenPreflight>>;
   };
@@ -633,7 +636,6 @@ export class AgentWorkspaceOpenService {
     if (sourceCredentialResult.isErr()) return err(sourceCredentialResult.error);
     const sourceCredential = validateSourceCredential(sourceCredentialResult.value);
     if (sourceCredential.isErr()) return err(sourceCredential.error);
-
     const preflight = await this.dependencies.preflight.admit(context, resolved.value, {
       ...(options.credentialReferences
         ? { credentialReferences: options.credentialReferences }
@@ -647,6 +649,7 @@ export class AgentWorkspaceOpenService {
       ...(options.placementProviderKey
         ? { placementProviderKey: options.placementProviderKey }
         : {}),
+      ...(input.targetServerId ? { targetServerId: input.targetServerId } : {}),
     });
     if (preflight.isErr()) return err(preflight.error);
     const begun = await this.dependencies.entries.begin(context, key, {

@@ -45,6 +45,7 @@ describe("remote code door", () => {
       }),
     });
     expect(door.projectId).toBe("project");
+    expect(door.serverId).toBe("srv_1");
     expect(door.commitSha).toBe("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
   });
 
@@ -75,8 +76,9 @@ describe("remote code door", () => {
     });
 
     expect(door.commitSha).toBe("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-    expect(formatRemoteCodeBanner(door)).toBe(
-      "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox",
+    expect(door.serverId).toBe("srv_1");
+    expect(formatRemoteCodeBanner({ ...door, workspaceId: "sbx_1" })).toBe(
+      "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · sbx_1",
     );
     expect(selectDefaultRemoteCodeServer([{ id: "srv_1", name: "mac-mini" }])?.name).toBe(
       "mac-mini",
@@ -113,5 +115,30 @@ describe("remote code door", () => {
 
     expect(door.serverProviderKey).toBe("local-shell");
     expect(door.serverName).toBe("this-mac");
+  });
+
+  test("[WS-REMOTE-NO-UPLOAD-006] uses origin tracking SHA when ls-remote cannot prompt", async () => {
+    const door = await resolveDefaultRemoteCodeDoor({
+      env: { APPALOFT_TOKEN: "token" },
+      listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
+      resolveLocator: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+      }),
+      showBinding: async () => null,
+      runGit: async ({ args }) => {
+        if (args[0] === "ls-remote") {
+          throw new Error("ls-remote cannot prompt");
+        }
+        if (args[0] === "rev-parse" && args[1] === "refs/remotes/origin/main") {
+          return { stdout: `${"b".repeat(40)}\n`, stderr: "" };
+        }
+        throw new Error(args.join(" "));
+      },
+    });
+    expect(door.commitSha).toBe("b".repeat(40));
+    expect(door.serverId).toBe("srv_1");
   });
 });

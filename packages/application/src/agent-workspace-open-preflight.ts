@@ -57,6 +57,7 @@ export interface WorkspaceOpenPlacementPort {
       readonly profileInstallationId: string;
       readonly sandbox: WorkspaceOpenPreflight["plan"]["sandbox"];
       readonly providerKey?: string;
+      readonly targetServerId?: string;
     },
   ): Promise<Result<WorkspaceOpenReservation>>;
   consume(context: ExecutionContext, reservation: WorkspaceOpenReservation): Promise<Result<void>>;
@@ -118,16 +119,25 @@ export class InMemoryWorkspaceOpenPlacementPort implements WorkspaceOpenPlacemen
   private sequence = 0;
   private readonly reservations = new Map<string, "reserved" | "consumed" | "released">();
 
-  async reserve(): Promise<Result<WorkspaceOpenReservation>> {
+  async reserve(
+    _context: ExecutionContext,
+    input: Parameters<WorkspaceOpenPlacementPort["reserve"]>[1],
+  ): Promise<Result<WorkspaceOpenReservation>> {
     const reservationId = `wres_${++this.sequence}`;
     this.reservations.set(reservationId, "reserved");
     return ok({
       reservationId,
-      targetSelection: {
-        targetClass: "local",
-        source: "explicit",
-        reason: "local_composition",
-      },
+      targetSelection: input.targetServerId
+        ? {
+            targetClass: "registered-server",
+            source: "explicit",
+            reason: "code_target_server",
+          }
+        : {
+            targetClass: "local",
+            source: "explicit",
+            reason: "local_composition",
+          },
     });
   }
 
@@ -307,6 +317,7 @@ export class AgentWorkspaceOpenPreflightService {
       | "precompiledProfilePlan"
       | "credentialAdmissionScope"
       | "placementProviderKey"
+      | "targetServerId"
     > = {},
   ): Promise<Result<WorkspaceOpenPreflight>> {
     if (options.precompiledProfilePlan && options.credentialReferences) {
@@ -358,6 +369,7 @@ export class AgentWorkspaceOpenPreflightService {
       profileInstallationId: resolved.profileInstallationId,
       sandbox: plan.value.sandbox,
       ...(options.placementProviderKey ? { providerKey: options.placementProviderKey } : {}),
+      ...(options.targetServerId ? { targetServerId: options.targetServerId } : {}),
     });
     if (reservation.isErr()) return err(reservation.error);
     const targetSelection = validateWorkspaceTargetSelectionEvidence(

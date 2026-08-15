@@ -27,10 +27,10 @@ status readback; it does not retain target topology or credentials.
 
 ## Task-Oriented Activation
 
-Default `appaloft code` is the remote Agent door (ADR-117 / Spec 139). After login it requires a
-default enrolled Server and a Project Binding, resolves the Binding remote SHA, and runs this
-workflow. Laptop Git is a locator only; dirty trees are not uploaded and do not fail closed. The
-banner is `Remote · <project> · <repo@sha> · <server> · my sandbox`.
+Default `appaloft code` occupies my Sandbox (ADR-118 / Spec 139). After login it
+requires a default enrolled Server, resolves the remote SHA, and runs this
+workflow with `targetServerId`. Laptop Git is not uploaded and does not fail
+closed. The banner is `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>`.
 
 `appaloft code --local` remains the Scratch session on this Mac (ADR-116 / Spec 138). It does not
 run this durable workflow and creates no Sandbox, Binding, Profile or Cloud row.

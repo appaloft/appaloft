@@ -16,6 +16,7 @@ export interface RemoteCodeDoorResolution {
   readonly branch: string;
   readonly commitSha: string;
   readonly projectId: string;
+  readonly serverId: string;
   readonly serverName: string;
   readonly serverProviderKey?: string;
 }
@@ -65,10 +66,14 @@ export function formatRemoteCodeBanner(input: {
   readonly repositoryIdentity: string;
   readonly commitSha: string;
   readonly serverName: string;
+  readonly workspaceId?: string;
 }): string {
   const sha = input.commitSha.slice(0, 7);
   const project = input.projectId?.trim() || "project";
-  return `Remote · ${project} · ${input.repositoryIdentity}@${sha} · ${input.serverName} · my sandbox`;
+  const occupancy = input.workspaceId?.trim()
+    ? `my sandbox · ${input.workspaceId.trim()}`
+    : "my sandbox";
+  return `Remote · ${project} · ${input.repositoryIdentity}@${sha} · ${input.serverName} · ${occupancy}`;
 }
 
 function remoteCodeError(
@@ -128,14 +133,13 @@ export async function resolveDefaultRemoteCodeDoor(
       },
     );
   }
-
   const locator = probe.resolveLocator
     ? await probe.resolveLocator()
     : await resolveRemoteCodeLocator(path, probe.runGit);
   const binding = probe.showBinding ? await probe.showBinding(locator.repositoryIdentity) : null;
   const remote =
     probe.resolveRemoteRef === undefined
-      ? await resolveRemoteGitWorkspaceRef(locator.repository, locator.ref, probe.runGit)
+      ? await resolveRemoteCodeRef(locator, probe.runGit)
       : await probe.resolveRemoteRef(locator.repository, locator.ref);
 
   return {
@@ -145,9 +149,68 @@ export async function resolveDefaultRemoteCodeDoor(
     branch: locator.branch,
     commitSha: remote.commitSha,
     projectId: binding?.status === "active" ? binding.projectId : "project",
+    serverId: server.id,
     serverName: server.name,
     ...(server.providerKey ? { serverProviderKey: server.providerKey } : {}),
   };
+}
+
+async function resolveRemoteCodeRef(
+  locator: {
+    readonly repository: string;
+    readonly repositoryIdentity: string;
+    readonly ref: string;
+    readonly branch: string;
+  },
+  runGit?: WorkspaceGitCommandRunner,
+): Promise<RemoteGitWorkspaceRef> {
+  try {
+    return await resolveRemoteGitWorkspaceRef(locator.repository, locator.ref, runGit);
+  } catch (error) {
+    const tracked = await resolveTrackedRemoteCodeSha(locator, runGit);
+    if (tracked) return tracked;
+    throw error;
+  }
+}
+
+async function resolveTrackedRemoteCodeSha(
+  locator: {
+    readonly repository: string;
+    readonly repositoryIdentity: string;
+    readonly ref: string;
+    readonly branch: string;
+  },
+  runGit?: WorkspaceGitCommandRunner,
+): Promise<RemoteGitWorkspaceRef | undefined> {
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const execFileAsync = promisify(execFile);
+  const git =
+    runGit ??
+    (async ({ args, cwd }: { args: readonly string[]; cwd: string }) => {
+      const result = await execFileAsync("git", [...args], {
+        cwd,
+        timeout: 15_000,
+        encoding: "utf8",
+      });
+      return { stdout: result.stdout, stderr: result.stderr };
+    });
+  try {
+    const tracked = await git({
+      args: ["rev-parse", `refs/remotes/origin/${locator.branch}`],
+      cwd: ".",
+    });
+    const commitSha = tracked.stdout.trim().toLowerCase();
+    if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/u.test(commitSha)) return undefined;
+    return {
+      repositoryIdentity: locator.repositoryIdentity,
+      credentialFreeHttpsRepository: locator.repository,
+      ref: locator.ref,
+      commitSha,
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 export async function resolveRemoteCodeLocator(

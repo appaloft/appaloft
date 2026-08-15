@@ -43,6 +43,7 @@ export const openAgentWorkspaceInputSchema = z
     profile: z.string().trim().min(1).max(160).optional(),
     forceNew: z.boolean().optional(),
     attach: z.boolean().optional(),
+    targetServerId: z.string().trim().min(1).max(160).optional(),
   })
   .strict();
 
@@ -63,6 +64,7 @@ export class OpenAgentWorkspaceCommand extends Command<WorkspaceOpenResult> {
           ...(parsed.profile ? { profile: parsed.profile } : {}),
           ...(parsed.forceNew !== undefined ? { forceNew: parsed.forceNew } : {}),
           ...(parsed.attach !== undefined ? { attach: parsed.attach } : {}),
+          ...(parsed.targetServerId ? { targetServerId: parsed.targetServerId } : {}),
         }),
     );
   }

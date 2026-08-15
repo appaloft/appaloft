@@ -379,26 +379,31 @@ export const workspaceCodeCommand = EffectCommand.make(
         catch: (error) => workspaceCliError(error, "remote-code-door"),
       });
       const attach = !noAttach;
-      const session = yield* Effect.tryPromise({
-        try: () =>
-          resolveScratchSession(path, cli.resolveScratchHarness ?? resolveDefaultScratchHarness),
-        catch: (error) => workspaceCliError(error, "scratch-harness"),
-      });
-      process.stdout.write(`${formatRemoteCodeBanner(door)}\n`);
+      const command = yield* resultToEffect(
+        OpenAgentWorkspaceCommand.create({
+          repository: door.repository,
+          repositoryIdentity: door.repositoryIdentity,
+          ref: door.ref,
+          branch: door.branch,
+          commitSha: door.commitSha,
+          targetServerId: door.serverId,
+          attach,
+        }),
+      );
+      const result = (yield* resultToEffect(
+        yield* Effect.promise(() => cli.executeCommand(command)),
+      )) as WorkspaceOpenResult;
       process.stdout.write(
-        `${session.harness.name}${session.harness.skillOffered ? " · Appaloft skill offered" : ""}\n`,
+        `${formatRemoteCodeBanner({
+          projectId: result.projectId || door.projectId,
+          repositoryIdentity: door.repositoryIdentity,
+          commitSha: door.commitSha,
+          serverName: door.serverName,
+          workspaceId: result.workspaceId,
+        })}\n`,
       );
       if (!attach) return;
-      const launch = cli.launchScratchAgent ?? launchScratchAgent;
-      yield* Effect.tryPromise({
-        try: () =>
-          launch({
-            argv: session.harness.argv,
-            cwd: session.path,
-            ...(session.harness.env ? { env: session.harness.env } : {}),
-          }),
-        catch: (error) => workspaceCliError(error, "scratch-harness"),
-      });
+      yield* completeWorkspaceOpen(result, true, cli.launchNativeWorkspaceClient);
     }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.agentScratch));
 
