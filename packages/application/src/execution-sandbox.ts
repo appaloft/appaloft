@@ -29,6 +29,10 @@ import {
   UpdatedAt,
 } from "@appaloft/core";
 import {
+  COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID,
+  communityOccupancyOpenCodeTemplateSpec,
+} from "./community-occupancy-opencode-template";
+import {
   type ExecutionContext,
   type RepositoryContext,
   toRepositoryContext,
@@ -1232,6 +1236,8 @@ export class ExecutionSandboxService {
       sourceProviderKey = snapshot.providerKey;
       sourceSnapshot = snapshot;
     } else if (input.source.kind === "template") {
+      const ensured = await this.ensureReservedOccupancyTemplate(context, input.source.templateId);
+      if (ensured.isErr()) return err(ensured.error);
       const template = await this.repository.findTemplate(
         repositoryContext,
         input.source.templateId,
@@ -1455,10 +1461,10 @@ export class ExecutionSandboxService {
         ...(snapshotState.recoveryFamily ? { recoveryFamily: snapshotState.recoveryFamily } : {}),
       };
     } else {
-      const template = await this.repository.findTemplate(
-        toRepositoryContext(context),
-        state.source.templateId.value,
-      );
+      const templateId = state.source.templateId.value;
+      const ensured = await this.ensureReservedOccupancyTemplate(context, templateId);
+      if (ensured.isErr()) return err(ensured.error);
+      const template = await this.repository.findTemplate(toRepositoryContext(context), templateId);
       if (!template) {
         stored.sandbox.markFailed({ code: "sandbox_template_unavailable", retryable: false, at });
         await this.saveSandbox(context, stored.sandbox, stored.providerKey);
@@ -2825,6 +2831,89 @@ export class ExecutionSandboxService {
     };
     await this.repository.saveTemplate(toRepositoryContext(context), template.value);
     return ok(templateDescriptor(stored));
+  }
+
+  async ensureTemplate(
+    context: ExecutionContext,
+    input: {
+      templateId: string;
+      name: string;
+      image: string;
+      minimumIsolation: SandboxIsolation;
+      limits: SandboxResourceLimitsState;
+      networkPolicy: SandboxNetworkPolicyState;
+    },
+  ): Promise<Result<SandboxTemplateDescriptor>> {
+    const templateId = SandboxTemplateId.create(input.templateId);
+    if (templateId.isErr()) return err(templateId.error);
+    const name = SandboxTemplateName.create(input.name);
+    if (name.isErr()) return err(name.error);
+    const isolation = SandboxIsolationLevel.create(input.minimumIsolation);
+    if (isolation.isErr()) return err(isolation.error);
+    const limits = SandboxResourceLimits.create(input.limits);
+    if (limits.isErr()) return err(limits.error);
+    const networkPolicy = SandboxNetworkPolicy.create(input.networkPolicy);
+    if (networkPolicy.isErr()) return err(networkPolicy.error);
+    const repositoryContext = toRepositoryContext(context);
+    const existing = await this.repository.findTemplate(repositoryContext, templateId.value.value);
+    if (existing) {
+      const state = existing.template.toState();
+      const existingLimits = state.limits.toState();
+      if (
+        state.image !== input.image ||
+        !state.minimumIsolation.equals(isolation.value) ||
+        existingLimits.cpuMillis !== limits.value.toState().cpuMillis ||
+        existingLimits.memoryBytes !== limits.value.toState().memoryBytes ||
+        existingLimits.diskBytes !== limits.value.toState().diskBytes ||
+        existingLimits.maxProcesses !== limits.value.toState().maxProcesses ||
+        !state.networkPolicy.equals(networkPolicy.value)
+      ) {
+        return err(
+          domainError.conflict("Sandbox template network policy is immutable", {
+            phase: "execution-sandbox-template-override",
+            field: "template",
+            code: "sandbox_template_network_policy_immutable",
+            templateId: templateId.value.value,
+            recovery:
+              "Register a matching template with `appaloft sandbox template create --network-policy remote-default`, then set APPALOFT_OPENCODE_SANDBOX_TEMPLATE_ID to that template id.",
+          }),
+        );
+      }
+      return ok(templateDescriptor(existing));
+    }
+    const createdAt = CreatedAt.create(this.clock.now());
+    if (createdAt.isErr()) return err(createdAt.error);
+    const template = SandboxTemplate.create({
+      id: templateId.value,
+      name: name.value,
+      image: input.image,
+      minimumIsolation: isolation.value,
+      limits: limits.value,
+      networkPolicy: networkPolicy.value,
+      overridePolicy: {
+        isolation: "strengthen-only",
+        limits: "decrease-only",
+        network: "immutable",
+      },
+      createdAt: createdAt.value,
+    });
+    if (template.isErr()) return err(template.error);
+    await this.repository.saveTemplate(repositoryContext, template.value);
+    return ok(
+      templateDescriptor({
+        tenantId: context.tenant?.tenantId ?? "tenant_instance",
+        template: template.value,
+      }),
+    );
+  }
+
+  private async ensureReservedOccupancyTemplate(
+    context: ExecutionContext,
+    templateId: string,
+  ): Promise<Result<void>> {
+    if (templateId !== COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID) return ok(undefined);
+    const ensured = await this.ensureTemplate(context, communityOccupancyOpenCodeTemplateSpec());
+    return ensured.isErr() ? err(ensured.error) : ok(undefined);
   }
 
   async listTemplates(

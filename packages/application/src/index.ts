@@ -23,6 +23,7 @@ export * from "./capability-handlers";
 export * from "./capability-messages";
 export * from "./certificate-handlers";
 export * from "./certificate-messages";
+export * from "./community-occupancy-opencode-template";
 export * from "./community-remote-default-network-policy";
 
 export * from "./community-workspace-activation-context-initializer";
