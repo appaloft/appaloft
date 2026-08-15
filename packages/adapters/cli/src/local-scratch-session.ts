@@ -140,10 +140,13 @@ export function buildScratchHarness(
     config.skills = { paths: [dirname(skillPath)] };
   }
   if (options.appaloftCli && options.appaloftCli.length > 0) {
+    const remoteStdio = options.appaloftCli.includes("remote-stdio");
     config.mcp = {
       appaloft: {
         type: "local",
-        command: ["env", "APPALOFT_CONTROL_PLANE_MODE=none", ...options.appaloftCli],
+        command: remoteStdio
+          ? [...options.appaloftCli]
+          : ["env", "APPALOFT_CONTROL_PLANE_MODE=none", ...options.appaloftCli],
         enabled: true,
       },
     };
