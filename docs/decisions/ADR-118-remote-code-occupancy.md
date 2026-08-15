@@ -43,7 +43,9 @@ must not use laptop HEAD as Workspace truth.
    when Binding or Project default Profile is missing, creates or reuses a
    Project, Binding, and invisible `appaloft-remote` Adapter + Profile
    (OpenCode if the template supports it, else Pi). The Profile has no required
-   model credential. Personal vendor login stays inside the Sandbox.
+   model credential; `model-api` is optional so a later Connection can bind
+   without replacing the Adapter. Unbound occupancy still starts vendor-login.
+   Personal vendor login stays inside the Sandbox.
 5. Laptop Git fail-closed remains only on explicit `workspace open` /
    `workspace create`. Default `code` continues to resolve the remote SHA with
    `ls-remote` and never uploads the laptop tree.

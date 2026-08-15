@@ -18,6 +18,15 @@ describe("community remote default profile", () => {
       requirements: {
         capabilities: { required: ["native-attach"], optional: ["headless"] },
       },
+      credentials: [
+        {
+          id: "model-api",
+          kind: "model-api",
+          required: false,
+          purpose: "Brokered or personal model access",
+          delivery: { kind: "stdin" },
+        },
+      ],
     });
     expect(profile?.profileManifest).toMatchObject({
       id: "appaloft-remote",
@@ -50,6 +59,13 @@ describe("community remote default profile", () => {
       requirements: {
         capabilities: { required: ["managed-terminal"], optional: ["headless"] },
       },
+      credentials: [
+        {
+          id: "model-api",
+          kind: "model-api",
+          required: false,
+        },
+      ],
     });
   });
 });
