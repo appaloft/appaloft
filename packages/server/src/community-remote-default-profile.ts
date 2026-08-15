@@ -65,7 +65,15 @@ export function createCommunityRemoteDefaultProfile(input: {
         }
       : { healthcheck: { kind: "process" } }),
     persistentPaths: ["/workspace/.appaloft-agent"],
-    credentials: [],
+    credentials: [
+      {
+        id: "model-api",
+        kind: "model-api",
+        required: false,
+        purpose: "Brokered or personal model access",
+        delivery: { kind: "stdin" },
+      },
+    ],
   };
   const validatedAdapter = validateAgentAdapterManifest(adapterManifest);
   if (!validatedAdapter.ok) return undefined;
