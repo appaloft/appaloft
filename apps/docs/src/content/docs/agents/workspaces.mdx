@@ -185,13 +185,16 @@ console.log(
 
 ## 断线重连
 
-Terminal Session 由 Appaloft 托管的 PTY 支撑——客户端断线只是"detach"，只要 Session 的存活时间和 Sandbox 仍然有效，再次运行 `appaloft code` 就会重用 Session、重放有限历史输出并继续同一个 Agent 进程：
+Terminal Session 由 Appaloft 托管的 PTY 支撑——客户端断线只是"detach"。只要 Session 的存活时间和
+Sandbox 仍然有效，再次运行 `appaloft workspace open` 就会重用 Session、重放有限历史输出并继续
+同一个 Agent 进程：
 
 ```bash
-appaloft code
+appaloft workspace open
 ```
 
-已有脚本可以继续使用 `appaloft workspace open .`；它不会被弃用或改变机器可读行为。
+默认 `appaloft code` 会打开新的本机 Scratch 会话，不会重连 durable Workspace。已有脚本可以继续
+使用 `appaloft workspace open .`；它不会被弃用或改变机器可读行为。
 
 底层排障命令仍然保留：
 

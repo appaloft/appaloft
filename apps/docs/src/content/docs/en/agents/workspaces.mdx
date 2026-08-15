@@ -221,15 +221,16 @@ against that same partial identity instead of silently creating a duplicate Sand
 ## Reconnecting after disconnect
 
 Terminal sessions are backed by a PTY managed by Appaloft — a client disconnect is just a "detach."
-While the session TTL and Sandbox remain valid, running `appaloft code` again reuses the Session,
-replays bounded output, and continues the same Agent process:
+While the session TTL and Sandbox remain valid, running `appaloft workspace open` again reuses the
+Session, replays bounded output, and continues the same Agent process:
 
 ```bash
-appaloft code
+appaloft workspace open
 ```
 
-Existing automation can keep using `appaloft workspace open .`; it is not deprecated and its
-machine-readable behavior is unchanged.
+Default `appaloft code` opens a new local Scratch session and does not reconnect a durable
+Workspace. Existing automation can keep using `appaloft workspace open .`; it is not deprecated
+and its machine-readable behavior is unchanged.
 
 Lower-level diagnostic commands remain available:
 
