@@ -1,6 +1,7 @@
 import {
   AcceptSandboxPromotionCommand,
   CancelSandboxAgentRunCommand,
+  COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY,
   ConfigureSandboxNetworkPolicyCommand,
   CreateSandboxAgentRunCommand,
   CreateSandboxAgentRuntimeCommand,
@@ -360,15 +361,21 @@ const templateCreate = EffectCommand.make(
     memoryBytes: Options.integer("memory-bytes"),
     diskBytes: Options.integer("disk-bytes"),
     maxProcesses: Options.integer("max-processes"),
+    networkPolicy: Options.choice("network-policy", ["deny", "remote-default"] as const).pipe(
+      Options.withDefault("deny" as const),
+    ),
   },
-  ({ cpuMillis, diskBytes, image, isolation, maxProcesses, memoryBytes, name }) =>
+  ({ cpuMillis, diskBytes, image, isolation, maxProcesses, memoryBytes, name, networkPolicy }) =>
     runCommand(
       CreateSandboxTemplateCommand.create({
         name,
         image,
         minimumIsolation: isolation,
         limits: { cpuMillis, memoryBytes, diskBytes, maxProcesses },
-        networkPolicy: { mode: "deny", rules: [] },
+        networkPolicy:
+          networkPolicy === "remote-default"
+            ? COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY
+            : { mode: "deny", rules: [] },
       }),
     ),
 );

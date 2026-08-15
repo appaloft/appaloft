@@ -2,9 +2,11 @@ import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
 import {
+  COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY,
   type Command,
   type CommandBus,
   CreateSandboxCommand,
+  CreateSandboxTemplateCommand,
   createExecutionContext,
   ExecuteSandboxCommand,
   type ExecutionContextFactory,
@@ -119,6 +121,63 @@ describe("CLI execution sandbox commands", () => {
       relativeDirectory: "app",
       initialRows: 32,
       initialCols: 120,
+    });
+  });
+
+  test("[WS-REMOTE-AUTH-009] sandbox template create can register the remote-default allowlist", async () => {
+    const commands: Command<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: Command<T>) => {
+        commands.push(command as Command<unknown>);
+        return ok({ templateId: "stp_cli" } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>() => ok({ items: [] } as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) => createExecutionContext({ ...input, requestId: "req_template_cli" }),
+    };
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+    const write = process.stdout.write;
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    try {
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "sandbox",
+        "template",
+        "create",
+        "--name",
+        "occupancy-opencode-remote-default",
+        "--image",
+        "ghcr.io/appaloft/agent-workspace-opencode:1.18.4",
+        "--isolation",
+        "container-trusted",
+        "--cpu-millis",
+        "2000",
+        "--memory-bytes",
+        "4294967296",
+        "--disk-bytes",
+        "21474836480",
+        "--max-processes",
+        "128",
+        "--network-policy",
+        "remote-default",
+      ]);
+    } finally {
+      process.stdout.write = write;
+    }
+    expect(commands[0]).toBeInstanceOf(CreateSandboxTemplateCommand);
+    expect(commands[0]).toMatchObject({
+      input: { networkPolicy: COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY },
     });
   });
 });
