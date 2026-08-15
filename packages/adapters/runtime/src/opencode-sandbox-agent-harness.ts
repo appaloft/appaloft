@@ -2,9 +2,9 @@ import {
   type ExecutionContext,
   type SandboxAgentHarness,
   type SandboxAgentHarnessEvent,
+  type SandboxAgentMcpAccessDescriptor,
   type SandboxAgentMcpAccessProvider,
   type SandboxAgentModelAccessProvider,
-  type SandboxAgentModelCredentialBinding,
   type SandboxExecResult,
   type SandboxFileDescriptor,
   type SandboxProcessDescriptor,
@@ -13,8 +13,8 @@ import {
   revokeSandboxAgentMcpAccess,
   selectSandboxAgentModelCredentialBinding,
   withOccupancyFirstPartyMcpDiscovery,
-
 } from "@appaloft/application";
+
 
 
 import { type Result } from "@appaloft/core";
