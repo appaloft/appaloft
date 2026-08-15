@@ -402,41 +402,60 @@ async function runShellMcpHttp(app: AppComposition, argv: readonly string[]): Pr
 
 async function runShellMcpRemoteStdio(argv: readonly string[]): Promise<void> {
   const args = commandArgs(argv);
-  const profileName = readOptionValue(args, "profile") ?? "mcp";
-  const store = defaultCliControlPlaneProfileStore(process.env);
+  const profileName = readOptionValue(args, "profile");
+  const env = process.env;
+  const envUrl = env.APPALOFT_CONTROL_PLANE_URL?.trim();
+  const envCookie = env.APPALOFT_AUTH_COOKIE?.trim();
+  if (!profileName && envUrl && envCookie) {
+    await runAppaloftMcpRemoteStdioProxy({
+      endpoint: new URL("/mcp", envUrl).toString(),
+      cookie: envCookie,
+    });
+    return;
+  }
+
+  const store = defaultCliControlPlaneProfileStore(env);
   const data = await store.read();
   if (data.isErr()) {
     writeDomainError(data.error);
     process.exit(1);
   }
 
-  const profile = data.value.profiles[profileName];
+  const selectedName = profileName ?? "mcp";
+  const profile = data.value.profiles[selectedName];
   if (!profile) {
     writeDomainError(
       domainError.validation("Appaloft MCP profile was not found; run appaloft auth mcp login", {
         phase: "mcp-remote-stdio-profile",
-        profile: profileName,
+        profile: selectedName,
       }),
     );
     process.exit(1);
   }
 
+  if (profile.auth.kind === "product-session") {
+    await runAppaloftMcpRemoteStdioProxy({
+      endpoint: new URL("/mcp", profile.baseUrl).toString(),
+      cookie: profile.auth.cookie,
+    });
+    return;
+  }
+
   if (profile.auth.kind !== "bearer") {
     writeDomainError(
       domainError.validation(
-        "Appaloft MCP remote stdio requires a bearer profile; run appaloft auth mcp login",
+        "Appaloft MCP remote stdio requires a bearer or product-session profile",
         {
           phase: "mcp-remote-stdio-profile",
-          profile: profileName,
+          profile: selectedName,
         },
       ),
     );
     process.exit(1);
   }
 
-  const endpoint = new URL("/mcp", profile.baseUrl).toString();
   await runAppaloftMcpRemoteStdioProxy({
-    endpoint,
+    endpoint: new URL("/mcp", profile.baseUrl).toString(),
     authorization: `Bearer ${profile.auth.token}`,
   });
 }

@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 
 import {
   buildScratchHarness,
+  resolveAppaloftMcpArgv,
   resolveAppaloftSkillPath,
   resolveDefaultScratchHarness,
   resolveLocalAppaloftCli,
@@ -140,8 +141,13 @@ describe("local scratch session", () => {
         skills?: { paths?: string[] };
         mcp?: { appaloft?: { command?: string[] } };
       };
-      expect(config.skills?.paths).toEqual([dirname(skillDir)]);
-      expect(config.mcp?.appaloft?.command).toEqual(["/opt/appaloftdev", "mcp", "stdio"]);
+      expect(config.mcp?.appaloft?.command).toEqual([
+        "env",
+        "APPALOFT_CONTROL_PLANE_MODE=none",
+        "/opt/appaloftdev",
+        "mcp",
+        "stdio",
+      ]);
       expect(await Bun.file(join(scratchDir, ".opencode")).exists()).toBe(false);
       expect(await Bun.file(join(scratchDir, "AGENTS.md")).exists()).toBe(false);
     });
@@ -162,21 +168,33 @@ describe("local scratch session", () => {
     });
   });
 
-  test("[WS-REMOTE-SKILL-017] occupancy attach env offers the public skill and local MCP", async () => {
+  test("[WS-REMOTE-SKILL-017] occupancy attach env offers the public skill and remote-stdio MCP", async () => {
     await withTempDir("appaloft-occupancy-attach-skill-", async (root) => {
       const skillDir = join(root, "skills", "appaloft");
       await mkdir(skillDir, { recursive: true });
       await writeFile(join(skillDir, "SKILL.md"), "---\nname: appaloft\ndescription: test\n---\n");
+      expect(
+        resolveAppaloftMcpArgv({
+          APPALOFT_CONTROL_PLANE_URL: "http://127.0.0.1:3001",
+          APPALOFT_CONTROL_PLANE_MODE: "self-hosted",
+        }),
+      ).toEqual(["mcp", "remote-stdio"]);
       const env = resolveNativeOpenCodeAttachEnv({
         resolveSkillPath: () => skillDir,
-        resolveAppaloftCli: () => ["/opt/appaloftdev", "mcp", "stdio"],
+        resolveAppaloftCli: () => ["/opt/appaloftdev", "mcp", "remote-stdio"],
       });
       const config = JSON.parse(env?.OPENCODE_CONFIG_CONTENT ?? "{}") as {
         skills?: { paths?: string[] };
         mcp?: { appaloft?: { command?: string[] } };
       };
       expect(config.skills?.paths).toEqual([dirname(skillDir)]);
-      expect(config.mcp?.appaloft?.command).toEqual(["/opt/appaloftdev", "mcp", "stdio"]);
+      expect(config.mcp?.appaloft?.command).toEqual([
+        "env",
+        "APPALOFT_CONTROL_PLANE_MODE=none",
+        "/opt/appaloftdev",
+        "mcp",
+        "remote-stdio",
+      ]);
     });
   });
 

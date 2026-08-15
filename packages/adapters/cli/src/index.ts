@@ -99,6 +99,7 @@ export {
 export {
   buildScratchHarness,
   launchScratchAgent,
+  resolveAppaloftMcpArgv,
   resolveAppaloftSkillPath,
   resolveDefaultScratchHarness,
   resolveLocalAppaloftCli,

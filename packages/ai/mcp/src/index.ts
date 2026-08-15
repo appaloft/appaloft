@@ -1209,7 +1209,8 @@ export async function runAppaloftMcpStdioServer(input: {
 
 export async function runAppaloftMcpRemoteStdioProxy(input: {
   endpoint: string;
-  authorization: string;
+  authorization?: string;
+  cookie?: string;
   fetch?: typeof fetch;
   stdin?: ReadableStream<Uint8Array>;
   stdout?: { write(data: string): void };
@@ -1225,8 +1226,9 @@ export async function runAppaloftMcpRemoteStdioProxy(input: {
       method: "POST",
       headers: {
         accept: "application/json",
-        authorization: input.authorization,
         "content-type": "application/json",
+        ...(input.authorization ? { authorization: input.authorization } : {}),
+        ...(input.cookie ? { cookie: input.cookie } : {}),
       },
       body: line,
     });
