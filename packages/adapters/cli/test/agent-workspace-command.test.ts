@@ -820,6 +820,79 @@ describe("Agent Workspace CLI", () => {
     );
   });
 
+  test("[R8-OCC-CODE-009] code attach after pin mismatch launches the native OpenCode client", async () => {
+    const commands: Command<unknown>[] = [];
+    const launched: string[][] = [];
+    const { createCliProgram } = await import("../src");
+    const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
+    const { domainError } = await import("@appaloft/core");
+    let attempts = 0;
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          attempts += 1;
+          if (attempts === 1) {
+            return err(
+              domainError.conflict("Preferred Workspace is pinned to another Git commit", {
+                code: "workspace_open_source_pin_mismatch",
+                workspaceId: "sbx_h1swq765kcgw",
+                requestedCommitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                workspaceCommitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              }),
+            );
+          }
+          return ok({
+            workspaceId: "sbx_h1swq765kcgw",
+            projectId: "prj_billing",
+            attach: {
+              transport: "native-attach",
+              clientHandoff: "local-client-exec",
+              clientCommand: [
+                "opencode",
+                "attach",
+                "https://attach.example.test/capability",
+                "--dir",
+                "/workspace",
+              ],
+            },
+          } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_code_resume_attach" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        projectId: "prj_billing",
+        serverId: "srv_1",
+        serverName: "mac-mini",
+      }),
+      launchNativeWorkspaceClient: async (argv) => {
+        launched.push([...argv]);
+      },
+    });
+
+    await program.parseAsync(["node", "appaloft", "code"]);
+
+    expect((commands[1] as OpenAgentWorkspaceCommand).input).toMatchObject({
+      commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      attach: true,
+      forceNew: false,
+    });
+    expect(launched).toEqual([
+      ["opencode", "attach", "https://attach.example.test/capability", "--dir", "/workspace"],
+    ]);
+  });
+
   test("[WS-REMOTE-TARGET-015] local-shell Server occupies with targetServerId", async () => {
     const commands: Command<unknown>[] = [];
     const output: string[] = [];
