@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { existsSync, realpathSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, realpathSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 
@@ -87,6 +88,12 @@ export function resolveAppaloftMcpArgv(
   return remote ? (["mcp", "remote-stdio"] as const) : (["mcp", "stdio"] as const);
 }
 
+export function isolatedOpenCodeConfigHome(): string {
+  const directory = join(tmpdir(), "appaloft-opencode-attach-config");
+  mkdirSync(directory, { recursive: true });
+  return directory;
+}
+
 export function resolveLocalAppaloftCli(
   which: (name: string) => string | null | undefined = (name) => Bun.which(name),
   env: NodeJS.ProcessEnv = process.env,
@@ -128,7 +135,6 @@ export function buildScratchHarness(
       skillOffered,
     };
   }
-
   const config: Record<string, unknown> = {};
   if (skillOffered && skillPath) {
     config.skills = { paths: [dirname(skillPath)] };
@@ -143,12 +149,18 @@ export function buildScratchHarness(
     };
   }
 
+  const env =
+    Object.keys(config).length > 0
+      ? {
+          OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
+          XDG_CONFIG_HOME: isolatedOpenCodeConfigHome(),
+        }
+      : undefined;
+
   return {
     name,
     argv: [executable],
-    ...(Object.keys(config).length > 0
-      ? { env: { OPENCODE_CONFIG_CONTENT: JSON.stringify(config) } }
-      : {}),
+    ...(env ? { env } : {}),
     ...(skillOffered && skillPath ? { skillPath } : {}),
     skillOffered,
   };
