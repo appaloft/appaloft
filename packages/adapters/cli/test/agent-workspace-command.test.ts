@@ -1,6 +1,9 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   AcquireWorkspaceWriterLeaseCommand,
   AddWorkspaceCollaborationLaneCommand,
@@ -441,7 +444,7 @@ describe("Agent Workspace CLI", () => {
     });
   });
 
-  test("[WS-CODE-PREFLIGHT-004][WS-CODE-ERROR-009] code preserves Git preflight errors before dispatch", async () => {
+  test("[WS-CODE-PREFLIGHT-004][WS-CODE-ERROR-009][WS-SCRATCH-COMPAT-013] workspace open preserves Git preflight errors before dispatch", async () => {
     let commandDispatched = false;
     const { createCliProgram } = await import("../src");
     const program = createCliProgram({
@@ -476,7 +479,7 @@ describe("Agent Workspace CLI", () => {
     const write = process.stderr.write;
     process.stderr.write = (() => true) as typeof process.stderr.write;
     try {
-      await program.parseAsync(["node", "appaloft", "code"]);
+      await program.parseAsync(["node", "appaloft", "workspace", "open"]);
       throw new Error("Expected dirty Git preflight to fail");
     } catch (error) {
       const errorText = String(error);
@@ -489,6 +492,150 @@ describe("Agent Workspace CLI", () => {
     }
 
     expect(commandDispatched).toBeFalse();
+  });
+
+  test("[WS-SCRATCH-CLI-001][WS-SCRATCH-EMPTY-002][WS-SCRATCH-DIRTY-003][WS-SCRATCH-LOGGED-OUT-004][WS-SCRATCH-BANNER-005][WS-SCRATCH-HARNESS-006][WS-SCRATCH-NO-ATTACH-009][WS-SCRATCH-NO-STATE-012][WS-SCRATCH-UPGRADE-014][WS-SCRATCH-PROFILE-016] default code is scratch without Git or workspaces.open", async () => {
+    const scratchDir = await mkdtemp(join(tmpdir(), "appaloft-scratch-empty-"));
+    const commands: Command<unknown>[] = [];
+    const launched: string[][] = [];
+    const output: string[] = [];
+    let gitResolved = false;
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({}) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_scratch_cli" }),
+      },
+      resolveLocalWorkspaceGitContext: async () => {
+        gitResolved = true;
+        throw new Error("scratch must not inspect Git");
+      },
+      resolveScratchHarness: async () => ({
+        name: "opencode",
+        argv: ["opencode"],
+        skillOffered: true,
+      }),
+      launchNativeWorkspaceClient: async (argv) => {
+        launched.push([...argv]);
+      },
+    });
+    const write = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", scratchDir, "--no-attach"]);
+    } finally {
+      process.stdout.write = write;
+      await rm(scratchDir, { recursive: true, force: true });
+    }
+
+    expect(gitResolved).toBeFalse();
+    expect(commands).toEqual([]);
+    expect(launched).toEqual([]);
+    expect(output.join("")).toContain("Local scratch · this Mac · not saved remotely");
+    expect(output.join("")).toContain("opencode");
+  });
+
+  test("[WS-SCRATCH-INSTALL-007] refused install is the only hard scratch failure", async () => {
+    let commandDispatched = false;
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async () => {
+          commandDispatched = true;
+          return ok({});
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({}) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_scratch_install_refused" }),
+      },
+      resolveScratchHarness: async () => {
+        throw {
+          code: "workspace_scratch_install_refused",
+          category: "validation",
+          message: "Install a supported local Agent to continue",
+          retryable: false,
+          details: { phase: "scratch-harness" },
+        };
+      },
+    });
+    const originalExitCode = process.exitCode;
+    const write = process.stderr.write;
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
+      throw new Error("Expected refused install to fail");
+    } catch (error) {
+      const errorText = String(error);
+      expect(errorText).toContain('"code":"workspace_scratch_install_refused"');
+      expect(errorText).toContain('"phase":"scratch-harness"');
+    } finally {
+      process.stderr.write = write;
+      process.exitCode = originalExitCode ?? 0;
+    }
+    expect(commandDispatched).toBeFalse();
+  });
+
+  test("[WS-SCRATCH-ATTACH-008][WS-SCRATCH-SKILL-010] scratch attaches the local harness in the selected directory", async () => {
+    const scratchDir = await mkdtemp(join(tmpdir(), "appaloft-scratch-attach-"));
+    const launched: Array<{ argv: string[]; cwd: string; env?: Record<string, string> }> = [];
+    const commands: Command<unknown>[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({}) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_scratch_attach" }),
+      },
+      resolveScratchHarness: async () => ({
+        name: "pi",
+        argv: ["pi", "--skill", "/tmp/skills/appaloft"],
+        skillOffered: true,
+        skillPath: "/tmp/skills/appaloft",
+      }),
+      launchScratchAgent: async (input) => {
+        launched.push({
+          argv: [...input.argv],
+          cwd: input.cwd,
+          ...(input.env ? { env: { ...input.env } } : {}),
+        });
+      },
+    });
+
+    try {
+      await program.parseAsync(["node", "appaloft", "code", scratchDir]);
+    } finally {
+      await rm(scratchDir, { recursive: true, force: true });
+    }
+
+    expect(commands).toEqual([]);
+    expect(launched).toEqual([
+      {
+        argv: ["pi", "--skill", "/tmp/skills/appaloft"],
+        cwd: scratchDir,
+      },
+    ]);
   });
 
   test("[WS-CODE-ATTACH-006][WS-ATTACH-MANAGED-014] automatically connects a managed-terminal attach descriptor", async () => {
@@ -577,7 +724,7 @@ describe("Agent Workspace CLI", () => {
       }),
     });
 
-    await program.parseAsync(["node", "appaloft", "code"]);
+    await program.parseAsync(["node", "appaloft", "code", "--new"]);
 
     expect(attached).toEqual(["term_pi"]);
     expect(output.join("")).toBe("Pi ready\n");
@@ -637,7 +784,7 @@ describe("Agent Workspace CLI", () => {
       },
     });
 
-    await program.parseAsync(["node", "appaloft", "code"]);
+    await program.parseAsync(["node", "appaloft", "code", "--new"]);
 
     expect(launched).toEqual([
       ["opencode", "attach", "https://attach.example.test/capability", "--dir", "/workspace"],

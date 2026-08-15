@@ -40,21 +40,40 @@ flowchart LR
 
 A Sandbox by itself is just a controlled execution environment — it doesn't presuppose "what should run in it." Workspace combines a Sandbox with a specific agent runtime, repository source, and terminal session into an environment the user can develop in remotely and reconnect to anytime after disconnecting — this is the abstraction level most "let an AI agent help me change code" scenarios actually need.
 
-## Open a Workspace from a local repository <a id="agent-workspace-open" />
+## Open an Agent from a local directory <a id="agent-workspace-open" />
 
-Run this from a clean, pushed Git branch:
+Run this from any directory:
 
 ```bash
 appaloft code
 ```
 
-`appaloft code [path]` is the primary task-oriented entry; path defaults to `.`. The compatibility
-command `appaloft workspace open [path]` delegates to the same `workspaces.open` operation. The CLI
-uses the path only to find the Git root, upstream remote, branch, and HEAD SHA. It does not
-upload the local directory or uncommitted files. It normalizes the remote to a Repository identity,
-finds the Project through its Repository Binding, selects `--profile` or the Project default
-Profile, then creates or resumes the remote Workspace. By default it enters the Agent-owned
-interface.
+Default `appaloft code [path]` opens a local Scratch session. Path defaults to `.`. Empty, dirty,
+detached, unpushed, logged-out, and Binding-less directories are valid. The CLI does not call
+`workspaces.open` and does not upload local files. The banner is:
+
+```text
+Local scratch · this Mac · not saved remotely
+```
+
+The default harness is OpenCode if present, otherwise Pi. If neither binary exists, Appaloft
+prompts to install. Refusing install is the only hard failure before attach. Scratch offers the
+public Appaloft skill to that local Agent without writing project files. `--no-attach` resolves
+scratch, prints the banner and harness, then exits.
+
+Durable Workspace still uses:
+
+```bash
+appaloft workspace open
+appaloft code . --profile <workspace-profile>
+appaloft code . --new
+```
+
+Those paths still dispatch `workspaces.open`. The CLI uses the path only to find the Git root,
+upstream remote, branch, and HEAD SHA. Dirty trees, detached HEAD, missing upstream, and remote
+tip mismatch fail before remote creation. V1 never performs implicit sync or patch upload.
+`--profile` selects an Agent Workspace Profile. It is distinct from
+`--control-plane-profile`.
 
 `workspaces.open` validates the source before reading the existing Repository Binding and Project
 default Profile. A deployment may compose the optional activation initializer so missing Project,
@@ -64,44 +83,9 @@ initializer keep the existing fail-closed setup guidance. The initializer must p
 deployment-specific authorization and admission before creating context, and it cannot overwrite
 existing, conflicting, disabled, or unauthorized state.
 
-When attaching:
-
-- a managed-terminal Adapter launches or reuses the Agent TUI Terminal Session and connects;
-- a native-attach Adapter obtains a short-lived revocable capability and executes or displays its
-  declared local-client handoff;
-- an Adapter without attach support returns an explicit capability error.
-
-Attach behavior comes only from Adapter capabilities, never Pi, OpenCode, or another Agent name.
-
-The successful result and Workspace detail return safe activation and target-selection evidence:
-
-- Project, Repository Binding, and Profile activation items each report `created` or `reused`;
-- target class is `managed`, `registered-server`, or `local`; selection source is
-  `platform-default`, `saved-policy`, or `explicit`; and a stable reason explains the choice;
-- evidence contains no Server id, host, provider handle, capacity probe, or credential. Reopening
-  the same Workspace returns the persisted evidence without rerunning placement. A legacy Workspace
-  without evidence explicitly reports `legacy-unclassified` rather than guessing its location.
-
 Deployment-specific entitlement, target-policy, or capacity failures must happen before any
 Sandbox/provider effect. Recovery may offer wait, retry, or explicit alternative enrollment, but
-Appaloft never silently changes a managed request to a registered Server or the local machine.
-
-The same command resumes the preferred Workspace when its source SHA still matches. Use `--new` for
-a new isolated Workspace, or `--no-attach` to return only the descriptor:
-
-```bash
-appaloft code . --new
-appaloft code . --no-attach
-```
-
-`--profile` selects an Agent Workspace Profile. It is distinct from the global
-`--control-plane-profile`, which selects a saved local control-plane connection. The first slice
-does not add `--keep-awake` or automatic-removal shortcuts; use explicit Workspace lifecycle
-commands to pause, resume, or terminate.
-
-Staged, unstaged, or untracked files; no upstream; an unpushed HEAD; or a remote branch tip that
-differs from HEAD all fail before any remote creation. The error shows the exact HEAD SHA and safe
-clean/push guidance. V1 never performs implicit sync or patch upload.
+Appaloft never silently changes a managed request into local scratch.
 
 ## Manage running Workspaces <a id="workspace-control-tui" />
 

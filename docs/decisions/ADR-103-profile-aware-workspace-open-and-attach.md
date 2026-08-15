@@ -34,9 +34,10 @@ for a Repository-to-Project Workspace onboarding decision.
 6. Creation fails before Sandbox effects unless Repository, Project, enabled Profile, exact named
    Credentials, Adapter/Template/capability compatibility, authz, and a consumable
    admission/placement reservation all succeed.
-7. Local Git inspection is a CLI adapter responsibility. Dirty state, detached/no-upstream state,
-   and remote branch tip mismatch fail before business dispatch. V1 never uploads or synchronizes
-   local changes.
+7. Local Git inspection for durable `workspaces.open` / `workspace open` / `workspace create` is a
+   CLI adapter responsibility. Dirty state, detached/no-upstream state, and remote branch tip
+   mismatch fail before business dispatch. V1 never uploads or synchronizes local changes.
+   Default `appaloft code` Scratch sessions (ADR-116) do not use this preflight.
 8. Explicit refs resolve to immutable commit pins before Sandbox creation. Resume requires the
    preferred Workspace source pin to match the requested commit; otherwise callers use `--new`.
 9. `--new` creates a distinct Sandbox, makes it preferred for later open, and leaves older

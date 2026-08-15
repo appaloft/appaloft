@@ -17,17 +17,20 @@ control TUI also needs a durable ownership boundary before a terminal framework 
 
 ## Decision
 
-1. `appaloft code [path]` is the canonical task-oriented CLI entry for opening or resuming the
-   Agent Workspace associated with a local Git repository. The default path is `.`.
-2. `appaloft code` is CLI presentation over the existing `workspaces.open` operation. It reuses the
-   same local Git preflight, control-plane target resolution, Agent Workspace Profile resolution,
-   input schema, errors, result and attach handoff. It does not add an operation-catalog entry,
-   command/query message, Workspace aggregate, projection or lifecycle.
-3. The first activation slice accepts `--profile`, `--new` and `--no-attach` with exactly the
-   semantics already governed for `appaloft workspace open`. Global control-plane selection keeps
-   using `--control-plane-profile` and the existing target resolver.
+1. `appaloft code [path]` is the canonical task-oriented CLI entry. The default path is `.`.
+   After ADR-116, default `code` opens a Scratch session on this Mac. It is no longer
+   presentation over `workspaces.open`.
+2. Durable Agent Workspace activation remains `appaloft workspace open [path]` over
+   `workspaces.open`. That path reuses local Git preflight, control-plane target resolution,
+   Agent Workspace Profile resolution, input schema, errors, result and attach handoff. Neither
+   command adds an operation-catalog entry, command/query message, Workspace aggregate,
+   projection or lifecycle.
+3. `--profile`, `--new` and `--no-attach` keep their Workspace-open meaning when they dispatch
+   durable open. On default scratch `code`, `--no-attach` skips native attach after resolution;
+   `--profile` / `--new` remain durable-open flags and therefore keep Git fail-closed.
 4. `appaloft workspace open` and all current headless Workspace subcommands remain supported.
-   `appaloft code` is additive and does not deprecate them.
+   `appaloft code` remains additive and does not deprecate them. Users who need the historical
+   R1.1 managed default use `workspace open`.
 5. A no-subcommand `appaloft workspace` experience presents Appaloft-owned Workspace, Server,
    Profile, Terminal, Task, Preview, Deployment and recovery state beside an embedded native Agent
    terminal. Every mutation must dispatch an existing public operation and retain a headless or
@@ -72,8 +75,9 @@ control TUI also needs a durable ownership boundary before a terminal framework 
 
 ## Migration Gaps
 
-- `appaloft code` is implemented under Spec 125. The no-subcommand Workspace control presentation
-  is in Code Round under accepted Spec 126 and public Ticket #1026.
+- Historical `appaloft code` == `workspaces.open` shipped under Spec 125. ADR-116 / Spec 138
+  revise the default `code` door to Scratch; durable open stays on `workspace open`.
+- The no-subcommand Workspace control presentation shipped under accepted Spec 126.
 - Closed Spike #1024 selected a replaceable Rust/Ratatui sidecar because the required OpenTUI
   embedded API remained unreleased and its teardown failed the bounded-process gate. This is an
   implementation choice behind the framework-neutral presentation and terminal contracts, not a

@@ -2,29 +2,26 @@
 
 ## Status
 
-- Round: Post-Implementation Sync complete
+- Round: Post-Implementation Sync complete; default-door superseded by Spec 138 / ADR-116
 - Artifact state: implemented and verified by public Ticket [#1022](https://github.com/appaloft/appaloft/issues/1022)
-- Code changes allowed: delivered through the accepted Spec and ready public Ticket
-- Compatibility: additive public CLI capability; expected minor release impact
+- Code changes allowed: historical record only; default `appaloft code` is now Scratch
+- Compatibility: historical additive CLI capability. Durable semantics live on `workspace open`.
 
 ## Business Outcome
 
-An authenticated developer with a configured Repository Binding and Agent Workspace Profile can
-enter a clean, pushed local Git repository and run:
+Historically, an authenticated developer with a configured Repository Binding and Agent Workspace
+Profile could enter a clean, pushed local Git repository and run `appaloft code` to open or resume
+the Profile-aware Workspace governed by `workspaces.open`.
 
-```bash
-appaloft code
-```
-
-Appaloft opens or resumes the same Profile-aware Workspace governed by `workspaces.open`, enters the
-Agent-owned interface when attach is supported, and preserves exact reconnect, error and cleanup
-semantics without exposing internal ids or credentials.
+That default door is revised by [Spec 138](../138-instant-local-scratch/spec.md). Durable
+activation now uses `appaloft workspace open`. This Spec remains the delivery record for the
+original presentation command and its `WS-CODE-*` matrix.
 
 ## Ubiquitous Language
 
 | Term | Meaning | Compatibility |
 | --- | --- | --- |
-| Workspace Code Activation | Task-oriented CLI presentation that resolves local repository context and dispatches `workspaces.open`. | New canonical task entry. |
+| Workspace Code Activation | Historical task-oriented CLI presentation that resolved local repository context and dispatched `workspaces.open`. Default `code` is now Scratch. | Compatibility command: `workspace open`. |
 | Agent Workspace | Existing public workflow whose identity and lifecycle remain the underlying Sandbox. | Unchanged. |
 | Agent Workspace Profile | Existing installed Profile selected explicitly or through the Project default. | `--profile` keeps existing meaning. |
 | Control-Plane Target | Existing local, self-hosted or Cloud CLI dispatch target. | Selected by existing resolver and `--control-plane-profile`. |

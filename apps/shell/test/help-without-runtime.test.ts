@@ -12,7 +12,7 @@ afterEach(async () => {
 });
 
 describe("shell help without runtime composition", () => {
-  test("[WS-CODE-PACKAGE-011] code help does not initialize PGlite", async () => {
+  test("[WS-CODE-PACKAGE-011][WS-SCRATCH-PACKAGE-018] code help does not initialize PGlite", async () => {
     const temporaryRoot = await mkdtemp(join(tmpdir(), "appaloft-code-help-no-runtime-"));
     temporaryRoots.push(temporaryRoot);
     const unusablePglitePath = join(temporaryRoot, "pglite-is-a-file");
@@ -40,7 +40,7 @@ describe("shell help without runtime composition", () => {
     ]);
 
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("Create or resume a Profile-aware Workspace");
+    expect(stdout).toContain("Open a local scratch Agent session on this Mac");
     expect(stdout).toContain("--profile");
     expect(stdout).toContain("--new");
     expect(stdout).toContain("--no-attach");

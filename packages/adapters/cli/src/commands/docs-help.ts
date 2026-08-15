@@ -6,6 +6,7 @@ function withDocs(summary: string, topicId: PublicDocsHelpTopicId): string {
 
 export const cliDocsHrefs = {
   agentWorkspace: resolvePublicDocsHelpHref("agent.workspace"),
+  agentScratch: resolvePublicDocsHelpHref("agent.scratch"),
   deploymentSource: resolvePublicDocsHelpHref("deployment.source"),
   deploymentPlanPreview: resolvePublicDocsHelpHref("deployment.plan-preview"),
   deploymentProof: resolvePublicDocsHelpHref("deployment.proof"),
@@ -83,6 +84,10 @@ export const cliCommandDescriptions = {
   agentWorkspaceOpen: withDocs(
     "Create or resume a Profile-aware Workspace from clean, pushed local Git context",
     "agent.workspace",
+  ),
+  agentScratch: withDocs(
+    "Open a local scratch Agent session on this Mac without Git, login, or Cloud",
+    "agent.scratch",
   ),
   agentAdapter: withDocs(
     "Manage tenant-scoped Agent Adapter installations",
