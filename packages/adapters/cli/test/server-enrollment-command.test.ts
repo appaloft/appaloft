@@ -177,6 +177,70 @@ describe("CLI server enrollment", () => {
     expect(stdout).toContain('"status": "available"');
   });
 
+  test("[R8-OCC-DEPLOY-002] defaults local enrollment to sandbox-worker and deployment-runtime", async () => {
+    const commands: AppCommand<unknown>[] = [];
+    const program = enrollmentProgram({
+      executeCommand: async <T>(command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        if (command instanceof RegisterServerCommand) {
+          return ok({
+            id: "srv_local",
+            workloadRoles: ["sandbox-worker", "deployment-runtime"],
+          } as T);
+        }
+        if (command instanceof TestServerConnectivityCommand) {
+          return ok({
+            serverId: "srv_local",
+            name: "Local machine",
+            host: "localhost",
+            port: 22,
+            providerKey: "local-shell",
+            checkedAt: "2026-08-11T00:00:01.000Z",
+            status: "healthy",
+            checks: [],
+          } as T);
+        }
+        if (command instanceof PrepareServerRuntimeCommand) {
+          return ok({
+            serverId: "srv_local",
+            status: "ready",
+            preparedAt: "2026-08-11T00:00:02.000Z",
+            steps: [],
+          } as T);
+        }
+        return err(domainError.validation(`Unexpected command ${command.constructor.name}`));
+      },
+      executeQuery: async <T>() =>
+        ok(
+          serverDetail({
+            id: "srv_local",
+            host: "localhost",
+            port: 22,
+            providerKey: "local-shell",
+          }) as T,
+        ),
+    });
+
+    await captureStdout(() =>
+      program.parseAsync([
+        "node",
+        "appaloft",
+        "server",
+        "enroll",
+        "--local",
+        "--name",
+        "occupancy-mac",
+      ]),
+    );
+
+    expect(commands[0]).toMatchObject({
+      name: "occupancy-mac",
+      host: "localhost",
+      providerKey: "local-shell",
+      workloadRoles: ["sandbox-worker", "deployment-runtime"],
+    });
+  });
+
   test("[SERVER-ENROLL-001][SERVER-ENROLL-003][SERVER-ENROLL-007] enrolls an SSH target without printing private-key bytes", async () => {
     const secret = "-----BEGIN PRIVATE KEY-----\nsecret-enrollment-key\n-----END PRIVATE KEY-----";
     const keyFile = join(mkdtempSync(join(tmpdir(), "appaloft-enroll-")), "id_ed25519");

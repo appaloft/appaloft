@@ -55,6 +55,30 @@ describe("SslipDefaultAccessDomainProvider", () => {
     });
   });
 
+  test("[R8-OCC-DEPLOY-001] maps localhost occupancy hosts to loopback sslip addresses", async () => {
+    const provider = new SslipDefaultAccessDomainProvider();
+    const context = createProviderTestContext();
+
+    const result = await provider.generate(context, {
+      publicAddress: "localhost",
+      projectId: "prj_occupancy",
+      environmentId: "env_local",
+      resourceId: "res_occupancy12",
+      resourceSlug: "occupancy-static",
+      serverId: "srv_local",
+      routePurpose: "default-resource-access",
+      correlationId: "req_provider_test",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const generated = result._unsafeUnwrap();
+    expect(generated.kind).toBe("generated");
+    if (generated.kind !== "generated") return;
+    expect(generated.domain.hostname).toContain("127.0.0.1.sslip.io");
+    expect(generated.domain.scheme).toBe("http");
+    expect(generated.domain.providerKey).toBe("sslip");
+  });
+
   test("returns a provider error for unsupported public address shapes", async () => {
     const provider = new SslipDefaultAccessDomainProvider();
     const context = createProviderTestContext();

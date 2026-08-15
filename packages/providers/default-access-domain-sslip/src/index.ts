@@ -66,9 +66,13 @@ function normalizeIpv4Address(input: string): Result<string, DomainError> {
 
     return trimmed.replace(/^\[/, "").replace(/\]$/, "").split(":")[0] ?? trimmed;
   })();
+  const loopback =
+    host === "localhost" || host === "::1" || host === "0:0:0:0:0:0:0:1" ? "127.0.0.1" : host;
 
   if (
-    !/^(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(host)
+    !/^(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(
+      loopback,
+    )
   ) {
     return err(
       domainError.provider("Default access domain provider requires an IPv4 public address", {
@@ -78,7 +82,7 @@ function normalizeIpv4Address(input: string): Result<string, DomainError> {
     );
   }
 
-  return ok(host);
+  return ok(loopback);
 }
 
 export class SslipDefaultAccessDomainProvider implements DefaultAccessDomainProvider {
