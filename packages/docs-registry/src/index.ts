@@ -157,9 +157,9 @@ export const publicDocsHelpTopics = {
   },
   "agent.scratch": {
     id: "agent.scratch",
-    title: "Local scratch session",
+    title: "Remote Agent door and local scratch",
     description:
-      "How to open a local OpenCode or Pi scratch session on this Mac without Git, login, Binding, or Cloud.",
+      "How default appaloft code opens a remote Sandbox after login, and how --local opens this-Mac scratch.",
     page: {
       "zh-CN": "agents/workspaces",
       "en-US": "en/agents/workspaces",
@@ -170,11 +170,12 @@ export const publicDocsHelpTopics = {
     },
     surfaces: ["cli"],
     anchor: "agent-workspace-open",
-    aliases: ["appaloft code", "local scratch", "scratch session", "instant local scratch"],
+    aliases: ["appaloft code", "remote agent door", "local scratch", "scratch session"],
     specReferences: [
+      "docs/specs/139-remote-agent-door/spec.md",
+      "docs/testing/remote-agent-door-test-matrix.md",
+      "docs/decisions/ADR-117-remote-agent-door.md",
       "docs/specs/138-instant-local-scratch/spec.md",
-      "docs/testing/instant-local-scratch-test-matrix.md",
-      "docs/decisions/ADR-116-instant-local-scratch-session-boundary.md",
     ],
   },
   "agent.workspace-control": {

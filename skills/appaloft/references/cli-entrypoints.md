@@ -38,18 +38,23 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `--preview <previewEnvironmentId>` on logs, health, diagnostics, effective config, runtime
   control, and terminal commands when the user is operating a preview rather than its parent
   resource.
-- `appaloft code [path]` defaults to a local Scratch session on this Mac. It does not require
-  Git, login, Binding, Profile or Cloud, creates no Sandbox, and prints
-  `Local scratch · this Mac · not saved remotely`. The only hard failure before attach is a
-  missing OpenCode/Pi binary after the user refuses install. Do not treat scratch as a durable
-  Workspace.
-- `appaloft workspace open [path]` is the durable Profile-aware entrypoint. It resolves clean,
-  pushed Git context, creates or resumes the underlying Sandbox, and attaches through the
-  Adapter-declared capability. `appaloft code --profile` / `--new` keep this durable meaning.
+- `appaloft code [path]` is the remote Agent door after login. It requires a default
+  enrolled Server, prints `Remote · <project> · <repo@sha> · <server> · my sandbox`,
+  then native-attaches OpenCode/Pi/omp on this laptop. It does not create a Sandbox
+  and does not call `workspaces.open`. Missing login or Server fails closed and never
+  becomes Scratch.
+- `appaloft code --local [path]` is a local Scratch session on this Mac. It does not
+  require Git, login, Binding, Profile or Cloud, creates no Sandbox, and prints
+  `Local scratch · this Mac · not saved remotely`. The only hard failure before attach
+  is a missing OpenCode/Pi binary after the user refuses install. Do not treat scratch
+  as a durable Workspace.
+- `appaloft workspace open [path]` is the durable Profile-aware entrypoint. It resolves
+  clean, pushed Git context, creates or resumes the underlying Sandbox, and attaches
+  through the Adapter-declared capability.
   `workspace create/list/show/pause/resume/terminate/connect/attach/task/preview` remain
   lower-level workflows over Sandbox, Agent Runtime, Terminal Session, and Sandbox Port
-  operations. `workspaceId` is the underlying `sandboxId`; do not invent a Workspace aggregate
-  or Cloud-only operation.
+  operations. `workspaceId` is the underlying `sandboxId`; do not invent a Workspace
+  aggregate or Cloud-only operation.
 
 ## Catalog
 
@@ -77,8 +82,8 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft repository-binding bind` - `repository-bindings.bind`
 - `appaloft repository-binding show` - `repository-bindings.show`
 - `appaloft repository-binding unbind` - `repository-bindings.unbind`
-- `appaloft code [path]` - Scratch session; no catalog operation
-- `appaloft workspace open [path]` - `workspaces.open`
+- `appaloft code` - remote Agent identity door; native-attaches OpenCode/Pi; `--local` is Scratch
+- `appaloft workspace open [path]` - `workspaces.open` with local Git fail-closed
 - `appaloft sandbox create` - `sandboxes.create`
 - `appaloft sandbox list` - `sandboxes.list`
 - `appaloft sandbox show <sandboxId>` - `sandboxes.show`

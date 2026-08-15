@@ -9,7 +9,7 @@ export const SCRATCH_BANNER = "Local scratch · this Mac · not saved remotely";
 export const OPENCODE_INSTALL_URL = "https://opencode.ai";
 export const PI_INSTALL_URL = "https://www.npmjs.com/package/@mariozechner/pi-coding-agent";
 
-export type ScratchHarnessName = "opencode" | "pi";
+export type ScratchHarnessName = "opencode" | "pi" | "omp";
 
 export interface ScratchHarnessResolution {
   readonly name: ScratchHarnessName;
@@ -109,7 +109,7 @@ export function buildScratchHarness(
 ): ScratchHarnessResolution {
   const skillPath = options.skillPath;
   const skillOffered = Boolean(skillPath && existsSync(join(skillPath, "SKILL.md")));
-  if (name === "pi") {
+  if (name === "pi" || name === "omp") {
     return {
       name,
       argv: skillOffered && skillPath ? [executable, "--skill", skillPath] : [executable],
@@ -150,7 +150,7 @@ async function confirmScratchInstall(): Promise<boolean> {
   });
   try {
     const answer = await readline.question(
-      "No OpenCode or Pi binary found. Show install guidance? [y/N] ",
+      "No OpenCode, Pi, or Oh My Pi binary found. Show install guidance? [y/N] ",
     );
     return /^(y|yes)$/i.test(answer.trim());
   } finally {
@@ -163,7 +163,7 @@ export async function resolveDefaultScratchHarness(
   probe: ScratchHarnessProbe = {},
 ): Promise<ScratchHarnessResolution> {
   const which = probe.which ?? ((name: string) => Bun.which(name));
-  const names: ScratchHarnessName[] = ["opencode", "pi"];
+  const names: ScratchHarnessName[] = ["opencode", "pi", "omp"];
   for (const name of names) {
     const executable = which(name);
     if (executable) {
@@ -182,10 +182,10 @@ export async function resolveDefaultScratchHarness(
 
   const interactive = probe.isInteractive ?? Boolean(process.stdin.isTTY && process.stdout.isTTY);
   const write = probe.write ?? ((message: string) => process.stdout.write(message));
-  const guidance = `Install OpenCode from ${OPENCODE_INSTALL_URL} or Pi from ${PI_INSTALL_URL}, then retry.`;
+  const guidance = `Install OpenCode from ${OPENCODE_INSTALL_URL}, Pi from ${PI_INSTALL_URL}, or Oh My Pi (\`omp\`), then retry.`;
 
   if (!interactive) {
-    throw domainError.validation("Install OpenCode or Pi, then retry appaloft code", {
+    throw domainError.validation("Install OpenCode, Pi, or Oh My Pi, then retry appaloft code", {
       code: "workspace_scratch_agent_missing",
       phase: "scratch-harness",
       guidance,
@@ -195,14 +195,14 @@ export async function resolveDefaultScratchHarness(
   const accepted = await (probe.confirmInstall ?? confirmScratchInstall)();
   if (accepted) {
     write(`${guidance}\n`);
-    throw domainError.validation("Install OpenCode or Pi, then retry appaloft code", {
+    throw domainError.validation("Install OpenCode, Pi, or Oh My Pi, then retry appaloft code", {
       code: "workspace_scratch_agent_missing",
       phase: "scratch-harness",
       guidance,
     });
   }
 
-  throw domainError.validation("Install OpenCode or Pi, then retry appaloft code", {
+  throw domainError.validation("Install OpenCode, Pi, or Oh My Pi, then retry appaloft code", {
     code: "workspace_scratch_install_refused",
     phase: "scratch-harness",
     guidance,

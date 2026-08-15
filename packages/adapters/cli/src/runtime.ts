@@ -35,6 +35,7 @@ import {
 } from "./local-git-workspace-context.js";
 import { type ScratchAgentLauncher, type ScratchHarnessResolver } from "./local-scratch-session.js";
 import { type OperatePresentation } from "./operate-presentation.js";
+import { type RemoteCodeDoorResolver } from "./remote-code-session.js";
 import {
   type OpenedNativeWorkspaceTerminal,
   type OpenNativeWorkspaceTerminalInput,
@@ -101,6 +102,7 @@ export interface CliProgramInput {
   ) => Promise<RemoteGitWorkspaceRef>;
   resolveScratchHarness?: ScratchHarnessResolver;
   launchScratchAgent?: ScratchAgentLauncher;
+  resolveRemoteCodeDoor?: RemoteCodeDoorResolver;
   launchNativeWorkspaceClient?: (argv: readonly string[]) => Promise<void>;
   workspaceControlPresentation?: WorkspaceControlPresentation;
   operatePresentation?: OperatePresentation;
@@ -178,6 +180,7 @@ export class CliRuntime extends Context.Tag("CliRuntime")<
     ) => Promise<RemoteGitWorkspaceRef>;
     readonly resolveScratchHarness?: ScratchHarnessResolver;
     readonly launchScratchAgent?: ScratchAgentLauncher;
+    readonly resolveRemoteCodeDoor?: RemoteCodeDoorResolver;
     readonly launchNativeWorkspaceClient?: (argv: readonly string[]) => Promise<void>;
     readonly workspaceControlPresentation?: WorkspaceControlPresentation;
     readonly operatePresentation?: OperatePresentation;
@@ -264,6 +267,7 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
       : {}),
     ...(input.resolveScratchHarness ? { resolveScratchHarness: input.resolveScratchHarness } : {}),
     ...(input.launchScratchAgent ? { launchScratchAgent: input.launchScratchAgent } : {}),
+    ...(input.resolveRemoteCodeDoor ? { resolveRemoteCodeDoor: input.resolveRemoteCodeDoor } : {}),
     ...(input.launchNativeWorkspaceClient
       ? { launchNativeWorkspaceClient: input.launchNativeWorkspaceClient }
       : {}),

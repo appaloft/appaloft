@@ -30,7 +30,7 @@ appaloft init                                 # Initialize appaloft.yml in the c
 appaloft deploy .                             # Deploy the current directory
 appaloft login                                # Log in to Appaloft Cloud or a self-hosted instance
 appaloft context list                         # View saved local profiles/contexts
-appaloft code                                 # Open a local scratch Agent session on this Mac
+appaloft code                                 # Open a remote Agent session on the default Server
 appaloft workspace                            # Manage Workspaces with an embedded native Agent TUI
 appaloft dev                                  # Start the local Development TUI / foreground session
 appaloft dev . --server <serverId>            # Develop remotely through a live outbound Worker
@@ -49,18 +49,20 @@ Every command supports `--help` for the full argument list; interactive prompts 
 
 ## Workspace quick entry
 
-`appaloft code [path]` opens a local Scratch session on this Mac. Git, login, Binding, and Cloud
-are not required. The path defaults to `.`. Use `--no-attach` to print the scratch banner without
-spawning the Agent TUI.
+`appaloft code` opens a remote Agent session after login. It requires an enrolled Server and a
+Project Binding. The laptop path is only a locator; dirty files are not uploaded. Use
+`--no-attach` to print the identity banner without attaching. Use `--local` for this-Mac Scratch.
 
 ```bash
+appaloft login
 appaloft code
-appaloft code . --no-attach
+appaloft code --no-attach
+appaloft code --local
 appaloft workspace open . --profile <workspace-profile> --new
 ```
 
-`--profile` and `--new` keep durable `workspaces.open` meaning and still require a clean, pushed
-Git branch. Existing automation can keep using `appaloft workspace open .`. See
+`--profile` and `--new` keep remote `workspaces.open` meaning and do not inspect a dirty laptop
+tree. `appaloft workspace open` still requires a clean, pushed Git branch. See
 [Open an Agent from a local directory](/docs/en/agents/workspaces/#agent-workspace-open) for
 scratch versus durable-open guidance.
 

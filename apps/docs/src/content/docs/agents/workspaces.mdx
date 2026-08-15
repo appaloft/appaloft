@@ -43,33 +43,37 @@ Sandbox 本身只是一个受控执行环境，不预设"应该跑什么"。Work
 
 ## 从本地目录打开 Agent <a id="agent-workspace-open" />
 
-在任意目录运行：
+登录后，团队已有默认 Server 时运行：
 
 ```bash
+appaloft login
 appaloft code
 ```
 
-默认 `appaloft code [path]` 打开本机 Scratch 会话，path 默认为 `.`。空目录、脏工作树、detached
-HEAD、未 push、未登录、没有 Binding/Profile/Cloud 都可以进入。CLI 不会调用 `workspaces.open`，
-也不会上传本地文件。横幅是：
+默认 `appaloft code` 先解析团队默认已注册 Server 和 Binding 远端 SHA，再在本机 native-attach
+OpenCode（否则 Pi，否则 Oh My Pi）。不要求 Adapter、Profile 或 Sandbox。笔记本路径不是
+Workspace 真相，脏树也不会上传。横幅是：
 
 ```text
-Local scratch · this Mac · not saved remotely
+Remote · <project> · <repo@sha> · <server> · my sandbox
 ```
 
-默认先找本机 `opencode`，否则 `pi`。都没有时提示安装；拒绝安装是 attach 前唯一硬失败。
-Scratch 会向本机 Agent 提供公共 Appaloft skill，不会改所选目录里的项目文件。
-`--no-attach` 只解析 scratch、打印横幅和 harness，然后退出。
+未登录或没有 Server 会 fail closed 并给出下一步，不会变成 Scratch。本机 Scratch 必须显式指定：
 
-durable Workspace 仍用：
+```bash
+appaloft code --local
+```
+
+`--local` 仍是本机 OpenCode，否则 Pi；不要求 Git、登录、Binding 或 Cloud。横幅仍是
+`Local scratch · this Mac · not saved remotely`。
+
+交付用的 durable open 仍是：
 
 ```bash
 appaloft workspace open
-appaloft code . --profile <workspace-profile>
-appaloft code . --new
 ```
 
-这些路径继续走 `workspaces.open`：只用 path 查找 Git root、upstream、branch 和 HEAD SHA，要求
+这条路径继续走 `workspaces.open`：只用 path 查找 Git root、upstream、branch 和 HEAD SHA，要求
 clean 且已 push。`--profile` 选择 Agent Workspace Profile，不同于全局
 `--control-plane-profile`。脏树、detached、缺 upstream 或 remote tip 不一致会在任何远端创建前
 失败。V1 不做隐式 sync 或 patch upload。

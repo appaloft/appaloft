@@ -132,7 +132,8 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-113: Platform Migration Presentation Boundary](./ADR-113-platform-migration-presentation-boundary.md) | Accepted | Defines a secret-safe Migration Bundle and `appaloft migrate` as receipt-backed coordination over existing operation owners, without a vendor mirror or Migration lifecycle. |
 | [ADR-114: Kubernetes Runtime Target And Scale Policy Boundary](./ADR-114-kubernetes-runtime-target-and-scale-policy-boundary.md) | Accepted | Defines provider-neutral target/scale/rollout profiles, an adapter-owned Kubernetes backend, ids-only deployment admission, and public connector/private managed-cluster composition. |
 | [ADR-115: Managed Capacity Failure-Domain Boundary](./ADR-115-managed-capacity-failure-domain-boundary.md) | Accepted | Defines provider-neutral failure-domain identity, required separation, fail-closed placement and safe resilience evidence without moving hosted policy into public core. |
-| [ADR-116: Instant Local Scratch Session Boundary](./ADR-116-instant-local-scratch-session-boundary.md) | Accepted | Makes default `appaloft code` a no-Sandbox Scratch session on this Mac and keeps Git fail-closed on durable `workspaces.open`. |
+| [ADR-116: Instant Local Scratch Session Boundary](./ADR-116-instant-local-scratch-session-boundary.md) | Accepted (Scratch only) | Scratch contract for `appaloft code --local`. Default door superseded by ADR-117. |
+| [ADR-117: Remote Agent Door](./ADR-117-remote-agent-door.md) | Accepted | Default `appaloft code` is remote my-Sandbox; `workspace` `ca` later; personal model login. |
 
 ## Authoring Rules
 

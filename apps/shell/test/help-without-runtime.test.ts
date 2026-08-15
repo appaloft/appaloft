@@ -40,10 +40,11 @@ describe("shell help without runtime composition", () => {
     ]);
 
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("Open a local scratch Agent session on this Mac");
+    expect(stdout).toContain("Open a remote Agent session on the default Server");
     expect(stdout).toContain("--profile");
     expect(stdout).toContain("--new");
     expect(stdout).toContain("--no-attach");
+    expect(stdout).toContain("--local");
     expect(stderr).not.toContain("PGlite");
   });
 

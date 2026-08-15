@@ -108,6 +108,16 @@ describe("local scratch session", () => {
     expect(harness.skillOffered).toBe(false);
   });
 
+  test("[WS-SCRATCH-HARNESS-006] default probe falls back to Oh My Pi omp", async () => {
+    const harness = await resolveDefaultScratchHarness(".", {
+      which: (name) => (name === "omp" ? "/bin/omp" : undefined),
+      resolveSkillPath: () => undefined,
+      resolveAppaloftCli: () => undefined,
+    });
+    expect(harness.name).toBe("omp");
+    expect(harness.argv).toEqual(["/bin/omp"]);
+  });
+
   test("[WS-SCRATCH-SKILL-010] OpenCode receives skill source and local MCP without writing cwd", async () => {
     await withTempDir("appaloft-scratch-skill-", async (root) => {
       const skillDir = join(root, "skills", "appaloft");

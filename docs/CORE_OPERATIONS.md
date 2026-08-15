@@ -1115,7 +1115,7 @@ Server id/host, provider handle, capacity probes or credentials.
 
 | Workspace action | Canonical operations | CLI / SDK |
 | --- | --- | --- |
-| Open local scratch | none | default `appaloft code [path]` |
+| Open remote Agent door | `workspaces.open` | default `appaloft code`; `--local` is Scratch |
 | Open/create-or-resume | `workspaces.open` | durable `appaloft workspace open [path]`; `appaloft code --profile` / `--new`; `appaloft.workspaces.open(...)` |
 | Profile-aware create | `workspaces.open(forceNew=true)` | `appaloft workspace create --profile ...`; `appaloft.workspaces.create(...)` |
 | Adapter catalog | `sandboxes.agents.harnesses.list` | `appaloft workspace harness list`; Console capability-driven creation |
