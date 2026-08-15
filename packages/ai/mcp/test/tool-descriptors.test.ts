@@ -92,6 +92,38 @@ describe("MCP tool descriptors", () => {
     expect(stdout).not.toContain("tok_remote_mcp_secret_1234");
   });
 
+  test("[WS-REMOTE-SKILL-017] remote stdio proxy forwards occupancy product-session cookie", async () => {
+    const requests: Request[] = [];
+    let stdout = "";
+    const stdin = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"jsonrpc":"2.0","id":1,"method":"ping"}\n'));
+        controller.close();
+      },
+    });
+
+    await runAppaloftMcpRemoteStdioProxy({
+      endpoint: "http://127.0.0.1:3001/mcp",
+      cookie: "appaloft.session=occupancy-cookie",
+      stdin,
+      stdout: {
+        write(data) {
+          stdout += data;
+        },
+      },
+      fetch: async (input, init) => {
+        requests.push(new Request(input, init));
+        return new Response('{"jsonrpc":"2.0","id":1,"result":{}}', {
+          headers: { "content-type": "application/json" },
+        });
+      },
+    });
+
+    expect(requests[0]?.headers.get("cookie")).toBe("appaloft.session=occupancy-cookie");
+    expect(requests[0]?.headers.get("authorization")).toBeNull();
+    expect(stdout).not.toContain("occupancy-cookie");
+  });
+
   test("[MCP-TOOL-DESC-001] every operation catalog entry has one generated tool descriptor", () => {
     expect(toolContracts).toHaveLength(operationCatalog.length);
 

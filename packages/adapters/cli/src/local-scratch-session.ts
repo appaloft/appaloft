@@ -78,24 +78,35 @@ export function resolveAppaloftSkillPath(startDirs: readonly string[] = []): str
   return undefined;
 }
 
+export function resolveAppaloftMcpArgv(
+  env: NodeJS.ProcessEnv = process.env,
+): readonly ["mcp", "stdio"] | readonly ["mcp", "remote-stdio"] {
+  const mode = env.APPALOFT_CONTROL_PLANE_MODE?.trim();
+  const url = env.APPALOFT_CONTROL_PLANE_URL?.trim();
+  const remote = Boolean(url) || (Boolean(mode) && mode !== "none" && mode !== "auto");
+  return remote ? (["mcp", "remote-stdio"] as const) : (["mcp", "stdio"] as const);
+}
+
 export function resolveLocalAppaloftCli(
   which: (name: string) => string | null | undefined = (name) => Bun.which(name),
+  env: NodeJS.ProcessEnv = process.env,
 ): readonly string[] | undefined {
+  const mcpArgv = resolveAppaloftMcpArgv(env);
   const sourceEntry = process.argv[1];
   if (sourceEntry) {
     try {
       const absoluteEntry = realpathSync(resolve(sourceEntry));
       if (/(?:^|\/)(?:appaloft(?:dev)?|index\.ts)$/u.test(absoluteEntry.replaceAll("\\", "/"))) {
-        return [process.execPath, absoluteEntry, "mcp", "stdio"];
+        return [process.execPath, absoluteEntry, ...mcpArgv];
       }
     } catch {
       // Fall through to PATH binaries when argv[1] is not a real file.
     }
   }
   const wrapper = which("appaloftdev");
-  if (wrapper) return [realpathSync(resolve(wrapper)), "mcp", "stdio"];
+  if (wrapper) return [realpathSync(resolve(wrapper)), ...mcpArgv];
   const installed = which("appaloft");
-  if (installed) return [realpathSync(resolve(installed)), "mcp", "stdio"];
+  if (installed) return [realpathSync(resolve(installed)), ...mcpArgv];
   return undefined;
 }
 
@@ -126,7 +137,7 @@ export function buildScratchHarness(
     config.mcp = {
       appaloft: {
         type: "local",
-        command: [...options.appaloftCli],
+        command: ["env", "APPALOFT_CONTROL_PLANE_MODE=none", ...options.appaloftCli],
         enabled: true,
       },
     };
