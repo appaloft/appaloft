@@ -741,6 +741,9 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       if (exitCode !== 0) {
         throw new Error(stderr.trim() || `opencode_process_failed:${exitCode}`);
       }
+      if (stdout.trim() === "" && stderr.trim() === "") {
+        throw new Error("opencode_empty_run_result");
+      }
       return {
         events: [] as readonly SandboxAgentHarnessEvent[],
         outcomeDigest: await sha256(stdout),
