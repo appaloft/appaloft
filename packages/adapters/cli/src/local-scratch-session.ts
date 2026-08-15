@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 
@@ -61,11 +61,7 @@ export function resolveScratchPath(path = "."): string {
 }
 
 export function resolveAppaloftSkillPath(startDirs: readonly string[] = []): string | undefined {
-  const starts = [
-    ...startDirs,
-    import.meta.dir,
-    process.argv[1] ? dirname(process.argv[1]) : undefined,
-  ].filter((value): value is string => Boolean(value));
+  const starts = [...startDirs, import.meta.dir].filter((value): value is string => Boolean(value));
 
   for (const start of starts) {
     let current = resolve(start);
@@ -86,17 +82,20 @@ export function resolveLocalAppaloftCli(
   which: (name: string) => string | null | undefined = (name) => Bun.which(name),
 ): readonly string[] | undefined {
   const sourceEntry = process.argv[1];
-  if (
-    sourceEntry &&
-    existsSync(sourceEntry) &&
-    /(?:^|\/)(?:appaloft(?:dev)?|index\.ts)$/u.test(sourceEntry.replaceAll("\\", "/"))
-  ) {
-    return [process.execPath, sourceEntry, "mcp", "stdio"];
+  if (sourceEntry) {
+    try {
+      const absoluteEntry = realpathSync(resolve(sourceEntry));
+      if (/(?:^|\/)(?:appaloft(?:dev)?|index\.ts)$/u.test(absoluteEntry.replaceAll("\\", "/"))) {
+        return [process.execPath, absoluteEntry, "mcp", "stdio"];
+      }
+    } catch {
+      // Fall through to PATH binaries when argv[1] is not a real file.
+    }
   }
   const wrapper = which("appaloftdev");
-  if (wrapper) return [wrapper, "mcp", "stdio"];
+  if (wrapper) return [realpathSync(resolve(wrapper)), "mcp", "stdio"];
   const installed = which("appaloft");
-  if (installed) return [installed, "mcp", "stdio"];
+  if (installed) return [realpathSync(resolve(installed)), "mcp", "stdio"];
   return undefined;
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -37,6 +37,41 @@ describe("local scratch session", () => {
     } finally {
       process.argv[1] = previous;
     }
+  });
+
+  test("[WS-SCRATCH-SKILL-010] pins a relative source CLI to an absolute MCP command", async () => {
+    await withTempDir("appaloft-scratch-relative-cli-", async (dir) => {
+      const entry = join(dir, "src", "index.ts");
+      await mkdir(dirname(entry), { recursive: true });
+      await writeFile(entry, "export {}\n");
+      const previousArgv = process.argv[1];
+      const previousCwd = process.cwd();
+      process.chdir(dir);
+      process.argv[1] = "src/index.ts";
+      try {
+        const command = resolveLocalAppaloftCli(() => undefined);
+        expect(command?.[1]).toBe(await realpath(entry));
+      } finally {
+        process.argv[1] = previousArgv;
+        process.chdir(previousCwd);
+      }
+    });
+  });
+
+  test("[WS-SCRATCH-SKILL-010] does not offer a skill planted beside argv[1]", async () => {
+    await withTempDir("appaloft-scratch-planted-skill-", async (dir) => {
+      const planted = join(dir, "skills", "appaloft");
+      await mkdir(planted, { recursive: true });
+      await writeFile(join(planted, "SKILL.md"), "---\nname: planted\ndescription: no\n---\n");
+      const previousArgv = process.argv[1];
+      process.argv[1] = join(dir, "src", "index.ts");
+      try {
+        expect(resolveAppaloftSkillPath()).not.toBe(planted);
+        expect(resolveAppaloftSkillPath()?.endsWith("/skills/appaloft")).toBe(true);
+      } finally {
+        process.argv[1] = previousArgv;
+      }
+    });
   });
 
   test("[WS-SCRATCH-HARNESS-006] prefers OpenCode over Pi", async () => {
