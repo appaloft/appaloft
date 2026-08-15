@@ -98,6 +98,7 @@ export {
 } from "./local-git-workspace-context.js";
 export {
   buildScratchHarness,
+  isolatedOpenCodeConfigHome,
   launchScratchAgent,
   resolveAppaloftMcpArgv,
   resolveAppaloftSkillPath,

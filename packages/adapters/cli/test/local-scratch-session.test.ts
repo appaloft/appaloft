@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 
 import {
   buildScratchHarness,
+  isolatedOpenCodeConfigHome,
   resolveAppaloftMcpArgv,
   resolveAppaloftSkillPath,
   resolveDefaultScratchHarness,
@@ -195,6 +196,7 @@ describe("local scratch session", () => {
         "mcp",
         "remote-stdio",
       ]);
+      expect(env?.XDG_CONFIG_HOME).toBe(isolatedOpenCodeConfigHome());
     });
   });
 
