@@ -5,6 +5,7 @@ import {
   issueSandboxAgentMcpAccess,
   reconcileSandboxAgentMcpAccessScope,
   type SandboxAgentMcpAccessProvider,
+  withOccupancyFirstPartyMcpDiscovery,
 } from "../src";
 
 const context = createExecutionContext({
@@ -108,5 +109,49 @@ describe("Sandbox Agent MCP access", () => {
 
     await reconcileSandboxAgentMcpAccessScope(provider, scope);
     expect(reconciled).toEqual(["sbx_a:sar_a:srun_a"]);
+  });
+
+  test("[WS-REMOTE-MCP-DISCOVERY-021] unions occupancy first-party discovery tools without rewriting tenant MCP", () => {
+    expect(
+      withOccupancyFirstPartyMcpDiscovery([
+        {
+          requirementId: "appaloft-tools",
+          connectionReference: "appaloft-first-party",
+          required: false,
+          purpose: "Deploy and inspect Appaloft from occupancy",
+          requestedTools: ["projects_list", "deployments_create"],
+        },
+        {
+          requirementId: "docs",
+          connectionReference: "mcpconn_docs",
+          required: true,
+          purpose: "Documentation",
+          requestedTools: ["docs.search"],
+        },
+      ]),
+    ).toEqual([
+      {
+        requirementId: "appaloft-tools",
+        connectionReference: "appaloft-first-party",
+        required: false,
+        purpose: "Deploy and inspect Appaloft from occupancy",
+        requestedTools: [
+          "projects_list",
+          "deployments_create",
+          "environments_list",
+          "resources_list",
+          "resources_show",
+          "servers_list",
+          "deployments_show",
+        ],
+      },
+      {
+        requirementId: "docs",
+        connectionReference: "mcpconn_docs",
+        required: true,
+        purpose: "Documentation",
+        requestedTools: ["docs.search"],
+      },
+    ]);
   });
 });

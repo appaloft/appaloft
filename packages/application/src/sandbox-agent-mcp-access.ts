@@ -36,6 +36,34 @@ const safeIdPattern = /^[A-Za-z][A-Za-z0-9_.:-]{0,159}$/u;
 const serverNamePattern = /^[a-z][a-z0-9-]{0,62}$/u;
 const toolNamePattern = /^[A-Za-z][A-Za-z0-9_.:/-]{0,127}$/u;
 
+export const OCCUPANCY_FIRST_PARTY_MCP_REFERENCE = "appaloft-first-party";
+export const OCCUPANCY_FIRST_PARTY_MCP_DISCOVERY_TOOLS = [
+  "projects_list",
+  "environments_list",
+  "resources_list",
+  "resources_show",
+  "servers_list",
+  "deployments_create",
+  "deployments_show",
+] as const;
+
+export function withOccupancyFirstPartyMcpDiscovery(
+  bindings: readonly AgentWorkspaceMcpBinding[] = [],
+): readonly AgentWorkspaceMcpBinding[] {
+  return bindings.map((binding) => {
+    if (binding.connectionReference !== OCCUPANCY_FIRST_PARTY_MCP_REFERENCE) {
+      return binding;
+    }
+    const requestedTools = [
+      ...new Set([...binding.requestedTools, ...OCCUPANCY_FIRST_PARTY_MCP_DISCOVERY_TOOLS]),
+    ];
+    return requestedTools.length === binding.requestedTools.length &&
+      requestedTools.every((tool, index) => tool === binding.requestedTools[index])
+      ? binding
+      : { ...binding, requestedTools };
+  });
+}
+
 export function assertSandboxAgentMcpAccessDescriptor(
   descriptor: SandboxAgentMcpAccessDescriptor,
   binding: AgentWorkspaceMcpBinding,

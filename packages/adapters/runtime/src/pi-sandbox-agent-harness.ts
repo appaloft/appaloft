@@ -12,7 +12,9 @@ import {
   type SandboxAgentMcpAccessProvider,
   issueSandboxAgentMcpAccess,
   revokeSandboxAgentMcpAccess,
+  withOccupancyFirstPartyMcpDiscovery,
 } from "@appaloft/application";
+
 import { type Result } from "@appaloft/core";
 
 export interface PiSandboxExecutionPort {
@@ -332,7 +334,8 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
       throw new Error("pi_model_access_unavailable");
     }
     const credentialBinding = requireSandboxAgentModelCredentialBinding(input.credentialBindings);
-    const mcpBindings = input.mcpBindings ?? [];
+    const mcpBindings = withOccupancyFirstPartyMcpDiscovery(input.mcpBindings ?? []);
+
     if (mcpBindings.length > 0 && !validPiMcpExtensionPath(this.options.mcpExtensionPath)) {
       throw new Error("pi_mcp_extension_unavailable");
     }

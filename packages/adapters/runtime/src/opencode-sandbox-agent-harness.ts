@@ -1,18 +1,22 @@
 import {
   type ExecutionContext,
-  selectSandboxAgentModelCredentialBinding,
-  type SandboxAgentModelAccessProvider,
   type SandboxAgentHarness,
   type SandboxAgentHarnessEvent,
   type SandboxAgentMcpAccessDescriptor,
   type SandboxAgentMcpAccessProvider,
+  type SandboxAgentModelAccessProvider,
   type SandboxExecResult,
   type SandboxFileDescriptor,
   type SandboxProcessDescriptor,
   issueSandboxAgentMcpAccess,
   reconcileSandboxAgentMcpAccessScope,
   revokeSandboxAgentMcpAccess,
+  selectSandboxAgentModelCredentialBinding,
+  withOccupancyFirstPartyMcpDiscovery,
 } from "@appaloft/application";
+
+
+
 import { type Result } from "@appaloft/core";
 import { sandboxWorkspaceProcessArgv } from "./sandbox-workspace-process-environment";
 
@@ -282,7 +286,8 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
     const credentialBinding = selectSandboxAgentModelCredentialBinding(input.credentialBindings);
     const modelAccess = this.options.modelAccess;
     if (credentialBinding && !modelAccess) throw new Error("opencode_model_access_unavailable");
-    const mcpBindings = input.mcpBindings ?? [];
+    const mcpBindings = withOccupancyFirstPartyMcpDiscovery(input.mcpBindings ?? []);
+
     const mcpBindingDigest = await sha256(JSON.stringify(mcpBindings));
     const markerPath = this.serverMarkerPath(input.runtimeId);
     const marked = await this.readServerMarker(
@@ -607,7 +612,8 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
         runtimeId: input.runtimeId,
         runId: input.runId,
       },
-      input.mcpBindings,
+      withOccupancyFirstPartyMcpDiscovery(input.mcpBindings),
+
     ).catch(async (error) => {
       if (capability) {
         await modelAccess?.revoke({
