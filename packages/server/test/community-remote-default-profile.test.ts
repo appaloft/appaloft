@@ -27,6 +27,18 @@ describe("community remote default profile", () => {
           delivery: { kind: "stdin" },
         },
       ],
+      mcpServers: [
+        {
+          id: "appaloft-tools",
+          required: false,
+          requestedTools: [
+            "projects_list",
+            "resources_show",
+            "deployments_create",
+            "deployments_show",
+          ],
+        },
+      ],
     });
     expect(profile?.profileManifest).toMatchObject({
       id: "appaloft-remote",
@@ -64,6 +76,12 @@ describe("community remote default profile", () => {
         {
           id: "model-api",
           kind: "model-api",
+          required: false,
+        },
+      ],
+      mcpServers: [
+        {
+          id: "appaloft-tools",
           required: false,
         },
       ],
