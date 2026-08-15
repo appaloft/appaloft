@@ -573,19 +573,21 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
 
   async execute(input: Parameters<SandboxAgentHarness["execute"]>[0]) {
     await this.prepareRuntime(input);
-    const modelAccess = this.options.modelAccess;
-    if (!modelAccess) throw new Error("opencode_model_access_unavailable");
     const credentialBinding = selectSandboxAgentModelCredentialBinding(input.credentialBindings);
-    if (!credentialBinding) throw new Error("sandbox_agent_model_connection_binding_missing");
-    const capability = await modelAccess.issue({
-      executionContext: input.executionContext,
-      sandboxId: input.sandboxId,
-      runtimeId: input.runtimeId,
-      runId: input.runId,
-      credentialBinding,
-    });
-    if (!validModelCapability(capability, this.capabilitySafetyWindowMs())) {
-      await modelAccess.revoke({
+    const modelAccess = this.options.modelAccess;
+    if (credentialBinding && !modelAccess) throw new Error("opencode_model_access_unavailable");
+    const capability =
+      credentialBinding && modelAccess
+        ? await modelAccess.issue({
+            executionContext: input.executionContext,
+            sandboxId: input.sandboxId,
+            runtimeId: input.runtimeId,
+            runId: input.runId,
+            credentialBinding,
+          })
+        : undefined;
+    if (capability && !validModelCapability(capability, this.capabilitySafetyWindowMs())) {
+      await modelAccess?.revoke({
         executionContext: input.executionContext,
         sandboxId: input.sandboxId,
         runtimeId: input.runtimeId,
@@ -604,18 +606,20 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       },
       input.mcpBindings,
     ).catch(async (error) => {
-      await modelAccess.revoke({
-        executionContext: input.executionContext,
-        sandboxId: input.sandboxId,
-        runtimeId: input.runtimeId,
-        runId: input.runId,
-        capabilityId: capability.capabilityId,
-      });
+      if (capability) {
+        await modelAccess?.revoke({
+          executionContext: input.executionContext,
+          sandboxId: input.sandboxId,
+          runtimeId: input.runtimeId,
+          runId: input.runId,
+          capabilityId: capability.capabilityId,
+        });
+      }
       throw error;
     });
     const config = createOpenCodeSandboxConfig(capability, mcpCapabilities);
     if (!(await this.nativeConfigIsValid(input.executionContext, input.sandboxId, config))) {
-      await this.revokeCapabilities(input, capability.capabilityId, mcpCapabilities);
+      await this.revokePreparedCapabilities(input, capability?.capabilityId, mcpCapabilities);
       throw new Error("opencode_harness_config_invalid");
     }
     const outputRoot = `.appaloft-agent/${input.runId}`;
@@ -639,8 +643,9 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
         "run",
         "--dir",
         this.cwd === "." ? "/workspace" : `/workspace/${this.cwd}`,
-        "--model",
-        `${capability.provider}/${capability.model}`,
+        ...(capability
+          ? ["--model", `${capability.provider}/${capability.model}`]
+          : ["--attach", `http://127.0.0.1:${this.port}`]),
         "--format",
         "json",
         "--auto",
@@ -652,14 +657,21 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       argv,
       ...(this.cwd === "." ? {} : { cwd: this.cwd }),
       background: true,
-      stdin: new TextEncoder().encode(`${config}\n${capability.accessToken}\n`),
+      stdin: new TextEncoder().encode(`${config}\n${capability?.accessToken ?? ""}\n`),
     });
+    const revokeExecute = async () => {
+      if (capability) {
+        await this.revokeCapabilities(input, capability.capabilityId, mcpCapabilities);
+        return;
+      }
+      await revokeSandboxAgentMcpAccess(this.options.mcpAccess, input, mcpCapabilities);
+    };
     if (result.isErr()) {
-      await this.revokeCapabilities(input, capability.capabilityId, mcpCapabilities);
+      await revokeExecute();
       throw new Error(result.error.message);
     }
     if (result.value.mode !== "background") {
-      await this.revokeCapabilities(input, capability.capabilityId, mcpCapabilities);
+      await revokeExecute();
       throw new Error("OpenCode harness requires a cancellable background process");
     }
     const active = {
@@ -735,7 +747,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       };
     } finally {
       this.active.delete(input.runId);
-      await this.revokeCapabilities(input, capability.capabilityId, mcpCapabilities);
+      await revokeExecute();
     }
   }
 

@@ -1180,6 +1180,117 @@ describe("OpenCodeSandboxAgentHarness", () => {
     expect(JSON.parse(new TextDecoder().decode(marker)).capabilityId).toBe("vendor-login");
   });
 
+  test("[R8-OCC-TASK-004] attaches occupancy headless run to the vendor-login OpenCode server", async () => {
+    const files = new Map<string, Uint8Array>();
+    const calls: Parameters<OpenCodeSandboxExecutionPort["exec"]>[2][] = [];
+    let issueCalls = 0;
+    const execution: OpenCodeSandboxExecutionPort = {
+      async exec(_context, _sandboxId, input) {
+        calls.push(input);
+        if (input.argv.includes("--version")) {
+          return ok({
+            mode: "foreground",
+            frames: [
+              { kind: "stdout", sequence: 1, data: "1.1.60\n" },
+              { kind: "exit", sequence: 2, exitCode: 0 },
+            ],
+          } satisfies SandboxExecResult);
+        }
+        if (input.argv.includes("debug") && input.argv.includes("config")) {
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
+          } satisfies SandboxExecResult);
+        }
+        if (input.argv.includes("serve")) {
+          return ok({ mode: "background", processId: "spr_server" });
+        }
+        if (isHealthProbe(input)) {
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
+          } satisfies SandboxExecResult);
+        }
+        if (input.argv.includes("run")) {
+          files.set(
+            ".appaloft-agent/srun_open/stdout.jsonl",
+            new TextEncoder().encode(`${JSON.stringify({ type: "text", part: { text: "done" } })}\n`),
+          );
+          files.set(".appaloft-agent/srun_open/stderr.log", new Uint8Array());
+          files.set(".appaloft-agent/srun_open/exit-code", new TextEncoder().encode("0"));
+          return ok({ mode: "background", processId: "spr_run" });
+        }
+        throw new Error("unexpected command");
+      },
+      async listProcesses() {
+        return ok([
+          { processId: "spr_server", status: "running" },
+          { processId: "spr_run", status: "exited" },
+        ]);
+      },
+      async terminateProcess() {
+        return ok(undefined);
+      },
+      async readFile(_context, _sandboxId, input) {
+        const value = files.get(input.path);
+        return value
+          ? ok(value)
+          : err({
+              code: "sandbox_file_not_found",
+              category: "user",
+              message: "missing",
+              retryable: false,
+              details: {},
+            });
+      },
+      async writeFile(_context, _sandboxId, input) {
+        files.set(input.path, input.content);
+        return ok({ path: input.path, sizeBytes: input.content.byteLength });
+      },
+      async removeFile(_context, _sandboxId, input) {
+        files.delete(input.path);
+        return ok(undefined);
+      },
+    };
+    const harness = new OpenCodeSandboxAgentHarness(execution, {
+      templateId: "aht_opencode_managed_v1",
+      sandboxTemplateId: "stp_opencode_pinned",
+      version: "1.1.60",
+      templateDigest: `sha256:${"b".repeat(64)}`,
+      startupPollAttempts: 1,
+      startupPollIntervalMs: 0,
+      modelAccess: {
+        async issue() {
+          issueCalls += 1;
+          return modelAccess.issue();
+        },
+        async revoke() {},
+      },
+    });
+
+    const result = await harness.execute({
+      executionContext: context,
+      sandboxId: "sbx_open",
+      runtimeId: "sar_open",
+      runId: "srun_open",
+      task: "open a PR",
+      context: { mode: "fresh" },
+      idempotencyKey: "run_occupancy_vendor",
+    });
+
+    expect(issueCalls).toBe(0);
+    expect(result.outcomeDigest).toStartWith("sha256:");
+    const run = calls.find((call) => Array.isArray(call.argv) && call.argv.includes("run"));
+    expect(run?.argv).toEqual(
+      expect.arrayContaining(["run", "--attach", "http://127.0.0.1:4096", "--format", "json", "--auto", "open a PR"]),
+    );
+    expect(run?.argv).not.toContain("--model");
+    expect(JSON.parse(new TextDecoder().decode(run?.stdin).split("\n")[0] ?? "null")).toEqual({
+      snapshot: false,
+    });
+  });
+
+
 
   test("[MODEL-ACCESS-BIND-003] fails before native startup when the model binding is ambiguous", async () => {
     const context = createExecutionContext({ requestId: "req_open" });
