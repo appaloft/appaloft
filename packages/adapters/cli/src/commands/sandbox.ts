@@ -1,7 +1,6 @@
 import {
   AcceptSandboxPromotionCommand,
   CancelSandboxAgentRunCommand,
-  COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY,
   ConfigureSandboxNetworkPolicyCommand,
   CreateSandboxAgentRunCommand,
   CreateSandboxAgentRuntimeCommand,
@@ -53,6 +52,8 @@ import {
   TerminateSandboxProcessCommand,
   WriteSandboxFileCommand,
 } from "@appaloft/application";
+import { COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY } from "@appaloft/application/community-remote-default-network-policy";
+
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 
 import {

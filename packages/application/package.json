@@ -5,6 +5,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./client-types": "./src/client-types.ts",
+    "./community-remote-default-network-policy": "./src/community-remote-default-network-policy.ts",
     "./execution-context": "./src/execution-context.ts",
     "./messages": "./src/messages.ts",
     "./resource-access-failure-diagnostics": "./src/resource-access-failure-diagnostics.ts",

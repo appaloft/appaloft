@@ -2,7 +2,6 @@ import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
 import {
-  COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY,
   type Command,
   type CommandBus,
   CreateSandboxCommand,
@@ -16,6 +15,7 @@ import {
   type QueryBus,
   WriteSandboxFileCommand,
 } from "@appaloft/application";
+import { COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY } from "@appaloft/application/community-remote-default-network-policy";
 import { ok } from "@appaloft/core";
 
 describe("CLI execution sandbox commands", () => {

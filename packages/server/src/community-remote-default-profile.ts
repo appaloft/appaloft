@@ -2,12 +2,10 @@ import {
   validateAgentAdapterManifest,
   validateAgentWorkspaceProfile,
 } from "@appaloft/agent-adapter-sdk";
-import {
-  COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY,
-  type CommunityRemoteWorkspaceDefaultProfileConfig,
-} from "@appaloft/application";
+import { type CommunityRemoteWorkspaceDefaultProfileConfig } from "@appaloft/application";
+import { COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY } from "@appaloft/application/community-remote-default-network-policy";
 
-export { COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY } from "@appaloft/application";
+export { COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY } from "@appaloft/application/community-remote-default-network-policy";
 
 export function createCommunityRemoteDefaultProfile(input: {
   readonly harnessKey: string;
