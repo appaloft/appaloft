@@ -190,11 +190,21 @@ function occupancyProductionUrlForProject(
   return occupancyChromeForProject(resources, projectId).production?.url;
 }
 
+function isProductAuthMissing(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { readonly code?: unknown }).code === "product_auth_missing"
+  );
+}
+
 function occupancyTreeFromLists(
   reason: string,
   servers: ServerListResult["items"],
   sandboxes: readonly SandboxResult[],
   resources: ResourceListResult["items"] = [],
+  status: "ready" | "login-required" = "ready",
 ) {
   const previewByProjectId = new Map<string, { readonly url: string }>();
   const deploymentByProjectId = new Map<
@@ -210,7 +220,7 @@ function occupancyTreeFromLists(
   }
   return {
     schemaVersion: "appaloft.workspace-occupancy/v1",
-    status: "ready",
+    status,
     reason,
     nextAction: "Use workspace show/pause/resume or appaloft code to attach.",
     servers: servers.map((server) => ({
@@ -1477,15 +1487,21 @@ export const agentWorkspaceCommand = EffectCommand.make(
                 ? terminalFallbackReason
                 : "presentation-not-composed";
         const serversQuery = yield* resultToEffect(ListServersQuery.create());
-        const servers = (yield* resultToEffect(
-          yield* Effect.promise(() => cli.executeQuery(serversQuery)),
-        )) as ServerListResult;
+        const serversResult = yield* Effect.promise(() => cli.executeQuery(serversQuery));
+        if (serversResult.isErr() && isProductAuthMissing(serversResult.error)) {
+          return yield* print(occupancyTreeFromLists(reason, [], [], [], "login-required"));
+        }
+        const servers = (yield* resultToEffect(serversResult)) as ServerListResult;
         const sandboxesQuery = yield* resultToEffect(
           ListSandboxesQuery.create({ limit: 100, offset: 0 }),
         );
-        const sandboxes = (yield* resultToEffect(
-          yield* Effect.promise(() => cli.executeQuery(sandboxesQuery)),
-        )) as SandboxListResult;
+        const sandboxesResult = yield* Effect.promise(() => cli.executeQuery(sandboxesQuery));
+        if (sandboxesResult.isErr() && isProductAuthMissing(sandboxesResult.error)) {
+          return yield* print(
+            occupancyTreeFromLists(reason, servers.items ?? [], [], [], "login-required"),
+          );
+        }
+        const sandboxes = (yield* resultToEffect(sandboxesResult)) as SandboxListResult;
         let resources: ResourceListResult["items"] = [];
         const resourcesQuery = ListResourcesQuery.create({ limit: 100 });
         if (resourcesQuery.isOk()) {
