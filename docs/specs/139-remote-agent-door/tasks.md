@@ -98,6 +98,14 @@
 - [x] Unit tests WS-REMOTE-NET-044–045
 - [x] `appaloftdev deployments plan --resource --server` after Hello-World occupy
 
+## Slice 11 — remote-git planner evidence
+
+- [x] Grill D40–D42
+- [x] Ticket `ready-for-agent` — [#1173](https://github.com/appaloft/appaloft/issues/1173)
+- [x] Remote-git auto method uses inspection
+- [x] Unit tests WS-REMOTE-PLAN-046–047
+- [x] `appaloftdev deployments plan --resource --server` after Hello-World occupy
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

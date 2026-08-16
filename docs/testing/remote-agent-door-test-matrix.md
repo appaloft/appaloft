@@ -51,6 +51,8 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-RES-043 | application | this slice | existing Resource `app` is reused | `packages/application/test/community-workspace-activation-context-initializer.test.ts` |
 | WS-REMOTE-NET-044 | application + `appaloftdev` | this slice | occupancy default network is `3000` / `http` / `reverse-proxy` | `packages/application/test/community-workspace-activation-context-initializer.test.ts`; live `deployments plan --resource --server` |
 | WS-REMOTE-NET-045 | application | this slice | existing Resource network is reused | `packages/application/test/community-workspace-activation-context-initializer.test.ts` |
+| WS-REMOTE-PLAN-046 | runtime + `appaloftdev` | this slice | remote-git without Dockerfile fail-closed | `packages/adapters/runtime/test/runtime-plan-resolver.test.ts`; live `deployments plan --resource --server` |
+| WS-REMOTE-PLAN-047 | runtime | this slice | remote-git Dockerfile evidence still wins | `packages/adapters/runtime/test/runtime-plan-resolver.test.ts` |
 
 
 

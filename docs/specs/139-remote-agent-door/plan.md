@@ -93,6 +93,12 @@ Slice-10 verification:
 - unit: existing Resource without network is configured; existing network is reused;
 - `appaloftdev deployments plan --resource res_vhmyk4zutvnd --server srv_uil9cpctplou` no longer reports `missing-internal-port`.
 
+Slice-11 verification:
+
+- unit: remote-git with empty inspection does not select dockerfile;
+- unit: remote-git with detected dockerfile still selects dockerfile;
+- `appaloftdev deployments plan --resource res_vhmyk4zutvnd --server srv_uil9cpctplou` is blocked and does not claim `Dockerfile`.
+
 
 ## Risks
 

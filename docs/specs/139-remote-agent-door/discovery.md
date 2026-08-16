@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–9 shipped. Slice 10 occupancy default network owner-confirmed 2026-08-16 (D37–D39).
+- Round: Spec. Slice 1–10 shipped. Slice 11 remote-git planner evidence owner-confirmed 2026-08-16 (D40–D42).
 - Date: 2026-08-16.
-- Predecessor: occupancy default Resource shipped as public #1170.
-- Code changes allowed: yes for slice 10 after the occupancy-network ticket is `ready-for-agent`.
+- Predecessor: occupancy default network shipped as public #1172.
+- Code changes allowed: yes for slice 11 after the remote-git-planner ticket is `ready-for-agent`.
 
 ## Actor And Observable Outcome
 
@@ -74,7 +74,10 @@ Sandbox on that Server, not one VM per person.
 | D36 | Created Resource source is `remote-git` of the occupancy repo; no network/runtime profile | Slice 9 shipped; `internalPort` is now slice 10 |
 | D37 | Slice 10 occupancy default network is product `internalPort 3000`, `http`, `reverse-proxy` | Live plan on `res_vhmyk4zutvnd` is blocked `missing-internal-port`. This is the documented Appaloft default, not repo detection. Hello-World has no Dockerfile or start command. |
 | D38 | Missing network on existing Resource `app` is filled via `resources.configure-network`; existing network is reused | Do not overwrite a user-configured port. |
-| D39 | Do not invent runtime/start this slice | Plan still has `plannerKey unsupported` after network. Runtime stays later. |
+| D39 | Do not invent runtime/start this slice | Slice 10 shipped; planner lie is now slice 11 |
+| D40 | Slice 11 remote-git / git-* auto method uses the same inspection as local sources | Live Hello-World create accepted a dockerfile plan with `detectedFiles: []`, then failed `open Dockerfile`. `autoDeploymentMethodFor` hardcodes `remoteGit -> dockerfile`. |
+| D41 | Missing Dockerfile / start / static evidence fail-closed; do not invent Dockerfile | Plan and create must block before package. Existing explicit `runtime.strategy=dockerfile` still wins. |
+| D42 | Do not invent Hello-World start or static publish this slice | README-only repo stays blocked until the user or a later slice supplies runtime. |
 
 ## Rejected
 
@@ -131,11 +134,12 @@ Later slices after occupancy:
 7. Plan resource context (slice 7, shipped #1166).
 8. Occupancy default Environment (slice 8, shipped #1168).
 9. Occupancy default Resource (slice 9, shipped #1170).
-10. **Occupancy default network** (slice 10): activation ensures Resource `app` has product default `internalPort 3000`.
-11. Session-native Preview / remaining first-deploy chrome.
-12. GitHub as source surface / `owner/repo` shorthand.
-13. Optional team Connection.
-14. Cloud managed as default Server when no BYOS exists.
+10. Occupancy default network (slice 10, shipped #1172).
+11. **Remote-git planner evidence** (slice 11): occupancy remote-git plan/create does not invent Dockerfile.
+12. Session-native Preview / remaining first-deploy chrome.
+13. GitHub as source surface / `owner/repo` shorthand.
+14. Optional team Connection.
+15. Cloud managed as default Server when no BYOS exists.
 
 ## Delivery chrome (owner 2026-08-15)
 

@@ -79,22 +79,24 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-RES-043 | Existing app reused | Environment already has Resource `app` | second occupancy of same repo | no second Resource; create is not called. |
 | WS-REMOTE-NET-044 | Occupancy default network | occupancy Resource `app` has no network profile | `appaloft code --no-attach` then `resource show` / `deployments.plan --resource --server` | Resource has `internalPort 3000`, `http`, `reverse-proxy`; plan no longer reports `missing-internal-port`. |
 | WS-REMOTE-NET-045 | Existing network reused | Resource `app` already has a network profile | second occupancy of same repo | configure-network is not called; existing port is kept. |
+| WS-REMOTE-PLAN-046 | Remote-git without Dockerfile fail-closed | occupancy Resource source is remote-git; inspection has no dockerfile/start/static evidence | `deployments.plan --resource --server` | readiness blocked; planner does not invent `Dockerfile`. |
+| WS-REMOTE-PLAN-047 | Remote-git Dockerfile evidence still wins | inspection detects dockerfile | `deployments.plan` | plannerKey `dockerfile`; path comes from inspection, not a hardcoded default. |
 
 ## Slice Scope
 
-Slice 1–9 shipped.
+Slice 1–10 shipped.
 
-Slice 10 (this ticket): occupancy activation ensures Resource `app` has the
-product default network profile.
+Slice 11 (this ticket): remote-git / git-* auto method uses the same
+inspection as local sources.
 
-In slice 10:
+In slice 11:
 
-- missing `app` → `resources.create` includes `networkProfile` `3000` / `http` / `reverse-proxy`;
-- existing `app` without network → `resources.configure-network` with the same default;
-- existing network reused.
+- no dockerfile / start / static evidence → fail-closed;
+- explicit `runtime.strategy=dockerfile` still wins;
+- do not invent Hello-World start or static publish.
 
-- Out of slice 10: inventing runtime/start, repo-detected ports, Resource id on
-  the occupancy tree, defaulting Server, interactive TUI rebuild, session-native Preview.
+Out of slice 11: session-native Preview, defaulting Server, interactive TUI
+rebuild, inventing runtime for README-only repos.
 
 ## Public Surfaces
 
