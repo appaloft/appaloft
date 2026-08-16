@@ -617,8 +617,19 @@ async function listWorkspaces(
   context: WorkspaceControlPresentationContext,
 ): Promise<WorkspaceControlWorkspaceSummary[]> {
   const query = operationValue(ListSandboxesQuery.create({ limit: 100, offset: 0 }));
-  const result = resultValue(await context.executeQuery(query)) as SandboxListResult;
-  return result.items
+  const result = await context.executeQuery(query);
+  if (result.isErr()) {
+    if (
+      result.error &&
+      typeof result.error === "object" &&
+      "code" in result.error &&
+      result.error.code === "product_auth_missing"
+    ) {
+      return [];
+    }
+    throw result.error;
+  }
+  return (result.value as SandboxListResult).items
     .filter((record) => {
       const status = optionalString(record, "status");
       return status !== "terminated" && status !== "failed";
@@ -930,7 +941,11 @@ export function createBoundedWorkspaceControlPresentation(
       };
 
       try {
-        await renderer.send({ type: "workspaces", workspaces: await listWorkspaces(context) });
+        await renderer.send({ type: "workspaces", workspaces: [] });
+        void listWorkspaces(context).then(
+          (workspaces) => renderer.send({ type: "workspaces", workspaces }),
+          (error) => sendErrorBestEffort(error, "workspace-control-start"),
+        );
         for await (const event of renderer.events()) {
           if (event.type === "quit") break;
           try {
