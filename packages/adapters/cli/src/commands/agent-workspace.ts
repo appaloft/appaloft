@@ -142,10 +142,8 @@ interface ServerListResult {
     readonly name?: string;
     readonly lifecycleStatus?: string;
     readonly providerKey?: string;
-    readonly [key: string]: unknown;
   }[];
 }
-
 function occupancyTreeFromLists(
   reason: string,
   servers: ServerListResult["items"],
