@@ -23,6 +23,7 @@
 | Plan default Destination | `DeploymentContextResolver` read-only |
 | Headless occupancy tree | public CLI adapter composing `servers.list` + `sandboxes.list` |
 | Occupancy projectId | same tree; copy `activation.project.projectId` |
+| Occupancy Preview URL | same tree; copy succeeded generated access from Resource `app` |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -104,6 +105,13 @@ Slice-12 verification:
 - unit: remote-git enrichment is allowed;
 - unit: detector inspects a cloned remote with root Dockerfile;
 - `appaloftdev deployments plan --resource res_3qjkhtnc45nk --server srv_uil9cpctplou` against occupied `appaloft/examples` asks for `source.baseDirectory`.
+
+Slice-13 verification:
+
+- unit: occupancy with succeeded generated access prints `preview.url`;
+- unit: occupancy without succeeded access omits `preview`;
+- `appaloftdev workspace --json` after official hello create includes `http://app-jkhtnc45nk.127.0.0.1.sslip.io`.
+
 
 
 ## Risks

@@ -21,8 +21,10 @@ import {
   IssueWorkspaceCollaborationNativeAttachCommand,
   IssueWorkspaceCollaborationTerminalAccessCommand,
   ListAgentTaskRunsQuery,
+  ListResourcesQuery,
   ListSandboxAgentRuntimesQuery,
   ListSandboxesQuery,
+  ListServersQuery,
   ListWorkspaceCollaborationsQuery,
   OpenAgentWorkspaceCommand,
   type Query,
@@ -212,6 +214,100 @@ describe("Agent Workspace CLI", () => {
     expect(printed).toContain("prj_demo");
     expect(printed).toContain("sbx_failed");
     expect(printed).not.toMatch(/sbx_failed[\s\S]{0,120}"projectId"/);
+  });
+
+  test("[WS-REMOTE-PREVIEW-050][WS-REMOTE-PREVIEW-051] occupancy tree copies succeeded generated Preview URL", async () => {
+    const output: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: { execute: async () => ok({}) } as unknown as CommandBus,
+      queryBus: {
+        execute: async (_context, query) => {
+          if (query instanceof ListServersQuery) {
+            return ok({
+              items: [{ id: "srv_demo", name: "occupancy-mac", lifecycleStatus: "active" }],
+            });
+          }
+          if (query instanceof ListSandboxesQuery) {
+            return ok({
+              items: [
+                {
+                  sandboxId: "sbx_preview",
+                  status: "ready",
+                  occupancy: {
+                    repositoryIdentity: "github.com/appaloft/examples",
+                    commitSha: "1a23b77",
+                    branch: "main",
+                  },
+                  activation: { project: { projectId: "prj_preview" } },
+                },
+                {
+                  sandboxId: "sbx_no_preview",
+                  status: "ready",
+                  occupancy: {
+                    repositoryIdentity: "github.com/octocat/Hello-World",
+                    commitSha: "7fd1a60",
+                    branch: "master",
+                  },
+                  activation: { project: { projectId: "prj_empty" } },
+                },
+              ],
+            });
+          }
+          if (query instanceof ListResourcesQuery) {
+            return ok({
+              items: [
+                {
+                  projectId: "prj_preview",
+                  slug: "app",
+                  lastDeploymentStatus: "succeeded",
+                  accessSummary: {
+                    latestGeneratedAccessRoute: {
+                      url: "http://app-jkhtnc45nk.127.0.0.1.sslip.io",
+                      deploymentStatus: "succeeded",
+                    },
+                  },
+                },
+                {
+                  projectId: "prj_empty",
+                  slug: "app",
+                  lastDeploymentStatus: "failed",
+                },
+              ],
+            });
+          }
+          return ok({ items: [] });
+        },
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_workspace_occupancy_preview" }),
+      },
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+    });
+
+    const processWrite = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "workspace", "--json"]);
+    } finally {
+      process.stdout.write = processWrite;
+    }
+
+    const printed = output.join("");
+    expect(printed).toContain("http://app-jkhtnc45nk.127.0.0.1.sslip.io");
+    expect(printed).toContain("prj_preview");
+    expect(printed).toContain("prj_empty");
+    expect(printed).not.toMatch(/sbx_no_preview[\s\S]{0,240}"preview"/);
   });
 
   test("[WS-TUI-FALLBACK-009][WS-TUI-TERMINAL-012] unsupported host terminals fail closed before renderer startup", async () => {

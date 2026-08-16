@@ -55,6 +55,8 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-PLAN-047 | runtime | this slice | remote-git Dockerfile evidence still wins | `packages/adapters/runtime/test/runtime-plan-resolver.test.ts` |
 | WS-REMOTE-INSPECT-048 | filesystem + `appaloftdev` | this slice | remote-git occupancy inspects a single-app remote | `packages/adapters/filesystem/test/source-detector.test.ts`; live occupy of a root-Dockerfile repo |
 | WS-REMOTE-INSPECT-049 | filesystem + `appaloftdev` | this slice | monorepo remote-git asks for baseDirectory | `packages/adapters/filesystem/test/source-detector.test.ts`; live `deployments plan` on occupied `appaloft/examples` |
+| WS-REMOTE-PREVIEW-050 | CLI + `appaloftdev` | this slice | occupancy tree copies live generated Preview URL | `packages/adapters/cli/test/agent-workspace-command.test.ts`; live `workspace --json` after hello create |
+| WS-REMOTE-PREVIEW-051 | CLI | this slice | missing generated access stays omitted | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
 
 
 

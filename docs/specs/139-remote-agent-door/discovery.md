@@ -2,11 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–11 shipped. Slice 12 remote-git inspection owner-confirmed 2026-08-16 (D43–D45).
+- Round: Spec. Slice 1–12 shipped. Slice 13 occupancy Preview URL owner-confirmed 2026-08-16 (D46–D48).
 - Date: 2026-08-16.
-- Predecessor: remote-git planner evidence shipped as public #1174.
-- Code changes allowed: yes for slice 12 after the remote-git-inspect ticket is `ready-for-agent`.
-
+- Predecessor: remote-git inspection shipped as public #1176.
+- Code changes allowed: yes for slice 13 after the occupancy-preview ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -81,6 +80,9 @@ Sandbox on that Server, not one VM per person.
 | D43 | Slice 12 occupancy remote-git / git-* sources are inspectable | Live `appaloft/examples` occupy created Resource `app` but plan `detectedFiles: []`. `canBeEnrichedFromSourceInspection` excludes remote-git; detector only reads local paths. |
 | D44 | Detector shallow-clones the remote, keeps remote kind, attaches inspection | Reuse existing `discoverLocalWorkspace`. Single deployable root may set `source.baseDirectory`. |
 | D45 | Multiple deployable roots fail-closed on `source.baseDirectory` | `appaloft/examples` is a monorepo. Do not invent `hello/`. Preview of official hello requires explicit baseDirectory this slice. |
+| D46 | Slice 13 occupancy tree exposes live Preview URL from existing `resources.list` | Live occupy+create of official hello succeeded (`dep_mh73nchmktot`). Container `/health` is 200. Generated host is 200 through Traefik. `resource list` already has `accessSummary.latestGeneratedAccessRoute`. `workspace --json` still has no URL. |
+| D47 | Only occupancy Resource slug `app` with a succeeded generated route | Durable/production domain is later. Do not invent sslip. Do not scrape vendor TUI. |
+| D48 | Missing or failed access stays omitted | Tree still prints servers and occupancies. List-resources failure does not fail the tree. Interactive TUI and `code` banner stay unchanged this slice. |
 
 ## Rejected
 
@@ -139,11 +141,12 @@ Later slices after occupancy:
 9. Occupancy default Resource (slice 9, shipped #1170).
 10. Occupancy default network (slice 10, shipped #1172).
 11. Remote-git planner evidence (slice 11, shipped #1174).
-12. **Remote-git inspection** (slice 12): occupancy plan/create inspects the remote tree.
-13. Session-native Preview / remaining first-deploy chrome.
-14. GitHub as source surface / `owner/repo` shorthand.
-15. Optional team Connection.
-16. Cloud managed as default Server when no BYOS exists.
+12. Remote-git inspection (slice 12, shipped #1176).
+13. **Occupancy Preview URL** (slice 13): `workspace --json` copies live generated access from Resource `app`.
+14. Session-native Preview chrome / interactive `workspace` TUI.
+15. GitHub as source surface / `owner/repo` shorthand.
+16. Optional team Connection.
+17. Cloud managed as default Server when no BYOS exists.
 
 ## Delivery chrome (owner 2026-08-15)
 

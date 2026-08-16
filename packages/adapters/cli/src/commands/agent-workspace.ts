@@ -17,6 +17,7 @@ import {
   IssueWorkspaceCollaborationNativeAttachCommand,
   IssueWorkspaceCollaborationTerminalAccessCommand,
   ListAgentTaskRunsQuery,
+  ListResourcesQuery,
   ListSandboxAgentHarnessesQuery,
   ListSandboxAgentRuntimesQuery,
   ListSandboxesQuery,
@@ -120,6 +121,20 @@ interface SandboxResult {
   };
 }
 
+interface ResourceListResult {
+  readonly items: readonly {
+    readonly projectId?: string;
+    readonly slug?: string;
+    readonly lastDeploymentStatus?: string;
+    readonly accessSummary?: {
+      readonly latestGeneratedAccessRoute?: {
+        readonly url?: string;
+        readonly deploymentStatus?: string;
+      };
+    };
+  }[];
+}
+
 interface AgentRuntimeResult {
   readonly runtimeId: string;
   readonly status?: string;
@@ -148,11 +163,30 @@ interface ServerListResult {
     readonly providerKey?: string;
   }[];
 }
+function occupancyPreviewFromResource(
+  resource: ResourceListResult["items"][number],
+): { readonly url: string } | undefined {
+  if (resource.slug !== "app") return undefined;
+  const route = resource.accessSummary?.latestGeneratedAccessRoute;
+  if (typeof route?.url !== "string" || route.url.length === 0) return undefined;
+  if (route.deploymentStatus !== "succeeded" && resource.lastDeploymentStatus !== "succeeded") {
+    return undefined;
+  }
+  return { url: route.url };
+}
+
 function occupancyTreeFromLists(
   reason: string,
   servers: ServerListResult["items"],
   sandboxes: readonly SandboxResult[],
+  resources: ResourceListResult["items"] = [],
 ) {
+  const previewByProjectId = new Map<string, { readonly url: string }>();
+  for (const resource of resources) {
+    if (typeof resource.projectId !== "string") continue;
+    const preview = occupancyPreviewFromResource(resource);
+    if (preview) previewByProjectId.set(resource.projectId, preview);
+  }
   return {
     schemaVersion: "appaloft.workspace-occupancy/v1",
     status: "ready",
@@ -166,14 +200,20 @@ function occupancyTreeFromLists(
         : {}),
       ...(typeof server.providerKey === "string" ? { providerKey: server.providerKey } : {}),
     })),
-    occupancies: sandboxes.map((sandbox) => ({
-      workspaceId: sandbox.sandboxId,
-      status: sandbox.status,
-      ...(sandbox.occupancy ? { occupancy: sandbox.occupancy } : {}),
-      ...(typeof sandbox.activation?.project?.projectId === "string"
-        ? { projectId: sandbox.activation.project.projectId }
-        : {}),
-    })),
+    occupancies: sandboxes.map((sandbox) => {
+      const projectId =
+        typeof sandbox.activation?.project?.projectId === "string"
+          ? sandbox.activation.project.projectId
+          : undefined;
+      const preview = projectId ? previewByProjectId.get(projectId) : undefined;
+      return {
+        workspaceId: sandbox.sandboxId,
+        status: sandbox.status,
+        ...(sandbox.occupancy ? { occupancy: sandbox.occupancy } : {}),
+        ...(projectId ? { projectId } : {}),
+        ...(preview ? { preview } : {}),
+      };
+    }),
   };
 }
 
@@ -1332,8 +1372,14 @@ export const agentWorkspaceCommand = EffectCommand.make(
         const sandboxes = (yield* resultToEffect(
           yield* Effect.promise(() => cli.executeQuery(sandboxesQuery)),
         )) as SandboxListResult;
+        let resources: ResourceListResult["items"] = [];
+        const resourcesQuery = ListResourcesQuery.create({ limit: 100 });
+        if (resourcesQuery.isOk()) {
+          const listed = yield* Effect.promise(() => cli.executeQuery(resourcesQuery.value));
+          if (listed.isOk()) resources = listed.value.items ?? [];
+        }
         return yield* print(
-          occupancyTreeFromLists(reason, servers.items ?? [], sandboxes.items ?? []),
+          occupancyTreeFromLists(reason, servers.items ?? [], sandboxes.items ?? [], resources),
         );
       }
       yield* Effect.tryPromise({

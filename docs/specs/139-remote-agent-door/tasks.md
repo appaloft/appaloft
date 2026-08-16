@@ -114,10 +114,18 @@
 - [x] Unit tests WS-REMOTE-INSPECT-048–049
 - [x] `appaloftdev deployments plan` after occupying `appaloft/examples`
 
+## Slice 13 — occupancy Preview URL
+
+- [x] Grill D46–D48
+- [x] Ticket `ready-for-agent` — [#1177](https://github.com/appaloft/appaloft/issues/1177)
+- [x] Occupancy tree copies live generated access
+- [x] Unit tests WS-REMOTE-PREVIEW-050–051
+- [x] `appaloftdev workspace --json` after official hello create
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator
 - [ ] Team Connection
 - [ ] Cloud managed as default Server
 - [ ] GitHub `owner/repo` shorthand
-- [ ] Session-native Preview
+- [ ] Session-native Preview chrome
