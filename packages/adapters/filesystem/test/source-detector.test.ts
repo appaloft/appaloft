@@ -304,6 +304,33 @@ describe("FileSystemSourceDetector", () => {
     expect(result._unsafeUnwrap().source.inspection?.exposedPort).toBeUndefined();
   });
 
+  test("[WS-REMOTE-INSPECT-050] missing git executable fails closed without throwing", async () => {
+    ensureReflectMetadata();
+    const [{ createExecutionContext }, { FileSystemSourceDetector }] = await Promise.all([
+      import("@appaloft/application"),
+      import("../src"),
+    ]);
+    const previous = Bun.spawnSync;
+    Bun.spawnSync = ((..._args: Parameters<typeof Bun.spawnSync>) => {
+      throw new Error('Executable not found in $PATH: "git"');
+    }) as typeof Bun.spawnSync;
+    try {
+      const result = await new FileSystemSourceDetector().detect(
+        createExecutionContext({ entrypoint: "http", requestId: "req_missing_git" }),
+        "https://github.com/traefik/whoami.git",
+      );
+      expect(result.isErr()).toBe(true);
+      expect(result._unsafeUnwrapErr().details).toMatchObject({
+        phase: "source-detection",
+        reasonCode: "missing-source-root",
+        affectedProfileField: "source.locator",
+        detail: 'Executable not found in $PATH: "git"',
+      });
+    } finally {
+      Bun.spawnSync = previous;
+    }
+  });
+
   test("[WS-REMOTE-INSPECT-049] cloned monorepo remote-git asks for baseDirectory", async () => {
     ensureReflectMetadata();
     const [{ createExecutionContext }, { FileSystemSourceDetector }, { pathToFileURL }] =
