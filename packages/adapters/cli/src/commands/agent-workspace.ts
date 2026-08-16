@@ -61,6 +61,11 @@ import {
   SCRATCH_BANNER,
 } from "../local-scratch-session.js";
 import {
+  occupancyChromeForProject,
+  occupancyLastDeploymentFromResource,
+  occupancyPreviewFromResource,
+} from "../occupancy-chrome.js";
+import {
   formatRemoteCodeBanner,
   isRemoteCodeGitRemoteLocator,
   nativeAttachRequiresInteractiveTerminal,
@@ -164,44 +169,11 @@ interface ServerListResult {
     readonly providerKey?: string;
   }[];
 }
-function occupancyPreviewFromResource(
-  resource: ResourceListResult["items"][number],
-): { readonly url: string } | undefined {
-  if (resource.slug !== "app") return undefined;
-  const route = resource.accessSummary?.latestGeneratedAccessRoute;
-  if (typeof route?.url !== "string" || route.url.length === 0) return undefined;
-  if (route.deploymentStatus !== "succeeded" && resource.lastDeploymentStatus !== "succeeded") {
-    return undefined;
-  }
-  return { url: route.url };
-}
-
-function occupancyLastDeploymentFromResource(
-  resource: ResourceListResult["items"][number],
-): { readonly id: string; readonly status?: string } | undefined {
-  if (resource.slug !== "app") return undefined;
-  if (typeof resource.lastDeploymentId !== "string" || resource.lastDeploymentId.length === 0) {
-    return undefined;
-  }
-  return {
-    id: resource.lastDeploymentId,
-    ...(typeof resource.lastDeploymentStatus === "string"
-      ? { status: resource.lastDeploymentStatus }
-      : {}),
-  };
-}
-
 function occupancyPreviewUrlForProject(
   resources: ResourceListResult["items"],
   projectId: string | undefined,
 ): string | undefined {
-  if (!projectId) return undefined;
-  for (const resource of resources) {
-    if (resource.projectId !== projectId) continue;
-    const preview = occupancyPreviewFromResource(resource);
-    if (preview) return preview.url;
-  }
-  return undefined;
+  return occupancyChromeForProject(resources, projectId).preview?.url;
 }
 
 function occupancyTreeFromLists(

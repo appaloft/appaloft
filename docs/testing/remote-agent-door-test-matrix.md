@@ -78,6 +78,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-CA-069 | TUI / unit | this slice | TUI list uses occupancy repo@sha | `workspace-control-presentation.test.ts`; workspace-control-tui |
 | WS-REMOTE-CA-070 | TUI / unit | this slice | TUI list omits terminated/failed | same presentation test |
 | WS-REMOTE-CA-071 | TUI / unit | this slice | missing occupancy stays lean | same presentation test |
+| WS-REMOTE-CA-072 | TUI / unit | this slice | TUI detail copies Preview URL | `workspace-control-presentation.test.ts`; workspace-control-tui |
+| WS-REMOTE-CA-073 | TUI / unit | this slice | TUI detail copies last deployment | same presentation test |
+| WS-REMOTE-CA-074 | TUI / unit | this slice | missing TUI chrome stays omitted | same presentation test |
 
 
 

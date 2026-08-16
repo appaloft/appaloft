@@ -195,6 +195,20 @@ pub struct TargetSelectionSummary {
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct OccupancyPreviewChrome {
+    pub url: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct OccupancyDeploymentChrome {
+    pub id: String,
+    #[serde(default)]
+    pub status: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct DetailMessage {
     pub workspace: WorkspaceSummary,
     #[serde(default)]
@@ -209,6 +223,10 @@ pub struct DetailMessage {
     pub activation: Option<ActivationSummary>,
     #[serde(default)]
     pub target_selection: Option<TargetSelectionSummary>,
+    #[serde(default)]
+    pub preview: Option<OccupancyPreviewChrome>,
+    #[serde(default)]
+    pub deployment: Option<OccupancyDeploymentChrome>,
     #[serde(default)]
     pub recovery: RecoverySummary,
 }
@@ -1673,10 +1691,32 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
                             .unwrap_or("unknown")
                     )
                 });
+            let preview = detail
+                .preview
+                .as_ref()
+                .map(|preview| format!("Preview  {}", preview.url))
+                .unwrap_or_default();
+            let deployment = detail
+                .deployment
+                .as_ref()
+                .map(|deployment| {
+                    format!(
+                        "Deploy   {}{}",
+                        deployment.id,
+                        deployment
+                            .status
+                            .as_deref()
+                            .map(|status| format!("  {status}"))
+                            .unwrap_or_default()
+                    )
+                })
+                .unwrap_or_default();
             format!(
-                "Workspace {}  {}\n{}\n{}\nRecovery\nIsolation  {}\nContinuity {}\nSnapshot(s)\n{}\nWorkspace-owned cleanup: {}\nactive runtimes:{}  previews:{}\nBounded readback; not host/provider proof\nAgent Runtime(s)\n{}\nPorts\n{}\nTasks\n{}\nPromotions\n{}",
-                detail.workspace.workspace_id,
+                "Workspace {}  {}\n{}\n{}\n{}\n{}\nRecovery\nIsolation  {}\nContinuity {}\nSnapshot(s)\n{}\nWorkspace-owned cleanup: {}\nactive runtimes:{}  previews:{}\nBounded readback; not host/provider proof\nAgent Runtime(s)\n{}\nPorts\n{}\nTasks\n{}\nPromotions\n{}",
+                occupancy_list_label(&detail.workspace),
                 detail.workspace.status,
+                preview,
+                deployment,
                 target_selection,
                 activation,
                 isolation,
@@ -2209,6 +2249,13 @@ mod tests {
                     source: "platform-default".to_owned(),
                     reason: "managed_entitlement_default".to_owned(),
                 }),
+                preview: Some(OccupancyPreviewChrome {
+                    url: "http://whoami.test".to_owned(),
+                }),
+                deployment: Some(OccupancyDeploymentChrome {
+                    id: "dep_rfqfapqwpyjn".to_owned(),
+                    status: Some("succeeded".to_owned()),
+                }),
                 recovery: RecoverySummary::default(),
             },
         });
@@ -2228,6 +2275,9 @@ mod tests {
                     output
                 });
         assert!(rendered.contains("traefik/whoami@1ce75d0"));
+        assert!(rendered.contains("Preview"));
+        assert!(rendered.contains("whoami.test"));
+        assert!(rendered.contains("dep_rfqfapqwpyjn"));
         assert!(rendered.contains("task_1"));
         assert!(rendered.contains("prm_1"));
         assert!(rendered.contains("verified"));
@@ -2270,6 +2320,8 @@ mod tests {
             promotions: Vec::new(),
             activation: None,
             target_selection: None,
+            preview: None,
+            deployment: None,
             recovery: RecoverySummary {
                 requested_isolation: Some("gvisor".to_owned()),
                 realized_isolation: Some("gvisor".to_owned()),
@@ -2336,6 +2388,8 @@ mod tests {
             promotions: Vec::new(),
             activation: None,
             target_selection: None,
+            preview: None,
+            deployment: None,
             recovery: RecoverySummary {
                 snapshots: vec![SnapshotSummary {
                     snapshot_id: "ssn_1".to_owned(),
@@ -2415,6 +2469,8 @@ mod tests {
             promotions: Vec::new(),
             activation: None,
             target_selection: None,
+            preview: None,
+            deployment: None,
             recovery: RecoverySummary {
                 requested_isolation: Some("gvisor".to_owned()),
                 realized_isolation: Some("gvisor".to_owned()),
@@ -2481,6 +2537,8 @@ mod tests {
             promotions: Vec::new(),
             activation: None,
             target_selection: None,
+            preview: None,
+            deployment: None,
             recovery: RecoverySummary::default(),
         });
         assert!(state.open_recovery_menu());
@@ -2545,6 +2603,8 @@ mod tests {
                 promotions: Vec::new(),
                 activation: None,
                 target_selection: None,
+                preview: None,
+                deployment: None,
                 recovery: RecoverySummary::default(),
             },
         });
@@ -2651,6 +2711,8 @@ mod tests {
             ],
             activation: None,
             target_selection: None,
+            preview: None,
+            deployment: None,
             recovery: RecoverySummary::default(),
         };
 
@@ -2786,6 +2848,8 @@ mod tests {
                 promotions: Vec::new(),
                 activation: None,
                 target_selection: None,
+                preview: None,
+                deployment: None,
                 recovery: RecoverySummary::default(),
             },
         });

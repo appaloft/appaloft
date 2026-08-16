@@ -105,21 +105,24 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-CA-069 | TUI list uses occupancy identity | TTY + occupancy has repositoryIdentity | `appaloft workspace` | list row shows repo@short-sha, not only `sbx_*`. |
 | WS-REMOTE-CA-070 | TUI list omits leftovers | TTY + occupancies include terminated/failed | `appaloft workspace` | TUI workspaces omit `terminated` and `failed`. |
 | WS-REMOTE-CA-071 | Missing occupancy stays lean | Sandbox has no occupancy | TUI workspaces message | row keeps workspaceId/status; no invented repo. |
+| WS-REMOTE-CA-072 | TUI detail copies Preview URL | occupancy Resource `app` has succeeded generated access | TUI detail | shows that URL. |
+| WS-REMOTE-CA-073 | TUI detail copies last deployment | occupancy Resource `app` has lastDeploymentId | TUI detail | shows that id and status. |
+| WS-REMOTE-CA-074 | Missing TUI chrome stays omitted | occupancy has projectId but Resource `app` has no preview/deploy | TUI detail | no invented URL or `dep_*`. |
 
 ## Slice Scope
 
-Slice 1–22 shipped.
+Slice 1–23 shipped.
 
-Slice 23 (this ticket): interactive `workspace` TUI list uses occupancy identity.
+Slice 24 (this ticket): interactive `workspace` TUI detail shows occupancy Preview URL and last deployment.
 
-In slice 23:
+In slice 24:
 
-- TUI workspaces message copies sandbox occupancy when present;
-- TUI list omits `terminated` / `failed`;
-- missing occupancy stays workspaceId/status;
-- no preview / deploy / PR chrome in the list.
+- TUI detail copies Resource `app` generated access URL and last deployment;
+- missing chrome stays omitted;
+- list stays identity-only;
+- no PR number.
 
-Out of slice 23: Railway `ca` navigator chrome, team Connection, Cloud managed default Server.
+Out of slice 24: PR chrome, team Connection, Cloud managed default Server.
 
 ## Public Surfaces
 

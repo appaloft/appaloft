@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–22 shipped. Slice 23 occupancy TUI identity owner-confirmed 2026-08-16 (D76–D78).
+- Round: Spec. Slice 1–23 shipped. Slice 24 occupancy TUI chrome owner-confirmed 2026-08-16 (D79–D81).
 - Date: 2026-08-16.
-- Predecessor: occupancy help door shipped as public #1196.
-- Code changes allowed: yes for slice 23 after the occupancy-tui-identity ticket is `ready-for-agent`.
+- Predecessor: occupancy TUI identity shipped as public #1198.
+- Code changes allowed: yes for slice 24 after the occupancy-tui-chrome ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -113,6 +113,9 @@ Sandbox on that Server, not one VM per person.
 | D76 | Slice 23 TUI workspace list shows occupancy repo@sha when present | Live TTY `workspace` still paints `sbx_*`. Railway `ca` names the current repo. `workspace --json` already has occupancy identity. |
 | D77 | TUI list omits `terminated` / `failed` leftovers | Same D70 policy. `workspace list` stays the full catalog. |
 | D78 | Preview URL / last deploy / PR number stay out of this TUI list | JSON tree already has preview + last deployment. Do not pull Resource list into the TUI protocol this slice. |
+| D79 | Slice 24 TUI detail copies occupancy Preview URL and last deployment | Live TUI detail still paints Recovery / `sbx_*`. JSON tree already has `preview.url` and `deployment`. Railway `ca` shows the current URL. |
+| D80 | Missing preview or last deployment stays omitted | Do not invent sslip or `dep_*`. Resource list failure stays lean. |
+| D81 | PR number stays out; list stays identity-only | Same D78. `d` delivery palette already exists. Do not add a new command. |
 
 ## Rejected
 
@@ -182,10 +185,11 @@ Later slices after occupancy:
 20. Occupancy last deployment (slice 20, shipped #1192).
 21. Occupancy tree filter (slice 21, shipped #1194).
 22. Occupancy help door (slice 22, shipped #1196).
-23. **Occupancy TUI identity** (slice 23): interactive `workspace` list shows repo@sha and hides leftovers.
-24. Interactive `workspace` TUI as Railway `ca` navigator (preview / deploy / PR).
-25. Optional team Connection.
-26. Cloud managed as default Server when no BYOS exists.
+23. Occupancy TUI identity (slice 23, shipped #1198).
+24. **Occupancy TUI chrome** (slice 24): TUI detail shows Preview URL and last deployment.
+25. Interactive `workspace` TUI as Railway `ca` navigator (PR / production).
+26. Optional team Connection.
+27. Cloud managed as default Server when no BYOS exists.
 ## Delivery chrome (owner 2026-08-15)
 
 Cmux-style “this session is PR #928” is correct *context*. It is not a new GitHub aggregate

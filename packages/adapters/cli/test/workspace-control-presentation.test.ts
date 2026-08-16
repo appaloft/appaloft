@@ -12,6 +12,7 @@ import {
   ExposeSandboxPortCommand,
   IssueSandboxAgentAttachAccessCommand,
   ListAgentTaskRunsQuery,
+  ListResourcesQuery,
   ListSandboxAgentRuntimesQuery,
   ListSandboxesQuery,
   ListSandboxPortsQuery,
@@ -1275,5 +1276,95 @@ describe("Workspace control presentation", () => {
         { workspaceId: "sbx_provisioning", status: "provisioning" },
       ],
     });
+  });
+
+  test("[WS-REMOTE-CA-072][WS-REMOTE-CA-073][WS-REMOTE-CA-074] TUI detail copies occupancy preview and last deployment", async () => {
+    const renderer = new FakeRendererSession([
+      { type: "select", workspaceId: "sbx_ready" },
+      { type: "quit" },
+    ]);
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+
+    await presentation.start({
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery) {
+          return ok({
+            items: [
+              {
+                sandboxId: "sbx_ready",
+                status: "ready",
+                activation: {
+                  project: { projectId: "prj_web", disposition: "created" },
+                  repositoryBinding: { bindingId: "rbd_web", disposition: "created" },
+                  profile: { profileInstallationId: "awpi_default", disposition: "reused" },
+                },
+              },
+            ],
+          } as T);
+        }
+        if (query instanceof ShowSandboxQuery) {
+          return ok({
+            sandboxId: "sbx_ready",
+            status: "ready",
+            activation: {
+              project: { projectId: "prj_web", disposition: "created" },
+              repositoryBinding: { bindingId: "rbd_web", disposition: "created" },
+              profile: { profileInstallationId: "awpi_default", disposition: "reused" },
+            },
+          } as T);
+        }
+        if (query instanceof ListResourcesQuery) {
+          return ok({
+            items: [
+              {
+                projectId: "prj_web",
+                slug: "app",
+                lastDeploymentId: "dep_rfqfapqwpyjn",
+                lastDeploymentStatus: "succeeded",
+                accessSummary: {
+                  latestGeneratedAccessRoute: {
+                    url: "http://app-sc156jw98k.127.0.0.1.sslip.io",
+                    deploymentStatus: "succeeded",
+                  },
+                },
+              },
+              {
+                projectId: "prj_other",
+                slug: "app",
+                lastDeploymentId: "dep_other",
+                lastDeploymentStatus: "succeeded",
+                accessSummary: {
+                  latestGeneratedAccessRoute: {
+                    url: "http://other.example.test",
+                    deploymentStatus: "succeeded",
+                  },
+                },
+              },
+            ],
+          } as T);
+        }
+        if (
+          query instanceof ListSandboxAgentRuntimesQuery ||
+          query instanceof ListSandboxPortsQuery ||
+          query instanceof ListSandboxPromotionsQuery ||
+          query instanceof ListSandboxSnapshotsQuery
+        ) {
+          return ok({ items: [] } as T);
+        }
+        throw new Error(`unexpected query ${query.constructor.name}`);
+      },
+    });
+
+    const detail = renderer.messages.find((message) => message.type === "detail");
+    expect(detail).toMatchObject({
+      type: "detail",
+      preview: { url: "http://app-sc156jw98k.127.0.0.1.sslip.io/" },
+      deployment: { id: "dep_rfqfapqwpyjn", status: "succeeded" },
+    });
+    expect(JSON.stringify(detail)).not.toContain("dep_other");
+    expect(JSON.stringify(detail)).not.toContain("other.example.test");
   });
 });

@@ -34,6 +34,7 @@
 | Occupancy tree filter | same occupancy tree; omit terminated/failed leftovers |
 | Occupancy help door | public CLI root help naming login/code/workspace/deploy |
 | Occupancy TUI identity | public CLI TUI presentation + workspace-control-tui list label |
+| Occupancy TUI chrome | same presentation + TUI detail; copy occupancy Resource `app` preview/deploy |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -181,6 +182,12 @@ Slice-23 verification:
 - unit: TUI workspaces message copies occupancy and omits terminated/failed;
 - unit: TUI list label prefers repo@short-sha;
 - missing occupancy stays workspaceId/status.
+
+Slice-24 verification:
+
+- unit: TUI detail copies Preview URL and last deployment;
+- unit: missing chrome stays omitted;
+- list stays identity-only.
 
 
 
