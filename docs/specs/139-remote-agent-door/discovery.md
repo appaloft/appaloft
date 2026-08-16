@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–18 shipped. Slice 19 occupancy banner Preview URL owner-confirmed 2026-08-16 (D64–D66).
+- Round: Spec. Slice 1–19 shipped. Slice 20 occupancy last deployment owner-confirmed 2026-08-16 (D67–D69).
 - Date: 2026-08-16.
-- Predecessor: occupancy deploy URL shipped as public #1188.
-- Code changes allowed: yes for slice 19 after the occupancy-banner-preview ticket is `ready-for-agent`.
+- Predecessor: occupancy banner Preview URL shipped as public #1190.
+- Code changes allowed: yes for slice 20 after the occupancy-last-deployment ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -101,6 +101,9 @@ Sandbox on that Server, not one VM per person.
 | D64 | Slice 19 `code` banner appends occupancy Preview URL when Resource `app` already has succeeded generated access | Live `code --no-attach` after deploy still prints only `Remote · project · repo@sha · server · my sandbox`. `workspace --json` already has `preview.url`. Railway `ca` / session chrome shows the URL without a second command. |
 | D65 | URL is the same generated access as slice 13 / 18 | Copy from occupancy Resource `app` `accessSummary.latestGeneratedAccessRoute`. Do not invent sslip. Do not scrape vendor TUI. One banner line. |
 | D66 | Missing generated URL keeps the existing banner | Do not fail occupy. Interactive TUI / PR number stay later. |
+| D67 | Slice 20 occupancy tree copies Resource `app` last deployment id/status | Live `workspace --json` has `preview.url` but no `dep_*`. Agent still guesses the latest create. `resource list` already has `lastDeploymentId` / `lastDeploymentStatus`. |
+| D68 | Copy only those two fields from occupancy Resource `app` | Same list already used for Preview URL. Do not invent a deployment. Do not add a live stream. |
+| D69 | Missing last deployment stays omitted | Tree still prints servers and occupancies. Interactive TUI / PR number stay later. |
 
 ## Rejected
 
@@ -166,10 +169,11 @@ Later slices after occupancy:
 16. GitHub `owner/repo` (slice 16, shipped #1184).
 17. Bare occupancy deploy (slice 17, shipped #1186).
 18. Occupancy deploy URL (slice 18, shipped #1188).
-19. **Occupancy banner Preview URL** (slice 19): `appaloft code` banner includes generated access when present.
-20. Interactive `workspace` TUI / session-native PR chrome.
-21. Optional team Connection.
-22. Cloud managed as default Server when no BYOS exists.
+19. Occupancy banner Preview URL (slice 19, shipped #1190).
+20. **Occupancy last deployment** (slice 20): `workspace --json` includes Resource `app` last deployment id/status.
+21. Interactive `workspace` TUI / session-native PR chrome.
+22. Optional team Connection.
+23. Cloud managed as default Server when no BYOS exists.
 
 ## Delivery chrome (owner 2026-08-15)
 

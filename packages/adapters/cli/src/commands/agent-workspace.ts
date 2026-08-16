@@ -125,6 +125,7 @@ interface ResourceListResult {
   readonly items: readonly {
     readonly projectId?: string;
     readonly slug?: string;
+    readonly lastDeploymentId?: string;
     readonly lastDeploymentStatus?: string;
     readonly accessSummary?: {
       readonly latestGeneratedAccessRoute?: {
@@ -175,6 +176,21 @@ function occupancyPreviewFromResource(
   return { url: route.url };
 }
 
+function occupancyLastDeploymentFromResource(
+  resource: ResourceListResult["items"][number],
+): { readonly id: string; readonly status?: string } | undefined {
+  if (resource.slug !== "app") return undefined;
+  if (typeof resource.lastDeploymentId !== "string" || resource.lastDeploymentId.length === 0) {
+    return undefined;
+  }
+  return {
+    id: resource.lastDeploymentId,
+    ...(typeof resource.lastDeploymentStatus === "string"
+      ? { status: resource.lastDeploymentStatus }
+      : {}),
+  };
+}
+
 function occupancyPreviewUrlForProject(
   resources: ResourceListResult["items"],
   projectId: string | undefined,
@@ -195,10 +211,16 @@ function occupancyTreeFromLists(
   resources: ResourceListResult["items"] = [],
 ) {
   const previewByProjectId = new Map<string, { readonly url: string }>();
+  const deploymentByProjectId = new Map<
+    string,
+    { readonly id: string; readonly status?: string }
+  >();
   for (const resource of resources) {
     if (typeof resource.projectId !== "string") continue;
     const preview = occupancyPreviewFromResource(resource);
     if (preview) previewByProjectId.set(resource.projectId, preview);
+    const deployment = occupancyLastDeploymentFromResource(resource);
+    if (deployment) deploymentByProjectId.set(resource.projectId, deployment);
   }
   return {
     schemaVersion: "appaloft.workspace-occupancy/v1",
@@ -219,12 +241,14 @@ function occupancyTreeFromLists(
           ? sandbox.activation.project.projectId
           : undefined;
       const preview = projectId ? previewByProjectId.get(projectId) : undefined;
+      const deployment = projectId ? deploymentByProjectId.get(projectId) : undefined;
       return {
         workspaceId: sandbox.sandboxId,
         status: sandbox.status,
         ...(sandbox.occupancy ? { occupancy: sandbox.occupancy } : {}),
         ...(projectId ? { projectId } : {}),
         ...(preview ? { preview } : {}),
+        ...(deployment ? { deployment } : {}),
       };
     }),
   };

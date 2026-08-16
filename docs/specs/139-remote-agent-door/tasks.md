@@ -171,6 +171,14 @@
 - [x] Unit tests WS-REMOTE-BANNER-061–062
 - [x] `appaloftdev code --no-attach` after occupying+deploying `traefik/whoami` prints sslip URL
 
+## Slice 20 — occupancy last deployment
+
+- [x] Grill D67–D69
+- [x] Ticket `ready-for-agent` — [#1191](https://github.com/appaloft/appaloft/issues/1191)
+- [x] Occupancy tree copies last deployment id/status
+- [x] Unit tests WS-REMOTE-DEPLOY-063–064
+- [x] `appaloftdev workspace --json` after occupying+deploying `traefik/whoami` includes last deployment
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

@@ -216,7 +216,7 @@ describe("Agent Workspace CLI", () => {
     expect(printed).not.toMatch(/sbx_failed[\s\S]{0,120}"projectId"/);
   });
 
-  test("[WS-REMOTE-PREVIEW-050][WS-REMOTE-PREVIEW-051] occupancy tree copies succeeded generated Preview URL", async () => {
+  test("[WS-REMOTE-PREVIEW-050][WS-REMOTE-PREVIEW-051][WS-REMOTE-DEPLOY-063][WS-REMOTE-DEPLOY-064] occupancy tree copies Preview URL and last deployment", async () => {
     const output: string[] = [];
     const { createCliProgram } = await import("../src");
     const program = createCliProgram({
@@ -262,6 +262,7 @@ describe("Agent Workspace CLI", () => {
                 {
                   projectId: "prj_preview",
                   slug: "app",
+                  lastDeploymentId: "dep_rfqfapqwpyjn",
                   lastDeploymentStatus: "succeeded",
                   accessSummary: {
                     latestGeneratedAccessRoute: {
@@ -307,7 +308,9 @@ describe("Agent Workspace CLI", () => {
     expect(printed).toContain("http://app-jkhtnc45nk.127.0.0.1.sslip.io");
     expect(printed).toContain("prj_preview");
     expect(printed).toContain("prj_empty");
+    expect(printed).toContain("dep_rfqfapqwpyjn");
     expect(printed).not.toMatch(/sbx_no_preview[\s\S]{0,240}"preview"/);
+    expect(printed).not.toMatch(/sbx_no_preview[\s\S]{0,240}"deployment"/);
   });
 
   test("[WS-TUI-FALLBACK-009][WS-TUI-TERMINAL-012] unsupported host terminals fail closed before renderer startup", async () => {

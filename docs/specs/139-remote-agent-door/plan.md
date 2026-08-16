@@ -30,6 +30,7 @@
 | Bare occupancy deploy | public CLI adapter composing latest occupancy + Binding/`app` |
 | Occupancy deploy URL | public CLI adapter printing first generated access URL after create |
 | Occupancy banner Preview URL | public CLI banner composing occupancy Resource `app` generated access |
+| Occupancy last deployment | same occupancy tree; copy Resource `app` lastDeploymentId/status |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -153,6 +154,13 @@ Slice-19 verification:
 - unit: occupancy banner includes generated access URL when Resource `app` has it;
 - unit: missing generated access keeps the existing banner;
 - `appaloftdev code --no-attach` after occupying+deploying `traefik/whoami` prints the sslip URL.
+
+Slice-20 verification:
+
+- unit: occupancy tree includes lastDeploymentId/status from Resource `app`;
+- unit: missing last deployment stays omitted;
+- `appaloftdev workspace --json` after occupying+deploying `traefik/whoami` includes `dep_rfqfapqwpyjn`.
+
 
 
 

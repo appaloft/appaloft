@@ -3,11 +3,11 @@
 ## Status
 
 - Round: Spec
-- Artifact state: slice 1–18 shipped; slice 19 occupancy banner Preview URL accepted 2026-08-16
+- Artifact state: slice 1–19 shipped; slice 20 occupancy last deployment accepted 2026-08-16
 - Discovery: [discovery.md](./discovery.md)
 - Governing decision: ADR-120 plan default destination; ADR-119 locates; ADR-118 occupies; ADR-117 remains the login/Server/`--local` door; ADR-116 remains Scratch-only; ADR-103 stays on explicit `workspace open` Git fail-closed
-- Code changes allowed: yes for slice 19 after the occupancy-banner-preview ticket is `ready-for-agent`
-- Compatibility: public minor. Occupancy `code` banner may append generated access URL; no new catalog field
+- Code changes allowed: yes for slice 20 after the occupancy-last-deployment ticket is `ready-for-agent`
+- Compatibility: public minor. Occupancy tree may include last deployment id/status; no new catalog field
 
 ## Business Outcome
 
@@ -96,20 +96,22 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-DEPLOY-060 | Missing generated URL stays omitted | occupancy deploy succeeds but no public access route | `appaloft deploy` | still prints deployment id; exit 0; no invented URL. |
 | WS-REMOTE-BANNER-061 | Occupancy banner includes Preview URL | occupancy Resource `app` has succeeded generated access | `appaloft code --no-attach` | banner includes that URL. |
 | WS-REMOTE-BANNER-062 | Missing Preview stays omitted from banner | occupancy has projectId but Resource `app` has no succeeded generated route | `appaloft code --no-attach` | existing identity banner; no invented URL. |
+| WS-REMOTE-DEPLOY-063 | Occupancy last deployment | occupancy Resource `app` has `lastDeploymentId` | `appaloft workspace --json` | occupancy row includes that id and status. |
+| WS-REMOTE-DEPLOY-064 | Missing last deployment stays omitted | occupancy has projectId but Resource `app` has no last deployment | `appaloft workspace --json` | row has projectId; no invented `deployment`. |
 
 ## Slice Scope
 
-Slice 1–18 shipped.
+Slice 1–19 shipped.
 
-Slice 19 (this ticket): occupancy `code` banner includes generated access URL when present.
+Slice 20 (this ticket): occupancy tree includes Resource `app` last deployment id/status.
 
-In slice 19:
+In slice 20:
 
-- same generated route as `workspace --json` / `deploy` URL;
-- missing route keeps the existing banner;
-- one banner line; no vendor TUI scrape.
+- copy `lastDeploymentId` / `lastDeploymentStatus` from occupancy Resource `app`;
+- missing last deployment stays omitted;
+- no invented PR number.
 
-Out of slice 19: interactive TUI, PR number chrome, Cloud managed default Server.
+Out of slice 20: interactive TUI, PR chrome, Cloud managed default Server.
 
 ## Public Surfaces
 
