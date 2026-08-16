@@ -18,17 +18,32 @@
 
 - [x] ADR-118
 - [x] Ticket `ready-for-agent` — [#1128](https://github.com/appaloft/appaloft/issues/1128)
-- [ ] Optional `targetServerId` on `workspaces.open`
-- [ ] Community initializer for missing Binding / default Profile
-- [ ] Default `code` dispatches `workspaces.open` after remote SHA
-- [ ] Banner includes real `workspaceId`
-- [ ] `--no-attach` occupies
-- [ ] Two subjects do not share a preferred Sandbox
+- [x] Optional `targetServerId` on `workspaces.open`
+- [x] Community initializer for missing Binding / default Profile
+- [x] Default `code` dispatches `workspaces.open` after remote SHA
+- [x] Banner includes real `workspaceId`
+- [x] `--no-attach` occupies
+- [x] Two subjects do not share a preferred Sandbox
+- [x] Help / skill / changelog
+- [x] `appaloftdev code --no-attach` then `sandbox list`
+
+## Slice 3 — repo-URL locator
+
+- [x] Grill D9–D15 / ADR-119
+- [x] Ticket `ready-for-agent` — tracking [#1153](https://github.com/appaloft/appaloft/issues/1153), slice [#1154](https://github.com/appaloft/appaloft/issues/1154)
+- [ ] Classify positional git remotes before path resolution
+- [ ] `ls-remote` HEAD → one `refs/heads/*`
+- [ ] URL of B never resumes occupancy of A
+- [ ] `--local` + remote fail closed
 - [ ] Help / skill / changelog
-- [ ] `appaloftdev code --no-attach` then `sandbox list`
+- [ ] `appaloftdev code https://github.com/org/repo.git --no-attach`
+
 
 ## Later
 
 - [ ] `appaloft workspace` as Railway `ca`
 - [ ] Team Connection
 - [ ] Cloud managed as default Server
+- [ ] GitHub `owner/repo` shorthand
+- [ ] Destination discovery / session-native Preview
+

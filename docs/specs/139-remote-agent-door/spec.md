@@ -2,18 +2,20 @@
 
 ## Status
 
-- Round: Code
-- Artifact state: slice 1 identity door shipped on public `main` `4f237698`; slice 2 occupancy ticket [#1128](https://github.com/appaloft/appaloft/issues/1128)
+- Round: Spec
+- Artifact state: slice 1 identity door shipped on public `main` `4f237698`; slice 2 occupancy shipped; slice 3 repo-URL locator accepted 2026-08-16
 - Discovery: [discovery.md](./discovery.md)
-- Governing decision: ADR-118 occupies; ADR-117 remains the login/Server/`--local` door; ADR-116 remains Scratch-only; ADR-103 stays on explicit `workspace open` Git fail-closed
-- Code changes allowed: yes for occupancy
-- Compatibility: public minor. Default `appaloft code` now occupies a Sandbox; `--local` preserves Spec 138; `workspace open` Git preflight unchanged
+- Governing decision: ADR-119 locates; ADR-118 occupies; ADR-117 remains the login/Server/`--local` door; ADR-116 remains Scratch-only; ADR-103 stays on explicit `workspace open` Git fail-closed
+- Code changes allowed: yes for slice 3 after the repo-URL ticket is `ready-for-agent`
+- Compatibility: public minor. Default `appaloft code` still occupies a Sandbox; positional git remotes occupy that repo without a local clone; `--local` preserves Spec 138; `workspace open` Git preflight unchanged
 
 ## Business Outcome
 
 After `appaloft login`, `appaloft code` occupies **my Sandbox** on the team’s default
-enrolled Server. Source is the remote Binding SHA. The laptop tree is not uploaded.
+enrolled Server. Source is the remote SHA. The locator may be a git remote URL or a
+local path used only to discover `origin`. The laptop tree is not uploaded.
 `--local` remains this-Mac Scratch. Explicit `workspace open` keeps ADR-103 Git fail-closed.
+
 
 ## Ubiquitous Language
 
@@ -25,6 +27,7 @@ enrolled Server. Source is the remote Binding SHA. The laptop tree is not upload
 | Scratch | Spec 138 this-Mac session. Only `appaloft code --local`. |
 | Delivery open | `appaloft workspace open`. ADR-103 Git fail-closed. Unchanged managed-default policy. |
 | `ca` tree | Later `appaloft workspace` management UI. Not this slice. |
+| Repo-URL locator | Positional `https://` / `ssh://` / `git@host:path`. Occupies that `repositoryIdentity` from remote HEAD. |
 
 ## Requirements And Acceptance Criteria
 
@@ -33,9 +36,9 @@ enrolled Server. Source is the remote Binding SHA. The laptop tree is not upload
 | WS-REMOTE-LOGIN-001 | Login is the door | no Appaloft login | `appaloft code` | exits non-zero with login guidance; does not start Scratch. |
 | WS-REMOTE-SERVER-002 | Server required | logged in, no enrolled/default Server | `appaloft code` | exits with enroll / `workspace` guidance; no Scratch; no Sandbox create. |
 | WS-REMOTE-OPEN-003 | Default code occupies | logged in, default Server exists | `appaloft code` | CLI does not inspect laptop Git as Workspace truth; dispatches `workspaces.open` with remote SHA + `targetServerId`; prints Remote banner with real `workspaceId`; attaches via existing handoff. |
-| WS-REMOTE-RESUME-004 | Same person reconnect | I already have a non-terminal preferred Sandbox | `appaloft code` from any directory, including another Git origin | resumes that Sandbox; cwd origin is not Workspace truth unless `--new`. |
+| WS-REMOTE-RESUME-004 | Same person reconnect | I already have a non-terminal preferred Sandbox | `appaloft code` from any directory, including another Git origin, **without** an explicit remote locator | resumes that Sandbox; cwd origin is not Workspace truth unless `--new`. An explicit remote locator uses WS-REMOTE-URL-024. |
 | WS-REMOTE-OCCUPY-005 | One disk each | teammate B is logged in on the same Server/Binding | B runs `appaloft code` | B gets B’s Sandbox; A’s files and auth paths are not mounted. |
-| WS-REMOTE-NO-UPLOAD-006 | No laptop upload | laptop tree is dirty / missing / not a repo | `appaloft code` | still occupies from remote SHA when origin exists; no file content upload; no `workspace_git_dirty`. Missing origin resumes the latest non-terminal occupancy when one exists; otherwise fail-closes `workspace_remote_repository_missing`. |
+| WS-REMOTE-NO-UPLOAD-006 | No laptop upload | laptop tree is dirty / missing / not a repo | `appaloft code` | still occupies from remote SHA when origin exists; no file content upload; no `workspace_git_dirty`. Missing origin and no explicit remote locator resumes the latest non-terminal occupancy when one exists; otherwise fail-closes `workspace_remote_repository_missing`. |
 | WS-REMOTE-BINDING-007 | Binding optional at CLI | logged in + Server, no Project Binding | `appaloft code` | Community initializer creates/reuses Project + Binding + invisible `appaloft-remote` Profile; occupancy proceeds. |
 | WS-REMOTE-PROFILE-008 | Shared harness pin | Project has no default Profile | `appaloft code` occupies | initializer installs OpenCode-else-Pi `appaloft-remote` with optional `model-api` and no required model credential. Unbound compile still starts vendor-login. Existing default Profile is reused, never overwritten. |
 | WS-REMOTE-AUTH-009 | Personal model login | no team Connection; I never signed in inside my Sandbox | Agent starts | vendor TUI may prompt **me** to log in; occupancy egress allowlist includes `opencode.ai` so unbound OpenCode vendor-login is not blocked by the sandbox proxy. No teammate OAuth file is copied. |
@@ -54,45 +57,47 @@ enrolled Server. Source is the remote Binding SHA. The laptop tree is not upload
 | WS-REMOTE-MCP-DISCOVERY-021 | Occupancy can discover deploy ids and deliver | occupancy OpenCode/Pi has first-party `appaloft-tools` | Agent prepares serve, deploys, or opens a PR | first-party binding always includes `projects_list`, `environments_list`, `environments_create`, `resources_list`, `resources_show`, `resources_create`, `resources_configure_source`, `resources_configure_runtime`, `resources_configure_network`, `resources_configure_access`, `servers_list`, `deployments_list`, `deployments_plan`, `deployments_create`, `deployments_show`, `preview_environments_list`, `preview_environments_show`, `sandbox_ports_expose`, and `sandboxes_agent_tasks_deliver`. Tenant MCP Connections are unchanged. Invisible `appaloft-remote` default lists the same tools. |
 | WS-REMOTE-GITHUB-DELIVERY-022 | Occupancy can push and open a PR | occupancy OpenCode serve starts and IntegrationAuth has a GitHub token | Agent runs `gh` / `git push` or Task deliver | serve process receives `GH_TOKEN` on stdin, never argv. Missing token still starts occupancy. Tenant MCP unchanged. |
 | WS-REMOTE-MCP-TENANT-023 | Occupancy first-party MCP can see my Sandbox | occupancy OpenCode has `appaloft-tools` and I occupy `sbx_*` | Agent calls `sandbox_ports_expose` / later preview tools with that sandboxId | `/mcp` remaps the product-session organization through `TenantContextResolver` before dispatch, same as oRPC. Missing remap must not 404 a tenant-visible Sandbox. |
-
-
-
-
+| WS-REMOTE-URL-024 | Positional git remote occupies | logged in + default Server; cwd is empty / not a repo | `appaloft code https://github.com/org/repo.git --no-attach` (or `ssh://` / `git@host:path`) | CLI does not require a local clone; normalizes to credential-free HTTPS; `ls-remote` HEAD → exactly one `refs/heads/*`; dispatches `workspaces.open` with that SHA + `targetServerId`; Remote banner uses that identity. |
+| WS-REMOTE-URL-HEAD-025 | Default branch from remote HEAD | URL has no branch | door resolves ref | `ls-remote HEAD` maps to one `refs/heads/*`. Zero or many heads fail closed (`workspace_remote_default_ref_unavailable` / `workspace_git_ref_ambiguous`). No GitHub `/tree/` parsing. |
+| WS-REMOTE-URL-WINS-026 | URL wins over other occupancy | I have a non-terminal occupancy of repo A | `appaloft code <git-remote-of-B> --no-attach` | occupies or resumes B only; does not resume A. |
+| WS-REMOTE-URL-LOCAL-027 | Scratch rejects remotes | any state | `appaloft code --local https://github.com/org/repo.git` | fail closed; Scratch is this-Mac only. |
+| WS-REMOTE-URL-SHORTHAND-028 | No host shorthand | logged in + Server | `appaloft code org/repo` | treated as a local path, not github.com/org/repo. Missing path / origin still `workspace_remote_repository_missing`. |
+| WS-REMOTE-URL-DOCS-029 | Help names the URL door | `code --help` / Workspace docs / skill | rendered | `appaloft code <git-remote>` occupies that repo without a clone; `--local` stays Scratch. |
 
 ## Slice Scope
 
 Slice 1 (shipped): login + default Server + Remote banner + this-laptop native-attach.
 
-Slice 2 (this ticket): occupy my Sandbox from default `code`.
+Slice 2 (shipped): occupy my Sandbox from default `code`.
 
-In slice 2:
+Slice 3 (this ticket): positional git-remote locator.
 
-- default `code` must call `workspaces.open`;
-- optional `targetServerId` on `workspaces.open`;
-- Community initializer for missing Binding/default Profile;
-- `--no-attach` still occupies;
-- `appaloftdev code --no-attach` after login + enrolled Server lists a Sandbox.
+In slice 3:
 
-Out of slice 2: `workspace` as Railway `ca` tree, team Connection, Cloud managed as
-default Server when no BYOS, adding Server to the preferred unique key, sharing
-occupancy metrics.
+- `https://` / `ssh://` / `git@` occupy that `repositoryIdentity` with no local clone;
+- default ref is remote HEAD → one `refs/heads/*`;
+- explicit URL never resumes a different repository’s occupancy;
+- `--local` + remote fail closed;
+- `appaloftdev code https://github.com/org/repo.git --no-attach` occupies.
+
+Out of slice 3: `workspace` as Railway `ca`, team Connection, Cloud managed as
+default Server when no BYOS, GitHub `owner/repo` shorthand, `/tree/` URLs,
+destination discovery, session-native Preview.
 
 ## Public Surfaces
 
-- CLI: default `appaloft code [--no-attach] [--local]`. Path is not a Git locator
-  for the default door.
-- Catalog: existing `workspaces.open` gains optional `targetServerId`.
+- CLI: default `appaloft code [path|git-remote] [--no-attach] [--local]`. A git remote is a locator, not a local path.
+- Catalog: no new field. Existing `workspaces.open` already takes credential-free HTTPS.
 - Persistence: existing Server / Binding / Profile / `workspace_open_entries`.
 - No new aggregate or Cloud table.
+
 
 ## Domain Ownership
 
 - Server, Sandbox, Binding, Profile: existing public aggregates.
-- CLI resolves login, default Server, and remote SHA, then dispatches
-  `workspaces.open`.
+- CLI resolves login, default Server, and remote SHA (from cwd origin **or** positional git remote), then dispatches `workspaces.open`.
 - Community initializer owns invisible `appaloft-remote`.
-- Cloud: later default-Server injection when no BYOS exists. Must honor
-  `targetServerId` and must not override it with managed capacity.
+- Cloud: later default-Server injection when no BYOS exists. Must honor `targetServerId` and must not override it with managed capacity. Slice 3 needs no Cloud change.
 
 ## Error Contract
 
@@ -100,26 +105,33 @@ occupancy metrics.
 | --- | --- |
 | `workspace_remote_login_required` | not logged in |
 | `workspace_remote_server_missing` | no default Server |
-| `workspace_remote_repository_missing` | no Git origin and no resumable occupancy |
+| `workspace_remote_repository_missing` | no Git origin, no explicit remote locator, and no resumable occupancy |
+| `workspace_remote_default_ref_unavailable` | remote HEAD does not map to one `refs/heads/*` |
+| `workspace_git_ref_ambiguous` | remote HEAD maps to more than one head |
+| `workspace_scratch_remote_rejected` | `--local` with a git-remote locator |
 | `workspace_open_target_server_unavailable` | `targetServerId` is not tenant-visible or not reservable |
 | existing `workspace_git_*` | `workspace open` / `workspace create` only |
-| Spec 138 scratch codes | `--local` only |
+| Spec 138 scratch codes | `--local` path Scratch only |
 
 Missing Binding is not a `code` hard failure. The initializer creates or reuses it.
 
 ## Non-Goals
 
-- Implementing `ca` in the same ticket as occupancy.
+- Implementing `ca` in the same ticket as occupancy or URL locator.
 - Shared personal OAuth.
 - Dirty-tree upload.
 - New Host aggregate.
 - Deleting Scratch; only keep it behind `--local`.
 - Adding Server to the preferred unique index.
 - Cloud managed as default Server when no BYOS exists.
+- GitHub `owner/repo` shorthand or `/tree/` URL parsing.
+- Destination discovery or session-native Preview.
 
 ## Compatibility
 
 - Spec 138 / ADR-116: Scratch lives under `--local`.
 - ADR-117 identity-only attach is superseded by ADR-118 occupancy.
-- Users who adopted #1127 identity-only `code` now occupy a Sandbox.
-- Expected SemVer: public minor. Changelog must say default `code` occupies my Sandbox.
+- ADR-119 extends the occupancy locator; it does not change Sandbox identity.
+- Users who adopted cwd-origin `code` keep that path. URL is additive.
+- Expected SemVer: public minor. Changelog must say `code <git-remote>` occupies without a clone.
+

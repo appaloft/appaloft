@@ -29,6 +29,12 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-MCP-DISCOVERY-021 | application / runtime | automated | first-party occupancy MCP unions list/create/configure/plan/preview/deliver tools; tenant MCP unchanged | `packages/application/test/sandbox-agent-mcp-access.test.ts`; `packages/server/test/community-remote-default-profile.test.ts` |
 | WS-REMOTE-GITHUB-DELIVERY-022 | runtime | automated | occupancy OpenCode serve injects GitHub token as GH_TOKEN; argv stays clean | `packages/adapters/runtime/test/opencode-sandbox-agent-harness.test.ts` |
 | WS-REMOTE-MCP-TENANT-023 | HTTP / MCP | automated | occupancy `/mcp` remaps product-session org to hosted tenant before `sandbox_ports_expose` | `packages/adapters/http-elysia/test/mcp-http.test.ts` |
+| WS-REMOTE-URL-024 | CLI / unit | this slice | positional `https://` / `ssh://` / `git@` occupies without a local clone | `packages/adapters/cli/test/remote-code-session.test.ts`; `packages/adapters/cli/test/agent-workspace-command.test.ts` |
+| WS-REMOTE-URL-HEAD-025 | CLI / unit | this slice | remote HEAD maps to one `refs/heads/*`; zero/many fail closed | `packages/adapters/cli/test/remote-code-session.test.ts` |
+| WS-REMOTE-URL-WINS-026 | CLI / unit | this slice | URL of B does not resume occupancy of A | `packages/adapters/cli/test/remote-code-session.test.ts` |
+| WS-REMOTE-URL-LOCAL-027 | CLI / unit | this slice | `--local` + git-remote fail closed | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
+| WS-REMOTE-URL-SHORTHAND-028 | CLI / unit | this slice | `org/repo` is a local path, not github.com | `packages/adapters/cli/test/remote-code-session.test.ts` |
+| WS-REMOTE-URL-DOCS-029 | help | this slice | `code --help` / skill name the URL door | `packages/adapters/cli/test/docs-help.test.ts` |
 
 
 

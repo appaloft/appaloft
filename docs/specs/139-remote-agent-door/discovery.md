@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1 identity door shipped `4f237698`. Slice 2 occupancy owner-confirmed by goal: login → my Sandbox.
-- Date: 2026-08-15.
-- Predecessor: Spec 138 / ADR-116 Instant Local Scratch shipped as public #1125; ADR-117 identity door shipped as public #1127.
-- Code changes allowed: yes for occupancy after the slice-2 ticket is `ready-for-agent`. `workspace` as `ca` remains later.
+- Round: Spec. Slice 1 identity door shipped `4f237698`. Slice 2 occupancy shipped. Slice 3 repo-URL locator owner-confirmed 2026-08-16 (D9–D15).
+- Date: 2026-08-16.
+- Predecessor: Spec 138 / ADR-116 Instant Local Scratch shipped as public #1125; ADR-117 identity door shipped as public #1127; ADR-118 occupancy shipped.
+- Code changes allowed: yes for slice 3 after the repo-URL ticket is `ready-for-agent`. `workspace` as `ca` remains later.
 
 ## Actor And Observable Outcome
 
@@ -96,15 +96,17 @@ Not logged in → login guidance, no Scratch.
 No Server → enroll guidance, no Scratch.
 No capacity on that Server → fail closed, no Scratch, no other Server, no managed substitution.
 
-Later slices stay out of this ticket:
+Later slices stay out of occupancy (slice 2):
 
 1. Remote identity door (slice 1, shipped).
-2. **Occupancy** (this ticket).
-3. `workspace` as `ca`.
-4. Deployment as first-class in that TUI.
-5. GitHub as source surface.
-6. Optional team Connection.
-7. Cloud managed as default Server when no BYOS exists.
+2. Occupancy (slice 2, shipped).
+3. **Repo-URL locator** (slice 3, this Grill): `appaloft code <git-remote>` with no local clone. D12–D15.
+4. `workspace` as `ca`.
+5. Deployment as first-class in that TUI.
+6. GitHub as source surface / `owner/repo` shorthand.
+7. Optional team Connection.
+8. Cloud managed as default Server when no BYOS exists.
+
 
 ## Delivery chrome (owner 2026-08-15)
 
