@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–36 shipped. Slice 37 occupancy `--open-target` owner-confirmed 2026-08-16 (D118–D120).
+- Round: Spec. Slice 1–37 shipped. Slice 38 occupancy production open owner-confirmed 2026-08-16 (D121–D123).
 - Date: 2026-08-16.
-- Predecessor: occupancy code `--open` shipped as public #1224.
-- Code changes allowed: yes for slice 37 after the occupancy-open-target ticket is `ready-for-agent`.
+- Predecessor: occupancy `--open-target` shipped as public #1226.
+- Code changes allowed: yes for slice 38 after the occupancy-production-open ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -155,6 +155,9 @@ Sandbox on that Server, not one VM per person.
 | D118 | Slice 37 `code --open-target preview\|pr\|compare` selects one occupancy URL | Railway `ca` can open the chosen service. Bare `--open` stays Preview → PR → compare. |
 | D119 | Missing chosen target stays lean | Do not fall back to another target. Same URL guards as TUI `p` / `o` / `c`. |
 | D120 | `--open-target` implies `--open` | CI / `APPALOFT_CLI_OPEN_BROWSER=false` still fail-soft. Catalog create-PR write stays later. |
+| D121 | Slice 38 `code --open-target production` opens occupancy Production only | Railway `ca` can open production. Bare `--open` still prefers Preview. |
+| D122 | Banner copies Production on its own line after Preview | Same wrap as Preview / Compare / PR. Missing Production stays omitted. |
+| D123 | Missing Production target stays lean | Do not fall back to Preview. Same http(s) guard as TUI `P`. Catalog create-PR write stays later. |
 
 ## Rejected
 
@@ -238,10 +241,11 @@ Later slices after occupancy:
 34. Occupancy banner compare (slice 34, shipped #1220).
 35. Occupancy banner wrap (slice 35, shipped #1222).
 36. Occupancy code `--open` (slice 36, shipped #1224).
-37. **Occupancy `--open-target`** (slice 37): `code --open-target preview\|pr\|compare` opens that URL only.
-38. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
-39. Optional team Connection.
-40. Cloud managed as default Server when no BYOS exists.
+37. Occupancy `--open-target` (slice 37, shipped #1226).
+38. **Occupancy production open** (slice 38): `code` banner / `--open-target production` copy Production.
+39. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
+40. Optional team Connection.
+41. Cloud managed as default Server when no BYOS exists.
 
 Cmux-style “this session is PR #928” is correct *context*. It is not a new GitHub aggregate
 and not something `code` scrapes from the vendor TUI.

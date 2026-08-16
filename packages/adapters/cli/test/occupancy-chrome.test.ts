@@ -304,4 +304,24 @@ describe("occupancy code --open", () => {
       }),
     ).toBeUndefined();
   });
+
+  test("[WS-REMOTE-OPEN-114][WS-REMOTE-OPEN-115] --open-target production stays on Production", () => {
+    expect(
+      occupancyCodeOpenUrl({
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io/",
+        productionUrl: "https://whoami.example/",
+        target: "production",
+      }),
+    ).toBe("https://whoami.example/");
+    expect(
+      occupancyCodeOpenUrl({
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io/",
+        target: "production",
+      }),
+    ).toBeUndefined();
+  });
 });

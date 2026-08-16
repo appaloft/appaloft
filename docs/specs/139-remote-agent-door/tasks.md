@@ -314,6 +314,14 @@
 - [x] Unit tests WS-REMOTE-OPEN-110–112
 - [x] `appaloftdev code --no-attach --open-target pr` would open occupancy PR
 
+## Slice 38 — occupancy production open
+
+- [x] Grill D121–D123
+- [x] Ticket `ready-for-agent` — [#1227](https://github.com/appaloft/appaloft/issues/1227)
+- [x] `code` banner / `--open-target production` copy Production
+- [x] Unit tests WS-REMOTE-BANNER-113 / WS-REMOTE-OPEN-114–115
+- [x] `appaloftdev code --no-attach --open-target production` would open Production
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

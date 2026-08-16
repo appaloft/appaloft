@@ -197,6 +197,23 @@ describe("remote code door", () => {
     );
   });
 
+  test("[WS-REMOTE-BANNER-113] occupancy banner copies Production", () => {
+    expect(
+      formatRemoteCodeBanner({
+        projectId: "prj_tk5lovqu2vj8",
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        serverName: "occupancy-mac",
+        workspaceId: "sbx_rn32pzyp8yxr",
+        previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io",
+        productionUrl: "https://whoami.example/",
+        pullRequestNumber: 928,
+      }),
+    ).toBe(
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nhttp://app-sc156jw98k.127.0.0.1.sslip.io\nhttps://whoami.example/\nPR #928 · https://github.com/traefik/whoami/pull/928",
+    );
+  });
+
   test("[WS-REMOTE-LOGIN-001] local composition skips Cloud login", async () => {
     const door = await resolveDefaultRemoteCodeDoor({
       env: {},

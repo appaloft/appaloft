@@ -181,6 +181,13 @@ function occupancyPreviewUrlForProject(
   return occupancyChromeForProject(resources, projectId).preview?.url;
 }
 
+function occupancyProductionUrlForProject(
+  resources: ResourceListResult["items"],
+  projectId: string | undefined,
+): string | undefined {
+  return occupancyChromeForProject(resources, projectId).production?.url;
+}
+
 function occupancyTreeFromLists(
   reason: string,
   servers: ServerListResult["items"],
@@ -444,9 +451,12 @@ export const workspaceCodeCommand = EffectCommand.make(
     local: Options.boolean("local").pipe(Options.withDefault(false)),
     forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
     open: Options.boolean("open").pipe(Options.withDefault(false)),
-    openTarget: Options.choice("open-target", ["preview", "pr", "compare"] as const).pipe(
-      Options.optional,
-    ),
+    openTarget: Options.choice("open-target", [
+      "preview",
+      "production",
+      "pr",
+      "compare",
+    ] as const).pipe(Options.optional),
   },
   ({ forceNew, local, noAttach, open, openTarget, path }) =>
     Effect.gen(function* () {
@@ -583,11 +593,16 @@ export const workspaceCodeCommand = EffectCommand.make(
       }
       const bannerProjectId = result.projectId || door.projectId;
       let previewUrl: string | undefined;
+      let productionUrl: string | undefined;
       const resourcesQuery = ListResourcesQuery.create({ limit: 100 });
       if (resourcesQuery.isOk()) {
         const listed = yield* Effect.promise(() => cli.executeQuery(resourcesQuery.value));
         if (listed.isOk()) {
           previewUrl = occupancyPreviewUrlForProject(listed.value.items ?? [], bannerProjectId);
+          productionUrl = occupancyProductionUrlForProject(
+            listed.value.items ?? [],
+            bannerProjectId,
+          );
         }
       }
       let pullRequestNumber: number | undefined;
@@ -617,6 +632,7 @@ export const workspaceCodeCommand = EffectCommand.make(
           serverName: door.serverName,
           workspaceId: result.workspaceId,
           ...(previewUrl ? { previewUrl } : {}),
+          ...(productionUrl ? { productionUrl } : {}),
           ...(pullRequestNumber ? { pullRequestNumber } : {}),
           ...(door.branch ? { branch: door.branch } : {}),
         })}\n`,
@@ -626,6 +642,7 @@ export const workspaceCodeCommand = EffectCommand.make(
           repositoryIdentity: door.repositoryIdentity,
           commitSha: bannerCommitSha,
           ...(previewUrl ? { previewUrl } : {}),
+          ...(productionUrl ? { productionUrl } : {}),
           ...(pullRequestNumber ? { pullRequestNumber } : {}),
           ...(door.branch ? { branch: door.branch } : {}),
           ...(optionalValue(openTarget)

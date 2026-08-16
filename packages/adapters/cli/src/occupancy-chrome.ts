@@ -136,10 +136,11 @@ export function occupancyBrowserLaunchAllowed(env: NodeJS.ProcessEnv = process.e
   return env["APPALOFT_CLI_OPEN_BROWSER"] !== "false" && env["CI"] !== "true";
 }
 
-export type OccupancyCodeOpenTarget = "auto" | "preview" | "pr" | "compare";
+export type OccupancyCodeOpenTarget = "auto" | "preview" | "production" | "pr" | "compare";
 
 export function occupancyCodeOpenUrl(input: {
   readonly previewUrl?: string;
+  readonly productionUrl?: string;
   readonly pullRequestNumber?: number;
   readonly repositoryIdentity: string;
   readonly commitSha: string;
@@ -149,6 +150,8 @@ export function occupancyCodeOpenUrl(input: {
   const target = input.target ?? "auto";
   const preview = input.previewUrl?.trim();
   const previewUrl = preview && isOccupancyHttpUrl(preview) ? preview : undefined;
+  const production = input.productionUrl?.trim();
+  const productionUrl = production && isOccupancyHttpUrl(production) ? production : undefined;
   const pull =
     typeof input.pullRequestNumber === "number" &&
     Number.isInteger(input.pullRequestNumber) &&
@@ -167,6 +170,7 @@ export function occupancyCodeOpenUrl(input: {
     ...(input.branch ? { branch: input.branch } : {}),
   });
   if (target === "preview") return previewUrl;
+  if (target === "production") return productionUrl;
   if (target === "pr") return pull;
   if (target === "compare") return compare;
   return previewUrl ?? pull ?? compare;

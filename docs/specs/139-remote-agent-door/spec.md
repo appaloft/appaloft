@@ -146,21 +146,24 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-OPEN-110 | `--open-target preview` opens Preview only | occupancy has Preview | `appaloft code --no-attach --open-target preview` | presentation launches that Preview URL. |
 | WS-REMOTE-OPEN-111 | `--open-target pr` opens pull URL only | occupancy has GitHub PR | `appaloft code --no-attach --open-target pr` | presentation launches that pull URL, not Preview. |
 | WS-REMOTE-OPEN-112 | Missing chosen target stays lean | chosen target has no URL | `appaloft code --no-attach --open-target compare` | no fallback; no browser spawn. |
+| WS-REMOTE-BANNER-113 | Occupancy banner copies Production | occupancy has durable Production URL | `appaloft code --no-attach` | Production follows Preview on its own line. |
+| WS-REMOTE-OPEN-114 | `--open-target production` opens Production only | occupancy has Production | `appaloft code --no-attach --open-target production` | presentation launches that Production URL, not Preview. |
+| WS-REMOTE-OPEN-115 | Missing Production target stays lean | no durable Production URL | `appaloft code --no-attach --open-target production` | no fallback; no browser spawn. |
 
 ## Slice Scope
 
-Slice 1–36 shipped.
+Slice 1–37 shipped.
 
-Slice 37 (this ticket): `appaloft code --open-target preview|pr|compare` opens that occupancy URL only.
+Slice 38 (this ticket): `appaloft code` copies occupancy Production and `--open-target production` opens it.
 
-In slice 37:
+In slice 38:
 
-- `--open-target preview` opens Preview only;
-- `--open-target pr` opens the GitHub pull URL only;
-- missing chosen target does not fall back;
+- banner copies Production on its own line when present;
+- `--open-target production` opens Production only;
+- missing Production does not fall back to Preview;
 - no GitHub write.
 
-Out of slice 37: catalog create-PR write, team Connection, Cloud managed default Server.
+Out of slice 38: catalog create-PR write, team Connection, Cloud managed default Server.
 
 
 ## Public Surfaces

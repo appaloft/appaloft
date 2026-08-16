@@ -94,6 +94,7 @@ export function formatRemoteCodeBanner(input: {
   readonly serverName: string;
   readonly workspaceId?: string;
   readonly previewUrl?: string;
+  readonly productionUrl?: string;
   readonly pullRequestNumber?: number;
   readonly branch?: string;
 }): string {
@@ -107,6 +108,8 @@ export function formatRemoteCodeBanner(input: {
   ];
   const preview = input.previewUrl?.trim();
   if (preview) lines.push(preview);
+  const production = input.productionUrl?.trim();
+  if (production) lines.push(production);
   if (
     typeof input.pullRequestNumber === "number" &&
     Number.isInteger(input.pullRequestNumber) &&
