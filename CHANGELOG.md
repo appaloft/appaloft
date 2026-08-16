@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.8.4](https://github.com/appaloft/appaloft/compare/v1.8.3...v1.8.4) (2026-08-16)
+
+
+### Bug Fixes
+
+* **cli:** quit Workspace TUI before occupancy list returns ([9abed7c](https://github.com/appaloft/appaloft/commit/9abed7cf551a6d6d99cbf36c9759c080031f74e3))
+* **cli:** quit Workspace TUI before occupancy list returns ([9abed7c](https://github.com/appaloft/appaloft/commit/9abed7cf551a6d6d99cbf36c9759c080031f74e3))
+* **cli:** quit Workspace TUI before occupancy list returns ([39a6dcf](https://github.com/appaloft/appaloft/commit/39a6dcfe8ed77ef759d66ae3f39e862e3bc4dc58))
+
 ## [1.8.3](https://github.com/appaloft/appaloft/compare/v1.8.2...v1.8.3) (2026-08-16)
 
 
