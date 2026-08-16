@@ -37,6 +37,7 @@
 | Occupancy TUI chrome | same presentation + TUI detail; copy occupancy Resource `app` preview/deploy |
 | Occupancy TUI PR chrome | same presentation + TUI detail; copy `preview-environments.list` PR |
 | Occupancy TUI production chrome | same presentation + TUI detail; copy Resource `app` durable domain |
+| Occupancy banner PR chrome | public CLI `code` banner; same preview-environment matcher |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -200,6 +201,12 @@ Slice-26 verification:
 
 - unit: TUI detail copies durable-domain Production URL;
 - unit: generated preview is not labeled Production.
+
+Slice-27 verification:
+
+- unit: `code` banner includes matching `PR #n`;
+- unit: missing or foreign PR stays omitted;
+- `appaloftdev code --no-attach` prints PR when a preview-environment matches.
 
 
 

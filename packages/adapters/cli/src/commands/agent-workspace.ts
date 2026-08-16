@@ -17,6 +17,7 @@ import {
   IssueWorkspaceCollaborationNativeAttachCommand,
   IssueWorkspaceCollaborationTerminalAccessCommand,
   ListAgentTaskRunsQuery,
+  ListPreviewEnvironmentsQuery,
   ListResourcesQuery,
   ListSandboxAgentHarnessesQuery,
   ListSandboxAgentRuntimesQuery,
@@ -64,6 +65,7 @@ import {
   occupancyChromeForProject,
   occupancyLastDeploymentFromResource,
   occupancyPreviewFromResource,
+  occupancyPullRequestFromPreviewEnvironments,
 } from "../occupancy-chrome.js";
 import {
   formatRemoteCodeBanner,
@@ -581,6 +583,25 @@ export const workspaceCodeCommand = EffectCommand.make(
           previewUrl = occupancyPreviewUrlForProject(listed.value.items ?? [], bannerProjectId);
         }
       }
+      let pullRequestNumber: number | undefined;
+      const previewEnvironmentsQuery = ListPreviewEnvironmentsQuery.create({
+        ...(bannerProjectId ? { projectId: bannerProjectId } : {}),
+        limit: 100,
+      });
+      if (previewEnvironmentsQuery.isOk()) {
+        const listed = yield* Effect.promise(() =>
+          cli.executeQuery(previewEnvironmentsQuery.value),
+        );
+        if (listed.isOk()) {
+          pullRequestNumber = occupancyPullRequestFromPreviewEnvironments(
+            listed.value.items ?? [],
+            {
+              repositoryIdentity: door.repositoryIdentity,
+              commitSha: bannerCommitSha,
+            },
+          )?.number;
+        }
+      }
       process.stdout.write(
         `${formatRemoteCodeBanner({
           projectId: bannerProjectId,
@@ -589,6 +610,7 @@ export const workspaceCodeCommand = EffectCommand.make(
           serverName: door.serverName,
           workspaceId: result.workspaceId,
           ...(previewUrl ? { previewUrl } : {}),
+          ...(pullRequestNumber ? { pullRequestNumber } : {}),
         })}\n`,
       );
       process.stdout.write(`${REMOTE_CODE_MODEL_HINT}\n`);

@@ -87,6 +87,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-CA-078 | TUI / unit | this slice | TUI detail copies Production URL | `occupancy-chrome.test.ts`; workspace-control-tui |
 | WS-REMOTE-CA-079 | TUI / unit | this slice | missing Production stays omitted | same chrome test |
 | WS-REMOTE-CA-080 | TUI / unit | this slice | generated preview is not Production | same chrome test |
+| WS-REMOTE-BANNER-081 | CLI / unit | this slice | `code` banner copies matching PR | `remote-code-session.test.ts` |
+| WS-REMOTE-BANNER-082 | CLI / unit | this slice | missing banner PR stays omitted | same banner test |
+| WS-REMOTE-BANNER-083 | CLI / unit | this slice | foreign banner PR stays out | same banner test |
 
 
 

@@ -93,16 +93,26 @@ export function formatRemoteCodeBanner(input: {
   readonly serverName: string;
   readonly workspaceId?: string;
   readonly previewUrl?: string;
+  readonly pullRequestNumber?: number;
 }): string {
   const sha = input.commitSha.slice(0, 7);
   const project = input.projectId?.trim() || "project";
   const occupancy = input.workspaceId?.trim()
     ? `my sandbox · ${input.workspaceId.trim()}`
     : "my sandbox";
+  const parts = [
+    `Remote · ${project} · ${input.repositoryIdentity}@${sha} · ${input.serverName} · ${occupancy}`,
+  ];
   const preview = input.previewUrl?.trim();
-  return preview
-    ? `Remote · ${project} · ${input.repositoryIdentity}@${sha} · ${input.serverName} · ${occupancy} · ${preview}`
-    : `Remote · ${project} · ${input.repositoryIdentity}@${sha} · ${input.serverName} · ${occupancy}`;
+  if (preview) parts.push(preview);
+  if (
+    typeof input.pullRequestNumber === "number" &&
+    Number.isInteger(input.pullRequestNumber) &&
+    input.pullRequestNumber > 0
+  ) {
+    parts.push(`PR #${input.pullRequestNumber}`);
+  }
+  return parts.join(" · ");
 }
 
 function remoteCodeError(

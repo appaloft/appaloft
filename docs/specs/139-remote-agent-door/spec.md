@@ -114,20 +114,23 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-CA-078 | TUI detail copies Production URL | occupancy Resource `app` has `latestDurableDomainRoute` | TUI detail | shows that URL as Production. |
 | WS-REMOTE-CA-079 | Missing Production stays omitted | occupancy has generated preview only | TUI detail | no invented Production URL. |
 | WS-REMOTE-CA-080 | Preview is not Production | Resource has both generated and durable routes | TUI detail | Preview stays generated; Production stays durable. |
+| WS-REMOTE-BANNER-081 | Code banner copies PR number | occupancy repo+sha match a preview-environment | `appaloft code --no-attach` | banner includes `PR #n`. |
+| WS-REMOTE-BANNER-082 | Missing banner PR stays omitted | occupancy has no matching preview-environment | `appaloft code --no-attach` | existing banner; no invented PR. |
+| WS-REMOTE-BANNER-083 | Foreign banner PR stays out | preview-environment belongs to another repo | `appaloft code --no-attach` | does not copy that PR. |
 
 ## Slice Scope
 
-Slice 1–25 shipped.
+Slice 1–26 shipped.
 
-Slice 26 (this ticket): interactive `workspace` TUI detail shows occupancy Production URL.
+Slice 27 (this ticket): occupancy `code` banner shows matching PR number.
 
-In slice 26:
+In slice 27:
 
-- TUI detail copies Resource `app` `latestDurableDomainRoute`;
-- missing durable domain stays omitted;
-- generated preview is never labeled Production.
+- banner copies `preview-environments.list` PR when repo+sha match;
+- missing/foreign PR stays omitted;
+- one banner line; no PR create.
 
-Out of slice 26: create-PR navigator, team Connection, Cloud managed default Server.
+Out of slice 27: create-PR navigator, team Connection, Cloud managed default Server.
 
 ## Public Surfaces
 
