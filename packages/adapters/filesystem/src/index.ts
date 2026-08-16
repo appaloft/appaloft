@@ -1412,13 +1412,27 @@ function checkoutRemoteGitLocator(locator: string): Result<string | undefined> {
 
   const cloneLocator = locator.startsWith("file://") ? fileURLToPath(locator) : locator;
   const checkoutRoot = mkdtempSync(join(tmpdir(), "appaloft-remote-src-"));
-  const clone = Bun.spawnSync(["git", "clone", "--depth", "1", "--", cloneLocator, checkoutRoot], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
+  let clone: ReturnType<typeof Bun.spawnSync>;
+  try {
+    clone = Bun.spawnSync(["git", "clone", "--depth", "1", "--", cloneLocator, checkoutRoot], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+  } catch (error) {
+    rmSync(checkoutRoot, { recursive: true, force: true });
+    const detail = error instanceof Error ? error.message : "git-unavailable";
+    return err(
+      domainError.validation("Remote git source could not be inspected", {
+        phase: "source-detection",
+        reasonCode: "missing-source-root",
+        affectedProfileField: "source.locator",
+        detail,
+      }),
+    );
+  }
   if (!clone.success) {
     rmSync(checkoutRoot, { recursive: true, force: true });
-    const detail = clone.stderr.toString().trim() || clone.stdout.toString().trim();
+    const detail = clone.stderr?.toString().trim() || clone.stdout?.toString().trim();
     return err(
       domainError.validation("Remote git source could not be inspected", {
         phase: "source-detection",
