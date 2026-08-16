@@ -1449,6 +1449,9 @@ function runCreateDeploymentCommand(
         appLogLines: options.appLogLines,
       },
     );
+    if (effectiveInput.executionMode === "detached") {
+      return;
+    }
     const deployment = yield* waitForSynchronousDeployment({
       deploymentId: output.id,
       resourceId: effectiveInput.resourceId,
@@ -1470,9 +1473,7 @@ function runCreateDeploymentCommand(
       }
     }
 
-    if (effectiveInput.executionMode !== "detached") {
-      yield* failIfSynchronousDeploymentDidNotSucceed(deployment);
-    }
+    yield* failIfSynchronousDeploymentDidNotSucceed(deployment);
     const url =
       occupancyDeployUrlFromSummary(deployment) ?? (yield* readCreatedDeploymentUrl(output.id));
     if (url) yield* print({ url });
