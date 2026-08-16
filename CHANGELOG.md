@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/appaloft/appaloft/compare/v1.8.5...v1.9.0) (2026-08-16)
+
+
+### Features
+
+* **sandbox:** admit host-egress allowlist for registered Servers ([#1248](https://github.com/appaloft/appaloft/issues/1248)) ([e33f119](https://github.com/appaloft/appaloft/commit/e33f119291dadcf0359382c1683becbb1e0c20a6))
+
 ## [1.8.5](https://github.com/appaloft/appaloft/compare/v1.8.4...v1.8.5) (2026-08-16)
 
 
