@@ -210,6 +210,7 @@ type DockerSandboxProviderInput = {
   now?: () => string;
   sleep?: (delayMs: number) => Promise<void>;
   credentialBroker?: boolean;
+  hostEgress?: boolean;
   portableRecovery?: {
     kind: "shared-filesystem";
     rootPath: string;
@@ -364,6 +365,7 @@ export class DockerSandboxProvider implements SandboxProvider {
   private readonly runtimeName: "runc" | "runsc";
   private readonly networkName: string;
   private readonly portableRecovery: DockerSandboxProviderInput["portableRecovery"];
+  private readonly hostEgress: boolean;
 
   constructor(input: DockerSandboxProviderInput = {}) {
     const isolation = input.isolation ?? "container-trusted";
@@ -375,10 +377,14 @@ export class DockerSandboxProvider implements SandboxProvider {
     if (input.portPublisher && !input.internalNetwork) {
       throw new Error("Sandbox port publishing requires an internal Docker network");
     }
-    if (input.egressPolicy && !input.internalNetwork) {
+    if (input.hostEgress && input.internalNetwork) {
+      throw new Error("Sandbox host egress cannot combine with an internal Docker network");
+    }
+    if (input.egressPolicy && !input.internalNetwork && !input.hostEgress) {
       throw new Error("Sandbox egress policy requires an internal Docker network");
     }
-    this.networkName = input.internalNetwork ?? "none";
+    this.networkName = input.internalNetwork ?? (input.hostEgress ? "bridge" : "none");
+    this.hostEgress = Boolean(input.hostEgress);
     this.portableRecovery = normalizedPortableRecoveryConfig(input.portableRecovery);
     this.capabilities = {
       isolation,
@@ -401,7 +407,7 @@ export class DockerSandboxProvider implements SandboxProvider {
       processes: true,
       files: true,
       ports: Boolean(input.portPublisher),
-      networkPolicy: input.egressPolicy ? ["deny", "allowlist"] : ["deny"],
+      networkPolicy: input.egressPolicy || input.hostEgress ? ["deny", "allowlist"] : ["deny"],
       credentialBroker: input.credentialBroker ?? false,
     };
     this.runner = input.runner ?? new BunSandboxDockerCommandRunner();
@@ -419,7 +425,7 @@ export class DockerSandboxProvider implements SandboxProvider {
         throw new Error("Docker worker does not expose the required runsc runtime");
       }
     }
-    if (this.networkName !== "none") {
+    if (this.networkName !== "none" && !this.hostEgress) {
       const result = await this.docker([
         "network",
         "inspect",
@@ -437,7 +443,7 @@ export class DockerSandboxProvider implements SandboxProvider {
     if (request.requestedIsolation !== this.capabilities.isolation) {
       throw new Error("Docker provider isolation does not match the admitted Sandbox request");
     }
-    if (request.networkPolicy.mode === "allowlist" && !this.egressPolicy) {
+    if (request.networkPolicy.mode === "allowlist" && !this.egressPolicy && !this.hostEgress) {
       throw new Error("Docker provider requires an egress policy adapter for allowlist mode");
     }
     await this.probe();
