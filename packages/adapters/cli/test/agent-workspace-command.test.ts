@@ -1288,6 +1288,58 @@ describe("Agent Workspace CLI", () => {
     );
   });
 
+  test("[WS-REMOTE-COMPAT-128][WS-REMOTE-COMPAT-129][WS-REMOTE-COMPAT-130] unstructured occupancy validation names the enrolled Server", async () => {
+    const commands: Command<unknown>[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return err({
+            code: "bad_request",
+            category: "user",
+            message: "Input validation failed",
+            retryable: false,
+            details: { phase: "orpc-error-normalization", orpcCode: "BAD_REQUEST" },
+          });
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_cloud_compat" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        projectId: "prj_web",
+        serverId: "srv_4lifk0yrcecy",
+        serverName: "hostinger",
+      }),
+    });
+    const originalExitCode = process.exitCode;
+    const write = process.stderr.write;
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
+      throw new Error("Expected occupancy Cloud-compat validation to fail");
+    } catch (error) {
+      expect(String(error)).toContain('"code":"workspace_open_target_server_unsupported"');
+      expect(String(error)).toContain("hostinger (srv_4lifk0yrcecy)");
+    } finally {
+      process.stderr.write = write;
+      process.exitCode = originalExitCode ?? 0;
+    }
+    expect(commands).toHaveLength(1);
+    expect((commands[0] as OpenAgentWorkspaceCommand).input.targetServerId).toBe(
+      "srv_4lifk0yrcecy",
+    );
+  });
+
   test("[WS-SCRATCH-INSTALL-007] refused install is the only hard scratch failure", async () => {
     let commandDispatched = false;
     const { createCliProgram } = await import("../src");

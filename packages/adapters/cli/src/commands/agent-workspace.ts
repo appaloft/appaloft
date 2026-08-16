@@ -75,6 +75,7 @@ import {
   formatRemoteCodeBanner,
   isRemoteCodeGitRemoteLocator,
   nativeAttachRequiresInteractiveTerminal,
+  occupancyCloudCompatError,
   REMOTE_CODE_MODEL_HINT,
   resolveDefaultRemoteCodeDoor,
   scratchRemoteRejectedError,
@@ -576,7 +577,14 @@ export const workspaceCodeCommand = EffectCommand.make(
           typeof details.workspaceCommitSha === "string"
             ? details.workspaceCommitSha
             : undefined;
-        if (!pinnedSha) return yield* Effect.fail(opened.error);
+        if (!pinnedSha) {
+          return yield* Effect.fail(
+            occupancyCloudCompatError(opened.error, {
+              id: door.serverId,
+              name: door.serverName,
+            }),
+          );
+        }
         const retry = yield* resultToEffect(
           OpenAgentWorkspaceCommand.create({
             ...openInput,

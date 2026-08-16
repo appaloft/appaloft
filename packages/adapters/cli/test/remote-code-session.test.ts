@@ -4,6 +4,7 @@ import {
   formatRemoteCodeBanner,
   isRemoteCodeGitRemoteLocator,
   nativeAttachRequiresInteractiveTerminal,
+  occupancyCloudCompatError,
   REMOTE_CODE_DOOR_HINT,
   REMOTE_CODE_MODEL_HINT,
   resolveDefaultRemoteCodeDoor,
@@ -16,6 +17,33 @@ describe("remote code door", () => {
     expect(REMOTE_CODE_DOOR_HINT).toContain("--open-target");
     expect(REMOTE_CODE_DOOR_HINT).toContain("workspace p/P/o/c");
     expect(REMOTE_CODE_MODEL_HINT).toContain("OpenCode");
+  });
+  test("[WS-REMOTE-COMPAT-128][WS-REMOTE-COMPAT-129][WS-REMOTE-COMPAT-130] unstructured occupancy validation names the enrolled Server", () => {
+    const server = { id: "srv_4lifk0yrcecy", name: "hostinger" };
+    expect(
+      occupancyCloudCompatError(
+        {
+          code: "bad_request",
+          category: "user",
+          message: "Input validation failed",
+          retryable: false,
+          details: { phase: "orpc-error-normalization", orpcCode: "BAD_REQUEST" },
+        },
+        server,
+      ),
+    ).toMatchObject({
+      code: "workspace_open_target_server_unsupported",
+      message: "This Cloud does not accept occupancy targeting for hostinger (srv_4lifk0yrcecy)",
+      details: { serverId: "srv_4lifk0yrcecy" },
+    });
+    const bound = {
+      code: "not_found",
+      category: "user" as const,
+      message: "RepositoryBinding github.com/traefik/whoami was not found",
+      retryable: false,
+      details: { code: "workspace_open_repository_not_bound" },
+    };
+    expect(occupancyCloudCompatError(bound, server)).toEqual(bound);
   });
   test("[WS-REMOTE-LOGIN-001] fails closed without login or profile", async () => {
     await expect(

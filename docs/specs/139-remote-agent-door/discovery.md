@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1-41 shipped. Slice 42 occupancy TUI available-door footer owner-confirmed 2026-08-16 (D133-D135).
+- Round: Spec. Slice 1-42 shipped. Slice 43 occupancy Cloud-compat error owner-confirmed 2026-08-16 (D136-D138).
 - Date: 2026-08-16.
-- Predecessor: occupancy available-door hint shipped as public #1234.
-- Code changes allowed: yes for slice 42 after the occupancy-tui-available-door-footer ticket is `ready-for-agent`.
+- Predecessor: occupancy TUI available-door footer shipped as public #1236.
+- Code changes allowed: yes for slice 43 after the occupancy-cloud-compat-error ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -170,6 +170,9 @@ Sandbox on that Server, not one VM per person.
 | D133 | Slice 42 TUI footer lists only occupancy doors that exist now | Railway `ca` does not advertise missing services. Static `o`/`c`/`p`/`P` overpromises. |
 | D134 | Keys stay paired: `o open PR`, `c compare`, `p preview`, `P production` | Existing PR still omits compare. No invented create-PR write. |
 | D135 | No available door stays lean | Footer keeps lifecycle / delivery / recovery / focus. Catalog create-PR write stays later. |
+| D136 | Slice 43 occupancy `Input validation failed` names the enrolled Server | Live Cloud `9ba333eb` rejects `targetServerId` as unstructured `BAD_REQUEST`. Railway would not say only "validation failed". |
+| D137 | Do not retry `workspaces.open` without `targetServerId` | A successful retry would occupy managed capacity. No silent Server substitution. |
+| D138 | Newer Cloud Binding / Profile errors stay specific | Compat copy is only for unstructured occupancy validation. Catalog create-PR write stays later. |
 
 ## Rejected
 
@@ -258,10 +261,11 @@ Later slices after occupancy:
 39. Occupancy banner labels (slice 39, shipped #1230).
 40. Occupancy door hint (slice 40, shipped #1232).
 41. Occupancy available-door hint (slice 41, shipped #1234).
-42. **Occupancy TUI available-door footer** (slice 42): `workspace` names only occupancy doors that exist.
-43. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
-44. Optional team Connection.
-45. Cloud managed as default Server when no BYOS exists.
+42. Occupancy TUI available-door footer (slice 42, shipped #1236).
+43. **Occupancy Cloud-compat error** (slice 43): unstructured `targetServerId` rejection names the enrolled Server.
+44. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
+45. Optional team Connection.
+46. Cloud managed as default Server when no BYOS exists.
 
 Cmux-style “this session is PR #928” is correct *context*. It is not a new GitHub aggregate
 and not something `code` scrapes from the vendor TUI.

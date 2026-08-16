@@ -53,6 +53,7 @@
 | Occupancy door hint | public CLI `code` after banner |
 | Occupancy available-door hint | same `code` hint + occupancy URL selector |
 | Occupancy TUI available-door footer | same occupancy URL selector + `workspace` footer |
+| Occupancy Cloud-compat error | public CLI `code` after unstructured `workspaces.open` validation |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -308,6 +309,12 @@ Slice-42 verification:
 - unit: TUI footer lists only present occupancy doors;
 - unit: existing PR omits compare from the footer;
 - unit: no available door keeps a lean TUI footer.
+
+Slice-43 verification:
+
+- unit: unstructured occupancy validation names the enrolled Server;
+- unit: occupancy does not retry without `targetServerId`;
+- unit: Binding / Profile errors stay specific.
 
 
 

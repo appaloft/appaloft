@@ -354,6 +354,14 @@
 - [x] Unit tests WS-REMOTE-CA-125-127
 - [x] `appaloftdev workspace` would omit missing occupancy keys
 
+## Slice 43 - occupancy Cloud-compat error
+
+- [x] Grill D136-D138
+- [x] Ticket `ready-for-agent` - [#1237](https://github.com/appaloft/appaloft/issues/1237)
+- [x] `code` names unstructured `targetServerId` rejection
+- [x] Unit tests WS-REMOTE-COMPAT-128-130
+- [x] `appaloftdev code --no-attach` would name the enrolled Server
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

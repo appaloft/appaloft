@@ -134,6 +134,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-CA-125 | TUI / unit | this slice | TUI footer lists only present occupancy doors | `apps/workspace-control-tui/src/lib.rs` |
 | WS-REMOTE-CA-126 | TUI / unit | this slice | existing PR omits compare from the TUI footer | same TUI test |
 | WS-REMOTE-CA-127 | TUI / unit | this slice | no available door keeps a lean TUI footer | same TUI test |
+| WS-REMOTE-COMPAT-128 | CLI / unit | this slice | unstructured occupancy validation names the enrolled Server | `agent-workspace-command.test.ts` |
+| WS-REMOTE-COMPAT-129 | CLI / unit | this slice | occupancy does not retry without `targetServerId` | same command test |
+| WS-REMOTE-COMPAT-130 | CLI / unit | this slice | Binding / Profile errors stay specific | same command test |
 
 
 

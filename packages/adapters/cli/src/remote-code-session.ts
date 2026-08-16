@@ -213,6 +213,31 @@ export function scratchRemoteRejectedError(): DomainError {
   });
 }
 
+export function occupancyCloudCompatError(
+  error: DomainError,
+  server: { readonly id: string; readonly name: string },
+): DomainError {
+  if (error.details?.code === "workspace_open_repository_not_bound") return error;
+  if (error.code === "workspace_open_repository_not_bound") return error;
+  const unstructured =
+    error.message === "Input validation failed" &&
+    (error.code === "bad_request" || error.code === "validation_error") &&
+    (error.details?.phase === "orpc-error-normalization" ||
+      error.details?.orpcCode === "BAD_REQUEST");
+  if (!unstructured) return error;
+  return remoteCodeError(
+    "workspace_open_target_server_unsupported",
+    `This Cloud does not accept occupancy targeting for ${server.name} (${server.id})`,
+    {
+      phase: "remote-code-cloud-compat",
+      serverId: server.id,
+      serverName: server.name,
+      guidance:
+        "Deploy a Cloud that accepts workspaces.open targetServerId, then retry. Do not retry without the enrolled Server.",
+    },
+  );
+}
+
 export async function resolveDefaultRemoteCodeDoor(
   probe: RemoteCodeDoorProbe = {},
   path = ".",

@@ -161,20 +161,23 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-CA-125 | TUI footer lists only present occupancy doors | occupancy has Preview + PR | `appaloft workspace` | footer names `p preview` and `o open PR`, not production or compare. |
 | WS-REMOTE-CA-126 | Existing PR omits compare from the TUI footer | occupancy has GitHub PR | `appaloft workspace` | footer has `o open PR`, not `c compare`. |
 | WS-REMOTE-CA-127 | No available door keeps a lean TUI footer | no Preview / Production / PR / compare | `appaloft workspace` | footer keeps lifecycle / delivery / recovery / focus, no occupancy door keys. |
+| WS-REMOTE-COMPAT-128 | Unstructured occupancy validation names the enrolled Server | Cloud rejects `targetServerId` as `Input validation failed` | `appaloft code --no-attach` | error names that Server id and says this Cloud does not accept occupancy targeting. |
+| WS-REMOTE-COMPAT-129 | Occupancy does not retry without `targetServerId` | same unstructured validation | `appaloft code --no-attach` | only one `workspaces.open`; no managed substitution. |
+| WS-REMOTE-COMPAT-130 | Binding / Profile errors stay specific | Cloud returns `workspace_open_repository_not_bound` | `appaloft code --no-attach` | existing Binding guidance is unchanged. |
 
 ## Slice Scope
 
-Slice 1-41 shipped.
+Slice 1-42 shipped.
 
-Slice 42 (this ticket): `appaloft workspace` names only the occupancy doors that exist.
+Slice 43 (this ticket): occupancy names an unstructured Cloud `targetServerId` rejection.
 
-In slice 42:
+In slice 43:
 
-- TUI footer lists only present Preview / Production / PR / compare;
-- existing PR omits compare from the footer;
-- no available door stays lean.
+- unstructured occupancy validation names the enrolled Server;
+- occupancy does not retry without `targetServerId`;
+- Binding / Profile errors stay specific.
 
-Out of slice 42: catalog create-PR write, team Connection, Cloud managed default Server.
+Out of slice 43: catalog create-PR write, team Connection, Cloud managed default Server.
 
 
 ## Public Surfaces
