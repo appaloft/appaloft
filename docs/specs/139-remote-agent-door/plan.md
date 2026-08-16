@@ -22,6 +22,7 @@
 | Scratch | `code --local` only |
 | Plan default Destination | `DeploymentContextResolver` read-only |
 | Headless occupancy tree | public CLI adapter composing `servers.list` + `sandboxes.list` |
+| Occupancy projectId | same tree; copy `activation.project.projectId` |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -60,11 +61,18 @@ Slice-5 verification:
 - unit: interactive TTY still starts TUI;
 - `appaloftdev workspace --json` lists `occupancy-mac` and ready Sandboxes.
 
+Slice-6 verification:
+
+- unit: occupancy with activation prints `projectId`;
+- unit: occupancy without activation invents no projectId;
+- `appaloftdev workspace --json` includes `prj_4o6txzih1dja` / `prj_aoqjs0es367x`.
+
 ## Risks
 
 - Plan must stay read-only. Do not reuse the create bootstrap create-or-reuse
   path inside the query.
 - Do not pick an arbitrary Destination when none is named `default`.
 - Do not leak teammate disk contents through the occupancy tree.
+- Do not invent Resource / Environment / Destination ids from occupancy.
 
 

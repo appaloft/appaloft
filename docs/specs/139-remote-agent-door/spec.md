@@ -69,6 +69,8 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-CA-033 | Headless occupancy tree | logged in + Server; occupancies exist | `appaloft workspace --json` | stdout is `appaloft.workspace-occupancy/v1` with Servers and my Sandboxes; no `renderer-unavailable` empty shell. |
 | WS-REMOTE-CA-034 | `--no-tui` same tree | same | `appaloft workspace --no-tui` | same occupancy tree; TUI does not start. |
 | WS-REMOTE-CA-035 | Interactive TUI unchanged | TTY + supported terminal | `appaloft workspace` | existing Workspace control TUI starts; no occupancy-tree JSON. |
+| WS-REMOTE-CA-036 | Occupancy projectId | occupancy activation exists | `appaloft workspace --json` | occupancy row includes `projectId` from `activation.project.projectId`. |
+| WS-REMOTE-CA-037 | Missing activation stays lean | Sandbox has no activation | `appaloft workspace --json` | row has workspaceId/status/occupancy only; no invented projectId. |
 
 ## Slice Scope
 
@@ -80,18 +82,20 @@ Slice 3 (shipped): positional git-remote locator.
 
 Slice 4 (shipped): omitted `deployments.plan` destinationId.
 
-Slice 5 (this ticket): headless `appaloft workspace` occupancy tree.
+Slice 5 (shipped): headless `appaloft workspace` occupancy tree.
 
-In slice 5:
+Slice 6 (this ticket): occupancy tree includes activation `projectId`.
 
-- `workspace --json` / `--no-tui` / non-TTY prints `appaloft.workspace-occupancy/v1`;
-- tree composes existing `servers.list` + `sandboxes.list`;
-- no teammate disk contents;
-- interactive TTY without those flags still starts the existing TUI.
+In slice 6:
 
-Out of slice 5: rebuilding the interactive TUI as Railway `ca`, team Connection, Cloud managed as
+- ready occupancy with activation copies `projectId`;
+- no activation means no invented ids;
+- still no Resource / Environment / Destination invented on the tree.
+
+Out of slice 6: rebuilding the interactive TUI as Railway `ca`, team Connection, Cloud managed as
 default Server when no BYOS, GitHub `owner/repo` shorthand, `/tree/` URLs,
-`destinations.list`, `servers.show` destinations field, session-native Preview.
+`destinations.list`, `servers.show` destinations field, session-native Preview,
+auto-creating a Resource from occupancy.
 
 ## Public Surfaces
 

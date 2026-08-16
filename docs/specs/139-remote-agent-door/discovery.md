@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–3 shipped. Slice 4 destination discovery owner-confirmed 2026-08-16 (D16–D21).
+- Round: Spec. Slice 1–5 shipped. Slice 6 occupancy projectId owner-confirmed 2026-08-16 (D25–D27).
 - Date: 2026-08-16.
-- Predecessor: Spec 138 / ADR-116 Instant Local Scratch shipped as public #1125; ADR-117 identity door shipped as public #1127; ADR-118 occupancy shipped; ADR-119 repo-URL locator shipped as public #1156.
-- Code changes allowed: yes for slice 4 after the destination ticket is `ready-for-agent`.
+- Predecessor: Spec 138 / ADR-116 Instant Local Scratch shipped as public #1125; ADR-117 identity door shipped as public #1127; ADR-118 occupancy shipped; ADR-119 repo-URL locator shipped as public #1156; ADR-120 destination shipped as public #1158; occupancy tree shipped as public #1162.
+- Code changes allowed: yes for slice 6 after the occupancy-project ticket is `ready-for-agent`.
 
 ## Actor And Observable Outcome
 
@@ -60,6 +60,9 @@ Sandbox on that Server, not one VM per person.
 | D22 | Slice 5 `workspace` as `ca` first cut is a headless occupancy tree | Live `appaloft workspace --json` still prints `renderer-unavailable` while `workspace list` + `server list` already have the data |
 | D23 | Headless `workspace --json` / `--no-tui` composes existing `servers.list` + `sandboxes.list` | No new catalog operation; no teammate disk contents |
 | D24 | Interactive TUI stay unchanged this slice | Spec 128 delivery palette already ships; do not rebuild Ratatui to close the Railway loop |
+| D25 | Slice 6 occupancy tree exposes activation `projectId` | Live `workspace --json` lists repo@sha but Agent still cannot deploy without guessing `prj_*` |
+| D26 | Reuse `sandboxes.list` `activation.project.projectId`; no new catalog field | `workspace list` already returns it |
+| D27 | Do not invent Resource / Environment / Destination on the tree | Occupancy is not a Resource; first-deploy still uses existing `deploy` / `resources.create` |
 
 ## Rejected
 
@@ -111,11 +114,12 @@ Later slices after occupancy:
 2. Occupancy (slice 2, shipped).
 3. Repo-URL locator (slice 3, shipped #1156).
 4. Destination discovery (slice 4, shipped #1158).
-5. **`workspace` occupancy tree** (slice 5): headless `workspace --json` lists Servers + my Sandboxes.
-6. Session-native Preview / remaining first-deploy chrome.
-7. GitHub as source surface / `owner/repo` shorthand.
-8. Optional team Connection.
-9. Cloud managed as default Server when no BYOS exists.
+5. `workspace` occupancy tree (slice 5, shipped #1162).
+6. **Occupancy `projectId`** (slice 6): headless tree includes activation `projectId` so Agent deploy can start from occupancy.
+7. Session-native Preview / remaining first-deploy chrome.
+8. GitHub as source surface / `owner/repo` shorthand.
+9. Optional team Connection.
+10. Cloud managed as default Server when no BYOS exists.
 
 ## Delivery chrome (owner 2026-08-15)
 
