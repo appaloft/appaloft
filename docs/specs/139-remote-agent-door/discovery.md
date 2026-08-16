@@ -57,6 +57,9 @@ Sandbox on that Server, not one VM per person.
 | D19 | Missing default Destination still fail-closed | No `destinations.list` / `servers.show` destinations field this slice |
 | D20 | Missing `internalPort` is the next Railway-loop gap, not this slice | Occupancy create reached `Resource network profile internalPort is required` after destination |
 | D21 | No new catalog operation | Reuse existing Destination + `deployments.plan` |
+| D22 | Slice 5 `workspace` as `ca` first cut is a headless occupancy tree | Live `appaloft workspace --json` still prints `renderer-unavailable` while `workspace list` + `server list` already have the data |
+| D23 | Headless `workspace --json` / `--no-tui` composes existing `servers.list` + `sandboxes.list` | No new catalog operation; no teammate disk contents |
+| D24 | Interactive TUI stay unchanged this slice | Spec 128 delivery palette already ships; do not rebuild Ratatui to close the Railway loop |
 
 ## Rejected
 
@@ -107,9 +110,9 @@ Later slices after occupancy:
 1. Remote identity door (slice 1, shipped).
 2. Occupancy (slice 2, shipped).
 3. Repo-URL locator (slice 3, shipped #1156).
-4. **Destination discovery** (slice 4): omitted `destinationId` on `deployments.plan` resolves Server `default`.
-5. `workspace` as `ca`.
-6. Session-native Preview / missing `internalPort` first-deploy.
+4. Destination discovery (slice 4, shipped #1158).
+5. **`workspace` occupancy tree** (slice 5): headless `workspace --json` lists Servers + my Sandboxes.
+6. Session-native Preview / remaining first-deploy chrome.
 7. GitHub as source surface / `owner/repo` shorthand.
 8. Optional team Connection.
 9. Cloud managed as default Server when no BYOS exists.

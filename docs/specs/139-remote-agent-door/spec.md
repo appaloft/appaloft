@@ -66,6 +66,9 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-DEST-030 | Plan omitted destination | logged in + Server; resource has no destination pin; Server has Destination named `default` | Agent/CLI `deployments.plan` without `destinationId` | preview uses that Destination; does not create Destination; does not fail `destinationId is required`. |
 | WS-REMOTE-DEST-031 | Resource pin wins | resource `defaultDestinationId` is set | `deployments.plan` omits destinationId | preview uses the pinned Destination when it belongs to the selected Server. |
 | WS-REMOTE-DEST-032 | Missing default fail-closed | Server has no Destination named `default` and resource has no pin | `deployments.plan` omits destinationId | fail-closed `destinationId is required`; no Destination created. |
+| WS-REMOTE-CA-033 | Headless occupancy tree | logged in + Server; occupancies exist | `appaloft workspace --json` | stdout is `appaloft.workspace-occupancy/v1` with Servers and my Sandboxes; no `renderer-unavailable` empty shell. |
+| WS-REMOTE-CA-034 | `--no-tui` same tree | same | `appaloft workspace --no-tui` | same occupancy tree; TUI does not start. |
+| WS-REMOTE-CA-035 | Interactive TUI unchanged | TTY + supported terminal | `appaloft workspace` | existing Workspace control TUI starts; no occupancy-tree JSON. |
 
 ## Slice Scope
 
@@ -75,19 +78,20 @@ Slice 2 (shipped): occupy my Sandbox from default `code`.
 
 Slice 3 (shipped): positional git-remote locator.
 
-Slice 4 (this ticket): omitted `deployments.plan` destinationId.
+Slice 4 (shipped): omitted `deployments.plan` destinationId.
 
-In slice 4:
+Slice 5 (this ticket): headless `appaloft workspace` occupancy tree.
 
-- plan resolves resource pin or Server Destination named `default`;
-- plan never creates Destination;
-- missing default still fail-closed;
-- occupancy `appaloftdev deployments plan` without `--destination` passes destination.
+In slice 5:
 
-Out of slice 4: `workspace` as Railway `ca`, team Connection, Cloud managed as
+- `workspace --json` / `--no-tui` / non-TTY prints `appaloft.workspace-occupancy/v1`;
+- tree composes existing `servers.list` + `sandboxes.list`;
+- no teammate disk contents;
+- interactive TTY without those flags still starts the existing TUI.
+
+Out of slice 5: rebuilding the interactive TUI as Railway `ca`, team Connection, Cloud managed as
 default Server when no BYOS, GitHub `owner/repo` shorthand, `/tree/` URLs,
-`destinations.list`, `servers.show` destinations field, session-native Preview,
-missing `internalPort` first-deploy.
+`destinations.list`, `servers.show` destinations field, session-native Preview.
 
 ## Public Surfaces
 

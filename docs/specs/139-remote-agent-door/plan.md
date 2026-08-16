@@ -21,6 +21,7 @@
 | Invisible `appaloft-remote` | Community activation initializer |
 | Scratch | `code --local` only |
 | Plan default Destination | `DeploymentContextResolver` read-only |
+| Headless occupancy tree | public CLI adapter composing `servers.list` + `sandboxes.list` |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -52,10 +53,18 @@ Slice-4 verification:
   Server `srv_uil9cpctplou` / resource `res_vj1602cxjisn` must not fail
   `destinationId is required`.
 
+Slice-5 verification:
+
+- unit: `--json` / `--no-tui` / non-TTY print `appaloft.workspace-occupancy/v1`;
+- unit: tree includes Server id/name and occupancy workspaceId/repo;
+- unit: interactive TTY still starts TUI;
+- `appaloftdev workspace --json` lists `occupancy-mac` and ready Sandboxes.
+
 ## Risks
 
 - Plan must stay read-only. Do not reuse the create bootstrap create-or-reuse
   path inside the query.
 - Do not pick an arbitrary Destination when none is named `default`.
-- Missing `internalPort` remains the next first-deploy blocker.
+- Do not leak teammate disk contents through the occupancy tree.
+
 
