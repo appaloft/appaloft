@@ -255,7 +255,7 @@ jobs:
           "${bundle}/appaloft-workspace-tui" --version
           APPALOFT_DATA_DIR="${RUNNER_TEMP}/appaloft-workspace-tui-headless" \
             APPALOFT_PGLITE_DATA_DIR="${RUNNER_TEMP}/appaloft-workspace-tui-headless/pglite" \
-            "${bundle}/appaloft" workspace --no-tui | grep -q 'appaloft.workspace-control/v1'
+            "${bundle}/appaloft" workspace --no-tui | grep -q 'appaloft.workspace-occupancy/v1'
           bun run scripts/test/workspace-control-packaged-tui.ts "${bundle}"
           "${bundle}/run-appaloft.sh" doctor
 
