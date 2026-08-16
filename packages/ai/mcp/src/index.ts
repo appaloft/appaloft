@@ -639,9 +639,9 @@ export function createAppaloftMcpResources(): AppaloftMcpResource[] {
       text: [
         "# Deploy Protocol",
         "",
-        "Inspect safe project metadata only. Select deployment mode before asking for ids. Create or select project, server, environment, and resource context through Appaloft operations. Configure Resource profile before deployment admission. Plan when useful, deploy, observe, then return URL/access state first.",
+        "Inspect safe project metadata only. Select deployment mode before asking for ids. Create or select project, server, environment, and resource context through Appaloft operations. Configure Resource profile before deployment admission. Call `deployments_plan`. If readiness is blocked, execute each `nextActions` target and replan before `deployments_create`. `missing-internal-port` is `resources_configure_network` with source-evidenced `internalPort` (static-site `80`; otherwise the listen/`PORT` in the selected source). Observe, then return URL/access state first.",
         "",
-        "Use `deployments_plan`, `deployments_create`, `deployments_show`, `deployments_logs`, `resources_health`, `resources_diagnostic_summary`, and `deployments_recovery_readiness` as the core MCP path when tools are available.",
+        "Use `deployments_plan`, `resources_configure_network`, `deployments_create`, `deployments_show`, `deployments_logs`, `resources_health`, `resources_diagnostic_summary`, and `deployments_recovery_readiness` as the core MCP path when tools are available.",
       ].join("\n"),
     },
     {
@@ -694,7 +694,7 @@ export function createAppaloftMcpPrompts(): AppaloftMcpPrompt[] {
           role: "user",
           content: {
             type: "text",
-            text: `Deploy ${arg(args, "source", "the current project")} with Appaloft for ${arg(args, "goal", "the user's goal")}. Inspect only safe metadata, avoid secrets, select or create context through existing project/server/environment/resource tools, configure the Resource profile, call deployments_plan when useful, call deployments_create, observe status/logs/health, and return URL/access state first.`,
+            text: `Deploy ${arg(args, "source", "the current project")} with Appaloft for ${arg(args, "goal", "the user's goal")}. Inspect only safe metadata, avoid secrets, select or create context through existing project/server/environment/resource tools, configure the Resource profile, call deployments_plan, and if readiness is blocked execute each nextActions target then replan before deployments_create. missing-internal-port is resources_configure_network with source-evidenced internalPort (static-site 80; otherwise the listen/PORT in the selected source). Observe status/logs/health, and return URL/access state first.`,
           },
         },
       ],

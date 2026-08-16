@@ -222,12 +222,13 @@
       "id": "appaloft-skill-first-deploy-outcome",
       "family": "first-deploy-and-outcome",
       "prompt": "Deploy this repository with Appaloft and return the live URL, deployment id, resource id, logs command, diagnostics command, and recovery command.",
-      "expected_output": "A first-deploy sequence that safely inspects source, chooses CLI/API/Web/MCP surface, creates or selects project/server/environment/resource context, plans/deploys, observes, reads deployment proof, and only claims success for a verified verdict.",
+      "expected_output": "A first-deploy sequence that safely inspects source, chooses CLI/API/Web/MCP surface, creates or selects project/server/environment/resource context, plans, executes blocked nextActions such as resources.configure-network for missing-internal-port, replans, deploys, observes, reads deployment proof, and only claims success for a verified verdict.",
       "expected_operations": [
         "projects.create",
         "servers.register",
         "environments.create",
         "resources.create",
+        "resources.configure-network",
         "deployments.plan",
         "deployments.create",
         "deployments.show",
@@ -248,6 +249,7 @@
       "assertions": [
         "Performs safe source inspection without reading .env, keys, tokens, cookies, or provider credentials.",
         "Uses existing Appaloft operations and does not invent quick-deploy.create.",
+        "Treats a blocked deployments.plan as nextActions to execute and replan, including resources.configure-network for missing-internal-port.",
         "Treats deployment progress observation as part of deploy and follows deployment events instead of relying only on a final snapshot.",
         "Reads deployments.proof after progress observation and claims success only for a verified verdict.",
         "Returns URL/access state first, followed by proof verdict, ids, progress stream, logs, diagnostics, and recovery readiness."
