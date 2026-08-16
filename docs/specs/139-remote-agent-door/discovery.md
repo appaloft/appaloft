@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1-42 shipped. Slice 43 occupancy Cloud-compat error owner-confirmed 2026-08-16 (D136-D138).
+- Round: Spec. Slice 1-43 shipped. Slice 44 occupancy resume keeps preferred Profile owner-confirmed 2026-08-16 (D139-D141).
 - Date: 2026-08-16.
-- Predecessor: occupancy TUI available-door footer shipped as public #1236.
-- Code changes allowed: yes for slice 43 after the occupancy-cloud-compat-error ticket is `ready-for-agent`.
+- Predecessor: occupancy Cloud-compat error shipped as public #1238.
+- Code changes allowed: yes for slice 44 after the occupancy-resume-profile-pin ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -173,6 +173,9 @@ Sandbox on that Server, not one VM per person.
 | D136 | Slice 43 occupancy `Input validation failed` names the enrolled Server | Live Cloud `9ba333eb` rejects `targetServerId` as unstructured `BAD_REQUEST`. Railway would not say only "validation failed". |
 | D137 | Do not retry `workspaces.open` without `targetServerId` | A successful retry would occupy managed capacity. No silent Server substitution. |
 | D138 | Newer Cloud Binding / Profile errors stay specific | Compat copy is only for unstructured occupancy validation. Catalog create-PR write stays later. |
+| D139 | Slice 44 default occupancy resume keeps the preferred Sandbox Profile | Railway reconnects the same machine. A newer default Profile must not block `code`. |
+| D140 | Explicit `--profile` still fail-closes on pin mismatch | Delivery `workspace open --profile` stays exact. |
+| D141 | `--new` still creates an isolated Workspace | Do not rewrite the preferred disk onto a new Profile. Catalog create-PR write stays later. |
 
 ## Rejected
 
@@ -262,10 +265,11 @@ Later slices after occupancy:
 40. Occupancy door hint (slice 40, shipped #1232).
 41. Occupancy available-door hint (slice 41, shipped #1234).
 42. Occupancy TUI available-door footer (slice 42, shipped #1236).
-43. **Occupancy Cloud-compat error** (slice 43): unstructured `targetServerId` rejection names the enrolled Server.
-44. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
-45. Optional team Connection.
-46. Cloud managed as default Server when no BYOS exists.
+43. Occupancy Cloud-compat error (slice 43, shipped #1238).
+44. **Occupancy resume keeps preferred Profile** (slice 44): default `code` reconnects my Sandbox even if the Project default Profile changed.
+45. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
+46. Optional team Connection.
+47. Cloud managed as default Server when no BYOS exists.
 
 Cmux-style “this session is PR #928” is correct *context*. It is not a new GitHub aggregate
 and not something `code` scrapes from the vendor TUI.

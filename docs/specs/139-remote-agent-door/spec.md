@@ -164,20 +164,23 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-COMPAT-128 | Unstructured occupancy validation names the enrolled Server | Cloud rejects `targetServerId` as `Input validation failed` | `appaloft code --no-attach` | error names that Server id and says this Cloud does not accept occupancy targeting. |
 | WS-REMOTE-COMPAT-129 | Occupancy does not retry without `targetServerId` | same unstructured validation | `appaloft code --no-attach` | only one `workspaces.open`; no managed substitution. |
 | WS-REMOTE-COMPAT-130 | Binding / Profile errors stay specific | Cloud returns `workspace_open_repository_not_bound` | `appaloft code --no-attach` | existing Binding guidance is unchanged. |
+| WS-REMOTE-RESUME-131 | Default occupancy resume keeps preferred Profile | preferred Sandbox Profile differs from current Project default | `appaloft code --no-attach` | resumes that Sandbox; no `workspace_open_profile_pin_mismatch`. |
+| WS-REMOTE-RESUME-132 | Explicit Profile still fail-closes | `workspace open --profile` names another installation | `appaloft workspace open --profile awpi_new` | `workspace_open_profile_pin_mismatch`. |
+| WS-REMOTE-RESUME-133 | `--new` stays isolated | preferred Sandbox already exists | `appaloft code --new --no-attach` | creates a new Workspace instead of rewriting the preferred disk. |
 
 ## Slice Scope
 
-Slice 1-42 shipped.
+Slice 1-43 shipped.
 
-Slice 43 (this ticket): occupancy names an unstructured Cloud `targetServerId` rejection.
+Slice 44 (this ticket): default occupancy resume keeps the preferred Sandbox Profile.
 
-In slice 43:
+In slice 44:
 
-- unstructured occupancy validation names the enrolled Server;
-- occupancy does not retry without `targetServerId`;
-- Binding / Profile errors stay specific.
+- default `code` resumes my Sandbox when only the Project default Profile changed;
+- explicit `--profile` still fail-closes;
+- `--new` stays isolated.
 
-Out of slice 43: catalog create-PR write, team Connection, Cloud managed default Server.
+Out of slice 44: catalog create-PR write, team Connection, Cloud managed default Server.
 
 
 ## Public Surfaces

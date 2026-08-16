@@ -54,6 +54,7 @@
 | Occupancy available-door hint | same `code` hint + occupancy URL selector |
 | Occupancy TUI available-door footer | same occupancy URL selector + `workspace` footer |
 | Occupancy Cloud-compat error | public CLI `code` after unstructured `workspaces.open` validation |
+| Occupancy resume preferred Profile | public `workspaces.open` resume path |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -315,6 +316,12 @@ Slice-43 verification:
 - unit: unstructured occupancy validation names the enrolled Server;
 - unit: occupancy does not retry without `targetServerId`;
 - unit: Binding / Profile errors stay specific.
+
+Slice-44 verification:
+
+- unit: default occupancy resume keeps the preferred Profile;
+- unit: explicit `--profile` still fail-closes;
+- unit: `--new` stays isolated.
 
 
 

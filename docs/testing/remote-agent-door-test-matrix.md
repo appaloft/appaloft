@@ -137,6 +137,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-COMPAT-128 | CLI / unit | this slice | unstructured occupancy validation names the enrolled Server | `agent-workspace-command.test.ts` |
 | WS-REMOTE-COMPAT-129 | CLI / unit | this slice | occupancy does not retry without `targetServerId` | same command test |
 | WS-REMOTE-COMPAT-130 | CLI / unit | this slice | Binding / Profile errors stay specific | same command test |
+| WS-REMOTE-RESUME-131 | application | this slice | default occupancy resume keeps preferred Profile | `packages/application/test/agent-workspace-open.test.ts` |
+| WS-REMOTE-RESUME-132 | application | this slice | explicit Profile still fail-closes | same application test |
+| WS-REMOTE-RESUME-133 | application | this slice | `--new` stays isolated | same application test |
 
 
 

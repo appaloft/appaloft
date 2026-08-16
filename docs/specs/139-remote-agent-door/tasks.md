@@ -362,6 +362,14 @@
 - [x] Unit tests WS-REMOTE-COMPAT-128-130
 - [x] `appaloftdev code --no-attach` would name the enrolled Server
 
+## Slice 44 - occupancy resume keeps preferred Profile
+
+- [x] Grill D139-D141
+- [x] Ticket `ready-for-agent` - [#1239](https://github.com/appaloft/appaloft/issues/1239)
+- [x] default `code` resumes my Sandbox when only the default Profile changed
+- [x] Unit tests WS-REMOTE-RESUME-131-133
+- [x] `appaloftdev code --no-attach` would resume the preferred Sandbox
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator
