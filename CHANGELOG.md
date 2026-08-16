@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.8.5](https://github.com/appaloft/appaloft/compare/v1.8.4...v1.8.5) (2026-08-16)
+
+
+### Bug Fixes
+
+* **source:** fail closed when remote inspect cannot spawn git ([4c2b3eb](https://github.com/appaloft/appaloft/commit/4c2b3eb452492738c9bc7ab96e495c90eccff244))
+* **source:** fail closed when remote inspect cannot spawn git ([4c2b3eb](https://github.com/appaloft/appaloft/commit/4c2b3eb452492738c9bc7ab96e495c90eccff244))
+* **source:** tolerate missing spawnSync stdio when git clone fails ([3baceb6](https://github.com/appaloft/appaloft/commit/3baceb6346012141768f44d30165bf6d129c2167))
+
 ## [1.8.4](https://github.com/appaloft/appaloft/compare/v1.8.3...v1.8.4) (2026-08-16)
 
 
