@@ -24,6 +24,7 @@
 | Headless occupancy tree | public CLI adapter composing `servers.list` + `sandboxes.list` |
 | Occupancy projectId | same tree; copy `activation.project.projectId` |
 | Occupancy Preview URL | same tree; copy succeeded generated access from Resource `app` |
+| Occupancy deploy reuse | public CLI adapter composing Binding + Environment `local` + Resource `app` + default Server |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -111,6 +112,13 @@ Slice-13 verification:
 - unit: occupancy with succeeded generated access prints `preview.url`;
 - unit: occupancy without succeeded access omits `preview`;
 - `appaloftdev workspace --json` after official hello create includes `http://app-jkhtnc45nk.127.0.0.1.sslip.io`.
+
+Slice-14 verification:
+
+- unit: git-remote with occupancy Resource `app` dispatches `deployments.create`;
+- unit: missing Binding/`app` does not invent Resource;
+- `appaloftdev deploy https://github.com/appaloft/examples.git` after occupy does not prompt for method.
+
 
 
 

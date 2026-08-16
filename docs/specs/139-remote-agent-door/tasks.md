@@ -122,6 +122,14 @@
 - [x] Unit tests WS-REMOTE-PREVIEW-050–051
 - [x] `appaloftdev workspace --json` after official hello create
 
+## Slice 14 — occupancy deploy reuse
+
+- [x] Grill D49–D51
+- [x] Ticket `ready-for-agent` — [#1179](https://github.com/appaloft/appaloft/issues/1179)
+- [x] `deploy <git-remote>` reuses occupancy Resource `app`
+- [x] Unit tests WS-REMOTE-DEPLOY-052–053
+- [x] `appaloftdev deploy https://github.com/appaloft/examples.git` after occupy
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

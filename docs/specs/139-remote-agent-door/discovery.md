@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–12 shipped. Slice 13 occupancy Preview URL owner-confirmed 2026-08-16 (D46–D48).
+- Round: Spec. Slice 1–13 shipped. Slice 14 occupancy deploy reuse owner-confirmed 2026-08-16 (D49–D51).
 - Date: 2026-08-16.
-- Predecessor: remote-git inspection shipped as public #1176.
-- Code changes allowed: yes for slice 13 after the occupancy-preview ticket is `ready-for-agent`.
+- Predecessor: occupancy Preview URL shipped as public #1178.
+- Code changes allowed: yes for slice 14 after the occupancy-deploy ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -83,6 +83,9 @@ Sandbox on that Server, not one VM per person.
 | D46 | Slice 13 occupancy tree exposes live Preview URL from existing `resources.list` | Live occupy+create of official hello succeeded (`dep_mh73nchmktot`). Container `/health` is 200. Generated host is 200 through Traefik. `resource list` already has `accessSummary.latestGeneratedAccessRoute`. `workspace --json` still has no URL. |
 | D47 | Only occupancy Resource slug `app` with a succeeded generated route | Durable/production domain is later. Do not invent sslip. Do not scrape vendor TUI. |
 | D48 | Missing or failed access stays omitted | Tree still prints servers and occupancies. List-resources failure does not fail the tree. Interactive TUI and `code` banner stay unchanged this slice. |
+| D49 | Slice 14 `appaloft deploy <git-remote>` reuses occupancy Resource `app` | Live `deploy https://github.com/appaloft/examples.git` after occupy+create still prompts for Deployment method. Occupancy already has Project / Environment `local` / Resource `app` / default Server. |
+| D50 | Reuse Binding + Environment `local` + Resource slug `app` + default Server; call existing `deployments.create` | Do not create a second Resource. Do not invent method/Dockerfile. Destination still omitted so plan/create resolve Server `default`. |
+| D51 | Missing occupancy Resource: interactive stays on the existing prompt path; non-interactive fail-closed | Do not invent Resource/`app`. No Binding or no `app` is not a silent create. |
 
 ## Rejected
 
@@ -142,11 +145,12 @@ Later slices after occupancy:
 10. Occupancy default network (slice 10, shipped #1172).
 11. Remote-git planner evidence (slice 11, shipped #1174).
 12. Remote-git inspection (slice 12, shipped #1176).
-13. **Occupancy Preview URL** (slice 13): `workspace --json` copies live generated access from Resource `app`.
-14. Session-native Preview chrome / interactive `workspace` TUI.
-15. GitHub as source surface / `owner/repo` shorthand.
-16. Optional team Connection.
-17. Cloud managed as default Server when no BYOS exists.
+13. Occupancy Preview URL (slice 13, shipped #1178).
+14. **Occupancy deploy reuse** (slice 14): `appaloft deploy <git-remote>` creates from occupancy Resource `app`.
+15. Session-native Preview chrome / interactive `workspace` TUI.
+16. GitHub as source surface / `owner/repo` shorthand.
+17. Optional team Connection.
+18. Cloud managed as default Server when no BYOS exists.
 
 ## Delivery chrome (owner 2026-08-15)
 

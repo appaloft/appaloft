@@ -3,11 +3,11 @@
 ## Status
 
 - Round: Spec
-- Artifact state: slice 1–12 shipped; slice 13 occupancy Preview URL accepted 2026-08-16
+- Artifact state: slice 1–13 shipped; slice 14 occupancy deploy reuse accepted 2026-08-16
 - Discovery: [discovery.md](./discovery.md)
 - Governing decision: ADR-120 plan default destination; ADR-119 locates; ADR-118 occupies; ADR-117 remains the login/Server/`--local` door; ADR-116 remains Scratch-only; ADR-103 stays on explicit `workspace open` Git fail-closed
-- Code changes allowed: yes for slice 13 after the occupancy-preview ticket is `ready-for-agent`
-- Compatibility: public minor. Occupancy tree may include live generated Preview URL; no new catalog field
+- Code changes allowed: yes for slice 14 after the occupancy-deploy ticket is `ready-for-agent`
+- Compatibility: public minor. `appaloft deploy <git-remote>` may reuse occupancy Resource `app`; no new catalog field
 
 ## Business Outcome
 
@@ -85,20 +85,22 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-INSPECT-049 | Monorepo remote-git fail-closed | occupancy Resource source is `appaloft/examples` with multiple deployable roots | `deployments.plan --resource --server` | blocked on `source.baseDirectory`; does not invent `hello/`. |
 | WS-REMOTE-PREVIEW-050 | Occupancy Preview URL | occupancy Project has Resource `app` with succeeded generated access | `appaloft workspace --json` | occupancy row includes `preview.url` from `resources.list` `accessSummary.latestGeneratedAccessRoute`. |
 | WS-REMOTE-PREVIEW-051 | Missing Preview stays omitted | occupancy has projectId but Resource `app` has no succeeded generated route | `appaloft workspace --json` | row has projectId; no invented `preview`. |
+| WS-REMOTE-DEPLOY-052 | Occupancy deploy reuse | occupancy Project has Environment `local` and Resource `app`; default Server exists | `appaloft deploy https://github.com/appaloft/examples.git` | CLI does not prompt for method; dispatches `deployments.create` with occupancy project/env/resource/server. |
+| WS-REMOTE-DEPLOY-053 | Missing occupancy Resource stays fail-closed when non-interactive | git-remote has no Binding or no Resource `app`; no TTY | `appaloft deploy <git-remote>` | exits non-zero `workspace_occupancy_resource_missing`; no invented Resource. |
 
 ## Slice Scope
 
-Slice 1–12 shipped.
+Slice 1–13 shipped.
 
-Slice 13 (this ticket): occupancy tree exposes live generated Preview URL.
+Slice 14 (this ticket): `appaloft deploy <git-remote>` reuses occupancy Resource `app`.
 
-In slice 13:
+In slice 14:
 
-- compose existing `resources.list` into headless `workspace --json`;
-- copy succeeded generated access from occupancy Resource slug `app`;
-- omit preview when access is missing or not succeeded.
+- resolve Binding → Environment `local` → Resource slug `app` → default Server;
+- dispatch existing `deployments.create`;
+- omit destinationId so Server `default` still resolves.
 
-Out of slice 13: `code` banner Preview, interactive TUI chrome, durable/production domain, inventing sslip, owner/repo shorthand.
+Out of slice 14: inventing `hello/`, `code` banner Preview, interactive TUI chrome, owner/repo shorthand.
 
 ## Public Surfaces
 
@@ -142,7 +144,7 @@ Missing Binding is not a `code` hard failure. The initializer creates or reuses 
 - Cloud managed as default Server when no BYOS exists.
 - GitHub `owner/repo` shorthand or `/tree/` URL parsing.
 - `destinations.list` or expanding `servers.show` with destinations.
-- `code` banner Preview, interactive TUI Preview chrome, or inventing sslip hosts.
+- Inventing occupancy Resource or Deployment method when Binding/`app` is missing.
 
 ## Compatibility
 
