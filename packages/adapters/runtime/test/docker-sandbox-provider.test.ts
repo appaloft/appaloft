@@ -184,6 +184,23 @@ const request = {
 };
 
 describe("DockerSandboxProvider", () => {
+  test("[WS-REMOTE-HOST-EGRESS-001] host egress admits allowlist without a proxy adapter", async () => {
+    const runner = new CapturingRunner();
+    const provider = new DockerSandboxProvider({ isolation: "container-trusted", runner, hostEgress: true });
+    expect(provider.capabilities.networkPolicy).toEqual(["deny", "allowlist"]);
+    await provider.provision({
+      ...request,
+      requestedIsolation: "container-trusted",
+      networkPolicy: {
+        mode: "allowlist",
+        rules: [{ kind: "domain", value: "github.com", ports: [443] }],
+      },
+    });
+    const created = runner.calls.find((call) => call.argv.includes("create"));
+    expect(created?.argv).toContain("bridge");
+    expect(runner.calls.some((call) => call.argv[0] === "dd")).toBe(false);
+  });
+
   test("[TERM-SESSION-SANDBOX-001][SBX-RUNTIME-005] opens the managed container shell with a Workspace-scoped home", async () => {
     const runner = new CapturingRunner();
     const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
