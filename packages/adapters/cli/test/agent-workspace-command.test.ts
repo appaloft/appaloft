@@ -874,6 +874,63 @@ describe("Agent Workspace CLI", () => {
     expect(output.join("")).not.toContain("Local scratch · this Mac · not saved remotely");
   });
 
+  test("[WS-REMOTE-BANNER-061] code banner includes occupancy Preview URL", async () => {
+    const output: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>() =>
+          ok({ workspaceId: "sbx_whoami", projectId: "prj_tk5lovqu2vj8" } as T),
+      } as unknown as CommandBus,
+      queryBus: {
+        execute: async <T>() =>
+          ok({
+            items: [
+              {
+                projectId: "prj_tk5lovqu2vj8",
+                slug: "app",
+                lastDeploymentStatus: "succeeded",
+                accessSummary: {
+                  latestGeneratedAccessRoute: {
+                    url: "http://app-sc156jw98k.127.0.0.1.sslip.io",
+                    deploymentStatus: "succeeded",
+                  },
+                },
+              },
+            ],
+          } as T),
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_banner_preview" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/traefik/whoami.git",
+        repositoryIdentity: "github.com/traefik/whoami",
+        ref: "refs/heads/master",
+        branch: "master",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        projectId: "prj_tk5lovqu2vj8",
+        serverId: "srv_uil9cpctplou",
+        serverName: "occupancy-mac",
+      }),
+    });
+    const write = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
+    } finally {
+      process.stdout.write = write;
+    }
+    expect(output.join("")).toContain(
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_whoami · http://app-sc156jw98k.127.0.0.1.sslip.io",
+    );
+  });
+
   test("[R8-OCC-CODE-007] code --new isolates a new occupancy Workspace", async () => {
     const commands: Command<unknown>[] = [];
     const { createCliProgram } = await import("../src");

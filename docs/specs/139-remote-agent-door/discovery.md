@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–17 shipped. Slice 18 occupancy deploy URL owner-confirmed 2026-08-16 (D61–D63).
+- Round: Spec. Slice 1–18 shipped. Slice 19 occupancy banner Preview URL owner-confirmed 2026-08-16 (D64–D66).
 - Date: 2026-08-16.
-- Predecessor: bare occupancy deploy shipped as public #1186.
-- Code changes allowed: yes for slice 18 after the occupancy-deploy-url ticket is `ready-for-agent`.
+- Predecessor: occupancy deploy URL shipped as public #1188.
+- Code changes allowed: yes for slice 19 after the occupancy-banner-preview ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -98,6 +98,9 @@ Sandbox on that Server, not one VM per person.
 | D61 | Slice 18 successful occupancy `deploy` prints the generated access URL | Live `appaloft deploy` after occupying whoami returns only `{"id":"dep_*"}`. `deployments.show` and `workspace --json` already have `http://app-sc156jw98k.127.0.0.1.sslip.io`. Railway `up` prints the URL. |
 | D62 | URL comes from existing `publicPreviewUrlsFromDeploymentSummary` after sync create | Same generated route as slice 13. Do not invent sslip. Do not scrape vendor TUI. First URL only. |
 | D63 | Missing or failed route still prints `dep_*` and exits 0 | `--require-preview-url` stays the hard gate. Do not fail a succeeded deploy because chrome is missing. |
+| D64 | Slice 19 `code` banner appends occupancy Preview URL when Resource `app` already has succeeded generated access | Live `code --no-attach` after deploy still prints only `Remote · project · repo@sha · server · my sandbox`. `workspace --json` already has `preview.url`. Railway `ca` / session chrome shows the URL without a second command. |
+| D65 | URL is the same generated access as slice 13 / 18 | Copy from occupancy Resource `app` `accessSummary.latestGeneratedAccessRoute`. Do not invent sslip. Do not scrape vendor TUI. One banner line. |
+| D66 | Missing generated URL keeps the existing banner | Do not fail occupy. Interactive TUI / PR number stay later. |
 
 ## Rejected
 
@@ -162,10 +165,11 @@ Later slices after occupancy:
 15. Occupancy EXPOSE port (slice 15, shipped #1182).
 16. GitHub `owner/repo` (slice 16, shipped #1184).
 17. Bare occupancy deploy (slice 17, shipped #1186).
-18. **Occupancy deploy URL** (slice 18): successful `appaloft deploy` prints the generated access URL.
-19. Session-native Preview chrome / interactive `workspace` TUI.
-20. Optional team Connection.
-21. Cloud managed as default Server when no BYOS exists.
+18. Occupancy deploy URL (slice 18, shipped #1188).
+19. **Occupancy banner Preview URL** (slice 19): `appaloft code` banner includes generated access when present.
+20. Interactive `workspace` TUI / session-native PR chrome.
+21. Optional team Connection.
+22. Cloud managed as default Server when no BYOS exists.
 
 ## Delivery chrome (owner 2026-08-15)
 

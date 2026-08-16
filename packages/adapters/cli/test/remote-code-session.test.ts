@@ -88,6 +88,35 @@ describe("remote code door", () => {
     );
   });
 
+  test("[WS-REMOTE-BANNER-061] occupancy banner includes generated access URL", () => {
+    expect(
+      formatRemoteCodeBanner({
+        projectId: "prj_tk5lovqu2vj8",
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        serverName: "occupancy-mac",
+        workspaceId: "sbx_rn32pzyp8yxr",
+        previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io",
+      }),
+    ).toBe(
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr · http://app-sc156jw98k.127.0.0.1.sslip.io",
+    );
+  });
+
+  test("[WS-REMOTE-BANNER-062] missing generated access keeps existing banner", () => {
+    expect(
+      formatRemoteCodeBanner({
+        projectId: "prj_tk5lovqu2vj8",
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        serverName: "occupancy-mac",
+        workspaceId: "sbx_rn32pzyp8yxr",
+      }),
+    ).toBe(
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr",
+    );
+  });
+
   test("[WS-REMOTE-LOGIN-001] local composition skips Cloud login", async () => {
     const door = await resolveDefaultRemoteCodeDoor({
       env: {},

@@ -92,13 +92,17 @@ export function formatRemoteCodeBanner(input: {
   readonly commitSha: string;
   readonly serverName: string;
   readonly workspaceId?: string;
+  readonly previewUrl?: string;
 }): string {
   const sha = input.commitSha.slice(0, 7);
   const project = input.projectId?.trim() || "project";
   const occupancy = input.workspaceId?.trim()
     ? `my sandbox · ${input.workspaceId.trim()}`
     : "my sandbox";
-  return `Remote · ${project} · ${input.repositoryIdentity}@${sha} · ${input.serverName} · ${occupancy}`;
+  const preview = input.previewUrl?.trim();
+  return preview
+    ? `Remote · ${project} · ${input.repositoryIdentity}@${sha} · ${input.serverName} · ${occupancy} · ${preview}`
+    : `Remote · ${project} · ${input.repositoryIdentity}@${sha} · ${input.serverName} · ${occupancy}`;
 }
 
 function remoteCodeError(

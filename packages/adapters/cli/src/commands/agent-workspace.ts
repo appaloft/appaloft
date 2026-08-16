@@ -175,6 +175,19 @@ function occupancyPreviewFromResource(
   return { url: route.url };
 }
 
+function occupancyPreviewUrlForProject(
+  resources: ResourceListResult["items"],
+  projectId: string | undefined,
+): string | undefined {
+  if (!projectId) return undefined;
+  for (const resource of resources) {
+    if (resource.projectId !== projectId) continue;
+    const preview = occupancyPreviewFromResource(resource);
+    if (preview) return preview.url;
+  }
+  return undefined;
+}
+
 function occupancyTreeFromLists(
   reason: string,
   servers: ServerListResult["items"],
@@ -561,13 +574,23 @@ export const workspaceCodeCommand = EffectCommand.make(
           `Pinned · ${workspaceId} @ ${pinnedSha.slice(0, 7)} · requested ${door.commitSha.slice(0, 7)} · use --new for an isolated Workspace\n`,
         );
       }
+      const bannerProjectId = result.projectId || door.projectId;
+      let previewUrl: string | undefined;
+      const resourcesQuery = ListResourcesQuery.create({ limit: 100 });
+      if (resourcesQuery.isOk()) {
+        const listed = yield* Effect.promise(() => cli.executeQuery(resourcesQuery.value));
+        if (listed.isOk()) {
+          previewUrl = occupancyPreviewUrlForProject(listed.value.items ?? [], bannerProjectId);
+        }
+      }
       process.stdout.write(
         `${formatRemoteCodeBanner({
-          projectId: result.projectId || door.projectId,
+          projectId: bannerProjectId,
           repositoryIdentity: door.repositoryIdentity,
           commitSha: bannerCommitSha,
           serverName: door.serverName,
           workspaceId: result.workspaceId,
+          ...(previewUrl ? { previewUrl } : {}),
         })}\n`,
       );
       process.stdout.write(`${REMOTE_CODE_MODEL_HINT}\n`);

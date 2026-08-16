@@ -3,11 +3,11 @@
 ## Status
 
 - Round: Spec
-- Artifact state: slice 1–17 shipped; slice 18 occupancy deploy URL accepted 2026-08-16
+- Artifact state: slice 1–18 shipped; slice 19 occupancy banner Preview URL accepted 2026-08-16
 - Discovery: [discovery.md](./discovery.md)
 - Governing decision: ADR-120 plan default destination; ADR-119 locates; ADR-118 occupies; ADR-117 remains the login/Server/`--local` door; ADR-116 remains Scratch-only; ADR-103 stays on explicit `workspace open` Git fail-closed
-- Code changes allowed: yes for slice 18 after the occupancy-deploy-url ticket is `ready-for-agent`
-- Compatibility: public minor. Successful occupancy `deploy` may print generated access URL; no new catalog field
+- Code changes allowed: yes for slice 19 after the occupancy-banner-preview ticket is `ready-for-agent`
+- Compatibility: public minor. Occupancy `code` banner may append generated access URL; no new catalog field
 
 ## Business Outcome
 
@@ -46,7 +46,7 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-OPEN-COMPAT-011 | Delivery open unchanged | `workspace open` / `workspace create` | dirty/non-git laptop | existing `workspace_git_*` fail-closed. Bare `workspace open` does not require `targetServerId`. |
 | WS-REMOTE-CAPACITY-012 | No silent fallback | default Server has no capacity | `appaloft code` | fail closed; not Scratch; not another teammate’s Sandbox; not a different Server; not managed substitution. |
 | WS-REMOTE-DOCS-013 | Help names doors | `code --help` / Workspace docs | rendered | default `code` occupies my Sandbox; `--local` is Scratch; `workspace open` is delivery Git-safe; `workspace` `ca` is later. |
-| WS-REMOTE-BANNER-014 | Identity after occupy | `workspaces.open` succeeds | attach or `--no-attach` | stdout has one banner: `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>`. No live deploy stream. |
+| WS-REMOTE-BANNER-014 | Identity after occupy | `workspaces.open` succeeds | attach or `--no-attach` | stdout has one banner: `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>` and optional ` · <preview-url>` when Resource `app` already has succeeded generated access. No live deploy stream. |
 | WS-REMOTE-TARGET-015 | Door Server is placement | door selected Server S | `code` dispatches open | command includes `targetServerId=S`; placement reserves S. |
 | WS-REMOTE-NO-ATTACH-016 | Occupy without attach | `--no-attach` | `appaloft code --no-attach` | Sandbox is created or resumed; CLI does not attach; exit 0; `sandbox list` shows my occupancy. |
 | WS-REMOTE-SKILL-017 | Occupancy offers Appaloft skill | occupancy OpenCode starts or attaches | harness config is prepared | Sandbox serve offers `/workspace/skills` and `/workspace/.agents/skills`; `appaloft-remote` declares optional `appaloft-tools` so a later first-party MCP Connection can bind into occupancy serve. Unbound occupancy still starts without serve MCP. Native attach offers the public Appaloft skill plus `appaloft mcp remote-stdio` when a control plane is selected, or `mcp stdio` for local-only Scratch. Occupancy attach must not wrap remote-stdio with `APPALOFT_CONTROL_PLANE_MODE=none`. Attach sets an isolated `XDG_CONFIG_HOME` so a broken host `opencode.json` cannot reject the injected MCP. Vendor TUI text is not parsed. |
@@ -94,20 +94,22 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-DEPLOY-058 | Bare deploy without occupancy fail-closed | no non-terminal occupancy or no Resource `app`; no TTY | `appaloft deploy` | exits non-zero `workspace_occupancy_resource_missing`; does not treat cwd as source. |
 | WS-REMOTE-DEPLOY-059 | Occupancy deploy prints generated URL | occupancy Resource `app` has a succeeded generated access route | `appaloft deploy` | stdout includes that URL after `deployments.create`. |
 | WS-REMOTE-DEPLOY-060 | Missing generated URL stays omitted | occupancy deploy succeeds but no public access route | `appaloft deploy` | still prints deployment id; exit 0; no invented URL. |
+| WS-REMOTE-BANNER-061 | Occupancy banner includes Preview URL | occupancy Resource `app` has succeeded generated access | `appaloft code --no-attach` | banner includes that URL. |
+| WS-REMOTE-BANNER-062 | Missing Preview stays omitted from banner | occupancy has projectId but Resource `app` has no succeeded generated route | `appaloft code --no-attach` | existing identity banner; no invented URL. |
 
 ## Slice Scope
 
-Slice 1–17 shipped.
+Slice 1–18 shipped.
 
-Slice 18 (this ticket): successful occupancy `deploy` prints the generated access URL.
+Slice 19 (this ticket): occupancy `code` banner includes generated access URL when present.
 
-In slice 18:
+In slice 19:
 
-- after sync `deployments.create`, print first `publicPreviewUrlsFromDeploymentSummary` URL;
-- missing route does not fail the deploy;
-- `--require-preview-url` unchanged.
+- same generated route as `workspace --json` / `deploy` URL;
+- missing route keeps the existing banner;
+- one banner line; no vendor TUI scrape.
 
-Out of slice 18: interactive TUI Preview chrome, Cloud managed default Server.
+Out of slice 19: interactive TUI, PR number chrome, Cloud managed default Server.
 
 ## Public Surfaces
 

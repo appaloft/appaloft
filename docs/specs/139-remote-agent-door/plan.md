@@ -29,6 +29,7 @@
 | GitHub owner/repo | public CLI remote-code locator |
 | Bare occupancy deploy | public CLI adapter composing latest occupancy + Binding/`app` |
 | Occupancy deploy URL | public CLI adapter printing first generated access URL after create |
+| Occupancy banner Preview URL | public CLI banner composing occupancy Resource `app` generated access |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -146,6 +147,13 @@ Slice-18 verification:
 - unit: occupancy `deploy` stdout includes the generated access URL;
 - unit: missing generated route still prints deployment id;
 - `appaloftdev deploy` after occupying `traefik/whoami` prints the sslip URL.
+
+Slice-19 verification:
+
+- unit: occupancy banner includes generated access URL when Resource `app` has it;
+- unit: missing generated access keeps the existing banner;
+- `appaloftdev code --no-attach` after occupying+deploying `traefik/whoami` prints the sslip URL.
+
 
 
 

@@ -163,9 +163,17 @@
 - [x] Unit tests WS-REMOTE-DEPLOY-059–060
 - [x] `appaloftdev deploy` after occupying `traefik/whoami` prints sslip URL
 
+## Slice 19 — occupancy banner Preview URL
+
+- [x] Grill D64–D66
+- [x] Ticket `ready-for-agent` — [#1189](https://github.com/appaloft/appaloft/issues/1189)
+- [x] Occupancy `code` banner includes generated URL
+- [x] Unit tests WS-REMOTE-BANNER-061–062
+- [x] `appaloftdev code --no-attach` after occupying+deploying `traefik/whoami` prints sslip URL
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator
 - [ ] Team Connection
 - [ ] Cloud managed as default Server
-- [ ] Session-native Preview chrome
+- [ ] Session-native PR chrome
