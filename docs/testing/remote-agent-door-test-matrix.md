@@ -113,6 +113,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-BANNER-104 | CLI / unit | this slice | occupancy banner wraps Preview / Compare | `remote-code-session.test.ts` |
 | WS-REMOTE-BANNER-105 | CLI / unit | this slice | existing PR wrap stays PR-only | same banner test |
 | WS-REMOTE-BANNER-106 | CLI / unit | this slice | lean banner stays one line | same banner test |
+| WS-REMOTE-OPEN-107 | CLI / unit | this slice | `code --open` prefers Preview | `remote-code-session.test.ts` |
+| WS-REMOTE-OPEN-108 | CLI / unit | this slice | `code --open` falls back to PR then compare | same session test |
+| WS-REMOTE-OPEN-109 | CLI / unit | this slice | missing occupancy open stays lean | same session test |
 
 
 

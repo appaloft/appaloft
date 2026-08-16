@@ -62,7 +62,9 @@ import {
   SCRATCH_BANNER,
 } from "../local-scratch-session.js";
 import {
+  occupancyBrowserLaunchAllowed,
   occupancyChromeForProject,
+  occupancyCodeOpenUrl,
   occupancyLastDeploymentFromResource,
   occupancyPreviewFromResource,
   occupancyPullRequestFromPreviewEnvironments,
@@ -440,8 +442,9 @@ export const workspaceCodeCommand = EffectCommand.make(
     noAttach: Options.boolean("no-attach").pipe(Options.withDefault(false)),
     local: Options.boolean("local").pipe(Options.withDefault(false)),
     forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
+    open: Options.boolean("open").pipe(Options.withDefault(false)),
   },
-  ({ forceNew, local, noAttach, path }) =>
+  ({ forceNew, local, noAttach, open, path }) =>
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
       if (local) {
@@ -614,6 +617,31 @@ export const workspaceCodeCommand = EffectCommand.make(
           ...(door.branch ? { branch: door.branch } : {}),
         })}\n`,
       );
+      if (open) {
+        const url = occupancyCodeOpenUrl({
+          repositoryIdentity: door.repositoryIdentity,
+          commitSha: bannerCommitSha,
+          ...(previewUrl ? { previewUrl } : {}),
+          ...(pullRequestNumber ? { pullRequestNumber } : {}),
+          ...(door.branch ? { branch: door.branch } : {}),
+        });
+        if (url) {
+          process.stdout.write(`Open · ${url}\n`);
+          if (occupancyBrowserLaunchAllowed()) {
+            const command =
+              process.platform === "darwin"
+                ? ["open", url]
+                : process.platform === "win32"
+                  ? ["cmd", "/c", "start", "", url]
+                  : ["xdg-open", url];
+            const child = spawn(command[0]!, command.slice(1), {
+              shell: false,
+              stdio: "ignore",
+            });
+            child.unref();
+          }
+        }
+      }
       process.stdout.write(`${REMOTE_CODE_MODEL_HINT}\n`);
       if (!attach) return;
       yield* completeWorkspaceOpen(result, true, cli.launchNativeWorkspaceClient);

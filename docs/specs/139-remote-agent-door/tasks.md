@@ -298,6 +298,14 @@
 - [x] Unit tests WS-REMOTE-BANNER-104–106
 - [x] `appaloftdev code --no-attach` would print compare on its own line
 
+## Slice 36 — occupancy code `--open`
+
+- [x] Grill D115–D117
+- [x] Ticket `ready-for-agent` — [#1223](https://github.com/appaloft/appaloft/issues/1223)
+- [x] `code --open` opens Preview, else PR, else compare
+- [x] Unit tests WS-REMOTE-OPEN-107–109
+- [x] `appaloftdev code --no-attach --open` would open occupancy Preview
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

@@ -136,6 +136,36 @@ export function occupancyBrowserLaunchAllowed(env: NodeJS.ProcessEnv = process.e
   return env["APPALOFT_CLI_OPEN_BROWSER"] !== "false" && env["CI"] !== "true";
 }
 
+export function occupancyCodeOpenUrl(input: {
+  readonly previewUrl?: string;
+  readonly pullRequestNumber?: number;
+  readonly repositoryIdentity: string;
+  readonly commitSha: string;
+  readonly branch?: string;
+}): string | undefined {
+  const preview = input.previewUrl?.trim();
+  if (preview && isOccupancyHttpUrl(preview)) return preview;
+  if (
+    typeof input.pullRequestNumber === "number" &&
+    Number.isInteger(input.pullRequestNumber) &&
+    input.pullRequestNumber > 0
+  ) {
+    const pull = occupancyGitHubPullRequestUrl(
+      {
+        repositoryIdentity: input.repositoryIdentity,
+        commitSha: input.commitSha,
+      },
+      input.pullRequestNumber,
+    );
+    if (pull) return pull;
+  }
+  return occupancyGitHubCompareUrl({
+    repositoryIdentity: input.repositoryIdentity,
+    commitSha: input.commitSha,
+    ...(input.branch ? { branch: input.branch } : {}),
+  });
+}
+
 function previewEnvironmentMatchesOccupancy(
   environment: OccupancyPreviewEnvironment,
   occupancy: OccupancyIdentity,

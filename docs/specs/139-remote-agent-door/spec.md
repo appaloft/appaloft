@@ -140,21 +140,24 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-BANNER-104 | Occupancy banner wraps Preview / Compare | occupancy has Preview + GitHub compare and no PR | `appaloft code --no-attach` | identity first line; Preview and compare each on their own following line. |
 | WS-REMOTE-BANNER-105 | Existing PR wrap stays PR-only | occupancy already has PR #n | `appaloft code --no-attach` | second line is `PR #n` plus pull URL when available; no compare line. |
 | WS-REMOTE-BANNER-106 | Lean banner stays one line | missing Preview / Compare / PR | `appaloft code --no-attach` | identity line only. |
+| WS-REMOTE-OPEN-107 | `code --open` prefers Preview | occupancy has Preview URL | `appaloft code --no-attach --open` | presentation launches that Preview URL. |
+| WS-REMOTE-OPEN-108 | `code --open` falls back to PR then compare | no Preview | `appaloft code --no-attach --open` | existing PR opens pull URL; otherwise GitHub compare. |
+| WS-REMOTE-OPEN-109 | Missing occupancy open stays lean | no Preview / PR / compare | `appaloft code --no-attach --open` | no browser spawn. |
 
 ## Slice Scope
 
-Slice 1–34 shipped.
+Slice 1–35 shipped.
 
-Slice 35 (this ticket): `appaloft code` banner wraps occupancy Preview / Compare / PR onto their own lines.
+Slice 36 (this ticket): `appaloft code --open` opens occupancy Preview, else PR, else compare.
 
-In slice 35:
+In slice 36:
 
-- identity stays the first line;
-- Preview / Compare / PR each follow on their own line when present;
-- existing PR still omits compare;
-- missing URLs stay omitted.
+- `--open` prefers Preview;
+- missing Preview falls back to PR, then compare;
+- missing / unsafe URL does not spawn a browser;
+- no GitHub write.
 
-Out of slice 35: catalog create-PR write, team Connection, Cloud managed default Server.
+Out of slice 36: catalog create-PR write, team Connection, Cloud managed default Server.
 
 
 ## Public Surfaces

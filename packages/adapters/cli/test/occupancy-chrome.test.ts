@@ -5,6 +5,7 @@ import {
   isOccupancyGitHubPullRequestUrl,
   isOccupancyHttpUrl,
   occupancyChromeForProject,
+  occupancyCodeOpenUrl,
   occupancyCompareOrPullUrl,
   occupancyGitHubCompareUrl,
   occupancyPullRequestFromPreviewEnvironments,
@@ -230,5 +231,46 @@ describe("occupancy production chrome", () => {
     ).toEqual({
       preview: { url: "http://app-sc156jw98k.127.0.0.1.sslip.io" },
     });
+  });
+});
+
+describe("occupancy code --open", () => {
+  test("[WS-REMOTE-OPEN-107] prefers Preview", () => {
+    expect(
+      occupancyCodeOpenUrl({
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        branch: "feat/occupancy",
+        previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io/",
+        pullRequestNumber: 928,
+      }),
+    ).toBe("http://app-sc156jw98k.127.0.0.1.sslip.io/");
+  });
+
+  test("[WS-REMOTE-OPEN-108] falls back to PR then compare", () => {
+    expect(
+      occupancyCodeOpenUrl({
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        branch: "feat/occupancy",
+        pullRequestNumber: 928,
+      }),
+    ).toBe("https://github.com/traefik/whoami/pull/928");
+    expect(
+      occupancyCodeOpenUrl({
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        branch: "feat/occupancy",
+      }),
+    ).toBe("https://github.com/traefik/whoami/compare/feat/occupancy?expand=1");
+  });
+
+  test("[WS-REMOTE-OPEN-109] missing occupancy open stays lean", () => {
+    expect(
+      occupancyCodeOpenUrl({
+        repositoryIdentity: "gitlab.com/acme/api",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+      }),
+    ).toBeUndefined();
   });
 });

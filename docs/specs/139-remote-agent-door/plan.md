@@ -46,6 +46,7 @@
 | Occupancy commit prefill | same Deliver Task form + occupancy short SHA |
 | Occupancy banner compare | public CLI `code` banner + same compare helper |
 | Occupancy banner wrap | same `code` banner formatter |
+| Occupancy code `--open` | public CLI `code --open` + same occupancy URL guards |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -259,6 +260,12 @@ Slice-35 verification:
 - unit: banner wraps Preview / Compare onto following lines;
 - unit: existing PR wrap stays PR-only;
 - unit: lean banner stays one line.
+
+Slice-36 verification:
+
+- unit: `--open` prefers Preview;
+- unit: missing Preview falls back to PR then compare;
+- unit: missing URL does not spawn a browser.
 
 
 
