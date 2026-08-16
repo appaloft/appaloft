@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.8.3](https://github.com/appaloft/appaloft/compare/v1.8.2...v1.8.3) (2026-08-16)
+
+
+### Bug Fixes
+
+* **cli:** print occupancy tree when login is missing ([2be7b12](https://github.com/appaloft/appaloft/commit/2be7b124c8c4caf02329488733a8277bd5d0047e))
+* **cli:** print occupancy tree when login is missing ([2be7b12](https://github.com/appaloft/appaloft/commit/2be7b124c8c4caf02329488733a8277bd5d0047e))
+* **cli:** print occupancy tree when login is missing ([4c205e3](https://github.com/appaloft/appaloft/commit/4c205e34359b4eafc2a653ecb4b35b4fa10b2c8f))
+
 ## [1.8.2](https://github.com/appaloft/appaloft/compare/v1.8.1...v1.8.2) (2026-08-16)
 
 
