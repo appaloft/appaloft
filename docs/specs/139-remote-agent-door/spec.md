@@ -3,11 +3,11 @@
 ## Status
 
 - Round: Spec
-- Artifact state: slice 1–16 shipped; slice 17 bare occupancy deploy accepted 2026-08-16
+- Artifact state: slice 1–17 shipped; slice 18 occupancy deploy URL accepted 2026-08-16
 - Discovery: [discovery.md](./discovery.md)
 - Governing decision: ADR-120 plan default destination; ADR-119 locates; ADR-118 occupies; ADR-117 remains the login/Server/`--local` door; ADR-116 remains Scratch-only; ADR-103 stays on explicit `workspace open` Git fail-closed
-- Code changes allowed: yes for slice 17 after the occupancy-bare-deploy ticket is `ready-for-agent`
-- Compatibility: public minor. Bare `appaloft deploy` may reuse latest occupancy Resource `app`; no new catalog field
+- Code changes allowed: yes for slice 18 after the occupancy-deploy-url ticket is `ready-for-agent`
+- Compatibility: public minor. Successful occupancy `deploy` may print generated access URL; no new catalog field
 
 ## Business Outcome
 
@@ -92,20 +92,22 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-EXPOSE-055 | Missing or multiple EXPOSE keeps 3000 | occupancy remote has no EXPOSE or more than one distinct EXPOSE | `appaloft code --no-attach` | Resource stays `internalPort 3000`. |
 | WS-REMOTE-DEPLOY-057 | Bare occupancy deploy | latest occupancy has Environment `local` and Resource `app` | `appaloft deploy` | no pathOrSource prompt; dispatches `deployments.create` for that occupancy. |
 | WS-REMOTE-DEPLOY-058 | Bare deploy without occupancy fail-closed | no non-terminal occupancy or no Resource `app`; no TTY | `appaloft deploy` | exits non-zero `workspace_occupancy_resource_missing`; does not treat cwd as source. |
+| WS-REMOTE-DEPLOY-059 | Occupancy deploy prints generated URL | occupancy Resource `app` has a succeeded generated access route | `appaloft deploy` | stdout includes that URL after `deployments.create`. |
+| WS-REMOTE-DEPLOY-060 | Missing generated URL stays omitted | occupancy deploy succeeds but no public access route | `appaloft deploy` | still prints deployment id; exit 0; no invented URL. |
 
 ## Slice Scope
 
-Slice 1–16 shipped.
+Slice 1–17 shipped.
 
-Slice 17 (this ticket): bare `appaloft deploy` reuses the latest occupancy Resource `app`.
+Slice 18 (this ticket): successful occupancy `deploy` prints the generated access URL.
 
-In slice 17:
+In slice 18:
 
-- no locator + no config + no profile overrides → latest occupancy Binding/`local`/`app`/default Server;
-- same `deployments.create` as slice 14;
-- missing occupancy fail-closed when non-interactive.
+- after sync `deployments.create`, print first `publicPreviewUrlsFromDeploymentSummary` URL;
+- missing route does not fail the deploy;
+- `--require-preview-url` unchanged.
 
-Out of slice 17: interactive TUI Preview chrome, Cloud managed default Server.
+Out of slice 18: interactive TUI Preview chrome, Cloud managed default Server.
 
 ## Public Surfaces
 

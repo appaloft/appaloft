@@ -80,6 +80,7 @@ export interface CliProgram {
 
 export interface CliProgramInput {
   version: string;
+  executionTarget?: "local" | "remote";
   startServer(): Promise<void>;
   startWorkerRuntime?(): Promise<void>;
   commandBus: CommandBus;
@@ -193,7 +194,7 @@ export class CliRuntime extends Context.Tag("CliRuntime")<
 export const CliRuntimeLive = (input: CliProgramInput) =>
   Layer.succeed(CliRuntime, {
     version: input.version,
-    executionTarget: "local",
+    executionTarget: input.executionTarget ?? "local",
     startServer: input.startServer,
     ...(input.startWorkerRuntime ? { startWorkerRuntime: input.startWorkerRuntime } : {}),
     executeCommand: async <T>(message: AppCommand<T>, options?: ExecuteCommandOptions) => {

@@ -65,6 +65,8 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-URL-SHORTHAND-056 | CLI | this slice | existing local `owner/repo` directory stays a path | `packages/adapters/cli/test/remote-code-session.test.ts` |
 | WS-REMOTE-DEPLOY-057 | CLI + `appaloftdev` | this slice | bare `deploy` reuses latest occupancy Resource `app` | `packages/adapters/cli/test/deployment-create-command.test.ts`; live `deploy` after occupying whoami |
 | WS-REMOTE-DEPLOY-058 | CLI | this slice | bare `deploy` without occupancy fail-closed when non-interactive | `packages/adapters/cli/test/deployment-create-command.test.ts` |
+| WS-REMOTE-DEPLOY-059 | CLI + `appaloftdev` | this slice | occupancy `deploy` prints generated access URL | `packages/adapters/cli/test/deployment-create-command.test.ts`; live `deploy` after occupying whoami |
+| WS-REMOTE-DEPLOY-060 | CLI | this slice | missing generated URL stays omitted | `packages/adapters/cli/test/deployment-create-command.test.ts` |
 
 
 

@@ -155,6 +155,14 @@
 - [x] Unit tests WS-REMOTE-DEPLOY-057–058
 - [x] `appaloftdev deploy` after occupying `traefik/whoami`
 
+## Slice 18 — occupancy deploy URL
+
+- [x] Grill D61–D63
+- [x] Ticket `ready-for-agent` — [#1187](https://github.com/appaloft/appaloft/issues/1187)
+- [x] Successful occupancy `deploy` prints generated URL
+- [x] Unit tests WS-REMOTE-DEPLOY-059–060
+- [x] `appaloftdev deploy` after occupying `traefik/whoami` prints sslip URL
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

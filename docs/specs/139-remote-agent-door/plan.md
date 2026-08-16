@@ -28,6 +28,7 @@
 | Occupancy EXPOSE port | detector + occupancy initializer |
 | GitHub owner/repo | public CLI remote-code locator |
 | Bare occupancy deploy | public CLI adapter composing latest occupancy + Binding/`app` |
+| Occupancy deploy URL | public CLI adapter printing first generated access URL after create |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -139,6 +140,13 @@ Slice-17 verification:
 - unit: bare `deploy` dispatches `deployments.create` for the latest occupancy Resource `app`;
 - unit: bare `deploy` without occupancy fail-closed when non-interactive;
 - `appaloftdev deploy` after occupying `traefik/whoami` does not require a path.
+
+Slice-18 verification:
+
+- unit: occupancy `deploy` stdout includes the generated access URL;
+- unit: missing generated route still prints deployment id;
+- `appaloftdev deploy` after occupying `traefik/whoami` prints the sslip URL.
+
 
 
 

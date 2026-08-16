@@ -439,4 +439,220 @@ describe("CLI deployment create command", () => {
     }
     expect(commands).toHaveLength(0);
   });
+
+  test("[WS-REMOTE-DEPLOY-059] occupancy deploy prints generated access URL", async () => {
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({ id: "dep_url" } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        switch (query.constructor.name) {
+          case "ListSandboxesQuery":
+            return ok({
+              items: [
+                {
+                  sandboxId: "sbx_whoami",
+                  status: "ready",
+                  lastActivityAt: "2026-08-16T08:00:00.000Z",
+                  occupancy: {
+                    repositoryIdentity: "github.com/traefik/whoami",
+                    commitSha: "b".repeat(40),
+                    branch: "master",
+                  },
+                },
+              ],
+            } as T);
+          case "ShowRepositoryBindingQuery":
+            return ok({
+              bindingId: "bnd_whoami",
+              repositoryIdentity: "github.com/traefik/whoami",
+              projectId: "prj_tk5lovqu2vj8",
+              status: "active",
+              createdAt: "2026-08-16T00:00:00.000Z",
+            } as T);
+          case "ListEnvironmentsQuery":
+            return ok({
+              items: [{ id: "env_8moaj3z5e7s9", projectId: "prj_tk5lovqu2vj8", name: "local" }],
+            } as T);
+          case "ListResourcesQuery":
+            return ok({
+              items: [
+                {
+                  id: "res_dfsc156jw98k",
+                  projectId: "prj_tk5lovqu2vj8",
+                  environmentId: "env_8moaj3z5e7s9",
+                  slug: "app",
+                },
+              ],
+            } as T);
+          case "ListServersQuery":
+            return ok({
+              items: [{ id: "srv_uil9cpctplou", name: "occupancy-mac", lifecycleStatus: "active" }],
+            } as T);
+          case "ShowDeploymentQuery":
+            return ok({
+              schemaVersion: "deployments.show/v1",
+              deployment: {
+                id: "dep_url",
+                resourceId: "res_dfsc156jw98k",
+                status: "succeeded",
+                runtimePlan: {
+                  execution: {
+                    accessRoutes: [
+                      {
+                        domains: ["app-sc156jw98k.127.0.0.1.sslip.io"],
+                        pathPrefix: "/",
+                        tlsMode: "disabled",
+                      },
+                    ],
+                  },
+                },
+              },
+            } as T);
+          default:
+            return ok({
+              items: [{ id: "dep_url", resourceId: "res_dfsc156jw98k", status: "succeeded" }],
+            } as T);
+        }
+      },
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_occupancy_deploy_url",
+        }),
+    };
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      executionTarget: "remote",
+      startServer: async () => {},
+      startWorkerRuntime: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+    });
+    const chunks: string[] = [];
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = ((chunk: string | Uint8Array) => {
+        chunks.push(typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk));
+        return true;
+      }) as typeof process.stdout.write;
+      await program.parseAsync(["node", "appaloft", "deploy"]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+    expect(commands).toHaveLength(1);
+    expect(chunks.join("")).toContain("http://app-sc156jw98k.127.0.0.1.sslip.io");
+  });
+
+  test("[WS-REMOTE-DEPLOY-060] missing generated URL stays omitted", async () => {
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({ id: "dep_nourl" } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        switch (query.constructor.name) {
+          case "ListSandboxesQuery":
+            return ok({
+              items: [
+                {
+                  sandboxId: "sbx_whoami",
+                  status: "ready",
+                  lastActivityAt: "2026-08-16T08:00:00.000Z",
+                  occupancy: {
+                    repositoryIdentity: "github.com/traefik/whoami",
+                    commitSha: "b".repeat(40),
+                    branch: "master",
+                  },
+                },
+              ],
+            } as T);
+          case "ShowRepositoryBindingQuery":
+            return ok({
+              bindingId: "bnd_whoami",
+              repositoryIdentity: "github.com/traefik/whoami",
+              projectId: "prj_tk5lovqu2vj8",
+              status: "active",
+              createdAt: "2026-08-16T00:00:00.000Z",
+            } as T);
+          case "ListEnvironmentsQuery":
+            return ok({
+              items: [{ id: "env_8moaj3z5e7s9", projectId: "prj_tk5lovqu2vj8", name: "local" }],
+            } as T);
+          case "ListResourcesQuery":
+            return ok({
+              items: [
+                {
+                  id: "res_dfsc156jw98k",
+                  projectId: "prj_tk5lovqu2vj8",
+                  environmentId: "env_8moaj3z5e7s9",
+                  slug: "app",
+                },
+              ],
+            } as T);
+          case "ListServersQuery":
+            return ok({
+              items: [{ id: "srv_uil9cpctplou", name: "occupancy-mac", lifecycleStatus: "active" }],
+            } as T);
+          default:
+            return ok({
+              items: [{ id: "dep_nourl", resourceId: "res_dfsc156jw98k", status: "succeeded" }],
+            } as T);
+        }
+      },
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_occupancy_deploy_nourl",
+        }),
+    };
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      startWorkerRuntime: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+    });
+    const chunks: string[] = [];
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = ((chunk: string | Uint8Array) => {
+        chunks.push(typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk));
+        return true;
+      }) as typeof process.stdout.write;
+      await program.parseAsync(["node", "appaloft", "deploy"]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+    const stdout = chunks.join("");
+    expect(commands).toHaveLength(1);
+    expect(stdout).toContain("dep_nourl");
+    expect(stdout).not.toContain("sslip.io");
+    expect(stdout).not.toContain('"url"');
+  });
 });

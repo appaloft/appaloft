@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–16 shipped. Slice 17 bare occupancy deploy owner-confirmed 2026-08-16 (D58–D60).
+- Round: Spec. Slice 1–17 shipped. Slice 18 occupancy deploy URL owner-confirmed 2026-08-16 (D61–D63).
 - Date: 2026-08-16.
-- Predecessor: GitHub owner/repo shipped as public #1184.
-- Code changes allowed: yes for slice 17 after the occupancy-bare-deploy ticket is `ready-for-agent`.
+- Predecessor: bare occupancy deploy shipped as public #1186.
+- Code changes allowed: yes for slice 18 after the occupancy-deploy-url ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -95,6 +95,9 @@ Sandbox on that Server, not one VM per person.
 | D58 | Slice 17 bare `appaloft deploy` reuses the latest occupancy Resource `app` | Live `code traefik/whoami` then `deploy` fails `pathOrSource is required`. Railway `up` after the workspace exists does not ask for a path. |
 | D59 | Latest non-terminal occupancy wins; same Binding → `local` → `app` → default Server path as slice 14 | Do not invent a Resource. Destination stays omitted. |
 | D60 | No occupancy / no Resource `app` fail-closed when non-interactive | Interactive prompt path unchanged. Do not fall back to cwd `.`. |
+| D61 | Slice 18 successful occupancy `deploy` prints the generated access URL | Live `appaloft deploy` after occupying whoami returns only `{"id":"dep_*"}`. `deployments.show` and `workspace --json` already have `http://app-sc156jw98k.127.0.0.1.sslip.io`. Railway `up` prints the URL. |
+| D62 | URL comes from existing `publicPreviewUrlsFromDeploymentSummary` after sync create | Same generated route as slice 13. Do not invent sslip. Do not scrape vendor TUI. First URL only. |
+| D63 | Missing or failed route still prints `dep_*` and exits 0 | `--require-preview-url` stays the hard gate. Do not fail a succeeded deploy because chrome is missing. |
 
 ## Rejected
 
@@ -158,10 +161,11 @@ Later slices after occupancy:
 14. Occupancy deploy reuse (slice 14, shipped #1180).
 15. Occupancy EXPOSE port (slice 15, shipped #1182).
 16. GitHub `owner/repo` (slice 16, shipped #1184).
-17. **Bare occupancy deploy** (slice 17): `appaloft deploy` creates from the latest occupancy Resource `app`.
-18. Session-native Preview chrome / interactive `workspace` TUI.
-19. Optional team Connection.
-20. Cloud managed as default Server when no BYOS exists.
+17. Bare occupancy deploy (slice 17, shipped #1186).
+18. **Occupancy deploy URL** (slice 18): successful `appaloft deploy` prints the generated access URL.
+19. Session-native Preview chrome / interactive `workspace` TUI.
+20. Optional team Connection.
+21. Cloud managed as default Server when no BYOS exists.
 
 ## Delivery chrome (owner 2026-08-15)
 

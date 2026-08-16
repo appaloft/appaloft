@@ -61,6 +61,7 @@ import {
   CliRuntime,
   optionalNumber,
   optionalValue,
+  print,
   resultToEffect,
   runCommand,
   runDeploymentCommand,
@@ -1248,11 +1249,49 @@ function readDeploymentSummary(input: { deploymentId: string; resourceId: string
   });
 }
 
+function occupancyDeployUrlFromSummary(
+  deployment:
+    | {
+        readonly runtimePlan?: {
+          readonly execution?: {
+            readonly accessRoutes?: DeploymentSummary["runtimePlan"]["execution"]["accessRoutes"];
+          };
+        };
+      }
+    | undefined,
+): string | undefined {
+  const accessRoutes = deployment?.runtimePlan?.execution?.accessRoutes;
+  if (!accessRoutes) return undefined;
+  return publicPreviewUrlsFromDeploymentSummary({
+    runtimePlan: { execution: { accessRoutes } },
+  } as DeploymentSummary)[0];
+}
+
+function readCreatedDeploymentUrl(deploymentId: string) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const query = ShowDeploymentQuery.create({
+      deploymentId,
+      includeTimeline: false,
+      includeSnapshot: false,
+      includeRelatedContext: false,
+      includeLatestFailure: false,
+    });
+    if (query.isErr()) return undefined;
+    const result = yield* Effect.promise(() => cli.executeQuery(query.value));
+    if (result.isErr()) return undefined;
+    return occupancyDeployUrlFromSummary(result.value.deployment);
+  });
+}
+
 function waitForSynchronousDeployment(input: { deploymentId: string; resourceId: string }) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
-    yield* Effect.promise(() => (cli.startWorkerRuntime ?? cli.startServer)());
-
+    if (cli.startWorkerRuntime) {
+      yield* Effect.promise(() => cli.startWorkerRuntime?.() ?? Promise.resolve());
+    } else if (cli.executionTarget !== "remote") {
+      yield* Effect.promise(() => cli.startServer());
+    }
     const deadline = Date.now() + synchronousDeploymentTimeoutMs;
     while (true) {
       const deployment = yield* readDeploymentSummary(input);
@@ -1410,13 +1449,10 @@ function runCreateDeploymentCommand(
         appLogLines: options.appLogLines,
       },
     );
-    let deployment: DeploymentSummary | undefined;
-    if (effectiveInput.executionMode !== "detached") {
-      deployment = yield* waitForSynchronousDeployment({
-        deploymentId: output.id,
-        resourceId: effectiveInput.resourceId,
-      });
-    }
+    const deployment = yield* waitForSynchronousDeployment({
+      deploymentId: output.id,
+      resourceId: effectiveInput.resourceId,
+    });
 
     if (options.requirePreviewUrl || options.previewOutputFile) {
       const resolution = yield* resolvePreviewAccessForDeployment({
@@ -1437,6 +1473,9 @@ function runCreateDeploymentCommand(
     if (effectiveInput.executionMode !== "detached") {
       yield* failIfSynchronousDeploymentDidNotSucceed(deployment);
     }
+    const url =
+      occupancyDeployUrlFromSummary(deployment) ?? (yield* readCreatedDeploymentUrl(output.id));
+    if (url) yield* print({ url });
   });
 }
 
