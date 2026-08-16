@@ -31,12 +31,13 @@
 
 - [x] Grill D9–D15 / ADR-119
 - [x] Ticket `ready-for-agent` — tracking [#1153](https://github.com/appaloft/appaloft/issues/1153), slice [#1154](https://github.com/appaloft/appaloft/issues/1154)
-- [ ] Classify positional git remotes before path resolution
-- [ ] `ls-remote` HEAD → one `refs/heads/*`
-- [ ] URL of B never resumes occupancy of A
-- [ ] `--local` + remote fail closed
-- [ ] Help / skill / changelog
-- [ ] `appaloftdev code https://github.com/org/repo.git --no-attach`
+- [x] Classify positional git remotes before path resolution
+- [x] `ls-remote` HEAD → one `refs/heads/*`
+- [x] URL of B never resumes occupancy of A
+- [x] `--local` + remote fail closed
+- [x] Help / skill / changelog
+- [x] `appaloftdev code https://github.com/org/repo.git --no-attach`
+
 
 
 ## Later

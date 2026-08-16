@@ -52,6 +52,7 @@ import {
   resolveRemoteGitWorkspaceRef,
 } from "../local-git-workspace-context.js";
 import {
+  isolatedOpenCodeConfigHome,
   launchScratchAgent,
   resolveDefaultScratchHarness,
   resolveNativeOpenCodeAttachEnv,
@@ -60,9 +61,11 @@ import {
 } from "../local-scratch-session.js";
 import {
   formatRemoteCodeBanner,
+  isRemoteCodeGitRemoteLocator,
   nativeAttachRequiresInteractiveTerminal,
   REMOTE_CODE_MODEL_HINT,
   resolveDefaultRemoteCodeDoor,
+  scratchRemoteRejectedError,
 } from "../remote-code-session.js";
 import {
   attachTerminalSession,
@@ -348,6 +351,9 @@ export const workspaceCodeCommand = EffectCommand.make(
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
       if (local) {
+        if (isRemoteCodeGitRemoteLocator(path)) {
+          return yield* Effect.fail(scratchRemoteRejectedError());
+        }
         const session = yield* Effect.tryPromise({
           try: () =>
             resolveScratchSession(path, cli.resolveScratchHarness ?? resolveDefaultScratchHarness),

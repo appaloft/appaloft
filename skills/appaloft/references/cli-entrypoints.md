@@ -38,17 +38,18 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `--preview <previewEnvironmentId>` on logs, health, diagnostics, effective config, runtime
   control, and terminal commands when the user is operating a preview rather than its parent
   resource.
-- `appaloft code [path]` occupies my Sandbox after login. It requires a default
+- `appaloft code [path|git-remote]` occupies my Sandbox after login. It requires a default
   enrolled Server, dispatches `workspaces.open` with the remote SHA and
   `targetServerId`, then prints
   `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>`.
-  Laptop Git is not uploaded. Missing login or Server fails closed and never
-  becomes Scratch.
+  A positional `https://`, `ssh://`, or `git@host:path` occupies that repository
+  without a local clone. Laptop Git is not uploaded. Missing login or Server fails
+  closed and never becomes Scratch. `owner/repo` is a local path, not GitHub shorthand.
 - `appaloft code --local [path]` is a local Scratch session on this Mac. It does not
   require Git, login, Binding, Profile or Cloud, creates no Sandbox, and prints
-  `Local scratch · this Mac · not saved remotely`. The only hard failure before attach
-  is a missing OpenCode/Pi binary after the user refuses install. Do not treat scratch
-  as a durable Workspace.
+  `Local scratch · this Mac · not saved remotely`. `--local` plus a git remote fails
+  closed. The only other hard failure before attach is a missing OpenCode/Pi binary
+  after the user refuses install. Do not treat scratch as a durable Workspace.
 - `appaloft workspace open [path]` is the durable Profile-aware entrypoint. It resolves
   clean, pushed Git context, creates or resumes the underlying Sandbox, and attaches
   through the Adapter-declared capability.

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   formatRemoteCodeBanner,
+  isRemoteCodeGitRemoteLocator,
   nativeAttachRequiresInteractiveTerminal,
   resolveDefaultRemoteCodeDoor,
   selectDefaultRemoteCodeServer,
@@ -260,5 +261,150 @@ describe("remote code door", () => {
     expect(nativeAttachRequiresInteractiveTerminal({ isTTY: true }, { isTTY: true })).toBe(true);
     expect(nativeAttachRequiresInteractiveTerminal({ isTTY: false }, { isTTY: true })).toBe(false);
     expect(nativeAttachRequiresInteractiveTerminal({ isTTY: true }, { isTTY: false })).toBe(false);
+  });
+
+  test("[WS-REMOTE-URL-024][WS-REMOTE-URL-SHORTHAND-028] classifies git remotes and leaves owner/repo as a path", () => {
+    expect(isRemoteCodeGitRemoteLocator("https://github.com/org/repo.git")).toBe(true);
+    expect(isRemoteCodeGitRemoteLocator("ssh://git@github.com/org/repo.git")).toBe(true);
+    expect(isRemoteCodeGitRemoteLocator("git@github.com:org/repo.git")).toBe(true);
+    expect(isRemoteCodeGitRemoteLocator("org/repo")).toBe(false);
+    expect(isRemoteCodeGitRemoteLocator(".")).toBe(false);
+    expect(isRemoteCodeGitRemoteLocator("/tmp/project")).toBe(false);
+  });
+
+  test("[WS-REMOTE-URL-024] positional HTTPS occupies without reading cwd origin", async () => {
+    let locatorCalled = false;
+    const door = await resolveDefaultRemoteCodeDoor(
+      {
+        env: { APPALOFT_TOKEN: "token" },
+        listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
+        resolveLocator: async () => {
+          locatorCalled = true;
+          throw new Error("explicit git remote must not read cwd origin");
+        },
+        resolveRemoteRef: async (repository, ref) => ({
+          repositoryIdentity: "github.com/org/repo",
+          credentialFreeHttpsRepository: repository,
+          ref,
+          commitSha: "a".repeat(40),
+        }),
+        runGit: async ({ args }) => {
+          if (args[0] === "ls-remote" && args.includes("HEAD")) {
+            return {
+              stdout: `ref: refs/heads/main\tHEAD\n${"a".repeat(40)}\tHEAD\n`,
+              stderr: "",
+            };
+          }
+          throw new Error(args.join(" "));
+        },
+      },
+      "https://github.com/org/repo.git",
+    );
+    expect(locatorCalled).toBe(false);
+    expect(door.repositoryIdentity).toBe("github.com/org/repo");
+    expect(door.repository).toBe("https://github.com/org/repo.git");
+    expect(door.branch).toBe("main");
+    expect(door.ref).toBe("refs/heads/main");
+    expect(door.commitSha).toBe("a".repeat(40));
+  });
+
+  test("[WS-REMOTE-URL-WINS-026] URL of B does not resume occupancy of A", async () => {
+    const door = await resolveDefaultRemoteCodeDoor(
+      {
+        env: { APPALOFT_TOKEN: "token" },
+        listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
+        listOccupancies: async () => [
+          {
+            sandboxId: "sbx_a",
+            status: "ready",
+            occupancy: {
+              repositoryIdentity: "github.com/acme/api",
+              commitSha: "d".repeat(40),
+              branch: "main",
+            },
+            lastActivityAt: "2026-08-15T12:30:00.000Z",
+          },
+        ],
+        resolveLocator: async () => {
+          throw new Error("explicit git remote must not read cwd origin");
+        },
+        resolveRemoteRef: async (repository, ref) => ({
+          repositoryIdentity: "github.com/org/repo-b",
+          credentialFreeHttpsRepository: repository,
+          ref,
+          commitSha: "b".repeat(40),
+        }),
+        runGit: async ({ args }) => {
+          if (args[0] === "ls-remote" && args.includes("HEAD")) {
+            return {
+              stdout: `ref: refs/heads/trunk\tHEAD\n${"b".repeat(40)}\tHEAD\n`,
+              stderr: "",
+            };
+          }
+          throw new Error(args.join(" "));
+        },
+      },
+      "https://github.com/org/repo-b.git",
+    );
+    expect(door.repositoryIdentity).toBe("github.com/org/repo-b");
+    expect(door.branch).toBe("trunk");
+    expect(door.commitSha).toBe("b".repeat(40));
+  });
+
+  test("[WS-REMOTE-URL-HEAD-025] fails closed when remote HEAD has no branch", async () => {
+    await expect(
+      resolveDefaultRemoteCodeDoor(
+        {
+          env: { APPALOFT_TOKEN: "token" },
+          listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
+          runGit: async () => ({ stdout: `${"c".repeat(40)}\tHEAD\n`, stderr: "" }),
+        },
+        "https://github.com/org/repo.git",
+      ),
+    ).rejects.toMatchObject({ code: "workspace_remote_default_ref_unavailable" });
+  });
+
+  test("[WS-REMOTE-URL-HEAD-025] fails closed when remote HEAD matches many heads", async () => {
+    await expect(
+      resolveDefaultRemoteCodeDoor(
+        {
+          env: { APPALOFT_TOKEN: "token" },
+          listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
+          runGit: async ({ args }) => {
+            if (args.includes("--symref")) {
+              return { stdout: `${"c".repeat(40)}\tHEAD\n`, stderr: "" };
+            }
+            if (args.includes("--heads")) {
+              return {
+                stdout: `${"c".repeat(40)}\trefs/heads/main\n${"c".repeat(40)}\trefs/heads/trunk\n`,
+                stderr: "",
+              };
+            }
+            throw new Error(args.join(" "));
+          },
+        },
+        "https://github.com/org/repo.git",
+      ),
+    ).rejects.toMatchObject({ code: "workspace_git_ref_ambiguous" });
+  });
+
+  test("[WS-REMOTE-URL-SHORTHAND-028] owner/repo stays a local path", async () => {
+    let locatorCalled = false;
+    await expect(
+      resolveDefaultRemoteCodeDoor(
+        {
+          env: { APPALOFT_TOKEN: "token" },
+          listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
+          resolveLocator: async () => {
+            locatorCalled = true;
+            throw Object.assign(new Error("missing origin"), {
+              code: "workspace_remote_repository_missing",
+            });
+          },
+        },
+        "org/repo",
+      ),
+    ).rejects.toMatchObject({ code: "workspace_remote_repository_missing" });
+    expect(locatorCalled).toBe(true);
   });
 });

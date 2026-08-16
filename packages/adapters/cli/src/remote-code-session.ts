@@ -113,6 +113,13 @@ function remoteCodeError(
   };
 }
 
+export function isRemoteCodeGitRemoteLocator(value: string): boolean {
+  const locator = value.trim();
+  if (!locator || locator.includes("\0") || /[\r\n]/u.test(locator)) return false;
+  if (locator.startsWith("https://") || locator.startsWith("ssh://")) return true;
+  return /^git@[^/\s]+:.+$/u.test(locator);
+}
+
 export function selectDefaultRemoteCodeServer(
   servers: readonly RemoteCodeServerSummary[] | undefined,
 ): RemoteCodeServerSummary | undefined {
@@ -138,6 +145,14 @@ export function selectResumeOccupancy(
       const rightAt = right.lastActivityAt ?? right.updatedAt ?? "";
       return rightAt.localeCompare(leftAt);
     })[0];
+}
+
+export function scratchRemoteRejectedError(): DomainError {
+  return remoteCodeError("workspace_scratch_remote_rejected", "Scratch cannot open a git remote", {
+    phase: "scratch-path",
+    guidance:
+      "Use appaloft code <git-remote> without --local, or appaloft code --local in a local directory.",
+  });
 }
 
 export async function resolveDefaultRemoteCodeDoor(
@@ -177,6 +192,9 @@ export async function resolveDefaultRemoteCodeDoor(
   }
   const occupancies = probe.listOccupancies ? await probe.listOccupancies() : [];
   const latestOccupancy = selectResumeOccupancy(occupancies);
+  const explicitRemote = isRemoteCodeGitRemoteLocator(path)
+    ? await resolveRemoteCodeGitRemoteLocator(path, probe.runGit)
+    : undefined;
   let localLocator:
     | {
         readonly repository: string;
@@ -186,21 +204,26 @@ export async function resolveDefaultRemoteCodeDoor(
       }
     | undefined;
   let localLocatorError: unknown;
-  try {
-    localLocator = probe.resolveLocator
-      ? await probe.resolveLocator()
-      : await resolveRemoteCodeLocator(path, probe.runGit);
-  } catch (error) {
-    localLocatorError = error;
+  if (!explicitRemote) {
+    try {
+      localLocator = probe.resolveLocator
+        ? await probe.resolveLocator()
+        : await resolveRemoteCodeLocator(path, probe.runGit);
+    } catch (error) {
+      localLocatorError = error;
+    }
   }
-  const matchingOccupancy = localLocator
+  const requestedLocator = explicitRemote ?? localLocator;
+  const matchingOccupancy = requestedLocator
     ? selectResumeOccupancy(
         occupancies.filter(
-          (item) => item.occupancy?.repositoryIdentity === localLocator?.repositoryIdentity,
+          (item) => item.occupancy?.repositoryIdentity === requestedLocator.repositoryIdentity,
         ),
       )
     : undefined;
-  const occupancy = probe.forceNew ? undefined : (matchingOccupancy ?? latestOccupancy);
+  const occupancy = probe.forceNew
+    ? undefined
+    : (matchingOccupancy ?? (explicitRemote ? undefined : latestOccupancy));
   let locator: {
     readonly repository: string;
     readonly repositoryIdentity: string;
@@ -208,7 +231,7 @@ export async function resolveDefaultRemoteCodeDoor(
     readonly branch: string;
   };
   let occupancyResume: RemoteCodeOccupancy["occupancy"];
-  if (occupancy?.occupancy) {
+  if (occupancy?.occupancy && !explicitRemote) {
     occupancyResume = occupancy.occupancy;
     const normalized = normalizeWorkspaceRepositoryRemote(
       `https://${occupancy.occupancy.repositoryIdentity.replace(/\.git$/u, "")}.git`,
@@ -219,11 +242,13 @@ export async function resolveDefaultRemoteCodeDoor(
       ref: `refs/heads/${occupancy.occupancy.branch?.trim() || "main"}`,
       branch: occupancy.occupancy.branch?.trim() || "main",
     };
-  } else if (localLocator) {
-    locator = localLocator;
+  } else if (requestedLocator) {
+    locator = requestedLocator;
+    if (occupancy?.occupancy) occupancyResume = occupancy.occupancy;
   } else {
     throw localLocatorError;
   }
+
   const binding = probe.showBinding ? await probe.showBinding(locator.repositoryIdentity) : null;
   let remote: RemoteGitWorkspaceRef;
   try {
@@ -310,6 +335,136 @@ async function resolveTrackedRemoteCodeSha(
   } catch {
     return undefined;
   }
+}
+
+async function resolveRemoteCodeGitRemoteLocator(
+  remoteValue: string,
+  runGit?: WorkspaceGitCommandRunner,
+): Promise<{
+  readonly repository: string;
+  readonly repositoryIdentity: string;
+  readonly ref: string;
+  readonly branch: string;
+}> {
+  const normalized = normalizeWorkspaceRepositoryRemote(remoteValue);
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const execFileAsync = promisify(execFile);
+  const git =
+    runGit ??
+    (async ({ args, cwd }: { args: readonly string[]; cwd: string }) => {
+      const result = await execFileAsync("git", [...args], {
+        cwd,
+        timeout: 15_000,
+        encoding: "utf8",
+      });
+      return { stdout: result.stdout, stderr: result.stderr };
+    });
+  let head: string;
+  try {
+    head = (
+      await git({
+        args: ["ls-remote", "--symref", "--exit-code", normalized.credentialFreeHttps, "HEAD"],
+        cwd: ".",
+      })
+    ).stdout;
+  } catch {
+    throw remoteCodeError(
+      "workspace_remote_default_ref_unavailable",
+      "Remote default branch cannot be resolved",
+      {
+        phase: "remote-code-locator",
+        guidance: "Check the git remote is reachable, then retry appaloft code <git-remote>.",
+      },
+    );
+  }
+  const symbolic = /^ref:\s+refs\/heads\/([^\s]+)\s+HEAD$/mu.exec(head);
+  if (symbolic?.[1]) {
+    return {
+      repository: normalized.credentialFreeHttps,
+      repositoryIdentity: normalized.identity,
+      ref: `refs/heads/${symbolic[1]}`,
+      branch: symbolic[1],
+    };
+  }
+  const sha = head
+    .split("\n")
+    .map((line) => line.split(/\s+/u)[0] ?? "")
+    .find((value) => /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/u.test(value));
+  if (!sha) {
+    throw remoteCodeError(
+      "workspace_remote_default_ref_unavailable",
+      "Remote default branch cannot be resolved",
+      {
+        phase: "remote-code-locator",
+        guidance: "Check the git remote is reachable, then retry appaloft code <git-remote>.",
+      },
+    );
+  }
+  let heads: string;
+  try {
+    heads = (
+      await git({
+        args: ["ls-remote", "--heads", "--exit-code", normalized.credentialFreeHttps],
+        cwd: ".",
+      })
+    ).stdout;
+  } catch {
+    throw remoteCodeError(
+      "workspace_remote_default_ref_unavailable",
+      "Remote default branch cannot be resolved",
+      {
+        phase: "remote-code-locator",
+        guidance: "Check the git remote is reachable, then retry appaloft code <git-remote>.",
+      },
+    );
+  }
+  const matches = heads
+    .split("\n")
+    .map((line) => {
+      const [object, ref] = line.split(/\s+/u);
+      return object === sha && ref?.startsWith("refs/heads/")
+        ? ref.slice("refs/heads/".length)
+        : undefined;
+    })
+    .filter((branch): branch is string => Boolean(branch));
+  if (matches.length === 0) {
+    throw remoteCodeError(
+      "workspace_remote_default_ref_unavailable",
+      "Remote default branch cannot be resolved",
+      {
+        phase: "remote-code-locator",
+        guidance: "Check the git remote is reachable, then retry appaloft code <git-remote>.",
+      },
+    );
+  }
+  if (matches.length > 1) {
+    throw remoteCodeError(
+      "workspace_git_ref_ambiguous",
+      "Remote HEAD must resolve to exactly one branch",
+      {
+        phase: "remote-code-locator",
+        guidance: "Pass a repository whose default branch is unique, then retry.",
+      },
+    );
+  }
+  const branch = matches[0];
+  if (!branch) {
+    throw remoteCodeError(
+      "workspace_remote_default_ref_unavailable",
+      "Remote default branch cannot be resolved",
+      {
+        phase: "remote-code-locator",
+        guidance: "Check the git remote is reachable, then retry appaloft code <git-remote>.",
+      },
+    );
+  }
+  return {
+    repository: normalized.credentialFreeHttps,
+    repositoryIdentity: normalized.identity,
+    ref: `refs/heads/${branch}`,
+    branch,
+  };
 }
 
 export async function resolveRemoteCodeLocator(
