@@ -99,6 +99,12 @@ Slice-11 verification:
 - unit: remote-git with detected dockerfile still selects dockerfile;
 - `appaloftdev deployments plan --resource res_vhmyk4zutvnd --server srv_uil9cpctplou` is blocked and does not claim `Dockerfile`.
 
+Slice-12 verification:
+
+- unit: remote-git enrichment is allowed;
+- unit: detector inspects a cloned remote with root Dockerfile;
+- `appaloftdev deployments plan --resource res_3qjkhtnc45nk --server srv_uil9cpctplou` against occupied `appaloft/examples` asks for `source.baseDirectory`.
+
 
 ## Risks
 

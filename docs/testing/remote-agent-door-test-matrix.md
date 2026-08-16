@@ -53,6 +53,8 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-NET-045 | application | this slice | existing Resource network is reused | `packages/application/test/community-workspace-activation-context-initializer.test.ts` |
 | WS-REMOTE-PLAN-046 | runtime + `appaloftdev` | this slice | remote-git without Dockerfile fail-closed | `packages/adapters/runtime/test/runtime-plan-resolver.test.ts`; live `deployments plan --resource --server` |
 | WS-REMOTE-PLAN-047 | runtime | this slice | remote-git Dockerfile evidence still wins | `packages/adapters/runtime/test/runtime-plan-resolver.test.ts` |
+| WS-REMOTE-INSPECT-048 | filesystem + `appaloftdev` | this slice | remote-git occupancy inspects a single-app remote | `packages/adapters/filesystem/test/source-detector.test.ts`; live occupy of a root-Dockerfile repo |
+| WS-REMOTE-INSPECT-049 | filesystem + `appaloftdev` | this slice | monorepo remote-git asks for baseDirectory | `packages/adapters/filesystem/test/source-detector.test.ts`; live `deployments plan` on occupied `appaloft/examples` |
 
 
 

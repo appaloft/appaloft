@@ -625,7 +625,15 @@ export class ResourceSourceBinding extends ValueObject<ResourceSourceBindingStat
 
   canBeEnrichedFromSourceInspection(): boolean {
     const kind = this.state.kind.value;
-    return kind === "local-folder" || kind === "local-git" || kind === "compose";
+    return (
+      kind === "local-folder" ||
+      kind === "local-git" ||
+      kind === "compose" ||
+      kind === "remote-git" ||
+      kind === "git-public" ||
+      kind === "git-github-app" ||
+      kind === "git-deploy-key"
+    );
   }
 
   fingerprint(): SourceBindingFingerprint {

@@ -1,5 +1,14 @@
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+} from "node:fs";
 import {
   mkdir,
   readdir as readDir,
@@ -7,7 +16,9 @@ import {
   stat as statPath,
   writeFile,
 } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { inflateRawSync } from "node:zlib";
 import {
   type ActivateStaticArtifactRouteInput,
@@ -1334,11 +1345,15 @@ function hasExplicitNodePackageManager(packageJson: Record<string, unknown> | nu
   );
 }
 
+function isRemoteGitLocator(locator: string): boolean {
+  return /^(https?|ssh|git|file):\/\//.test(locator) || /^git@/.test(locator);
+}
+
 function resolveSourceKind(locator: string): {
   kind: SourceKind;
   inspection?: SourceInspectionSnapshot;
 } {
-  if (/^(https?|ssh):\/\//.test(locator) || locator.endsWith(".git")) {
+  if (isRemoteGitLocator(locator) || locator.endsWith(".git")) {
     return { kind: "git-public" };
   }
 
@@ -1373,6 +1388,32 @@ function resolveSourceKind(locator: string): {
   return { kind: "local-folder" };
 }
 
+function checkoutRemoteGitLocator(locator: string): Result<string | undefined> {
+  if (!isRemoteGitLocator(locator)) {
+    return ok(undefined);
+  }
+
+  const cloneLocator = locator.startsWith("file://") ? fileURLToPath(locator) : locator;
+  const checkoutRoot = mkdtempSync(join(tmpdir(), "appaloft-remote-src-"));
+  const clone = Bun.spawnSync(["git", "clone", "--depth", "1", "--", cloneLocator, checkoutRoot], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  if (!clone.success) {
+    rmSync(checkoutRoot, { recursive: true, force: true });
+    const detail = clone.stderr.toString().trim() || clone.stdout.toString().trim();
+    return err(
+      domainError.validation("Remote git source could not be inspected", {
+        phase: "source-detection",
+        reasonCode: "missing-source-root",
+        affectedProfileField: "source.locator",
+        ...(detail ? { detail } : {}),
+      }),
+    );
+  }
+  return ok(realpathSync(checkoutRoot));
+}
+
 export class FileSystemSourceDetector implements SourceDetector {
   async detect(
     context: ExecutionContext,
@@ -1391,75 +1432,92 @@ export class FileSystemSourceDetector implements SourceDetector {
           return err(domainError.validation("Source locator is required"));
         }
 
-        const absolutePath = resolve(locator);
-        const localWorkspace =
-          existsSync(absolutePath) && statSync(absolutePath).isDirectory()
-            ? discoverLocalWorkspace(absolutePath, input)
-            : undefined;
-        let workspace: LocalWorkspaceDiscovery | undefined;
-        if (localWorkspace) {
-          if (localWorkspace.isErr()) {
-            return err(localWorkspace.error);
-          }
-          workspace = localWorkspace.value;
+        const remoteCheckout = checkoutRemoteGitLocator(locator);
+        if (remoteCheckout.isErr()) {
+          return err(remoteCheckout.error);
         }
-        const resolved = workspace
-          ? {
-              ...resolveSourceKind(locator),
-              inspection: detectLocalInspection(workspace.path),
+        const checkoutRoot = remoteCheckout.value;
+
+        try {
+          const absolutePath = checkoutRoot ?? resolve(locator);
+          const localWorkspace =
+            existsSync(absolutePath) && statSync(absolutePath).isDirectory()
+              ? discoverLocalWorkspace(absolutePath, input)
+              : undefined;
+          let workspace: LocalWorkspaceDiscovery | undefined;
+          if (localWorkspace) {
+            if (localWorkspace.isErr()) {
+              return err(localWorkspace.error);
             }
-          : resolveSourceKind(locator);
-        const packageJson = workspace ? readJsonObject(join(workspace.path, "package.json")) : null;
-        const lockfiles = workspace ? conflictingNodeLockfiles(workspace.path) : [];
-        const hasExplicitPackageManager = workspace
-          ? hasExplicitNodePackageManager(packageJson)
-          : false;
-        if (lockfiles.length > 1 && !hasExplicitPackageManager) {
-          return err(
-            domainError.validation("Source workspace has conflicting Node package manager locks", {
-              phase: "source-detection",
-              reasonCode: "ambiguous-build-tool",
-              affectedProfileField: "source.baseDirectory",
-              selectedRoot: workspace?.evidence.selectedRoot ?? "/",
-              detectedFiles: lockfiles,
-            }),
-          );
-        }
-        const reasoning = [
-          `Detected source kind: ${resolved.kind}`,
-          ...(workspace
-            ? [`Selected deployable source root: ${workspace.evidence.selectedRoot}`]
-            : []),
-          resolved.inspection?.hasDetectedFile("dockerfile")
-            ? "Dockerfile present in workspace"
-            : "Dockerfile not detected",
-          resolved.inspection?.hasDetectedFile("compose-manifest")
-            ? "Compose manifest present in workspace"
-            : "Compose manifest not detected",
-        ];
-
-        const source = SourceDescriptor.rehydrate({
-          kind: SourceKindValue.rehydrate(resolved.kind),
-          locator: SourceLocator.rehydrate(
-            locator.startsWith(".") || locator.startsWith("/") ? absolutePath : locator,
-          ),
-          displayName: DisplayNameText.rehydrate(basename(locator) || basename(absolutePath)),
-          ...(resolved.inspection ? { inspection: resolved.inspection } : {}),
-          ...(workspace
+            workspace = localWorkspace.value;
+          }
+          const resolved = workspace
             ? {
-                metadata: {
-                  baseDirectory: workspace.evidence.selectedRoot,
-                  detectedSourceRoot: workspace.evidence.selectedRoot,
-                },
+                ...resolveSourceKind(locator),
+                inspection: detectLocalInspection(workspace.path),
               }
-            : {}),
-        });
+            : resolveSourceKind(locator);
+          const packageJson = workspace
+            ? readJsonObject(join(workspace.path, "package.json"))
+            : null;
+          const lockfiles = workspace ? conflictingNodeLockfiles(workspace.path) : [];
+          const hasExplicitPackageManager = workspace
+            ? hasExplicitNodePackageManager(packageJson)
+            : false;
+          if (lockfiles.length > 1 && !hasExplicitPackageManager) {
+            return err(
+              domainError.validation(
+                "Source workspace has conflicting Node package manager locks",
+                {
+                  phase: "source-detection",
+                  reasonCode: "ambiguous-build-tool",
+                  affectedProfileField: "source.baseDirectory",
+                  selectedRoot: workspace?.evidence.selectedRoot ?? "/",
+                  detectedFiles: lockfiles,
+                },
+              ),
+            );
+          }
+          const reasoning = [
+            `Detected source kind: ${resolved.kind}`,
+            ...(workspace
+              ? [`Selected deployable source root: ${workspace.evidence.selectedRoot}`]
+              : []),
+            resolved.inspection?.hasDetectedFile("dockerfile")
+              ? "Dockerfile present in workspace"
+              : "Dockerfile not detected",
+            resolved.inspection?.hasDetectedFile("compose-manifest")
+              ? "Compose manifest present in workspace"
+              : "Compose manifest not detected",
+          ];
 
-        return ok({
-          source,
-          reasoning,
-          ...(workspace ? { workspace: workspace.evidence } : {}),
-        });
+          const source = SourceDescriptor.rehydrate({
+            kind: SourceKindValue.rehydrate(resolved.kind),
+            locator: SourceLocator.rehydrate(
+              locator.startsWith(".") || locator.startsWith("/") ? absolutePath : locator,
+            ),
+            displayName: DisplayNameText.rehydrate(basename(locator) || basename(absolutePath)),
+            ...(resolved.inspection ? { inspection: resolved.inspection } : {}),
+            ...(workspace
+              ? {
+                  metadata: {
+                    baseDirectory: workspace.evidence.selectedRoot,
+                    detectedSourceRoot: workspace.evidence.selectedRoot,
+                  },
+                }
+              : {}),
+          });
+
+          return ok({
+            source,
+            reasoning,
+            ...(workspace ? { workspace: workspace.evidence } : {}),
+          });
+        } finally {
+          if (checkoutRoot) {
+            rmSync(checkoutRoot, { recursive: true, force: true });
+          }
+        }
       },
     );
   }

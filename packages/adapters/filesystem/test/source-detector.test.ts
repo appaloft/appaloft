@@ -248,4 +248,68 @@ describe("FileSystemSourceDetector", () => {
       detectedFiles: ["bun-lock", "pnpm-lock"],
     });
   });
+
+  test("[WS-REMOTE-INSPECT-048] inspects a cloned remote-git repo with root Dockerfile", async () => {
+    ensureReflectMetadata();
+    const [{ createExecutionContext }, { FileSystemSourceDetector }, { pathToFileURL }] =
+      await Promise.all([import("@appaloft/application"), import("../src"), import("node:url")]);
+    const remote = await createGitRemote("dockerfile", {
+      Dockerfile: "FROM scratch\n",
+      "README.md": "whoami\n",
+    });
+
+    const result = await new FileSystemSourceDetector().detect(
+      createExecutionContext({ entrypoint: "cli", requestId: "req_remote_inspect" }),
+      pathToFileURL(remote).href,
+    );
+
+    expect(result.isOk()).toBe(true);
+    const detected = result._unsafeUnwrap();
+    expect(detected.source.kind).toBe("git-public");
+    expect(detected.source.inspection?.hasDetectedFile("dockerfile")).toBe(true);
+    expect(detected.source.locator.startsWith("file:")).toBe(true);
+  });
+
+  test("[WS-REMOTE-INSPECT-049] cloned monorepo remote-git asks for baseDirectory", async () => {
+    ensureReflectMetadata();
+    const [{ createExecutionContext }, { FileSystemSourceDetector }, { pathToFileURL }] =
+      await Promise.all([import("@appaloft/application"), import("../src"), import("node:url")]);
+    const remote = await createGitRemote("mono", {
+      "hello/Dockerfile": "FROM scratch\n",
+      "hello/package.json": `${JSON.stringify({ name: "hello", scripts: { start: "node index.js" } })}\n`,
+      "api/package.json": `${JSON.stringify({ name: "api", scripts: { start: "node server.js" } })}\n`,
+      "api/server.js": "console.log('api')\n",
+    });
+
+    const result = await new FileSystemSourceDetector().detect(
+      createExecutionContext({ entrypoint: "cli", requestId: "req_remote_mono" }),
+      pathToFileURL(remote).href,
+    );
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().details).toMatchObject({
+      phase: "source-detection",
+      reasonCode: "ambiguous-framework-evidence",
+      affectedProfileField: "source.baseDirectory",
+    });
+  });
 });
+
+async function createGitRemote(name: string, files: Record<string, string>): Promise<string> {
+  const { mkdir } = await import("node:fs/promises");
+  const root = await createWorkspace(name);
+  for (const [relativePath, content] of Object.entries(files)) {
+    const target = join(root, relativePath);
+    await mkdir(join(target, ".."), { recursive: true });
+    await Bun.write(target, content);
+  }
+  const git = (args: string[]) =>
+    Bun.spawnSync(["git", "-C", root, ...args], { stdout: "pipe", stderr: "pipe" });
+  expect(git(["init"]).success).toBe(true);
+  expect(git(["add", "."]).success).toBe(true);
+  expect(
+    git(["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "init"])
+      .success,
+  ).toBe(true);
+  return root;
+}

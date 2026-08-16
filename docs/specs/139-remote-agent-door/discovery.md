@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–10 shipped. Slice 11 remote-git planner evidence owner-confirmed 2026-08-16 (D40–D42).
+- Round: Spec. Slice 1–11 shipped. Slice 12 remote-git inspection owner-confirmed 2026-08-16 (D43–D45).
 - Date: 2026-08-16.
-- Predecessor: occupancy default network shipped as public #1172.
-- Code changes allowed: yes for slice 11 after the remote-git-planner ticket is `ready-for-agent`.
+- Predecessor: remote-git planner evidence shipped as public #1174.
+- Code changes allowed: yes for slice 12 after the remote-git-inspect ticket is `ready-for-agent`.
 
 ## Actor And Observable Outcome
 
@@ -77,7 +77,10 @@ Sandbox on that Server, not one VM per person.
 | D39 | Do not invent runtime/start this slice | Slice 10 shipped; planner lie is now slice 11 |
 | D40 | Slice 11 remote-git / git-* auto method uses the same inspection as local sources | Live Hello-World create accepted a dockerfile plan with `detectedFiles: []`, then failed `open Dockerfile`. `autoDeploymentMethodFor` hardcodes `remoteGit -> dockerfile`. |
 | D41 | Missing Dockerfile / start / static evidence fail-closed; do not invent Dockerfile | Plan and create must block before package. Existing explicit `runtime.strategy=dockerfile` still wins. |
-| D42 | Do not invent Hello-World start or static publish this slice | README-only repo stays blocked until the user or a later slice supplies runtime. |
+| D42 | Do not invent Hello-World start or static publish this slice | Slice 11 shipped; README-only stays blocked |
+| D43 | Slice 12 occupancy remote-git / git-* sources are inspectable | Live `appaloft/examples` occupy created Resource `app` but plan `detectedFiles: []`. `canBeEnrichedFromSourceInspection` excludes remote-git; detector only reads local paths. |
+| D44 | Detector shallow-clones the remote, keeps remote kind, attaches inspection | Reuse existing `discoverLocalWorkspace`. Single deployable root may set `source.baseDirectory`. |
+| D45 | Multiple deployable roots fail-closed on `source.baseDirectory` | `appaloft/examples` is a monorepo. Do not invent `hello/`. Preview of official hello requires explicit baseDirectory this slice. |
 
 ## Rejected
 
@@ -135,11 +138,12 @@ Later slices after occupancy:
 8. Occupancy default Environment (slice 8, shipped #1168).
 9. Occupancy default Resource (slice 9, shipped #1170).
 10. Occupancy default network (slice 10, shipped #1172).
-11. **Remote-git planner evidence** (slice 11): occupancy remote-git plan/create does not invent Dockerfile.
-12. Session-native Preview / remaining first-deploy chrome.
-13. GitHub as source surface / `owner/repo` shorthand.
-14. Optional team Connection.
-15. Cloud managed as default Server when no BYOS exists.
+11. Remote-git planner evidence (slice 11, shipped #1174).
+12. **Remote-git inspection** (slice 12): occupancy plan/create inspects the remote tree.
+13. Session-native Preview / remaining first-deploy chrome.
+14. GitHub as source surface / `owner/repo` shorthand.
+15. Optional team Connection.
+16. Cloud managed as default Server when no BYOS exists.
 
 ## Delivery chrome (owner 2026-08-15)
 

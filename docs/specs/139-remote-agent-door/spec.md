@@ -81,22 +81,23 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-NET-045 | Existing network reused | Resource `app` already has a network profile | second occupancy of same repo | configure-network is not called; existing port is kept. |
 | WS-REMOTE-PLAN-046 | Remote-git without Dockerfile fail-closed | occupancy Resource source is remote-git; inspection has no dockerfile/start/static evidence | `deployments.plan --resource --server` | readiness blocked; planner does not invent `Dockerfile`. |
 | WS-REMOTE-PLAN-047 | Remote-git Dockerfile evidence still wins | inspection detects dockerfile | `deployments.plan` | plannerKey `dockerfile`; path comes from inspection, not a hardcoded default. |
+| WS-REMOTE-INSPECT-048 | Remote-git occupancy inspects the remote tree | occupancy Resource source is remote-git of a single-app repo with root Dockerfile | `deployments.plan --resource --server` | `detectedFiles` includes dockerfile; plannerKey `dockerfile`. |
+| WS-REMOTE-INSPECT-049 | Monorepo remote-git fail-closed | occupancy Resource source is `appaloft/examples` with multiple deployable roots | `deployments.plan --resource --server` | blocked on `source.baseDirectory`; does not invent `hello/`. |
 
 ## Slice Scope
 
-Slice 1–10 shipped.
+Slice 1–11 shipped.
 
-Slice 11 (this ticket): remote-git / git-* auto method uses the same
-inspection as local sources.
+Slice 12 (this ticket): occupancy remote-git / git-* sources are inspectable.
 
-In slice 11:
+In slice 12:
 
-- no dockerfile / start / static evidence → fail-closed;
-- explicit `runtime.strategy=dockerfile` still wins;
-- do not invent Hello-World start or static publish.
+- enrich remote-git / git-* from source inspection;
+- detector shallow-clones, keeps remote kind, attaches inspection;
+- multiple deployable roots fail-closed on `source.baseDirectory`.
 
-Out of slice 11: session-native Preview, defaulting Server, interactive TUI
-rebuild, inventing runtime for README-only repos.
+Out of slice 12: inventing official `hello/` baseDirectory, session-native
+Preview chrome, defaulting Server.
 
 ## Public Surfaces
 
