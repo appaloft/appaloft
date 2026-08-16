@@ -117,20 +117,23 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-BANNER-081 | Code banner copies PR number | occupancy repo+sha match a preview-environment | `appaloft code --no-attach` | banner includes `PR #n`. |
 | WS-REMOTE-BANNER-082 | Missing banner PR stays omitted | occupancy has no matching preview-environment | `appaloft code --no-attach` | existing banner; no invented PR. |
 | WS-REMOTE-BANNER-083 | Foreign banner PR stays out | preview-environment belongs to another repo | `appaloft code --no-attach` | does not copy that PR. |
+| WS-REMOTE-CA-084 | TUI detail copies GitHub PR URL | occupancy is `github.com/owner/repo` and PR matches | TUI detail | shows `https://github.com/owner/repo/pull/n`. |
+| WS-REMOTE-CA-085 | Non-GitHub PR stays number-only | occupancy identity is not github.com | TUI detail | has `PR #n`; no invented host URL. |
+| WS-REMOTE-CA-086 | Missing PR URL stays omitted | occupancy has no matching preview-environment | TUI detail | no invented pull URL. |
 
 ## Slice Scope
 
-Slice 1–26 shipped.
+Slice 1–27 shipped.
 
-Slice 27 (this ticket): occupancy `code` banner shows matching PR number.
+Slice 28 (this ticket): occupancy TUI detail shows GitHub PR URL.
 
-In slice 27:
+In slice 28:
 
-- banner copies `preview-environments.list` PR when repo+sha match;
-- missing/foreign PR stays omitted;
-- one banner line; no PR create.
+- matching GitHub occupancy gets `https://github.com/{owner}/{repo}/pull/{n}`;
+- non-GitHub stays number-only;
+- no browser launch, no create-PR.
 
-Out of slice 27: create-PR navigator, team Connection, Cloud managed default Server.
+Out of slice 28: open-in-browser, create-PR navigator, team Connection, Cloud managed default Server.
 
 ## Public Surfaces
 

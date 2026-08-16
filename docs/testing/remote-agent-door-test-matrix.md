@@ -90,6 +90,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-BANNER-081 | CLI / unit | this slice | `code` banner copies matching PR | `remote-code-session.test.ts` |
 | WS-REMOTE-BANNER-082 | CLI / unit | this slice | missing banner PR stays omitted | same banner test |
 | WS-REMOTE-BANNER-083 | CLI / unit | this slice | foreign banner PR stays out | same banner test |
+| WS-REMOTE-CA-084 | TUI / unit | this slice | TUI detail copies GitHub PR URL | `occupancy-chrome.test.ts`; workspace-control-tui |
+| WS-REMOTE-CA-085 | TUI / unit | this slice | non-GitHub PR stays number-only | same chrome test |
+| WS-REMOTE-CA-086 | TUI / unit | this slice | missing PR URL stays omitted | same chrome test |
 
 
 

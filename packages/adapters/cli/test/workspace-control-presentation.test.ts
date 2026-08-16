@@ -1457,7 +1457,10 @@ describe("Workspace control presentation", () => {
     const detail = renderer.messages.find((message) => message.type === "detail");
     expect(detail).toMatchObject({
       type: "detail",
-      pullRequest: { number: 928 },
+      pullRequest: {
+        number: 928,
+        url: "https://github.com/traefik/whoami/pull/928",
+      },
     });
     expect(JSON.stringify(detail)).not.toContain('"number":1');
   });

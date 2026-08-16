@@ -235,6 +235,14 @@
 - [x] Unit tests WS-REMOTE-BANNER-081–083
 - [x] `appaloftdev code --no-attach` would show PR #n
 
+## Slice 28 — occupancy PR URL chrome
+
+- [x] Grill D91–D93
+- [x] Ticket `ready-for-agent` — [#1207](https://github.com/appaloft/appaloft/issues/1207)
+- [x] TUI detail copies GitHub PR URL
+- [x] Unit tests WS-REMOTE-CA-084–086
+- [x] `appaloftdev workspace` detail would show github.com/.../pull/n
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

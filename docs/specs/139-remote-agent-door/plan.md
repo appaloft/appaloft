@@ -38,6 +38,7 @@
 | Occupancy TUI PR chrome | same presentation + TUI detail; copy `preview-environments.list` PR |
 | Occupancy TUI production chrome | same presentation + TUI detail; copy Resource `app` durable domain |
 | Occupancy banner PR chrome | public CLI `code` banner; same preview-environment matcher |
+| Occupancy PR URL chrome | same occupancy chrome helper + TUI detail |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -207,6 +208,11 @@ Slice-27 verification:
 - unit: `code` banner includes matching `PR #n`;
 - unit: missing or foreign PR stays omitted;
 - `appaloftdev code --no-attach` prints PR when a preview-environment matches.
+
+Slice-28 verification:
+
+- unit: GitHub occupancy PR includes composed pull URL;
+- unit: non-GitHub / missing PR stays without invented URL.
 
 
 

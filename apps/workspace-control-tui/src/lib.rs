@@ -211,6 +211,8 @@ pub struct OccupancyDeploymentChrome {
 #[serde(rename_all = "camelCase")]
 pub struct OccupancyPullRequestChrome {
     pub number: u32,
+    #[serde(default)]
+    pub url: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
@@ -1729,7 +1731,10 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
             let pull_request = detail
                 .pull_request
                 .as_ref()
-                .map(|pull_request| format!("PR       #{}", pull_request.number))
+                .map(|pull_request| match &pull_request.url {
+                    Some(url) => format!("PR       #{}\n{url}", pull_request.number),
+                    None => format!("PR       #{}", pull_request.number),
+                })
                 .unwrap_or_default();
             format!(
                 "Workspace {}  {}\n{}\n{}\n{}\n{}\n{}\n{}\nRecovery\nIsolation  {}\nContinuity {}\nSnapshot(s)\n{}\nWorkspace-owned cleanup: {}\nactive runtimes:{}  previews:{}\nBounded readback; not host/provider proof\nAgent Runtime(s)\n{}\nPorts\n{}\nTasks\n{}\nPromotions\n{}",
@@ -2281,7 +2286,10 @@ mod tests {
                     id: "dep_rfqfapqwpyjn".to_owned(),
                     status: Some("succeeded".to_owned()),
                 }),
-                pull_request: Some(OccupancyPullRequestChrome { number: 928 }),
+                pull_request: Some(OccupancyPullRequestChrome {
+                    number: 928,
+                    url: Some("https://github.com/traefik/whoami/pull/928".to_owned()),
+                }),
                 recovery: RecoverySummary::default(),
             },
         });
@@ -2306,6 +2314,7 @@ mod tests {
         assert!(rendered.contains("whoami.example"));
         assert!(rendered.contains("dep_rfqfapqwpyjn"));
         assert!(rendered.contains("PR       #928"));
+        assert!(rendered.contains("pull/928"));
         assert!(rendered.contains("task_1"));
         assert!(rendered.contains("prm_1"));
         assert!(rendered.contains("verified"));

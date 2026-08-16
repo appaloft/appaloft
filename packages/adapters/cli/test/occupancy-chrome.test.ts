@@ -33,7 +33,10 @@ describe("occupancy PR chrome", () => {
           branch: "feat/occupancy",
         },
       ),
-    ).toEqual({ number: 928 });
+    ).toEqual({
+      number: 928,
+      url: "https://github.com/traefik/whoami/pull/928",
+    });
   });
 
   test("[WS-REMOTE-CA-076] missing PR stays omitted", () => {
@@ -63,6 +66,49 @@ describe("occupancy PR chrome", () => {
         },
       ),
     ).toBeUndefined();
+  });
+
+  test("[WS-REMOTE-CA-084] GitHub occupancy PR includes pull URL", () => {
+    expect(
+      occupancyPullRequestFromPreviewEnvironments(
+        [
+          {
+            source: {
+              repositoryFullName: "traefik/whoami",
+              pullRequestNumber: 928,
+              headSha: "1ce75d01b6978863647da42557a707a479da3a51",
+            },
+          },
+        ],
+        {
+          repositoryIdentity: "github.com/traefik/whoami",
+          commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        },
+      ),
+    ).toEqual({
+      number: 928,
+      url: "https://github.com/traefik/whoami/pull/928",
+    });
+  });
+
+  test("[WS-REMOTE-CA-085] non-GitHub occupancy PR stays number-only", () => {
+    expect(
+      occupancyPullRequestFromPreviewEnvironments(
+        [
+          {
+            source: {
+              repositoryFullName: "acme/api",
+              pullRequestNumber: 12,
+              headSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            },
+          },
+        ],
+        {
+          repositoryIdentity: "gitlab.com/acme/api",
+          commitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        },
+      ),
+    ).toEqual({ number: 12 });
   });
 });
 

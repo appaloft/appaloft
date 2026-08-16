@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–26 shipped. Slice 27 occupancy banner PR chrome owner-confirmed 2026-08-16 (D88–D90).
+- Round: Spec. Slice 1–27 shipped. Slice 28 occupancy PR URL chrome owner-confirmed 2026-08-16 (D91–D93).
 - Date: 2026-08-16.
-- Predecessor: occupancy TUI production chrome shipped as public #1204.
-- Code changes allowed: yes for slice 27 after the occupancy-banner-pr ticket is `ready-for-agent`.
+- Predecessor: occupancy banner PR chrome shipped as public #1206.
+- Code changes allowed: yes for slice 28 after the occupancy-pr-url ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -125,6 +125,9 @@ Sandbox on that Server, not one VM per person.
 | D88 | Slice 27 `code` banner appends `PR #n` from the same preview-environment matcher | Live `code --no-attach` still has Preview URL only. Cmux / Railway session chrome names the current PR. |
 | D89 | Missing or foreign PR stays omitted | Same D83. Do not scrape `gh` or vendor TUI. |
 | D90 | One banner line; no PR create | Session-native OpenCode PR chrome and create-PR navigator stay later. |
+| D91 | Slice 28 occupancy PR chrome includes a GitHub URL | Live TUI / banner only say `PR #n`. Railway `ca` opens the PR. Compose `https://github.com/{owner}/{repo}/pull/{n}` from occupancy identity + preview-environment number. |
+| D92 | Non-GitHub occupancy stays number-only | Do not invent gitlab/self-hosted hosts this slice. Missing URL stays omitted. |
+| D93 | No browser launch / create-PR this slice | Print the URL in TUI detail. Banner stays one line with `PR #n`. Open-in-browser stays later. |
 
 ## Rejected
 
@@ -198,10 +201,11 @@ Later slices after occupancy:
 24. Occupancy TUI chrome (slice 24, shipped #1200).
 25. Occupancy TUI PR chrome (slice 25, shipped #1202).
 26. Occupancy TUI production chrome (slice 26, shipped #1204).
-27. **Occupancy banner PR chrome** (slice 27): `code` banner appends `PR #n`.
-28. Interactive `workspace` TUI as Railway `ca` navigator (create PR).
-29. Optional team Connection.
-30. Cloud managed as default Server when no BYOS exists.
+27. Occupancy banner PR chrome (slice 27, shipped #1206).
+28. **Occupancy PR URL chrome** (slice 28): TUI detail shows GitHub PR URL.
+29. Interactive `workspace` TUI as Railway `ca` navigator (open/create PR).
+30. Optional team Connection.
+31. Cloud managed as default Server when no BYOS exists.
 ## Delivery chrome (owner 2026-08-15)
 
 Cmux-style “this session is PR #928” is correct *context*. It is not a new GitHub aggregate

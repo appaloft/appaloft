@@ -49,6 +49,7 @@ export interface OccupancyPreviewEnvironment {
 
 export interface OccupancyPullRequestChrome {
   readonly number: number;
+  readonly url?: string;
 }
 
 function normalizeRepositoryIdentity(value: string): string {
@@ -58,6 +59,17 @@ function normalizeRepositoryIdentity(value: string): string {
     .replace(/^gitlab\.com\//iu, "")
     .replace(/\.git$/u, "")
     .toLowerCase();
+}
+
+export function occupancyGitHubPullRequestUrl(
+  occupancy: OccupancyIdentity | undefined,
+  pullRequestNumber: number,
+): string | undefined {
+  if (!occupancy?.repositoryIdentity || pullRequestNumber <= 0) return undefined;
+  const identity = occupancy.repositoryIdentity.trim();
+  const github = identity.match(/^github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:\.git)?$/u);
+  if (!github) return undefined;
+  return `https://github.com/${github[1]}/pull/${pullRequestNumber}`;
 }
 
 function previewEnvironmentMatchesOccupancy(
@@ -95,7 +107,9 @@ export function occupancyPullRequestFromPreviewEnvironments(
       match = { number, ...(environment.updatedAt ? { updatedAt: environment.updatedAt } : {}) };
     }
   }
-  return match ? { number: match.number } : undefined;
+  if (!match) return undefined;
+  const url = occupancyGitHubPullRequestUrl(occupancy, match.number);
+  return { number: match.number, ...(url ? { url } : {}) };
 }
 
 export function occupancyPreviewFromResource(
