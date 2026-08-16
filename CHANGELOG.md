@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.9.0](https://github.com/appaloft/appaloft/compare/v1.8.5...v1.9.0) (2026-08-16)
+## [1.8.6](https://github.com/appaloft/appaloft/compare/v1.8.5...v1.8.6) (2026-08-16)
 
 
 ### Features
