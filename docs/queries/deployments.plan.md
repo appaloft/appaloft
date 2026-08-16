@@ -40,8 +40,8 @@ deployment lifecycle events, or execute build/run/verify/proxy work.
 
 ```ts
 type DeploymentPlanQueryInput = {
-  projectId: string;
-  environmentId: string;
+  projectId?: string;
+  environmentId?: string;
   resourceId: string;
   serverId: string;
   destinationId?: string;
@@ -52,9 +52,11 @@ type DeploymentPlanQueryInput = {
 
 The input reuses deployment context references. It must not accept resource profile fields,
 framework/base-image/buildpack fields, Docker/Kubernetes/Compose native fields, repository config
-paths, or secret-bearing values. Omitted `destinationId` is resolved read-only: resource
+paths, or secret-bearing values. Omitted `projectId` / `environmentId` resolve read-only from the
+selected Resource. Omitted `destinationId` is resolved read-only: resource
 `defaultDestinationId` if pinned, otherwise the selected Server Destination named `default`.
 The query must not create a Destination. Missing default remains `destinationId is required`.
+Omitted `serverId` still fail-closed.
 
 ## Output
 
@@ -173,7 +175,7 @@ must not be reused for role mismatch.
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
 | Web | Resource new-deployment read-only plan preview. | Active |
-| CLI | `appaloft deployments plan --project <id> --environment <id> --resource <id> --server <id> [--destination <id>] [--json]`. | Active |
+| CLI | `appaloft deployments plan --resource <id> --server <id> [--project <id>] [--environment <id>] [--destination <id>] [--json]`. | Active |
 | oRPC / HTTP | `GET /api/deployments/plan` using the query schema. | Active |
 | Automation / MCP | Future read-only plan inspection tool over the same operation key. | Future |
 

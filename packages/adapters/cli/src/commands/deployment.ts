@@ -2254,8 +2254,8 @@ const deploymentPlanCommand = EffectCommand.make(
   ({ destination, environment, project, resource, server }) =>
     runQuery(
       DeploymentPlanQuery.create({
-        projectId: optionalValue(project) ?? "",
-        environmentId: optionalValue(environment) ?? "",
+        ...(optionalValue(project) ? { projectId: optionalValue(project) } : {}),
+        ...(optionalValue(environment) ? { environmentId: optionalValue(environment) } : {}),
         resourceId: optionalValue(resource) ?? "",
         serverId: optionalValue(server) ?? "",
         destinationId: optionalValue(destination),

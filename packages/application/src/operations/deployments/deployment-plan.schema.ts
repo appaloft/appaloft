@@ -13,8 +13,8 @@ const booleanInput = (defaultValue: boolean) =>
 
 export const deploymentPlanQueryInputSchema = z
   .object({
-    projectId: nonEmptyTrimmedString("Project id"),
-    environmentId: nonEmptyTrimmedString("Environment id"),
+    projectId: nonEmptyTrimmedString("Project id").optional(),
+    environmentId: nonEmptyTrimmedString("Environment id").optional(),
     resourceId: nonEmptyTrimmedString("Resource id"),
     serverId: nonEmptyTrimmedString("Server id"),
     destinationId: nonEmptyTrimmedString("Destination id").optional(),

@@ -547,6 +547,41 @@ describe("DeploymentPlanQueryService", () => {
     expect(harness.runtimePlanResolver.input).toBeUndefined();
   });
 
+  test("[WS-REMOTE-CTX-038] omitted projectId and environmentId resolve from the resource", async () => {
+    const harness = await createHarness();
+    const query = DeploymentPlanQuery.create({
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      includeCommandSpecs: true,
+      includeAccessPlan: true,
+    })._unsafeUnwrap();
+
+    const result = await harness.service.execute(harness.context, query);
+
+    expect(result.isOk()).toBe(true);
+    expect(unwrap(result).context).toMatchObject({
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+    });
+  });
+
+  test("[WS-REMOTE-CTX-039] omitted resourceId still fail-closed", async () => {
+    const created = DeploymentPlanQuery.create({
+      serverId: "srv_demo",
+      includeCommandSpecs: true,
+      includeAccessPlan: true,
+    } as never);
+
+    expect(created.isErr()).toBe(true);
+    expect(created._unsafeUnwrapErr()).toMatchObject({
+      code: "validation_error",
+    });
+    expect(String(created._unsafeUnwrapErr().message)).toMatch(/Resource id|expected string/i);
+  });
+
   test("[SRV-ROLE-006][SRV-ROLE-007] returns a blocked plan preview when the selected server lacks deployment-runtime", async () => {
     const harness = await createHarness({ serverWorkloadRoles: ["artifact-builder"] });
 

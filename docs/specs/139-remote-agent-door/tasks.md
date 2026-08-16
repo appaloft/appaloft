@@ -65,6 +65,15 @@
 - [x] Unit tests WS-REMOTE-CA-036–037
 - [x] `appaloftdev workspace --json` shows occupancy project ids
 
+## Slice 7 — plan resource context
+
+- [x] Grill D28–D30
+- [x] Ticket `ready-for-agent` — [#1165](https://github.com/appaloft/appaloft/issues/1165)
+- [x] `deployments.plan` omitted project/env resolve from Resource
+- [x] Unit tests WS-REMOTE-CTX-038–039
+- [x] `appaloftdev deployments plan --resource --server`
+
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

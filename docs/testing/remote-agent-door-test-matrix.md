@@ -43,6 +43,8 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-CA-035 | CLI / unit | this slice | interactive `workspace` still starts TUI | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
 | WS-REMOTE-CA-036 | CLI / unit + `appaloftdev` | this slice | occupancy tree includes activation `projectId` | `packages/adapters/cli/test/agent-workspace-command.test.ts`; live `appaloftdev workspace --json` |
 | WS-REMOTE-CA-037 | CLI / unit | this slice | missing activation invents no projectId | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
+| WS-REMOTE-CTX-038 | application + `appaloftdev` | this slice | omitted plan project/env resolve from Resource | `packages/application/test/deployment-plan-preview.test.ts`; live plan `--resource --server` |
+| WS-REMOTE-CTX-039 | application | this slice | omitted resourceId fail-closed | `packages/application/test/deployment-plan-preview.test.ts` |
 
 
 

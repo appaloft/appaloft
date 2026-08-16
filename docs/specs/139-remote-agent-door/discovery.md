@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–5 shipped. Slice 6 occupancy projectId owner-confirmed 2026-08-16 (D25–D27).
+- Round: Spec. Slice 1–6 shipped. Slice 7 plan resource context owner-confirmed 2026-08-16 (D28–D30).
 - Date: 2026-08-16.
-- Predecessor: Spec 138 / ADR-116 Instant Local Scratch shipped as public #1125; ADR-117 identity door shipped as public #1127; ADR-118 occupancy shipped; ADR-119 repo-URL locator shipped as public #1156; ADR-120 destination shipped as public #1158; occupancy tree shipped as public #1162.
-- Code changes allowed: yes for slice 6 after the occupancy-project ticket is `ready-for-agent`.
+- Predecessor: Spec 138 / ADR-116 Instant Local Scratch shipped as public #1125; ADR-117 identity door shipped as public #1127; ADR-118 occupancy shipped; ADR-119 repo-URL locator shipped as public #1156; ADR-120 destination shipped as public #1158; occupancy tree shipped as public #1162; occupancy projectId shipped as public #1164.
+- Code changes allowed: yes for slice 7 after the plan-context ticket is `ready-for-agent`.
 
 ## Actor And Observable Outcome
 
@@ -63,6 +63,9 @@ Sandbox on that Server, not one VM per person.
 | D25 | Slice 6 occupancy tree exposes activation `projectId` | Live `workspace --json` lists repo@sha but Agent still cannot deploy without guessing `prj_*` |
 | D26 | Reuse `sandboxes.list` `activation.project.projectId`; no new catalog field | `workspace list` already returns it |
 | D27 | Do not invent Resource / Environment / Destination on the tree | Occupancy is not a Resource; first-deploy still uses existing `deploy` / `resources.create` |
+| D28 | Slice 7 `deployments.plan` omitted project/env resolve from Resource | Live plan still required four ids after occupancy projectId shipped |
+| D29 | Server stays required | Resource does not own a Server; occupancy Server is a later default |
+| D30 | `deployments.create` input stays explicit | Plan is the Railway inspect door; create remains fail-closed on omitted ids |
 
 ## Rejected
 
@@ -115,11 +118,12 @@ Later slices after occupancy:
 3. Repo-URL locator (slice 3, shipped #1156).
 4. Destination discovery (slice 4, shipped #1158).
 5. `workspace` occupancy tree (slice 5, shipped #1162).
-6. **Occupancy `projectId`** (slice 6): headless tree includes activation `projectId` so Agent deploy can start from occupancy.
-7. Session-native Preview / remaining first-deploy chrome.
-8. GitHub as source surface / `owner/repo` shorthand.
-9. Optional team Connection.
-10. Cloud managed as default Server when no BYOS exists.
+6. Occupancy `projectId` (slice 6, shipped #1164).
+7. **Plan resource context** (slice 7): `deployments.plan --resource --server` fills project/env from Resource.
+8. Session-native Preview / remaining first-deploy chrome.
+9. GitHub as source surface / `owner/repo` shorthand.
+10. Optional team Connection.
+11. Cloud managed as default Server when no BYOS exists.
 
 ## Delivery chrome (owner 2026-08-15)
 

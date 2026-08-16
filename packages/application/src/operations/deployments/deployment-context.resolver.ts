@@ -40,6 +40,13 @@ import {
 import { tokens } from "../../tokens";
 import { type CreateDeploymentCommandInput } from "./create-deployment.command";
 
+export type DeploymentContextInput = Partial<
+  Pick<
+    CreateDeploymentCommandInput,
+    "projectId" | "environmentId" | "resourceId" | "serverId" | "destinationId"
+  >
+>;
+
 const deploymentRuntimeRole = ServerWorkloadRoleValue.rehydrate("deployment-runtime");
 
 export interface ResolvedDeploymentContext {
@@ -67,7 +74,7 @@ export class DeploymentContextResolver {
 
   async resolve(
     context: ExecutionContext,
-    input: CreateDeploymentCommandInput,
+    input: DeploymentContextInput,
     options: { enforceWorkloadRole?: boolean } = {},
   ): Promise<Result<ResolvedDeploymentContext>> {
     const self = this;
@@ -92,21 +99,33 @@ export class DeploymentContextResolver {
       const explicitResource = yield* explicitResourceResult;
 
       let project = explicitProject;
-      if (!project) {
-        if (explicitEnvironment) {
-          const implicitProjectResult = await self.loadProject(
-            repositoryContext,
-            explicitEnvironment.projectId.value,
-          );
-          project = yield* implicitProjectResult;
-        }
+      if (!project && explicitEnvironment) {
+        const implicitProjectResult = await self.loadProject(
+          repositoryContext,
+          explicitEnvironment.projectId.value,
+        );
+        project = yield* implicitProjectResult;
+      }
+      if (!project && explicitResource) {
+        const implicitProjectResult = await self.loadProject(
+          repositoryContext,
+          explicitResource.projectId.value,
+        );
+        project = yield* implicitProjectResult;
       }
 
       if (!project) {
         return err(domainError.validation("Unable to resolve project for deployment context"));
       }
 
-      const environment = explicitEnvironment;
+      let environment = explicitEnvironment;
+      if (!environment && explicitResource) {
+        const implicitEnvironmentResult = await self.loadEnvironment(
+          repositoryContext,
+          explicitResource.environmentId.value,
+        );
+        environment = yield* implicitEnvironmentResult;
+      }
       if (!environment) {
         return err(domainError.validation("environmentId is required for this deployment context"));
       }
