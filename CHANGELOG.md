@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.7](https://github.com/appaloft/appaloft/compare/v1.8.6...v1.8.7) (2026-08-16)
+
+
+### Bug Fixes
+
+* **sandbox:** start occupancy without a composed MCP provider ([#1250](https://github.com/appaloft/appaloft/issues/1250)) ([4e4b960](https://github.com/appaloft/appaloft/commit/4e4b960c937b32064203932c420cf3d0a56fbdbf))
+
 ## [1.8.6](https://github.com/appaloft/appaloft/compare/v1.8.5...v1.8.6) (2026-08-16)
 
 
