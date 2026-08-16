@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–38 shipped. Slice 39 occupancy banner labels owner-confirmed 2026-08-16 (D124–D126).
+- Round: Spec. Slice 1–39 shipped. Slice 40 occupancy door hint owner-confirmed 2026-08-16 (D127–D129).
 - Date: 2026-08-16.
-- Predecessor: occupancy production open shipped as public #1228.
-- Code changes allowed: yes for slice 39 after the occupancy-banner-labels ticket is `ready-for-agent`.
+- Predecessor: occupancy banner labels shipped as public #1230.
+- Code changes allowed: yes for slice 40 after the occupancy-door-hint ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -161,6 +161,9 @@ Sandbox on that Server, not one VM per person.
 | D124 | Slice 39 banner labels Preview / Production / Compare like `PR #n` | Railway `ca` names the service. Bare URLs are ambiguous once Production exists. |
 | D125 | Labels are `Preview ·`, `Production ·`, `Compare ·` | Existing PR line stays `PR #n · <url>`. |
 | D126 | Missing URLs stay omitted | No extra blank labeled lines. Catalog create-PR write stays later. |
+| D127 | Slice 40 `code` prints one occupancy door hint after the banner | Railway `ca` names the next key. Model hint alone does not. |
+| D128 | Hint lists `--open-target preview\|production\|pr\|compare` and `workspace` `p`/`P`/`o`/`c` | Only existing doors. No invented create-PR write. |
+| D129 | Hint stays one line and always prints on remote `code` | Scratch `--local` stays unchanged. Catalog create-PR write stays later. |
 
 ## Rejected
 
@@ -246,10 +249,11 @@ Later slices after occupancy:
 36. Occupancy code `--open` (slice 36, shipped #1224).
 37. Occupancy `--open-target` (slice 37, shipped #1226).
 38. Occupancy production open (slice 38, shipped #1228).
-39. **Occupancy banner labels** (slice 39): `code` banner labels Preview / Production / Compare.
-40. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
-41. Optional team Connection.
-42. Cloud managed as default Server when no BYOS exists.
+39. Occupancy banner labels (slice 39, shipped #1230).
+40. **Occupancy door hint** (slice 40): `code` names `--open-target` and `workspace` keys.
+41. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
+42. Optional team Connection.
+43. Cloud managed as default Server when no BYOS exists.
 
 Cmux-style “this session is PR #928” is correct *context*. It is not a new GitHub aggregate
 and not something `code` scrapes from the vendor TUI.

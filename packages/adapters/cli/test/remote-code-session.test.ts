@@ -4,12 +4,20 @@ import {
   formatRemoteCodeBanner,
   isRemoteCodeGitRemoteLocator,
   nativeAttachRequiresInteractiveTerminal,
+  REMOTE_CODE_DOOR_HINT,
+  REMOTE_CODE_MODEL_HINT,
   resolveDefaultRemoteCodeDoor,
   selectDefaultRemoteCodeServer,
   selectResumeOccupancy,
 } from "../src/remote-code-session.js";
 
 describe("remote code door", () => {
+  test("[WS-REMOTE-HINT-119] occupancy door hint names existing doors", () => {
+    expect(REMOTE_CODE_DOOR_HINT).toBe(
+      "Open · --open-target preview|production|pr|compare · workspace p/P/o/c",
+    );
+    expect(REMOTE_CODE_MODEL_HINT).toContain("OpenCode");
+  });
   test("[WS-REMOTE-LOGIN-001] fails closed without login or profile", async () => {
     await expect(
       resolveDefaultRemoteCodeDoor({

@@ -125,6 +125,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-BANNER-116 | CLI / unit | this slice | occupancy banner labels Preview / Production | `remote-code-session.test.ts` |
 | WS-REMOTE-BANNER-117 | CLI / unit | this slice | occupancy banner labels Compare | same banner test |
 | WS-REMOTE-BANNER-118 | CLI / unit | this slice | existing PR line stays `PR #n` | same banner test |
+| WS-REMOTE-HINT-119 | CLI / unit | this slice | occupancy door hint follows the banner | `remote-code-session.test.ts`; `agent-workspace-command.test.ts` |
+| WS-REMOTE-HINT-120 | CLI / unit | this slice | occupancy door hint stays before the model hint | same command test |
+| WS-REMOTE-HINT-121 | CLI / unit | this slice | scratch `--local` stays unlabeled | same command test |
 
 
 

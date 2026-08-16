@@ -11,6 +11,8 @@ import {
 import { occupancyGitHubCompareUrl, occupancyGitHubPullRequestUrl } from "./occupancy-chrome.js";
 
 export const REMOTE_CODE_BANNER_PREFIX = "Remote ·";
+export const REMOTE_CODE_DOOR_HINT =
+  "Open · --open-target preview|production|pr|compare · workspace p/P/o/c";
 export const REMOTE_CODE_MODEL_HINT =
   "Connect a model in the attached OpenCode session before running a Task.";
 

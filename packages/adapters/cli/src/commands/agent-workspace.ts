@@ -74,6 +74,7 @@ import {
   formatRemoteCodeBanner,
   isRemoteCodeGitRemoteLocator,
   nativeAttachRequiresInteractiveTerminal,
+  REMOTE_CODE_DOOR_HINT,
   REMOTE_CODE_MODEL_HINT,
   resolveDefaultRemoteCodeDoor,
   scratchRemoteRejectedError,
@@ -666,6 +667,7 @@ export const workspaceCodeCommand = EffectCommand.make(
           }
         }
       }
+      process.stdout.write(`${REMOTE_CODE_DOOR_HINT}\n`);
       process.stdout.write(`${REMOTE_CODE_MODEL_HINT}\n`);
       if (!attach) return;
       yield* completeWorkspaceOpen(result, true, cli.launchNativeWorkspaceClient);

@@ -721,7 +721,7 @@ describe("Agent Workspace CLI", () => {
     expect(commandDispatched).toBeFalse();
   });
 
-  test("[WS-SCRATCH-CLI-001][WS-SCRATCH-EMPTY-002][WS-SCRATCH-DIRTY-003][WS-SCRATCH-LOGGED-OUT-004][WS-SCRATCH-BANNER-005][WS-SCRATCH-HARNESS-006][WS-SCRATCH-NO-ATTACH-009][WS-SCRATCH-NO-STATE-012][WS-SCRATCH-PROFILE-016][WS-REMOTE-LOCAL-010] --local code is scratch without Git or workspaces.open", async () => {
+  test("[WS-SCRATCH-CLI-001][WS-SCRATCH-EMPTY-002][WS-SCRATCH-DIRTY-003][WS-SCRATCH-LOGGED-OUT-004][WS-SCRATCH-BANNER-005][WS-SCRATCH-HARNESS-006][WS-SCRATCH-NO-ATTACH-009][WS-SCRATCH-NO-STATE-012][WS-SCRATCH-PROFILE-016][WS-REMOTE-LOCAL-010][WS-REMOTE-HINT-121] --local code is scratch without Git or workspaces.open", async () => {
     const scratchDir = await mkdtemp(join(tmpdir(), "appaloft-scratch-empty-"));
     const commands: Command<unknown>[] = [];
     const launched: string[][] = [];
@@ -771,6 +771,7 @@ describe("Agent Workspace CLI", () => {
     expect(launched).toEqual([]);
     expect(output.join("")).toContain("Local scratch · this Mac · not saved remotely");
     expect(output.join("")).toContain("opencode");
+    expect(output.join("")).not.toContain("--open-target");
   });
 
   test("[WS-REMOTE-LOGIN-001] default code fails closed when logged out", async () => {
@@ -920,7 +921,7 @@ describe("Agent Workspace CLI", () => {
     expect(output.join("")).not.toContain("Local scratch · this Mac · not saved remotely");
   });
 
-  test("[WS-REMOTE-BANNER-061] code banner includes occupancy Preview URL", async () => {
+  test("[WS-REMOTE-BANNER-061][WS-REMOTE-HINT-119][WS-REMOTE-HINT-120] code banner includes occupancy Preview URL", async () => {
     const output: string[] = [];
     const { createCliProgram } = await import("../src");
     const program = createCliProgram({
@@ -974,6 +975,9 @@ describe("Agent Workspace CLI", () => {
     }
     expect(output.join("")).toContain(
       "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_whoami\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
+    );
+    expect(output.join("")).toContain(
+      "Open · --open-target preview|production|pr|compare · workspace p/P/o/c\nConnect a model in the attached OpenCode session before running a Task.",
     );
   });
 

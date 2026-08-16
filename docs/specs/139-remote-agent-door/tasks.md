@@ -330,6 +330,14 @@
 - [x] Unit tests WS-REMOTE-BANNER-116–118
 - [x] `appaloftdev code --no-attach` would print Preview · / Production ·
 
+## Slice 40 — occupancy door hint
+
+- [x] Grill D127–D129
+- [x] Ticket `ready-for-agent` — [#1231](https://github.com/appaloft/appaloft/issues/1231)
+- [x] `code` names `--open-target` and `workspace` keys
+- [x] Unit tests WS-REMOTE-HINT-119–121
+- [x] `appaloftdev code --no-attach` would print `--open-target` / `workspace` keys
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator
