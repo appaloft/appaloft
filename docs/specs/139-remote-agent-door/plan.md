@@ -74,6 +74,13 @@ Slice-7 verification:
 - `appaloftdev deployments plan --resource res_vj1602cxjisn --server srv_uil9cpctplou` does not fail `Project id is required`.
 
 
+Slice-8 verification:
+
+- unit: missing `local` Environment is created;
+- unit: existing `local` is reused and create is not called;
+- `appaloftdev env list --project prj_aoqjs0es367x` shows `local` after occupying Hello-World.
+
+
 ## Risks
 
 - Plan must stay read-only. Do not reuse the create bootstrap create-or-reuse

@@ -1,5 +1,7 @@
 import {
   domainError,
+  EnvironmentByProjectAndNameSpec,
+  EnvironmentName,
   err,
   ok,
   ProjectByIdSpec,
@@ -19,9 +21,10 @@ import {
 } from "./agent-workspace-profile";
 import { type CommandBus } from "./cqrs";
 import { type ExecutionContext, toRepositoryContext } from "./execution-context";
+import { CreateEnvironmentCommand } from "./operations/environments/create-environment.command";
 import { ConfigureProjectWorkspaceProfileCommand } from "./operations/projects/configure-project-workspace-profile.command";
 import { CreateProjectCommand } from "./operations/projects/create-project.command";
-import { type ProjectRepository } from "./ports";
+import { type EnvironmentRepository, type ProjectRepository } from "./ports";
 import { type RepositoryBindingRepository } from "./repository-binding";
 import { BindProjectRepositoryCommand } from "./repository-binding-messages";
 
@@ -57,6 +60,7 @@ export class CommunityWorkspaceActivationContextInitializer
     private readonly dependencies: {
       readonly commandBus: Pick<CommandBus, "execute">;
       readonly projects: ProjectRepository;
+      readonly environments: EnvironmentRepository;
       readonly repositoryBindings: RepositoryBindingRepository;
       readonly adapters: AgentAdapterInstallationService;
       readonly profiles: AgentWorkspaceProfileInstallationService;
@@ -176,6 +180,8 @@ export class CommunityWorkspaceActivationContextInitializer
         }),
       );
     }
+    const environment = await this.ensureLocalEnvironment(context, projectId);
+    if (environment.isErr()) return err(environment.error);
     if (project.toState().defaultWorkspaceProfileInstallationId) {
       return ok({
         project: projectDisposition,
@@ -223,5 +229,31 @@ export class CommunityWorkspaceActivationContextInitializer
       repositoryBinding: bindingDisposition,
       profile: existingProfile ? "reused" : "created",
     });
+  }
+
+  async ensureLocalEnvironment(
+    context: ExecutionContext,
+    projectId: string,
+  ): Promise<Result<void>> {
+    const name = EnvironmentName.create("local");
+    if (name.isErr()) return err(name.error);
+    const existing = await this.dependencies.environments.findOne(
+      toRepositoryContext(context),
+      EnvironmentByProjectAndNameSpec.create(ProjectId.rehydrate(projectId), name.value),
+    );
+    if (existing) return ok(undefined);
+    const created = CreateEnvironmentCommand.create({
+      projectId,
+      name: "local",
+      kind: "local",
+    });
+    if (created.isErr()) return err(created.error);
+    const executed = await this.dependencies.commandBus.execute(context, created.value);
+    if (executed.isOk()) return ok(undefined);
+    const raced = await this.dependencies.environments.findOne(
+      toRepositoryContext(context),
+      EnvironmentByProjectAndNameSpec.create(ProjectId.rehydrate(projectId), name.value),
+    );
+    return raced ? ok(undefined) : err(executed.error);
   }
 }

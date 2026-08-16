@@ -73,6 +73,14 @@
 - [x] Unit tests WS-REMOTE-CTX-038–039
 - [x] `appaloftdev deployments plan --resource --server`
 
+## Slice 8 — occupancy default Environment
+
+- [x] Grill D31–D33
+- [x] Ticket `ready-for-agent` — [#1167](https://github.com/appaloft/appaloft/issues/1167)
+- [x] Occupancy activation ensures Environment `local`
+- [x] Unit tests WS-REMOTE-ENV-040–041
+- [x] `appaloftdev env list --project` after Hello-World occupy
+
 
 ## Later
 
