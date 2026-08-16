@@ -102,6 +102,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-CA-093 | TUI / unit | this slice | `c` opens GitHub compare for occupancy branch | `occupancy-chrome.test.ts`; `workspace-control-presentation.test.ts`; workspace-control-tui |
 | WS-REMOTE-CA-094 | TUI / unit | this slice | existing PR compare stays on pull URL | same presentation test |
 | WS-REMOTE-CA-095 | TUI / unit | this slice | missing compare stays lean | same presentation test |
+| WS-REMOTE-CA-096 | TUI / unit | this slice | Deliver Task prefills occupancy branch | workspace-control-tui |
+| WS-REMOTE-CA-097 | TUI / unit | this slice | missing occupancy PR prefills PR title | same TUI test |
+| WS-REMOTE-CA-098 | TUI / unit | this slice | existing occupancy PR leaves PR fields blank | same TUI test |
 
 
 

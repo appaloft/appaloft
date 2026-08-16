@@ -1051,13 +1051,30 @@ impl AppState {
                 DeliveryDecision::FormOpened
             }
             DeliveryAction::DeliverTask { task_run_id } => {
+                let occupancy = self
+                    .detail
+                    .as_ref()
+                    .and_then(|detail| detail.workspace.occupancy.as_ref());
+                let branch = occupancy
+                    .and_then(|occupancy| occupancy.branch.clone())
+                    .unwrap_or_default();
+                let pull_request_title = if self
+                    .detail
+                    .as_ref()
+                    .and_then(|detail| detail.pull_request.as_ref())
+                    .is_none()
+                {
+                    branch.clone()
+                } else {
+                    String::new()
+                };
                 self.delivery_form = Some(DeliveryForm::Task {
                     task_run_id,
                     values: [
-                        String::new(),
+                        branch,
                         String::new(),
                         "origin".to_owned(),
-                        String::new(),
+                        pull_request_title,
                         String::new(),
                         String::new(),
                     ],
@@ -2917,6 +2934,61 @@ mod tests {
         assert!(state.pending_delivery_confirmation.is_none());
     }
 
+    #[test]
+    fn ws_tui_deliver_task_prefills_occupancy_branch_and_pr_title() {
+        let mut state = occupancy_delivery_ready_state(None);
+        assert!(state.open_delivery_menu());
+        state.move_delivery_selection(1);
+        assert_eq!(
+            state.activate_selected_delivery_action(),
+            DeliveryDecision::FormOpened
+        );
+        assert_eq!(
+            state.delivery_form,
+            Some(DeliveryForm::Task {
+                task_run_id: "task_deliver".to_owned(),
+                values: [
+                    "feat/occupancy".to_owned(),
+                    String::new(),
+                    "origin".to_owned(),
+                    "feat/occupancy".to_owned(),
+                    String::new(),
+                    String::new(),
+                ],
+                field: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn ws_tui_deliver_task_leaves_pr_fields_blank_when_occupancy_pr_exists() {
+        let mut state = occupancy_delivery_ready_state(Some(OccupancyPullRequestChrome {
+            number: 928,
+            url: Some("https://github.com/traefik/whoami/pull/928".to_owned()),
+        }));
+        assert!(state.open_delivery_menu());
+        state.move_delivery_selection(1);
+        assert_eq!(
+            state.activate_selected_delivery_action(),
+            DeliveryDecision::FormOpened
+        );
+        assert_eq!(
+            state.delivery_form,
+            Some(DeliveryForm::Task {
+                task_run_id: "task_deliver".to_owned(),
+                values: [
+                    "feat/occupancy".to_owned(),
+                    String::new(),
+                    "origin".to_owned(),
+                    String::new(),
+                    String::new(),
+                    String::new(),
+                ],
+                field: 0,
+            })
+        );
+    }
+
     fn delivery_ready_state() -> AppState {
         let mut state = AppState::default();
         state.apply(ParentMessage::Workspaces {
@@ -2948,6 +3020,23 @@ mod tests {
                 recovery: RecoverySummary::default(),
             },
         });
+        state
+    }
+
+    fn occupancy_delivery_ready_state(
+        pull_request: Option<OccupancyPullRequestChrome>,
+    ) -> AppState {
+        let mut state = delivery_ready_state();
+        let occupancy = OccupancySummary {
+            repository_identity: "github.com/traefik/whoami".to_owned(),
+            commit_sha: "1ce75d01b6978863647da42557a707a479da3a51".to_owned(),
+            branch: Some("feat/occupancy".to_owned()),
+        };
+        state.workspaces[0].occupancy = Some(occupancy.clone());
+        if let Some(detail) = state.detail.as_mut() {
+            detail.workspace.occupancy = Some(occupancy);
+            detail.pull_request = pull_request;
+        }
         state
     }
 }

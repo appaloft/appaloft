@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–30 shipped. Slice 31 occupancy compare-PR door owner-confirmed 2026-08-16 (D100–D102).
+- Round: Spec. Slice 1–31 shipped. Slice 32 occupancy delivery prefills owner-confirmed 2026-08-16 (D103–D105).
 - Date: 2026-08-16.
-- Predecessor: occupancy open-preview door shipped as public #1212.
-- Code changes allowed: yes for slice 31 after the occupancy-compare-pr ticket is `ready-for-agent`.
+- Predecessor: occupancy compare-PR door shipped as public #1214.
+- Code changes allowed: yes for slice 32 after the occupancy-delivery-prefills ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -137,6 +137,9 @@ Sandbox on that Server, not one VM per person.
 | D100 | Slice 31 TUI `c` opens GitHub compare for occupancy branch | Railway `ca` create-PR starts from the current branch. No GitHub write. Existing `o` still opens an already-open PR. |
 | D101 | Only `https://github.com/{owner}/{repo}/compare/{branch}?expand=1` | Reject missing branch, non-github occupancy, or URL that is not that compare form. If occupancy already has a GitHub PR URL, `c` opens that pull URL instead. |
 | D102 | Same CI / `APPALOFT_CLI_OPEN_BROWSER=false` fail-soft as `o` | Footer names `c compare`. Catalog `task deliver --pull-request-*` stays the write path. |
+| D103 | Slice 32 TUI `d` Deliver Task prefills occupancy branch | Railway `ca` starts from the current branch. Remote stays `origin`. No auto-submit. |
+| D104 | Missing occupancy PR also prefills PR title from occupancy branch | Existing PR leaves title/body/base empty so deliver does not invent a second PR. |
+| D105 | Missing occupancy / empty branch stays blank | No invented `feat/...`. Catalog `task deliver --pull-request-*` stays the write path. |
 
 ## Rejected
 
@@ -214,10 +217,11 @@ Later slices after occupancy:
 28. Occupancy PR URL chrome (slice 28, shipped #1208).
 29. Occupancy open-PR door (slice 29, shipped #1210).
 30. Occupancy open-preview door (slice 30, shipped #1212).
-31. **Occupancy compare-PR door** (slice 31): TUI `c` opens GitHub compare / existing PR.
-32. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
-33. Optional team Connection.
-34. Cloud managed as default Server when no BYOS exists.
+31. Occupancy compare-PR door (slice 31, shipped #1214).
+32. **Occupancy delivery prefills** (slice 32): TUI `d` Deliver Task prefills occupancy branch / PR title.
+33. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
+34. Optional team Connection.
+35. Cloud managed as default Server when no BYOS exists.
 
 Cmux-style “this session is PR #928” is correct *context*. It is not a new GitHub aggregate
 and not something `code` scrapes from the vendor TUI.

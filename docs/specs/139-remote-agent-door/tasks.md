@@ -266,6 +266,14 @@
 - [x] Unit tests WS-REMOTE-CA-093–095
 - [x] `appaloftdev workspace` `c` would open github.com/.../compare/...
 
+## Slice 32 — occupancy delivery prefills
+
+- [x] Grill D103–D105
+- [x] Ticket `ready-for-agent` — [#1215](https://github.com/appaloft/appaloft/issues/1215)
+- [x] TUI Deliver Task prefills occupancy branch / PR title
+- [x] Unit tests WS-REMOTE-CA-096–098
+- [x] `appaloftdev workspace` `d` would open a prefilled Deliver Task form
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

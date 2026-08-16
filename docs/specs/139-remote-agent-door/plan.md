@@ -42,6 +42,7 @@
 | Occupancy open-PR door | TUI `o` + presentation open of selected GitHub pull URL |
 | Occupancy open-preview door | TUI `p` / `P` + same presentation `openUrl` |
 | Occupancy compare-PR door | TUI `c` + occupancy compare URL helper |
+| Occupancy delivery prefills | TUI Deliver Task form + selected occupancy |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -232,6 +233,12 @@ Slice-31 verification:
 - unit: `c` opens GitHub compare for occupancy branch when no PR exists;
 - unit: existing PR still opens the pull URL;
 - unit: missing / non-github occupancy does not spawn a browser.
+
+Slice-32 verification:
+
+- unit: Deliver Task prefills occupancy branch;
+- unit: missing occupancy PR prefills PR title;
+- unit: existing occupancy PR leaves PR fields blank.
 
 
 

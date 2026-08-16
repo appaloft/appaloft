@@ -129,21 +129,24 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-CA-093 | TUI `c` opens GitHub compare | selected occupancy has GitHub repo + branch and no PR URL | `c` | presentation launches `https://github.com/{owner}/{repo}/compare/{branch}?expand=1`. |
 | WS-REMOTE-CA-094 | Existing PR compare stays on pull URL | selected occupancy already has GitHub PR URL | `c` | presentation launches that pull URL, not compare. |
 | WS-REMOTE-CA-095 | Missing compare stays lean | missing branch / non-github occupancy | `c` | no browser spawn; no invented compare. |
+| WS-REMOTE-CA-096 | Deliver Task prefills occupancy branch | selected occupancy has a branch | `d` Deliver Task | form branch is that occupancy branch; remote stays `origin`. |
+| WS-REMOTE-CA-097 | Missing occupancy PR prefills PR title | occupancy has a branch and no PR | `d` Deliver Task | form PR title is that occupancy branch. |
+| WS-REMOTE-CA-098 | Existing occupancy PR leaves PR fields blank | occupancy already has a PR | `d` Deliver Task | title/body/base stay empty. |
 
 ## Slice Scope
 
-Slice 1–30 shipped.
+Slice 1–31 shipped.
 
-Slice 31 (this ticket): interactive `workspace` `c` opens occupancy GitHub compare or the existing PR.
+Slice 32 (this ticket): interactive `workspace` Deliver Task prefills occupancy branch / PR title.
 
-In slice 31:
+In slice 32:
 
-- `c` opens selected GitHub compare when occupancy has repo + branch and no PR;
-- existing GitHub PR URL still opens that pull URL;
-- missing / non-github occupancy does not spawn a browser;
-- no GitHub write.
+- Deliver Task prefills occupancy branch when present;
+- missing occupancy PR also prefills PR title from that branch;
+- existing occupancy PR leaves PR fields blank;
+- no auto-submit and no GitHub write.
 
-Out of slice 31: catalog create-PR write, team Connection, Cloud managed default Server.
+Out of slice 32: catalog create-PR write, team Connection, Cloud managed default Server.
 
 
 ## Public Surfaces
