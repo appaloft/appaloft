@@ -49,6 +49,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-ENV-041 | application | this slice | existing `local` Environment is reused | `packages/application/test/community-workspace-activation-context-initializer.test.ts` |
 | WS-REMOTE-RES-042 | application + `appaloftdev` | this slice | occupancy creates Resource `app` when missing | `packages/application/test/community-workspace-activation-context-initializer.test.ts`; live `resource list` |
 | WS-REMOTE-RES-043 | application | this slice | existing Resource `app` is reused | `packages/application/test/community-workspace-activation-context-initializer.test.ts` |
+| WS-REMOTE-NET-044 | application + `appaloftdev` | this slice | occupancy default network is `3000` / `http` / `reverse-proxy` | `packages/application/test/community-workspace-activation-context-initializer.test.ts`; live `deployments plan --resource --server` |
+| WS-REMOTE-NET-045 | application | this slice | existing Resource network is reused | `packages/application/test/community-workspace-activation-context-initializer.test.ts` |
+
 
 
 

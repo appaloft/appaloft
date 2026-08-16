@@ -77,21 +77,24 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-ENV-041 | Existing local reused | Project already has Environment `local` | second occupancy of same repo | no second Environment; create is not called. |
 | WS-REMOTE-RES-042 | Occupancy default Resource | occupancy Project has Environment `local` and no Resource `app` | `appaloft code --no-attach` then `resource list --project <id>` | one Resource slug `app` exists with remote-git source. |
 | WS-REMOTE-RES-043 | Existing app reused | Environment already has Resource `app` | second occupancy of same repo | no second Resource; create is not called. |
+| WS-REMOTE-NET-044 | Occupancy default network | occupancy Resource `app` has no network profile | `appaloft code --no-attach` then `resource show` / `deployments.plan --resource --server` | Resource has `internalPort 3000`, `http`, `reverse-proxy`; plan no longer reports `missing-internal-port`. |
+| WS-REMOTE-NET-045 | Existing network reused | Resource `app` already has a network profile | second occupancy of same repo | configure-network is not called; existing port is kept. |
 
 ## Slice Scope
 
-Slice 1–8 shipped.
+Slice 1–9 shipped.
 
-Slice 9 (this ticket): occupancy activation ensures Resource slug `app`.
+Slice 10 (this ticket): occupancy activation ensures Resource `app` has the
+product default network profile.
 
-In slice 9:
+In slice 10:
 
-- missing `app` → `resources.create` kind `application`, source `remote-git`;
-- existing `app` reused;
-- no invented `internalPort`.
+- missing `app` → `resources.create` includes `networkProfile` `3000` / `http` / `reverse-proxy`;
+- existing `app` without network → `resources.configure-network` with the same default;
+- existing network reused.
 
-Out of slice 9: Resource id on the occupancy tree, guessing network/runtime
-profile, defaulting Server, interactive TUI rebuild, session-native Preview.
+- Out of slice 10: inventing runtime/start, repo-detected ports, Resource id on
+  the occupancy tree, defaulting Server, interactive TUI rebuild, session-native Preview.
 
 ## Public Surfaces
 

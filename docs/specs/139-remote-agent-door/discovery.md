@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–8 shipped. Slice 9 occupancy default Resource owner-confirmed 2026-08-16 (D34–D36).
+- Round: Spec. Slice 1–9 shipped. Slice 10 occupancy default network owner-confirmed 2026-08-16 (D37–D39).
 - Date: 2026-08-16.
-- Predecessor: occupancy default Environment shipped as public #1168.
-- Code changes allowed: yes for slice 9 after the occupancy-resource ticket is `ready-for-agent`.
+- Predecessor: occupancy default Resource shipped as public #1170.
+- Code changes allowed: yes for slice 10 after the occupancy-network ticket is `ready-for-agent`.
 
 ## Actor And Observable Outcome
 
@@ -71,7 +71,10 @@ Sandbox on that Server, not one VM per person.
 | D33 | Do not add Environment to activation evidence this slice | Tree still exposes projectId only; Resource remains a later deploy step |
 | D34 | Slice 9 occupancy ensures Resource slug `app` on Environment `local` | Hello-World now has `env_ky8ro1a8cy5l` but `resource list` is empty |
 | D35 | Reuse existing Resource `app`; create only when missing | `resources.create` slug-conflicts; do not treat conflict as success |
-| D36 | Created Resource source is `remote-git` of the occupancy repo; no network/runtime profile | `internalPort` stays the next first-deploy blocker; do not guess a port |
+| D36 | Created Resource source is `remote-git` of the occupancy repo; no network/runtime profile | Slice 9 shipped; `internalPort` is now slice 10 |
+| D37 | Slice 10 occupancy default network is product `internalPort 3000`, `http`, `reverse-proxy` | Live plan on `res_vhmyk4zutvnd` is blocked `missing-internal-port`. This is the documented Appaloft default, not repo detection. Hello-World has no Dockerfile or start command. |
+| D38 | Missing network on existing Resource `app` is filled via `resources.configure-network`; existing network is reused | Do not overwrite a user-configured port. |
+| D39 | Do not invent runtime/start this slice | Plan still has `plannerKey unsupported` after network. Runtime stays later. |
 
 ## Rejected
 
@@ -127,11 +130,12 @@ Later slices after occupancy:
 6. Occupancy `projectId` (slice 6, shipped #1164).
 7. Plan resource context (slice 7, shipped #1166).
 8. Occupancy default Environment (slice 8, shipped #1168).
-9. **Occupancy default Resource** (slice 9): activation ensures Resource slug `app` on Environment `local`.
-10. Session-native Preview / remaining first-deploy chrome.
-11. GitHub as source surface / `owner/repo` shorthand.
-12. Optional team Connection.
-13. Cloud managed as default Server when no BYOS exists.
+9. Occupancy default Resource (slice 9, shipped #1170).
+10. **Occupancy default network** (slice 10): activation ensures Resource `app` has product default `internalPort 3000`.
+11. Session-native Preview / remaining first-deploy chrome.
+12. GitHub as source surface / `owner/repo` shorthand.
+13. Optional team Connection.
+14. Cloud managed as default Server when no BYOS exists.
 
 ## Delivery chrome (owner 2026-08-15)
 

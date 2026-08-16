@@ -87,6 +87,12 @@ Slice-9 verification:
 - unit: existing Resource `app` is reused and create is not called;
 - `appaloftdev resource list --project prj_aoqjs0es367x` shows slug `app` after occupying Hello-World.
 
+Slice-10 verification:
+
+- unit: created Resource `app` includes network `3000` / `http` / `reverse-proxy`;
+- unit: existing Resource without network is configured; existing network is reused;
+- `appaloftdev deployments plan --resource res_vhmyk4zutvnd --server srv_uil9cpctplou` no longer reports `missing-internal-port`.
+
 
 ## Risks
 

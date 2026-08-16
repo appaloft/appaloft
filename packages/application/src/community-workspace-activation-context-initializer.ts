@@ -28,6 +28,7 @@ import { type ExecutionContext, toRepositoryContext } from "./execution-context"
 import { CreateEnvironmentCommand } from "./operations/environments/create-environment.command";
 import { ConfigureProjectWorkspaceProfileCommand } from "./operations/projects/configure-project-workspace-profile.command";
 import { CreateProjectCommand } from "./operations/projects/create-project.command";
+import { ConfigureResourceNetworkCommand } from "./operations/resources/configure-resource-network.command";
 import { CreateResourceCommand } from "./operations/resources/create-resource.command";
 import {
   type EnvironmentRepository,
@@ -301,7 +302,17 @@ export class CommunityWorkspaceActivationContextInitializer
         slug.value,
       ),
     );
-    if (existing) return ok(undefined);
+    if (existing) {
+      if (existing.toState().networkProfile) return ok(undefined);
+      const configured = ConfigureResourceNetworkCommand.create({
+        resourceId: existing.id.value,
+        networkProfile: OCCUPANCY_DEFAULT_NETWORK_PROFILE,
+      });
+      if (configured.isErr()) return err(configured.error);
+      return this.dependencies.commandBus
+        .execute(context, configured.value)
+        .then((executed) => (executed.isOk() ? ok(undefined) : err(executed.error)));
+    }
     const created = CreateResourceCommand.create({
       projectId,
       environmentId: environment.id.value,
@@ -311,6 +322,7 @@ export class CommunityWorkspaceActivationContextInitializer
         kind: "remote-git",
         locator: repository,
       },
+      networkProfile: OCCUPANCY_DEFAULT_NETWORK_PROFILE,
     });
     if (created.isErr()) return err(created.error);
     const executed = await this.dependencies.commandBus.execute(context, created.value);
@@ -326,3 +338,9 @@ export class CommunityWorkspaceActivationContextInitializer
     return raced ? ok(undefined) : err(executed.error);
   }
 }
+
+const OCCUPANCY_DEFAULT_NETWORK_PROFILE = {
+  internalPort: 3000,
+  upstreamProtocol: "http",
+  exposureMode: "reverse-proxy",
+} as const;

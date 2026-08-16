@@ -90,6 +90,14 @@
 - [x] `appaloftdev resource list --project` after Hello-World occupy
 
 
+## Slice 10 — occupancy default network
+
+- [x] Grill D37–D39
+- [x] Ticket `ready-for-agent` — [#1171](https://github.com/appaloft/appaloft/issues/1171)
+- [x] Occupancy activation ensures Resource `app` network `3000`
+- [x] Unit tests WS-REMOTE-NET-044–045
+- [x] `appaloftdev deployments plan --resource --server` after Hello-World occupy
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator
