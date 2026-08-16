@@ -573,6 +573,14 @@ pub enum RendererEvent {
         #[serde(rename = "workspaceId")]
         workspace_id: String,
     },
+    OpenPreview {
+        #[serde(rename = "workspaceId")]
+        workspace_id: String,
+    },
+    OpenProduction {
+        #[serde(rename = "workspaceId")]
+        workspace_id: String,
+    },
     Refresh {
         #[serde(rename = "workspaceId", skip_serializing_if = "Option::is_none")]
         workspace_id: Option<String>,
@@ -1790,7 +1798,7 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
     }
     frame.render_widget(
         Paragraph::new(format!(
-            " Ctrl+] release  │  {}  │  q quit  ↑↓ select  Enter attach/focus  o open PR  a lifecycle  d delivery  s recovery  f Focus Mode  r refresh  R reconnect ",
+            " Ctrl+] release  │  {}  │  q quit  ↑↓ select  Enter attach/focus  o open PR  p preview  P production  a lifecycle  d delivery  s recovery  f Focus Mode  r refresh  R reconnect ",
             state.status_line
         ))
         .style(Style::default().fg(Color::DarkGray)),
@@ -2696,6 +2704,20 @@ mod tests {
             })
             .expect("serialize open pr"),
             r#"{"type":"open-pr","workspaceId":"sbx_1"}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&RendererEvent::OpenPreview {
+                workspace_id: "sbx_1".to_owned(),
+            })
+            .expect("serialize open preview"),
+            r#"{"type":"open-preview","workspaceId":"sbx_1"}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&RendererEvent::OpenProduction {
+                workspace_id: "sbx_1".to_owned(),
+            })
+            .expect("serialize open production"),
+            r#"{"type":"open-production","workspaceId":"sbx_1"}"#
         );
         let mut state = AppState::default();
         state.apply(ParentMessage::TerminalReady {

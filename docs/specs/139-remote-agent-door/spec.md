@@ -123,20 +123,24 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-CA-087 | TUI `o` opens GitHub PR URL | selected detail has github pull URL | `o` | presentation launches that exact URL. |
 | WS-REMOTE-CA-088 | Missing PR open stays lean | selected detail has no pull URL | `o` | no browser spawn; no invented URL. |
 | WS-REMOTE-CA-089 | Foreign open-PR stays rejected | event URL is not the selected occupancy PR | `open-pr` | no browser spawn. |
+| WS-REMOTE-CA-090 | TUI `p` opens Preview URL | selected detail has occupancy Preview URL | `p` | presentation launches that exact URL. |
+| WS-REMOTE-CA-091 | TUI `P` opens Production URL | selected detail has occupancy Production URL | `P` | presentation launches that exact URL. |
+| WS-REMOTE-CA-092 | Missing preview/production open stays lean | selected detail has no matching URL | `p` / `P` | no browser spawn. |
 
 ## Slice Scope
 
-Slice 1–28 shipped.
+Slice 1–29 shipped.
 
-Slice 29 (this ticket): interactive `workspace` `o` opens the occupancy GitHub PR URL.
+Slice 30 (this ticket): interactive `workspace` `p` / `P` open occupancy Preview / Production URLs.
 
-In slice 29:
+In slice 30:
 
-- `o` opens the selected GitHub pull URL;
-- missing / foreign URL does not spawn a browser;
+- `p` opens selected Preview URL;
+- `P` opens selected Production URL;
+- missing URL does not spawn a browser;
 - no create-PR.
 
-Out of slice 29: create-PR navigator, team Connection, Cloud managed default Server.
+Out of slice 30: create-PR navigator, team Connection, Cloud managed default Server.
 
 ## Public Surfaces
 

@@ -40,6 +40,7 @@
 | Occupancy banner PR chrome | public CLI `code` banner; same preview-environment matcher |
 | Occupancy PR URL chrome | same occupancy chrome helper + TUI detail |
 | Occupancy open-PR door | TUI `o` + presentation open of selected GitHub pull URL |
+| Occupancy open-preview door | TUI `p` / `P` + same presentation `openUrl` |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -219,6 +220,11 @@ Slice-29 verification:
 
 - unit: `o` opens the selected GitHub pull URL;
 - unit: missing / foreign URL does not spawn a browser.
+
+Slice-30 verification:
+
+- unit: `p` / `P` open selected Preview / Production URLs;
+- unit: missing URL does not spawn a browser.
 
 
 

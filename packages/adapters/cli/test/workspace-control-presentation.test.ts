@@ -1594,4 +1594,147 @@ describe("Workspace control presentation", () => {
       retryable: false,
     });
   });
+
+  test("[WS-REMOTE-CA-090][WS-REMOTE-CA-091] TUI p and P open occupancy Preview and Production", async () => {
+    const opened: string[] = [];
+    const renderer = new FakeRendererSession([
+      { type: "select", workspaceId: "sbx_ready" },
+      { type: "open-preview", workspaceId: "sbx_other" },
+      { type: "open-preview", workspaceId: "sbx_ready" },
+      { type: "open-production", workspaceId: "sbx_ready" },
+      { type: "quit" },
+    ]);
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+      openUrl: async (url) => {
+        opened.push(url);
+        return true;
+      },
+    });
+
+    await presentation.start({
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery) {
+          return ok({
+            items: [
+              {
+                sandboxId: "sbx_ready",
+                status: "ready",
+                activation: {
+                  project: { projectId: "prj_web", disposition: "created" },
+                  repositoryBinding: { bindingId: "rbd_web", disposition: "created" },
+                  profile: { profileInstallationId: "awpi_default", disposition: "reused" },
+                },
+              },
+            ],
+          } as T);
+        }
+        if (query instanceof ShowSandboxQuery) {
+          return ok({
+            sandboxId: "sbx_ready",
+            status: "ready",
+            activation: {
+              project: { projectId: "prj_web", disposition: "created" },
+              repositoryBinding: { bindingId: "rbd_web", disposition: "created" },
+              profile: { profileInstallationId: "awpi_default", disposition: "reused" },
+            },
+          } as T);
+        }
+        if (query instanceof ListResourcesQuery) {
+          return ok({
+            items: [
+              {
+                projectId: "prj_web",
+                slug: "app",
+                lastDeploymentId: "dep_rfqfapqwpyjn",
+                lastDeploymentStatus: "succeeded",
+                accessSummary: {
+                  latestGeneratedAccessRoute: {
+                    url: "http://app-sc156jw98k.127.0.0.1.sslip.io",
+                    deploymentStatus: "succeeded",
+                  },
+                  latestDurableDomainRoute: {
+                    url: "https://whoami.example",
+                    deploymentStatus: "succeeded",
+                  },
+                },
+              },
+            ],
+          } as T);
+        }
+        if (
+          query instanceof ListPreviewEnvironmentsQuery ||
+          query instanceof ListSandboxAgentRuntimesQuery ||
+          query instanceof ListSandboxPortsQuery ||
+          query instanceof ListSandboxPromotionsQuery ||
+          query instanceof ListSandboxSnapshotsQuery
+        ) {
+          return ok({ items: [] } as T);
+        }
+        throw new Error(`unexpected query ${query.constructor.name}`);
+      },
+    });
+
+    expect(opened).toEqual([
+      "http://app-sc156jw98k.127.0.0.1.sslip.io/",
+      "https://whoami.example/",
+    ]);
+    expect(renderer.messages.some((message) => message.type === "error")).toBe(true);
+  });
+
+  test("[WS-REMOTE-CA-092] missing preview and production open stays lean", async () => {
+    const opened: string[] = [];
+    const renderer = new FakeRendererSession([
+      { type: "select", workspaceId: "sbx_ready" },
+      { type: "open-preview", workspaceId: "sbx_ready" },
+      { type: "open-production", workspaceId: "sbx_ready" },
+      { type: "quit" },
+    ]);
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+      openUrl: async (url) => {
+        opened.push(url);
+        return true;
+      },
+    });
+
+    await presentation.start({
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery || query instanceof ShowSandboxQuery) {
+          return ok({
+            items: [{ sandboxId: "sbx_ready", status: "ready" }],
+            sandboxId: "sbx_ready",
+            status: "ready",
+          } as T);
+        }
+        if (
+          query instanceof ListPreviewEnvironmentsQuery ||
+          query instanceof ListResourcesQuery ||
+          query instanceof ListSandboxAgentRuntimesQuery ||
+          query instanceof ListSandboxPortsQuery ||
+          query instanceof ListSandboxPromotionsQuery ||
+          query instanceof ListSandboxSnapshotsQuery
+        ) {
+          return ok({ items: [] } as T);
+        }
+        throw new Error(`unexpected query ${query.constructor.name}`);
+      },
+    });
+
+    expect(opened).toEqual([]);
+    expect(renderer.messages).toContainEqual({
+      type: "error",
+      code: "occupancy_preview_unavailable",
+      phase: "workspace-control-open-preview",
+      retryable: false,
+    });
+    expect(renderer.messages).toContainEqual({
+      type: "error",
+      code: "occupancy_production_unavailable",
+      phase: "workspace-control-open-production",
+      retryable: false,
+    });
+  });
 });

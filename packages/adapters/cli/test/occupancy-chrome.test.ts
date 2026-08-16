@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   isOccupancyGitHubPullRequestUrl,
+  isOccupancyHttpUrl,
   occupancyChromeForProject,
   occupancyPullRequestFromPreviewEnvironments,
 } from "../src/occupancy-chrome.js";
@@ -123,6 +124,14 @@ describe("occupancy PR chrome", () => {
     expect(isOccupancyGitHubPullRequestUrl("https://github.com/traefik/whoami/issues/928")).toBe(
       false,
     );
+  });
+
+  test("[WS-REMOTE-CA-090] accepts only http occupancy Preview URLs", () => {
+    expect(isOccupancyHttpUrl("http://app-sc156jw98k.127.0.0.1.sslip.io/")).toBe(true);
+    expect(isOccupancyHttpUrl("https://whoami.example/")).toBe(true);
+    expect(isOccupancyHttpUrl("javascript:alert(1)")).toBe(false);
+    expect(isOccupancyHttpUrl("file:///etc/passwd")).toBe(false);
+    expect(isOccupancyHttpUrl("https://user:pass@whoami.example/")).toBe(false);
   });
 });
 

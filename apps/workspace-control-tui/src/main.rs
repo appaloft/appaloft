@@ -410,6 +410,22 @@ fn main() -> Result<()> {
                         )?;
                     }
                 }
+                KeyCode::Char('p') => {
+                    if let Some(workspace_id) = state.selected_workspace_id().map(str::to_owned) {
+                        send(
+                            &mut writer,
+                            &RendererEvent::OpenPreview { workspace_id },
+                        )?;
+                    }
+                }
+                KeyCode::Char('P') => {
+                    if let Some(workspace_id) = state.selected_workspace_id().map(str::to_owned) {
+                        send(
+                            &mut writer,
+                            &RendererEvent::OpenProduction { workspace_id },
+                        )?;
+                    }
+                }
                 KeyCode::Char('a') => {
                     state.open_action_menu();
                 }

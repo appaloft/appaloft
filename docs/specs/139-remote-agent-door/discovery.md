@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–28 shipped. Slice 29 occupancy open-PR door owner-confirmed 2026-08-16 (D94–D96).
+- Round: Spec. Slice 1–29 shipped. Slice 30 occupancy open-preview door owner-confirmed 2026-08-16 (D97–D99).
 - Date: 2026-08-16.
-- Predecessor: occupancy PR URL chrome shipped as public #1208.
-- Code changes allowed: yes for slice 29 after the occupancy-open-pr ticket is `ready-for-agent`.
+- Predecessor: occupancy open-PR door shipped as public #1210.
+- Code changes allowed: yes for slice 30 after the occupancy-open-preview ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -131,6 +131,9 @@ Sandbox on that Server, not one VM per person.
 | D94 | Slice 29 TUI `o` opens the selected occupancy GitHub PR URL | Railway `ca` opens the current PR. URL already exists on detail. Reuse login `open` / `xdg-open`. |
 | D95 | Only `https://github.com/{owner}/{repo}/pull/{n}` | Reject missing URL, non-https, non-github, or URL that does not match occupancy chrome. No create-PR. |
 | D96 | CI / `APPALOFT_CLI_OPEN_BROWSER=false` prints the URL and does not spawn | Same login fail-soft. Footer names `o open PR`. |
+| D97 | Slice 30 TUI `p` opens Preview URL; `P` opens Production URL | Railway `ca` opens the current URL. Same `openUrl` as `o`. Create-PR stays later. |
+| D98 | Only the selected occupancy chrome URL | Reject missing URL or URL that is not the selected Preview/Production. No invented sslip. |
+| D99 | Same CI / `APPALOFT_CLI_OPEN_BROWSER=false` fail-soft as `o` | Footer names `p preview` / `P production`. |
 
 ## Rejected
 
@@ -206,10 +209,11 @@ Later slices after occupancy:
 26. Occupancy TUI production chrome (slice 26, shipped #1204).
 27. Occupancy banner PR chrome (slice 27, shipped #1206).
 28. Occupancy PR URL chrome (slice 28, shipped #1208).
-29. **Occupancy open-PR door** (slice 29): TUI `o` opens the GitHub PR URL.
-30. Interactive `workspace` TUI as Railway `ca` navigator (create PR).
-31. Optional team Connection.
-32. Cloud managed as default Server when no BYOS exists.
+29. Occupancy open-PR door (slice 29, shipped #1210).
+30. **Occupancy open-preview door** (slice 30): TUI `p` / `P` open Preview / Production.
+31. Interactive `workspace` TUI as Railway `ca` navigator (create PR).
+32. Optional team Connection.
+33. Cloud managed as default Server when no BYOS exists.
 
 Cmux-style “this session is PR #928” is correct *context*. It is not a new GitHub aggregate
 and not something `code` scrapes from the vendor TUI.

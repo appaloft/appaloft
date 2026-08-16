@@ -96,6 +96,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-CA-087 | TUI / unit | this slice | `o` opens selected GitHub PR URL | `workspace-control-presentation.test.ts`; workspace-control-tui |
 | WS-REMOTE-CA-088 | TUI / unit | this slice | missing PR open stays lean | same presentation test |
 | WS-REMOTE-CA-089 | TUI / unit | this slice | foreign open-PR stays rejected | same presentation test |
+| WS-REMOTE-CA-090 | TUI / unit | this slice | `p` opens selected Preview URL | `workspace-control-presentation.test.ts`; workspace-control-tui |
+| WS-REMOTE-CA-091 | TUI / unit | this slice | `P` opens selected Production URL | same presentation test |
+| WS-REMOTE-CA-092 | TUI / unit | this slice | missing preview/production open stays lean | same presentation test |
 
 
 

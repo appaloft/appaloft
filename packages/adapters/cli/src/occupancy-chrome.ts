@@ -84,6 +84,17 @@ export function isOccupancyGitHubPullRequestUrl(url: string): boolean {
   }
 }
 
+export function isOccupancyHttpUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+    if (parsed.username || parsed.password) return false;
+    return parsed.hostname.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 export function occupancyBrowserLaunchAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
   return env["APPALOFT_CLI_OPEN_BROWSER"] !== "false" && env["CI"] !== "true";
 }
