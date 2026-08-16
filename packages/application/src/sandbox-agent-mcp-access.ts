@@ -116,8 +116,7 @@ export async function issueSandboxAgentMcpAccess(
   input: Omit<SandboxAgentMcpAccessIssueInput, "binding">,
   bindings: readonly AgentWorkspaceMcpBinding[] = [],
 ): Promise<SandboxAgentMcpAccessDescriptor[]> {
-  if (bindings.length === 0) return [];
-  if (!provider) throw new Error("sandbox_agent_mcp_access_unavailable");
+  if (bindings.length === 0 || !provider) return [];
   const capabilities: SandboxAgentMcpAccessDescriptor[] = [];
   try {
     for (const binding of bindings) {

@@ -24,6 +24,19 @@ const scope = {
 };
 
 describe("Sandbox Agent MCP access", () => {
+  test("[WS-REMOTE-SKILL-017] occupancy starts without MCP when no access provider is composed", async () => {
+    const capabilities = await issueSandboxAgentMcpAccess(undefined, scope, [
+      {
+        requirementId: "appaloft-tools",
+        connectionReference: "appaloft-first-party",
+        required: false,
+        purpose: "Occupancy first-party tools",
+        requestedTools: ["projects.list"],
+      },
+    ]);
+    expect(capabilities).toEqual([]);
+  });
+
   test("[MCP-ACCESS-ISSUE-004][MCP-ACCESS-POLICY-006] accepts only narrowed effective tools", async () => {
     const provider: SandboxAgentMcpAccessProvider = {
       issue: async () => ({
