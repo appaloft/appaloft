@@ -202,6 +202,10 @@ function parseRendererEvent(value: unknown): WorkspaceControlRendererEvent | und
       return typeof record.workspaceId === "string"
         ? { type: "open-production", workspaceId: record.workspaceId }
         : undefined;
+    case "open-compare":
+      return typeof record.workspaceId === "string"
+        ? { type: "open-compare", workspaceId: record.workspaceId }
+        : undefined;
     case "refresh":
       return typeof record.workspaceId === "string"
         ? { type: "refresh", workspaceId: record.workspaceId }

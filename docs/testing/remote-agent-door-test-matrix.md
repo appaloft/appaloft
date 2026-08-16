@@ -99,6 +99,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-CA-090 | TUI / unit | this slice | `p` opens selected Preview URL | `workspace-control-presentation.test.ts`; workspace-control-tui |
 | WS-REMOTE-CA-091 | TUI / unit | this slice | `P` opens selected Production URL | same presentation test |
 | WS-REMOTE-CA-092 | TUI / unit | this slice | missing preview/production open stays lean | same presentation test |
+| WS-REMOTE-CA-093 | TUI / unit | this slice | `c` opens GitHub compare for occupancy branch | `occupancy-chrome.test.ts`; `workspace-control-presentation.test.ts`; workspace-control-tui |
+| WS-REMOTE-CA-094 | TUI / unit | this slice | existing PR compare stays on pull URL | same presentation test |
+| WS-REMOTE-CA-095 | TUI / unit | this slice | missing compare stays lean | same presentation test |
 
 
 

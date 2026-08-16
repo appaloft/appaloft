@@ -29,11 +29,13 @@ import {
 } from "@appaloft/application";
 import { type Result } from "@appaloft/core";
 import {
+  isOccupancyGitHubCompareUrl,
   isOccupancyGitHubPullRequestUrl,
   isOccupancyHttpUrl,
   type OccupancyPreviewEnvironment,
   type OccupancyResource,
   occupancyChromeForProject,
+  occupancyCompareOrPullUrl,
   occupancyPullRequestFromPreviewEnvironments,
 } from "./occupancy-chrome.js";
 import { type OperateRendererEvent, type OperateRendererMessage } from "./operate-presentation.js";
@@ -217,6 +219,7 @@ export type WorkspaceControlRendererEvent =
   | { readonly type: "open-pr"; readonly workspaceId: string }
   | { readonly type: "open-preview"; readonly workspaceId: string }
   | { readonly type: "open-production"; readonly workspaceId: string }
+  | { readonly type: "open-compare"; readonly workspaceId: string }
   | { readonly type: "refresh"; readonly workspaceId?: string }
   | { readonly type: "attach"; readonly workspaceId: string; readonly runtimeId: string }
   | {
@@ -939,7 +942,8 @@ export function createBoundedWorkspaceControlPresentation(
             if (
               event.type === "open-pr" ||
               event.type === "open-preview" ||
-              event.type === "open-production"
+              event.type === "open-production" ||
+              event.type === "open-compare"
             ) {
               const selected = requireSelectedWorkspace(event.workspaceId);
               const target =
@@ -957,12 +961,24 @@ export function createBoundedWorkspaceControlPresentation(
                         code: "occupancy_preview_unavailable",
                         phase: "workspace-control-open-preview",
                       }
-                    : {
-                        url: selected.production?.url,
-                        allowed: isOccupancyHttpUrl,
-                        code: "occupancy_production_unavailable",
-                        phase: "workspace-control-open-production",
-                      };
+                    : event.type === "open-production"
+                      ? {
+                          url: selected.production?.url,
+                          allowed: isOccupancyHttpUrl,
+                          code: "occupancy_production_unavailable",
+                          phase: "workspace-control-open-production",
+                        }
+                      : {
+                          url: occupancyCompareOrPullUrl(
+                            selected.workspace.occupancy,
+                            selected.pullRequest?.url,
+                          ),
+                          allowed: (url: string) =>
+                            isOccupancyGitHubPullRequestUrl(url) ||
+                            isOccupancyGitHubCompareUrl(url),
+                          code: "occupancy_compare_unavailable",
+                          phase: "workspace-control-open-compare",
+                        };
               if (!target.url || !target.allowed(target.url)) {
                 await renderer.send({
                   type: "error",

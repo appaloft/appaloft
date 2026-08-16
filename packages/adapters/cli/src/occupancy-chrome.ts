@@ -84,6 +84,43 @@ export function isOccupancyGitHubPullRequestUrl(url: string): boolean {
   }
 }
 
+const occupancyGitHubBranchPattern = /^[A-Za-z0-9_./-]+$/u;
+
+export function occupancyGitHubCompareUrl(
+  occupancy: OccupancyIdentity | undefined,
+): string | undefined {
+  const branch = occupancy?.branch?.trim();
+  if (!occupancy?.repositoryIdentity || !branch || !occupancyGitHubBranchPattern.test(branch)) {
+    return undefined;
+  }
+  const identity = occupancy.repositoryIdentity.trim();
+  const github = identity.match(/^github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:\.git)?$/u);
+  if (!github) return undefined;
+  return `https://github.com/${github[1]}/compare/${branch}?expand=1`;
+}
+
+export function isOccupancyGitHubCompareUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return false;
+    if (parsed.username || parsed.password || parsed.hash) return false;
+    if (parsed.hostname !== "github.com") return false;
+    if (parsed.search !== "?expand=1") return false;
+    return /^\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/compare\/[A-Za-z0-9_./-]+$/u.test(parsed.pathname);
+  } catch {
+    return false;
+  }
+}
+
+export function occupancyCompareOrPullUrl(
+  occupancy: OccupancyIdentity | undefined,
+  pullRequestUrl: string | undefined,
+): string | undefined {
+  if (pullRequestUrl && isOccupancyGitHubPullRequestUrl(pullRequestUrl)) return pullRequestUrl;
+  const compare = occupancyGitHubCompareUrl(occupancy);
+  return compare && isOccupancyGitHubCompareUrl(compare) ? compare : undefined;
+}
+
 export function isOccupancyHttpUrl(url: string): boolean {
   try {
     const parsed = new URL(url);

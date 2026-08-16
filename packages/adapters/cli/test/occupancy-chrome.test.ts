@@ -1,9 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  isOccupancyGitHubCompareUrl,
   isOccupancyGitHubPullRequestUrl,
   isOccupancyHttpUrl,
   occupancyChromeForProject,
+  occupancyCompareOrPullUrl,
+  occupancyGitHubCompareUrl,
   occupancyPullRequestFromPreviewEnvironments,
 } from "../src/occupancy-chrome.js";
 
@@ -132,6 +135,47 @@ describe("occupancy PR chrome", () => {
     expect(isOccupancyHttpUrl("javascript:alert(1)")).toBe(false);
     expect(isOccupancyHttpUrl("file:///etc/passwd")).toBe(false);
     expect(isOccupancyHttpUrl("https://user:pass@whoami.example/")).toBe(false);
+  });
+
+  test("[WS-REMOTE-CA-093][WS-REMOTE-CA-094][WS-REMOTE-CA-095] occupancy compare stays GitHub-only", () => {
+    expect(
+      occupancyGitHubCompareUrl({
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        branch: "feat/occupancy",
+      }),
+    ).toEqual("https://github.com/traefik/whoami/compare/feat/occupancy?expand=1");
+    expect(
+      occupancyCompareOrPullUrl(
+        {
+          repositoryIdentity: "github.com/traefik/whoami",
+          commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+          branch: "feat/occupancy",
+        },
+        "https://github.com/traefik/whoami/pull/928",
+      ),
+    ).toEqual("https://github.com/traefik/whoami/pull/928");
+    expect(
+      occupancyGitHubCompareUrl({
+        repositoryIdentity: "gitlab.com/acme/api",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        branch: "feat/occupancy",
+      }),
+    ).toBeUndefined();
+    expect(
+      occupancyGitHubCompareUrl({
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+      }),
+    ).toBeUndefined();
+    expect(
+      isOccupancyGitHubCompareUrl(
+        "https://github.com/traefik/whoami/compare/feat/occupancy?expand=1",
+      ),
+    ).toBe(true);
+    expect(
+      isOccupancyGitHubCompareUrl("https://github.com/traefik/whoami/compare/feat/occupancy"),
+    ).toBe(false);
   });
 });
 

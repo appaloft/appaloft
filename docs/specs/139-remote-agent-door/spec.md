@@ -126,21 +126,25 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-CA-090 | TUI `p` opens Preview URL | selected detail has occupancy Preview URL | `p` | presentation launches that exact URL. |
 | WS-REMOTE-CA-091 | TUI `P` opens Production URL | selected detail has occupancy Production URL | `P` | presentation launches that exact URL. |
 | WS-REMOTE-CA-092 | Missing preview/production open stays lean | selected detail has no matching URL | `p` / `P` | no browser spawn. |
+| WS-REMOTE-CA-093 | TUI `c` opens GitHub compare | selected occupancy has GitHub repo + branch and no PR URL | `c` | presentation launches `https://github.com/{owner}/{repo}/compare/{branch}?expand=1`. |
+| WS-REMOTE-CA-094 | Existing PR compare stays on pull URL | selected occupancy already has GitHub PR URL | `c` | presentation launches that pull URL, not compare. |
+| WS-REMOTE-CA-095 | Missing compare stays lean | missing branch / non-github occupancy | `c` | no browser spawn; no invented compare. |
 
 ## Slice Scope
 
-Slice 1–29 shipped.
+Slice 1–30 shipped.
 
-Slice 30 (this ticket): interactive `workspace` `p` / `P` open occupancy Preview / Production URLs.
+Slice 31 (this ticket): interactive `workspace` `c` opens occupancy GitHub compare or the existing PR.
 
-In slice 30:
+In slice 31:
 
-- `p` opens selected Preview URL;
-- `P` opens selected Production URL;
-- missing URL does not spawn a browser;
-- no create-PR.
+- `c` opens selected GitHub compare when occupancy has repo + branch and no PR;
+- existing GitHub PR URL still opens that pull URL;
+- missing / non-github occupancy does not spawn a browser;
+- no GitHub write.
 
-Out of slice 30: create-PR navigator, team Connection, Cloud managed default Server.
+Out of slice 31: catalog create-PR write, team Connection, Cloud managed default Server.
+
 
 ## Public Surfaces
 

@@ -41,6 +41,7 @@
 | Occupancy PR URL chrome | same occupancy chrome helper + TUI detail |
 | Occupancy open-PR door | TUI `o` + presentation open of selected GitHub pull URL |
 | Occupancy open-preview door | TUI `p` / `P` + same presentation `openUrl` |
+| Occupancy compare-PR door | TUI `c` + occupancy compare URL helper |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -225,6 +226,12 @@ Slice-30 verification:
 
 - unit: `p` / `P` open selected Preview / Production URLs;
 - unit: missing URL does not spawn a browser.
+
+Slice-31 verification:
+
+- unit: `c` opens GitHub compare for occupancy branch when no PR exists;
+- unit: existing PR still opens the pull URL;
+- unit: missing / non-github occupancy does not spawn a browser.
 
 
 

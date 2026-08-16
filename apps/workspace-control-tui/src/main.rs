@@ -410,6 +410,14 @@ fn main() -> Result<()> {
                         )?;
                     }
                 }
+                KeyCode::Char('c') => {
+                    if let Some(workspace_id) = state.selected_workspace_id().map(str::to_owned) {
+                        send(
+                            &mut writer,
+                            &RendererEvent::OpenCompare { workspace_id },
+                        )?;
+                    }
+                }
                 KeyCode::Char('p') => {
                     if let Some(workspace_id) = state.selected_workspace_id().map(str::to_owned) {
                         send(
