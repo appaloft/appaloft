@@ -4,6 +4,7 @@ import {
   isOccupancyGitHubCompareUrl,
   isOccupancyGitHubPullRequestUrl,
   isOccupancyHttpUrl,
+  occupancyAvailableDoorHint,
   occupancyChromeForProject,
   occupancyCodeOpenUrl,
   occupancyCompareOrPullUrl,
@@ -321,6 +322,31 @@ describe("occupancy code --open", () => {
         commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
         previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io/",
         target: "production",
+      }),
+    ).toBeUndefined();
+  });
+
+  test("[WS-REMOTE-HINT-122][WS-REMOTE-HINT-123][WS-REMOTE-HINT-124] available-door hint lists only present URLs", () => {
+    expect(
+      occupancyAvailableDoorHint({
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io/",
+        pullRequestNumber: 928,
+      }),
+    ).toBe("Open · --open-target preview|pr · workspace p/o");
+    expect(
+      occupancyAvailableDoorHint({
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        branch: "feat/occupancy",
+        pullRequestNumber: 928,
+      }),
+    ).toBe("Open · --open-target pr · workspace o");
+    expect(
+      occupancyAvailableDoorHint({
+        repositoryIdentity: "gitlab.com/acme/api",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
       }),
     ).toBeUndefined();
   });

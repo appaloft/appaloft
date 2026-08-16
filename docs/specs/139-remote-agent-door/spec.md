@@ -155,21 +155,24 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-HINT-119 | Occupancy door hint follows the banner | remote `code --no-attach` | `appaloft code --no-attach` | one line names `--open-target` and `workspace` `p`/`P`/`o`/`c`. |
 | WS-REMOTE-HINT-120 | Occupancy door hint stays before the model hint | remote `code --no-attach` | `appaloft code --no-attach` | door hint prints, then the existing model hint. |
 | WS-REMOTE-HINT-121 | Scratch `--local` stays unlabeled | `--local` scratch session | `appaloft code --local --no-attach` | no occupancy door hint. |
+| WS-REMOTE-HINT-122 | Available-door hint lists only present URLs | occupancy has Preview + PR | `appaloft code --no-attach` | hint names `preview`/`p` and `pr`/`o`, not production or compare. |
+| WS-REMOTE-HINT-123 | Existing PR omits compare from the hint | occupancy has GitHub PR | `appaloft code --no-attach` | hint has `pr`/`o`, not `compare`/`c`. |
+| WS-REMOTE-HINT-124 | No available door stays lean | no Preview / Production / PR / compare | `appaloft code --no-attach` | no occupancy door hint. |
 
 ## Slice Scope
 
-Slice 1–39 shipped.
+Slice 1–40 shipped.
 
-Slice 40 (this ticket): `appaloft code` prints one occupancy door hint after the banner.
+Slice 41 (this ticket): `appaloft code` names only the occupancy doors that exist.
 
-In slice 40:
+In slice 41:
 
-- remote `code` prints one occupancy door hint;
-- hint names `--open-target preview|production|pr|compare` and `workspace` `p`/`P`/`o`/`c`;
-- hint stays before the existing model hint;
+- hint lists only present Preview / Production / PR / compare;
+- existing PR omits compare from the hint;
+- no available door stays lean;
 - scratch `--local` stays unlabeled.
 
-Out of slice 40: catalog create-PR write, team Connection, Cloud managed default Server.
+Out of slice 41: catalog create-PR write, team Connection, Cloud managed default Server.
 
 
 ## Public Surfaces

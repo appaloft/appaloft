@@ -338,6 +338,14 @@
 - [x] Unit tests WS-REMOTE-HINT-119–121
 - [x] `appaloftdev code --no-attach` would print `--open-target` / `workspace` keys
 
+## Slice 41 - occupancy available-door hint
+
+- [x] Grill D130-D132
+- [x] Ticket `ready-for-agent` - [#1233](https://github.com/appaloft/appaloft/issues/1233)
+- [x] `code` names only occupancy doors that exist
+- [x] Unit tests WS-REMOTE-HINT-122-124
+- [x] `appaloftdev code --no-attach` would omit missing `--open-target`s
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

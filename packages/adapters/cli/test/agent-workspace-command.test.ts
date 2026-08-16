@@ -977,7 +977,7 @@ describe("Agent Workspace CLI", () => {
       "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_whoami\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
     );
     expect(output.join("")).toContain(
-      "Open · --open-target preview|production|pr|compare · workspace p/P/o/c\nConnect a model in the attached OpenCode session before running a Task.",
+      "Open · --open-target preview|compare · workspace p/c\nConnect a model in the attached OpenCode session before running a Task.",
     );
   });
 

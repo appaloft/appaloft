@@ -63,6 +63,7 @@ import {
 } from "../local-scratch-session.js";
 import {
   type OccupancyCodeOpenTarget,
+  occupancyAvailableDoorHint,
   occupancyBrowserLaunchAllowed,
   occupancyChromeForProject,
   occupancyCodeOpenUrl,
@@ -74,7 +75,6 @@ import {
   formatRemoteCodeBanner,
   isRemoteCodeGitRemoteLocator,
   nativeAttachRequiresInteractiveTerminal,
-  REMOTE_CODE_DOOR_HINT,
   REMOTE_CODE_MODEL_HINT,
   resolveDefaultRemoteCodeDoor,
   scratchRemoteRejectedError,
@@ -667,7 +667,15 @@ export const workspaceCodeCommand = EffectCommand.make(
           }
         }
       }
-      process.stdout.write(`${REMOTE_CODE_DOOR_HINT}\n`);
+      const doorHint = occupancyAvailableDoorHint({
+        repositoryIdentity: door.repositoryIdentity,
+        commitSha: bannerCommitSha,
+        ...(previewUrl ? { previewUrl } : {}),
+        ...(productionUrl ? { productionUrl } : {}),
+        ...(pullRequestNumber ? { pullRequestNumber } : {}),
+        ...(door.branch ? { branch: door.branch } : {}),
+      });
+      if (doorHint) process.stdout.write(`${doorHint}\n`);
       process.stdout.write(`${REMOTE_CODE_MODEL_HINT}\n`);
       if (!attach) return;
       yield* completeWorkspaceOpen(result, true, cli.launchNativeWorkspaceClient);

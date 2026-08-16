@@ -51,6 +51,7 @@
 | Occupancy production open | same banner / `--open-target` + Resource durable domain |
 | Occupancy banner labels | same `code` banner formatter |
 | Occupancy door hint | public CLI `code` after banner |
+| Occupancy available-door hint | same `code` hint + occupancy URL selector |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -294,6 +295,12 @@ Slice-40 verification:
 - unit: remote `code` prints the occupancy door hint;
 - unit: hint stays before the model hint;
 - unit: scratch `--local` stays unlabeled.
+
+Slice-41 verification:
+
+- unit: hint lists only present occupancy doors;
+- unit: existing PR omits compare from the hint;
+- unit: no available door stays lean.
 
 
 

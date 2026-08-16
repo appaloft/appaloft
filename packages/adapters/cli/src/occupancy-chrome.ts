@@ -176,6 +176,29 @@ export function occupancyCodeOpenUrl(input: {
   return previewUrl ?? pull ?? compare;
 }
 
+const occupancyDoorKeys = {
+  preview: "p",
+  production: "P",
+  pr: "o",
+  compare: "c",
+} as const;
+
+export function occupancyAvailableDoorHint(input: {
+  readonly previewUrl?: string;
+  readonly productionUrl?: string;
+  readonly pullRequestNumber?: number;
+  readonly repositoryIdentity: string;
+  readonly commitSha: string;
+  readonly branch?: string;
+}): string | undefined {
+  const doors = (["preview", "production", "pr", "compare"] as const).filter((target) => {
+    if (target === "compare" && occupancyCodeOpenUrl({ ...input, target: "pr" })) return false;
+    return occupancyCodeOpenUrl({ ...input, target }) !== undefined;
+  });
+  if (doors.length === 0) return undefined;
+  return `Open · --open-target ${doors.join("|")} · workspace ${doors.map((door) => occupancyDoorKeys[door]).join("/")}`;
+}
+
 function previewEnvironmentMatchesOccupancy(
   environment: OccupancyPreviewEnvironment,
   occupancy: OccupancyIdentity,

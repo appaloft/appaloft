@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–39 shipped. Slice 40 occupancy door hint owner-confirmed 2026-08-16 (D127–D129).
+- Round: Spec. Slice 1–40 shipped. Slice 41 occupancy available-door hint owner-confirmed 2026-08-16 (D130–D132).
 - Date: 2026-08-16.
-- Predecessor: occupancy banner labels shipped as public #1230.
-- Code changes allowed: yes for slice 40 after the occupancy-door-hint ticket is `ready-for-agent`.
+- Predecessor: occupancy door hint shipped as public #1232.
+- Code changes allowed: yes for slice 41 after the occupancy-available-door-hint ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -164,6 +164,9 @@ Sandbox on that Server, not one VM per person.
 | D127 | Slice 40 `code` prints one occupancy door hint after the banner | Railway `ca` names the next key. Model hint alone does not. |
 | D128 | Hint lists `--open-target preview\|production\|pr\|compare` and `workspace` `p`/`P`/`o`/`c` | Only existing doors. No invented create-PR write. |
 | D129 | Hint stays one line and always prints on remote `code` | Scratch `--local` stays unchanged. Catalog create-PR write stays later. |
+| D130 | Slice 41 hint lists only occupancy URLs that exist now | Railway `ca` does not advertise missing services. Static `preview\|production\|pr\|compare` overpromises. |
+| D131 | Keys stay paired: preview/`p`, production/`P`, pr/`o`, compare/`c` | Existing PR still omits compare. No invented create-PR write. |
+| D132 | No available door stays lean | Print no occupancy door hint. Scratch `--local` stays unlabeled. Catalog create-PR write stays later. |
 
 ## Rejected
 
@@ -250,10 +253,11 @@ Later slices after occupancy:
 37. Occupancy `--open-target` (slice 37, shipped #1226).
 38. Occupancy production open (slice 38, shipped #1228).
 39. Occupancy banner labels (slice 39, shipped #1230).
-40. **Occupancy door hint** (slice 40): `code` names `--open-target` and `workspace` keys.
-41. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
-42. Optional team Connection.
-43. Cloud managed as default Server when no BYOS exists.
+40. Occupancy door hint (slice 40, shipped #1232).
+41. **Occupancy available-door hint** (slice 41): `code` names only the occupancy doors that exist.
+42. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
+43. Optional team Connection.
+44. Cloud managed as default Server when no BYOS exists.
 
 Cmux-style “this session is PR #928” is correct *context*. It is not a new GitHub aggregate
 and not something `code` scrapes from the vendor TUI.

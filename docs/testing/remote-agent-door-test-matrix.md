@@ -128,6 +128,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-HINT-119 | CLI / unit | this slice | occupancy door hint follows the banner | `remote-code-session.test.ts`; `agent-workspace-command.test.ts` |
 | WS-REMOTE-HINT-120 | CLI / unit | this slice | occupancy door hint stays before the model hint | same command test |
 | WS-REMOTE-HINT-121 | CLI / unit | this slice | scratch `--local` stays unlabeled | same command test |
+| WS-REMOTE-HINT-122 | CLI / unit | this slice | available-door hint lists only present URLs | `occupancy-chrome.test.ts`; `agent-workspace-command.test.ts` |
+| WS-REMOTE-HINT-123 | CLI / unit | this slice | existing PR omits compare from the hint | same chrome test |
+| WS-REMOTE-HINT-124 | CLI / unit | this slice | no available door stays lean | same chrome test |
 
 
 
