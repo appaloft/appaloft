@@ -132,21 +132,23 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-CA-096 | Deliver Task prefills occupancy branch | selected occupancy has a branch | `d` Deliver Task | form branch is that occupancy branch; remote stays `origin`. |
 | WS-REMOTE-CA-097 | Missing occupancy PR prefills PR title | occupancy has a branch and no PR | `d` Deliver Task | form PR title is that occupancy branch. |
 | WS-REMOTE-CA-098 | Existing occupancy PR leaves PR fields blank | occupancy already has a PR | `d` Deliver Task | title/body/base stay empty. |
+| WS-REMOTE-CA-099 | Deliver Task prefills occupancy commit | selected occupancy has a hex commitSha ≥ 7 | `d` Deliver Task | commit is `Deliver occupancy <shortSha>`. |
+| WS-REMOTE-CA-100 | Missing occupancy SHA leaves commit blank | missing / non-hex / short SHA | `d` Deliver Task | commit stays empty; no invented SHA. |
 
 ## Slice Scope
 
-Slice 1–31 shipped.
+Slice 1–32 shipped.
 
-Slice 32 (this ticket): interactive `workspace` Deliver Task prefills occupancy branch / PR title.
+Slice 33 (this ticket): interactive `workspace` Deliver Task prefills occupancy commit message.
 
-In slice 32:
+In slice 33:
 
-- Deliver Task prefills occupancy branch when present;
-- missing occupancy PR also prefills PR title from that branch;
-- existing occupancy PR leaves PR fields blank;
+- Deliver Task prefills `Deliver occupancy <shortSha>` when occupancy has a hex SHA ≥ 7;
+- missing / non-hex / short SHA leaves commit blank;
+- existing occupancy PR still leaves PR fields blank;
 - no auto-submit and no GitHub write.
 
-Out of slice 32: catalog create-PR write, team Connection, Cloud managed default Server.
+Out of slice 33: catalog create-PR write, team Connection, Cloud managed default Server.
 
 
 ## Public Surfaces

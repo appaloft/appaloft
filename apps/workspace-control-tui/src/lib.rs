@@ -43,6 +43,14 @@ fn occupancy_list_label(workspace: &WorkspaceSummary) -> String {
     }
 }
 
+fn occupancy_commit_message(commit_sha: &str) -> Option<String> {
+    let sha = commit_sha.trim();
+    if sha.len() < 7 || !sha.bytes().take(7).all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
+    Some(format!("Deliver occupancy {}", &sha[..7]))
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AttachCapability {
@@ -1058,6 +1066,9 @@ impl AppState {
                 let branch = occupancy
                     .and_then(|occupancy| occupancy.branch.clone())
                     .unwrap_or_default();
+                let commit_message = occupancy
+                    .and_then(|occupancy| occupancy_commit_message(&occupancy.commit_sha))
+                    .unwrap_or_default();
                 let pull_request_title = if self
                     .detail
                     .as_ref()
@@ -1072,7 +1083,7 @@ impl AppState {
                     task_run_id,
                     values: [
                         branch,
-                        String::new(),
+                        commit_message,
                         "origin".to_owned(),
                         pull_request_title,
                         String::new(),
@@ -2949,7 +2960,7 @@ mod tests {
                 task_run_id: "task_deliver".to_owned(),
                 values: [
                     "feat/occupancy".to_owned(),
-                    String::new(),
+                    "Deliver occupancy 1ce75d0".to_owned(),
                     "origin".to_owned(),
                     "feat/occupancy".to_owned(),
                     String::new(),
@@ -2978,9 +2989,40 @@ mod tests {
                 task_run_id: "task_deliver".to_owned(),
                 values: [
                     "feat/occupancy".to_owned(),
-                    String::new(),
+                    "Deliver occupancy 1ce75d0".to_owned(),
                     "origin".to_owned(),
                     String::new(),
+                    String::new(),
+                    String::new(),
+                ],
+                field: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn ws_tui_deliver_task_leaves_commit_blank_when_occupancy_sha_is_invalid() {
+        let mut state = occupancy_delivery_ready_state(None);
+        if let Some(detail) = state.detail.as_mut() {
+            if let Some(occupancy) = detail.workspace.occupancy.as_mut() {
+                occupancy.commit_sha = "not-a-sha".to_owned();
+            }
+        }
+        assert!(state.open_delivery_menu());
+        state.move_delivery_selection(1);
+        assert_eq!(
+            state.activate_selected_delivery_action(),
+            DeliveryDecision::FormOpened
+        );
+        assert_eq!(
+            state.delivery_form,
+            Some(DeliveryForm::Task {
+                task_run_id: "task_deliver".to_owned(),
+                values: [
+                    "feat/occupancy".to_owned(),
+                    String::new(),
+                    "origin".to_owned(),
+                    "feat/occupancy".to_owned(),
                     String::new(),
                     String::new(),
                 ],

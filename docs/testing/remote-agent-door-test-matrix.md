@@ -105,6 +105,8 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-CA-096 | TUI / unit | this slice | Deliver Task prefills occupancy branch | workspace-control-tui |
 | WS-REMOTE-CA-097 | TUI / unit | this slice | missing occupancy PR prefills PR title | same TUI test |
 | WS-REMOTE-CA-098 | TUI / unit | this slice | existing occupancy PR leaves PR fields blank | same TUI test |
+| WS-REMOTE-CA-099 | TUI / unit | this slice | Deliver Task prefills occupancy commit | workspace-control-tui |
+| WS-REMOTE-CA-100 | TUI / unit | this slice | missing occupancy SHA leaves commit blank | same TUI test |
 
 
 

@@ -274,6 +274,14 @@
 - [x] Unit tests WS-REMOTE-CA-096–098
 - [x] `appaloftdev workspace` `d` would open a prefilled Deliver Task form
 
+## Slice 33 — occupancy commit prefill
+
+- [x] Grill D106–D108
+- [x] Ticket `ready-for-agent` — [#1217](https://github.com/appaloft/appaloft/issues/1217)
+- [x] TUI Deliver Task prefills occupancy commit
+- [x] Unit tests WS-REMOTE-CA-099–100
+- [x] `appaloftdev workspace` `d` would show Deliver occupancy <shortSha>
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

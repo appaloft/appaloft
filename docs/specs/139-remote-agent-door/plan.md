@@ -43,6 +43,7 @@
 | Occupancy open-preview door | TUI `p` / `P` + same presentation `openUrl` |
 | Occupancy compare-PR door | TUI `c` + occupancy compare URL helper |
 | Occupancy delivery prefills | TUI Deliver Task form + selected occupancy |
+| Occupancy commit prefill | same Deliver Task form + occupancy short SHA |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -239,6 +240,11 @@ Slice-32 verification:
 - unit: Deliver Task prefills occupancy branch;
 - unit: missing occupancy PR prefills PR title;
 - unit: existing occupancy PR leaves PR fields blank.
+
+Slice-33 verification:
+
+- unit: Deliver Task prefills occupancy commit from short SHA;
+- unit: missing / non-hex / short SHA leaves commit blank.
 
 
 

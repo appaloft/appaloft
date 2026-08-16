@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–31 shipped. Slice 32 occupancy delivery prefills owner-confirmed 2026-08-16 (D103–D105).
+- Round: Spec. Slice 1–32 shipped. Slice 33 occupancy commit prefill owner-confirmed 2026-08-16 (D106–D108).
 - Date: 2026-08-16.
-- Predecessor: occupancy compare-PR door shipped as public #1214.
-- Code changes allowed: yes for slice 32 after the occupancy-delivery-prefills ticket is `ready-for-agent`.
+- Predecessor: occupancy delivery prefills shipped as public #1216.
+- Code changes allowed: yes for slice 33 after the occupancy-commit-prefill ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -140,6 +140,9 @@ Sandbox on that Server, not one VM per person.
 | D103 | Slice 32 TUI `d` Deliver Task prefills occupancy branch | Railway `ca` starts from the current branch. Remote stays `origin`. No auto-submit. |
 | D104 | Missing occupancy PR also prefills PR title from occupancy branch | Existing PR leaves title/body/base empty so deliver does not invent a second PR. |
 | D105 | Missing occupancy / empty branch stays blank | No invented `feat/...`. Catalog `task deliver --pull-request-*` stays the write path. |
+| D106 | Slice 33 TUI Deliver Task prefills commit from occupancy short SHA | Railway `ca` starts from current work. Message is `Deliver occupancy <shortSha>`. No auto-submit. |
+| D107 | Short SHA is the first 7 hex chars of occupancy commitSha | Missing / non-hex / shorter-than-7 SHA stays blank. Do not invent a commit. |
+| D108 | Existing occupancy PR still leaves PR fields blank | Branch + commit still prefill. Catalog `task deliver --pull-request-*` stays the write path. |
 
 ## Rejected
 
@@ -218,10 +221,11 @@ Later slices after occupancy:
 29. Occupancy open-PR door (slice 29, shipped #1210).
 30. Occupancy open-preview door (slice 30, shipped #1212).
 31. Occupancy compare-PR door (slice 31, shipped #1214).
-32. **Occupancy delivery prefills** (slice 32): TUI `d` Deliver Task prefills occupancy branch / PR title.
-33. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
-34. Optional team Connection.
-35. Cloud managed as default Server when no BYOS exists.
+32. Occupancy delivery prefills (slice 32, shipped #1216).
+33. **Occupancy commit prefill** (slice 33): TUI Deliver Task prefills occupancy commit message.
+34. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
+35. Optional team Connection.
+36. Cloud managed as default Server when no BYOS exists.
 
 Cmux-style “this session is PR #928” is correct *context*. It is not a new GitHub aggregate
 and not something `code` scrapes from the vendor TUI.
