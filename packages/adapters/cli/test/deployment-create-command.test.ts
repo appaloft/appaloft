@@ -276,4 +276,167 @@ describe("CLI deployment create command", () => {
     }
     expect(commands).toHaveLength(0);
   });
+
+  test("[WS-REMOTE-DEPLOY-057] bare deploy reuses latest occupancy Resource app", async () => {
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({ id: "dep_bare" } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        switch (query.constructor.name) {
+          case "ListSandboxesQuery":
+            return ok({
+              items: [
+                {
+                  sandboxId: "sbx_old",
+                  status: "ready",
+                  lastActivityAt: "2026-08-16T07:00:00.000Z",
+                  occupancy: {
+                    repositoryIdentity: "github.com/appaloft/examples",
+                    commitSha: "a".repeat(40),
+                    branch: "main",
+                  },
+                },
+                {
+                  sandboxId: "sbx_whoami",
+                  status: "ready",
+                  lastActivityAt: "2026-08-16T08:00:00.000Z",
+                  occupancy: {
+                    repositoryIdentity: "github.com/traefik/whoami",
+                    commitSha: "b".repeat(40),
+                    branch: "master",
+                  },
+                },
+              ],
+            } as T);
+          case "ShowRepositoryBindingQuery":
+            return ok({
+              bindingId: "bnd_whoami",
+              repositoryIdentity: "github.com/traefik/whoami",
+              projectId: "prj_tk5lovqu2vj8",
+              status: "active",
+              createdAt: "2026-08-16T00:00:00.000Z",
+            } as T);
+          case "ListEnvironmentsQuery":
+            return ok({
+              items: [{ id: "env_8moaj3z5e7s9", projectId: "prj_tk5lovqu2vj8", name: "local" }],
+            } as T);
+          case "ListResourcesQuery":
+            return ok({
+              items: [
+                {
+                  id: "res_dfsc156jw98k",
+                  projectId: "prj_tk5lovqu2vj8",
+                  environmentId: "env_8moaj3z5e7s9",
+                  slug: "app",
+                },
+              ],
+            } as T);
+          case "ListServersQuery":
+            return ok({
+              items: [
+                {
+                  id: "srv_uil9cpctplou",
+                  name: "occupancy-mac",
+                  lifecycleStatus: "active",
+                },
+              ],
+            } as T);
+          default:
+            return ok({
+              items: [{ id: "dep_bare", resourceId: "res_dfsc156jw98k", status: "succeeded" }],
+            } as T);
+        }
+      },
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_bare_occupancy_deploy",
+        }),
+    };
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      startWorkerRuntime: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync(["node", "appaloft", "deploy"]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(CreateDeploymentCommand);
+    expect(commands[0]).toMatchObject({
+      projectId: "prj_tk5lovqu2vj8",
+      environmentId: "env_8moaj3z5e7s9",
+      resourceId: "res_dfsc156jw98k",
+      serverId: "srv_uil9cpctplou",
+    });
+  });
+
+  test("[WS-REMOTE-DEPLOY-058] bare deploy without occupancy fail-closed when non-interactive", async () => {
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({ id: "dep_unexpected" } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>() => ok({ items: [] } as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_bare_occupancy_missing",
+        }),
+    };
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      startWorkerRuntime: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+    });
+    const writeStdout = process.stdout.write;
+    const writeStderr = process.stderr.write;
+    const exitCode = process.exitCode;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      process.stderr.write = (() => true) as typeof process.stderr.write;
+      await expect(program.parseAsync(["node", "appaloft", "deploy"])).rejects.toBeDefined();
+    } finally {
+      process.stdout.write = writeStdout;
+      process.stderr.write = writeStderr;
+      process.exitCode = exitCode ?? 0;
+    }
+    expect(commands).toHaveLength(0);
+  });
 });

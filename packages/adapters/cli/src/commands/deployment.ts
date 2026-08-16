@@ -16,6 +16,7 @@ import {
   ListDeploymentsQuery,
   ListEnvironmentsQuery,
   ListResourcesQuery,
+  ListSandboxesQuery,
   ListServersQuery,
   ListStaleDeploymentAttemptsQuery,
   PruneDeploymentsCommand,
@@ -54,6 +55,7 @@ import { normalizeWorkspaceRepositoryRemote } from "../local-git-workspace-conte
 import {
   isRemoteCodeGitRemoteLocator,
   selectDefaultRemoteCodeServer,
+  selectResumeOccupancy,
 } from "../remote-code-session.js";
 import {
   CliRuntime,
@@ -262,6 +264,55 @@ function occupancyDeploymentInputFromGitRemote(input: {
       serverId: server.id,
       ...(input.destinationId ? { destinationId: input.destinationId } : {}),
     } satisfies CreateDeploymentCommandInput;
+  });
+}
+
+interface OccupancySandboxListResult {
+  readonly items: readonly {
+    readonly sandboxId: string;
+    readonly status: string;
+    readonly lastActivityAt?: string;
+    readonly updatedAt?: string;
+    readonly occupancy?: {
+      readonly repositoryIdentity: string;
+      readonly commitSha: string;
+      readonly branch?: string;
+    };
+  }[];
+}
+
+function occupancyDeploymentInputFromLatestOccupancy(input: {
+  readonly projectId?: string;
+  readonly environmentId?: string;
+  readonly resourceId?: string;
+  readonly serverId?: string;
+  readonly destinationId?: string;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const sandboxesQuery = ListSandboxesQuery.create({ limit: 100, offset: 0 });
+    if (sandboxesQuery.isErr()) return undefined;
+    const sandboxesResult = yield* Effect.promise(() => cli.executeQuery(sandboxesQuery.value));
+    if (sandboxesResult.isErr()) return undefined;
+    const occupancy = selectResumeOccupancy(
+      ((sandboxesResult.value as OccupancySandboxListResult).items ?? []).map((item) => ({
+        sandboxId: item.sandboxId,
+        status: item.status,
+        ...(item.occupancy ? { occupancy: item.occupancy } : {}),
+        ...(typeof item.lastActivityAt === "string" ? { lastActivityAt: item.lastActivityAt } : {}),
+        ...(typeof item.updatedAt === "string" ? { updatedAt: item.updatedAt } : {}),
+      })),
+    );
+    const repositoryIdentity = occupancy?.occupancy?.repositoryIdentity;
+    if (!repositoryIdentity) return undefined;
+    return yield* occupancyDeploymentInputFromGitRemote({
+      sourceLocator: `https://${repositoryIdentity.replace(/\.git$/u, "")}.git`,
+      ...(input.projectId ? { projectId: input.projectId } : {}),
+      ...(input.environmentId ? { environmentId: input.environmentId } : {}),
+      ...(input.resourceId ? { resourceId: input.resourceId } : {}),
+      ...(input.serverId ? { serverId: input.serverId } : {}),
+      ...(input.destinationId ? { destinationId: input.destinationId } : {}),
+    });
   });
 }
 
@@ -1746,6 +1797,40 @@ export const deployCommand = EffectCommand.make(
           ...(previewOutputFilePath ? { previewOutputFile: previewOutputFilePath } : {}),
         });
       }
+      if (
+        !sourceLocator &&
+        !configFilePath &&
+        !previewContext &&
+        !hasProfileOverrides &&
+        !(projectId && serverId && environmentId && resourceId)
+      ) {
+        const occupancyInput = yield* occupancyDeploymentInputFromLatestOccupancy({
+          ...(projectId ? { projectId } : {}),
+          ...(environmentId ? { environmentId } : {}),
+          ...(resourceId ? { resourceId } : {}),
+          ...(serverId ? { serverId } : {}),
+          ...(destinationId ? { destinationId } : {}),
+        });
+        if (occupancyInput) {
+          return yield* runCreateDeploymentCommand(occupancyInput, {
+            appLogLines: parseAppLogLines(appLogLines),
+            requirePreviewUrl,
+            ...(previewOutputFilePath ? { previewOutputFile: previewOutputFilePath } : {}),
+          });
+        }
+        const interactive = Boolean(cli.terminalIO.stdin.isTTY && cli.terminalIO.stdout.isTTY);
+        if (!interactive) {
+          return yield* Effect.fail(
+            domainError.validation("Occupancy Resource app is required for deploy", {
+              phase: "occupancy-deploy-reuse",
+              code: "workspace_occupancy_resource_missing",
+              guidance:
+                "Run appaloft code first, or pass --project --environment --resource --server.",
+            }),
+          );
+        }
+      }
+
       if (
         sourceLocator &&
         isRemoteCodeGitRemoteLocator(sourceLocator) &&

@@ -147,10 +147,17 @@
 - [x] Unit tests WS-REMOTE-URL-SHORTHAND-028/056
 - [x] `appaloftdev code traefik/whoami --no-attach` after occupying examples
 
+## Slice 17 — bare occupancy deploy
+
+- [x] Grill D58–D60
+- [x] Ticket `ready-for-agent` — [#1185](https://github.com/appaloft/appaloft/issues/1185)
+- [x] Bare `deploy` reuses latest occupancy Resource `app`
+- [x] Unit tests WS-REMOTE-DEPLOY-057–058
+- [x] `appaloftdev deploy` after occupying `traefik/whoami`
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator
 - [ ] Team Connection
 - [ ] Cloud managed as default Server
 - [ ] Session-native Preview chrome
-- [ ] Bare `appaloft deploy`

@@ -27,6 +27,7 @@
 | Occupancy deploy reuse | public CLI adapter composing Binding + Environment `local` + Resource `app` + default Server |
 | Occupancy EXPOSE port | detector + occupancy initializer |
 | GitHub owner/repo | public CLI remote-code locator |
+| Bare occupancy deploy | public CLI adapter composing latest occupancy + Binding/`app` |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -132,6 +133,13 @@ Slice-16 verification:
 - unit: `owner/repo` expands to github.com HTTPS when that path is not a local directory;
 - unit: an existing local directory named `owner/repo` stays a path;
 - `appaloftdev code traefik/whoami --no-attach` after occupying examples occupies whoami.
+
+Slice-17 verification:
+
+- unit: bare `deploy` dispatches `deployments.create` for the latest occupancy Resource `app`;
+- unit: bare `deploy` without occupancy fail-closed when non-interactive;
+- `appaloftdev deploy` after occupying `traefik/whoami` does not require a path.
+
 
 
 

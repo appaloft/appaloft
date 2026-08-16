@@ -63,6 +63,8 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-EXPOSE-055 | filesystem + application | this slice | missing or multiple EXPOSE keeps 3000 | `packages/adapters/filesystem/test/source-detector.test.ts`; `packages/application/test/community-workspace-activation-context-initializer.test.ts` |
 | WS-REMOTE-URL-SHORTHAND-028 | CLI + `appaloftdev` | this slice | `owner/repo` occupies GitHub HTTPS | `packages/adapters/cli/test/remote-code-session.test.ts`; live `code traefik/whoami` after occupying examples |
 | WS-REMOTE-URL-SHORTHAND-056 | CLI | this slice | existing local `owner/repo` directory stays a path | `packages/adapters/cli/test/remote-code-session.test.ts` |
+| WS-REMOTE-DEPLOY-057 | CLI + `appaloftdev` | this slice | bare `deploy` reuses latest occupancy Resource `app` | `packages/adapters/cli/test/deployment-create-command.test.ts`; live `deploy` after occupying whoami |
+| WS-REMOTE-DEPLOY-058 | CLI | this slice | bare `deploy` without occupancy fail-closed when non-interactive | `packages/adapters/cli/test/deployment-create-command.test.ts` |
 
 
 

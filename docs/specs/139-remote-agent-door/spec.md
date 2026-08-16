@@ -3,11 +3,11 @@
 ## Status
 
 - Round: Spec
-- Artifact state: slice 1–15 shipped; slice 16 GitHub `owner/repo` accepted 2026-08-16
+- Artifact state: slice 1–16 shipped; slice 17 bare occupancy deploy accepted 2026-08-16
 - Discovery: [discovery.md](./discovery.md)
 - Governing decision: ADR-120 plan default destination; ADR-119 locates; ADR-118 occupies; ADR-117 remains the login/Server/`--local` door; ADR-116 remains Scratch-only; ADR-103 stays on explicit `workspace open` Git fail-closed
-- Code changes allowed: yes for slice 16 after the occupancy-shorthand ticket is `ready-for-agent`
-- Compatibility: public minor. `appaloft code owner/repo` occupies GitHub HTTPS when that path is not a local directory
+- Code changes allowed: yes for slice 17 after the occupancy-bare-deploy ticket is `ready-for-agent`
+- Compatibility: public minor. Bare `appaloft deploy` may reuse latest occupancy Resource `app`; no new catalog field
 
 ## Business Outcome
 
@@ -90,20 +90,22 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-DEPLOY-053 | Missing occupancy Resource stays fail-closed when non-interactive | git-remote has no Binding or no Resource `app`; no TTY | `appaloft deploy <git-remote>` | exits non-zero `workspace_occupancy_resource_missing`; no invented Resource. |
 | WS-REMOTE-EXPOSE-054 | Occupancy uses single EXPOSE | occupancy remote has one Dockerfile `EXPOSE` | `appaloft code --no-attach` then `resource show` / `deployments.plan` | Resource `internalPort` is that EXPOSE; plan execution port matches. |
 | WS-REMOTE-EXPOSE-055 | Missing or multiple EXPOSE keeps 3000 | occupancy remote has no EXPOSE or more than one distinct EXPOSE | `appaloft code --no-attach` | Resource stays `internalPort 3000`. |
+| WS-REMOTE-DEPLOY-057 | Bare occupancy deploy | latest occupancy has Environment `local` and Resource `app` | `appaloft deploy` | no pathOrSource prompt; dispatches `deployments.create` for that occupancy. |
+| WS-REMOTE-DEPLOY-058 | Bare deploy without occupancy fail-closed | no non-terminal occupancy or no Resource `app`; no TTY | `appaloft deploy` | exits non-zero `workspace_occupancy_resource_missing`; does not treat cwd as source. |
 
 ## Slice Scope
 
-Slice 1–15 shipped.
+Slice 1–16 shipped.
 
-Slice 16 (this ticket): `appaloft code owner/repo` occupies GitHub HTTPS.
+Slice 17 (this ticket): bare `appaloft deploy` reuses the latest occupancy Resource `app`.
 
-In slice 16:
+In slice 17:
 
-- `owner/repo` that is not a local directory expands to `https://github.com/owner/repo.git`;
-- same `ls-remote` HEAD contract as an explicit HTTPS locator;
-- a real local directory named `owner/repo` stays a path.
+- no locator + no config + no profile overrides → latest occupancy Binding/`local`/`app`/default Server;
+- same `deployments.create` as slice 14;
+- missing occupancy fail-closed when non-interactive.
 
-Out of slice 16: `/tree/` parsing, GitLab/Bitbucket host inference, bare `deploy`.
+Out of slice 17: interactive TUI Preview chrome, Cloud managed default Server.
 
 ## Public Surfaces
 

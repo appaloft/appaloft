@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–15 shipped. Slice 16 GitHub `owner/repo` owner-confirmed 2026-08-16 (D55–D57).
+- Round: Spec. Slice 1–16 shipped. Slice 17 bare occupancy deploy owner-confirmed 2026-08-16 (D58–D60).
 - Date: 2026-08-16.
-- Predecessor: occupancy EXPOSE port shipped as public #1182.
-- Code changes allowed: yes for slice 16 after the occupancy-shorthand ticket is `ready-for-agent`.
+- Predecessor: GitHub owner/repo shipped as public #1184.
+- Code changes allowed: yes for slice 17 after the occupancy-bare-deploy ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -92,6 +92,9 @@ Sandbox on that Server, not one VM per person.
 | D55 | Slice 16 `owner/repo` is a GitHub HTTPS locator | Live `code traefik/whoami` after occupying `examples` resumed examples. WS-REMOTE-URL-SHORTHAND-028 currently treats `org/repo` as a local path. Railway/GitHub users type `owner/repo`. |
 | D56 | Expand only `owner/repo` to `https://github.com/owner/repo.git` | Same `ls-remote` HEAD contract as HTTPS. No `/tree/` parsing. No GitLab/Bitbucket host inference. |
 | D57 | Existing local path `owner/repo` still wins if that directory exists | Do not steal a real relative directory named `org/repo`. |
+| D58 | Slice 17 bare `appaloft deploy` reuses the latest occupancy Resource `app` | Live `code traefik/whoami` then `deploy` fails `pathOrSource is required`. Railway `up` after the workspace exists does not ask for a path. |
+| D59 | Latest non-terminal occupancy wins; same Binding → `local` → `app` → default Server path as slice 14 | Do not invent a Resource. Destination stays omitted. |
+| D60 | No occupancy / no Resource `app` fail-closed when non-interactive | Interactive prompt path unchanged. Do not fall back to cwd `.`. |
 
 ## Rejected
 
@@ -154,11 +157,11 @@ Later slices after occupancy:
 13. Occupancy Preview URL (slice 13, shipped #1178).
 14. Occupancy deploy reuse (slice 14, shipped #1180).
 15. Occupancy EXPOSE port (slice 15, shipped #1182).
-16. **GitHub `owner/repo`** (slice 16): `appaloft code owner/repo` occupies `github.com/owner/repo`.
-17. Session-native Preview chrome / interactive `workspace` TUI.
-18. Optional team Connection.
-19. Cloud managed as default Server when no BYOS exists.
-20. Bare `appaloft deploy` without a locator.
+16. GitHub `owner/repo` (slice 16, shipped #1184).
+17. **Bare occupancy deploy** (slice 17): `appaloft deploy` creates from the latest occupancy Resource `app`.
+18. Session-native Preview chrome / interactive `workspace` TUI.
+19. Optional team Connection.
+20. Cloud managed as default Server when no BYOS exists.
 
 ## Delivery chrome (owner 2026-08-15)
 
