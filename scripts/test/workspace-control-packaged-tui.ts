@@ -46,13 +46,20 @@ async function waitFor(needle: string): Promise<void> {
 try {
   await waitFor("Workspaces");
   await waitFor("\x1b[?1049h");
-  terminal.write("q");
-  const exitCode = await Promise.race([
-    child.exited,
-    Bun.sleep(5_000).then(() => {
-      throw new Error("Packaged Workspace TUI did not exit after q");
-    }),
-  ]);
+  let exitCode: number | undefined;
+  for (let attempt = 0; attempt < 40 && exitCode === undefined; attempt += 1) {
+    terminal.write("q");
+    const result = await Promise.race([
+      child.exited.then((code) => ({ exited: true as const, code })),
+      Bun.sleep(150).then(() => ({ exited: false as const })),
+    ]);
+    if (result.exited) exitCode = result.code;
+  }
+  if (exitCode === undefined) {
+    throw new Error(
+      `Packaged Workspace TUI did not exit after q; output=${JSON.stringify(output)}`,
+    );
+  }
   if (exitCode !== 0) {
     throw new Error(
       `Packaged Workspace TUI exited with ${exitCode}; output=${JSON.stringify(output)}`,
