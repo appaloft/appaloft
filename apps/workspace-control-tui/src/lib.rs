@@ -31,7 +31,10 @@ pub struct WorkspaceSummary {
 fn occupancy_list_label(workspace: &WorkspaceSummary) -> String {
     match &workspace.occupancy {
         Some(occupancy) => {
-            let sha = occupancy.commit_sha.get(..7).unwrap_or(&occupancy.commit_sha);
+            let sha = occupancy
+                .commit_sha
+                .get(..7)
+                .unwrap_or(&occupancy.commit_sha);
             let repo = occupancy
                 .repository_identity
                 .strip_prefix("github.com/")
@@ -49,6 +52,79 @@ fn occupancy_commit_message(commit_sha: &str) -> Option<String> {
         return None;
     }
     Some(format!("Deliver occupancy {}", &sha[..7]))
+}
+
+fn occupancy_github_compare_available(occupancy: &OccupancySummary) -> bool {
+    let Some(branch) = occupancy.branch.as_deref().map(str::trim) else {
+        return false;
+    };
+    if branch.is_empty() {
+        return false;
+    }
+    if !branch
+        .chars()
+        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, '_' | '.' | '/' | '-'))
+    {
+        return false;
+    }
+    occupancy
+        .repository_identity
+        .trim()
+        .starts_with("github.com/")
+}
+
+fn occupancy_available_door_keys(detail: Option<&DetailMessage>) -> Vec<&'static str> {
+    let Some(detail) = detail else {
+        return Vec::new();
+    };
+    let mut doors = Vec::new();
+    let has_pr = detail
+        .pull_request
+        .as_ref()
+        .and_then(|pull_request| pull_request.url.as_deref())
+        .is_some_and(|url| !url.trim().is_empty());
+    if has_pr {
+        doors.push("o open PR");
+    } else if detail
+        .workspace
+        .occupancy
+        .as_ref()
+        .is_some_and(occupancy_github_compare_available)
+    {
+        doors.push("c compare");
+    }
+    if detail
+        .preview
+        .as_ref()
+        .is_some_and(|preview| !preview.url.trim().is_empty())
+    {
+        doors.push("p preview");
+    }
+    if detail
+        .production
+        .as_ref()
+        .is_some_and(|production| !production.url.trim().is_empty())
+    {
+        doors.push("P production");
+    }
+    doors
+}
+
+fn occupancy_available_door_footer(detail: Option<&DetailMessage>) -> String {
+    let doors = occupancy_available_door_keys(detail);
+    if doors.is_empty() {
+        String::new()
+    } else {
+        format!("  {} ", doors.join("  "))
+    }
+}
+
+fn occupancy_control_footer(status_line: &str, detail: Option<&DetailMessage>) -> String {
+    format!(
+        " Ctrl+] release  │  {}  │  q quit  ↑↓ select  Enter attach/focus{} a lifecycle  d delivery  s recovery  f Focus Mode  r refresh  R reconnect ",
+        status_line,
+        occupancy_available_door_footer(detail),
+    )
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
@@ -1829,9 +1905,9 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
         );
     }
     frame.render_widget(
-        Paragraph::new(format!(
-            " Ctrl+] release  │  {}  │  q quit  ↑↓ select  Enter attach/focus  o open PR  c compare  p preview  P production  a lifecycle  d delivery  s recovery  f Focus Mode  r refresh  R reconnect ",
-            state.status_line
+        Paragraph::new(occupancy_control_footer(
+            &state.status_line,
+            state.detail.as_ref(),
         ))
         .style(Style::default().fg(Color::DarkGray)),
         footer,
@@ -2179,6 +2255,43 @@ mod tests {
         };
         assert_eq!(occupancy_list_label(&occupied), "traefik/whoami@1ce75d0");
         assert_eq!(occupancy_list_label(&lean), "sbx_lean");
+    }
+
+    #[test]
+    fn ws_remote_ca_125_126_127_tui_footer_lists_only_present_occupancy_doors() {
+        let preview_and_pr = occupancy_delivery_ready_state(Some(OccupancyPullRequestChrome {
+            number: 928,
+            url: Some("https://github.com/traefik/whoami/pull/928".to_owned()),
+        }));
+        let mut preview_and_pr = preview_and_pr;
+        if let Some(detail) = preview_and_pr.detail.as_mut() {
+            detail.preview = Some(OccupancyPreviewChrome {
+                url: "http://app-sc156jw98k.127.0.0.1.sslip.io/".to_owned(),
+            });
+        }
+        let preview_and_pr_footer = occupancy_control_footer("", preview_and_pr.detail.as_ref());
+        assert!(preview_and_pr_footer.contains("o open PR"));
+        assert!(preview_and_pr_footer.contains("p preview"));
+        assert!(!preview_and_pr_footer.contains("c compare"));
+        assert!(!preview_and_pr_footer.contains("P production"));
+
+        let existing_pr = occupancy_delivery_ready_state(Some(OccupancyPullRequestChrome {
+            number: 928,
+            url: Some("https://github.com/traefik/whoami/pull/928".to_owned()),
+        }));
+        let existing_pr_footer = occupancy_control_footer("", existing_pr.detail.as_ref());
+        assert!(existing_pr_footer.contains("o open PR"));
+        assert!(!existing_pr_footer.contains("c compare"));
+
+        let lean = occupancy_control_footer("", None);
+        assert!(!lean.contains("o open PR"));
+        assert!(!lean.contains("c compare"));
+        assert!(!lean.contains("p preview"));
+        assert!(!lean.contains("P production"));
+        assert!(lean.contains("a lifecycle"));
+        assert!(lean.contains("d delivery"));
+        assert!(lean.contains("s recovery"));
+        assert!(lean.contains("f Focus Mode"));
     }
 
     #[test]

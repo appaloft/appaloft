@@ -158,21 +158,23 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-HINT-122 | Available-door hint lists only present URLs | occupancy has Preview + PR | `appaloft code --no-attach` | hint names `preview`/`p` and `pr`/`o`, not production or compare. |
 | WS-REMOTE-HINT-123 | Existing PR omits compare from the hint | occupancy has GitHub PR | `appaloft code --no-attach` | hint has `pr`/`o`, not `compare`/`c`. |
 | WS-REMOTE-HINT-124 | No available door stays lean | no Preview / Production / PR / compare | `appaloft code --no-attach` | no occupancy door hint. |
+| WS-REMOTE-CA-125 | TUI footer lists only present occupancy doors | occupancy has Preview + PR | `appaloft workspace` | footer names `p preview` and `o open PR`, not production or compare. |
+| WS-REMOTE-CA-126 | Existing PR omits compare from the TUI footer | occupancy has GitHub PR | `appaloft workspace` | footer has `o open PR`, not `c compare`. |
+| WS-REMOTE-CA-127 | No available door keeps a lean TUI footer | no Preview / Production / PR / compare | `appaloft workspace` | footer keeps lifecycle / delivery / recovery / focus, no occupancy door keys. |
 
 ## Slice Scope
 
-Slice 1–40 shipped.
+Slice 1-41 shipped.
 
-Slice 41 (this ticket): `appaloft code` names only the occupancy doors that exist.
+Slice 42 (this ticket): `appaloft workspace` names only the occupancy doors that exist.
 
-In slice 41:
+In slice 42:
 
-- hint lists only present Preview / Production / PR / compare;
-- existing PR omits compare from the hint;
-- no available door stays lean;
-- scratch `--local` stays unlabeled.
+- TUI footer lists only present Preview / Production / PR / compare;
+- existing PR omits compare from the footer;
+- no available door stays lean.
 
-Out of slice 41: catalog create-PR write, team Connection, Cloud managed default Server.
+Out of slice 42: catalog create-PR write, team Connection, Cloud managed default Server.
 
 
 ## Public Surfaces

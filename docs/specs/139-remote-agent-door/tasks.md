@@ -346,6 +346,14 @@
 - [x] Unit tests WS-REMOTE-HINT-122-124
 - [x] `appaloftdev code --no-attach` would omit missing `--open-target`s
 
+## Slice 42 - occupancy TUI available-door footer
+
+- [x] Grill D133-D135
+- [x] Ticket `ready-for-agent` - [#1235](https://github.com/appaloft/appaloft/issues/1235)
+- [x] `workspace` footer names only occupancy doors that exist
+- [x] Unit tests WS-REMOTE-CA-125-127
+- [x] `appaloftdev workspace` would omit missing occupancy keys
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

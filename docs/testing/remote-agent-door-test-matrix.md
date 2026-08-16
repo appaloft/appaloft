@@ -131,6 +131,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-HINT-122 | CLI / unit | this slice | available-door hint lists only present URLs | `occupancy-chrome.test.ts`; `agent-workspace-command.test.ts` |
 | WS-REMOTE-HINT-123 | CLI / unit | this slice | existing PR omits compare from the hint | same chrome test |
 | WS-REMOTE-HINT-124 | CLI / unit | this slice | no available door stays lean | same chrome test |
+| WS-REMOTE-CA-125 | TUI / unit | this slice | TUI footer lists only present occupancy doors | `apps/workspace-control-tui/src/lib.rs` |
+| WS-REMOTE-CA-126 | TUI / unit | this slice | existing PR omits compare from the TUI footer | same TUI test |
+| WS-REMOTE-CA-127 | TUI / unit | this slice | no available door keeps a lean TUI footer | same TUI test |
 
 
 

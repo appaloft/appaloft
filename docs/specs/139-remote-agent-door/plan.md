@@ -52,6 +52,7 @@
 | Occupancy banner labels | same `code` banner formatter |
 | Occupancy door hint | public CLI `code` after banner |
 | Occupancy available-door hint | same `code` hint + occupancy URL selector |
+| Occupancy TUI available-door footer | same occupancy URL selector + `workspace` footer |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -301,6 +302,12 @@ Slice-41 verification:
 - unit: hint lists only present occupancy doors;
 - unit: existing PR omits compare from the hint;
 - unit: no available door stays lean.
+
+Slice-42 verification:
+
+- unit: TUI footer lists only present occupancy doors;
+- unit: existing PR omits compare from the footer;
+- unit: no available door keeps a lean TUI footer.
 
 
 
