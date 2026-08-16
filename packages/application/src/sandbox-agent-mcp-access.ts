@@ -53,6 +53,8 @@ export const OCCUPANCY_FIRST_PARTY_MCP_DISCOVERY_TOOLS = [
   "deployments_plan",
   "deployments_create",
   "deployments_show",
+  "deployments_proof",
+  "deployments_timeline",
   "preview_environments_list",
   "preview_environments_show",
   "sandbox_ports_expose",

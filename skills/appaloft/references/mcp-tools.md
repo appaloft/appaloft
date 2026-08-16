@@ -63,7 +63,8 @@ Each MCP tool maps one-to-one to an operation catalog key:
   `resources_list`, `resources_show`, `resources_create`, `resources_configure_source`,
   `resources_configure_runtime`, `resources_configure_network`, `resources_configure_access`,
   `servers_list`, `deployments_list`, `deployments_plan`, `deployments_create`,
-  `deployments_show`, `preview_environments_list`, `preview_environments_show`,
+  `deployments_show`, `deployments_proof`, `deployments_timeline`,
+  `preview_environments_list`, `preview_environments_show`,
   `sandbox_ports_expose`, and `sandboxes_agent_tasks_deliver`. Tenant MCP Connections are
   unchanged and may add more tools. A blocked `deployments_plan` is a next action, not a
   hard stop: execute the named `nextActions` (`missing-internal-port` ->

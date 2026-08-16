@@ -26,7 +26,7 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 
 | WS-REMOTE-RESUME-SERVE-018 | application | this slice | resume `code --no-attach` calls `ensureRuntime` so OpenCode serve is healthy |
 | WS-REMOTE-RESUME-EGRESS-020 | application | automated | ready allowlist occupancy resume reapplies stored egress; gateway failure fail-closes | `packages/application/test/execution-sandbox-operations.test.ts` |
-| WS-REMOTE-MCP-DISCOVERY-021 | application / runtime | automated | first-party occupancy MCP unions list/create/configure/plan/preview/deliver tools; tenant MCP unchanged | `packages/application/test/sandbox-agent-mcp-access.test.ts`; `packages/server/test/community-remote-default-profile.test.ts` |
+| WS-REMOTE-MCP-DISCOVERY-021 | application / runtime | automated | first-party occupancy MCP unions list/create/configure/plan/create/show/proof/timeline/preview/deliver tools; tenant MCP unchanged | `packages/application/test/sandbox-agent-mcp-access.test.ts`; `packages/server/test/community-remote-default-profile.test.ts` |
 | WS-REMOTE-GITHUB-DELIVERY-022 | runtime | automated | occupancy OpenCode serve injects GitHub token as GH_TOKEN; argv stays clean | `packages/adapters/runtime/test/opencode-sandbox-agent-harness.test.ts` |
 | WS-REMOTE-MCP-TENANT-023 | HTTP / MCP | automated | occupancy `/mcp` remaps product-session org to hosted tenant before `sandbox_ports_expose` | `packages/adapters/http-elysia/test/mcp-http.test.ts` |
 | WS-REMOTE-URL-024 | CLI / unit + `appaloftdev` | automated | positional `https://` / `ssh://` / `git@` occupies without a local clone | `packages/adapters/cli/test/remote-code-session.test.ts`; live `appaloftdev code https://github.com/octocat/Hello-World.git --no-attach` → `sbx_hdphcqv7jazu` |

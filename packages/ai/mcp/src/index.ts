@@ -641,7 +641,7 @@ export function createAppaloftMcpResources(): AppaloftMcpResource[] {
         "",
         "Inspect safe project metadata only. Select deployment mode before asking for ids. Create or select project, server, environment, and resource context through Appaloft operations. Configure Resource profile before deployment admission. Call `deployments_plan`. If readiness is blocked, execute each `nextActions` target and replan before `deployments_create`. `missing-internal-port` is `resources_configure_network` with source-evidenced `internalPort` (static-site `80`; otherwise the listen/`PORT` in the selected source). Observe, then return URL/access state first.",
         "",
-        "Use `deployments_plan`, `resources_configure_network`, `deployments_create`, `deployments_show`, `deployments_logs`, `resources_health`, `resources_diagnostic_summary`, and `deployments_recovery_readiness` as the core MCP path when tools are available.",
+        "Use `deployments_plan`, `resources_configure_network`, `deployments_create`, `deployments_show`, `deployments_proof`, `deployments_timeline`, `resources_health`, `resources_diagnostic_summary`, and `deployments_recovery_readiness` as the core MCP path when tools are available.",
       ].join("\n"),
     },
     {
