@@ -8,7 +8,10 @@ For deployment work, use this Appaloft deploy protocol:
    operations or trusted bootstrap context.
 4. Configure source, runtime, network, health, access, variables, dependencies, storage, and
    scheduled tasks on the Resource profile.
-5. Run plan/preview when useful.
+5. Run `deployments.plan`. If `readiness.status` is `blocked`, execute each `nextActions`
+   target and replan before `deployments.create`. `missing-internal-port` persists
+   `network.internalPort` through `resources.configure-network` from source evidence:
+   static-site uses `80`; serverful apps use the listen/`PORT` value in the selected source.
 6. Create or clean up deployment through Appaloft.
 7. Watch progress through the right stream, then observe detail, logs, resource health,
    diagnostics, recovery readiness, and `deployments.proof`.

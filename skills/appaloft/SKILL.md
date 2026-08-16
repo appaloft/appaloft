@@ -66,9 +66,13 @@ surface available in the session.
   list/show tools are bound. Do not scrape vendor TUI text for PR or deploy state.
 
 - First deployment: inspect source safely, create or select project/server/environment/resource,
-  plan when useful, deploy, watch progress, read `deployments.proof`, and return URL plus
-  diagnostics. A terminal deployment status or green CI run is not machine-verifiable success.
-  Claim success only when the proof verdict is `verified`; describe `partially-verified`,
+  persist source/runtime/network on the Resource, then `deployments.plan`. If readiness is
+  `blocked`, execute each named `nextActions` target and replan before `deployments.create`.
+  `missing-internal-port` is `resources.configure-network` with `network.internalPort` from
+  source evidence: static-site uses `80`; serverful apps use the listen/`PORT` value in the
+  selected source. Watch progress, read `deployments.proof`, and return URL plus diagnostics.
+  A terminal deployment status or green CI run is not machine-verifiable success. Claim
+  success only when the proof verdict is `verified`; describe `partially-verified`,
   `unverified`, `stale`, or `failed` as the explicit evidence gap or failure they represent.
 - Deployment progress observation is a core deploy step. For one deployment attempt, follow
   `appaloft deployments timeline <deploymentId> --follow --json` and use deployment timeline entries for log

@@ -151,6 +151,8 @@ describe("Sandbox Agent MCP access", () => {
           "deployments_list",
           "deployments_plan",
           "deployments_show",
+          "deployments_proof",
+          "deployments_timeline",
           "preview_environments_list",
           "preview_environments_show",
           "sandbox_ports_expose",

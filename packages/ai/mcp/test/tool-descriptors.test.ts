@@ -997,6 +997,14 @@ describe("MCP tool descriptors", () => {
       },
     });
     expect(JSON.stringify(resourceRead)).toContain("operation-catalog.ts");
+    const deployProtocol = await handleAppaloftMcpJsonRpcRequest(server, {
+      jsonrpc: "2.0",
+      id: "deploy-protocol",
+      method: "resources/read",
+      params: { uri: "appaloft://skill/deploy-protocol" },
+    });
+    expect(JSON.stringify(deployProtocol)).toContain("missing-internal-port");
+    expect(JSON.stringify(deployProtocol)).toContain("resources_configure_network");
     await expect(
       handleAppaloftMcpJsonRpcRequest(server, {
         jsonrpc: "2.0",
@@ -1025,7 +1033,9 @@ describe("MCP tool descriptors", () => {
         messages: [
           expect.objectContaining({
             content: expect.objectContaining({
-              text: expect.stringContaining("repo"),
+              text: expect.stringMatching(
+                /repo[\s\S]*missing-internal-port[\s\S]*resources_configure_network/,
+              ),
             }),
           }),
         ],
