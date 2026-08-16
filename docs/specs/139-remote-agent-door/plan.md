@@ -47,6 +47,7 @@
 | Occupancy banner compare | public CLI `code` banner + same compare helper |
 | Occupancy banner wrap | same `code` banner formatter |
 | Occupancy code `--open` | public CLI `code --open` + same occupancy URL guards |
+| Occupancy `--open-target` | same `code` selector + chosen target |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -266,6 +267,12 @@ Slice-36 verification:
 - unit: `--open` prefers Preview;
 - unit: missing Preview falls back to PR then compare;
 - unit: missing URL does not spawn a browser.
+
+Slice-37 verification:
+
+- unit: `--open-target preview` opens Preview only;
+- unit: `--open-target pr` opens pull URL only;
+- unit: missing chosen target does not fall back.
 
 
 

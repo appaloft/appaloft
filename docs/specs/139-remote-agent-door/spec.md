@@ -143,21 +143,24 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-OPEN-107 | `code --open` prefers Preview | occupancy has Preview URL | `appaloft code --no-attach --open` | presentation launches that Preview URL. |
 | WS-REMOTE-OPEN-108 | `code --open` falls back to PR then compare | no Preview | `appaloft code --no-attach --open` | existing PR opens pull URL; otherwise GitHub compare. |
 | WS-REMOTE-OPEN-109 | Missing occupancy open stays lean | no Preview / PR / compare | `appaloft code --no-attach --open` | no browser spawn. |
+| WS-REMOTE-OPEN-110 | `--open-target preview` opens Preview only | occupancy has Preview | `appaloft code --no-attach --open-target preview` | presentation launches that Preview URL. |
+| WS-REMOTE-OPEN-111 | `--open-target pr` opens pull URL only | occupancy has GitHub PR | `appaloft code --no-attach --open-target pr` | presentation launches that pull URL, not Preview. |
+| WS-REMOTE-OPEN-112 | Missing chosen target stays lean | chosen target has no URL | `appaloft code --no-attach --open-target compare` | no fallback; no browser spawn. |
 
 ## Slice Scope
 
-Slice 1–35 shipped.
+Slice 1–36 shipped.
 
-Slice 36 (this ticket): `appaloft code --open` opens occupancy Preview, else PR, else compare.
+Slice 37 (this ticket): `appaloft code --open-target preview|pr|compare` opens that occupancy URL only.
 
-In slice 36:
+In slice 37:
 
-- `--open` prefers Preview;
-- missing Preview falls back to PR, then compare;
-- missing / unsafe URL does not spawn a browser;
+- `--open-target preview` opens Preview only;
+- `--open-target pr` opens the GitHub pull URL only;
+- missing chosen target does not fall back;
 - no GitHub write.
 
-Out of slice 36: catalog create-PR write, team Connection, Cloud managed default Server.
+Out of slice 37: catalog create-PR write, team Connection, Cloud managed default Server.
 
 
 ## Public Surfaces

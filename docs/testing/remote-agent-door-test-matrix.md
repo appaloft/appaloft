@@ -116,6 +116,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-OPEN-107 | CLI / unit | this slice | `code --open` prefers Preview | `remote-code-session.test.ts` |
 | WS-REMOTE-OPEN-108 | CLI / unit | this slice | `code --open` falls back to PR then compare | same session test |
 | WS-REMOTE-OPEN-109 | CLI / unit | this slice | missing occupancy open stays lean | same session test |
+| WS-REMOTE-OPEN-110 | CLI / unit | this slice | `--open-target preview` opens Preview only | `occupancy-chrome.test.ts` |
+| WS-REMOTE-OPEN-111 | CLI / unit | this slice | `--open-target pr` opens pull URL only | same chrome test |
+| WS-REMOTE-OPEN-112 | CLI / unit | this slice | missing chosen target stays lean | same chrome test |
 
 
 

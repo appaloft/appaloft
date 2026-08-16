@@ -136,34 +136,40 @@ export function occupancyBrowserLaunchAllowed(env: NodeJS.ProcessEnv = process.e
   return env["APPALOFT_CLI_OPEN_BROWSER"] !== "false" && env["CI"] !== "true";
 }
 
+export type OccupancyCodeOpenTarget = "auto" | "preview" | "pr" | "compare";
+
 export function occupancyCodeOpenUrl(input: {
   readonly previewUrl?: string;
   readonly pullRequestNumber?: number;
   readonly repositoryIdentity: string;
   readonly commitSha: string;
   readonly branch?: string;
+  readonly target?: OccupancyCodeOpenTarget;
 }): string | undefined {
+  const target = input.target ?? "auto";
   const preview = input.previewUrl?.trim();
-  if (preview && isOccupancyHttpUrl(preview)) return preview;
-  if (
+  const previewUrl = preview && isOccupancyHttpUrl(preview) ? preview : undefined;
+  const pull =
     typeof input.pullRequestNumber === "number" &&
     Number.isInteger(input.pullRequestNumber) &&
     input.pullRequestNumber > 0
-  ) {
-    const pull = occupancyGitHubPullRequestUrl(
-      {
-        repositoryIdentity: input.repositoryIdentity,
-        commitSha: input.commitSha,
-      },
-      input.pullRequestNumber,
-    );
-    if (pull) return pull;
-  }
-  return occupancyGitHubCompareUrl({
+      ? occupancyGitHubPullRequestUrl(
+          {
+            repositoryIdentity: input.repositoryIdentity,
+            commitSha: input.commitSha,
+          },
+          input.pullRequestNumber,
+        )
+      : undefined;
+  const compare = occupancyGitHubCompareUrl({
     repositoryIdentity: input.repositoryIdentity,
     commitSha: input.commitSha,
     ...(input.branch ? { branch: input.branch } : {}),
   });
+  if (target === "preview") return previewUrl;
+  if (target === "pr") return pull;
+  if (target === "compare") return compare;
+  return previewUrl ?? pull ?? compare;
 }
 
 function previewEnvironmentMatchesOccupancy(

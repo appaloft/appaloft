@@ -273,4 +273,35 @@ describe("occupancy code --open", () => {
       }),
     ).toBeUndefined();
   });
+
+  test("[WS-REMOTE-OPEN-110][WS-REMOTE-OPEN-111][WS-REMOTE-OPEN-112] --open-target stays on the chosen URL", () => {
+    expect(
+      occupancyCodeOpenUrl({
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        branch: "feat/occupancy",
+        previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io/",
+        pullRequestNumber: 928,
+        target: "preview",
+      }),
+    ).toBe("http://app-sc156jw98k.127.0.0.1.sslip.io/");
+    expect(
+      occupancyCodeOpenUrl({
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        branch: "feat/occupancy",
+        previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io/",
+        pullRequestNumber: 928,
+        target: "pr",
+      }),
+    ).toBe("https://github.com/traefik/whoami/pull/928");
+    expect(
+      occupancyCodeOpenUrl({
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io/",
+        target: "compare",
+      }),
+    ).toBeUndefined();
+  });
 });

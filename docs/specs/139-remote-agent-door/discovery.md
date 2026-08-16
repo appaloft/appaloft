@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–35 shipped. Slice 36 occupancy code `--open` owner-confirmed 2026-08-16 (D115–D117).
+- Round: Spec. Slice 1–36 shipped. Slice 37 occupancy `--open-target` owner-confirmed 2026-08-16 (D118–D120).
 - Date: 2026-08-16.
-- Predecessor: occupancy banner wrap shipped as public #1222.
-- Code changes allowed: yes for slice 36 after the occupancy-code-open ticket is `ready-for-agent`.
+- Predecessor: occupancy code `--open` shipped as public #1224.
+- Code changes allowed: yes for slice 37 after the occupancy-open-target ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -152,6 +152,9 @@ Sandbox on that Server, not one VM per person.
 | D115 | Slice 36 `code --open` opens one occupancy URL | Railway `ca` opens the current URL. Default target is Preview, else PR, else compare. |
 | D116 | Same URL guards as TUI `p` / `o` / `c` | No invented sslip / compare. Existing PR still prefers pull URL over compare. |
 | D117 | CI / `APPALOFT_CLI_OPEN_BROWSER=false` fail-soft | Print the chosen URL and do not spawn. Missing URL stays lean. Catalog create-PR write stays later. |
+| D118 | Slice 37 `code --open-target preview\|pr\|compare` selects one occupancy URL | Railway `ca` can open the chosen service. Bare `--open` stays Preview → PR → compare. |
+| D119 | Missing chosen target stays lean | Do not fall back to another target. Same URL guards as TUI `p` / `o` / `c`. |
+| D120 | `--open-target` implies `--open` | CI / `APPALOFT_CLI_OPEN_BROWSER=false` still fail-soft. Catalog create-PR write stays later. |
 
 ## Rejected
 
@@ -234,10 +237,11 @@ Later slices after occupancy:
 33. Occupancy commit prefill (slice 33, shipped #1218).
 34. Occupancy banner compare (slice 34, shipped #1220).
 35. Occupancy banner wrap (slice 35, shipped #1222).
-36. **Occupancy code `--open`** (slice 36): `code --open` opens Preview, else PR, else compare.
-37. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
-38. Optional team Connection.
-39. Cloud managed as default Server when no BYOS exists.
+36. Occupancy code `--open` (slice 36, shipped #1224).
+37. **Occupancy `--open-target`** (slice 37): `code --open-target preview\|pr\|compare` opens that URL only.
+38. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
+39. Optional team Connection.
+40. Cloud managed as default Server when no BYOS exists.
 
 Cmux-style “this session is PR #928” is correct *context*. It is not a new GitHub aggregate
 and not something `code` scrapes from the vendor TUI.

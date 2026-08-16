@@ -306,6 +306,14 @@
 - [x] Unit tests WS-REMOTE-OPEN-107–109
 - [x] `appaloftdev code --no-attach --open` would open occupancy Preview
 
+## Slice 37 — occupancy `--open-target`
+
+- [x] Grill D118–D120
+- [x] Ticket `ready-for-agent` — [#1225](https://github.com/appaloft/appaloft/issues/1225)
+- [x] `code --open-target preview\|pr\|compare` opens that URL only
+- [x] Unit tests WS-REMOTE-OPEN-110–112
+- [x] `appaloftdev code --no-attach --open-target pr` would open occupancy PR
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

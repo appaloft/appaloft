@@ -62,6 +62,7 @@ import {
   SCRATCH_BANNER,
 } from "../local-scratch-session.js";
 import {
+  type OccupancyCodeOpenTarget,
   occupancyBrowserLaunchAllowed,
   occupancyChromeForProject,
   occupancyCodeOpenUrl,
@@ -443,8 +444,11 @@ export const workspaceCodeCommand = EffectCommand.make(
     local: Options.boolean("local").pipe(Options.withDefault(false)),
     forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
     open: Options.boolean("open").pipe(Options.withDefault(false)),
+    openTarget: Options.choice("open-target", ["preview", "pr", "compare"] as const).pipe(
+      Options.optional,
+    ),
   },
-  ({ forceNew, local, noAttach, open, path }) =>
+  ({ forceNew, local, noAttach, open, openTarget, path }) =>
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
       if (local) {
@@ -617,13 +621,16 @@ export const workspaceCodeCommand = EffectCommand.make(
           ...(door.branch ? { branch: door.branch } : {}),
         })}\n`,
       );
-      if (open) {
+      if (open || optionalValue(openTarget)) {
         const url = occupancyCodeOpenUrl({
           repositoryIdentity: door.repositoryIdentity,
           commitSha: bannerCommitSha,
           ...(previewUrl ? { previewUrl } : {}),
           ...(pullRequestNumber ? { pullRequestNumber } : {}),
           ...(door.branch ? { branch: door.branch } : {}),
+          ...(optionalValue(openTarget)
+            ? { target: optionalValue(openTarget) as OccupancyCodeOpenTarget }
+            : {}),
         });
         if (url) {
           process.stdout.write(`Open · ${url}\n`);
