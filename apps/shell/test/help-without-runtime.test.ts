@@ -40,7 +40,7 @@ describe("shell help without runtime composition", () => {
     ]);
 
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("Occupy my Sandbox on the default Server");
+    expect(stdout).toContain("Occupy my Sandbox from a path or git remote");
     expect(stdout).not.toContain("--profile");
     expect(stdout).toContain("--new");
     expect(stdout).toContain("--no-attach");

@@ -1004,6 +1004,53 @@ describe("Agent Workspace CLI", () => {
     expect(commandDispatched).toBeFalse();
   });
 
+  test("[WS-REMOTE-URL-LOCAL-027] --local plus git remote fail closed", async () => {
+    let commandDispatched = false;
+    let scratchResolved = false;
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async () => {
+          commandDispatched = true;
+          return ok({});
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({}) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_scratch_remote_rejected" }),
+      },
+      resolveScratchHarness: async () => {
+        scratchResolved = true;
+        return { name: "opencode", argv: ["opencode"], skillOffered: true };
+      },
+    });
+    const originalExitCode = process.exitCode;
+    const write = process.stderr.write;
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+    try {
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "code",
+        "--local",
+        "https://github.com/org/repo.git",
+        "--no-attach",
+      ]);
+      throw new Error("Expected --local plus remote to fail");
+    } catch (error) {
+      const errorText = String(error);
+      expect(errorText).toContain('"code":"workspace_scratch_remote_rejected"');
+    } finally {
+      process.stderr.write = write;
+      process.exitCode = originalExitCode ?? 0;
+    }
+    expect(commandDispatched).toBeFalse();
+    expect(scratchResolved).toBeFalse();
+  });
+
   test("[WS-SCRATCH-ATTACH-008][WS-SCRATCH-SKILL-010] scratch attaches the local harness in the selected directory", async () => {
     const scratchDir = await mkdtemp(join(tmpdir(), "appaloft-scratch-attach-"));
     const launched: Array<{ argv: string[]; cwd: string; env?: Record<string, string> }> = [];

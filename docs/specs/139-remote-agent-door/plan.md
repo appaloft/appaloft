@@ -26,11 +26,13 @@
 Do not add a new command family.
 
 ```text
-appaloft code
+appaloft code [path|git-remote]
+  if --local and locator is git-remote -> workspace_scratch_remote_rejected
   if --local -> Spec 138 scratch
   if not logged in -> workspace_remote_login_required
   if no default Server -> workspace_remote_server_missing
-  resolve remote SHA (ls-remote / stored canonical commit)
+  if locator is git-remote -> normalize HTTPS; ls-remote HEAD; never read cwd origin
+  else resolve cwd origin (existing); missing origin may resume latest occupancy
   OpenAgentWorkspaceCommand {
     repository, identity, ref, branch, commitSha,
     targetServerId
@@ -40,8 +42,11 @@ appaloft code
   attach unless --no-attach
 ```
 
-Laptop path is unused for default `code`. `--profile` / `--new` stay durable-open
-flags on the remote door and do **not** trigger Git fail-closed.
+A positional git remote is classified before path resolution: `https://`,
+`ssh://`, or `git@host:path`. `owner/repo` is a path.
+
+Laptop path is unused for default `code` occupancy truth. `--profile` / `--new`
+stay durable-open flags on the remote door and do **not** trigger Git fail-closed.
 
 `workspace open` keeps the current local-Git preflight and does not require
 `targetServerId`.
@@ -56,21 +61,20 @@ Placement: if `targetServerId` is set, reserve that Server only.
 
 Matrix `docs/testing/remote-agent-door-test-matrix.md`.
 
-Flip Spec 139 slice-1 tests that assert default `code` does not dispatch
-`workspaces.open`.
+Slice-3 verification:
 
-Slice-2 verification:
-
-- unit/CLI: `code` constructs `OpenAgentWorkspaceCommand` with remote SHA +
-  `targetServerId`;
-- unit: two subjects get two preferred entries;
-- unit: `targetServerId` rejects managed substitution;
-- `appaloftdev code --no-attach` after login + enrolled Server lists a Sandbox.
+- unit: classify `https://` / `ssh://` / `git@` as remotes; `org/repo` as path;
+- unit: `--local` + remote → `workspace_scratch_remote_rejected`;
+- unit: URL of B does not resume occupancy of A;
+- unit: HEAD → one `refs/heads/*`; zero/many fail closed;
+- `appaloftdev code https://github.com/org/repo.git --no-attach` after login +
+  enrolled Server lists a Sandbox for that identity.
 
 ## Risks
 
-- Reusing `workspaces.open` still requires a SHA. Must come from remote origin,
-  not `HEAD` of a dirty laptop.
+- Reusing `workspaces.open` still requires a SHA. Must come from remote
+  `ls-remote`, not `HEAD` of a dirty laptop.
 - Preference key already includes subject; do not add Server in this slice.
 - Cloud managed-default must not override `targetServerId`.
-- Do not implement `workspace` `ca` in the same PR.
+- Do not implement `workspace` `ca`, destination discovery, or Preview here.
+

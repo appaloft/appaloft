@@ -86,7 +86,7 @@ export const cliCommandDescriptions = {
     "agent.workspace",
   ),
   agentScratch: withDocs(
-    "Occupy my Sandbox on the default Server, or this-Mac scratch with --local",
+    "Occupy my Sandbox from a path or git remote, or this-Mac scratch with --local",
     "agent.scratch",
   ),
   agentAdapter: withDocs(

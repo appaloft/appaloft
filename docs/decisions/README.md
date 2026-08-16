@@ -135,6 +135,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-116: Instant Local Scratch Session Boundary](./ADR-116-instant-local-scratch-session-boundary.md) | Accepted (Scratch only) | Scratch contract for `appaloft code --local`. Default door superseded by ADR-117. |
 | [ADR-117: Remote Agent Door](./ADR-117-remote-agent-door.md) | Accepted (identity door; occupancy superseded by ADR-118) | Default `appaloft code` requires login + default Server; Scratch is `--local`. |
 | [ADR-118: Remote Code Occupancy](./ADR-118-remote-code-occupancy.md) | Accepted | Default `code` occupies my Sandbox via `workspaces.open` + optional `targetServerId`. |
+| [ADR-119: Remote Code Repo-URL Locator](./ADR-119-remote-code-repo-url.md) | Accepted | `appaloft code <git-remote>` occupies that repo from remote HEAD; no clone; URL wins over other occupancy. |
 
 ## Authoring Rules
 

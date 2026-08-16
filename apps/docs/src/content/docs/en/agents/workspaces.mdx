@@ -51,7 +51,9 @@ appaloft code
 
 Default `appaloft code` occupies **my Sandbox** on the team's default enrolled Server.
 Source is the remote SHA. Adapter and Profile are created if missing. The laptop path
-is not Workspace truth, and dirty files are not uploaded. The banner is:
+is not Workspace truth, and dirty files are not uploaded. A positional git remote
+(`https://`, `ssh://`, or `git@host:path`) occupies that repository without a local
+clone. The banner is:
 
 ```text
 Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>
@@ -63,6 +65,7 @@ Scratch remains explicit:
 ```bash
 appaloft code --local
 ```
+
 
 `--local` still opens OpenCode if present, otherwise Pi, without Git, login, Binding, or Cloud.
 The scratch banner is `Local scratch · this Mac · not saved remotely`.
