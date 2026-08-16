@@ -136,6 +136,40 @@ interface AgentRuntimeListResult {
   readonly items: readonly AgentRuntimeResult[];
 }
 
+interface ServerListResult {
+  readonly items: readonly {
+    readonly id: string;
+    readonly name?: string;
+    readonly lifecycleStatus?: string;
+    readonly providerKey?: string;
+  }[];
+}
+function occupancyTreeFromLists(
+  reason: string,
+  servers: ServerListResult["items"],
+  sandboxes: readonly SandboxResult[],
+) {
+  return {
+    schemaVersion: "appaloft.workspace-occupancy/v1",
+    status: "ready",
+    reason,
+    nextAction: "Use workspace show/pause/resume or appaloft code to attach.",
+    servers: servers.map((server) => ({
+      id: server.id,
+      ...(typeof server.name === "string" ? { name: server.name } : {}),
+      ...(typeof server.lifecycleStatus === "string"
+        ? { lifecycleStatus: server.lifecycleStatus }
+        : {}),
+      ...(typeof server.providerKey === "string" ? { providerKey: server.providerKey } : {}),
+    })),
+    occupancies: sandboxes.map((sandbox) => ({
+      workspaceId: sandbox.sandboxId,
+      status: sandbox.status,
+      ...(sandbox.occupancy ? { occupancy: sandbox.occupancy } : {}),
+    })),
+  };
+}
+
 function requireOption(value: string | undefined, label: string): string {
   if (value?.trim()) return value.trim();
   throw domainError.validation(`${label} is required`);
@@ -1248,7 +1282,7 @@ const workspaceNoTui = Options.boolean("no-tui").pipe(
   Options.withDefault(false),
 );
 const workspaceJson = Options.boolean("json").pipe(
-  Options.withDescription("Print the headless Workspace control status as JSON."),
+  Options.withDescription("Print the headless occupancy tree as JSON."),
   Options.withDefault(false),
 );
 
@@ -1272,20 +1306,28 @@ export const agentWorkspaceCommand = EffectCommand.make(
         terminalFallbackReason ||
         !cli.workspaceControlPresentation
       ) {
-        return yield* print({
-          schemaVersion: "appaloft.workspace-control/v1",
-          status: "renderer-unavailable",
-          reason: !interactive
-            ? "non-interactive-terminal"
-            : noTui
-              ? "no-tui"
-              : json
-                ? "structured-output"
-                : terminalFallbackReason
-                  ? terminalFallbackReason
-                  : "presentation-not-composed",
-          nextAction: "Use an explicit appaloft workspace subcommand.",
-        });
+        const reason = !interactive
+          ? "non-interactive-terminal"
+          : noTui
+            ? "no-tui"
+            : json
+              ? "structured-output"
+              : terminalFallbackReason
+                ? terminalFallbackReason
+                : "presentation-not-composed";
+        const serversQuery = yield* resultToEffect(ListServersQuery.create());
+        const servers = (yield* resultToEffect(
+          yield* Effect.promise(() => cli.executeQuery(serversQuery)),
+        )) as ServerListResult;
+        const sandboxesQuery = yield* resultToEffect(
+          ListSandboxesQuery.create({ limit: 100, offset: 0 }),
+        );
+        const sandboxes = (yield* resultToEffect(
+          yield* Effect.promise(() => cli.executeQuery(sandboxesQuery)),
+        )) as SandboxListResult;
+        return yield* print(
+          occupancyTreeFromLists(reason, servers.items ?? [], sandboxes.items ?? []),
+        );
       }
       yield* Effect.tryPromise({
         try: () =>

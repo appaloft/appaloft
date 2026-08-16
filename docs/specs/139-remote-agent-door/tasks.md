@@ -49,10 +49,18 @@
 - [x] `appaloftdev deployments plan` without `--destination`
 - [x] Help / changelog if user-visible plan contract changes — query spec only; no CLI flag change
 
+## Slice 5 — workspace occupancy tree
+
+- [x] Grill D22–D24
+- [x] Ticket `ready-for-agent` — [#1161](https://github.com/appaloft/appaloft/issues/1161)
+- [x] Headless `workspace --json` / `--no-tui` occupancy tree
+- [x] Unit tests WS-REMOTE-CA-033–035
+- [x] `appaloftdev workspace --json` shows occupancy-mac + ready sandboxes
+
 ## Later
 
-- [ ] `appaloft workspace` as Railway `ca`
+- [ ] Interactive `workspace` TUI as Railway `ca` navigator
 - [ ] Team Connection
 - [ ] Cloud managed as default Server
 - [ ] GitHub `owner/repo` shorthand
-- [ ] Session-native Preview / missing `internalPort`
+- [ ] Session-native Preview

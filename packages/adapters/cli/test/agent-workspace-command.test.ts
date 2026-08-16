@@ -143,9 +143,65 @@ describe("Agent Workspace CLI", () => {
     }
 
     expect(presentationStarts).toBe(0);
+    expect(output.join("")).toContain("appaloft.workspace-occupancy/v1");
     expect(output.join("")).toContain("non-interactive-terminal");
     expect(output.join("")).toContain("no-tui");
     expect(output.join("")).toContain("structured-output");
+  });
+
+  test("[WS-REMOTE-CA-033][WS-REMOTE-CA-034] headless workspace --json prints servers and occupancies", async () => {
+    const output: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: { execute: async () => ok({}) } as unknown as CommandBus,
+      queryBus: {
+        execute: async () =>
+          ok({
+            items: [
+              {
+                id: "srv_demo",
+                name: "occupancy-mac",
+                sandboxId: "sbx_demo",
+                status: "ready",
+                occupancy: {
+                  repositoryIdentity: "github.com/appaloft/appaloft",
+                  commitSha: "abc123",
+                  branch: "main",
+                },
+              },
+            ],
+          }),
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_workspace_occupancy_tree" }),
+      },
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+    });
+
+    const processWrite = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "workspace", "--json"]);
+    } finally {
+      process.stdout.write = processWrite;
+    }
+
+    const printed = output.join("");
+    expect(printed).toContain("appaloft.workspace-occupancy/v1");
+    expect(printed).toContain("srv_demo");
+    expect(printed).toContain("occupancy-mac");
+    expect(printed).toContain("sbx_demo");
+    expect(printed).toContain("github.com/appaloft/appaloft");
   });
 
   test("[WS-TUI-FALLBACK-009][WS-TUI-TERMINAL-012] unsupported host terminals fail closed before renderer startup", async () => {
