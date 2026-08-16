@@ -232,6 +232,8 @@ pub struct DetailMessage {
     #[serde(default)]
     pub preview: Option<OccupancyPreviewChrome>,
     #[serde(default)]
+    pub production: Option<OccupancyPreviewChrome>,
+    #[serde(default)]
     pub deployment: Option<OccupancyDeploymentChrome>,
     #[serde(default)]
     pub pull_request: Option<OccupancyPullRequestChrome>,
@@ -1704,6 +1706,11 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
                 .as_ref()
                 .map(|preview| format!("Preview  {}", preview.url))
                 .unwrap_or_default();
+            let production = detail
+                .production
+                .as_ref()
+                .map(|production| format!("Prod     {}", production.url))
+                .unwrap_or_default();
             let deployment = detail
                 .deployment
                 .as_ref()
@@ -1725,10 +1732,11 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
                 .map(|pull_request| format!("PR       #{}", pull_request.number))
                 .unwrap_or_default();
             format!(
-                "Workspace {}  {}\n{}\n{}\n{}\n{}\n{}\nRecovery\nIsolation  {}\nContinuity {}\nSnapshot(s)\n{}\nWorkspace-owned cleanup: {}\nactive runtimes:{}  previews:{}\nBounded readback; not host/provider proof\nAgent Runtime(s)\n{}\nPorts\n{}\nTasks\n{}\nPromotions\n{}",
+                "Workspace {}  {}\n{}\n{}\n{}\n{}\n{}\n{}\nRecovery\nIsolation  {}\nContinuity {}\nSnapshot(s)\n{}\nWorkspace-owned cleanup: {}\nactive runtimes:{}  previews:{}\nBounded readback; not host/provider proof\nAgent Runtime(s)\n{}\nPorts\n{}\nTasks\n{}\nPromotions\n{}",
                 occupancy_list_label(&detail.workspace),
                 detail.workspace.status,
                 preview,
+                production,
                 deployment,
                 pull_request,
                 target_selection,
@@ -2266,6 +2274,9 @@ mod tests {
                 preview: Some(OccupancyPreviewChrome {
                     url: "http://whoami.test".to_owned(),
                 }),
+                production: Some(OccupancyPreviewChrome {
+                    url: "https://whoami.example".to_owned(),
+                }),
                 deployment: Some(OccupancyDeploymentChrome {
                     id: "dep_rfqfapqwpyjn".to_owned(),
                     status: Some("succeeded".to_owned()),
@@ -2292,6 +2303,7 @@ mod tests {
         assert!(rendered.contains("traefik/whoami@1ce75d0"));
         assert!(rendered.contains("Preview"));
         assert!(rendered.contains("whoami.test"));
+        assert!(rendered.contains("whoami.example"));
         assert!(rendered.contains("dep_rfqfapqwpyjn"));
         assert!(rendered.contains("PR       #928"));
         assert!(rendered.contains("task_1"));
@@ -2337,6 +2349,7 @@ mod tests {
             activation: None,
             target_selection: None,
             preview: None,
+            production: None,
             deployment: None,
             pull_request: None,
             recovery: RecoverySummary {
@@ -2406,6 +2419,7 @@ mod tests {
             activation: None,
             target_selection: None,
             preview: None,
+            production: None,
             deployment: None,
             pull_request: None,
             recovery: RecoverySummary {
@@ -2488,6 +2502,7 @@ mod tests {
             activation: None,
             target_selection: None,
             preview: None,
+            production: None,
             deployment: None,
             pull_request: None,
             recovery: RecoverySummary {
@@ -2557,6 +2572,7 @@ mod tests {
             activation: None,
             target_selection: None,
             preview: None,
+            production: None,
             deployment: None,
             pull_request: None,
             recovery: RecoverySummary::default(),
@@ -2624,6 +2640,7 @@ mod tests {
                 activation: None,
                 target_selection: None,
                 preview: None,
+                production: None,
                 deployment: None,
                 pull_request: None,
                 recovery: RecoverySummary::default(),
@@ -2733,6 +2750,7 @@ mod tests {
             activation: None,
             target_selection: None,
             preview: None,
+            production: None,
             deployment: None,
             pull_request: None,
             recovery: RecoverySummary::default(),
@@ -2871,6 +2889,7 @@ mod tests {
                 activation: None,
                 target_selection: None,
                 preview: None,
+                production: None,
                 deployment: None,
                 pull_request: None,
                 recovery: RecoverySummary::default(),

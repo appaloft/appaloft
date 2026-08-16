@@ -111,20 +111,23 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-CA-075 | TUI detail copies PR number | occupancy repo matches a preview-environment PR | TUI detail | shows `PR #n`. |
 | WS-REMOTE-CA-076 | Missing PR stays omitted | occupancy has repo/branch but no preview-environment | TUI detail | no invented PR. |
 | WS-REMOTE-CA-077 | Foreign PR stays out | preview-environment belongs to another repo | TUI detail | does not copy that PR. |
+| WS-REMOTE-CA-078 | TUI detail copies Production URL | occupancy Resource `app` has `latestDurableDomainRoute` | TUI detail | shows that URL as Production. |
+| WS-REMOTE-CA-079 | Missing Production stays omitted | occupancy has generated preview only | TUI detail | no invented Production URL. |
+| WS-REMOTE-CA-080 | Preview is not Production | Resource has both generated and durable routes | TUI detail | Preview stays generated; Production stays durable. |
 
 ## Slice Scope
 
-Slice 1–24 shipped.
+Slice 1–25 shipped.
 
-Slice 25 (this ticket): interactive `workspace` TUI detail shows occupancy PR number.
+Slice 26 (this ticket): interactive `workspace` TUI detail shows occupancy Production URL.
 
-In slice 25:
+In slice 26:
 
-- TUI detail copies `preview-environments.list` PR when repo matches occupancy;
-- missing PR stays omitted;
-- no `gh` scrape, no PR create, no `code` banner change.
+- TUI detail copies Resource `app` `latestDurableDomainRoute`;
+- missing durable domain stays omitted;
+- generated preview is never labeled Production.
 
-Out of slice 25: production navigator, team Connection, Cloud managed default Server.
+Out of slice 26: create-PR navigator, team Connection, Cloud managed default Server.
 
 ## Public Surfaces
 

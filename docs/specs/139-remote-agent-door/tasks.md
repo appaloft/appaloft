@@ -219,6 +219,14 @@
 - [x] Unit tests WS-REMOTE-CA-075–077
 - [x] `appaloftdev workspace` detail would show PR #n
 
+## Slice 26 — occupancy TUI production chrome
+
+- [x] Grill D85–D87
+- [x] Ticket `ready-for-agent` — [#1203](https://github.com/appaloft/appaloft/issues/1203)
+- [x] TUI detail copies durable-domain Production URL
+- [x] Unit tests WS-REMOTE-CA-078–080
+- [x] `appaloftdev workspace` detail would show Production
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

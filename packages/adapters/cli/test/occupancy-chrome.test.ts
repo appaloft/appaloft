@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { occupancyPullRequestFromPreviewEnvironments } from "../src/occupancy-chrome.js";
+import {
+  occupancyChromeForProject,
+  occupancyPullRequestFromPreviewEnvironments,
+} from "../src/occupancy-chrome.js";
 
 describe("occupancy PR chrome", () => {
   test("[WS-REMOTE-CA-075] copies matching preview-environment PR", () => {
@@ -60,5 +63,59 @@ describe("occupancy PR chrome", () => {
         },
       ),
     ).toBeUndefined();
+  });
+});
+
+describe("occupancy production chrome", () => {
+  test("[WS-REMOTE-CA-078][WS-REMOTE-CA-080] copies durable domain as Production", () => {
+    expect(
+      occupancyChromeForProject(
+        [
+          {
+            projectId: "prj_web",
+            slug: "app",
+            lastDeploymentId: "dep_rfqfapqwpyjn",
+            lastDeploymentStatus: "succeeded",
+            accessSummary: {
+              latestGeneratedAccessRoute: {
+                url: "http://app-sc156jw98k.127.0.0.1.sslip.io",
+                deploymentStatus: "succeeded",
+              },
+              latestDurableDomainRoute: {
+                url: "https://whoami.example",
+                deploymentStatus: "succeeded",
+              },
+            },
+          },
+        ],
+        "prj_web",
+      ),
+    ).toEqual({
+      preview: { url: "http://app-sc156jw98k.127.0.0.1.sslip.io" },
+      production: { url: "https://whoami.example" },
+      deployment: { id: "dep_rfqfapqwpyjn", status: "succeeded" },
+    });
+  });
+
+  test("[WS-REMOTE-CA-079] missing Production stays omitted", () => {
+    expect(
+      occupancyChromeForProject(
+        [
+          {
+            projectId: "prj_web",
+            slug: "app",
+            accessSummary: {
+              latestGeneratedAccessRoute: {
+                url: "http://app-sc156jw98k.127.0.0.1.sslip.io",
+                deploymentStatus: "succeeded",
+              },
+            },
+          },
+        ],
+        "prj_web",
+      ),
+    ).toEqual({
+      preview: { url: "http://app-sc156jw98k.127.0.0.1.sslip.io" },
+    });
   });
 });

@@ -1330,6 +1330,10 @@ describe("Workspace control presentation", () => {
                     url: "http://app-sc156jw98k.127.0.0.1.sslip.io",
                     deploymentStatus: "succeeded",
                   },
+                  latestDurableDomainRoute: {
+                    url: "https://whoami.example",
+                    deploymentStatus: "succeeded",
+                  },
                 },
               },
               {
@@ -1364,6 +1368,7 @@ describe("Workspace control presentation", () => {
     expect(detail).toMatchObject({
       type: "detail",
       preview: { url: "http://app-sc156jw98k.127.0.0.1.sslip.io/" },
+      production: { url: "https://whoami.example/" },
       deployment: { id: "dep_rfqfapqwpyjn", status: "succeeded" },
     });
     expect(JSON.stringify(detail)).not.toContain("dep_other");

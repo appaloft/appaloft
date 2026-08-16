@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–24 shipped. Slice 25 occupancy TUI PR chrome owner-confirmed 2026-08-16 (D82–D84).
+- Round: Spec. Slice 1–25 shipped. Slice 26 occupancy TUI production chrome owner-confirmed 2026-08-16 (D85–D87).
 - Date: 2026-08-16.
-- Predecessor: occupancy TUI chrome shipped as public #1200.
-- Code changes allowed: yes for slice 25 after the occupancy-tui-pr ticket is `ready-for-agent`.
+- Predecessor: occupancy TUI PR chrome shipped as public #1202.
+- Code changes allowed: yes for slice 26 after the occupancy-tui-production ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -119,6 +119,9 @@ Sandbox on that Server, not one VM per person.
 | D82 | Slice 25 TUI detail copies open PR from existing `preview-environments.list` | Delivery chrome already said `workspace` is the PR navigator. Do not scrape `gh` or vendor TUI. |
 | D83 | Match occupancy repo + branch/headSha; missing PR stays omitted | Do not invent `#n`. Multiple matches take the newest listed item. |
 | D84 | No PR create/update this slice; `code` banner stays unchanged | Session-native PR in OpenCode stays later. List stays identity-only. |
+| D85 | Slice 26 TUI detail copies Resource `app` `latestDurableDomainRoute` as Production | Delivery chrome already said `workspace` navigates production URL. Railway `ca` shows the live domain. |
+| D86 | Missing durable domain stays omitted | Do not promote sslip / generated preview to Production. |
+| D87 | Preview stays generated access; Production stays durable domain | No new command. List stays identity-only. |
 
 ## Rejected
 
@@ -190,10 +193,11 @@ Later slices after occupancy:
 22. Occupancy help door (slice 22, shipped #1196).
 23. Occupancy TUI identity (slice 23, shipped #1198).
 24. Occupancy TUI chrome (slice 24, shipped #1200).
-25. **Occupancy TUI PR chrome** (slice 25): TUI detail shows `PR #n` from preview-environments.
-26. Interactive `workspace` TUI as Railway `ca` navigator (production / create PR).
-27. Optional team Connection.
-28. Cloud managed as default Server when no BYOS exists.
+25. Occupancy TUI PR chrome (slice 25, shipped #1202).
+26. **Occupancy TUI production chrome** (slice 26): TUI detail shows Production URL from durable domain.
+27. Interactive `workspace` TUI as Railway `ca` navigator (create PR).
+28. Optional team Connection.
+29. Cloud managed as default Server when no BYOS exists.
 ## Delivery chrome (owner 2026-08-15)
 
 Cmux-style “this session is PR #928” is correct *context*. It is not a new GitHub aggregate

@@ -36,6 +36,7 @@
 | Occupancy TUI identity | public CLI TUI presentation + workspace-control-tui list label |
 | Occupancy TUI chrome | same presentation + TUI detail; copy occupancy Resource `app` preview/deploy |
 | Occupancy TUI PR chrome | same presentation + TUI detail; copy `preview-environments.list` PR |
+| Occupancy TUI production chrome | same presentation + TUI detail; copy Resource `app` durable domain |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -194,6 +195,11 @@ Slice-25 verification:
 
 - unit: TUI detail copies matching preview-environment PR;
 - unit: missing or foreign PR stays omitted.
+
+Slice-26 verification:
+
+- unit: TUI detail copies durable-domain Production URL;
+- unit: generated preview is not labeled Production.
 
 
 

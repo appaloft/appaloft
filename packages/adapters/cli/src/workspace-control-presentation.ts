@@ -175,6 +175,7 @@ export type WorkspaceControlRendererMessage =
       readonly activation?: WorkspaceControlActivationSummary;
       readonly targetSelection?: WorkspaceControlTargetSelectionSummary;
       readonly preview?: { readonly url: string };
+      readonly production?: { readonly url: string };
       readonly deployment?: { readonly id: string; readonly status?: string };
       readonly pullRequest?: { readonly number: number };
       readonly recovery: WorkspaceControlRecoverySummary;
@@ -752,6 +753,9 @@ async function loadDetail(
   const previewUrl = occupancyChrome.preview
     ? safePresentationUrl(occupancyChrome.preview.url)
     : undefined;
+  const productionUrl = occupancyChrome.production
+    ? safePresentationUrl(occupancyChrome.production.url)
+    : undefined;
   const workspaceSummaryRecord = workspaceSummary(workspace);
   const pullRequest = occupancyPullRequestFromPreviewEnvironments(
     await listOccupancyPreviewEnvironments(context, activation?.project.projectId),
@@ -768,6 +772,7 @@ async function loadDetail(
       ...(activation ? { activation } : {}),
       ...(targetSelection ? { targetSelection } : {}),
       ...(previewUrl ? { preview: { url: previewUrl } } : {}),
+      ...(productionUrl ? { production: { url: productionUrl } } : {}),
       ...(occupancyChrome.deployment ? { deployment: occupancyChrome.deployment } : {}),
       ...(pullRequest ? { pullRequest } : {}),
       recovery: {

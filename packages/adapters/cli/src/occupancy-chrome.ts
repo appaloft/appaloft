@@ -8,6 +8,10 @@ export interface OccupancyResource {
       readonly url?: string;
       readonly deploymentStatus?: string;
     };
+    readonly latestDurableDomainRoute?: {
+      readonly url?: string;
+      readonly deploymentStatus?: string;
+    };
   };
 }
 
@@ -22,6 +26,7 @@ export interface OccupancyDeploymentChrome {
 
 export interface OccupancyChrome {
   readonly preview?: OccupancyPreviewChrome;
+  readonly production?: OccupancyPreviewChrome;
   readonly deployment?: OccupancyDeploymentChrome;
 }
 
@@ -120,21 +125,34 @@ export function occupancyLastDeploymentFromResource(
   };
 }
 
+export function occupancyProductionFromResource(
+  resource: OccupancyResource,
+): OccupancyPreviewChrome | undefined {
+  if (resource.slug !== "app") return undefined;
+  const route = resource.accessSummary?.latestDurableDomainRoute;
+  if (typeof route?.url !== "string" || route.url.length === 0) return undefined;
+  if (route.deploymentStatus && route.deploymentStatus !== "succeeded") return undefined;
+  return { url: route.url };
+}
+
 export function occupancyChromeForProject(
   resources: readonly OccupancyResource[],
   projectId: string | undefined,
 ): OccupancyChrome {
   if (!projectId) return {};
   let preview: OccupancyPreviewChrome | undefined;
+  let production: OccupancyPreviewChrome | undefined;
   let deployment: OccupancyDeploymentChrome | undefined;
   for (const resource of resources) {
     if (resource.projectId !== projectId) continue;
     preview ??= occupancyPreviewFromResource(resource);
+    production ??= occupancyProductionFromResource(resource);
     deployment ??= occupancyLastDeploymentFromResource(resource);
-    if (preview && deployment) break;
+    if (preview && production && deployment) break;
   }
   return {
     ...(preview ? { preview } : {}),
+    ...(production ? { production } : {}),
     ...(deployment ? { deployment } : {}),
   };
 }
