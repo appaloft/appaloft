@@ -50,6 +50,7 @@ class FakeRendererSession implements WorkspaceControlRendererSession {
   }
 
   async *events(): AsyncIterable<WorkspaceControlRendererEvent> {
+    await Promise.resolve();
     for (const event of this.rendererEvents) {
       yield event;
     }
@@ -59,6 +60,17 @@ class FakeRendererSession implements WorkspaceControlRendererSession {
     this.closed += 1;
     return Promise.resolve();
   }
+}
+
+async function waitForPopulatedWorkspaces(
+  renderer: FakeRendererSession,
+): Promise<Extract<WorkspaceControlRendererMessage, { type: "workspaces" }>> {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const workspaces = renderer.messages.findLast((message) => message.type === "workspaces");
+    if (workspaces && workspaces.workspaces.length > 0) return workspaces;
+    await Promise.resolve();
+  }
+  throw new Error("Workspace list never populated");
 }
 
 describe("Workspace control presentation", () => {
@@ -1230,6 +1242,34 @@ describe("Workspace control presentation", () => {
     expect(JSON.stringify(renderer.messages)).not.toContain("must-not-cross");
   });
 
+  test("[WS-TUI-ENTRY-001] quit is accepted before the first Workspace list resolves", async () => {
+    let resolveList: ((value: { items: readonly unknown[] }) => void) | undefined;
+    const listStarted = Promise.withResolvers<void>();
+    const renderer = new FakeRendererSession([{ type: "quit" }]);
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+
+    const started = presentation.start({
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery) {
+          listStarted.resolve();
+          return await new Promise((resolve) => {
+            resolveList = (value) => resolve(ok(value) as never);
+          });
+        }
+        throw new Error(`unexpected query ${query.constructor.name}`);
+      },
+    });
+
+    await listStarted.promise;
+    await started;
+    expect(renderer.closed).toBe(1);
+    expect(renderer.messages[0]).toEqual({ type: "workspaces", workspaces: [] });
+    resolveList?.({ items: [{ sandboxId: "sbx_late", status: "ready" }] });
+  });
+
   test("[WS-REMOTE-CA-069][WS-REMOTE-CA-070][WS-REMOTE-CA-071] TUI list copies occupancy and omits leftovers", async () => {
     const renderer = new FakeRendererSession([{ type: "quit" }]);
     const presentation = createBoundedWorkspaceControlPresentation({
@@ -1261,7 +1301,7 @@ describe("Workspace control presentation", () => {
       },
     });
 
-    const workspaces = renderer.messages.find((message) => message.type === "workspaces");
+    const workspaces = await waitForPopulatedWorkspaces(renderer);
     expect(workspaces).toEqual({
       type: "workspaces",
       workspaces: [
