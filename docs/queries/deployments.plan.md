@@ -175,7 +175,7 @@ must not be reused for role mismatch.
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
 | Web | Resource new-deployment read-only plan preview. | Active |
-| CLI | `appaloft deployments plan --project <id> --environment <id> --resource <id> --server <id> [--destination <id>] [--json]`. | Active |
+| CLI | `appaloft deployments plan --resource <id> --server <id> [--project <id>] [--environment <id>] [--destination <id>] [--json]`. | Active |
 | oRPC / HTTP | `GET /api/deployments/plan` using the query schema. | Active |
 | Automation / MCP | Future read-only plan inspection tool over the same operation key. | Future |
 

@@ -230,7 +230,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       handlerName: "DeploymentPlanQueryHandler",
       serviceName: "DeploymentPlanQueryService",
       transports: {
-        cli: "appaloft deployments plan --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]",
+        cli: "appaloft deployments plan --resource <resourceId> --server <serverId> [--project <projectId>] [--environment <environmentId>] [--destination <destinationId>]",
         orpc: { method: "GET", path: "/api/deployments/plan" },
       },
     });
