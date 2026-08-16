@@ -79,6 +79,7 @@ export interface WorkspaceActivationContextInitializerPort {
       readonly profile: WorkspaceActivationContextDisposition;
     }>
   >;
+  ensureLocalEnvironment(context: ExecutionContext, projectId: string): Promise<Result<void>>;
 }
 
 export class FailClosedWorkspaceOpenCredentialAdmission
@@ -277,6 +278,13 @@ export class AgentWorkspaceOpenPreflightService {
           projectId,
         }),
       );
+    }
+    if (this.dependencies.contextInitializer) {
+      const environment = await this.dependencies.contextInitializer.ensureLocalEnvironment(
+        context,
+        projectId,
+      );
+      if (environment.isErr()) return err(environment.error);
     }
     const selector =
       input.profile ?? project.toState().defaultWorkspaceProfileInstallationId?.value;

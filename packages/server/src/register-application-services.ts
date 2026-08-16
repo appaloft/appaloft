@@ -4027,6 +4027,7 @@ export function registerApplicationServices(
         return new CommunityWorkspaceActivationContextInitializer({
           commandBus: dependencyContainer.resolve(tokens.commandBus),
           projects: dependencyContainer.resolve(tokens.projectRepository),
+          environments: dependencyContainer.resolve(tokens.environmentRepository),
           repositoryBindings: dependencyContainer.resolve<RepositoryBindingRepository>(
             tokens.repositoryBindingRepository,
           ),

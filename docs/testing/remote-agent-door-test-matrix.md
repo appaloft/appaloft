@@ -45,6 +45,8 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-CA-037 | CLI / unit | this slice | missing activation invents no projectId | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
 | WS-REMOTE-CTX-038 | application + `appaloftdev` | this slice | omitted plan project/env resolve from Resource | `packages/application/test/deployment-plan-preview.test.ts`; live plan `--resource --server` |
 | WS-REMOTE-CTX-039 | application | this slice | omitted resourceId fail-closed | `packages/application/test/deployment-plan-preview.test.ts` |
+| WS-REMOTE-ENV-040 | application + `appaloftdev` | this slice | occupancy creates Environment `local` when missing | `packages/application/test/community-workspace-activation-context-initializer.test.ts`; live `env list` |
+| WS-REMOTE-ENV-041 | application | this slice | existing `local` Environment is reused | `packages/application/test/community-workspace-activation-context-initializer.test.ts` |
 
 
 

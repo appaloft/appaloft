@@ -73,22 +73,23 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-CA-037 | Missing activation stays lean | Sandbox has no activation | `appaloft workspace --json` | row has workspaceId/status/occupancy only; no invented projectId. |
 | WS-REMOTE-CTX-038 | Plan resource context | Resource exists; project/env omitted | `deployments.plan --resource --server` | preview uses Resource project/env; destination still default. |
 | WS-REMOTE-CTX-039 | Missing resource fail-closed | plan omits resourceId | `deployments.plan --server` | fail-closed; no invented Resource. |
+| WS-REMOTE-ENV-040 | Occupancy default Environment | occupancy creates a Project with no Environment | `appaloft code --no-attach` then `env list --project <id>` | one Environment named `local` exists. |
+| WS-REMOTE-ENV-041 | Existing local reused | Project already has Environment `local` | second occupancy of same repo | no second Environment; create is not called. |
 
 ## Slice Scope
 
-Slice 1–6 shipped.
+Slice 1–7 shipped.
 
-Slice 7 (this ticket): omitted `deployments.plan` projectId / environmentId resolve from Resource.
+Slice 8 (this ticket): occupancy activation ensures Environment `local`.
 
-In slice 7:
+In slice 8:
 
-- `plan --resource --server` is enough;
-- omitted resource still fail-closed;
-- `deployments.create` still requires explicit project/env/resource/server.
+- missing `local` → `environments.create` kind `local`;
+- existing `local` reused;
+- activation evidence unchanged.
 
-Out of slice 7: inventing a Resource from occupancy, defaulting Server from occupancy,
-rebuilding the interactive TUI, team Connection, Cloud managed default Server,
-GitHub `owner/repo` shorthand, session-native Preview.
+Out of slice 8: Resource from occupancy, Environment on the occupancy tree,
+defaulting Server, interactive TUI rebuild, session-native Preview.
 
 ## Public Surfaces
 

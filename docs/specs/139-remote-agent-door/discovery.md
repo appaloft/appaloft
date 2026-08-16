@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–6 shipped. Slice 7 plan resource context owner-confirmed 2026-08-16 (D28–D30).
+- Round: Spec. Slice 1–7 shipped. Slice 8 occupancy default Environment owner-confirmed 2026-08-16 (D31–D33).
 - Date: 2026-08-16.
-- Predecessor: Spec 138 / ADR-116 Instant Local Scratch shipped as public #1125; ADR-117 identity door shipped as public #1127; ADR-118 occupancy shipped; ADR-119 repo-URL locator shipped as public #1156; ADR-120 destination shipped as public #1158; occupancy tree shipped as public #1162; occupancy projectId shipped as public #1164.
-- Code changes allowed: yes for slice 7 after the plan-context ticket is `ready-for-agent`.
+- Predecessor: occupancy projectId shipped as public #1164; plan resource context shipped as public #1166.
+- Code changes allowed: yes for slice 8 after the occupancy-env ticket is `ready-for-agent`.
 
 ## Actor And Observable Outcome
 
@@ -66,6 +66,9 @@ Sandbox on that Server, not one VM per person.
 | D28 | Slice 7 `deployments.plan` omitted project/env resolve from Resource | Live plan still required four ids after occupancy projectId shipped |
 | D29 | Server stays required | Resource does not own a Server; occupancy Server is a later default |
 | D30 | `deployments.create` input stays explicit | Plan is the Railway inspect door; create remains fail-closed on omitted ids |
+| D31 | Slice 8 occupancy activation ensures one Environment named `local` | Hello-World occupancy created Project/Binding only; `env list` is empty so deploy cannot start |
+| D32 | Reuse existing Environment named `local`; create only when missing | `environments.create` conflicts; do not treat conflict as success |
+| D33 | Do not add Environment to activation evidence this slice | Tree still exposes projectId only; Resource remains a later deploy step |
 
 ## Rejected
 
@@ -119,11 +122,12 @@ Later slices after occupancy:
 4. Destination discovery (slice 4, shipped #1158).
 5. `workspace` occupancy tree (slice 5, shipped #1162).
 6. Occupancy `projectId` (slice 6, shipped #1164).
-7. **Plan resource context** (slice 7): `deployments.plan --resource --server` fills project/env from Resource.
-8. Session-native Preview / remaining first-deploy chrome.
-9. GitHub as source surface / `owner/repo` shorthand.
-10. Optional team Connection.
-11. Cloud managed as default Server when no BYOS exists.
+7. Plan resource context (slice 7, shipped #1166).
+8. **Occupancy default Environment** (slice 8): activation ensures Project Environment named `local`.
+9. Session-native Preview / remaining first-deploy chrome.
+10. GitHub as source surface / `owner/repo` shorthand.
+11. Optional team Connection.
+12. Cloud managed as default Server when no BYOS exists.
 
 ## Delivery chrome (owner 2026-08-15)
 
