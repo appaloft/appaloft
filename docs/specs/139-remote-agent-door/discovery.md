@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–14 shipped. Slice 15 occupancy EXPOSE port owner-confirmed 2026-08-16 (D52–D54).
+- Round: Spec. Slice 1–15 shipped. Slice 16 GitHub `owner/repo` owner-confirmed 2026-08-16 (D55–D57).
 - Date: 2026-08-16.
-- Predecessor: occupancy deploy reuse shipped as public #1180.
-- Code changes allowed: yes for slice 15 after the occupancy-expose ticket is `ready-for-agent`.
+- Predecessor: occupancy EXPOSE port shipped as public #1182.
+- Code changes allowed: yes for slice 16 after the occupancy-shorthand ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -89,6 +89,9 @@ Sandbox on that Server, not one VM per person.
 | D52 | Slice 15 occupancy network uses a single Dockerfile `EXPOSE` when present | Live `code` + `deploy` of `traefik/whoami` created `dep_19e01i9s0nkp` and failed `docker_health_check_failed` on published 3000. Dockerfile is `EXPOSE 80`. Occupancy still writes `internalPort 3000`. |
 | D53 | No `EXPOSE` or more than one distinct `EXPOSE` keeps 3000 | Do not invent 80. Do not pick the first of many. |
 | D54 | Existing non-3000 network is reused; occupancy-default 3000 may be replaced by a single `EXPOSE` | User-configured ports stay. The slice-10 default is not a user choice. |
+| D55 | Slice 16 `owner/repo` is a GitHub HTTPS locator | Live `code traefik/whoami` after occupying `examples` resumed examples. WS-REMOTE-URL-SHORTHAND-028 currently treats `org/repo` as a local path. Railway/GitHub users type `owner/repo`. |
+| D56 | Expand only `owner/repo` to `https://github.com/owner/repo.git` | Same `ls-remote` HEAD contract as HTTPS. No `/tree/` parsing. No GitLab/Bitbucket host inference. |
+| D57 | Existing local path `owner/repo` still wins if that directory exists | Do not steal a real relative directory named `org/repo`. |
 
 ## Rejected
 
@@ -150,11 +153,12 @@ Later slices after occupancy:
 12. Remote-git inspection (slice 12, shipped #1176).
 13. Occupancy Preview URL (slice 13, shipped #1178).
 14. Occupancy deploy reuse (slice 14, shipped #1180).
-15. **Occupancy EXPOSE port** (slice 15): occupancy Resource `app` uses a single Dockerfile `EXPOSE`.
-16. Session-native Preview chrome / interactive `workspace` TUI.
-17. GitHub as source surface / `owner/repo` shorthand.
+15. Occupancy EXPOSE port (slice 15, shipped #1182).
+16. **GitHub `owner/repo`** (slice 16): `appaloft code owner/repo` occupies `github.com/owner/repo`.
+17. Session-native Preview chrome / interactive `workspace` TUI.
 18. Optional team Connection.
 19. Cloud managed as default Server when no BYOS exists.
+20. Bare `appaloft deploy` without a locator.
 
 ## Delivery chrome (owner 2026-08-15)
 

@@ -139,10 +139,18 @@
 - [x] Unit tests WS-REMOTE-EXPOSE-054–055
 - [x] `appaloftdev` occupy+plan of `traefik/whoami` is port 80
 
+## Slice 16 — GitHub owner/repo
+
+- [x] Grill D55–D57
+- [x] Ticket `ready-for-agent` — [#1183](https://github.com/appaloft/appaloft/issues/1183)
+- [x] `owner/repo` occupies GitHub HTTPS
+- [x] Unit tests WS-REMOTE-URL-SHORTHAND-028/056
+- [x] `appaloftdev code traefik/whoami --no-attach` after occupying examples
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator
 - [ ] Team Connection
 - [ ] Cloud managed as default Server
-- [ ] GitHub `owner/repo` shorthand
 - [ ] Session-native Preview chrome
+- [ ] Bare `appaloft deploy`

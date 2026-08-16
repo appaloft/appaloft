@@ -1,3 +1,5 @@
+import { existsSync, statSync } from "node:fs";
+
 import { type DomainError } from "@appaloft/core";
 import { activeControlPlaneProfile } from "./control-plane-service.js";
 import {
@@ -117,7 +119,26 @@ export function isRemoteCodeGitRemoteLocator(value: string): boolean {
   const locator = value.trim();
   if (!locator || locator.includes("\0") || /[\r\n]/u.test(locator)) return false;
   if (locator.startsWith("https://") || locator.startsWith("ssh://")) return true;
-  return /^git@[^/\s]+:.+$/u.test(locator);
+  if (/^git@[^/\s]+:.+$/u.test(locator)) return true;
+  return isGitHubOwnerRepoLocator(locator);
+}
+
+function isGitHubOwnerRepoLocator(value: string): boolean {
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?$/u.test(value)) return false;
+  try {
+    return !(existsSync(value) && statSync(value).isDirectory());
+  } catch {
+    return true;
+  }
+}
+
+function expandRemoteCodeGitRemoteLocator(value: string): string {
+  const locator = value.trim();
+  if (isGitHubOwnerRepoLocator(locator)) {
+    const slug = locator.replace(/\.git$/u, "");
+    return `https://github.com/${slug}.git`;
+  }
+  return locator;
 }
 
 export function selectDefaultRemoteCodeServer(
@@ -346,7 +367,9 @@ async function resolveRemoteCodeGitRemoteLocator(
   readonly ref: string;
   readonly branch: string;
 }> {
-  const normalized = normalizeWorkspaceRepositoryRemote(remoteValue);
+  const normalized = normalizeWorkspaceRepositoryRemote(
+    expandRemoteCodeGitRemoteLocator(remoteValue),
+  );
   const { execFile } = await import("node:child_process");
   const { promisify } = await import("node:util");
   const execFileAsync = promisify(execFile);

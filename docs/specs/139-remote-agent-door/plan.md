@@ -26,6 +26,7 @@
 | Occupancy Preview URL | same tree; copy succeeded generated access from Resource `app` |
 | Occupancy deploy reuse | public CLI adapter composing Binding + Environment `local` + Resource `app` + default Server |
 | Occupancy EXPOSE port | detector + occupancy initializer |
+| GitHub owner/repo | public CLI remote-code locator |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -125,6 +126,13 @@ Slice-15 verification:
 - unit: single Dockerfile EXPOSE is recorded and used as occupancy internalPort;
 - unit: missing or multiple EXPOSE keeps 3000;
 - `appaloftdev resource show` after occupying `traefik/whoami` is `internalPort 80`.
+
+Slice-16 verification:
+
+- unit: `owner/repo` expands to github.com HTTPS when that path is not a local directory;
+- unit: an existing local directory named `owner/repo` stays a path;
+- `appaloftdev code traefik/whoami --no-attach` after occupying examples occupies whoami.
+
 
 
 

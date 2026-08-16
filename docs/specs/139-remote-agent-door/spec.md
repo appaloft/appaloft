@@ -3,11 +3,11 @@
 ## Status
 
 - Round: Spec
-- Artifact state: slice 1–14 shipped; slice 15 occupancy EXPOSE port accepted 2026-08-16
+- Artifact state: slice 1–15 shipped; slice 16 GitHub `owner/repo` accepted 2026-08-16
 - Discovery: [discovery.md](./discovery.md)
 - Governing decision: ADR-120 plan default destination; ADR-119 locates; ADR-118 occupies; ADR-117 remains the login/Server/`--local` door; ADR-116 remains Scratch-only; ADR-103 stays on explicit `workspace open` Git fail-closed
-- Code changes allowed: yes for slice 15 after the occupancy-expose ticket is `ready-for-agent`
-- Compatibility: public minor. Occupancy Resource `app` may use Dockerfile `EXPOSE` instead of 3000; no new catalog field
+- Code changes allowed: yes for slice 16 after the occupancy-shorthand ticket is `ready-for-agent`
+- Compatibility: public minor. `appaloft code owner/repo` occupies GitHub HTTPS when that path is not a local directory
 
 ## Business Outcome
 
@@ -61,7 +61,8 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-URL-HEAD-025 | Default branch from remote HEAD | URL has no branch | door resolves ref | `ls-remote HEAD` maps to one `refs/heads/*`. Zero or many heads fail closed (`workspace_remote_default_ref_unavailable` / `workspace_git_ref_ambiguous`). No GitHub `/tree/` parsing. |
 | WS-REMOTE-URL-WINS-026 | URL wins over other occupancy | I have a non-terminal occupancy of repo A | `appaloft code <git-remote-of-B> --no-attach` | occupies or resumes B only; does not resume A. |
 | WS-REMOTE-URL-LOCAL-027 | Scratch rejects remotes | any state | `appaloft code --local https://github.com/org/repo.git` | fail closed; Scratch is this-Mac only. |
-| WS-REMOTE-URL-SHORTHAND-028 | No host shorthand | logged in + Server | `appaloft code org/repo` | treated as a local path, not github.com/org/repo. Missing path / origin still `workspace_remote_repository_missing`. |
+| WS-REMOTE-URL-SHORTHAND-028 | GitHub owner/repo occupies | logged in + Server; `owner/repo` is not a local directory | `appaloft code owner/repo --no-attach` | occupies `https://github.com/owner/repo.git` via the same HEAD contract as WS-REMOTE-URL-024; does not resume another occupancy. |
+| WS-REMOTE-URL-SHORTHAND-056 | Existing local path wins | cwd has a directory `owner/repo` | `appaloft code owner/repo` | treated as a local path, not github.com. |
 | WS-REMOTE-URL-DOCS-029 | Help names the URL door | `code --help` / Workspace docs / skill | rendered | `appaloft code <git-remote>` occupies that repo without a clone; `--local` stays Scratch. |
 | WS-REMOTE-DEST-030 | Plan omitted destination | logged in + Server; resource has no destination pin; Server has Destination named `default` | Agent/CLI `deployments.plan` without `destinationId` | preview uses that Destination; does not create Destination; does not fail `destinationId is required`. |
 | WS-REMOTE-DEST-031 | Resource pin wins | resource `defaultDestinationId` is set | `deployments.plan` omits destinationId | preview uses the pinned Destination when it belongs to the selected Server. |
@@ -92,17 +93,17 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 
 ## Slice Scope
 
-Slice 1–14 shipped.
+Slice 1–15 shipped.
 
-Slice 15 (this ticket): occupancy Resource `app` uses a single Dockerfile `EXPOSE`.
+Slice 16 (this ticket): `appaloft code owner/repo` occupies GitHub HTTPS.
 
-In slice 15:
+In slice 16:
 
-- detector records a single Dockerfile `EXPOSE` on inspection;
-- occupancy create / missing network / occupancy-default 3000 use that port;
-- no EXPOSE or multiple distinct EXPOSE keep 3000.
+- `owner/repo` that is not a local directory expands to `https://github.com/owner/repo.git`;
+- same `ls-remote` HEAD contract as an explicit HTTPS locator;
+- a real local directory named `owner/repo` stays a path.
 
-Out of slice 15: inventing 80, owner/repo shorthand, `code` banner Preview.
+Out of slice 16: `/tree/` parsing, GitLab/Bitbucket host inference, bare `deploy`.
 
 ## Public Surfaces
 
@@ -144,9 +145,8 @@ Missing Binding is not a `code` hard failure. The initializer creates or reuses 
 - Deleting Scratch; only keep it behind `--local`.
 - Adding Server to the preferred unique index.
 - Cloud managed as default Server when no BYOS exists.
-- GitHub `owner/repo` shorthand or `/tree/` URL parsing.
 - `destinations.list` or expanding `servers.show` with destinations.
-- Inventing a listen port when Dockerfile has no single `EXPOSE`.
+- Parsing GitHub `/tree/` URLs or inferring non-GitHub hosts from `owner/repo`.
 
 ## Compatibility
 
