@@ -49,6 +49,7 @@
 | Occupancy code `--open` | public CLI `code --open` + same occupancy URL guards |
 | Occupancy `--open-target` | same `code` selector + chosen target |
 | Occupancy production open | same banner / `--open-target` + Resource durable domain |
+| Occupancy banner labels | same `code` banner formatter |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -280,6 +281,12 @@ Slice-38 verification:
 - unit: banner copies Production on its own line;
 - unit: `--open-target production` opens Production only;
 - unit: missing Production does not fall back.
+
+Slice-39 verification:
+
+- unit: banner labels Preview / Production;
+- unit: banner labels Compare when no PR exists;
+- unit: existing PR line stays `PR #n`.
 
 
 

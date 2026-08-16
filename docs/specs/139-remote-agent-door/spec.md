@@ -149,21 +149,24 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-BANNER-113 | Occupancy banner copies Production | occupancy has durable Production URL | `appaloft code --no-attach` | Production follows Preview on its own line. |
 | WS-REMOTE-OPEN-114 | `--open-target production` opens Production only | occupancy has Production | `appaloft code --no-attach --open-target production` | presentation launches that Production URL, not Preview. |
 | WS-REMOTE-OPEN-115 | Missing Production target stays lean | no durable Production URL | `appaloft code --no-attach --open-target production` | no fallback; no browser spawn. |
+| WS-REMOTE-BANNER-116 | Occupancy banner labels Preview / Production | occupancy has Preview + Production | `appaloft code --no-attach` | lines are `Preview · <url>` and `Production · <url>`. |
+| WS-REMOTE-BANNER-117 | Occupancy banner labels Compare | occupancy has GitHub compare and no PR | `appaloft code --no-attach` | compare line is `Compare · <url>`. |
+| WS-REMOTE-BANNER-118 | Existing PR line stays `PR #n` | occupancy already has PR #n | `appaloft code --no-attach` | PR line stays `PR #n · <url>`; no Compare line. |
 
 ## Slice Scope
 
-Slice 1–37 shipped.
+Slice 1–38 shipped.
 
-Slice 38 (this ticket): `appaloft code` copies occupancy Production and `--open-target production` opens it.
+Slice 39 (this ticket): `appaloft code` banner labels Preview / Production / Compare.
 
-In slice 38:
+In slice 39:
 
-- banner copies Production on its own line when present;
-- `--open-target production` opens Production only;
-- missing Production does not fall back to Preview;
-- no GitHub write.
+- Preview / Production lines use `Preview ·` / `Production ·`;
+- compare line uses `Compare ·`;
+- existing PR line stays `PR #n · <url>`;
+- missing URLs stay omitted.
 
-Out of slice 38: catalog create-PR write, team Connection, Cloud managed default Server.
+Out of slice 39: catalog create-PR write, team Connection, Cloud managed default Server.
 
 
 ## Public Surfaces

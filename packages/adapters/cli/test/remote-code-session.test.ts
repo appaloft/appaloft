@@ -81,7 +81,7 @@ describe("remote code door", () => {
     expect(door.commitSha).toBe("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     expect(door.serverId).toBe("srv_1");
     expect(formatRemoteCodeBanner({ ...door, workspaceId: "sbx_1" })).toBe(
-      "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · sbx_1\nhttps://github.com/acme/api/compare/main?expand=1",
+      "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · sbx_1\nCompare · https://github.com/acme/api/compare/main?expand=1",
     );
     expect(selectDefaultRemoteCodeServer([{ id: "srv_1", name: "mac-mini" }])?.name).toBe(
       "mac-mini",
@@ -99,7 +99,7 @@ describe("remote code door", () => {
         previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io",
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nhttp://app-sc156jw98k.127.0.0.1.sslip.io",
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
     );
   });
 
@@ -129,7 +129,7 @@ describe("remote code door", () => {
         pullRequestNumber: 928,
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nhttp://app-sc156jw98k.127.0.0.1.sslip.io\nPR #928 · https://github.com/traefik/whoami/pull/928",
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nPR #928 · https://github.com/traefik/whoami/pull/928",
     );
   });
 
@@ -145,11 +145,11 @@ describe("remote code door", () => {
         pullRequestNumber: 0,
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nhttp://app-sc156jw98k.127.0.0.1.sslip.io",
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
     );
   });
 
-  test("[WS-REMOTE-BANNER-101][WS-REMOTE-BANNER-104] occupancy banner copies GitHub compare when no PR exists", () => {
+  test("[WS-REMOTE-BANNER-101][WS-REMOTE-BANNER-104][WS-REMOTE-BANNER-117] occupancy banner copies GitHub compare when no PR exists", () => {
     expect(
       formatRemoteCodeBanner({
         projectId: "prj_tk5lovqu2vj8",
@@ -161,11 +161,11 @@ describe("remote code door", () => {
         branch: "feat/occupancy",
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nhttp://app-sc156jw98k.127.0.0.1.sslip.io\nhttps://github.com/traefik/whoami/compare/feat/occupancy?expand=1",
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nCompare · https://github.com/traefik/whoami/compare/feat/occupancy?expand=1",
     );
   });
 
-  test("[WS-REMOTE-BANNER-102][WS-REMOTE-BANNER-105] existing PR banner stays PR-only", () => {
+  test("[WS-REMOTE-BANNER-102][WS-REMOTE-BANNER-105][WS-REMOTE-BANNER-118] existing PR banner stays PR-only", () => {
     expect(
       formatRemoteCodeBanner({
         projectId: "prj_tk5lovqu2vj8",
@@ -178,7 +178,7 @@ describe("remote code door", () => {
         branch: "feat/occupancy",
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nhttp://app-sc156jw98k.127.0.0.1.sslip.io\nPR #928 · https://github.com/traefik/whoami/pull/928",
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nPR #928 · https://github.com/traefik/whoami/pull/928",
     );
   });
 
@@ -197,7 +197,7 @@ describe("remote code door", () => {
     );
   });
 
-  test("[WS-REMOTE-BANNER-113] occupancy banner copies Production", () => {
+  test("[WS-REMOTE-BANNER-113][WS-REMOTE-BANNER-116] occupancy banner copies Production", () => {
     expect(
       formatRemoteCodeBanner({
         projectId: "prj_tk5lovqu2vj8",
@@ -210,7 +210,7 @@ describe("remote code door", () => {
         pullRequestNumber: 928,
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nhttp://app-sc156jw98k.127.0.0.1.sslip.io\nhttps://whoami.example/\nPR #928 · https://github.com/traefik/whoami/pull/928",
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nProduction · https://whoami.example/\nPR #928 · https://github.com/traefik/whoami/pull/928",
     );
   });
 

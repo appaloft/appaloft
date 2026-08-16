@@ -107,9 +107,9 @@ export function formatRemoteCodeBanner(input: {
     `Remote · ${project} · ${input.repositoryIdentity}@${sha} · ${input.serverName} · ${occupancy}`,
   ];
   const preview = input.previewUrl?.trim();
-  if (preview) lines.push(preview);
+  if (preview) lines.push(`Preview · ${preview}`);
   const production = input.productionUrl?.trim();
-  if (production) lines.push(production);
+  if (production) lines.push(`Production · ${production}`);
   if (
     typeof input.pullRequestNumber === "number" &&
     Number.isInteger(input.pullRequestNumber) &&
@@ -131,7 +131,7 @@ export function formatRemoteCodeBanner(input: {
       commitSha: input.commitSha,
       ...(input.branch ? { branch: input.branch } : {}),
     });
-    if (compare) lines.push(compare);
+    if (compare) lines.push(`Compare · ${compare}`);
   }
   return lines.join("\n");
 }

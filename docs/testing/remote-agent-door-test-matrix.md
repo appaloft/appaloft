@@ -122,6 +122,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-BANNER-113 | CLI / unit | this slice | occupancy banner copies Production | `remote-code-session.test.ts` |
 | WS-REMOTE-OPEN-114 | CLI / unit | this slice | `--open-target production` opens Production only | `occupancy-chrome.test.ts` |
 | WS-REMOTE-OPEN-115 | CLI / unit | this slice | missing Production target stays lean | same chrome test |
+| WS-REMOTE-BANNER-116 | CLI / unit | this slice | occupancy banner labels Preview / Production | `remote-code-session.test.ts` |
+| WS-REMOTE-BANNER-117 | CLI / unit | this slice | occupancy banner labels Compare | same banner test |
+| WS-REMOTE-BANNER-118 | CLI / unit | this slice | existing PR line stays `PR #n` | same banner test |
 
 
 

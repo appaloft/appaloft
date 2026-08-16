@@ -973,7 +973,7 @@ describe("Agent Workspace CLI", () => {
       process.stdout.write = write;
     }
     expect(output.join("")).toContain(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_whoami\nhttp://app-sc156jw98k.127.0.0.1.sslip.io",
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_whoami\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
     );
   });
 
