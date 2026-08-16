@@ -75,21 +75,23 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-CTX-039 | Missing resource fail-closed | plan omits resourceId | `deployments.plan --server` | fail-closed; no invented Resource. |
 | WS-REMOTE-ENV-040 | Occupancy default Environment | occupancy creates a Project with no Environment | `appaloft code --no-attach` then `env list --project <id>` | one Environment named `local` exists. |
 | WS-REMOTE-ENV-041 | Existing local reused | Project already has Environment `local` | second occupancy of same repo | no second Environment; create is not called. |
+| WS-REMOTE-RES-042 | Occupancy default Resource | occupancy Project has Environment `local` and no Resource `app` | `appaloft code --no-attach` then `resource list --project <id>` | one Resource slug `app` exists with remote-git source. |
+| WS-REMOTE-RES-043 | Existing app reused | Environment already has Resource `app` | second occupancy of same repo | no second Resource; create is not called. |
 
 ## Slice Scope
 
-Slice 1–7 shipped.
+Slice 1–8 shipped.
 
-Slice 8 (this ticket): occupancy activation ensures Environment `local`.
+Slice 9 (this ticket): occupancy activation ensures Resource slug `app`.
 
-In slice 8:
+In slice 9:
 
-- missing `local` → `environments.create` kind `local`;
-- existing `local` reused;
-- activation evidence unchanged.
+- missing `app` → `resources.create` kind `application`, source `remote-git`;
+- existing `app` reused;
+- no invented `internalPort`.
 
-Out of slice 8: Resource from occupancy, Environment on the occupancy tree,
-defaulting Server, interactive TUI rebuild, session-native Preview.
+Out of slice 9: Resource id on the occupancy tree, guessing network/runtime
+profile, defaulting Server, interactive TUI rebuild, session-native Preview.
 
 ## Public Surfaces
 

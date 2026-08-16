@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–7 shipped. Slice 8 occupancy default Environment owner-confirmed 2026-08-16 (D31–D33).
+- Round: Spec. Slice 1–8 shipped. Slice 9 occupancy default Resource owner-confirmed 2026-08-16 (D34–D36).
 - Date: 2026-08-16.
-- Predecessor: occupancy projectId shipped as public #1164; plan resource context shipped as public #1166.
-- Code changes allowed: yes for slice 8 after the occupancy-env ticket is `ready-for-agent`.
+- Predecessor: occupancy default Environment shipped as public #1168.
+- Code changes allowed: yes for slice 9 after the occupancy-resource ticket is `ready-for-agent`.
 
 ## Actor And Observable Outcome
 
@@ -69,6 +69,9 @@ Sandbox on that Server, not one VM per person.
 | D31 | Slice 8 occupancy activation ensures one Environment named `local` | Hello-World occupancy created Project/Binding only; `env list` is empty so deploy cannot start |
 | D32 | Reuse existing Environment named `local`; create only when missing | `environments.create` conflicts; do not treat conflict as success |
 | D33 | Do not add Environment to activation evidence this slice | Tree still exposes projectId only; Resource remains a later deploy step |
+| D34 | Slice 9 occupancy ensures Resource slug `app` on Environment `local` | Hello-World now has `env_ky8ro1a8cy5l` but `resource list` is empty |
+| D35 | Reuse existing Resource `app`; create only when missing | `resources.create` slug-conflicts; do not treat conflict as success |
+| D36 | Created Resource source is `remote-git` of the occupancy repo; no network/runtime profile | `internalPort` stays the next first-deploy blocker; do not guess a port |
 
 ## Rejected
 
@@ -123,11 +126,12 @@ Later slices after occupancy:
 5. `workspace` occupancy tree (slice 5, shipped #1162).
 6. Occupancy `projectId` (slice 6, shipped #1164).
 7. Plan resource context (slice 7, shipped #1166).
-8. **Occupancy default Environment** (slice 8): activation ensures Project Environment named `local`.
-9. Session-native Preview / remaining first-deploy chrome.
-10. GitHub as source surface / `owner/repo` shorthand.
-11. Optional team Connection.
-12. Cloud managed as default Server when no BYOS exists.
+8. Occupancy default Environment (slice 8, shipped #1168).
+9. **Occupancy default Resource** (slice 9): activation ensures Resource slug `app` on Environment `local`.
+10. Session-native Preview / remaining first-deploy chrome.
+11. GitHub as source surface / `owner/repo` shorthand.
+12. Optional team Connection.
+13. Cloud managed as default Server when no BYOS exists.
 
 ## Delivery chrome (owner 2026-08-15)
 

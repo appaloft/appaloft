@@ -81,6 +81,13 @@ Slice-8 verification:
 - `appaloftdev env list --project prj_aoqjs0es367x` shows `local` after occupying Hello-World.
 
 
+Slice-9 verification:
+
+- unit: missing Resource `app` is created with remote-git source;
+- unit: existing Resource `app` is reused and create is not called;
+- `appaloftdev resource list --project prj_aoqjs0es367x` shows slug `app` after occupying Hello-World.
+
+
 ## Risks
 
 - Plan must stay read-only. Do not reuse the create bootstrap create-or-reuse

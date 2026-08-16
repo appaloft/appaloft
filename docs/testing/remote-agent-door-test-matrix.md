@@ -47,6 +47,8 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-CTX-039 | application | this slice | omitted resourceId fail-closed | `packages/application/test/deployment-plan-preview.test.ts` |
 | WS-REMOTE-ENV-040 | application + `appaloftdev` | this slice | occupancy creates Environment `local` when missing | `packages/application/test/community-workspace-activation-context-initializer.test.ts`; live `env list` |
 | WS-REMOTE-ENV-041 | application | this slice | existing `local` Environment is reused | `packages/application/test/community-workspace-activation-context-initializer.test.ts` |
+| WS-REMOTE-RES-042 | application + `appaloftdev` | this slice | occupancy creates Resource `app` when missing | `packages/application/test/community-workspace-activation-context-initializer.test.ts`; live `resource list` |
+| WS-REMOTE-RES-043 | application | this slice | existing Resource `app` is reused | `packages/application/test/community-workspace-activation-context-initializer.test.ts` |
 
 
 

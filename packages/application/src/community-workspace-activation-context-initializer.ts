@@ -1,6 +1,7 @@
 import {
   domainError,
   EnvironmentByProjectAndNameSpec,
+  EnvironmentId,
   EnvironmentName,
   err,
   ok,
@@ -9,6 +10,9 @@ import {
   ProjectId,
   ProjectName,
   ProjectSlug,
+  ResourceByEnvironmentAndSlugSpec,
+  ResourceName,
+  ResourceSlug,
   type Result,
 } from "@appaloft/core";
 
@@ -24,7 +28,12 @@ import { type ExecutionContext, toRepositoryContext } from "./execution-context"
 import { CreateEnvironmentCommand } from "./operations/environments/create-environment.command";
 import { ConfigureProjectWorkspaceProfileCommand } from "./operations/projects/configure-project-workspace-profile.command";
 import { CreateProjectCommand } from "./operations/projects/create-project.command";
-import { type EnvironmentRepository, type ProjectRepository } from "./ports";
+import { CreateResourceCommand } from "./operations/resources/create-resource.command";
+import {
+  type EnvironmentRepository,
+  type ProjectRepository,
+  type ResourceRepository,
+} from "./ports";
 import { type RepositoryBindingRepository } from "./repository-binding";
 import { BindProjectRepositoryCommand } from "./repository-binding-messages";
 
@@ -61,6 +70,7 @@ export class CommunityWorkspaceActivationContextInitializer
       readonly commandBus: Pick<CommandBus, "execute">;
       readonly projects: ProjectRepository;
       readonly environments: EnvironmentRepository;
+      readonly resources: ResourceRepository;
       readonly repositoryBindings: RepositoryBindingRepository;
       readonly adapters: AgentAdapterInstallationService;
       readonly profiles: AgentWorkspaceProfileInstallationService;
@@ -182,6 +192,8 @@ export class CommunityWorkspaceActivationContextInitializer
     }
     const environment = await this.ensureLocalEnvironment(context, projectId);
     if (environment.isErr()) return err(environment.error);
+    const resource = await this.ensureDefaultResource(context, projectId, input.repository);
+    if (resource.isErr()) return err(resource.error);
     if (project.toState().defaultWorkspaceProfileInstallationId) {
       return ok({
         project: projectDisposition,
@@ -253,6 +265,63 @@ export class CommunityWorkspaceActivationContextInitializer
     const raced = await this.dependencies.environments.findOne(
       toRepositoryContext(context),
       EnvironmentByProjectAndNameSpec.create(ProjectId.rehydrate(projectId), name.value),
+    );
+    return raced ? ok(undefined) : err(executed.error);
+  }
+
+  async ensureDefaultResource(
+    context: ExecutionContext,
+    projectId: string,
+    repository: string,
+  ): Promise<Result<void>> {
+    const environmentReady = await this.ensureLocalEnvironment(context, projectId);
+    if (environmentReady.isErr()) return err(environmentReady.error);
+    const environmentName = EnvironmentName.create("local");
+    if (environmentName.isErr()) return err(environmentName.error);
+    const environment = await this.dependencies.environments.findOne(
+      toRepositoryContext(context),
+      EnvironmentByProjectAndNameSpec.create(ProjectId.rehydrate(projectId), environmentName.value),
+    );
+    if (!environment) {
+      return err(
+        domainError.conflict("Workspace activation Environment is unavailable", {
+          code: "workspace_activation_context_conflict",
+        }),
+      );
+    }
+    const resourceName = ResourceName.create("app");
+    if (resourceName.isErr()) return err(resourceName.error);
+    const slug = ResourceSlug.fromName(resourceName.value);
+    if (slug.isErr()) return err(slug.error);
+    const existing = await this.dependencies.resources.findOne(
+      toRepositoryContext(context),
+      ResourceByEnvironmentAndSlugSpec.create(
+        ProjectId.rehydrate(projectId),
+        EnvironmentId.rehydrate(environment.id.value),
+        slug.value,
+      ),
+    );
+    if (existing) return ok(undefined);
+    const created = CreateResourceCommand.create({
+      projectId,
+      environmentId: environment.id.value,
+      name: "app",
+      kind: "application",
+      source: {
+        kind: "remote-git",
+        locator: repository,
+      },
+    });
+    if (created.isErr()) return err(created.error);
+    const executed = await this.dependencies.commandBus.execute(context, created.value);
+    if (executed.isOk()) return ok(undefined);
+    const raced = await this.dependencies.resources.findOne(
+      toRepositoryContext(context),
+      ResourceByEnvironmentAndSlugSpec.create(
+        ProjectId.rehydrate(projectId),
+        EnvironmentId.rehydrate(environment.id.value),
+        slug.value,
+      ),
     );
     return raced ? ok(undefined) : err(executed.error);
   }

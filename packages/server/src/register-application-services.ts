@@ -4028,6 +4028,7 @@ export function registerApplicationServices(
           commandBus: dependencyContainer.resolve(tokens.commandBus),
           projects: dependencyContainer.resolve(tokens.projectRepository),
           environments: dependencyContainer.resolve(tokens.environmentRepository),
+          resources: dependencyContainer.resolve(tokens.resourceRepository),
           repositoryBindings: dependencyContainer.resolve<RepositoryBindingRepository>(
             tokens.repositoryBindingRepository,
           ),

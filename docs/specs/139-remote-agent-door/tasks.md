@@ -81,6 +81,14 @@
 - [x] Unit tests WS-REMOTE-ENV-040–041
 - [x] `appaloftdev env list --project` after Hello-World occupy
 
+## Slice 9 — occupancy default Resource
+
+- [x] Grill D34–D36
+- [x] Ticket `ready-for-agent` — [#1169](https://github.com/appaloft/appaloft/issues/1169)
+- [x] Occupancy activation ensures Resource `app`
+- [x] Unit tests WS-REMOTE-RES-042–043
+- [x] `appaloftdev resource list --project` after Hello-World occupy
+
 
 ## Later
 
