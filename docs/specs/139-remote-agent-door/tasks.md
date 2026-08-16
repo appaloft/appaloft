@@ -40,11 +40,19 @@
 
 
 
+## Slice 4 — plan default destination
+
+- [x] Grill D16–D21 / ADR-120
+- [x] Ticket `ready-for-agent` — [#1157](https://github.com/appaloft/appaloft/issues/1157)
+- [x] `DeploymentContextResolver` read-only default Destination
+- [x] Unit tests WS-REMOTE-DEST-030–032
+- [x] `appaloftdev deployments plan` without `--destination`
+- [x] Help / changelog if user-visible plan contract changes — query spec only; no CLI flag change
+
 ## Later
 
 - [ ] `appaloft workspace` as Railway `ca`
 - [ ] Team Connection
 - [ ] Cloud managed as default Server
 - [ ] GitHub `owner/repo` shorthand
-- [ ] Destination discovery / session-native Preview
-
+- [ ] Session-native Preview / missing `internalPort`

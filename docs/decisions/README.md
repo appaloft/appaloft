@@ -136,6 +136,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-117: Remote Agent Door](./ADR-117-remote-agent-door.md) | Accepted (identity door; occupancy superseded by ADR-118) | Default `appaloft code` requires login + default Server; Scratch is `--local`. |
 | [ADR-118: Remote Code Occupancy](./ADR-118-remote-code-occupancy.md) | Accepted | Default `code` occupies my Sandbox via `workspaces.open` + optional `targetServerId`. |
 | [ADR-119: Remote Code Repo-URL Locator](./ADR-119-remote-code-repo-url.md) | Accepted | `appaloft code <git-remote>` occupies that repo from remote HEAD; no clone; URL wins over other occupancy. |
+| [ADR-120: Plan Preview Resolves Server Default Destination](./ADR-120-plan-default-destination.md) | Accepted | Omitted `deployments.plan` destinationId read-only resolves resource pin or Server Destination named `default`. |
 
 ## Authoring Rules
 

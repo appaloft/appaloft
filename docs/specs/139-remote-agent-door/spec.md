@@ -3,11 +3,11 @@
 ## Status
 
 - Round: Spec
-- Artifact state: slice 1 identity door shipped on public `main` `4f237698`; slice 2 occupancy shipped; slice 3 repo-URL locator accepted 2026-08-16
+- Artifact state: slice 1–3 shipped; slice 4 destination discovery accepted 2026-08-16
 - Discovery: [discovery.md](./discovery.md)
-- Governing decision: ADR-119 locates; ADR-118 occupies; ADR-117 remains the login/Server/`--local` door; ADR-116 remains Scratch-only; ADR-103 stays on explicit `workspace open` Git fail-closed
-- Code changes allowed: yes for slice 3 after the repo-URL ticket is `ready-for-agent`
-- Compatibility: public minor. Default `appaloft code` still occupies a Sandbox; positional git remotes occupy that repo without a local clone; `--local` preserves Spec 138; `workspace open` Git preflight unchanged
+- Governing decision: ADR-120 plan default destination; ADR-119 locates; ADR-118 occupies; ADR-117 remains the login/Server/`--local` door; ADR-116 remains Scratch-only; ADR-103 stays on explicit `workspace open` Git fail-closed
+- Code changes allowed: yes for slice 4 after the destination ticket is `ready-for-agent`
+- Compatibility: public minor. Omitted `deployments.plan` destinationId resolves existing Server `default`; plan stays read-only
 
 ## Business Outcome
 
@@ -63,6 +63,9 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-URL-LOCAL-027 | Scratch rejects remotes | any state | `appaloft code --local https://github.com/org/repo.git` | fail closed; Scratch is this-Mac only. |
 | WS-REMOTE-URL-SHORTHAND-028 | No host shorthand | logged in + Server | `appaloft code org/repo` | treated as a local path, not github.com/org/repo. Missing path / origin still `workspace_remote_repository_missing`. |
 | WS-REMOTE-URL-DOCS-029 | Help names the URL door | `code --help` / Workspace docs / skill | rendered | `appaloft code <git-remote>` occupies that repo without a clone; `--local` stays Scratch. |
+| WS-REMOTE-DEST-030 | Plan omitted destination | logged in + Server; resource has no destination pin; Server has Destination named `default` | Agent/CLI `deployments.plan` without `destinationId` | preview uses that Destination; does not create Destination; does not fail `destinationId is required`. |
+| WS-REMOTE-DEST-031 | Resource pin wins | resource `defaultDestinationId` is set | `deployments.plan` omits destinationId | preview uses the pinned Destination when it belongs to the selected Server. |
+| WS-REMOTE-DEST-032 | Missing default fail-closed | Server has no Destination named `default` and resource has no pin | `deployments.plan` omits destinationId | fail-closed `destinationId is required`; no Destination created. |
 
 ## Slice Scope
 
@@ -70,19 +73,21 @@ Slice 1 (shipped): login + default Server + Remote banner + this-laptop native-a
 
 Slice 2 (shipped): occupy my Sandbox from default `code`.
 
-Slice 3 (this ticket): positional git-remote locator.
+Slice 3 (shipped): positional git-remote locator.
 
-In slice 3:
+Slice 4 (this ticket): omitted `deployments.plan` destinationId.
 
-- `https://` / `ssh://` / `git@` occupy that `repositoryIdentity` with no local clone;
-- default ref is remote HEAD → one `refs/heads/*`;
-- explicit URL never resumes a different repository’s occupancy;
-- `--local` + remote fail closed;
-- `appaloftdev code https://github.com/org/repo.git --no-attach` occupies.
+In slice 4:
 
-Out of slice 3: `workspace` as Railway `ca`, team Connection, Cloud managed as
+- plan resolves resource pin or Server Destination named `default`;
+- plan never creates Destination;
+- missing default still fail-closed;
+- occupancy `appaloftdev deployments plan` without `--destination` passes destination.
+
+Out of slice 4: `workspace` as Railway `ca`, team Connection, Cloud managed as
 default Server when no BYOS, GitHub `owner/repo` shorthand, `/tree/` URLs,
-destination discovery, session-native Preview.
+`destinations.list`, `servers.show` destinations field, session-native Preview,
+missing `internalPort` first-deploy.
 
 ## Public Surfaces
 
@@ -125,13 +130,15 @@ Missing Binding is not a `code` hard failure. The initializer creates or reuses 
 - Adding Server to the preferred unique index.
 - Cloud managed as default Server when no BYOS exists.
 - GitHub `owner/repo` shorthand or `/tree/` URL parsing.
-- Destination discovery or session-native Preview.
+- `destinations.list` or expanding `servers.show` with destinations.
+- Session-native Preview or auto-filling `internalPort`.
 
 ## Compatibility
 
 - Spec 138 / ADR-116: Scratch lives under `--local`.
 - ADR-117 identity-only attach is superseded by ADR-118 occupancy.
 - ADR-119 extends the occupancy locator; it does not change Sandbox identity.
+- ADR-120 lets omitted `deployments.plan` destinationId resolve Server `default`.
 - Users who adopted cwd-origin `code` keep that path. URL is additive.
-- Expected SemVer: public minor. Changelog must say `code <git-remote>` occupies without a clone.
+- Expected SemVer: public minor. Changelog must say omitted plan destination resolves Server `default`.
 

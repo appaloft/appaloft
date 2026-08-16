@@ -52,7 +52,9 @@ type DeploymentPlanQueryInput = {
 
 The input reuses deployment context references. It must not accept resource profile fields,
 framework/base-image/buildpack fields, Docker/Kubernetes/Compose native fields, repository config
-paths, or secret-bearing values.
+paths, or secret-bearing values. Omitted `destinationId` is resolved read-only: resource
+`defaultDestinationId` if pinned, otherwise the selected Server Destination named `default`.
+The query must not create a Destination. Missing default remains `destinationId is required`.
 
 ## Output
 

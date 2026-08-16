@@ -4,7 +4,9 @@ import {
   DeploymentTargetId,
   type Destination,
   DestinationByIdSpec,
+  DestinationByServerAndNameSpec,
   DestinationId,
+  DestinationName,
   domainError,
   EnvironmentByIdSpec,
   EnvironmentId,
@@ -153,10 +155,9 @@ export class DeploymentContextResolver {
         options.enforceWorkloadRole === false ? undefined : { requiredRole: deploymentRuntimeRole },
       );
 
-      const destination = explicitDestination;
-      if (!destination) {
-        return err(domainError.validation("destinationId is required for this deployment context"));
-      }
+      const destination = explicitDestination
+        ? explicitDestination
+        : yield* await self.loadDefaultDestination(repositoryContext, server, resource);
 
       if (!destination.belongsToServer(server.id)) {
         return err(
@@ -282,6 +283,44 @@ export class DeploymentContextResolver {
       return destination
         ? ok(destination)
         : err(domainError.notFound("destination", destinationId));
+    });
+  }
+
+  private async loadDefaultDestination(
+    context: RepositoryContext,
+    server: DeploymentTarget,
+    resource: Resource,
+  ): Promise<Result<Destination>> {
+    const self = this;
+
+    return safeTry(async function* () {
+      const resourceDestinationId = resource.defaultDestinationId;
+      if (resourceDestinationId) {
+        const pinned = await self.destinationRepository.findOne(
+          context,
+          DestinationByIdSpec.create(resourceDestinationId),
+        );
+        if (!pinned) {
+          return err(domainError.notFound("destination", resourceDestinationId.value));
+        }
+        return ok(pinned);
+      }
+
+      const name = yield* DestinationName.create("default");
+      const destination = await self.destinationRepository.findOne(
+        context,
+        DestinationByServerAndNameSpec.create(server.id, name),
+      );
+      if (!destination) {
+        return err(
+          domainError.validation("destinationId is required for this deployment context", {
+            phase: "context-resolution",
+            serverId: server.id.value,
+            destinationName: name.value,
+          }),
+        );
+      }
+      return ok(destination);
     });
   }
 }
