@@ -688,8 +688,8 @@ export class DeploymentPlanQueryService {
       const resolvedContext = yield* await deploymentContextResolver.resolve(
         context,
         {
-          projectId: query.projectId,
-          environmentId: query.environmentId,
+          ...(query.projectId ? { projectId: query.projectId } : {}),
+          ...(query.environmentId ? { environmentId: query.environmentId } : {}),
           resourceId: query.resourceId,
           serverId: query.serverId,
           ...(query.destinationId ? { destinationId: query.destinationId } : {}),

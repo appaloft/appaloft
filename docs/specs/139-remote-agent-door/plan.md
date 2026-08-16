@@ -67,6 +67,13 @@ Slice-6 verification:
 - unit: occupancy without activation invents no projectId;
 - `appaloftdev workspace --json` includes `prj_4o6txzih1dja` / `prj_aoqjs0es367x`.
 
+Slice-7 verification:
+
+- unit: omitted project/env resolve from Resource;
+- unit: omitted resource still fail-closed;
+- `appaloftdev deployments plan --resource res_vj1602cxjisn --server srv_uil9cpctplou` does not fail `Project id is required`.
+
+
 ## Risks
 
 - Plan must stay read-only. Do not reuse the create bootstrap create-or-reuse

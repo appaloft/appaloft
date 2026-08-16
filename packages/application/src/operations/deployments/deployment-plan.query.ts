@@ -15,8 +15,8 @@ export {
 
 export class DeploymentPlanQuery extends Query<DeploymentPlanPreview> {
   constructor(
-    public readonly projectId: string,
-    public readonly environmentId: string,
+    public readonly projectId: string | undefined,
+    public readonly environmentId: string | undefined,
     public readonly resourceId: string,
     public readonly serverId: string,
     public readonly destinationId: string | undefined,
