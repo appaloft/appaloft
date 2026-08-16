@@ -21,8 +21,10 @@ import {
   IssueWorkspaceCollaborationNativeAttachCommand,
   IssueWorkspaceCollaborationTerminalAccessCommand,
   ListAgentTaskRunsQuery,
+  ListResourcesQuery,
   ListSandboxAgentRuntimesQuery,
   ListSandboxesQuery,
+  ListServersQuery,
   ListWorkspaceCollaborationsQuery,
   OpenAgentWorkspaceCommand,
   type Query,
@@ -149,7 +151,7 @@ describe("Agent Workspace CLI", () => {
     expect(output.join("")).toContain("structured-output");
   });
 
-  test("[WS-REMOTE-CA-033][WS-REMOTE-CA-034][WS-REMOTE-CA-036][WS-REMOTE-CA-037] headless workspace --json prints servers and occupancies", async () => {
+  test("[WS-REMOTE-CA-033][WS-REMOTE-CA-034][WS-REMOTE-CA-036][WS-REMOTE-CA-037][WS-REMOTE-CA-065] headless workspace --json prints current occupancies", async () => {
     const output: string[] = [];
     const { createCliProgram } = await import("../src");
     const program = createCliProgram({
@@ -210,8 +212,148 @@ describe("Agent Workspace CLI", () => {
     expect(printed).toContain("sbx_demo");
     expect(printed).toContain("github.com/appaloft/appaloft");
     expect(printed).toContain("prj_demo");
-    expect(printed).toContain("sbx_failed");
+    expect(printed).not.toContain("sbx_failed");
     expect(printed).not.toMatch(/sbx_failed[\s\S]{0,120}"projectId"/);
+  });
+
+  test("[WS-REMOTE-CA-066] workspace list still includes terminated and failed leftovers", async () => {
+    const output: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: { execute: async () => ok({}) } as unknown as CommandBus,
+      queryBus: {
+        execute: async () =>
+          ok({
+            items: [
+              { sandboxId: "sbx_ready", status: "ready" },
+              { sandboxId: "sbx_failed", status: "failed" },
+              { sandboxId: "sbx_terminated", status: "terminated" },
+            ],
+          }),
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_workspace_list_leftovers" }),
+      },
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+    });
+    const processWrite = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "workspace", "list"]);
+    } finally {
+      process.stdout.write = processWrite;
+    }
+    const printed = output.join("");
+    expect(printed).toContain("sbx_ready");
+    expect(printed).toContain("sbx_failed");
+    expect(printed).toContain("sbx_terminated");
+  });
+
+  test("[WS-REMOTE-PREVIEW-050][WS-REMOTE-PREVIEW-051][WS-REMOTE-DEPLOY-063][WS-REMOTE-DEPLOY-064] occupancy tree copies Preview URL and last deployment", async () => {
+    const output: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: { execute: async () => ok({}) } as unknown as CommandBus,
+      queryBus: {
+        execute: async (_context, query) => {
+          if (query instanceof ListServersQuery) {
+            return ok({
+              items: [{ id: "srv_demo", name: "occupancy-mac", lifecycleStatus: "active" }],
+            });
+          }
+          if (query instanceof ListSandboxesQuery) {
+            return ok({
+              items: [
+                {
+                  sandboxId: "sbx_preview",
+                  status: "ready",
+                  occupancy: {
+                    repositoryIdentity: "github.com/appaloft/examples",
+                    commitSha: "1a23b77",
+                    branch: "main",
+                  },
+                  activation: { project: { projectId: "prj_preview" } },
+                },
+                {
+                  sandboxId: "sbx_no_preview",
+                  status: "ready",
+                  occupancy: {
+                    repositoryIdentity: "github.com/octocat/Hello-World",
+                    commitSha: "7fd1a60",
+                    branch: "master",
+                  },
+                  activation: { project: { projectId: "prj_empty" } },
+                },
+              ],
+            });
+          }
+          if (query instanceof ListResourcesQuery) {
+            return ok({
+              items: [
+                {
+                  projectId: "prj_preview",
+                  slug: "app",
+                  lastDeploymentId: "dep_rfqfapqwpyjn",
+                  lastDeploymentStatus: "succeeded",
+                  accessSummary: {
+                    latestGeneratedAccessRoute: {
+                      url: "http://app-jkhtnc45nk.127.0.0.1.sslip.io",
+                      deploymentStatus: "succeeded",
+                    },
+                  },
+                },
+                {
+                  projectId: "prj_empty",
+                  slug: "app",
+                  lastDeploymentStatus: "failed",
+                },
+              ],
+            });
+          }
+          return ok({ items: [] });
+        },
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_workspace_occupancy_preview" }),
+      },
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+    });
+
+    const processWrite = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "workspace", "--json"]);
+    } finally {
+      process.stdout.write = processWrite;
+    }
+
+    const printed = output.join("");
+    expect(printed).toContain("http://app-jkhtnc45nk.127.0.0.1.sslip.io");
+    expect(printed).toContain("prj_preview");
+    expect(printed).toContain("prj_empty");
+    expect(printed).toContain("dep_rfqfapqwpyjn");
+    expect(printed).not.toMatch(/sbx_no_preview[\s\S]{0,240}"preview"/);
+    expect(printed).not.toMatch(/sbx_no_preview[\s\S]{0,240}"deployment"/);
   });
 
   test("[WS-TUI-FALLBACK-009][WS-TUI-TERMINAL-012] unsupported host terminals fail closed before renderer startup", async () => {
@@ -579,7 +721,7 @@ describe("Agent Workspace CLI", () => {
     expect(commandDispatched).toBeFalse();
   });
 
-  test("[WS-SCRATCH-CLI-001][WS-SCRATCH-EMPTY-002][WS-SCRATCH-DIRTY-003][WS-SCRATCH-LOGGED-OUT-004][WS-SCRATCH-BANNER-005][WS-SCRATCH-HARNESS-006][WS-SCRATCH-NO-ATTACH-009][WS-SCRATCH-NO-STATE-012][WS-SCRATCH-PROFILE-016][WS-REMOTE-LOCAL-010] --local code is scratch without Git or workspaces.open", async () => {
+  test("[WS-SCRATCH-CLI-001][WS-SCRATCH-EMPTY-002][WS-SCRATCH-DIRTY-003][WS-SCRATCH-LOGGED-OUT-004][WS-SCRATCH-BANNER-005][WS-SCRATCH-HARNESS-006][WS-SCRATCH-NO-ATTACH-009][WS-SCRATCH-NO-STATE-012][WS-SCRATCH-PROFILE-016][WS-REMOTE-LOCAL-010][WS-REMOTE-HINT-121] --local code is scratch without Git or workspaces.open", async () => {
     const scratchDir = await mkdtemp(join(tmpdir(), "appaloft-scratch-empty-"));
     const commands: Command<unknown>[] = [];
     const launched: string[][] = [];
@@ -629,6 +771,7 @@ describe("Agent Workspace CLI", () => {
     expect(launched).toEqual([]);
     expect(output.join("")).toContain("Local scratch · this Mac · not saved remotely");
     expect(output.join("")).toContain("opencode");
+    expect(output.join("")).not.toContain("--open-target");
   });
 
   test("[WS-REMOTE-LOGIN-001] default code fails closed when logged out", async () => {
@@ -776,6 +919,125 @@ describe("Agent Workspace CLI", () => {
       "Connect a model in the attached OpenCode session before running a Task.",
     );
     expect(output.join("")).not.toContain("Local scratch · this Mac · not saved remotely");
+  });
+
+  test("[WS-REMOTE-BANNER-061][WS-REMOTE-HINT-119][WS-REMOTE-HINT-120] code banner includes occupancy Preview URL", async () => {
+    const output: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>() =>
+          ok({ workspaceId: "sbx_whoami", projectId: "prj_tk5lovqu2vj8" } as T),
+      } as unknown as CommandBus,
+      queryBus: {
+        execute: async <T>() =>
+          ok({
+            items: [
+              {
+                projectId: "prj_tk5lovqu2vj8",
+                slug: "app",
+                lastDeploymentStatus: "succeeded",
+                accessSummary: {
+                  latestGeneratedAccessRoute: {
+                    url: "http://app-sc156jw98k.127.0.0.1.sslip.io",
+                    deploymentStatus: "succeeded",
+                  },
+                },
+              },
+            ],
+          } as T),
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_banner_preview" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/traefik/whoami.git",
+        repositoryIdentity: "github.com/traefik/whoami",
+        ref: "refs/heads/master",
+        branch: "master",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        projectId: "prj_tk5lovqu2vj8",
+        serverId: "srv_uil9cpctplou",
+        serverName: "occupancy-mac",
+      }),
+    });
+    const write = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
+    } finally {
+      process.stdout.write = write;
+    }
+    expect(output.join("")).toContain(
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_whoami\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
+    );
+    expect(output.join("")).toContain(
+      "Open · --open-target preview|compare · workspace p/c\nConnect a model in the attached OpenCode session before running a Task.",
+    );
+  });
+
+  test("[WS-REMOTE-OPEN-107][WS-REMOTE-OPEN-109] code --open prints Preview and stays lean in CI", async () => {
+    const output: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>() =>
+          ok({ workspaceId: "sbx_whoami", projectId: "prj_tk5lovqu2vj8" } as T),
+      } as unknown as CommandBus,
+      queryBus: {
+        execute: async <T>() =>
+          ok({
+            items: [
+              {
+                projectId: "prj_tk5lovqu2vj8",
+                slug: "app",
+                lastDeploymentStatus: "succeeded",
+                accessSummary: {
+                  latestGeneratedAccessRoute: {
+                    url: "http://app-sc156jw98k.127.0.0.1.sslip.io",
+                    deploymentStatus: "succeeded",
+                  },
+                },
+              },
+            ],
+          } as T),
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_open" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/traefik/whoami.git",
+        repositoryIdentity: "github.com/traefik/whoami",
+        ref: "refs/heads/master",
+        branch: "master",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        projectId: "prj_tk5lovqu2vj8",
+        serverId: "srv_uil9cpctplou",
+        serverName: "occupancy-mac",
+      }),
+    });
+    const write = process.stdout.write;
+    const previousCi = process.env.CI;
+    process.env.CI = "true";
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--no-attach", "--open"]);
+    } finally {
+      process.stdout.write = write;
+      if (previousCi === undefined) delete process.env.CI;
+      else process.env.CI = previousCi;
+    }
+    expect(output.join("")).toContain("Open · http://app-sc156jw98k.127.0.0.1.sslip.io");
   });
 
   test("[R8-OCC-CODE-007] code --new isolates a new occupancy Workspace", async () => {
@@ -1023,6 +1285,58 @@ describe("Agent Workspace CLI", () => {
     expect(launched).toEqual([["opencode", "attach"]]);
     expect(output.join("")).toContain(
       "Remote · prj_billing · github.com/acme/api@aaaaaaa · this-mac · my sandbox · sbx_local",
+    );
+  });
+
+  test("[WS-REMOTE-COMPAT-128][WS-REMOTE-COMPAT-129][WS-REMOTE-COMPAT-130] unstructured occupancy validation names the enrolled Server", async () => {
+    const commands: Command<unknown>[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return err({
+            code: "bad_request",
+            category: "user",
+            message: "Input validation failed",
+            retryable: false,
+            details: { phase: "orpc-error-normalization", orpcCode: "BAD_REQUEST" },
+          });
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_cloud_compat" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        projectId: "prj_web",
+        serverId: "srv_4lifk0yrcecy",
+        serverName: "hostinger",
+      }),
+    });
+    const originalExitCode = process.exitCode;
+    const write = process.stderr.write;
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
+      throw new Error("Expected occupancy Cloud-compat validation to fail");
+    } catch (error) {
+      expect(String(error)).toContain('"code":"workspace_open_target_server_unsupported"');
+      expect(String(error)).toContain("hostinger (srv_4lifk0yrcecy)");
+    } finally {
+      process.stderr.write = write;
+      process.exitCode = originalExitCode ?? 0;
+    }
+    expect(commands).toHaveLength(1);
+    expect((commands[0] as OpenAgentWorkspaceCommand).input.targetServerId).toBe(
+      "srv_4lifk0yrcecy",
     );
   });
 

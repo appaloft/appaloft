@@ -2,11 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–7 shipped. Slice 8 occupancy default Environment owner-confirmed 2026-08-16 (D31–D33).
+- Round: Spec. Slice 1-43 shipped. Slice 44 occupancy resume keeps preferred Profile owner-confirmed 2026-08-16 (D139-D141).
 - Date: 2026-08-16.
-- Predecessor: occupancy projectId shipped as public #1164; plan resource context shipped as public #1166.
-- Code changes allowed: yes for slice 8 after the occupancy-env ticket is `ready-for-agent`.
-
+- Predecessor: occupancy Cloud-compat error shipped as public #1238.
+- Code changes allowed: yes for slice 44 after the occupancy-resume-profile-pin ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -69,6 +68,114 @@ Sandbox on that Server, not one VM per person.
 | D31 | Slice 8 occupancy activation ensures one Environment named `local` | Hello-World occupancy created Project/Binding only; `env list` is empty so deploy cannot start |
 | D32 | Reuse existing Environment named `local`; create only when missing | `environments.create` conflicts; do not treat conflict as success |
 | D33 | Do not add Environment to activation evidence this slice | Tree still exposes projectId only; Resource remains a later deploy step |
+| D34 | Slice 9 occupancy ensures Resource slug `app` on Environment `local` | Hello-World now has `env_ky8ro1a8cy5l` but `resource list` is empty |
+| D35 | Reuse existing Resource `app`; create only when missing | `resources.create` slug-conflicts; do not treat conflict as success |
+| D36 | Created Resource source is `remote-git` of the occupancy repo; no network/runtime profile | Slice 9 shipped; `internalPort` is now slice 10 |
+| D37 | Slice 10 occupancy default network is product `internalPort 3000`, `http`, `reverse-proxy` | Live plan on `res_vhmyk4zutvnd` is blocked `missing-internal-port`. This is the documented Appaloft default, not repo detection. Hello-World has no Dockerfile or start command. |
+| D38 | Missing network on existing Resource `app` is filled via `resources.configure-network`; existing network is reused | Do not overwrite a user-configured port. |
+| D39 | Do not invent runtime/start this slice | Slice 10 shipped; planner lie is now slice 11 |
+| D40 | Slice 11 remote-git / git-* auto method uses the same inspection as local sources | Live Hello-World create accepted a dockerfile plan with `detectedFiles: []`, then failed `open Dockerfile`. `autoDeploymentMethodFor` hardcodes `remoteGit -> dockerfile`. |
+| D41 | Missing Dockerfile / start / static evidence fail-closed; do not invent Dockerfile | Plan and create must block before package. Existing explicit `runtime.strategy=dockerfile` still wins. |
+| D42 | Do not invent Hello-World start or static publish this slice | Slice 11 shipped; README-only stays blocked |
+| D43 | Slice 12 occupancy remote-git / git-* sources are inspectable | Live `appaloft/examples` occupy created Resource `app` but plan `detectedFiles: []`. `canBeEnrichedFromSourceInspection` excludes remote-git; detector only reads local paths. |
+| D44 | Detector shallow-clones the remote, keeps remote kind, attaches inspection | Reuse existing `discoverLocalWorkspace`. Single deployable root may set `source.baseDirectory`. |
+| D45 | Multiple deployable roots fail-closed on `source.baseDirectory` | `appaloft/examples` is a monorepo. Do not invent `hello/`. Preview of official hello requires explicit baseDirectory this slice. |
+| D46 | Slice 13 occupancy tree exposes live Preview URL from existing `resources.list` | Live occupy+create of official hello succeeded (`dep_mh73nchmktot`). Container `/health` is 200. Generated host is 200 through Traefik. `resource list` already has `accessSummary.latestGeneratedAccessRoute`. `workspace --json` still has no URL. |
+| D47 | Only occupancy Resource slug `app` with a succeeded generated route | Durable/production domain is later. Do not invent sslip. Do not scrape vendor TUI. |
+| D48 | Missing or failed access stays omitted | Tree still prints servers and occupancies. List-resources failure does not fail the tree. Interactive TUI and `code` banner stay unchanged this slice. |
+| D49 | Slice 14 `appaloft deploy <git-remote>` reuses occupancy Resource `app` | Live `deploy https://github.com/appaloft/examples.git` after occupy+create still prompts for Deployment method. Occupancy already has Project / Environment `local` / Resource `app` / default Server. |
+| D50 | Reuse Binding + Environment `local` + Resource slug `app` + default Server; call existing `deployments.create` | Do not create a second Resource. Do not invent method/Dockerfile. Destination still omitted so plan/create resolve Server `default`. |
+| D51 | Missing occupancy Resource: interactive stays on the existing prompt path; non-interactive fail-closed | Do not invent Resource/`app`. No Binding or no `app` is not a silent create. |
+| D52 | Slice 15 occupancy network uses a single Dockerfile `EXPOSE` when present | Live `code` + `deploy` of `traefik/whoami` created `dep_19e01i9s0nkp` and failed `docker_health_check_failed` on published 3000. Dockerfile is `EXPOSE 80`. Occupancy still writes `internalPort 3000`. |
+| D53 | No `EXPOSE` or more than one distinct `EXPOSE` keeps 3000 | Do not invent 80. Do not pick the first of many. |
+| D54 | Existing non-3000 network is reused; occupancy-default 3000 may be replaced by a single `EXPOSE` | User-configured ports stay. The slice-10 default is not a user choice. |
+| D55 | Slice 16 `owner/repo` is a GitHub HTTPS locator | Live `code traefik/whoami` after occupying `examples` resumed examples. WS-REMOTE-URL-SHORTHAND-028 currently treats `org/repo` as a local path. Railway/GitHub users type `owner/repo`. |
+| D56 | Expand only `owner/repo` to `https://github.com/owner/repo.git` | Same `ls-remote` HEAD contract as HTTPS. No `/tree/` parsing. No GitLab/Bitbucket host inference. |
+| D57 | Existing local path `owner/repo` still wins if that directory exists | Do not steal a real relative directory named `org/repo`. |
+| D58 | Slice 17 bare `appaloft deploy` reuses the latest occupancy Resource `app` | Live `code traefik/whoami` then `deploy` fails `pathOrSource is required`. Railway `up` after the workspace exists does not ask for a path. |
+| D59 | Latest non-terminal occupancy wins; same Binding → `local` → `app` → default Server path as slice 14 | Do not invent a Resource. Destination stays omitted. |
+| D60 | No occupancy / no Resource `app` fail-closed when non-interactive | Interactive prompt path unchanged. Do not fall back to cwd `.`. |
+| D61 | Slice 18 successful occupancy `deploy` prints the generated access URL | Live `appaloft deploy` after occupying whoami returns only `{"id":"dep_*"}`. `deployments.show` and `workspace --json` already have `http://app-sc156jw98k.127.0.0.1.sslip.io`. Railway `up` prints the URL. |
+| D62 | URL comes from existing `publicPreviewUrlsFromDeploymentSummary` after sync create | Same generated route as slice 13. Do not invent sslip. Do not scrape vendor TUI. First URL only. |
+| D63 | Missing or failed route still prints `dep_*` and exits 0 | `--require-preview-url` stays the hard gate. Do not fail a succeeded deploy because chrome is missing. |
+| D64 | Slice 19 `code` banner appends occupancy Preview URL when Resource `app` already has succeeded generated access | Live `code --no-attach` after deploy still prints only `Remote · project · repo@sha · server · my sandbox`. `workspace --json` already has `preview.url`. Railway `ca` / session chrome shows the URL without a second command. |
+| D65 | URL is the same generated access as slice 13 / 18 | Copy from occupancy Resource `app` `accessSummary.latestGeneratedAccessRoute`. Do not invent sslip. Do not scrape vendor TUI. One banner line. |
+| D66 | Missing generated URL keeps the existing banner | Do not fail occupy. Interactive TUI / PR number stay later. |
+| D67 | Slice 20 occupancy tree copies Resource `app` last deployment id/status | Live `workspace --json` has `preview.url` but no `dep_*`. Agent still guesses the latest create. `resource list` already has `lastDeploymentId` / `lastDeploymentStatus`. |
+| D68 | Copy only those two fields from occupancy Resource `app` | Same list already used for Preview URL. Do not invent a deployment. Do not add a live stream. |
+| D69 | Missing last deployment stays omitted | Tree still prints servers and occupancies. Interactive TUI / PR number stay later. |
+| D70 | Slice 21 default occupancy tree omits `terminated` and `failed` Sandboxes | Live `workspace --json` lists ~25 rows; most are `terminated` leftovers. Railway `ca` shows current workspaces. |
+| D71 | Keep `ready`, `provisioning`, and other non-terminal statuses | Do not hide a Sandbox that can still be attached. `code` resume still uses `selectResumeOccupancy`. |
+| D72 | No new flag this slice | `workspace list` remains the full catalog. Interactive TUI / PR chrome stay later. |
+| D73 | Slice 22 top-level `--help` names `login` / `code` / `workspace` / `deploy` | Live `appaloftdev --help` still lists `workspace open` and `deploy <path>` as the door. Railway users type `login` then `code` then `up`. |
+| D74 | Keep durable `workspace open` / `workspace create` as later lines | Do not delete the Git-safe delivery door. Do not invent a wizard. |
+| D75 | `deploy` help line is optional locator | Bare `deploy` already reuses occupancy. Required `<path>` is a lie. |
+| D76 | Slice 23 TUI workspace list shows occupancy repo@sha when present | Live TTY `workspace` still paints `sbx_*`. Railway `ca` names the current repo. `workspace --json` already has occupancy identity. |
+| D77 | TUI list omits `terminated` / `failed` leftovers | Same D70 policy. `workspace list` stays the full catalog. |
+| D78 | Preview URL / last deploy / PR number stay out of this TUI list | JSON tree already has preview + last deployment. Do not pull Resource list into the TUI protocol this slice. |
+| D79 | Slice 24 TUI detail copies occupancy Preview URL and last deployment | Live TUI detail still paints Recovery / `sbx_*`. JSON tree already has `preview.url` and `deployment`. Railway `ca` shows the current URL. |
+| D80 | Missing preview or last deployment stays omitted | Do not invent sslip or `dep_*`. Resource list failure stays lean. |
+| D81 | PR number stays out; list stays identity-only | Same D78. `d` delivery palette already exists. Do not add a new command. |
+| D82 | Slice 25 TUI detail copies open PR from existing `preview-environments.list` | Delivery chrome already said `workspace` is the PR navigator. Do not scrape `gh` or vendor TUI. |
+| D83 | Match occupancy repo + branch/headSha; missing PR stays omitted | Do not invent `#n`. Multiple matches take the newest listed item. |
+| D84 | No PR create/update this slice; `code` banner stays unchanged | Session-native PR in OpenCode stays later. List stays identity-only. |
+| D85 | Slice 26 TUI detail copies Resource `app` `latestDurableDomainRoute` as Production | Delivery chrome already said `workspace` navigates production URL. Railway `ca` shows the live domain. |
+| D86 | Missing durable domain stays omitted | Do not promote sslip / generated preview to Production. |
+| D87 | Preview stays generated access; Production stays durable domain | No new command. List stays identity-only. |
+| D88 | Slice 27 `code` banner appends `PR #n` from the same preview-environment matcher | Live `code --no-attach` still has Preview URL only. Cmux / Railway session chrome names the current PR. |
+| D89 | Missing or foreign PR stays omitted | Same D83. Do not scrape `gh` or vendor TUI. |
+| D90 | One banner line; no PR create | Session-native OpenCode PR chrome and create-PR navigator stay later. |
+| D91 | Slice 28 occupancy PR chrome includes a GitHub URL | Live TUI / banner only say `PR #n`. Railway `ca` opens the PR. Compose `https://github.com/{owner}/{repo}/pull/{n}` from occupancy identity + preview-environment number. |
+| D92 | Non-GitHub occupancy stays number-only | Do not invent gitlab/self-hosted hosts this slice. Missing URL stays omitted. |
+| D93 | No browser launch / create-PR this slice | Print the URL in TUI detail. Banner stays one line with `PR #n`. Open-in-browser stays later. |
+| D94 | Slice 29 TUI `o` opens the selected occupancy GitHub PR URL | Railway `ca` opens the current PR. URL already exists on detail. Reuse login `open` / `xdg-open`. |
+| D95 | Only `https://github.com/{owner}/{repo}/pull/{n}` | Reject missing URL, non-https, non-github, or URL that does not match occupancy chrome. No create-PR. |
+| D96 | CI / `APPALOFT_CLI_OPEN_BROWSER=false` prints the URL and does not spawn | Same login fail-soft. Footer names `o open PR`. |
+| D97 | Slice 30 TUI `p` opens Preview URL; `P` opens Production URL | Railway `ca` opens the current URL. Same `openUrl` as `o`. Create-PR stays later. |
+| D98 | Only the selected occupancy chrome URL | Reject missing URL or URL that is not the selected Preview/Production. No invented sslip. |
+| D99 | Same CI / `APPALOFT_CLI_OPEN_BROWSER=false` fail-soft as `o` | Footer names `p preview` / `P production`. |
+| D100 | Slice 31 TUI `c` opens GitHub compare for occupancy branch | Railway `ca` create-PR starts from the current branch. No GitHub write. Existing `o` still opens an already-open PR. |
+| D101 | Only `https://github.com/{owner}/{repo}/compare/{branch}?expand=1` | Reject missing branch, non-github occupancy, or URL that is not that compare form. If occupancy already has a GitHub PR URL, `c` opens that pull URL instead. |
+| D102 | Same CI / `APPALOFT_CLI_OPEN_BROWSER=false` fail-soft as `o` | Footer names `c compare`. Catalog `task deliver --pull-request-*` stays the write path. |
+| D103 | Slice 32 TUI `d` Deliver Task prefills occupancy branch | Railway `ca` starts from the current branch. Remote stays `origin`. No auto-submit. |
+| D104 | Missing occupancy PR also prefills PR title from occupancy branch | Existing PR leaves title/body/base empty so deliver does not invent a second PR. |
+| D105 | Missing occupancy / empty branch stays blank | No invented `feat/...`. Catalog `task deliver --pull-request-*` stays the write path. |
+| D106 | Slice 33 TUI Deliver Task prefills commit from occupancy short SHA | Railway `ca` starts from current work. Message is `Deliver occupancy <shortSha>`. No auto-submit. |
+| D107 | Short SHA is the first 7 hex chars of occupancy commitSha | Missing / non-hex / shorter-than-7 SHA stays blank. Do not invent a commit. |
+| D108 | Existing occupancy PR still leaves PR fields blank | Branch + commit still prefill. Catalog `task deliver --pull-request-*` stays the write path. |
+| D109 | Slice 34 `code` banner copies GitHub compare when occupancy has branch and no PR | Railway `ca` starts from current branch. Same compare helper as TUI `c`. |
+| D110 | Existing PR still shows `PR #n` only | Do not append compare next to an already-open PR. |
+| D111 | Missing branch / non-github occupancy stays lean | No invented compare URL. Catalog create-PR write stays later. |
+| D112 | Slice 35 `code` identity stays first line; Preview / Compare / PR each follow on their own line | Railway URLs are clickable. One long ` · ` line is not. |
+| D113 | Existing PR line is `PR #n` plus pull URL when available | Do not put compare on the same banner as an already-open PR. |
+| D114 | Missing URLs stay omitted | No extra blank lines. Catalog create-PR write stays later. |
+| D115 | Slice 36 `code --open` opens one occupancy URL | Railway `ca` opens the current URL. Default target is Preview, else PR, else compare. |
+| D116 | Same URL guards as TUI `p` / `o` / `c` | No invented sslip / compare. Existing PR still prefers pull URL over compare. |
+| D117 | CI / `APPALOFT_CLI_OPEN_BROWSER=false` fail-soft | Print the chosen URL and do not spawn. Missing URL stays lean. Catalog create-PR write stays later. |
+| D118 | Slice 37 `code --open-target preview\|pr\|compare` selects one occupancy URL | Railway `ca` can open the chosen service. Bare `--open` stays Preview → PR → compare. |
+| D119 | Missing chosen target stays lean | Do not fall back to another target. Same URL guards as TUI `p` / `o` / `c`. |
+| D120 | `--open-target` implies `--open` | CI / `APPALOFT_CLI_OPEN_BROWSER=false` still fail-soft. Catalog create-PR write stays later. |
+| D121 | Slice 38 `code --open-target production` opens occupancy Production only | Railway `ca` can open production. Bare `--open` still prefers Preview. |
+| D122 | Banner copies Production on its own line after Preview | Same wrap as Preview / Compare / PR. Missing Production stays omitted. |
+| D123 | Missing Production target stays lean | Do not fall back to Preview. Same http(s) guard as TUI `P`. Catalog create-PR write stays later. |
+| D124 | Slice 39 banner labels Preview / Production / Compare like `PR #n` | Railway `ca` names the service. Bare URLs are ambiguous once Production exists. |
+| D125 | Labels are `Preview ·`, `Production ·`, `Compare ·` | Existing PR line stays `PR #n · <url>`. |
+| D126 | Missing URLs stay omitted | No extra blank labeled lines. Catalog create-PR write stays later. |
+| D127 | Slice 40 `code` prints one occupancy door hint after the banner | Railway `ca` names the next key. Model hint alone does not. |
+| D128 | Hint lists `--open-target preview\|production\|pr\|compare` and `workspace` `p`/`P`/`o`/`c` | Only existing doors. No invented create-PR write. |
+| D129 | Hint stays one line and always prints on remote `code` | Scratch `--local` stays unchanged. Catalog create-PR write stays later. |
+| D130 | Slice 41 hint lists only occupancy URLs that exist now | Railway `ca` does not advertise missing services. Static `preview\|production\|pr\|compare` overpromises. |
+| D131 | Keys stay paired: preview/`p`, production/`P`, pr/`o`, compare/`c` | Existing PR still omits compare. No invented create-PR write. |
+| D132 | No available door stays lean | Print no occupancy door hint. Scratch `--local` stays unlabeled. Catalog create-PR write stays later. |
+| D133 | Slice 42 TUI footer lists only occupancy doors that exist now | Railway `ca` does not advertise missing services. Static `o`/`c`/`p`/`P` overpromises. |
+| D134 | Keys stay paired: `o open PR`, `c compare`, `p preview`, `P production` | Existing PR still omits compare. No invented create-PR write. |
+| D135 | No available door stays lean | Footer keeps lifecycle / delivery / recovery / focus. Catalog create-PR write stays later. |
+| D136 | Slice 43 occupancy `Input validation failed` names the enrolled Server | Live Cloud `9ba333eb` rejects `targetServerId` as unstructured `BAD_REQUEST`. Railway would not say only "validation failed". |
+| D137 | Do not retry `workspaces.open` without `targetServerId` | A successful retry would occupy managed capacity. No silent Server substitution. |
+| D138 | Newer Cloud Binding / Profile errors stay specific | Compat copy is only for unstructured occupancy validation. Catalog create-PR write stays later. |
+| D139 | Slice 44 default occupancy resume keeps the preferred Sandbox Profile | Railway reconnects the same machine. A newer default Profile must not block `code`. |
+| D140 | Explicit `--profile` still fail-closes on pin mismatch | Delivery `workspace open --profile` stays exact. |
+| D141 | `--new` still creates an isolated Workspace | Do not rewrite the preferred disk onto a new Profile. Catalog create-PR write stays later. |
 
 ## Rejected
 
@@ -123,13 +230,46 @@ Later slices after occupancy:
 5. `workspace` occupancy tree (slice 5, shipped #1162).
 6. Occupancy `projectId` (slice 6, shipped #1164).
 7. Plan resource context (slice 7, shipped #1166).
-8. **Occupancy default Environment** (slice 8): activation ensures Project Environment named `local`.
-9. Session-native Preview / remaining first-deploy chrome.
-10. GitHub as source surface / `owner/repo` shorthand.
-11. Optional team Connection.
-12. Cloud managed as default Server when no BYOS exists.
-
-## Delivery chrome (owner 2026-08-15)
+8. Occupancy default Environment (slice 8, shipped #1168).
+9. Occupancy default Resource (slice 9, shipped #1170).
+10. Occupancy default network (slice 10, shipped #1172).
+11. Remote-git planner evidence (slice 11, shipped #1174).
+12. Remote-git inspection (slice 12, shipped #1176).
+13. Occupancy Preview URL (slice 13, shipped #1178).
+14. Occupancy deploy reuse (slice 14, shipped #1180).
+15. Occupancy EXPOSE port (slice 15, shipped #1182).
+16. GitHub `owner/repo` (slice 16, shipped #1184).
+17. Bare occupancy deploy (slice 17, shipped #1186).
+18. Occupancy deploy URL (slice 18, shipped #1188).
+19. Occupancy banner Preview URL (slice 19, shipped #1190).
+20. Occupancy last deployment (slice 20, shipped #1192).
+21. Occupancy tree filter (slice 21, shipped #1194).
+22. Occupancy help door (slice 22, shipped #1196).
+23. Occupancy TUI identity (slice 23, shipped #1198).
+24. Occupancy TUI chrome (slice 24, shipped #1200).
+25. Occupancy TUI PR chrome (slice 25, shipped #1202).
+26. Occupancy TUI production chrome (slice 26, shipped #1204).
+27. Occupancy banner PR chrome (slice 27, shipped #1206).
+28. Occupancy PR URL chrome (slice 28, shipped #1208).
+29. Occupancy open-PR door (slice 29, shipped #1210).
+30. Occupancy open-preview door (slice 30, shipped #1212).
+31. Occupancy compare-PR door (slice 31, shipped #1214).
+32. Occupancy delivery prefills (slice 32, shipped #1216).
+33. Occupancy commit prefill (slice 33, shipped #1218).
+34. Occupancy banner compare (slice 34, shipped #1220).
+35. Occupancy banner wrap (slice 35, shipped #1222).
+36. Occupancy code `--open` (slice 36, shipped #1224).
+37. Occupancy `--open-target` (slice 37, shipped #1226).
+38. Occupancy production open (slice 38, shipped #1228).
+39. Occupancy banner labels (slice 39, shipped #1230).
+40. Occupancy door hint (slice 40, shipped #1232).
+41. Occupancy available-door hint (slice 41, shipped #1234).
+42. Occupancy TUI available-door footer (slice 42, shipped #1236).
+43. Occupancy Cloud-compat error (slice 43, shipped #1238).
+44. **Occupancy resume keeps preferred Profile** (slice 44): default `code` reconnects my Sandbox even if the Project default Profile changed.
+45. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
+46. Optional team Connection.
+47. Cloud managed as default Server when no BYOS exists.
 
 Cmux-style “this session is PR #928” is correct *context*. It is not a new GitHub aggregate
 and not something `code` scrapes from the vendor TUI.

@@ -1856,6 +1856,78 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(plan.steps).not.toContain("Configure edge proxy");
   });
 
+  test("[WS-REMOTE-PLAN-046] remote-git without Dockerfile evidence fail-closed", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_remote_git_empty",
+      source: createSource({
+        kind: "remote-git",
+        locator: "https://github.com/octocat/Hello-World.git",
+        displayName: "Hello-World",
+      }),
+      server: {
+        id: "srv_occupancy",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_remote_empty"),
+      detectedReasoning: ["Resource source binding kind: remote-git"],
+      requestedDeployment: {
+        method: "auto",
+        port: 3000,
+      },
+      generatedAt: "2026-08-16T00:00:00.000Z",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(String(result._unsafeUnwrapErr().message)).toMatch(/Could not resolve a deployment method/i);
+    expect(String(result._unsafeUnwrapErr().message)).not.toMatch(/Dockerfile/i);
+  });
+
+  test("[WS-REMOTE-PLAN-047] remote-git Dockerfile evidence still wins", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_remote_git_dockerfile",
+      source: createSource({
+        kind: "remote-git",
+        locator: "https://github.com/acme/storefront.git",
+        displayName: "storefront",
+        inspection: createSourceInspection({
+          detectedFiles: ["dockerfile"],
+          dockerfilePath: "deploy/Dockerfile",
+        }),
+      }),
+      server: {
+        id: "srv_occupancy",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_remote_dockerfile"),
+      detectedReasoning: ["detected dockerfile"],
+      requestedDeployment: {
+        method: "auto",
+        port: 3000,
+      },
+      generatedAt: "2026-08-16T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.buildStrategy).toBe("dockerfile");
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        dockerfilePath: "deploy/Dockerfile",
+      }),
+    );
+  });
+
+
   test("[DEP-CREATE-SMOKE-001] resolves resource-owned Dockerfile path into the runtime plan", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
@@ -2249,7 +2321,7 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(plan.steps).toContain("Verify public access route");
   });
 
-  test("defaults public git sources to target-side dockerfile builds", async () => {
+  test("[WS-REMOTE-PLAN-046] git-public without Dockerfile evidence fail-closed", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
     const resolver = new DefaultRuntimePlanResolver();
@@ -2275,18 +2347,9 @@ describe("DefaultRuntimePlanResolver", () => {
       generatedAt: "2026-01-01T00:00:00.000Z",
     });
 
-    expect(result.isOk()).toBe(true);
-    const plan = result._unsafeUnwrap();
-
-    expect(plan.source.kind).toBe("git-public");
-    expect(plan.buildStrategy).toBe("dockerfile");
-    expect(plan.execution).toEqual(
-      expect.objectContaining({
-        kind: "docker-container",
-        dockerfilePath: "Dockerfile",
-        port: 4313,
-      }),
-    );
+    expect(result.isErr()).toBe(true);
+    expect(String(result._unsafeUnwrapErr().message)).toMatch(/Could not resolve a deployment method/i);
+    expect(String(result._unsafeUnwrapErr().message)).not.toMatch(/Dockerfile/i);
   });
 
   test("plans inline compose sources as compose stacks", async () => {

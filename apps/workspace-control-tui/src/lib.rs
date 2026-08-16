@@ -8,6 +8,15 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct OccupancySummary {
+    pub repository_identity: String,
+    pub commit_sha: String,
+    #[serde(default)]
+    pub branch: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceSummary {
     pub workspace_id: String,
     pub status: String,
@@ -15,6 +24,107 @@ pub struct WorkspaceSummary {
     pub provider_key: Option<String>,
     #[serde(default)]
     pub source_kind: Option<String>,
+    #[serde(default)]
+    pub occupancy: Option<OccupancySummary>,
+}
+
+fn occupancy_list_label(workspace: &WorkspaceSummary) -> String {
+    match &workspace.occupancy {
+        Some(occupancy) => {
+            let sha = occupancy
+                .commit_sha
+                .get(..7)
+                .unwrap_or(&occupancy.commit_sha);
+            let repo = occupancy
+                .repository_identity
+                .strip_prefix("github.com/")
+                .or_else(|| occupancy.repository_identity.strip_prefix("gitlab.com/"))
+                .unwrap_or(&occupancy.repository_identity);
+            format!("{repo}@{sha}")
+        }
+        None => workspace.workspace_id.clone(),
+    }
+}
+
+fn occupancy_commit_message(commit_sha: &str) -> Option<String> {
+    let sha = commit_sha.trim();
+    if sha.len() < 7 || !sha.bytes().take(7).all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
+    Some(format!("Deliver occupancy {}", &sha[..7]))
+}
+
+fn occupancy_github_compare_available(occupancy: &OccupancySummary) -> bool {
+    let Some(branch) = occupancy.branch.as_deref().map(str::trim) else {
+        return false;
+    };
+    if branch.is_empty() {
+        return false;
+    }
+    if !branch
+        .chars()
+        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, '_' | '.' | '/' | '-'))
+    {
+        return false;
+    }
+    occupancy
+        .repository_identity
+        .trim()
+        .starts_with("github.com/")
+}
+
+fn occupancy_available_door_keys(detail: Option<&DetailMessage>) -> Vec<&'static str> {
+    let Some(detail) = detail else {
+        return Vec::new();
+    };
+    let mut doors = Vec::new();
+    let has_pr = detail
+        .pull_request
+        .as_ref()
+        .and_then(|pull_request| pull_request.url.as_deref())
+        .is_some_and(|url| !url.trim().is_empty());
+    if has_pr {
+        doors.push("o open PR");
+    } else if detail
+        .workspace
+        .occupancy
+        .as_ref()
+        .is_some_and(occupancy_github_compare_available)
+    {
+        doors.push("c compare");
+    }
+    if detail
+        .preview
+        .as_ref()
+        .is_some_and(|preview| !preview.url.trim().is_empty())
+    {
+        doors.push("p preview");
+    }
+    if detail
+        .production
+        .as_ref()
+        .is_some_and(|production| !production.url.trim().is_empty())
+    {
+        doors.push("P production");
+    }
+    doors
+}
+
+fn occupancy_available_door_footer(detail: Option<&DetailMessage>) -> String {
+    let doors = occupancy_available_door_keys(detail);
+    if doors.is_empty() {
+        String::new()
+    } else {
+        format!("  {} ", doors.join("  "))
+    }
+}
+
+fn occupancy_control_footer(status_line: &str, detail: Option<&DetailMessage>) -> String {
+    format!(
+        " Ctrl+] release  │  {}  │  q quit  ↑↓ select  Enter attach/focus{} a lifecycle  d delivery  s recovery  f Focus Mode  r refresh  R reconnect ",
+        status_line,
+        occupancy_available_door_footer(detail),
+    )
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
@@ -169,6 +279,28 @@ pub struct TargetSelectionSummary {
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct OccupancyPreviewChrome {
+    pub url: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct OccupancyDeploymentChrome {
+    pub id: String,
+    #[serde(default)]
+    pub status: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct OccupancyPullRequestChrome {
+    pub number: u32,
+    #[serde(default)]
+    pub url: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct DetailMessage {
     pub workspace: WorkspaceSummary,
     #[serde(default)]
@@ -183,6 +315,14 @@ pub struct DetailMessage {
     pub activation: Option<ActivationSummary>,
     #[serde(default)]
     pub target_selection: Option<TargetSelectionSummary>,
+    #[serde(default)]
+    pub preview: Option<OccupancyPreviewChrome>,
+    #[serde(default)]
+    pub production: Option<OccupancyPreviewChrome>,
+    #[serde(default)]
+    pub deployment: Option<OccupancyDeploymentChrome>,
+    #[serde(default)]
+    pub pull_request: Option<OccupancyPullRequestChrome>,
     #[serde(default)]
     pub recovery: RecoverySummary,
 }
@@ -510,6 +650,22 @@ pub enum RendererEvent {
         token: String,
     },
     Select {
+        #[serde(rename = "workspaceId")]
+        workspace_id: String,
+    },
+    OpenPr {
+        #[serde(rename = "workspaceId")]
+        workspace_id: String,
+    },
+    OpenPreview {
+        #[serde(rename = "workspaceId")]
+        workspace_id: String,
+    },
+    OpenProduction {
+        #[serde(rename = "workspaceId")]
+        workspace_id: String,
+    },
+    OpenCompare {
         #[serde(rename = "workspaceId")]
         workspace_id: String,
     },
@@ -979,13 +1135,33 @@ impl AppState {
                 DeliveryDecision::FormOpened
             }
             DeliveryAction::DeliverTask { task_run_id } => {
+                let occupancy = self
+                    .detail
+                    .as_ref()
+                    .and_then(|detail| detail.workspace.occupancy.as_ref());
+                let branch = occupancy
+                    .and_then(|occupancy| occupancy.branch.clone())
+                    .unwrap_or_default();
+                let commit_message = occupancy
+                    .and_then(|occupancy| occupancy_commit_message(&occupancy.commit_sha))
+                    .unwrap_or_default();
+                let pull_request_title = if self
+                    .detail
+                    .as_ref()
+                    .and_then(|detail| detail.pull_request.as_ref())
+                    .is_none()
+                {
+                    branch.clone()
+                } else {
+                    String::new()
+                };
                 self.delivery_form = Some(DeliveryForm::Task {
                     task_run_id,
                     values: [
-                        String::new(),
-                        String::new(),
+                        branch,
+                        commit_message,
                         "origin".to_owned(),
-                        String::new(),
+                        pull_request_title,
                         String::new(),
                         String::new(),
                     ],
@@ -1493,7 +1669,7 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
                 let marker = if index == state.selected { "›" } else { " " };
                 ListItem::new(Line::from(vec![
                     Span::styled(
-                        format!("{marker} {}", workspace.workspace_id),
+                        format!("{marker} {}", occupancy_list_label(workspace)),
                         if index == state.selected {
                             Style::default()
                                 .fg(Color::Cyan)
@@ -1647,10 +1823,47 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
                             .unwrap_or("unknown")
                     )
                 });
+            let preview = detail
+                .preview
+                .as_ref()
+                .map(|preview| format!("Preview  {}", preview.url))
+                .unwrap_or_default();
+            let production = detail
+                .production
+                .as_ref()
+                .map(|production| format!("Prod     {}", production.url))
+                .unwrap_or_default();
+            let deployment = detail
+                .deployment
+                .as_ref()
+                .map(|deployment| {
+                    format!(
+                        "Deploy   {}{}",
+                        deployment.id,
+                        deployment
+                            .status
+                            .as_deref()
+                            .map(|status| format!("  {status}"))
+                            .unwrap_or_default()
+                    )
+                })
+                .unwrap_or_default();
+            let pull_request = detail
+                .pull_request
+                .as_ref()
+                .map(|pull_request| match &pull_request.url {
+                    Some(url) => format!("PR       #{}\n{url}", pull_request.number),
+                    None => format!("PR       #{}", pull_request.number),
+                })
+                .unwrap_or_default();
             format!(
-                "Workspace {}  {}\n{}\n{}\nRecovery\nIsolation  {}\nContinuity {}\nSnapshot(s)\n{}\nWorkspace-owned cleanup: {}\nactive runtimes:{}  previews:{}\nBounded readback; not host/provider proof\nAgent Runtime(s)\n{}\nPorts\n{}\nTasks\n{}\nPromotions\n{}",
-                detail.workspace.workspace_id,
+                "Workspace {}  {}\n{}\n{}\n{}\n{}\n{}\n{}\nRecovery\nIsolation  {}\nContinuity {}\nSnapshot(s)\n{}\nWorkspace-owned cleanup: {}\nactive runtimes:{}  previews:{}\nBounded readback; not host/provider proof\nAgent Runtime(s)\n{}\nPorts\n{}\nTasks\n{}\nPromotions\n{}",
+                occupancy_list_label(&detail.workspace),
                 detail.workspace.status,
+                preview,
+                production,
+                deployment,
+                pull_request,
                 target_selection,
                 activation,
                 isolation,
@@ -1692,9 +1905,9 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
         );
     }
     frame.render_widget(
-        Paragraph::new(format!(
-            " Ctrl+] release  │  {}  │  q quit  ↑↓ select  Enter attach/focus  a lifecycle  d delivery  s recovery  f Focus Mode  r refresh  R reconnect ",
-            state.status_line
+        Paragraph::new(occupancy_control_footer(
+            &state.status_line,
+            state.detail.as_ref(),
         ))
         .style(Style::default().fg(Color::DarkGray)),
         footer,
@@ -2021,6 +2234,67 @@ mod tests {
     use super::*;
 
     #[test]
+    fn ws_remote_ca_069_occupancy_list_label_prefers_repo_sha() {
+        let occupied = WorkspaceSummary {
+            workspace_id: "sbx_1".to_owned(),
+            status: "ready".to_owned(),
+            provider_key: None,
+            source_kind: None,
+            occupancy: Some(OccupancySummary {
+                repository_identity: "github.com/traefik/whoami".to_owned(),
+                commit_sha: "1ce75d01b6978863647da42557a707a479da3a51".to_owned(),
+                branch: Some("master".to_owned()),
+            }),
+        };
+        let lean = WorkspaceSummary {
+            workspace_id: "sbx_lean".to_owned(),
+            status: "ready".to_owned(),
+            provider_key: None,
+            source_kind: None,
+            occupancy: None,
+        };
+        assert_eq!(occupancy_list_label(&occupied), "traefik/whoami@1ce75d0");
+        assert_eq!(occupancy_list_label(&lean), "sbx_lean");
+    }
+
+    #[test]
+    fn ws_remote_ca_125_126_127_tui_footer_lists_only_present_occupancy_doors() {
+        let preview_and_pr = occupancy_delivery_ready_state(Some(OccupancyPullRequestChrome {
+            number: 928,
+            url: Some("https://github.com/traefik/whoami/pull/928".to_owned()),
+        }));
+        let mut preview_and_pr = preview_and_pr;
+        if let Some(detail) = preview_and_pr.detail.as_mut() {
+            detail.preview = Some(OccupancyPreviewChrome {
+                url: "http://app-sc156jw98k.127.0.0.1.sslip.io/".to_owned(),
+            });
+        }
+        let preview_and_pr_footer = occupancy_control_footer("", preview_and_pr.detail.as_ref());
+        assert!(preview_and_pr_footer.contains("o open PR"));
+        assert!(preview_and_pr_footer.contains("p preview"));
+        assert!(!preview_and_pr_footer.contains("c compare"));
+        assert!(!preview_and_pr_footer.contains("P production"));
+
+        let existing_pr = occupancy_delivery_ready_state(Some(OccupancyPullRequestChrome {
+            number: 928,
+            url: Some("https://github.com/traefik/whoami/pull/928".to_owned()),
+        }));
+        let existing_pr_footer = occupancy_control_footer("", existing_pr.detail.as_ref());
+        assert!(existing_pr_footer.contains("o open PR"));
+        assert!(!existing_pr_footer.contains("c compare"));
+
+        let lean = occupancy_control_footer("", None);
+        assert!(!lean.contains("o open PR"));
+        assert!(!lean.contains("c compare"));
+        assert!(!lean.contains("p preview"));
+        assert!(!lean.contains("P production"));
+        assert!(lean.contains("a lifecycle"));
+        assert!(lean.contains("d delivery"));
+        assert!(lean.contains("s recovery"));
+        assert!(lean.contains("f Focus Mode"));
+    }
+
+    #[test]
     fn ws_tui_embed_focus_and_unicode_keep_one_session() {
         let mut state = AppState::default();
         state.apply(ParentMessage::TerminalReady {
@@ -2098,6 +2372,11 @@ mod tests {
                 status: "running".to_owned(),
                 provider_key: Some("registered-server".to_owned()),
                 source_kind: Some("template".to_owned()),
+                occupancy: Some(OccupancySummary {
+                    repository_identity: "github.com/traefik/whoami".to_owned(),
+                    commit_sha: "1ce75d01b6978863647da42557a707a479da3a51".to_owned(),
+                    branch: Some("master".to_owned()),
+                }),
             }],
         });
         state.apply(ParentMessage::Detail {
@@ -2154,10 +2433,24 @@ mod tests {
                     source: "platform-default".to_owned(),
                     reason: "managed_entitlement_default".to_owned(),
                 }),
+                preview: Some(OccupancyPreviewChrome {
+                    url: "http://whoami.test".to_owned(),
+                }),
+                production: Some(OccupancyPreviewChrome {
+                    url: "https://whoami.example".to_owned(),
+                }),
+                deployment: Some(OccupancyDeploymentChrome {
+                    id: "dep_rfqfapqwpyjn".to_owned(),
+                    status: Some("succeeded".to_owned()),
+                }),
+                pull_request: Some(OccupancyPullRequestChrome {
+                    number: 928,
+                    url: Some("https://github.com/traefik/whoami/pull/928".to_owned()),
+                }),
                 recovery: RecoverySummary::default(),
             },
         });
-        let backend = ratatui::backend::TestBackend::new(120, 32);
+        let backend = ratatui::backend::TestBackend::new(120, 36);
         let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
         terminal
             .draw(|frame| render(frame, &state))
@@ -2172,7 +2465,13 @@ mod tests {
                     output.push_str(cell.symbol());
                     output
                 });
-        assert!(rendered.contains("https://preview.example.test/"));
+        assert!(rendered.contains("traefik/whoami@1ce75d0"));
+        assert!(rendered.contains("Preview"));
+        assert!(rendered.contains("whoami.test"));
+        assert!(rendered.contains("whoami.example"));
+        assert!(rendered.contains("dep_rfqfapqwpyjn"));
+        assert!(rendered.contains("PR       #928"));
+        assert!(rendered.contains("pull/928"));
         assert!(rendered.contains("task_1"));
         assert!(rendered.contains("prm_1"));
         assert!(rendered.contains("verified"));
@@ -2207,6 +2506,7 @@ mod tests {
                 status: "ready".to_owned(),
                 provider_key: None,
                 source_kind: None,
+                occupancy: None,
             },
             runtimes: Vec::new(),
             ports: Vec::new(),
@@ -2214,6 +2514,10 @@ mod tests {
             promotions: Vec::new(),
             activation: None,
             target_selection: None,
+            preview: None,
+            production: None,
+            deployment: None,
+            pull_request: None,
             recovery: RecoverySummary {
                 requested_isolation: Some("gvisor".to_owned()),
                 realized_isolation: Some("gvisor".to_owned()),
@@ -2272,6 +2576,7 @@ mod tests {
                 status: "ready".to_owned(),
                 provider_key: None,
                 source_kind: None,
+                occupancy: None,
             },
             runtimes: Vec::new(),
             ports: Vec::new(),
@@ -2279,6 +2584,10 @@ mod tests {
             promotions: Vec::new(),
             activation: None,
             target_selection: None,
+            preview: None,
+            production: None,
+            deployment: None,
+            pull_request: None,
             recovery: RecoverySummary {
                 snapshots: vec![SnapshotSummary {
                     snapshot_id: "ssn_1".to_owned(),
@@ -2350,6 +2659,7 @@ mod tests {
                 status: "terminated".to_owned(),
                 provider_key: Some("registered-server".to_owned()),
                 source_kind: Some("template".to_owned()),
+                occupancy: None,
             },
             runtimes: Vec::new(),
             ports: Vec::new(),
@@ -2357,6 +2667,10 @@ mod tests {
             promotions: Vec::new(),
             activation: None,
             target_selection: None,
+            preview: None,
+            production: None,
+            deployment: None,
+            pull_request: None,
             recovery: RecoverySummary {
                 requested_isolation: Some("gvisor".to_owned()),
                 realized_isolation: Some("gvisor".to_owned()),
@@ -2415,6 +2729,7 @@ mod tests {
                 status: "ready".to_owned(),
                 provider_key: None,
                 source_kind: None,
+                occupancy: None,
             },
             runtimes: Vec::new(),
             ports: Vec::new(),
@@ -2422,6 +2737,10 @@ mod tests {
             promotions: Vec::new(),
             activation: None,
             target_selection: None,
+            preview: None,
+            production: None,
+            deployment: None,
+            pull_request: None,
             recovery: RecoverySummary::default(),
         });
         assert!(state.open_recovery_menu());
@@ -2474,6 +2793,7 @@ mod tests {
                 status: "ready".to_owned(),
                 provider_key: None,
                 source_kind: None,
+                occupancy: None,
             }],
         });
         state.apply(ParentMessage::Detail {
@@ -2485,6 +2805,10 @@ mod tests {
                 promotions: Vec::new(),
                 activation: None,
                 target_selection: None,
+                preview: None,
+                production: None,
+                deployment: None,
+                pull_request: None,
                 recovery: RecoverySummary::default(),
             },
         });
@@ -2519,6 +2843,34 @@ mod tests {
             .expect("serialize lifecycle action"),
             r#"{"type":"lifecycle-action","workspaceId":"sbx_1","action":"pause"}"#
         );
+        assert_eq!(
+            serde_json::to_string(&RendererEvent::OpenPr {
+                workspace_id: "sbx_1".to_owned(),
+            })
+            .expect("serialize open pr"),
+            r#"{"type":"open-pr","workspaceId":"sbx_1"}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&RendererEvent::OpenPreview {
+                workspace_id: "sbx_1".to_owned(),
+            })
+            .expect("serialize open preview"),
+            r#"{"type":"open-preview","workspaceId":"sbx_1"}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&RendererEvent::OpenProduction {
+                workspace_id: "sbx_1".to_owned(),
+            })
+            .expect("serialize open production"),
+            r#"{"type":"open-production","workspaceId":"sbx_1"}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&RendererEvent::OpenCompare {
+                workspace_id: "sbx_1".to_owned(),
+            })
+            .expect("serialize open compare"),
+            r#"{"type":"open-compare","workspaceId":"sbx_1"}"#
+        );
         let mut state = AppState::default();
         state.apply(ParentMessage::TerminalReady {
             workspace_id: "sbx_1".to_owned(),
@@ -2544,6 +2896,7 @@ mod tests {
                 status: "ready".to_owned(),
                 provider_key: None,
                 source_kind: None,
+                occupancy: None,
             },
             runtimes: Vec::new(),
             ports: vec![PortSummary {
@@ -2590,6 +2943,10 @@ mod tests {
             ],
             activation: None,
             target_selection: None,
+            preview: None,
+            production: None,
+            deployment: None,
+            pull_request: None,
             recovery: RecoverySummary::default(),
         };
 
@@ -2701,6 +3058,92 @@ mod tests {
         assert!(state.pending_delivery_confirmation.is_none());
     }
 
+    #[test]
+    fn ws_tui_deliver_task_prefills_occupancy_branch_and_pr_title() {
+        let mut state = occupancy_delivery_ready_state(None);
+        assert!(state.open_delivery_menu());
+        state.move_delivery_selection(1);
+        assert_eq!(
+            state.activate_selected_delivery_action(),
+            DeliveryDecision::FormOpened
+        );
+        assert_eq!(
+            state.delivery_form,
+            Some(DeliveryForm::Task {
+                task_run_id: "task_deliver".to_owned(),
+                values: [
+                    "feat/occupancy".to_owned(),
+                    "Deliver occupancy 1ce75d0".to_owned(),
+                    "origin".to_owned(),
+                    "feat/occupancy".to_owned(),
+                    String::new(),
+                    String::new(),
+                ],
+                field: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn ws_tui_deliver_task_leaves_pr_fields_blank_when_occupancy_pr_exists() {
+        let mut state = occupancy_delivery_ready_state(Some(OccupancyPullRequestChrome {
+            number: 928,
+            url: Some("https://github.com/traefik/whoami/pull/928".to_owned()),
+        }));
+        assert!(state.open_delivery_menu());
+        state.move_delivery_selection(1);
+        assert_eq!(
+            state.activate_selected_delivery_action(),
+            DeliveryDecision::FormOpened
+        );
+        assert_eq!(
+            state.delivery_form,
+            Some(DeliveryForm::Task {
+                task_run_id: "task_deliver".to_owned(),
+                values: [
+                    "feat/occupancy".to_owned(),
+                    "Deliver occupancy 1ce75d0".to_owned(),
+                    "origin".to_owned(),
+                    String::new(),
+                    String::new(),
+                    String::new(),
+                ],
+                field: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn ws_tui_deliver_task_leaves_commit_blank_when_occupancy_sha_is_invalid() {
+        let mut state = occupancy_delivery_ready_state(None);
+        if let Some(detail) = state.detail.as_mut() {
+            if let Some(occupancy) = detail.workspace.occupancy.as_mut() {
+                occupancy.commit_sha = "not-a-sha".to_owned();
+            }
+        }
+        assert!(state.open_delivery_menu());
+        state.move_delivery_selection(1);
+        assert_eq!(
+            state.activate_selected_delivery_action(),
+            DeliveryDecision::FormOpened
+        );
+        assert_eq!(
+            state.delivery_form,
+            Some(DeliveryForm::Task {
+                task_run_id: "task_deliver".to_owned(),
+                values: [
+                    "feat/occupancy".to_owned(),
+                    String::new(),
+                    "origin".to_owned(),
+                    "feat/occupancy".to_owned(),
+                    String::new(),
+                    String::new(),
+                ],
+                field: 0,
+            })
+        );
+    }
+
     fn delivery_ready_state() -> AppState {
         let mut state = AppState::default();
         state.apply(ParentMessage::Workspaces {
@@ -2709,6 +3152,7 @@ mod tests {
                 status: "ready".to_owned(),
                 provider_key: None,
                 source_kind: None,
+                occupancy: None,
             }],
         });
         state.apply(ParentMessage::Detail {
@@ -2724,9 +3168,30 @@ mod tests {
                 promotions: Vec::new(),
                 activation: None,
                 target_selection: None,
+                preview: None,
+                production: None,
+                deployment: None,
+                pull_request: None,
                 recovery: RecoverySummary::default(),
             },
         });
+        state
+    }
+
+    fn occupancy_delivery_ready_state(
+        pull_request: Option<OccupancyPullRequestChrome>,
+    ) -> AppState {
+        let mut state = delivery_ready_state();
+        let occupancy = OccupancySummary {
+            repository_identity: "github.com/traefik/whoami".to_owned(),
+            commit_sha: "1ce75d01b6978863647da42557a707a479da3a51".to_owned(),
+            branch: Some("feat/occupancy".to_owned()),
+        };
+        state.workspaces[0].occupancy = Some(occupancy.clone());
+        if let Some(detail) = state.detail.as_mut() {
+            detail.workspace.occupancy = Some(occupancy);
+            detail.pull_request = pull_request;
+        }
         state
     }
 }

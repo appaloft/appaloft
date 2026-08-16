@@ -478,6 +478,7 @@ describe("Agent Workspace open preflight", () => {
           return ok({ project: "reused", repositoryBinding: "created", profile: "created" });
         },
         ensureLocalEnvironment: async () => ok(undefined),
+        ensureDefaultResource: async () => ok(undefined),
       }),
     });
 
@@ -502,6 +503,7 @@ describe("Agent Workspace open preflight", () => {
           return ok({ project: "created", repositoryBinding: "created", profile: "created" });
         },
         ensureLocalEnvironment: async () => ok(undefined),
+        ensureDefaultResource: async () => ok(undefined),
       }),
     });
     expect(
@@ -526,6 +528,7 @@ describe("Agent Workspace open preflight", () => {
           return ok({ project: "reused", repositoryBinding: "created", profile: "reused" });
         },
         ensureLocalEnvironment: async () => ok(undefined),
+        ensureDefaultResource: async () => ok(undefined),
       }),
     });
     const conflicted = await conflict.service.resolveContext(context, input);

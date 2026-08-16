@@ -14,6 +14,10 @@ import {
   DeploymentTimelineQuery,
   ForceRedeployDeploymentCommand,
   ListDeploymentsQuery,
+  ListEnvironmentsQuery,
+  ListResourcesQuery,
+  ListSandboxesQuery,
+  ListServersQuery,
   ListStaleDeploymentAttemptsQuery,
   PruneDeploymentsCommand,
   publicPreviewUrlsFromDeploymentSummary,
@@ -22,6 +26,7 @@ import {
   RetryDeploymentCommand,
   RollbackDeploymentCommand,
   ShowDeploymentQuery,
+  ShowRepositoryBindingQuery,
   StreamDeploymentTimelineQuery,
 } from "@appaloft/application";
 import { createQuickDeployGeneratedResourceName } from "@appaloft/contracts";
@@ -46,11 +51,17 @@ import {
 } from "@appaloft/deployment-config";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect, Either } from "effect";
-
+import { normalizeWorkspaceRepositoryRemote } from "../local-git-workspace-context.js";
+import {
+  isRemoteCodeGitRemoteLocator,
+  selectDefaultRemoteCodeServer,
+  selectResumeOccupancy,
+} from "../remote-code-session.js";
 import {
   CliRuntime,
   optionalNumber,
   optionalValue,
+  print,
   resultToEffect,
   runCommand,
   runDeploymentCommand,
@@ -194,6 +205,116 @@ export const deployCommandDescription = cliCommandDescriptions.deploy;
 function parseAppLogLines(value: string): number {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : 3;
+}
+
+function occupancyDeploymentInputFromGitRemote(input: {
+  readonly sourceLocator: string;
+  readonly projectId?: string;
+  readonly environmentId?: string;
+  readonly resourceId?: string;
+  readonly serverId?: string;
+  readonly destinationId?: string;
+}) {
+  return Effect.gen(function* () {
+    let repositoryIdentity: string;
+    try {
+      repositoryIdentity = normalizeWorkspaceRepositoryRemote(input.sourceLocator).identity;
+    } catch {
+      return undefined;
+    }
+    const cli = yield* CliRuntime;
+    const bindingQuery = ShowRepositoryBindingQuery.create({ repositoryIdentity });
+    if (bindingQuery.isErr()) return undefined;
+    const bindingResult = yield* Effect.promise(() => cli.executeQuery(bindingQuery.value));
+    if (bindingResult.isErr() || bindingResult.value.status !== "active") return undefined;
+    const projectId = input.projectId ?? bindingResult.value.projectId;
+    const environmentsQuery = ListEnvironmentsQuery.create({ projectId, limit: 100 });
+    if (environmentsQuery.isErr()) return undefined;
+    const environmentsResult = yield* Effect.promise(() =>
+      cli.executeQuery(environmentsQuery.value),
+    );
+    if (environmentsResult.isErr()) return undefined;
+    const environment = input.environmentId
+      ? environmentsResult.value.items.find((item) => item.id === input.environmentId)
+      : environmentsResult.value.items.find((item) => item.name === "local");
+    if (!environment) return undefined;
+    const resourcesQuery = ListResourcesQuery.create({
+      projectId,
+      environmentId: environment.id,
+      limit: 100,
+    });
+    if (resourcesQuery.isErr()) return undefined;
+    const resourcesResult = yield* Effect.promise(() => cli.executeQuery(resourcesQuery.value));
+    if (resourcesResult.isErr()) return undefined;
+    const resource = input.resourceId
+      ? resourcesResult.value.items.find((item) => item.id === input.resourceId)
+      : resourcesResult.value.items.find((item) => item.slug === "app");
+    if (!resource) return undefined;
+    const serversQuery = ListServersQuery.create();
+    if (serversQuery.isErr()) return undefined;
+    const serversResult = yield* Effect.promise(() => cli.executeQuery(serversQuery.value));
+    if (serversResult.isErr()) return undefined;
+    const server = input.serverId
+      ? serversResult.value.items.find((item) => item.id === input.serverId)
+      : selectDefaultRemoteCodeServer(serversResult.value.items);
+    if (!server) return undefined;
+    return {
+      projectId,
+      environmentId: environment.id,
+      resourceId: resource.id,
+      serverId: server.id,
+      ...(input.destinationId ? { destinationId: input.destinationId } : {}),
+    } satisfies CreateDeploymentCommandInput;
+  });
+}
+
+interface OccupancySandboxListResult {
+  readonly items: readonly {
+    readonly sandboxId: string;
+    readonly status: string;
+    readonly lastActivityAt?: string;
+    readonly updatedAt?: string;
+    readonly occupancy?: {
+      readonly repositoryIdentity: string;
+      readonly commitSha: string;
+      readonly branch?: string;
+    };
+  }[];
+}
+
+function occupancyDeploymentInputFromLatestOccupancy(input: {
+  readonly projectId?: string;
+  readonly environmentId?: string;
+  readonly resourceId?: string;
+  readonly serverId?: string;
+  readonly destinationId?: string;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const sandboxesQuery = ListSandboxesQuery.create({ limit: 100, offset: 0 });
+    if (sandboxesQuery.isErr()) return undefined;
+    const sandboxesResult = yield* Effect.promise(() => cli.executeQuery(sandboxesQuery.value));
+    if (sandboxesResult.isErr()) return undefined;
+    const occupancy = selectResumeOccupancy(
+      ((sandboxesResult.value as OccupancySandboxListResult).items ?? []).map((item) => ({
+        sandboxId: item.sandboxId,
+        status: item.status,
+        ...(item.occupancy ? { occupancy: item.occupancy } : {}),
+        ...(typeof item.lastActivityAt === "string" ? { lastActivityAt: item.lastActivityAt } : {}),
+        ...(typeof item.updatedAt === "string" ? { updatedAt: item.updatedAt } : {}),
+      })),
+    );
+    const repositoryIdentity = occupancy?.occupancy?.repositoryIdentity;
+    if (!repositoryIdentity) return undefined;
+    return yield* occupancyDeploymentInputFromGitRemote({
+      sourceLocator: `https://${repositoryIdentity.replace(/\.git$/u, "")}.git`,
+      ...(input.projectId ? { projectId: input.projectId } : {}),
+      ...(input.environmentId ? { environmentId: input.environmentId } : {}),
+      ...(input.resourceId ? { resourceId: input.resourceId } : {}),
+      ...(input.serverId ? { serverId: input.serverId } : {}),
+      ...(input.destinationId ? { destinationId: input.destinationId } : {}),
+    });
+  });
 }
 
 function inferResourceName(sourceLocator: string): string {
@@ -1124,15 +1245,53 @@ function readDeploymentSummary(input: { deploymentId: string; resourceId: string
     );
     const result = yield* Effect.promise(() => cli.executeQuery(query));
     const deployments = yield* resultToEffect(result);
-    return deployments.items.find((item) => item.id === input.deploymentId);
+    return deployments.items?.find((item) => item.id === input.deploymentId);
+  });
+}
+
+function occupancyDeployUrlFromSummary(
+  deployment:
+    | {
+        readonly runtimePlan?: {
+          readonly execution?: {
+            readonly accessRoutes?: DeploymentSummary["runtimePlan"]["execution"]["accessRoutes"];
+          };
+        };
+      }
+    | undefined,
+): string | undefined {
+  const accessRoutes = deployment?.runtimePlan?.execution?.accessRoutes;
+  if (!accessRoutes) return undefined;
+  return publicPreviewUrlsFromDeploymentSummary({
+    runtimePlan: { execution: { accessRoutes } },
+  } as DeploymentSummary)[0];
+}
+
+function readCreatedDeploymentUrl(deploymentId: string) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const query = ShowDeploymentQuery.create({
+      deploymentId,
+      includeTimeline: false,
+      includeSnapshot: false,
+      includeRelatedContext: false,
+      includeLatestFailure: false,
+    });
+    if (query.isErr()) return undefined;
+    const result = yield* Effect.promise(() => cli.executeQuery(query.value));
+    if (result.isErr()) return undefined;
+    return occupancyDeployUrlFromSummary(result.value?.deployment);
   });
 }
 
 function waitForSynchronousDeployment(input: { deploymentId: string; resourceId: string }) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
-    yield* Effect.promise(() => (cli.startWorkerRuntime ?? cli.startServer)());
-
+    if (cli.startWorkerRuntime) {
+      yield* Effect.promise(() => cli.startWorkerRuntime?.() ?? Promise.resolve());
+    } else if (cli.executionTarget !== "remote") {
+      yield* Effect.promise(() => cli.startServer());
+    }
     const deadline = Date.now() + synchronousDeploymentTimeoutMs;
     while (true) {
       const deployment = yield* readDeploymentSummary(input);
@@ -1290,13 +1449,15 @@ function runCreateDeploymentCommand(
         appLogLines: options.appLogLines,
       },
     );
-    let deployment: DeploymentSummary | undefined;
-    if (effectiveInput.executionMode !== "detached") {
-      deployment = yield* waitForSynchronousDeployment({
-        deploymentId: output.id,
-        resourceId: effectiveInput.resourceId,
-      });
+    if (effectiveInput.executionMode === "detached") {
+      const url = yield* readCreatedDeploymentUrl(output.id);
+      if (url) yield* print({ url });
+      return;
     }
+    const deployment = yield* waitForSynchronousDeployment({
+      deploymentId: output.id,
+      resourceId: effectiveInput.resourceId,
+    });
 
     if (options.requirePreviewUrl || options.previewOutputFile) {
       const resolution = yield* resolvePreviewAccessForDeployment({
@@ -1314,9 +1475,10 @@ function runCreateDeploymentCommand(
       }
     }
 
-    if (effectiveInput.executionMode !== "detached") {
-      yield* failIfSynchronousDeploymentDidNotSucceed(deployment);
-    }
+    yield* failIfSynchronousDeploymentDidNotSucceed(deployment);
+    const url =
+      occupancyDeployUrlFromSummary(deployment) ?? (yield* readCreatedDeploymentUrl(output.id));
+    if (url) yield* print({ url });
   });
 }
 
@@ -1676,6 +1838,74 @@ export const deployCommand = EffectCommand.make(
           requirePreviewUrl,
           ...(previewOutputFilePath ? { previewOutputFile: previewOutputFilePath } : {}),
         });
+      }
+      if (
+        !sourceLocator &&
+        !configFilePath &&
+        !previewContext &&
+        !hasProfileOverrides &&
+        !(projectId && serverId && environmentId && resourceId)
+      ) {
+        const occupancyInput = yield* occupancyDeploymentInputFromLatestOccupancy({
+          ...(projectId ? { projectId } : {}),
+          ...(environmentId ? { environmentId } : {}),
+          ...(resourceId ? { resourceId } : {}),
+          ...(serverId ? { serverId } : {}),
+          ...(destinationId ? { destinationId } : {}),
+        });
+        if (occupancyInput) {
+          return yield* runCreateDeploymentCommand(occupancyInput, {
+            appLogLines: parseAppLogLines(appLogLines),
+            requirePreviewUrl,
+            ...(previewOutputFilePath ? { previewOutputFile: previewOutputFilePath } : {}),
+          });
+        }
+        const interactive = Boolean(cli.terminalIO.stdin.isTTY && cli.terminalIO.stdout.isTTY);
+        if (!interactive) {
+          return yield* Effect.fail(
+            domainError.validation("Occupancy Resource app is required for deploy", {
+              phase: "occupancy-deploy-reuse",
+              code: "workspace_occupancy_resource_missing",
+              guidance:
+                "Run appaloft code first, or pass --project --environment --resource --server.",
+            }),
+          );
+        }
+      }
+
+      if (
+        sourceLocator &&
+        isRemoteCodeGitRemoteLocator(sourceLocator) &&
+        !configFilePath &&
+        !previewContext &&
+        !hasProfileOverrides
+      ) {
+        const occupancyInput = yield* occupancyDeploymentInputFromGitRemote({
+          sourceLocator,
+          ...(projectId ? { projectId } : {}),
+          ...(environmentId ? { environmentId } : {}),
+          ...(resourceId ? { resourceId } : {}),
+          ...(serverId ? { serverId } : {}),
+          ...(destinationId ? { destinationId } : {}),
+        });
+        if (occupancyInput) {
+          return yield* runCreateDeploymentCommand(occupancyInput, {
+            appLogLines: parseAppLogLines(appLogLines),
+            requirePreviewUrl,
+            ...(previewOutputFilePath ? { previewOutputFile: previewOutputFilePath } : {}),
+          });
+        }
+        const interactive = Boolean(cli.terminalIO.stdin.isTTY && cli.terminalIO.stdout.isTTY);
+        if (!interactive) {
+          return yield* Effect.fail(
+            domainError.validation("Occupancy Resource app is required for this git remote", {
+              phase: "occupancy-deploy-reuse",
+              code: "workspace_occupancy_resource_missing",
+              guidance:
+                "Run appaloft code <git-remote> first, or pass --project --environment --resource --server.",
+            }),
+          );
+        }
       }
 
       const configSourceLocator = sourceLocator ?? ".";

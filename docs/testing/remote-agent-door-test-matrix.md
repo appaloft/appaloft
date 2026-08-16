@@ -47,6 +47,100 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-CTX-039 | application | this slice | omitted resourceId fail-closed | `packages/application/test/deployment-plan-preview.test.ts` |
 | WS-REMOTE-ENV-040 | application + `appaloftdev` | this slice | occupancy creates Environment `local` when missing | `packages/application/test/community-workspace-activation-context-initializer.test.ts`; live `env list` |
 | WS-REMOTE-ENV-041 | application | this slice | existing `local` Environment is reused | `packages/application/test/community-workspace-activation-context-initializer.test.ts` |
+| WS-REMOTE-RES-042 | application + `appaloftdev` | this slice | occupancy creates Resource `app` when missing | `packages/application/test/community-workspace-activation-context-initializer.test.ts`; live `resource list` |
+| WS-REMOTE-RES-043 | application | this slice | existing Resource `app` is reused | `packages/application/test/community-workspace-activation-context-initializer.test.ts` |
+| WS-REMOTE-NET-044 | application + `appaloftdev` | this slice | occupancy default network is `3000` / `http` / `reverse-proxy` | `packages/application/test/community-workspace-activation-context-initializer.test.ts`; live `deployments plan --resource --server` |
+| WS-REMOTE-NET-045 | application | this slice | existing Resource network is reused | `packages/application/test/community-workspace-activation-context-initializer.test.ts` |
+| WS-REMOTE-PLAN-046 | runtime + `appaloftdev` | this slice | remote-git without Dockerfile fail-closed | `packages/adapters/runtime/test/runtime-plan-resolver.test.ts`; live `deployments plan --resource --server` |
+| WS-REMOTE-PLAN-047 | runtime | this slice | remote-git Dockerfile evidence still wins | `packages/adapters/runtime/test/runtime-plan-resolver.test.ts` |
+| WS-REMOTE-INSPECT-048 | filesystem + `appaloftdev` | this slice | remote-git occupancy inspects a single-app remote | `packages/adapters/filesystem/test/source-detector.test.ts`; live occupy of a root-Dockerfile repo |
+| WS-REMOTE-INSPECT-049 | filesystem + `appaloftdev` | this slice | monorepo remote-git asks for baseDirectory | `packages/adapters/filesystem/test/source-detector.test.ts`; live `deployments plan` on occupied `appaloft/examples` |
+| WS-REMOTE-PREVIEW-050 | CLI + `appaloftdev` | this slice | occupancy tree copies live generated Preview URL | `packages/adapters/cli/test/agent-workspace-command.test.ts`; live `workspace --json` after hello create |
+| WS-REMOTE-PREVIEW-051 | CLI | this slice | missing generated access stays omitted | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
+| WS-REMOTE-DEPLOY-052 | CLI + `appaloftdev` | this slice | occupancy deploy reuses Resource `app` | `packages/adapters/cli/test/deployment-create-command.test.ts`; live `deploy <git-remote>` after occupy |
+| WS-REMOTE-DEPLOY-053 | CLI | this slice | missing occupancy Resource stays fail-closed when non-interactive | `packages/adapters/cli/test/deployment-create-command.test.ts` |
+| WS-REMOTE-EXPOSE-054 | filesystem + application + `appaloftdev` | this slice | occupancy uses a single Dockerfile EXPOSE | `packages/adapters/filesystem/test/source-detector.test.ts`; `packages/application/test/community-workspace-activation-context-initializer.test.ts`; live occupy of `traefik/whoami` |
+| WS-REMOTE-EXPOSE-055 | filesystem + application | this slice | missing or multiple EXPOSE keeps 3000 | `packages/adapters/filesystem/test/source-detector.test.ts`; `packages/application/test/community-workspace-activation-context-initializer.test.ts` |
+| WS-REMOTE-URL-SHORTHAND-028 | CLI + `appaloftdev` | this slice | `owner/repo` occupies GitHub HTTPS | `packages/adapters/cli/test/remote-code-session.test.ts`; live `code traefik/whoami` after occupying examples |
+| WS-REMOTE-URL-SHORTHAND-056 | CLI | this slice | existing local `owner/repo` directory stays a path | `packages/adapters/cli/test/remote-code-session.test.ts` |
+| WS-REMOTE-DEPLOY-057 | CLI + `appaloftdev` | this slice | bare `deploy` reuses latest occupancy Resource `app` | `packages/adapters/cli/test/deployment-create-command.test.ts`; live `deploy` after occupying whoami |
+| WS-REMOTE-DEPLOY-058 | CLI | this slice | bare `deploy` without occupancy fail-closed when non-interactive | `packages/adapters/cli/test/deployment-create-command.test.ts` |
+| WS-REMOTE-DEPLOY-059 | CLI + `appaloftdev` | this slice | occupancy `deploy` prints generated access URL | `packages/adapters/cli/test/deployment-create-command.test.ts`; live `deploy` after occupying whoami |
+| WS-REMOTE-DEPLOY-060 | CLI | this slice | missing generated URL stays omitted | `packages/adapters/cli/test/deployment-create-command.test.ts` |
+| WS-REMOTE-BANNER-061 | CLI + `appaloftdev` | this slice | occupancy `code` banner includes generated access URL | `packages/adapters/cli/test/remote-code-session.test.ts`; live `code --no-attach` after occupying+deploying whoami |
+| WS-REMOTE-BANNER-062 | CLI | this slice | missing generated access keeps existing banner | `packages/adapters/cli/test/remote-code-session.test.ts` |
+| WS-REMOTE-DEPLOY-063 | CLI + `appaloftdev` | this slice | occupancy tree includes last deployment id/status | `packages/adapters/cli/test/agent-workspace-command.test.ts`; live `workspace --json` after occupying+deploying whoami |
+| WS-REMOTE-DEPLOY-064 | CLI | this slice | missing last deployment stays omitted | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
+| WS-REMOTE-CA-065 | CLI + `appaloftdev` | this slice | occupancy tree omits terminated/failed leftovers | `packages/adapters/cli/test/agent-workspace-command.test.ts`; live `workspace --json` after occupying whoami |
+| WS-REMOTE-CA-066 | CLI | this slice | `workspace list` still includes terminated/failed | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
+| WS-REMOTE-DOCS-067 | CLI + `appaloftdev` | this slice | top-level help names occupancy door | `packages/adapters/cli/test/standalone-control-plane.test.ts` or equivalent; live `appaloftdev --help` |
+| WS-REMOTE-DOCS-068 | CLI | this slice | top-level deploy locator is optional | same help test |
+| WS-REMOTE-CA-069 | TUI / unit | this slice | TUI list uses occupancy repo@sha | `workspace-control-presentation.test.ts`; workspace-control-tui |
+| WS-REMOTE-CA-070 | TUI / unit | this slice | TUI list omits terminated/failed | same presentation test |
+| WS-REMOTE-CA-071 | TUI / unit | this slice | missing occupancy stays lean | same presentation test |
+| WS-REMOTE-CA-072 | TUI / unit | this slice | TUI detail copies Preview URL | `workspace-control-presentation.test.ts`; workspace-control-tui |
+| WS-REMOTE-CA-073 | TUI / unit | this slice | TUI detail copies last deployment | same presentation test |
+| WS-REMOTE-CA-074 | TUI / unit | this slice | missing TUI chrome stays omitted | same presentation test |
+| WS-REMOTE-CA-075 | TUI / unit | this slice | TUI detail copies matching PR | `workspace-control-presentation.test.ts`; workspace-control-tui |
+| WS-REMOTE-CA-076 | TUI / unit | this slice | missing PR stays omitted | same presentation test |
+| WS-REMOTE-CA-077 | TUI / unit | this slice | foreign PR stays out | same presentation test |
+| WS-REMOTE-CA-078 | TUI / unit | this slice | TUI detail copies Production URL | `occupancy-chrome.test.ts`; workspace-control-tui |
+| WS-REMOTE-CA-079 | TUI / unit | this slice | missing Production stays omitted | same chrome test |
+| WS-REMOTE-CA-080 | TUI / unit | this slice | generated preview is not Production | same chrome test |
+| WS-REMOTE-BANNER-081 | CLI / unit | this slice | `code` banner copies matching PR | `remote-code-session.test.ts` |
+| WS-REMOTE-BANNER-082 | CLI / unit | this slice | missing banner PR stays omitted | same banner test |
+| WS-REMOTE-BANNER-083 | CLI / unit | this slice | foreign banner PR stays out | same banner test |
+| WS-REMOTE-CA-084 | TUI / unit | this slice | TUI detail copies GitHub PR URL | `occupancy-chrome.test.ts`; workspace-control-tui |
+| WS-REMOTE-CA-085 | TUI / unit | this slice | non-GitHub PR stays number-only | same chrome test |
+| WS-REMOTE-CA-086 | TUI / unit | this slice | missing PR URL stays omitted | same chrome test |
+| WS-REMOTE-CA-087 | TUI / unit | this slice | `o` opens selected GitHub PR URL | `workspace-control-presentation.test.ts`; workspace-control-tui |
+| WS-REMOTE-CA-088 | TUI / unit | this slice | missing PR open stays lean | same presentation test |
+| WS-REMOTE-CA-089 | TUI / unit | this slice | foreign open-PR stays rejected | same presentation test |
+| WS-REMOTE-CA-090 | TUI / unit | this slice | `p` opens selected Preview URL | `workspace-control-presentation.test.ts`; workspace-control-tui |
+| WS-REMOTE-CA-091 | TUI / unit | this slice | `P` opens selected Production URL | same presentation test |
+| WS-REMOTE-CA-092 | TUI / unit | this slice | missing preview/production open stays lean | same presentation test |
+| WS-REMOTE-CA-093 | TUI / unit | this slice | `c` opens GitHub compare for occupancy branch | `occupancy-chrome.test.ts`; `workspace-control-presentation.test.ts`; workspace-control-tui |
+| WS-REMOTE-CA-094 | TUI / unit | this slice | existing PR compare stays on pull URL | same presentation test |
+| WS-REMOTE-CA-095 | TUI / unit | this slice | missing compare stays lean | same presentation test |
+| WS-REMOTE-CA-096 | TUI / unit | this slice | Deliver Task prefills occupancy branch | workspace-control-tui |
+| WS-REMOTE-CA-097 | TUI / unit | this slice | missing occupancy PR prefills PR title | same TUI test |
+| WS-REMOTE-CA-098 | TUI / unit | this slice | existing occupancy PR leaves PR fields blank | same TUI test |
+| WS-REMOTE-CA-099 | TUI / unit | this slice | Deliver Task prefills occupancy commit | workspace-control-tui |
+| WS-REMOTE-CA-100 | TUI / unit | this slice | missing occupancy SHA leaves commit blank | same TUI test |
+| WS-REMOTE-BANNER-101 | CLI / unit | this slice | occupancy banner copies GitHub compare | `remote-code-session.test.ts` |
+| WS-REMOTE-BANNER-102 | CLI / unit | this slice | existing PR banner stays PR-only | same banner test |
+| WS-REMOTE-BANNER-103 | CLI / unit | this slice | missing compare stays omitted | same banner test |
+| WS-REMOTE-BANNER-104 | CLI / unit | this slice | occupancy banner wraps Preview / Compare | `remote-code-session.test.ts` |
+| WS-REMOTE-BANNER-105 | CLI / unit | this slice | existing PR wrap stays PR-only | same banner test |
+| WS-REMOTE-BANNER-106 | CLI / unit | this slice | lean banner stays one line | same banner test |
+| WS-REMOTE-OPEN-107 | CLI / unit | this slice | `code --open` prefers Preview | `remote-code-session.test.ts` |
+| WS-REMOTE-OPEN-108 | CLI / unit | this slice | `code --open` falls back to PR then compare | same session test |
+| WS-REMOTE-OPEN-109 | CLI / unit | this slice | missing occupancy open stays lean | same session test |
+| WS-REMOTE-OPEN-110 | CLI / unit | this slice | `--open-target preview` opens Preview only | `occupancy-chrome.test.ts` |
+| WS-REMOTE-OPEN-111 | CLI / unit | this slice | `--open-target pr` opens pull URL only | same chrome test |
+| WS-REMOTE-OPEN-112 | CLI / unit | this slice | missing chosen target stays lean | same chrome test |
+| WS-REMOTE-BANNER-113 | CLI / unit | this slice | occupancy banner copies Production | `remote-code-session.test.ts` |
+| WS-REMOTE-OPEN-114 | CLI / unit | this slice | `--open-target production` opens Production only | `occupancy-chrome.test.ts` |
+| WS-REMOTE-OPEN-115 | CLI / unit | this slice | missing Production target stays lean | same chrome test |
+| WS-REMOTE-BANNER-116 | CLI / unit | this slice | occupancy banner labels Preview / Production | `remote-code-session.test.ts` |
+| WS-REMOTE-BANNER-117 | CLI / unit | this slice | occupancy banner labels Compare | same banner test |
+| WS-REMOTE-BANNER-118 | CLI / unit | this slice | existing PR line stays `PR #n` | same banner test |
+| WS-REMOTE-HINT-119 | CLI / unit | this slice | occupancy door hint follows the banner | `remote-code-session.test.ts`; `agent-workspace-command.test.ts` |
+| WS-REMOTE-HINT-120 | CLI / unit | this slice | occupancy door hint stays before the model hint | same command test |
+| WS-REMOTE-HINT-121 | CLI / unit | this slice | scratch `--local` stays unlabeled | same command test |
+| WS-REMOTE-HINT-122 | CLI / unit | this slice | available-door hint lists only present URLs | `occupancy-chrome.test.ts`; `agent-workspace-command.test.ts` |
+| WS-REMOTE-HINT-123 | CLI / unit | this slice | existing PR omits compare from the hint | same chrome test |
+| WS-REMOTE-HINT-124 | CLI / unit | this slice | no available door stays lean | same chrome test |
+| WS-REMOTE-CA-125 | TUI / unit | this slice | TUI footer lists only present occupancy doors | `apps/workspace-control-tui/src/lib.rs` |
+| WS-REMOTE-CA-126 | TUI / unit | this slice | existing PR omits compare from the TUI footer | same TUI test |
+| WS-REMOTE-CA-127 | TUI / unit | this slice | no available door keeps a lean TUI footer | same TUI test |
+| WS-REMOTE-COMPAT-128 | CLI / unit | this slice | unstructured occupancy validation names the enrolled Server | `agent-workspace-command.test.ts` |
+| WS-REMOTE-COMPAT-129 | CLI / unit | this slice | occupancy does not retry without `targetServerId` | same command test |
+| WS-REMOTE-COMPAT-130 | CLI / unit | this slice | Binding / Profile errors stay specific | same command test |
+| WS-REMOTE-RESUME-131 | application | this slice | default occupancy resume keeps preferred Profile | `packages/application/test/agent-workspace-open.test.ts` |
+| WS-REMOTE-RESUME-132 | application | this slice | explicit Profile still fail-closes | same application test |
+| WS-REMOTE-RESUME-133 | application | this slice | `--new` stays isolated | same application test |
+
 
 
 

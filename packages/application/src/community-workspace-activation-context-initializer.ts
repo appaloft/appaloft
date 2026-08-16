@@ -1,6 +1,7 @@
 import {
   domainError,
   EnvironmentByProjectAndNameSpec,
+  EnvironmentId,
   EnvironmentName,
   err,
   ok,
@@ -9,6 +10,9 @@ import {
   ProjectId,
   ProjectName,
   ProjectSlug,
+  ResourceByEnvironmentAndSlugSpec,
+  ResourceName,
+  ResourceSlug,
   type Result,
 } from "@appaloft/core";
 
@@ -24,7 +28,14 @@ import { type ExecutionContext, toRepositoryContext } from "./execution-context"
 import { CreateEnvironmentCommand } from "./operations/environments/create-environment.command";
 import { ConfigureProjectWorkspaceProfileCommand } from "./operations/projects/configure-project-workspace-profile.command";
 import { CreateProjectCommand } from "./operations/projects/create-project.command";
-import { type EnvironmentRepository, type ProjectRepository } from "./ports";
+import { ConfigureResourceNetworkCommand } from "./operations/resources/configure-resource-network.command";
+import { CreateResourceCommand } from "./operations/resources/create-resource.command";
+import {
+  type EnvironmentRepository,
+  type ProjectRepository,
+  type ResourceRepository,
+  type SourceDetector,
+} from "./ports";
 import { type RepositoryBindingRepository } from "./repository-binding";
 import { BindProjectRepositoryCommand } from "./repository-binding-messages";
 
@@ -61,11 +72,13 @@ export class CommunityWorkspaceActivationContextInitializer
       readonly commandBus: Pick<CommandBus, "execute">;
       readonly projects: ProjectRepository;
       readonly environments: EnvironmentRepository;
+      readonly resources: ResourceRepository;
       readonly repositoryBindings: RepositoryBindingRepository;
       readonly adapters: AgentAdapterInstallationService;
       readonly profiles: AgentWorkspaceProfileInstallationService;
       readonly profileRepository: AgentWorkspaceProfileRegistryRepository;
       readonly defaultProfile?: CommunityRemoteWorkspaceDefaultProfileConfig;
+      readonly sourceDetector?: SourceDetector;
     },
   ) {}
 
@@ -182,6 +195,8 @@ export class CommunityWorkspaceActivationContextInitializer
     }
     const environment = await this.ensureLocalEnvironment(context, projectId);
     if (environment.isErr()) return err(environment.error);
+    const resource = await this.ensureDefaultResource(context, projectId, input.repository);
+    if (resource.isErr()) return err(resource.error);
     if (project.toState().defaultWorkspaceProfileInstallationId) {
       return ok({
         project: projectDisposition,
@@ -256,4 +271,104 @@ export class CommunityWorkspaceActivationContextInitializer
     );
     return raced ? ok(undefined) : err(executed.error);
   }
+
+  async ensureDefaultResource(
+    context: ExecutionContext,
+    projectId: string,
+    repository: string,
+  ): Promise<Result<void>> {
+    const environmentReady = await this.ensureLocalEnvironment(context, projectId);
+    if (environmentReady.isErr()) return err(environmentReady.error);
+    const environmentName = EnvironmentName.create("local");
+    if (environmentName.isErr()) return err(environmentName.error);
+    const environment = await this.dependencies.environments.findOne(
+      toRepositoryContext(context),
+      EnvironmentByProjectAndNameSpec.create(ProjectId.rehydrate(projectId), environmentName.value),
+    );
+    if (!environment) {
+      return err(
+        domainError.conflict("Workspace activation Environment is unavailable", {
+          code: "workspace_activation_context_conflict",
+        }),
+      );
+    }
+    const resourceName = ResourceName.create("app");
+    if (resourceName.isErr()) return err(resourceName.error);
+    const slug = ResourceSlug.fromName(resourceName.value);
+    if (slug.isErr()) return err(slug.error);
+    const existing = await this.dependencies.resources.findOne(
+      toRepositoryContext(context),
+      ResourceByEnvironmentAndSlugSpec.create(
+        ProjectId.rehydrate(projectId),
+        EnvironmentId.rehydrate(environment.id.value),
+        slug.value,
+      ),
+    );
+    if (existing) {
+      const existingPort = existing.toState().networkProfile?.internalPort?.value;
+      if (existingPort && existingPort !== 3000) return ok(undefined);
+      const networkProfile = await this.occupancyNetworkProfile(context, repository);
+      if (existingPort === networkProfile.internalPort && existing.toState().networkProfile) {
+        return ok(undefined);
+      }
+      const configured = ConfigureResourceNetworkCommand.create({
+        resourceId: existing.id.value,
+        networkProfile,
+      });
+      if (configured.isErr()) return err(configured.error);
+      return this.dependencies.commandBus
+        .execute(context, configured.value)
+        .then((executed) => (executed.isOk() ? ok(undefined) : err(executed.error)));
+    }
+    const networkProfile = await this.occupancyNetworkProfile(context, repository);
+    const created = CreateResourceCommand.create({
+      projectId,
+      environmentId: environment.id.value,
+      name: "app",
+      kind: "application",
+      source: {
+        kind: "remote-git",
+        locator: repository,
+      },
+      networkProfile,
+    });
+    if (created.isErr()) return err(created.error);
+    const executed = await this.dependencies.commandBus.execute(context, created.value);
+    if (executed.isOk()) return ok(undefined);
+    const raced = await this.dependencies.resources.findOne(
+      toRepositoryContext(context),
+      ResourceByEnvironmentAndSlugSpec.create(
+        ProjectId.rehydrate(projectId),
+        EnvironmentId.rehydrate(environment.id.value),
+        slug.value,
+      ),
+    );
+    return raced ? ok(undefined) : err(executed.error);
+  }
+
+  private async occupancyNetworkProfile(
+    context: ExecutionContext,
+    repository: string,
+  ): Promise<{
+    readonly internalPort: number;
+    readonly upstreamProtocol: "http";
+    readonly exposureMode: "reverse-proxy";
+  }> {
+    const detector = this.dependencies.sourceDetector;
+    if (!detector) return OCCUPANCY_DEFAULT_NETWORK_PROFILE;
+    const detected = await detector.detect(context, repository);
+    const exposedPort = detected.isOk() ? detected.value.source.inspection?.exposedPort : undefined;
+    if (!exposedPort) return OCCUPANCY_DEFAULT_NETWORK_PROFILE;
+    return {
+      internalPort: exposedPort,
+      upstreamProtocol: "http",
+      exposureMode: "reverse-proxy",
+    };
+  }
 }
+
+const OCCUPANCY_DEFAULT_NETWORK_PROFILE = {
+  internalPort: 3000,
+  upstreamProtocol: "http",
+  exposureMode: "reverse-proxy",
+} as const;

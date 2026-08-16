@@ -643,4 +643,210 @@ describe("Agent Workspace open application workflow", () => {
         .some(({ argv }) => argv.includes("checkout")),
     ).toBe(false);
   });
+
+  test("[WS-REMOTE-RESUME-131][WS-REMOTE-RESUME-132][WS-REMOTE-RESUME-133] default occupancy resume keeps preferred Profile", async () => {
+    const preferred = {
+      workspaceId: "sbx_preferred",
+      runtimeId: "sar_preferred",
+      commitSha: input.commitSha,
+      profileInstallationId: "awpi_preferred",
+      status: "ready" as const,
+      targetSelection: {
+        targetClass: "registered-server" as const,
+        source: "explicit" as const,
+        reason: "occupancy_registered_server",
+      },
+      activation: {
+        project: { projectId: "prj_web", disposition: "reused" as const },
+        repositoryBinding: { bindingId: "rbd_web", disposition: "reused" as const },
+        profile: { profileInstallationId: "awpi_preferred", disposition: "reused" as const },
+      },
+    };
+    const begun: Array<{ profileInstallationId: string; forceNew: boolean }> = [];
+    const dependencies: WorkspaceOpenDependencies = {
+      preflight: {
+        resolveContext: async () =>
+          ok({
+            projectId: "prj_web",
+            profileInstallationId: "awpi_default",
+            activation: {
+              project: { projectId: "prj_web", disposition: "reused" },
+              repositoryBinding: { bindingId: "rbd_web", disposition: "reused" },
+              profile: { profileInstallationId: "awpi_default", disposition: "reused" },
+            },
+          }),
+        admit: async (_context, resolved) =>
+          ok({
+            projectId: resolved.projectId,
+            profileInstallationId: resolved.profileInstallationId,
+            activation: resolved.activation,
+            plan: {
+              sandbox: {
+                source: { kind: "template", templateId: "sbt_agent" },
+                requestedIsolation: "gvisor",
+                limits: {
+                  cpuMillis: 1_000,
+                  memoryBytes: 536_870_912,
+                  diskBytes: 2_147_483_648,
+                  maxProcesses: 32,
+                },
+                networkPolicy: { mode: "allowlist", rules: [] },
+              },
+              initialization: [],
+              runtime: {
+                harnessKey: "custom-agent",
+                harnessTemplateId: "aht_custom",
+                declarativeHarness: {},
+              },
+              defaultPorts: [],
+              suggestedChecks: [],
+              credentialRequirements: [],
+              pin: {
+                profileInstallationId: resolved.profileInstallationId,
+                profileDefinitionDigest: `sha256:${"a".repeat(64)}`,
+                profileId: "custom-default",
+                profileVersion: "1.0.0",
+                adapterInstallationId: "aai_custom",
+                adapterDefinitionDigest: `sha256:${"b".repeat(64)}`,
+                adapterId: "custom-agent",
+                adapterVersion: "1.0.0",
+                harnessKey: "custom-agent",
+                harnessTemplateId: "aht_custom",
+                sandboxTemplateId: "sbt_agent",
+                sandboxTemplateVersion: "1",
+                sandboxTemplateDigest: `sha256:${"c".repeat(64)}`,
+                capabilities: {
+                  taskMode: true,
+                  interactive: true,
+                  backgroundRuns: true,
+                  nativeSession: false,
+                  persistentPaths: ["/workspace"],
+                },
+              },
+            },
+            reservation: {
+              reservationId: "res_new",
+              targetSelection: preferred.targetSelection,
+            },
+          }),
+      },
+      entries: {
+        findByWorkspaceIds: async () => new Map(),
+        findByWorkspaceId: async () => preferred,
+        findPreferred: async () => preferred,
+        begin: async (_context, _key, value) => {
+          begun.push({
+            profileInstallationId: value.profileInstallationId,
+            forceNew: value.forceNew,
+          });
+          return ok({ workspaceId: "sbx_new", created: true });
+        },
+        complete: async () => ok(undefined),
+        fail: async () => ok(undefined),
+        markWorkspaceTerminated: async () => ok({ advanced: true }),
+      },
+      sandboxes: {
+        create: async () => ok({ sandboxId: "sbx_new", status: "ready" }),
+        resume: async (_context, workspaceId) => ok({ sandboxId: workspaceId, status: "ready" }),
+        exec: async () => ok({ mode: "foreground", frames: [{ kind: "exit", exitCode: 0 }] }),
+        exposePort: async () => ok(undefined),
+      },
+      agents: {
+        showRuntime: async (_context, value) =>
+          ok({
+            runtimeId: value.runtimeId,
+            sandboxId: value.sandboxId,
+            harnessKey: "custom-agent",
+            harnessTemplateId: "aht_custom",
+            status: "ready",
+            profilePin: {
+              profileInstallationId: preferred.profileInstallationId,
+              profileDefinitionDigest: `sha256:${"a".repeat(64)}`,
+              profileId: "custom-default",
+              profileVersion: "1.0.0",
+              adapterInstallationId: "aai_custom",
+              adapterDefinitionDigest: `sha256:${"b".repeat(64)}`,
+              adapterId: "custom-agent",
+              adapterVersion: "1.0.0",
+              harnessKey: "custom-agent",
+              harnessTemplateId: "aht_custom",
+              sandboxTemplateId: "sbt_agent",
+              sandboxTemplateVersion: "1",
+              sandboxTemplateDigest: `sha256:${"c".repeat(64)}`,
+              capabilities: {
+                taskMode: true,
+                interactive: true,
+                backgroundRuns: true,
+                nativeSession: false,
+                persistentPaths: ["/workspace"],
+              },
+            },
+            capabilities: {
+              taskMode: true,
+              interactive: true,
+              backgroundRuns: true,
+              nativeSession: false,
+              persistentPaths: ["/workspace"],
+            },
+            createdAt: "2026-07-28T00:00:00.000Z",
+          }),
+        createRuntime: async () =>
+          ok({
+            runtimeId: "sar_new",
+            sandboxId: "sbx_new",
+            harnessKey: "custom-agent",
+            harnessTemplateId: "aht_custom",
+            status: "ready",
+            capabilities: {
+              taskMode: true,
+              interactive: true,
+              backgroundRuns: true,
+              nativeSession: false,
+              persistentPaths: ["/workspace"],
+            },
+            createdAt: "2026-07-28T00:00:00.000Z",
+          }),
+        ensureRuntime: async () => ok(undefined),
+        attach: async () => {
+          throw new Error("attach should not run");
+        },
+      },
+      reservations: {
+        consume: async () => ok(undefined),
+        release: async () => ok(undefined),
+      },
+      now: () => "2026-07-28T00:00:00.000Z",
+    };
+    const service = new AgentWorkspaceOpenService(dependencies);
+    const context = createExecutionContext({
+      requestId: "req_occupancy_resume_profile",
+      entrypoint: "cli",
+      actor: { kind: "user", id: "usr_1" },
+      tenant: { tenantId: "ten_1" },
+    });
+
+    const resumed = await service.open(context, input);
+    const explicitMismatch = await service.open(context, {
+      ...input,
+      profile: "awpi_default",
+    });
+    const isolated = await service.open(context, {
+      ...input,
+      forceNew: true,
+    });
+
+    expect(resumed._unsafeUnwrap()).toMatchObject({
+      workspaceId: "sbx_preferred",
+      resumed: true,
+      profilePin: { profileInstallationId: "awpi_preferred" },
+    });
+    expect(explicitMismatch._unsafeUnwrapErr().details?.code).toBe(
+      "workspace_open_profile_pin_mismatch",
+    );
+    expect(isolated._unsafeUnwrap()).toMatchObject({
+      workspaceId: "sbx_new",
+      resumed: false,
+    });
+    expect(begun).toEqual([{ profileInstallationId: "awpi_default", forceNew: true }]);
+  });
 });

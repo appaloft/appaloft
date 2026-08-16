@@ -33,7 +33,9 @@ The workflow then coordinates tenant + subject + Project + Repository Identity +
 matching preferred Workspace is resumed/reconnected; `forceNew` creates a distinct Sandbox and
 advances the preference. An explicit Profile selector resumes the latest non-terminal Workspace
 pinned to that resolved Profile within the same coordinates, while an omitted selector uses the
-global preference. Source mismatch fails and requires a new Workspace.
+global preference and keeps that Workspace's pinned Profile even if the Project default later
+changed. An explicit selector that does not match the preferred pin fail-closes. Source mismatch
+fails and requires a new Workspace.
 
 ```ts
 type OpenAgentWorkspaceCommandInput = {

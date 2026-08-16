@@ -11,6 +11,8 @@ import {
   ExposeSandboxPortCommand,
   IssueSandboxAgentAttachAccessCommand,
   ListAgentTaskRunsQuery,
+  ListPreviewEnvironmentsQuery,
+  ListResourcesQuery,
   ListSandboxAgentRuntimesQuery,
   ListSandboxesQuery,
   ListSandboxPortsQuery,
@@ -26,8 +28,24 @@ import {
   type TerminalSessionAttachmentGateway,
 } from "@appaloft/application";
 import { type Result } from "@appaloft/core";
+import {
+  isOccupancyGitHubCompareUrl,
+  isOccupancyGitHubPullRequestUrl,
+  isOccupancyHttpUrl,
+  type OccupancyPreviewEnvironment,
+  type OccupancyResource,
+  occupancyChromeForProject,
+  occupancyCompareOrPullUrl,
+  occupancyPullRequestFromPreviewEnvironments,
+} from "./occupancy-chrome.js";
 import { type OperateRendererEvent, type OperateRendererMessage } from "./operate-presentation.js";
 import { terminateWorkspaceWithRuntimes } from "./workspace-lifecycle-actions.js";
+
+export interface WorkspaceControlOccupancySummary {
+  readonly repositoryIdentity: string;
+  readonly commitSha: string;
+  readonly branch?: string;
+}
 
 export interface WorkspaceControlWorkspaceSummary {
   readonly workspaceId: string;
@@ -37,6 +55,7 @@ export interface WorkspaceControlWorkspaceSummary {
   readonly createdAt?: string;
   readonly updatedAt?: string;
   readonly lastActivityAt?: string;
+  readonly occupancy?: WorkspaceControlOccupancySummary;
 }
 
 export interface WorkspaceControlRuntimeSummary {
@@ -159,6 +178,10 @@ export type WorkspaceControlRendererMessage =
       readonly promotions: readonly WorkspaceControlPromotionSummary[];
       readonly activation?: WorkspaceControlActivationSummary;
       readonly targetSelection?: WorkspaceControlTargetSelectionSummary;
+      readonly preview?: { readonly url: string };
+      readonly production?: { readonly url: string };
+      readonly deployment?: { readonly id: string; readonly status?: string };
+      readonly pullRequest?: { readonly number: number; readonly url?: string };
       readonly recovery: WorkspaceControlRecoverySummary;
     }
   | {
@@ -193,6 +216,10 @@ export type WorkspaceControlRendererEvent =
   | { readonly type: "development-stop" }
   | { readonly type: "development-detach" }
   | { readonly type: "select"; readonly workspaceId: string }
+  | { readonly type: "open-pr"; readonly workspaceId: string }
+  | { readonly type: "open-preview"; readonly workspaceId: string }
+  | { readonly type: "open-production"; readonly workspaceId: string }
+  | { readonly type: "open-compare"; readonly workspaceId: string }
   | { readonly type: "refresh"; readonly workspaceId?: string }
   | { readonly type: "attach"; readonly workspaceId: string; readonly runtimeId: string }
   | {
@@ -267,6 +294,7 @@ export interface BoundedWorkspaceControlPresentationInput {
   openRenderer(): Promise<WorkspaceControlRendererSession>;
   now?: () => string;
   idempotencyKey?: () => string;
+  openUrl?: (url: string) => Promise<boolean> | boolean;
 }
 
 interface SandboxListResult {
@@ -394,6 +422,22 @@ function suspensionSummary(
   return { mode, portability, ...(recoveryFamily ? { recoveryFamily } : {}) };
 }
 
+function occupancySummary(
+  record: Record<string, unknown>,
+): WorkspaceControlOccupancySummary | undefined {
+  if (!record.occupancy || typeof record.occupancy !== "object") return undefined;
+  const occupancy = record.occupancy as Record<string, unknown>;
+  const repositoryIdentity = optionalString(occupancy, "repositoryIdentity");
+  const commitSha = optionalString(occupancy, "commitSha");
+  if (!repositoryIdentity || !commitSha) return undefined;
+  const branch = optionalString(occupancy, "branch");
+  return {
+    repositoryIdentity,
+    commitSha,
+    ...(branch ? { branch } : {}),
+  };
+}
+
 function workspaceSummary(record: Record<string, unknown>): WorkspaceControlWorkspaceSummary {
   const workspaceId = optionalString(record, "sandboxId");
   const status = optionalString(record, "status");
@@ -405,6 +449,7 @@ function workspaceSummary(record: Record<string, unknown>): WorkspaceControlWork
   const createdAt = optionalString(record, "createdAt");
   const updatedAt = optionalString(record, "updatedAt");
   const lastActivityAt = optionalString(record, "lastActivityAt");
+  const occupancy = occupancySummary(record);
   return {
     workspaceId,
     status,
@@ -413,6 +458,7 @@ function workspaceSummary(record: Record<string, unknown>): WorkspaceControlWork
     ...(createdAt ? { createdAt } : {}),
     ...(updatedAt ? { updatedAt } : {}),
     ...(lastActivityAt ? { lastActivityAt } : {}),
+    ...(occupancy ? { occupancy } : {}),
   };
 }
 
@@ -572,7 +618,45 @@ async function listWorkspaces(
 ): Promise<WorkspaceControlWorkspaceSummary[]> {
   const query = operationValue(ListSandboxesQuery.create({ limit: 100, offset: 0 }));
   const result = resultValue(await context.executeQuery(query)) as SandboxListResult;
-  return result.items.map(workspaceSummary);
+  return result.items
+    .filter((record) => {
+      const status = optionalString(record, "status");
+      return status !== "terminated" && status !== "failed";
+    })
+    .map(workspaceSummary);
+}
+async function listOccupancyResources(
+  context: WorkspaceControlPresentationContext,
+): Promise<readonly OccupancyResource[]> {
+  try {
+    const query = ListResourcesQuery.create({ limit: 100 });
+    if (query.isErr()) return [];
+    const result = await context.executeQuery(query.value);
+    if (result.isErr() || !result.value || typeof result.value !== "object") return [];
+    const items = (result.value as { items?: unknown }).items;
+    return Array.isArray(items) ? (items as OccupancyResource[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function listOccupancyPreviewEnvironments(
+  context: WorkspaceControlPresentationContext,
+  projectId: string | undefined,
+): Promise<readonly OccupancyPreviewEnvironment[]> {
+  try {
+    const query = ListPreviewEnvironmentsQuery.create({
+      ...(projectId ? { projectId } : {}),
+      limit: 100,
+    });
+    if (query.isErr()) return [];
+    const result = await context.executeQuery(query.value);
+    if (result.isErr() || !result.value || typeof result.value !== "object") return [];
+    const items = (result.value as { items?: unknown }).items;
+    return Array.isArray(items) ? (items as OccupancyPreviewEnvironment[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 async function loadDetail(
@@ -671,16 +755,35 @@ async function loadDetail(
   const suspension = suspensionSummary(workspace);
   const activation = activationSummary(workspace);
   const targetSelection = targetSelectionSummary(workspace);
+  const occupancyChrome = occupancyChromeForProject(
+    await listOccupancyResources(context),
+    activation?.project.projectId,
+  );
+  const previewUrl = occupancyChrome.preview
+    ? safePresentationUrl(occupancyChrome.preview.url)
+    : undefined;
+  const productionUrl = occupancyChrome.production
+    ? safePresentationUrl(occupancyChrome.production.url)
+    : undefined;
+  const workspaceSummaryRecord = workspaceSummary(workspace);
+  const pullRequest = occupancyPullRequestFromPreviewEnvironments(
+    await listOccupancyPreviewEnvironments(context, activation?.project.projectId),
+    workspaceSummaryRecord.occupancy,
+  );
   return {
     message: {
       type: "detail",
-      workspace: workspaceSummary(workspace),
+      workspace: workspaceSummaryRecord,
       runtimes: runtimeSummaries,
       ports: portSummaries,
       tasks,
       promotions: promotionSummaries,
       ...(activation ? { activation } : {}),
       ...(targetSelection ? { targetSelection } : {}),
+      ...(previewUrl ? { preview: { url: previewUrl } } : {}),
+      ...(productionUrl ? { production: { url: productionUrl } } : {}),
+      ...(occupancyChrome.deployment ? { deployment: occupancyChrome.deployment } : {}),
+      ...(pullRequest ? { pullRequest } : {}),
       recovery: {
         ...(requestedIsolation ? { requestedIsolation } : {}),
         ...(realizedIsolation ? { realizedIsolation } : {}),
@@ -836,6 +939,61 @@ export function createBoundedWorkspaceControlPresentation(
               await sendSelectedDetail(event.workspaceId);
               continue;
             }
+            if (
+              event.type === "open-pr" ||
+              event.type === "open-preview" ||
+              event.type === "open-production" ||
+              event.type === "open-compare"
+            ) {
+              const selected = requireSelectedWorkspace(event.workspaceId);
+              const target =
+                event.type === "open-pr"
+                  ? {
+                      url: selected.pullRequest?.url,
+                      allowed: isOccupancyGitHubPullRequestUrl,
+                      code: "occupancy_pr_unavailable",
+                      phase: "workspace-control-open-pr",
+                    }
+                  : event.type === "open-preview"
+                    ? {
+                        url: selected.preview?.url,
+                        allowed: isOccupancyHttpUrl,
+                        code: "occupancy_preview_unavailable",
+                        phase: "workspace-control-open-preview",
+                      }
+                    : event.type === "open-production"
+                      ? {
+                          url: selected.production?.url,
+                          allowed: isOccupancyHttpUrl,
+                          code: "occupancy_production_unavailable",
+                          phase: "workspace-control-open-production",
+                        }
+                      : {
+                          url: occupancyCompareOrPullUrl(
+                            selected.workspace.occupancy,
+                            selected.pullRequest?.url,
+                          ),
+                          allowed: (url: string) =>
+                            isOccupancyGitHubPullRequestUrl(url) ||
+                            isOccupancyGitHubCompareUrl(url),
+                          code: "occupancy_compare_unavailable",
+                          phase: "workspace-control-open-compare",
+                        };
+              if (!target.url || !target.allowed(target.url)) {
+                await renderer.send({
+                  type: "error",
+                  code: target.code,
+                  phase: target.phase,
+                  retryable: false,
+                });
+                continue;
+              }
+              if (input.openUrl) {
+                await input.openUrl(target.url);
+              }
+              continue;
+            }
+
             if (event.type === "refresh") {
               await renderer.send({
                 type: "workspaces",

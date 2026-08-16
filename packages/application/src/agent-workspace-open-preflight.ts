@@ -80,6 +80,11 @@ export interface WorkspaceActivationContextInitializerPort {
     }>
   >;
   ensureLocalEnvironment(context: ExecutionContext, projectId: string): Promise<Result<void>>;
+  ensureDefaultResource(
+    context: ExecutionContext,
+    projectId: string,
+    repository: string,
+  ): Promise<Result<void>>;
 }
 
 export class FailClosedWorkspaceOpenCredentialAdmission
@@ -285,6 +290,12 @@ export class AgentWorkspaceOpenPreflightService {
         projectId,
       );
       if (environment.isErr()) return err(environment.error);
+      const resource = await this.dependencies.contextInitializer.ensureDefaultResource(
+        context,
+        projectId,
+        input.repository,
+      );
+      if (resource.isErr()) return err(resource.error);
     }
     const selector =
       input.profile ?? project.toState().defaultWorkspaceProfileInstallationId?.value;

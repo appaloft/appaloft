@@ -317,6 +317,7 @@ export interface SourceInspectionSnapshotState {
   dockerfilePath?: FilePathText;
   composeFilePath?: FilePathText;
   jarPath?: FilePathText;
+  exposedPort?: PortNumber;
 }
 
 export interface RuntimePlanState {
@@ -639,6 +640,10 @@ export class SourceInspectionSnapshot extends ValueObject<SourceInspectionSnapsh
     return this.state.jarPath?.value;
   }
 
+  get exposedPort(): number | undefined {
+    return this.state.exposedPort?.value;
+  }
+
   hasDetectedFile(file: SourceDetectedFile): boolean {
     return this.detectedFiles.includes(file);
   }
@@ -660,6 +665,7 @@ export class SourceInspectionSnapshot extends ValueObject<SourceInspectionSnapsh
       ...(this.state.dockerfilePath ? { dockerfilePath: this.state.dockerfilePath } : {}),
       ...(this.state.composeFilePath ? { composeFilePath: this.state.composeFilePath } : {}),
       ...(this.state.jarPath ? { jarPath: this.state.jarPath } : {}),
+      ...(this.state.exposedPort ? { exposedPort: this.state.exposedPort } : {}),
     };
   }
 }

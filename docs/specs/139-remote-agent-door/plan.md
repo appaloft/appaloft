@@ -23,6 +23,38 @@
 | Plan default Destination | `DeploymentContextResolver` read-only |
 | Headless occupancy tree | public CLI adapter composing `servers.list` + `sandboxes.list` |
 | Occupancy projectId | same tree; copy `activation.project.projectId` |
+| Occupancy Preview URL | same tree; copy succeeded generated access from Resource `app` |
+| Occupancy deploy reuse | public CLI adapter composing Binding + Environment `local` + Resource `app` + default Server |
+| Occupancy EXPOSE port | detector + occupancy initializer |
+| GitHub owner/repo | public CLI remote-code locator |
+| Bare occupancy deploy | public CLI adapter composing latest occupancy + Binding/`app` |
+| Occupancy deploy URL | public CLI adapter printing first generated access URL after create |
+| Occupancy banner Preview URL | public CLI banner composing occupancy Resource `app` generated access |
+| Occupancy last deployment | same occupancy tree; copy Resource `app` lastDeploymentId/status |
+| Occupancy tree filter | same occupancy tree; omit terminated/failed leftovers |
+| Occupancy help door | public CLI root help naming login/code/workspace/deploy |
+| Occupancy TUI identity | public CLI TUI presentation + workspace-control-tui list label |
+| Occupancy TUI chrome | same presentation + TUI detail; copy occupancy Resource `app` preview/deploy |
+| Occupancy TUI PR chrome | same presentation + TUI detail; copy `preview-environments.list` PR |
+| Occupancy TUI production chrome | same presentation + TUI detail; copy Resource `app` durable domain |
+| Occupancy banner PR chrome | public CLI `code` banner; same preview-environment matcher |
+| Occupancy PR URL chrome | same occupancy chrome helper + TUI detail |
+| Occupancy open-PR door | TUI `o` + presentation open of selected GitHub pull URL |
+| Occupancy open-preview door | TUI `p` / `P` + same presentation `openUrl` |
+| Occupancy compare-PR door | TUI `c` + occupancy compare URL helper |
+| Occupancy delivery prefills | TUI Deliver Task form + selected occupancy |
+| Occupancy commit prefill | same Deliver Task form + occupancy short SHA |
+| Occupancy banner compare | public CLI `code` banner + same compare helper |
+| Occupancy banner wrap | same `code` banner formatter |
+| Occupancy code `--open` | public CLI `code --open` + same occupancy URL guards |
+| Occupancy `--open-target` | same `code` selector + chosen target |
+| Occupancy production open | same banner / `--open-target` + Resource durable domain |
+| Occupancy banner labels | same `code` banner formatter |
+| Occupancy door hint | public CLI `code` after banner |
+| Occupancy available-door hint | same `code` hint + occupancy URL selector |
+| Occupancy TUI available-door footer | same occupancy URL selector + `workspace` footer |
+| Occupancy Cloud-compat error | public CLI `code` after unstructured `workspaces.open` validation |
+| Occupancy resume preferred Profile | public `workspaces.open` resume path |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -79,6 +111,227 @@ Slice-8 verification:
 - unit: missing `local` Environment is created;
 - unit: existing `local` is reused and create is not called;
 - `appaloftdev env list --project prj_aoqjs0es367x` shows `local` after occupying Hello-World.
+
+
+Slice-9 verification:
+
+- unit: missing Resource `app` is created with remote-git source;
+- unit: existing Resource `app` is reused and create is not called;
+- `appaloftdev resource list --project prj_aoqjs0es367x` shows slug `app` after occupying Hello-World.
+
+Slice-10 verification:
+
+- unit: created Resource `app` includes network `3000` / `http` / `reverse-proxy`;
+- unit: existing Resource without network is configured; existing network is reused;
+- `appaloftdev deployments plan --resource res_vhmyk4zutvnd --server srv_uil9cpctplou` no longer reports `missing-internal-port`.
+
+Slice-11 verification:
+
+- unit: remote-git with empty inspection does not select dockerfile;
+- unit: remote-git with detected dockerfile still selects dockerfile;
+- `appaloftdev deployments plan --resource res_vhmyk4zutvnd --server srv_uil9cpctplou` is blocked and does not claim `Dockerfile`.
+
+Slice-12 verification:
+
+- unit: remote-git enrichment is allowed;
+- unit: detector inspects a cloned remote with root Dockerfile;
+- `appaloftdev deployments plan --resource res_3qjkhtnc45nk --server srv_uil9cpctplou` against occupied `appaloft/examples` asks for `source.baseDirectory`.
+
+Slice-13 verification:
+
+- unit: occupancy with succeeded generated access prints `preview.url`;
+- unit: occupancy without succeeded access omits `preview`;
+- `appaloftdev workspace --json` after official hello create includes `http://app-jkhtnc45nk.127.0.0.1.sslip.io`.
+
+Slice-14 verification:
+
+- unit: git-remote with occupancy Resource `app` dispatches `deployments.create`;
+- unit: missing Binding/`app` does not invent Resource;
+- `appaloftdev deploy https://github.com/appaloft/examples.git` after occupy does not prompt for method.
+
+Slice-15 verification:
+
+- unit: single Dockerfile EXPOSE is recorded and used as occupancy internalPort;
+- unit: missing or multiple EXPOSE keeps 3000;
+- `appaloftdev resource show` after occupying `traefik/whoami` is `internalPort 80`.
+
+Slice-16 verification:
+
+- unit: `owner/repo` expands to github.com HTTPS when that path is not a local directory;
+- unit: an existing local directory named `owner/repo` stays a path;
+- `appaloftdev code traefik/whoami --no-attach` after occupying examples occupies whoami.
+
+Slice-17 verification:
+
+- unit: bare `deploy` dispatches `deployments.create` for the latest occupancy Resource `app`;
+- unit: bare `deploy` without occupancy fail-closed when non-interactive;
+- `appaloftdev deploy` after occupying `traefik/whoami` does not require a path.
+
+Slice-18 verification:
+
+- unit: occupancy `deploy` stdout includes the generated access URL;
+- unit: missing generated route still prints deployment id;
+- `appaloftdev deploy` after occupying `traefik/whoami` prints the sslip URL.
+
+Slice-19 verification:
+
+- unit: occupancy banner includes generated access URL when Resource `app` has it;
+- unit: missing generated access keeps the existing banner;
+- `appaloftdev code --no-attach` after occupying+deploying `traefik/whoami` prints the sslip URL.
+
+Slice-20 verification:
+
+- unit: occupancy tree includes lastDeploymentId/status from Resource `app`;
+- unit: missing last deployment stays omitted;
+- `appaloftdev workspace --json` after occupying+deploying `traefik/whoami` includes last deployment.
+
+Slice-21 verification:
+
+- unit: occupancy tree omits terminated/failed leftovers;
+- unit: `workspace list` still includes terminated/failed;
+- `appaloftdev workspace --json` after occupying whoami does not list terminated leftovers.
+
+Slice-22 verification:
+
+- unit: top-level help includes `appaloft code` and `appaloft workspace` before `workspace open`;
+- unit: top-level deploy line is not a required `<path>`;
+- `appaloftdev --help` names the occupancy door.
+
+Slice-23 verification:
+
+- unit: TUI workspaces message copies occupancy and omits terminated/failed;
+- unit: TUI list label prefers repo@short-sha;
+- missing occupancy stays workspaceId/status.
+
+Slice-24 verification:
+
+- unit: TUI detail copies Preview URL and last deployment;
+- unit: missing chrome stays omitted;
+- list stays identity-only.
+
+Slice-25 verification:
+
+- unit: TUI detail copies matching preview-environment PR;
+- unit: missing or foreign PR stays omitted.
+
+Slice-26 verification:
+
+- unit: TUI detail copies durable-domain Production URL;
+- unit: generated preview is not labeled Production.
+
+Slice-27 verification:
+
+- unit: `code` banner includes matching `PR #n`;
+- unit: missing or foreign PR stays omitted;
+- `appaloftdev code --no-attach` prints PR when a preview-environment matches.
+
+Slice-28 verification:
+
+- unit: GitHub occupancy PR includes composed pull URL;
+- unit: non-GitHub / missing PR stays without invented URL.
+
+Slice-29 verification:
+
+- unit: `o` opens the selected GitHub pull URL;
+- unit: missing / foreign URL does not spawn a browser.
+
+Slice-30 verification:
+
+- unit: `p` / `P` open selected Preview / Production URLs;
+- unit: missing URL does not spawn a browser.
+
+Slice-31 verification:
+
+- unit: `c` opens GitHub compare for occupancy branch when no PR exists;
+- unit: existing PR still opens the pull URL;
+- unit: missing / non-github occupancy does not spawn a browser.
+
+Slice-32 verification:
+
+- unit: Deliver Task prefills occupancy branch;
+- unit: missing occupancy PR prefills PR title;
+- unit: existing occupancy PR leaves PR fields blank.
+
+Slice-33 verification:
+
+- unit: Deliver Task prefills occupancy commit from short SHA;
+- unit: missing / non-hex / short SHA leaves commit blank.
+
+Slice-34 verification:
+
+- unit: `code` banner copies GitHub compare when no PR exists;
+- unit: existing PR stays PR-only;
+- unit: missing branch / non-github occupancy stays lean.
+
+Slice-35 verification:
+
+- unit: banner wraps Preview / Compare onto following lines;
+- unit: existing PR wrap stays PR-only;
+- unit: lean banner stays one line.
+
+Slice-36 verification:
+
+- unit: `--open` prefers Preview;
+- unit: missing Preview falls back to PR then compare;
+- unit: missing URL does not spawn a browser.
+
+Slice-37 verification:
+
+- unit: `--open-target preview` opens Preview only;
+- unit: `--open-target pr` opens pull URL only;
+- unit: missing chosen target does not fall back.
+
+Slice-38 verification:
+
+- unit: banner copies Production on its own line;
+- unit: `--open-target production` opens Production only;
+- unit: missing Production does not fall back.
+
+Slice-39 verification:
+
+- unit: banner labels Preview / Production;
+- unit: banner labels Compare when no PR exists;
+- unit: existing PR line stays `PR #n`.
+
+Slice-40 verification:
+
+- unit: remote `code` prints the occupancy door hint;
+- unit: hint stays before the model hint;
+- unit: scratch `--local` stays unlabeled.
+
+Slice-41 verification:
+
+- unit: hint lists only present occupancy doors;
+- unit: existing PR omits compare from the hint;
+- unit: no available door stays lean.
+
+Slice-42 verification:
+
+- unit: TUI footer lists only present occupancy doors;
+- unit: existing PR omits compare from the footer;
+- unit: no available door keeps a lean TUI footer.
+
+Slice-43 verification:
+
+- unit: unstructured occupancy validation names the enrolled Server;
+- unit: occupancy does not retry without `targetServerId`;
+- unit: Binding / Profile errors stay specific.
+
+Slice-44 verification:
+
+- unit: default occupancy resume keeps the preferred Profile;
+- unit: explicit `--profile` still fail-closes;
+- unit: `--new` stays isolated.
+
+
+
+
+
+
+
+
+
+
 
 
 ## Risks

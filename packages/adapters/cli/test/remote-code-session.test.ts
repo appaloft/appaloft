@@ -4,12 +4,47 @@ import {
   formatRemoteCodeBanner,
   isRemoteCodeGitRemoteLocator,
   nativeAttachRequiresInteractiveTerminal,
+  occupancyCloudCompatError,
+  REMOTE_CODE_DOOR_HINT,
+  REMOTE_CODE_MODEL_HINT,
   resolveDefaultRemoteCodeDoor,
   selectDefaultRemoteCodeServer,
   selectResumeOccupancy,
 } from "../src/remote-code-session.js";
 
 describe("remote code door", () => {
+  test("[WS-REMOTE-HINT-119] occupancy door hint names existing doors", () => {
+    expect(REMOTE_CODE_DOOR_HINT).toContain("--open-target");
+    expect(REMOTE_CODE_DOOR_HINT).toContain("workspace p/P/o/c");
+    expect(REMOTE_CODE_MODEL_HINT).toContain("OpenCode");
+  });
+  test("[WS-REMOTE-COMPAT-128][WS-REMOTE-COMPAT-129][WS-REMOTE-COMPAT-130] unstructured occupancy validation names the enrolled Server", () => {
+    const server = { id: "srv_4lifk0yrcecy", name: "hostinger" };
+    expect(
+      occupancyCloudCompatError(
+        {
+          code: "bad_request",
+          category: "user",
+          message: "Input validation failed",
+          retryable: false,
+          details: { phase: "orpc-error-normalization", orpcCode: "BAD_REQUEST" },
+        },
+        server,
+      ),
+    ).toMatchObject({
+      code: "workspace_open_target_server_unsupported",
+      message: "This Cloud does not accept occupancy targeting for hostinger (srv_4lifk0yrcecy)",
+      details: { serverId: "srv_4lifk0yrcecy" },
+    });
+    const bound = {
+      code: "not_found",
+      category: "user" as const,
+      message: "RepositoryBinding github.com/traefik/whoami was not found",
+      retryable: false,
+      details: { code: "workspace_open_repository_not_bound" },
+    };
+    expect(occupancyCloudCompatError(bound, server)).toEqual(bound);
+  });
   test("[WS-REMOTE-LOGIN-001] fails closed without login or profile", async () => {
     await expect(
       resolveDefaultRemoteCodeDoor({
@@ -81,10 +116,136 @@ describe("remote code door", () => {
     expect(door.commitSha).toBe("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     expect(door.serverId).toBe("srv_1");
     expect(formatRemoteCodeBanner({ ...door, workspaceId: "sbx_1" })).toBe(
-      "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · sbx_1",
+      "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · sbx_1\nCompare · https://github.com/acme/api/compare/main?expand=1",
     );
     expect(selectDefaultRemoteCodeServer([{ id: "srv_1", name: "mac-mini" }])?.name).toBe(
       "mac-mini",
+    );
+  });
+
+  test("[WS-REMOTE-BANNER-061] occupancy banner includes generated access URL", () => {
+    expect(
+      formatRemoteCodeBanner({
+        projectId: "prj_tk5lovqu2vj8",
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        serverName: "occupancy-mac",
+        workspaceId: "sbx_rn32pzyp8yxr",
+        previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io",
+      }),
+    ).toBe(
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
+    );
+  });
+
+  test("[WS-REMOTE-BANNER-062] missing generated access keeps existing banner", () => {
+    expect(
+      formatRemoteCodeBanner({
+        projectId: "prj_tk5lovqu2vj8",
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        serverName: "occupancy-mac",
+        workspaceId: "sbx_rn32pzyp8yxr",
+      }),
+    ).toBe(
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr",
+    );
+  });
+
+  test("[WS-REMOTE-BANNER-081] occupancy banner includes matching PR", () => {
+    expect(
+      formatRemoteCodeBanner({
+        projectId: "prj_tk5lovqu2vj8",
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        serverName: "occupancy-mac",
+        workspaceId: "sbx_rn32pzyp8yxr",
+        previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io",
+        pullRequestNumber: 928,
+      }),
+    ).toBe(
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nPR #928 · https://github.com/traefik/whoami/pull/928",
+    );
+  });
+
+  test("[WS-REMOTE-BANNER-082][WS-REMOTE-BANNER-083] missing or invalid banner PR stays omitted", () => {
+    expect(
+      formatRemoteCodeBanner({
+        projectId: "prj_tk5lovqu2vj8",
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        serverName: "occupancy-mac",
+        workspaceId: "sbx_rn32pzyp8yxr",
+        previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io",
+        pullRequestNumber: 0,
+      }),
+    ).toBe(
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
+    );
+  });
+
+  test("[WS-REMOTE-BANNER-101][WS-REMOTE-BANNER-104][WS-REMOTE-BANNER-117] occupancy banner copies GitHub compare when no PR exists", () => {
+    expect(
+      formatRemoteCodeBanner({
+        projectId: "prj_tk5lovqu2vj8",
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        serverName: "occupancy-mac",
+        workspaceId: "sbx_rn32pzyp8yxr",
+        previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io",
+        branch: "feat/occupancy",
+      }),
+    ).toBe(
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nCompare · https://github.com/traefik/whoami/compare/feat/occupancy?expand=1",
+    );
+  });
+
+  test("[WS-REMOTE-BANNER-102][WS-REMOTE-BANNER-105][WS-REMOTE-BANNER-118] existing PR banner stays PR-only", () => {
+    expect(
+      formatRemoteCodeBanner({
+        projectId: "prj_tk5lovqu2vj8",
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        serverName: "occupancy-mac",
+        workspaceId: "sbx_rn32pzyp8yxr",
+        previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io",
+        pullRequestNumber: 928,
+        branch: "feat/occupancy",
+      }),
+    ).toBe(
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nPR #928 · https://github.com/traefik/whoami/pull/928",
+    );
+  });
+
+  test("[WS-REMOTE-BANNER-103][WS-REMOTE-BANNER-106] missing compare stays omitted", () => {
+    expect(
+      formatRemoteCodeBanner({
+        projectId: "prj_tk5lovqu2vj8",
+        repositoryIdentity: "gitlab.com/acme/api",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        serverName: "occupancy-mac",
+        workspaceId: "sbx_rn32pzyp8yxr",
+        branch: "feat/occupancy",
+      }),
+    ).toBe(
+      "Remote · prj_tk5lovqu2vj8 · gitlab.com/acme/api@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr",
+    );
+  });
+
+  test("[WS-REMOTE-BANNER-113][WS-REMOTE-BANNER-116] occupancy banner copies Production", () => {
+    expect(
+      formatRemoteCodeBanner({
+        projectId: "prj_tk5lovqu2vj8",
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        serverName: "occupancy-mac",
+        workspaceId: "sbx_rn32pzyp8yxr",
+        previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io",
+        productionUrl: "https://whoami.example/",
+        pullRequestNumber: 928,
+      }),
+    ).toBe(
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nProduction · https://whoami.example/\nPR #928 · https://github.com/traefik/whoami/pull/928",
     );
   });
 
@@ -263,11 +424,11 @@ describe("remote code door", () => {
     expect(nativeAttachRequiresInteractiveTerminal({ isTTY: true }, { isTTY: false })).toBe(false);
   });
 
-  test("[WS-REMOTE-URL-024][WS-REMOTE-URL-SHORTHAND-028] classifies git remotes and leaves owner/repo as a path", () => {
+  test("[WS-REMOTE-URL-024][WS-REMOTE-URL-SHORTHAND-028] classifies git remotes and GitHub owner/repo", () => {
     expect(isRemoteCodeGitRemoteLocator("https://github.com/org/repo.git")).toBe(true);
     expect(isRemoteCodeGitRemoteLocator("ssh://git@github.com/org/repo.git")).toBe(true);
     expect(isRemoteCodeGitRemoteLocator("git@github.com:org/repo.git")).toBe(true);
-    expect(isRemoteCodeGitRemoteLocator("org/repo")).toBe(false);
+    expect(isRemoteCodeGitRemoteLocator("org/repo")).toBe(true);
     expect(isRemoteCodeGitRemoteLocator(".")).toBe(false);
     expect(isRemoteCodeGitRemoteLocator("/tmp/project")).toBe(false);
   });
@@ -388,23 +549,83 @@ describe("remote code door", () => {
     ).rejects.toMatchObject({ code: "workspace_git_ref_ambiguous" });
   });
 
-  test("[WS-REMOTE-URL-SHORTHAND-028] owner/repo stays a local path", async () => {
+  test("[WS-REMOTE-URL-SHORTHAND-028] owner/repo occupies GitHub HTTPS", async () => {
     let locatorCalled = false;
-    await expect(
-      resolveDefaultRemoteCodeDoor(
-        {
-          env: { APPALOFT_TOKEN: "token" },
-          listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
-          resolveLocator: async () => {
-            locatorCalled = true;
-            throw Object.assign(new Error("missing origin"), {
-              code: "workspace_remote_repository_missing",
-            });
+    const door = await resolveDefaultRemoteCodeDoor(
+      {
+        env: { APPALOFT_TOKEN: "token" },
+        listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
+        listOccupancies: async () => [
+          {
+            sandboxId: "sbx_examples",
+            status: "ready",
+            occupancy: {
+              repositoryIdentity: "github.com/appaloft/examples",
+              commitSha: "d".repeat(40),
+              branch: "main",
+            },
+            lastActivityAt: "2026-08-16T12:30:00.000Z",
           },
+        ],
+        resolveLocator: async () => {
+          locatorCalled = true;
+          throw new Error("owner/repo must not read cwd origin");
         },
-        "org/repo",
-      ),
-    ).rejects.toMatchObject({ code: "workspace_remote_repository_missing" });
+        resolveRemoteRef: async (repository, ref) => ({
+          repositoryIdentity: "github.com/traefik/whoami",
+          credentialFreeHttpsRepository: repository,
+          ref,
+          commitSha: "e".repeat(40),
+        }),
+        runGit: async ({ args }) => {
+          if (args[0] === "ls-remote" && args.includes("HEAD")) {
+            expect(args).toContain("https://github.com/traefik/whoami.git");
+            return {
+              stdout: `ref: refs/heads/master\tHEAD\n${"e".repeat(40)}\tHEAD\n`,
+              stderr: "",
+            };
+          }
+          throw new Error(args.join(" "));
+        },
+      },
+      "traefik/whoami",
+    );
+    expect(locatorCalled).toBe(false);
+    expect(door.repositoryIdentity).toBe("github.com/traefik/whoami");
+    expect(door.repository).toBe("https://github.com/traefik/whoami.git");
+    expect(door.branch).toBe("master");
+  });
+
+  test("[WS-REMOTE-URL-SHORTHAND-056] existing local owner/repo directory stays a path", async () => {
+    const { mkdir, mkdtemp, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const root = await mkdtemp(join(tmpdir(), "appaloft-owner-repo-"));
+    const local = join(root, "org", "repo");
+    await mkdir(local, { recursive: true });
+    const previous = process.cwd();
+    let locatorCalled = false;
+    try {
+      process.chdir(root);
+      await expect(
+        resolveDefaultRemoteCodeDoor(
+          {
+            env: { APPALOFT_TOKEN: "token" },
+            listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
+            resolveLocator: async () => {
+              locatorCalled = true;
+              throw Object.assign(new Error("missing origin"), {
+                code: "workspace_remote_repository_missing",
+              });
+            },
+          },
+          "org/repo",
+        ),
+      ).rejects.toMatchObject({ code: "workspace_remote_repository_missing" });
+    } finally {
+      process.chdir(previous);
+      await rm(root, { recursive: true, force: true });
+    }
     expect(locatorCalled).toBe(true);
   });
 });

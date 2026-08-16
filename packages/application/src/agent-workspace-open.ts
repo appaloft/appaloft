@@ -567,7 +567,10 @@ export class AgentWorkspaceOpenService {
           }),
         );
       }
-      if (preferred.profileInstallationId !== resolved.value.profileInstallationId) {
+      if (
+        input.profile &&
+        preferred.profileInstallationId !== resolved.value.profileInstallationId
+      ) {
         return err(
           domainError.conflict("Preferred Workspace is pinned to another Agent Profile", {
             code: "workspace_open_profile_pin_mismatch",
@@ -604,7 +607,10 @@ export class AgentWorkspaceOpenService {
         runtimeId: preferred.runtimeId,
       });
       if (ensured.isErr()) return err(ensured.error);
-      if (agent.profilePin?.profileInstallationId !== resolved.value.profileInstallationId) {
+      const expectedProfileInstallationId = input.profile
+        ? resolved.value.profileInstallationId
+        : preferred.profileInstallationId;
+      if (agent.profilePin?.profileInstallationId !== expectedProfileInstallationId) {
         return err(
           domainError.conflict("Preferred Workspace Runtime Profile pin is inconsistent", {
             code: "workspace_open_runtime_profile_pin_mismatch",

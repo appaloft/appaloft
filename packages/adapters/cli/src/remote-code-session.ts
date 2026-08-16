@@ -1,3 +1,5 @@
+import { existsSync, statSync } from "node:fs";
+
 import { type DomainError } from "@appaloft/core";
 import { activeControlPlaneProfile } from "./control-plane-service.js";
 import {
@@ -6,8 +8,11 @@ import {
   resolveRemoteGitWorkspaceRef,
   type WorkspaceGitCommandRunner,
 } from "./local-git-workspace-context.js";
+import { occupancyGitHubCompareUrl, occupancyGitHubPullRequestUrl } from "./occupancy-chrome.js";
 
 export const REMOTE_CODE_BANNER_PREFIX = "Remote ·";
+export const REMOTE_CODE_DOOR_HINT =
+  "Open · --open-target preview|production|pr|compare · workspace p/P/o/c";
 export const REMOTE_CODE_MODEL_HINT =
   "Connect a model in the attached OpenCode session before running a Task.";
 
@@ -90,13 +95,47 @@ export function formatRemoteCodeBanner(input: {
   readonly commitSha: string;
   readonly serverName: string;
   readonly workspaceId?: string;
+  readonly previewUrl?: string;
+  readonly productionUrl?: string;
+  readonly pullRequestNumber?: number;
+  readonly branch?: string;
 }): string {
   const sha = input.commitSha.slice(0, 7);
   const project = input.projectId?.trim() || "project";
   const occupancy = input.workspaceId?.trim()
     ? `my sandbox · ${input.workspaceId.trim()}`
     : "my sandbox";
-  return `Remote · ${project} · ${input.repositoryIdentity}@${sha} · ${input.serverName} · ${occupancy}`;
+  const lines = [
+    `Remote · ${project} · ${input.repositoryIdentity}@${sha} · ${input.serverName} · ${occupancy}`,
+  ];
+  const preview = input.previewUrl?.trim();
+  if (preview) lines.push(`Preview · ${preview}`);
+  const production = input.productionUrl?.trim();
+  if (production) lines.push(`Production · ${production}`);
+  if (
+    typeof input.pullRequestNumber === "number" &&
+    Number.isInteger(input.pullRequestNumber) &&
+    input.pullRequestNumber > 0
+  ) {
+    const pullUrl = occupancyGitHubPullRequestUrl(
+      {
+        repositoryIdentity: input.repositoryIdentity,
+        commitSha: input.commitSha,
+      },
+      input.pullRequestNumber,
+    );
+    lines.push(
+      pullUrl ? `PR #${input.pullRequestNumber} · ${pullUrl}` : `PR #${input.pullRequestNumber}`,
+    );
+  } else {
+    const compare = occupancyGitHubCompareUrl({
+      repositoryIdentity: input.repositoryIdentity,
+      commitSha: input.commitSha,
+      ...(input.branch ? { branch: input.branch } : {}),
+    });
+    if (compare) lines.push(`Compare · ${compare}`);
+  }
+  return lines.join("\n");
 }
 
 function remoteCodeError(
@@ -117,7 +156,26 @@ export function isRemoteCodeGitRemoteLocator(value: string): boolean {
   const locator = value.trim();
   if (!locator || locator.includes("\0") || /[\r\n]/u.test(locator)) return false;
   if (locator.startsWith("https://") || locator.startsWith("ssh://")) return true;
-  return /^git@[^/\s]+:.+$/u.test(locator);
+  if (/^git@[^/\s]+:.+$/u.test(locator)) return true;
+  return isGitHubOwnerRepoLocator(locator);
+}
+
+function isGitHubOwnerRepoLocator(value: string): boolean {
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?$/u.test(value)) return false;
+  try {
+    return !(existsSync(value) && statSync(value).isDirectory());
+  } catch {
+    return true;
+  }
+}
+
+function expandRemoteCodeGitRemoteLocator(value: string): string {
+  const locator = value.trim();
+  if (isGitHubOwnerRepoLocator(locator)) {
+    const slug = locator.replace(/\.git$/u, "");
+    return `https://github.com/${slug}.git`;
+  }
+  return locator;
 }
 
 export function selectDefaultRemoteCodeServer(
@@ -153,6 +211,31 @@ export function scratchRemoteRejectedError(): DomainError {
     guidance:
       "Use appaloft code <git-remote> without --local, or appaloft code --local in a local directory.",
   });
+}
+
+export function occupancyCloudCompatError(
+  error: DomainError,
+  server: { readonly id: string; readonly name: string },
+): DomainError {
+  if (error.details?.code === "workspace_open_repository_not_bound") return error;
+  if (error.code === "workspace_open_repository_not_bound") return error;
+  const unstructured =
+    error.message === "Input validation failed" &&
+    (error.code === "bad_request" || error.code === "validation_error") &&
+    (error.details?.phase === "orpc-error-normalization" ||
+      error.details?.orpcCode === "BAD_REQUEST");
+  if (!unstructured) return error;
+  return remoteCodeError(
+    "workspace_open_target_server_unsupported",
+    `This Cloud does not accept occupancy targeting for ${server.name} (${server.id})`,
+    {
+      phase: "remote-code-cloud-compat",
+      serverId: server.id,
+      serverName: server.name,
+      guidance:
+        "Deploy a Cloud that accepts workspaces.open targetServerId, then retry. Do not retry without the enrolled Server.",
+    },
+  );
 }
 
 export async function resolveDefaultRemoteCodeDoor(
@@ -346,7 +429,9 @@ async function resolveRemoteCodeGitRemoteLocator(
   readonly ref: string;
   readonly branch: string;
 }> {
-  const normalized = normalizeWorkspaceRepositoryRemote(remoteValue);
+  const normalized = normalizeWorkspaceRepositoryRemote(
+    expandRemoteCodeGitRemoteLocator(remoteValue),
+  );
   const { execFile } = await import("node:child_process");
   const { promisify } = await import("node:util");
   const execFileAsync = promisify(execFile);

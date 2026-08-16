@@ -229,6 +229,20 @@ describe("Resource", () => {
     }
   });
 
+  test("[WS-REMOTE-INSPECT-048] remote-git sources can be enriched from inspection", () => {
+    const resource = Resource.create({
+      ...baseInput,
+      kind: ResourceKindValue.rehydrate("application"),
+      sourceBinding: {
+        kind: SourceKindValue.rehydrate("remote-git"),
+        locator: SourceLocator.rehydrate("https://github.com/traefik/whoami.git"),
+        displayName: DisplayNameText.rehydrate("whoami"),
+      },
+    })._unsafeUnwrap();
+
+    expect(resource.shouldEnrichSourceFromDetector()).toBe(true);
+  });
+
   test("[DMBH-RES-001] Resource composes network and health value predicates", () => {
     expect(ResourceExposureModeValue.rehydrate("direct-port").isDirectPort()).toBe(true);
     expect(HealthCheckTypeValue.rehydrate("http").isHttp()).toBe(true);

@@ -17,6 +17,8 @@ import {
   IssueWorkspaceCollaborationNativeAttachCommand,
   IssueWorkspaceCollaborationTerminalAccessCommand,
   ListAgentTaskRunsQuery,
+  ListPreviewEnvironmentsQuery,
+  ListResourcesQuery,
   ListSandboxAgentHarnessesQuery,
   ListSandboxAgentRuntimesQuery,
   ListSandboxesQuery,
@@ -60,9 +62,20 @@ import {
   SCRATCH_BANNER,
 } from "../local-scratch-session.js";
 import {
+  type OccupancyCodeOpenTarget,
+  occupancyAvailableDoorHint,
+  occupancyBrowserLaunchAllowed,
+  occupancyChromeForProject,
+  occupancyCodeOpenUrl,
+  occupancyLastDeploymentFromResource,
+  occupancyPreviewFromResource,
+  occupancyPullRequestFromPreviewEnvironments,
+} from "../occupancy-chrome.js";
+import {
   formatRemoteCodeBanner,
   isRemoteCodeGitRemoteLocator,
   nativeAttachRequiresInteractiveTerminal,
+  occupancyCloudCompatError,
   REMOTE_CODE_MODEL_HINT,
   resolveDefaultRemoteCodeDoor,
   scratchRemoteRejectedError,
@@ -120,6 +133,21 @@ interface SandboxResult {
   };
 }
 
+interface ResourceListResult {
+  readonly items: readonly {
+    readonly projectId?: string;
+    readonly slug?: string;
+    readonly lastDeploymentId?: string;
+    readonly lastDeploymentStatus?: string;
+    readonly accessSummary?: {
+      readonly latestGeneratedAccessRoute?: {
+        readonly url?: string;
+        readonly deploymentStatus?: string;
+      };
+    };
+  }[];
+}
+
 interface AgentRuntimeResult {
   readonly runtimeId: string;
   readonly status?: string;
@@ -148,11 +176,38 @@ interface ServerListResult {
     readonly providerKey?: string;
   }[];
 }
+function occupancyPreviewUrlForProject(
+  resources: ResourceListResult["items"],
+  projectId: string | undefined,
+): string | undefined {
+  return occupancyChromeForProject(resources, projectId).preview?.url;
+}
+
+function occupancyProductionUrlForProject(
+  resources: ResourceListResult["items"],
+  projectId: string | undefined,
+): string | undefined {
+  return occupancyChromeForProject(resources, projectId).production?.url;
+}
+
 function occupancyTreeFromLists(
   reason: string,
   servers: ServerListResult["items"],
   sandboxes: readonly SandboxResult[],
+  resources: ResourceListResult["items"] = [],
 ) {
+  const previewByProjectId = new Map<string, { readonly url: string }>();
+  const deploymentByProjectId = new Map<
+    string,
+    { readonly id: string; readonly status?: string }
+  >();
+  for (const resource of resources) {
+    if (typeof resource.projectId !== "string") continue;
+    const preview = occupancyPreviewFromResource(resource);
+    if (preview) previewByProjectId.set(resource.projectId, preview);
+    const deployment = occupancyLastDeploymentFromResource(resource);
+    if (deployment) deploymentByProjectId.set(resource.projectId, deployment);
+  }
   return {
     schemaVersion: "appaloft.workspace-occupancy/v1",
     status: "ready",
@@ -166,14 +221,24 @@ function occupancyTreeFromLists(
         : {}),
       ...(typeof server.providerKey === "string" ? { providerKey: server.providerKey } : {}),
     })),
-    occupancies: sandboxes.map((sandbox) => ({
-      workspaceId: sandbox.sandboxId,
-      status: sandbox.status,
-      ...(sandbox.occupancy ? { occupancy: sandbox.occupancy } : {}),
-      ...(typeof sandbox.activation?.project?.projectId === "string"
-        ? { projectId: sandbox.activation.project.projectId }
-        : {}),
-    })),
+    occupancies: sandboxes
+      .filter((sandbox) => sandbox.status !== "terminated" && sandbox.status !== "failed")
+      .map((sandbox) => {
+        const projectId =
+          typeof sandbox.activation?.project?.projectId === "string"
+            ? sandbox.activation.project.projectId
+            : undefined;
+        const preview = projectId ? previewByProjectId.get(projectId) : undefined;
+        const deployment = projectId ? deploymentByProjectId.get(projectId) : undefined;
+        return {
+          workspaceId: sandbox.sandboxId,
+          status: sandbox.status,
+          ...(sandbox.occupancy ? { occupancy: sandbox.occupancy } : {}),
+          ...(projectId ? { projectId } : {}),
+          ...(preview ? { preview } : {}),
+          ...(deployment ? { deployment } : {}),
+        };
+      }),
   };
 }
 
@@ -387,8 +452,15 @@ export const workspaceCodeCommand = EffectCommand.make(
     noAttach: Options.boolean("no-attach").pipe(Options.withDefault(false)),
     local: Options.boolean("local").pipe(Options.withDefault(false)),
     forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
+    open: Options.boolean("open").pipe(Options.withDefault(false)),
+    openTarget: Options.choice("open-target", [
+      "preview",
+      "production",
+      "pr",
+      "compare",
+    ] as const).pipe(Options.optional),
   },
-  ({ forceNew, local, noAttach, path }) =>
+  ({ forceNew, local, noAttach, open, openTarget, path }) =>
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
       if (local) {
@@ -505,7 +577,14 @@ export const workspaceCodeCommand = EffectCommand.make(
           typeof details.workspaceCommitSha === "string"
             ? details.workspaceCommitSha
             : undefined;
-        if (!pinnedSha) return yield* Effect.fail(opened.error);
+        if (!pinnedSha) {
+          return yield* Effect.fail(
+            occupancyCloudCompatError(opened.error, {
+              id: door.serverId,
+              name: door.serverName,
+            }),
+          );
+        }
         const retry = yield* resultToEffect(
           OpenAgentWorkspaceCommand.create({
             ...openInput,
@@ -521,15 +600,90 @@ export const workspaceCodeCommand = EffectCommand.make(
           `Pinned · ${workspaceId} @ ${pinnedSha.slice(0, 7)} · requested ${door.commitSha.slice(0, 7)} · use --new for an isolated Workspace\n`,
         );
       }
+      const bannerProjectId = result.projectId || door.projectId;
+      let previewUrl: string | undefined;
+      let productionUrl: string | undefined;
+      const resourcesQuery = ListResourcesQuery.create({ limit: 100 });
+      if (resourcesQuery.isOk()) {
+        const listed = yield* Effect.promise(() => cli.executeQuery(resourcesQuery.value));
+        if (listed.isOk()) {
+          previewUrl = occupancyPreviewUrlForProject(listed.value.items ?? [], bannerProjectId);
+          productionUrl = occupancyProductionUrlForProject(
+            listed.value.items ?? [],
+            bannerProjectId,
+          );
+        }
+      }
+      let pullRequestNumber: number | undefined;
+      const previewEnvironmentsQuery = ListPreviewEnvironmentsQuery.create({
+        ...(bannerProjectId ? { projectId: bannerProjectId } : {}),
+        limit: 100,
+      });
+      if (previewEnvironmentsQuery.isOk()) {
+        const listed = yield* Effect.promise(() =>
+          cli.executeQuery(previewEnvironmentsQuery.value),
+        );
+        if (listed.isOk()) {
+          pullRequestNumber = occupancyPullRequestFromPreviewEnvironments(
+            listed.value.items ?? [],
+            {
+              repositoryIdentity: door.repositoryIdentity,
+              commitSha: bannerCommitSha,
+            },
+          )?.number;
+        }
+      }
       process.stdout.write(
         `${formatRemoteCodeBanner({
-          projectId: result.projectId || door.projectId,
+          projectId: bannerProjectId,
           repositoryIdentity: door.repositoryIdentity,
           commitSha: bannerCommitSha,
           serverName: door.serverName,
           workspaceId: result.workspaceId,
+          ...(previewUrl ? { previewUrl } : {}),
+          ...(productionUrl ? { productionUrl } : {}),
+          ...(pullRequestNumber ? { pullRequestNumber } : {}),
+          ...(door.branch ? { branch: door.branch } : {}),
         })}\n`,
       );
+      if (open || optionalValue(openTarget)) {
+        const url = occupancyCodeOpenUrl({
+          repositoryIdentity: door.repositoryIdentity,
+          commitSha: bannerCommitSha,
+          ...(previewUrl ? { previewUrl } : {}),
+          ...(productionUrl ? { productionUrl } : {}),
+          ...(pullRequestNumber ? { pullRequestNumber } : {}),
+          ...(door.branch ? { branch: door.branch } : {}),
+          ...(optionalValue(openTarget)
+            ? { target: optionalValue(openTarget) as OccupancyCodeOpenTarget }
+            : {}),
+        });
+        if (url) {
+          process.stdout.write(`Open · ${url}\n`);
+          if (occupancyBrowserLaunchAllowed()) {
+            const command =
+              process.platform === "darwin"
+                ? ["open", url]
+                : process.platform === "win32"
+                  ? ["cmd", "/c", "start", "", url]
+                  : ["xdg-open", url];
+            const child = spawn(command[0]!, command.slice(1), {
+              shell: false,
+              stdio: "ignore",
+            });
+            child.unref();
+          }
+        }
+      }
+      const doorHint = occupancyAvailableDoorHint({
+        repositoryIdentity: door.repositoryIdentity,
+        commitSha: bannerCommitSha,
+        ...(previewUrl ? { previewUrl } : {}),
+        ...(productionUrl ? { productionUrl } : {}),
+        ...(pullRequestNumber ? { pullRequestNumber } : {}),
+        ...(door.branch ? { branch: door.branch } : {}),
+      });
+      if (doorHint) process.stdout.write(`${doorHint}\n`);
       process.stdout.write(`${REMOTE_CODE_MODEL_HINT}\n`);
       if (!attach) return;
       yield* completeWorkspaceOpen(result, true, cli.launchNativeWorkspaceClient);
@@ -1332,8 +1486,14 @@ export const agentWorkspaceCommand = EffectCommand.make(
         const sandboxes = (yield* resultToEffect(
           yield* Effect.promise(() => cli.executeQuery(sandboxesQuery)),
         )) as SandboxListResult;
+        let resources: ResourceListResult["items"] = [];
+        const resourcesQuery = ListResourcesQuery.create({ limit: 100 });
+        if (resourcesQuery.isOk()) {
+          const listed = yield* Effect.promise(() => cli.executeQuery(resourcesQuery.value));
+          if (listed.isOk()) resources = listed.value.items ?? [];
+        }
         return yield* print(
-          occupancyTreeFromLists(reason, servers.items ?? [], sandboxes.items ?? []),
+          occupancyTreeFromLists(reason, servers.items ?? [], sandboxes.items ?? [], resources),
         );
       }
       yield* Effect.tryPromise({
