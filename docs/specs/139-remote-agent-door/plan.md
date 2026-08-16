@@ -25,6 +25,7 @@
 | Occupancy projectId | same tree; copy `activation.project.projectId` |
 | Occupancy Preview URL | same tree; copy succeeded generated access from Resource `app` |
 | Occupancy deploy reuse | public CLI adapter composing Binding + Environment `local` + Resource `app` + default Server |
+| Occupancy EXPOSE port | detector + occupancy initializer |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -118,6 +119,13 @@ Slice-14 verification:
 - unit: git-remote with occupancy Resource `app` dispatches `deployments.create`;
 - unit: missing Binding/`app` does not invent Resource;
 - `appaloftdev deploy https://github.com/appaloft/examples.git` after occupy does not prompt for method.
+
+Slice-15 verification:
+
+- unit: single Dockerfile EXPOSE is recorded and used as occupancy internalPort;
+- unit: missing or multiple EXPOSE keeps 3000;
+- `appaloftdev resource show` after occupying `traefik/whoami` is `internalPort 80`.
+
 
 
 

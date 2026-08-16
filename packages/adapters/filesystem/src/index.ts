@@ -54,6 +54,7 @@ import {
   err,
   FilePathText,
   ok,
+  PortNumber,
   ProviderKey,
   type Result,
   type SourceApplicationShape,
@@ -1068,8 +1069,23 @@ function detectLocalProjectProfile(path: string): LocalProjectProfile | null {
   return null;
 }
 
+function singleDockerfileExpose(path: string): number | undefined {
+  const dockerfilePath = join(path, "Dockerfile");
+  if (!existsSync(dockerfilePath)) return undefined;
+  const ports = new Set<number>();
+  for (const line of readFileSync(dockerfilePath, "utf8").split(/\r?\n/u)) {
+    const match = /^\s*EXPOSE\s+(\d{1,5})\b/iu.exec(line);
+    if (!match) continue;
+    const port = Number(match[1]);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) continue;
+    ports.add(port);
+  }
+  return ports.size === 1 ? [...ports][0] : undefined;
+}
+
 function detectLocalInspection(path: string): SourceInspectionSnapshot {
   const profile = detectLocalProjectProfile(path);
+  const exposedPort = singleDockerfileExpose(path);
   const detectedFiles: SourceDetectedFile[] = [
     ...(existsSync(join(path, "Dockerfile")) ? ["dockerfile" as const] : []),
     ...(existsSync(join(path, "docker-compose.yml")) || existsSync(join(path, "compose.yml"))
@@ -1108,6 +1124,7 @@ function detectLocalInspection(path: string): SourceInspectionSnapshot {
         }
       : {}),
     dockerfilePath: FilePathText.rehydrate("Dockerfile"),
+    ...(exposedPort ? { exposedPort: PortNumber.rehydrate(exposedPort) } : {}),
     ...(existsSync(join(path, "docker-compose.yml"))
       ? { composeFilePath: FilePathText.rehydrate("docker-compose.yml") }
       : existsSync(join(path, "compose.yml"))

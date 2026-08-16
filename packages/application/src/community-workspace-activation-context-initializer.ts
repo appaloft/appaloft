@@ -34,6 +34,7 @@ import {
   type EnvironmentRepository,
   type ProjectRepository,
   type ResourceRepository,
+  type SourceDetector,
 } from "./ports";
 import { type RepositoryBindingRepository } from "./repository-binding";
 import { BindProjectRepositoryCommand } from "./repository-binding-messages";
@@ -77,6 +78,7 @@ export class CommunityWorkspaceActivationContextInitializer
       readonly profiles: AgentWorkspaceProfileInstallationService;
       readonly profileRepository: AgentWorkspaceProfileRegistryRepository;
       readonly defaultProfile?: CommunityRemoteWorkspaceDefaultProfileConfig;
+      readonly sourceDetector?: SourceDetector;
     },
   ) {}
 
@@ -303,16 +305,22 @@ export class CommunityWorkspaceActivationContextInitializer
       ),
     );
     if (existing) {
-      if (existing.toState().networkProfile) return ok(undefined);
+      const existingPort = existing.toState().networkProfile?.internalPort?.value;
+      if (existingPort && existingPort !== 3000) return ok(undefined);
+      const networkProfile = await this.occupancyNetworkProfile(context, repository);
+      if (existingPort === networkProfile.internalPort && existing.toState().networkProfile) {
+        return ok(undefined);
+      }
       const configured = ConfigureResourceNetworkCommand.create({
         resourceId: existing.id.value,
-        networkProfile: OCCUPANCY_DEFAULT_NETWORK_PROFILE,
+        networkProfile,
       });
       if (configured.isErr()) return err(configured.error);
       return this.dependencies.commandBus
         .execute(context, configured.value)
         .then((executed) => (executed.isOk() ? ok(undefined) : err(executed.error)));
     }
+    const networkProfile = await this.occupancyNetworkProfile(context, repository);
     const created = CreateResourceCommand.create({
       projectId,
       environmentId: environment.id.value,
@@ -322,7 +330,7 @@ export class CommunityWorkspaceActivationContextInitializer
         kind: "remote-git",
         locator: repository,
       },
-      networkProfile: OCCUPANCY_DEFAULT_NETWORK_PROFILE,
+      networkProfile,
     });
     if (created.isErr()) return err(created.error);
     const executed = await this.dependencies.commandBus.execute(context, created.value);
@@ -336,6 +344,26 @@ export class CommunityWorkspaceActivationContextInitializer
       ),
     );
     return raced ? ok(undefined) : err(executed.error);
+  }
+
+  private async occupancyNetworkProfile(
+    context: ExecutionContext,
+    repository: string,
+  ): Promise<{
+    readonly internalPort: number;
+    readonly upstreamProtocol: "http";
+    readonly exposureMode: "reverse-proxy";
+  }> {
+    const detector = this.dependencies.sourceDetector;
+    if (!detector) return OCCUPANCY_DEFAULT_NETWORK_PROFILE;
+    const detected = await detector.detect(context, repository);
+    const exposedPort = detected.isOk() ? detected.value.source.inspection?.exposedPort : undefined;
+    if (!exposedPort) return OCCUPANCY_DEFAULT_NETWORK_PROFILE;
+    return {
+      internalPort: exposedPort,
+      upstreamProtocol: "http",
+      exposureMode: "reverse-proxy",
+    };
   }
 }
 

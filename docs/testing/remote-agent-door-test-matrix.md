@@ -58,7 +58,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-PREVIEW-050 | CLI + `appaloftdev` | this slice | occupancy tree copies live generated Preview URL | `packages/adapters/cli/test/agent-workspace-command.test.ts`; live `workspace --json` after hello create |
 | WS-REMOTE-PREVIEW-051 | CLI | this slice | missing generated access stays omitted | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
 | WS-REMOTE-DEPLOY-052 | CLI + `appaloftdev` | this slice | occupancy deploy reuses Resource `app` | `packages/adapters/cli/test/deployment-create-command.test.ts`; live `deploy <git-remote>` after occupy |
-| WS-REMOTE-DEPLOY-053 | CLI | this slice | missing occupancy Resource stays on existing prompt path | `packages/adapters/cli/test/deployment-create-command.test.ts` |
+| WS-REMOTE-DEPLOY-053 | CLI | this slice | missing occupancy Resource stays fail-closed when non-interactive | `packages/adapters/cli/test/deployment-create-command.test.ts` |
+| WS-REMOTE-EXPOSE-054 | filesystem + application + `appaloftdev` | this slice | occupancy uses a single Dockerfile EXPOSE | `packages/adapters/filesystem/test/source-detector.test.ts`; `packages/application/test/community-workspace-activation-context-initializer.test.ts`; live occupy of `traefik/whoami` |
+| WS-REMOTE-EXPOSE-055 | filesystem + application | this slice | missing or multiple EXPOSE keeps 3000 | `packages/adapters/filesystem/test/source-detector.test.ts`; `packages/application/test/community-workspace-activation-context-initializer.test.ts` |
 
 
 

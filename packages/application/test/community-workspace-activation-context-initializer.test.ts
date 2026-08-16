@@ -370,4 +370,84 @@ describe("Community occupancy initializer", () => {
       },
     });
   });
+
+  test("[WS-REMOTE-EXPOSE-054] uses a single detected EXPOSE as occupancy internalPort", async () => {
+    const executed: unknown[] = [];
+    const initializer = new CommunityWorkspaceActivationContextInitializer({
+      commandBus: {
+        execute: async (_context: unknown, command: unknown) => {
+          executed.push(command);
+          return ok({ id: "res_app" });
+        },
+      } as never,
+      projects: {
+        findOne: async () =>
+          ({
+            id: { value: "prj_demo" },
+            toState: () => ({
+              lifecycleStatus: { value: "active" },
+              defaultWorkspaceProfileInstallationId: { value: "awpi_demo" },
+            }),
+          }) as never,
+        upsert: async () => undefined,
+      },
+      environments: {
+        findOne: async () => ({ id: { value: "env_local" } }),
+        upsert: async () => undefined,
+      } as never,
+      resources: {
+        findOne: async () => null,
+        upsert: async () => undefined,
+      } as never,
+      repositoryBindings: {
+        findByIdentity: async () => ({
+          binding: {
+            toState: () => ({
+              status: "active",
+              projectId: { value: "prj_demo" },
+            }),
+          },
+        }),
+        save: async () => undefined,
+      } as never,
+      adapters: { install: async () => ok({ installationId: "aai_demo" }) } as never,
+      profiles: {
+        validate: () => ok({ definitionDigest: "sha256:demo" }),
+        install: async () => ok({ installationId: "awpi_demo" }),
+      } as never,
+      profileRepository: { findInstallationByDefinition: async () => ({}) } as never,
+      defaultProfile,
+      sourceDetector: {
+        detect: async () =>
+          ok({
+            source: { inspection: { exposedPort: 80 } },
+            reasoning: [],
+          }),
+      } as never,
+    });
+
+    const result = await initializer.ensure(
+      createExecutionContext({
+        requestId: "req_occupancy_expose",
+        entrypoint: "cli",
+        actor: { kind: "user", id: "usr_1" },
+        tenant: { tenantId: "tenant_1" },
+      }),
+      {
+        repository: "https://github.com/traefik/whoami.git",
+        repositoryIdentity: "github.com/traefik/whoami",
+        missing: "repository-binding",
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(executed[0]).toBeInstanceOf(CreateResourceCommand);
+    expect(executed[0]).toMatchObject({
+      networkProfile: {
+        internalPort: 80,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+    });
+  });
 });

@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–13 shipped. Slice 14 occupancy deploy reuse owner-confirmed 2026-08-16 (D49–D51).
+- Round: Spec. Slice 1–14 shipped. Slice 15 occupancy EXPOSE port owner-confirmed 2026-08-16 (D52–D54).
 - Date: 2026-08-16.
-- Predecessor: occupancy Preview URL shipped as public #1178.
-- Code changes allowed: yes for slice 14 after the occupancy-deploy ticket is `ready-for-agent`.
+- Predecessor: occupancy deploy reuse shipped as public #1180.
+- Code changes allowed: yes for slice 15 after the occupancy-expose ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -86,6 +86,9 @@ Sandbox on that Server, not one VM per person.
 | D49 | Slice 14 `appaloft deploy <git-remote>` reuses occupancy Resource `app` | Live `deploy https://github.com/appaloft/examples.git` after occupy+create still prompts for Deployment method. Occupancy already has Project / Environment `local` / Resource `app` / default Server. |
 | D50 | Reuse Binding + Environment `local` + Resource slug `app` + default Server; call existing `deployments.create` | Do not create a second Resource. Do not invent method/Dockerfile. Destination still omitted so plan/create resolve Server `default`. |
 | D51 | Missing occupancy Resource: interactive stays on the existing prompt path; non-interactive fail-closed | Do not invent Resource/`app`. No Binding or no `app` is not a silent create. |
+| D52 | Slice 15 occupancy network uses a single Dockerfile `EXPOSE` when present | Live `code` + `deploy` of `traefik/whoami` created `dep_19e01i9s0nkp` and failed `docker_health_check_failed` on published 3000. Dockerfile is `EXPOSE 80`. Occupancy still writes `internalPort 3000`. |
+| D53 | No `EXPOSE` or more than one distinct `EXPOSE` keeps 3000 | Do not invent 80. Do not pick the first of many. |
+| D54 | Existing non-3000 network is reused; occupancy-default 3000 may be replaced by a single `EXPOSE` | User-configured ports stay. The slice-10 default is not a user choice. |
 
 ## Rejected
 
@@ -146,11 +149,12 @@ Later slices after occupancy:
 11. Remote-git planner evidence (slice 11, shipped #1174).
 12. Remote-git inspection (slice 12, shipped #1176).
 13. Occupancy Preview URL (slice 13, shipped #1178).
-14. **Occupancy deploy reuse** (slice 14): `appaloft deploy <git-remote>` creates from occupancy Resource `app`.
-15. Session-native Preview chrome / interactive `workspace` TUI.
-16. GitHub as source surface / `owner/repo` shorthand.
-17. Optional team Connection.
-18. Cloud managed as default Server when no BYOS exists.
+14. Occupancy deploy reuse (slice 14, shipped #1180).
+15. **Occupancy EXPOSE port** (slice 15): occupancy Resource `app` uses a single Dockerfile `EXPOSE`.
+16. Session-native Preview chrome / interactive `workspace` TUI.
+17. GitHub as source surface / `owner/repo` shorthand.
+18. Optional team Connection.
+19. Cloud managed as default Server when no BYOS exists.
 
 ## Delivery chrome (owner 2026-08-15)
 

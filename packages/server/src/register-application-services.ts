@@ -4041,6 +4041,7 @@ export function registerApplicationServices(
           profileRepository: dependencyContainer.resolve<AgentWorkspaceProfileRegistryRepository>(
             tokens.agentWorkspaceProfileRegistryRepository,
           ),
+          sourceDetector: dependencyContainer.resolve(tokens.sourceDetector),
           ...(defaultProfile ? { defaultProfile } : {}),
         });
       }),

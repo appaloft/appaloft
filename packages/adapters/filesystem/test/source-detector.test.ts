@@ -270,6 +270,40 @@ describe("FileSystemSourceDetector", () => {
     expect(detected.source.locator.startsWith("file:")).toBe(true);
   });
 
+  test("[WS-REMOTE-EXPOSE-054] records a single Dockerfile EXPOSE", async () => {
+    ensureReflectMetadata();
+    const [{ createExecutionContext }, { FileSystemSourceDetector }, { pathToFileURL }] =
+      await Promise.all([import("@appaloft/application"), import("../src"), import("node:url")]);
+    const remote = await createGitRemote("expose-one", {
+      Dockerfile: "FROM scratch\nEXPOSE 80\n",
+    });
+
+    const result = await new FileSystemSourceDetector().detect(
+      createExecutionContext({ entrypoint: "cli", requestId: "req_expose_one" }),
+      pathToFileURL(remote).href,
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().source.inspection?.exposedPort).toBe(80);
+  });
+
+  test("[WS-REMOTE-EXPOSE-055] ignores multiple Dockerfile EXPOSE ports", async () => {
+    ensureReflectMetadata();
+    const [{ createExecutionContext }, { FileSystemSourceDetector }, { pathToFileURL }] =
+      await Promise.all([import("@appaloft/application"), import("../src"), import("node:url")]);
+    const remote = await createGitRemote("expose-many", {
+      Dockerfile: "FROM scratch\nEXPOSE 80\nEXPOSE 443\n",
+    });
+
+    const result = await new FileSystemSourceDetector().detect(
+      createExecutionContext({ entrypoint: "cli", requestId: "req_expose_many" }),
+      pathToFileURL(remote).href,
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().source.inspection?.exposedPort).toBeUndefined();
+  });
+
   test("[WS-REMOTE-INSPECT-049] cloned monorepo remote-git asks for baseDirectory", async () => {
     ensureReflectMetadata();
     const [{ createExecutionContext }, { FileSystemSourceDetector }, { pathToFileURL }] =

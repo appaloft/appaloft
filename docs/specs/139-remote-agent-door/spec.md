@@ -3,11 +3,11 @@
 ## Status
 
 - Round: Spec
-- Artifact state: slice 1–13 shipped; slice 14 occupancy deploy reuse accepted 2026-08-16
+- Artifact state: slice 1–14 shipped; slice 15 occupancy EXPOSE port accepted 2026-08-16
 - Discovery: [discovery.md](./discovery.md)
 - Governing decision: ADR-120 plan default destination; ADR-119 locates; ADR-118 occupies; ADR-117 remains the login/Server/`--local` door; ADR-116 remains Scratch-only; ADR-103 stays on explicit `workspace open` Git fail-closed
-- Code changes allowed: yes for slice 14 after the occupancy-deploy ticket is `ready-for-agent`
-- Compatibility: public minor. `appaloft deploy <git-remote>` may reuse occupancy Resource `app`; no new catalog field
+- Code changes allowed: yes for slice 15 after the occupancy-expose ticket is `ready-for-agent`
+- Compatibility: public minor. Occupancy Resource `app` may use Dockerfile `EXPOSE` instead of 3000; no new catalog field
 
 ## Business Outcome
 
@@ -87,20 +87,22 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-PREVIEW-051 | Missing Preview stays omitted | occupancy has projectId but Resource `app` has no succeeded generated route | `appaloft workspace --json` | row has projectId; no invented `preview`. |
 | WS-REMOTE-DEPLOY-052 | Occupancy deploy reuse | occupancy Project has Environment `local` and Resource `app`; default Server exists | `appaloft deploy https://github.com/appaloft/examples.git` | CLI does not prompt for method; dispatches `deployments.create` with occupancy project/env/resource/server. |
 | WS-REMOTE-DEPLOY-053 | Missing occupancy Resource stays fail-closed when non-interactive | git-remote has no Binding or no Resource `app`; no TTY | `appaloft deploy <git-remote>` | exits non-zero `workspace_occupancy_resource_missing`; no invented Resource. |
+| WS-REMOTE-EXPOSE-054 | Occupancy uses single EXPOSE | occupancy remote has one Dockerfile `EXPOSE` | `appaloft code --no-attach` then `resource show` / `deployments.plan` | Resource `internalPort` is that EXPOSE; plan execution port matches. |
+| WS-REMOTE-EXPOSE-055 | Missing or multiple EXPOSE keeps 3000 | occupancy remote has no EXPOSE or more than one distinct EXPOSE | `appaloft code --no-attach` | Resource stays `internalPort 3000`. |
 
 ## Slice Scope
 
-Slice 1–13 shipped.
+Slice 1–14 shipped.
 
-Slice 14 (this ticket): `appaloft deploy <git-remote>` reuses occupancy Resource `app`.
+Slice 15 (this ticket): occupancy Resource `app` uses a single Dockerfile `EXPOSE`.
 
-In slice 14:
+In slice 15:
 
-- resolve Binding → Environment `local` → Resource slug `app` → default Server;
-- dispatch existing `deployments.create`;
-- omit destinationId so Server `default` still resolves.
+- detector records a single Dockerfile `EXPOSE` on inspection;
+- occupancy create / missing network / occupancy-default 3000 use that port;
+- no EXPOSE or multiple distinct EXPOSE keep 3000.
 
-Out of slice 14: inventing `hello/`, `code` banner Preview, interactive TUI chrome, owner/repo shorthand.
+Out of slice 15: inventing 80, owner/repo shorthand, `code` banner Preview.
 
 ## Public Surfaces
 
@@ -144,7 +146,7 @@ Missing Binding is not a `code` hard failure. The initializer creates or reuses 
 - Cloud managed as default Server when no BYOS exists.
 - GitHub `owner/repo` shorthand or `/tree/` URL parsing.
 - `destinations.list` or expanding `servers.show` with destinations.
-- Inventing occupancy Resource or Deployment method when Binding/`app` is missing.
+- Inventing a listen port when Dockerfile has no single `EXPOSE`.
 
 ## Compatibility
 

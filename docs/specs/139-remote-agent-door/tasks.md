@@ -130,6 +130,15 @@
 - [x] Unit tests WS-REMOTE-DEPLOY-052–053
 - [x] `appaloftdev deploy https://github.com/appaloft/examples.git` after occupy
 
+## Slice 15 — occupancy EXPOSE port
+
+- [x] Grill D52–D54
+- [x] Ticket `ready-for-agent` — [#1181](https://github.com/appaloft/appaloft/issues/1181)
+- [x] Detector records a single Dockerfile EXPOSE
+- [x] Occupancy Resource `app` uses that port
+- [x] Unit tests WS-REMOTE-EXPOSE-054–055
+- [x] `appaloftdev` occupy+plan of `traefik/whoami` is port 80
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator
