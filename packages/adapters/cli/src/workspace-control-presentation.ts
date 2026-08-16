@@ -29,6 +29,12 @@ import { type Result } from "@appaloft/core";
 import { type OperateRendererEvent, type OperateRendererMessage } from "./operate-presentation.js";
 import { terminateWorkspaceWithRuntimes } from "./workspace-lifecycle-actions.js";
 
+export interface WorkspaceControlOccupancySummary {
+  readonly repositoryIdentity: string;
+  readonly commitSha: string;
+  readonly branch?: string;
+}
+
 export interface WorkspaceControlWorkspaceSummary {
   readonly workspaceId: string;
   readonly status: string;
@@ -37,6 +43,7 @@ export interface WorkspaceControlWorkspaceSummary {
   readonly createdAt?: string;
   readonly updatedAt?: string;
   readonly lastActivityAt?: string;
+  readonly occupancy?: WorkspaceControlOccupancySummary;
 }
 
 export interface WorkspaceControlRuntimeSummary {
@@ -394,6 +401,22 @@ function suspensionSummary(
   return { mode, portability, ...(recoveryFamily ? { recoveryFamily } : {}) };
 }
 
+function occupancySummary(
+  record: Record<string, unknown>,
+): WorkspaceControlOccupancySummary | undefined {
+  if (!record.occupancy || typeof record.occupancy !== "object") return undefined;
+  const occupancy = record.occupancy as Record<string, unknown>;
+  const repositoryIdentity = optionalString(occupancy, "repositoryIdentity");
+  const commitSha = optionalString(occupancy, "commitSha");
+  if (!repositoryIdentity || !commitSha) return undefined;
+  const branch = optionalString(occupancy, "branch");
+  return {
+    repositoryIdentity,
+    commitSha,
+    ...(branch ? { branch } : {}),
+  };
+}
+
 function workspaceSummary(record: Record<string, unknown>): WorkspaceControlWorkspaceSummary {
   const workspaceId = optionalString(record, "sandboxId");
   const status = optionalString(record, "status");
@@ -405,6 +428,7 @@ function workspaceSummary(record: Record<string, unknown>): WorkspaceControlWork
   const createdAt = optionalString(record, "createdAt");
   const updatedAt = optionalString(record, "updatedAt");
   const lastActivityAt = optionalString(record, "lastActivityAt");
+  const occupancy = occupancySummary(record);
   return {
     workspaceId,
     status,
@@ -413,6 +437,7 @@ function workspaceSummary(record: Record<string, unknown>): WorkspaceControlWork
     ...(createdAt ? { createdAt } : {}),
     ...(updatedAt ? { updatedAt } : {}),
     ...(lastActivityAt ? { lastActivityAt } : {}),
+    ...(occupancy ? { occupancy } : {}),
   };
 }
 
@@ -572,7 +597,12 @@ async function listWorkspaces(
 ): Promise<WorkspaceControlWorkspaceSummary[]> {
   const query = operationValue(ListSandboxesQuery.create({ limit: 100, offset: 0 }));
   const result = resultValue(await context.executeQuery(query)) as SandboxListResult;
-  return result.items.map(workspaceSummary);
+  return result.items
+    .filter((record) => {
+      const status = optionalString(record, "status");
+      return status !== "terminated" && status !== "failed";
+    })
+    .map(workspaceSummary);
 }
 
 async function loadDetail(

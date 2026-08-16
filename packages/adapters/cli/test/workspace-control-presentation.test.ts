@@ -1227,4 +1227,53 @@ describe("Workspace control presentation", () => {
     });
     expect(JSON.stringify(renderer.messages)).not.toContain("must-not-cross");
   });
+
+  test("[WS-REMOTE-CA-069][WS-REMOTE-CA-070][WS-REMOTE-CA-071] TUI list copies occupancy and omits leftovers", async () => {
+    const renderer = new FakeRendererSession([{ type: "quit" }]);
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+
+    await presentation.start({
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery) {
+          return ok({
+            items: [
+              {
+                sandboxId: "sbx_ready",
+                status: "ready",
+                occupancy: {
+                  repositoryIdentity: "github.com/traefik/whoami",
+                  commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+                  branch: "master",
+                },
+              },
+              { sandboxId: "sbx_provisioning", status: "provisioning" },
+              { sandboxId: "sbx_failed", status: "failed" },
+              { sandboxId: "sbx_terminated", status: "terminated" },
+            ],
+          } as T);
+        }
+        throw new Error(`unexpected query ${query.constructor.name}`);
+      },
+    });
+
+    const workspaces = renderer.messages.find((message) => message.type === "workspaces");
+    expect(workspaces).toEqual({
+      type: "workspaces",
+      workspaces: [
+        {
+          workspaceId: "sbx_ready",
+          status: "ready",
+          occupancy: {
+            repositoryIdentity: "github.com/traefik/whoami",
+            commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+            branch: "master",
+          },
+        },
+        { workspaceId: "sbx_provisioning", status: "provisioning" },
+      ],
+    });
+  });
 });

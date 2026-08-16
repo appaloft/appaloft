@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–21 shipped. Slice 22 occupancy help door owner-confirmed 2026-08-16 (D73–D75).
+- Round: Spec. Slice 1–22 shipped. Slice 23 occupancy TUI identity owner-confirmed 2026-08-16 (D76–D78).
 - Date: 2026-08-16.
-- Predecessor: occupancy tree filter shipped as public #1194.
-- Code changes allowed: yes for slice 22 after the occupancy-help-door ticket is `ready-for-agent`.
+- Predecessor: occupancy help door shipped as public #1196.
+- Code changes allowed: yes for slice 23 after the occupancy-tui-identity ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -110,6 +110,9 @@ Sandbox on that Server, not one VM per person.
 | D73 | Slice 22 top-level `--help` names `login` / `code` / `workspace` / `deploy` | Live `appaloftdev --help` still lists `workspace open` and `deploy <path>` as the door. Railway users type `login` then `code` then `up`. |
 | D74 | Keep durable `workspace open` / `workspace create` as later lines | Do not delete the Git-safe delivery door. Do not invent a wizard. |
 | D75 | `deploy` help line is optional locator | Bare `deploy` already reuses occupancy. Required `<path>` is a lie. |
+| D76 | Slice 23 TUI workspace list shows occupancy repo@sha when present | Live TTY `workspace` still paints `sbx_*`. Railway `ca` names the current repo. `workspace --json` already has occupancy identity. |
+| D77 | TUI list omits `terminated` / `failed` leftovers | Same D70 policy. `workspace list` stays the full catalog. |
+| D78 | Preview URL / last deploy / PR number stay out of this TUI list | JSON tree already has preview + last deployment. Do not pull Resource list into the TUI protocol this slice. |
 
 ## Rejected
 
@@ -178,11 +181,11 @@ Later slices after occupancy:
 19. Occupancy banner Preview URL (slice 19, shipped #1190).
 20. Occupancy last deployment (slice 20, shipped #1192).
 21. Occupancy tree filter (slice 21, shipped #1194).
-22. **Occupancy help door** (slice 22): top-level `--help` names `login` / `code` / `workspace` / `deploy`.
-23. Interactive `workspace` TUI / session-native PR chrome.
-24. Optional team Connection.
-25. Cloud managed as default Server when no BYOS exists.
-
+22. Occupancy help door (slice 22, shipped #1196).
+23. **Occupancy TUI identity** (slice 23): interactive `workspace` list shows repo@sha and hides leftovers.
+24. Interactive `workspace` TUI as Railway `ca` navigator (preview / deploy / PR).
+25. Optional team Connection.
+26. Cloud managed as default Server when no BYOS exists.
 ## Delivery chrome (owner 2026-08-15)
 
 Cmux-style “this session is PR #928” is correct *context*. It is not a new GitHub aggregate

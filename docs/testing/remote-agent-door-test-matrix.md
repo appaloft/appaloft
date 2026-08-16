@@ -75,6 +75,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-CA-066 | CLI | this slice | `workspace list` still includes terminated/failed | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
 | WS-REMOTE-DOCS-067 | CLI + `appaloftdev` | this slice | top-level help names occupancy door | `packages/adapters/cli/test/standalone-control-plane.test.ts` or equivalent; live `appaloftdev --help` |
 | WS-REMOTE-DOCS-068 | CLI | this slice | top-level deploy locator is optional | same help test |
+| WS-REMOTE-CA-069 | TUI / unit | this slice | TUI list uses occupancy repo@sha | `workspace-control-presentation.test.ts`; workspace-control-tui |
+| WS-REMOTE-CA-070 | TUI / unit | this slice | TUI list omits terminated/failed | same presentation test |
+| WS-REMOTE-CA-071 | TUI / unit | this slice | missing occupancy stays lean | same presentation test |
 
 
 

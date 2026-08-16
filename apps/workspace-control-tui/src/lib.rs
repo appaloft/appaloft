@@ -8,6 +8,15 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct OccupancySummary {
+    pub repository_identity: String,
+    pub commit_sha: String,
+    #[serde(default)]
+    pub branch: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceSummary {
     pub workspace_id: String,
     pub status: String,
@@ -15,6 +24,23 @@ pub struct WorkspaceSummary {
     pub provider_key: Option<String>,
     #[serde(default)]
     pub source_kind: Option<String>,
+    #[serde(default)]
+    pub occupancy: Option<OccupancySummary>,
+}
+
+fn occupancy_list_label(workspace: &WorkspaceSummary) -> String {
+    match &workspace.occupancy {
+        Some(occupancy) => {
+            let sha = occupancy.commit_sha.get(..7).unwrap_or(&occupancy.commit_sha);
+            let repo = occupancy
+                .repository_identity
+                .strip_prefix("github.com/")
+                .or_else(|| occupancy.repository_identity.strip_prefix("gitlab.com/"))
+                .unwrap_or(&occupancy.repository_identity);
+            format!("{repo}@{sha}")
+        }
+        None => workspace.workspace_id.clone(),
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
@@ -1493,7 +1519,7 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
                 let marker = if index == state.selected { "›" } else { " " };
                 ListItem::new(Line::from(vec![
                     Span::styled(
-                        format!("{marker} {}", workspace.workspace_id),
+                        format!("{marker} {}", occupancy_list_label(workspace)),
                         if index == state.selected {
                             Style::default()
                                 .fg(Color::Cyan)
@@ -2021,6 +2047,30 @@ mod tests {
     use super::*;
 
     #[test]
+    fn ws_remote_ca_069_occupancy_list_label_prefers_repo_sha() {
+        let occupied = WorkspaceSummary {
+            workspace_id: "sbx_1".to_owned(),
+            status: "ready".to_owned(),
+            provider_key: None,
+            source_kind: None,
+            occupancy: Some(OccupancySummary {
+                repository_identity: "github.com/traefik/whoami".to_owned(),
+                commit_sha: "1ce75d01b6978863647da42557a707a479da3a51".to_owned(),
+                branch: Some("master".to_owned()),
+            }),
+        };
+        let lean = WorkspaceSummary {
+            workspace_id: "sbx_lean".to_owned(),
+            status: "ready".to_owned(),
+            provider_key: None,
+            source_kind: None,
+            occupancy: None,
+        };
+        assert_eq!(occupancy_list_label(&occupied), "traefik/whoami@1ce75d0");
+        assert_eq!(occupancy_list_label(&lean), "sbx_lean");
+    }
+
+    #[test]
     fn ws_tui_embed_focus_and_unicode_keep_one_session() {
         let mut state = AppState::default();
         state.apply(ParentMessage::TerminalReady {
@@ -2098,6 +2148,11 @@ mod tests {
                 status: "running".to_owned(),
                 provider_key: Some("registered-server".to_owned()),
                 source_kind: Some("template".to_owned()),
+                occupancy: Some(OccupancySummary {
+                    repository_identity: "github.com/traefik/whoami".to_owned(),
+                    commit_sha: "1ce75d01b6978863647da42557a707a479da3a51".to_owned(),
+                    branch: Some("master".to_owned()),
+                }),
             }],
         });
         state.apply(ParentMessage::Detail {
@@ -2172,7 +2227,7 @@ mod tests {
                     output.push_str(cell.symbol());
                     output
                 });
-        assert!(rendered.contains("https://preview.example.test/"));
+        assert!(rendered.contains("traefik/whoami@1ce75d0"));
         assert!(rendered.contains("task_1"));
         assert!(rendered.contains("prm_1"));
         assert!(rendered.contains("verified"));
@@ -2207,6 +2262,7 @@ mod tests {
                 status: "ready".to_owned(),
                 provider_key: None,
                 source_kind: None,
+                occupancy: None,
             },
             runtimes: Vec::new(),
             ports: Vec::new(),
@@ -2272,6 +2328,7 @@ mod tests {
                 status: "ready".to_owned(),
                 provider_key: None,
                 source_kind: None,
+                occupancy: None,
             },
             runtimes: Vec::new(),
             ports: Vec::new(),
@@ -2350,6 +2407,7 @@ mod tests {
                 status: "terminated".to_owned(),
                 provider_key: Some("registered-server".to_owned()),
                 source_kind: Some("template".to_owned()),
+                occupancy: None,
             },
             runtimes: Vec::new(),
             ports: Vec::new(),
@@ -2415,6 +2473,7 @@ mod tests {
                 status: "ready".to_owned(),
                 provider_key: None,
                 source_kind: None,
+                occupancy: None,
             },
             runtimes: Vec::new(),
             ports: Vec::new(),
@@ -2474,6 +2533,7 @@ mod tests {
                 status: "ready".to_owned(),
                 provider_key: None,
                 source_kind: None,
+                occupancy: None,
             }],
         });
         state.apply(ParentMessage::Detail {
@@ -2544,6 +2604,7 @@ mod tests {
                 status: "ready".to_owned(),
                 provider_key: None,
                 source_kind: None,
+                occupancy: None,
             },
             runtimes: Vec::new(),
             ports: vec![PortSummary {
@@ -2709,6 +2770,7 @@ mod tests {
                 status: "ready".to_owned(),
                 provider_key: None,
                 source_kind: None,
+                occupancy: None,
             }],
         });
         state.apply(ParentMessage::Detail {

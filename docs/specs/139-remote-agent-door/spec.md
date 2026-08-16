@@ -102,20 +102,24 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-CA-066 | workspace list stays complete | same occupancies | `appaloft workspace list` | still includes terminated/failed rows. |
 | WS-REMOTE-DOCS-067 | Top-level help names occupancy door | any checkout | `appaloft --help` | usage includes `appaloft code` and `appaloft workspace` before durable `workspace open`. |
 | WS-REMOTE-DOCS-068 | Top-level deploy locator is optional | any checkout | `appaloft --help` | deploy line is not a required `<path>`. |
+| WS-REMOTE-CA-069 | TUI list uses occupancy identity | TTY + occupancy has repositoryIdentity | `appaloft workspace` | list row shows repo@short-sha, not only `sbx_*`. |
+| WS-REMOTE-CA-070 | TUI list omits leftovers | TTY + occupancies include terminated/failed | `appaloft workspace` | TUI workspaces omit `terminated` and `failed`. |
+| WS-REMOTE-CA-071 | Missing occupancy stays lean | Sandbox has no occupancy | TUI workspaces message | row keeps workspaceId/status; no invented repo. |
 
 ## Slice Scope
 
-Slice 1–21 shipped.
+Slice 1–22 shipped.
 
-Slice 22 (this ticket): top-level `--help` names occupancy doors.
+Slice 23 (this ticket): interactive `workspace` TUI list uses occupancy identity.
 
-In slice 22:
+In slice 23:
 
-- `appaloft --help` lists `login`, `code`, `workspace`, optional `deploy`;
-- durable `workspace open` / `create` stay later lines;
-- no TUI / PR chrome.
+- TUI workspaces message copies sandbox occupancy when present;
+- TUI list omits `terminated` / `failed`;
+- missing occupancy stays workspaceId/status;
+- no preview / deploy / PR chrome in the list.
 
-Out of slice 22: interactive TUI, PR number, Cloud managed default Server.
+Out of slice 23: Railway `ca` navigator chrome, team Connection, Cloud managed default Server.
 
 ## Public Surfaces
 

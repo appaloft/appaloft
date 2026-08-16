@@ -33,6 +33,7 @@
 | Occupancy last deployment | same occupancy tree; copy Resource `app` lastDeploymentId/status |
 | Occupancy tree filter | same occupancy tree; omit terminated/failed leftovers |
 | Occupancy help door | public CLI root help naming login/code/workspace/deploy |
+| Occupancy TUI identity | public CLI TUI presentation + workspace-control-tui list label |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -174,6 +175,12 @@ Slice-22 verification:
 - unit: top-level help includes `appaloft code` and `appaloft workspace` before `workspace open`;
 - unit: top-level deploy line is not a required `<path>`;
 - `appaloftdev --help` names the occupancy door.
+
+Slice-23 verification:
+
+- unit: TUI workspaces message copies occupancy and omits terminated/failed;
+- unit: TUI list label prefers repo@short-sha;
+- missing occupancy stays workspaceId/status.
 
 
 

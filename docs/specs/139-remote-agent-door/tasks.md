@@ -195,6 +195,14 @@
 - [x] Unit tests WS-REMOTE-DOCS-067–068
 - [x] `appaloftdev --help` lists occupancy doors
 
+## Slice 23 — occupancy TUI identity
+
+- [x] Grill D76–D78
+- [x] Ticket `ready-for-agent` — [#1197](https://github.com/appaloft/appaloft/issues/1197)
+- [x] TUI list copies occupancy and omits leftovers
+- [x] Unit tests WS-REMOTE-CA-069–071
+- [x] `appaloftdev workspace` list would show repo@sha
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator
