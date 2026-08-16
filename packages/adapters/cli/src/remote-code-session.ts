@@ -8,7 +8,7 @@ import {
   resolveRemoteGitWorkspaceRef,
   type WorkspaceGitCommandRunner,
 } from "./local-git-workspace-context.js";
-import { occupancyGitHubCompareUrl } from "./occupancy-chrome.js";
+import { occupancyGitHubCompareUrl, occupancyGitHubPullRequestUrl } from "./occupancy-chrome.js";
 
 export const REMOTE_CODE_BANNER_PREFIX = "Remote ·";
 export const REMOTE_CODE_MODEL_HINT =
@@ -102,26 +102,35 @@ export function formatRemoteCodeBanner(input: {
   const occupancy = input.workspaceId?.trim()
     ? `my sandbox · ${input.workspaceId.trim()}`
     : "my sandbox";
-  const parts = [
+  const lines = [
     `Remote · ${project} · ${input.repositoryIdentity}@${sha} · ${input.serverName} · ${occupancy}`,
   ];
   const preview = input.previewUrl?.trim();
-  if (preview) parts.push(preview);
+  if (preview) lines.push(preview);
   if (
     typeof input.pullRequestNumber === "number" &&
     Number.isInteger(input.pullRequestNumber) &&
     input.pullRequestNumber > 0
   ) {
-    parts.push(`PR #${input.pullRequestNumber}`);
+    const pullUrl = occupancyGitHubPullRequestUrl(
+      {
+        repositoryIdentity: input.repositoryIdentity,
+        commitSha: input.commitSha,
+      },
+      input.pullRequestNumber,
+    );
+    lines.push(
+      pullUrl ? `PR #${input.pullRequestNumber} · ${pullUrl}` : `PR #${input.pullRequestNumber}`,
+    );
   } else {
     const compare = occupancyGitHubCompareUrl({
       repositoryIdentity: input.repositoryIdentity,
       commitSha: input.commitSha,
       ...(input.branch ? { branch: input.branch } : {}),
     });
-    if (compare) parts.push(compare);
+    if (compare) lines.push(compare);
   }
-  return parts.join(" · ");
+  return lines.join("\n");
 }
 
 function remoteCodeError(

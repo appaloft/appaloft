@@ -137,21 +137,24 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-BANNER-101 | Occupancy banner copies GitHub compare | occupancy has GitHub repo + branch and no PR | `appaloft code --no-attach` | banner includes `https://github.com/{owner}/{repo}/compare/{branch}?expand=1`. |
 | WS-REMOTE-BANNER-102 | Existing PR banner stays PR-only | occupancy already has PR #n | `appaloft code --no-attach` | banner shows `PR #n` and no compare URL. |
 | WS-REMOTE-BANNER-103 | Missing compare stays omitted | missing branch / non-github occupancy | `appaloft code --no-attach` | banner stays lean. |
+| WS-REMOTE-BANNER-104 | Occupancy banner wraps Preview / Compare | occupancy has Preview + GitHub compare and no PR | `appaloft code --no-attach` | identity first line; Preview and compare each on their own following line. |
+| WS-REMOTE-BANNER-105 | Existing PR wrap stays PR-only | occupancy already has PR #n | `appaloft code --no-attach` | second line is `PR #n` plus pull URL when available; no compare line. |
+| WS-REMOTE-BANNER-106 | Lean banner stays one line | missing Preview / Compare / PR | `appaloft code --no-attach` | identity line only. |
 
 ## Slice Scope
 
-Slice 1–33 shipped.
+Slice 1–34 shipped.
 
-Slice 34 (this ticket): `appaloft code` banner copies occupancy GitHub compare when no PR exists.
+Slice 35 (this ticket): `appaloft code` banner wraps occupancy Preview / Compare / PR onto their own lines.
 
-In slice 34:
+In slice 35:
 
-- banner copies GitHub compare when occupancy has repo + branch and no PR;
-- existing PR still shows `PR #n` only;
-- missing branch / non-github occupancy stays lean;
-- no GitHub write.
+- identity stays the first line;
+- Preview / Compare / PR each follow on their own line when present;
+- existing PR still omits compare;
+- missing URLs stay omitted.
 
-Out of slice 34: catalog create-PR write, team Connection, Cloud managed default Server.
+Out of slice 35: catalog create-PR write, team Connection, Cloud managed default Server.
 
 
 ## Public Surfaces

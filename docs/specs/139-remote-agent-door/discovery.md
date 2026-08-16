@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–33 shipped. Slice 34 occupancy banner compare owner-confirmed 2026-08-16 (D109–D111).
+- Round: Spec. Slice 1–34 shipped. Slice 35 occupancy banner wrap owner-confirmed 2026-08-16 (D112–D114).
 - Date: 2026-08-16.
-- Predecessor: occupancy commit prefill shipped as public #1218.
-- Code changes allowed: yes for slice 34 after the occupancy-banner-compare ticket is `ready-for-agent`.
+- Predecessor: occupancy banner compare shipped as public #1220.
+- Code changes allowed: yes for slice 35 after the occupancy-banner-wrap ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -146,6 +146,9 @@ Sandbox on that Server, not one VM per person.
 | D109 | Slice 34 `code` banner copies GitHub compare when occupancy has branch and no PR | Railway `ca` starts from current branch. Same compare helper as TUI `c`. |
 | D110 | Existing PR still shows `PR #n` only | Do not append compare next to an already-open PR. |
 | D111 | Missing branch / non-github occupancy stays lean | No invented compare URL. Catalog create-PR write stays later. |
+| D112 | Slice 35 `code` identity stays first line; Preview / Compare / PR each follow on their own line | Railway URLs are clickable. One long ` · ` line is not. |
+| D113 | Existing PR line is `PR #n` plus pull URL when available | Do not put compare on the same banner as an already-open PR. |
+| D114 | Missing URLs stay omitted | No extra blank lines. Catalog create-PR write stays later. |
 
 ## Rejected
 
@@ -226,10 +229,11 @@ Later slices after occupancy:
 31. Occupancy compare-PR door (slice 31, shipped #1214).
 32. Occupancy delivery prefills (slice 32, shipped #1216).
 33. Occupancy commit prefill (slice 33, shipped #1218).
-34. **Occupancy banner compare** (slice 34): `code` banner copies GitHub compare when no PR exists.
-35. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
-36. Optional team Connection.
-37. Cloud managed as default Server when no BYOS exists.
+34. Occupancy banner compare (slice 34, shipped #1220).
+35. **Occupancy banner wrap** (slice 35): `code` banner puts Preview / Compare / PR on their own lines.
+36. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
+37. Optional team Connection.
+38. Cloud managed as default Server when no BYOS exists.
 
 Cmux-style “this session is PR #928” is correct *context*. It is not a new GitHub aggregate
 and not something `code` scrapes from the vendor TUI.

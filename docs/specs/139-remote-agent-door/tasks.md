@@ -290,6 +290,14 @@
 - [x] Unit tests WS-REMOTE-BANNER-101–103
 - [x] `appaloftdev code --no-attach` would show github.com/.../compare/...
 
+## Slice 35 — occupancy banner wrap
+
+- [x] Grill D112–D114
+- [x] Ticket `ready-for-agent` — [#1221](https://github.com/appaloft/appaloft/issues/1221)
+- [x] `code` banner wraps Preview / Compare / PR onto their own lines
+- [x] Unit tests WS-REMOTE-BANNER-104–106
+- [x] `appaloftdev code --no-attach` would print compare on its own line
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

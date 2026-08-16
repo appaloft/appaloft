@@ -110,6 +110,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-BANNER-101 | CLI / unit | this slice | occupancy banner copies GitHub compare | `remote-code-session.test.ts` |
 | WS-REMOTE-BANNER-102 | CLI / unit | this slice | existing PR banner stays PR-only | same banner test |
 | WS-REMOTE-BANNER-103 | CLI / unit | this slice | missing compare stays omitted | same banner test |
+| WS-REMOTE-BANNER-104 | CLI / unit | this slice | occupancy banner wraps Preview / Compare | `remote-code-session.test.ts` |
+| WS-REMOTE-BANNER-105 | CLI / unit | this slice | existing PR wrap stays PR-only | same banner test |
+| WS-REMOTE-BANNER-106 | CLI / unit | this slice | lean banner stays one line | same banner test |
 
 
 

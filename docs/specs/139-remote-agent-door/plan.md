@@ -45,6 +45,7 @@
 | Occupancy delivery prefills | TUI Deliver Task form + selected occupancy |
 | Occupancy commit prefill | same Deliver Task form + occupancy short SHA |
 | Occupancy banner compare | public CLI `code` banner + same compare helper |
+| Occupancy banner wrap | same `code` banner formatter |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -252,6 +253,12 @@ Slice-34 verification:
 - unit: `code` banner copies GitHub compare when no PR exists;
 - unit: existing PR stays PR-only;
 - unit: missing branch / non-github occupancy stays lean.
+
+Slice-35 verification:
+
+- unit: banner wraps Preview / Compare onto following lines;
+- unit: existing PR wrap stays PR-only;
+- unit: lean banner stays one line.
 
 
 
