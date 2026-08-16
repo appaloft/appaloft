@@ -52,10 +52,10 @@ Version plan:
 Current release alignment:
 
 <!-- release-alignment:start -->
-- [x] On 2026-08-16, the latest public release is `v1.8.4`; root package
-  and Release Please manifest on `main` are `1.8.4`; the release PR target is
-  `1.8.5`.
-- [x] On 2026-08-16, the roadmap gate allows `Release-As: 1.8.5` because
+- [x] On 2026-08-16, the latest public release is `v1.8.5`; root package
+  and Release Please manifest on `main` are `1.8.5`; the release PR target is
+  `1.8.6`.
+- [x] On 2026-08-16, the roadmap gate allows `Release-As: 1.8.6` because
   Phase 0 through Phase 12 release rules, required items, and exit criteria are checked.
 <!-- release-alignment:end -->
 
