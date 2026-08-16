@@ -235,22 +235,24 @@ function occupancyTreeFromLists(
         : {}),
       ...(typeof server.providerKey === "string" ? { providerKey: server.providerKey } : {}),
     })),
-    occupancies: sandboxes.map((sandbox) => {
-      const projectId =
-        typeof sandbox.activation?.project?.projectId === "string"
-          ? sandbox.activation.project.projectId
-          : undefined;
-      const preview = projectId ? previewByProjectId.get(projectId) : undefined;
-      const deployment = projectId ? deploymentByProjectId.get(projectId) : undefined;
-      return {
-        workspaceId: sandbox.sandboxId,
-        status: sandbox.status,
-        ...(sandbox.occupancy ? { occupancy: sandbox.occupancy } : {}),
-        ...(projectId ? { projectId } : {}),
-        ...(preview ? { preview } : {}),
-        ...(deployment ? { deployment } : {}),
-      };
-    }),
+    occupancies: sandboxes
+      .filter((sandbox) => sandbox.status !== "terminated" && sandbox.status !== "failed")
+      .map((sandbox) => {
+        const projectId =
+          typeof sandbox.activation?.project?.projectId === "string"
+            ? sandbox.activation.project.projectId
+            : undefined;
+        const preview = projectId ? previewByProjectId.get(projectId) : undefined;
+        const deployment = projectId ? deploymentByProjectId.get(projectId) : undefined;
+        return {
+          workspaceId: sandbox.sandboxId,
+          status: sandbox.status,
+          ...(sandbox.occupancy ? { occupancy: sandbox.occupancy } : {}),
+          ...(projectId ? { projectId } : {}),
+          ...(preview ? { preview } : {}),
+          ...(deployment ? { deployment } : {}),
+        };
+      }),
   };
 }
 

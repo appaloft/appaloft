@@ -3,11 +3,11 @@
 ## Status
 
 - Round: Spec
-- Artifact state: slice 1–19 shipped; slice 20 occupancy last deployment accepted 2026-08-16
+- Artifact state: slice 1–20 shipped; slice 21 occupancy tree filter accepted 2026-08-16
 - Discovery: [discovery.md](./discovery.md)
 - Governing decision: ADR-120 plan default destination; ADR-119 locates; ADR-118 occupies; ADR-117 remains the login/Server/`--local` door; ADR-116 remains Scratch-only; ADR-103 stays on explicit `workspace open` Git fail-closed
-- Code changes allowed: yes for slice 20 after the occupancy-last-deployment ticket is `ready-for-agent`
-- Compatibility: public minor. Occupancy tree may include last deployment id/status; no new catalog field
+- Code changes allowed: yes for slice 21 after the occupancy-tree-filter ticket is `ready-for-agent`
+- Compatibility: public minor. Default occupancy tree may omit terminated/failed leftovers; no new catalog field
 
 ## Business Outcome
 
@@ -98,20 +98,22 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-BANNER-062 | Missing Preview stays omitted from banner | occupancy has projectId but Resource `app` has no succeeded generated route | `appaloft code --no-attach` | existing identity banner; no invented URL. |
 | WS-REMOTE-DEPLOY-063 | Occupancy last deployment | occupancy Resource `app` has `lastDeploymentId` | `appaloft workspace --json` | occupancy row includes that id and status. |
 | WS-REMOTE-DEPLOY-064 | Missing last deployment stays omitted | occupancy has projectId but Resource `app` has no last deployment | `appaloft workspace --json` | row has projectId; no invented `deployment`. |
+| WS-REMOTE-CA-065 | Default occupancy tree omits leftovers | logged in + Server; occupancies include terminated/failed | `appaloft workspace --json` | occupancies omit `terminated` and `failed`; ready/provisioning remain. |
+| WS-REMOTE-CA-066 | workspace list stays complete | same occupancies | `appaloft workspace list` | still includes terminated/failed rows. |
 
 ## Slice Scope
 
-Slice 1–19 shipped.
+Slice 1–20 shipped.
 
-Slice 20 (this ticket): occupancy tree includes Resource `app` last deployment id/status.
+Slice 21 (this ticket): default occupancy tree omits terminated/failed leftovers.
 
-In slice 20:
+In slice 21:
 
-- copy `lastDeploymentId` / `lastDeploymentStatus` from occupancy Resource `app`;
-- missing last deployment stays omitted;
-- no invented PR number.
+- `workspace --json` / `--no-tui` hide `terminated` and `failed`;
+- `workspace list` stays the full catalog;
+- no invented PR chrome.
 
-Out of slice 20: interactive TUI, PR chrome, Cloud managed default Server.
+Out of slice 21: interactive TUI, PR number, Cloud managed default Server.
 
 ## Public Surfaces
 

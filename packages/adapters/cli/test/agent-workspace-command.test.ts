@@ -151,7 +151,7 @@ describe("Agent Workspace CLI", () => {
     expect(output.join("")).toContain("structured-output");
   });
 
-  test("[WS-REMOTE-CA-033][WS-REMOTE-CA-034][WS-REMOTE-CA-036][WS-REMOTE-CA-037] headless workspace --json prints servers and occupancies", async () => {
+  test("[WS-REMOTE-CA-033][WS-REMOTE-CA-034][WS-REMOTE-CA-036][WS-REMOTE-CA-037][WS-REMOTE-CA-065] headless workspace --json prints current occupancies", async () => {
     const output: string[] = [];
     const { createCliProgram } = await import("../src");
     const program = createCliProgram({
@@ -212,8 +212,51 @@ describe("Agent Workspace CLI", () => {
     expect(printed).toContain("sbx_demo");
     expect(printed).toContain("github.com/appaloft/appaloft");
     expect(printed).toContain("prj_demo");
-    expect(printed).toContain("sbx_failed");
+    expect(printed).not.toContain("sbx_failed");
     expect(printed).not.toMatch(/sbx_failed[\s\S]{0,120}"projectId"/);
+  });
+
+  test("[WS-REMOTE-CA-066] workspace list still includes terminated and failed leftovers", async () => {
+    const output: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: { execute: async () => ok({}) } as unknown as CommandBus,
+      queryBus: {
+        execute: async () =>
+          ok({
+            items: [
+              { sandboxId: "sbx_ready", status: "ready" },
+              { sandboxId: "sbx_failed", status: "failed" },
+              { sandboxId: "sbx_terminated", status: "terminated" },
+            ],
+          }),
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_workspace_list_leftovers" }),
+      },
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+    });
+    const processWrite = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "workspace", "list"]);
+    } finally {
+      process.stdout.write = processWrite;
+    }
+    const printed = output.join("");
+    expect(printed).toContain("sbx_ready");
+    expect(printed).toContain("sbx_failed");
+    expect(printed).toContain("sbx_terminated");
   });
 
   test("[WS-REMOTE-PREVIEW-050][WS-REMOTE-PREVIEW-051][WS-REMOTE-DEPLOY-063][WS-REMOTE-DEPLOY-064] occupancy tree copies Preview URL and last deployment", async () => {

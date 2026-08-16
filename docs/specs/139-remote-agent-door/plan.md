@@ -31,6 +31,7 @@
 | Occupancy deploy URL | public CLI adapter printing first generated access URL after create |
 | Occupancy banner Preview URL | public CLI banner composing occupancy Resource `app` generated access |
 | Occupancy last deployment | same occupancy tree; copy Resource `app` lastDeploymentId/status |
+| Occupancy tree filter | same occupancy tree; omit terminated/failed leftovers |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -159,7 +160,14 @@ Slice-20 verification:
 
 - unit: occupancy tree includes lastDeploymentId/status from Resource `app`;
 - unit: missing last deployment stays omitted;
-- `appaloftdev workspace --json` after occupying+deploying `traefik/whoami` includes `dep_rfqfapqwpyjn`.
+- `appaloftdev workspace --json` after occupying+deploying `traefik/whoami` includes last deployment.
+
+Slice-21 verification:
+
+- unit: occupancy tree omits terminated/failed leftovers;
+- unit: `workspace list` still includes terminated/failed;
+- `appaloftdev workspace --json` after occupying whoami does not list terminated leftovers.
+
 
 
 

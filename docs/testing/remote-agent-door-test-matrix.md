@@ -71,6 +71,8 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-BANNER-062 | CLI | this slice | missing generated access keeps existing banner | `packages/adapters/cli/test/remote-code-session.test.ts` |
 | WS-REMOTE-DEPLOY-063 | CLI + `appaloftdev` | this slice | occupancy tree includes last deployment id/status | `packages/adapters/cli/test/agent-workspace-command.test.ts`; live `workspace --json` after occupying+deploying whoami |
 | WS-REMOTE-DEPLOY-064 | CLI | this slice | missing last deployment stays omitted | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
+| WS-REMOTE-CA-065 | CLI + `appaloftdev` | this slice | occupancy tree omits terminated/failed leftovers | `packages/adapters/cli/test/agent-workspace-command.test.ts`; live `workspace --json` after occupying whoami |
+| WS-REMOTE-CA-066 | CLI | this slice | `workspace list` still includes terminated/failed | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
 
 
 

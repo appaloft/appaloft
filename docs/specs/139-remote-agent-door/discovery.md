@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–19 shipped. Slice 20 occupancy last deployment owner-confirmed 2026-08-16 (D67–D69).
+- Round: Spec. Slice 1–20 shipped. Slice 21 occupancy tree filter owner-confirmed 2026-08-16 (D70–D72).
 - Date: 2026-08-16.
-- Predecessor: occupancy banner Preview URL shipped as public #1190.
-- Code changes allowed: yes for slice 20 after the occupancy-last-deployment ticket is `ready-for-agent`.
+- Predecessor: occupancy last deployment shipped as public #1192.
+- Code changes allowed: yes for slice 21 after the occupancy-tree-filter ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -104,6 +104,9 @@ Sandbox on that Server, not one VM per person.
 | D67 | Slice 20 occupancy tree copies Resource `app` last deployment id/status | Live `workspace --json` has `preview.url` but no `dep_*`. Agent still guesses the latest create. `resource list` already has `lastDeploymentId` / `lastDeploymentStatus`. |
 | D68 | Copy only those two fields from occupancy Resource `app` | Same list already used for Preview URL. Do not invent a deployment. Do not add a live stream. |
 | D69 | Missing last deployment stays omitted | Tree still prints servers and occupancies. Interactive TUI / PR number stay later. |
+| D70 | Slice 21 default occupancy tree omits `terminated` and `failed` Sandboxes | Live `workspace --json` lists ~25 rows; most are `terminated` leftovers. Railway `ca` shows current workspaces. |
+| D71 | Keep `ready`, `provisioning`, and other non-terminal statuses | Do not hide a Sandbox that can still be attached. `code` resume still uses `selectResumeOccupancy`. |
+| D72 | No new flag this slice | `workspace list` remains the full catalog. Interactive TUI / PR chrome stay later. |
 
 ## Rejected
 
@@ -170,10 +173,11 @@ Later slices after occupancy:
 17. Bare occupancy deploy (slice 17, shipped #1186).
 18. Occupancy deploy URL (slice 18, shipped #1188).
 19. Occupancy banner Preview URL (slice 19, shipped #1190).
-20. **Occupancy last deployment** (slice 20): `workspace --json` includes Resource `app` last deployment id/status.
-21. Interactive `workspace` TUI / session-native PR chrome.
-22. Optional team Connection.
-23. Cloud managed as default Server when no BYOS exists.
+20. Occupancy last deployment (slice 20, shipped #1192).
+21. **Occupancy tree filter** (slice 21): default `workspace --json` omits terminated/failed leftovers.
+22. Interactive `workspace` TUI / session-native PR chrome.
+23. Optional team Connection.
+24. Cloud managed as default Server when no BYOS exists.
 
 ## Delivery chrome (owner 2026-08-15)
 

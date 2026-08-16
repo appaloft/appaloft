@@ -179,6 +179,14 @@
 - [x] Unit tests WS-REMOTE-DEPLOY-063–064
 - [x] `appaloftdev workspace --json` after occupying+deploying `traefik/whoami` includes last deployment
 
+## Slice 21 — occupancy tree filter
+
+- [x] Grill D70–D72
+- [x] Ticket `ready-for-agent` — [#1193](https://github.com/appaloft/appaloft/issues/1193)
+- [x] Default occupancy tree omits terminated/failed
+- [x] Unit tests WS-REMOTE-CA-065–066
+- [x] `appaloftdev workspace --json` after occupying whoami omits terminated leftovers
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator
