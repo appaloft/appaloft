@@ -41,6 +41,8 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-CA-033 | CLI / unit + `appaloftdev` | this slice | headless `workspace --json` prints occupancy tree | `packages/adapters/cli/test/agent-workspace-command.test.ts`; live `appaloftdev workspace --json` |
 | WS-REMOTE-CA-034 | CLI / unit | this slice | `--no-tui` prints the same tree and does not start TUI | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
 | WS-REMOTE-CA-035 | CLI / unit | this slice | interactive `workspace` still starts TUI | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
+| WS-REMOTE-CA-036 | CLI / unit + `appaloftdev` | this slice | occupancy tree includes activation `projectId` | `packages/adapters/cli/test/agent-workspace-command.test.ts`; live `appaloftdev workspace --json` |
+| WS-REMOTE-CA-037 | CLI / unit | this slice | missing activation invents no projectId | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
 
 
 

@@ -57,6 +57,14 @@
 - [x] Unit tests WS-REMOTE-CA-033–035
 - [x] `appaloftdev workspace --json` shows occupancy-mac + ready sandboxes
 
+## Slice 6 — occupancy projectId
+
+- [x] Grill D25–D27
+- [x] Ticket `ready-for-agent` — [#1163](https://github.com/appaloft/appaloft/issues/1163)
+- [x] Headless occupancy tree includes activation `projectId`
+- [x] Unit tests WS-REMOTE-CA-036–037
+- [x] `appaloftdev workspace --json` shows occupancy project ids
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

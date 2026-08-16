@@ -149,7 +149,7 @@ describe("Agent Workspace CLI", () => {
     expect(output.join("")).toContain("structured-output");
   });
 
-  test("[WS-REMOTE-CA-033][WS-REMOTE-CA-034] headless workspace --json prints servers and occupancies", async () => {
+  test("[WS-REMOTE-CA-033][WS-REMOTE-CA-034][WS-REMOTE-CA-036][WS-REMOTE-CA-037] headless workspace --json prints servers and occupancies", async () => {
     const output: string[] = [];
     const { createCliProgram } = await import("../src");
     const program = createCliProgram({
@@ -170,6 +170,13 @@ describe("Agent Workspace CLI", () => {
                   commitSha: "abc123",
                   branch: "main",
                 },
+                activation: {
+                  project: { projectId: "prj_demo" },
+                },
+              },
+              {
+                sandboxId: "sbx_failed",
+                status: "failed",
               },
             ],
           }),
@@ -202,6 +209,9 @@ describe("Agent Workspace CLI", () => {
     expect(printed).toContain("occupancy-mac");
     expect(printed).toContain("sbx_demo");
     expect(printed).toContain("github.com/appaloft/appaloft");
+    expect(printed).toContain("prj_demo");
+    expect(printed).toContain("sbx_failed");
+    expect(printed).not.toMatch(/sbx_failed[\s\S]{0,120}"projectId"/);
   });
 
   test("[WS-TUI-FALLBACK-009][WS-TUI-TERMINAL-012] unsupported host terminals fail closed before renderer startup", async () => {

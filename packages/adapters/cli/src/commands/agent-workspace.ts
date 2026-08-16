@@ -113,7 +113,11 @@ interface SandboxResult {
     readonly commitSha: string;
     readonly branch?: string;
   };
-  readonly [key: string]: unknown;
+  readonly activation?: {
+    readonly project?: {
+      readonly projectId?: string;
+    };
+  };
 }
 
 interface AgentRuntimeResult {
@@ -166,6 +170,9 @@ function occupancyTreeFromLists(
       workspaceId: sandbox.sandboxId,
       status: sandbox.status,
       ...(sandbox.occupancy ? { occupancy: sandbox.occupancy } : {}),
+      ...(typeof sandbox.activation?.project?.projectId === "string"
+        ? { projectId: sandbox.activation.project.projectId }
+        : {}),
     })),
   };
 }
