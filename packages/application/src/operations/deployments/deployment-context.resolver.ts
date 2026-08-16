@@ -47,6 +47,8 @@ export type DeploymentContextInput = Partial<
   >
 >;
 
+const deploymentRuntimeRole = ServerWorkloadRoleValue.rehydrate("deployment-runtime");
+
 export interface ResolvedDeploymentContext {
   project: Project;
   server: DeploymentTarget;

@@ -573,7 +573,7 @@ describe("DeploymentPlanQueryService", () => {
       serverId: "srv_demo",
       includeCommandSpecs: true,
       includeAccessPlan: true,
-    });
+    } as never);
 
     expect(created.isErr()).toBe(true);
     expect(created._unsafeUnwrapErr()).toMatchObject({
