@@ -29,6 +29,7 @@ import {
 } from "@appaloft/application";
 import { type Result } from "@appaloft/core";
 import {
+  isOccupancyGitHubPullRequestUrl,
   type OccupancyPreviewEnvironment,
   type OccupancyResource,
   occupancyChromeForProject,
@@ -177,7 +178,7 @@ export type WorkspaceControlRendererMessage =
       readonly preview?: { readonly url: string };
       readonly production?: { readonly url: string };
       readonly deployment?: { readonly id: string; readonly status?: string };
-      readonly pullRequest?: { readonly number: number };
+      readonly pullRequest?: { readonly number: number; readonly url?: string };
       readonly recovery: WorkspaceControlRecoverySummary;
     }
   | {
@@ -212,6 +213,7 @@ export type WorkspaceControlRendererEvent =
   | { readonly type: "development-stop" }
   | { readonly type: "development-detach" }
   | { readonly type: "select"; readonly workspaceId: string }
+  | { readonly type: "open-pr"; readonly workspaceId: string }
   | { readonly type: "refresh"; readonly workspaceId?: string }
   | { readonly type: "attach"; readonly workspaceId: string; readonly runtimeId: string }
   | {
@@ -286,6 +288,7 @@ export interface BoundedWorkspaceControlPresentationInput {
   openRenderer(): Promise<WorkspaceControlRendererSession>;
   now?: () => string;
   idempotencyKey?: () => string;
+  openUrl?: (url: string) => Promise<boolean> | boolean;
 }
 
 interface SandboxListResult {
@@ -930,6 +933,24 @@ export function createBoundedWorkspaceControlPresentation(
               await sendSelectedDetail(event.workspaceId);
               continue;
             }
+            if (event.type === "open-pr") {
+              const selected = requireSelectedWorkspace(event.workspaceId);
+              const url = selected.pullRequest?.url;
+              if (!url || !isOccupancyGitHubPullRequestUrl(url)) {
+                await renderer.send({
+                  type: "error",
+                  code: "occupancy_pr_unavailable",
+                  phase: "workspace-control-open-pr",
+                  retryable: false,
+                });
+                continue;
+              }
+              if (input.openUrl) {
+                await input.openUrl(url);
+              }
+              continue;
+            }
+
             if (event.type === "refresh") {
               await renderer.send({
                 type: "workspaces",

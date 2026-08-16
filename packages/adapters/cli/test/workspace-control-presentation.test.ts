@@ -1464,4 +1464,134 @@ describe("Workspace control presentation", () => {
     });
     expect(JSON.stringify(detail)).not.toContain('"number":1');
   });
+
+  test("[WS-REMOTE-CA-087][WS-REMOTE-CA-088][WS-REMOTE-CA-089] TUI o opens only the selected GitHub PR URL", async () => {
+    const opened: string[] = [];
+    const renderer = new FakeRendererSession([
+      { type: "select", workspaceId: "sbx_ready" },
+      { type: "open-pr", workspaceId: "sbx_other" },
+      { type: "open-pr", workspaceId: "sbx_ready" },
+      { type: "quit" },
+    ]);
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+      openUrl: async (url) => {
+        opened.push(url);
+        return true;
+      },
+    });
+
+    await presentation.start({
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery || query instanceof ShowSandboxQuery) {
+          return ok({
+            items: [
+              {
+                sandboxId: "sbx_ready",
+                status: "ready",
+                occupancy: {
+                  repositoryIdentity: "github.com/traefik/whoami",
+                  commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+                  branch: "feat/occupancy",
+                },
+                activation: {
+                  project: { projectId: "prj_web", disposition: "created" },
+                  repositoryBinding: { bindingId: "rbd_web", disposition: "created" },
+                  profile: { profileInstallationId: "awpi_default", disposition: "reused" },
+                },
+              },
+            ],
+            sandboxId: "sbx_ready",
+            status: "ready",
+            occupancy: {
+              repositoryIdentity: "github.com/traefik/whoami",
+              commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+              branch: "feat/occupancy",
+            },
+            activation: {
+              project: { projectId: "prj_web", disposition: "created" },
+              repositoryBinding: { bindingId: "rbd_web", disposition: "created" },
+              profile: { profileInstallationId: "awpi_default", disposition: "reused" },
+            },
+          } as T);
+        }
+        if (query instanceof ListPreviewEnvironmentsQuery) {
+          return ok({
+            items: [
+              {
+                updatedAt: "2026-08-16T01:00:00.000Z",
+                source: {
+                  repositoryFullName: "traefik/whoami",
+                  pullRequestNumber: 928,
+                  headSha: "1ce75d01b6978863647da42557a707a479da3a51",
+                },
+              },
+            ],
+          } as T);
+        }
+        if (
+          query instanceof ListResourcesQuery ||
+          query instanceof ListSandboxAgentRuntimesQuery ||
+          query instanceof ListSandboxPortsQuery ||
+          query instanceof ListSandboxPromotionsQuery ||
+          query instanceof ListSandboxSnapshotsQuery
+        ) {
+          return ok({ items: [] } as T);
+        }
+        throw new Error(`unexpected query ${query.constructor.name}`);
+      },
+    });
+
+    expect(opened).toEqual(["https://github.com/traefik/whoami/pull/928"]);
+    expect(renderer.messages.some((message) => message.type === "error")).toBe(true);
+  });
+
+  test("[WS-REMOTE-CA-088] missing PR open stays lean", async () => {
+    const opened: string[] = [];
+    const renderer = new FakeRendererSession([
+      { type: "select", workspaceId: "sbx_ready" },
+      { type: "open-pr", workspaceId: "sbx_ready" },
+      { type: "quit" },
+    ]);
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+      openUrl: async (url) => {
+        opened.push(url);
+        return true;
+      },
+    });
+
+    await presentation.start({
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery || query instanceof ShowSandboxQuery) {
+          return ok({
+            items: [{ sandboxId: "sbx_ready", status: "ready" }],
+            sandboxId: "sbx_ready",
+            status: "ready",
+          } as T);
+        }
+        if (
+          query instanceof ListPreviewEnvironmentsQuery ||
+          query instanceof ListResourcesQuery ||
+          query instanceof ListSandboxAgentRuntimesQuery ||
+          query instanceof ListSandboxPortsQuery ||
+          query instanceof ListSandboxPromotionsQuery ||
+          query instanceof ListSandboxSnapshotsQuery
+        ) {
+          return ok({ items: [] } as T);
+        }
+        throw new Error(`unexpected query ${query.constructor.name}`);
+      },
+    });
+
+    expect(opened).toEqual([]);
+    expect(renderer.messages).toContainEqual({
+      type: "error",
+      code: "occupancy_pr_unavailable",
+      phase: "workspace-control-open-pr",
+      retryable: false,
+    });
+  });
 });

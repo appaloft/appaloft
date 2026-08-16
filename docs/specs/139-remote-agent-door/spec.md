@@ -120,20 +120,23 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-CA-084 | TUI detail copies GitHub PR URL | occupancy is `github.com/owner/repo` and PR matches | TUI detail | shows `https://github.com/owner/repo/pull/n`. |
 | WS-REMOTE-CA-085 | Non-GitHub PR stays number-only | occupancy identity is not github.com | TUI detail | has `PR #n`; no invented host URL. |
 | WS-REMOTE-CA-086 | Missing PR URL stays omitted | occupancy has no matching preview-environment | TUI detail | no invented pull URL. |
+| WS-REMOTE-CA-087 | TUI `o` opens GitHub PR URL | selected detail has github pull URL | `o` | presentation launches that exact URL. |
+| WS-REMOTE-CA-088 | Missing PR open stays lean | selected detail has no pull URL | `o` | no browser spawn; no invented URL. |
+| WS-REMOTE-CA-089 | Foreign open-PR stays rejected | event URL is not the selected occupancy PR | `open-pr` | no browser spawn. |
 
 ## Slice Scope
 
-Slice 1–27 shipped.
+Slice 1–28 shipped.
 
-Slice 28 (this ticket): occupancy TUI detail shows GitHub PR URL.
+Slice 29 (this ticket): interactive `workspace` `o` opens the occupancy GitHub PR URL.
 
-In slice 28:
+In slice 29:
 
-- matching GitHub occupancy gets `https://github.com/{owner}/{repo}/pull/{n}`;
-- non-GitHub stays number-only;
-- no browser launch, no create-PR.
+- `o` opens the selected GitHub pull URL;
+- missing / foreign URL does not spawn a browser;
+- no create-PR.
 
-Out of slice 28: open-in-browser, create-PR navigator, team Connection, Cloud managed default Server.
+Out of slice 29: create-PR navigator, team Connection, Cloud managed default Server.
 
 ## Public Surfaces
 

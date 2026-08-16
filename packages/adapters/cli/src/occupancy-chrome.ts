@@ -72,6 +72,22 @@ export function occupancyGitHubPullRequestUrl(
   return `https://github.com/${github[1]}/pull/${pullRequestNumber}`;
 }
 
+export function isOccupancyGitHubPullRequestUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return false;
+    if (parsed.username || parsed.password || parsed.search || parsed.hash) return false;
+    if (parsed.hostname !== "github.com") return false;
+    return /^\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/[1-9][0-9]*$/u.test(parsed.pathname);
+  } catch {
+    return false;
+  }
+}
+
+export function occupancyBrowserLaunchAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env["APPALOFT_CLI_OPEN_BROWSER"] !== "false" && env["CI"] !== "true";
+}
+
 function previewEnvironmentMatchesOccupancy(
   environment: OccupancyPreviewEnvironment,
   occupancy: OccupancyIdentity,

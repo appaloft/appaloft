@@ -402,6 +402,14 @@ fn main() -> Result<()> {
                 )?,
                 KeyCode::Char('R') => send(&mut writer, &RendererEvent::TerminalReconnect)?,
                 KeyCode::Char('f') => state.toggle_focus_mode(),
+                KeyCode::Char('o') => {
+                    if let Some(workspace_id) = state.selected_workspace_id().map(str::to_owned) {
+                        send(
+                            &mut writer,
+                            &RendererEvent::OpenPr { workspace_id },
+                        )?;
+                    }
+                }
                 KeyCode::Char('a') => {
                     state.open_action_menu();
                 }

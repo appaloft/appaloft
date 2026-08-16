@@ -6,6 +6,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { domainError } from "@appaloft/core";
+import { occupancyBrowserLaunchAllowed } from "./occupancy-chrome.js";
 import {
   createBoundedOperatePresentation,
   type OperateAction,
@@ -188,6 +189,10 @@ function parseRendererEvent(value: unknown): WorkspaceControlRendererEvent | und
     case "select":
       return typeof record.workspaceId === "string"
         ? { type: "select", workspaceId: record.workspaceId }
+        : undefined;
+    case "open-pr":
+      return typeof record.workspaceId === "string"
+        ? { type: "open-pr", workspaceId: record.workspaceId }
         : undefined;
     case "refresh":
       return typeof record.workspaceId === "string"
@@ -541,12 +546,28 @@ export function createRatatuiWorkspaceControlPresentation(
           });
           return {
             exited,
-            terminate: () => {
-              child.kill("SIGTERM");
+            terminate() {
+              child.kill();
             },
           };
         },
       });
+    },
+    openUrl: async (url) => {
+      const environment = input.environment ?? process.env;
+      if (!occupancyBrowserLaunchAllowed(environment)) return false;
+      const command =
+        process.platform === "darwin"
+          ? ["open", url]
+          : process.platform === "win32"
+            ? ["cmd", "/c", "start", "", url]
+            : ["xdg-open", url];
+      const child = spawn(command[0]!, command.slice(1), {
+        shell: false,
+        stdio: "ignore",
+      });
+      child.unref();
+      return true;
     },
   });
 }

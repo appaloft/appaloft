@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  isOccupancyGitHubPullRequestUrl,
   occupancyChromeForProject,
   occupancyPullRequestFromPreviewEnvironments,
 } from "../src/occupancy-chrome.js";
@@ -109,6 +110,19 @@ describe("occupancy PR chrome", () => {
         },
       ),
     ).toEqual({ number: 12 });
+  });
+
+  test("[WS-REMOTE-CA-087] accepts only https GitHub pull URLs", () => {
+    expect(isOccupancyGitHubPullRequestUrl("https://github.com/traefik/whoami/pull/928")).toBe(
+      true,
+    );
+    expect(isOccupancyGitHubPullRequestUrl("http://github.com/traefik/whoami/pull/928")).toBe(
+      false,
+    );
+    expect(isOccupancyGitHubPullRequestUrl("https://gitlab.com/acme/api/pull/12")).toBe(false);
+    expect(isOccupancyGitHubPullRequestUrl("https://github.com/traefik/whoami/issues/928")).toBe(
+      false,
+    );
   });
 });
 

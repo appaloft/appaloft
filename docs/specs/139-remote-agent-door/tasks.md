@@ -243,6 +243,14 @@
 - [x] Unit tests WS-REMOTE-CA-084–086
 - [x] `appaloftdev workspace` detail would show github.com/.../pull/n
 
+## Slice 29 — occupancy open-PR door
+
+- [x] Grill D94–D96
+- [x] Ticket `ready-for-agent` — [#1209](https://github.com/appaloft/appaloft/issues/1209)
+- [x] TUI `o` opens selected GitHub PR URL
+- [x] Unit tests WS-REMOTE-CA-087–089
+- [x] `appaloftdev workspace` `o` would open github.com/.../pull/n
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator
