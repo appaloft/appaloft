@@ -3,11 +3,11 @@
 ## Status
 
 - Round: Spec
-- Artifact state: slice 1–20 shipped; slice 21 occupancy tree filter accepted 2026-08-16
+- Artifact state: slice 1–21 shipped; slice 22 occupancy help door accepted 2026-08-16
 - Discovery: [discovery.md](./discovery.md)
 - Governing decision: ADR-120 plan default destination; ADR-119 locates; ADR-118 occupies; ADR-117 remains the login/Server/`--local` door; ADR-116 remains Scratch-only; ADR-103 stays on explicit `workspace open` Git fail-closed
-- Code changes allowed: yes for slice 21 after the occupancy-tree-filter ticket is `ready-for-agent`
-- Compatibility: public minor. Default occupancy tree may omit terminated/failed leftovers; no new catalog field
+- Code changes allowed: yes for slice 22 after the occupancy-help-door ticket is `ready-for-agent`
+- Compatibility: public minor. Top-level CLI help names occupancy doors; no new catalog field
 
 ## Business Outcome
 
@@ -45,7 +45,7 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-LOCAL-010 | Scratch is explicit | any directory | `appaloft code --local` | Spec 138 Scratch contract; no Server/Sandbox required. |
 | WS-REMOTE-OPEN-COMPAT-011 | Delivery open unchanged | `workspace open` / `workspace create` | dirty/non-git laptop | existing `workspace_git_*` fail-closed. Bare `workspace open` does not require `targetServerId`. |
 | WS-REMOTE-CAPACITY-012 | No silent fallback | default Server has no capacity | `appaloft code` | fail closed; not Scratch; not another teammate’s Sandbox; not a different Server; not managed substitution. |
-| WS-REMOTE-DOCS-013 | Help names doors | `code --help` / Workspace docs | rendered | default `code` occupies my Sandbox; `--local` is Scratch; `workspace open` is delivery Git-safe; `workspace` `ca` is later. |
+| WS-REMOTE-DOCS-013 | Help names doors | `appaloft --help` / `code --help` / Workspace docs | rendered | default `code` occupies my Sandbox; `--local` is Scratch; `workspace` is occupancy tree; `workspace open` is delivery Git-safe; bare `deploy` reuses occupancy. |
 | WS-REMOTE-BANNER-014 | Identity after occupy | `workspaces.open` succeeds | attach or `--no-attach` | stdout has one banner: `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>` and optional ` · <preview-url>` when Resource `app` already has succeeded generated access. No live deploy stream. |
 | WS-REMOTE-TARGET-015 | Door Server is placement | door selected Server S | `code` dispatches open | command includes `targetServerId=S`; placement reserves S. |
 | WS-REMOTE-NO-ATTACH-016 | Occupy without attach | `--no-attach` | `appaloft code --no-attach` | Sandbox is created or resumed; CLI does not attach; exit 0; `sandbox list` shows my occupancy. |
@@ -100,20 +100,22 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-DEPLOY-064 | Missing last deployment stays omitted | occupancy has projectId but Resource `app` has no last deployment | `appaloft workspace --json` | row has projectId; no invented `deployment`. |
 | WS-REMOTE-CA-065 | Default occupancy tree omits leftovers | logged in + Server; occupancies include terminated/failed | `appaloft workspace --json` | occupancies omit `terminated` and `failed`; ready/provisioning remain. |
 | WS-REMOTE-CA-066 | workspace list stays complete | same occupancies | `appaloft workspace list` | still includes terminated/failed rows. |
+| WS-REMOTE-DOCS-067 | Top-level help names occupancy door | any checkout | `appaloft --help` | usage includes `appaloft code` and `appaloft workspace` before durable `workspace open`. |
+| WS-REMOTE-DOCS-068 | Top-level deploy locator is optional | any checkout | `appaloft --help` | deploy line is not a required `<path>`. |
 
 ## Slice Scope
 
-Slice 1–20 shipped.
+Slice 1–21 shipped.
 
-Slice 21 (this ticket): default occupancy tree omits terminated/failed leftovers.
+Slice 22 (this ticket): top-level `--help` names occupancy doors.
 
-In slice 21:
+In slice 22:
 
-- `workspace --json` / `--no-tui` hide `terminated` and `failed`;
-- `workspace list` stays the full catalog;
-- no invented PR chrome.
+- `appaloft --help` lists `login`, `code`, `workspace`, optional `deploy`;
+- durable `workspace open` / `create` stay later lines;
+- no TUI / PR chrome.
 
-Out of slice 21: interactive TUI, PR number, Cloud managed default Server.
+Out of slice 22: interactive TUI, PR number, Cloud managed default Server.
 
 ## Public Surfaces
 

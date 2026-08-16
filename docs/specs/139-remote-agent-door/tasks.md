@@ -187,6 +187,14 @@
 - [x] Unit tests WS-REMOTE-CA-065–066
 - [x] `appaloftdev workspace --json` after occupying whoami omits terminated leftovers
 
+## Slice 22 — occupancy help door
+
+- [x] Grill D73–D75
+- [x] Ticket `ready-for-agent` — [#1195](https://github.com/appaloft/appaloft/issues/1195)
+- [x] Top-level `--help` names `code` / `workspace` / optional `deploy`
+- [x] Unit tests WS-REMOTE-DOCS-067–068
+- [x] `appaloftdev --help` lists occupancy doors
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

@@ -73,6 +73,8 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-DEPLOY-064 | CLI | this slice | missing last deployment stays omitted | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
 | WS-REMOTE-CA-065 | CLI + `appaloftdev` | this slice | occupancy tree omits terminated/failed leftovers | `packages/adapters/cli/test/agent-workspace-command.test.ts`; live `workspace --json` after occupying whoami |
 | WS-REMOTE-CA-066 | CLI | this slice | `workspace list` still includes terminated/failed | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
+| WS-REMOTE-DOCS-067 | CLI + `appaloftdev` | this slice | top-level help names occupancy door | `packages/adapters/cli/test/standalone-control-plane.test.ts` or equivalent; live `appaloftdev --help` |
+| WS-REMOTE-DOCS-068 | CLI | this slice | top-level deploy locator is optional | same help test |
 
 
 

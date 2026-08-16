@@ -188,15 +188,17 @@ function renderRootHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
 
 Usage:
   appaloft login [--url <url>] [--mode cloud|self-hosted] [--no-browser]
-  appaloft auth mcp login [--url <url>] [--mode cloud|self-hosted] [--profile <name>] [--no-browser]
-  appaloft auth mcp codex install [--profile <name>] [--server-name <name>] [--codex-home <path>] [--command <command>]
-  appaloft auth token login [--stdin | --token-file <path>] [--url <url>] [--profile <name>]
+  appaloft code [path|git-remote] [--no-attach] [--local] [--new]
+  appaloft workspace [--json]
+  appaloft deploy [path|git-remote]
+  appaloft server list
   appaloft auth status
   appaloft context show
   appaloft workspace open [path] [--profile <name-or-id>] [--new] [--no-attach]
   appaloft workspace create --profile <name-or-id> --repo <https-url> --ref <git-ref> --branch <branch> [--attach]
-  appaloft server list
-  appaloft deploy <path>
+  appaloft auth mcp login [--url <url>] [--mode cloud|self-hosted] [--profile <name>] [--no-browser]
+  appaloft auth mcp codex install [--profile <name>] [--server-name <name>] [--codex-home <path>] [--command <command>]
+  appaloft auth token login [--stdin | --token-file <path>] [--url <url>] [--profile <name>]
 
 Options:
   --help, -h     Show this help

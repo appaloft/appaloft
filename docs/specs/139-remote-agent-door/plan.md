@@ -32,6 +32,7 @@
 | Occupancy banner Preview URL | public CLI banner composing occupancy Resource `app` generated access |
 | Occupancy last deployment | same occupancy tree; copy Resource `app` lastDeploymentId/status |
 | Occupancy tree filter | same occupancy tree; omit terminated/failed leftovers |
+| Occupancy help door | public CLI root help naming login/code/workspace/deploy |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -167,6 +168,13 @@ Slice-21 verification:
 - unit: occupancy tree omits terminated/failed leftovers;
 - unit: `workspace list` still includes terminated/failed;
 - `appaloftdev workspace --json` after occupying whoami does not list terminated leftovers.
+
+Slice-22 verification:
+
+- unit: top-level help includes `appaloft code` and `appaloft workspace` before `workspace open`;
+- unit: top-level deploy line is not a required `<path>`;
+- `appaloftdev --help` names the occupancy door.
+
 
 
 
