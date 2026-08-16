@@ -62,11 +62,11 @@ describe("Community occupancy initializer", () => {
     const executed: unknown[] = [];
     const initializer = new CommunityWorkspaceActivationContextInitializer({
       commandBus: {
-        execute: async (_context, command) => {
+        execute: async (_context: unknown, command: unknown) => {
           executed.push(command);
           return ok({ id: "env_created" });
         },
-      },
+      } as never,
       projects: {
         findOne: async () =>
           ({
@@ -127,11 +127,11 @@ describe("Community occupancy initializer", () => {
     const executed: unknown[] = [];
     const initializer = new CommunityWorkspaceActivationContextInitializer({
       commandBus: {
-        execute: async (_context, command) => {
+        execute: async (_context: unknown, command: unknown) => {
           executed.push(command);
           return ok({ id: "unused" });
         },
-      },
+      } as never,
       projects: {
         findOne: async () =>
           ({
@@ -146,7 +146,7 @@ describe("Community occupancy initializer", () => {
       environments: {
         findOne: async () => ({ id: { value: "env_local" } }),
         upsert: async () => undefined,
-      },
+      } as never,
       repositoryBindings: {
         findByIdentity: async () => ({
           binding: {
