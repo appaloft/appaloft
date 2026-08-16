@@ -134,21 +134,24 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-CA-098 | Existing occupancy PR leaves PR fields blank | occupancy already has a PR | `d` Deliver Task | title/body/base stay empty. |
 | WS-REMOTE-CA-099 | Deliver Task prefills occupancy commit | selected occupancy has a hex commitSha ≥ 7 | `d` Deliver Task | commit is `Deliver occupancy <shortSha>`. |
 | WS-REMOTE-CA-100 | Missing occupancy SHA leaves commit blank | missing / non-hex / short SHA | `d` Deliver Task | commit stays empty; no invented SHA. |
+| WS-REMOTE-BANNER-101 | Occupancy banner copies GitHub compare | occupancy has GitHub repo + branch and no PR | `appaloft code --no-attach` | banner includes `https://github.com/{owner}/{repo}/compare/{branch}?expand=1`. |
+| WS-REMOTE-BANNER-102 | Existing PR banner stays PR-only | occupancy already has PR #n | `appaloft code --no-attach` | banner shows `PR #n` and no compare URL. |
+| WS-REMOTE-BANNER-103 | Missing compare stays omitted | missing branch / non-github occupancy | `appaloft code --no-attach` | banner stays lean. |
 
 ## Slice Scope
 
-Slice 1–32 shipped.
+Slice 1–33 shipped.
 
-Slice 33 (this ticket): interactive `workspace` Deliver Task prefills occupancy commit message.
+Slice 34 (this ticket): `appaloft code` banner copies occupancy GitHub compare when no PR exists.
 
-In slice 33:
+In slice 34:
 
-- Deliver Task prefills `Deliver occupancy <shortSha>` when occupancy has a hex SHA ≥ 7;
-- missing / non-hex / short SHA leaves commit blank;
-- existing occupancy PR still leaves PR fields blank;
-- no auto-submit and no GitHub write.
+- banner copies GitHub compare when occupancy has repo + branch and no PR;
+- existing PR still shows `PR #n` only;
+- missing branch / non-github occupancy stays lean;
+- no GitHub write.
 
-Out of slice 33: catalog create-PR write, team Connection, Cloud managed default Server.
+Out of slice 34: catalog create-PR write, team Connection, Cloud managed default Server.
 
 
 ## Public Surfaces

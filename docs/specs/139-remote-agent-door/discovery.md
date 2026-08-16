@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1–32 shipped. Slice 33 occupancy commit prefill owner-confirmed 2026-08-16 (D106–D108).
+- Round: Spec. Slice 1–33 shipped. Slice 34 occupancy banner compare owner-confirmed 2026-08-16 (D109–D111).
 - Date: 2026-08-16.
-- Predecessor: occupancy delivery prefills shipped as public #1216.
-- Code changes allowed: yes for slice 33 after the occupancy-commit-prefill ticket is `ready-for-agent`.
+- Predecessor: occupancy commit prefill shipped as public #1218.
+- Code changes allowed: yes for slice 34 after the occupancy-banner-compare ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -143,6 +143,9 @@ Sandbox on that Server, not one VM per person.
 | D106 | Slice 33 TUI Deliver Task prefills commit from occupancy short SHA | Railway `ca` starts from current work. Message is `Deliver occupancy <shortSha>`. No auto-submit. |
 | D107 | Short SHA is the first 7 hex chars of occupancy commitSha | Missing / non-hex / shorter-than-7 SHA stays blank. Do not invent a commit. |
 | D108 | Existing occupancy PR still leaves PR fields blank | Branch + commit still prefill. Catalog `task deliver --pull-request-*` stays the write path. |
+| D109 | Slice 34 `code` banner copies GitHub compare when occupancy has branch and no PR | Railway `ca` starts from current branch. Same compare helper as TUI `c`. |
+| D110 | Existing PR still shows `PR #n` only | Do not append compare next to an already-open PR. |
+| D111 | Missing branch / non-github occupancy stays lean | No invented compare URL. Catalog create-PR write stays later. |
 
 ## Rejected
 
@@ -222,10 +225,11 @@ Later slices after occupancy:
 30. Occupancy open-preview door (slice 30, shipped #1212).
 31. Occupancy compare-PR door (slice 31, shipped #1214).
 32. Occupancy delivery prefills (slice 32, shipped #1216).
-33. **Occupancy commit prefill** (slice 33): TUI Deliver Task prefills occupancy commit message.
-34. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
-35. Optional team Connection.
-36. Cloud managed as default Server when no BYOS exists.
+33. Occupancy commit prefill (slice 33, shipped #1218).
+34. **Occupancy banner compare** (slice 34): `code` banner copies GitHub compare when no PR exists.
+35. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
+36. Optional team Connection.
+37. Cloud managed as default Server when no BYOS exists.
 
 Cmux-style “this session is PR #928” is correct *context*. It is not a new GitHub aggregate
 and not something `code` scrapes from the vendor TUI.

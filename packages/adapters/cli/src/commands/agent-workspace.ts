@@ -611,6 +611,7 @@ export const workspaceCodeCommand = EffectCommand.make(
           workspaceId: result.workspaceId,
           ...(previewUrl ? { previewUrl } : {}),
           ...(pullRequestNumber ? { pullRequestNumber } : {}),
+          ...(door.branch ? { branch: door.branch } : {}),
         })}\n`,
       );
       process.stdout.write(`${REMOTE_CODE_MODEL_HINT}\n`);

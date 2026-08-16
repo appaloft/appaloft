@@ -282,6 +282,14 @@
 - [x] Unit tests WS-REMOTE-CA-099–100
 - [x] `appaloftdev workspace` `d` would show Deliver occupancy <shortSha>
 
+## Slice 34 — occupancy banner compare
+
+- [x] Grill D109–D111
+- [x] Ticket `ready-for-agent` — [#1219](https://github.com/appaloft/appaloft/issues/1219)
+- [x] `code` banner copies GitHub compare when no PR exists
+- [x] Unit tests WS-REMOTE-BANNER-101–103
+- [x] `appaloftdev code --no-attach` would show github.com/.../compare/...
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

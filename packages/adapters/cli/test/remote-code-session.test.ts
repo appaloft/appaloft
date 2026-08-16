@@ -81,7 +81,7 @@ describe("remote code door", () => {
     expect(door.commitSha).toBe("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     expect(door.serverId).toBe("srv_1");
     expect(formatRemoteCodeBanner({ ...door, workspaceId: "sbx_1" })).toBe(
-      "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · sbx_1",
+      "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · sbx_1 · https://github.com/acme/api/compare/main?expand=1",
     );
     expect(selectDefaultRemoteCodeServer([{ id: "srv_1", name: "mac-mini" }])?.name).toBe(
       "mac-mini",
@@ -146,6 +146,54 @@ describe("remote code door", () => {
       }),
     ).toBe(
       "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr · http://app-sc156jw98k.127.0.0.1.sslip.io",
+    );
+  });
+
+  test("[WS-REMOTE-BANNER-101] occupancy banner copies GitHub compare when no PR exists", () => {
+    expect(
+      formatRemoteCodeBanner({
+        projectId: "prj_tk5lovqu2vj8",
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        serverName: "occupancy-mac",
+        workspaceId: "sbx_rn32pzyp8yxr",
+        previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io",
+        branch: "feat/occupancy",
+      }),
+    ).toBe(
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr · http://app-sc156jw98k.127.0.0.1.sslip.io · https://github.com/traefik/whoami/compare/feat/occupancy?expand=1",
+    );
+  });
+
+  test("[WS-REMOTE-BANNER-102] existing PR banner stays PR-only", () => {
+    expect(
+      formatRemoteCodeBanner({
+        projectId: "prj_tk5lovqu2vj8",
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        serverName: "occupancy-mac",
+        workspaceId: "sbx_rn32pzyp8yxr",
+        previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io",
+        pullRequestNumber: 928,
+        branch: "feat/occupancy",
+      }),
+    ).toBe(
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr · http://app-sc156jw98k.127.0.0.1.sslip.io · PR #928",
+    );
+  });
+
+  test("[WS-REMOTE-BANNER-103] missing compare stays omitted", () => {
+    expect(
+      formatRemoteCodeBanner({
+        projectId: "prj_tk5lovqu2vj8",
+        repositoryIdentity: "gitlab.com/acme/api",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        serverName: "occupancy-mac",
+        workspaceId: "sbx_rn32pzyp8yxr",
+        branch: "feat/occupancy",
+      }),
+    ).toBe(
+      "Remote · prj_tk5lovqu2vj8 · gitlab.com/acme/api@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr",
     );
   });
 

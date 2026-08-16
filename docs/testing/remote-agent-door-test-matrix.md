@@ -107,6 +107,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-CA-098 | TUI / unit | this slice | existing occupancy PR leaves PR fields blank | same TUI test |
 | WS-REMOTE-CA-099 | TUI / unit | this slice | Deliver Task prefills occupancy commit | workspace-control-tui |
 | WS-REMOTE-CA-100 | TUI / unit | this slice | missing occupancy SHA leaves commit blank | same TUI test |
+| WS-REMOTE-BANNER-101 | CLI / unit | this slice | occupancy banner copies GitHub compare | `remote-code-session.test.ts` |
+| WS-REMOTE-BANNER-102 | CLI / unit | this slice | existing PR banner stays PR-only | same banner test |
+| WS-REMOTE-BANNER-103 | CLI / unit | this slice | missing compare stays omitted | same banner test |
 
 
 

@@ -8,6 +8,7 @@ import {
   resolveRemoteGitWorkspaceRef,
   type WorkspaceGitCommandRunner,
 } from "./local-git-workspace-context.js";
+import { occupancyGitHubCompareUrl } from "./occupancy-chrome.js";
 
 export const REMOTE_CODE_BANNER_PREFIX = "Remote ·";
 export const REMOTE_CODE_MODEL_HINT =
@@ -94,6 +95,7 @@ export function formatRemoteCodeBanner(input: {
   readonly workspaceId?: string;
   readonly previewUrl?: string;
   readonly pullRequestNumber?: number;
+  readonly branch?: string;
 }): string {
   const sha = input.commitSha.slice(0, 7);
   const project = input.projectId?.trim() || "project";
@@ -111,6 +113,13 @@ export function formatRemoteCodeBanner(input: {
     input.pullRequestNumber > 0
   ) {
     parts.push(`PR #${input.pullRequestNumber}`);
+  } else {
+    const compare = occupancyGitHubCompareUrl({
+      repositoryIdentity: input.repositoryIdentity,
+      commitSha: input.commitSha,
+      ...(input.branch ? { branch: input.branch } : {}),
+    });
+    if (compare) parts.push(compare);
   }
   return parts.join(" · ");
 }

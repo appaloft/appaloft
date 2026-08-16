@@ -44,6 +44,7 @@
 | Occupancy compare-PR door | TUI `c` + occupancy compare URL helper |
 | Occupancy delivery prefills | TUI Deliver Task form + selected occupancy |
 | Occupancy commit prefill | same Deliver Task form + occupancy short SHA |
+| Occupancy banner compare | public CLI `code` banner + same compare helper |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 
 ## Architecture
@@ -245,6 +246,12 @@ Slice-33 verification:
 
 - unit: Deliver Task prefills occupancy commit from short SHA;
 - unit: missing / non-hex / short SHA leaves commit blank.
+
+Slice-34 verification:
+
+- unit: `code` banner copies GitHub compare when no PR exists;
+- unit: existing PR stays PR-only;
+- unit: missing branch / non-github occupancy stays lean.
 
 
 
