@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1 identity door shipped `4f237698`. Slice 2 occupancy shipped. Slice 3 repo-URL locator owner-confirmed 2026-08-16 (D9–D15).
+- Round: Spec. Slice 1–3 shipped. Slice 4 destination discovery owner-confirmed 2026-08-16 (D16–D21).
 - Date: 2026-08-16.
-- Predecessor: Spec 138 / ADR-116 Instant Local Scratch shipped as public #1125; ADR-117 identity door shipped as public #1127; ADR-118 occupancy shipped.
-- Code changes allowed: yes for slice 3 after the repo-URL ticket is `ready-for-agent`. `workspace` as `ca` remains later.
+- Predecessor: Spec 138 / ADR-116 Instant Local Scratch shipped as public #1125; ADR-117 identity door shipped as public #1127; ADR-118 occupancy shipped; ADR-119 repo-URL locator shipped as public #1156.
+- Code changes allowed: yes for slice 4 after the destination ticket is `ready-for-agent`.
 
 ## Actor And Observable Outcome
 
@@ -51,6 +51,12 @@ Sandbox on that Server, not one VM per person.
 | D6 | Repo is the Project Binding, materialized **on the Server**. Laptop dirty tree is not uploaded and is not Workspace truth. | Owner |
 | D7 | No capacity / no Server still fail closed. Never silently switch to this Mac Scratch. Scratch remains explicit `code --local` (or equivalent) only. | Owner + ADR-116 non-goal preserved |
 | D8 | Deploy and Git/PR preview stay existing operations. `code` does not become `deploy`. | Owner + Railway docs |
+| D16 | `deployments.plan` omitted `destinationId` resolves the same server default Destination as the `deployments.create` compatibility seam | Occupancy plan 2026-08-16 died on `destinationId is required` while create already passed that gate |
+| D17 | Plan stays read-only: resolve existing Destination; never create one | Spec 013 forbids plan mutation |
+| D18 | Default name is `default` | Existing `DeploymentContextDefaultsFactory` / occupancy row `dst_di9i62yldejw` |
+| D19 | Missing default Destination still fail-closed | No `destinations.list` / `servers.show` destinations field this slice |
+| D20 | Missing `internalPort` is the next Railway-loop gap, not this slice | Occupancy create reached `Resource network profile internalPort is required` after destination |
+| D21 | No new catalog operation | Reuse existing Destination + `deployments.plan` |
 
 ## Rejected
 
@@ -96,17 +102,17 @@ Not logged in → login guidance, no Scratch.
 No Server → enroll guidance, no Scratch.
 No capacity on that Server → fail closed, no Scratch, no other Server, no managed substitution.
 
-Later slices stay out of occupancy (slice 2):
+Later slices after occupancy:
 
 1. Remote identity door (slice 1, shipped).
 2. Occupancy (slice 2, shipped).
-3. **Repo-URL locator** (slice 3, this Grill): `appaloft code <git-remote>` with no local clone. D12–D15.
-4. `workspace` as `ca`.
-5. Deployment as first-class in that TUI.
-6. GitHub as source surface / `owner/repo` shorthand.
-7. Optional team Connection.
-8. Cloud managed as default Server when no BYOS exists.
-
+3. Repo-URL locator (slice 3, shipped #1156).
+4. **Destination discovery** (slice 4): omitted `destinationId` on `deployments.plan` resolves Server `default`.
+5. `workspace` as `ca`.
+6. Session-native Preview / missing `internalPort` first-deploy.
+7. GitHub as source surface / `owner/repo` shorthand.
+8. Optional team Connection.
+9. Cloud managed as default Server when no BYOS exists.
 
 ## Delivery chrome (owner 2026-08-15)
 

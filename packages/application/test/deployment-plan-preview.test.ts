@@ -232,6 +232,8 @@ async function createHarness(input?: {
   serverWorkloadRoles?: Parameters<typeof DeploymentTargetWorkloadRoles.rehydrate>[0];
   inactiveServer?: boolean;
   withoutSourceBinding?: boolean;
+  withoutResourceDestination?: boolean;
+  withoutServerDestination?: boolean;
 }) {
   const testContext = context();
   const repositoryContext = toRepositoryContext(testContext);
@@ -294,7 +296,9 @@ async function createHarness(input?: {
     id: ResourceId.rehydrate("res_demo"),
     projectId: ProjectId.rehydrate("prj_demo"),
     environmentId: EnvironmentId.rehydrate("env_demo"),
-    destinationId: DestinationId.rehydrate("dst_demo"),
+    ...(input?.withoutResourceDestination
+      ? {}
+      : { destinationId: DestinationId.rehydrate("dst_demo") }),
     name: ResourceName.rehydrate("web"),
     kind: ResourceKindValue.rehydrate("application"),
     ...(input?.withoutSourceBinding
@@ -366,11 +370,13 @@ async function createHarness(input?: {
     server,
     UpsertDeploymentTargetSpec.fromDeploymentTarget(server),
   );
-  await destinations.upsert(
-    repositoryContext,
-    destination,
-    UpsertDestinationSpec.fromDestination(destination),
-  );
+  if (!input?.withoutServerDestination) {
+    await destinations.upsert(
+      repositoryContext,
+      destination,
+      UpsertDestinationSpec.fromDestination(destination),
+    );
+  }
   await environments.upsert(
     repositoryContext,
     environment,
@@ -475,6 +481,70 @@ describe("DeploymentPlanQueryService", () => {
     ).toBe(true);
     expect(generalPurpose.runtimePlanResolver.input).toBeDefined();
     expect(deploymentRuntime.runtimePlanResolver.input).toBeDefined();
+  });
+
+  test("[DPP-DEST-DEFAULT-001] omitted destinationId resolves the server default destination", async () => {
+    const harness = await createHarness();
+    const query = DeploymentPlanQuery.create({
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      includeCommandSpecs: true,
+      includeAccessPlan: true,
+    })._unsafeUnwrap();
+
+    const result = await harness.service.execute(harness.context, query);
+
+    expect(result.isOk()).toBe(true);
+    expect(unwrap(result).context.destinationId).toBe("dst_demo");
+    expect(harness.runtimePlanResolver.input).toBeDefined();
+  });
+
+  test("[DPP-DEST-DEFAULT-002] omitted destinationId uses server default when resource has none", async () => {
+    const harness = await createHarness({ withoutResourceDestination: true });
+    const query = DeploymentPlanQuery.create({
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      includeCommandSpecs: true,
+      includeAccessPlan: true,
+    })._unsafeUnwrap();
+
+    const result = await harness.service.execute(harness.context, query);
+
+    expect(result.isOk()).toBe(true);
+    expect(unwrap(result).context.destinationId).toBe("dst_demo");
+  });
+
+  test("[DPP-DEST-DEFAULT-003] omitted destinationId fails closed when server has no default", async () => {
+    const harness = await createHarness({
+      withoutResourceDestination: true,
+      withoutServerDestination: true,
+    });
+    const query = DeploymentPlanQuery.create({
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      includeCommandSpecs: true,
+      includeAccessPlan: true,
+    })._unsafeUnwrap();
+
+    const result = await harness.service.execute(harness.context, query);
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "validation_error",
+      message: "destinationId is required for this deployment context",
+      details: {
+        phase: "context-resolution",
+        serverId: "srv_demo",
+        destinationName: "default",
+      },
+    });
+    expect(harness.runtimePlanResolver.input).toBeUndefined();
   });
 
   test("[SRV-ROLE-006][SRV-ROLE-007] returns a blocked plan preview when the selected server lacks deployment-runtime", async () => {

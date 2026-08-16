@@ -32,6 +32,9 @@ creating a deployment attempt, publishing deployment events, or executing runtim
 | DEP-BIND-SNAP-REF-005 | integration | Dependency binding snapshot readiness preview | Resource has an active Postgres dependency binding | Returns safe dependency binding snapshot readiness, reference metadata, and runtime injection deferred without deployment id or execution. |
 | DEP-BIND-SNAP-REF-004 | integration | Not-ready dependency binding preview diagnostic | Resource has an active binding whose dependency metadata is not ready for safe snapshot reference | Returns a blocked dependency binding snapshot readiness diagnostic while keeping overall deployment plan admission non-blocking for this slice. |
 | DMBH-RES-DPP-001 | unit/integration | Resource-owned preview predicates | Plan preview evaluates the same resource source, source inspection enrichment, and internal-port requirements as deployment admission. |
+| DPP-DEST-DEFAULT-001 | unit | Omitted destinationId with resource pin | Resource pins `dst_demo` | Preview context uses `dst_demo`; no Destination created. |
+| DPP-DEST-DEFAULT-002 | unit | Omitted destinationId without resource pin | Server has Destination named `default` | Preview context uses that Destination. |
+| DPP-DEST-DEFAULT-003 | unit | Omitted destinationId and no Server default | Resource has no pin; Server has no `default` | Whole-query `destinationId is required`; no Destination created. |
 
 ## Side-Effect Matrix
 

@@ -35,6 +35,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-URL-LOCAL-027 | CLI / unit + `appaloftdev` | automated | `--local` + git-remote fail closed | `packages/adapters/cli/test/agent-workspace-command.test.ts`; live `workspace_scratch_remote_rejected` |
 | WS-REMOTE-URL-SHORTHAND-028 | CLI / unit | automated | `org/repo` is a local path, not github.com | `packages/adapters/cli/test/remote-code-session.test.ts` |
 | WS-REMOTE-URL-DOCS-029 | help | automated | `code --help` / skill name the URL door | `packages/adapters/cli/test/docs-help.test.ts`; `appaloftdev code --help` |
+| WS-REMOTE-DEST-030 | application + `appaloftdev` | automated | omitted `deployments.plan` destinationId uses Server `default` | `packages/application/test/deployment-plan-preview.test.ts`; live occupancy plan without `--destination` |
+| WS-REMOTE-DEST-031 | application | automated | resource pin wins when present | `packages/application/test/deployment-plan-preview.test.ts` |
+| WS-REMOTE-DEST-032 | application | automated | missing Server `default` fail-closed; plan creates nothing | `packages/application/test/deployment-plan-preview.test.ts` |
 
 
 
