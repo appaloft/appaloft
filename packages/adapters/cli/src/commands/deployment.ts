@@ -1450,6 +1450,8 @@ function runCreateDeploymentCommand(
       },
     );
     if (effectiveInput.executionMode === "detached") {
+      const url = yield* readCreatedDeploymentUrl(output.id);
+      if (url) yield* print({ url });
       return;
     }
     const deployment = yield* waitForSynchronousDeployment({

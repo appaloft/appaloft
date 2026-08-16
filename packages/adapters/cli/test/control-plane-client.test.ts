@@ -2793,7 +2793,12 @@ describe("CLI remote control-plane client", () => {
     );
 
     expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
-      ["GET /api/version", "GET /api/organizations/current-context", "POST /api/deployments"],
+      [
+        "GET /api/version",
+        "GET /api/organizations/current-context",
+        "POST /api/deployments",
+        "GET /api/deployments/dep_remote",
+      ],
     );
     expect(await requests[2]?.json()).toEqual({
       projectId: "prj_remote",
