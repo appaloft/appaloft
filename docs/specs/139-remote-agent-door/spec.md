@@ -108,21 +108,23 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-CA-072 | TUI detail copies Preview URL | occupancy Resource `app` has succeeded generated access | TUI detail | shows that URL. |
 | WS-REMOTE-CA-073 | TUI detail copies last deployment | occupancy Resource `app` has lastDeploymentId | TUI detail | shows that id and status. |
 | WS-REMOTE-CA-074 | Missing TUI chrome stays omitted | occupancy has projectId but Resource `app` has no preview/deploy | TUI detail | no invented URL or `dep_*`. |
+| WS-REMOTE-CA-075 | TUI detail copies PR number | occupancy repo matches a preview-environment PR | TUI detail | shows `PR #n`. |
+| WS-REMOTE-CA-076 | Missing PR stays omitted | occupancy has repo/branch but no preview-environment | TUI detail | no invented PR. |
+| WS-REMOTE-CA-077 | Foreign PR stays out | preview-environment belongs to another repo | TUI detail | does not copy that PR. |
 
 ## Slice Scope
 
-Slice 1–23 shipped.
+Slice 1–24 shipped.
 
-Slice 24 (this ticket): interactive `workspace` TUI detail shows occupancy Preview URL and last deployment.
+Slice 25 (this ticket): interactive `workspace` TUI detail shows occupancy PR number.
 
-In slice 24:
+In slice 25:
 
-- TUI detail copies Resource `app` generated access URL and last deployment;
-- missing chrome stays omitted;
-- list stays identity-only;
-- no PR number.
+- TUI detail copies `preview-environments.list` PR when repo matches occupancy;
+- missing PR stays omitted;
+- no `gh` scrape, no PR create, no `code` banner change.
 
-Out of slice 24: PR chrome, team Connection, Cloud managed default Server.
+Out of slice 25: production navigator, team Connection, Cloud managed default Server.
 
 ## Public Surfaces
 

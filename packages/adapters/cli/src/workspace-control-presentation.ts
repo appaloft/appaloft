@@ -11,6 +11,7 @@ import {
   ExposeSandboxPortCommand,
   IssueSandboxAgentAttachAccessCommand,
   ListAgentTaskRunsQuery,
+  ListPreviewEnvironmentsQuery,
   ListResourcesQuery,
   ListSandboxAgentRuntimesQuery,
   ListSandboxesQuery,
@@ -27,7 +28,12 @@ import {
   type TerminalSessionAttachmentGateway,
 } from "@appaloft/application";
 import { type Result } from "@appaloft/core";
-import { type OccupancyResource, occupancyChromeForProject } from "./occupancy-chrome.js";
+import {
+  type OccupancyPreviewEnvironment,
+  type OccupancyResource,
+  occupancyChromeForProject,
+  occupancyPullRequestFromPreviewEnvironments,
+} from "./occupancy-chrome.js";
 import { type OperateRendererEvent, type OperateRendererMessage } from "./operate-presentation.js";
 import { terminateWorkspaceWithRuntimes } from "./workspace-lifecycle-actions.js";
 
@@ -170,6 +176,7 @@ export type WorkspaceControlRendererMessage =
       readonly targetSelection?: WorkspaceControlTargetSelectionSummary;
       readonly preview?: { readonly url: string };
       readonly deployment?: { readonly id: string; readonly status?: string };
+      readonly pullRequest?: { readonly number: number };
       readonly recovery: WorkspaceControlRecoverySummary;
     }
   | {
@@ -623,6 +630,25 @@ async function listOccupancyResources(
   }
 }
 
+async function listOccupancyPreviewEnvironments(
+  context: WorkspaceControlPresentationContext,
+  projectId: string | undefined,
+): Promise<readonly OccupancyPreviewEnvironment[]> {
+  try {
+    const query = ListPreviewEnvironmentsQuery.create({
+      ...(projectId ? { projectId } : {}),
+      limit: 100,
+    });
+    if (query.isErr()) return [];
+    const result = await context.executeQuery(query.value);
+    if (result.isErr() || !result.value || typeof result.value !== "object") return [];
+    const items = (result.value as { items?: unknown }).items;
+    return Array.isArray(items) ? (items as OccupancyPreviewEnvironment[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 async function loadDetail(
   context: WorkspaceControlPresentationContext,
   workspaceId: string,
@@ -726,10 +752,15 @@ async function loadDetail(
   const previewUrl = occupancyChrome.preview
     ? safePresentationUrl(occupancyChrome.preview.url)
     : undefined;
+  const workspaceSummaryRecord = workspaceSummary(workspace);
+  const pullRequest = occupancyPullRequestFromPreviewEnvironments(
+    await listOccupancyPreviewEnvironments(context, activation?.project.projectId),
+    workspaceSummaryRecord.occupancy,
+  );
   return {
     message: {
       type: "detail",
-      workspace: workspaceSummary(workspace),
+      workspace: workspaceSummaryRecord,
       runtimes: runtimeSummaries,
       ports: portSummaries,
       tasks,
@@ -738,6 +769,7 @@ async function loadDetail(
       ...(targetSelection ? { targetSelection } : {}),
       ...(previewUrl ? { preview: { url: previewUrl } } : {}),
       ...(occupancyChrome.deployment ? { deployment: occupancyChrome.deployment } : {}),
+      ...(pullRequest ? { pullRequest } : {}),
       recovery: {
         ...(requestedIsolation ? { requestedIsolation } : {}),
         ...(realizedIsolation ? { realizedIsolation } : {}),

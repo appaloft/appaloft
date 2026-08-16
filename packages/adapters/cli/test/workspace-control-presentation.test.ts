@@ -12,6 +12,7 @@ import {
   ExposeSandboxPortCommand,
   IssueSandboxAgentAttachAccessCommand,
   ListAgentTaskRunsQuery,
+  ListPreviewEnvironmentsQuery,
   ListResourcesQuery,
   ListSandboxAgentRuntimesQuery,
   ListSandboxesQuery,
@@ -1347,6 +1348,7 @@ describe("Workspace control presentation", () => {
           } as T);
         }
         if (
+          query instanceof ListPreviewEnvironmentsQuery ||
           query instanceof ListSandboxAgentRuntimesQuery ||
           query instanceof ListSandboxPortsQuery ||
           query instanceof ListSandboxPromotionsQuery ||
@@ -1366,5 +1368,92 @@ describe("Workspace control presentation", () => {
     });
     expect(JSON.stringify(detail)).not.toContain("dep_other");
     expect(JSON.stringify(detail)).not.toContain("other.example.test");
+  });
+
+  test("[WS-REMOTE-CA-075][WS-REMOTE-CA-077] TUI detail copies matching preview-environment PR", async () => {
+    const renderer = new FakeRendererSession([
+      { type: "select", workspaceId: "sbx_ready" },
+      { type: "quit" },
+    ]);
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+
+    await presentation.start({
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery || query instanceof ShowSandboxQuery) {
+          return ok({
+            items: [
+              {
+                sandboxId: "sbx_ready",
+                status: "ready",
+                occupancy: {
+                  repositoryIdentity: "github.com/traefik/whoami",
+                  commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+                  branch: "feat/occupancy",
+                },
+                activation: {
+                  project: { projectId: "prj_web", disposition: "created" },
+                  repositoryBinding: { bindingId: "rbd_web", disposition: "created" },
+                  profile: { profileInstallationId: "awpi_default", disposition: "reused" },
+                },
+              },
+            ],
+            sandboxId: "sbx_ready",
+            status: "ready",
+            occupancy: {
+              repositoryIdentity: "github.com/traefik/whoami",
+              commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+              branch: "feat/occupancy",
+            },
+            activation: {
+              project: { projectId: "prj_web", disposition: "created" },
+              repositoryBinding: { bindingId: "rbd_web", disposition: "created" },
+              profile: { profileInstallationId: "awpi_default", disposition: "reused" },
+            },
+          } as T);
+        }
+        if (query instanceof ListPreviewEnvironmentsQuery) {
+          return ok({
+            items: [
+              {
+                updatedAt: "2026-08-16T00:00:00.000Z",
+                source: {
+                  repositoryFullName: "octocat/Hello-World",
+                  pullRequestNumber: 1,
+                  headSha: "1ce75d01b6978863647da42557a707a479da3a51",
+                },
+              },
+              {
+                updatedAt: "2026-08-16T01:00:00.000Z",
+                source: {
+                  repositoryFullName: "traefik/whoami",
+                  pullRequestNumber: 928,
+                  headSha: "1ce75d01b6978863647da42557a707a479da3a51",
+                },
+              },
+            ],
+          } as T);
+        }
+        if (
+          query instanceof ListResourcesQuery ||
+          query instanceof ListSandboxAgentRuntimesQuery ||
+          query instanceof ListSandboxPortsQuery ||
+          query instanceof ListSandboxPromotionsQuery ||
+          query instanceof ListSandboxSnapshotsQuery
+        ) {
+          return ok({ items: [] } as T);
+        }
+        throw new Error(`unexpected query ${query.constructor.name}`);
+      },
+    });
+
+    const detail = renderer.messages.find((message) => message.type === "detail");
+    expect(detail).toMatchObject({
+      type: "detail",
+      pullRequest: { number: 928 },
+    });
+    expect(JSON.stringify(detail)).not.toContain('"number":1');
   });
 });

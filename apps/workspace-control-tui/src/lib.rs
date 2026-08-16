@@ -209,6 +209,12 @@ pub struct OccupancyDeploymentChrome {
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct OccupancyPullRequestChrome {
+    pub number: u32,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct DetailMessage {
     pub workspace: WorkspaceSummary,
     #[serde(default)]
@@ -227,6 +233,8 @@ pub struct DetailMessage {
     pub preview: Option<OccupancyPreviewChrome>,
     #[serde(default)]
     pub deployment: Option<OccupancyDeploymentChrome>,
+    #[serde(default)]
+    pub pull_request: Option<OccupancyPullRequestChrome>,
     #[serde(default)]
     pub recovery: RecoverySummary,
 }
@@ -1711,12 +1719,18 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
                     )
                 })
                 .unwrap_or_default();
+            let pull_request = detail
+                .pull_request
+                .as_ref()
+                .map(|pull_request| format!("PR       #{}", pull_request.number))
+                .unwrap_or_default();
             format!(
-                "Workspace {}  {}\n{}\n{}\n{}\n{}\nRecovery\nIsolation  {}\nContinuity {}\nSnapshot(s)\n{}\nWorkspace-owned cleanup: {}\nactive runtimes:{}  previews:{}\nBounded readback; not host/provider proof\nAgent Runtime(s)\n{}\nPorts\n{}\nTasks\n{}\nPromotions\n{}",
+                "Workspace {}  {}\n{}\n{}\n{}\n{}\n{}\nRecovery\nIsolation  {}\nContinuity {}\nSnapshot(s)\n{}\nWorkspace-owned cleanup: {}\nactive runtimes:{}  previews:{}\nBounded readback; not host/provider proof\nAgent Runtime(s)\n{}\nPorts\n{}\nTasks\n{}\nPromotions\n{}",
                 occupancy_list_label(&detail.workspace),
                 detail.workspace.status,
                 preview,
                 deployment,
+                pull_request,
                 target_selection,
                 activation,
                 isolation,
@@ -2256,10 +2270,11 @@ mod tests {
                     id: "dep_rfqfapqwpyjn".to_owned(),
                     status: Some("succeeded".to_owned()),
                 }),
+                pull_request: Some(OccupancyPullRequestChrome { number: 928 }),
                 recovery: RecoverySummary::default(),
             },
         });
-        let backend = ratatui::backend::TestBackend::new(120, 32);
+        let backend = ratatui::backend::TestBackend::new(120, 36);
         let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
         terminal
             .draw(|frame| render(frame, &state))
@@ -2278,6 +2293,7 @@ mod tests {
         assert!(rendered.contains("Preview"));
         assert!(rendered.contains("whoami.test"));
         assert!(rendered.contains("dep_rfqfapqwpyjn"));
+        assert!(rendered.contains("PR       #928"));
         assert!(rendered.contains("task_1"));
         assert!(rendered.contains("prm_1"));
         assert!(rendered.contains("verified"));
@@ -2322,6 +2338,7 @@ mod tests {
             target_selection: None,
             preview: None,
             deployment: None,
+            pull_request: None,
             recovery: RecoverySummary {
                 requested_isolation: Some("gvisor".to_owned()),
                 realized_isolation: Some("gvisor".to_owned()),
@@ -2390,6 +2407,7 @@ mod tests {
             target_selection: None,
             preview: None,
             deployment: None,
+            pull_request: None,
             recovery: RecoverySummary {
                 snapshots: vec![SnapshotSummary {
                     snapshot_id: "ssn_1".to_owned(),
@@ -2471,6 +2489,7 @@ mod tests {
             target_selection: None,
             preview: None,
             deployment: None,
+            pull_request: None,
             recovery: RecoverySummary {
                 requested_isolation: Some("gvisor".to_owned()),
                 realized_isolation: Some("gvisor".to_owned()),
@@ -2539,6 +2558,7 @@ mod tests {
             target_selection: None,
             preview: None,
             deployment: None,
+            pull_request: None,
             recovery: RecoverySummary::default(),
         });
         assert!(state.open_recovery_menu());
@@ -2605,6 +2625,7 @@ mod tests {
                 target_selection: None,
                 preview: None,
                 deployment: None,
+                pull_request: None,
                 recovery: RecoverySummary::default(),
             },
         });
@@ -2713,6 +2734,7 @@ mod tests {
             target_selection: None,
             preview: None,
             deployment: None,
+            pull_request: None,
             recovery: RecoverySummary::default(),
         };
 
@@ -2850,6 +2872,7 @@ mod tests {
                 target_selection: None,
                 preview: None,
                 deployment: None,
+                pull_request: None,
                 recovery: RecoverySummary::default(),
             },
         });

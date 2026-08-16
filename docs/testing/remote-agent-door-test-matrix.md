@@ -81,6 +81,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-CA-072 | TUI / unit | this slice | TUI detail copies Preview URL | `workspace-control-presentation.test.ts`; workspace-control-tui |
 | WS-REMOTE-CA-073 | TUI / unit | this slice | TUI detail copies last deployment | same presentation test |
 | WS-REMOTE-CA-074 | TUI / unit | this slice | missing TUI chrome stays omitted | same presentation test |
+| WS-REMOTE-CA-075 | TUI / unit | this slice | TUI detail copies matching PR | `workspace-control-presentation.test.ts`; workspace-control-tui |
+| WS-REMOTE-CA-076 | TUI / unit | this slice | missing PR stays omitted | same presentation test |
+| WS-REMOTE-CA-077 | TUI / unit | this slice | foreign PR stays out | same presentation test |
 
 
 

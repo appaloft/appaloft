@@ -211,6 +211,14 @@
 - [x] Unit tests WS-REMOTE-CA-072–074
 - [x] `appaloftdev workspace` detail would show occupancy URL
 
+## Slice 25 — occupancy TUI PR chrome
+
+- [x] Grill D82–D84
+- [x] Ticket `ready-for-agent` — [#1201](https://github.com/appaloft/appaloft/issues/1201)
+- [x] TUI detail copies matching preview-environment PR
+- [x] Unit tests WS-REMOTE-CA-075–077
+- [x] `appaloftdev workspace` detail would show PR #n
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator
