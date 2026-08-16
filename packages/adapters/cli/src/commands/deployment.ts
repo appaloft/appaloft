@@ -1245,7 +1245,7 @@ function readDeploymentSummary(input: { deploymentId: string; resourceId: string
     );
     const result = yield* Effect.promise(() => cli.executeQuery(query));
     const deployments = yield* resultToEffect(result);
-    return deployments.items.find((item) => item.id === input.deploymentId);
+    return deployments.items?.find((item) => item.id === input.deploymentId);
   });
 }
 
@@ -1280,7 +1280,7 @@ function readCreatedDeploymentUrl(deploymentId: string) {
     if (query.isErr()) return undefined;
     const result = yield* Effect.promise(() => cli.executeQuery(query.value));
     if (result.isErr()) return undefined;
-    return occupancyDeployUrlFromSummary(result.value.deployment);
+    return occupancyDeployUrlFromSummary(result.value?.deployment);
   });
 }
 

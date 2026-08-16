@@ -2140,6 +2140,18 @@ describe("CLI deployment config entry workflow", () => {
             ],
           } as T);
         }
+        if (query.constructor.name === "ShowDeploymentQuery") {
+          return ok({
+            deployment: {
+              id: "dep_1",
+              resourceId: "res_1",
+              status: "succeeded",
+              runtimePlan: {
+                execution: {},
+              },
+            },
+          } as T);
+        }
 
         return ok({ items: [] } as T);
       },
@@ -2248,6 +2260,7 @@ describe("CLI deployment config entry workflow", () => {
       "ListProjectsQuery",
       "ListServersQuery",
       "ListDeploymentsQuery",
+      "ShowDeploymentQuery",
     ]);
     expect(operations).toEqual([
       "PrepareState:ssh-pglite",
@@ -2260,6 +2273,7 @@ describe("CLI deployment config entry workflow", () => {
       "UpsertServerAppliedRoutes",
       "CreateDeploymentCommand",
       "ListDeploymentsQuery",
+      "ShowDeploymentQuery",
       "ReleaseState:ssh-pglite",
     ]);
     expect(desiredRoutes).toHaveLength(1);
