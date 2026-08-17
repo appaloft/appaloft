@@ -78,6 +78,7 @@ describe("Appaloft SDK auth and structured errors", () => {
     );
     expect(capturedRequest?.headers.get("cookie")).toBe("better-auth.session_token=test-session");
     expect(capturedRequest?.headers.get("user-agent")).toBe("appaloft-cli/test");
+    expect(capturedRequest?.headers.get("accept")).toBe("application/json");
     expect(capturedRequest?.headers.has("authorization")).toBe(false);
   });
 
@@ -113,6 +114,7 @@ describe("Appaloft SDK auth and structured errors", () => {
       "Bearer aplt_dt_rawtokenvalue00000000",
     );
     expect(capturedRequest?.headers.get("content-type")).toBe("application/json");
+    expect(capturedRequest?.headers.get("accept")).toBe("application/json");
     expect(await capturedRequest?.json()).toEqual({ eventId: "evt_1" });
   });
 
@@ -239,6 +241,79 @@ describe("Appaloft SDK auth and structured errors", () => {
         },
       },
     });
+  });
+
+  test("[TS-SDK-ERROR-002] prefers structured JSON errors over an HTML content type", async () => {
+    const client = createAppaloftSdkClient({
+      baseUrl: "https://appaloft.example/api",
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "sandbox_provider_operation_failed",
+              category: "provider",
+              message: "Sandbox provider operation failed",
+              retryable: true,
+              details: { phase: "execution-sandbox-resume-ready-egress" },
+            },
+          }),
+          {
+            headers: {
+              "content-type": "text/html; charset=utf-8",
+            },
+            status: 502,
+          },
+        ),
+    });
+
+    const result = await client.request({
+      operation: productSessionOperation,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 502,
+      error: {
+        code: "sandbox_provider_operation_failed",
+        category: "provider",
+        message: "Sandbox provider operation failed",
+        retryable: true,
+        details: { phase: "execution-sandbox-resume-ready-egress" },
+      },
+    });
+  });
+
+  test("[TS-SDK-ERROR-002] does not classify a JSON gateway problem document as HTML", async () => {
+    const client = createAppaloftSdkClient({
+      baseUrl: "https://appaloft.example/api",
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            type: "https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-5xx-errors/error-502/",
+            title: "Error 502: Bad gateway",
+            status: 502,
+            detail:
+              "The origin web server returned an invalid or incomplete response to Cloudflare.",
+          }),
+          {
+            headers: {
+              "content-type": "application/json; charset=utf-8",
+            },
+            status: 502,
+          },
+        ),
+    });
+
+    const result = await client.request({
+      operation: productSessionOperation,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).not.toBe("control_plane_unexpected_html_response");
+      expect(result.status).toBe(502);
+      expect(result.error.retryable).toBe(true);
+    }
   });
 
   test("[TS-SDK-ERROR-002] classifies transient HTML gateway responses as retryable without exposing the body", async () => {

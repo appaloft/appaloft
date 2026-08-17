@@ -361,24 +361,24 @@ async function readJsonApiResponse(
     return { ok: true, data: null };
   }
 
-  if (contentType.toLowerCase().includes("text/html")) {
-    return {
-      ok: false,
-      error: unexpectedJsonResponseError({
-        code: "control_plane_unexpected_html_response",
-        message:
-          "Control plane returned HTML instead of JSON. Check the control-plane base URL and API route.",
-        response,
-        request,
-        contentType,
-        bodyKind: "html",
-      }),
-    };
-  }
-
   try {
     return { ok: true, data: JSON.parse(text) as unknown };
   } catch {
+    if (contentType.toLowerCase().includes("text/html")) {
+      return {
+        ok: false,
+        error: unexpectedJsonResponseError({
+          code: "control_plane_unexpected_html_response",
+          message:
+            "Control plane returned HTML instead of JSON. Check the control-plane base URL and API route.",
+          response,
+          request,
+          contentType,
+          bodyKind: "html",
+        }),
+      };
+    }
+
     const hasJsonContentType = contentType.toLowerCase().includes("json");
     return {
       ok: false,
@@ -1001,6 +1001,7 @@ function buildCatalogRouteRequest(input: {
     headers.set("authorization", `Bearer ${auth.token}`);
   }
   headers.set("user-agent", cliUserAgent);
+  headers.set("accept", "application/json");
   if (input.body !== undefined) {
     headers.set("content-type", "application/json");
   }

@@ -206,6 +206,7 @@ export function createAppaloftSdkClient(options: AppaloftSdkClientOptions): Appa
         auth: resolveAuth(options.auth),
         configuredHeaders: options.headers,
         userAgent: options.userAgent,
+        acceptJson: true,
       });
       const response = await fetchImplementation(request);
       const data = await readAppaloftJsonApiResponse(response, {
@@ -225,7 +226,7 @@ export function createAppaloftSdkClient(options: AppaloftSdkClientOptions): Appa
         return {
           ok: false,
           status: response.status,
-          error: parseDomainError(data.data),
+          error: parseDomainError(data.data, response.status),
         };
       }
 
@@ -508,7 +509,7 @@ async function* streamOperation<TEnvelope>(
       method: request.method,
       url: request.url,
     });
-    const error = data.ok ? parseDomainError(data.data) : data.error;
+    const error = data.ok ? parseDomainError(data.data, response.status) : data.error;
     throw new AppaloftSdkStreamError(
       `SDK stream request failed with ${error.code}`,
       response.status,
@@ -530,6 +531,7 @@ function buildRequest(
     readonly auth: AppaloftSdkAuth | undefined;
     readonly configuredHeaders: HeadersInit | (() => HeadersInit) | undefined;
     readonly userAgent: string | undefined;
+    readonly acceptJson?: boolean;
   },
 ): Request {
   const requestInit: RequestInit = {
@@ -539,6 +541,7 @@ function buildRequest(
       body: input.body,
       configuredHeaders: options.configuredHeaders,
       userAgent: options.userAgent,
+      acceptJson: options.acceptJson === true,
     }),
     ...(input.body === undefined ? {} : { body: JSON.stringify(input.body) }),
     ...(input.signal ? { signal: input.signal } : {}),
@@ -582,6 +585,7 @@ function buildHeaders(input: {
   body: unknown;
   configuredHeaders: HeadersInit | (() => HeadersInit) | undefined;
   userAgent: string | undefined;
+  acceptJson?: boolean;
 }): Headers {
   const headers = new Headers(
     typeof input.configuredHeaders === "function"
@@ -593,6 +597,10 @@ function buildHeaders(input: {
 
   if (input.userAgent && !headers.has("user-agent")) {
     headers.set("user-agent", input.userAgent);
+  }
+
+  if (input.acceptJson && !headers.has("accept")) {
+    headers.set("accept", "application/json");
   }
 
   if (input.body !== undefined && !headers.has("content-type")) {
@@ -626,23 +634,23 @@ export async function readAppaloftJsonApiResponse(
     return { ok: true, data: null };
   }
 
-  if (isHtmlResponse(contentType, text)) {
-    return {
-      ok: false,
-      error: unexpectedResponseError(
-        "control_plane_unexpected_html_response",
-        "Control plane returned HTML instead of JSON. Check the control-plane base URL and API route.",
-        response,
-        context,
-        contentType,
-        "html",
-      ),
-    };
-  }
-
   try {
     return { ok: true, data: JSON.parse(text) as unknown };
   } catch {
+    if (isHtmlResponse(contentType, text)) {
+      return {
+        ok: false,
+        error: unexpectedResponseError(
+          "control_plane_unexpected_html_response",
+          "Control plane returned HTML instead of JSON. Check the control-plane base URL and API route.",
+          response,
+          context,
+          contentType,
+          "html",
+        ),
+      };
+    }
+
     return {
       ok: false,
       error: unexpectedResponseError(
@@ -836,7 +844,7 @@ export function isAppaloftSdkErrorCode<TCode extends string>(
   return error.code === code;
 }
 
-function parseDomainError(value: unknown): DomainErrorResponse {
+function parseDomainError(value: unknown, status?: number): DomainErrorResponse {
   if (isDomainErrorResponse(value)) {
     return value;
   }
@@ -852,7 +860,7 @@ function parseDomainError(value: unknown): DomainErrorResponse {
     code: "sdk_unstructured_error",
     category: "infra",
     message: "The server returned an error that did not match the Appaloft error contract.",
-    retryable: false,
+    retryable: status === 502 || status === 503 || status === 504,
   };
 }
 
