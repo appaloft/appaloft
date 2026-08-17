@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.8.13](https://github.com/appaloft/appaloft/compare/v1.8.12...v1.8.13) (2026-08-17)
+
+
+### Bug Fixes
+
+* **mcp:** make tools/list schemas object-shaped for OpenCode ([#1272](https://github.com/appaloft/appaloft/issues/1272)) ([d51b606](https://github.com/appaloft/appaloft/commit/d51b60620c121136c876448c99cb2d4df7740359))
+
+
+### Documentation
+
+* not user-facing; existing /mcp contract plus APPALOFT-MCP-017. ([d51b606](https://github.com/appaloft/appaloft/commit/d51b60620c121136c876448c99cb2d4df7740359))
+
 ## [1.8.12](https://github.com/appaloft/appaloft/compare/v1.8.11...v1.8.12) (2026-08-17)
 
 
