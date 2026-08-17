@@ -2383,7 +2383,11 @@ export class ExecutionSandboxService {
       }
     }
     if (!ready.value.provider.capabilities.ports) {
-      return err(domainError.conflict("Sandbox provider does not support port publishing"));
+      return err(
+        domainError.conflict("Sandbox provider does not support port publishing", {
+          code: "sandbox_port_publishing_unsupported",
+        }),
+      );
     }
     const result = await this.providerOperation("execution-sandbox-port-expose", () =>
       ready.value.provider.exposePort({
@@ -2404,7 +2408,11 @@ export class ExecutionSandboxService {
     const ready = await this.ready(context, sandboxId);
     if (ready.isErr()) return err(ready.error);
     if (!ready.value.provider.capabilities.ports) {
-      return err(domainError.conflict("Sandbox provider does not support port publishing"));
+      return err(
+        domainError.conflict("Sandbox provider does not support port publishing", {
+          code: "sandbox_port_publishing_unsupported",
+        }),
+      );
     }
     const result = await this.providerOperation("execution-sandbox-port-list", () =>
       ready.value.provider.listPorts({
@@ -2423,7 +2431,11 @@ export class ExecutionSandboxService {
     const ready = await this.ready(context, sandboxId);
     if (ready.isErr()) return err(ready.error);
     if (!ready.value.provider.capabilities.ports) {
-      return err(domainError.conflict("Sandbox provider does not support port publishing"));
+      return err(
+        domainError.conflict("Sandbox provider does not support port publishing", {
+          code: "sandbox_port_publishing_unsupported",
+        }),
+      );
     }
     const result = await this.providerOperation("execution-sandbox-port-revoke", () =>
       ready.value.provider.revokePort({

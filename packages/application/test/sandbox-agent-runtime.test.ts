@@ -340,6 +340,7 @@ function fixture(
     workspaceProfileResolver?: SandboxAgentDeliveryDependencies["workspaceProfileResolver"];
     processCredentialGrants?: SandboxAgentDeliveryDependencies["processCredentialGrants"];
     attachUrl?: string;
+    exposePort?: SandboxAgentDeliveryDependencies["sandboxAccess"];
   } = {},
 ) {
   const counters = { resources: 0, deployments: 0 };
@@ -382,7 +383,7 @@ function fixture(
         };
       },
     },
-    sandboxAccess: {
+    sandboxAccess: options.exposePort ?? {
       async exposePort(_context, sandboxId, input) {
         exposedPorts.push({ sandboxId, ...input });
         return ok({
@@ -1448,6 +1449,164 @@ describe("SandboxAgentDeliveryService", () => {
     expect(attached._unsafeUnwrapErr().details?.code).toBe(
       "agent_workspace_native_attach_unavailable",
     );
+  });
+
+  test("[WS-REMOTE-ATTACH-136] falls back to in-Sandbox managed-terminal when port publishing is unsupported", async () => {
+    const opened: Array<{ argv: readonly string[] }> = [];
+    const pin = {
+      profileInstallationId: "awpi_opencode",
+      profileDefinitionDigest: `sha256:${"1".repeat(64)}`,
+      profileId: "appaloft-remote",
+      profileVersion: "1.0.0",
+      adapterInstallationId: "aai_opencode",
+      adapterDefinitionDigest: `sha256:${"2".repeat(64)}`,
+      adapterId: "appaloft-remote",
+      adapterVersion: "1.0.0",
+      harnessKey: "opencode",
+      harnessTemplateId: "aht_opencode_managed_v1",
+      sandboxTemplateId: "stp_appaloft_remote_opencode",
+      sandboxTemplateVersion: "1.18.4",
+      sandboxTemplateDigest: `sha256:${"a".repeat(64)}`,
+      capabilities: {
+        taskMode: true,
+        interactive: true,
+        backgroundRuns: true,
+        nativeSession: true,
+        persistentPaths: ["/workspace/.appaloft-agent"],
+        healthcheck: { kind: "http" as const, port: 4096, path: "/ready" },
+      },
+    };
+    const { service, exposedPorts } = fixture({
+      harness: {
+        key: "opencode",
+        templateId: "aht_opencode_managed_v1",
+        version: "1.18.4",
+        templateDigest: `sha256:${"a".repeat(64)}`,
+        interaction: {
+          transport: "native-attach",
+          command: ["opencode", "attach", "http://127.0.0.1:4096", "--dir", "/workspace"],
+          sessionRecovery: "native-session-store",
+          serverPort: 4096,
+        },
+        async execute() {
+          return { events: [], outcomeDigest: "sha256:complete" };
+        },
+        async cancel() {},
+      },
+      exposePort: {
+        async exposePort() {
+          return err(
+            domainError.conflict("Sandbox provider does not support port publishing", {
+              code: "sandbox_port_publishing_unsupported",
+            }),
+          );
+        },
+      },
+      workspaceProfileResolver: {
+        async compileForNewWorkspace() {
+          return ok({
+            sandbox: {
+              source: { kind: "template" as const, templateId: "stp_appaloft_remote_opencode" },
+              requestedIsolation: "container-trusted" as const,
+              limits: {
+                cpuMillis: 1_000,
+                memoryBytes: 1_024,
+                diskBytes: 2_048,
+                maxProcesses: 16,
+              },
+              networkPolicy: { mode: "deny" as const },
+            },
+            initialization: [],
+            runtime: {
+              harnessKey: "opencode",
+              harnessTemplateId: "aht_opencode_managed_v1",
+              declarativeHarness: {},
+            },
+            defaultPorts: [],
+            suggestedChecks: [],
+            credentialRequirements: [],
+            pin,
+          });
+        },
+      },
+      processCredentialGrants: {
+        async admit() {
+          return ok(undefined);
+        },
+        async launch() {
+          throw new Error("launch must not run");
+        },
+        async openTerminal(_context, input) {
+          opened.push({ argv: input.process.argv });
+          return ok({
+            workspaceId: input.scope.sandboxId,
+            runtimeId: input.scope.runtimeId,
+            transport: "managed-terminal",
+            sessionId: "term_occupancy",
+            processId: "spr_occupancy",
+            access: {
+              kind: "websocket",
+              path: "/api/terminal-sessions/term_occupancy/attach",
+              expiresAt: input.expiresAt,
+            },
+          });
+        },
+        async revoke() {
+          return ok(undefined);
+        },
+      },
+    });
+    const runtime = (
+      await service.createRuntime(context, {
+        sandboxId: "sbx_hostinger",
+        harnessKey: "opencode",
+        harnessTemplateId: "aht_opencode_managed_v1",
+        idempotencyKey: "runtime_hostinger_attach",
+        profileInstallationId: "awpi_opencode",
+        profilePlan: {
+          sandbox: {
+            source: { kind: "template", templateId: "stp_appaloft_remote_opencode" },
+            requestedIsolation: "container-trusted",
+            limits: {
+              cpuMillis: 1_000,
+              memoryBytes: 1_024,
+              diskBytes: 2_048,
+              maxProcesses: 16,
+            },
+            networkPolicy: { mode: "deny" },
+          },
+          initialization: [],
+          runtime: {
+            harnessKey: "opencode",
+            harnessTemplateId: "aht_opencode_managed_v1",
+            declarativeHarness: {},
+          },
+          defaultPorts: [],
+          suggestedChecks: [],
+          credentialRequirements: [],
+          pin,
+        },
+      })
+    )._unsafeUnwrap();
+
+    const attach = (
+      await service.issueAttachAccess(context, {
+        sandboxId: "sbx_hostinger",
+        runtimeId: runtime.runtimeId,
+        expiresAt: "2026-07-20T01:00:00.000Z",
+      })
+    )._unsafeUnwrap();
+
+    expect(exposedPorts).toEqual([]);
+    expect(opened).toEqual([
+      { argv: ["opencode", "attach", "http://127.0.0.1:4096", "--dir", "/workspace"] },
+    ]);
+    expect(attach).toMatchObject({
+      workspaceId: "sbx_hostinger",
+      runtimeId: runtime.runtimeId,
+      transport: "managed-terminal",
+      sessionId: "term_occupancy",
+    });
   });
 
   test("[AGENT-WS-START-009] persists failed startup and invokes harness termination", async () => {

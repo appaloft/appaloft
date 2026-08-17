@@ -3,11 +3,11 @@
 ## Status
 
 - Round: Spec
-- Artifact state: slice 1–44 shipped; slice 45 leftover occupancy EXPOSE / git-on-control-plane accepted 2026-08-17
+- Artifact state: slice 1–45 leftover EXPOSE live-verified 2026-08-17; slice 46 registered-Server OpenCode attach accepted 2026-08-17
 - Discovery: [discovery.md](./discovery.md)
 - Governing decision: ADR-120 plan default destination; ADR-119 locates; ADR-118 occupies; ADR-117 remains the login/Server/`--local` door; ADR-116 remains Scratch-only; ADR-103 stays on explicit `workspace open` Git fail-closed
-- Code changes allowed: yes for slice 45 after the leftover-EXPOSE ticket is `ready-for-agent`
-- Compatibility: public minor. Occupancy leftover-default 3000 may be replaced by a single remote EXPOSE; no new catalog field
+- Code changes allowed: yes for slice 46 after the registered-Server attach ticket is `ready-for-agent`
+- Compatibility: public minor. Occupancy leftover-default 3000 may be replaced by a single remote EXPOSE; registered-Server attach may use in-Sandbox managed-terminal when port publishing is unsupported; no new catalog field
 
 ## Business Outcome
 
@@ -167,20 +167,26 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-RESUME-131 | Default occupancy resume keeps preferred Profile | preferred Sandbox Profile differs from current Project default | `appaloft code --no-attach` | resumes that Sandbox; no `workspace_open_profile_pin_mismatch`. |
 | WS-REMOTE-RESUME-132 | Explicit Profile still fail-closes | `workspace open --profile` names another installation | `appaloft workspace open --profile awpi_new` | `workspace_open_profile_pin_mismatch`. |
 | WS-REMOTE-RESUME-133 | `--new` stays isolated | preferred Sandbox already exists | `appaloft code --new --no-attach` | creates a new Workspace instead of rewriting the preferred disk. |
+| WS-REMOTE-ATTACH-134 | TTY default code attaches OpenCode | logged in + registered Server; occupancy OpenCode serve is ready; stdin/stdout are TTY | `appaloft code` | occupancy resumes or creates my Sandbox and attaches OpenCode inside that Sandbox; does not fail `Sandbox provider does not support port publishing`. |
+| WS-REMOTE-ATTACH-135 | `--no-attach` stays occupy-only | same occupancy | `appaloft code --no-attach` | occupy/resume exit 0; no attach grant; no TUI. |
+| WS-REMOTE-ATTACH-136 | Unsupported ports fall back in-Sandbox | provider `capabilities.ports` is false; harness is native-attach OpenCode | `workspaces.open` with `attach: true` / `workspace attach` | `exposePort` returns `sandbox_port_publishing_unsupported`; attach opens managed-terminal running the harness command against Sandbox loopback (`opencode attach http://127.0.0.1:4096`); laptop does not receive a raw `:4096` URL. |
+| WS-REMOTE-ATTACH-137 | Gateway providers keep native-attach | provider has a private signed gateway URL | same attach | client command is `opencode attach <private /s/... URL>`; no managed-terminal fallback. |
+| WS-REMOTE-ATTACH-138 | Raw loopback stay fail-closed | expose returns `http://127.0.0.1:4096` | attach | `agent_workspace_native_attach_access_unsafe`; no fallback that publishes the host port. |
 
 ## Slice Scope
 
-Slice 1-43 shipped.
+Slice 1-45 shipped. Leftover occupancy-default 3000→single EXPOSE is live-verified on whoami.
 
-Slice 44 (this ticket): default occupancy resume keeps the preferred Sandbox Profile.
+Slice 46 (this ticket): TTY `appaloft code` attaches OpenCode inside my registered-Server Sandbox.
 
-In slice 44:
+In slice 46:
 
-- default `code` resumes my Sandbox when only the Project default Profile changed;
-- explicit `--profile` still fail-closes;
-- `--new` stays isolated.
+- unsupported port publishing is a stable `sandbox_port_publishing_unsupported` conflict;
+- native-attach falls back to in-Sandbox managed-terminal running the harness command;
+- gateway-capable providers keep the private signed URL;
+- `--no-attach` stays occupy-only.
 
-Out of slice 44: catalog create-PR write, team Connection, Cloud managed default Server.
+Out of slice 46: host port publish, laptop SSH `-L`, wrapping host-egress with the Sandbox Gateway, catalog create-PR write, team Connection, Cloud managed default Server.
 
 
 ## Public Surfaces

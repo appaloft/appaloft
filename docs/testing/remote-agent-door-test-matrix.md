@@ -140,6 +140,11 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-RESUME-131 | application | this slice | default occupancy resume keeps preferred Profile | `packages/application/test/agent-workspace-open.test.ts` |
 | WS-REMOTE-RESUME-132 | application | this slice | explicit Profile still fail-closes | same application test |
 | WS-REMOTE-RESUME-133 | application | this slice | `--new` stays isolated | same application test |
+| WS-REMOTE-ATTACH-134 | CLI + `appaloftdev` | this slice | TTY default `code` attaches OpenCode on a registered Server | `packages/adapters/cli/test/agent-workspace-command.test.ts`; live Hostinger `appaloftdev code` |
+| WS-REMOTE-ATTACH-135 | CLI + `appaloftdev` | this slice | `--no-attach` stays occupy-only | same command test; live `appaloftdev code --no-attach` |
+| WS-REMOTE-ATTACH-136 | application | this slice | unsupported ports fall back to in-Sandbox managed-terminal | `packages/application/test/sandbox-agent-runtime.test.ts` |
+| WS-REMOTE-ATTACH-137 | application | this slice | signed gateway URL still wins | same runtime test |
+| WS-REMOTE-ATTACH-138 | application | this slice | raw loopback stays unsafe | same runtime test |
 
 
 

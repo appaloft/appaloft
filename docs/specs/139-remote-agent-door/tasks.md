@@ -376,8 +376,17 @@
 - [ ] Ticket `ready-for-agent`
 - [x] Leftover occupancy-default 3000 upgrades to a single remote Dockerfile EXPOSE
 - [x] Unit tests WS-REMOTE-EXPOSE-054 leftover upgrade
-- [ ] `appaloftdev code --no-attach` of `traefik/whoami` after leftover 3000 becomes port 80
+- [x] `appaloftdev code --no-attach` of `traefik/whoami` after leftover 3000 becomes port 80
 - [x] Cloud web image keeps `git` in Dockerfile/readiness
+
+## Slice 46 - registered-Server OpenCode attach
+
+- [x] Grill D149-D155: leftover EXPOSE closed; attach is the next door
+- [x] Ticket `ready-for-agent` - [#1260](https://github.com/appaloft/appaloft/issues/1260)
+- [x] Unsupported port publishing is `sandbox_port_publishing_unsupported`
+- [x] Native-attach falls back to in-Sandbox managed-terminal
+- [x] Unit tests WS-REMOTE-ATTACH-136; 134/135/137/138 reuse existing attach tests pending live TTY
+- [ ] `appaloftdev code` on Hostinger occupancy attaches OpenCode
 
 ## Later
 
