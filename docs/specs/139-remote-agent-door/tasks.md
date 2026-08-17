@@ -370,6 +370,15 @@
 - [x] Unit tests WS-REMOTE-RESUME-131-133
 - [x] `appaloftdev code --no-attach` would resume the preferred Sandbox
 
+## Slice 45 - leftover occupancy EXPOSE / git-on-control-plane
+
+- [x] Grill D142-D148: do not reopen R7 default Scratch
+- [ ] Ticket `ready-for-agent`
+- [x] Leftover occupancy-default 3000 upgrades to a single remote Dockerfile EXPOSE
+- [x] Unit tests WS-REMOTE-EXPOSE-054 leftover upgrade
+- [ ] `appaloftdev code --no-attach` of `traefik/whoami` after leftover 3000 becomes port 80
+- [x] Cloud web image keeps `git` in Dockerfile/readiness
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

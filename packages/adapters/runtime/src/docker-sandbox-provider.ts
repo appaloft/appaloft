@@ -1397,6 +1397,7 @@ export class DockerSandboxProvider implements SandboxProvider {
       return;
     }
     if (!this.egressPolicy) {
+      if (this.hostEgress) return;
       throw new Error("Docker provider requires an egress adapter for allowlist mode");
     }
     const inspected = await this.docker([

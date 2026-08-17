@@ -201,6 +201,35 @@ describe("DockerSandboxProvider", () => {
     expect(runner.calls.some((call) => call.argv[0] === "dd")).toBe(false);
   });
 
+  test("[WS-REMOTE-RESUME-EGRESS-020] host egress resume keeps allowlist without a gateway adapter", async () => {
+    const runner = new CapturingRunner();
+    const provider = new DockerSandboxProvider({
+      isolation: "container-trusted",
+      runner,
+      hostEgress: true,
+    });
+    await provider.provision({
+      ...request,
+      requestedIsolation: "container-trusted",
+      networkPolicy: {
+        mode: "allowlist",
+        rules: [{ kind: "domain", value: "github.com", ports: [443] }],
+      },
+    });
+
+    await expect(
+      provider.updateNetworkPolicy({
+        sandboxId: "sbx_demo",
+        providerHandle: "appaloft-sbx_demo",
+        networkPolicy: {
+          mode: "allowlist",
+          rules: [{ kind: "domain", value: "github.com", ports: [443] }],
+        },
+      }),
+    ).resolves.toBeUndefined();
+    expect(runner.calls.filter((call) => call.argv[0] === "dd")).toHaveLength(0);
+  });
+
   test("[TERM-SESSION-SANDBOX-001][SBX-RUNTIME-005] opens the managed container shell with a Workspace-scoped home", async () => {
     const runner = new CapturingRunner();
     const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
