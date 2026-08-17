@@ -3,11 +3,11 @@
 ## Status
 
 - Round: Spec
-- Artifact state: slice 1–21 shipped; slice 22 occupancy help door accepted 2026-08-16
+- Artifact state: slice 1–44 shipped; slice 45 leftover occupancy EXPOSE / git-on-control-plane accepted 2026-08-17
 - Discovery: [discovery.md](./discovery.md)
 - Governing decision: ADR-120 plan default destination; ADR-119 locates; ADR-118 occupies; ADR-117 remains the login/Server/`--local` door; ADR-116 remains Scratch-only; ADR-103 stays on explicit `workspace open` Git fail-closed
-- Code changes allowed: yes for slice 22 after the occupancy-help-door ticket is `ready-for-agent`
-- Compatibility: public minor. Top-level CLI help names occupancy doors; no new catalog field
+- Code changes allowed: yes for slice 45 after the leftover-EXPOSE ticket is `ready-for-agent`
+- Compatibility: public minor. Occupancy leftover-default 3000 may be replaced by a single remote EXPOSE; no new catalog field
 
 ## Business Outcome
 
