@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.8.14](https://github.com/appaloft/appaloft/compare/v1.8.13...v1.8.14) (2026-08-17)
+
+
+### Bug Fixes
+
+* **cli:** print occupancy GitHub PR delivery hint ([#1274](https://github.com/appaloft/appaloft/issues/1274)) ([d80a0e2](https://github.com/appaloft/appaloft/commit/d80a0e2cd8600766599770d48c19b486243fa597))
+
+
+### Documentation
+
+* WS-REMOTE-HINT-140 and occupancy skill. ([d80a0e2](https://github.com/appaloft/appaloft/commit/d80a0e2cd8600766599770d48c19b486243fa597))
+
 ## [1.8.13](https://github.com/appaloft/appaloft/compare/v1.8.12...v1.8.13) (2026-08-17)
 
 
