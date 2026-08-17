@@ -28,6 +28,8 @@ in the default shell runtime registry unless explicitly opted out.
 | SWARM-TARGET-SECRET-001 | Redaction | Registry and runtime secret references. | Image pull credentials, pull secrets, env secret values, rendered commands, and provider responses expose only masked values and safe references in logs, diagnostics, errors, and read models. |
 | SWARM-TARGET-AUTH-001 | Runtime adapter integration | Registry-authenticated apply execution context. | Shell/server composition resolves the registered Swarm manager and runs image-service and Compose-stack apply plans through that manager's SSH identity, preserving the remote user's Docker credential-store context and propagating it with `--with-registry-auth` without copying registry credentials or creating an Appaloft-owned `DOCKER_CONFIG`. |
 | SWARM-TARGET-VERIFY-001 | Runtime adapter integration | Candidate service task convergence. | Verification waits until desired replicas equal running tasks, fails on timeout/under-replication before route promotion, and returns bounded task/node evidence suitable for diagnosing per-node image-pull failures. |
+| SWARM-TARGET-ENV-001 | Adapter contract + opt-in real smoke | Special-character Compose environment values. | Generated override round-trips exact quotes, spaces, dollar signs, backslashes, colons, Unicode, and newlines; production diagnostics expose keys/masks only and real smoke compares only test-owned values. |
+| SWARM-TARGET-ROUTE-002 | Runtime/proxy integration | Multiple served routes after promotion. | Every distinct served route/domain is verified before superseded cleanup; failure restores previous route labels and verifies the old owner before candidate cleanup. |
 | SWARM-TARGET-APPLY-001 | Adapter integration | Successful replacement rollout. | Candidate/update rollout preserves previous same-resource service until required apply, health, route, and public verification gates pass, then records sanitized new runtime identity. |
 | SWARM-TARGET-APPLY-002 | Adapter integration | Failed replacement rollout. | Original `deployments.create` remains accepted; failure state and `deployment-failed` are persisted; cleanup touches only the failed candidate or safe Swarm rollback artifact. |
 | SWARM-TARGET-OBS-001 | Query/log adapter | Read Swarm service logs. | `resources.runtime-logs` returns normalized Appaloft log events with resource/deployment context, not raw Docker service log frames. |
@@ -83,6 +85,14 @@ in the default shell runtime registry unless explicitly opted out.
   convergence command that compares desired replicas with running tasks before route promotion.
   Failure output includes bounded task and node placement evidence while redaction remains active.
   This proves pulls on scheduled nodes, not on otherwise unused cluster nodes.
+- `SWARM-TARGET-ENV-001` has generated-override YAML parse coverage proving exact round-trip for
+  quotes, spaces, dollar signs, backslashes, colons, Unicode, and embedded newlines. The existing
+  opt-in real Swarm smoke also inspects only its test-owned `PUBLIC_FLAG` value from the realized
+  service environment; production timeline and metadata assertions remain key/mask-only.
+- `SWARM-TARGET-ROUTE-002` has apply-plan and fake-runner coverage proving every distinct served
+  hostname/path is verified after promotion and before superseded cleanup. A failed public proof
+  removes the candidate route labels, verifies the previous owner with the same route set, and only
+  then removes the failed candidate; a failed restore cannot be misreported as verified.
 - `SWARM-TARGET-APPLY-001` has initial adapter contract coverage proving OCI image apply planning
   creates a deployment-specific candidate service before verification, route promotion, and
   superseded-service cleanup. The opt-in fake backend now executes that order, records sanitized
@@ -113,7 +123,8 @@ in the default shell runtime registry unless explicitly opted out.
   provider payload, or registry-secret fields.
 - `SWARM-TARGET-APPLY-002` has fake-runner backend coverage proving a failed candidate verification
   records deployment failure metadata and runs only the deployment-scoped cleanup command for the
-  failed candidate. Real Swarm rollback command behavior remains open.
+  failed candidate. Public-route failure additionally restores and verifies the previous route
+  owner before cleanup. Opt-in real Swarm rollback execution remains environment-gated.
 - `SWARM-TARGET-OBS-001` has initial runtime-log adapter coverage proving Swarm-backed OCI image
   deployments read `docker service logs` through sanitized `swarm.serviceName` metadata and return
   normalized Appaloft runtime log lines with configured redaction applied. Coverage now proves the

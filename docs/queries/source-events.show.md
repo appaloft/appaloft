@@ -66,7 +66,7 @@ type SourceEventDetail = {
     method?: "provider-signature" | "generic-hmac";
     keyVersion?: string;
   };
-  status: "accepted" | "deduped" | "ignored" | "blocked" | "dispatched" | "failed";
+  status: "accepted" | "deduped" | "ignored" | "blocked" | "waiting-checks" | "checks-blocked" | "superseded" | "dispatched" | "failed";
   dedupeOfSourceEventId?: string;
   policyResults: readonly SourceEventPolicyResult[];
   createdDeploymentIds: readonly string[];
@@ -75,7 +75,7 @@ type SourceEventDetail = {
 
 type SourceEventPolicyResult = {
   resourceId: string;
-  status: "matched" | "ignored" | "blocked" | "dispatch-failed" | "dispatched";
+  status: "matched" | "waiting-checks" | "checks-blocked" | "dispatching" | "superseded" | "ignored" | "blocked" | "dispatch-failed" | "dispatched";
   reason?:
     | "ref-not-matched"
     | "path-not-matched"
@@ -86,6 +86,14 @@ type SourceEventPolicyResult = {
     | "dispatch-failed";
   matchedPaths?: readonly string[];
   matchedPathCount?: number;
+  requiredChecks?: readonly string[];
+  observedChecks?: readonly {
+    name: string;
+    conclusion: string;
+    checkRunId: string;
+    completedAt: string;
+  }[];
+  supersededBySourceEventId?: string;
   deploymentId?: string;
   errorCode?: string;
 };

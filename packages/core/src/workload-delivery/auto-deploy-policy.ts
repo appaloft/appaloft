@@ -16,6 +16,7 @@ const policyStatuses = ["enabled", "disabled", "blocked"] as const;
 const blockedReasons = ["source-binding-changed"] as const;
 const resourceSecretRefPrefix = "resource-secret:";
 const maximumSourcePathPatternCount = 100;
+const maximumRequiredCheckCount = 50;
 
 function includesValue<TValue extends string>(
   values: readonly TValue[],
@@ -295,6 +296,32 @@ export class SourcePathPattern extends ScalarValueObject<string> {
   }
 }
 
+const requiredCheckNameBrand: unique symbol = Symbol("ResourceAutoDeployRequiredCheckName");
+export class ResourceAutoDeployRequiredCheckName extends ScalarValueObject<string> {
+  private [requiredCheckNameBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<ResourceAutoDeployRequiredCheckName> {
+    const normalized = value.trim();
+    if (!normalized || normalized.length > 200 || /[\r\n\0]/.test(normalized)) {
+      return err(
+        autoDeployValidationError(
+          "Required check name must be a non-empty single line up to 200 characters",
+          { field: "policy.requiredChecks" },
+        ),
+      );
+    }
+    return ok(new ResourceAutoDeployRequiredCheckName(normalized));
+  }
+
+  static rehydrate(value: string): ResourceAutoDeployRequiredCheckName {
+    return new ResourceAutoDeployRequiredCheckName(value.trim());
+  }
+}
+
 export interface ResourceAutoDeployPathPolicyState {
   includePaths: SourcePathPattern[];
   excludePaths: SourcePathPattern[];
@@ -386,6 +413,7 @@ export interface ResourceAutoDeployPolicyState {
   dedupeWindowSeconds?: SourceEventDedupeWindowSeconds;
   includePaths?: SourcePathPattern[];
   excludePaths?: SourcePathPattern[];
+  requiredChecks?: ResourceAutoDeployRequiredCheckName[];
 }
 
 export class ResourceAutoDeployPolicy extends ValueObject<ResourceAutoDeployPolicyState> {
@@ -403,11 +431,13 @@ export class ResourceAutoDeployPolicy extends ValueObject<ResourceAutoDeployPoli
     dedupeWindowSeconds?: SourceEventDedupeWindowSeconds;
     includePaths?: readonly SourcePathPattern[];
     excludePaths?: readonly SourcePathPattern[];
+    requiredChecks?: readonly ResourceAutoDeployRequiredCheckName[];
   }): Result<ResourceAutoDeployPolicy> {
     const refs = uniqueByValue(input.refs);
     const eventKinds = uniqueByValue(input.eventKinds);
     const includePaths = uniqueByValue(input.includePaths ?? []);
     const excludePaths = uniqueByValue(input.excludePaths ?? []);
+    const requiredChecks = uniqueByValue(input.requiredChecks ?? []);
 
     if (
       includePaths.length > maximumSourcePathPatternCount ||
@@ -417,6 +447,15 @@ export class ResourceAutoDeployPolicy extends ValueObject<ResourceAutoDeployPoli
         autoDeployValidationError("Auto-deploy path policy contains too many patterns", {
           field: "policy.pathPatterns",
           maximum: maximumSourcePathPatternCount,
+        }),
+      );
+    }
+
+    if (requiredChecks.length > maximumRequiredCheckCount) {
+      return err(
+        autoDeployValidationError("Auto-deploy policy contains too many required checks", {
+          field: "policy.requiredChecks",
+          maximum: maximumRequiredCheckCount,
         }),
       );
     }
@@ -459,6 +498,13 @@ export class ResourceAutoDeployPolicy extends ValueObject<ResourceAutoDeployPoli
         }),
       );
     }
+    if (input.triggerKind.requiresGenericWebhookSecret() && requiredChecks.length) {
+      return err(
+        autoDeployValidationError("Required checks are supported only for git-push auto-deploy", {
+          field: "policy.requiredChecks",
+        }),
+      );
+    }
 
     return ok(
       new ResourceAutoDeployPolicy({
@@ -474,6 +520,7 @@ export class ResourceAutoDeployPolicy extends ValueObject<ResourceAutoDeployPoli
         ...(input.dedupeWindowSeconds ? { dedupeWindowSeconds: input.dedupeWindowSeconds } : {}),
         ...(includePaths.length ? { includePaths } : {}),
         ...(excludePaths.length ? { excludePaths } : {}),
+        ...(requiredChecks.length ? { requiredChecks } : {}),
       }),
     );
   }
@@ -541,6 +588,7 @@ export function cloneResourceAutoDeployPolicyState(
     ...(state.dedupeWindowSeconds ? { dedupeWindowSeconds: state.dedupeWindowSeconds } : {}),
     ...(state.includePaths ? { includePaths: [...state.includePaths] } : {}),
     ...(state.excludePaths ? { excludePaths: [...state.excludePaths] } : {}),
+    ...(state.requiredChecks ? { requiredChecks: [...state.requiredChecks] } : {}),
   };
 }
 

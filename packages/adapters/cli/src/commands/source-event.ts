@@ -17,6 +17,9 @@ const sourceEventStatuses = [
   "deduped",
   "ignored",
   "blocked",
+  "waiting-checks",
+  "checks-blocked",
+  "superseded",
   "dispatched",
   "failed",
 ] as const;

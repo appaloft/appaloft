@@ -18,7 +18,7 @@ are aligned. Future MCP/tool descriptors remain deferred.
 ## Intent
 
 `source-events.list` returns recent safe source event delivery records for a project or Resource so
-operators can inspect dedupe, ignored, blocked, failed, and dispatched outcomes.
+operators can inspect dedupe, ignored, blocked, waiting-check, superseded, failed, and dispatched outcomes.
 
 It is read-only. It must not replay events, retry failed dispatch, mutate policies, or create
 deployments.
@@ -29,7 +29,7 @@ deployments.
 type ListSourceEventsInput = {
   projectId?: string;
   resourceId?: string;
-  status?: "accepted" | "deduped" | "ignored" | "blocked" | "dispatched" | "failed";
+  status?: "accepted" | "deduped" | "ignored" | "blocked" | "waiting-checks" | "checks-blocked" | "superseded" | "dispatched" | "failed";
   sourceKind?: "github" | "gitlab" | "generic-signed";
   limit?: number;
   cursor?: string;
@@ -56,7 +56,7 @@ type SourceEventListItem = {
   eventKind: "push" | "tag";
   ref: string;
   revision: string;
-  status: "accepted" | "deduped" | "ignored" | "blocked" | "dispatched" | "failed";
+  status: "accepted" | "deduped" | "ignored" | "blocked" | "waiting-checks" | "checks-blocked" | "superseded" | "dispatched" | "failed";
   dedupeStatus: "new" | "duplicate";
   ignoredReasons: readonly string[];
   createdDeploymentIds: readonly string[];

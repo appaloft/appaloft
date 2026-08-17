@@ -126,6 +126,7 @@ import { domainBindingActiveCertificateMigration } from "./migrations/117_domain
 import { agentWorkspaceProfileMcpConnectionsMigration } from "./migrations/118_agent_workspace_profile_mcp_connections";
 import { workspaceActivationTargetEvidenceMigration } from "./migrations/119_workspace_activation_target_evidence";
 import { serverRuntimeTargetProfileMigration } from "./migrations/120_server_runtime_target_profile";
+import { sourceEventRequiredCheckDeliveriesMigration } from "./migrations/121_source_event_required_check_deliveries";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -348,6 +349,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "118_agent_workspace_profile_mcp_connections": agentWorkspaceProfileMcpConnectionsMigration,
       "119_workspace_activation_target_evidence": workspaceActivationTargetEvidenceMigration,
       "120_server_runtime_target_profile": serverRuntimeTargetProfileMigration,
+      "121_source_event_required_check_deliveries": sourceEventRequiredCheckDeliveriesMigration,
     };
   }
 }

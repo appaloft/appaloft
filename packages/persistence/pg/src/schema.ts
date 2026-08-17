@@ -718,6 +718,7 @@ export interface SourceEventsTable {
   ignored_reasons: ColumnType<string[], string[] | undefined, string[]>;
   policy_results: ColumnType<JsonRecord[], JsonRecord[] | undefined, JsonRecord[]>;
   created_deployment_ids: ColumnType<string[], string[] | undefined, string[]>;
+  check_gate_version: ColumnType<number, number | undefined, number>;
   agent_automation_claimed_at: ColumnType<string | null, string | null | undefined, string | null>;
   agent_automation_outcome: ColumnType<
     JsonRecord | null,
@@ -725,6 +726,19 @@ export interface SourceEventsTable {
     JsonRecord | null
   >;
   received_at: string;
+}
+
+export interface SourceEventCheckDeliveriesTable {
+  source_kind: string;
+  delivery_id: string;
+  source_identity: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+  revision: string;
+  check_name: string;
+  check_run_id: string;
+  conclusion: string;
+  completed_at: string;
+  received_at: string;
+  processed_at: string | null;
 }
 
 type JsonRecord = Record<string, unknown>;
@@ -1372,6 +1386,7 @@ export interface Database {
   domain_event_stream_prune_watermarks: DomainEventStreamPruneWatermarksTable;
   source_links: SourceLinksTable;
   source_events: SourceEventsTable;
+  source_event_check_deliveries: SourceEventCheckDeliveriesTable;
   preview_environments: PreviewEnvironmentsTable;
   preview_policies: PreviewPoliciesTable;
   preview_policy_decisions: PreviewPolicyDecisionsTable;

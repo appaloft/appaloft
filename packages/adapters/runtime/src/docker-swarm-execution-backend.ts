@@ -60,6 +60,8 @@ export interface DockerSwarmCommandRunnerInput {
   command: string;
   displayCommand: string;
   stdinFile?: string;
+  rollbackCommand?: string;
+  rollbackDisplayCommand?: string;
 }
 
 export interface DockerSwarmCommandRunnerResult {
@@ -503,6 +505,18 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
           message,
           level: "error",
         });
+        if (step.step === "verify-public-routes") {
+          const restored = await this.restorePreviousRouteOwner(
+            context,
+            deployment,
+            step,
+            timeline,
+            redactions,
+          );
+          if (restored) {
+            await this.verifyPreviousRouteOwner(context, deployment, step, timeline, redactions);
+          }
+        }
         await this.cleanupFailedCandidate(context, deployment, timeline, redactions);
         return applyExecutionResult(
           deployment,
@@ -526,6 +540,18 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
           message,
           level: "error",
         });
+        if (step.step === "verify-public-routes") {
+          const restored = await this.restorePreviousRouteOwner(
+            context,
+            deployment,
+            step,
+            timeline,
+            redactions,
+          );
+          if (restored) {
+            await this.verifyPreviousRouteOwner(context, deployment, step, timeline, redactions);
+          }
+        }
         await this.cleanupFailedCandidate(context, deployment, timeline, redactions);
         return applyExecutionResult(
           deployment,
@@ -625,7 +651,9 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
   }
 
   private phaseForStep(step: string): SwarmExecutionPhase {
-    return step === "verify-candidate-service" ? "verify" : "deploy";
+    return step === "verify-candidate-service" || step === "verify-public-routes"
+      ? "verify"
+      : "deploy";
   }
 
   private async pushTimeline(
@@ -726,5 +754,84 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
         return;
       }
     }
+  }
+
+  private async verifyPreviousRouteOwner(
+    context: ExecutionContext,
+    deployment: Deployment,
+    failedStep: DockerSwarmCommandRunnerInput,
+    timeline: DeploymentTimelineJournalEntry[],
+    redactions: readonly string[],
+  ): Promise<void> {
+    const result = await this.runner.run({
+      context,
+      targetId: deploymentIdentity(deployment).targetId,
+      step: "verify-previous-route-owner",
+      command: failedStep.command,
+      displayCommand: failedStep.displayCommand,
+    });
+    if (result.isErr()) {
+      timeline.push(
+        phaseLog("rollback", safeFailureMessage(result.error.message, redactions), "error"),
+      );
+      return;
+    }
+    if (result.value.exitCode !== 0) {
+      timeline.push(
+        phaseLog(
+          "rollback",
+          safeFailureMessage(
+            result.value.stderr ?? "Previous Docker Swarm route owner could not be verified",
+            redactions,
+          ),
+          "error",
+        ),
+      );
+      return;
+    }
+    timeline.push(phaseLog("rollback", "Previous Docker Swarm route owner is reachable"));
+  }
+
+  private async restorePreviousRouteOwner(
+    context: ExecutionContext,
+    deployment: Deployment,
+    failedStep: DockerSwarmCommandRunnerInput,
+    timeline: DeploymentTimelineJournalEntry[],
+    redactions: readonly string[],
+  ): Promise<boolean> {
+    if (!failedStep.rollbackCommand || !failedStep.rollbackDisplayCommand) {
+      timeline.push(
+        phaseLog("rollback", "Previous route owner restore command is unavailable", "error"),
+      );
+      return false;
+    }
+    const result = await this.runner.run({
+      context,
+      targetId: deploymentIdentity(deployment).targetId,
+      step: "restore-previous-route-owner",
+      command: failedStep.rollbackCommand,
+      displayCommand: failedStep.rollbackDisplayCommand,
+    });
+    if (result.isErr()) {
+      timeline.push(
+        phaseLog("rollback", safeFailureMessage(result.error.message, redactions), "error"),
+      );
+      return false;
+    }
+    if (result.value.exitCode !== 0) {
+      timeline.push(
+        phaseLog(
+          "rollback",
+          safeFailureMessage(
+            result.value.stderr ?? "Previous Docker Swarm route owner could not be restored",
+            redactions,
+          ),
+          "error",
+        ),
+      );
+      return false;
+    }
+    timeline.push(phaseLog("rollback", "Previous Docker Swarm route owner labels restored"));
+    return true;
   }
 }

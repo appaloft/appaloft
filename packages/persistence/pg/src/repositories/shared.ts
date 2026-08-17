@@ -135,6 +135,7 @@ import {
   ReplicaCount,
   ResourceAutoDeployPolicyBlockedReasonValue,
   ResourceAutoDeployPolicyStatusValue,
+  ResourceAutoDeployRequiredCheckName,
   ResourceAutoDeploySecretRef,
   ResourceAutoDeployTriggerKindValue,
   ResourceBindingId,
@@ -524,6 +525,7 @@ export interface SerializedResourceAutoDeployPolicy extends Record<string, unkno
   dedupeWindowSeconds?: number;
   includePaths?: string[];
   excludePaths?: string[];
+  requiredChecks?: string[];
 }
 
 export interface SerializedDomainVerificationAttempt extends Record<string, unknown> {
@@ -1899,6 +1901,13 @@ export function rehydrateResourceRow(
               ? {
                   excludePaths: autoDeployPolicy.excludePaths.map((pattern) =>
                     SourcePathPattern.rehydrate(pattern),
+                  ),
+                }
+              : {}),
+            ...(autoDeployPolicy.requiredChecks
+              ? {
+                  requiredChecks: autoDeployPolicy.requiredChecks.map((check) =>
+                    ResourceAutoDeployRequiredCheckName.rehydrate(check),
                   ),
                 }
               : {}),

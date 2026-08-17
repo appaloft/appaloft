@@ -262,6 +262,14 @@ event records, error details, read models, logs, or events.
 - First Code Round can proceed before Phase 8 outbox/inbox, but must clearly mark automatic source
   event retry as deferred.
 
+## Required Check Gate Extension
+
+[ADR-121](./ADR-121-source-event-required-check-gate.md) extends this workflow with optional
+Resource-owned explicit required check names and verified provider completed-check facts. It does
+not move source/ref/check fields into `deployments.create`, mirror branch protection, or add a
+background retry guarantee. Policies without required checks preserve this ADR's synchronous
+dispatch baseline.
+
 ## Required Spec Updates
 
 This decision governs:

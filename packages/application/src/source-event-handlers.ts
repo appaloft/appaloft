@@ -1,3 +1,5 @@
+export * from "./operations/source-events/complete-source-event-check.command";
+export * from "./operations/source-events/complete-source-event-check.handler";
 export * from "./operations/source-events/create-deployment-source-event-dispatcher";
 export * from "./operations/source-events/generic-signed-source-event-verifier";
 export * from "./operations/source-events/ingest-source-event.handler";

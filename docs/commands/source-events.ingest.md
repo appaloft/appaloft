@@ -3,7 +3,7 @@
 ## Status
 
 Accepted active integration boundary. Application command handling, generic signed verification,
-GitHub push verification/normalization, durable source-event dedupe persistence, policy matching
+GitHub push and completed-check verification/normalization, durable source-event dedupe persistence, policy matching
 for ignored or blocked outcomes, deployment dispatch, read models, public docs/help,
 `CORE_OPERATIONS.md`, `operation-catalog.ts`, operator-visible process-attempt projection, and
 tests are aligned for the active HTTP routes.
@@ -18,6 +18,7 @@ tests are aligned for the active HTTP routes.
 - [source-events.list Query Spec](../queries/source-events.list.md)
 - [source-events.show Query Spec](../queries/source-events.show.md)
 - [deployments.create Command Spec](./deployments.create.md)
+- [ADR-121: Source Event Required Check Gate](../decisions/ADR-121-source-event-required-check-gate.md)
 
 ## Intent
 
@@ -79,6 +80,13 @@ It verifies `X-Hub-Signature-256` with configured `APPALOFT_GITHUB_WEBHOOK_SECRE
 this command without `scopeResourceId` so matching may fan out to all eligible Resource policies.
 GitHub `ping` is a transport no-op and must not dispatch this command.
 
+The same route accepts verified `X-GitHub-Event = check_run` deliveries only when the action is
+`completed`. It dispatches the internal `source-events.complete-check` command with safe repository
+identity, exact head SHA, check name, conclusion, check-run id, completion time, and delivery id.
+The database transaction dedupes the delivery, merges newer same-name reruns, and claims at most one
+deployment dispatch per Resource gate. `success`, `neutral`, and `skipped` pass; other terminal
+conclusions block until a newer passing rerun. No check output or raw webhook material is stored.
+
 For GitHub push events, the transport normalizes `before`, `after`, `created`, `deleted`, and
 `forced`. A deleted ref uses the last non-zero revision for evidence but always fails closed before
 deployment dispatch. When at least one candidate policy declares path rules, the GitHub adapter
@@ -119,10 +127,12 @@ included in this command input, source event records, read models, errors, logs,
 8. Include `scopeResourceId` in the dedupe key so Resource-scoped generic signed routes do not
    dedupe events across different Resources that share the same source identity and delivery id.
 9. Record ignored or blocked reasons when no deployment is created.
-10. For each match, dispatch ordinary `deployments.create` with Resource/environment/runtime context
+10. For policies with `requiredChecks`, record an exact-revision `waiting-checks` result instead of
+   dispatching. A newer push for the same Resource/ref supersedes an older waiting result.
+11. For each immediate or atomically check-gate-claimed match, dispatch ordinary `deployments.create` with Resource/environment/runtime context
    only; do not pass source event fields into deployment admission.
-11. Record created deployment ids or structured dispatch failure details.
-12. Project accepted and dispatched/failed outcomes into `operator-work.*` through safe
+12. Record created deployment ids or structured dispatch failure details.
+13. Project accepted and dispatched/failed outcomes into `operator-work.*` through safe
     process-attempt rows keyed by the source event dedupe key. This is an operator-visible
     projection only; source-event deployment dispatch still runs inline from this command path.
 
@@ -131,7 +141,16 @@ included in this command input, source event records, read models, errors, logs,
 ```ts
 type IngestSourceEventResult = {
   sourceEventId: string;
-  status: "accepted" | "deduped" | "ignored" | "blocked" | "dispatched" | "failed";
+  status:
+    | "accepted"
+    | "deduped"
+    | "ignored"
+    | "blocked"
+    | "waiting-checks"
+    | "checks-blocked"
+    | "superseded"
+    | "dispatched"
+    | "failed";
   matchedResourceIds: readonly string[];
   createdDeploymentIds: readonly string[];
   ignoredReasons: readonly (
@@ -168,7 +187,7 @@ Use [Source Event Auto Deploy Error Spec](../errors/source-events.md). Minimum c
 | --- | --- | --- |
 | Web | No raw webhook ingestion; reads source event results. | Active for Resource detail list |
 | CLI | Optional local smoke/diagnostic ingestion over normalized facts. | Future |
-| oRPC / HTTP | `POST /api/resources/{resourceId}/source-events/generic-signed` verifies Resource-scoped generic signed events. `POST /api/integrations/github/source-events` verifies GitHub push events and treats GitHub `ping` as a no-op. | Active |
+| oRPC / HTTP | `POST /api/resources/{resourceId}/source-events/generic-signed` verifies Resource-scoped generic signed events. `POST /api/integrations/github/source-events` verifies GitHub push and completed `check_run` events and treats GitHub `ping` as a no-op. | Active |
 | Automation / MCP | Future event ingest tool only when verification input is safe. | Future |
 
 ## Tests

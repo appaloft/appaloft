@@ -24,6 +24,10 @@ const resourceAutoDeployPolicyInputSchema = z
       .min(1)
       .max(100)
       .optional(),
+    requiredChecks: z
+      .array(nonEmptyTrimmedString("Required check name").max(200))
+      .max(50)
+      .optional(),
     genericWebhookSecretRef: nonEmptyTrimmedString("Generic webhook secret reference").optional(),
     dedupeWindowSeconds: z.number().int().positive().optional(),
   })
@@ -36,6 +40,13 @@ const resourceAutoDeployPolicyInputSchema = z
         code: "custom",
         message: "Auto-deploy path filters require git-push trigger kind",
         path: ["includePaths"],
+      });
+    }
+    if (policy.triggerKind !== "git-push" && (policy.requiredChecks?.length ?? 0) > 0) {
+      context.addIssue({
+        code: "custom",
+        message: "Required checks require git-push trigger kind",
+        path: ["requiredChecks"],
       });
     }
   });
@@ -81,6 +92,7 @@ export interface ConfigureResourceAutoDeployResult {
   eventKinds?: ("push" | "tag")[];
   includePaths?: string[];
   excludePaths?: string[];
+  requiredChecks?: string[];
   sourceBindingFingerprint?: string;
   blockedReason?: "source-binding-changed";
 }

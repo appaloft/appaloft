@@ -186,6 +186,32 @@ class FailingVerifySwarmCommandRunner implements DockerSwarmCommandRunner {
   }
 }
 
+class FailingPublicRouteSwarmCommandRunner implements DockerSwarmCommandRunner {
+  readonly calls: DockerSwarmCommandRunnerInput[] = [];
+
+  async run(
+    input: DockerSwarmCommandRunnerInput,
+  ): Promise<Result<DockerSwarmCommandRunnerResult>> {
+    this.calls.push(input);
+    if (input.step === "verify-public-routes") {
+      return ok({ exitCode: 22, stderr: "later public route failed verification" });
+    }
+    return ok({ exitCode: 0 });
+  }
+}
+
+class FailingRouteRestoreSwarmCommandRunner extends FailingPublicRouteSwarmCommandRunner {
+  override async run(
+    input: DockerSwarmCommandRunnerInput,
+  ): Promise<Result<DockerSwarmCommandRunnerResult>> {
+    if (input.step === "restore-previous-route-owner") {
+      this.calls.push(input);
+      return ok({ exitCode: 1, stderr: "candidate route labels could not be removed" });
+    }
+    return super.run(input);
+  }
+}
+
 class CapacityExhaustedSwarmCommandRunner implements DockerSwarmCommandRunner {
   readonly calls: DockerSwarmCommandRunnerInput[] = [];
 
@@ -260,7 +286,9 @@ const testSecretProtector = new TestControlPlaneSecretProtector();
 const protectedFixture = (value: string) =>
   `appaloft-test-secret:v1:${Buffer.from(value, "utf8").toString("base64url")}`;
 
-function runtimeEnvironmentSnapshot(input: { secretKey?: string } = {}): EnvironmentConfigSnapshot {
+function runtimeEnvironmentSnapshot(
+  input: { publicFlagValue?: string; secretKey?: string } = {},
+): EnvironmentConfigSnapshot {
   const secretKey = input.secretKey ?? "DATABASE_URL";
 
   return EnvironmentConfigSnapshot.rehydrate({
@@ -283,7 +311,7 @@ function runtimeEnvironmentSnapshot(input: { secretKey?: string } = {}): Environ
       },
       {
         key: ConfigKey.rehydrate("PUBLIC_FLAG"),
-        value: ConfigValueText.rehydrate("enabled"),
+        value: ConfigValueText.rehydrate(input.publicFlagValue ?? "enabled"),
         kind: VariableKindValue.rehydrate("plain-config"),
         exposure: VariableExposureValue.rehydrate("runtime"),
         scope: ConfigScopeValue.rehydrate("deployment"),
@@ -301,6 +329,7 @@ function runtimePlan(
     image?: string;
     metadata?: Record<string, string>;
     port?: number;
+    publicFlagValue?: string;
     tlsMode?: "auto" | "disabled";
   } = {},
 ): RuntimePlan {
@@ -465,6 +494,25 @@ function swarmServiceEnvironmentKeys(serviceName: string): string[] {
   ])
     .split(/\r?\n/)
     .filter(Boolean);
+}
+
+function swarmServiceEnvironment(serviceName: string): Map<string, string> {
+  const values = JSON.parse(
+    commandOutput([
+      "docker",
+      "service",
+      "inspect",
+      serviceName,
+      "--format",
+      "{{json .Spec.TaskTemplate.ContainerSpec.Env}}",
+    ]),
+  ) as string[];
+  return new Map(
+    values.map((entry) => {
+      const separator = entry.indexOf("=");
+      return separator < 0 ? [entry, ""] : [entry.slice(0, separator), entry.slice(separator + 1)];
+    }),
+  );
 }
 
 function commandResult(command: string[]): { exitCode: number; stderr: string; stdout: string } {
@@ -863,6 +911,7 @@ describe("DockerSwarmExecutionBackend", () => {
       "create-candidate-service",
       "verify-candidate-service",
       "promote-route-target",
+      "verify-public-routes",
       "cleanup-superseded-services",
     ]);
     expect(runner.calls).toMatchSnapshot();
@@ -874,10 +923,10 @@ describe("DockerSwarmExecutionBackend", () => {
     );
     expect(runner.calls[0]?.displayCommand).not.toContain("postgres://secret-value");
     expect(runner.calls[1]?.command).toContain("sed 's/=.*//' | grep -Fqx -- 'DATABASE_URL'");
-    expect(runner.calls[3]?.command).toContain(
+    expect(runner.calls[4]?.command).toContain(
       '); if [ "$current_deployment" != \'dep_swarm_backend\' ]; then',
     );
-    expect(runner.calls[3]?.command).toContain('fi; done');
+    expect(runner.calls[4]?.command).toContain('fi; done');
     expect(deployment.runtimePlan.execution.metadata).toMatchObject({
       "swarm.serviceName": "appaloft-res-api-dst-prod-dep-swarm-backend_web",
       "swarm.applyPlanSchemaVersion": "docker-swarm.apply-plan/v1",
@@ -1022,6 +1071,7 @@ describe("DockerSwarmExecutionBackend", () => {
       "create-candidate-service",
       "verify-candidate-service",
       "promote-route-target",
+      "verify-public-routes",
       "cleanup-superseded-services",
     ]);
     expect(runner.calls[0]?.command).toContain(`--env 'DATABASE_URL=${secretValue}'`);
@@ -1138,6 +1188,84 @@ describe("DockerSwarmExecutionBackend", () => {
     expect(runner.calls[2]?.command).toContain("--filter 'label=appaloft.resource-id=res_api'");
     expect(runner.calls[2]?.command).not.toContain("docker system prune");
     expect(runner.calls[2]?.command).not.toContain("docker volume");
+  });
+
+  test("[ROUTE-TERM-SWARM-002] restores and verifies the previous route owner before candidate cleanup", async () => {
+    const runner = new FailingPublicRouteSwarmCommandRunner();
+    const backend = new DockerSwarmExecutionBackend(
+      runner,
+      undefined,
+      {},
+      undefined,
+      undefined,
+      undefined,
+      testSecretProtector,
+    );
+
+    const result = await backend.execute(createContext(), runningDeployment());
+
+    expect(result.isOk()).toBe(true);
+    const deployment = result._unsafeUnwrap().deployment.toState();
+    expect(deployment.status.value).toBe("failed");
+    expect(deployment.runtimePlan.execution.metadata).toMatchObject({
+      phase: "verify-public-routes",
+      errorCode: "docker_swarm_command_failed",
+    });
+    expect(runner.calls.map((call) => call.step)).toEqual([
+      "create-candidate-service",
+      "verify-candidate-service",
+      "promote-route-target",
+      "verify-public-routes",
+      "restore-previous-route-owner",
+      "verify-previous-route-owner",
+      "remove-services",
+    ]);
+    expect(runner.calls[4]?.command).toContain(
+      "--label-rm 'appaloft.route-candidate'",
+    );
+    expect(runner.calls[4]?.command).toContain("--label-rm 'traefik.enable'");
+    expect(runner.calls[5]?.command).toBe(runner.calls[3]?.command);
+    expect(runner.calls[6]?.command).toContain(
+      "--filter 'label=appaloft.deployment-id=dep_swarm_backend'",
+    );
+    expect(deployment.timeline).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          phase: "rollback",
+          message: "Previous Docker Swarm route owner labels restored",
+        }),
+        expect.objectContaining({
+          phase: "rollback",
+          message: "Previous Docker Swarm route owner is reachable",
+        }),
+      ]),
+    );
+  });
+
+  test("[ROUTE-TERM-SWARM-002] does not claim previous-owner reachability when route restore fails", async () => {
+    const runner = new FailingRouteRestoreSwarmCommandRunner();
+    const backend = new DockerSwarmExecutionBackend(
+      runner,
+      undefined,
+      {},
+      undefined,
+      undefined,
+      undefined,
+      testSecretProtector,
+    );
+
+    const result = await backend.execute(createContext(), runningDeployment());
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().deployment.toState().status.value).toBe("failed");
+    expect(runner.calls.map((call) => call.step)).toEqual([
+      "create-candidate-service",
+      "verify-candidate-service",
+      "promote-route-target",
+      "verify-public-routes",
+      "restore-previous-route-owner",
+      "remove-services",
+    ]);
   });
 
   test("[DEP-CREATE-ASYNC-019] classifies Swarm apply capacity failures as resource exhaustion", async () => {
@@ -1385,6 +1513,7 @@ describe("DockerSwarmExecutionBackend", () => {
       expect(edgeNetwork).toBe("overlay swarm");
 
       const secretKey = "APPALOFT_SWARM_SMOKE_DATABASE_URL";
+      const publicFlagValue = 'quote="single=\' dollar=$HOME slash=\\ colon=: unicode=部署 newline\nnext';
       const registryPassword = "appaloft-swarm-smoke-password";
       const registryUsername = "appaloft";
       let deploymentCleaned = false;
@@ -1400,6 +1529,7 @@ describe("DockerSwarmExecutionBackend", () => {
         healthPath: "/",
         image: Bun.env.APPALOFT_DOCKER_SWARM_SMOKE_IMAGE ?? "nginx:alpine",
         port: 80,
+        publicFlagValue,
         secretKey,
         tlsMode: "disabled",
       });
@@ -1443,6 +1573,11 @@ describe("DockerSwarmExecutionBackend", () => {
         expect(
           swarmServiceEnvironmentKeys("appaloft-res-api-dst-prod-dep-swarm-backend_web"),
         ).toEqual(expect.arrayContaining([secretKey, "PUBLIC_FLAG"]));
+        expect(
+          swarmServiceEnvironment("appaloft-res-api-dst-prod-dep-swarm-backend_web").get(
+            "PUBLIC_FLAG",
+          ),
+        ).toBe(publicFlagValue);
         await waitForSmokeRoute({
           expectedText: "Welcome to nginx",
           host: "api.example.com",

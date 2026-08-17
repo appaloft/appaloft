@@ -111,7 +111,7 @@ import {
   runtimeTargetCapacityAwareFailureFields,
 } from "./runtime-target-failure-classification";
 import { createPreviewRuntimeArtifactCleanupPlan } from "./preview-artifact-cleanup";
-import { selectPublicHealthRoute } from "./public-health-route";
+import { selectPublicHealthRouteTargets } from "./public-health-route";
 import {
   dockerStorageMountsFromRuntimeMetadata,
   dockerStorageVolumeRealizationsFromRuntimeMetadata,
@@ -328,6 +328,7 @@ async function waitForHealth(
 
 function composePublicHealthUrl(input: {
   route: RuntimeExecutionPlan["accessRoutes"][number];
+  domain?: string;
   healthPath: string;
   port: number;
   httpPort?: number;
@@ -345,7 +346,7 @@ function composePublicHealthUrl(input: {
     proxyPort && !((scheme === "http" && proxyPort === 80) || (scheme === "https" && proxyPort === 443))
       ? `:${proxyPort}`
       : "";
-  return `${scheme}://${input.route.domains[0] ?? "localhost"}${portSuffix}${routePath}`;
+  return `${scheme}://${input.domain ?? input.route.domains[0] ?? "localhost"}${portSuffix}${routePath}`;
 }
 
 function sanitizeName(input: string): string {
@@ -3269,10 +3270,14 @@ export class LocalExecutionBackend implements ExecutionBackend {
 
     const verificationSteps = state.runtimePlan.execution.verificationSteps.map((step) => step.kind);
     if (healthOptions && verificationSteps.includes("public-http") && containerPort) {
-      const publicHealthRoute = selectPublicHealthRoute(accessRoutes, targetServiceName);
-      for (const route of publicHealthRoute ? [publicHealthRoute] : []) {
+      const publicHealthRouteTargets = selectPublicHealthRouteTargets(
+        accessRoutes,
+        targetServiceName,
+      );
+      for (const { route, domain } of publicHealthRouteTargets) {
         const publicUrl = composePublicHealthUrl({
           route,
+          ...(domain ? { domain } : {}),
           healthPath: state.runtimePlan.execution.healthCheckPath ?? "/",
           port: containerPort,
           ...proxyBootstrapOptionsFromEnv(runtimeEnv.value.env),

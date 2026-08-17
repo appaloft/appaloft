@@ -48,6 +48,21 @@ exports[`DockerSwarmExecutionBackend [SWARM-TARGET-APPLY-001][SWARM-TARGET-CLEAN
     "targetId": "dtg_swarm_1",
   },
   {
+    "command": "command -v curl >/dev/null 2>&1; route_timeout='5'; max_attempts='3'; verify_public_route() { url="$1"; expected_status="$2"; expected_text="$3"; allow_untrusted="$4"; attempt=0; body_file=$(mktemp -t appaloft-swarm-public-health.XXXXXX); while [ "$attempt" -lt "$max_attempts" ]; do curl_tls=""; if [ "$allow_untrusted" = "true" ]; then curl_tls="--insecure"; fi; status=$(curl --silent --show-error $curl_tls --max-time "$route_timeout" --output "$body_file" --write-out "%{http_code}" "$url") && [ "$status" = "$expected_status" ] && { [ -z "$expected_text" ] || grep -Fq -- "$expected_text" "$body_file"; } && { rm -f "$body_file"; return 0; }; attempt=$((attempt + 1)); if [ "$attempt" -lt "$max_attempts" ]; then sleep 1; fi; done; rm -f "$body_file"; return 1; }; verify_public_route 'https://api.example.com/healthz' '200' '' 'true'",
+    "context": {
+      "entrypoint": "system",
+      "locale": "en",
+      "requestId": "req_swarm_backend",
+      "t": [Function],
+      "tracer": {
+        "startActiveSpan": [Function: startActiveSpan],
+      },
+    },
+    "displayCommand": "command -v curl >/dev/null 2>&1; route_timeout='5'; max_attempts='3'; verify_public_route() { url="$1"; expected_status="$2"; expected_text="$3"; allow_untrusted="$4"; attempt=0; body_file=$(mktemp -t appaloft-swarm-public-health.XXXXXX); while [ "$attempt" -lt "$max_attempts" ]; do curl_tls=""; if [ "$allow_untrusted" = "true" ]; then curl_tls="--insecure"; fi; status=$(curl --silent --show-error $curl_tls --max-time "$route_timeout" --output "$body_file" --write-out "%{http_code}" "$url") && [ "$status" = "$expected_status" ] && { [ -z "$expected_text" ] || grep -Fq -- "$expected_text" "$body_file"; } && { rm -f "$body_file"; return 0; }; attempt=$((attempt + 1)); if [ "$attempt" -lt "$max_attempts" ]; then sleep 1; fi; done; rm -f "$body_file"; return 1; }; verify_public_route 'https://api.example.com/healthz' '200' '' 'true'",
+    "step": "verify-public-routes",
+    "targetId": "dtg_swarm_1",
+  },
+  {
     "command": "docker service ls -q --filter 'label=appaloft.destination-id=dst_prod' --filter 'label=appaloft.managed=true' --filter 'label=appaloft.resource-id=res_api' --filter 'label=appaloft.runtime-target=docker-swarm' | while read -r service_id; do current_deployment=$(docker service inspect "$service_id" --format '{{ index .Spec.Labels "appaloft.deployment-id" }}'); if [ "$current_deployment" != 'dep_swarm_backend' ]; then stack_name=$(docker service inspect "$service_id" --format '{{ index .Spec.Labels "com.docker.stack.namespace" }}'); if [ -n "$stack_name" ] && [ "$stack_name" != "<no value>" ]; then docker stack rm "$stack_name"; else docker service rm "$service_id"; fi; fi; done",
     "context": {
       "entrypoint": "system",

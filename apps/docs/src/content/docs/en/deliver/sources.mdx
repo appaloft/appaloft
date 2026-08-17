@@ -2,6 +2,12 @@
 title: "Configuring Deployment Sources"
 description: "Configuring a Git repository, image, or other input as a deployment source."
 docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: complete
+searchAliases:
+  - "required checks"
+  - "GitHub checks"
 ---
 <a id="source-auto-deploy-setup" />
 <a id="source-auto-deploy-signatures" />
@@ -57,6 +63,59 @@ A source is not responsible for Project, Server, Environment, or domain concerns
 | Generic workload archive bundles (`.zip`, etc.) relying on auto-detection | **Not supported** |
 
 Appaloft **fails closed** (stops and explains why) rather than guessing when it can't safely produce a complete plan — that's a design choice, not a defect.
+
+## GitHub auto-deploy check gate <a id="source-auto-deploy-required-checks" />
+
+A Resource GitHub auto-deploy policy can declare exact, case-sensitive `requiredChecks`. After a
+push, Appaloft waits for a completed `check_run` for the same commit SHA and every configured name.
+It creates an ordinary deployment only when every conclusion is `success`, `neutral`, or `skipped`.
+
+```yaml
+autoDeploy:
+  enabled: true
+  trigger: git-push
+  refs:
+    - main
+  events:
+    - push
+  requiredChecks:
+    - build
+    - lint
+```
+
+The CLI and shared API configure the same policy:
+
+```bash
+appaloft resource auto-deploy res_web \
+  --mode enable \
+  --ref main \
+  --required-check build \
+  --required-check lint
+```
+
+```json
+{
+  "resourceId": "res_web",
+  "mode": "enable",
+  "policy": {
+    "triggerKind": "git-push",
+    "refs": ["main"],
+    "eventKinds": ["push"],
+    "requiredChecks": ["build", "lint"]
+  }
+}
+```
+
+This does not mirror branch protection: names must be explicit in the Appaloft policy. The GitHub
+App needs Checks read permission and the `check_run` webhook subscription. Failure, cancellation,
+and timeout conclusions show as checks blocked; a later successful rerun of the same name can
+unblock the gate. A newer push for the same Resource/ref supersedes the older wait, so late events
+for the old SHA cannot deploy it.
+
+Use `appaloft source-event list --resource res_web` and
+`appaloft source-event show <sourceEventId> --resource res_web` to inspect `waiting-checks`,
+`checks-blocked`, `superseded`, or `dispatched`. To turn off the gate, replace the policy without
+`requiredChecks` and push a new commit; Appaloft never releases an old revision on a timer.
 
 ## CLI steps
 

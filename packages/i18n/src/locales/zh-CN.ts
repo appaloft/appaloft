@@ -2950,6 +2950,10 @@ export const zhCN = {
       autoDeployExcludePathsPlaceholder: "**/*.md\ndocs/**",
       autoDeployPathPolicyDescription:
         "可选的仓库根目录 glob。Appaloft 只计算最终 before..after 差异，再先应用包含规则、后应用排除规则。",
+      autoDeployRequiredChecks: "必需的 GitHub 检查",
+      autoDeployRequiredChecksDescription:
+        "可选的精确 check-run 名称。只有全部检查成功、neutral 或 skipped 后，才部署对应提交。",
+      autoDeployRequiredChecksPlaceholder: "build\nlint",
       autoDeployRefs: "Refs",
       autoDeployRefsPlaceholder: "main, release",
       autoDeploySaveFailed: "自动部署策略保存失败",
@@ -3004,6 +3008,9 @@ export const zhCN = {
       sourceEventsTab: "来源事件",
       sourceEventsTitle: "来源事件",
       sourceEventStatusAccepted: "已接受",
+      sourceEventStatusChecksBlocked: "检查未通过",
+      sourceEventStatusSuperseded: "已被新提交取代",
+      sourceEventStatusWaitingChecks: "等待检查",
       sourceEventStatusDeduped: "已去重",
       sourceEventStatusDispatched: "已分发",
       sourceEventStatusIgnored: "已忽略",

@@ -8,7 +8,10 @@ import {
   type HealthFetch,
   type HttpHealthCheckOptions,
 } from "../src/ssh-execution";
-import { selectPublicHealthRoute } from "../src/public-health-route";
+import {
+  selectPublicHealthRoute,
+  selectPublicHealthRouteTargets,
+} from "../src/public-health-route";
 
 const baseOptions: HttpHealthCheckOptions = {
   method: "GET",
@@ -40,6 +43,66 @@ describe("public route health checks", () => {
     );
 
     expect(route).toEqual({ pathPrefix: "/" });
+  });
+
+  test("[ROUTE-TERM-PLAN-001] expands every served domain and path for the target service", () => {
+    const targets = selectPublicHealthRouteTargets(
+      [
+        {
+          proxyKind: "traefik",
+          domains: ["app.example.test", "www.example.test", "app.example.test"],
+          pathPrefix: "/",
+          targetServiceName: "web",
+        },
+        {
+          proxyKind: "traefik",
+          domains: ["app.example.test"],
+          pathPrefix: "/healthz",
+          targetServiceName: "web",
+        },
+        {
+          proxyKind: "traefik",
+          domains: ["api.example.test"],
+          pathPrefix: "/api",
+          targetServiceName: "api",
+        },
+        {
+          proxyKind: "traefik",
+          domains: ["old.example.test"],
+          pathPrefix: "/",
+          targetServiceName: "web",
+          redirectTo: "app.example.test",
+        },
+      ],
+      "web",
+    );
+
+    expect(targets.map(({ route, domain }) => `${domain}${route.pathPrefix}`)).toEqual([
+      "app.example.test/",
+      "www.example.test/",
+      "app.example.test/healthz",
+    ]);
+  });
+
+  test("[ROUTE-TERM-PLAN-001] uses only legacy routes when explicit target metadata is absent", () => {
+    const targets = selectPublicHealthRouteTargets(
+      [
+        { domains: ["legacy.example.test"], pathPrefix: "/" },
+        {
+          domains: ["api.example.test"],
+          pathPrefix: "/api",
+          targetServiceName: "api",
+        },
+      ],
+      "web",
+    );
+
+    expect(targets).toEqual([
+      {
+        route: { domains: ["legacy.example.test"], pathPrefix: "/" },
+        domain: "legacy.example.test",
+      },
+    ]);
   });
 
   test("[SSH-DOCKER-HEALTH-001] renders Docker network IP lookup for SSH internal health", () => {
