@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.12](https://github.com/appaloft/appaloft/compare/v1.8.11...v1.8.12) (2026-08-17)
+
+
+### Bug Fixes
+
+* **cli:** use active profile for occupancy remote-stdio ([#1269](https://github.com/appaloft/appaloft/issues/1269)) ([cf03344](https://github.com/appaloft/appaloft/commit/cf03344cbf27f5ea6c647018a43003f118a3bb4d))
+* **sandbox:** send occupancy product-session Cookie to MCP ([#1270](https://github.com/appaloft/appaloft/issues/1270)) ([e2f30c8](https://github.com/appaloft/appaloft/commit/e2f30c8ee22a100bf22a12db1c3f4d5694641017))
+
 ## [1.8.11](https://github.com/appaloft/appaloft/compare/v1.8.10...v1.8.11) (2026-08-17)
 
 
