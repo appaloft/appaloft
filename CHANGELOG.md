@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.9](https://github.com/appaloft/appaloft/compare/v1.8.8...v1.8.9) (2026-08-17)
+
+
+### Bug Fixes
+
+* harden deployment verification and check gates ([#1259](https://github.com/appaloft/appaloft/issues/1259)) ([4ec751d](https://github.com/appaloft/appaloft/commit/4ec751d2fc1721ad7810978d6f74cbcee6c054a4))
+* **sandbox:** attach occupancy OpenCode without port publishing ([#1261](https://github.com/appaloft/appaloft/issues/1261)) ([60da308](https://github.com/appaloft/appaloft/commit/60da30830d826772e157995cdf16c36cfac92307))
+
 ## [1.8.8](https://github.com/appaloft/appaloft/compare/v1.8.7...v1.8.8) (2026-08-17)
 
 
