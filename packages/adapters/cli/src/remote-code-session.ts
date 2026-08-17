@@ -15,6 +15,8 @@ export const REMOTE_CODE_DOOR_HINT =
   "Open · --open-target preview|production|pr|compare · workspace p/P/o/c";
 export const REMOTE_CODE_MODEL_HINT =
   "Connect a model in the attached OpenCode session before running a Task.";
+export const REMOTE_CODE_GITHUB_HINT =
+  "GitHub PR · connect repo at /account/connections or install the App with contents/PR write.";
 
 export function nativeAttachRequiresInteractiveTerminal(
   stdin: { readonly isTTY?: boolean } = process.stdin,

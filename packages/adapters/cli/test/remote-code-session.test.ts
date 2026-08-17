@@ -6,6 +6,7 @@ import {
   nativeAttachRequiresInteractiveTerminal,
   occupancyCloudCompatError,
   REMOTE_CODE_DOOR_HINT,
+  REMOTE_CODE_GITHUB_HINT,
   REMOTE_CODE_MODEL_HINT,
   resolveDefaultRemoteCodeDoor,
   selectDefaultRemoteCodeServer,
@@ -17,6 +18,8 @@ describe("remote code door", () => {
     expect(REMOTE_CODE_DOOR_HINT).toContain("--open-target");
     expect(REMOTE_CODE_DOOR_HINT).toContain("workspace p/P/o/c");
     expect(REMOTE_CODE_MODEL_HINT).toContain("OpenCode");
+    expect(REMOTE_CODE_GITHUB_HINT).toContain("/account/connections");
+    expect(REMOTE_CODE_GITHUB_HINT).toContain("contents/PR write");
   });
   test("[WS-REMOTE-COMPAT-128][WS-REMOTE-COMPAT-129][WS-REMOTE-COMPAT-130] unstructured occupancy validation names the enrolled Server", () => {
     const server = { id: "srv_4lifk0yrcecy", name: "hostinger" };
