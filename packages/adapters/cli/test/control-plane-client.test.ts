@@ -1817,6 +1817,7 @@ describe("CLI remote control-plane client", () => {
     expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
       ["POST /api/workspaces/open"],
     );
+    expect(requests[0]?.headers.get("accept")).toBe("application/json");
     expect(await requests[0]?.json()).toEqual(body);
   });
 
@@ -2017,6 +2018,47 @@ describe("CLI remote control-plane client", () => {
       },
     });
     expect(requests).toHaveLength(1);
+  });
+
+  test("[CONTROL-PLANE-CLI-021] preserves structured JSON command errors despite an HTML content type", async () => {
+    const result = await requestControlPlaneOperation({
+      profile: profile("local"),
+      operationKey: "workspaces.open",
+      body: {
+        repository: "https://github.com/appaloft/appaloft.git",
+        repositoryIdentity: "github.com/appaloft/appaloft",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "a".repeat(40),
+      },
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "sandbox_provider_operation_failed",
+              category: "provider",
+              message: "Sandbox provider operation failed",
+              retryable: true,
+              details: { phase: "execution-sandbox-resume-ready-egress" },
+            },
+          }),
+          {
+            status: 502,
+            headers: { "content-type": "text/html; charset=utf-8" },
+          },
+        ),
+      phase: "remote-operation-dispatch",
+    });
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "sandbox_provider_operation_failed",
+      category: "provider",
+      retryable: true,
+      details: {
+        phase: "execution-sandbox-resume-ready-egress",
+        status: 502,
+      },
+    });
   });
 
   test("[CONTROL-PLANE-CLI-021] returns a sanitized retryable error after the bounded query retry is exhausted", async () => {
