@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.10](https://github.com/appaloft/appaloft/compare/v1.8.9...v1.8.10) (2026-08-17)
+
+
+### Bug Fixes
+
+* **cli:** attach issued occupancy terminal without a show query ([#1263](https://github.com/appaloft/appaloft/issues/1263)) ([5f962d6](https://github.com/appaloft/appaloft/commit/5f962d64692454dbd073acb71ccbf5201fee676d))
+* **sandbox:** give occupancy an executable tmpfs for OpenTUI ([#1265](https://github.com/appaloft/appaloft/issues/1265)) ([2bea908](https://github.com/appaloft/appaloft/commit/2bea90873232ed6cdec2071a2e0ec91a8d05e7f2))
+
 ## [1.8.9](https://github.com/appaloft/appaloft/compare/v1.8.8...v1.8.9) (2026-08-17)
 
 
