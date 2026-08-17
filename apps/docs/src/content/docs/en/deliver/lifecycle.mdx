@@ -44,7 +44,7 @@ Builds, uploads, starts, and routes the app on the target server. Failures here 
 
 ### Verify
 
-Checks the process, health policy, proxy routing, and access URL. **`docker compose up` returning success does not mean the deployment succeeded** — Appaloft also confirms the container is actually running, native health checks haven't failed, and, when an HTTP health check or public routing is configured, that those checks pass too. Failed candidates are cleaned up without polluting the previous successful runtime.
+Checks the process, health policy, proxy routing, and access URLs. **`docker compose up` returning success does not mean the deployment succeeded** — Appaloft also confirms the container is running, native health checks have not failed, and every distinct served hostname/path route for the target service passes (redirects are not served-route proofs). One failing route fails the candidate. Local/SSH clean it up; Swarm restores and verifies the previous route owner before candidate cleanup. An explicitly disabled health policy adds no public probe.
 
 ### Rollback
 

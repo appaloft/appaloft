@@ -1,3 +1,4 @@
+export * from "./operations/source-events/complete-source-event-check.command";
 export * from "./operations/source-events/ingest-source-event.command";
 export * from "./operations/source-events/list-source-events.query";
 export * from "./operations/source-events/prune-source-events.command";

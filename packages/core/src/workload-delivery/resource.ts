@@ -71,6 +71,7 @@ import {
   cloneResourceAutoDeployPolicyState,
   ResourceAutoDeployPolicy,
   type ResourceAutoDeployPolicyState,
+  type ResourceAutoDeployRequiredCheckName,
   type ResourceAutoDeploySecretRef,
   type ResourceAutoDeployTriggerKindValue,
   type SourceEventDedupeWindowSeconds,
@@ -2305,6 +2306,7 @@ export class Resource extends AggregateRoot<ResourceState> {
     dedupeWindowSeconds?: SourceEventDedupeWindowSeconds;
     includePaths?: readonly SourcePathPattern[];
     excludePaths?: readonly SourcePathPattern[];
+    requiredChecks?: readonly ResourceAutoDeployRequiredCheckName[];
   }): Result<ResourceAutoDeployPolicyState> {
     const lifecycleGuard = this.rejectInactiveResource("resources.configure-auto-deploy");
     if (lifecycleGuard.isErr()) {
@@ -2337,6 +2339,7 @@ export class Resource extends AggregateRoot<ResourceState> {
       ...(input.dedupeWindowSeconds ? { dedupeWindowSeconds: input.dedupeWindowSeconds } : {}),
       ...(input.includePaths ? { includePaths: input.includePaths } : {}),
       ...(input.excludePaths ? { excludePaths: input.excludePaths } : {}),
+      ...(input.requiredChecks ? { requiredChecks: input.requiredChecks } : {}),
     });
     if (policy.isErr()) {
       return err(policy.error);
@@ -2354,6 +2357,7 @@ export class Resource extends AggregateRoot<ResourceState> {
       eventKinds: this.state.autoDeployPolicy.eventKinds.map((eventKind) => eventKind.value),
       includePaths: this.state.autoDeployPolicy.includePaths?.map((pattern) => pattern.value) ?? [],
       excludePaths: this.state.autoDeployPolicy.excludePaths?.map((pattern) => pattern.value) ?? [],
+      requiredChecks: this.state.autoDeployPolicy.requiredChecks?.map((check) => check.value) ?? [],
       sourceBindingFingerprint: this.state.autoDeployPolicy.sourceBindingFingerprint.value,
       configuredAt: input.configuredAt.value,
     });
@@ -2459,7 +2463,7 @@ export class Resource extends AggregateRoot<ResourceState> {
 
     const policy = this.state.autoDeployPolicy;
     const secretRef = policy?.genericWebhookSecretRef;
-    if (!policy || policy.triggerKind.value !== "generic-signed-webhook" || !secretRef) {
+    if (policy?.triggerKind.value !== "generic-signed-webhook" || !secretRef) {
       return err(unavailable());
     }
 

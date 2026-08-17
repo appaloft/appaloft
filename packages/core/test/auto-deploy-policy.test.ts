@@ -5,6 +5,7 @@ import {
   ResourceAutoDeployPathPolicy,
   ResourceAutoDeployPolicy,
   ResourceAutoDeployPolicyBlockedReasonValue,
+  ResourceAutoDeployRequiredCheckName,
   ResourceAutoDeploySecretRef,
   ResourceAutoDeployTriggerKindValue,
   SourceBindingFingerprint,
@@ -25,11 +26,16 @@ describe("ResourceAutoDeployPolicy", () => {
       sourceBindingFingerprint: fingerprint,
       updatedAt,
       includePaths: [SourcePathPattern.create("apps/**")._unsafeUnwrap()],
+      requiredChecks: [
+        ResourceAutoDeployRequiredCheckName.create("build")._unsafeUnwrap(),
+        ResourceAutoDeployRequiredCheckName.create(" build ")._unsafeUnwrap(),
+      ],
     })._unsafeUnwrap();
 
     expect(policy.toState().status.value).toBe("enabled");
     expect(policy.toState().refs.map((ref) => ref.value)).toEqual(["main"]);
     expect(policy.toState().includePaths?.map((path) => path.value)).toEqual(["apps/**"]);
+    expect(policy.toState().requiredChecks?.map((check) => check.value)).toEqual(["build"]);
   });
 
   test("[CORE-AUTO-DEPLOY-002] rejects missing refs or event kinds", () => {
@@ -79,6 +85,19 @@ describe("ResourceAutoDeployPolicy", () => {
     expect(withPaths._unsafeUnwrapErr().message).toContain(
       "Path filters are supported only for git-push auto-deploy",
     );
+
+    const withChecks = ResourceAutoDeployPolicy.create({
+      triggerKind: ResourceAutoDeployTriggerKindValue.rehydrate("generic-signed-webhook"),
+      refs: [GitRefText.rehydrate("main")],
+      eventKinds: [SourceEventKindValue.rehydrate("push")],
+      sourceBindingFingerprint: fingerprint,
+      updatedAt,
+      genericWebhookSecretRef: ResourceAutoDeploySecretRef.create(
+        "resource-secret:APPALOFT_WEBHOOK_SECRET",
+      )._unsafeUnwrap(),
+      requiredChecks: [ResourceAutoDeployRequiredCheckName.create("build")._unsafeUnwrap()],
+    });
+    expect(withChecks.isErr()).toBe(true);
   });
 
   test("[CORE-AUTO-DEPLOY-004] blocks when source binding fingerprint changes and can re-ack", () => {

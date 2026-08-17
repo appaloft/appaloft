@@ -1625,6 +1625,9 @@ describe("Appaloft deployment config schema", () => {
         "    - apps/web/**",
         "  excludePaths:",
         "    - apps/web/docs/**",
+        "  requiredChecks:",
+        "    - build",
+        "    - lint",
         "  dedupeWindowSeconds: 300",
       ].join("\n"),
       "appaloft.yaml",
@@ -1639,6 +1642,7 @@ describe("Appaloft deployment config schema", () => {
         events: ["push", "tag"],
         includePaths: ["apps/web/**"],
         excludePaths: ["apps/web/docs/**"],
+        requiredChecks: ["build", "lint"],
         dedupeWindowSeconds: 300,
       });
     }

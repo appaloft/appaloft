@@ -16,6 +16,7 @@ be generated from the same operation key and command schema.
 - [resources.configure-source Command Spec](./resources.configure-source.md)
 - [source-events.ingest Command Spec](./source-events.ingest.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
+- [ADR-121: Source Event Required Check Gate](../decisions/ADR-121-source-event-required-check-gate.md)
 
 ## Intent
 
@@ -38,6 +39,7 @@ type ConfigureResourceAutoDeployInput = {
     eventKinds: readonly ("push" | "tag")[];
     includePaths?: readonly string[];
     excludePaths?: readonly string[];
+    requiredChecks?: readonly string[];
     genericWebhookSecretRef?: string;
     dedupeWindowSeconds?: number;
   };
@@ -60,6 +62,9 @@ Rules:
   set, applies includes first, then excludes. No path fields preserves ref-only behavior.
 - Path patterns must be bounded safe relative globs. Absolute paths, `..`, and backslashes are
   rejected before persistence.
+- `requiredChecks` is an optional bounded list of exact, case-sensitive GitHub check-run names for
+  `git-push` only. Names are normalized and deduplicated; the policy does not mirror GitHub branch
+  protection.
 - The first accepted generic signed reference format is `resource-secret:<KEY>`, where `<KEY>` is a
   Resource-owned runtime secret variable on the same Resource.
 
@@ -74,9 +79,10 @@ The command must:
 5. Reject generic signed webhook policy without a safe Resource-scoped secret reference.
 6. Reject generic signed webhook policy when the reference is not in the accepted
    `resource-secret:<KEY>` family.
-7. Bind the policy to the current source binding fingerprint.
-8. Persist policy state on the Resource-owned configuration boundary.
-9. Return safe policy status and blocked reason, if any.
+7. Reject required checks for generic signed webhook policies.
+8. Bind the policy to the current source binding fingerprint.
+9. Persist policy state on the Resource-owned configuration boundary.
+10. Return safe policy status and blocked reason, if any.
 
 When `resources.configure-source` changes the Resource source binding after policy creation, the
 policy becomes blocked pending explicit acknowledgement by this command.
@@ -92,6 +98,7 @@ type ConfigureResourceAutoDeployResult = {
   eventKinds?: readonly ("push" | "tag")[];
   includePaths?: readonly string[];
   excludePaths?: readonly string[];
+  requiredChecks?: readonly string[];
   sourceBindingFingerprint?: string;
   blockedReason?: "source-binding-changed";
 };

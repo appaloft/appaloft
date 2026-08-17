@@ -86,7 +86,8 @@ Out of scope for the first Code Round:
 - GitHub App installation management UI.
 - Always-on cloud runner execution.
 - Deployment queueing beyond the accepted async lifecycle and operation coordination contracts.
-- Provider-native branch protection or required status check policy.
+- Dynamic provider-native branch protection/ruleset mirroring. Explicit named GitHub completed-check
+  gating is governed by [GitHub Check-Gated Auto Deploy](../141-github-check-gated-auto-deploy/spec.md).
 - Secrets rotation, reusable webhook credential aggregates, provider-native secret backends, or
   arbitrary secret reference resolution beyond the first Resource-scoped `resource-secret:<KEY>`
   format.

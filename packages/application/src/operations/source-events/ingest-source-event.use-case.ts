@@ -14,6 +14,7 @@ import {
   AllowAllOperationGuardPort,
   type AutoDeploySourceEventKind,
   type Clock,
+  type CompleteSourceEventCheckResult,
   type IdGenerator,
   type IngestSourceEventResult,
   type OperationGuardPort,
@@ -21,6 +22,7 @@ import {
   type ProcessAttemptRecorder,
   type SourceEventChangedPathResolver,
   type SourceEventChangeSet,
+  type SourceEventCheckObservation,
   type SourceEventDeploymentDispatcher,
   type SourceEventIdentity,
   type SourceEventIgnoredReason,
@@ -34,6 +36,10 @@ import {
 import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { parseOperationInput } from "../shared-schema";
+import {
+  type CompleteSourceEventCheckCommandInput,
+  completeSourceEventCheckCommandInputSchema,
+} from "./complete-source-event-check.schema";
 import {
   type IngestSourceEventCommandInput,
   type IngestSourceEventCommandPayload,
@@ -74,6 +80,115 @@ export class IngestSourceEventUseCase {
     }
 
     return this.executeParsed(context, parsed.value);
+  }
+
+  async completeCheck(
+    context: ExecutionContext,
+    input: CompleteSourceEventCheckCommandInput,
+  ): Promise<Result<CompleteSourceEventCheckResult>> {
+    const parsed = parseOperationInput(completeSourceEventCheckCommandInputSchema, input);
+    if (parsed.isErr()) {
+      return err(parsed.error);
+    }
+
+    const repositoryContext = toRepositoryContext(context);
+    const sourceIdentity = sourceIdentityFromInput(parsed.value.sourceIdentity);
+    const applied = await this.sourceEventRecorder.applyCompletedCheck(
+      repositoryContext,
+      {
+        sourceKind: "github",
+        sourceIdentity,
+        revision: parsed.value.revision,
+        deliveryId: parsed.value.deliveryId,
+        observation: { ...parsed.value.check },
+        receivedAt: parsed.value.receivedAt ?? this.clock.now(),
+      },
+      (record) =>
+        evolveCompletedSourceCheck(record, parsed.value.check, {
+          allowDispatchClaim: Boolean(
+            this.sourceEventPolicyReader && this.sourceEventDeploymentDispatcher,
+          ),
+        }),
+    );
+
+    if (applied.duplicate) {
+      return ok({
+        deliveryId: parsed.value.deliveryId,
+        status: "deduped",
+        sourceEventIds: [],
+        dispatchedResourceIds: [],
+        createdDeploymentIds: [],
+      });
+    }
+
+    const createdDeploymentIds: string[] = [];
+    const dispatchedResourceIds: string[] = [];
+    if (this.sourceEventPolicyReader && this.sourceEventDeploymentDispatcher) {
+      const candidates = await this.sourceEventPolicyReader.listCandidates(repositoryContext, {
+        sourceKind: "github",
+        sourceIdentity,
+      });
+      for (const transition of applied.transitions) {
+        const targets = transition.claimedResourceIds
+          .map((resourceId) => candidates.find((candidate) => candidate.resourceId === resourceId))
+          .filter((candidate): candidate is SourceEventPolicyCandidate =>
+            Boolean(
+              candidate &&
+                candidate.status === "enabled" &&
+                candidate.refs.includes(transition.record.ref) &&
+                candidate.eventKinds.includes(
+                  transition.record.eventKind as AutoDeploySourceEventKind,
+                ),
+            ),
+          );
+        let finalized = transition.record;
+        if (targets.length > 0) {
+          finalized = await dispatchSourceEventDeployments(
+            context,
+            this.sourceEventRecorder,
+            this.sourceEventDeploymentDispatcher,
+            repositoryContext,
+            finalized,
+            targets,
+          );
+          dispatchedResourceIds.push(...targets.map((target) => target.resourceId));
+        }
+        const targetIds = new Set(targets.map((target) => target.resourceId));
+        const unavailableResourceIds = transition.claimedResourceIds.filter(
+          (resourceId) => !targetIds.has(resourceId),
+        );
+        if (unavailableResourceIds.length > 0) {
+          const unavailable = new Set(unavailableResourceIds);
+          finalized = await this.sourceEventRecorder.updateOutcome(repositoryContext, {
+            sourceEventId: finalized.sourceEventId,
+            status: "failed",
+            ...(finalized.projectId ? { projectId: finalized.projectId } : {}),
+            matchedResourceIds: [...finalized.matchedResourceIds],
+            ignoredReasons: [...finalized.ignoredReasons],
+            policyResults: finalized.policyResults.map((result) =>
+              unavailable.has(result.resourceId)
+                ? {
+                    ...result,
+                    status: "dispatch-failed",
+                    reason: "dispatch-failed",
+                    errorCode: "source_event_policy_no_longer_dispatchable",
+                  }
+                : result,
+            ),
+            createdDeploymentIds: [...finalized.createdDeploymentIds],
+          });
+        }
+        createdDeploymentIds.push(...finalized.createdDeploymentIds);
+      }
+    }
+
+    return ok({
+      deliveryId: parsed.value.deliveryId,
+      status: "accepted",
+      sourceEventIds: applied.transitions.map((transition) => transition.record.sourceEventId),
+      dispatchedResourceIds: [...new Set(dispatchedResourceIds)],
+      createdDeploymentIds: [...new Set(createdDeploymentIds)],
+    });
   }
 
   private async executeParsed(
@@ -164,6 +279,16 @@ export class IngestSourceEventUseCase {
     };
 
     const stored = await this.sourceEventRecorder.record(repositoryContext, record);
+    if (stored.sourceEventId === sourceEventId && stored.matchedResourceIds.length > 0) {
+      await this.sourceEventRecorder.supersedeOlderPending(repositoryContext, {
+        sourceEventId: stored.sourceEventId,
+        sourceKind: stored.sourceKind,
+        sourceIdentity: stored.sourceIdentity,
+        ref: stored.ref,
+        receivedAt: stored.receivedAt,
+        matchedResourceIds: [...stored.matchedResourceIds],
+      });
+    }
     await recordSourceEventProcessAttempt({
       recorder: this.processAttemptRecorder,
       repositoryContext,
@@ -211,11 +336,14 @@ function isDeploymentSourceEventKind(
 function sourceEventProcessStatus(record: SourceEventRecord): "running" | "succeeded" | "failed" {
   switch (record.status) {
     case "accepted":
+    case "waiting-checks":
       return record.matchedResourceIds.length > 0 ? "running" : "succeeded";
     case "dispatched":
     case "ignored":
+    case "superseded":
       return "succeeded";
     case "blocked":
+    case "checks-blocked":
     case "failed":
       return "failed";
     case "deduped":
@@ -224,7 +352,9 @@ function sourceEventProcessStatus(record: SourceEventRecord): "running" | "succe
 }
 
 function sourceEventProcessNextActions(record: SourceEventRecord): ProcessAttemptNextAction[] {
-  return record.status === "blocked" || record.status === "failed"
+  return record.status === "blocked" ||
+    record.status === "checks-blocked" ||
+    record.status === "failed"
     ? ["diagnostic", "manual-review"]
     : ["no-action"];
 }
@@ -302,7 +432,7 @@ async function recordSourceEventProcessAttempt(input: {
 }
 
 export interface SourceEventOutcome {
-  status: "accepted" | "ignored" | "blocked";
+  status: "accepted" | "ignored" | "blocked" | "waiting-checks";
   projectId?: string;
   matchedResourceIds: string[];
   ignoredReasons: SourceEventIgnoredReason[];
@@ -457,10 +587,10 @@ export async function evaluateSourceEventPolicyMatch(
       }
 
       matchedResourceIds.push(candidate.resourceId);
-      dispatchTargets.push(candidate);
-      policyResults.push({
-        resourceId: candidate.resourceId,
-        status: "matched",
+      addMatchedPolicyResult({
+        candidate,
+        dispatchTargets,
+        policyResults,
         matchedPathCount: matchingPaths.length,
         matchedPaths: matchingPaths.slice(0, 20),
       });
@@ -468,16 +598,14 @@ export async function evaluateSourceEventPolicyMatch(
     }
 
     matchedResourceIds.push(candidate.resourceId);
-    dispatchTargets.push(candidate);
-    policyResults.push({
-      resourceId: candidate.resourceId,
-      status: "matched",
-    });
+    addMatchedPolicyResult({ candidate, dispatchTargets, policyResults });
   }
 
   if (matchedResourceIds.length > 0) {
     return {
-      status: "accepted",
+      status: policyResults.some((result) => result.status === "waiting-checks")
+        ? "waiting-checks"
+        : "accepted",
       ...(projectId ? { projectId } : {}),
       matchedResourceIds,
       ignoredReasons: [...ignoredReasons],
@@ -498,6 +626,126 @@ export async function evaluateSourceEventPolicyMatch(
     dispatchTargets: [],
     changeSet,
   };
+}
+
+function addMatchedPolicyResult(input: {
+  candidate: SourceEventPolicyCandidate;
+  dispatchTargets: SourceEventPolicyCandidate[];
+  policyResults: SourceEventPolicyResult[];
+  matchedPathCount?: number;
+  matchedPaths?: string[];
+}): void {
+  const common = {
+    resourceId: input.candidate.resourceId,
+    ...(input.matchedPathCount !== undefined ? { matchedPathCount: input.matchedPathCount } : {}),
+    ...(input.matchedPaths ? { matchedPaths: input.matchedPaths } : {}),
+  };
+  if ((input.candidate.requiredChecks?.length ?? 0) > 0) {
+    input.policyResults.push({
+      ...common,
+      status: "waiting-checks",
+      reason: "required-checks-pending",
+      requiredChecks: [...(input.candidate.requiredChecks ?? [])],
+      observedChecks: [],
+    });
+    return;
+  }
+
+  input.dispatchTargets.push(input.candidate);
+  input.policyResults.push({ ...common, status: "matched" });
+}
+
+export function evolveCompletedSourceCheck(
+  record: SourceEventRecord,
+  observation: SourceEventCheckObservation,
+  options: { allowDispatchClaim: boolean },
+): { record: SourceEventRecord; claimedResourceIds: string[] } {
+  const claimedResourceIds: string[] = [];
+  const policyResults = record.policyResults.map((result) => {
+    if (
+      (result.status !== "waiting-checks" && result.status !== "checks-blocked") ||
+      !result.requiredChecks?.includes(observation.name)
+    ) {
+      return result;
+    }
+
+    const observedByName = new Map(
+      (result.observedChecks ?? []).map((check) => [check.name, { ...check }]),
+    );
+    const existing = observedByName.get(observation.name);
+    if (!existing || compareCheckObservations(existing, observation) <= 0) {
+      observedByName.set(observation.name, { ...observation });
+    }
+    const observedChecks = [...observedByName.values()];
+    const requiredObservations = result.requiredChecks.map((name) => observedByName.get(name));
+    const hasFailure = requiredObservations.some(
+      (check) => check && !isPassingCheckConclusion(check.conclusion),
+    );
+    if (hasFailure) {
+      return {
+        ...result,
+        status: "checks-blocked" as const,
+        reason: "required-checks-failed" as const,
+        observedChecks,
+      };
+    }
+    const allPassing = requiredObservations.every(
+      (check) => check && isPassingCheckConclusion(check.conclusion),
+    );
+    if (allPassing && options.allowDispatchClaim) {
+      claimedResourceIds.push(result.resourceId);
+      const { reason: _reason, ...resultWithoutReason } = result;
+      return {
+        ...resultWithoutReason,
+        status: "dispatching" as const,
+        observedChecks,
+      };
+    }
+    return {
+      ...result,
+      status: "waiting-checks" as const,
+      reason: "required-checks-pending" as const,
+      observedChecks,
+    };
+  });
+
+  return {
+    record: {
+      ...record,
+      status: sourceEventStatusFromPolicyResults(policyResults),
+      policyResults,
+    },
+    claimedResourceIds,
+  };
+}
+
+function compareCheckObservations(
+  left: SourceEventCheckObservation,
+  right: SourceEventCheckObservation,
+): number {
+  const completedAt = left.completedAt.localeCompare(right.completedAt);
+  return completedAt !== 0 ? completedAt : left.checkRunId.localeCompare(right.checkRunId);
+}
+
+function isPassingCheckConclusion(conclusion: SourceEventCheckObservation["conclusion"]): boolean {
+  return conclusion === "success" || conclusion === "neutral" || conclusion === "skipped";
+}
+
+function sourceEventStatusFromPolicyResults(
+  policyResults: SourceEventPolicyResult[],
+): SourceEventRecord["status"] {
+  if (policyResults.some((result) => result.status === "dispatch-failed")) return "failed";
+  if (policyResults.some((result) => result.status === "checks-blocked")) return "checks-blocked";
+  if (
+    policyResults.some(
+      (result) => result.status === "waiting-checks" || result.status === "dispatching",
+    )
+  ) {
+    return "waiting-checks";
+  }
+  if (policyResults.some((result) => result.status === "dispatched")) return "dispatched";
+  if (policyResults.every((result) => result.status === "superseded")) return "superseded";
+  return "accepted";
 }
 
 async function resolveChangeSet(input: {
@@ -646,7 +894,7 @@ export async function dispatchSourceEventDeployments(
 
   return sourceEventRecorder.updateOutcome(repositoryContext, {
     sourceEventId: record.sourceEventId,
-    status: hasDispatchFailure ? "failed" : "dispatched",
+    status: hasDispatchFailure ? "failed" : sourceEventStatusFromPolicyResults(policyResults),
     ...(record.projectId ? { projectId: record.projectId } : {}),
     matchedResourceIds: [...record.matchedResourceIds],
     ignoredReasons: [...record.ignoredReasons],

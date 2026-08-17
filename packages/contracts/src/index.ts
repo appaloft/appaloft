@@ -3258,6 +3258,7 @@ export const resourceAutoDeployPolicySummarySchema = z.object({
   dedupeWindowSeconds: z.number().int().positive().optional(),
   includePaths: z.array(z.string()).optional(),
   excludePaths: z.array(z.string()).optional(),
+  requiredChecks: z.array(z.string()).optional(),
   updatedAt: z.string(),
 });
 
@@ -3824,6 +3825,7 @@ export const configureResourceAutoDeployInputSchema = z.object({
       dedupeWindowSeconds: z.number().int().positive().optional(),
       includePaths: z.array(z.string().min(1).max(512)).min(1).max(100).optional(),
       excludePaths: z.array(z.string().min(1).max(512)).min(1).max(100).optional(),
+      requiredChecks: z.array(z.string().min(1).max(200)).min(1).max(50).optional(),
     })
     .optional(),
   idempotencyKey: z.string().min(1).optional(),
@@ -3837,6 +3839,7 @@ export const configureResourceAutoDeployResponseSchema = z.object({
   eventKinds: z.array(z.enum(["push", "tag"])).optional(),
   includePaths: z.array(z.string()).optional(),
   excludePaths: z.array(z.string()).optional(),
+  requiredChecks: z.array(z.string()).optional(),
   sourceBindingFingerprint: z.string().optional(),
   blockedReason: z.enum(["source-binding-changed"]).optional(),
 });
@@ -3858,6 +3861,9 @@ export const sourceEventStatusSchema = z.enum([
   "deduped",
   "ignored",
   "blocked",
+  "waiting-checks",
+  "checks-blocked",
+  "superseded",
   "dispatched",
   "failed",
 ]);
@@ -3873,6 +3879,10 @@ export const sourceEventIgnoredReasonSchema = z.enum([
 ]);
 export const sourceEventPolicyResultStatusSchema = z.enum([
   "matched",
+  "waiting-checks",
+  "checks-blocked",
+  "dispatching",
+  "superseded",
   "ignored",
   "blocked",
   "dispatch-failed",
@@ -3885,8 +3895,28 @@ export const sourceEventPolicyResultReasonSchema = z.enum([
   "ref-deleted",
   "policy-disabled",
   "policy-blocked",
+  "required-checks-pending",
+  "required-checks-failed",
+  "superseded-by-newer-revision",
   "dispatch-failed",
 ]);
+
+export const sourceEventCheckObservationSchema = z.object({
+  name: z.string(),
+  conclusion: z.enum([
+    "success",
+    "neutral",
+    "skipped",
+    "failure",
+    "cancelled",
+    "timed_out",
+    "action_required",
+    "stale",
+    "startup_failure",
+  ]),
+  checkRunId: z.string(),
+  completedAt: z.string(),
+});
 
 export const listSourceEventsInputSchema = z.object({
   projectId: z.string().min(1).optional(),
@@ -3960,6 +3990,9 @@ export const sourceEventPolicyResultSchema = z.object({
   errorCode: z.string().optional(),
   matchedPaths: z.array(z.string()).max(20).optional(),
   matchedPathCount: z.number().int().nonnegative().optional(),
+  requiredChecks: z.array(z.string()).max(50).optional(),
+  observedChecks: z.array(sourceEventCheckObservationSchema).max(50).optional(),
+  supersededBySourceEventId: z.string().optional(),
 });
 
 export const sourceEventChangeSetSchema = z.object({

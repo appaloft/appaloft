@@ -45,6 +45,9 @@ describe("source event console diagnostics", () => {
     expect(sourceEventsQuerySource).toContain("enabled: resourceSourceEventsEnabled");
     expect(sourceEventsQuerySource).not.toContain("enabled: browser && resourceId.length > 0,");
     expect(source).toContain("sourceEventVisibleOutcomes");
+    expect(source).toContain("sourceEventStatusWaitingChecks");
+    expect(source).toContain("sourceEventStatusChecksBlocked");
+    expect(source).toContain("sourceEventStatusSuperseded");
     expect(source).toContain("sourceAutoDeployDedupe");
     expect(source).not.toMatch(
       /sourceEventsTitle[\s\S]*?sourceAutoDeployIgnoredEvents[\s\S]*?sourceEventsDescription/,

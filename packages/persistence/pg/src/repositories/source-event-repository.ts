@@ -1,5 +1,7 @@
 import {
   type RepositoryContext,
+  type SourceEventCompletedCheckApplyResult,
+  type SourceEventCompletedCheckTransition,
   type SourceEventDedupeStatus,
   type SourceEventDetail,
   type SourceEventIdentity,
@@ -94,6 +96,168 @@ export class PgSourceEventRepository
     return recordFromRow(updated);
   }
 
+  async supersedeOlderPending(
+    _context: RepositoryContext,
+    input: {
+      sourceEventId: string;
+      sourceKind: SourceEventSourceKind;
+      sourceIdentity: SourceEventIdentity;
+      ref: string;
+      receivedAt: string;
+      matchedResourceIds: string[];
+    },
+  ): Promise<void> {
+    await this.db.transaction().execute(async (transaction) => {
+      const rows = await transaction
+        .selectFrom("source_events")
+        .selectAll()
+        .where("source_kind", "=", input.sourceKind)
+        .where("ref", "=", input.ref)
+        .where("status", "in", ["waiting-checks", "checks-blocked"])
+        .forUpdate()
+        .execute();
+      const resourceIds = new Set(input.matchedResourceIds);
+      for (const row of rows) {
+        if (
+          row.id === input.sourceEventId ||
+          compareSourceEventOrder(row.received_at, row.id, input.receivedAt, input.sourceEventId) >=
+            0
+        ) {
+          continue;
+        }
+        const record = recordFromRow(row);
+        if (!sourceEventIdentitiesMatch(record.sourceIdentity, input.sourceIdentity)) continue;
+
+        let changed = false;
+        const policyResults = record.policyResults.map((result) => {
+          if (
+            !resourceIds.has(result.resourceId) ||
+            (result.status !== "waiting-checks" && result.status !== "checks-blocked")
+          ) {
+            return result;
+          }
+          changed = true;
+          return {
+            ...result,
+            status: "superseded" as const,
+            reason: "superseded-by-newer-revision" as const,
+            supersededBySourceEventId: input.sourceEventId,
+          };
+        });
+        if (!changed) continue;
+        const hasPending = policyResults.some(
+          (result) =>
+            result.status === "waiting-checks" ||
+            result.status === "checks-blocked" ||
+            result.status === "dispatching",
+        );
+        const status = hasPending
+          ? record.status
+          : policyResults.some((result) => result.status === "dispatched")
+            ? "dispatched"
+            : "superseded";
+        await transaction
+          .updateTable("source_events")
+          .set({ status, policy_results: policyResults.map((result) => ({ ...result })) })
+          .where("id", "=", record.sourceEventId)
+          .execute();
+      }
+    });
+  }
+
+  async applyCompletedCheck(
+    _context: RepositoryContext,
+    input: Parameters<SourceEventRecorder["applyCompletedCheck"]>[1],
+    evolve: (record: SourceEventRecord) => SourceEventCompletedCheckTransition,
+  ): Promise<SourceEventCompletedCheckApplyResult> {
+    return this.db.transaction().execute(async (transaction) => {
+      const inserted = await transaction
+        .insertInto("source_event_check_deliveries")
+        .values({
+          source_kind: input.sourceKind,
+          delivery_id: input.deliveryId,
+          source_identity: { ...input.sourceIdentity },
+          revision: input.revision,
+          check_name: input.observation.name,
+          check_run_id: input.observation.checkRunId,
+          conclusion: input.observation.conclusion,
+          completed_at: input.observation.completedAt,
+          received_at: input.receivedAt,
+          processed_at: null,
+        })
+        .onConflict((conflict) => conflict.columns(["source_kind", "delivery_id"]).doNothing())
+        .returning("delivery_id")
+        .executeTakeFirst();
+      if (!inserted) {
+        const existing = await transaction
+          .selectFrom("source_event_check_deliveries")
+          .select("processed_at")
+          .where("source_kind", "=", input.sourceKind)
+          .where("delivery_id", "=", input.deliveryId)
+          .executeTakeFirst();
+        if (existing?.processed_at) return { duplicate: true, transitions: [] };
+      }
+
+      const rows = await transaction
+        .selectFrom("source_events")
+        .select("id")
+        .where("source_kind", "=", input.sourceKind)
+        .where("revision", "=", input.revision)
+        .where("status", "in", ["waiting-checks", "checks-blocked"])
+        .execute();
+      const transitions: SourceEventCompletedCheckTransition[] = [];
+      for (const row of rows) {
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const currentRow = await transaction
+            .selectFrom("source_events")
+            .selectAll()
+            .where("id", "=", row.id)
+            .executeTakeFirst();
+          if (!currentRow) break;
+          const current = recordFromRow(currentRow);
+          if (
+            (current.status !== "waiting-checks" && current.status !== "checks-blocked") ||
+            !sourceEventIdentitiesMatch(current.sourceIdentity, input.sourceIdentity)
+          ) {
+            break;
+          }
+          const transition = evolve(current);
+          if (
+            transition.record.status === current.status &&
+            JSON.stringify(transition.record.policyResults) ===
+              JSON.stringify(current.policyResults)
+          ) {
+            break;
+          }
+          const updated = await transaction
+            .updateTable("source_events")
+            .set({
+              status: transition.record.status,
+              policy_results: transition.record.policyResults.map((result) => ({ ...result })),
+              check_gate_version: currentRow.check_gate_version + 1,
+            })
+            .where("id", "=", current.sourceEventId)
+            .where("check_gate_version", "=", currentRow.check_gate_version)
+            .returningAll()
+            .executeTakeFirst();
+          if (!updated) continue;
+          transitions.push({
+            record: recordFromRow(updated),
+            claimedResourceIds: [...transition.claimedResourceIds],
+          });
+          break;
+        }
+      }
+      await transaction
+        .updateTable("source_event_check_deliveries")
+        .set({ processed_at: input.receivedAt })
+        .where("source_kind", "=", input.sourceKind)
+        .where("delivery_id", "=", input.deliveryId)
+        .execute();
+      return { duplicate: false, transitions };
+    });
+  }
+
   async listCandidates(
     _context: RepositoryContext,
     input: {
@@ -144,6 +308,7 @@ export class PgSourceEventRepository
         eventKinds: [...policy.eventKinds],
         ...(policy.includePaths ? { includePaths: [...policy.includePaths] } : {}),
         ...(policy.excludePaths ? { excludePaths: [...policy.excludePaths] } : {}),
+        ...(policy.requiredChecks ? { requiredChecks: [...policy.requiredChecks] } : {}),
         sourceBinding: sourceIdentityFromBinding(sourceBinding),
         ...(policy.blockedReason ? { blockedReason: policy.blockedReason } : {}),
       });
@@ -316,7 +481,14 @@ function serializedAutoDeployPolicy(
 
   const refs = value.refs.filter((ref): ref is string => typeof ref === "string");
   const eventKinds = value.eventKinds.filter(isSourceEventKind);
-  if (refs.length !== value.refs.length || eventKinds.length !== value.eventKinds.length) {
+  const requiredChecks = Array.isArray(value.requiredChecks)
+    ? value.requiredChecks.filter((check): check is string => typeof check === "string")
+    : [];
+  if (
+    refs.length !== value.refs.length ||
+    eventKinds.length !== value.eventKinds.length ||
+    (Array.isArray(value.requiredChecks) && requiredChecks.length !== value.requiredChecks.length)
+  ) {
     return null;
   }
 
@@ -325,6 +497,7 @@ function serializedAutoDeployPolicy(
     triggerKind: value.triggerKind,
     refs,
     eventKinds,
+    requiredChecks,
     sourceBindingFingerprint: value.sourceBindingFingerprint,
     updatedAt: value.updatedAt,
     ...(value.blockedReason === "source-binding-changed"
@@ -361,6 +534,37 @@ function sourceBindingMatches(
   }
 
   return safeSourceLocator(sourceIdentity.locator) === safeSourceLocator(sourceBinding.locator);
+}
+
+function sourceEventIdentitiesMatch(
+  left: SourceEventIdentity,
+  right: SourceEventIdentity,
+): boolean {
+  if (
+    left.providerRepositoryId &&
+    right.providerRepositoryId &&
+    left.providerRepositoryId === right.providerRepositoryId
+  ) {
+    return true;
+  }
+  if (
+    left.repositoryFullName &&
+    right.repositoryFullName &&
+    left.repositoryFullName.toLowerCase() === right.repositoryFullName.toLowerCase()
+  ) {
+    return true;
+  }
+  return safeSourceLocator(left.locator) === safeSourceLocator(right.locator);
+}
+
+function compareSourceEventOrder(
+  leftReceivedAt: string,
+  leftId: string,
+  rightReceivedAt: string,
+  rightId: string,
+): number {
+  const receivedAt = leftReceivedAt.localeCompare(rightReceivedAt);
+  return receivedAt !== 0 ? receivedAt : leftId.localeCompare(rightId);
 }
 
 function sourceIdentityFromBinding(

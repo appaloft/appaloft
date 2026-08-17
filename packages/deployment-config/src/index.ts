@@ -1323,6 +1323,11 @@ export const appaloftDeploymentAutoDeployConfigSchema = z
       .min(1)
       .max(100)
       .optional(),
+    requiredChecks: z
+      .array(nonEmptyStringSchema.max(200).refine((value) => !/[\r\n\0]/.test(value)))
+      .min(1)
+      .max(50)
+      .optional(),
   })
   .strict()
   .superRefine((value, context) => {

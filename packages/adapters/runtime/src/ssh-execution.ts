@@ -115,7 +115,7 @@ import {
   withRemoteRuntimeEnvironmentFile,
 } from "./ssh-runtime-env-file";
 import { createPreviewRuntimeArtifactCleanupPlan } from "./preview-artifact-cleanup";
-import { selectPublicHealthRoute } from "./public-health-route";
+import { selectPublicHealthRouteTargets } from "./public-health-route";
 import {
   dockerStorageMountsFromRuntimeMetadata,
   dockerStorageVolumeRealizationsFromRuntimeMetadata,
@@ -708,6 +708,7 @@ function joinRouteAndHealthPath(pathPrefix: string, healthPath: string): string 
 
 function publicHealthUrl(input: {
   route: AccessRoute;
+  domain?: string;
   healthPath: string;
   publicHost: string;
   port: number;
@@ -718,7 +719,7 @@ function publicHealthUrl(input: {
   }
 
   const scheme = input.route.tlsMode === "auto" ? "https" : "http";
-  const domain = input.route.domains[0] ?? "localhost";
+  const domain = input.domain ?? input.route.domains[0] ?? "localhost";
   const path = joinRouteAndHealthPath(input.route.pathPrefix, input.healthPath);
 
   return `${scheme}://${domain}${path}`;
@@ -2936,20 +2937,18 @@ export class SshExecutionBackend implements ExecutionBackend {
           );
         }
       }
-      const publicHealthRoute = selectPublicHealthRoute(accessRoutes);
-      const publicRouteHealthChecks = publicHealthRoute
-        ? [
-            {
-              route: publicHealthRoute,
-              url: publicHealthUrl({
-                route: publicHealthRoute,
-                healthPath,
-                publicHost: target.publicHost,
-                port,
-              }),
-            },
-          ]
-        : [];
+      const publicRouteHealthChecks = selectPublicHealthRouteTargets(accessRoutes).map(
+        ({ route, domain }) => ({
+          route,
+          url: publicHealthUrl({
+            route,
+            ...(domain ? { domain } : {}),
+            healthPath,
+            publicHost: target.publicHost,
+            port,
+          }),
+        }),
+      );
       const routeConflictCleanupCommand = !usesDirectHostPort
         ? dockerRemoveConflictingRouteContainersCommand({
             deploymentId: state.id.value,
@@ -4195,9 +4194,18 @@ export class SshExecutionBackend implements ExecutionBackend {
           });
         }
 
-        const publicHealthRoute = selectPublicHealthRoute(accessRoutes, targetServiceName);
-        for (const route of publicHealthRoute ? [publicHealthRoute] : []) {
-          const publicUrl = publicHealthUrl({ route, healthPath, publicHost: target.publicHost, port: port ?? 80 });
+        const publicHealthRouteTargets = selectPublicHealthRouteTargets(
+          accessRoutes,
+          targetServiceName,
+        );
+        for (const { route, domain } of publicHealthRouteTargets) {
+          const publicUrl = publicHealthUrl({
+            route,
+            ...(domain ? { domain } : {}),
+            healthPath,
+            publicHost: target.publicHost,
+            port: port ?? 80,
+          });
           const publicHealth = await waitForHealth(publicUrl, {
             ...healthOptions,
             tlsVerification:

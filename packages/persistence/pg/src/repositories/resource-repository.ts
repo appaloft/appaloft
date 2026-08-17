@@ -289,6 +289,13 @@ class KyselyResourceMutationVisitor
                 ),
               }
             : {}),
+          ...(spec.state.autoDeployPolicy.requiredChecks
+            ? {
+                requiredChecks: spec.state.autoDeployPolicy.requiredChecks.map(
+                  (check) => check.value,
+                ),
+              }
+            : {}),
         } satisfies SerializedResourceAutoDeployPolicy)
       : null;
 

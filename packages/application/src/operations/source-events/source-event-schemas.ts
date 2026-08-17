@@ -19,6 +19,9 @@ export const sourceEventStatusSchema = z.enum([
   "deduped",
   "ignored",
   "blocked",
+  "waiting-checks",
+  "checks-blocked",
+  "superseded",
   "dispatched",
   "failed",
 ]);

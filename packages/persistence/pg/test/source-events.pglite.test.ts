@@ -210,6 +210,103 @@ describe("source event persistence", () => {
     }
   });
 
+  test("[GH-CHECK-GATE-005] atomically dedupes completed checks and claims one dispatch", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "appaloft-source-event-check-gate-"));
+    const { createDatabase, createMigrator, PgSourceEventRepository } = await import("../src");
+    const { evolveCompletedSourceCheck } = await import("@appaloft/application");
+    const database = await createDatabase({ driver: "pglite", pgliteDataDir: dataDir });
+
+    try {
+      expect((await createMigrator(database.db).migrateToLatest()).error).toBeUndefined();
+      const context = toRepositoryContext(
+        createExecutionContext({ requestId: "req_check_gate_pg", entrypoint: "system" }),
+      );
+      const sourceEvents = new PgSourceEventRepository(database.db);
+      const sourceIdentity = {
+        locator: "https://github.com/appaloft/demo",
+        providerRepositoryId: "repo_1",
+        repositoryFullName: "appaloft/demo",
+      };
+      await sourceEvents.record(context, {
+        sourceEventId: "sevt_gate",
+        projectId: "prj_demo",
+        matchedResourceIds: ["res_web"],
+        sourceKind: "github",
+        eventKind: "push",
+        sourceIdentity,
+        ref: "main",
+        revision: "sha_gate",
+        dedupeKey: "delivery:github:repo_1:appaloft/demo:gate",
+        dedupeStatus: "new",
+        verification: { status: "verified", method: "provider-signature" },
+        status: "waiting-checks",
+        ignoredReasons: [],
+        policyResults: [
+          {
+            resourceId: "res_web",
+            status: "waiting-checks",
+            reason: "required-checks-pending",
+            requiredChecks: ["build", "lint"],
+            observedChecks: [],
+          },
+        ],
+        createdDeploymentIds: [],
+        receivedAt: "2026-01-01T00:00:00.000Z",
+      });
+
+      const apply = (deliveryId: string, name: string, checkRunId: string) =>
+        sourceEvents.applyCompletedCheck(
+          context,
+          {
+            sourceKind: "github",
+            sourceIdentity,
+            revision: "sha_gate",
+            deliveryId,
+            observation: {
+              name,
+              conclusion: "success",
+              checkRunId,
+              completedAt: `2026-01-01T00:0${checkRunId}:00.000Z`,
+            },
+            receivedAt: `2026-01-01T00:0${checkRunId}:01.000Z`,
+          },
+          (record) =>
+            evolveCompletedSourceCheck(
+              record,
+              {
+                name,
+                conclusion: "success",
+                checkRunId,
+                completedAt: `2026-01-01T00:0${checkRunId}:00.000Z`,
+              },
+              { allowDispatchClaim: true },
+            ),
+        );
+
+      const [build, lint] = await Promise.all([
+        apply("delivery_build", "build", "1"),
+        apply("delivery_lint", "lint", "2"),
+      ]);
+      expect(
+        [...build.transitions, ...lint.transitions].flatMap(
+          (transition) => transition.claimedResourceIds,
+        ),
+      ).toEqual(["res_web"]);
+      const stored = await sourceEvents.findByDedupeKey(
+        context,
+        "delivery:github:repo_1:appaloft/demo:gate",
+      );
+      expect(stored).toMatchObject({
+        status: "waiting-checks",
+        policyResults: [{ status: "dispatching" }],
+      });
+      expect((await apply("delivery_lint", "lint", "2")).duplicate).toBe(true);
+    } finally {
+      await database.close();
+      rmSync(dataDir, { force: true, recursive: true });
+    }
+  });
+
   test("[SRC-AUTO-EVENT-003] persists ignored ref outcomes from Resource policy matching", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "appaloft-source-event-policy-"));
     const {

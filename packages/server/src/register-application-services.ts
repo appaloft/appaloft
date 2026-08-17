@@ -112,6 +112,7 @@ import {
   CommunityWorkspaceActivationContextInitializer,
   CompleteConnectionCallbackCommandHandler,
   CompleteConnectionCallbackUseCase,
+  CompleteSourceEventCheckCommandHandler,
   ConfigureAuditEventLegalHoldCommandHandler,
   ConfigureAuditEventLegalHoldUseCase,
   ConfigureDefaultAccessDomainPolicyCommandHandler,
@@ -3178,6 +3179,7 @@ export function registerApplicationServices(
   container.registerSingleton(ConfigureDomainBindingRouteCommandHandler);
   container.registerSingleton(ConfigureResourceAccessCommandHandler);
   container.registerSingleton(ConfigureResourceAutoDeployCommandHandler);
+  container.registerSingleton(CompleteSourceEventCheckCommandHandler);
   container.registerSingleton(IngestSourceEventCommandHandler);
   container.registerSingleton(PruneSourceEventsCommandHandler);
   container.registerSingleton(ReplaySourceEventCommandHandler);

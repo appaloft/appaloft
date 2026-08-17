@@ -5,6 +5,7 @@ import {
   type AppLogger,
   type Command,
   type CommandBus,
+  CompleteSourceEventCheckCommand,
   createExecutionContext,
   type ExecutionContext,
   type ExecutionContextFactory,
@@ -97,6 +98,57 @@ function createApp(input: {
 }
 
 describe("GitHub source event HTTP route", () => {
+  test("[GH-CHECK-GATE-006] dispatches a verified completed check command", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({
+          deliveryId: "delivery_check_1",
+          status: "accepted",
+          sourceEventIds: ["sevt_1"],
+          dispatchedResourceIds: ["res_web"],
+          createdDeploymentIds: ["dep_1"],
+        } as T);
+      },
+    } as CommandBus;
+    const rawBody = JSON.stringify({
+      action: "completed",
+      check_run: {
+        id: 7788,
+        name: "build",
+        head_sha: "abc123",
+        conclusion: "success",
+        completed_at: "2026-01-01T00:03:00Z",
+      },
+      repository: githubPushPayload().repository,
+    });
+    const signature = await hmacSha256Hex("correct-secret", rawBody);
+    const response = await createApp({ commandBus, githubWebhookSecret: "correct-secret" }).handle(
+      new Request("http://localhost/api/integrations/github/source-events", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-github-delivery": "delivery_check_1",
+          "x-github-event": "check_run",
+          "x-hub-signature-256": `sha256=${signature}`,
+        },
+        body: rawBody,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      deliveryId: "delivery_check_1",
+      dispatchedResourceIds: ["res_web"],
+    });
+    expect(capturedCommand).toBeInstanceOf(CompleteSourceEventCheckCommand);
+    expect((capturedCommand as CompleteSourceEventCheckCommand).payload).toMatchObject({
+      revision: "abc123",
+      check: { name: "build", conclusion: "success", checkRunId: "7788" },
+    });
+  });
+
   test("[SRC-AUTO-ENTRY-004] verifies GitHub push webhook and dispatches source event ingest", async () => {
     let capturedCommand: Command<unknown> | undefined;
     const commandBus = {

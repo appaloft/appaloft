@@ -170,6 +170,7 @@ const autoDeployEventKindOption = Options.choice("event-kind", autoDeployEventKi
 );
 const autoDeployIncludePathOption = Options.text("include-path").pipe(Options.repeated);
 const autoDeployExcludePathOption = Options.text("exclude-path").pipe(Options.repeated);
+const autoDeployRequiredCheckOption = Options.text("required-check").pipe(Options.repeated);
 const autoDeploySourceBindingFingerprintOption = Options.text("source-binding-fingerprint").pipe(
   Options.optional,
 );
@@ -1374,6 +1375,7 @@ const configureAutoDeployCommand = EffectCommand.make(
     eventKinds: autoDeployEventKindOption,
     includePaths: autoDeployIncludePathOption,
     excludePaths: autoDeployExcludePathOption,
+    requiredChecks: autoDeployRequiredCheckOption,
     sourceBindingFingerprint: autoDeploySourceBindingFingerprintOption,
     genericWebhookSecretRef: autoDeployGenericWebhookSecretRefOption,
     dedupeWindowSeconds: autoDeployDedupeWindowSecondsOption,
@@ -1390,6 +1392,7 @@ const configureAutoDeployCommand = EffectCommand.make(
     json,
     mode,
     refs,
+    requiredChecks,
     resourceId,
     sourceBindingFingerprint,
     triggerKind,
@@ -1409,6 +1412,7 @@ const configureAutoDeployCommand = EffectCommand.make(
             eventKinds: selectedEventKinds.length > 0 ? [...selectedEventKinds] : ["push"],
             ...(includePaths.length > 0 ? { includePaths: [...includePaths] } : {}),
             ...(excludePaths.length > 0 ? { excludePaths: [...excludePaths] } : {}),
+            ...(requiredChecks.length > 0 ? { requiredChecks: [...requiredChecks] } : {}),
             ...(genericWebhookSecretRefValue
               ? { genericWebhookSecretRef: genericWebhookSecretRefValue }
               : {}),

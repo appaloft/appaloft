@@ -21,6 +21,7 @@ import {
   dockerStorageMountsFromRuntimeMetadata,
   dockerStorageVolumeRealizationsFromRuntimeMetadata,
 } from "./storage-runtime-mounts";
+import { selectPublicHealthRouteTargets } from "./public-health-route";
 
 type RuntimePlanLike = {
   toState(): RuntimePlanState;
@@ -178,6 +179,7 @@ export type DockerSwarmApplyPlanStepName =
   | "deploy-candidate-stack"
   | "verify-candidate-service"
   | "promote-route-target"
+  | "verify-public-routes"
   | "cleanup-superseded-services";
 
 export interface DockerSwarmApplyPlanStep {
@@ -185,6 +187,8 @@ export interface DockerSwarmApplyPlanStep {
   command: string;
   displayCommand: string;
   stdinFile?: string;
+  rollbackCommand?: string;
+  rollbackDisplayCommand?: string;
 }
 
 export interface DockerSwarmApplyPlan {
@@ -292,7 +296,7 @@ function yamlQuoted(value: string): string {
   return JSON.stringify(value);
 }
 
-function dockerComposeOverrideContent(input: {
+export function dockerComposeOverrideContent(input: {
   intent: DockerSwarmRuntimeIntent;
   networkNames: readonly string[];
   redactValues?: boolean;
@@ -390,6 +394,84 @@ function dockerComposeOverrideContent(input: {
   ].join("\n");
 }
 
+function joinRouteAndHealthPath(pathPrefix: string, healthPath: string): string {
+  const normalizedPrefix = pathPrefix === "/" ? "" : pathPrefix.replace(/\/+$/, "");
+  const normalizedHealthPath = healthPath.startsWith("/") ? healthPath : `/${healthPath}`;
+  if (!normalizedPrefix) {
+    return normalizedHealthPath || "/";
+  }
+  return normalizedHealthPath === "/"
+    ? normalizedPrefix
+    : `${normalizedPrefix}${normalizedHealthPath}`;
+}
+
+function dockerSwarmPublicRouteUrls(intent: DockerSwarmRuntimeIntent): Array<{
+  url: string;
+  allowUntrustedTls: boolean;
+}> {
+  if (!intent.health?.enabled || intent.health.type !== "http" || !intent.health.http) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  return selectPublicHealthRouteTargets(intent.routes)
+    .filter(({ route, domain }) => route.proxyKind !== "none" && Boolean(domain))
+    .flatMap(({ route, domain }) => {
+      const scheme = route.tlsMode === "auto" ? "https" : "http";
+      const url = `${scheme}://${domain}${joinRouteAndHealthPath(
+        route.pathPrefix,
+        intent.health?.http?.path ?? "/",
+      )}`;
+      if (seen.has(url)) {
+        return [];
+      }
+      seen.add(url);
+      return [{ url, allowUntrustedTls: route.tlsMode === "auto" }];
+    });
+}
+
+function dockerSwarmPublicRouteVerificationCommand(intent: DockerSwarmRuntimeIntent): string {
+  if (!intent.health?.http) {
+    return "";
+  }
+
+  const routes = dockerSwarmPublicRouteUrls(intent);
+  if (routes.length === 0) {
+    return "";
+  }
+
+  const expectedStatusCode = String(intent.health.http.expectedStatusCode);
+  const expectedResponseText = intent.health.http.expectedResponseText ?? "";
+  const timeoutSeconds = String(Math.max(1, intent.health.timeoutSeconds));
+  const retries = String(Math.max(1, intent.health.retries));
+  const startPeriodSeconds = String(Math.max(0, intent.health.startPeriodSeconds));
+  const functionDefinition = [
+    "verify_public_route() {",
+    'url="$1"; expected_status="$2"; expected_text="$3"; allow_untrusted="$4";',
+    'attempt=0; body_file=$(mktemp -t appaloft-swarm-public-health.XXXXXX);',
+    'while [ "$attempt" -lt "$max_attempts" ]; do',
+    'curl_tls=""; if [ "$allow_untrusted" = "true" ]; then curl_tls="--insecure"; fi;',
+    'status=$(curl --silent --show-error $curl_tls --max-time "$route_timeout" --output "$body_file" --write-out "%{http_code}" "$url") && [ "$status" = "$expected_status" ] && { [ -z "$expected_text" ] || grep -Fq -- "$expected_text" "$body_file"; } && { rm -f "$body_file"; return 0; };',
+    'attempt=$((attempt + 1)); if [ "$attempt" -lt "$max_attempts" ]; then sleep 1; fi;',
+    "done; rm -f \"$body_file\"; return 1;",
+    "}",
+  ].join(" ");
+  const checks = routes.map(({ url, allowUntrustedTls }) =>
+    `verify_public_route ${ash.quote(url)} ${ash.quote(expectedStatusCode)} ${ash.quote(
+      expectedResponseText,
+    )} ${ash.quote(String(allowUntrustedTls))}`,
+  );
+
+  return [
+    "command -v curl >/dev/null 2>&1",
+    `route_timeout=${ash.quote(timeoutSeconds)}`,
+    `max_attempts=${ash.quote(retries)}`,
+    ...(startPeriodSeconds !== "0" ? [`sleep ${ash.quote(startPeriodSeconds)}`] : []),
+    functionDefinition,
+    ...checks,
+  ].join("; ");
+}
+
 function stackDeployCommand(input: {
   composeFile: string;
   intent: DockerSwarmRuntimeIntent;
@@ -457,6 +539,13 @@ function dockerHealthFlags(health: DockerSwarmHealthIntent | undefined): string 
 
 function routeLabelFlags(labels: readonly string[]): string {
   return labels.map((label) => `--label-add ${ash.quote(label)}`).join(" ");
+}
+
+function routeLabelRemovalFlags(labels: readonly string[]): string {
+  return labels
+    .map((label) => label.split("=", 1)[0] ?? label)
+    .map((key) => `--label-rm ${ash.quote(key)}`)
+    .join(" ");
 }
 
 function commandParts(parts: readonly string[]): string {
@@ -1269,6 +1358,43 @@ export function renderDockerSwarmApplyPlan(
           routeLabelFlags(labels),
           ash.quote(intent.serviceName),
         ]);
+  const restorePreviousRouteOwnerCommand =
+    intent.workload.kind === "compose"
+      ? [
+          ...new Set(
+            intent.routes.map(
+              (route) => route.targetServiceName ?? composeDefaultTargetServiceName ?? "",
+            ),
+          ),
+        ]
+          .map((targetServiceName) => {
+            const serviceName = `${intent.stackName}_${targetServiceName}`;
+            const targetLabels = routeLabels({
+              serviceName,
+              routes: intent.routes.filter(
+                (route) =>
+                  (route.targetServiceName ?? composeDefaultTargetServiceName) ===
+                  targetServiceName,
+              ),
+              ...(intent.resourceAccessFailureRenderer
+                ? { resourceAccessFailureRenderer: intent.resourceAccessFailureRenderer }
+                : {}),
+            });
+            return commandParts([
+              "docker service update",
+              `--label-rm ${ash.quote("appaloft.route-candidate")}`,
+              routeLabelRemovalFlags(targetLabels),
+              ash.quote(serviceName),
+            ]);
+          })
+          .join("; ")
+      : commandParts([
+          "docker service update",
+          `--label-rm ${ash.quote("appaloft.route-candidate")}`,
+          routeLabelRemovalFlags(labels),
+          ash.quote(intent.serviceName),
+        ]);
+  const verifyPublicRoutesCommand = dockerSwarmPublicRouteVerificationCommand(intent);
   const cleanupCommand = commandParts([
     "docker service ls -q",
     dockerServiceLabelFilters({
@@ -1301,6 +1427,17 @@ export function renderDockerSwarmApplyPlan(
         command: promoteCommand,
         displayCommand: promoteCommand,
       },
+      ...(verifyPublicRoutesCommand
+        ? [
+            {
+              step: "verify-public-routes" as const,
+              command: verifyPublicRoutesCommand,
+              displayCommand: verifyPublicRoutesCommand,
+              rollbackCommand: restorePreviousRouteOwnerCommand,
+              rollbackDisplayCommand: restorePreviousRouteOwnerCommand,
+            },
+          ]
+        : []),
       {
         step: "cleanup-superseded-services",
         command: cleanupCommand,

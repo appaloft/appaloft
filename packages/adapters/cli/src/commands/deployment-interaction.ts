@@ -256,6 +256,7 @@ export interface DeploymentAutoDeploySeed {
   dedupeWindowSeconds?: number;
   includePaths?: string[];
   excludePaths?: string[];
+  requiredChecks?: string[];
 }
 export interface DeploymentGeneratedAccessProfileSeed {
   generatedAccessMode: "inherit" | "disabled";
@@ -899,6 +900,9 @@ export function deploymentPromptSeedFromConfig(
           : {}),
         ...(config.autoDeploy.excludePaths
           ? { excludePaths: [...config.autoDeploy.excludePaths] }
+          : {}),
+        ...(config.autoDeploy.requiredChecks
+          ? { requiredChecks: [...config.autoDeploy.requiredChecks] }
           : {}),
       } satisfies DeploymentAutoDeploySeed)
     : undefined;
@@ -3683,6 +3687,7 @@ function autoDeployPolicyMatchesConfig(
     stringArraysEqual(current.eventKinds, desired.eventKinds) &&
     stringArraysEqual(current.includePaths ?? [], desired.includePaths ?? []) &&
     stringArraysEqual(current.excludePaths ?? [], desired.excludePaths ?? []) &&
+    stringArraysEqual(current.requiredChecks ?? [], desired.requiredChecks ?? []) &&
     current.dedupeWindowSeconds === desired.dedupeWindowSeconds
   );
 }
@@ -3735,6 +3740,9 @@ function configureRepositoryConfigAutoDeploy(input: {
                   : {}),
                 ...(input.policy.excludePaths
                   ? { excludePaths: [...input.policy.excludePaths] }
+                  : {}),
+                ...(input.policy.requiredChecks
+                  ? { requiredChecks: [...input.policy.requiredChecks] }
                   : {}),
               },
             }
