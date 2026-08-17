@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1-43 shipped. Slice 44 occupancy resume keeps preferred Profile owner-confirmed 2026-08-16 (D139-D141).
-- Date: 2026-08-16.
-- Predecessor: occupancy Cloud-compat error shipped as public #1238.
-- Code changes allowed: yes for slice 44 after the occupancy-resume-profile-pin ticket is `ready-for-agent`.
+- Round: Spec. Slice 1-44 shipped. Occupancy login→code→deploy→preview loop accepted 2026-08-17 (D142-D148).
+- Date: 2026-08-17.
+- Predecessor: occupancy resume Profile pin shipped as public #1251 / Cloud #995.
+- Code changes allowed: yes for the next occupancy-hardening ticket after it is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -176,6 +176,13 @@ Sandbox on that Server, not one VM per person.
 | D139 | Slice 44 default occupancy resume keeps the preferred Sandbox Profile | Railway reconnects the same machine. A newer default Profile must not block `code`. |
 | D140 | Explicit `--profile` still fail-closes on pin mismatch | Delivery `workspace open --profile` stays exact. |
 | D141 | `--new` still creates an isolated Workspace | Do not rewrite the preferred disk onto a new Profile. Catalog create-PR write stays later. |
+| D142 | Do not reopen R7 as the default `code` door | 2026-08-17 re-grill. Spec 138 / ADR-116 stay `--local`. ADR-118 stays default occupancy. |
+| D143 | Instant-open agents map to Scratch only | OpenCode / Pi / Claude `cd dir && claude` / Codex prove `--local` must stay instant, not that default `code` becomes Scratch. |
+| D144 | Claude `--cloud` dirty-tree bundle is not occupancy truth | Cloud execution of a local git bundle stays rejected. Occupancy source remains remote SHA. |
+| D145 | Next actor-visible slice is leftover EXPOSE upgrade | Occupy must replace occupancy-default 3000 with a single remote Dockerfile `EXPOSE`. Already WS-REMOTE-EXPOSE-054 / D54. |
+| D146 | Control-plane source inspect keeps `git` on the web image | Cloud #996 / `9d26c980` closed the live `missing-source-root` hole. Dockerfile/readiness must assert `git` so the next image prune cannot regress it. |
+| D147 | Occupancy login → code → deploy → preview is the accepted Railway loop | Live `appaloftdev` 2026-08-17: occupy whoami, deploy `dep_33iuz006q7fh`, public 200, `workspace --json` copies Preview + last deployment. |
+| D148 | Only replace occupancy-default 3000 | User-configured non-3000 ports stay. Re-detect on every resume is not required. |
 
 ## Rejected
 
@@ -185,6 +192,9 @@ Sandbox on that Server, not one VM per person.
 - Make `workspace open` accept a dirty laptop tree as remote truth.
 - New Host/Machine aggregate.
 - Silent managed → BYOS → Scratch fallback.
+- Reopen R7 as the default `code` door after occupancy shipped. Instant-open agents stay `--local`.
+- Treat Claude `--cloud` dirty-tree bundle as occupancy truth.
+- Open a new Spec/ADR just to restate Scratch vs occupancy; ADR-116/117/118 already split the doors.
 
 ## Mapping To Railway
 
@@ -267,9 +277,10 @@ Later slices after occupancy:
 42. Occupancy TUI available-door footer (slice 42, shipped #1236).
 43. Occupancy Cloud-compat error (slice 43, shipped #1238).
 44. **Occupancy resume keeps preferred Profile** (slice 44): default `code` reconnects my Sandbox even if the Project default Profile changed.
-45. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
-46. Optional team Connection.
-47. Cloud managed as default Server when no BYOS exists.
+45. **Occupancy EXPOSE / git-on-control-plane** (slice 45): leftover occupancy-default `internalPort 3000` must become a single remote Dockerfile `EXPOSE` on occupy, and `deployments.create` source inspect must not require `git` on the Cloud web image. Live 2026-08-17: occupy+deploy of `traefik/whoami` first failed `missing-source-root` / `Executable not found in $PATH: "git"` on production `9ba333eb`; after Cloud #996 / `9d26c980` the same Resource still listened on 3000 while whoami `EXPOSE 80`. Manual `resource configure-network --internal-port 80` then `appaloft deploy` succeeded (`dep_33iuz006q7fh`, public 200).
+46. Interactive `workspace` TUI as Railway `ca` navigator (catalog create-PR write).
+47. Optional team Connection.
+48. Cloud managed as default Server when no BYOS exists.
 
 Cmux-style “this session is PR #928” is correct *context*. It is not a new GitHub aggregate
 and not something `code` scrapes from the vendor TUI.
@@ -285,16 +296,73 @@ and not something `code` scrapes from the vendor TUI.
 
 Do not parse Pi/OpenCode output to discover PRs. Do not copy host `gh` state as product truth.
 
+## 2026-08-17 Re-grill: do not reopen R7 default Scratch
+
+The archived handoff asked to Grill `R7 Instant Local Scratch` as a default-door
+revision of R1.1. That Grill already shipped as Spec 138 / ADR-116, then owner
+review inverted the default door to occupancy (ADR-117/118, Spec 139). Re-running
+the same Grill now would silently invert settled D1/D7.
+
+### Live source-CLI evidence (`appaloftdev`, 2026-08-17)
+
+- Production health SHA `9d26c980` after Cloud #996 (`git` in the web image).
+- Logged-in occupancy:
+  `appaloftdev code --new --no-attach https://github.com/traefik/whoami.git`
+  printed `Remote · prj_42ymkffgt1eh · github.com/traefik/whoami@1ce75d0 · hostinger · my sandbox · sbx_y7urk98u5l8q`,
+  `Preview · http://app-78rpisds2x.2.25.182.56.sslip.io`,
+  `Compare · https://github.com/traefik/whoami/compare/master?expand=1`, exit 0.
+- Bare occupancy deploy after `resource configure-network --internal-port 80`:
+  `dep_33iuz006q7fh` succeeded; public URL HTTP 200 `Hostname: c3bf64b8edcc`.
+- `workspace --json` copies that Preview URL and last deployment.
+- Explicit Scratch still works:
+  `appaloftdev code --local --no-attach <empty-dir>` →
+  `Local scratch · this Mac · not saved remotely`.
+- Occupy after resetting the leftover 3000 port then hit transient
+  `Control plane returned HTML instead of JSON`; Resource remains 80 after the
+  manual configure. WS-REMOTE-EXPOSE-054 is therefore not closed on a leftover
+  occupancy-default Resource.
+
+### Competitor classes (not just Railway / Paseo)
+
+| Class | Examples | Door | What Appaloft already is |
+| --- | --- | --- | --- |
+| Instant-open local agent | OpenCode `cd dir && opencode`; Pi; Claude Code `cd dir && claude`; Codex CLI | Any directory, Git optional, login is vendor/model not product occupancy | `--local` Scratch. Must stay explicit. |
+| Remote occupancy / machine | Railway `login` then `code` / `ca`; GitHub Codespaces `gh codespace create -r OWNER/REPO [-b BRANCH\|SHA]`; Gitpod branch/PR URL; Daytona clone+`commit_id` | Login + known repo/ref, personal disk, resume later | Default `code` occupancy. |
+| Cloud execution of a local tree | Claude `--cloud` bundles a git repo (needs ≥1 commit; untracked omitted; dirty tracked files uploaded) | Explicit remote-execution flag, not the default `claude` | Rejected for occupancy. Laptop dirty tree is never Workspace truth. |
+| Workspace-from-SHA platforms | Codespaces/Gitpod/Coder/DevPod usually open branch then checkout SHA inside | Branch/PR first; SHA is checkout, not the product id | Appaloft occupancy already pins remote HEAD SHA via `ls-remote`. Keep that. |
+
+Claude, OpenCode, Codex prove **Scratch must remain instant**. They do **not**
+prove default `appaloft code` should become Scratch again. Appaloft's verb is
+the Railway/Codespaces class: occupy my disk on the team Server, then Preview /
+deploy / PR from that occupancy. Mixing the two doors was the R7 failure mode.
+
+### Recommended next change
+
+Do not write a new R7 spec. Keep Spec 138 / ADR-116 as `--local`. Keep Spec 139 /
+ADR-118 as the default door. Next actor-visible slice is occupancy hardening:
+
+1. Occupy of a single-EXPOSE remote must replace leftover occupancy-default 3000
+   (already specified as WS-REMOTE-EXPOSE-054 / D52–D54). Production whoami
+   proved the detector exists but leftover Resources can stay 3000 until a human
+   `configure-network`.
+2. Control-plane source inspect must not depend on `git` being absent from the
+   web image. Cloud #996 closed the current production hole; add a durable
+   Dockerfile/readiness assertion so the next image prune cannot regress it.
+3. Later, not this slice: team Connection; managed default Server when no BYOS
+   exists; occupancy TUI as write-capable `ca`.
+
 ## Open Questions (do not block first Spec)
 
 - Exact flag name for leftover Scratch (`--local` vs `code local`). Cosmetic.
 - Whether first-time personal model login is in-TUI OpenCode `/connect` only, or Appaloft also wraps token paste. Prefer vendor TUI.
 - Cloud-only: whether entitled managed capacity appears as the default Server when no BYOS Server exists. Must not silently become this Mac.
+- Whether occupy should re-detect EXPOSE on every resume, or only when the current port is the occupancy default 3000. Recommend: only replace 3000 (D54).
 
 ## Non-Goals For The Next Spec
 
-- Reopening R1–R6.
-- Deleting Scratch implementation; only demote it from the default door.
+- Reopening R1–R7 as a default-door rewrite.
+- Deleting Scratch implementation; only keep it off the default door.
 - Sharing personal OAuth as a product feature.
 - New Chat UI or vendor TUI parser.
-- Making durable SHA Workspace the `code` default.
+- Making durable SHA Workspace the `code` default, or making Scratch the `code` default again.
+- Silent dirty-tree upload in the Claude `--cloud` bundle style.
