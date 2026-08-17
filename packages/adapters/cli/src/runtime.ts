@@ -644,10 +644,8 @@ export const runTerminalCommand = (
       })
     : runCommand(message);
 
-export const attachTerminalSession = <
-  T extends TerminalSessionDescriptor | { item: TerminalSessionDescriptor },
->(
-  message: Result<AppQuery<T>>,
+export const attachIssuedTerminalSession = (
+  descriptor: TerminalSessionDescriptor,
   options: { initialRows?: number; initialCols?: number } = {},
 ): Effect.Effect<void, DomainError, CliRuntime> =>
   Effect.gen(function* () {
@@ -660,12 +658,6 @@ export const attachTerminalSession = <
         ),
       );
     }
-    const query = yield* resultToEffect(message);
-    const result = yield* Effect.promise(() => cli.executeQuery(query));
-    const output = yield* resultToEffect(result);
-    const descriptor =
-      (output as { item?: TerminalSessionDescriptor }).item ??
-      (output as TerminalSessionDescriptor);
     yield* Effect.tryPromise({
       try: () =>
         pipeTerminalSession({
@@ -683,6 +675,23 @@ export const attachTerminalSession = <
         }),
       catch: terminalSessionErrorFromUnknown,
     });
+  });
+
+export const attachTerminalSession = <
+  T extends TerminalSessionDescriptor | { item: TerminalSessionDescriptor },
+>(
+  message: Result<AppQuery<T>>,
+  options: { initialRows?: number; initialCols?: number } = {},
+): Effect.Effect<void, DomainError, CliRuntime> =>
+  Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const query = yield* resultToEffect(message);
+    const result = yield* Effect.promise(() => cli.executeQuery(query));
+    const output = yield* resultToEffect(result);
+    const descriptor =
+      (output as { item?: TerminalSessionDescriptor }).item ??
+      (output as TerminalSessionDescriptor);
+    return yield* attachIssuedTerminalSession(descriptor, options);
   });
 
 export const runCommand = <T>(
