@@ -335,6 +335,8 @@ describe("DockerSandboxProvider", () => {
     expect(create).toContain("no-new-privileges=true");
     expect(create).toContain("ALL");
     expect(create).toContain("/workspace:rw,nosuid,nodev,size=2048m");
+    expect(create).toContain("/tmp:rw,noexec,nosuid,size=64m");
+    expect(create).toContain("/var/tmp/appaloft-exec:rw,exec,nosuid,nodev,size=64m");
     expect(create).not.toContain("--storage-opt");
     expect(create).toContain("python@sha256:abc123");
     expect(create).not.toContain("sh -lc");
