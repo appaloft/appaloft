@@ -42,7 +42,10 @@ class FakeRendererSession implements WorkspaceControlRendererSession {
   readonly messages: WorkspaceControlRendererMessage[] = [];
   closed = 0;
 
-  constructor(private readonly rendererEvents: readonly WorkspaceControlRendererEvent[]) {}
+  constructor(
+    private readonly rendererEvents: readonly WorkspaceControlRendererEvent[],
+    private readonly options: { readonly allowQuitDuringDetail?: boolean } = {},
+  ) {}
 
   send(message: WorkspaceControlRendererMessage): Promise<void> {
     this.messages.push(message);
@@ -51,8 +54,16 @@ class FakeRendererSession implements WorkspaceControlRendererSession {
 
   async *events(): AsyncIterable<WorkspaceControlRendererEvent> {
     await Promise.resolve();
-    for (const event of this.rendererEvents) {
+    for (const [index, event] of this.rendererEvents.entries()) {
+      const next = this.rendererEvents[index + 1];
       yield event;
+      if (
+        event.type === "select" &&
+        next &&
+        (next.type !== "quit" || !this.options.allowQuitDuringDetail)
+      ) {
+        await waitForSelectedDetail(this, event.workspaceId);
+      }
     }
   }
 
@@ -60,6 +71,24 @@ class FakeRendererSession implements WorkspaceControlRendererSession {
     this.closed += 1;
     return Promise.resolve();
   }
+}
+
+async function waitForSelectedDetail(
+  renderer: FakeRendererSession,
+  workspaceId: string,
+): Promise<void> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (
+      renderer.closed > 0 ||
+      renderer.messages.some(
+        (message) => message.type === "detail" && message.workspace.workspaceId === workspaceId,
+      )
+    ) {
+      return;
+    }
+    await Promise.resolve();
+  }
+  throw new Error(`Workspace detail never arrived for ${workspaceId}`);
 }
 
 async function waitForPopulatedWorkspaces(
@@ -1268,6 +1297,52 @@ describe("Workspace control presentation", () => {
     expect(renderer.closed).toBe(1);
     expect(renderer.messages[0]).toEqual({ type: "workspaces", workspaces: [] });
     resolveList?.({ items: [{ sandboxId: "sbx_late", status: "ready" }] });
+  });
+
+  test("[WS-TUI-ENTRY-001] quit is accepted while occupancy detail is still loading", async () => {
+    let resolveDetail: ((value: Record<string, unknown>) => void) | undefined;
+    const detailStarted = Promise.withResolvers<void>();
+    const renderer = new FakeRendererSession(
+      [{ type: "select", workspaceId: "sbx_ready" }, { type: "quit" }],
+      { allowQuitDuringDetail: true },
+    );
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+
+    const started = presentation.start({
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery) {
+          return ok({
+            items: [
+              {
+                sandboxId: "sbx_ready",
+                status: "ready",
+                occupancy: {
+                  repositoryIdentity: "github.com/traefik/whoami",
+                  commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+                  branch: "master",
+                },
+              },
+            ],
+          } as T);
+        }
+        if (query instanceof ShowSandboxQuery) {
+          detailStarted.resolve();
+          return await new Promise((resolve) => {
+            resolveDetail = (value) => resolve(ok(value) as never);
+          });
+        }
+        throw new Error(`unexpected query ${query.constructor.name}`);
+      },
+    });
+
+    await detailStarted.promise;
+    await started;
+    expect(renderer.closed).toBe(1);
+    expect(renderer.messages.some((message) => message.type === "detail")).toBe(false);
+    resolveDetail?.({ sandboxId: "sbx_ready", status: "ready" });
   });
 
   test("[WS-REMOTE-CA-069][WS-REMOTE-CA-070][WS-REMOTE-CA-071] TUI list copies occupancy and omits leftovers", async () => {

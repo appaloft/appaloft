@@ -391,7 +391,7 @@ fn main() -> Result<()> {
             }
             Event::Key(key) if key.kind == KeyEventKind::Press => match key.code {
                 KeyCode::Char('q') => {
-                    send(&mut writer, &RendererEvent::Quit)?;
+                    let _ = send(&mut writer, &RendererEvent::Quit);
                     running = false;
                 }
                 KeyCode::Char('r') => send(

@@ -822,6 +822,8 @@ export function createBoundedWorkspaceControlPresentation(
       let selectedWorkspaceId: string | undefined;
       let selectedDetail: Extract<WorkspaceControlRendererMessage, { type: "detail" }> | undefined;
       let selectedPromotionRecords: readonly Record<string, unknown>[] = [];
+      let presentationOpen = true;
+      let detailGeneration = 0;
       let activeTerminal:
         | {
             workspaceId: string;
@@ -834,10 +836,16 @@ export function createBoundedWorkspaceControlPresentation(
       const terminalPumps = new Set<Promise<void>>();
 
       const sendSelectedDetail = async (workspaceId: string) => {
+        const generation = ++detailGeneration;
         const loaded = await loadDetail(context, workspaceId);
+        if (!presentationOpen || generation !== detailGeneration) return;
         selectedDetail = loaded.message;
         selectedPromotionRecords = loaded.promotionRecords;
         await renderer.send(loaded.message);
+      };
+
+      const requestSelectedDetail = (workspaceId: string, phase: string) => {
+        void sendSelectedDetail(workspaceId).catch((error) => sendErrorBestEffort(error, phase));
       };
 
       const completeDelivery = async (workspaceId: string) => {
@@ -951,7 +959,7 @@ export function createBoundedWorkspaceControlPresentation(
           try {
             if (event.type === "select") {
               selectedWorkspaceId = event.workspaceId;
-              await sendSelectedDetail(event.workspaceId);
+              requestSelectedDetail(event.workspaceId, "workspace-control-select");
               continue;
             }
             if (
@@ -1015,7 +1023,7 @@ export function createBoundedWorkspaceControlPresentation(
                 workspaces: await listWorkspaces(context),
               });
               const workspaceId = event.workspaceId ?? selectedWorkspaceId;
-              if (workspaceId) await sendSelectedDetail(workspaceId);
+              if (workspaceId) requestSelectedDetail(workspaceId, "workspace-control-refresh");
               continue;
             }
             if (event.type === "attach") {
@@ -1309,6 +1317,8 @@ export function createBoundedWorkspaceControlPresentation(
       } catch (error) {
         await sendErrorBestEffort(error, "workspace-control-start");
       } finally {
+        presentationOpen = false;
+        detailGeneration += 1;
         await detachActiveTerminal();
         if (terminalPumps.size > 0) {
           await Promise.allSettled([...terminalPumps]);

@@ -2,7 +2,7 @@
 
 | ID | Layer | Scenario | Expected evidence | Planned binding | Status |
 | --- | --- | --- | --- | --- | --- |
-| WS-TUI-ENTRY-001 | CLI/unit | Interactive `appaloft workspace` has no subcommand | Renderer starts after target resolution with no mutation. | `agent-workspace-command.test.ts` | automated pass |
+| WS-TUI-ENTRY-001 | CLI/unit | Interactive `appaloft workspace` has no subcommand | Renderer starts after target resolution with no mutation. `q` closes the renderer before the first list or occupancy detail resolves. | `agent-workspace-command.test.ts` + `workspace-control-presentation.test.ts` | automated pass |
 | WS-TUI-QUERY-002 | CLI/contract | Shell loads and refreshes Workspaces | Only bounded existing operation facade calls occur; no repository/TUI store exists. | `workspace-control-presentation.test.ts` + import boundary | automated pass |
 | WS-TUI-DETAIL-003 | CLI/unit | User selects a Workspace | Existing safe Workspace/Profile/Server/Runtime/Terminal/Preview/Task fields render without invented truth. | TypeScript safe mapping + Ratatui bounded-detail render test | automated pass |
 | WS-TUI-EMBED-004 | CLI/PTY | Selected Adapter exposes managed-terminal or approved native attach | Native alternate screen renders in the embedded pane from a transport-neutral byte stream; no Agent semantic parser exists. | fake `TerminalSession`, real `Bun.Terminal`, compiled Ratatui sidecar | automated macOS/Linux pass |
