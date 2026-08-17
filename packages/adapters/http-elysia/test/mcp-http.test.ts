@@ -94,6 +94,45 @@ describe("MCP HTTP transport", () => {
     );
   });
 
+  test("[APPALOFT-MCP-017] GET /mcp rejects standalone SSE and lists object-shaped tools", async () => {
+    const app = createTestApp({});
+
+    const sseResponse = await app.handle(
+      new Request("http://localhost/mcp", {
+        headers: {
+          accept: "text/event-stream",
+        },
+      }),
+    );
+    const sse = await sseResponse.json();
+
+    expect(sseResponse.status).toBe(405);
+    expect(sse.error.code).toBe("mcp_sse_not_supported");
+
+    const listResponse = await app.handle(
+      new Request("http://localhost/mcp", {
+        method: "POST",
+        headers: {
+          accept: "application/json, text/event-stream",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/list",
+        }),
+      }),
+    );
+    const list = await listResponse.json();
+    const tools = list.result.tools as { name: string; inputSchema?: { type?: string } }[];
+
+    expect(listResponse.status).toBe(200);
+    expect(listResponse.headers.get("content-type")).toContain("application/json");
+    expect(tools.length).toBeGreaterThan(0);
+    expect(tools.every((tool) => tool.inputSchema?.type === "object")).toBe(true);
+    expect(tools.some((tool) => tool.name === "deployments_plan")).toBe(true);
+  });
+
   test("[APPALOFT-MCP-012] dispatches /mcp tool calls with mcp entrypoint and product session actor", async () => {
     let capturedContext: ExecutionContext | undefined;
     let capturedCommand: Command<unknown> | undefined;

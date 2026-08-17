@@ -138,6 +138,32 @@ describe("MCP tool descriptors", () => {
     }
   });
 
+  test("[APPALOFT-MCP-017] every tools/list inputSchema is a JSON Schema object", () => {
+    const unionRoots = [
+      "dependency-resources.provisioning.plan",
+      "resources.health-history",
+      "runtime-monitoring.rollup",
+      "runtime-monitoring.samples.list",
+      "runtime-monitoring.thresholds.show",
+      "runtime-usage.inspect",
+      "servers.test-connectivity",
+      "servers.test-draft-connectivity",
+    ];
+
+    for (const descriptor of toolContracts) {
+      expect(descriptor.inputJsonSchema.type, descriptor.operationKey).toBe("object");
+    }
+
+    for (const operationKey of unionRoots) {
+      const schema = toolContractsByOperationKey.get(operationKey)?.inputJsonSchema;
+      expect(schema?.type, operationKey).toBe("object");
+      expect(
+        Boolean(schema?.anyOf) || Boolean(schema?.oneOf) || Boolean(schema?.allOf),
+        operationKey,
+      ).toBe(true);
+    }
+  });
+
   test("[MCP-TOOL-DESC-002] descriptors are serializable and preserve CLI/API transport metadata", () => {
     const names = new Set<string>();
 

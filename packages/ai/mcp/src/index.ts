@@ -232,6 +232,21 @@ function stripJsonSchemaDialect(schema: unknown): McpJsonSchema {
   return Object.fromEntries(entries);
 }
 
+function isJsonSchemaObject(value: unknown): value is McpJsonSchema {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function mcpObjectInputSchema(schema: McpJsonSchema): McpJsonSchema {
+  if (schema.type === "object") {
+    return schema;
+  }
+
+  return {
+    type: "object",
+    ...schema,
+  };
+}
+
 function inputJsonSchemaFor(entry: OperationCatalogEntry): McpJsonSchema {
   if (!entry.inputSchema) {
     return {
@@ -241,11 +256,20 @@ function inputJsonSchemaFor(entry: OperationCatalogEntry): McpJsonSchema {
     };
   }
 
-  return stripJsonSchemaDialect(
+  const stripped = stripJsonSchemaDialect(
     z.toJSONSchema(entry.inputSchema, {
       io: "input",
     }),
   );
+  if (!isJsonSchemaObject(stripped)) {
+    return {
+      type: "object",
+      additionalProperties: false,
+      properties: {},
+    };
+  }
+
+  return mcpObjectInputSchema(stripped);
 }
 
 export function toolDescriptorFromOperation(entry: OperationCatalogEntry): ToolDescriptor {
@@ -1075,6 +1099,12 @@ function mcpHttpHeaders(protocolVersion = defaultProtocolVersion): Headers {
   });
 }
 
+function requestAcceptsEventStream(request: Request): boolean {
+  return (request.headers.get("accept") ?? "")
+    .split(",")
+    .some((part) => part.trim().toLowerCase().startsWith("text/event-stream"));
+}
+
 export async function handleAppaloftMcpHttpRequest(input: {
   server: AppaloftMcpServer;
   request: Request;
@@ -1083,6 +1113,18 @@ export async function handleAppaloftMcpHttpRequest(input: {
   const headers = mcpHttpHeaders(input.request.headers.get("mcp-protocol-version") ?? undefined);
 
   if (input.request.method === "GET") {
+    if (requestAcceptsEventStream(input.request)) {
+      return new Response(
+        JSON.stringify({
+          error: {
+            code: "mcp_sse_not_supported",
+            message: "Appaloft MCP HTTP transport does not offer a standalone GET SSE stream.",
+          },
+        }),
+        { status: 405, headers },
+      );
+    }
+
     return new Response(
       JSON.stringify(
         {
