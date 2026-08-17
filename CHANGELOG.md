@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.8](https://github.com/appaloft/appaloft/compare/v1.8.7...v1.8.8) (2026-08-17)
+
+
+### Bug Fixes
+
+* **sandbox:** keep host-egress occupancy resume off the gateway ([#1252](https://github.com/appaloft/appaloft/issues/1252)) ([62b179f](https://github.com/appaloft/appaloft/commit/62b179fc8c51baf03c321120dcaf61206b18c100))
+* **sdk:** prefer JSON control-plane errors over HTML ([#1253](https://github.com/appaloft/appaloft/issues/1253)) ([3aa5bba](https://github.com/appaloft/appaloft/commit/3aa5bbabf0d8a16c35294695719fa656746c449e))
+
 ## [1.8.7](https://github.com/appaloft/appaloft/compare/v1.8.6...v1.8.7) (2026-08-16)
 
 
