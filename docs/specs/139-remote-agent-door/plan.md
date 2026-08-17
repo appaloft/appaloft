@@ -56,6 +56,8 @@
 | Occupancy Cloud-compat error | public CLI `code` after unstructured `workspaces.open` validation |
 | Occupancy resume preferred Profile | public `workspaces.open` resume path |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
+| Occupancy leftover EXPOSE | detector + occupancy initializer; live-verified whoami 80 |
+| Registered-Server OpenCode attach | public `issueAttachAccess` + existing managed-terminal grant |
 
 ## Architecture
 
@@ -323,8 +325,18 @@ Slice-44 verification:
 - unit: explicit `--profile` still fail-closes;
 - unit: `--new` stays isolated.
 
+Slice-45 verification:
 
+- unit: leftover occupancy-default 3000 upgrades to a single EXPOSE;
+- live: `appaloftdev code --no-attach` of whoami after leftover 3000 becomes port 80.
 
+Slice-46 verification:
+
+- unit: unsupported port publishing is `sandbox_port_publishing_unsupported`;
+- unit: native-attach falls back to in-Sandbox managed-terminal;
+- unit: signed gateway URL still wins;
+- unit: raw loopback stays unsafe;
+- `appaloftdev code` on Hostinger occupancy attaches OpenCode without port-publishing conflict.
 
 
 

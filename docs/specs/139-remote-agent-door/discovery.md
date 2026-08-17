@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1-44 shipped. Occupancy login→code→deploy→preview loop accepted 2026-08-17 (D142-D148).
+- Round: Spec. Slice 1-45 leftover EXPOSE live-verified 2026-08-17. Slice 46 is registered-Server OpenCode attach.
 - Date: 2026-08-17.
-- Predecessor: occupancy resume Profile pin shipped as public #1251 / Cloud #995.
-- Code changes allowed: yes for the next occupancy-hardening ticket after it is `ready-for-agent`.
+- Predecessor: leftover occupancy EXPOSE upgrade is in public `75bc24b4` / Cloud pin `134f5244`.
+- Code changes allowed: yes for slice 46 after the registered-Server attach ticket is `ready-for-agent`.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -179,10 +179,17 @@ Sandbox on that Server, not one VM per person.
 | D142 | Do not reopen R7 as the default `code` door | 2026-08-17 re-grill. Spec 138 / ADR-116 stay `--local`. ADR-118 stays default occupancy. |
 | D143 | Instant-open agents map to Scratch only | OpenCode / Pi / Claude `cd dir && claude` / Codex prove `--local` must stay instant, not that default `code` becomes Scratch. |
 | D144 | Claude `--cloud` dirty-tree bundle is not occupancy truth | Cloud execution of a local git bundle stays rejected. Occupancy source remains remote SHA. |
-| D145 | Next actor-visible slice is leftover EXPOSE upgrade | Occupy must replace occupancy-default 3000 with a single remote Dockerfile `EXPOSE`. Already WS-REMOTE-EXPOSE-054 / D54. |
+| D145 | Slice 45 leftover EXPOSE upgrade shipped | Occupy replaces occupancy-default 3000 with a single remote Dockerfile `EXPOSE`. Live-verified on whoami (D155). |
 | D146 | Control-plane source inspect keeps `git` on the web image | Cloud #996 / `9d26c980` closed the live `missing-source-root` hole. Dockerfile/readiness must assert `git` so the next image prune cannot regress it. |
 | D147 | Occupancy login → code → deploy → preview is the accepted Railway loop | Live `appaloftdev` 2026-08-17: occupy whoami, deploy `dep_33iuz006q7fh`, public 200, `workspace --json` copies Preview + last deployment. |
 | D148 | Only replace occupancy-default 3000 | User-configured non-3000 ports stay. Re-detect on every resume is not required. |
+| D149 | Default TTY `code` must enter OpenCode inside my Sandbox | Live `appaloftdev code` on Hostinger occupancy fails `Sandbox provider does not support port publishing` before any Agent TUI. Railway `code` is the machine, not occupy-only. |
+| D150 | `--no-attach` stays occupy-only | Non-TTY / CI clients that cannot hold a session pass `--no-attach`. Do not invent a second default door. |
+| D151 | Registered-Server host-egress has no port publisher | Occupancy Docker provider sets `hostEgress: true` and `ports: Boolean(portPublisher)`. Hostinger generic-ssh has no Sandbox Gateway, so `capabilities.ports` is false. |
+| D152 | Unsupported `exposePort` falls back to in-Sandbox managed-terminal | `issueAttachAccess` still prefers a private signed gateway URL. When expose fails `sandbox_port_publishing_unsupported`, open the harness command inside the Sandbox (`opencode attach http://127.0.0.1:4096 --dir /workspace`) through the existing managed-terminal grant. Laptop never receives a raw `:4096` URL. |
+| D153 | Gateway-capable providers keep native-attach | Managed / internal-network Sandboxes with a port publisher still get the private `/s/...` URL and local `opencode attach <url>`. |
+| D154 | Do not publish host ports or SSH-forward 4096 | `hostEgress` cannot combine with an internal Docker network. Raw loopback attach stays `agent_workspace_native_attach_access_unsafe`. |
+| D155 | Leftover EXPOSE 3000→80 is closed on whoami | Live 2026-08-17: reset `res_am78rpisds2x` to 3000, `appaloftdev code --no-attach` upgraded `internalPort` to 80. Next actor-visible slice is attach, not another EXPOSE ticket. |
 
 ## Rejected
 
@@ -303,7 +310,38 @@ revision of R1.1. That Grill already shipped as Spec 138 / ADR-116, then owner
 review inverted the default door to occupancy (ADR-117/118, Spec 139). Re-running
 the same Grill now would silently invert settled D1/D7.
 
-### Live source-CLI evidence (`appaloftdev`, 2026-08-17)
+### Live source-CLI evidence (`appaloftdev`, 2026-08-17 later)
+
+- Production health SHA `134f5244` (Cloud #998 / public 1.8.8 `75bc24b4`).
+- Default occupy without `--new`:
+  `appaloftdev code --no-attach` →
+  `Remote · prj_42ymkffgt1eh · github.com/traefik/whoami@1ce75d0 · hostinger · my sandbox · sbx_abxtj4v8xoqt`,
+  `Preview · http://app-78rpisds2x.2.25.182.56.sslip.io`, exit 0.
+- Leftover EXPOSE: `resource configure-network --internal-port 3000` then
+  `appaloftdev code --no-attach` restored `networkProfile.internalPort` 80.
+- Bare `appaloftdev deploy` created `dep_rl8i5k9gdc8w`; Preview HTTP 200.
+- Occupancy OpenCode serve is healthy on container `:4096`; process environ has
+  `GH_TOKEN` / `GH_HOST` (`githubAccessDigest` = sha256("bound")). Interactive
+  `sandbox exec` shells do not inherit that token.
+- Default `appaloftdev code` (attach requested) and
+  `appaloftdev workspace attach sbx_abxtj4v8xoqt --no-attach` fail
+  `Sandbox provider does not support port publishing`.
+- `sandbox port list` is the same unsupported-provider conflict.
+- `workspace connect` opens a managed terminal, not OpenCode native attach.
+
+### 2026-08-17 Re-grill: registered-Server OpenCode attach
+
+Occupancy login→code→deploy→preview is accepted. The remaining Railway door is
+TTY `appaloft code` entering OpenCode on the occupied Sandbox. Host-egress
+registered Servers cannot satisfy AGENT-WS-ATTACH-016's gateway URL because
+they have no port publisher. The accepted repair is in-Sandbox attach through
+the existing managed-terminal grant, not a new tunnel product.
+
+Rejected for this slice: host `docker publish`, laptop `ssh -L 4096`, wrapping
+the Cloud sandbox-gateway around host-egress (constructor forbids
+`hostEgress + internalNetwork`), catalog create-PR write, team Connection.
+
+### Live source-CLI evidence (`appaloftdev`, 2026-08-17 earlier)
 
 - Production health SHA `9d26c980` after Cloud #996 (`git` in the web image).
 - Logged-in occupancy:
@@ -338,18 +376,16 @@ deploy / PR from that occupancy. Mixing the two doors was the R7 failure mode.
 
 ### Recommended next change
 
-Do not write a new R7 spec. Keep Spec 138 / ADR-116 as `--local`. Keep Spec 139 /
-ADR-118 as the default door. Next actor-visible slice is occupancy hardening:
+Keep Spec 138 / ADR-116 as `--local`. Keep Spec 139 / ADR-118 as the default
+door. Next actor-visible slice is registered-Server OpenCode attach:
 
-1. Occupy of a single-EXPOSE remote must replace leftover occupancy-default 3000
-   (already specified as WS-REMOTE-EXPOSE-054 / D52–D54). Production whoami
-   proved the detector exists but leftover Resources can stay 3000 until a human
-   `configure-network`.
-2. Control-plane source inspect must not depend on `git` being absent from the
-   web image. Cloud #996 closed the current production hole; add a durable
-   Dockerfile/readiness assertion so the next image prune cannot regress it.
+1. TTY `appaloft code` on a registered Server must attach OpenCode inside my
+   Sandbox (D149 / D152). `--no-attach` stays occupy-only.
+2. Unsupported port publishing is a stable `sandbox_port_publishing_unsupported`
+   conflict. Attach falls back to managed-terminal running the harness command
+   inside the Sandbox. Gateway providers keep native-attach.
 3. Later, not this slice: team Connection; managed default Server when no BYOS
-   exists; occupancy TUI as write-capable `ca`.
+   exists; occupancy TUI as write-capable `ca`; catalog create-PR write.
 
 ## Open Questions (do not block first Spec)
 

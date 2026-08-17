@@ -1423,7 +1423,38 @@ export class SandboxAgentDeliveryService {
       visibility: "private",
       expiresAt: input.expiresAt,
     });
-    if (access.isErr()) return err(access.error);
+    if (access.isErr()) {
+      if (access.error.details?.code === "sandbox_port_publishing_unsupported") {
+        const record = await this.dependencies.repository.findRuntime(
+          toRepositoryContext(context),
+          input.runtimeId,
+        );
+        const scope = record
+          ? profileRuntimeScope(context, record, `srun_terminal_${input.runtimeId}`)
+          : undefined;
+        if (!record || !scope?.runId || !this.dependencies.processCredentialGrants) {
+          return err(
+            domainError.conflict(
+              "Managed-terminal Agent credentials are unavailable for this Runtime",
+              {
+                code: "agent_workspace_managed_terminal_credentials_unavailable",
+              },
+            ),
+          );
+        }
+        return this.dependencies.processCredentialGrants.openTerminal(context, {
+          scope: { ...scope, runId: scope.runId },
+          bindings: record.credentialBindings ?? [],
+          process: {
+            argv: interaction.command,
+            initialRows: 24,
+            initialCols: 80,
+          },
+          expiresAt: input.expiresAt,
+        });
+      }
+      return err(access.error);
+    }
     let accessUrl: URL;
     try {
       accessUrl = new URL(access.value.url);
