@@ -81,6 +81,7 @@ import {
   scratchRemoteRejectedError,
 } from "../remote-code-session.js";
 import {
+  attachIssuedTerminalSession,
   attachTerminalSession,
   CliRuntime,
   optionalNumber,
@@ -321,6 +322,22 @@ function launchNativeWorkspaceClient(argv: readonly string[]): Promise<void> {
   });
 }
 
+function issuedManagedTerminalDescriptor(
+  attach: Extract<SandboxAgentAttachDescriptor, { transport: "managed-terminal" }>,
+): import("@appaloft/application").TerminalSessionDescriptor {
+  return {
+    sessionId: attach.sessionId,
+    scope: "sandbox",
+    sandboxId: attach.workspaceId,
+    transport: {
+      kind: "websocket",
+      path: attach.access.path,
+    },
+    providerKey: "managed-agent",
+    createdAt: new Date().toISOString(),
+  };
+}
+
 function completeWorkspaceOpen(
   result: WorkspaceOpenResult,
   attach: boolean,
@@ -336,13 +353,10 @@ function completeWorkspaceOpen(
     );
   }
   if (result.attach.transport === "managed-terminal") {
-    return attachTerminalSession(
-      ShowTerminalSessionQuery.create({ sessionId: result.attach.sessionId }),
-      {
-        initialRows: 24,
-        initialCols: 80,
-      },
-    );
+    return attachIssuedTerminalSession(issuedManagedTerminalDescriptor(result.attach), {
+      initialRows: 24,
+      initialCols: 80,
+    });
   }
   if (result.attach.clientHandoff === "display-only") {
     return print({
@@ -885,13 +899,10 @@ const nativeAttach = EffectCommand.make(
       }
       process.stdout.write(`${REMOTE_CODE_MODEL_HINT}\n`);
       if (access.transport === "managed-terminal") {
-        yield* attachTerminalSession(
-          ShowTerminalSessionQuery.create({ sessionId: access.sessionId }),
-          {
-            initialRows: 24,
-            initialCols: 80,
-          },
-        );
+        yield* attachIssuedTerminalSession(issuedManagedTerminalDescriptor(access), {
+          initialRows: 24,
+          initialCols: 80,
+        });
         return;
       }
       if (access.clientHandoff === "display-only") {

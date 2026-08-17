@@ -145,6 +145,7 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-ATTACH-136 | application | this slice | unsupported ports fall back to in-Sandbox managed-terminal | `packages/application/test/sandbox-agent-runtime.test.ts` |
 | WS-REMOTE-ATTACH-137 | application | this slice | signed gateway URL still wins | same runtime test |
 | WS-REMOTE-ATTACH-138 | application | this slice | raw loopback stays unsafe | same runtime test |
+| WS-REMOTE-ATTACH-139 | CLI | this slice | issued occupancy terminal attaches without `terminal-sessions.show` | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
 
 
 

@@ -386,6 +386,7 @@
 - [x] Unsupported port publishing is `sandbox_port_publishing_unsupported`
 - [x] Native-attach falls back to in-Sandbox managed-terminal
 - [x] Unit tests WS-REMOTE-ATTACH-136; 134/135/137/138 reuse existing attach tests pending live TTY
+- [x] CLI occupancy attach uses issued session without `terminal-sessions.show` (WS-REMOTE-ATTACH-139)
 - [ ] `appaloftdev code` on Hostinger occupancy attaches OpenCode
 
 ## Later

@@ -1554,27 +1554,20 @@ describe("Agent Workspace CLI", () => {
           attach: {
             transport: "managed-terminal",
             sessionId: "term_pi",
+            workspaceId: "sbx_pi",
+            runtimeId: "sar_pi",
+            processId: "spr_pi",
+            access: {
+              kind: "websocket",
+              path: "/api/terminal-sessions/term_pi/attach",
+              expiresAt: "2026-07-28T01:00:00.000Z",
+            },
           },
         } as T),
     } as unknown as CommandBus;
     const queryBus = {
       execute: async <T>(_context: unknown, query: Query<T>) => {
-        expect(query).toBeInstanceOf(ShowTerminalSessionQuery);
-        return ok({
-          schemaVersion: "terminal-sessions.show/v1",
-          item: {
-            sessionId: "term_pi",
-            scope: "sandbox",
-            sandboxId: "sbx_pi",
-            transport: {
-              kind: "websocket",
-              path: "/api/terminal-sessions/term_pi/attach",
-            },
-            providerKey: "managed-agent",
-            createdAt: "2026-07-28T00:00:00.000Z",
-            status: "active",
-          },
-        } as T);
+        throw new Error(`occupancy attach must not re-query ${query.constructor.name}`);
       },
     } as unknown as QueryBus;
     const { createCliProgram } = await import("../src");
@@ -2384,5 +2377,85 @@ describe("Agent Workspace CLI", () => {
     expect(launched).toEqual([
       ["opencode", "attach", "https://attach.example.test/capability", "--dir", "/workspace"],
     ]);
+  });
+
+  test("[WS-REMOTE-ATTACH-136] occupancy attach uses the issued managed-terminal session without a show query", async () => {
+    const attached: string[] = [];
+    const output: string[] = [];
+    const frames: TerminalSessionFrame[] = [
+      { kind: "ready", sessionId: "term_occupancy" },
+      { kind: "output", stream: "stdout", data: "OpenCode ready\n" },
+      { kind: "closed", reason: "source-ended", exitCode: 0 },
+    ];
+    const session: TerminalSession = {
+      write: async () => {},
+      resize: async () => {},
+      detach: async () => {},
+      close: async () => {},
+      async *[Symbol.asyncIterator]() {
+        for (const frame of frames) yield frame;
+      },
+    };
+    const { createCliProgram } = await import("../src");
+    const { IssueSandboxAgentAttachAccessCommand } = await import("@appaloft/application");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          expect(command).toBeInstanceOf(IssueSandboxAgentAttachAccessCommand);
+          return ok({
+            workspaceId: "sbx_occupancy",
+            runtimeId: "sar_occupancy",
+            transport: "managed-terminal",
+            sessionId: "term_occupancy",
+            processId: "spr_occupancy",
+            access: {
+              kind: "websocket",
+              path: "/api/terminal-sessions/term_occupancy/attach",
+              expiresAt: "2026-08-17T09:00:00.000Z",
+            },
+          } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: {
+        execute: async <T>(_context: unknown, query: Query<T>) => {
+          if (query.constructor.name.includes("ListSandboxAgentRuntimes")) {
+            return ok({
+              items: [
+                {
+                  runtimeId: "sar_occupancy",
+                  interaction: { transport: "native-attach", serverPort: 4096 },
+                },
+              ],
+            } as T);
+          }
+          throw new Error(`occupancy attach must not re-query ${query.constructor.name}`);
+        },
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_occupancy_direct_terminal" }),
+      },
+      terminalSessionGateway: {
+        attach: (sessionId) => {
+          attached.push(sessionId);
+          return ok(session);
+        },
+      },
+      terminalIO: {
+        stdin: {
+          isTTY: false,
+          on: () => {},
+          removeListener: () => {},
+        },
+        stdout: { write: (data) => output.push(String(data)) },
+        stderr: { write: () => {} },
+      },
+    });
+
+    await program.parseAsync(["node", "appaloft", "workspace", "attach", "sbx_occupancy"]);
+    expect(attached).toEqual(["term_occupancy"]);
+    expect(output.join("")).toContain("OpenCode ready");
   });
 });
