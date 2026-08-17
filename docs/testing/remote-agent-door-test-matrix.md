@@ -22,7 +22,7 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-DOCS-013 | help | this slice | occupy default + `--local` |
 | WS-REMOTE-TARGET-015 | application | this slice | `targetServerId` is reserved |
 | WS-REMOTE-NO-ATTACH-016 | CLI + `appaloftdev` | this slice | occupy without attach; sandbox list non-empty |
-| WS-REMOTE-SKILL-017 | CLI / runtime | automated | occupancy OpenCode serve config includes workspace skill paths; `appaloft-remote` declares optional `appaloft-tools`; native attach uses `mcp remote-stdio` against the selected control plane without wrapping `APPALOFT_CONTROL_PLANE_MODE=none`, and isolates `XDG_CONFIG_HOME` from a broken host `opencode.json` | `packages/adapters/cli/test/local-scratch-session.test.ts` |
+| WS-REMOTE-SKILL-017 | CLI / runtime | automated | occupancy OpenCode serve config includes workspace skill paths; `appaloft-remote` declares optional `appaloft-tools`; native attach uses `mcp remote-stdio` against the selected control plane without wrapping `APPALOFT_CONTROL_PLANE_MODE=none`, and isolates `XDG_CONFIG_HOME` from a broken host `opencode.json`; omitted `--profile` uses the active product-session profile instead of a stale `mcp` bearer | `packages/adapters/cli/test/local-scratch-session.test.ts`; `apps/shell/test/run-control-plane-cli.test.ts` |
 
 | WS-REMOTE-RESUME-SERVE-018 | application | this slice | resume `code --no-attach` calls `ensureRuntime` so OpenCode serve is healthy |
 | WS-REMOTE-RESUME-EGRESS-020 | application | automated | ready allowlist occupancy resume reapplies stored egress; gateway failure fail-closes | `packages/application/test/execution-sandbox-operations.test.ts` |
