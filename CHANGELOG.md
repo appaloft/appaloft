@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.11](https://github.com/appaloft/appaloft/compare/v1.8.10...v1.8.11) (2026-08-17)
+
+
+### Bug Fixes
+
+* **workspace:** quit occupancy TUI while detail is loading ([#1267](https://github.com/appaloft/appaloft/issues/1267)) ([3a8abcf](https://github.com/appaloft/appaloft/commit/3a8abcfe02f06fa3b685f17abefa731541f7d441)), closes [#1266](https://github.com/appaloft/appaloft/issues/1266)
+
 ## [1.8.10](https://github.com/appaloft/appaloft/compare/v1.8.9...v1.8.10) (2026-08-17)
 
 

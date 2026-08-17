@@ -1,6 +1,6 @@
 [package]
 name = "appaloft-desktop"
-version = "1.8.10"
+version = "1.8.11"
 description = "Appaloft Tauri desktop shell"
 edition = "2021"
 
