@@ -208,9 +208,11 @@ export function createOpenCodeSandboxConfig(
                 url: mcpCapability.url,
                 enabled: true,
                 oauth: false,
-                headers: {
-                  Authorization: `Bearer ${mcpCapability.accessToken}`,
-                },
+                headers: mcpCapability.cookie
+                  ? { Cookie: mcpCapability.cookie }
+                  : {
+                      Authorization: `Bearer ${mcpCapability.accessToken}`,
+                    },
               },
             ]),
           ),

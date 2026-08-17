@@ -95,4 +95,20 @@ describe("Remote MCP Sandbox Agent configuration", () => {
     });
     expect(JSON.stringify(config)).not.toContain("projects.delete");
   });
+
+  test("[WS-REMOTE-SKILL-017] occupancy OpenCode MCP uses Cookie for product-session", () => {
+    const config = JSON.parse(
+      createOpenCodeSandboxConfig(modelAccess, [
+        {
+          ...mcpAccess,
+          cookie: "better-auth.session_token=occupancy-session",
+        },
+      ]),
+    ) as { mcp: Record<string, { headers?: Record<string, string> }> };
+    expect(config.mcp["appaloft-tools"]?.headers).toEqual({
+      Cookie: "better-auth.session_token=occupancy-session",
+    });
+    expect(JSON.stringify(config)).not.toContain("mcp-token");
+  });
+
 });

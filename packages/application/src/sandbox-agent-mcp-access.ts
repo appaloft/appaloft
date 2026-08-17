@@ -9,6 +9,7 @@ export interface SandboxAgentMcpAccessDescriptor {
   accessToken: string;
   expiresAt: string;
   effectiveTools: string[];
+  cookie?: string;
 }
 
 export interface SandboxAgentMcpAccessIssueInput {
@@ -99,6 +100,10 @@ export function assertSandboxAgentMcpAccessDescriptor(
     !descriptor.accessToken ||
     descriptor.accessToken.length > 4_096 ||
     /[\0\r\n]/u.test(descriptor.accessToken) ||
+    (descriptor.cookie !== undefined &&
+      (descriptor.cookie.length === 0 ||
+        descriptor.cookie.length > 4_096 ||
+        /[\0\r\n]/u.test(descriptor.cookie))) ||
     !Number.isFinite(new Date(descriptor.expiresAt).getTime()) ||
     descriptor.effectiveTools.some(
       (tool, index) =>
