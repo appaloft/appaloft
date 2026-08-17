@@ -878,6 +878,8 @@ export const publicDocsHelpTopics = {
       "docs/queries/deployments.proof.md",
       "docs/testing/deployment-proof-test-matrix.md",
       "docs/specs/103-deployment-proof/spec.md",
+      "docs/specs/140-served-route-terminal-verification/spec.md",
+      "docs/testing/served-route-terminal-verification-test-matrix.md",
       "docs/decisions/ADR-087-deployment-proof-boundary.md",
     ],
   },
@@ -1225,6 +1227,39 @@ export const publicDocsHelpTopics = {
       "docs/testing/source-binding-auto-deploy-test-matrix.md",
     ],
     webSurfaces: ["apps/web Resource detail auto-deploy settings"],
+  },
+  "source.auto-deploy-required-checks": {
+    id: "source.auto-deploy-required-checks",
+    title: "GitHub auto-deploy required checks",
+    description:
+      "How exact GitHub check-run names gate one pushed revision before ordinary deployment dispatch.",
+    page: {
+      "zh-CN": "deliver/sources",
+      "en-US": "en/deliver/sources",
+    },
+    anchor: "source-auto-deploy-required-checks",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "repository-config"],
+    relatedOperation: "resources.configure-auto-deploy",
+    aliases: [
+      "required checks",
+      "GitHub checks",
+      "check run gate",
+      "auto deploy gate",
+      "必需检查",
+      "检查闸门",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-121-source-event-required-check-gate.md",
+      "docs/specs/141-github-check-gated-auto-deploy/spec.md",
+      "docs/testing/github-check-gated-auto-deploy-test-matrix.md",
+      "docs/commands/resources.configure-auto-deploy.md",
+      "docs/commands/source-events.ingest.md",
+    ],
+    webSurfaces: ["apps/web Resource detail auto-deploy required checks field"],
   },
   "source.auto-deploy-signatures": {
     id: "source.auto-deploy-signatures",
@@ -4380,6 +4415,12 @@ export const publicDocsOperationCoverage = [
     operationKey: "source-events.ingest",
     status: "documented",
     topicId: "source.auto-deploy-signatures",
+  },
+  {
+    operationKey: "source-events.complete-check",
+    status: "documented",
+    topicId: "source.auto-deploy-required-checks",
+    note: "Internal verified-provider handoff; users configure and diagnose the gate through Resource and source-event surfaces.",
   },
   {
     operationKey: "source-events.list",

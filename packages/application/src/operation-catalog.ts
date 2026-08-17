@@ -320,6 +320,7 @@ import { showScheduledRuntimePrunePolicyQueryInputSchema } from "./operations/se
 import { showServerQueryInputSchema } from "./operations/servers/show-server.query";
 import { showSshCredentialQueryInputSchema } from "./operations/servers/show-ssh-credential.query";
 import { testServerConnectivityCommandInputSchema } from "./operations/servers/test-server-connectivity.command";
+import { completeSourceEventCheckCommandInputSchema } from "./operations/source-events/complete-source-event-check.command";
 import { ingestSourceEventCommandInputSchema } from "./operations/source-events/ingest-source-event.command";
 import { listSourceEventsQueryInputSchema } from "./operations/source-events/list-source-events.query";
 import { pruneSourceEventsCommandInputSchema } from "./operations/source-events/prune-source-events.command";
@@ -4337,6 +4338,17 @@ export const operationCatalog = [
       cli: "appaloft provider-job-log prune --before <iso>",
       orpc: { method: "POST", path: "/api/provider-job-logs/prune" },
     },
+  },
+  {
+    key: "source-events.complete-check",
+    kind: "command",
+    domain: "source-events",
+    messageName: "CompleteSourceEventCheckCommand",
+    handlerName: "CompleteSourceEventCheckCommandHandler",
+    serviceName: "IngestSourceEventUseCase",
+    inputSchema: completeSourceEventCheckCommandInputSchema,
+    serviceToken: tokens.ingestSourceEventUseCase,
+    transports: {},
   },
   {
     key: "source-events.ingest",

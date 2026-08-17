@@ -167,6 +167,9 @@ function autoDeployPolicyFromState(
     ...(policy.excludePaths
       ? { excludePaths: policy.excludePaths.map((pattern) => pattern.value) }
       : {}),
+    ...(policy.requiredChecks
+      ? { requiredChecks: policy.requiredChecks.map((check) => check.value) }
+      : {}),
     updatedAt: policy.updatedAt.value,
   };
 }

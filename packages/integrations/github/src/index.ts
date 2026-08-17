@@ -34,6 +34,7 @@ import {
   type SourceEventChangedPathResolution,
   type SourceEventChangedPathResolver,
   type SourceEventChangedPathResolverInput,
+  type SourceEventCheckConclusion,
   type VerifiedSourceEventInput,
   type WorkspaceSourceCommand,
 } from "@appaloft/application";
@@ -883,6 +884,41 @@ export class GitHubWebhookSourceEventVerifier implements GitHubSourceEventWebhoo
 
     if (input.eventName === "ping") {
       return ok({ outcome: "noop" });
+    }
+
+    if (input.eventName === "check_run") {
+      if (!input.deliveryId) {
+        return err(
+          domainError.validation("GitHub check run delivery id is required", {
+            phase: "source-event-normalization",
+            sourceKind: "github",
+            eventKind: input.eventName,
+          }),
+        );
+      }
+      const payload = parseGitHubCompletedCheckPayload(input.rawBody, input.deliveryId);
+      if (payload.isErr()) return err(payload.error);
+      return ok({
+        outcome: "completed-check",
+        completedCheck: {
+          sourceKind: "github",
+          sourceIdentity: {
+            locator: payload.value.locator,
+            providerRepositoryId: payload.value.providerRepositoryId,
+            repositoryFullName: payload.value.repositoryFullName,
+          },
+          revision: payload.value.revision,
+          deliveryId: input.deliveryId,
+          check: {
+            name: payload.value.name,
+            conclusion: payload.value.conclusion,
+            checkRunId: payload.value.checkRunId,
+            completedAt: payload.value.completedAt,
+          },
+          verification: { status: "verified", method: "provider-signature" },
+          ...(input.receivedAt ? { receivedAt: input.receivedAt } : {}),
+        },
+      });
     }
 
     if (input.eventName !== "push") {
@@ -2879,6 +2915,17 @@ interface GitHubPushPayloadFacts {
   providerConnectionId?: string;
 }
 
+interface GitHubCompletedCheckPayloadFacts {
+  locator: string;
+  providerRepositoryId: string;
+  repositoryFullName: string;
+  revision: string;
+  name: string;
+  conclusion: SourceEventCheckConclusion;
+  checkRunId: string;
+  completedAt: string;
+}
+
 interface GitHubPullRequestPayloadFacts {
   action: GitHubPreviewPullRequestAction;
   repositoryFullName: string;
@@ -2966,6 +3013,94 @@ function parseGitHubPushPayload(
     forced,
     ...(providerConnectionId ? { providerConnectionId } : {}),
   });
+}
+
+function parseGitHubCompletedCheckPayload(
+  rawBody: string,
+  deliveryId: string,
+): Result<GitHubCompletedCheckPayloadFacts> {
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(rawBody);
+  } catch {
+    return err(
+      domainError.validation("GitHub check run body must be valid JSON", {
+        phase: "source-event-normalization",
+        sourceKind: "github",
+        eventKind: "check_run",
+        deliveryId,
+      }),
+    );
+  }
+
+  const payload = objectRecord(parsedJson);
+  const checkRun = payload ? objectRecord(payload.check_run) : null;
+  const repository = payload ? objectRecord(payload.repository) : null;
+  const action = payload ? nonEmptyString(payload.action) : null;
+  const repositoryId = repository?.id;
+  const providerRepositoryId =
+    typeof repositoryId === "number" || typeof repositoryId === "string"
+      ? String(repositoryId)
+      : null;
+  const repositoryFullName = repository ? nonEmptyString(repository.full_name) : null;
+  const locator =
+    (repository ? nonEmptyString(repository.clone_url) : null) ??
+    (repository ? nonEmptyString(repository.html_url) : null);
+  const revision = checkRun ? nonEmptyString(checkRun.head_sha) : null;
+  const name = checkRun ? nonEmptyString(checkRun.name) : null;
+  const conclusion = checkRun ? githubCheckConclusion(checkRun.conclusion) : null;
+  const completedAt = checkRun ? nonEmptyString(checkRun.completed_at) : null;
+  const checkRunIdValue = checkRun?.id;
+  const checkRunId =
+    typeof checkRunIdValue === "number" || typeof checkRunIdValue === "string"
+      ? String(checkRunIdValue)
+      : null;
+  if (
+    action !== "completed" ||
+    !providerRepositoryId ||
+    !repositoryFullName ||
+    !locator ||
+    !revision ||
+    !name ||
+    !conclusion ||
+    !completedAt ||
+    !Number.isFinite(Date.parse(completedAt)) ||
+    !checkRunId
+  ) {
+    return err(
+      domainError.validation("GitHub completed check run body is invalid", {
+        phase: "source-event-normalization",
+        sourceKind: "github",
+        eventKind: "check_run",
+        deliveryId,
+      }),
+    );
+  }
+
+  return ok({
+    locator,
+    providerRepositoryId,
+    repositoryFullName,
+    revision,
+    name,
+    conclusion,
+    checkRunId,
+    completedAt,
+  });
+}
+
+function githubCheckConclusion(value: unknown): SourceEventCheckConclusion | null {
+  return value === "success" ||
+    value === "neutral" ||
+    value === "skipped" ||
+    value === "failure" ||
+    value === "cancelled" ||
+    value === "timed_out" ||
+    value === "action_required" ||
+    value === "stale" ||
+    value === "startup_failure"
+    ? value
+    : null;
 }
 
 function isZeroGitSha(value: string): boolean {

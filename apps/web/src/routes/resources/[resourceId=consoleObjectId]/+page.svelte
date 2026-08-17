@@ -1390,6 +1390,7 @@
   let autoDeployRefs = $state("");
   let autoDeployIncludePaths = $state("");
   let autoDeployExcludePaths = $state("");
+  let autoDeployRequiredChecks = $state("");
   let autoDeployEventKind = $state<AutoDeployEventKind>("push");
   let autoDeployGenericWebhookSecretRef = $state("");
   let autoDeployDedupeWindowSeconds = $state("");
@@ -4707,6 +4708,7 @@
       "main";
     autoDeployIncludePaths = autoDeployPolicy?.includePaths?.join("\n") ?? "";
     autoDeployExcludePaths = autoDeployPolicy?.excludePaths?.join("\n") ?? "";
+    autoDeployRequiredChecks = autoDeployPolicy?.requiredChecks?.join("\n") ?? "";
     autoDeployEventKind = autoDeployPolicy?.eventKinds[0] ?? "push";
     autoDeployGenericWebhookSecretRef = autoDeployPolicy?.genericWebhookSecretRef ?? "";
     autoDeployDedupeWindowSeconds = autoDeployPolicy?.dedupeWindowSeconds
@@ -5292,6 +5294,13 @@
       .filter((pattern) => pattern.length > 0);
   }
 
+  function parseAutoDeployRequiredChecks(value: string): string[] {
+    return value
+      .split(/\r?\n/)
+      .map((name) => name.trim())
+      .filter((name) => name.length > 0);
+  }
+
   function refreshRuntimeMonitor(): void {
     void resourceRuntimeUsageQuery.refetch();
     void resourceRuntimeMonitoringSamplesQuery.refetch();
@@ -5568,6 +5577,9 @@
         : {}),
       ...(autoDeployTriggerKind === "git-push" && autoDeployExcludePaths.trim()
         ? { excludePaths: parseAutoDeployPatterns(autoDeployExcludePaths) }
+        : {}),
+      ...(autoDeployTriggerKind === "git-push" && autoDeployRequiredChecks.trim()
+        ? { requiredChecks: parseAutoDeployRequiredChecks(autoDeployRequiredChecks) }
         : {}),
       ...(autoDeployTriggerKind === "generic-signed-webhook" && genericWebhookSecretRef
         ? { genericWebhookSecretRef }
@@ -6847,6 +6859,8 @@
         return $t(i18nKeys.console.resources.sourceEventStatusAccepted);
       case "blocked":
         return $t(i18nKeys.common.status.blocked);
+      case "checks-blocked":
+        return $t(i18nKeys.console.resources.sourceEventStatusChecksBlocked);
       case "deduped":
         return $t(i18nKeys.console.resources.sourceEventStatusDeduped);
       case "dispatched":
@@ -6855,6 +6869,10 @@
         return $t(i18nKeys.common.status.failed);
       case "ignored":
         return $t(i18nKeys.console.resources.sourceEventStatusIgnored);
+      case "superseded":
+        return $t(i18nKeys.console.resources.sourceEventStatusSuperseded);
+      case "waiting-checks":
+        return $t(i18nKeys.console.resources.sourceEventStatusWaitingChecks);
     }
   }
 
@@ -6866,11 +6884,14 @@
         return "default";
       case "accepted":
       case "deduped":
+      case "waiting-checks":
         return "secondary";
       case "blocked":
+      case "checks-blocked":
       case "failed":
         return "destructive";
       case "ignored":
+      case "superseded":
         return "outline";
     }
   }
@@ -11942,6 +11963,19 @@
                       />
                     </label>
                   </div>
+                  <label class="space-y-1.5 text-sm font-medium" for="resource-auto-deploy-required-checks">
+                    <span>{$t(i18nKeys.console.resources.autoDeployRequiredChecks)}</span>
+                    <p class="font-normal text-muted-foreground">
+                      {$t(i18nKeys.console.resources.autoDeployRequiredChecksDescription)}
+                    </p>
+                    <Textarea
+                      id="resource-auto-deploy-required-checks"
+                      bind:value={autoDeployRequiredChecks}
+                      class="min-h-20 font-mono text-xs"
+                      spellcheck={false}
+                      placeholder={$t(i18nKeys.console.resources.autoDeployRequiredChecksPlaceholder)}
+                    />
+                  </label>
                 </div>
               {:else}
                 <label class="space-y-1.5 text-sm font-medium" for="resource-auto-deploy-webhook-secret-ref">

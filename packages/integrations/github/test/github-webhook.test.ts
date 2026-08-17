@@ -71,6 +71,59 @@ function githubPullRequestPayload(action = "synchronize") {
 }
 
 describe("GitHub source event webhook verifier", () => {
+  test("[GH-CHECK-GATE-004] verifies and normalizes a completed GitHub check run", async () => {
+    const verifier = createGitHubSourceEventWebhookVerifier();
+    const rawBody = JSON.stringify({
+      action: "completed",
+      check_run: {
+        id: 7788,
+        name: "build",
+        head_sha: "f1e2d3c4",
+        conclusion: "success",
+        completed_at: "2026-01-01T00:03:00Z",
+      },
+      repository: {
+        id: 123456,
+        full_name: "appaloft/demo",
+        clone_url: "https://github.com/appaloft/demo.git",
+        html_url: "https://github.com/appaloft/demo",
+      },
+    });
+    const signature = await hmacSha256Hex("correct-secret", rawBody);
+
+    const result = await verifier.verify(
+      createExecutionContext({ entrypoint: "http", requestId: "req_github_check_run_test" }),
+      {
+        eventName: "check_run",
+        deliveryId: "delivery_check_1",
+        rawBody,
+        signature: `sha256=${signature}`,
+        secretValue: "correct-secret",
+      },
+    );
+
+    expect(result._unsafeUnwrap()).toEqual({
+      outcome: "completed-check",
+      completedCheck: {
+        sourceKind: "github",
+        sourceIdentity: {
+          locator: "https://github.com/appaloft/demo.git",
+          providerRepositoryId: "123456",
+          repositoryFullName: "appaloft/demo",
+        },
+        revision: "f1e2d3c4",
+        deliveryId: "delivery_check_1",
+        check: {
+          name: "build",
+          conclusion: "success",
+          checkRunId: "7788",
+          completedAt: "2026-01-01T00:03:00Z",
+        },
+        verification: { status: "verified", method: "provider-signature" },
+      },
+    });
+  });
+
   test("[SRC-AUTO-EVENT-007] verifies GitHub push signatures and normalizes safe source event facts", async () => {
     const verifier = createGitHubSourceEventWebhookVerifier();
     const rawBody = JSON.stringify(githubPushPayload());

@@ -2780,6 +2780,16 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "requiredChecks": {
+          "minItems": 1,
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
         }
       },
       "required": ["enabled", "trigger", "events"],

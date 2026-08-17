@@ -3197,6 +3197,10 @@ export const enUS = {
       autoDeployExcludePathsPlaceholder: "**/*.md\ndocs/**",
       autoDeployPathPolicyDescription:
         "Optional repository-root globs. Appaloft evaluates the final before..after diff, then applies includes before excludes.",
+      autoDeployRequiredChecks: "Required GitHub checks",
+      autoDeployRequiredChecksDescription:
+        "Optional exact check-run names. The pushed revision deploys only after every named check completes successfully, neutrally, or skipped.",
+      autoDeployRequiredChecksPlaceholder: "build\nlint",
       autoDeployRefs: "Refs",
       autoDeployRefsPlaceholder: "main, release",
       autoDeploySaveFailed: "Auto-deploy policy was not saved",
@@ -3252,6 +3256,9 @@ export const enUS = {
       sourceEventsTab: "Source events",
       sourceEventsTitle: "Source events",
       sourceEventStatusAccepted: "Accepted",
+      sourceEventStatusChecksBlocked: "Checks blocked",
+      sourceEventStatusSuperseded: "Superseded",
+      sourceEventStatusWaitingChecks: "Waiting for checks",
       sourceEventStatusDeduped: "Deduped",
       sourceEventStatusDispatched: "Dispatched",
       sourceEventStatusIgnored: "Ignored",

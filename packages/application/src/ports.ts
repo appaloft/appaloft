@@ -3517,6 +3517,7 @@ export interface ResourceDetailAutoDeployPolicy {
   dedupeWindowSeconds?: number;
   includePaths?: string[];
   excludePaths?: string[];
+  requiredChecks?: string[];
   updatedAt: string;
 }
 
@@ -7000,6 +7001,9 @@ export type SourceEventStatus =
   | "deduped"
   | "ignored"
   | "blocked"
+  | "waiting-checks"
+  | "checks-blocked"
+  | "superseded"
   | "dispatched"
   | "failed";
 export type SourceEventDedupeStatus = "new" | "duplicate";
@@ -7014,6 +7018,10 @@ export type SourceEventIgnoredReason =
   | "policy-blocked";
 export type SourceEventPolicyResultStatus =
   | "matched"
+  | "waiting-checks"
+  | "checks-blocked"
+  | "dispatching"
+  | "superseded"
   | "ignored"
   | "blocked"
   | "dispatch-failed"
@@ -7025,7 +7033,28 @@ export type SourceEventPolicyResultReason =
   | "ref-deleted"
   | "policy-disabled"
   | "policy-blocked"
+  | "required-checks-pending"
+  | "required-checks-failed"
+  | "superseded-by-newer-revision"
   | "dispatch-failed";
+
+export type SourceEventCheckConclusion =
+  | "success"
+  | "neutral"
+  | "skipped"
+  | "failure"
+  | "cancelled"
+  | "timed_out"
+  | "action_required"
+  | "stale"
+  | "startup_failure";
+
+export interface SourceEventCheckObservation {
+  name: string;
+  conclusion: SourceEventCheckConclusion;
+  checkRunId: string;
+  completedAt: string;
+}
 
 export interface SourceEventIdentity {
   locator: string;
@@ -7047,6 +7076,9 @@ export interface SourceEventPolicyResult {
   errorCode?: string;
   matchedPaths?: string[];
   matchedPathCount?: number;
+  requiredChecks?: string[];
+  observedChecks?: SourceEventCheckObservation[];
+  supersededBySourceEventId?: string;
 }
 
 export type SourceEventRefChangeKind = "created" | "updated" | "deleted";
@@ -7602,6 +7634,14 @@ export interface IngestSourceEventResult {
   dedupeOfSourceEventId?: string;
 }
 
+export interface CompleteSourceEventCheckResult {
+  deliveryId: string;
+  status: "accepted" | "deduped";
+  sourceEventIds: string[];
+  dispatchedResourceIds: string[];
+  createdDeploymentIds: string[];
+}
+
 export interface ReplaySourceEventResult {
   schemaVersion: "source-events.replay/v1";
   sourceEventId: string;
@@ -7655,6 +7695,19 @@ export interface VerifiedSourceEventInput {
     status: "verified";
     method: SourceEventVerificationMethod;
     keyVersion?: string;
+  };
+  receivedAt?: string;
+}
+
+export interface VerifiedSourceEventCheckInput {
+  sourceKind: "github";
+  sourceIdentity: SourceEventIdentity;
+  revision: string;
+  deliveryId: string;
+  check: SourceEventCheckObservation;
+  verification: {
+    status: "verified";
+    method: "provider-signature";
   };
   receivedAt?: string;
 }
@@ -8878,6 +8931,10 @@ export type GitHubSourceEventWebhookVerificationResult =
       sourceEvent: VerifiedSourceEventInput;
     }
   | {
+      outcome: "completed-check";
+      completedCheck: VerifiedSourceEventCheckInput;
+    }
+  | {
       outcome: "noop";
     };
 
@@ -9079,6 +9136,7 @@ export interface SourceEventPolicyCandidate {
   eventKinds: AutoDeploySourceEventKind[];
   includePaths?: string[];
   excludePaths?: string[];
+  requiredChecks?: string[];
   sourceBinding: SourceEventIdentity;
   blockedReason?: "source-binding-changed";
 }
@@ -9138,6 +9196,39 @@ export interface SourceEventRecorder {
     context: RepositoryContext,
     input: SourceEventOutcomeUpdate,
   ): Promise<SourceEventRecord>;
+  supersedeOlderPending(
+    context: RepositoryContext,
+    input: {
+      sourceEventId: string;
+      sourceKind: SourceEventSourceKind;
+      sourceIdentity: SourceEventIdentity;
+      ref: string;
+      receivedAt: string;
+      matchedResourceIds: string[];
+    },
+  ): Promise<void>;
+  applyCompletedCheck(
+    context: RepositoryContext,
+    input: {
+      deliveryId: string;
+      sourceKind: "github";
+      sourceIdentity: SourceEventIdentity;
+      revision: string;
+      observation: SourceEventCheckObservation;
+      receivedAt: string;
+    },
+    evolve: (record: SourceEventRecord) => SourceEventCompletedCheckTransition,
+  ): Promise<SourceEventCompletedCheckApplyResult>;
+}
+
+export interface SourceEventCompletedCheckTransition {
+  record: SourceEventRecord;
+  claimedResourceIds: string[];
+}
+
+export interface SourceEventCompletedCheckApplyResult {
+  duplicate: boolean;
+  transitions: SourceEventCompletedCheckTransition[];
 }
 
 export interface SourceEventReadModel {

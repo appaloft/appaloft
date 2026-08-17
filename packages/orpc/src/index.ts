@@ -77,6 +77,7 @@ import {
   type CommandBus,
   CompileAgentWorkspaceProfileQuery,
   CompleteConnectionCallbackCommand,
+  CompleteSourceEventCheckCommand,
   ConfigureAgentWorkspaceProfileCredentialConnectionsCommand,
   ConfigureAgentWorkspaceProfileMcpConnectionsCommand,
   ConfigureAuditEventLegalHoldCommand,
@@ -10256,6 +10257,18 @@ async function handleGitHubSourceEventRoute(input: {
 
   if (verified.value.outcome === "noop") {
     return new Response(null, { status: 204 });
+  }
+
+  if (verified.value.outcome === "completed-check") {
+    const command = CompleteSourceEventCheckCommand.create(verified.value.completedCheck);
+    if (command.isErr()) {
+      return domainErrorHttpResponse(command.error, executionContext);
+    }
+    const result = await context.commandBus.execute(executionContext, command.value);
+    if (result.isErr()) {
+      return domainErrorHttpResponse(result.error, executionContext);
+    }
+    return Response.json(result.value);
   }
 
   const command = IngestSourceEventCommand.create(verified.value.sourceEvent);

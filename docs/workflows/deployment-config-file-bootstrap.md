@@ -444,6 +444,9 @@ autoDeploy:
     - apps/api/**
   excludePaths:
     - "**/*.md"
+  requiredChecks:
+    - build
+    - lint
   dedupeWindowSeconds: 300
 ```
 
@@ -454,6 +457,11 @@ target/server identity. Path policies use repository-root-relative safe globs an
 provider `before..after` diff with include-before-exclude semantics. Omitting both fields preserves
 ref-only behavior. Generic signed webhook policy remains an explicit operation outside this
 MVP because it needs secret-reference custody and endpoint setup.
+
+`requiredChecks` contains exact, case-sensitive GitHub check-run names. It is valid only for
+`git-push`; the exact pushed revision waits until every named check completes with `success`,
+`neutral`, or `skipped`. The repository config does not mirror branch protection and contains no
+provider token, check output, or raw webhook material.
 
 `preview.pullRequest.policy` uses product-grade preview policy language:
 

@@ -4,7 +4,7 @@ description: "配置 Git 仓库、镜像或其它来源作为部署输入。"
 docType: "task"
 localeState:
   zh-CN: complete
-  en-US: needs-update
+  en-US: complete
 searchAliases:
   - "source"
   - "repository"
@@ -13,6 +13,8 @@ searchAliases:
   - "zero configuration"
   - "来源"
   - "零配置"
+  - "required checks"
+  - "GitHub checks"
 relatedOperations:
   - "deployments.create"
   - "resources.configure-source"
@@ -74,6 +76,58 @@ sidebar:
 | 通用 workload 归档包（`.zip` 等）依赖自动检测 | **不支持** |
 
 Appaloft 在无法安全生成完整计划时会 **fail closed**（停止并说明原因），不会猜测——这是设计选择，不是缺陷。
+
+## GitHub 自动部署检查闸门 <a id="source-auto-deploy-required-checks" />
+
+Resource 的 GitHub 自动部署策略可以声明一组精确、区分大小写的 `requiredChecks`。Appaloft
+收到 push 后会把对应提交标记为“等待检查”，只有每个名称都收到该提交 SHA 的已完成
+`check_run`，且结论为 `success`、`neutral` 或 `skipped`，才创建普通部署。
+
+```yaml
+autoDeploy:
+  enabled: true
+  trigger: git-push
+  refs:
+    - main
+  events:
+    - push
+  requiredChecks:
+    - build
+    - lint
+```
+
+也可以通过 CLI 或共享 API 配置同一策略：
+
+```bash
+appaloft resource auto-deploy res_web \
+  --mode enable \
+  --ref main \
+  --required-check build \
+  --required-check lint
+```
+
+```json
+{
+  "resourceId": "res_web",
+  "mode": "enable",
+  "policy": {
+    "triggerKind": "git-push",
+    "refs": ["main"],
+    "eventKinds": ["push"],
+    "requiredChecks": ["build", "lint"]
+  }
+}
+```
+
+这不是 branch protection 的镜像：名称必须显式写入 Appaloft 策略。GitHub App 需要 Checks
+读取权限并订阅 `check_run` webhook。失败、取消、超时等结论会显示为“检查未通过”；同名检查
+后续成功重跑可以解除阻塞。相同 Resource/ref 的新 push 会取代旧的等待项，旧 SHA 的迟到事件
+不会触发部署。
+
+用 `appaloft source-event list --resource res_web` 和
+`appaloft source-event show <sourceEventId> --resource res_web` 检查 `waiting-checks`、
+`checks-blocked`、`superseded` 或 `dispatched` 状态。要停用闸门，替换策略并移除
+`requiredChecks`，然后推送新提交；Appaloft 不会用计时器自动放行旧提交。
 
 ## CLI 操作步骤
 

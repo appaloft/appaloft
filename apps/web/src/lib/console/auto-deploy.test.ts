@@ -124,10 +124,12 @@ describe("resource auto-deploy console settings", () => {
     expect(source).toContain("autoDeployGenericWebhookSecretRef");
     expect(source).toContain("autoDeployIncludePaths");
     expect(source).toContain("autoDeployExcludePaths");
+    expect(source).toContain("autoDeployRequiredChecks");
     expect(source).toContain("parseAutoDeployPatterns");
     expect(source).toContain("autoDeployPolicy?.refs.join");
     expect(source).toContain("autoDeployPolicy?.includePaths?.join");
     expect(source).toContain("autoDeployPolicy?.excludePaths?.join");
+    expect(source).toContain("autoDeployPolicy?.requiredChecks?.join");
     expect(source).toContain("autoDeployPolicy?.eventKinds[0]");
     expect(source).toContain("autoDeployPolicy?.genericWebhookSecretRef");
     expect(source).toContain("autoDeployPolicy?.dedupeWindowSeconds");

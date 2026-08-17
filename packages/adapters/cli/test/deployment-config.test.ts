@@ -7499,6 +7499,9 @@ describe("CLI deployment config entry workflow", () => {
         "    - packages/shared/**",
         "  excludePaths:",
         '    - "**/*.md"',
+        "  requiredChecks:",
+        "    - build",
+        "    - lint",
         "  dedupeWindowSeconds: 300",
         "",
       ].join("\n"),
@@ -7555,6 +7558,7 @@ describe("CLI deployment config entry workflow", () => {
         eventKinds: ["push"],
         includePaths: ["apps/api/**", "packages/shared/**"],
         excludePaths: ["**/*.md"],
+        requiredChecks: ["build", "lint"],
         dedupeWindowSeconds: 300,
       },
     });

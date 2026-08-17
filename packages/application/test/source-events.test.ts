@@ -11,6 +11,8 @@ import {
   type RepositoryContext,
   type SourceEventChangedPathResolution,
   type SourceEventChangedPathResolver,
+  type SourceEventCompletedCheckApplyResult,
+  type SourceEventCompletedCheckTransition,
   type SourceEventDeploymentDispatcher,
   type SourceEventDeploymentDispatchInput,
   type SourceEventListInput,
@@ -54,6 +56,7 @@ class MemorySourceEventStore
   implements SourceEventRecorder, SourceEventReadModel, SourceEventRetentionStore
 {
   readonly records: SourceEventRecord[] = [];
+  readonly completedCheckDeliveries = new Set<string>();
 
   async findByDedupeKey(
     _context: RepositoryContext,
@@ -94,6 +97,69 @@ class MemorySourceEventStore
     const index = this.records.indexOf(record);
     this.records[index] = updated;
     return cloneRecord(updated);
+  }
+
+  async supersedeOlderPending(
+    _context: RepositoryContext,
+    input: Parameters<SourceEventRecorder["supersedeOlderPending"]>[1],
+  ): Promise<void> {
+    const resourceIds = new Set(input.matchedResourceIds);
+    for (const record of this.records) {
+      if (
+        record.sourceEventId === input.sourceEventId ||
+        record.sourceKind !== input.sourceKind ||
+        record.ref !== input.ref ||
+        record.receivedAt > input.receivedAt ||
+        (record.receivedAt === input.receivedAt && record.sourceEventId >= input.sourceEventId) ||
+        record.sourceIdentity.locator !== input.sourceIdentity.locator
+      ) {
+        continue;
+      }
+      record.policyResults = record.policyResults.map((result) =>
+        resourceIds.has(result.resourceId) &&
+        (result.status === "waiting-checks" || result.status === "checks-blocked")
+          ? {
+              ...result,
+              status: "superseded",
+              reason: "superseded-by-newer-revision",
+              supersededBySourceEventId: input.sourceEventId,
+            }
+          : result,
+      );
+      if (record.policyResults.every((result) => result.status === "superseded")) {
+        record.status = "superseded";
+      }
+    }
+  }
+
+  async applyCompletedCheck(
+    _context: RepositoryContext,
+    input: Parameters<SourceEventRecorder["applyCompletedCheck"]>[1],
+    evolve: (record: SourceEventRecord) => SourceEventCompletedCheckTransition,
+  ): Promise<SourceEventCompletedCheckApplyResult> {
+    const deliveryKey = `${input.sourceKind}:${input.deliveryId}`;
+    if (this.completedCheckDeliveries.has(deliveryKey)) {
+      return { duplicate: true, transitions: [] };
+    }
+    this.completedCheckDeliveries.add(deliveryKey);
+    const transitions: SourceEventCompletedCheckTransition[] = [];
+    for (const record of this.records) {
+      if (
+        record.sourceKind !== input.sourceKind ||
+        record.revision !== input.revision ||
+        record.sourceIdentity.locator !== input.sourceIdentity.locator
+      ) {
+        continue;
+      }
+      const transition = evolve(cloneRecord(record));
+      if (JSON.stringify(transition.record) === JSON.stringify(record)) continue;
+      Object.assign(record, cloneRecord(transition.record));
+      transitions.push({
+        record: cloneRecord(transition.record),
+        claimedResourceIds: [...transition.claimedResourceIds],
+      });
+    }
+    return { duplicate: false, transitions };
   }
 
   async list(
@@ -319,6 +385,10 @@ function cloneRecord(record: SourceEventRecord): SourceEventRecord {
     policyResults: record.policyResults.map((result) => ({
       ...result,
       ...(result.matchedPaths ? { matchedPaths: [...result.matchedPaths] } : {}),
+      ...(result.requiredChecks ? { requiredChecks: [...result.requiredChecks] } : {}),
+      ...(result.observedChecks
+        ? { observedChecks: result.observedChecks.map((check) => ({ ...check })) }
+        : {}),
     })),
     createdDeploymentIds: [...record.createdDeploymentIds],
   };
@@ -750,6 +820,290 @@ describe("source event application baseline", () => {
         },
       },
     ]);
+  });
+
+  test("[GH-CHECK-GATE-001] [GH-CHECK-GATE-002] gates one exact revision, accepts passing conclusions, reruns, and dedupes delivery", async () => {
+    const deploymentDispatcher = new MemorySourceEventDeploymentDispatcher(["dep_check_gate"]);
+    const { context, ingest, sourceEvents } = createHarness({
+      deploymentDispatcher,
+      policyCandidates: [
+        {
+          projectId: "prj_demo",
+          environmentId: "env_prod",
+          resourceId: "res_web",
+          serverId: "srv_prod",
+          destinationId: "dst_prod",
+          status: "enabled",
+          refs: ["main"],
+          eventKinds: ["push"],
+          requiredChecks: ["build", "lint"],
+          sourceBinding: {
+            locator: "https://github.com/appaloft/demo",
+            providerRepositoryId: "repo_1",
+            repositoryFullName: "appaloft/demo",
+          },
+        },
+      ],
+    });
+    const sourceIdentity = {
+      locator: "https://github.com/appaloft/demo",
+      providerRepositoryId: "repo_1",
+      repositoryFullName: "appaloft/demo",
+    };
+
+    const ingested = await ingest.execute(context, {
+      sourceKind: "github",
+      eventKind: "push",
+      sourceIdentity,
+      ref: "main",
+      revision: "sha_gate_1",
+      deliveryId: "delivery_push_gate_1",
+      verification: { status: "verified", method: "provider-signature" },
+    });
+    expect(ingested._unsafeUnwrap()).toMatchObject({ status: "waiting-checks" });
+    expect(deploymentDispatcher.inputs).toHaveLength(0);
+
+    const failed = await ingest.completeCheck(context, {
+      sourceKind: "github",
+      sourceIdentity,
+      revision: "sha_gate_1",
+      deliveryId: "delivery_check_build_failed",
+      check: {
+        name: "build",
+        conclusion: "failure",
+        checkRunId: "100",
+        completedAt: "2026-01-01T00:01:00.000Z",
+      },
+      verification: { status: "verified", method: "provider-signature" },
+    });
+    expect(failed._unsafeUnwrap()).toMatchObject({ status: "accepted" });
+    expect(sourceEvents.records[0]?.status).toBe("checks-blocked");
+
+    await ingest.completeCheck(context, {
+      sourceKind: "github",
+      sourceIdentity,
+      revision: "sha_gate_1",
+      deliveryId: "delivery_check_build_rerun",
+      check: {
+        name: "build",
+        conclusion: "success",
+        checkRunId: "101",
+        completedAt: "2026-01-01T00:02:00.000Z",
+      },
+      verification: { status: "verified", method: "provider-signature" },
+    });
+    expect(sourceEvents.records[0]?.status).toBe("waiting-checks");
+
+    await ingest.completeCheck(context, {
+      sourceKind: "github",
+      sourceIdentity,
+      revision: "sha_gate_1",
+      deliveryId: "delivery_check_build_stale_failure",
+      check: {
+        name: "build",
+        conclusion: "failure",
+        checkRunId: "99",
+        completedAt: "2026-01-01T00:01:30.000Z",
+      },
+      verification: { status: "verified", method: "provider-signature" },
+    });
+    expect(sourceEvents.records[0]?.status).toBe("waiting-checks");
+
+    const completed = await ingest.completeCheck(context, {
+      sourceKind: "github",
+      sourceIdentity,
+      revision: "sha_gate_1",
+      deliveryId: "delivery_check_lint",
+      check: {
+        name: "lint",
+        conclusion: "neutral",
+        checkRunId: "102",
+        completedAt: "2026-01-01T00:03:00.000Z",
+      },
+      verification: { status: "verified", method: "provider-signature" },
+    });
+    expect(completed._unsafeUnwrap()).toMatchObject({
+      status: "accepted",
+      sourceEventIds: ["sevt_1"],
+      dispatchedResourceIds: ["res_web"],
+      createdDeploymentIds: ["dep_check_gate"],
+    });
+    expect(sourceEvents.records[0]).toMatchObject({
+      status: "dispatched",
+      policyResults: [{ status: "dispatched", deploymentId: "dep_check_gate" }],
+    });
+
+    const duplicate = await ingest.completeCheck(context, {
+      sourceKind: "github",
+      sourceIdentity,
+      revision: "sha_gate_1",
+      deliveryId: "delivery_check_lint",
+      check: {
+        name: "lint",
+        conclusion: "neutral",
+        checkRunId: "102",
+        completedAt: "2026-01-01T00:03:00.000Z",
+      },
+      verification: { status: "verified", method: "provider-signature" },
+    });
+    expect(duplicate._unsafeUnwrap()).toMatchObject({ status: "deduped" });
+    expect(deploymentDispatcher.inputs).toHaveLength(1);
+  });
+
+  test("[GH-CHECK-GATE-007] progresses immediate and gated Resources independently", async () => {
+    const deploymentDispatcher = new MemorySourceEventDeploymentDispatcher([
+      "dep_immediate",
+      "dep_gated",
+    ]);
+    const sourceBinding = {
+      locator: "https://github.com/appaloft/demo",
+      providerRepositoryId: "repo_1",
+      repositoryFullName: "appaloft/demo",
+    };
+    const { context, ingest, sourceEvents } = createHarness({
+      deploymentDispatcher,
+      policyCandidates: [
+        {
+          projectId: "prj_demo",
+          environmentId: "env_prod",
+          resourceId: "res_immediate",
+          serverId: "srv_prod",
+          status: "enabled",
+          refs: ["main"],
+          eventKinds: ["push"],
+          sourceBinding,
+        },
+        {
+          projectId: "prj_demo",
+          environmentId: "env_prod",
+          resourceId: "res_gated",
+          serverId: "srv_prod",
+          status: "enabled",
+          refs: ["main"],
+          eventKinds: ["push"],
+          requiredChecks: ["build"],
+          sourceBinding,
+        },
+      ],
+    });
+
+    const ingested = await ingest.execute(context, {
+      sourceKind: "github",
+      eventKind: "push",
+      sourceIdentity: sourceBinding,
+      ref: "main",
+      revision: "sha_fanout",
+      deliveryId: "delivery_fanout",
+      verification: { status: "verified", method: "provider-signature" },
+    });
+    expect(ingested._unsafeUnwrap()).toMatchObject({
+      status: "waiting-checks",
+      createdDeploymentIds: ["dep_immediate"],
+    });
+    expect(sourceEvents.records[0]?.policyResults).toMatchObject([
+      { resourceId: "res_immediate", status: "dispatched" },
+      { resourceId: "res_gated", status: "waiting-checks" },
+    ]);
+
+    await ingest.completeCheck(context, {
+      sourceKind: "github",
+      sourceIdentity: sourceBinding,
+      revision: "sha_fanout",
+      deliveryId: "delivery_fanout_check",
+      check: {
+        name: "build",
+        conclusion: "success",
+        checkRunId: "300",
+        completedAt: "2026-01-01T00:06:00.000Z",
+      },
+      verification: { status: "verified", method: "provider-signature" },
+    });
+    expect(deploymentDispatcher.inputs.map((input) => input.resourceId)).toEqual([
+      "res_immediate",
+      "res_gated",
+    ]);
+    expect(sourceEvents.records[0]).toMatchObject({
+      status: "dispatched",
+      createdDeploymentIds: ["dep_immediate", "dep_gated"],
+    });
+  });
+
+  test("[GH-CHECK-GATE-003] supersedes an older pending revision for the same Resource and ref", async () => {
+    const deploymentDispatcher = new MemorySourceEventDeploymentDispatcher(["dep_new_revision"]);
+    const { context, ingest, sourceEvents } = createHarness({
+      deploymentDispatcher,
+      policyCandidates: [
+        {
+          projectId: "prj_demo",
+          environmentId: "env_prod",
+          resourceId: "res_web",
+          serverId: "srv_prod",
+          status: "enabled",
+          refs: ["main"],
+          eventKinds: ["push"],
+          requiredChecks: ["build"],
+          sourceBinding: {
+            locator: "https://github.com/appaloft/demo",
+            providerRepositoryId: "repo_1",
+            repositoryFullName: "appaloft/demo",
+          },
+        },
+      ],
+    });
+    const sourceIdentity = {
+      locator: "https://github.com/appaloft/demo",
+      providerRepositoryId: "repo_1",
+      repositoryFullName: "appaloft/demo",
+    };
+    for (const [revision, deliveryId] of [
+      ["sha_old", "delivery_push_old"],
+      ["sha_new", "delivery_push_new"],
+    ] as const) {
+      await ingest.execute(context, {
+        sourceKind: "github",
+        eventKind: "push",
+        sourceIdentity,
+        ref: "main",
+        revision,
+        deliveryId,
+        verification: { status: "verified", method: "provider-signature" },
+      });
+    }
+    expect(sourceEvents.records.map((record) => record.status)).toEqual([
+      "superseded",
+      "waiting-checks",
+    ]);
+
+    await ingest.completeCheck(context, {
+      sourceKind: "github",
+      sourceIdentity,
+      revision: "sha_old",
+      deliveryId: "delivery_check_old",
+      check: {
+        name: "build",
+        conclusion: "success",
+        checkRunId: "200",
+        completedAt: "2026-01-01T00:04:00.000Z",
+      },
+      verification: { status: "verified", method: "provider-signature" },
+    });
+    expect(deploymentDispatcher.inputs).toHaveLength(0);
+
+    await ingest.completeCheck(context, {
+      sourceKind: "github",
+      sourceIdentity,
+      revision: "sha_new",
+      deliveryId: "delivery_check_new",
+      check: {
+        name: "build",
+        conclusion: "skipped",
+        checkRunId: "201",
+        completedAt: "2026-01-01T00:05:00.000Z",
+      },
+      verification: { status: "verified", method: "provider-signature" },
+    });
+    expect(deploymentDispatcher.inputs).toHaveLength(1);
+    expect(deploymentDispatcher.inputs[0]).toMatchObject({ sourceEventId: "sevt_2" });
   });
 
   test("[SRC-AUTO-EVENT-001] [PROC-DELIVERY-004] records safe operator-visible source event dispatch failures", async () => {

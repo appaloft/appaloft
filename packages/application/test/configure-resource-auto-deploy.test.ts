@@ -85,6 +85,7 @@ describe("ConfigureResourceAutoDeployUseCase", () => {
         eventKinds: ["push"],
         includePaths: ["apps/web/**"],
         excludePaths: ["apps/web/docs/**"],
+        requiredChecks: ["build", "lint"],
       },
     });
 
@@ -97,6 +98,7 @@ describe("ConfigureResourceAutoDeployUseCase", () => {
       eventKinds: ["push"],
       includePaths: ["apps/web/**"],
       excludePaths: ["apps/web/docs/**"],
+      requiredChecks: ["build", "lint"],
     });
     const persisted = await resources.findOne(
       repositoryContext,
@@ -106,6 +108,9 @@ describe("ConfigureResourceAutoDeployUseCase", () => {
     expect(
       persisted?.toState().autoDeployPolicy?.includePaths?.map((pattern) => pattern.value),
     ).toEqual(["apps/web/**"]);
+    expect(
+      persisted?.toState().autoDeployPolicy?.requiredChecks?.map((check) => check.value),
+    ).toEqual(["build", "lint"]);
     expect(eventBus.events.map((event) => (event as { type?: string }).type)).toContain(
       "resource-auto-deploy-policy-configured",
     );

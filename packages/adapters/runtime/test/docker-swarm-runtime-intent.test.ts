@@ -61,6 +61,7 @@ import {
   VariableKindValue,
 } from "@appaloft/core";
 import {
+  dockerComposeOverrideContent,
   renderDockerSwarmApplyPlan,
   renderDockerSwarmCleanupPlan,
   renderDockerSwarmRuntimeIntent,
@@ -179,7 +180,10 @@ function workerComponentRuntimePlan(): BlueprintComponentRuntimePlan {
   };
 }
 
-function imageRuntimePlan(metadata?: Record<string, string>): RuntimePlan {
+function imageRuntimePlan(
+  metadata?: Record<string, string>,
+  healthEnabled = true,
+): RuntimePlan {
   const accessRoute = AccessRoute.rehydrate({
     proxyKind: EdgeProxyKindValue.rehydrate("traefik"),
     domains: [PublicDomainName.rehydrate("pr-1.example.com")],
@@ -199,7 +203,7 @@ function imageRuntimePlan(metadata?: Record<string, string>): RuntimePlan {
       image: ImageReference.rehydrate("registry.example.com/team/app:sha"),
       accessRoutes: [accessRoute],
       healthCheck: {
-        enabled: true,
+        enabled: healthEnabled,
         type: HealthCheckTypeValue.rehydrate("http"),
         intervalSeconds: HealthCheckIntervalSeconds.rehydrate(10),
         timeoutSeconds: HealthCheckTimeoutSeconds.rehydrate(5),
@@ -443,6 +447,7 @@ describe("renderDockerSwarmRuntimeIntent", () => {
       "create-candidate-service",
       "verify-candidate-service",
       "promote-route-target",
+      "verify-public-routes",
       "cleanup-superseded-services",
     ]);
     expect(plan.steps[0]?.command ?? "").toContain("docker service ps");
@@ -745,6 +750,7 @@ describe("renderDockerSwarmRuntimeIntent", () => {
       "create-candidate-service",
       "verify-candidate-service",
       "promote-route-target",
+      "verify-public-routes",
       "cleanup-superseded-services",
     ]);
 
@@ -811,7 +817,8 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     expect(privateRegistryCreateCommand).not.toContain("raw-private-registry-token");
     expect(privateRegistryDisplayCommand).not.toContain("raw-private-registry-token");
 
-    const promoteCommand = plan.steps[2]?.command ?? "";
+    const promoteCommand =
+      plan.steps.find((step) => step.step === "promote-route-target")?.command ?? "";
     expect(plan.routeLabels).toContain("traefik.enable=true");
     expect(plan.routeLabels).toContain("traefik.docker.network=appaloft-edge");
     expect(plan.routeLabels).toContain(
@@ -833,9 +840,43 @@ describe("renderDockerSwarmRuntimeIntent", () => {
       "--label-add 'traefik.http.services.appaloft-res-api-dst-prod-dep-123-web-svc.loadbalancer.server.port=3000'",
     );
 
-    expect(plan.steps[3]?.command ?? "").toContain("docker service rm");
-    expect(plan.steps[3]?.command ?? "").toContain("appaloft.destination-id=dst_prod");
-    expect(plan.steps[3]?.command ?? "").toContain("appaloft.runtime-target=docker-swarm");
+    const publicRouteStep = plan.steps.find((step) => step.step === "verify-public-routes");
+    const verifyPublicRoutes = publicRouteStep?.command ?? "";
+    expect(verifyPublicRoutes).toContain("https://pr-1.example.com/health");
+    expect(verifyPublicRoutes).toContain("verify_public_route");
+    expect(Bun.spawnSync(["sh", "-n", "-c", verifyPublicRoutes]).exitCode).toBe(0);
+    expect(publicRouteStep?.rollbackCommand).toContain(
+      "--label-rm 'appaloft.route-candidate'",
+    );
+    expect(publicRouteStep?.rollbackCommand).toContain("--label-rm 'traefik.enable'");
+
+    const cleanupCommand =
+      plan.steps.find((step) => step.step === "cleanup-superseded-services")?.command ?? "";
+    expect(cleanupCommand).toContain("docker service rm");
+    expect(cleanupCommand).toContain("appaloft.destination-id=dst_prod");
+    expect(cleanupCommand).toContain("appaloft.runtime-target=docker-swarm");
+  });
+
+  test("[ROUTE-TERM-OPT-001] does not add public route proof when health checks are disabled", () => {
+    const intent = renderDockerSwarmRuntimeIntent({
+      runtimePlan: imageRuntimePlan(undefined, false),
+      environmentSnapshot: runtimeEnvironmentSnapshot(),
+      identity: {
+        resourceId: "res_api",
+        deploymentId: "dep_health_disabled",
+        targetId: "dtg_swarm_1",
+        destinationId: "dst_prod",
+      },
+    })._unsafeUnwrap();
+    const plan = renderDockerSwarmApplyPlan({
+      ...intent,
+      environment: intent.environment.map((variable) => ({
+        ...variable,
+        value: variable.secret ? "postgres://secret-value" : variable.value,
+      })),
+    })._unsafeUnwrap();
+
+    expect(plan.steps.map((step) => step.step)).not.toContain("verify-public-routes");
   });
 
   test("[RES-ACCESS-DIAG-ROUTE-003][SWARM-TARGET-APPLY-001] renders Traefik access failure middleware for Swarm routes", () => {
@@ -926,8 +967,57 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     expect(deployCommand).not.toContain("docker volume prune");
     expect(deployCommand).not.toContain("docker system prune");
 
-    const cleanupCommand = plan.steps[3]?.command ?? "";
+    const cleanupCommand =
+      plan.steps.find((step) => step.step === "cleanup-superseded-services")?.command ?? "";
     expect(cleanupCommand).toContain("docker stack rm \"$stack_name\"");
     expect(cleanupCommand).toContain("docker service rm \"$service_id\"");
+  });
+
+  test("[SWARM-TARGET-ENV-001] round-trips special-character Compose environment values", () => {
+    const intent = renderDockerSwarmRuntimeIntent({
+      runtimePlan: composeRuntimePlan({ swarmTargetService: "web" }),
+      identity: {
+        resourceId: "res_api",
+        deploymentId: "dep_env_roundtrip",
+        targetId: "dtg_swarm_1",
+        destinationId: "dst_preview",
+      },
+    })._unsafeUnwrap();
+    const values = {
+      QUOTES: `single ' and double "`,
+      SPACES: "  leading and trailing  ",
+      DOLLAR: "$HOME and ${LITERAL}",
+      BACKSLASH: "C:\\temp\\app",
+      COLON: "https://example.test:8443/a:b",
+      UNICODE: "部署完成",
+      NEWLINE: "first line\nsecond line",
+    };
+    const materializedIntent = {
+      ...intent,
+      environment: Object.entries(values).map(([name, value]) => ({
+        name,
+        value,
+        exposure: "runtime",
+        scope: "environment",
+        secret: false,
+      })),
+    };
+
+    const override = dockerComposeOverrideContent({
+      intent: materializedIntent,
+      networkNames: ["appaloft-edge"],
+    });
+    const parsed = Bun.YAML.parse(override) as {
+      services: Record<string, { environment: Record<string, string> }>;
+    };
+
+    expect(parsed.services.web?.environment).toEqual(values);
+    const displayOverride = dockerComposeOverrideContent({
+      intent: materializedIntent,
+      networkNames: ["appaloft-edge"],
+      redactValues: true,
+    });
+    expect(displayOverride).not.toContain(values.QUOTES);
+    expect(displayOverride).not.toContain(values.NEWLINE);
   });
 });

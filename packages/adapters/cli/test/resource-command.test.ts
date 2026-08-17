@@ -123,6 +123,10 @@ describe("CLI resource commands", () => {
       "packages/shared/**",
       "--exclude-path",
       "**/*.md",
+      "--required-check",
+      "build",
+      "--required-check",
+      "lint",
     ]);
 
     expect(commands).toHaveLength(1);
@@ -136,6 +140,7 @@ describe("CLI resource commands", () => {
         eventKinds: ["push"],
         includePaths: ["apps/api/**", "packages/shared/**"],
         excludePaths: ["**/*.md"],
+        requiredChecks: ["build", "lint"],
       },
     });
   });

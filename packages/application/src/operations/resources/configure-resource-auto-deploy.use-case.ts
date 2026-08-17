@@ -4,6 +4,7 @@ import {
   GitRefText,
   ok,
   type ResourceAutoDeployPolicyState,
+  ResourceAutoDeployRequiredCheckName,
   ResourceAutoDeploySecretRef,
   ResourceAutoDeployTriggerKindValue,
   ResourceByIdSpec,
@@ -116,6 +117,7 @@ function autoDeployPolicyFromInput(
   dedupeWindowSeconds?: SourceEventDedupeWindowSeconds;
   includePaths?: SourcePathPattern[];
   excludePaths?: SourcePathPattern[];
+  requiredChecks?: ResourceAutoDeployRequiredCheckName[];
 }> {
   return safeTry(function* () {
     const triggerKind = yield* ResourceAutoDeployTriggerKindValue.create(input.triggerKind);
@@ -123,6 +125,7 @@ function autoDeployPolicyFromInput(
     const eventKinds: SourceEventKindValue[] = [];
     const includePaths: SourcePathPattern[] = [];
     const excludePaths: SourcePathPattern[] = [];
+    const requiredChecks: ResourceAutoDeployRequiredCheckName[] = [];
 
     for (const ref of input.refs) {
       refs.push(yield* GitRefText.create(ref));
@@ -140,6 +143,10 @@ function autoDeployPolicyFromInput(
       excludePaths.push(yield* SourcePathPattern.create(path));
     }
 
+    for (const check of input.requiredChecks ?? []) {
+      requiredChecks.push(yield* ResourceAutoDeployRequiredCheckName.create(check));
+    }
+
     const genericWebhookSecretRef = input.genericWebhookSecretRef
       ? yield* ResourceAutoDeploySecretRef.create(input.genericWebhookSecretRef)
       : undefined;
@@ -155,6 +162,7 @@ function autoDeployPolicyFromInput(
       ...(dedupeWindowSeconds ? { dedupeWindowSeconds } : {}),
       ...(includePaths.length ? { includePaths } : {}),
       ...(excludePaths.length ? { excludePaths } : {}),
+      ...(requiredChecks.length ? { requiredChecks } : {}),
     });
   });
 }
@@ -174,6 +182,9 @@ function resultFromPolicy(
       : {}),
     ...(policy.excludePaths
       ? { excludePaths: policy.excludePaths.map((pattern) => pattern.value) }
+      : {}),
+    ...(policy.requiredChecks
+      ? { requiredChecks: policy.requiredChecks.map((check) => check.value) }
       : {}),
     sourceBindingFingerprint: policy.sourceBindingFingerprint.value,
     ...(policy.blockedReason ? { blockedReason: policy.blockedReason.value } : {}),
