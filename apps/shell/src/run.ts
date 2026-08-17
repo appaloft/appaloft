@@ -421,7 +421,7 @@ async function runShellMcpRemoteStdio(argv: readonly string[]): Promise<void> {
     process.exit(1);
   }
 
-  const selectedName = profileName ?? "mcp";
+  const selectedName = profileName ?? data.value.activeProfile ?? "mcp";
   const profile = data.value.profiles[selectedName];
   if (!profile) {
     writeDomainError(

@@ -17,6 +17,10 @@ function jsonResponse(value: unknown, status = 200): Response {
   });
 }
 
+function headerValue(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 async function listenOnAvailableTestPort(server: ReturnType<typeof createServer>): Promise<number> {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const port = randomInt(40_000, 60_000);
@@ -72,6 +76,51 @@ async function writeActiveProfile(
             updatedAt: "2026-05-17T00:00:00.000Z",
             lastHandshake: {
               checkedAt: "2026-05-17T00:00:00.000Z",
+              apiVersion: "v1",
+            },
+          },
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+}
+
+async function writeOccupancyAttachProfiles(appaloftHome: string, baseUrl: string): Promise<void> {
+  await writeFile(
+    join(appaloftHome, "profiles.json"),
+    `${JSON.stringify(
+      {
+        activeProfile: "cloud",
+        profiles: {
+          cloud: {
+            name: "cloud",
+            mode: "cloud",
+            baseUrl,
+            auth: {
+              kind: "product-session",
+              cookie: "appaloft.session=active-occupancy-cookie",
+            },
+            createdAt: "2026-08-17T00:00:00.000Z",
+            updatedAt: "2026-08-17T00:00:00.000Z",
+            lastHandshake: {
+              checkedAt: "2026-08-17T00:00:00.000Z",
+              apiVersion: "v1",
+            },
+          },
+          mcp: {
+            name: "mcp",
+            mode: "cloud",
+            baseUrl,
+            auth: {
+              kind: "bearer",
+              token: "tok_stale_mcp_profile",
+            },
+            createdAt: "2026-06-22T00:00:00.000Z",
+            updatedAt: "2026-06-22T00:00:00.000Z",
+            lastHandshake: {
+              checkedAt: "2026-06-22T00:00:00.000Z",
               apiVersion: "v1",
             },
           },
@@ -374,6 +423,69 @@ describe("shell CLI remote control-plane pre-dispatch", () => {
           connectionUrl: "postgres://app:secret@db.example.com/app",
         },
       });
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
+  }, 15000);
+
+  test("[WS-REMOTE-SKILL-017] occupancy remote-stdio uses the active profile when --profile is omitted", async () => {
+    const appaloftHome = await mkdtemp(join(tmpdir(), "appaloft-cli-occupancy-mcp-"));
+    const pingPath = join(appaloftHome, "ping.jsonl");
+    const requests: Array<{
+      authorization: string | undefined;
+      cookie: string | undefined;
+      path: string;
+    }> = [];
+    const server = createServer(async (request, response) => {
+      const path = request.url ? new URL(request.url, "http://127.0.0.1").pathname : "/";
+      requests.push({
+        path,
+        authorization: headerValue(request.headers["authorization"]),
+        cookie: headerValue(request.headers.cookie),
+      });
+      response.setHeader("content-type", "application/json");
+      response.end('{"jsonrpc":"2.0","id":1,"result":{}}');
+    });
+    const port = await listenOnAvailableTestPort(server);
+
+    try {
+      await writeOccupancyAttachProfiles(appaloftHome, `http://127.0.0.1:${port}`);
+      await writeFile(pingPath, '{"jsonrpc":"2.0","id":1,"method":"ping"}\n', { mode: 0o600 });
+      const child = Bun.spawn(
+        ["bun", "run", "--cwd", "apps/shell", "src/index.ts", "mcp", "remote-stdio"],
+        {
+          cwd: join(import.meta.dir, "../../.."),
+          env: {
+            ...process.env,
+            APPALOFT_HOME: appaloftHome,
+            OTEL_SDK_DISABLED: "true",
+            APPALOFT_CONTROL_PLANE_URL: "",
+            APPALOFT_AUTH_COOKIE: "",
+          },
+          stdin: Bun.file(pingPath),
+          stdout: "pipe",
+          stderr: "pipe",
+        },
+      );
+      const [exitCode, stdout, stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ]);
+      expect(exitCode).toBe(0);
+      expect(stderr).toBe("");
+      expect(requests).toEqual([
+        {
+          path: "/mcp",
+          authorization: undefined,
+          cookie: "appaloft.session=active-occupancy-cookie",
+        },
+      ]);
+      expect(stdout).toContain('"id":1');
+      expect(stdout).not.toContain("tok_stale_mcp_profile");
+      expect(stdout).not.toContain("active-occupancy-cookie");
     } finally {
       await new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve())),
