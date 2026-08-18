@@ -513,7 +513,6 @@ jobs:
       - source-artifacts
       - binary-artifacts
       - desktop-artifacts
-      - container
     runs-on: ubuntu-latest
     env:
       APPALOFT_APP_VERSION: ${{ needs.resolve.outputs.version }}
