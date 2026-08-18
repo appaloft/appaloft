@@ -186,6 +186,8 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-ENV-150 | Missing occupancy env list stays global | no occupancy projectId | `appaloft env list` | existing unscoped list; does not invent a project. |
 | WS-REMOTE-RES-151 | Bare resource list reuses occupancy project | latest occupancy has activation projectId | `appaloft resource list` | CLI scopes to that project; does not dump every Resource. |
 | WS-REMOTE-RES-152 | Missing occupancy resource list stays global | no occupancy projectId | `appaloft resource list` | existing unscoped list; does not invent a project. |
+| WS-REMOTE-RUNTIME-153 | Bare resource runtime restart reuse occupancy | latest occupancy has Resource `app` | `appaloft resource runtime restart` | CLI does not require `resourceId`; restarts that Resource `app`. |
+| WS-REMOTE-RUNTIME-154 | Missing occupancy runtime stays fail-closed | no occupancy Resource `app` and no preview | `appaloft resource runtime restart` | still requires resourceId or previewEnvironmentId; does not invent a Resource. |
 
 ## Slice Scope
 
