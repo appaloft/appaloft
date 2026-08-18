@@ -30,6 +30,7 @@ import {
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
 
+import { resolveLatestOccupancyProjectId } from "../occupancy-context.js";
 import {
   CliRuntime,
   optionalValue,
@@ -111,11 +112,15 @@ const listCommand = EffectCommand.make(
     project: projectOption,
   },
   ({ project }) =>
-    runQuery(
-      ListEnvironmentsQuery.create({
-        projectId: optionalValue(project),
-      }),
-    ),
+    Effect.gen(function* () {
+      const requestedProjectId = optionalValue(project);
+      const projectId = requestedProjectId ?? (yield* resolveLatestOccupancyProjectId());
+      return yield* runQuery(
+        ListEnvironmentsQuery.create({
+          ...(projectId ? { projectId } : {}),
+        }),
+      );
+    }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentList));
 
 const createCommand = EffectCommand.make(
