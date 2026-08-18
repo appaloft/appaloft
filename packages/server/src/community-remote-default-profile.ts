@@ -5,6 +5,7 @@ import {
 import {
   type CommunityRemoteWorkspaceDefaultProfileConfig,
   OCCUPANCY_FIRST_PARTY_MCP_DISCOVERY_TOOLS,
+  occupancyRemoteProfileId,
 } from "@appaloft/application";
 import { COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY } from "@appaloft/application/community-remote-default-network-policy";
 
@@ -18,10 +19,11 @@ export function createCommunityRemoteDefaultProfile(input: {
   readonly templateDigest: string;
 }): CommunityRemoteWorkspaceDefaultProfileConfig | undefined {
   const native = input.harnessKey === "opencode";
+  const remoteId = occupancyRemoteProfileId(input.harnessKey);
   const adapterManifest = {
     schemaVersion: "appaloft.agent-adapter/v1",
-    id: "appaloft-remote",
-    displayName: "Appaloft Remote",
+    id: remoteId,
+    displayName: native ? "Appaloft Remote" : "Appaloft Remote Pi",
     version: "1.0.0",
     kind: "declarative",
     requirements: {
@@ -93,8 +95,8 @@ export function createCommunityRemoteDefaultProfile(input: {
   if (!validatedAdapter.ok) return undefined;
   const profileManifest = {
     schemaVersion: "appaloft.agent-workspace-profile/v1",
-    id: "appaloft-remote",
-    displayName: "Appaloft Remote",
+    id: remoteId,
+    displayName: native ? "Appaloft Remote" : "Appaloft Remote Pi",
     version: "1.0.0",
     adapter: {
       id: adapterManifest.id,

@@ -707,6 +707,45 @@ describe("ExecutionSandboxService", () => {
     });
   });
 
+  test("[WS-REMOTE-HARNESS-175] auto-creates the reserved occupancy Pi template", async () => {
+    const fake = provider({ isolation: "container-trusted", networkPolicy: ["deny", "allowlist"] });
+    const app = service(fake.adapter);
+
+    const sandbox = await app.createAndReconcile(context, {
+      source: { kind: "template", templateId: "stp_appaloft_remote_pi" },
+      requestedIsolation: "container-trusted",
+      limits: {
+        cpuMillis: 2_000,
+        memoryBytes: 4_294_967_296,
+        diskBytes: 21_474_836_480,
+        maxProcesses: 128,
+      },
+      networkPolicy: {
+        mode: "allowlist",
+        rules: [
+          { kind: "domain", value: "github.com", ports: [443] },
+          { kind: "domain", value: "api.github.com", ports: [443] },
+          { kind: "domain", value: "api.openai.com", ports: [443] },
+          { kind: "domain", value: "api.anthropic.com", ports: [443] },
+          { kind: "domain", value: "openrouter.ai", ports: [443] },
+          { kind: "domain", value: "api.deepseek.com", ports: [443] },
+          { kind: "domain", value: "api.x.ai", ports: [443] },
+          { kind: "domain", value: "opencode.ai", ports: [443] },
+        ],
+      },
+    });
+    expect(sandbox._unsafeUnwrap()).toMatchObject({
+      sourceKind: "template",
+      status: "ready",
+    });
+    expect(
+      (await app.showTemplate(context, "stp_appaloft_remote_pi"))._unsafeUnwrap(),
+    ).toMatchObject({
+      templateId: "stp_appaloft_remote_pi",
+      image: "ghcr.io/appaloft/agent-workspace-pi:0.82.0",
+    });
+  });
+
   test("[WS-REMOTE-TEMPLATE-019] reuses a matching reserved occupancy template", async () => {
     const fake = provider();
     const app = service(fake.adapter);

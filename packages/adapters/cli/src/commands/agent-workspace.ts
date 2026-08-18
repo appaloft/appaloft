@@ -27,6 +27,7 @@ import {
   OfferWorkspaceCollaborationHandoffCommand,
   OpenAgentWorkspaceCommand,
   OpenTerminalSessionCommand,
+  occupancyRemoteProfileId,
   PauseSandboxCommand,
   ReleaseWorkspaceWriterLeaseCommand,
   RemoveWorkspaceCollaborationParticipantCommand,
@@ -479,6 +480,9 @@ export const workspaceCodeCommand = EffectCommand.make(
     local: Options.boolean("local").pipe(Options.withDefault(false)),
     forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
     open: Options.boolean("open").pipe(Options.withDefault(false)),
+    harness: Options.choice("harness", ["opencode", "pi"] as const).pipe(
+      Options.withDefault("opencode" as const),
+    ),
     openTarget: Options.choice("open-target", [
       "preview",
       "production",
@@ -487,7 +491,7 @@ export const workspaceCodeCommand = EffectCommand.make(
       "connections",
     ] as const).pipe(Options.optional),
   },
-  ({ forceNew, local, noAttach, open, openTarget, path }) =>
+  ({ forceNew, harness, local, noAttach, open, openTarget, path }) =>
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
       if (local) {
@@ -580,6 +584,7 @@ export const workspaceCodeCommand = EffectCommand.make(
         catch: (error) => workspaceCliError(error, "remote-code-door"),
       });
       const attach = !noAttach;
+      const profile = occupancyRemoteProfileId(harness);
       const openInput = {
         repository: door.repository,
         repositoryIdentity: door.repositoryIdentity,
@@ -589,6 +594,7 @@ export const workspaceCodeCommand = EffectCommand.make(
         targetServerId: door.serverId,
         attach,
         forceNew,
+        profile,
       };
       const command = yield* resultToEffect(OpenAgentWorkspaceCommand.create(openInput));
       const opened = yield* Effect.promise(() => cli.executeCommand(command));

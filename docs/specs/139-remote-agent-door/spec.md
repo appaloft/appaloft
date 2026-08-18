@@ -208,6 +208,7 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-ENVPREC-172 | Missing occupancy env effective-precedence stays fail-closed | no occupancy Environment `local` | `appaloft env effective-precedence` | still requires environmentId; does not invent an Environment. |
 | WS-REMOTE-MCP-ENV-173 | Occupancy MCP can set local env vars | occupancy OpenCode has first-party `appaloft-tools` | Agent configures the occupied app | first-party binding includes `environments_show`, `environments_set_variable`, `environments_unset_variable`, and `environments_effective_precedence`. Tenant MCP unchanged. |
 | WS-REMOTE-MCP-INSPECT-174 | Occupancy MCP can inspect Resource app | occupancy OpenCode has first-party `appaloft-tools` | Agent inspects logs/health/config | first-party binding includes `resources_runtime_logs`, `resources_health`, `resources_effective_config`, and `resources_diagnostic_summary`. Tenant MCP unchanged. |
+| WS-REMOTE-HARNESS-175 | Occupancy can open Pi | registered Server occupancy | `appaloft code --harness pi --new --no-attach` | occupy uses reserved `stp_appaloft_remote_pi` / profile `appaloft-remote-pi` and does not rewrite the project's OpenCode default. Existing OpenCode Workspace without `--new` stays fail-closed on profile pin mismatch. |
 
 ## Slice Scope
 

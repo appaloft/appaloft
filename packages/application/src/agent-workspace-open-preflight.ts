@@ -71,6 +71,7 @@ export interface WorkspaceActivationContextInitializerPort {
       readonly repository: string;
       readonly repositoryIdentity: string;
       readonly missing: "repository-binding" | "default-profile";
+      readonly profile?: string;
     },
   ): Promise<
     Result<{
@@ -215,12 +216,13 @@ export class AgentWorkspaceOpenPreflightService {
       profile: "reused",
     });
     if (initial.isOk() || !this.dependencies.contextInitializer) return initial;
-    const missing = missingActivationContext(initial.error);
+    const missing = missingActivationContext(initial.error, input.profile);
     if (!missing) return initial;
     const initialized = await this.dependencies.contextInitializer.ensure(context, {
       repository: input.repository,
       repositoryIdentity: input.repositoryIdentity,
       missing,
+      ...(input.profile ? { profile: input.profile } : {}),
     });
     if (initialized.isErr()) return err(initialized.error);
     if (!validActivationDispositions(initialized.value)) {
@@ -478,15 +480,24 @@ export class AgentWorkspaceOpenPreflightService {
   }
 }
 
-function missingActivationContext(error: {
-  readonly details?: Readonly<Record<string, unknown>>;
-}): "repository-binding" | "default-profile" | undefined {
+function missingActivationContext(
+  error: {
+    readonly code?: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  },
+  requestedProfile?: string,
+): "repository-binding" | "default-profile" | undefined {
   const code = error.details?.code;
-  return code === "workspace_open_repository_not_bound"
-    ? "repository-binding"
-    : code === "workspace_open_profile_required"
-      ? "default-profile"
-      : undefined;
+  if (code === "workspace_open_repository_not_bound") return "repository-binding";
+  if (code === "workspace_open_profile_required") return "default-profile";
+  if (
+    requestedProfile &&
+    error.code === "not_found" &&
+    error.details?.entity === "AgentWorkspaceProfileInstallation"
+  ) {
+    return "default-profile";
+  }
+  return undefined;
 }
 
 function validActivationDispositions(value: {

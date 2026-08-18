@@ -89,7 +89,7 @@ describe("community remote default profile", () => {
     ]);
   });
 
-  test("[WS-REMOTE-PROFILE-008] builds terminal appaloft-remote for Pi", () => {
+  test("[WS-REMOTE-HARNESS-175] builds terminal appaloft-remote-pi for Pi", () => {
     const profile = createCommunityRemoteDefaultProfile({
       harnessKey: "pi",
       templateId: "aht_pi_managed_v1",
@@ -100,7 +100,8 @@ describe("community remote default profile", () => {
 
     expect(profile).toBeDefined();
     expect(profile?.adapterManifest).toMatchObject({
-      id: "appaloft-remote",
+      id: "appaloft-remote-pi",
+      displayName: "Appaloft Remote Pi",
       requirements: {
         capabilities: { required: ["managed-terminal"], optional: ["headless"] },
       },
@@ -117,6 +118,10 @@ describe("community remote default profile", () => {
           required: false,
         },
       ],
+    });
+    expect(profile?.profileManifest).toMatchObject({
+      id: "appaloft-remote-pi",
+      displayName: "Appaloft Remote Pi",
     });
   });
 });

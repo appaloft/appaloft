@@ -38,11 +38,13 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `--preview <previewEnvironmentId>` on logs, health, diagnostics, effective config, runtime
   control, and terminal commands when the user is operating a preview rather than its parent
   resource.
-- `appaloft code [path|git-remote]` occupies my Sandbox after login. It requires a default
+- `appaloft code [path|git-remote] [--harness opencode|pi]` occupies my Sandbox after login. It requires a default
   enrolled Server, dispatches `workspaces.open` with the remote SHA and
   `targetServerId`, then prints
   `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>`.
-  A positional `https://`, `ssh://`, or `git@host:path` occupies that repository
+  Default harness is OpenCode (`appaloft-remote`). `--harness pi` occupies reserved
+  `appaloft-remote-pi` and does not rewrite the project's OpenCode default; an existing
+  OpenCode Workspace needs `--new`. A positional `https://`, `ssh://`, or `git@host:path` occupies that repository
   without a local clone. Laptop Git is not uploaded. Missing login or Server fails
   closed and never becomes Scratch. `owner/repo` is a local path, not GitHub shorthand.
 - After occupy, omit project/environment/resource ids on `env list|show|set|unset|effective-precedence`,
