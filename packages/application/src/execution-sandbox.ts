@@ -33,6 +33,10 @@ import {
   communityOccupancyOpenCodeTemplateSpec,
 } from "./community-occupancy-opencode-template";
 import {
+  COMMUNITY_OCCUPANCY_PI_TEMPLATE_ID,
+  communityOccupancyPiTemplateSpec,
+} from "./community-occupancy-pi-template";
+import {
   type ExecutionContext,
   type RepositoryContext,
   toRepositoryContext,
@@ -2943,8 +2947,14 @@ export class ExecutionSandboxService {
     context: ExecutionContext,
     templateId: string,
   ): Promise<Result<void>> {
-    if (templateId !== COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID) return ok(undefined);
-    const ensured = await this.ensureTemplate(context, communityOccupancyOpenCodeTemplateSpec());
+    const reserved =
+      templateId === COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID
+        ? communityOccupancyOpenCodeTemplateSpec()
+        : templateId === COMMUNITY_OCCUPANCY_PI_TEMPLATE_ID
+          ? communityOccupancyPiTemplateSpec()
+          : undefined;
+    if (!reserved) return ok(undefined);
+    const ensured = await this.ensureTemplate(context, reserved);
     return ensured.isErr() ? err(ensured.error) : ok(undefined);
   }
 

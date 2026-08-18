@@ -7,6 +7,7 @@ import {
   type CommandSandboxAgentDescriptor,
   CommandSandboxAgentHarness,
   OpenCodeSandboxAgentHarness,
+  PiSandboxAgentHarness,
 } from "@appaloft/adapter-runtime";
 
 import {
@@ -108,6 +109,9 @@ import {
   COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_DIGEST,
   COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID,
   COMMUNITY_OCCUPANCY_OPENCODE_VERSION,
+  COMMUNITY_OCCUPANCY_PI_TEMPLATE_DIGEST,
+  COMMUNITY_OCCUPANCY_PI_TEMPLATE_ID,
+  COMMUNITY_OCCUPANCY_PI_VERSION,
   type CommunityRemoteWorkspaceDefaultProfileConfig,
   CommunityWorkspaceActivationContextInitializer,
   CompleteConnectionCallbackCommandHandler,
@@ -3605,6 +3609,12 @@ export function registerApplicationServices(
                 }
               : {}),
           }),
+          new PiSandboxAgentHarness(sandboxes, {
+            templateId: "aht_pi_managed_v1",
+            sandboxTemplateId: COMMUNITY_OCCUPANCY_PI_TEMPLATE_ID,
+            version: COMMUNITY_OCCUPANCY_PI_VERSION,
+            templateDigest: COMMUNITY_OCCUPANCY_PI_TEMPLATE_DIGEST,
+          }),
         ]);
       }),
     });
@@ -4017,15 +4027,31 @@ export function registerApplicationServices(
           harnesses.find(
             (harness) => harness.key === "pi" || harness.key === "appaloft-managed-pi",
           );
-        const defaultProfile = preferred
-          ? createCommunityRemoteDefaultProfile({
-              harnessKey: preferred.key,
-              templateId: preferred.templateId,
-              sandboxTemplateId: preferred.sandboxTemplateId ?? preferred.templateId,
-              version: preferred.version,
-              templateDigest: preferred.templateDigest,
-            })
-          : undefined;
+        const defaultProfiles = Object.fromEntries(
+          harnesses
+            .filter((harness) => harness.key === "opencode" || harness.key === "pi")
+            .flatMap((harness) => {
+              const profile = createCommunityRemoteDefaultProfile({
+                harnessKey: harness.key,
+                templateId: harness.templateId,
+                sandboxTemplateId: harness.sandboxTemplateId ?? harness.templateId,
+                version: harness.version,
+                templateDigest: harness.templateDigest,
+              });
+              return profile ? [[harness.key, profile] as const] : [];
+            }),
+        ) as Partial<Record<"opencode" | "pi", CommunityRemoteWorkspaceDefaultProfileConfig>>;
+        const defaultProfile =
+          defaultProfiles.opencode ??
+          (preferred
+            ? createCommunityRemoteDefaultProfile({
+                harnessKey: preferred.key,
+                templateId: preferred.templateId,
+                sandboxTemplateId: preferred.sandboxTemplateId ?? preferred.templateId,
+                version: preferred.version,
+                templateDigest: preferred.templateDigest,
+              })
+            : undefined);
         return new CommunityWorkspaceActivationContextInitializer({
           commandBus: dependencyContainer.resolve(tokens.commandBus),
           projects: dependencyContainer.resolve(tokens.projectRepository),
@@ -4045,6 +4071,7 @@ export function registerApplicationServices(
           ),
           sourceDetector: dependencyContainer.resolve(tokens.sourceDetector),
           ...(defaultProfile ? { defaultProfile } : {}),
+          ...(Object.keys(defaultProfiles).length > 0 ? { defaultProfiles } : {}),
         });
       }),
     });

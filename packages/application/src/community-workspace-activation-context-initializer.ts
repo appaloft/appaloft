@@ -23,6 +23,7 @@ import {
   type AgentWorkspaceProfileInstallationService,
   type AgentWorkspaceProfileRegistryRepository,
 } from "./agent-workspace-profile";
+import { COMMUNITY_OCCUPANCY_PI_PROFILE_ID } from "./community-occupancy-pi-template";
 import { type CommandBus } from "./cqrs";
 import { type ExecutionContext, toRepositoryContext } from "./execution-context";
 import { CreateEnvironmentCommand } from "./operations/environments/create-environment.command";
@@ -78,6 +79,9 @@ export class CommunityWorkspaceActivationContextInitializer
       readonly profiles: AgentWorkspaceProfileInstallationService;
       readonly profileRepository: AgentWorkspaceProfileRegistryRepository;
       readonly defaultProfile?: CommunityRemoteWorkspaceDefaultProfileConfig;
+      readonly defaultProfiles?: Readonly<
+        Partial<Record<"opencode" | "pi", CommunityRemoteWorkspaceDefaultProfileConfig>>
+      >;
       readonly sourceDetector?: SourceDetector;
     },
   ) {}
@@ -87,7 +91,7 @@ export class CommunityWorkspaceActivationContextInitializer
     input: Parameters<WorkspaceActivationContextInitializerPort["ensure"]>[1],
   ): Promise<CommunityWorkspaceActivationInitializationResult> {
     const tenantId = context.tenant?.tenantId ?? "tenant_instance";
-    const key = `${tenantId}\0${input.repositoryIdentity}`;
+    const key = `${tenantId}\0${input.repositoryIdentity}\0${input.profile ?? "default"}`;
     const existing = this.pending.get(key);
     if (existing) return existing;
     const operation = this.ensureUnlocked(context, input).finally(() => {
@@ -197,7 +201,15 @@ export class CommunityWorkspaceActivationContextInitializer
     if (environment.isErr()) return err(environment.error);
     const resource = await this.ensureDefaultResource(context, projectId, input.repository);
     if (resource.isErr()) return err(resource.error);
-    if (project.toState().defaultWorkspaceProfileInstallationId) {
+    const requestedProfile = this.profileConfigFor(input.profile);
+    if (!requestedProfile) {
+      return err(
+        domainError.validation("Requested occupancy harness profile is not registered", {
+          code: "workspace_activation_profile_unavailable",
+        }),
+      );
+    }
+    if (project.toState().defaultWorkspaceProfileInstallationId && !input.profile) {
       return ok({
         project: projectDisposition,
         repositoryBinding: bindingDisposition,
@@ -206,7 +218,7 @@ export class CommunityWorkspaceActivationContextInitializer
     }
 
     const profileValidation = this.dependencies.profiles.validate({
-      manifest: this.dependencies.defaultProfile.profileManifest,
+      manifest: requestedProfile.profileManifest,
     });
     if (profileValidation.isErr()) return err(profileValidation.error);
     const existingProfile = await this.dependencies.profileRepository.findInstallationByDefinition(
@@ -214,29 +226,31 @@ export class CommunityWorkspaceActivationContextInitializer
       profileValidation.value.definitionDigest,
     );
     const adapter = await this.dependencies.adapters.install(context, {
-      manifest: this.dependencies.defaultProfile.adapterManifest,
+      manifest: requestedProfile.adapterManifest,
     });
     if (adapter.isErr()) return err(adapter.error);
     const profile = await this.dependencies.profiles.install(context, {
-      manifest: this.dependencies.defaultProfile.profileManifest,
+      manifest: requestedProfile.profileManifest,
     });
     if (profile.isErr()) return err(profile.error);
-    const configure = ConfigureProjectWorkspaceProfileCommand.create({
-      projectId,
-      profileInstallationId: profile.value.installationId,
-    });
-    if (configure.isErr()) return err(configure.error);
-    const configured = await this.dependencies.commandBus.execute(context, configure.value);
-    if (configured.isErr()) {
-      const concurrentlyConfiguredProject = await this.dependencies.projects.findOne(
-        repositoryContext,
-        ProjectByIdSpec.create(ProjectId.rehydrate(projectId)),
-      );
-      if (
-        concurrentlyConfiguredProject?.toState().defaultWorkspaceProfileInstallationId?.value !==
-        profile.value.installationId
-      ) {
-        return err(configured.error);
+    if (!project.toState().defaultWorkspaceProfileInstallationId) {
+      const configure = ConfigureProjectWorkspaceProfileCommand.create({
+        projectId,
+        profileInstallationId: profile.value.installationId,
+      });
+      if (configure.isErr()) return err(configure.error);
+      const configured = await this.dependencies.commandBus.execute(context, configure.value);
+      if (configured.isErr()) {
+        const concurrentlyConfiguredProject = await this.dependencies.projects.findOne(
+          repositoryContext,
+          ProjectByIdSpec.create(ProjectId.rehydrate(projectId)),
+        );
+        if (
+          concurrentlyConfiguredProject?.toState().defaultWorkspaceProfileInstallationId?.value !==
+          profile.value.installationId
+        ) {
+          return err(configured.error);
+        }
       }
     }
     return ok({
@@ -244,6 +258,15 @@ export class CommunityWorkspaceActivationContextInitializer
       repositoryBinding: bindingDisposition,
       profile: existingProfile ? "reused" : "created",
     });
+  }
+
+  private profileConfigFor(
+    profile?: string,
+  ): CommunityRemoteWorkspaceDefaultProfileConfig | undefined {
+    if (profile === COMMUNITY_OCCUPANCY_PI_PROFILE_ID) {
+      return this.dependencies.defaultProfiles?.pi;
+    }
+    return this.dependencies.defaultProfiles?.opencode ?? this.dependencies.defaultProfile;
   }
 
   async ensureLocalEnvironment(

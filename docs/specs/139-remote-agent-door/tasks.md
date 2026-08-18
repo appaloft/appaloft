@@ -389,6 +389,15 @@
 - [x] CLI occupancy attach uses issued session without `terminal-sessions.show` (WS-REMOTE-ATTACH-139)
 - [ ] `appaloftdev code` on Hostinger occupancy attaches OpenCode
 
+
+## Slice 47 - occupancy Pi harness
+
+- [ ] Ticket `ready-for-agent`
+- [x] Reserved `stp_appaloft_remote_pi` / profile `appaloft-remote-pi`
+- [x] `appaloft code --harness pi` occupies Pi without rewriting OpenCode default
+- [x] Unit tests WS-REMOTE-HARNESS-175
+- [ ] `appaloftdev code --harness pi --new --no-attach` on registered Server
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

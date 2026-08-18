@@ -1124,6 +1124,58 @@ describe("Agent Workspace CLI", () => {
       forceNew: true,
       attach: false,
       targetServerId: "srv_1",
+      profile: "appaloft-remote",
+    });
+  });
+
+  test("[WS-REMOTE-HARNESS-175] code --harness pi occupies the Pi profile", async () => {
+    const commands: Command<unknown>[] = [];
+    const { createCliProgram } = await import("../src");
+    const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return ok({
+            workspaceId: "aws_pi",
+            sandboxId: "sbx_pi",
+            runtimeId: "sar_pi",
+          } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_pi" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        projectId: "prj_billing",
+        serverId: "srv_1",
+        serverName: "mac-mini",
+      }),
+    });
+
+    await program.parseAsync([
+      "node",
+      "appaloft",
+      "code",
+      "--harness",
+      "pi",
+      "--new",
+      "--no-attach",
+    ]);
+
+    expect((commands[0] as OpenAgentWorkspaceCommand).input).toMatchObject({
+      forceNew: true,
+      attach: false,
+      targetServerId: "srv_1",
+      profile: "appaloft-remote-pi",
     });
   });
 

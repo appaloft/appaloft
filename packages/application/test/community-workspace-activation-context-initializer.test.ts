@@ -534,4 +534,91 @@ describe("Community occupancy initializer", () => {
       },
     });
   });
+
+  test("[WS-REMOTE-HARNESS-175] installs Pi occupancy without rewriting the OpenCode default", async () => {
+    const installed: unknown[] = [];
+    const executed: unknown[] = [];
+    const initializer = new CommunityWorkspaceActivationContextInitializer({
+      commandBus: {
+        execute: async (_context: unknown, command: unknown) => {
+          executed.push(command);
+          return ok({ id: "unused" });
+        },
+      } as never,
+      projects: {
+        findOne: async () =>
+          ({
+            id: { value: "prj_demo" },
+            toState: () => ({
+              lifecycleStatus: { value: "active" },
+              defaultWorkspaceProfileInstallationId: { value: "awpi_opencode" },
+            }),
+          }) as never,
+        upsert: async () => undefined,
+      },
+      environments: {
+        findOne: async () => ({ id: { value: "env_local" } }),
+        upsert: async () => undefined,
+      } as never,
+      resources: {
+        findOne: async () => ({
+          id: { value: "res_app" },
+          toState: () => ({ networkProfile: { internalPort: { value: 80 } } }),
+        }),
+        upsert: async () => undefined,
+      } as never,
+      repositoryBindings: {
+        findByIdentity: async () => ({
+          binding: {
+            toState: () => ({
+              status: "active",
+              projectId: { value: "prj_demo" },
+            }),
+          },
+        }),
+        save: async () => undefined,
+      } as never,
+      adapters: {
+        install: async (_context: unknown, input: { manifest: unknown }) => {
+          installed.push(input.manifest);
+          return ok({ installationId: "aai_pi" });
+        },
+      } as never,
+      profiles: {
+        validate: () => ok({ definitionDigest: "sha256:pi" }),
+        install: async (_context: unknown, input: { manifest: unknown }) => {
+          installed.push(input.manifest);
+          return ok({ installationId: "awpi_pi" });
+        },
+      } as never,
+      profileRepository: { findInstallationByDefinition: async () => null } as never,
+      defaultProfile,
+      defaultProfiles: {
+        opencode: defaultProfile,
+        pi: {
+          adapterManifest: { adapter: "pi" },
+          profileManifest: { profile: "pi" },
+        },
+      },
+    });
+
+    const result = await initializer.ensure(
+      createExecutionContext({
+        requestId: "req_occupancy_pi",
+        entrypoint: "cli",
+        actor: { kind: "user", id: "usr_1" },
+        tenant: { tenantId: "tenant_1" },
+      }),
+      {
+        repository: "https://github.com/octocat/Hello-World.git",
+        repositoryIdentity: "github.com/octocat/Hello-World",
+        missing: "default-profile",
+        profile: "appaloft-remote-pi",
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(installed).toEqual([{ adapter: "pi" }, { profile: "pi" }]);
+    expect(executed).toHaveLength(0);
+  });
 });
