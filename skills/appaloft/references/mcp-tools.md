@@ -60,6 +60,8 @@ Each MCP tool maps one-to-one to an operation catalog key:
 - `system.doctor` -> `system_doctor`
 - Occupancy first-party `appaloft-tools` is a subset of that catalog. After login + Server,
   the bound tools are `projects_list`, `environments_list`, `environments_create`,
+  `environments_show`, `environments_set_variable`, `environments_unset_variable`,
+  `environments_effective_precedence`,
   `resources_list`, `resources_show`, `resources_create`, `resources_configure_source`,
   `resources_configure_runtime`, `resources_configure_network`, `resources_configure_access`,
   `servers_list`, `deployments_list`, `deployments_plan`, `deployments_create`,
