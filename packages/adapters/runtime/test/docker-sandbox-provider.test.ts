@@ -320,6 +320,48 @@ describe("DockerSandboxProvider", () => {
     expect(new TextDecoder().decode(runner.terminalWrites[0])).toContain("model-secret-value");
   });
 
+  test("[WS-REMOTE-ATTACH-136] execs occupancy attach argv when no bootstrap input exists", async () => {
+    const runner = new CapturingRunner();
+    const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
+    await provider.provision(request);
+
+    await provider.openTerminal({
+      sandboxId: "sbx_demo",
+      providerHandle: "appaloft-sbx_demo",
+      cwd: ".",
+      initialRows: 24,
+      initialCols: 80,
+      process: {
+        argv: ["opencode", "attach", "http://127.0.0.1:4096", "--dir", "/workspace"],
+      },
+    });
+
+    expect(runner.terminalCalls[0]?.argv).toEqual([
+      "docker",
+      "exec",
+      "-it",
+      "-e",
+      "HOME=/workspace",
+      "-e",
+      "XDG_DATA_HOME=/workspace/.local/share",
+      "-e",
+      "XDG_CONFIG_HOME=/workspace/.config",
+      "-e",
+      "XDG_STATE_HOME=/workspace/.local/state",
+      "-e",
+      "XDG_CACHE_HOME=/workspace/.cache",
+      "-w",
+      "/workspace",
+      "appaloft-sbx_demo",
+      "opencode",
+      "attach",
+      "http://127.0.0.1:4096",
+      "--dir",
+      "/workspace",
+    ]);
+    expect(runner.terminalWrites).toEqual([]);
+  });
+
   test("[SBX-RUNTIME-002] provisions a constrained gVisor container without shell interpolation", async () => {
     const runner = new CapturingRunner();
     const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
