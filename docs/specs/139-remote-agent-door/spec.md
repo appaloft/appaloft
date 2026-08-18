@@ -190,6 +190,10 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-RUNTIME-154 | Missing occupancy runtime stays fail-closed | no occupancy Resource `app` and no preview | `appaloft resource runtime restart` | still requires resourceId or previewEnvironmentId; does not invent a Resource. |
 | WS-REMOTE-TERM-155 | Bare resource terminal reuse occupancy | latest occupancy has Resource `app` | `appaloft resource terminal` | CLI does not require `resourceId`; opens a terminal session for that Resource `app`. |
 | WS-REMOTE-TERM-156 | Missing occupancy terminal stays fail-closed | no occupancy Resource `app` and no preview | `appaloft resource terminal` | still requires resourceId or previewEnvironmentId; does not invent a Resource. |
+| WS-REMOTE-SHOW-157 | Bare resource show reuse occupancy | latest occupancy has Resource `app` | `appaloft resource show` | CLI does not require `resourceId`; shows that Resource `app`. |
+| WS-REMOTE-SHOW-158 | Missing occupancy show stays fail-closed | no occupancy Resource `app` | `appaloft resource show` | still requires resourceId; does not invent a Resource. |
+| WS-REMOTE-CONFIG-159 | Bare effective-config reuse occupancy | latest occupancy has Resource `app` | `appaloft resource effective-config` | CLI does not require `resourceId`; shows masked effective config for that Resource `app`. |
+| WS-REMOTE-CONFIG-160 | Missing occupancy effective-config stays fail-closed | no occupancy Resource `app` and no preview | `appaloft resource effective-config` | still requires resourceId or previewEnvironmentId; does not invent a Resource. |
 
 ## Slice Scope
 

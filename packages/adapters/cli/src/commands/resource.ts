@@ -338,20 +338,25 @@ const listCommand = EffectCommand.make(
 const showCommand = EffectCommand.make(
   "show",
   {
-    resourceId: resourceIdArg,
+    resourceId: optionalResourceIdArg,
     json: jsonOption,
   },
-  ({ json, resourceId }) => {
-    void json;
-    return runQuery(
-      ShowResourceQuery.create({
-        resourceId,
-        includeLatestDeployment: true,
-        includeAccessSummary: true,
-        includeProfileDiagnostics: true,
-      }),
-    );
-  },
+  ({ json, resourceId }) =>
+    Effect.gen(function* () {
+      void json;
+      const resolvedResourceId = yield* resolveOptionalOccupancyResourceId(
+        optionalArgValue(resourceId),
+        undefined,
+      );
+      return yield* runQuery(
+        ShowResourceQuery.create({
+          resourceId: resolvedResourceId ?? "",
+          includeLatestDeployment: true,
+          includeAccessSummary: true,
+          includeProfileDiagnostics: true,
+        }),
+      );
+    }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceShow));
 
 const effectiveConfigCommand = EffectCommand.make(
@@ -361,12 +366,20 @@ const effectiveConfigCommand = EffectCommand.make(
     preview: previewEnvironmentOption,
   },
   ({ preview, resourceId }) =>
-    runQuery(
-      ResourceEffectiveConfigQuery.create({
-        resourceId: optionalArgValue(resourceId),
-        previewEnvironmentId: optionalValue(preview),
-      }),
-    ),
+    Effect.gen(function* () {
+      const requestedResourceId = optionalArgValue(resourceId);
+      const previewEnvironmentId = optionalValue(preview);
+      const resolvedResourceId = yield* resolveOptionalOccupancyResourceId(
+        requestedResourceId,
+        previewEnvironmentId,
+      );
+      return yield* runQuery(
+        ResourceEffectiveConfigQuery.create({
+          resourceId: resolvedResourceId,
+          previewEnvironmentId,
+        }),
+      );
+    }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceEffectiveConfig));
 
 const dependencyBindCommand = EffectCommand.make(
