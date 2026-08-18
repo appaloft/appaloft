@@ -77,11 +77,10 @@ import {
   isRemoteCodeGitRemoteLocator,
   nativeAttachRequiresInteractiveTerminal,
   occupancyCloudCompatError,
-  REMOTE_CODE_MODEL_HINT,
   resolveDefaultRemoteCodeDoor,
   resolveOccupancyConnectionsUrl,
-  resolveRemoteCodeGitHubHint,
   scratchRemoteRejectedError,
+  writeOccupancySessionHints,
 } from "../remote-code-session.js";
 import {
   attachIssuedTerminalSession,
@@ -725,10 +724,12 @@ export const workspaceCodeCommand = EffectCommand.make(
         ...(door.branch ? { branch: door.branch } : {}),
       });
       if (doorHint) process.stdout.write(`${doorHint}\n`);
-      process.stdout.write(`${REMOTE_CODE_MODEL_HINT}\n`);
-      process.stdout.write(`${yield* Effect.promise(() => resolveRemoteCodeGitHubHint())}\n`);
-      if (!attach) return;
+      if (!attach) {
+        yield* Effect.promise(() => writeOccupancySessionHints());
+        return;
+      }
       yield* completeWorkspaceOpen(result, true, cli.launchNativeWorkspaceClient);
+      yield* Effect.promise(() => writeOccupancySessionHints());
     }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.agentScratch));
 
@@ -915,13 +916,12 @@ const nativeAttach = EffectCommand.make(
         yield* print(access);
         return;
       }
-      process.stdout.write(`${REMOTE_CODE_MODEL_HINT}\n`);
-      process.stdout.write(`${yield* Effect.promise(() => resolveRemoteCodeGitHubHint())}\n`);
       if (access.transport === "managed-terminal") {
         yield* attachIssuedTerminalSession(issuedManagedTerminalDescriptor(access), {
           initialRows: 24,
           initialCols: 80,
         });
+        yield* Effect.promise(() => writeOccupancySessionHints());
         return;
       }
       if (access.clientHandoff === "display-only") {
@@ -933,6 +933,7 @@ const nativeAttach = EffectCommand.make(
           (cli.launchNativeWorkspaceClient ?? launchNativeWorkspaceClient)(access.clientCommand),
         catch: (error) => workspaceCliError(error, "workspace-native-client-handoff"),
       });
+      yield* Effect.promise(() => writeOccupancySessionHints());
     }),
 ).pipe(
   EffectCommand.withDescription(
