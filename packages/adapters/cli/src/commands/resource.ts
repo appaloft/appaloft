@@ -1089,23 +1089,30 @@ const diagnoseCommand = EffectCommand.make(
     summary,
     tail,
     to,
-  }) => {
-    void json;
-    return runResourceDiagnosticSummaryQuery(
-      ResourceDiagnosticSummaryQuery.create({
-        resourceId: optionalArgValue(resourceId),
-        previewEnvironmentId: optionalValue(preview),
-        deploymentId: optionalValue(deployment),
-        includeDeploymentTimelineTail: deploymentTimeline,
-        includeRuntimeLogTail: runtimeLogs,
-        includeProxyConfiguration: proxyConfiguration,
-        tailLines: Number(tail),
-        observationFrom: optionalValue(from),
-        observationTo: optionalValue(to),
-      }),
-      { summary },
-    );
-  },
+  }) =>
+    Effect.gen(function* () {
+      void json;
+      const requestedResourceId = optionalArgValue(resourceId);
+      const previewEnvironmentId = optionalValue(preview);
+      const resolvedResourceId = yield* resolveOptionalOccupancyResourceId(
+        requestedResourceId,
+        previewEnvironmentId,
+      );
+      return yield* runResourceDiagnosticSummaryQuery(
+        ResourceDiagnosticSummaryQuery.create({
+          resourceId: resolvedResourceId,
+          previewEnvironmentId,
+          deploymentId: optionalValue(deployment),
+          includeDeploymentTimelineTail: deploymentTimeline,
+          includeRuntimeLogTail: runtimeLogs,
+          includeProxyConfiguration: proxyConfiguration,
+          tailLines: Number(tail),
+          observationFrom: optionalValue(from),
+          observationTo: optionalValue(to),
+        }),
+        { summary },
+      );
+    }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceDiagnose));
 
 const accessFailureCommand = EffectCommand.make(
