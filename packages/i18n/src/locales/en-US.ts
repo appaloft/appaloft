@@ -564,8 +564,12 @@ export const enUS = {
       emailVerified: "Email verification",
       emptySessions: "No active sessions are visible for this account.",
       githubAccountTitle: "GitHub account",
+      authorizeGitHubRepo: "Authorize repository access",
+      authorizingGitHubRepo: "Authorizing repository access",
       githubConnectedAs: "GitHub connected: {{account}}",
       githubConnectionDescription: "Link a GitHub account for repository authorization.",
+      githubIdentityOnlyDescription:
+        "GitHub sign-in is identity-only. Authorize repository access to open occupancy PRs.",
       introBody:
         "Manage profile metadata, sign-in security, active sessions, and account deletion.",
       introTitle: "Account settings",

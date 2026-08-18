@@ -3423,8 +3423,10 @@ describe("console page structure", () => {
     );
     expect(accountConnectionsPageSource).toContain('activePath="/account/connections"');
     expect(accountConnectionsPageSource).toContain("/api/auth/link-social");
+    expect(accountConnectionsPageSource).toContain("/api/auth/sign-in/social");
     expect(accountConnectionsPageSource).toContain("githubProvider?.accountLabel");
     expect(accountConnectionsPageSource).toContain("linkGitHubAccount");
+    expect(accountConnectionsPageSource).toContain("authorizeGitHubRepo");
     expect(consoleShellSource).not.toContain("/api/auth/link-social");
   });
 

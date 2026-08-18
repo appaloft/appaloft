@@ -475,13 +475,21 @@ describe("organization auth management console surface", () => {
     expect(accountConnectionsSource).toContain('activePath="/account/connections"');
     expect(accountConnectionsSource).toContain("data-account-github-connection");
     expect(accountConnectionsSource).toContain("/api/auth/link-social");
+    expect(accountConnectionsSource).toContain("/api/auth/sign-in/social");
     expect(accountConnectionsSource).toContain("githubProvider?.accountLabel");
     expect(accountConnectionsSource).toContain(
       "i18nKeys.console.accountSettings.githubConnectedAs",
     );
     expect(accountConnectionsSource).toContain(
+      "i18nKeys.console.accountSettings.githubIdentityOnlyDescription",
+    );
+    expect(accountConnectionsSource).toContain(
+      "i18nKeys.console.accountSettings.authorizeGitHubRepo",
+    );
+    expect(accountConnectionsSource).toContain(
       "i18nKeys.console.accountSettings.linkGitHubAccount",
     );
+    expect(accountConnectionsSource).not.toContain("!githubConnected && !linkingGitHub");
     expect(accountSessionsSource).toContain("orpc.account.listSessions.queryOptions");
     expect(accountSessionsSource).toContain("orpcClient.account.revokeSession");
     expect(accountSessionsSource).toContain("clientKind");

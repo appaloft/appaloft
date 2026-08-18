@@ -51,6 +51,7 @@
 | APP-CONN-004 | adapter/application | Persistent DNS apply manages only accepted Appaloft-owned records. |
 | APP-CONN-005 | adapter/application | DNS conflicts fail closed by default. |
 | APP-CONN-006 | application/UI | GitHub login does not grant source access. |
+| APP-CONN-006A | Web | Identity-only GitHub login can still request repo from Connections. |
 | APP-CONN-007 | persistence/application | GitHub App installation readback maps to source connection. |
 | APP-CONN-008 | adapter/contract | Provider app tokens are short-lived and redacted. |
 | APP-CONN-009 | application | Infrastructure onboarding returns generic SSH target proposals. |
