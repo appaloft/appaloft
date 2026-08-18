@@ -762,20 +762,31 @@ export class DockerSandboxProvider implements SandboxProvider {
     }
     const terminal = await this.runner.openTerminal(
       processArgv
-        ? [
-            "docker",
-            "exec",
-            "-it",
-            ...sandboxProcessDockerExecArgs,
-            "-w",
-            cwd,
-            request.providerHandle,
-            "sh",
-            "-c",
-            'stty -echo; exec sh -s -- "$@"',
-            "appaloft-managed-terminal",
-            ...processArgv,
-          ]
+        ? initialInput?.byteLength
+          ? [
+              "docker",
+              "exec",
+              "-it",
+              ...sandboxProcessDockerExecArgs,
+              "-w",
+              cwd,
+              request.providerHandle,
+              "sh",
+              "-c",
+              'stty -echo; exec sh -s -- "$@"',
+              "appaloft-managed-terminal",
+              ...processArgv,
+            ]
+          : [
+              "docker",
+              "exec",
+              "-it",
+              ...sandboxProcessDockerExecArgs,
+              "-w",
+              cwd,
+              request.providerHandle,
+              ...processArgv,
+            ]
         : [
             "docker",
             "exec",
@@ -786,7 +797,7 @@ export class DockerSandboxProvider implements SandboxProvider {
             request.providerHandle,
             "sh",
             "-lc",
-            'if command -v bash >/dev/null 2>&1; then exec bash --noprofile --norc -i; fi; exec sh -i',
+            "if command -v bash >/dev/null 2>&1; then exec bash --noprofile --norc -i; fi; exec sh -i",
           ],
       {
         initialRows: request.initialRows,

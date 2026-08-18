@@ -34,6 +34,7 @@ import {
   type RemoteGitWorkspaceRef,
 } from "./local-git-workspace-context.js";
 import { type ScratchAgentLauncher, type ScratchHarnessResolver } from "./local-scratch-session.js";
+import { createManagedTerminalBootstrapEchoFilter } from "./managed-terminal-bootstrap-echo.js";
 import { type OperatePresentation } from "./operate-presentation.js";
 import { type RemoteCodeDoorResolver } from "./remote-code-session.js";
 import {
@@ -557,6 +558,7 @@ async function pipeTerminalSession(input: {
     void session.write(chunkToTerminalInput(chunk));
   };
   let sessionClosed = false;
+  const stripBootstrapEcho = createManagedTerminalBootstrapEchoFilter();
 
   try {
     if (supportsRawMode) {
@@ -570,7 +572,10 @@ async function pipeTerminalSession(input: {
 
     for await (const frame of session) {
       if (frame.kind === "output") {
-        (frame.stream === "stderr" ? stderr : stdout).write(frame.data);
+        const data = frame.stream === "stderr" ? frame.data : stripBootstrapEcho(frame.data);
+        if (typeof data === "string" ? data.length > 0 : data.byteLength > 0) {
+          (frame.stream === "stderr" ? stderr : stdout).write(data);
+        }
         continue;
       }
 
