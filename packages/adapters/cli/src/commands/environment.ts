@@ -474,9 +474,24 @@ const copyCommand = EffectCommand.make(
 const effectivePrecedenceCommand = EffectCommand.make(
   "effective-precedence",
   {
-    environmentId: environmentIdArg,
+    environmentId: Args.text({ name: "environmentId" }).pipe(Args.optional),
   },
-  ({ environmentId }) => runQuery(EnvironmentEffectivePrecedenceQuery.create({ environmentId })),
+  ({ environmentId }) =>
+    Effect.gen(function* () {
+      const resolvedEnvironmentId = yield* resolveOptionalOccupancyEnvironmentId(
+        optionalValue(environmentId),
+      );
+      if (!resolvedEnvironmentId) {
+        return yield* Effect.fail(
+          domainError.validation("Environment id is required", {
+            phase: "environment-effective-precedence-cli",
+          }),
+        );
+      }
+      return yield* runQuery(
+        EnvironmentEffectivePrecedenceQuery.create({ environmentId: resolvedEnvironmentId }),
+      );
+    }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentEffectivePrecedence));
 
 const promoteCommand = EffectCommand.make(

@@ -204,6 +204,8 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-ENVSHOW-168 | Missing occupancy env show stays fail-closed | no occupancy Environment `local` | `appaloft env show` | still requires environmentId; does not invent an Environment. |
 | WS-REMOTE-PROJSHOW-169 | Bare project show reuse occupancy project | latest occupancy has activation projectId | `appaloft project show` | CLI does not require `projectId`; shows that project. |
 | WS-REMOTE-PROJSHOW-170 | Missing occupancy project show stays fail-closed | no occupancy projectId | `appaloft project show` | still requires projectId; does not invent a project. |
+| WS-REMOTE-ENVPREC-171 | Bare env effective-precedence reuse occupancy local | latest occupancy has Environment `local` | `appaloft env effective-precedence` | CLI does not require `environmentId`; shows masked vars for that Environment `local`. |
+| WS-REMOTE-ENVPREC-172 | Missing occupancy env effective-precedence stays fail-closed | no occupancy Environment `local` | `appaloft env effective-precedence` | still requires environmentId; does not invent an Environment. |
 
 ## Slice Scope
 
