@@ -1003,29 +1003,37 @@ const terminalCommand = EffectCommand.make(
     attach: attachTerminalOption,
   },
   ({ attach, cols, deployment, directory, preview, resourceId, rows }) =>
-    runTerminalCommand(
-      OpenTerminalSessionCommand.create({
-        scope: optionalValue(preview)
-          ? {
-              kind: "preview",
-              previewEnvironmentId: optionalValue(preview) ?? "",
-              deploymentId: optionalValue(deployment),
-            }
-          : {
-              kind: "resource",
-              resourceId: optionalArgValue(resourceId) ?? "",
-              deploymentId: optionalValue(deployment),
-            },
-        relativeDirectory: optionalValue(directory),
-        initialRows: Number(rows),
-        initialCols: Number(cols),
-      }),
-      {
-        attach,
-        initialRows: Number(rows),
-        initialCols: Number(cols),
-      },
-    ),
+    Effect.gen(function* () {
+      const requestedResourceId = optionalArgValue(resourceId);
+      const previewEnvironmentId = optionalValue(preview);
+      const resolvedResourceId = yield* resolveOptionalOccupancyResourceId(
+        requestedResourceId,
+        previewEnvironmentId,
+      );
+      return yield* runTerminalCommand(
+        OpenTerminalSessionCommand.create({
+          scope: previewEnvironmentId
+            ? {
+                kind: "preview",
+                previewEnvironmentId,
+                deploymentId: optionalValue(deployment),
+              }
+            : {
+                kind: "resource",
+                resourceId: resolvedResourceId ?? "",
+                deploymentId: optionalValue(deployment),
+              },
+          relativeDirectory: optionalValue(directory),
+          initialRows: Number(rows),
+          initialCols: Number(cols),
+        }),
+        {
+          attach,
+          initialRows: Number(rows),
+          initialCols: Number(cols),
+        },
+      );
+    }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceTerminal));
 
 const proxyConfigCommand = EffectCommand.make(
