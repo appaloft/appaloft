@@ -136,6 +136,17 @@ describe("release build workflow", () => {
     expect(updateReleaseNotesStepBody?.match(/^ {8}env:/gm)?.length).toBe(1);
   });
 
+  test("[RELEASE-HARDENING-003] GitHub release assets do not wait on the container image", async () => {
+    const workflow = await readText(".github/workflows/release-build.yml");
+    const publish = workflow.match(
+      / {2}publish-release-assets:\n {4}needs:\n(?<needs>[\s\S]*?)\n {4}runs-on:/,
+    );
+    expect(publish?.groups?.needs).toBeDefined();
+    expect(publish?.groups?.needs).toContain("- binary-artifacts");
+    expect(publish?.groups?.needs).toContain("- desktop-artifacts");
+    expect(publish?.groups?.needs).not.toContain("- container");
+  });
+
   test("[WS-TUI-PACKAGE-011][WS-TUI-TERMINAL-012] packages and smokes the Workspace renderer on every supported release family", async () => {
     const workflow = await readText(".github/workflows/release-build.yml");
 
