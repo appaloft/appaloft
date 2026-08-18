@@ -297,6 +297,11 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
   readonly sandboxTemplateId: string;
   readonly version: string;
   readonly templateDigest: string;
+  readonly interaction = Object.freeze({
+    transport: "managed-terminal" as const,
+    command: Object.freeze(["pi"]),
+    sessionRecovery: "managed-run-lineage" as const,
+  });
   readonly capabilities = Object.freeze({
     taskMode: true,
     interactive: true,

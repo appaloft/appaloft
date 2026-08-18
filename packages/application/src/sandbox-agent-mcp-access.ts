@@ -73,6 +73,21 @@ export const OCCUPANCY_FIRST_PARTY_MCP_DISCOVERY_TOOLS = [
 export function withOccupancyFirstPartyMcpDiscovery(
   bindings: readonly AgentWorkspaceMcpBinding[] = [],
 ): readonly AgentWorkspaceMcpBinding[] {
+  const firstParty = bindings.find(
+    (binding) => binding.connectionReference === OCCUPANCY_FIRST_PARTY_MCP_REFERENCE,
+  );
+  if (!firstParty) {
+    return [
+      ...bindings,
+      {
+        requirementId: "appaloft-tools",
+        connectionReference: OCCUPANCY_FIRST_PARTY_MCP_REFERENCE,
+        required: false,
+        purpose: "Deploy and inspect Appaloft from occupancy",
+        requestedTools: [...OCCUPANCY_FIRST_PARTY_MCP_DISCOVERY_TOOLS],
+      },
+    ];
+  }
   return bindings.map((binding) => {
     if (binding.connectionReference !== OCCUPANCY_FIRST_PARTY_MCP_REFERENCE) {
       return binding;

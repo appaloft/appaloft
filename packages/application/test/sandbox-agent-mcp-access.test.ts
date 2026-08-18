@@ -1,8 +1,11 @@
+import "reflect-metadata";
+
 import { describe, expect, test } from "bun:test";
 
 import {
   createExecutionContext,
   issueSandboxAgentMcpAccess,
+  OCCUPANCY_FIRST_PARTY_MCP_DISCOVERY_TOOLS,
   reconcileSandboxAgentMcpAccessScope,
   type SandboxAgentMcpAccessProvider,
   withOccupancyFirstPartyMcpDiscovery,
@@ -186,6 +189,18 @@ describe("Sandbox Agent MCP access", () => {
         required: true,
         purpose: "Documentation",
         requestedTools: ["docs.search"],
+      },
+    ]);
+  });
+
+  test("[WS-REMOTE-MCP-DISCOVERY-021] injects occupancy first-party tools when none are bound", () => {
+    expect(withOccupancyFirstPartyMcpDiscovery([])).toEqual([
+      {
+        requirementId: "appaloft-tools",
+        connectionReference: "appaloft-first-party",
+        required: false,
+        purpose: "Deploy and inspect Appaloft from occupancy",
+        requestedTools: [...OCCUPANCY_FIRST_PARTY_MCP_DISCOVERY_TOOLS],
       },
     ]);
   });

@@ -15,6 +15,12 @@ describe("community remote default profile", () => {
       sandboxTemplateId: "tpl_opencode",
       version: "1.0.0",
       templateDigest: `sha256:${"a".repeat(64)}`,
+      interaction: {
+        transport: "native-attach",
+        command: ["opencode", "attach", "http://127.0.0.1:4096"],
+        sessionRecovery: "native-session-store",
+        serverPort: 4096,
+      },
     });
 
     expect(profile).toBeDefined();
@@ -96,12 +102,17 @@ describe("community remote default profile", () => {
       sandboxTemplateId: "tpl_pi",
       version: "1.0.0",
       templateDigest: `sha256:${"b".repeat(64)}`,
+      interaction: {
+        transport: "managed-terminal",
+        command: ["pi"],
+        sessionRecovery: "managed-run-lineage",
+      },
     });
 
     expect(profile).toBeDefined();
     expect(profile?.adapterManifest).toMatchObject({
       id: "appaloft-remote-pi",
-      displayName: "Appaloft Remote Pi",
+      displayName: "Appaloft Remote pi",
       requirements: {
         capabilities: { required: ["managed-terminal"], optional: ["headless"] },
       },
@@ -121,7 +132,30 @@ describe("community remote default profile", () => {
     });
     expect(profile?.profileManifest).toMatchObject({
       id: "appaloft-remote-pi",
-      displayName: "Appaloft Remote Pi",
+      displayName: "Appaloft Remote pi",
+    });
+  });
+
+  test("[WS-REMOTE-HARNESS-175] builds terminal appaloft-remote-omp from harness interaction", () => {
+    const profile = createCommunityRemoteDefaultProfile({
+      harnessKey: "omp",
+      templateId: "aht_omp_managed_v1",
+      sandboxTemplateId: "tpl_pi",
+      version: "1.0.0",
+      templateDigest: `sha256:${"c".repeat(64)}`,
+      interaction: {
+        transport: "managed-terminal",
+        command: ["omp"],
+        sessionRecovery: "managed-run-lineage",
+      },
+    });
+
+    expect(profile?.adapterManifest).toMatchObject({
+      id: "appaloft-remote-omp",
+      displayName: "Appaloft Remote omp",
+      requirements: {
+        capabilities: { required: ["managed-terminal"], optional: ["headless"] },
+      },
     });
   });
 });

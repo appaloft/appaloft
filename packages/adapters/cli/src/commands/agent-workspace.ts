@@ -492,7 +492,7 @@ export const workspaceCodeCommand = EffectCommand.make(
     local: Options.boolean("local").pipe(Options.withDefault(false)),
     forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
     open: Options.boolean("open").pipe(Options.withDefault(false)),
-    harness: Options.choice("harness", ["opencode", "pi"] as const).pipe(
+    harness: Options.choice("harness", ["opencode", "pi", "omp"] as const).pipe(
       Options.withDefault("opencode" as const),
     ),
     openTarget: Options.choice("open-target", [

@@ -112,7 +112,6 @@ import {
   COMMUNITY_OCCUPANCY_PI_TEMPLATE_DIGEST,
   COMMUNITY_OCCUPANCY_PI_TEMPLATE_ID,
   COMMUNITY_OCCUPANCY_PI_VERSION,
-  type CommunityRemoteWorkspaceDefaultProfileConfig,
   CommunityWorkspaceActivationContextInitializer,
   CompleteConnectionCallbackCommandHandler,
   CompleteConnectionCallbackUseCase,
@@ -446,6 +445,7 @@ import {
   OpenTerminalSessionUseCase,
   OperationAuditDomainEventProjector,
   OperatorWorkQueryService,
+  occupancyRemoteProfileId,
   operationCatalog,
   PlanConnectorCapabilityQueryHandler,
   PlanConnectorCapabilityQueryService,
@@ -3615,6 +3615,20 @@ export function registerApplicationServices(
             version: COMMUNITY_OCCUPANCY_PI_VERSION,
             templateDigest: COMMUNITY_OCCUPANCY_PI_TEMPLATE_DIGEST,
           }),
+          new CommandSandboxAgentHarness(sandboxes, {
+            key: "omp",
+            templateId: "aht_omp_managed_v1",
+            sandboxTemplateId: COMMUNITY_OCCUPANCY_PI_TEMPLATE_ID,
+            version: COMMUNITY_OCCUPANCY_PI_VERSION,
+            templateDigest: COMMUNITY_OCCUPANCY_PI_TEMPLATE_DIGEST,
+            run: { argv: ["omp"] },
+            attach: {
+              transport: "managed-terminal",
+              command: ["omp"],
+              sessionRecovery: "managed-run-lineage",
+            },
+            healthcheck: { kind: "process" },
+          }),
         ]);
       }),
     });
@@ -4022,36 +4036,24 @@ export function registerApplicationServices(
         const harnesses = dependencyContainer
           .resolve<SandboxAgentHarnessRegistry>(tokens.sandboxAgentHarnessRegistry)
           .list();
-        const preferred =
-          harnesses.find((harness) => harness.key === "opencode") ??
-          harnesses.find(
-            (harness) => harness.key === "pi" || harness.key === "appaloft-managed-pi",
-          );
+        const preferred = harnesses.find((harness) => harness.key === "opencode") ?? harnesses[0];
         const defaultProfiles = Object.fromEntries(
-          harnesses
-            .filter((harness) => harness.key === "opencode" || harness.key === "pi")
-            .flatMap((harness) => {
-              const profile = createCommunityRemoteDefaultProfile({
-                harnessKey: harness.key,
-                templateId: harness.templateId,
-                sandboxTemplateId: harness.sandboxTemplateId ?? harness.templateId,
-                version: harness.version,
-                templateDigest: harness.templateDigest,
-              });
-              return profile ? [[harness.key, profile] as const] : [];
-            }),
-        ) as Partial<Record<"opencode" | "pi", CommunityRemoteWorkspaceDefaultProfileConfig>>;
+          harnesses.flatMap((harness) => {
+            const profile = createCommunityRemoteDefaultProfile({
+              harnessKey: harness.key,
+              templateId: harness.templateId,
+              sandboxTemplateId: harness.sandboxTemplateId ?? harness.templateId,
+              version: harness.version,
+              templateDigest: harness.templateDigest,
+              ...(harness.interaction ? { interaction: harness.interaction } : {}),
+              ...(harness.capabilities ? { capabilities: harness.capabilities } : {}),
+            });
+            return profile ? [[occupancyRemoteProfileId(harness.key), profile] as const] : [];
+          }),
+        );
         const defaultProfile =
-          defaultProfiles.opencode ??
-          (preferred
-            ? createCommunityRemoteDefaultProfile({
-                harnessKey: preferred.key,
-                templateId: preferred.templateId,
-                sandboxTemplateId: preferred.sandboxTemplateId ?? preferred.templateId,
-                version: preferred.version,
-                templateDigest: preferred.templateDigest,
-              })
-            : undefined);
+          (preferred ? defaultProfiles[occupancyRemoteProfileId(preferred.key)] : undefined) ??
+          Object.values(defaultProfiles)[0];
         return new CommunityWorkspaceActivationContextInitializer({
           commandBus: dependencyContainer.resolve(tokens.commandBus),
           projects: dependencyContainer.resolve(tokens.projectRepository),
