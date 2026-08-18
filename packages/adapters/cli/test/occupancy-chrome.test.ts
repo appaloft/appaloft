@@ -11,7 +11,10 @@ import {
   occupancyCompareOrPullUrl,
   occupancyConnectionsUrl,
   occupancyGitHubCompareUrl,
+  occupancyLocalEnvironmentId,
   occupancyPullRequestFromPreviewEnvironments,
+  parseOccupancyEnvSetAssignment,
+  parseOccupancyEnvUnsetAssignment,
 } from "../src/occupancy-chrome.js";
 
 describe("occupancy PR chrome", () => {
@@ -397,5 +400,49 @@ describe("occupancy resource logs", () => {
         "prj_web",
       ),
     ).toBeUndefined();
+  });
+});
+
+describe("occupancy env set", () => {
+  test("[WS-REMOTE-ENVSET-161][WS-REMOTE-ENVUNSET-163] copies occupancy Environment local id", () => {
+    expect(
+      occupancyLocalEnvironmentId(
+        [
+          { id: "env_other", projectId: "prj_web", name: "preview", status: "active" },
+          { id: "env_xc5zlcwxk650", projectId: "prj_web", name: "local", status: "active" },
+        ],
+        "prj_web",
+      ),
+    ).toBe("env_xc5zlcwxk650");
+  });
+
+  test("[WS-REMOTE-ENVSET-162][WS-REMOTE-ENVUNSET-164] missing occupancy Environment local stays omitted", () => {
+    expect(
+      occupancyLocalEnvironmentId(
+        [{ id: "env_other", projectId: "prj_web", name: "preview", status: "active" }],
+        "prj_web",
+      ),
+    ).toBeUndefined();
+  });
+
+  test("[WS-REMOTE-ENVSET-161] parses KEY VALUE without environment id", () => {
+    expect(parseOccupancyEnvSetAssignment(["OCCUPANCY_CLI_SMOKE", "1"])).toEqual({
+      key: "OCCUPANCY_CLI_SMOKE",
+      value: "1",
+    });
+  });
+
+  test("[WS-REMOTE-ENVSET-161] keeps explicit environment id", () => {
+    expect(parseOccupancyEnvSetAssignment(["env_demo", "APP_SECRET", "private-value"])).toEqual({
+      environmentId: "env_demo",
+      key: "APP_SECRET",
+      value: "private-value",
+    });
+  });
+
+  test("[WS-REMOTE-ENVUNSET-163] parses KEY without environment id", () => {
+    expect(parseOccupancyEnvUnsetAssignment(["OCCUPANCY_CLI_SMOKE"])).toEqual({
+      key: "OCCUPANCY_CLI_SMOKE",
+    });
   });
 });

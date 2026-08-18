@@ -1,7 +1,16 @@
-import { ListResourcesQuery, ListSandboxesQuery } from "@appaloft/application";
+import {
+  ListEnvironmentsQuery,
+  ListResourcesQuery,
+  ListSandboxesQuery,
+} from "@appaloft/application";
 import { Effect } from "effect";
 
-import { type OccupancyResource, occupancyAppResourceId } from "./occupancy-chrome.js";
+import {
+  type OccupancyEnvironment,
+  type OccupancyResource,
+  occupancyAppResourceId,
+  occupancyLocalEnvironmentId,
+} from "./occupancy-chrome.js";
 import { selectResumeOccupancy } from "./remote-code-session.js";
 import { CliRuntime } from "./runtime.js";
 
@@ -61,5 +70,31 @@ export function resolveLatestOccupancyAppResourceId() {
       (resourcesResult.value as { readonly items?: readonly OccupancyResource[] }).items ?? [],
       projectId,
     );
+  });
+}
+
+export function resolveLatestOccupancyLocalEnvironmentId() {
+  return Effect.gen(function* () {
+    const projectId = yield* resolveLatestOccupancyProjectId();
+    if (!projectId) return undefined;
+    const cli = yield* CliRuntime;
+    const environmentsQuery = ListEnvironmentsQuery.create({ projectId });
+    if (environmentsQuery.isErr()) return undefined;
+    const environmentsResult = yield* Effect.promise(() =>
+      cli.executeQuery(environmentsQuery.value),
+    );
+    if (environmentsResult.isErr()) return undefined;
+    return occupancyLocalEnvironmentId(
+      ((environmentsResult.value as { readonly items?: readonly OccupancyEnvironment[] }).items ??
+        []) as OccupancyEnvironment[],
+      projectId,
+    );
+  });
+}
+
+export function resolveOptionalOccupancyEnvironmentId(requestedEnvironmentId: string | undefined) {
+  return Effect.gen(function* () {
+    if (requestedEnvironmentId) return requestedEnvironmentId;
+    return yield* resolveLatestOccupancyLocalEnvironmentId();
   });
 }
