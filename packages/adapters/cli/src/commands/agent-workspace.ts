@@ -76,9 +76,9 @@ import {
   isRemoteCodeGitRemoteLocator,
   nativeAttachRequiresInteractiveTerminal,
   occupancyCloudCompatError,
-  REMOTE_CODE_GITHUB_HINT,
   REMOTE_CODE_MODEL_HINT,
   resolveDefaultRemoteCodeDoor,
+  resolveRemoteCodeGitHubHint,
   scratchRemoteRejectedError,
 } from "../remote-code-session.js";
 import {
@@ -710,7 +710,7 @@ export const workspaceCodeCommand = EffectCommand.make(
       });
       if (doorHint) process.stdout.write(`${doorHint}\n`);
       process.stdout.write(`${REMOTE_CODE_MODEL_HINT}\n`);
-      process.stdout.write(`${REMOTE_CODE_GITHUB_HINT}\n`);
+      process.stdout.write(`${yield* Effect.promise(() => resolveRemoteCodeGitHubHint())}\n`);
       if (!attach) return;
       yield* completeWorkspaceOpen(result, true, cli.launchNativeWorkspaceClient);
     }),
@@ -900,7 +900,7 @@ const nativeAttach = EffectCommand.make(
         return;
       }
       process.stdout.write(`${REMOTE_CODE_MODEL_HINT}\n`);
-      process.stdout.write(`${REMOTE_CODE_GITHUB_HINT}\n`);
+      process.stdout.write(`${yield* Effect.promise(() => resolveRemoteCodeGitHubHint())}\n`);
       if (access.transport === "managed-terminal") {
         yield* attachIssuedTerminalSession(issuedManagedTerminalDescriptor(access), {
           initialRows: 24,

@@ -154,7 +154,7 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-BANNER-118 | Existing PR line stays `PR #n` | occupancy already has PR #n | `appaloft code --no-attach` | PR line stays `PR #n · <url>`; no Compare line. |
 | WS-REMOTE-HINT-119 | Occupancy door hint follows the banner | remote `code --no-attach` | `appaloft code --no-attach` | one line names `--open-target` and `workspace` `p`/`P`/`o`/`c`. |
 | WS-REMOTE-HINT-120 | Occupancy door hint stays before the model hint | remote `code --no-attach` | `appaloft code --no-attach` | door hint prints, then the existing model hint. |
-| WS-REMOTE-HINT-140 | Occupancy GitHub PR hint follows the model hint | remote `code --no-attach` | `appaloft code --no-attach` | one line tells the user to connect repo at `/account/connections` or install the App with contents/PR write. |
+| WS-REMOTE-HINT-140 | Occupancy GitHub PR hint follows the model hint | remote `code --no-attach` | `appaloft code --no-attach` | one line tells the user to connect repo at the control-plane `/account/connections` URL, or install the App with contents/PR write. Active Cloud profile uses the absolute origin. |
 | WS-REMOTE-HINT-121 | Scratch `--local` stays unlabeled | `--local` scratch session | `appaloft code --local --no-attach` | no occupancy door hint. |
 | WS-REMOTE-HINT-122 | Available-door hint lists only present URLs | occupancy has Preview + PR | `appaloft code --no-attach` | hint names `preview`/`p` and `pr`/`o`, not production or compare. |
 | WS-REMOTE-HINT-123 | Existing PR omits compare from the hint | occupancy has GitHub PR | `appaloft code --no-attach` | hint has `pr`/`o`, not `compare`/`c`. |
