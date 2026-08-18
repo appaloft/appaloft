@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.8.15](https://github.com/appaloft/appaloft/compare/v1.8.14...v1.8.15) (2026-08-18)
+
+
+### Bug Fixes
+
+* **web:** let identity GitHub authorize repo from Connections ([#1276](https://github.com/appaloft/appaloft/issues/1276)) ([b22f47a](https://github.com/appaloft/appaloft/commit/b22f47a1127cb666bbbfc21892c28bcdc3bff4d6))
+
+
+### Documentation
+
+* APP-CONN-006A. User-facing Connections copy and button. ([b22f47a](https://github.com/appaloft/appaloft/commit/b22f47a1127cb666bbbfc21892c28bcdc3bff4d6))
+
 ## [1.8.14](https://github.com/appaloft/appaloft/compare/v1.8.13...v1.8.14) (2026-08-17)
 
 
