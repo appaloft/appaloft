@@ -530,6 +530,16 @@ function resolveOccupancyAppResourceId() {
   });
 }
 
+function resolveOptionalOccupancyResourceId(
+  requestedResourceId: string | undefined,
+  previewEnvironmentId: string | undefined,
+) {
+  return Effect.gen(function* () {
+    if (requestedResourceId || previewEnvironmentId) return requestedResourceId;
+    return yield* resolveOccupancyAppResourceId();
+  });
+}
+
 const logsCommand = EffectCommand.make(
   "logs",
   {
@@ -544,10 +554,10 @@ const logsCommand = EffectCommand.make(
     Effect.gen(function* () {
       const requestedResourceId = optionalArgValue(resourceId);
       const previewEnvironmentId = optionalValue(preview);
-      const resolvedResourceId =
-        requestedResourceId || previewEnvironmentId
-          ? requestedResourceId
-          : yield* resolveOccupancyAppResourceId();
+      const resolvedResourceId = yield* resolveOptionalOccupancyResourceId(
+        requestedResourceId,
+        previewEnvironmentId,
+      );
       return yield* runResourceRuntimeLogsQuery(
         ResourceRuntimeLogsQuery.create({
           resourceId: resolvedResourceId,
@@ -1131,19 +1141,26 @@ const healthCommand = EffectCommand.make(
     runtimeProbe: runtimeProbeOption,
     json: jsonOption,
   },
-  ({ checks, json, live, preview, publicAccessProbe, resourceId, runtimeProbe }) => {
-    void json;
-    return runQuery(
-      ResourceHealthQuery.create({
-        resourceId: optionalArgValue(resourceId),
-        previewEnvironmentId: optionalValue(preview),
-        mode: live ? "live" : "cached",
-        includeChecks: checks,
-        includePublicAccessProbe: publicAccessProbe,
-        includeRuntimeProbe: runtimeProbe,
-      }),
-    );
-  },
+  ({ checks, json, live, preview, publicAccessProbe, resourceId, runtimeProbe }) =>
+    Effect.gen(function* () {
+      void json;
+      const requestedResourceId = optionalArgValue(resourceId);
+      const previewEnvironmentId = optionalValue(preview);
+      const resolvedResourceId = yield* resolveOptionalOccupancyResourceId(
+        requestedResourceId,
+        previewEnvironmentId,
+      );
+      return yield* runQuery(
+        ResourceHealthQuery.create({
+          resourceId: resolvedResourceId,
+          previewEnvironmentId,
+          mode: live ? "live" : "cached",
+          includeChecks: checks,
+          includePublicAccessProbe: publicAccessProbe,
+          includeRuntimeProbe: runtimeProbe,
+        }),
+      );
+    }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceHealth));
 
 const healthHistoryCommand = EffectCommand.make(
