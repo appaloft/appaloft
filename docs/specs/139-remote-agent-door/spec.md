@@ -198,6 +198,8 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-ENVSET-162 | Missing occupancy env set stays fail-closed | no occupancy Environment `local` | `appaloft env set KEY VALUE` | still requires environmentId; does not invent an Environment. |
 | WS-REMOTE-ENVUNSET-163 | Bare env unset reuse occupancy local | latest occupancy has Environment `local` | `appaloft env unset KEY` | CLI does not require `environmentId`; unsets that Environment `local`. |
 | WS-REMOTE-ENVUNSET-164 | Missing occupancy env unset stays fail-closed | no occupancy Environment `local` | `appaloft env unset KEY` | still requires environmentId; does not invent an Environment. |
+| WS-REMOTE-ENVSET-165 | Bare env set defaults kind and exposure | occupancy Environment `local` exists | `appaloft env set KEY VALUE` | writes `plain-config` / `runtime` without `--kind` or `--exposure`. |
+| WS-REMOTE-ENVUNSET-166 | Bare env unset defaults exposure | occupancy Environment `local` exists | `appaloft env unset KEY` | unsets `runtime` without `--exposure`. |
 
 ## Slice Scope
 
