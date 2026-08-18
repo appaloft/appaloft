@@ -156,9 +156,22 @@ const createCommand = EffectCommand.make(
 const showCommand = EffectCommand.make(
   "show",
   {
-    environmentId: environmentIdArg,
+    environmentId: Args.text({ name: "environmentId" }).pipe(Args.optional),
   },
-  ({ environmentId }) => runQuery(ShowEnvironmentQuery.create({ environmentId })),
+  ({ environmentId }) =>
+    Effect.gen(function* () {
+      const resolvedEnvironmentId = yield* resolveOptionalOccupancyEnvironmentId(
+        optionalValue(environmentId),
+      );
+      if (!resolvedEnvironmentId) {
+        return yield* Effect.fail(
+          domainError.validation("Environment id is required", {
+            phase: "environment-show-cli",
+          }),
+        );
+      }
+      return yield* runQuery(ShowEnvironmentQuery.create({ environmentId: resolvedEnvironmentId }));
+    }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentShow));
 
 const archiveCommand = EffectCommand.make(
