@@ -2,7 +2,10 @@ import {
   validateAgentAdapterManifest,
   validateAgentWorkspaceProfile,
 } from "@appaloft/agent-adapter-sdk";
-import { type CommunityRemoteWorkspaceDefaultProfileConfig } from "@appaloft/application";
+import {
+  type CommunityRemoteWorkspaceDefaultProfileConfig,
+  OCCUPANCY_FIRST_PARTY_MCP_DISCOVERY_TOOLS,
+} from "@appaloft/application";
 import { COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY } from "@appaloft/application/community-remote-default-network-policy";
 
 export { COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY } from "@appaloft/application/community-remote-default-network-policy";
@@ -82,29 +85,7 @@ export function createCommunityRemoteDefaultProfile(input: {
         id: "appaloft-tools",
         required: false,
         purpose: "Deploy and inspect Appaloft from occupancy",
-        requestedTools: [
-          "projects_list",
-          "environments_list",
-          "environments_create",
-          "resources_list",
-          "resources_show",
-          "resources_create",
-          "resources_configure_source",
-          "resources_configure_runtime",
-          "resources_configure_network",
-          "resources_configure_access",
-          "servers_list",
-          "deployments_list",
-          "deployments_plan",
-          "deployments_create",
-          "deployments_show",
-          "deployments_proof",
-          "deployments_timeline",
-          "preview_environments_list",
-          "preview_environments_show",
-          "sandbox_ports_expose",
-          "sandboxes_agent_tasks_deliver",
-        ],
+        requestedTools: [...OCCUPANCY_FIRST_PARTY_MCP_DISCOVERY_TOOLS],
       },
     ],
   };

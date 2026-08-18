@@ -206,6 +206,7 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-PROJSHOW-170 | Missing occupancy project show stays fail-closed | no occupancy projectId | `appaloft project show` | still requires projectId; does not invent a project. |
 | WS-REMOTE-ENVPREC-171 | Bare env effective-precedence reuse occupancy local | latest occupancy has Environment `local` | `appaloft env effective-precedence` | CLI does not require `environmentId`; shows masked vars for that Environment `local`. |
 | WS-REMOTE-ENVPREC-172 | Missing occupancy env effective-precedence stays fail-closed | no occupancy Environment `local` | `appaloft env effective-precedence` | still requires environmentId; does not invent an Environment. |
+| WS-REMOTE-MCP-ENV-173 | Occupancy MCP can set local env vars | occupancy OpenCode has first-party `appaloft-tools` | Agent configures the occupied app | first-party binding includes `environments_show`, `environments_set_variable`, `environments_unset_variable`, and `environments_effective_precedence`. Tenant MCP unchanged. |
 
 ## Slice Scope
 
