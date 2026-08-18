@@ -178,6 +178,8 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-ATTACH-139 | Issued occupancy terminal attaches directly | managed-terminal attach grant already includes `sessionId` and websocket path | TTY `appaloft code` / `workspace attach` | CLI attaches that sessionId; it does not re-run `terminal-sessions.show` against another in-memory replica. |
 | WS-REMOTE-LOGS-143 | Bare resource logs reuse occupancy | latest occupancy has Environment `local` and Resource `app` | `appaloft resource logs` | CLI does not require `resourceId`; queries runtime logs for that Resource `app`. |
 | WS-REMOTE-LOGS-144 | Missing occupancy Resource stays fail-closed | no occupancy Resource `app` and no preview | `appaloft resource logs` | still requires resourceId or previewEnvironmentId; does not invent a Resource. |
+| WS-REMOTE-HEALTH-145 | Bare resource health reuse occupancy | latest occupancy has Resource `app` | `appaloft resource health` | CLI does not require `resourceId`; queries health for that Resource `app`. |
+| WS-REMOTE-HEALTH-146 | Missing occupancy Resource health stays fail-closed | no occupancy Resource `app` and no preview | `appaloft resource health` | still requires resourceId or previewEnvironmentId; does not invent a Resource. |
 
 ## Slice Scope
 
