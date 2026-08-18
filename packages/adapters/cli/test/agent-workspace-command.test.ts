@@ -18,6 +18,7 @@ import {
   DeliverAgentTaskRunCommand,
   ExecuteSandboxCommand,
   type ExecutionContextFactory,
+  ExposeSandboxPortCommand,
   IssueWorkspaceCollaborationNativeAttachCommand,
   IssueWorkspaceCollaborationTerminalAccessCommand,
   ListAgentTaskRunsQuery,
@@ -42,7 +43,7 @@ import {
   TerminateSandboxAgentRuntimeCommand,
   TerminateSandboxCommand,
 } from "@appaloft/application";
-import { err, ok } from "@appaloft/core";
+import { domainError, err, ok } from "@appaloft/core";
 
 describe("Agent Workspace CLI", () => {
   test("[WS-TUI-ENTRY-001] interactive no-subcommand workspace starts the injected control presentation without mutation", async () => {
@@ -2519,5 +2520,92 @@ describe("Agent Workspace CLI", () => {
     await program.parseAsync(["node", "appaloft", "workspace", "attach", "sbx_occupancy"]);
     expect(attached).toEqual(["term_occupancy"]);
     expect(output.join("")).toContain("OpenCode ready");
+  });
+
+  test("[WS-OCC-PREVIEW-001] occupancy preview falls back to the resource route when sandbox ports are unsupported", async () => {
+    const output: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          if (command instanceof ExposeSandboxPortCommand) {
+            return err(
+              domainError.conflict("Sandbox provider does not support port publishing", {
+                code: "sandbox_port_publishing_unsupported",
+              }),
+            );
+          }
+          throw new Error(`unexpected command ${command.constructor.name}`);
+        },
+      } as unknown as CommandBus,
+      queryBus: {
+        execute: async <T>(_context: unknown, query: Query<T>) => {
+          if (query instanceof ShowSandboxQuery) {
+            return ok({
+              sandboxId: "sbx_occupancy",
+              status: "ready",
+              occupancy: {
+                repositoryIdentity: "github.com/traefik/whoami",
+                commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+                branch: "master",
+              },
+              activation: { project: { projectId: "prj_whoami" } },
+            } as T);
+          }
+          if (query instanceof ListResourcesQuery) {
+            return ok({
+              items: [
+                {
+                  projectId: "prj_whoami",
+                  slug: "app",
+                  lastDeploymentId: "dep_preview",
+                  lastDeploymentStatus: "succeeded",
+                  accessSummary: {
+                    latestGeneratedAccessRoute: {
+                      url: "http://app-fxn4evc1sf.127.0.0.1.sslip.io",
+                      deploymentStatus: "succeeded",
+                    },
+                  },
+                },
+              ],
+            } as T);
+          }
+          throw new Error(`unexpected query ${query.constructor.name}`);
+        },
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_occupancy_preview" }),
+      },
+      terminalIO: {
+        stdin: { isTTY: false, on: () => {}, removeListener: () => {} },
+        stdout: { write: (data) => output.push(String(data)) },
+        stderr: { write: () => {} },
+      },
+    });
+
+    const write = process.stdout.write;
+    process.stdout.write = ((data: string | Uint8Array) => {
+      output.push(String(data));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "workspace",
+        "preview",
+        "sbx_occupancy",
+        "--port",
+        "80",
+      ]);
+    } finally {
+      process.stdout.write = write;
+    }
+    const printed = output.join("");
+    expect(printed).toContain('"kind": "occupancy-preview"');
+    expect(printed).toContain("http://app-fxn4evc1sf.127.0.0.1.sslip.io");
+    expect(printed).toContain("https://github.com/traefik/whoami/compare/master?expand=1");
   });
 });
