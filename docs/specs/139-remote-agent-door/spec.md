@@ -180,6 +180,8 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-LOGS-144 | Missing occupancy Resource stays fail-closed | no occupancy Resource `app` and no preview | `appaloft resource logs` | still requires resourceId or previewEnvironmentId; does not invent a Resource. |
 | WS-REMOTE-HEALTH-145 | Bare resource health reuse occupancy | latest occupancy has Resource `app` | `appaloft resource health` | CLI does not require `resourceId`; queries health for that Resource `app`. |
 | WS-REMOTE-HEALTH-146 | Missing occupancy Resource health stays fail-closed | no occupancy Resource `app` and no preview | `appaloft resource health` | still requires resourceId or previewEnvironmentId; does not invent a Resource. |
+| WS-REMOTE-DIAG-147 | Bare resource diagnose reuse occupancy | latest occupancy has Resource `app` | `appaloft resource diagnose` | CLI does not require `resourceId`; queries diagnostic summary for that Resource `app`. |
+| WS-REMOTE-DIAG-148 | Missing occupancy Resource diagnose stays fail-closed | no occupancy Resource `app` and no preview | `appaloft resource diagnose` | still requires resourceId or previewEnvironmentId; does not invent a Resource. |
 
 ## Slice Scope
 
