@@ -1310,10 +1310,14 @@ export class AgentTaskRunService {
         )?.trim();
         if (!token || token.length > 4_096 || /[\r\n\0]/u.test(token)) {
           return err(
-            domainError.conflict("Agent Task GitHub delivery credential is unavailable", {
-              phase: "agent-task-delivery-credential",
-              retryable: true,
-            }),
+            domainError.conflict(
+              "Agent Task GitHub delivery credential is unavailable. Connect repo at /account/connections or install the App with contents/PR write.",
+              {
+                phase: "agent-task-delivery-credential",
+                retryable: true,
+                nextAction: "account/connections",
+              },
+            ),
           );
         }
         execution = {

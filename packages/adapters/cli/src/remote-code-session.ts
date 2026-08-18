@@ -8,15 +8,38 @@ import {
   resolveRemoteGitWorkspaceRef,
   type WorkspaceGitCommandRunner,
 } from "./local-git-workspace-context.js";
-import { occupancyGitHubCompareUrl, occupancyGitHubPullRequestUrl } from "./occupancy-chrome.js";
+import {
+  occupancyConnectionsUrl,
+  occupancyGitHubCompareUrl,
+  occupancyGitHubPullRequestUrl,
+} from "./occupancy-chrome.js";
 
 export const REMOTE_CODE_BANNER_PREFIX = "Remote ·";
 export const REMOTE_CODE_DOOR_HINT =
-  "Open · --open-target preview|production|pr|compare · workspace p/P/o/c";
+  "Open · --open-target preview|production|pr|compare|connections · workspace p/P/o/c/g";
 export const REMOTE_CODE_MODEL_HINT =
   "Connect a model in the attached OpenCode session before running a Task.";
-export const REMOTE_CODE_GITHUB_HINT =
-  "GitHub PR · connect repo at /account/connections or install the App with contents/PR write.";
+export function formatRemoteCodeGitHubHint(baseUrl?: string): string {
+  const origin = baseUrl?.trim().replace(/\/+$/, "") ?? "";
+  const connections = origin === "" ? "/account/connections" : `${origin}/account/connections`;
+  return `GitHub PR · connect repo at ${connections} or install the App with contents/PR write.`;
+}
+
+export const REMOTE_CODE_GITHUB_HINT = formatRemoteCodeGitHubHint();
+
+export async function resolveRemoteCodeGitHubHint(): Promise<string> {
+  const profile = await activeControlPlaneProfile();
+  if (profile.isErr() || !profile.value?.baseUrl) {
+    return REMOTE_CODE_GITHUB_HINT;
+  }
+  return formatRemoteCodeGitHubHint(profile.value.baseUrl);
+}
+
+export async function resolveOccupancyConnectionsUrl(): Promise<string | undefined> {
+  const profile = await activeControlPlaneProfile();
+  if (profile.isErr() || !profile.value?.baseUrl) return undefined;
+  return occupancyConnectionsUrl(profile.value.baseUrl);
+}
 
 export function nativeAttachRequiresInteractiveTerminal(
   stdin: { readonly isTTY?: boolean } = process.stdin,

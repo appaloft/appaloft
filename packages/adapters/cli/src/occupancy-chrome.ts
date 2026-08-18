@@ -136,11 +136,24 @@ export function occupancyBrowserLaunchAllowed(env: NodeJS.ProcessEnv = process.e
   return env["APPALOFT_CLI_OPEN_BROWSER"] !== "false" && env["CI"] !== "true";
 }
 
-export type OccupancyCodeOpenTarget = "auto" | "preview" | "production" | "pr" | "compare";
+export type OccupancyCodeOpenTarget =
+  | "auto"
+  | "preview"
+  | "production"
+  | "pr"
+  | "compare"
+  | "connections";
+
+export function occupancyConnectionsUrl(baseUrl?: string): string | undefined {
+  const origin = baseUrl?.trim().replace(/\/+$/, "") ?? "";
+  if (!origin || !isOccupancyHttpUrl(origin)) return undefined;
+  return `${origin}/account/connections`;
+}
 
 export function occupancyCodeOpenUrl(input: {
   readonly previewUrl?: string;
   readonly productionUrl?: string;
+  readonly connectionsUrl?: string;
   readonly pullRequestNumber?: number;
   readonly repositoryIdentity: string;
   readonly commitSha: string;
@@ -169,10 +182,13 @@ export function occupancyCodeOpenUrl(input: {
     commitSha: input.commitSha,
     ...(input.branch ? { branch: input.branch } : {}),
   });
+  const connections = input.connectionsUrl?.trim();
+  const connectionsUrl = connections && isOccupancyHttpUrl(connections) ? connections : undefined;
   if (target === "preview") return previewUrl;
   if (target === "production") return productionUrl;
   if (target === "pr") return pull;
   if (target === "compare") return compare;
+  if (target === "connections") return connectionsUrl;
   return previewUrl ?? pull ?? compare;
 }
 
@@ -181,20 +197,24 @@ const occupancyDoorKeys = {
   production: "P",
   pr: "o",
   compare: "c",
+  connections: "g",
 } as const;
 
 export function occupancyAvailableDoorHint(input: {
   readonly previewUrl?: string;
   readonly productionUrl?: string;
+  readonly connectionsUrl?: string;
   readonly pullRequestNumber?: number;
   readonly repositoryIdentity: string;
   readonly commitSha: string;
   readonly branch?: string;
 }): string | undefined {
-  const doors = (["preview", "production", "pr", "compare"] as const).filter((target) => {
-    if (target === "compare" && occupancyCodeOpenUrl({ ...input, target: "pr" })) return false;
-    return occupancyCodeOpenUrl({ ...input, target }) !== undefined;
-  });
+  const doors = (["preview", "production", "pr", "compare", "connections"] as const).filter(
+    (target) => {
+      if (target === "compare" && occupancyCodeOpenUrl({ ...input, target: "pr" })) return false;
+      return occupancyCodeOpenUrl({ ...input, target }) !== undefined;
+    },
+  );
   if (doors.length === 0) return undefined;
   return `Open · --open-target ${doors.join("|")} · workspace ${doors.map((door) => occupancyDoorKeys[door]).join("/")}`;
 }

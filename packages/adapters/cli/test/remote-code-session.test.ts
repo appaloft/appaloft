@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   formatRemoteCodeBanner,
+  formatRemoteCodeGitHubHint,
   isRemoteCodeGitRemoteLocator,
   nativeAttachRequiresInteractiveTerminal,
   occupancyCloudCompatError,
@@ -20,6 +21,12 @@ describe("remote code door", () => {
     expect(REMOTE_CODE_MODEL_HINT).toContain("OpenCode");
     expect(REMOTE_CODE_GITHUB_HINT).toContain("/account/connections");
     expect(REMOTE_CODE_GITHUB_HINT).toContain("contents/PR write");
+    expect(formatRemoteCodeGitHubHint("https://app.appaloft.com")).toContain(
+      "https://app.appaloft.com/account/connections",
+    );
+    expect(formatRemoteCodeGitHubHint("https://app.appaloft.com/")).toContain(
+      "https://app.appaloft.com/account/connections",
+    );
   });
   test("[WS-REMOTE-COMPAT-128][WS-REMOTE-COMPAT-129][WS-REMOTE-COMPAT-130] unstructured occupancy validation names the enrolled Server", () => {
     const server = { id: "srv_4lifk0yrcecy", name: "hostinger" };
