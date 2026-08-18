@@ -30,7 +30,14 @@ import {
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
 
-import { resolveLatestOccupancyProjectId } from "../occupancy-context.js";
+import {
+  parseOccupancyEnvSetAssignment,
+  parseOccupancyEnvUnsetAssignment,
+} from "../occupancy-chrome.js";
+import {
+  resolveLatestOccupancyProjectId,
+  resolveOptionalOccupancyEnvironmentId,
+} from "../occupancy-context.js";
 import {
   CliRuntime,
   optionalValue,
@@ -228,51 +235,82 @@ const unlockCommand = EffectCommand.make(
 const setCommand = EffectCommand.make(
   "set",
   {
-    environmentId: environmentIdArg,
-    key: keyArg,
-    value: valueArg,
+    assignment: Args.text({ name: "assignment" }).pipe(Args.between(1, 3)),
     kind: variableKindOption,
     exposure: exposureOption,
     scope: scopeOption,
     secret: secretOption,
     ...remoteStateOptions,
   },
-  ({ environmentId, exposure, key, kind, scope, secret, value, ...remoteOptions }) => {
-    void remoteOptions;
-    return runCommand(
-      SetEnvironmentVariableCommand.create({
-        environmentId,
-        key,
-        value,
-        kind,
-        exposure,
-        scope: optionalValue(scope),
-        isSecret: secret,
-      }),
-    );
-  },
+  ({ assignment, exposure, kind, scope, secret, ...remoteOptions }) =>
+    Effect.gen(function* () {
+      void remoteOptions;
+      const parsed = parseOccupancyEnvSetAssignment(assignment);
+      if (!parsed) {
+        return yield* Effect.fail(
+          domainError.validation("Environment assignment is required as KEY VALUE or KEY=VALUE", {
+            phase: "environment-set-cli",
+          }),
+        );
+      }
+      const environmentId = yield* resolveOptionalOccupancyEnvironmentId(parsed.environmentId);
+      if (!environmentId) {
+        return yield* Effect.fail(
+          domainError.validation("Environment id is required", {
+            phase: "environment-set-cli",
+          }),
+        );
+      }
+      return yield* runCommand(
+        SetEnvironmentVariableCommand.create({
+          environmentId,
+          key: parsed.key,
+          value: parsed.value,
+          kind,
+          exposure,
+          scope: optionalValue(scope),
+          isSecret: secret,
+        }),
+      );
+    }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentSet));
 
 const unsetCommand = EffectCommand.make(
   "unset",
   {
-    environmentId: environmentIdArg,
-    key: keyArg,
+    assignment: Args.text({ name: "assignment" }).pipe(Args.between(1, 2)),
     exposure: exposureOption,
     scope: scopeOption,
     ...remoteStateOptions,
   },
-  ({ environmentId, exposure, key, scope, ...remoteOptions }) => {
-    void remoteOptions;
-    return runCommand(
-      UnsetEnvironmentVariableCommand.create({
-        environmentId,
-        key,
-        exposure,
-        scope: optionalValue(scope),
-      }),
-    );
-  },
+  ({ assignment, exposure, scope, ...remoteOptions }) =>
+    Effect.gen(function* () {
+      void remoteOptions;
+      const parsed = parseOccupancyEnvUnsetAssignment(assignment);
+      if (!parsed) {
+        return yield* Effect.fail(
+          domainError.validation("Environment variable key is required", {
+            phase: "environment-unset-cli",
+          }),
+        );
+      }
+      const environmentId = yield* resolveOptionalOccupancyEnvironmentId(parsed.environmentId);
+      if (!environmentId) {
+        return yield* Effect.fail(
+          domainError.validation("Environment id is required", {
+            phase: "environment-unset-cli",
+          }),
+        );
+      }
+      return yield* runCommand(
+        UnsetEnvironmentVariableCommand.create({
+          environmentId,
+          key: parsed.key,
+          exposure,
+          scope: optionalValue(scope),
+        }),
+      );
+    }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentUnset));
 
 const diffCommand = EffectCommand.make(

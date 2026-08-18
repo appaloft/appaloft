@@ -335,3 +335,71 @@ export function occupancyAppResourceId(
   }
   return undefined;
 }
+
+export interface OccupancyEnvironment {
+  readonly id: string;
+  readonly projectId: string;
+  readonly name: string;
+  readonly status?: string;
+}
+
+export function occupancyLocalEnvironmentId(
+  environments: readonly OccupancyEnvironment[],
+  projectId: string | undefined,
+): string | undefined {
+  if (!projectId) return undefined;
+  for (const environment of environments) {
+    if (
+      environment.projectId === projectId &&
+      environment.name === "local" &&
+      environment.status !== "archived" &&
+      typeof environment.id === "string"
+    ) {
+      return environment.id;
+    }
+  }
+  return undefined;
+}
+
+export function parseOccupancyEnvSetAssignment(
+  tokens: readonly string[],
+): { readonly environmentId?: string; readonly key: string; readonly value: string } | undefined {
+  const first = tokens[0];
+  const second = tokens[1];
+  const third = tokens[2];
+  if (tokens.length === 3 && first && second && third) {
+    return { environmentId: first, key: second, value: third };
+  }
+  if (tokens.length === 2 && first && second) {
+    const separator = second.indexOf("=");
+    if (first.startsWith("env_") && separator > 0) {
+      return {
+        environmentId: first,
+        key: second.slice(0, separator),
+        value: second.slice(separator + 1),
+      };
+    }
+    return { key: first, value: second };
+  }
+  if (tokens.length === 1 && first) {
+    const separator = first.indexOf("=");
+    if (separator > 0) {
+      return { key: first.slice(0, separator), value: first.slice(separator + 1) };
+    }
+  }
+  return undefined;
+}
+
+export function parseOccupancyEnvUnsetAssignment(
+  tokens: readonly string[],
+): { readonly environmentId?: string; readonly key: string } | undefined {
+  const first = tokens[0];
+  const second = tokens[1];
+  if (tokens.length === 2 && first && second) {
+    return { environmentId: first, key: second };
+  }
+  if (tokens.length === 1 && first) {
+    return { key: first };
+  }
+  return undefined;
+}
