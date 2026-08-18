@@ -422,6 +422,11 @@ fn main() -> Result<()> {
                         send(&mut writer, &RendererEvent::OpenProduction { workspace_id })?;
                     }
                 }
+                KeyCode::Char('g') => {
+                    if let Some(workspace_id) = state.selected_workspace_id().map(str::to_owned) {
+                        send(&mut writer, &RendererEvent::OpenConnections { workspace_id })?;
+                    }
+                }
                 KeyCode::Char('a') => {
                     state.open_action_menu();
                 }
