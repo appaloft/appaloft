@@ -28,8 +28,10 @@ export function communityOccupancyPiTemplateSpec() {
   };
 }
 
+const occupancyProfileIds: Readonly<Record<string, string>> = {
+  opencode: COMMUNITY_OCCUPANCY_OPENCODE_PROFILE_ID,
+};
+
 export function occupancyRemoteProfileId(harnessKey: string): string {
-  return harnessKey === "pi"
-    ? COMMUNITY_OCCUPANCY_PI_PROFILE_ID
-    : COMMUNITY_OCCUPANCY_OPENCODE_PROFILE_ID;
+  return occupancyProfileIds[harnessKey] ?? `appaloft-remote-${harnessKey}`;
 }

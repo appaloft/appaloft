@@ -80,7 +80,7 @@ export class CommunityWorkspaceActivationContextInitializer
       readonly profileRepository: AgentWorkspaceProfileRegistryRepository;
       readonly defaultProfile?: CommunityRemoteWorkspaceDefaultProfileConfig;
       readonly defaultProfiles?: Readonly<
-        Partial<Record<"opencode" | "pi", CommunityRemoteWorkspaceDefaultProfileConfig>>
+        Record<string, CommunityRemoteWorkspaceDefaultProfileConfig>
       >;
       readonly sourceDetector?: SourceDetector;
     },
@@ -263,10 +263,10 @@ export class CommunityWorkspaceActivationContextInitializer
   private profileConfigFor(
     profile?: string,
   ): CommunityRemoteWorkspaceDefaultProfileConfig | undefined {
-    if (profile === COMMUNITY_OCCUPANCY_PI_PROFILE_ID) {
-      return this.dependencies.defaultProfiles?.pi;
+    if (profile && this.dependencies.defaultProfiles?.[profile]) {
+      return this.dependencies.defaultProfiles[profile];
     }
-    return this.dependencies.defaultProfiles?.opencode ?? this.dependencies.defaultProfile;
+    return this.dependencies.defaultProfile;
   }
 
   async ensureLocalEnvironment(

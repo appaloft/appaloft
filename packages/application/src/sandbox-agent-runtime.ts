@@ -42,6 +42,7 @@ import {
 } from "./execution-context";
 import { type SandboxExecResult } from "./execution-sandbox";
 import { type ControlPlaneSecretProtector } from "./ports";
+import { withOccupancyFirstPartyMcpDiscovery } from "./sandbox-agent-mcp-access";
 import { type SandboxAgentModelProtocol } from "./sandbox-agent-model-access";
 
 export type { SandboxAgentModelProtocol } from "./sandbox-agent-model-access";
@@ -278,6 +279,17 @@ function resolveRuntimeHarness(
       ? { templateId: record.profilePin.harnessTemplateId }
       : {}),
   });
+}
+
+function occupancyRuntimeMcpBindings(
+  plan: AgentWorkspaceProfileCompiledPlan | undefined,
+): readonly AgentWorkspaceMcpBinding[] | undefined {
+  const bindings = plan?.mcpBindings ?? [];
+  const wantsFirstParty = plan?.mcpRequirements?.some(
+    (requirement) => requirement.id === "appaloft-tools",
+  );
+  if (wantsFirstParty) return withOccupancyFirstPartyMcpDiscovery(bindings);
+  return bindings.length > 0 ? bindings : undefined;
 }
 
 export interface SandboxAgentRuntimeRecord {
@@ -1597,6 +1609,7 @@ export class SandboxAgentDeliveryService {
       createdAt: createdAt.value,
     });
     if (runtime.isErr()) return err(runtime.error);
+    const mcpBindings = occupancyRuntimeMcpBindings(resolvedProfilePlan);
     const record = {
       runtime: runtime.value,
       harnessKey: input.harnessKey,
@@ -1606,9 +1619,7 @@ export class SandboxAgentDeliveryService {
       ...(resolvedProfilePlan?.credentialBindings?.length
         ? { credentialBindings: resolvedProfilePlan.credentialBindings }
         : {}),
-      ...(resolvedProfilePlan?.mcpBindings?.length
-        ? { mcpBindings: resolvedProfilePlan.mcpBindings }
-        : {}),
+      ...(mcpBindings ? { mcpBindings } : {}),
     };
     const credentialScope = credentialGrantScope(context, record);
     if (credentialScope) {

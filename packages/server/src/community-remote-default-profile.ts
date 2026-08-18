@@ -6,10 +6,84 @@ import {
   type CommunityRemoteWorkspaceDefaultProfileConfig,
   OCCUPANCY_FIRST_PARTY_MCP_DISCOVERY_TOOLS,
   occupancyRemoteProfileId,
+  type SandboxAgentHarnessCapabilities,
+  type SandboxAgentHarnessInteraction,
 } from "@appaloft/application";
 import { COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY } from "@appaloft/application/community-remote-default-network-policy";
 
 export { COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY } from "@appaloft/application/community-remote-default-network-policy";
+
+const occupancyDisplayNames: Readonly<Record<string, string>> = {
+  opencode: "Appaloft Remote",
+};
+
+type OccupancyTransport = NonNullable<SandboxAgentHarnessInteraction["transport"]>;
+
+interface OccupancyTransportAdapter {
+  readonly requiredCapability: "native-attach" | "managed-terminal";
+  readonly interactiveModeId: "native" | "terminal";
+  interactiveMode(input: {
+    readonly command: readonly string[];
+    readonly serverPort: number;
+  }): Record<string, unknown>;
+  headlessCommand(harnessKey: string, attachCommand: readonly string[]): readonly string[];
+  runtime(input: {
+    readonly harnessKey: string;
+    readonly serverPort: number;
+    readonly healthcheck?: SandboxAgentHarnessCapabilities["healthcheck"];
+  }): Record<string, unknown>;
+}
+
+const occupancyTransportAdapters: Readonly<Record<OccupancyTransport, OccupancyTransportAdapter>> =
+  {
+    "native-attach": {
+      requiredCapability: "native-attach",
+      interactiveModeId: "native",
+      interactiveMode({ command, serverPort }) {
+        return {
+          id: "native",
+          transport: "native-attach",
+          command: [...command],
+          eventFidelity: "raw-pty",
+          sessionRecovery: "native-session-store",
+          clientHandoff: "local-client-exec",
+          serverPort,
+        };
+      },
+      headlessCommand(harnessKey) {
+        return [harnessKey, "run"];
+      },
+      runtime({ harnessKey, serverPort, healthcheck }) {
+        return {
+          start: [harnessKey, "serve", "--port", String(serverPort)],
+          healthcheck: healthcheck ?? { kind: "http", port: serverPort, path: "/ready" },
+        };
+      },
+    },
+    "managed-terminal": {
+      requiredCapability: "managed-terminal",
+      interactiveModeId: "terminal",
+      interactiveMode({ command }) {
+        return {
+          id: "terminal",
+          transport: "terminal",
+          command: [...command],
+          eventFidelity: "raw-pty",
+          sessionRecovery: "process-lifetime",
+        };
+      },
+      headlessCommand(_harnessKey, attachCommand) {
+        return [...attachCommand];
+      },
+      runtime({ healthcheck }) {
+        return { healthcheck: healthcheck ?? { kind: "process" } };
+      },
+    },
+  };
+
+function occupancyTransportOf(interaction?: SandboxAgentHarnessInteraction): OccupancyTransport {
+  return interaction?.transport ?? "managed-terminal";
+}
 
 export function createCommunityRemoteDefaultProfile(input: {
   readonly harnessKey: string;
@@ -17,13 +91,20 @@ export function createCommunityRemoteDefaultProfile(input: {
   readonly sandboxTemplateId: string;
   readonly version: string;
   readonly templateDigest: string;
+  readonly interaction?: SandboxAgentHarnessInteraction;
+  readonly capabilities?: SandboxAgentHarnessCapabilities;
 }): CommunityRemoteWorkspaceDefaultProfileConfig | undefined {
-  const native = input.harnessKey === "opencode";
+  const transport = occupancyTransportOf(input.interaction);
+  const adapter = occupancyTransportAdapters[transport];
   const remoteId = occupancyRemoteProfileId(input.harnessKey);
+  const displayName =
+    occupancyDisplayNames[input.harnessKey] ?? `Appaloft Remote ${input.harnessKey}`;
+  const attachCommand = input.interaction?.command ?? [input.harnessKey];
+  const serverPort = input.interaction?.serverPort ?? 4096;
   const adapterManifest = {
     schemaVersion: "appaloft.agent-adapter/v1",
     id: remoteId,
-    displayName: native ? "Appaloft Remote" : "Appaloft Remote Pi",
+    displayName,
     version: "1.0.0",
     kind: "declarative",
     requirements: {
@@ -35,43 +116,26 @@ export function createCommunityRemoteDefaultProfile(input: {
       },
       runtimes: [{ id: input.harnessKey, version: `>=${input.version} <2.0.0` }],
       capabilities: {
-        required: [native ? "native-attach" : "managed-terminal"],
+        required: [adapter.requiredCapability],
         optional: ["headless"],
       },
     },
     interactionModes: [
-      native
-        ? {
-            id: "native",
-            transport: "native-attach",
-            command: [input.harnessKey, "attach", "http://127.0.0.1:4096"],
-            eventFidelity: "raw-pty",
-            sessionRecovery: "native-session-store",
-            clientHandoff: "local-client-exec",
-            serverPort: 4096,
-          }
-        : {
-            id: "terminal",
-            transport: "terminal",
-            command: [input.harnessKey],
-            eventFidelity: "raw-pty",
-            sessionRecovery: "process-lifetime",
-          },
+      adapter.interactiveMode({ command: attachCommand, serverPort }),
       {
         id: "headless",
         transport: "headless",
-        command: native ? [input.harnessKey, "run"] : [input.harnessKey],
+        command: [...adapter.headlessCommand(input.harnessKey, attachCommand)],
         taskInput: "append-argument",
         eventFidelity: "line-events",
         sessionRecovery: "managed-run-lineage",
       },
     ],
-    ...(native
-      ? {
-          start: [input.harnessKey, "serve", "--port", "4096"],
-          healthcheck: { kind: "http", port: 4096, path: "/ready" },
-        }
-      : { healthcheck: { kind: "process" } }),
+    ...adapter.runtime({
+      harnessKey: input.harnessKey,
+      serverPort,
+      healthcheck: input.capabilities?.healthcheck,
+    }),
     persistentPaths: ["/workspace/.appaloft-agent"],
     credentials: [
       {
@@ -96,13 +160,13 @@ export function createCommunityRemoteDefaultProfile(input: {
   const profileManifest = {
     schemaVersion: "appaloft.agent-workspace-profile/v1",
     id: remoteId,
-    displayName: native ? "Appaloft Remote" : "Appaloft Remote Pi",
+    displayName,
     version: "1.0.0",
     adapter: {
       id: adapterManifest.id,
       version: adapterManifest.version,
       digest: validatedAdapter.definition.digest,
-      interactiveModeId: native ? "native" : "terminal",
+      interactiveModeId: adapter.interactiveModeId,
       taskModeId: "headless",
     },
     harnessTemplateId: input.templateId,

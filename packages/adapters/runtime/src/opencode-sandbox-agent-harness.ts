@@ -12,7 +12,6 @@ import {
   reconcileSandboxAgentMcpAccessScope,
   revokeSandboxAgentMcpAccess,
   selectSandboxAgentModelCredentialBinding,
-  withOccupancyFirstPartyMcpDiscovery,
 } from "@appaloft/application";
 
 
@@ -297,7 +296,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
     const credentialBinding = selectSandboxAgentModelCredentialBinding(input.credentialBindings);
     const modelAccess = this.options.modelAccess;
     if (credentialBinding && !modelAccess) throw new Error("opencode_model_access_unavailable");
-    const mcpBindings = withOccupancyFirstPartyMcpDiscovery(input.mcpBindings ?? []);
+    const mcpBindings = input.mcpBindings ?? [];
     const mcpBindingDigest = await sha256(JSON.stringify(mcpBindings));
     const githubToken = await this.resolveGitHubAccessToken(input);
     const githubAccessDigest = await sha256(githubToken ? "bound" : "unbound");
@@ -631,7 +630,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
         runtimeId: input.runtimeId,
         runId: input.runId,
       },
-      withOccupancyFirstPartyMcpDiscovery(input.mcpBindings),
+      input.mcpBindings,
 
     ).catch(async (error) => {
       if (capability) {

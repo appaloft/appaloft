@@ -594,8 +594,8 @@ describe("Community occupancy initializer", () => {
       profileRepository: { findInstallationByDefinition: async () => null } as never,
       defaultProfile,
       defaultProfiles: {
-        opencode: defaultProfile,
-        pi: {
+        "appaloft-remote": defaultProfile,
+        "appaloft-remote-pi": {
           adapterManifest: { adapter: "pi" },
           profileManifest: { profile: "pi" },
         },
