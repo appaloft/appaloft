@@ -176,6 +176,8 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-ATTACH-137 | Gateway providers keep native-attach | provider has a private signed gateway URL | same attach | client command is `opencode attach <private /s/... URL>`; no managed-terminal fallback. |
 | WS-REMOTE-ATTACH-138 | Raw loopback stay fail-closed | expose returns `http://127.0.0.1:4096` | attach | `agent_workspace_native_attach_access_unsafe`; no fallback that publishes the host port. |
 | WS-REMOTE-ATTACH-139 | Issued occupancy terminal attaches directly | managed-terminal attach grant already includes `sessionId` and websocket path | TTY `appaloft code` / `workspace attach` | CLI attaches that sessionId; it does not re-run `terminal-sessions.show` against another in-memory replica. |
+| WS-REMOTE-LOGS-143 | Bare resource logs reuse occupancy | latest occupancy has Environment `local` and Resource `app` | `appaloft resource logs` | CLI does not require `resourceId`; queries runtime logs for that Resource `app`. |
+| WS-REMOTE-LOGS-144 | Missing occupancy Resource stays fail-closed | no occupancy Resource `app` and no preview | `appaloft resource logs` | still requires resourceId or previewEnvironmentId; does not invent a Resource. |
 
 ## Slice Scope
 

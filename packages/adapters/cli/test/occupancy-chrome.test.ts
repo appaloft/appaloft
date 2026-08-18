@@ -4,6 +4,7 @@ import {
   isOccupancyGitHubCompareUrl,
   isOccupancyGitHubPullRequestUrl,
   isOccupancyHttpUrl,
+  occupancyAppResourceId,
   occupancyAvailableDoorHint,
   occupancyChromeForProject,
   occupancyCodeOpenUrl,
@@ -373,5 +374,28 @@ describe("occupancy code --open", () => {
         connectionsUrl: "https://app.appaloft.com/account/connections",
       }),
     ).toBe("Open · --open-target preview|connections · workspace p/g");
+  });
+});
+
+describe("occupancy resource logs", () => {
+  test("[WS-REMOTE-LOGS-143] copies occupancy Resource app id", () => {
+    expect(
+      occupancyAppResourceId(
+        [
+          { id: "res_other", projectId: "prj_web", slug: "worker" },
+          { id: "res_am78rpisds2x", projectId: "prj_web", slug: "app" },
+        ],
+        "prj_web",
+      ),
+    ).toBe("res_am78rpisds2x");
+  });
+
+  test("[WS-REMOTE-LOGS-144] missing occupancy Resource app stays omitted", () => {
+    expect(
+      occupancyAppResourceId(
+        [{ id: "res_other", projectId: "prj_web", slug: "worker" }],
+        "prj_web",
+      ),
+    ).toBeUndefined();
   });
 });
