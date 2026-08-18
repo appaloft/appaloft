@@ -960,7 +960,7 @@ describe("Agent Workspace CLI", () => {
       "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · sbx_billing",
     );
     expect(output.join("")).toContain(
-      "Connect a model in the attached OpenCode session before running a Task.",
+      "Connect a model in OpenCode with /connect before running a Task.",
     );
     expect(output.join("")).not.toContain("Local scratch · this Mac · not saved remotely");
   });
@@ -1021,9 +1021,7 @@ describe("Agent Workspace CLI", () => {
       "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_whoami\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
     );
     const printed = output.join("");
-    expect(printed).toContain(
-      "Connect a model in the attached OpenCode session before running a Task.",
-    );
+    expect(printed).toContain("Connect a model in OpenCode with /connect before running a Task.");
     expect(printed).toMatch(
       /Open · --open-target preview\|compare(?:\|connections)? · workspace p\/c(?:\/g)?/,
     );
@@ -1203,7 +1201,7 @@ describe("Agent Workspace CLI", () => {
       "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · sbx_h1swq765kcgw",
     );
     expect(output.join("")).toContain(
-      "Connect a model in the attached OpenCode session before running a Task.",
+      "Connect a model in OpenCode with /connect before running a Task.",
     );
   });
 

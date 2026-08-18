@@ -18,7 +18,7 @@ export const REMOTE_CODE_BANNER_PREFIX = "Remote ·";
 export const REMOTE_CODE_DOOR_HINT =
   "Open · --open-target preview|production|pr|compare|connections · workspace p/P/o/c/g";
 export const REMOTE_CODE_MODEL_HINT =
-  "Connect a model in the attached OpenCode session before running a Task.";
+  "Connect a model in OpenCode with /connect before running a Task.";
 export function formatRemoteCodeGitHubHint(baseUrl?: string): string {
   const origin = baseUrl?.trim().replace(/\/+$/, "") ?? "";
   const connections = origin === "" ? "/account/connections" : `${origin}/account/connections`;
@@ -33,6 +33,15 @@ export async function resolveRemoteCodeGitHubHint(): Promise<string> {
     return REMOTE_CODE_GITHUB_HINT;
   }
   return formatRemoteCodeGitHubHint(profile.value.baseUrl);
+}
+
+export async function writeOccupancySessionHints(
+  write: (text: string) => void = (text) => {
+    process.stdout.write(text);
+  },
+): Promise<void> {
+  write(`${REMOTE_CODE_MODEL_HINT}\n`);
+  write(`${await resolveRemoteCodeGitHubHint()}\n`);
 }
 
 export async function resolveOccupancyConnectionsUrl(): Promise<string | undefined> {
