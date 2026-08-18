@@ -200,6 +200,10 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-ENVUNSET-164 | Missing occupancy env unset stays fail-closed | no occupancy Environment `local` | `appaloft env unset KEY` | still requires environmentId; does not invent an Environment. |
 | WS-REMOTE-ENVSET-165 | Bare env set defaults kind and exposure | occupancy Environment `local` exists | `appaloft env set KEY VALUE` | writes `plain-config` / `runtime` without `--kind` or `--exposure`. |
 | WS-REMOTE-ENVUNSET-166 | Bare env unset defaults exposure | occupancy Environment `local` exists | `appaloft env unset KEY` | unsets `runtime` without `--exposure`. |
+| WS-REMOTE-ENVSHOW-167 | Bare env show reuse occupancy local | latest occupancy has Environment `local` | `appaloft env show` | CLI does not require `environmentId`; shows that Environment `local`. |
+| WS-REMOTE-ENVSHOW-168 | Missing occupancy env show stays fail-closed | no occupancy Environment `local` | `appaloft env show` | still requires environmentId; does not invent an Environment. |
+| WS-REMOTE-PROJSHOW-169 | Bare project show reuse occupancy project | latest occupancy has activation projectId | `appaloft project show` | CLI does not require `projectId`; shows that project. |
+| WS-REMOTE-PROJSHOW-170 | Missing occupancy project show stays fail-closed | no occupancy projectId | `appaloft project show` | still requires projectId; does not invent a project. |
 
 ## Slice Scope
 

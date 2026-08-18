@@ -11,12 +11,16 @@ import {
   SetProjectDescriptionCommand,
   ShowProjectQuery,
 } from "@appaloft/application";
+import { domainError } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
+import { Effect } from "effect";
 
+import { resolveLatestOccupancyProjectId } from "../occupancy-context.js";
 import { optionalValue, runCommand, runQuery } from "../runtime.js";
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const projectIdArg = Args.text({ name: "projectId" });
+const optionalProjectIdArg = Args.text({ name: "projectId" }).pipe(Args.optional);
 const nameOption = Options.text("name");
 const descriptionOption = Options.text("description").pipe(Options.optional);
 const archiveReasonOption = Options.text("reason").pipe(Options.optional);
@@ -63,8 +67,22 @@ const listCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.projectList));
 
-const showCommand = EffectCommand.make("show", { projectId: projectIdArg }, ({ projectId }) =>
-  runQuery(ShowProjectQuery.create({ projectId })),
+const showCommand = EffectCommand.make(
+  "show",
+  { projectId: optionalProjectIdArg },
+  ({ projectId }) =>
+    Effect.gen(function* () {
+      const requestedProjectId = optionalValue(projectId);
+      const resolvedProjectId = requestedProjectId ?? (yield* resolveLatestOccupancyProjectId());
+      if (!resolvedProjectId) {
+        return yield* Effect.fail(
+          domainError.validation("Project id is required", {
+            phase: "project-show-cli",
+          }),
+        );
+      }
+      return yield* runQuery(ShowProjectQuery.create({ projectId: resolvedProjectId }));
+    }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.projectShow));
 
 const renameCommand = EffectCommand.make(

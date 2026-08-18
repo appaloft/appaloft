@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 
 import { occupancyProjectIdFromSandboxes } from "../src/occupancy-context.js";
 
-test("[WS-REMOTE-ENV-149][WS-REMOTE-RES-151] copies occupancy activation projectId", () => {
+test("[WS-REMOTE-ENV-149][WS-REMOTE-RES-151][WS-REMOTE-PROJSHOW-169] copies occupancy activation projectId", () => {
   expect(
     occupancyProjectIdFromSandboxes([
       {
@@ -29,7 +29,7 @@ test("[WS-REMOTE-ENV-149][WS-REMOTE-RES-151] copies occupancy activation project
   ).toBe("prj_42ymkffgt1eh");
 });
 
-test("[WS-REMOTE-ENV-150][WS-REMOTE-RES-152] missing occupancy project stays omitted", () => {
+test("[WS-REMOTE-ENV-150][WS-REMOTE-RES-152][WS-REMOTE-PROJSHOW-170] missing occupancy project stays omitted", () => {
   expect(
     occupancyProjectIdFromSandboxes([
       {
