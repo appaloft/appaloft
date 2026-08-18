@@ -92,10 +92,14 @@ const acknowledgeSharedSourceOption = Options.boolean("acknowledge-shared-source
 );
 const resourceIdsOption = Options.text("resource-ids");
 const lockReasonOption = Options.text("reason").pipe(Options.optional);
-const exposureOption = Options.choice("exposure", variableExposures);
+const exposureOption = Options.choice("exposure", variableExposures).pipe(
+  Options.withDefault("runtime" as const),
+);
 const scopeOption = Options.choice("scope", configScopes).pipe(Options.optional);
 const secretOption = Options.boolean("secret").pipe(Options.withDefault(false));
-const variableKindOption = Options.choice("kind", variableKinds);
+const variableKindOption = Options.choice("kind", variableKinds).pipe(
+  Options.withDefault("plain-config" as const),
+);
 const remoteStateOptions = {
   stateBackend: Options.choice("state-backend", [
     "ssh-pglite",
