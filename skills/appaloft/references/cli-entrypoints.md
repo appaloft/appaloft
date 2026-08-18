@@ -45,6 +45,10 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   A positional `https://`, `ssh://`, or `git@host:path` occupies that repository
   without a local clone. Laptop Git is not uploaded. Missing login or Server fails
   closed and never becomes Scratch. `owner/repo` is a local path, not GitHub shorthand.
+- After occupy, omit project/environment/resource ids on `env list|show|set|unset|effective-precedence`,
+  `project show`, `resource list|show|logs|health|diagnose|effective-config|terminal|runtime restart`,
+  and `deploy`. Those reuse the latest occupancy Project, Environment `local`, and Resource `app`.
+  Explicit ids still win. Missing occupancy stays fail-closed.
 - `appaloft code --local [path]` is a local Scratch session on this Mac. It does not
   require Git, login, Binding, Profile or Cloud, creates no Sandbox, and prints
   `Local scratch · this Mac · not saved remotely`. `--local` plus a git remote fails
@@ -187,7 +191,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft project create` - `projects.create`
 - `appaloft project list` - `projects.list`
 - `appaloft project count` - `projects.count`
-- `appaloft project show <projectId>` - `projects.show`
+- `appaloft project show [projectId]` - `projects.show`
 - `appaloft project rename <projectId> --name <name>` - `projects.rename`
 - `appaloft project reorder --project-ids <ids>` - `projects.reorder`
 - `appaloft project set-description <projectId> --description <description>` - `projects.set-description`
@@ -234,7 +238,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft server runtime prepare <serverId>` - `servers.prepare-runtime`
 - `appaloft resource list` - `resources.list`
 - `appaloft resource count` - `resources.count`
-- `appaloft resource show <resourceId>` - `resources.show`
+- `appaloft resource show [resourceId]` - `resources.show`
 - `appaloft resource create` - `resources.create`
 - `appaloft resource archive <resourceId>` - `resources.archive`
 - `appaloft resource restore <resourceId>` - `resources.restore`
@@ -360,16 +364,16 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft env create` - `environments.create`
 - `appaloft env list` - `environments.list`
 - `appaloft env count` - `environments.count`
-- `appaloft env show <environmentId>` - `environments.show`
+- `appaloft env show [environmentId]` - `environments.show`
 - `appaloft env rename <environmentId> --name <name>` - `environments.rename`
 - `appaloft env lock <environmentId>` - `environments.lock`
 - `appaloft env unlock <environmentId>` - `environments.unlock`
 - `appaloft env archive <environmentId>` - `environments.archive`
 - `appaloft env clone <environmentId> --name <targetName>` - `environments.clone`
 - `appaloft env copy <environmentId> <targetName>` - `environments.duplicate-profile`
-- `appaloft env set <environmentId> <key> <value>` - `environments.set-variable`
-- `appaloft env unset <environmentId> <key>` - `environments.unset-variable`
-- `appaloft env effective-precedence <environmentId>` - `environments.effective-precedence`
+- `appaloft env set [environmentId] <key> <value>` - `environments.set-variable`
+- `appaloft env unset [environmentId] <key>` - `environments.unset-variable`
+- `appaloft env effective-precedence [environmentId]` - `environments.effective-precedence`
 - `appaloft env diff <environmentId> <otherEnvironmentId>` - `environments.diff`
 - `appaloft env copy <environmentId> <targetName> --dry-run` - `environments.plan-duplicate`
 - `appaloft env diff-profile <environmentId> <targetEnvironmentId>` - `environments.diff-profile`
