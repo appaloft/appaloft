@@ -57,20 +57,23 @@
   const githubConfigured = $derived(Boolean(githubProvider?.configured));
   const githubAccountLabel = $derived(githubProvider?.accountLabel?.trim() ?? "");
   const githubConnectionSummary = $derived.by(() => {
-    if (githubConnected && githubAccountLabel) {
-      return $t(i18nKeys.console.accountSettings.githubConnectedAs, {
-        account: githubAccountLabel,
-      });
+    if (!githubConfigured) {
+      return $t(i18nKeys.console.accountSettings.providerNotConfigured);
     }
 
-    return githubConnected
-      ? `GitHub ${$t(i18nKeys.common.status.connected)}`
-      : githubConfigured
-        ? $t(i18nKeys.console.accountSettings.githubConnectionDescription)
-        : $t(i18nKeys.console.accountSettings.providerNotConfigured);
+    if (githubConnected) {
+      const identity = githubAccountLabel
+        ? $t(i18nKeys.console.accountSettings.githubConnectedAs, {
+            account: githubAccountLabel,
+          })
+        : `GitHub ${$t(i18nKeys.common.status.connected)}`;
+      return `${identity} ${$t(i18nKeys.console.accountSettings.githubIdentityOnlyDescription)}`;
+    }
+
+    return $t(i18nKeys.console.accountSettings.githubConnectionDescription);
   });
   const canLinkGitHub = $derived(
-    Boolean(githubProvider?.configured && authSession.session && !githubConnected && !linkingGitHub),
+    Boolean(githubProvider?.configured && authSession.session && !linkingGitHub),
   );
   const currentOrganization = $derived(
     organizationContextQuery.data?.currentOrganization ?? null,
@@ -90,18 +93,21 @@
     linkingGitHub = true;
 
     try {
-      const response = await request<{ redirect: boolean; url?: string }>("/api/auth/link-social", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+      const response = await request<{ redirect: boolean; url?: string }>(
+        githubConnected ? "/api/auth/sign-in/social" : "/api/auth/link-social",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            provider: "github",
+            callbackURL: browser ? window.location.href : API_BASE,
+            scopes: ["repo", "read:user"],
+            disableRedirect: true,
+          }),
         },
-        body: JSON.stringify({
-          provider: "github",
-          callbackURL: browser ? window.location.href : API_BASE,
-          scopes: ["repo", "read:user"],
-          disableRedirect: true,
-        }),
-      });
+      );
 
       if (response.url && browser) {
         window.location.href = response.url;
@@ -174,9 +180,11 @@
         <Button type="button" class="w-fit shrink-0" disabled={!canLinkGitHub} onclick={connectGitHub}>
           <GitHubIcon class="size-4" />
           {linkingGitHub
-            ? $t(i18nKeys.console.accountSettings.linkingGitHubAccount)
+            ? githubConnected
+              ? $t(i18nKeys.console.accountSettings.authorizingGitHubRepo)
+              : $t(i18nKeys.console.accountSettings.linkingGitHubAccount)
             : githubConnected
-              ? $t(i18nKeys.common.status.connected)
+              ? $t(i18nKeys.console.accountSettings.authorizeGitHubRepo)
               : $t(i18nKeys.console.accountSettings.linkGitHubAccount)}
         </Button>
       </div>

@@ -19,6 +19,7 @@
 - [x] APP-CONN-004/APP-CONN-015: add domain-binding DNS apply-plan and contextual Web flow tests.
 - [x] APP-CONN-005: add DNS conflict fail-closed plan test.
 - [x] APP-CONN-006: add identity/source separation test.
+- [x] APP-CONN-006A: keep Connections authorize enabled after GitHub login.
 - [x] APP-CONN-007: add GitHub App installation to source connection test.
 - [x] APP-CONN-008: add provider app token expiry/redaction test.
 - [x] APP-CONN-009: add infrastructure target proposal test.

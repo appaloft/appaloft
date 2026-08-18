@@ -65,7 +65,7 @@ surface available in the session.
   pull request. Occupancy `GH_TOKEN` is injected only for a writable GitHub App installation
   or a Connections OAuth token with `repo` scope. If occupy prints the GitHub PR hint, tell
   the user to connect GitHub at `/account/connections` or install the App with contents/PR
-  write; do not claim a PR can be opened. Do not ask the user for
+  write. If GitHub is already used for sign-in, `/account/connections` still has Authorize repository access; do not treat identity-only GitHub as repo write. Do not claim a PR can be opened. Do not ask the user for
   project/environment/resource/server ids when those
   list/show tools are bound. Do not scrape vendor TUI text for PR or deploy state.
 
