@@ -378,7 +378,7 @@ describe("occupancy code --open", () => {
 });
 
 describe("occupancy resource logs", () => {
-  test("[WS-REMOTE-LOGS-143][WS-REMOTE-HEALTH-145][WS-REMOTE-DIAG-147] copies occupancy Resource app id", () => {
+  test("[WS-REMOTE-LOGS-143][WS-REMOTE-HEALTH-145][WS-REMOTE-DIAG-147][WS-REMOTE-RUNTIME-153] copies occupancy Resource app id", () => {
     expect(
       occupancyAppResourceId(
         [
@@ -390,7 +390,7 @@ describe("occupancy resource logs", () => {
     ).toBe("res_am78rpisds2x");
   });
 
-  test("[WS-REMOTE-LOGS-144][WS-REMOTE-HEALTH-146][WS-REMOTE-DIAG-148] missing occupancy Resource app stays omitted", () => {
+  test("[WS-REMOTE-LOGS-144][WS-REMOTE-HEALTH-146][WS-REMOTE-DIAG-148][WS-REMOTE-RUNTIME-154] missing occupancy Resource app stays omitted", () => {
     expect(
       occupancyAppResourceId(
         [{ id: "res_other", projectId: "prj_web", slug: "worker" }],

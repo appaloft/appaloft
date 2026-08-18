@@ -631,14 +631,22 @@ const runtimeStopCommand = EffectCommand.make(
     reason: runtimeControlReasonOption,
   },
   ({ deployment, preview, reason, resourceId }) =>
-    runCommand(
-      StopResourceRuntimeCommand.create({
-        resourceId: optionalArgValue(resourceId),
-        previewEnvironmentId: optionalValue(preview),
-        deploymentId: optionalValue(deployment),
-        reason: optionalValue(reason),
-      }),
-    ),
+    Effect.gen(function* () {
+      const requestedResourceId = optionalArgValue(resourceId);
+      const previewEnvironmentId = optionalValue(preview);
+      const resolvedResourceId = yield* resolveOptionalOccupancyResourceId(
+        requestedResourceId,
+        previewEnvironmentId,
+      );
+      return yield* runCommand(
+        StopResourceRuntimeCommand.create({
+          resourceId: resolvedResourceId,
+          previewEnvironmentId,
+          deploymentId: optionalValue(deployment),
+          reason: optionalValue(reason),
+        }),
+      );
+    }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceRuntimeStop));
 
 const runtimeStartCommand = EffectCommand.make(
@@ -651,15 +659,23 @@ const runtimeStartCommand = EffectCommand.make(
     acknowledgeRetainedRuntimeMetadata: acknowledgeRetainedRuntimeMetadataOption,
   },
   ({ acknowledgeRetainedRuntimeMetadata, deployment, preview, reason, resourceId }) =>
-    runCommand(
-      StartResourceRuntimeCommand.create({
-        resourceId: optionalArgValue(resourceId),
-        previewEnvironmentId: optionalValue(preview),
-        deploymentId: optionalValue(deployment),
-        reason: optionalValue(reason),
-        acknowledgeRetainedRuntimeMetadata,
-      }),
-    ),
+    Effect.gen(function* () {
+      const requestedResourceId = optionalArgValue(resourceId);
+      const previewEnvironmentId = optionalValue(preview);
+      const resolvedResourceId = yield* resolveOptionalOccupancyResourceId(
+        requestedResourceId,
+        previewEnvironmentId,
+      );
+      return yield* runCommand(
+        StartResourceRuntimeCommand.create({
+          resourceId: resolvedResourceId,
+          previewEnvironmentId,
+          deploymentId: optionalValue(deployment),
+          reason: optionalValue(reason),
+          acknowledgeRetainedRuntimeMetadata,
+        }),
+      );
+    }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceRuntimeStart));
 
 const runtimeRestartCommand = EffectCommand.make(
@@ -672,15 +688,23 @@ const runtimeRestartCommand = EffectCommand.make(
     acknowledgeRetainedRuntimeMetadata: acknowledgeRetainedRuntimeMetadataOption,
   },
   ({ acknowledgeRetainedRuntimeMetadata, deployment, preview, reason, resourceId }) =>
-    runCommand(
-      RestartResourceRuntimeCommand.create({
-        resourceId: optionalArgValue(resourceId),
-        previewEnvironmentId: optionalValue(preview),
-        deploymentId: optionalValue(deployment),
-        reason: optionalValue(reason),
-        acknowledgeRetainedRuntimeMetadata,
-      }),
-    ),
+    Effect.gen(function* () {
+      const requestedResourceId = optionalArgValue(resourceId);
+      const previewEnvironmentId = optionalValue(preview);
+      const resolvedResourceId = yield* resolveOptionalOccupancyResourceId(
+        requestedResourceId,
+        previewEnvironmentId,
+      );
+      return yield* runCommand(
+        RestartResourceRuntimeCommand.create({
+          resourceId: resolvedResourceId,
+          previewEnvironmentId,
+          deploymentId: optionalValue(deployment),
+          reason: optionalValue(reason),
+          acknowledgeRetainedRuntimeMetadata,
+        }),
+      );
+    }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceRuntimeRestart));
 
 const runtimeCommand = EffectCommand.make("runtime").pipe(
