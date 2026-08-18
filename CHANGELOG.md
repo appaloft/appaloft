@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.9.0](https://github.com/appaloft/appaloft/compare/v1.8.15...v1.9.0) (2026-08-18)
+
+
+### Features
+
+* **cli:** default occupancy env set to runtime config ([#1293](https://github.com/appaloft/appaloft/issues/1293)) ([258dc35](https://github.com/appaloft/appaloft/commit/258dc3547799deb60d6d88fe612a226c989cc619))
+* **cli:** offer Appaloft skill in occupancy ([#1281](https://github.com/appaloft/appaloft/issues/1281)) ([d7ca7d3](https://github.com/appaloft/appaloft/commit/d7ca7d3d1e7c976fea7e22d3f83b4e70de1f8525))
+* **cli:** reuse occupancy for env and project show ([#1294](https://github.com/appaloft/appaloft/issues/1294)) ([2adc797](https://github.com/appaloft/appaloft/commit/2adc79796e067f07933592fcc990f1ca8ff144e0))
+* **cli:** reuse occupancy local env for precedence ([#1295](https://github.com/appaloft/appaloft/issues/1295)) ([ec61cf0](https://github.com/appaloft/appaloft/commit/ec61cf01fe7a6111d412743f90d57de51780a8d7))
+* **cli:** reuse occupancy local env for set and unset ([#1292](https://github.com/appaloft/appaloft/issues/1292)) ([cb19274](https://github.com/appaloft/appaloft/commit/cb19274e12ced0cad40f979b91ecb8b9ebb6b0b1))
+* **cli:** reuse occupancy Resource for diagnose ([#1286](https://github.com/appaloft/appaloft/issues/1286)) ([e36b92d](https://github.com/appaloft/appaloft/commit/e36b92d9e4e02aae41589815069c8bfaa6fcd80f))
+* **cli:** reuse occupancy Resource for health ([#1285](https://github.com/appaloft/appaloft/issues/1285)) ([4ecf91e](https://github.com/appaloft/appaloft/commit/4ecf91ec324ebc3b3db4e39b5ab0411b9f87014e))
+* **cli:** reuse occupancy Resource for runtime logs ([#1284](https://github.com/appaloft/appaloft/issues/1284)) ([7c1293e](https://github.com/appaloft/appaloft/commit/7c1293ea4cd7630a64d492cb17cd5714d12cec11))
+* **cli:** reuse occupancy Resource for runtime restart ([#1289](https://github.com/appaloft/appaloft/issues/1289)) ([a440904](https://github.com/appaloft/appaloft/commit/a440904d5768dacd5ed8880499b2eab58616228d))
+* **cli:** reuse occupancy Resource for show and config ([#1291](https://github.com/appaloft/appaloft/issues/1291)) ([171a303](https://github.com/appaloft/appaloft/commit/171a303171f7073b926576df22aa1c466adf5b64))
+* **cli:** reuse occupancy Resource for terminal ([#1290](https://github.com/appaloft/appaloft/issues/1290)) ([838ce92](https://github.com/appaloft/appaloft/commit/838ce92caec6e93750deb442cf9f1fa6136af753))
+* **cli:** scope env list to occupancy project ([#1287](https://github.com/appaloft/appaloft/issues/1287)) ([4a291a2](https://github.com/appaloft/appaloft/commit/4a291a25d004e9b7474c6b8f93f7bbc093e39c6a))
+* **cli:** scope resource list to occupancy project ([#1288](https://github.com/appaloft/appaloft/issues/1288)) ([adfd411](https://github.com/appaloft/appaloft/commit/adfd41122a2e86f9e260b2421372749ddff47c27))
+* **mcp:** give occupancy env configure tools ([#1297](https://github.com/appaloft/appaloft/issues/1297)) ([42de629](https://github.com/appaloft/appaloft/commit/42de629fabf7190a3249fc0262469fb7ff1e1f92))
+* **tui:** open occupancy Connections with g ([#1280](https://github.com/appaloft/appaloft/issues/1280)) ([29473d7](https://github.com/appaloft/appaloft/commit/29473d7304830fe9d7471813f48abf774464f8dc))
+
+
+### Bug Fixes
+
+* **cli:** hide empty occupancy attach bootstrap ([#1282](https://github.com/appaloft/appaloft/issues/1282)) ([dd30279](https://github.com/appaloft/appaloft/commit/dd30279a39b52ab0b2d871fce479f5d9d744126f))
+* **cli:** keep occupancy attach off the hint banner ([#1283](https://github.com/appaloft/appaloft/issues/1283)) ([4914681](https://github.com/appaloft/appaloft/commit/4914681d4efd503c8dec44065adbc26dc1d8789a))
+* **cli:** print occupy GitHub hint with control-plane origin ([#1279](https://github.com/appaloft/appaloft/issues/1279)) ([9469fd6](https://github.com/appaloft/appaloft/commit/9469fd6733f77f22e05d2d77ec15db8b9adeadb0))
+
+
+### Documentation
+
+* **skill:** teach occupancy configure without ids ([#1296](https://github.com/appaloft/appaloft/issues/1296)) ([836ac65](https://github.com/appaloft/appaloft/commit/836ac652372b50abfe3a8d4a2852c77b0f40ea3f))
+
 ## [1.8.15](https://github.com/appaloft/appaloft/compare/v1.8.14...v1.8.15) (2026-08-18)
 
 
