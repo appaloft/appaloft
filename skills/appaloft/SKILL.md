@@ -60,9 +60,12 @@ surface available in the session.
 ## Common Workflows
 
 - Occupancy session: after `appaloft login` and an enrolled Server, `appaloft code` occupies
-  my Sandbox. From inside OpenCode/Pi, use first-party `appaloft-tools` to list/plan/create
+  my Sandbox. From inside OpenCode, use first-party `appaloft-tools` to list/plan/create
   deployments, inspect preview environments, expose a sandbox port, or deliver a Task as a
-  pull request. Occupancy `GH_TOKEN` is injected only for a writable GitHub App installation
+  pull request. After occupy, configure and inspect the occupied app without ids:
+  `env set KEY VALUE`, `env unset KEY`, `env show`, `env effective-precedence`, `env list`,
+  `project show`, `resource show|logs|health|diagnose|terminal|runtime restart`, and `deploy`.
+  Occupancy `GH_TOKEN` is injected only for a writable GitHub App installation
   or a Connections OAuth token with `repo` scope. If occupy prints the GitHub PR hint, open the printed control-plane Connections URL and tell
   the user to connect GitHub at `/account/connections` or install the App with contents/PR
   write. If GitHub is already used for sign-in, `/account/connections` still has Authorize repository access; do not treat identity-only GitHub as repo write. Do not claim a PR can be opened. Do not ask the user for
