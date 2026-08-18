@@ -1,4 +1,5 @@
 export interface OccupancyResource {
+  readonly id?: string;
   readonly projectId?: string;
   readonly slug?: string;
   readonly lastDeploymentId?: string;
@@ -316,4 +317,21 @@ export function occupancyChromeForProject(
     ...(production ? { production } : {}),
     ...(deployment ? { deployment } : {}),
   };
+}
+
+export function occupancyAppResourceId(
+  resources: readonly OccupancyResource[],
+  projectId: string | undefined,
+): string | undefined {
+  if (!projectId) return undefined;
+  for (const resource of resources) {
+    if (
+      resource.projectId === projectId &&
+      resource.slug === "app" &&
+      typeof resource.id === "string"
+    ) {
+      return resource.id;
+    }
+  }
+  return undefined;
 }

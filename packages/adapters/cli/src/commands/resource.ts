@@ -24,6 +24,7 @@ import {
   ListResourceRuntimeLogArchivesQuery,
   ListResourceSecretReferencesQuery,
   ListResourcesQuery,
+  ListSandboxesQuery,
   OpenTerminalSessionCommand,
   PruneResourceRuntimeControlAttemptsCommand,
   PruneResourceRuntimeLogArchivesCommand,
@@ -65,6 +66,9 @@ import {
 } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
+
+import { type OccupancyResource, occupancyAppResourceId } from "../occupancy-chrome.js";
+import { selectResumeOccupancy } from "../remote-code-session.js";
 
 import {
   CliRuntime,
@@ -479,6 +483,53 @@ const createCommand = EffectCommand.make(
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceCreate));
 
+function resolveOccupancyAppResourceId() {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const sandboxesQuery = ListSandboxesQuery.create({ limit: 100, offset: 0 });
+    if (sandboxesQuery.isErr()) return undefined;
+    const sandboxesResult = yield* Effect.promise(() => cli.executeQuery(sandboxesQuery.value));
+    if (sandboxesResult.isErr()) return undefined;
+    const sandboxes =
+      (
+        sandboxesResult.value as {
+          readonly items?: readonly {
+            readonly sandboxId: string;
+            readonly status: string;
+            readonly lastActivityAt?: string;
+            readonly updatedAt?: string;
+            readonly occupancy?: {
+              readonly repositoryIdentity: string;
+              readonly commitSha: string;
+              readonly branch?: string;
+            };
+            readonly activation?: { readonly project?: { readonly projectId?: string } };
+          }[];
+        }
+      ).items ?? [];
+    const occupancy = selectResumeOccupancy(
+      sandboxes.map((item) => ({
+        sandboxId: item.sandboxId,
+        status: item.status,
+        ...(item.occupancy ? { occupancy: item.occupancy } : {}),
+        ...(typeof item.lastActivityAt === "string" ? { lastActivityAt: item.lastActivityAt } : {}),
+        ...(typeof item.updatedAt === "string" ? { updatedAt: item.updatedAt } : {}),
+      })),
+    );
+    const selected = sandboxes.find((item) => item.sandboxId === occupancy?.sandboxId);
+    const projectId = selected?.activation?.project?.projectId;
+    if (!projectId) return undefined;
+    const resourcesQuery = ListResourcesQuery.create({ projectId, limit: 100 });
+    if (resourcesQuery.isErr()) return undefined;
+    const resourcesResult = yield* Effect.promise(() => cli.executeQuery(resourcesQuery.value));
+    if (resourcesResult.isErr()) return undefined;
+    return occupancyAppResourceId(
+      (resourcesResult.value as { readonly items?: readonly OccupancyResource[] }).items ?? [],
+      projectId,
+    );
+  });
+}
+
 const logsCommand = EffectCommand.make(
   "logs",
   {
@@ -490,16 +541,24 @@ const logsCommand = EffectCommand.make(
     follow: followOption,
   },
   ({ deployment, follow, preview, resourceId, service, tail }) =>
-    runResourceRuntimeLogsQuery(
-      ResourceRuntimeLogsQuery.create({
-        resourceId: optionalArgValue(resourceId),
-        previewEnvironmentId: optionalValue(preview),
-        deploymentId: optionalValue(deployment),
-        serviceName: optionalValue(service),
-        tailLines: Number(tail),
-        follow,
-      }),
-    ),
+    Effect.gen(function* () {
+      const requestedResourceId = optionalArgValue(resourceId);
+      const previewEnvironmentId = optionalValue(preview);
+      const resolvedResourceId =
+        requestedResourceId || previewEnvironmentId
+          ? requestedResourceId
+          : yield* resolveOccupancyAppResourceId();
+      return yield* runResourceRuntimeLogsQuery(
+        ResourceRuntimeLogsQuery.create({
+          resourceId: resolvedResourceId,
+          previewEnvironmentId,
+          deploymentId: optionalValue(deployment),
+          serviceName: optionalValue(service),
+          tailLines: Number(tail),
+          follow,
+        }),
+      );
+    }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceLogs));
 
 const captureLogArchiveCommand = EffectCommand.make(
