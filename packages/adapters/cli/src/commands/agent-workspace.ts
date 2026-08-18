@@ -68,6 +68,7 @@ import {
   occupancyBrowserLaunchAllowed,
   occupancyChromeForProject,
   occupancyCodeOpenUrl,
+  occupancyGitHubCompareUrl,
   occupancyLastDeploymentFromResource,
   occupancyPreviewFromResource,
   occupancyPullRequestFromPreviewEnvironments,
@@ -200,6 +201,17 @@ function isProductAuthMissing(error: unknown): boolean {
     error !== null &&
     "code" in error &&
     (error as { readonly code?: unknown }).code === "product_auth_missing"
+  );
+}
+
+function isSandboxPortPublishingUnsupported(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "details" in error &&
+    typeof (error as { readonly details?: { readonly code?: unknown } }).details === "object" &&
+    (error as { readonly details?: { readonly code?: unknown } }).details?.code ===
+      "sandbox_port_publishing_unsupported"
   );
 }
 
@@ -958,14 +970,55 @@ const preview = EffectCommand.make(
     expiresAt: Options.text("expires-at").pipe(Options.optional),
   },
   ({ expiresAt, port, visibility, workspaceId }) =>
-    runCommand(
-      ExposeSandboxPortCommand.create({
-        sandboxId: workspaceId,
-        port,
-        visibility,
-        ...(optionalValue(expiresAt) ? { expiresAt: optionalValue(expiresAt) } : {}),
-      }),
-    ),
+    Effect.gen(function* () {
+      const cli = yield* CliRuntime;
+      const command = yield* resultToEffect(
+        ExposeSandboxPortCommand.create({
+          sandboxId: workspaceId,
+          port,
+          visibility,
+          ...(optionalValue(expiresAt) ? { expiresAt: optionalValue(expiresAt) } : {}),
+        }),
+      );
+      const exposed = yield* Effect.promise(() => cli.executeCommand(command));
+      if (exposed.isOk()) {
+        yield* print(exposed.value);
+        return;
+      }
+      if (!isSandboxPortPublishingUnsupported(exposed.error)) {
+        return yield* resultToEffect(exposed);
+      }
+      const sandboxQuery = yield* resultToEffect(
+        ShowSandboxQuery.create({ sandboxId: workspaceId }),
+      );
+      const sandbox = (yield* resultToEffect(
+        yield* Effect.promise(() => cli.executeQuery(sandboxQuery)),
+      )) as SandboxResult;
+      const resourcesQuery = yield* resultToEffect(ListResourcesQuery.create({ limit: 100 }));
+      const listed = (yield* resultToEffect(
+        yield* Effect.promise(() => cli.executeQuery(resourcesQuery)),
+      )) as ResourceListResult;
+      const previewUrl = occupancyPreviewUrlForProject(
+        listed.items ?? [],
+        sandbox.activation?.project?.projectId,
+      );
+      if (!previewUrl) {
+        return yield* Effect.fail(
+          domainError.conflict(
+            "Occupancy preview is unavailable. Deploy the occupancy resource first, then retry workspace preview.",
+            { code: "occupancy_preview_unavailable" },
+          ),
+        );
+      }
+      const occupancy = sandbox.occupancy;
+      const compareUrl = occupancyGitHubCompareUrl(occupancy);
+      yield* print({
+        kind: "occupancy-preview",
+        url: previewUrl,
+        ...(compareUrl ? { compareUrl } : {}),
+        guidance: "sandbox port publishing unsupported; using occupancy resource route",
+      });
+    }),
 );
 
 const taskRuntimeId = Options.text("runtime-id");
