@@ -1609,6 +1609,7 @@ export class SandboxAgentDeliveryService {
       createdAt: createdAt.value,
     });
     if (runtime.isErr()) return err(runtime.error);
+    const mcpBindings = occupancyRuntimeMcpBindings(resolvedProfilePlan);
     const record = {
       runtime: runtime.value,
       harnessKey: input.harnessKey,
@@ -1618,9 +1619,7 @@ export class SandboxAgentDeliveryService {
       ...(resolvedProfilePlan?.credentialBindings?.length
         ? { credentialBindings: resolvedProfilePlan.credentialBindings }
         : {}),
-      ...(occupancyRuntimeMcpBindings(resolvedProfilePlan)
-        ? { mcpBindings: occupancyRuntimeMcpBindings(resolvedProfilePlan) }
-        : {}),
+      ...(mcpBindings ? { mcpBindings } : {}),
     };
     const credentialScope = credentialGrantScope(context, record);
     if (credentialScope) {
