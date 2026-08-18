@@ -107,6 +107,13 @@ fn occupancy_available_door_keys(detail: Option<&DetailMessage>) -> Vec<&'static
     {
         doors.push("P production");
     }
+    if detail
+        .connections
+        .as_ref()
+        .is_some_and(|connections| !connections.url.trim().is_empty())
+    {
+        doors.push("g connections");
+    }
     doors
 }
 
@@ -323,6 +330,8 @@ pub struct DetailMessage {
     pub deployment: Option<OccupancyDeploymentChrome>,
     #[serde(default)]
     pub pull_request: Option<OccupancyPullRequestChrome>,
+    #[serde(default)]
+    pub connections: Option<OccupancyPreviewChrome>,
     #[serde(default)]
     pub recovery: RecoverySummary,
 }
@@ -666,6 +675,10 @@ pub enum RendererEvent {
         workspace_id: String,
     },
     OpenCompare {
+        #[serde(rename = "workspaceId")]
+        workspace_id: String,
+    },
+    OpenConnections {
         #[serde(rename = "workspaceId")]
         workspace_id: String,
     },
@@ -2274,6 +2287,7 @@ mod tests {
         assert!(preview_and_pr_footer.contains("p preview"));
         assert!(!preview_and_pr_footer.contains("c compare"));
         assert!(!preview_and_pr_footer.contains("P production"));
+        assert!(!preview_and_pr_footer.contains("g connections"));
 
         let existing_pr = occupancy_delivery_ready_state(Some(OccupancyPullRequestChrome {
             number: 928,
@@ -2283,11 +2297,21 @@ mod tests {
         assert!(existing_pr_footer.contains("o open PR"));
         assert!(!existing_pr_footer.contains("c compare"));
 
+        let mut with_connections = occupancy_delivery_ready_state(None);
+        if let Some(detail) = with_connections.detail.as_mut() {
+            detail.connections = Some(OccupancyPreviewChrome {
+                url: "https://app.appaloft.com/account/connections".to_owned(),
+            });
+        }
+        let connections_footer = occupancy_control_footer("", with_connections.detail.as_ref());
+        assert!(connections_footer.contains("g connections"));
+
         let lean = occupancy_control_footer("", None);
         assert!(!lean.contains("o open PR"));
         assert!(!lean.contains("c compare"));
         assert!(!lean.contains("p preview"));
         assert!(!lean.contains("P production"));
+        assert!(!lean.contains("g connections"));
         assert!(lean.contains("a lifecycle"));
         assert!(lean.contains("d delivery"));
         assert!(lean.contains("s recovery"));
@@ -2447,6 +2471,7 @@ mod tests {
                     number: 928,
                     url: Some("https://github.com/traefik/whoami/pull/928".to_owned()),
                 }),
+                connections: None,
                 recovery: RecoverySummary::default(),
             },
         });
@@ -2518,6 +2543,7 @@ mod tests {
             production: None,
             deployment: None,
             pull_request: None,
+            connections: None,
             recovery: RecoverySummary {
                 requested_isolation: Some("gvisor".to_owned()),
                 realized_isolation: Some("gvisor".to_owned()),
@@ -2588,6 +2614,7 @@ mod tests {
             production: None,
             deployment: None,
             pull_request: None,
+            connections: None,
             recovery: RecoverySummary {
                 snapshots: vec![SnapshotSummary {
                     snapshot_id: "ssn_1".to_owned(),
@@ -2671,6 +2698,7 @@ mod tests {
             production: None,
             deployment: None,
             pull_request: None,
+            connections: None,
             recovery: RecoverySummary {
                 requested_isolation: Some("gvisor".to_owned()),
                 realized_isolation: Some("gvisor".to_owned()),
@@ -2741,6 +2769,7 @@ mod tests {
             production: None,
             deployment: None,
             pull_request: None,
+            connections: None,
             recovery: RecoverySummary::default(),
         });
         assert!(state.open_recovery_menu());
@@ -2809,6 +2838,7 @@ mod tests {
                 production: None,
                 deployment: None,
                 pull_request: None,
+                connections: None,
                 recovery: RecoverySummary::default(),
             },
         });
@@ -2870,6 +2900,13 @@ mod tests {
             })
             .expect("serialize open compare"),
             r#"{"type":"open-compare","workspaceId":"sbx_1"}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&RendererEvent::OpenConnections {
+                workspace_id: "sbx_1".to_owned(),
+            })
+            .expect("serialize open connections"),
+            r#"{"type":"open-connections","workspaceId":"sbx_1"}"#
         );
         let mut state = AppState::default();
         state.apply(ParentMessage::TerminalReady {
@@ -2947,6 +2984,7 @@ mod tests {
             production: None,
             deployment: None,
             pull_request: None,
+            connections: None,
             recovery: RecoverySummary::default(),
         };
 
@@ -3172,6 +3210,7 @@ mod tests {
                 production: None,
                 deployment: None,
                 pull_request: None,
+                connections: None,
                 recovery: RecoverySummary::default(),
             },
         });

@@ -28,6 +28,7 @@ import {
   type TerminalSessionAttachmentGateway,
 } from "@appaloft/application";
 import { type Result } from "@appaloft/core";
+import { activeControlPlaneProfile } from "./control-plane-service.js";
 import {
   isOccupancyGitHubCompareUrl,
   isOccupancyGitHubPullRequestUrl,
@@ -36,6 +37,7 @@ import {
   type OccupancyResource,
   occupancyChromeForProject,
   occupancyCompareOrPullUrl,
+  occupancyConnectionsUrl,
   occupancyPullRequestFromPreviewEnvironments,
 } from "./occupancy-chrome.js";
 import { type OperateRendererEvent, type OperateRendererMessage } from "./operate-presentation.js";
@@ -182,6 +184,7 @@ export type WorkspaceControlRendererMessage =
       readonly production?: { readonly url: string };
       readonly deployment?: { readonly id: string; readonly status?: string };
       readonly pullRequest?: { readonly number: number; readonly url?: string };
+      readonly connections?: { readonly url: string };
       readonly recovery: WorkspaceControlRecoverySummary;
     }
   | {
@@ -220,6 +223,7 @@ export type WorkspaceControlRendererEvent =
   | { readonly type: "open-preview"; readonly workspaceId: string }
   | { readonly type: "open-production"; readonly workspaceId: string }
   | { readonly type: "open-compare"; readonly workspaceId: string }
+  | { readonly type: "open-connections"; readonly workspaceId: string }
   | { readonly type: "refresh"; readonly workspaceId?: string }
   | { readonly type: "attach"; readonly workspaceId: string; readonly runtimeId: string }
   | {
@@ -670,9 +674,20 @@ async function listOccupancyPreviewEnvironments(
   }
 }
 
+async function resolveConnectionsUrlSafe(): Promise<string | undefined> {
+  try {
+    const profile = await activeControlPlaneProfile();
+    if (profile.isErr() || !profile.value?.baseUrl) return undefined;
+    return occupancyConnectionsUrl(profile.value.baseUrl);
+  } catch {
+    return undefined;
+  }
+}
+
 async function loadDetail(
   context: WorkspaceControlPresentationContext,
   workspaceId: string,
+  connectionsUrl?: string,
 ): Promise<{
   readonly message: Extract<WorkspaceControlRendererMessage, { type: "detail" }>;
   readonly promotionRecords: readonly Record<string, unknown>[];
@@ -795,6 +810,7 @@ async function loadDetail(
       ...(productionUrl ? { production: { url: productionUrl } } : {}),
       ...(occupancyChrome.deployment ? { deployment: occupancyChrome.deployment } : {}),
       ...(pullRequest ? { pullRequest } : {}),
+      ...(connectionsUrl ? { connections: { url: connectionsUrl } } : {}),
       recovery: {
         ...(requestedIsolation ? { requestedIsolation } : {}),
         ...(realizedIsolation ? { realizedIsolation } : {}),
@@ -818,6 +834,7 @@ export function createBoundedWorkspaceControlPresentation(
 ): WorkspaceControlPresentation {
   return {
     async start(context) {
+      const connectionsUrl = await resolveConnectionsUrlSafe();
       const renderer = await input.openRenderer();
       let selectedWorkspaceId: string | undefined;
       let selectedDetail: Extract<WorkspaceControlRendererMessage, { type: "detail" }> | undefined;
@@ -837,7 +854,7 @@ export function createBoundedWorkspaceControlPresentation(
 
       const sendSelectedDetail = async (workspaceId: string) => {
         const generation = ++detailGeneration;
-        const loaded = await loadDetail(context, workspaceId);
+        const loaded = await loadDetail(context, workspaceId, connectionsUrl);
         if (!presentationOpen || generation !== detailGeneration) return;
         selectedDetail = loaded.message;
         selectedPromotionRecords = loaded.promotionRecords;
@@ -966,7 +983,8 @@ export function createBoundedWorkspaceControlPresentation(
               event.type === "open-pr" ||
               event.type === "open-preview" ||
               event.type === "open-production" ||
-              event.type === "open-compare"
+              event.type === "open-compare" ||
+              event.type === "open-connections"
             ) {
               const selected = requireSelectedWorkspace(event.workspaceId);
               const target =
@@ -991,17 +1009,24 @@ export function createBoundedWorkspaceControlPresentation(
                           code: "occupancy_production_unavailable",
                           phase: "workspace-control-open-production",
                         }
-                      : {
-                          url: occupancyCompareOrPullUrl(
-                            selected.workspace.occupancy,
-                            selected.pullRequest?.url,
-                          ),
-                          allowed: (url: string) =>
-                            isOccupancyGitHubPullRequestUrl(url) ||
-                            isOccupancyGitHubCompareUrl(url),
-                          code: "occupancy_compare_unavailable",
-                          phase: "workspace-control-open-compare",
-                        };
+                      : event.type === "open-compare"
+                        ? {
+                            url: occupancyCompareOrPullUrl(
+                              selected.workspace.occupancy,
+                              selected.pullRequest?.url,
+                            ),
+                            allowed: (url: string) =>
+                              isOccupancyGitHubPullRequestUrl(url) ||
+                              isOccupancyGitHubCompareUrl(url),
+                            code: "occupancy_compare_unavailable",
+                            phase: "workspace-control-open-compare",
+                          }
+                        : {
+                            url: selected.connections?.url,
+                            allowed: isOccupancyHttpUrl,
+                            code: "occupancy_connections_unavailable",
+                            phase: "workspace-control-open-connections",
+                          };
               if (!target.url || !target.allowed(target.url)) {
                 await renderer.send({
                   type: "error",
