@@ -1142,6 +1142,9 @@ describe("Agent Workspace CLI", () => {
       commandBus: {
         execute: async <T>(_context: unknown, command: Command<T>) => {
           commands.push(command as Command<unknown>);
+          if (!(command instanceof OpenAgentWorkspaceCommand)) {
+            return ok({} as T);
+          }
           attempts += 1;
           if (attempts === 1) {
             return err(
@@ -1186,11 +1189,10 @@ describe("Agent Workspace CLI", () => {
       process.stdout.write = write;
     }
 
-    expect(commands).toHaveLength(2);
-    expect((commands[0] as OpenAgentWorkspaceCommand).input.commitSha).toBe(
-      "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    );
-    expect((commands[1] as OpenAgentWorkspaceCommand).input).toMatchObject({
+    const opens = commands.filter((command) => command instanceof OpenAgentWorkspaceCommand);
+    expect(opens).toHaveLength(2);
+    expect(opens[0]?.input.commitSha).toBe("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+    expect(opens[1]?.input).toMatchObject({
       commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       forceNew: false,
     });
@@ -1218,6 +1220,9 @@ describe("Agent Workspace CLI", () => {
       commandBus: {
         execute: async <T>(_context: unknown, command: Command<T>) => {
           commands.push(command as Command<unknown>);
+          if (!(command instanceof OpenAgentWorkspaceCommand)) {
+            return ok({} as T);
+          }
           attempts += 1;
           if (attempts === 1) {
             return err(

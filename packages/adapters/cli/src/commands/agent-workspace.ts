@@ -71,6 +71,7 @@ import {
   occupancyPreviewFromResource,
   occupancyPullRequestFromPreviewEnvironments,
 } from "../occupancy-chrome.js";
+import { offerOccupancyAppaloftSkill } from "../occupancy-skill-offer.js";
 import {
   formatRemoteCodeBanner,
   isRemoteCodeGitRemoteLocator,
@@ -627,6 +628,16 @@ export const workspaceCodeCommand = EffectCommand.make(
           `Pinned · ${workspaceId} @ ${pinnedSha.slice(0, 7)} · requested ${door.commitSha.slice(0, 7)} · use --new for an isolated Workspace\n`,
         );
       }
+      yield* Effect.promise(async () => {
+        try {
+          await offerOccupancyAppaloftSkill({
+            workspaceId: result.workspaceId,
+            executeCommand: (command) => cli.executeCommand(command),
+          });
+        } catch {
+          // occupy still succeeds when skill offer cannot write
+        }
+      });
       const bannerProjectId = result.projectId || door.projectId;
       let previewUrl: string | undefined;
       let productionUrl: string | undefined;
