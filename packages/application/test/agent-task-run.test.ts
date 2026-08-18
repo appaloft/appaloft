@@ -49,6 +49,7 @@ function createHarness(
   options: {
     stateProtector?: AgentTaskRunDependencies["stateProtector"];
     existingPullRequest?: boolean;
+    githubToken?: string | null;
     unrelatedStagedChanges?: boolean;
     showRun?: AgentTaskRunDependencies["agents"]["showRun"];
   } = {},
@@ -196,7 +197,8 @@ function createHarness(
       },
     },
     integrationAuth: {
-      getProviderAccessToken: async () => "github-scoped-test-token",
+      getProviderAccessToken: async () =>
+        options.githubToken === undefined ? "github-scoped-test-token" : options.githubToken,
     },
     stateProtector: options.stateProtector ?? new TestControlPlaneSecretProtector(),
     clock: { now: () => now },
@@ -372,6 +374,37 @@ describe("Agent Task Run application workflow", () => {
       harness.commands.find((argv) => argv[0] === "git" && argv[1] === "add" && argv[2] === "-A"),
     ).toEqual(expect.arrayContaining([".", ":(exclude).appaloft/**"]));
     expect(harness.commands.flat().join(" ")).not.toContain("github-scoped-test-token");
+  });
+
+  test("[AGENT-TASK-PR-008] missing GitHub credential names Connections", async () => {
+    const harness = createHarness({ githubToken: null });
+    await harness.service.create(cliContext, {
+      workspaceId,
+      runtimeId,
+      task: "Implement issue #123",
+      runContext: { mode: "fresh" },
+      idempotencyKey: "task-create-no-github",
+      checks: [],
+      immutableReview: false,
+      sourceRoot: ".",
+    });
+    harness.setRunStatus("completed");
+    await harness.service.reconcile(cliContext, workspaceId, taskRunId);
+    const approved = await harness.service.approve(userContext, workspaceId, taskRunId);
+    expect(approved.isOk()).toBe(true);
+    const delivered = await harness.service.deliver(userContext, workspaceId, taskRunId, {
+      branch: "agent/issue-123",
+      commitMessage: "fix: implement issue 123",
+      remote: "origin",
+      pullRequest: {
+        provider: "github",
+        title: "Fix issue #123",
+      },
+    });
+    expect(delivered.isErr()).toBe(true);
+    if (delivered.isOk()) return;
+    expect(delivered.error.message).toContain("/account/connections");
+    expect(delivered.error.details?.phase).toBe("agent-task-delivery-credential");
   });
 
   test("[AGENT-TASK-PR-008] rejects unrelated staged content before task delivery", async () => {
