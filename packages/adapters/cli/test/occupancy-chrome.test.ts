@@ -8,6 +8,7 @@ import {
   occupancyChromeForProject,
   occupancyCodeOpenUrl,
   occupancyCompareOrPullUrl,
+  occupancyConnectionsUrl,
   occupancyGitHubCompareUrl,
   occupancyPullRequestFromPreviewEnvironments,
 } from "../src/occupancy-chrome.js";
@@ -349,5 +350,28 @@ describe("occupancy code --open", () => {
         commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
       }),
     ).toBeUndefined();
+  });
+
+  test("[WS-REMOTE-OPEN-141] --open-target connections stays on Connections", () => {
+    expect(occupancyConnectionsUrl("https://app.appaloft.com/")).toBe(
+      "https://app.appaloft.com/account/connections",
+    );
+    expect(
+      occupancyCodeOpenUrl({
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io/",
+        connectionsUrl: "https://app.appaloft.com/account/connections",
+        target: "connections",
+      }),
+    ).toBe("https://app.appaloft.com/account/connections");
+    expect(
+      occupancyAvailableDoorHint({
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+        previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io/",
+        connectionsUrl: "https://app.appaloft.com/account/connections",
+      }),
+    ).toBe("Open · --open-target preview|connections · workspace p/g");
   });
 });

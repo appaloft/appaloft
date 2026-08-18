@@ -78,6 +78,7 @@ import {
   occupancyCloudCompatError,
   REMOTE_CODE_MODEL_HINT,
   resolveDefaultRemoteCodeDoor,
+  resolveOccupancyConnectionsUrl,
   resolveRemoteCodeGitHubHint,
   scratchRemoteRejectedError,
 } from "../remote-code-session.js";
@@ -483,6 +484,7 @@ export const workspaceCodeCommand = EffectCommand.make(
       "production",
       "pr",
       "compare",
+      "connections",
     ] as const).pipe(Options.optional),
   },
   ({ forceNew, local, noAttach, open, openTarget, path }) =>
@@ -671,12 +673,14 @@ export const workspaceCodeCommand = EffectCommand.make(
           ...(door.branch ? { branch: door.branch } : {}),
         })}\n`,
       );
+      const connectionsUrl = yield* Effect.promise(() => resolveOccupancyConnectionsUrl());
       if (open || optionalValue(openTarget)) {
         const url = occupancyCodeOpenUrl({
           repositoryIdentity: door.repositoryIdentity,
           commitSha: bannerCommitSha,
           ...(previewUrl ? { previewUrl } : {}),
           ...(productionUrl ? { productionUrl } : {}),
+          ...(connectionsUrl ? { connectionsUrl } : {}),
           ...(pullRequestNumber ? { pullRequestNumber } : {}),
           ...(door.branch ? { branch: door.branch } : {}),
           ...(optionalValue(openTarget)
@@ -705,6 +709,7 @@ export const workspaceCodeCommand = EffectCommand.make(
         commitSha: bannerCommitSha,
         ...(previewUrl ? { previewUrl } : {}),
         ...(productionUrl ? { productionUrl } : {}),
+        ...(connectionsUrl ? { connectionsUrl } : {}),
         ...(pullRequestNumber ? { pullRequestNumber } : {}),
         ...(door.branch ? { branch: door.branch } : {}),
       });

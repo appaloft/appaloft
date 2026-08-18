@@ -1022,7 +1022,10 @@ describe("Agent Workspace CLI", () => {
     );
     const printed = output.join("");
     expect(printed).toContain(
-      "Open · --open-target preview|compare · workspace p/c\nConnect a model in the attached OpenCode session before running a Task.",
+      "Connect a model in the attached OpenCode session before running a Task.",
+    );
+    expect(printed).toMatch(
+      /Open · --open-target preview\|compare(?:\|connections)? · workspace p\/c(?:\/g)?/,
     );
     expect(printed).toMatch(
       /GitHub PR · connect repo at (?:https?:\/\/[^\s]+)?\/account\/connections or install the App with contents\/PR write\./,
