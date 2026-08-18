@@ -404,7 +404,7 @@ describe("occupancy resource logs", () => {
 });
 
 describe("occupancy env set", () => {
-  test("[WS-REMOTE-ENVSET-161][WS-REMOTE-ENVUNSET-163][WS-REMOTE-ENVSHOW-167] copies occupancy Environment local id", () => {
+  test("[WS-REMOTE-ENVSET-161][WS-REMOTE-ENVUNSET-163][WS-REMOTE-ENVSHOW-167][WS-REMOTE-ENVPREC-171] copies occupancy Environment local id", () => {
     expect(
       occupancyLocalEnvironmentId(
         [
@@ -416,7 +416,7 @@ describe("occupancy env set", () => {
     ).toBe("env_xc5zlcwxk650");
   });
 
-  test("[WS-REMOTE-ENVSET-162][WS-REMOTE-ENVUNSET-164][WS-REMOTE-ENVSHOW-168] missing occupancy Environment local stays omitted", () => {
+  test("[WS-REMOTE-ENVSET-162][WS-REMOTE-ENVUNSET-164][WS-REMOTE-ENVSHOW-168][WS-REMOTE-ENVPREC-172] missing occupancy Environment local stays omitted", () => {
     expect(
       occupancyLocalEnvironmentId(
         [{ id: "env_other", projectId: "prj_web", name: "preview", status: "active" }],
