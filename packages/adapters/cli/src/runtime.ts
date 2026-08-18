@@ -572,9 +572,11 @@ async function pipeTerminalSession(input: {
 
     for await (const frame of session) {
       if (frame.kind === "output") {
-        const data = frame.stream === "stderr" ? frame.data : stripBootstrapEcho(frame.data);
-        if (typeof data === "string" ? data.length > 0 : data.byteLength > 0) {
-          (frame.stream === "stderr" ? stderr : stdout).write(data);
+        if (frame.stream === "stderr") {
+          stderr.write(frame.data);
+        } else {
+          const text = stripBootstrapEcho(frame.data);
+          if (text.length > 0) stdout.write(text);
         }
         continue;
       }
