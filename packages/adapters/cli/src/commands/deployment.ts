@@ -1230,19 +1230,23 @@ function readShownDeployment(deploymentId: string) {
     if (result.isErr()) return undefined;
     const deployment = result.value.deployment;
     if (!deployment) return undefined;
+    const existingTimeline = (deployment as { timeline?: DeploymentSummary["timeline"] }).timeline;
     const latestFailure = result.value.latestFailure;
     const latestFailureMessage = latestFailure?.message?.trim();
-    const timeline = latestFailureMessage
-      ? [
-          {
-            timestamp: latestFailure?.timestamp ?? new Date().toISOString(),
-            source: latestFailure?.source ?? "ssh",
-            phase: latestFailure?.phase ?? "package",
-            level: latestFailure?.level ?? "error",
-            message: latestFailureMessage,
-          },
-        ]
-      : [];
+    const timeline =
+      existingTimeline && existingTimeline.length > 0
+        ? existingTimeline
+        : latestFailureMessage
+          ? [
+              {
+                timestamp: latestFailure?.timestamp ?? new Date().toISOString(),
+                source: latestFailure?.source ?? "ssh",
+                phase: latestFailure?.phase ?? "package",
+                level: latestFailure?.level ?? "error",
+                message: latestFailureMessage,
+              },
+            ]
+          : [];
     return {
       ...deployment,
       timeline,
@@ -1285,8 +1289,13 @@ function waitForSynchronousDeployment(input: { deploymentId: string; resourceId:
     }
     const deadline = Date.now() + synchronousDeploymentTimeoutMs;
     while (true) {
-      const deployment =
-        (yield* readShownDeployment(input.deploymentId)) ?? (yield* readDeploymentSummary(input));
+      const shown = yield* readShownDeployment(input.deploymentId);
+      const shownHasFailureLogs = (shown?.timeline ?? []).some((log) => log.message.trim());
+      const listed =
+        !shown || (shown.status !== "succeeded" && !shownHasFailureLogs)
+          ? yield* readDeploymentSummary(input)
+          : undefined;
+      const deployment = listed && (listed.timeline?.length ?? 0) > 0 ? listed : (shown ?? listed);
       if (deployment && deploymentTerminalStatuses.has(deployment.status)) {
         if (deployment.status !== "succeeded") {
           return (yield* enrichFailedDeploymentSummary(deployment)) ?? deployment;
