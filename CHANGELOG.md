@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.1](https://github.com/appaloft/appaloft/compare/v1.9.0...v1.9.1) (2026-08-19)
+
+
+### Bug Fixes
+
+* **sandbox:** extract occupancy opencode natives onto exec tmpfs ([#1306](https://github.com/appaloft/appaloft/issues/1306)) ([b4d4e6c](https://github.com/appaloft/appaloft/commit/b4d4e6c4c03717f9c2cae4acbbd686e59911c75a))
+
 ## [1.9.0](https://github.com/appaloft/appaloft/compare/v1.8.16...v1.9.0) (2026-08-19)
 
 
