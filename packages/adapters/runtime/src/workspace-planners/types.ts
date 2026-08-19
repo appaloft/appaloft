@@ -20,6 +20,7 @@ export {
   renderWorkspaceDockerBuild,
   renderWorkspaceDockerfile,
   type StaticSiteDockerfileContext,
+  staticPublishDirectoryForDockerCopy,
   staticSiteDockerBuildFromExecution,
   staticSiteDockerfileFromExecution,
 } from "./dockerfile-builder";

@@ -92,7 +92,11 @@ import {
   runtimeContainerEnvironmentVariables,
 } from "./dependency-runtime-secrets";
 import { normalizeGeneratedDockerBuildAssetPath } from "./generated-docker-build-assets";
-import { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild } from "./workspace-planners";
+import {
+  generateStaticSiteDockerBuild,
+  generateWorkspaceDockerBuild,
+  staticPublishDirectoryForDockerCopy,
+} from "./workspace-planners";
 import { runBufferedProcess, shellCommand } from "./buffered-process";
 import { renderComposeOwnershipLabelOverrideScript } from "./compose-label-overrides";
 import {
@@ -213,6 +217,57 @@ export function sshDockerUploadedWorkspaceFilePath(
   relativePath: string,
 ): string {
   return `${sshDockerUploadedWorkspaceContextPath(remoteWorkdir)}/${relativePath.replace(/^\/+/u, "")}`;
+}
+
+export function summarizeSshCommandFailureOutput(input: {
+  stdout: string;
+  stderr: string;
+}): string | undefined {
+  const lines = `${input.stderr}\n${input.stdout}`
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  const summary = lines.slice(-3).join(" | ");
+  if (!summary) {
+    return undefined;
+  }
+
+  return summary.length > 800 ? `${summary.slice(0, 797)}...` : summary;
+}
+
+export function sshStaticPublishDirectoryRelativePath(publishDirectory: string): string | null {
+  return staticPublishDirectoryForDockerCopy(publishDirectory);
+}
+
+export function sshStaticPublishDirectoryMissingMessage(publishDirectory: string): string {
+  const relative = sshStaticPublishDirectoryRelativePath(publishDirectory) ?? publishDirectory;
+  const display = relative === "." ? "./" : `${relative.replace(/\/+$/u, "")}/`;
+  return `static publish directory ${display} not found in uploaded workspace`;
+}
+
+export function buildRemoteStaticPublishDirectoryPresenceCommand(input: {
+  remoteWorkdir: string;
+  publishDirectory: string;
+}): string {
+  const contextPath = sshDockerUploadedWorkspaceContextPath(input.remoteWorkdir);
+  const relative = sshStaticPublishDirectoryRelativePath(input.publishDirectory);
+  if (!relative) {
+    throw new Error("SSH static publish directory presence check requires a publish directory");
+  }
+
+  const publishPath =
+    relative === "."
+      ? contextPath
+      : sshDockerUploadedWorkspaceFilePath(input.remoteWorkdir, relative);
+  const missingMessage = sshStaticPublishDirectoryMissingMessage(relative);
+
+  return ash.render(ash`
+    if ! test -d ${ash.arg(publishPath)}; then
+      printf '%s\n' ${ash.arg(missingMessage)}
+      ls -la ${ash.arg(contextPath)}
+      exit 1
+    fi
+  `);
 }
 
 function remoteWriteTextFileCommand(path: string, contents: string): string {
@@ -2273,6 +2328,60 @@ export class SshExecutionBackend implements ExecutionBackend {
             timeline.push(
               phaseLog("package", `Generated static site Dockerfile at ${dockerfilePath}`),
             );
+
+            const publishDirectory =
+              state.runtimePlan.execution.metadata?.["static.publishDirectory"];
+            if (publishDirectory && sshStaticPublishDirectoryRelativePath(publishDirectory)) {
+              const presenceCommand = buildRemoteStaticPublishDirectoryPresenceCommand({
+                remoteWorkdir,
+                publishDirectory,
+              });
+              const presence = await this.runRemoteCommand({
+                target,
+                command: presenceCommand,
+                cwd: runtimeDir,
+                env,
+              });
+              this.pushCommandOutput(timeline, {
+                context,
+                deploymentId: state.id.value,
+                phase: "package",
+                output: presence.stdout,
+                level: presence.failed ? "error" : "info",
+                stream: "stdout",
+                source: "application",
+              });
+              this.pushCommandOutput(timeline, {
+                context,
+                deploymentId: state.id.value,
+                phase: "package",
+                output: presence.stderr,
+                level: presence.failed ? "error" : "warn",
+                stream: "stderr",
+                source: "application",
+              });
+              if (presence.failed) {
+                const message =
+                  presence.stdout
+                    .split(/\r?\n/u)
+                    .map((line) => line.trim())
+                    .find((line) => line.length > 0) ??
+                  sshStaticPublishDirectoryMissingMessage(publishDirectory);
+                timeline.push(phaseLog("package", message, "error"));
+                return ok({
+                  deployment: this.applyFailure(deployment, {
+                    timeline,
+                    errorCode: "ssh_static_publish_directory_missing",
+                    retryable: false,
+                    metadata: {
+                      host: target.host,
+                      remoteWorkdir,
+                      publishDirectory,
+                    },
+                  }),
+                });
+              }
+            }
           }
 
           const buildCommand = renderRuntimeCommandString(
@@ -2330,7 +2439,12 @@ export class SshExecutionBackend implements ExecutionBackend {
 
           if (build.failed) {
             const message = "SSH Docker image build failed";
-            timeline.push(phaseLog("package", message, "error"));
+            const failureSummary = summarizeSshCommandFailureOutput(build);
+            const failureMessage = failureSummary ? `${message}: ${failureSummary}` : message;
+            timeline.push(phaseLog("package", failureMessage, "error", "application"));
+            if (failureSummary) {
+              timeline.push(phaseLog("package", message, "error"));
+            }
             return ok({
               deployment: this.applyFailure(deployment, {
                 timeline,
@@ -2339,6 +2453,7 @@ export class SshExecutionBackend implements ExecutionBackend {
                 metadata: {
                   host: target.host,
                   remoteWorkdir,
+                  ...(failureSummary ? { dockerBuildFailureSummary: failureSummary } : {}),
                 },
               }),
             });

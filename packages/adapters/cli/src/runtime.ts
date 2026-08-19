@@ -427,6 +427,24 @@ function humanErrorCode(error: DomainError): string | null {
   return /^[a-z][a-z0-9_]{2,80}$/u.test(trimmed) ? trimmed : null;
 }
 
+function humanFailureLogTail(error: DomainError): string | null {
+  const raw = error.details?.failureLogTail;
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  if (!Array.isArray(raw)) {
+    return null;
+  }
+
+  const lines = raw
+    .filter((line): line is string => typeof line === "string")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  return lines.length > 0 ? lines.join("\n") : null;
+}
+
 export function formatHumanCliError(error: unknown): string {
   if (isDomainError(error)) {
     const lines = [error.message.trim()].filter((line) => line.length > 0);
@@ -455,6 +473,10 @@ export function formatHumanCliError(error: unknown): string {
     const guidance = humanErrorGuidance(error);
     if (guidance) {
       lines.push(guidance);
+    }
+    const failureLogTail = humanFailureLogTail(error);
+    if (failureLogTail && !lines.some((line) => line.includes(failureLogTail))) {
+      lines.push(failureLogTail);
     }
     const installationIds = humanInstallationIds(error);
     if (

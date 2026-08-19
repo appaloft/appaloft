@@ -1268,11 +1268,29 @@ function lastDeploymentFailureMessage(
   const errorLogs = timeline.filter((log) => log.level === "error");
   const selected = errorLogs.at(-1) ?? timeline.at(-1);
   const message = selected?.message?.trim();
-  return message && message.length > 0 ? message : undefined;
+  if (!message) {
+    return undefined;
+  }
+
+  const diagnostic = [...errorLogs]
+    .map((log) => log.message.trim())
+    .reverse()
+    .find(
+      (line) =>
+        line.length > 0 &&
+        line !== message &&
+        (/not found/iu.test(line) ||
+          /ERROR:/u.test(line) ||
+          /static publish directory /iu.test(line)),
+    );
+  return diagnostic && !message.includes(diagnostic) ? `${message}: ${diagnostic}` : message;
 }
 
 function inferDeploymentFailureCode(message: string | undefined): string | undefined {
   if (!message) return undefined;
+  if (/static publish directory .+ not found in uploaded workspace/iu.test(message)) {
+    return "ssh_static_publish_directory_missing";
+  }
   if (/ssh docker image build failed/iu.test(message)) {
     return "ssh_docker_build_failed";
   }

@@ -182,7 +182,10 @@ Use this order:
 
 Progress monitoring is part of deployment, not an optional afterthought. `appaloft deploy` waits
 for a terminal deployment status. Claim a URL only after `succeeded`. A failed SSH Docker image
-build is a failed deploy: non-zero exit, no live URL.
+build is a failed deploy: non-zero exit, no live URL. When BuildKit cannot `COPY public/`, the
+CLI failure must include the last BuildKit lines such as `"/public": not found`. A missing
+uploaded `public/` fails as `static publish directory public/ not found in uploaded workspace`,
+not as a successful deploy.
 
 - Use `appaloft deployments timeline <deploymentId> --follow --json` for a single deployment
   attempt. It is the user-level deployment event stream and remains paired with

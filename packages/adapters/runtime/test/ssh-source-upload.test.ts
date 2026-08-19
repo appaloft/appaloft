@@ -1,6 +1,9 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 import { ash } from "@appaloft/ash";
 import { RuntimeCommandBuilder, renderRuntimeCommandString } from "../src/runtime-commands";
@@ -10,12 +13,16 @@ import {
   buildRemoteComposeFailureLogsCommand,
   buildRemoteDockerImageVersionMetadataCommand,
   buildRemotePreviewArtifactSweepCommand,
+  buildRemoteStaticPublishDirectoryPresenceCommand,
   parseDockerRepoDigestFromInspect,
   parseRemoteDockerImageVersionMetadataOutput,
   sshDockerUploadedWorkspaceContextPath,
   sshDockerUploadedWorkspaceFilePath,
+  sshStaticPublishDirectoryMissingMessage,
   SshExecutionBackend,
+  summarizeSshCommandFailureOutput,
 } from "../src/ssh-execution";
+import { generateStaticSiteDockerBuild } from "../src/workspace-planners";
 
 describe("SSH source upload", () => {
   test("[DEP-CREATE-PKG-001] local workspace upload excludes cache and dependency directories", () => {
@@ -65,6 +72,13 @@ describe("SSH Docker build context", () => {
     const remoteWorkdir = `${remoteRoot}/source`;
     const uploadedPublicIndex = `${remoteWorkdir}/public/index.html`;
     const contextPath = sshDockerUploadedWorkspaceContextPath(remoteWorkdir);
+    const dockerBuild = generateStaticSiteDockerBuild({
+      execution: {
+        metadata: {
+          "static.publishDirectory": "public",
+        },
+      } as never,
+    });
 
     expect(contextPath).toBe(remoteWorkdir);
     expect(contextPath).not.toBe(".");
@@ -73,6 +87,9 @@ describe("SSH Docker build context", () => {
       uploadedPublicIndex,
     );
     expect(uploadedPublicIndex.startsWith(`${contextPath}/`)).toBe(true);
+    expect(dockerBuild?.dockerfile).toContain('COPY ["public/","/usr/share/nginx/html/"]');
+    expect(dockerBuild?.dockerfile).not.toContain('COPY ["/public/","/usr/share/nginx/html/"]');
+    expect(dockerBuild?.dockerfile).not.toContain('COPY [".","/usr/share/nginx/html/"]');
 
     const spec = RuntimeCommandBuilder.docker().buildImage({
       image: "appaloft-image-dep_i28tpjmubc32:latest",
@@ -86,6 +103,63 @@ describe("SSH Docker build context", () => {
     expect(command).toContain(`-f '${remoteRoot}/Dockerfile.appaloft-static'`);
     expect(command.endsWith(" '.'")).toBe(false);
     expect(command).not.toContain("cd ");
+  });
+
+  test("[DEP-CREATE-PKG-005][DEP-CREATE-PKG-006] fixture public/index.html is inside context and missing public/ fails", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "appaloft-reverify-public-"));
+    const uploadedWorkspace = join(fixtureRoot, "source");
+    const generatedOnlyWorkspace = join(fixtureRoot, "generated-only");
+    mkdirSync(join(uploadedWorkspace, "public"), { recursive: true });
+    writeFileSync(join(uploadedWorkspace, "public", "index.html"), "<!doctype html><title>ok</title>");
+    mkdirSync(join(generatedOnlyWorkspace, ".appaloft", "docker-build"), { recursive: true });
+    writeFileSync(join(generatedOnlyWorkspace, ".appaloft", "docker-build", "nginx.conf"), "server {}\n");
+
+    try {
+      const presenceCommand = buildRemoteStaticPublishDirectoryPresenceCommand({
+        remoteWorkdir: uploadedWorkspace,
+        publishDirectory: "public",
+      });
+      const present = spawnSync("sh", ["-lc", presenceCommand], { encoding: "utf8" });
+
+      expect(join(uploadedWorkspace, "public", "index.html").startsWith(`${uploadedWorkspace}/`)).toBe(
+        true,
+      );
+      expect(presenceCommand).toContain("test -d");
+      expect(presenceCommand).toContain(ash.quote(`${uploadedWorkspace}/public`));
+      expect(present.status).toBe(0);
+      expect(present.stdout).not.toContain("not found in uploaded workspace");
+
+      const missingCommand = buildRemoteStaticPublishDirectoryPresenceCommand({
+        remoteWorkdir: generatedOnlyWorkspace,
+        publishDirectory: "/public",
+      });
+      const missing = spawnSync("sh", ["-lc", missingCommand], { encoding: "utf8" });
+      const missingMessage = sshStaticPublishDirectoryMissingMessage("public");
+
+      expect(missing.status).not.toBe(0);
+      expect(missing.stdout).toContain(missingMessage);
+      expect(missing.stdout).toContain(
+        "static publish directory public/ not found in uploaded workspace",
+      );
+      expect(missing.stdout).toContain(".appaloft");
+      expect(missingMessage).toBe("static publish directory public/ not found in uploaded workspace");
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[DEP-CREATE-PKG-005] surfaces BuildKit last lines on SSH docker build failure", () => {
+    const summary = summarizeSshCommandFailureOutput({
+      stdout: "",
+      stderr: [
+        "#5 [2/4] COPY [public/,/usr/share/nginx/html/]",
+        '#5 ERROR: "/public": not found',
+        'Dockerfile line 2: COPY ["public/","/usr/share/nginx/html/"]',
+      ].join("\n"),
+    });
+
+    expect(summary).toContain('"/public": not found');
+    expect(`SSH Docker image build failed: ${summary}`).toContain('"/public": not found');
   });
 });
 

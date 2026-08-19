@@ -224,6 +224,28 @@ describe("CLI safe error evidence", () => {
     expect(output).not.toContain("infra_error");
   });
 
+  test("[DEP-CREATE-ENTRY-010] surfaces BuildKit last lines from failureLogTail", () => {
+    const output = formatHumanCliError({
+      code: "infra_error",
+      category: "infra",
+      message: "SSH Docker image build failed",
+      retryable: false,
+      details: {
+        phase: "runtime-execution",
+        reason: "deployment_failed",
+        errorCode: "ssh_docker_build_failed",
+        guidance: "The deployment did not succeed. A live URL is not available.",
+        failureLogTail:
+          '#5 ERROR: "/public": not found\nDockerfile line 2: COPY ["public/","/usr/share/nginx/html/"]',
+      },
+    } satisfies DomainError);
+
+    expect(output).toContain("SSH Docker image build failed");
+    expect(output).toContain('"/public": not found');
+    expect(output).toContain("ssh_docker_build_failed");
+    expect(output).not.toContain("infra_error");
+  });
+
   test("does not serialize unknown failures in human CLI output", () => {
     const output = formatHumanCliError(
       new Error("secret-value ciphertext-value /private/operator/key"),
