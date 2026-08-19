@@ -2,8 +2,12 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 export interface CiTestBoundaryViolation {
-  readonly rule: "build-smoke-disk-budget" | "hermetic-package-tests" | "postgres-job-scope";
   readonly message: string;
+  readonly rule:
+    | "build-smoke-disk-budget"
+    | "hermetic-package-tests"
+    | "postgres-job-scope"
+    | "shared-change-classifier";
 }
 
 export function findCiTestBoundaryViolations(workflow: string): CiTestBoundaryViolation[] {
@@ -59,6 +63,72 @@ export function findCiTestBoundaryViolations(workflow: string): CiTestBoundaryVi
   return violations;
 }
 
+export function findCiChangeClassifierViolations(
+  ciWorkflow: string,
+  e2eWorkflow: string,
+): CiTestBoundaryViolation[] {
+  const violations: CiTestBoundaryViolation[] = [];
+  const classifier = "scripts/ci/classify-changed-files.ts";
+
+  if (!ciWorkflow.includes(classifier) || !e2eWorkflow.includes(classifier)) {
+    violations.push({
+      message:
+        "ci.yml and e2e.yml must classify changes through scripts/ci/classify-changed-files.ts.",
+      rule: "shared-change-classifier",
+    });
+  }
+
+  if (ciWorkflow.includes("Workflow dispatch; running full CI.")) {
+    violations.push({
+      message:
+        "workflow_dispatch must classify against the default branch instead of forcing full CI.",
+      rule: "shared-change-classifier",
+    });
+  }
+
+  if (
+    !e2eWorkflow.includes("name: Skip E2E") ||
+    !e2eWorkflow.includes("shard: [1, 2]") ||
+    e2eWorkflow.includes("e2e-skip:")
+  ) {
+    violations.push({
+      message:
+        "e2e.yml must keep the two-shard matrix and skip inside those jobs so e2e (1, 2) and e2e (2, 2) still succeed.",
+      rule: "shared-change-classifier",
+    });
+  }
+
+  const resultVar = ["$", "{result}"].join("");
+  const skippedOk = [
+    'if [[ "',
+    resultVar,
+    '" != "success" && "',
+    resultVar,
+    '" != "skipped" ]]; then',
+  ].join("");
+  const tuiJobSkip = ["if: $", "{{ needs.changes.outputs.lightweight_only != 'true' }}"].join("");
+  if (!ciWorkflow.includes(skippedOk) || !ciWorkflow.includes(tuiJobSkip)) {
+    violations.push({
+      message:
+        "ci.yml must job-level skip Workspace TUI when lightweight and treat skipped needed jobs as success.",
+      rule: "shared-change-classifier",
+    });
+  }
+
+  const pullRequestTrigger = e2eWorkflow.slice(
+    e2eWorkflow.indexOf("  pull_request:"),
+    e2eWorkflow.indexOf("  workflow_dispatch:"),
+  );
+  if (pullRequestTrigger.includes("paths:") || pullRequestTrigger.includes("paths-ignore:")) {
+    violations.push({
+      message: "e2e.yml must not hide required shard checks behind pull_request path filters.",
+      rule: "shared-change-classifier",
+    });
+  }
+
+  return violations;
+}
+
 function yamlBlock(source: string, startPattern: RegExp, indentation: number): string {
   const lines = source.split("\n");
   const start = lines.findIndex((line) => startPattern.test(line));
@@ -77,11 +147,17 @@ function yamlBlock(source: string, startPattern: RegExp, indentation: number): s
 }
 
 async function checkRepository(): Promise<void> {
-  const workflowPath = resolve(import.meta.dir, "../.github/workflows/ci.yml");
-  const violations = findCiTestBoundaryViolations(await readFile(workflowPath, "utf8"));
+  const ciWorkflowPath = resolve(import.meta.dir, "../.github/workflows/ci.yml");
+  const e2eWorkflowPath = resolve(import.meta.dir, "../.github/workflows/e2e.yml");
+  const ciWorkflow = await readFile(ciWorkflowPath, "utf8");
+  const e2eWorkflow = await readFile(e2eWorkflowPath, "utf8");
+  const violations = [
+    ...findCiTestBoundaryViolations(ciWorkflow),
+    ...findCiChangeClassifierViolations(ciWorkflow, e2eWorkflow),
+  ];
   if (violations.length > 0) {
     for (const violation of violations) {
-      console.error(`.github/workflows/ci.yml [${violation.rule}] ${violation.message}`);
+      console.error(`[${violation.rule}] ${violation.message}`);
     }
     process.exitCode = 1;
     return;
