@@ -65,5 +65,11 @@ describe("CLI session login gates", () => {
         "http://10.0.0.8:8787",
       ),
     ).toBe("http://10.0.0.8:8787/cli-auth/authorize?user_code=ABCD-EFGH");
+    expect(
+      rewriteCliAuthVerificationUri(
+        "http://app.appaloft.com/cli-auth/authorize?user_code=ABCD-EFGH",
+        "http://app.appaloft.com",
+      ),
+    ).toBe("http://app.appaloft.com/cli-auth/authorize?user_code=ABCD-EFGH");
   });
 });
