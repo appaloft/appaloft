@@ -20,6 +20,7 @@ export {
   hasExplicitLocalDeployIntent,
   isHeadlessWorkspaceInvocation,
   loginRequiredWorkspaceOccupancyTree,
+  requiresCloudDeployLogin,
   workspaceRemoteLoginRequiredError,
 } from "./cli-session-login.js";
 export {

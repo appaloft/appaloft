@@ -16,9 +16,9 @@ import {
   developmentPlanFromSource,
   formatSafeCliError,
   hasCliControlPlaneLogin,
-  hasExplicitLocalDeployIntent,
   isHeadlessWorkspaceInvocation,
   loginRequiredWorkspaceOccupancyTree,
+  requiresCloudDeployLogin,
   resolveCliExecutionTarget,
   runStandaloneControlPlaneCli,
   runStandaloneDevelopmentCli,
@@ -733,6 +733,15 @@ export async function runShellCli(
     env: process.env,
   });
   if (executionTarget.isErr()) {
+    const failedArgs = commandArgs(argv);
+    if (
+      failedArgs[0] === "deploy" &&
+      requiresCloudDeployLogin(failedArgs, process.env) &&
+      !(await hasCliControlPlaneLogin(process.env))
+    ) {
+      writeDomainError(deployLoginRequiredError());
+      process.exit(1);
+    }
     writeDomainError(executionTarget.error);
     process.exit(1);
   }
@@ -774,10 +783,6 @@ export async function runShellCli(
   if (!loggedIn) {
     if (localCommand === "code" && !localArgs.includes("--local")) {
       writeDomainError(workspaceRemoteLoginRequiredError());
-      process.exit(1);
-    }
-    if (localCommand === "deploy" && !hasExplicitLocalDeployIntent(localArgs)) {
-      writeDomainError(deployLoginRequiredError());
       process.exit(1);
     }
     if (localCommand === "workspace" && isHeadlessWorkspaceInvocation(localArgs)) {

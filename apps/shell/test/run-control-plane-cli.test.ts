@@ -519,7 +519,7 @@ describe("shell CLI remote control-plane pre-dispatch", () => {
     expect(stderr).not.toContain("appaloft-backend");
   });
 
-  test("[WS-REMOTE-DEPLOY-057] unauthenticated deploy is login-required before local composition", async () => {
+  test("[WS-REMOTE-DEPLOY-057] unauthenticated Cloud deploy is login-required before local composition", async () => {
     const appaloftHome = await mkdtemp(join(tmpdir(), "appaloft-cli-deploy-login-"));
     const originalStderrWrite = process.stderr.write;
     let stderr = "";
@@ -527,6 +527,8 @@ describe("shell CLI remote control-plane pre-dispatch", () => {
     process.env = {
       ...originalEnv,
       APPALOFT_HOME: appaloftHome,
+      APPALOFT_CONTROL_PLANE_MODE: "cloud",
+      APPALOFT_CONTROL_PLANE_URL: "https://app.appaloft.com",
     };
     process.stderr.write = ((chunk: string | Uint8Array) => {
       stderr += String(chunk);

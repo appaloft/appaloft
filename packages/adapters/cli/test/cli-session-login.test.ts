@@ -6,6 +6,7 @@ import {
   hasExplicitLocalDeployIntent,
   isHeadlessWorkspaceInvocation,
   loginRequiredWorkspaceOccupancyTree,
+  requiresCloudDeployLogin,
   workspaceRemoteLoginRequiredError,
 } from "../src/cli-session-login.js";
 import { rewriteCliAuthVerificationUri } from "../src/control-plane-profile.js";
@@ -50,6 +51,23 @@ describe("CLI session login gates", () => {
     ).toBe(false);
     expect(hasExplicitLocalDeployIntent(["deploy", "--server-host", "1.2.3.4"])).toBe(true);
     expect(hasExplicitLocalDeployIntent(["deploy"])).toBe(false);
+    expect(requiresCloudDeployLogin(["deploy"], { APPALOFT_CONTROL_PLANE_MODE: "none" })).toBe(
+      false,
+    );
+    expect(requiresCloudDeployLogin(["deploy"], { APPALOFT_CONTROL_PLANE_MODE: "cloud" })).toBe(
+      true,
+    );
+    expect(
+      requiresCloudDeployLogin(["deploy"], {
+        APPALOFT_CONTROL_PLANE_URL: "https://app.appaloft.com",
+      }),
+    ).toBe(true);
+    expect(requiresCloudDeployLogin(["deploy"], {})).toBe(false);
+    expect(
+      requiresCloudDeployLogin(["deploy", "--server-host", "1.2.3.4"], {
+        APPALOFT_CONTROL_PLANE_MODE: "cloud",
+      }),
+    ).toBe(false);
   });
 
   test("[CONTROL-PLANE-CLI-012] default Cloud http authorize URL becomes https", () => {

@@ -1,5 +1,8 @@
 import { type DomainError } from "@appaloft/core";
-import { defaultCliControlPlaneProfileStore } from "./control-plane-profile.js";
+import {
+  defaultCliControlPlaneProfileStore,
+  isDefaultPublicCloudControlPlaneUrl,
+} from "./control-plane-profile.js";
 import { activeControlPlaneProfile } from "./control-plane-service.js";
 
 export const CLI_LOGIN_GUIDANCE = "Run appaloft login";
@@ -99,4 +102,22 @@ export function hasExplicitLocalDeployIntent(args: readonly string[]): boolean {
       arg === "--state-backend" ||
       arg.startsWith("--state-backend="),
   );
+}
+
+export function requiresCloudDeployLogin(
+  args: readonly string[],
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  if (hasExplicitLocalDeployIntent(args)) {
+    return false;
+  }
+  const mode = env.APPALOFT_CONTROL_PLANE_MODE?.trim().toLowerCase();
+  if (mode === "none") {
+    return false;
+  }
+  if (mode === "cloud") {
+    return true;
+  }
+  const url = env.APPALOFT_CONTROL_PLANE_URL?.trim();
+  return Boolean(url && isDefaultPublicCloudControlPlaneUrl(url));
 }
