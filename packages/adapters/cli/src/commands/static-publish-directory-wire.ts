@@ -2,6 +2,9 @@
  * Live Cloud still runs the pre-#1309 `normalizeStaticPublishDirectory` that rejects `.`.
  * Production already accepts `/` as the source-root publish directory. CLI entry workflows
  * must send that form so tonight's control plane never sees a dot segment.
+ *
+ * Only rewrite source-root aliases. Do not prefix relative dirs such as `public` with `/`;
+ * that COPY shape is a separate companion fix.
  */
 export function wireCompatibleStaticPublishDirectory(value: string): string {
   const trimmed = value.trim();

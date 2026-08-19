@@ -385,7 +385,9 @@ CLI entry workflows serialize source-root publish-directory aliases (`.`, `./`, 
 `resources.create` and `resources.configure-runtime` so a live Cloud control plane that still runs
 the pre-#1309 validator (rejecting `.` as a dot segment) can admit the same source-root meaning.
 Local core still accepts `.` and persists `/`. Do not depend on Cloud being redeployed for
-`deploy .` / `--as static-site` / `--publish-dir .` to work against production.
+`deploy .` / `--as static-site` / `--publish-dir .` to work against production. Relative publish
+directories such as `public` stay relative on the CLI wire; leading-slash COPY packaging is a
+separate companion change.
 
 ## Open Questions
 

@@ -86,6 +86,14 @@ describe("CLI quick deploy draft mapping", () => {
     expect(wireCompatibleStaticPublishDirectory("/")).toBe("/");
     expect(wireCompatibleStaticPublishDirectory("dist")).toBe("dist");
     expect(wireCompatibleStaticPublishDirectory("/dist")).toBe("/dist");
+    expect(wireCompatibleStaticPublishDirectory("public")).toBe("public");
+    expect(runtimeProfileFromDeploymentInput("static", { publishDirectory: "public" })).toEqual({
+      strategy: "static",
+      publishDirectory: "public",
+    });
+    expect(
+      JSON.stringify(runtimeProfileFromDeploymentInput("static", { publishDirectory: "public" })),
+    ).not.toContain("/public");
 
     for (const publishDirectory of [".", "./", "/"] as const) {
       expect(
