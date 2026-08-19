@@ -221,6 +221,9 @@ export class CommunityWorkspaceActivationContextInitializer
       });
     }
 
+    // Reuse any enabled install for this profileId before digest lookup.
+    // findInstallationByDefinition is not the reuse gate: a digest bump must
+    // not call profiles.install() and create a second appaloft-remote.
     const requestedSelector = input.profile ?? COMMUNITY_OCCUPANCY_OPENCODE_PROFILE_ID;
     const existingBySelector = await this.findEnabledInstallationForSelector(
       context,
@@ -246,6 +249,7 @@ export class CommunityWorkspaceActivationContextInitializer
       manifest: requestedProfile.profileManifest,
     });
     if (profileValidation.isErr()) return err(profileValidation.error);
+    // Digest match only classifies leftover disable vs created after install.
     const existingProfile = await this.dependencies.profileRepository.findInstallationByDefinition(
       repositoryContext,
       profileValidation.value.definitionDigest,

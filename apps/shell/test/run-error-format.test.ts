@@ -91,6 +91,28 @@ describe("shell domain error formatting", () => {
     expect(output).toContain("correlationId=remote_state_1");
   });
 
+  test("[WS-REMOTE-PROFILE-AMBIGUOUS-176] prints selector and installationIds without guidance", () => {
+    const error: DomainError = {
+      code: "conflict",
+      category: "user",
+      message: "Agent Workspace Profile selector is ambiguous",
+      retryable: false,
+      details: {
+        code: "workspace_open_profile_ambiguous",
+        selector: "appaloft-remote",
+        installationIds: ["awpi_ptlsoktb2iq1", "awpi_b87sxo84xe7u"],
+      },
+    };
+
+    const output = formatDomainError(error);
+
+    expect(output).toContain("Agent Workspace Profile selector is ambiguous");
+    expect(output).toContain("selector=appaloft-remote");
+    expect(output).toContain("installationIds=awpi_ptlsoktb2iq1,awpi_b87sxo84xe7u");
+    expect(output).toContain("appaloft code --profile awpi_ptlsoktb2iq1");
+    expect(output).not.toContain("Workspace activation context is still unavailable");
+  });
+
   test("quarantines an incompatible SSH remote PGlite local mirror before retry", async () => {
     const dataRoot = await mkdtemp(join(tmpdir(), "appaloft-run-error-format-"));
     const pgliteDir = join(dataRoot, "pglite");
