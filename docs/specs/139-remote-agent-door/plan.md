@@ -57,6 +57,7 @@
 | Occupancy resume preferred Profile | public `workspaces.open` resume path |
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 | Occupancy leftover EXPOSE | detector + occupancy initializer; live-verified whoami 80 |
+| Occupancy HOME skill offer | public CLI `occupancy-skill-offer` after first-party Appaloft skill; `WriteSandboxFile` + add-only `ReadSandboxFile` |
 | Registered-Server OpenCode attach | public `issueAttachAccess` + existing managed-terminal grant |
 
 ## Architecture
@@ -337,6 +338,24 @@ Slice-46 verification:
 - unit: signed gateway URL still wins;
 - unit: raw loopback stays unsafe;
 - `appaloftdev code` on Hostinger occupancy attaches OpenCode without port-publishing conflict.
+
+Slice-48 verification:
+
+- unit: allowlisted HOME roots copy into `skills/<name>` and `.agents/skills/<name>`;
+- unit: missing HOME skill dirs are skipped;
+- unit: entries without `SKILL.md` are skipped;
+- unit: secrets and `mcp.json` are not uploaded;
+- unit: HOME skill offer is add-only;
+- unit: first-party Appaloft skill offer stays.
+
+Slice-48 verification:
+
+- unit: allowlisted HOME roots copy into `skills/<name>` and `.agents/skills/<name>`;
+- unit: missing HOME skill dirs are skipped;
+- unit: entries without `SKILL.md` are skipped;
+- unit: secrets and `mcp.json` are not uploaded;
+- unit: HOME skill offer is add-only;
+- unit: first-party Appaloft skill offer stays.
 
 
 

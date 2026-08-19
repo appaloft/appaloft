@@ -78,7 +78,11 @@ import {
   occupancyPreviewFromResource,
   occupancyPullRequestFromPreviewEnvironments,
 } from "../occupancy-chrome.js";
-import { offerOccupancyAppaloftSkill } from "../occupancy-skill-offer.js";
+import {
+  occupancyHomeSkillDestinationExists,
+  offerOccupancyAppaloftSkill,
+  offerOccupancyHomeSkills,
+} from "../occupancy-skill-offer.js";
 import {
   formatRemoteCodeBanner,
   isRemoteCodeGitRemoteLocator,
@@ -721,6 +725,14 @@ export const workspaceCodeCommand = EffectCommand.make(
           await offerOccupancyAppaloftSkill({
             workspaceId: result.workspaceId,
             executeCommand: (command) => cli.executeCommand(command),
+          });
+          await offerOccupancyHomeSkills({
+            workspaceId: result.workspaceId,
+            executeCommand: (command) => cli.executeCommand(command),
+            destinationExists: occupancyHomeSkillDestinationExists({
+              workspaceId: result.workspaceId,
+              executeQuery: (query) => cli.executeQuery(query),
+            }),
           });
         } catch {
           // occupy still succeeds when skill offer cannot write

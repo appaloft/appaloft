@@ -12,6 +12,8 @@ searchAliases:
   - "Pi"
   - "workspace"
   - "sandbox"
+  - "occupancy skills"
+  - "home skills"
 relatedOperations:
   - "workspaces.open"
   - "sandboxes.create"
@@ -58,6 +60,20 @@ appaloft code
 ```text
 Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>
 ```
+
+占用成功后，CLI 会把公开的 Appaloft skill 写入 `/workspace/skills/appaloft` 和
+`/workspace/.agents/skills/appaloft`。如果这台笔记本 HOME 里有匹配的 skill 目录，占用还会
+**只新增** 复制到 `/workspace/skills/<name>` 和 `/workspace/.agents/skills/<name>`。
+<a id="agent-workspace-occupancy-skills" />
+
+对齐 Railway 云 Agent 文档的根是 `~/.claude/skills`、`~/.codex/skills`、`~/.grok/skills`、
+`~/.agents/skills`。Appaloft 还会提供 `~/.cursor/skills` 和 `~/.config/opencode/skills`，
+因为这是用户实际使用的根；这两项**超出 Railway 文档范围**。Railway 文档没有写 plugins、
+MCP 配置、或这两个额外根。
+
+只复制包含 `SKILL.md` 的目录。已存在的沙箱文件不会被覆盖。不会复制 `mcp.json`、token、
+cookie、`.env` 或编辑器插件二进制。沙箱进程看不到笔记本 HOME；复制只发生在本机 occupy
+已经在写文件的那条 CLI 路径上。
 
 未登录或没有 Server 会 fail closed 并给出下一步，不会变成 Scratch。本机 Scratch 必须显式指定：
 

@@ -2,10 +2,10 @@
 
 ## Status
 
-- Round: Spec. Slice 1-45 leftover EXPOSE live-verified 2026-08-17. Slice 46 is registered-Server OpenCode attach.
-- Date: 2026-08-17.
+- Round: Spec. Slice 1-45 leftover EXPOSE live-verified 2026-08-17. Slice 46 is registered-Server OpenCode attach. Slice 48 occupancy HOME skill offer specified 2026-08-19.
+- Date: 2026-08-19.
 - Predecessor: leftover occupancy EXPOSE upgrade is in public `75bc24b4` / Cloud pin `134f5244`.
-- Code changes allowed: yes for slice 46 after the registered-Server attach ticket is `ready-for-agent`.
+- Code changes allowed: yes for the occupancy HOME skill-offer slice.
 ## Actor And Observable Outcome
 
 A teammate sits down at any laptop, already allowed on the team's enrolled Server
@@ -190,12 +190,16 @@ Sandbox on that Server, not one VM per person.
 | D153 | Gateway-capable providers keep native-attach | Managed / internal-network Sandboxes with a port publisher still get the private `/s/...` URL and local `opencode attach <url>`. |
 | D154 | Do not publish host ports or SSH-forward 4096 | `hostEgress` cannot combine with an internal Docker network. Raw loopback attach stays `agent_workspace_native_attach_access_unsafe`. |
 | D155 | Leftover EXPOSE 3000→80 is closed on whoami | Live 2026-08-17: reset `res_am78rpisds2x` to 3000, `appaloftdev code --no-attach` upgraded `internalPort` to 80. Next actor-visible slice is attach, not another EXPOSE ticket. |
+| D156 | Occupancy may offer allowlisted HOME skills | Owner 2026-08-19. Railway cloud agents only sync `~/.claude/skills`, `~/.codex/skills`, `~/.grok/skills`, `~/.agents/skills`, add-only, and fail files >10MB. Their docs do not mention plugins, MCP config, `~/.cursor/skills`, or `~/.config/opencode/skills`. Appaloft occupy may offer those Railway-aligned roots plus `~/.cursor/skills` and `~/.config/opencode/skills` (beyond Railway). Only directories that contain `SKILL.md`. Add-only. No `mcp.json` / tokens / cookies / `.env` / plugin binaries. Copy from the existing CLI occupy `WriteSandboxFile` path; the Sandbox cannot see laptop HOME. First-party Appaloft skill offer stays. No new setup command and not the local Agent door. |
 
 ## Rejected
 
 - Keep Scratch as the default door (owner: more confusing than Railway login-first).
 - One person one physical machine (BYOS team box cannot do that).
 - Share `~/.codex/auth.json` / Claude setup-token from the Server home with anyone who can attach.
+- Copy `mcp.json`, tokens, cookies, `.env`, or editor plugin binaries into occupancy.
+- Invent `auth mcp cursor install` / `appaloft setup agent` in the occupancy skill-offer slice.
+- Let the Sandbox read laptop HOME.
 - Make `workspace open` accept a dirty laptop tree as remote truth.
 - New Host/Machine aggregate.
 - Silent managed → BYOS → Scratch fallback.
@@ -213,7 +217,7 @@ Sandbox on that Server, not one VM per person.
 | Project / Environment | Project / Environment (existing) |
 | `railway up` / GitHub | existing deploy + source-link |
 | PR Environments | existing Cloud product-grade preview |
-| Skills sync from laptop | Project/Profile skill injection on the Server |
+| Skills sync from laptop | Occupy copies allowlisted HOME skill dirs add-only (`SKILL.md` only) plus first-party Appaloft skill; Project/Profile still pins harness. Cursor/OpenCode HOME roots are beyond Railway. |
 | Personal `auth.json` copied to my VM | Personal login inside my Sandbox; optional later team Connection |
 
 ## Slice 1 (shipped)

@@ -3,11 +3,11 @@
 ## Status
 
 - Round: Spec
-- Artifact state: slice 1–45 leftover EXPOSE live-verified 2026-08-17; slice 46 registered-Server OpenCode attach accepted 2026-08-17
+- Artifact state: slice 1–45 leftover EXPOSE live-verified 2026-08-17; slice 46 registered-Server OpenCode attach accepted 2026-08-17; slice 48 occupancy HOME skill offer specified 2026-08-19
 - Discovery: [discovery.md](./discovery.md)
-- Governing decision: ADR-120 plan default destination; ADR-119 locates; ADR-118 occupies; ADR-117 remains the login/Server/`--local` door; ADR-116 remains Scratch-only; ADR-103 stays on explicit `workspace open` Git fail-closed
-- Code changes allowed: yes for slice 46 after the registered-Server attach ticket is `ready-for-agent`
-- Compatibility: public minor. Occupancy leftover-default 3000 may be replaced by a single remote EXPOSE; registered-Server attach may use in-Sandbox managed-terminal when port publishing is unsupported; no new catalog field
+- Governing decision: ADR-120 plan default destination; ADR-119 locates; ADR-118 occupies and may offer allowlisted HOME skills; ADR-117 remains the login/Server/`--local` door; ADR-116 remains Scratch-only; ADR-103 stays on explicit `workspace open` Git fail-closed
+- Code changes allowed: yes for the occupancy HOME skill-offer slice after this spec update
+- Compatibility: public minor. Occupancy leftover-default 3000 may be replaced by a single remote EXPOSE; registered-Server attach may use in-Sandbox managed-terminal when port publishing is unsupported; HOME skill offer is add-only and adds no catalog field
 
 ## Business Outcome
 
@@ -49,7 +49,7 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-BANNER-014 | Identity after occupy | `workspaces.open` succeeds | attach or `--no-attach` | stdout has one banner: `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>` and optional ` · <preview-url>` when Resource `app` already has succeeded generated access. No live deploy stream. |
 | WS-REMOTE-TARGET-015 | Door Server is placement | door selected Server S | `code` dispatches open | command includes `targetServerId=S`; placement reserves S. |
 | WS-REMOTE-NO-ATTACH-016 | Occupy without attach | `--no-attach` | `appaloft code --no-attach` | Sandbox is created or resumed; CLI does not attach; exit 0; `sandbox list` shows my occupancy. |
-| WS-REMOTE-SKILL-017 | Occupancy offers Appaloft skill | occupancy OpenCode starts or attaches | harness config is prepared or `appaloft code --no-attach` occupies | Sandbox serve offers `/workspace/skills` and `/workspace/.agents/skills`. Occupy writes the public Appaloft skill into `skills/appaloft` and `.agents/skills/appaloft`, then git-excludes `/skills/` and `/.agents/` so the occupied repo stays clean. Missing skill tree or write failure is fail-soft. `appaloft-remote` declares optional `appaloft-tools` so a later first-party MCP Connection can bind into occupancy serve. Unbound occupancy still starts without serve MCP. Native attach offers the public Appaloft skill plus `appaloft mcp remote-stdio` when a control plane is selected, or `mcp stdio` for local-only Scratch. Occupancy attach must not wrap remote-stdio with `APPALOFT_CONTROL_PLANE_MODE=none`. Attach sets an isolated `XDG_CONFIG_HOME` so a broken host `opencode.json` cannot reject the injected MCP. Vendor TUI text is not parsed. |
+| WS-REMOTE-SKILL-017 | Occupancy offers Appaloft skill | occupancy OpenCode starts or attaches | harness config is prepared or `appaloft code --no-attach` occupies | Sandbox serve offers `/workspace/skills` and `/workspace/.agents/skills`. Occupy writes the public Appaloft skill into `skills/appaloft` and `.agents/skills/appaloft`, then git-excludes `/skills/` and `/.agents/` so the occupied repo stays clean. Missing skill tree or write failure is fail-soft. First-party Appaloft skill offer stays and is unchanged by HOME skill offer. `appaloft-remote` declares optional `appaloft-tools` so a later first-party MCP Connection can bind into occupancy serve. Unbound occupancy still starts without serve MCP. Native attach offers the public Appaloft skill plus `appaloft mcp remote-stdio` when a control plane is selected, or `mcp stdio` for local-only Scratch. Occupancy attach must not wrap remote-stdio with `APPALOFT_CONTROL_PLANE_MODE=none`. Attach sets an isolated `XDG_CONFIG_HOME` so a broken host `opencode.json` cannot reject the injected MCP. Vendor TUI text is not parsed. |
 
 | WS-REMOTE-RESUME-SERVE-018 | Resume restarts serve | preferred Sandbox exists but OpenCode serve is gone | `appaloft code --no-attach` | occupancy resumes the same workspaceId and `ensureRuntime` starts serve before exit 0. |
 | WS-REMOTE-TEMPLATE-019 | Occupancy template is automatic | login + Server, no `APPALOFT_OPENCODE_SANDBOX_TEMPLATE_ID` | `appaloft code --no-attach` | Community/Cloud register OpenCode against reserved `stp_appaloft_remote_opencode`, ensure that tenant template with `COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY`, then occupy. Explicit env still pins a different template id. Mismatch fail-closes; no local/BYOS fallback. |
@@ -215,6 +215,11 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-NEW-NO-DUP-179 | Failed `--new` does not install a second same-name Profile | an enabled `appaloft-remote` already exists, or this attempt created an install then later setup failed | `appaloft code --new --no-attach` | `--new` only skips occupancy resume / `findPreferred`. It must not install a Profile. Community initializer reuses an enabled same-`profileId` install before `findInstallationByDefinition`; digest mismatch must not call `profiles.install()`. Logged-in Cloud uses `CloudWorkspaceActivationContextInitializer` (appaloft-cloud); public CLI omitting `profile` enables Cloud's `existingInstallationId && !input.profile` reuse. Stopping a digest-bump leftover (`awpi_b87sxo84xe7u`) on Cloud still requires Cloud to not call `profiles.install()` for `--new`. Public `install()` still dedupes by definitionDigest only. Do not treat Cloud initializer failure as CLI success. |
 | WS-REMOTE-OPEN-CAUSE-180 | Failed open names the cwd repo and real cause | logged-in `code --new --no-attach` from another origin (for example `github.com/appaloft/appaloft-cloud`) | initializer or re-read fails | human error says what is missing and which repository is being opened; it does not resume whoami occupancy and does not swallow `causeCode` / guidance. safe-json allowlists `causeCode`, `detailCode`, and `repositoryIdentity`. Cloud activation/placement remains fail-closed. |
 | WS-REMOTE-OPEN-BYOS-181 | Registered BYOS is placement | hostinger `srv_4lifk0yrcecy` is the enrolled Server; no managed pool | `workspace open --new` or `workspace open --server srv_4lifk0yrcecy --new` after local Git check | dispatches `workspaces.open` with `targetServerId=srv_4lifk0yrcecy`. It does not demand managed targets and does not enroll another Server. |
+| WS-REMOTE-HOME-SKILL-182 | Occupancy offers allowlisted HOME skills | laptop HOME has matching skill directories | `appaloft code --no-attach` occupies | After the first-party Appaloft skill offer, occupy copies allowlisted HOME skill directories into `/workspace/skills/<name>` and `/workspace/.agents/skills/<name>` through the existing CLI `WriteSandboxFile` path, then git-excludes `/skills/` and `/.agents/` as today. Railway-aligned roots are `~/.claude/skills`, `~/.codex/skills`, `~/.grok/skills`, and `~/.agents/skills`. Appaloft also offers `~/.cursor/skills` and `~/.config/opencode/skills` because those are the roots Appaloft users actually use; those two roots are **beyond Railway**. Railway docs do not mention plugins, MCP config, `~/.cursor/skills`, or `~/.config/opencode/skills`. The Sandbox never reads laptop HOME. Same-name skills: first allowlisted root wins. Missing roots are skipped. Write failure is fail-soft. This is not a new setup command and is not the local Agent door. |
+| WS-REMOTE-HOME-SKILL-183 | Missing HOME skill dirs are skipped | some allowlisted roots are absent | occupy | those roots are skipped; occupy does not fail. |
+| WS-REMOTE-HOME-SKILL-184 | Only SKILL.md directories are copied | an allowlisted root has a child without `SKILL.md` | occupy | that child is not copied. Only immediate child directories that contain a `SKILL.md` file are offered. |
+| WS-REMOTE-HOME-SKILL-185 | Secrets and MCP are not copied | a matching skill directory also contains `mcp.json`, tokens, cookies, `.env`, or editor plugin binaries | occupy | those files are not written. Occupy does not upload `mcp.json`, tokens, cookies, `.env` / `.env.*`, `auth.json`, or editor plugin binaries such as `.vsix`. Files larger than 10MB are skipped (Railway fails those uploads). |
+| WS-REMOTE-HOME-SKILL-186 | HOME skill offer is add-only | destination `/workspace/skills/<name>/…` or `/workspace/.agents/skills/<name>/…` already exists | occupy | existing user/sandbox files are not overwritten. First-party Appaloft skill is offered first, so a laptop `appaloft` skill does not replace the public Appaloft skill. |
 
 ## Slice Scope
 
@@ -230,6 +235,9 @@ In slice 46:
 - `--no-attach` stays occupy-only.
 
 Out of slice 46: host port publish, laptop SSH `-L`, wrapping host-egress with the Sandbox Gateway, catalog create-PR write, team Connection, Cloud managed default Server.
+
+Slice 48: occupancy may offer allowlisted laptop HOME skill directories add-only.
+Out of slice 48: `auth mcp cursor install`, `appaloft setup agent`, MCP/plugin/secret copy, a new setup command, and treating `~/.cursor/skills` / `~/.config/opencode/skills` as Railway-aligned.
 
 
 ## Public Surfaces
@@ -268,8 +276,10 @@ Missing Binding is not a `code` hard failure. The initializer creates or reuses 
 ## Non-Goals
 
 - Implementing `ca` in the same ticket as occupancy or URL locator.
-- Shared personal OAuth.
+- Shared personal OAuth, `mcp.json`, tokens, cookies, `.env`, or editor plugin binaries.
 - Dirty-tree upload.
+- A new local Agent door or setup command (`auth mcp cursor install`, `appaloft setup agent`).
+- Sandbox processes reading laptop HOME. HOME skill copy happens only on the CLI occupy `WriteSandboxFile` path.
 - New Host aggregate.
 - Deleting Scratch; only keep it behind `--local`.
 - Adding Server to the preferred unique index.

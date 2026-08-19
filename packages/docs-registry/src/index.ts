@@ -179,6 +179,35 @@ export const publicDocsHelpTopics = {
       "docs/specs/138-instant-local-scratch/spec.md",
     ],
   },
+  "agent.occupancy-skills": {
+    id: "agent.occupancy-skills",
+    title: "Occupancy skill offer",
+    description:
+      "How occupy writes the public Appaloft skill and may add-only copy allowlisted laptop HOME skill directories into the sandbox.",
+    page: {
+      "zh-CN": "agents/workspaces",
+      "en-US": "en/agents/workspaces",
+    },
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli"],
+    anchor: "agent-workspace-occupancy-skills",
+    aliases: [
+      "occupancy skills",
+      "home skills",
+      "claude skills",
+      "codex skills",
+      "cursor skills",
+      "opencode skills",
+    ],
+    specReferences: [
+      "docs/specs/139-remote-agent-door/spec.md",
+      "docs/testing/remote-agent-door-test-matrix.md",
+      "docs/decisions/ADR-118-remote-code-occupancy.md",
+    ],
+  },
   "agent.workspace-control": {
     id: "agent.workspace-control",
     title: "Workspace control TUI",

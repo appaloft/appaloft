@@ -12,6 +12,8 @@ searchAliases:
   - "OpenCode"
   - "Pi"
   - "sandbox"
+  - "occupancy skills"
+  - "home skills"
 relatedOperations:
   - "workspaces.open"
   - "sandboxes.create"
@@ -58,6 +60,23 @@ clone. The banner is:
 ```text
 Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>
 ```
+
+After occupy, the CLI writes the public Appaloft skill into `/workspace/skills/appaloft`
+and `/workspace/.agents/skills/appaloft`. Matching skill directories from this laptop's
+HOME may also be copied **add-only** into `/workspace/skills/<name>` and
+`/workspace/.agents/skills/<name>`.
+<a id="agent-workspace-occupancy-skills" />
+
+Railway-aligned roots are `~/.claude/skills`, `~/.codex/skills`, `~/.grok/skills`, and
+`~/.agents/skills`. Appaloft also offers `~/.cursor/skills` and
+`~/.config/opencode/skills` because those are the roots Appaloft users actually use;
+those two roots are **beyond Railway**. Railway docs do not mention plugins, MCP
+config, or those extra roots.
+
+Only directories that contain `SKILL.md` are copied. Existing sandbox files are not
+overwritten. The CLI does not copy `mcp.json`, tokens, cookies, `.env`, or editor
+plugin binaries. The sandbox never reads laptop HOME; copy happens on the same CLI
+occupy path that already writes files.
 
 Missing login or Server fails closed with guidance. It never becomes Scratch. This-Mac
 Scratch remains explicit:

@@ -58,6 +58,16 @@ must not use laptop HEAD as Workspace truth.
    Agent install fail closed and never become Scratch.
 7. `appaloft workspace` as Railway `ca`, team Connection, and Cloud managed as
    the default Server when no BYOS exists remain later slices.
+8. Occupancy may offer allowlisted laptop HOME skill directories into my
+   Sandbox through the existing occupy `WriteSandboxFile` path. Railway-aligned
+   roots are `~/.claude/skills`, `~/.codex/skills`, `~/.grok/skills`, and
+   `~/.agents/skills`. Appaloft also offers `~/.cursor/skills` and
+   `~/.config/opencode/skills` because those are the roots Appaloft users
+   actually use; they are beyond Railway's documented cloud-agent skill sync.
+   Copy is add-only and only for immediate child directories that contain
+   `SKILL.md`. Do not copy `mcp.json`, tokens, cookies, `.env`, editor plugin
+   binaries, or files larger than 10MB. First-party Appaloft skill offer stays.
+   This is not a new command and is not the local Agent door.
 
 ## Consequences
 
@@ -76,6 +86,7 @@ must not use laptop HEAD as Workspace truth.
 - Keep identity-only `code` and tell users to run `workspace open`.
 - Add Server to the preferred unique key in the same ticket as occupancy.
 - Silent dirty-laptop upload as remote truth.
-- Sharing host OpenCode/Codex OAuth.
+- Sharing host OpenCode/Codex OAuth, MCP config, tokens, cookies, or `.env`.
+- Inventing a setup command or letting the Sandbox read laptop HOME.
 - Implementing `workspace` `ca` in the same ticket.
 - Letting Cloud managed placement override the Server the door already chose.
