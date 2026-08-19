@@ -5178,15 +5178,18 @@ export function resolveInteractiveDeploymentInput(
           defaultValue: ".",
           validate: requireNonEmpty("Source"),
         }));
+      const canPromptForMethod = Boolean(process.stdin.isTTY && process.stdout.isTTY);
       const deploymentMethod =
         seed.deploymentMethod ??
-        (yield* interaction.select<DeploymentMethod>({
-          message: "Deployment method",
-          choices: deploymentMethods.map((method) => ({
-            title: method,
-            value: method,
-          })),
-        }));
+        (canPromptForMethod
+          ? yield* interaction.select<DeploymentMethod>({
+              message: "Deployment method",
+              choices: deploymentMethods.map((method) => ({
+                title: method,
+                value: method,
+              })),
+            })
+          : "auto");
       const normalizedSourceLocator = normalizeCliPathOrSource(sourceLocator, deploymentMethod);
       const stateSession = yield* prepareDeploymentStateBackendIfNeeded(seed);
 

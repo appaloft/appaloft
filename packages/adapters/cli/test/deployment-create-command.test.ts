@@ -8,11 +8,7 @@ import {
   CreateDeploymentCommand,
   createExecutionContext,
   type ExecutionContextFactory,
-  ListEnvironmentsQuery,
-  ListResourcesQuery,
-  ListServersQuery,
   type QueryBus,
-  ShowRepositoryBindingQuery,
 } from "@appaloft/application";
 import { ok } from "@appaloft/core";
 
@@ -400,8 +396,7 @@ describe("CLI deployment create command", () => {
     expect(queried).not.toContain("ListSandboxesQuery");
     const occupancyDeploys = commands.filter(
       (command) =>
-        command instanceof CreateDeploymentCommand &&
-        command.resourceId === "res_dfsc156jw98k",
+        command instanceof CreateDeploymentCommand && command.resourceId === "res_dfsc156jw98k",
     );
     expect(occupancyDeploys).toHaveLength(0);
     if (commands.some((command) => command instanceof CreateDeploymentCommand)) {
@@ -423,7 +418,20 @@ describe("CLI deployment create command", () => {
       },
     } as unknown as CommandBus;
     const queryBus = {
-      execute: async <T>() => ok({ items: [] } as T),
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        if (query.constructor.name === "ListDeploymentsQuery") {
+          return ok({
+            items: [
+              {
+                id: "dep_unexpected",
+                resourceId: "res_cwd",
+                status: "succeeded",
+              },
+            ],
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
     } as unknown as QueryBus;
     const executionContextFactory: ExecutionContextFactory = {
       create: (input) =>
@@ -831,9 +839,7 @@ describe("CLI deployment create command", () => {
     expect(commands).toHaveLength(1);
     expect(error).toBeDefined();
     const errorText =
-      error instanceof Error
-        ? `${error.message}\n${JSON.stringify(error)}`
-        : JSON.stringify(error);
+      error instanceof Error ? `${error.message}\n${JSON.stringify(error)}` : JSON.stringify(error);
     expect(errorText).toContain("SSH Docker image build failed");
     expect(errorText).toContain("ssh_docker_build_failed");
     expect(errorText).toContain("deployment_failed");

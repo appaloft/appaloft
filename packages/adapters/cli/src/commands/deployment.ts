@@ -1233,7 +1233,9 @@ function readCreatedDeploymentUrl(deploymentId: string) {
   });
 }
 
-function lastDeploymentFailureMessage(deployment: DeploymentSummary | undefined): string | undefined {
+function lastDeploymentFailureMessage(
+  deployment: DeploymentSummary | undefined,
+): string | undefined {
   const timeline = deployment?.timeline ?? [];
   const errorLogs = timeline.filter((log) => log.level === "error");
   const selected = errorLogs.at(-1) ?? timeline.at(-1);
@@ -1323,8 +1325,7 @@ function failIfSynchronousDeploymentDidNotSucceed(deployment: DeploymentSummary 
     const failureLogTail = Array.isArray(details.failureLogTail)
       ? details.failureLogTail.join("\n")
       : undefined;
-    const humanMessage =
-      lastDeploymentFailureMessage(deployment) ?? "Deployment execution failed";
+    const humanMessage = lastDeploymentFailureMessage(deployment) ?? "Deployment execution failed";
     const errorCode = inferDeploymentFailureCode(humanMessage);
 
     return yield* Effect.fail(
