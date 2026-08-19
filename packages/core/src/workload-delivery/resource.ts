@@ -323,8 +323,12 @@ function normalizeStaticPublishDirectory(value: string): Result<string> {
     return ok("/");
   }
 
-  const withLeadingSlash = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
-  const segments = withLeadingSlash.split("/").filter(Boolean);
+  const segments = trimmed
+    .replaceAll("\\", "/")
+    .replace(/^\/+/u, "")
+    .replace(/\/+$/u, "")
+    .split("/")
+    .filter(Boolean);
   if (segments.some((segment) => segment === "." || segment === "..")) {
     return err(
       staticPublishDirectoryError("Static publish directory must not contain dot segments", {
@@ -338,7 +342,7 @@ function normalizeStaticPublishDirectory(value: string): Result<string> {
     return ok("/");
   }
 
-  return ok(`/${segments.join("/")}`);
+  return ok(segments.join("/"));
 }
 
 function isSourceRootStaticPublishDirectory(value: string): boolean {

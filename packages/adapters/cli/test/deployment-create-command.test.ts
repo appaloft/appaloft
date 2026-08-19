@@ -782,7 +782,7 @@ describe("CLI deployment create command", () => {
                 source: "ssh",
                 phase: "package",
                 level: "error",
-                message: "SSH Docker image build failed",
+                message: 'SSH Docker image build failed: #5 ERROR: "/public": not found',
               },
               deployment: {
                 id: "dep_aj0as1thikd0",
@@ -811,10 +811,17 @@ describe("CLI deployment create command", () => {
                   timeline: [
                     {
                       timestamp: "2026-08-19T11:01:54.000Z",
+                      source: "docker",
+                      phase: "package",
+                      level: "error",
+                      message: '#5 ERROR: "/public": not found',
+                    },
+                    {
+                      timestamp: "2026-08-19T11:01:55.000Z",
                       source: "ssh",
                       phase: "package",
                       level: "error",
-                      message: "SSH Docker image build failed",
+                      message: 'SSH Docker image build failed: #5 ERROR: "/public": not found',
                     },
                   ],
                 },
@@ -875,6 +882,8 @@ describe("CLI deployment create command", () => {
     const errorText =
       error instanceof Error ? `${error.message}\n${JSON.stringify(error)}` : JSON.stringify(error);
     expect(errorText).toContain("SSH Docker image build failed");
+    expect(errorText).toContain("/public");
+    expect(errorText).toContain("not found");
     expect(errorText).toContain("ssh_docker_build_failed");
     expect(errorText).toContain("deployment_failed");
     expect(chunks.join("")).not.toContain(failedUrl);

@@ -340,8 +340,18 @@ resource owns `kind = "static-site"`, source binding metadata, `RuntimePlanStrat
 `runtimeProfile.publishDirectory`, optional install/build commands, and
 `ResourceNetworkProfile.internalPort`. Deployment planning packages the resolved publish directory
 into a Docker/OCI image that serves static files over HTTP, typically through an adapter-selected
-static server image. The concrete static server image, generated web-server config, and Docker
-labels are adapter artifacts, not deployment command input.
+static server image. The generated static-server `COPY` source must be relative to the Docker build
+context: user `--publish-dir public` stays `public/` next to the Dockerfile, not `/public`. On
+generic-SSH, the uploaded workspace root, Docker build context, and Dockerfile `COPY` source are
+the same tree: context is the absolute uploaded workspace root that contains that publish
+directory (`public/index.html`), not `.` in the parent of the uploaded source. `-f` may point at a
+generated Dockerfile outside that context. Before image build, generic-SSH checks
+`test -d "$remoteWorkdir/public"` (or the normalized publish directory). A missing directory fails
+with `static publish directory public/ not found in uploaded workspace` plus a workspace `ls`, not
+only `ssh_docker_build_failed`. A later BuildKit `COPY` failure still exits non-zero with no live
+URL, and the CLI terminal failure includes the BuildKit last lines such as `"/public": not found`.
+The concrete static server image, generated web-server config, and Docker labels are adapter
+artifacts, not deployment command input.
 
 If a static resource lacks `runtimeProfile.publishDirectory`, or the value cannot be safely
 resolved under the source base directory after optional build commands, deployment admission fails

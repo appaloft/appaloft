@@ -27,6 +27,7 @@ import {
   renderStaticSiteDockerfile,
   renderWorkspaceDockerBuild,
   renderWorkspaceDockerfile,
+  staticPublishDirectoryForDockerCopy,
   staticSiteDockerBuildFromExecution,
   staticSiteDockerfileFromExecution,
   type GeneratedDockerBuildResult,
@@ -43,6 +44,7 @@ export {
   renderStaticSiteDockerfile,
   renderWorkspaceDockerBuild,
   renderWorkspaceDockerfile,
+  staticPublishDirectoryForDockerCopy,
 };
 
 const workspaceRuntimePlanners: WorkspaceRuntimePlanner[] = [

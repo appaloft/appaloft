@@ -210,6 +210,10 @@ export function dockerfileFromExecution(input: {
   return dockerBuildFromExecution(input)?.dockerfile ?? null;
 }
 
+export function staticPublishDirectoryForDockerCopy(value: string): string | null {
+  return normalizeStaticPublishDirectory(value);
+}
+
 function normalizeStaticPublishDirectory(value: string): string | null {
   const trimmed = value.trim();
   if (

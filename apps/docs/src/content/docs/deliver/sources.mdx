@@ -138,8 +138,9 @@ appaloft resource auto-deploy res_web \
 appaloft deploy
 appaloft deploy .
 
-# 本地目录，显式指定静态发布方式
+# 本地目录，显式指定静态发布方式（相对路径保持相对，public 不会被改写成 /public）
 appaloft deploy ./apps/web --method static --publish-dir build
+appaloft deploy . --as static-site --publish-dir public
 
 # 已经构建好的静态输出目录，跳过构建
 appaloft deploy ./dist --as static-site

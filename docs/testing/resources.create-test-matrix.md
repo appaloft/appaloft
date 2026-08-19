@@ -107,10 +107,11 @@ Then:
 | RES-CREATE-ADM-032 | integration | Duplicate slug | Existing resource same project/environment/slug | `err` | `resource_slug_conflict`, phase `resource-admission`, details include existing `resourceId` | None | Existing resource unchanged |
 | RES-CREATE-ADM-033 | integration | Persistence failure | Repository fails before durable state | `err` | `infra_error`, phase `resource-persistence` | None | No accepted resource state |
 | RES-CREATE-ADM-034 | integration | Event publication failure before safe success | Event recording fails before command success | `err` | `infra_error`, phase `event-publication` | None or recovery-specific | Caller does not receive accepted success |
-| RES-CREATE-ADM-035 | integration | Static site resource profile | `kind = static-site`, source binding, `runtimeProfile.strategy = static`, `runtimeProfile.publishDirectory = /dist`, and `networkProfile.internalPort = 80` | `ok({ id })` | None | `resource-created` | Resource persists static runtime profile and HTTP reverse-proxy network profile |
+| RES-CREATE-ADM-035 | integration | Static site resource profile | `kind = static-site`, source binding, `runtimeProfile.strategy = static`, `runtimeProfile.publishDirectory = /dist` or `dist`, and `networkProfile.internalPort = 80` | `ok({ id })` | None | `resource-created` | Resource persists static runtime profile with source-root-relative publish directory `dist` and HTTP reverse-proxy network profile |
 | RES-CREATE-ADM-036 | integration | Static strategy missing publish directory | Static runtime profile omits `publishDirectory` | `err` | `validation_error`, phase `resource-runtime-resolution` | None | No resource created |
 | RES-CREATE-ADM-037 | integration | Unsafe static publish directory | Static runtime profile uses `publishDirectory` with `..`, URL, shell metacharacter, or host absolute path semantics | `err` | `validation_error`, phase `resource-runtime-resolution`, guidance includes `--publish-dir public` | None | No resource created |
 | RES-CREATE-ADM-037C | integration | Source-root static publish directory | Static runtime profile uses `publishDirectory` `.`, `./`, or `/` meaning the source root | `ok({ id })` | None | `resource-created` | Resource persists publish directory `/` and does not reject the CLI `--as static-site` default |
+| RES-CREATE-ADM-037D | integration | Relative static publish directory `public` | Static runtime profile uses `publishDirectory = public` | `ok({ id })` | None | `resource-created` | Resource persists `public`, not `/public`; Dockerfile `COPY` uses context-relative `public/` |
 | RES-CREATE-ADM-037A | integration | Runtime name profile accepted | Runtime profile includes `runtimeName = api-preview` | `ok({ id })` | None | `resource-created` | Resource persists reusable runtime naming intent without reserving a target-global exact container name |
 | RES-CREATE-ADM-037B | integration | Unsafe runtime name rejected | Runtime profile includes empty, malformed, or unsafe `runtimeName` | `err` | `validation_error`, phase `resource-runtime-resolution` | None | No resource created |
 
@@ -163,8 +164,9 @@ coverage for `RES-CREATE-ENTRY-001`. CLI static draft helper coverage exists und
 coverage exists under `apps/web/test/e2e-webview/home.webview.test.ts`.
 
 Static site deployment rows `RES-CREATE-ADM-035`, `RES-CREATE-ADM-036`,
-`RES-CREATE-ADM-037`, and `RES-CREATE-ADM-037C` are covered by
-`packages/application/test/create-resource.test.ts` and `packages/core/test/resource.test.ts`.
+`RES-CREATE-ADM-037`, `RES-CREATE-ADM-037C`, and `RES-CREATE-ADM-037D` are covered by
+`packages/application/test/create-resource.test.ts`, `packages/core/test/resource.test.ts`, and
+runtime adapter static-server Dockerfile generation tests.
 CLI wire-form coverage for source-root aliases is `QUICK-DEPLOY-ENTRY-008A` in
 [Quick Deploy Test Matrix](./quick-deploy-test-matrix.md).
 `RES-CREATE-WF-007` is covered at the shared Quick Deploy workflow-contract layer. Runtime adapter

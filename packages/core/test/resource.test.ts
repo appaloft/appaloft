@@ -190,6 +190,21 @@ describe("Resource", () => {
     }
   });
 
+  test("[RES-CREATE-ADM-037D] relative publish directory public stays public", () => {
+    const relative = StaticPublishDirectory.create("public");
+    expect(relative.isOk()).toBe(true);
+    if (relative.isOk()) {
+      expect(relative.value.value).toBe("public");
+      expect(relative.value.value).not.toBe("/public");
+    }
+
+    const leadingSlash = StaticPublishDirectory.create("/public");
+    expect(leadingSlash.isOk()).toBe(true);
+    if (leadingSlash.isOk()) {
+      expect(leadingSlash.value.value).toBe("public");
+    }
+  });
+
   test("[DMBH-RES-001] Resource answers deployment admission questions without caller-owned primitive checks", () => {
     const resource = Resource.create({
       ...baseInput,
