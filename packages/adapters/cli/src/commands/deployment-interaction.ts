@@ -131,6 +131,10 @@ import {
   normalizeCliPathOrSource,
 } from "./deployment-source.js";
 import { type DeploymentStateBackendDecision } from "./deployment-state.js";
+import {
+  wireCompatibleStaticPublishDirectory,
+  withWireCompatibleStaticPublishDirectory,
+} from "./static-publish-directory-wire.js";
 
 export interface DeploymentPromptSeed {
   reconciliationAttemptId?: string;
@@ -382,11 +386,15 @@ export function normalizeUrlFirstDeploymentEntry(input: {
   publishDirectory?: string;
 }> {
   if (!input.entryMode) {
+    const publishDirectory = input.publishDirectory
+      ? withWireCompatibleStaticPublishDirectory({ publishDirectory: input.publishDirectory })
+          .publishDirectory
+      : undefined;
     return ok({
       ...(input.requestedDeploymentMethod
         ? { deploymentMethod: input.requestedDeploymentMethod }
         : {}),
-      ...(input.publishDirectory ? { publishDirectory: input.publishDirectory } : {}),
+      ...(publishDirectory ? { publishDirectory } : {}),
     });
   }
 
@@ -407,8 +415,11 @@ export function normalizeUrlFirstDeploymentEntry(input: {
 
   const sourceLocator = input.sourceLocator?.trim();
   const defaultPublishDirectory =
-    sourceLocator && !isRemoteOrImageSource(sourceLocator) ? "." : undefined;
-  const publishDirectory = input.publishDirectory ?? defaultPublishDirectory;
+    sourceLocator && !isRemoteOrImageSource(sourceLocator) ? "/" : undefined;
+  const requestedPublishDirectory = input.publishDirectory ?? defaultPublishDirectory;
+  const publishDirectory = requestedPublishDirectory
+    ? wireCompatibleStaticPublishDirectory(requestedPublishDirectory)
+    : undefined;
 
   return ok({
     deploymentMethod: "static",
@@ -530,13 +541,17 @@ export function runtimeProfileFromDeploymentInput(
   deploymentMethod: DeploymentMethod,
   input: ResourceRuntimeProfileDraftInput,
 ): ResourceRuntimeProfileInput {
+  const publishDirectory = input.publishDirectory
+    ? withWireCompatibleStaticPublishDirectory({ publishDirectory: input.publishDirectory })
+        .publishDirectory
+    : undefined;
   if (deploymentMethod === "static") {
     return {
       strategy: "static",
       ...(input.installCommand ? { installCommand: input.installCommand } : {}),
       ...(input.buildCommand ? { buildCommand: input.buildCommand } : {}),
       ...(input.runtimeName ? { runtimeName: input.runtimeName } : {}),
-      ...(input.publishDirectory ? { publishDirectory: input.publishDirectory } : {}),
+      ...(publishDirectory ? { publishDirectory } : {}),
       ...(input.dockerfilePath ? { dockerfilePath: input.dockerfilePath } : {}),
       ...(input.dockerComposeFilePath
         ? { dockerComposeFilePath: input.dockerComposeFilePath }
@@ -554,7 +569,7 @@ export function runtimeProfileFromDeploymentInput(
     ...(input.buildCommand ? { buildCommand: input.buildCommand } : {}),
     ...(input.startCommand ? { startCommand: input.startCommand } : {}),
     ...(input.runtimeName ? { runtimeName: input.runtimeName } : {}),
-    ...(input.publishDirectory ? { publishDirectory: input.publishDirectory } : {}),
+    ...(publishDirectory ? { publishDirectory } : {}),
     ...(input.dockerfilePath ? { dockerfilePath: input.dockerfilePath } : {}),
     ...(input.dockerComposeFilePath ? { dockerComposeFilePath: input.dockerComposeFilePath } : {}),
     ...(input.buildTarget ? { buildTarget: input.buildTarget } : {}),
@@ -1464,7 +1479,15 @@ function createEnvironment(input: { projectId: string; name: string; kind: Envir
 function createResource(input: CreateResourceInput) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
-    const message = yield* resultToEffect(CreateResourceCommand.create(input));
+    const runtimeProfile = input.runtimeProfile
+      ? withWireCompatibleStaticPublishDirectory(input.runtimeProfile)
+      : undefined;
+    const message = yield* resultToEffect(
+      CreateResourceCommand.create({
+        ...input,
+        ...(runtimeProfile ? { runtimeProfile } : {}),
+      }),
+    );
     const result = yield* Effect.promise(() => cli.executeCommand(message));
     const created = yield* Effect.either(resultToEffect(result));
     if (Either.isRight(created)) {
@@ -1502,7 +1525,12 @@ function createResource(input: CreateResourceInput) {
 function configureResourceRuntime(input: ConfigureResourceRuntimeInput) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
-    const message = yield* resultToEffect(ConfigureResourceRuntimeCommand.create(input));
+    const message = yield* resultToEffect(
+      ConfigureResourceRuntimeCommand.create({
+        ...input,
+        runtimeProfile: withWireCompatibleStaticPublishDirectory(input.runtimeProfile),
+      }),
+    );
     const result = yield* Effect.promise(() => cli.executeCommand(message));
     return yield* resultToEffect(result);
   });

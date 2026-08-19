@@ -165,6 +165,8 @@ coverage exists under `apps/web/test/e2e-webview/home.webview.test.ts`.
 Static site deployment rows `RES-CREATE-ADM-035`, `RES-CREATE-ADM-036`,
 `RES-CREATE-ADM-037`, and `RES-CREATE-ADM-037C` are covered by
 `packages/application/test/create-resource.test.ts` and `packages/core/test/resource.test.ts`.
+CLI wire-form coverage for source-root aliases is `QUICK-DEPLOY-ENTRY-008A` in
+[Quick Deploy Test Matrix](./quick-deploy-test-matrix.md).
 `RES-CREATE-WF-007` is covered at the shared Quick Deploy workflow-contract layer. Runtime adapter
 static-server Dockerfile generation is covered by runtime planner tests. Real runtime coverage now
 includes local Docker static smoke under `apps/shell/test/e2e/quick-deploy-static-docker.workflow.e2e.ts`
