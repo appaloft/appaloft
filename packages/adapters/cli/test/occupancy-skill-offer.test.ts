@@ -1,3 +1,4 @@
+import "../../../application/node_modules/reflect-metadata/Reflect.js";
 import { expect, test } from "bun:test";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -109,7 +110,14 @@ test("[WS-REMOTE-HOME-SKILL-182] copies only allowlisted HOME skill roots", asyn
 
   const listed = await listOccupancyHomeSkillOfferFiles(homeDir);
   expect(listed.map((file) => file.skillName).sort()).toEqual(
-    ["agents-note", "claude-review", "codex-ship", "cursor-edit", "grok-plan", "opencode-loop"].sort(),
+    [
+      "agents-note",
+      "claude-review",
+      "codex-ship",
+      "cursor-edit",
+      "grok-plan",
+      "opencode-loop",
+    ].sort(),
   );
   expect(OCCUPANCY_HOME_SKILL_ROOTS.map((root) => root.homeRelative)).toEqual([
     ".claude/skills",
@@ -120,7 +128,9 @@ test("[WS-REMOTE-HOME-SKILL-182] copies only allowlisted HOME skill roots", asyn
     ".config/opencode/skills",
   ]);
   expect(
-    OCCUPANCY_HOME_SKILL_ROOTS.filter((root) => !root.railwayAligned).map((root) => root.homeRelative),
+    OCCUPANCY_HOME_SKILL_ROOTS.filter((root) => !root.railwayAligned).map(
+      (root) => root.homeRelative,
+    ),
   ).toEqual([".cursor/skills", ".config/opencode/skills"]);
 
   const commands: Array<WriteSandboxFileCommand | ExecuteSandboxCommand> = [];
@@ -191,8 +201,8 @@ test("[WS-REMOTE-HOME-SKILL-185] skips secrets and does not upload mcp.json", as
     "SKILL.md": "# Safe\n",
     "mcp.json": '{"servers":[]}',
     ".env": "TOKEN=secret",
-    "tokens": "abc",
-    "cookies": "session=1",
+    tokens: "abc",
+    cookies: "session=1",
     "plugin.vsix": "binary",
     "notes.md": "keep\n",
   });

@@ -36,15 +36,7 @@ const SKIPPED_BASENAMES = new Set([
   "auth.json",
 ]);
 
-const SKIPPED_EXTENSIONS = new Set([
-  ".vsix",
-  ".exe",
-  ".dll",
-  ".so",
-  ".dylib",
-  ".node",
-  ".bin",
-]);
+const SKIPPED_EXTENSIONS = new Set([".vsix", ".exe", ".dll", ".so", ".dylib", ".node", ".bin"]);
 
 export interface OccupancySkillFile {
   readonly relativePath: string;
@@ -122,22 +114,13 @@ export async function listOccupancyHomeSkillOfferFiles(
 
   for (const root of OCCUPANCY_HOME_SKILL_ROOTS) {
     const rootPath = join(homeDir, root.homeRelative);
-    let entries: Awaited<ReturnType<typeof readdir>>;
-    try {
-      entries = await readdir(rootPath, { withFileTypes: true });
-    } catch {
-      continue;
-    }
+    const entries = await readdir(rootPath, { withFileTypes: true }).catch(() => undefined);
+    if (!entries) continue;
     for (const entry of entries) {
       if (!entry.isDirectory() || seenSkillNames.has(entry.name)) continue;
       const skillDir = join(rootPath, entry.name);
-      let skillFile: Awaited<ReturnType<typeof stat>>;
-      try {
-        skillFile = await stat(join(skillDir, "SKILL.md"));
-      } catch {
-        continue;
-      }
-      if (!skillFile.isFile()) continue;
+      const skillFile = await stat(join(skillDir, "SKILL.md")).catch(() => undefined);
+      if (!skillFile?.isFile()) continue;
       seenSkillNames.add(entry.name);
       const files = await listOccupancySkillFiles(skillDir, {
         skipRelativePath: isOccupancyHomeSkillSkippedFile,

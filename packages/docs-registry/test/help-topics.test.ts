@@ -165,7 +165,12 @@ describe("public docs help registry", () => {
       "/docs/en/agents/workspaces/#agent-workspace-occupancy-skills",
     );
     expect(topic.aliases).toEqual(
-      expect.arrayContaining(["occupancy skills", "home skills", "cursor skills", "opencode skills"]),
+      expect.arrayContaining([
+        "occupancy skills",
+        "home skills",
+        "cursor skills",
+        "opencode skills",
+      ]),
     );
     expect(topic.specReferences).toEqual(
       expect.arrayContaining([
