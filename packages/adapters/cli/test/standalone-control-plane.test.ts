@@ -148,5 +148,26 @@ describe("standalone control plane help", () => {
     expect(rootChunks.join("")).toContain("appaloft auth mcp cursor install");
     expect(rootChunks.join("")).toContain("appaloft auth mcp opencode install");
     expect(rootChunks.join("")).toContain("appaloft auth mcp codex install");
+    expect(rootChunks.join("")).toContain("appaloft setup agent");
+  });
+
+  test("[CONTROL-PLANE-CLI-025] setup agent --help prints usage", async () => {
+    const chunks: string[] = [];
+    const result = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "setup", "agent", "--help"],
+      stdout: {
+        write: (chunk) => {
+          chunks.push(String(chunk));
+          return true;
+        },
+      },
+    });
+
+    const printed = chunks.join("");
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(printed).toContain("appaloft setup agent");
+    expect(printed).toContain("--cursor-home");
+    expect(printed).toContain("--opencode-home");
+    expect(printed).toContain("mcp.json or opencode.json");
   });
 });

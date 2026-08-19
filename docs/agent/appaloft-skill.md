@@ -18,7 +18,20 @@ semantics aligned with `docs/CORE_OPERATIONS.md` and `packages/application/src/o
 
 ## Install
 
-Install the full AI-facing Appaloft entrypoint:
+The one-command local Agent door copies the skill and writes Local MCP into detected Cursor and
+OpenCode hosts:
+
+```bash
+appaloft login
+appaloft setup agent
+```
+
+`appaloft setup agent` copies the skill into `~/.cursor/skills/appaloft`,
+`~/.config/opencode/skills/appaloft`, and `~/.agents/skills/appaloft` for detected hosts, then writes
+token-free Local MCP launchers. Tokens stay out of `mcp.json` / `opencode.json`. Cursor and OpenCode
+are on the detection list.
+
+The skill-manager path still only copies skill files:
 
 ```bash
 # Codex
@@ -37,7 +50,7 @@ npx skills add appaloft/appaloft --skill appaloft --global --agent opencode --co
 This only copies skill files into the target skill host. It does not install the Appaloft CLI, write
 MCP host config, deploy, create resources, call Appaloft APIs, or wrap the Appaloft CLI.
 Appaloft does not provide a separate npm skill installer; `npx skills add appaloft/appaloft` is the
-single skill-manager entrypoint.
+skill-manager entrypoint.
 
 Current `npx skills` copies Codex, Claude Code, Cursor, and OpenCode installs into
 `~/.agents/skills/appaloft`. Cursor also reads that directory. It does not create
@@ -46,11 +59,9 @@ Current `npx skills` copies Codex, Claude Code, Cursor, and OpenCode installs in
 rebuilt. A successful copy alone is not availability evidence unless the list includes `appaloft`
 and the host discovery directory contains `appaloft/SKILL.md`.
 
-After the skill is copied, wire MCP with existing commands. Cursor and OpenCode should reuse an
-already-logged-in Appaloft profile:
+Explicit MCP siblings remain available:
 
 ```bash
-appaloft login
 appaloft auth mcp cursor install
 appaloft auth mcp opencode install
 ```

@@ -109,6 +109,7 @@ These rows are governed by
 | CONTROL-PLANE-CLI-022 | CLI/adapter integration | Remote terminal attach | A compatible Cloud or self-hosted profile is selected and terminal open returns an accepted WebSocket descriptor | `server terminal`, `resource terminal`, and Sandbox terminal commands dispatch `terminal-sessions.open` remotely; `--attach` bridges local TTY input, resize, output, error, detach, and close frames through the control-plane WebSocket without local shell composition, PGlite initialization, SSH state sync, or target credential exposure | Invalid frames and unexpected transport close return structured `remote_terminal_*` errors with phase `remote-terminal-attach` | Target resolution -> handshake -> typed terminal open -> WebSocket attach -> local TTY bridge |
 | CONTROL-PLANE-CLI-023 | CLI/unit | Cursor MCP install writes token-free bridge config | A local product-session or bearer CLI profile is active from `appaloft login` or `appaloft auth mcp login` | `appaloft auth mcp cursor install` writes or updates `~/.cursor/mcp.json` `mcpServers.appaloft` with command/args launching `appaloft mcp remote-stdio --profile <active-or-requested>`, keeps credential material only in the Appaloft profile store, and preserves other MCP servers | Missing profile returns `control_plane_profile_not_found`; malformed JSON returns `cursor_mcp_config_write_failed` | Profile read -> Cursor JSON merge -> redacted install report |
 | CONTROL-PLANE-CLI-024 | CLI/unit | OpenCode MCP install writes token-free local MCP entry | A local product-session or bearer CLI profile is active from `appaloft login` or `appaloft auth mcp login` | `appaloft auth mcp opencode install` writes or updates `~/.config/opencode/opencode.json` `mcp.appaloft` as `{ type: "local", command: [...], enabled: true }` launching `appaloft mcp remote-stdio --profile <active-or-requested>`, keeps credential material only in the Appaloft profile store, and preserves other MCP servers | Missing profile returns `control_plane_profile_not_found`; malformed JSON returns `opencode_mcp_config_write_failed` | Profile read -> OpenCode JSON merge -> redacted install report |
+| CONTROL-PLANE-CLI-025 | CLI/unit | One-command agent setup writes skill and Local MCP | Cursor and/or OpenCode are detected (home directory, binary, or `--cursor-home` / `--opencode-home`) and a local product-session or bearer CLI profile is active | `appaloft setup agent` copies the Appaloft skill into `~/.agents/skills/appaloft` plus detected Cursor/OpenCode skill directories, writes the same token-free Local MCP launchers as CONTROL-PLANE-CLI-023/024, keeps tokens out of `mcp.json` / `opencode.json`, and includes cursor and opencode on the detection list | Missing profile copies skills then returns `control_plane_profile_not_found`; no detected hosts returns `agent_host_not_detected` | Detect hosts -> copy skill tree -> Cursor/OpenCode MCP install -> redacted combined report |
 
 ## Self-Hosted Install Matrix
 
@@ -212,7 +213,8 @@ client bridge:
 - remote terminal target resolution and WebSocket frame bridging under
   `CONTROL-PLANE-CLI-022`;
 - token-free Cursor and OpenCode MCP host install under `CONTROL-PLANE-CLI-023` and
-  `CONTROL-PLANE-CLI-024`.
+  `CONTROL-PLANE-CLI-024`;
+- one-command local Agent door skill + Local MCP setup under `CONTROL-PLANE-CLI-025`.
 
 `apps/shell/test/run-control-plane-cli.test.ts` covers the shell pre-dispatch portion of
 `CONTROL-PLANE-CLI-006`, proving remote `project list` and `project rename` return before local

@@ -61,14 +61,16 @@ material, verifies current organization context, and writes a redacted local `mc
 default. It does not print raw bearer material. Noninteractive automation can still use
 `APPALOFT_TOKEN` or `appaloft auth token login --stdin` through a trusted local secret channel.
 
-For Cursor and OpenCode, reuse an already-logged-in Appaloft profile and write a token-free host
-entry. Do not copy bearer or session material into editor config:
+For Cursor and OpenCode, the one-command local Agent door copies the skill and writes a token-free
+host entry. Do not copy bearer or session material into editor config:
 
 ```bash
 appaloft login
-appaloft auth mcp cursor install
-appaloft auth mcp opencode install
+appaloft setup agent
 ```
+
+Explicit siblings remain `appaloft auth mcp cursor install` and
+`appaloft auth mcp opencode install`.
 
 Cursor install merges `~/.cursor/mcp.json` `mcpServers.appaloft`. OpenCode install merges
 `~/.config/opencode/opencode.json` `mcp.appaloft` as a local command (`type: "local"`,

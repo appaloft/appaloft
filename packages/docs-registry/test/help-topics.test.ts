@@ -384,6 +384,7 @@ describe("public docs help registry", () => {
     );
     expect(cliTopic.aliases).toEqual(
       expect.arrayContaining([
+        "appaloft setup agent",
         "appaloft auth mcp cursor install",
         "appaloft auth mcp opencode install",
         "~/.cursor/mcp.json",
@@ -392,6 +393,7 @@ describe("public docs help registry", () => {
     );
     expect(mcpTopic.aliases).toEqual(
       expect.arrayContaining([
+        "appaloft setup agent",
         "appaloft auth mcp cursor install",
         "appaloft auth mcp opencode install",
       ]),

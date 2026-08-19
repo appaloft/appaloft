@@ -13,6 +13,17 @@ The Appaloft Skill is the complete product entrypoint for AI agents — like the
 
 ## Installation
 
+One command leaves detected Cursor and OpenCode with both the skill and Local MCP:
+
+```bash
+appaloft login
+appaloft setup agent
+```
+
+`appaloft setup agent` copies the skill into `~/.cursor/skills/appaloft`, `~/.config/opencode/skills/appaloft`, and `~/.agents/skills/appaloft` for detected hosts, then writes token-free Local MCP. Tokens stay out of `mcp.json` / `opencode.json`.
+
+The skill-manager path still only copies skill files:
+
 ```bash
 # Codex
 npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
@@ -27,17 +38,9 @@ npx skills add appaloft/appaloft --skill appaloft --global --agent cursor --copy
 npx skills add appaloft/appaloft --skill appaloft --global --agent opencode --copy --yes
 ```
 
-The install command **only copies Skill files** — it doesn't install the Appaloft CLI, write MCP host config, deploy an app, create a resource, or call any API. Current `npx skills` copies Codex, Claude Code, Cursor, and OpenCode into `~/.agents/skills/appaloft`; Cursor also reads that directory. It does **not** create `~/.cursor/skills` or `~/.config/opencode/skills`. After installing, run `npx skills list --global --agent <agent>` to confirm Appaloft appears in the list and that the corresponding `SKILL.md` exists, then start a new agent session so the host reloads the Skill directory.
+`npx skills add` **only copies Skill files** — it doesn't install the Appaloft CLI, write MCP host config, deploy an app, create a resource, or call any API. Current `npx skills` copies Codex, Claude Code, Cursor, and OpenCode into `~/.agents/skills/appaloft`; Cursor also reads that directory. It does **not** create `~/.cursor/skills` or `~/.config/opencode/skills`. After installing, run `npx skills list --global --agent <agent>` to confirm Appaloft appears in the list and that the corresponding `SKILL.md` exists, then start a new agent session so the host reloads the Skill directory.
 
-After the copy, wire MCP with existing commands:
-
-```bash
-appaloft login
-appaloft auth mcp cursor install
-appaloft auth mcp opencode install
-```
-
-Codex still uses the dedicated bearer MCP profile: `appaloft auth mcp login` then `appaloft auth mcp codex install`. A directory without git can be deployed with `appaloft deploy .`.
+Explicit MCP siblings remain: `appaloft auth mcp cursor install` and `appaloft auth mcp opencode install`. Codex still uses the dedicated bearer MCP profile: `appaloft auth mcp login` then `appaloft auth mcp codex install`. A directory without git can be deployed with `appaloft deploy .`.
 
 ## Capability scope
 

@@ -92,12 +92,14 @@ The deploy subprotocol must include:
 - Public docs: stable "Appaloft skill" and "Agent deploy skill" anchors before v1.
 - Repository artifact: standard source `skills/appaloft` with references for entrypoint surfaces,
   CLI operation mapping, and deploy protocol.
-- standard install path: `npx skills add appaloft/appaloft --skill appaloft --global --agent
-  <agent> --copy --yes`, followed by `npx skills list --global --agent <agent>` and a new agent
-  session so the host reloads its catalog. Documented agents include `codex`, `claude-code`,
-  `cursor`, and `opencode`. Current `npx skills` copies these into `~/.agents/skills/appaloft`
-  and does not write MCP; Cursor/OpenCode MCP host config is written by
-  `appaloft auth mcp cursor install` and `appaloft auth mcp opencode install`.
+- standard install path: `appaloft setup agent` after `appaloft login` is the one-command local
+  Agent door. It detects Cursor and OpenCode (also Codex and Claude), copies the skill into
+  `~/.cursor/skills/appaloft`, `~/.config/opencode/skills/appaloft`, and `~/.agents/skills/appaloft`,
+  and writes token-free Local MCP host config. `npx skills add appaloft/appaloft --skill appaloft
+  --global --agent <agent> --copy --yes` remains the skill-manager-only path; current `npx skills`
+  copies into `~/.agents/skills/appaloft` and does not write MCP. Explicit siblings
+  `appaloft auth mcp cursor install` and `appaloft auth mcp opencode install` remain available.
+  Documented agents include `codex`, `claude-code`, `cursor`, and `opencode`.
 - eval source: `skills/appaloft/evals/evals.json`, validated by
   `scripts/validate-appaloft-skill-evals.ts`.
 - no Appaloft-owned npm skill installer; this keeps skill installation distinct from the Appaloft

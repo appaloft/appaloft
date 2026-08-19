@@ -26,15 +26,16 @@ Starting the server itself **doesn't** deploy an app, create a resource, or modi
 
 ## Host install <a id="appaloft-mcp-host-install" />
 
-`npx skills add` does not write MCP. After a local Appaloft profile exists, use the same command family to write host config without putting tokens in editor files:
+One command leaves detected Cursor and OpenCode with both the Appaloft skill and Local MCP. Tokens stay in the Appaloft CLI profile, not in editor config:
 
 ```bash
 appaloft login
-appaloft auth mcp cursor install
-appaloft auth mcp opencode install
+appaloft setup agent
 ```
 
-Cursor merges `~/.cursor/mcp.json` `mcpServers.appaloft`. OpenCode merges `~/.config/opencode/opencode.json` `mcp.appaloft` (`type: "local"`, `command: [...]`, `enabled: true`). Both launch `appaloft mcp remote-stdio --profile <active-or-requested>`. Codex still needs the dedicated bearer profile: `appaloft auth mcp login` then `appaloft auth mcp codex install`. A directory without git can be deployed with `appaloft deploy .`.
+`appaloft setup agent` copies the skill into `~/.cursor/skills/appaloft`, `~/.config/opencode/skills/appaloft`, and `~/.agents/skills/appaloft` for detected hosts, then writes the same Local MCP launchers as the sibling commands. Cursor merges `~/.cursor/mcp.json` `mcpServers.appaloft`. OpenCode merges `~/.config/opencode/opencode.json` `mcp.appaloft` (`type: "local"`, `command: [...]`, `enabled: true`). Both launch `appaloft mcp remote-stdio --profile <active-or-requested>`.
+
+Explicit siblings remain available: `appaloft auth mcp cursor install` and `appaloft auth mcp opencode install`. `npx skills add` still only copies the skill. Codex still needs the dedicated bearer profile: `appaloft auth mcp login` then `appaloft auth mcp codex install`. A directory without git can be deployed with `appaloft deploy .`.
 
 ## Input fields and validation: the tool model
 

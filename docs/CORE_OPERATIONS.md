@@ -2146,11 +2146,15 @@ CLI:
   `appaloft context *` manage local uncommitted client state; they must not write secrets to
   `appaloft.yml`, create operation-catalog aliases, or add control-plane fields to
   `deployments.create`
-- `appaloft auth mcp login` and `appaloft auth mcp {codex,cursor,opencode} install` are local
-  host-config affordances, not operation-catalog entries. They write token-free MCP host launcher
-  entries and keep credentials only in the local CLI profile store. Codex install still requires a
-  bearer `mcp` profile. Cursor and OpenCode install reuse an already-logged-in product-session or
-  bearer profile.
+- `appaloft auth mcp login`, `appaloft auth mcp {codex,cursor,opencode} install`, and
+  `appaloft setup agent` are local host-config affordances, not operation-catalog entries.
+  `appaloft setup agent` is the one-command local Agent door: it detects Cursor and OpenCode (also
+  Codex and Claude), copies the Appaloft skill into host skill directories including
+  `~/.cursor/skills` and `~/.config/opencode/skills`, and writes token-free Local MCP launchers.
+  Sibling `appaloft auth mcp {codex,cursor,opencode} install` commands remain explicit host-config
+  writers. Credentials stay only in the local CLI profile store. Codex MCP still requires a bearer
+  `mcp` profile. Cursor and OpenCode MCP reuse an already-logged-in product-session or bearer
+  profile. Editor files must not store tokens.
 - top-level quick deploy/source-package, webhook-signature-only ingestion, terminal attach, and
   streaming/watch behavior remain separate governed entrypoint capabilities until their transport
   contracts are specified

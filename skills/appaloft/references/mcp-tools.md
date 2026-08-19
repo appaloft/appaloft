@@ -34,10 +34,17 @@ The standalone `@appaloft/mcp` package exposes the `appaloft-mcp` launcher and d
 Appaloft CLI/runtime. It does not define another operation list or bypass the application buses.
 
 For Cursor or OpenCode connecting to a logged-in Appaloft Cloud or self-hosted control plane,
-reuse the existing CLI profile. Do not put tokens into editor config:
+run the one-command local Agent door. Do not put tokens into editor config:
 
 ```bash
 appaloft login
+appaloft setup agent
+```
+
+That copies the skill into detected Cursor/OpenCode skill directories plus `~/.agents/skills`, then
+writes Local MCP. Explicit siblings remain:
+
+```bash
 appaloft auth mcp cursor install
 appaloft auth mcp opencode install
 ```

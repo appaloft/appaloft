@@ -5,7 +5,18 @@ the same operation catalog and public docs anchors. Do not invent agent-only ope
 
 ## Install
 
-Install the full Appaloft skill through the standard skill manager:
+The one-command local Agent door copies the skill and writes Local MCP into detected hosts:
+
+```bash
+appaloft login
+appaloft setup agent
+```
+
+`appaloft setup agent` detects Cursor and OpenCode (also Codex and Claude), copies the Appaloft
+skill into `~/.cursor/skills/appaloft`, `~/.config/opencode/skills/appaloft`, and
+`~/.agents/skills/appaloft`, and writes token-free Local MCP. Tokens stay out of editor config.
+
+The skill-manager path still only copies skill files:
 
 ```bash
 npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
@@ -18,11 +29,10 @@ the Appaloft CLI, or write MCP host config. Verify the requested host with
 `npx skills list --global --agent <agent>` and start a new agent session before treating the skill
 as available.
 
-After the skill is copied, wire MCP with existing commands. Do not invent `appaloft setup agent`.
+Explicit MCP siblings remain available:
 
-- Cursor: `appaloft login` if no profile exists, then `appaloft auth mcp cursor install`. That
-  merges `~/.cursor/mcp.json` `mcpServers.appaloft` to launch
-  `appaloft mcp remote-stdio --profile <active>`.
+- Cursor: `appaloft auth mcp cursor install` merges `~/.cursor/mcp.json` `mcpServers.appaloft` to
+  launch `appaloft mcp remote-stdio --profile <active>`.
 - OpenCode: `appaloft auth mcp opencode install` merges `~/.config/opencode/opencode.json`
   `mcp.appaloft` as a local command (`type: "local"`, `enabled: true`) for the same launcher.
 - Codex: `appaloft auth mcp login` then `appaloft auth mcp codex install`.
