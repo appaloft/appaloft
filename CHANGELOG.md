@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.9.0](https://github.com/appaloft/appaloft/compare/v1.8.16...v1.9.0) (2026-08-19)
+
+
+### Features
+
+* **mcp:** give occupancy Resource inspect tools ([#1300](https://github.com/appaloft/appaloft/issues/1300)) ([81b7ed0](https://github.com/appaloft/appaloft/commit/81b7ed0e48cbf94420d845fe95da4638edd131f5))
+* **sandbox:** derive occupancy profiles from harness transports ([#1303](https://github.com/appaloft/appaloft/issues/1303)) ([696a481](https://github.com/appaloft/appaloft/commit/696a481e04f34a3932eac21dd60dee8f3d2bf81a))
+* **sandbox:** occupy Pi with --harness pi ([#1301](https://github.com/appaloft/appaloft/issues/1301)) ([63ca722](https://github.com/appaloft/appaloft/commit/63ca722c851c2fa01b454546025c757d02d63d08))
+
+
+### Bug Fixes
+
+* **cli:** fall back occupancy preview to the resource route ([#1302](https://github.com/appaloft/appaloft/issues/1302)) ([4a8b737](https://github.com/appaloft/appaloft/commit/4a8b73771cd43830db2d15dd33d7b3fc82babf2d))
+
 ## [1.8.16](https://github.com/appaloft/appaloft/compare/v1.8.15...v1.8.16) (2026-08-18)
 
 
