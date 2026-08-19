@@ -520,6 +520,8 @@ export class DockerSandboxProvider implements SandboxProvider {
         "/var/tmp/appaloft-exec:rw,exec,nosuid,nodev,size=64m",
         "--env",
         "TMPDIR=/var/tmp/appaloft-exec",
+        "--env",
+        "BUN_TMPDIR=/var/tmp/appaloft-exec",
         "--tmpfs",
         `/workspace:rw,nosuid,nodev,size=${diskMb}m`,
         "--workdir",
