@@ -398,6 +398,14 @@
 - [x] Unit tests WS-REMOTE-HARNESS-175
 - [ ] `appaloftdev code --harness pi --new --no-attach` on registered Server
 
+## Slice 48 - occupancy HOME skill offer
+
+- [x] Grill D156: Railway-aligned HOME roots plus cursor/opencode beyond Railway
+- [x] Expand Spec 139 / ADR-118; no new setup command
+- [x] Occupy copies matching HOME skills add-only via `occupancy-skill-offer` / `WriteSandboxFile`
+- [x] Unit tests WS-REMOTE-HOME-SKILL-182–186
+- [x] First-party Appaloft skill offer stays (WS-REMOTE-SKILL-017)
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

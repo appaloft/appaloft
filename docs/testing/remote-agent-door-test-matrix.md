@@ -22,7 +22,7 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-DOCS-013 | help | this slice | occupy default + `--local` |
 | WS-REMOTE-TARGET-015 | application | this slice | `targetServerId` is reserved |
 | WS-REMOTE-NO-ATTACH-016 | CLI + `appaloftdev` | this slice | occupy without attach; sandbox list non-empty |
-| WS-REMOTE-SKILL-017 | CLI / runtime | automated | occupancy OpenCode serve config includes workspace skill paths; `appaloft-remote` declares optional `appaloft-tools`; native attach uses `mcp remote-stdio` against the selected control plane without wrapping `APPALOFT_CONTROL_PLANE_MODE=none`, and isolates `XDG_CONFIG_HOME` from a broken host `opencode.json`; omitted `--profile` uses the active product-session profile instead of a stale `mcp` bearer | `packages/adapters/cli/test/local-scratch-session.test.ts`; `apps/shell/test/run-control-plane-cli.test.ts` |
+| WS-REMOTE-SKILL-017 | CLI / runtime | automated | occupancy OpenCode serve config includes workspace skill paths; occupy writes the public Appaloft skill into both workspace skill roots; `appaloft-remote` declares optional `appaloft-tools`; native attach uses `mcp remote-stdio` against the selected control plane without wrapping `APPALOFT_CONTROL_PLANE_MODE=none`, and isolates `XDG_CONFIG_HOME` from a broken host `opencode.json`; omitted `--profile` uses the active product-session profile instead of a stale `mcp` bearer | `packages/adapters/cli/test/occupancy-skill-offer.test.ts`; `packages/adapters/cli/test/local-scratch-session.test.ts`; `apps/shell/test/run-control-plane-cli.test.ts` |
 
 | WS-REMOTE-RESUME-SERVE-018 | application | this slice | resume `code --no-attach` calls `ensureRuntime` so OpenCode serve is healthy |
 | WS-REMOTE-RESUME-EGRESS-020 | application | automated | ready allowlist occupancy resume reapplies stored egress; gateway failure fail-closes | `packages/application/test/execution-sandbox-operations.test.ts` |
@@ -153,6 +153,11 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-NEW-NO-DUP-179 | application | this slice | Community initializer reuses same-name Profile; `--new` skips resume only. Cloud leftover install is appaloft-cloud | `packages/application/test/community-workspace-activation-context-initializer.test.ts`; `packages/application/test/agent-workspace-open-preflight.test.ts` |
 | WS-REMOTE-OPEN-CAUSE-180 | application / CLI | this slice | failed open names cwd repository + real cause; human and safe-json keep `causeCode` / `repositoryIdentity` | `packages/application/test/agent-workspace-open-preflight.test.ts`; `packages/adapters/cli/test/runtime-error-format.test.ts` |
 | WS-REMOTE-OPEN-BYOS-181 | CLI | this slice | `workspace open` / `create` pass enrolled BYOS or `--server`; do not demand managed | `packages/adapters/cli/test/remote-code-session.test.ts`; `packages/adapters/cli/test/agent-workspace-command.test.ts` |
+| WS-REMOTE-HOME-SKILL-182 | CLI | automated | occupy copies allowlisted HOME skill roots into `skills/<name>` and `.agents/skills/<name>`; cursor/opencode roots are included and marked beyond Railway | `packages/adapters/cli/test/occupancy-skill-offer.test.ts` |
+| WS-REMOTE-HOME-SKILL-183 | CLI | automated | missing HOME skill directories are skipped | `packages/adapters/cli/test/occupancy-skill-offer.test.ts` |
+| WS-REMOTE-HOME-SKILL-184 | CLI | automated | entries without `SKILL.md` are skipped | `packages/adapters/cli/test/occupancy-skill-offer.test.ts` |
+| WS-REMOTE-HOME-SKILL-185 | CLI | automated | secrets and `mcp.json` are not uploaded | `packages/adapters/cli/test/occupancy-skill-offer.test.ts` |
+| WS-REMOTE-HOME-SKILL-186 | CLI | automated | HOME skill offer is add-only and does not overwrite existing sandbox files | `packages/adapters/cli/test/occupancy-skill-offer.test.ts` |
 
 
 

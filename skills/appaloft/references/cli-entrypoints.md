@@ -51,7 +51,13 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   not invent a successful occupancy. `--harness pi` occupies reserved
   `appaloft-remote-pi` and does not rewrite the project's OpenCode default; an existing
   OpenCode Workspace needs `--new`. A positional `https://`, `ssh://`, or `git@host:path` occupies that repository
-  without a local clone. Laptop Git is not uploaded. Missing login or Server fails
+  without a local clone. Laptop Git is not uploaded. Occupy writes the public Appaloft
+  skill and may add-only copy allowlisted HOME skill directories
+  (`~/.claude/skills`, `~/.codex/skills`, `~/.grok/skills`, `~/.agents/skills`, plus
+  `~/.cursor/skills` and `~/.config/opencode/skills` beyond Railway) into
+  `/workspace/skills/<name>` and `/workspace/.agents/skills/<name>`. Only directories
+  with `SKILL.md` are copied; `mcp.json`, tokens, cookies, `.env`, and plugin binaries
+  are not. Missing login or Server fails
   closed and never becomes Scratch. `owner/repo` is a local path, not GitHub shorthand.
 - After occupy, omit project/environment/resource ids on `env list|show|set|unset|effective-precedence`,
   `project show`, `resource list|show|logs|health|diagnose|effective-config|terminal|runtime restart`,

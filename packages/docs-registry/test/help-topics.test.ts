@@ -155,6 +155,27 @@ describe("public docs help registry", () => {
     ).toBe("https://appaloft.com/docs/access/custom-domains/#domain-binding-purpose");
   });
 
+  test("[WS-REMOTE-HOME-SKILL-182] occupancy skill-offer help names Railway-aligned and beyond-Railway HOME roots", () => {
+    const topic = publicDocsHelpTopics["agent.occupancy-skills"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe(
+      "/docs/agents/workspaces/#agent-workspace-occupancy-skills",
+    );
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/agents/workspaces/#agent-workspace-occupancy-skills",
+    );
+    expect(topic.aliases).toEqual(
+      expect.arrayContaining(["occupancy skills", "home skills", "cursor skills", "opencode skills"]),
+    );
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/specs/139-remote-agent-door/spec.md",
+        "docs/testing/remote-agent-door-test-matrix.md",
+        "docs/decisions/ADR-118-remote-code-occupancy.md",
+      ]),
+    );
+  });
+
   test("[WS-CODE-DOCS-012][WS-ACT-PARITY-008] Workspace activation help keeps the task entry, safe target evidence and compatibility contract", () => {
     const topic = publicDocsHelpTopics["agent.workspace"];
 
