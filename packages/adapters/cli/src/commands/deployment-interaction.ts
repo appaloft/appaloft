@@ -111,6 +111,7 @@ import { type AppaloftDeploymentConfig } from "@appaloft/deployment-config";
 import { Effect, Either } from "effect";
 
 import { type CliInteraction, effectCliInteraction } from "../interaction.js";
+import { selectDefaultRemoteCodeServer } from "../remote-code-session.js";
 import { CliRuntime, resultToEffect } from "../runtime.js";
 import {
   type RemoteStateSession,
@@ -4087,7 +4088,28 @@ function resolveServer(input: {
         };
       }
 
+      const enrolled = selectDefaultRemoteCodeServer(input.servers);
+      if (!input.seed.server?.host && enrolled) {
+        return {
+          reference: {
+            mode: "existing",
+            id: enrolled.id,
+            ...(credential ? { credential } : {}),
+          },
+          label: enrolled.name,
+        };
+      }
+
       const canPrompt = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+      const cli = yield* CliRuntime;
+      if (cli.executionTarget === "remote" && !input.seed.server?.host && !canPrompt) {
+        return yield* Effect.fail(
+          domainError.validation("No enrolled server. Pass --server <id>.", {
+            phase: "server-resolution",
+            guidance: "Pass --server for the enrolled host, or a local path / --project.",
+          }),
+        );
+      }
       const defaultProviderKey = input.seed.server?.host
         ? defaultRemoteServerProviderKey
         : defaultServerProviderKey;
@@ -5178,15 +5200,18 @@ export function resolveInteractiveDeploymentInput(
           defaultValue: ".",
           validate: requireNonEmpty("Source"),
         }));
+      const canPromptForMethod = Boolean(process.stdin.isTTY && process.stdout.isTTY);
       const deploymentMethod =
         seed.deploymentMethod ??
-        (yield* interaction.select<DeploymentMethod>({
-          message: "Deployment method",
-          choices: deploymentMethods.map((method) => ({
-            title: method,
-            value: method,
-          })),
-        }));
+        (canPromptForMethod
+          ? yield* interaction.select<DeploymentMethod>({
+              message: "Deployment method",
+              choices: deploymentMethods.map((method) => ({
+                title: method,
+                value: method,
+              })),
+            })
+          : "auto");
       const normalizedSourceLocator = normalizeCliPathOrSource(sourceLocator, deploymentMethod);
       const stateSession = yield* prepareDeploymentStateBackendIfNeeded(seed);
 

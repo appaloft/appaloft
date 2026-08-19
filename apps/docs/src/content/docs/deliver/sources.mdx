@@ -134,7 +134,8 @@ appaloft resource auto-deploy res_web \
 <a id="resource-source-profile" />
 
 ```bash
-# 从当前目录发起零配置部署
+# 从当前目录发起零配置部署（无路径时同样部署当前目录，不会静默复用 occupancy）
+appaloft deploy
 appaloft deploy .
 
 # 本地目录，显式指定静态发布方式

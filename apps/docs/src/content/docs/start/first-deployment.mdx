@@ -81,14 +81,16 @@ appaloft projects create --name "my-first-project"
 appaloft server register --host 203.0.113.10 --ssh-user deploy --ssh-key ~/.ssh/id_ed25519
 appaloft server capacity inspect --server-id <serverId>
 
-# 4. 从当前目录发起部署（零配置检测）
+# 4. 从当前目录发起部署（零配置检测）。不要复用别人的 occupancy。
 appaloft deploy
+appaloft deploy .
 
 # 5. 或者显式指定配置文件 / profile
 appaloft deploy --config appaloft.yml --config-profile staging
 
-# 6. 已经构建好的静态目录，跳过构建步骤直接发布
+# 6. 已经构建好的静态目录，跳过构建步骤直接发布。`.` 表示把该目录本身当作发布根。
 appaloft deploy ./dist --as static-site
+appaloft deploy . --as static-site --publish-dir .
 
 # 7. 查看部署状态与时间线
 appaloft deployments timeline <deploymentId> --follow --json
@@ -111,6 +113,8 @@ curl -X POST https://your-appaloft-host/api/deployments \
 完整路由和输入输出结构见 [HTTP API 参考](/docs/reference/http-api/)；也可以直接查看运行时的 `/api/openapi.json` 或 `/api/reference`（Scalar）。
 
 ## 预期输出与状态
+
+`appaloft deploy` 会等到部署进入终态后再退出。构建失败（例如 SSH Docker 镜像构建失败）必须非零退出，并且不会把预留/旧 URL 当成成功地址打印出来。
 
 一次成功的部署会依次经过 `pending → planning → building → deploying → verifying → healthy` 等生命周期状态（具体取值以[状态与事件](/docs/troubleshoot/status-events/)为准），最终返回：
 

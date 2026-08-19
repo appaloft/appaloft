@@ -436,6 +436,38 @@ describe("CreateResourceUseCase", () => {
     expect(eventBus.events).toHaveLength(0);
   });
 
+  test("[RES-CREATE-ADM-037C] accepts source-root static publish directory .", async () => {
+    const { context, repositoryContext, resources, useCase } = await seedResourceContext();
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Hello Site",
+      kind: "static-site",
+      source: {
+        kind: "local-folder",
+        locator: ".",
+      },
+      runtimeProfile: {
+        strategy: "static",
+        publishDirectory: ".",
+      },
+      networkProfile: {
+        internalPort: 80,
+      },
+    } as never);
+
+    expect(result.isOk()).toBe(true);
+    const persisted = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate(result._unsafeUnwrap().id)),
+    );
+    const runtimeProfile = persisted?.toState().runtimeProfile as
+      | { publishDirectory?: { value: string } }
+      | undefined;
+    expect(runtimeProfile?.publishDirectory?.value).toBe("/");
+  });
+
   test("[RES-CREATE-ADM-037] rejects unsafe static publish directory", async () => {
     const { context, eventBus, useCase } = await seedResourceContext();
 
@@ -464,6 +496,7 @@ describe("CreateResourceUseCase", () => {
       phase: "resource-runtime-resolution",
       runtimePlanStrategy: "static",
       publishDirectory: "../dist",
+      guidance: "Pass --publish-dir public if the site is published from a public directory.",
     });
     expect(eventBus.events).toHaveLength(0);
   });

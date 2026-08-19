@@ -170,6 +170,26 @@ describe("Resource", () => {
     }
   });
 
+  test("[RES-CREATE-ADM-037C] source-root static publish directory . is legal", () => {
+    for (const value of [".", "./", "/"] as const) {
+      const created = StaticPublishDirectory.create(value);
+      expect(created.isOk()).toBe(true);
+      if (created.isOk()) {
+        expect(created.value.value).toBe("/");
+      }
+    }
+
+    const parent = StaticPublishDirectory.create("../dist");
+    expect(parent.isErr()).toBe(true);
+    if (parent.isErr()) {
+      expect(parent.error.details).toMatchObject({
+        phase: "resource-runtime-resolution",
+        runtimePlanStrategy: "static",
+        guidance: "Pass --publish-dir public if the site is published from a public directory.",
+      });
+    }
+  });
+
   test("[DMBH-RES-001] Resource answers deployment admission questions without caller-owned primitive checks", () => {
     const resource = Resource.create({
       ...baseInput,

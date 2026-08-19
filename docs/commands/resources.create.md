@@ -241,7 +241,10 @@ For first-class static site deployment, the resource must use `kind = "static-si
 explicit static runtime profile with `RuntimePlanStrategy = "static"`. Static strategy resources
 must persist a `runtimeProfile.publishDirectory` value before deployment admission. The publish
 directory is relative to the source binding's `baseDirectory` after optional install/build command
-execution; it must not be a host absolute path, URL, or path containing `..` or shell metacharacters.
+execution. `.`, `./`, and `/` mean the source root itself and are legal. It must not be a host
+absolute path, URL, or path containing `..` or shell metacharacters. Do not default an entry
+workflow to a publish-directory value the validator forbids. Remaining rejection copy must include
+`--publish-dir public` as the next step.
 Entry workflows may display the field as "publish directory", but the durable runtime profile owns
 it as strategy-specific planning state.
 

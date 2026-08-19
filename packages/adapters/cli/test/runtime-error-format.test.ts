@@ -204,6 +204,26 @@ describe("CLI safe error evidence", () => {
     expect(output).not.toContain("Workspace activation context is still unavailable");
   });
 
+  test("keeps ssh_docker_build_failed in human CLI copy", () => {
+    const output = formatHumanCliError({
+      code: "infra_error",
+      category: "infra",
+      message: "SSH Docker image build failed",
+      retryable: false,
+      details: {
+        phase: "runtime-execution",
+        reason: "deployment_failed",
+        errorCode: "ssh_docker_build_failed",
+        guidance: "The deployment did not succeed. A live URL is not available.",
+      },
+    } satisfies DomainError);
+
+    expect(output).toContain("SSH Docker image build failed");
+    expect(output).toContain("ssh_docker_build_failed");
+    expect(output).toContain("The deployment did not succeed. A live URL is not available.");
+    expect(output).not.toContain("infra_error");
+  });
+
   test("does not serialize unknown failures in human CLI output", () => {
     const output = formatHumanCliError(
       new Error("secret-value ciphertext-value /private/operator/key"),

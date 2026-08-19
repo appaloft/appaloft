@@ -2119,6 +2119,14 @@ describe("CLI remote control-plane client", () => {
       profile: profile("local"),
       fetch: createControlPlaneFetch(requests, {
         "/api/deployments": jsonResponse({ id: "dep_remote" }, 202),
+        "/api/deployments/dep_remote": jsonResponse({
+          schemaVersion: "deployments.show/v1",
+          deployment: {
+            id: "dep_remote",
+            resourceId: "res_api",
+            status: "succeeded",
+          },
+        }),
       }),
       now: () => "2026-05-17T00:00:00.000Z",
     });
@@ -2141,7 +2149,13 @@ describe("CLI remote control-plane client", () => {
     );
 
     expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
-      ["GET /api/version", "GET /api/organizations/current-context", "POST /api/deployments"],
+      [
+        "GET /api/version",
+        "GET /api/organizations/current-context",
+        "POST /api/deployments",
+        "GET /api/deployments/dep_remote",
+        "GET /api/deployments/dep_remote",
+      ],
     );
     expect(await requests[2]?.json()).toEqual({
       projectId: "prj_remote",
@@ -2814,6 +2828,14 @@ describe("CLI remote control-plane client", () => {
       profile: profile("local"),
       fetch: createControlPlaneFetch(requests, {
         "/api/deployments": jsonResponse({ id: "dep_remote" }, 202),
+        "/api/deployments/dep_remote": jsonResponse({
+          schemaVersion: "deployments.show/v1",
+          deployment: {
+            id: "dep_remote",
+            resourceId: "res_api",
+            status: "succeeded",
+          },
+        }),
       }),
       now: () => "2026-05-17T00:00:00.000Z",
     });
@@ -2839,6 +2861,7 @@ describe("CLI remote control-plane client", () => {
         "GET /api/version",
         "GET /api/organizations/current-context",
         "POST /api/deployments",
+        "GET /api/deployments/dep_remote",
         "GET /api/deployments/dep_remote",
       ],
     );

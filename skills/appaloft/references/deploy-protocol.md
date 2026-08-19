@@ -150,17 +150,22 @@ Use this order:
    create --project <projectId> --environment <environmentId> --resource <resourceId> --server
    <serverId> [--destination <destinationId>]`; it is ids-only and does not replace source/profile
    configuration or proof verification.
-2. Existing Appaloft config: `appaloft deploy <source>`; for an application graph, repeat
+2. Current directory: `appaloft deploy` and `appaloft deploy .` deploy this tree as this app. Do
+   not silently reuse an unrelated occupancy such as traefik/whoami. If there is no current app,
+   ask for a path or `--project`.
+3. Existing Appaloft config: `appaloft deploy <source>`; for an application graph, repeat
    `--application <key>` to deploy only the requested applications or omit it to deploy all entries.
    `source.type: image` in config is a Resource source/runtime profile declaration, not a deployment
    command field or registry secret surface.
-3. Docker/OCI image: `appaloft deploy image://<image>:<tag> --method prebuilt-image`.
-4. Compose source: `appaloft deploy <source> --method docker-compose`.
-5. Dockerfile source: `appaloft deploy <source> --method dockerfile`.
-6. Built static output: `appaloft deploy ./dist --as static-site`.
-7. Static source: `appaloft deploy <source> --method static --publish-dir <dir>`.
-8. Workspace commands: use explicit install, build, start, and port options.
-9. Blueprint catalog: use `appaloft blueprint list/show/plan-install` for neutral catalog discovery
+4. Docker/OCI image: `appaloft deploy image://<image>:<tag> --method prebuilt-image`.
+5. Compose source: `appaloft deploy <source> --method docker-compose`.
+6. Dockerfile source: `appaloft deploy <source> --method dockerfile`.
+7. Built static output: `appaloft deploy ./dist --as static-site`. `--as static-site` may use
+   `--publish-dir .` to mean the source root / current directory.
+8. Static source: `appaloft deploy <source> --method static --publish-dir <dir>`.
+   `.` is a legal publish directory (source root). Do not default to a value the validator forbids.
+9. Workspace commands: use explicit install, build, start, and port options.
+10. Blueprint catalog: use `appaloft blueprint list/show/plan-install` for neutral catalog discovery
    and dry-run planning. For Web quick deploy, use
    `source=blueprint&sourceExtension=<catalog-extension-key>&blueprintSlug=<slug>` for official or
    extension-provided Blueprints such as PocketBase; do not invent a hidden CLI-only Blueprint
@@ -174,7 +179,9 @@ Use this order:
 
 ## Progress Streams
 
-Progress monitoring is part of deployment, not an optional afterthought.
+Progress monitoring is part of deployment, not an optional afterthought. `appaloft deploy` waits
+for a terminal deployment status. Claim a URL only after `succeeded`. A failed SSH Docker image
+build is a failed deploy: non-zero exit, no live URL.
 
 - Use `appaloft deployments timeline <deploymentId> --follow --json` for a single deployment
   attempt. It is the user-level deployment event stream and remains paired with

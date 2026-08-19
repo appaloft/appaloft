@@ -16,7 +16,6 @@ import {
   ListDeploymentsQuery,
   ListEnvironmentsQuery,
   ListResourcesQuery,
-  ListSandboxesQuery,
   ListServersQuery,
   ListStaleDeploymentAttemptsQuery,
   PruneDeploymentsCommand,
@@ -55,7 +54,6 @@ import { normalizeWorkspaceRepositoryRemote } from "../local-git-workspace-conte
 import {
   isRemoteCodeGitRemoteLocator,
   selectDefaultRemoteCodeServer,
-  selectResumeOccupancy,
 } from "../remote-code-session.js";
 import {
   CliRuntime,
@@ -64,7 +62,6 @@ import {
   print,
   resultToEffect,
   runCommand,
-  runDeploymentCommand,
   runDeploymentCommandResult,
   runDeploymentTimelineQuery,
   runQuery,
@@ -265,55 +262,6 @@ function occupancyDeploymentInputFromGitRemote(input: {
       serverId: server.id,
       ...(input.destinationId ? { destinationId: input.destinationId } : {}),
     } satisfies CreateDeploymentCommandInput;
-  });
-}
-
-interface OccupancySandboxListResult {
-  readonly items: readonly {
-    readonly sandboxId: string;
-    readonly status: string;
-    readonly lastActivityAt?: string;
-    readonly updatedAt?: string;
-    readonly occupancy?: {
-      readonly repositoryIdentity: string;
-      readonly commitSha: string;
-      readonly branch?: string;
-    };
-  }[];
-}
-
-function occupancyDeploymentInputFromLatestOccupancy(input: {
-  readonly projectId?: string;
-  readonly environmentId?: string;
-  readonly resourceId?: string;
-  readonly serverId?: string;
-  readonly destinationId?: string;
-}) {
-  return Effect.gen(function* () {
-    const cli = yield* CliRuntime;
-    const sandboxesQuery = ListSandboxesQuery.create({ limit: 100, offset: 0 });
-    if (sandboxesQuery.isErr()) return undefined;
-    const sandboxesResult = yield* Effect.promise(() => cli.executeQuery(sandboxesQuery.value));
-    if (sandboxesResult.isErr()) return undefined;
-    const occupancy = selectResumeOccupancy(
-      ((sandboxesResult.value as OccupancySandboxListResult).items ?? []).map((item) => ({
-        sandboxId: item.sandboxId,
-        status: item.status,
-        ...(item.occupancy ? { occupancy: item.occupancy } : {}),
-        ...(typeof item.lastActivityAt === "string" ? { lastActivityAt: item.lastActivityAt } : {}),
-        ...(typeof item.updatedAt === "string" ? { updatedAt: item.updatedAt } : {}),
-      })),
-    );
-    const repositoryIdentity = occupancy?.occupancy?.repositoryIdentity;
-    if (!repositoryIdentity) return undefined;
-    return yield* occupancyDeploymentInputFromGitRemote({
-      sourceLocator: `https://${repositoryIdentity.replace(/\.git$/u, "")}.git`,
-      ...(input.projectId ? { projectId: input.projectId } : {}),
-      ...(input.environmentId ? { environmentId: input.environmentId } : {}),
-      ...(input.resourceId ? { resourceId: input.resourceId } : {}),
-      ...(input.serverId ? { serverId: input.serverId } : {}),
-      ...(input.destinationId ? { destinationId: input.destinationId } : {}),
-    });
   });
 }
 
@@ -1267,21 +1215,68 @@ function occupancyDeployUrlFromSummary(
   } as DeploymentSummary)[0];
 }
 
-function readCreatedDeploymentUrl(deploymentId: string) {
+function readShownDeployment(deploymentId: string) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
     const query = ShowDeploymentQuery.create({
       deploymentId,
-      includeTimeline: false,
+      includeTimeline: true,
       includeSnapshot: false,
       includeRelatedContext: false,
-      includeLatestFailure: false,
+      includeLatestFailure: true,
     });
     if (query.isErr()) return undefined;
     const result = yield* Effect.promise(() => cli.executeQuery(query.value));
     if (result.isErr()) return undefined;
-    return occupancyDeployUrlFromSummary(result.value?.deployment);
+    const deployment = result.value.deployment;
+    if (!deployment) return undefined;
+    const existingTimeline = (deployment as { timeline?: DeploymentSummary["timeline"] }).timeline;
+    const latestFailure = result.value.latestFailure;
+    const latestFailureMessage = latestFailure?.message?.trim();
+    const timeline =
+      existingTimeline && existingTimeline.length > 0
+        ? existingTimeline
+        : latestFailureMessage
+          ? [
+              {
+                timestamp: latestFailure?.timestamp ?? new Date().toISOString(),
+                source: latestFailure?.source ?? "ssh",
+                phase: latestFailure?.phase ?? "package",
+                level: latestFailure?.level ?? "error",
+                message: latestFailureMessage,
+              },
+            ]
+          : [];
+    return {
+      ...deployment,
+      timeline,
+    } as DeploymentSummary;
   });
+}
+
+function readCreatedDeploymentUrl(deploymentId: string) {
+  return Effect.gen(function* () {
+    const shown = yield* readShownDeployment(deploymentId);
+    return occupancyDeployUrlFromSummary(shown);
+  });
+}
+
+function lastDeploymentFailureMessage(
+  deployment: DeploymentSummary | undefined,
+): string | undefined {
+  const timeline = deployment?.timeline ?? [];
+  const errorLogs = timeline.filter((log) => log.level === "error");
+  const selected = errorLogs.at(-1) ?? timeline.at(-1);
+  const message = selected?.message?.trim();
+  return message && message.length > 0 ? message : undefined;
+}
+
+function inferDeploymentFailureCode(message: string | undefined): string | undefined {
+  if (!message) return undefined;
+  if (/ssh docker image build failed/iu.test(message)) {
+    return "ssh_docker_build_failed";
+  }
+  return undefined;
 }
 
 function waitForSynchronousDeployment(input: { deploymentId: string; resourceId: string }) {
@@ -1294,8 +1289,17 @@ function waitForSynchronousDeployment(input: { deploymentId: string; resourceId:
     }
     const deadline = Date.now() + synchronousDeploymentTimeoutMs;
     while (true) {
-      const deployment = yield* readDeploymentSummary(input);
+      const shown = yield* readShownDeployment(input.deploymentId);
+      const shownHasFailureLogs = (shown?.timeline ?? []).some((log) => log.message.trim());
+      const listed =
+        !shown || (shown.status !== "succeeded" && !shownHasFailureLogs)
+          ? yield* readDeploymentSummary(input)
+          : undefined;
+      const deployment = listed && (listed.timeline?.length ?? 0) > 0 ? listed : (shown ?? listed);
       if (deployment && deploymentTerminalStatuses.has(deployment.status)) {
+        if (deployment.status !== "succeeded") {
+          return (yield* enrichFailedDeploymentSummary(deployment)) ?? deployment;
+        }
         return deployment;
       }
 
@@ -1305,6 +1309,43 @@ function waitForSynchronousDeployment(input: { deploymentId: string; resourceId:
 
       yield* Effect.promise(() => Bun.sleep(synchronousDeploymentPollIntervalMs));
     }
+  });
+}
+
+function enrichFailedDeploymentSummary(deployment: DeploymentSummary) {
+  return Effect.gen(function* () {
+    if ((deployment.timeline ?? []).some((log) => log.level === "error" && log.message.trim())) {
+      return deployment;
+    }
+
+    const cli = yield* CliRuntime;
+    const query = ShowDeploymentQuery.create({
+      deploymentId: deployment.id,
+      includeTimeline: true,
+      includeSnapshot: false,
+      includeRelatedContext: false,
+      includeLatestFailure: true,
+    });
+    if (query.isErr()) return deployment;
+    const result = yield* Effect.promise(() => cli.executeQuery(query.value));
+    if (result.isErr()) return deployment;
+    const latestFailureMessage = result.value.latestFailure?.message?.trim();
+    if (!latestFailureMessage) return deployment;
+    return {
+      ...deployment,
+      timeline:
+        deployment.timeline && deployment.timeline.length > 0
+          ? deployment.timeline
+          : [
+              {
+                timestamp: result.value.latestFailure?.timestamp ?? new Date().toISOString(),
+                source: result.value.latestFailure?.source ?? "ssh",
+                phase: result.value.latestFailure?.phase ?? "package",
+                level: result.value.latestFailure?.level ?? "error",
+                message: latestFailureMessage,
+              },
+            ],
+    };
   });
 }
 
@@ -1318,11 +1359,15 @@ function failIfSynchronousDeploymentDidNotSucceed(deployment: DeploymentSummary 
     const failureLogTail = Array.isArray(details.failureLogTail)
       ? details.failureLogTail.join("\n")
       : undefined;
+    const humanMessage = lastDeploymentFailureMessage(deployment) ?? "Deployment execution failed";
+    const errorCode = inferDeploymentFailureCode(humanMessage);
 
     return yield* Effect.fail(
-      domainError.infra("Deployment execution failed", {
+      domainError.infra(humanMessage, {
         phase: "runtime-execution",
         reason: deployment ? "deployment_failed" : "deployment_not_observable",
+        guidance: "The deployment did not succeed. A live URL is not available.",
+        ...(errorCode ? { errorCode } : {}),
         ...(deployment
           ? {
               deploymentId: deployment.id,
@@ -1449,11 +1494,6 @@ function runCreateDeploymentCommand(
         appLogLines: options.appLogLines,
       },
     );
-    if (effectiveInput.executionMode === "detached") {
-      const url = yield* readCreatedDeploymentUrl(output.id);
-      if (url) yield* print({ url });
-      return;
-    }
     const deployment = yield* waitForSynchronousDeployment({
       deploymentId: output.id,
       resourceId: effectiveInput.resourceId,
@@ -1840,40 +1880,6 @@ export const deployCommand = EffectCommand.make(
         });
       }
       if (
-        !sourceLocator &&
-        !configFilePath &&
-        !previewContext &&
-        !hasProfileOverrides &&
-        !(projectId && serverId && environmentId && resourceId)
-      ) {
-        const occupancyInput = yield* occupancyDeploymentInputFromLatestOccupancy({
-          ...(projectId ? { projectId } : {}),
-          ...(environmentId ? { environmentId } : {}),
-          ...(resourceId ? { resourceId } : {}),
-          ...(serverId ? { serverId } : {}),
-          ...(destinationId ? { destinationId } : {}),
-        });
-        if (occupancyInput) {
-          return yield* runCreateDeploymentCommand(occupancyInput, {
-            appLogLines: parseAppLogLines(appLogLines),
-            requirePreviewUrl,
-            ...(previewOutputFilePath ? { previewOutputFile: previewOutputFilePath } : {}),
-          });
-        }
-        const interactive = Boolean(cli.terminalIO.stdin.isTTY && cli.terminalIO.stdout.isTTY);
-        if (!interactive) {
-          return yield* Effect.fail(
-            domainError.validation("Occupancy Resource app is required for deploy", {
-              phase: "occupancy-deploy-reuse",
-              code: "workspace_occupancy_resource_missing",
-              guidance:
-                "Run appaloft code first, or pass --project --environment --resource --server.",
-            }),
-          );
-        }
-      }
-
-      if (
         sourceLocator &&
         isRemoteCodeGitRemoteLocator(sourceLocator) &&
         !configFilePath &&
@@ -1894,17 +1900,6 @@ export const deployCommand = EffectCommand.make(
             requirePreviewUrl,
             ...(previewOutputFilePath ? { previewOutputFile: previewOutputFilePath } : {}),
           });
-        }
-        const interactive = Boolean(cli.terminalIO.stdin.isTTY && cli.terminalIO.stdout.isTTY);
-        if (!interactive) {
-          return yield* Effect.fail(
-            domainError.validation("Occupancy Resource app is required for this git remote", {
-              phase: "occupancy-deploy-reuse",
-              code: "workspace_occupancy_resource_missing",
-              guidance:
-                "Run appaloft code <git-remote> first, or pass --project --environment --resource --server.",
-            }),
-          );
         }
       }
 
@@ -2061,7 +2056,7 @@ export const deployCommand = EffectCommand.make(
               resolveConfigAnchoredSourceLocator({
                 ...(configResolution ? { configResolution } : {}),
               }) ??
-              (configResolution ? "." : undefined));
+              ".");
       const normalizedSourceLocator = configAnchoredSourceLocator
         ? normalizeCliPathOrSource(configAnchoredSourceLocator, deploymentMethod ?? "auto")
         : undefined;
@@ -2404,28 +2399,9 @@ const createDeploymentCommand = EffectCommand.make(
       ...(destinationId === undefined ? {} : { destinationId }),
     } satisfies Omit<CreateDeploymentCommandInput, "executionMode">;
 
-    return Effect.gen(function* () {
-      const cli = yield* CliRuntime;
-      if (cli.executionTarget === "remote") {
-        return yield* runDeploymentCommand(
-          CreateDeploymentCommand.create({
-            ...input,
-            executionMode: "detached",
-          }),
-          { appLogLines: 3 },
-        );
-      }
-
-      return yield* runCreateDeploymentCommand(
-        {
-          ...input,
-          executionMode: "synchronous",
-        },
-        {
-          appLogLines: 3,
-          requirePreviewUrl: false,
-        },
-      );
+    return runCreateDeploymentCommand(input, {
+      appLogLines: 3,
+      requirePreviewUrl: false,
     });
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentCreate));

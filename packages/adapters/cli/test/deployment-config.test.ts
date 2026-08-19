@@ -325,6 +325,29 @@ async function createPreviewDeployCliHarness(
       if (query.constructor.name === "ListDeploymentsQuery") {
         return ok({ items: input.deploymentSummaries ?? createdDeploymentSummaries } as T);
       }
+      if (query.constructor.name === "ShowDeploymentQuery") {
+        const showQuery = query as unknown as { deploymentId?: string };
+        const summaries = (input.deploymentSummaries ?? createdDeploymentSummaries) as Array<{
+          id?: string;
+          timeline?: Array<{
+            level?: string;
+            message?: string;
+            timestamp?: string;
+            source?: string;
+            phase?: string;
+          }>;
+        }>;
+        const deployment =
+          summaries.find((item) => item.id === showQuery.deploymentId) ?? summaries.at(-1);
+        const latestFailure = [...(deployment?.timeline ?? [])]
+          .reverse()
+          .find((log) => log.level === "error" && Boolean(log.message?.trim()));
+        return ok({
+          schemaVersion: "deployments.show/v1",
+          deployment,
+          ...(latestFailure ? { latestFailure } : {}),
+        } as T);
+      }
       if (query.constructor.name === "ListResourcesQuery") {
         return ok({ items: input.resourceSummaries ?? [] } as T);
       }
@@ -2259,7 +2282,7 @@ describe("CLI deployment config entry workflow", () => {
     expect(queries.map((query) => query.constructor.name)).toEqual([
       "ListProjectsQuery",
       "ListServersQuery",
-      "ListDeploymentsQuery",
+      "ShowDeploymentQuery",
       "ShowDeploymentQuery",
     ]);
     expect(operations).toEqual([
@@ -2272,7 +2295,7 @@ describe("CLI deployment config entry workflow", () => {
       "CreateResourceCommand",
       "UpsertServerAppliedRoutes",
       "CreateDeploymentCommand",
-      "ListDeploymentsQuery",
+      "ShowDeploymentQuery",
       "ShowDeploymentQuery",
       "ReleaseState:ssh-pglite",
     ]);
@@ -3766,7 +3789,7 @@ describe("CLI deployment config entry workflow", () => {
     }
 
     expect(harness.operations).toContain("PrepareState:ssh-pglite");
-    expect(harness.operations).toContain("ListDeploymentsQuery");
+    expect(harness.operations).toContain("ShowDeploymentQuery");
     const resource = harness.commands.find(
       (command) => command.constructor.name === "CreateResourceCommand",
     );
@@ -4405,7 +4428,7 @@ describe("CLI deployment config entry workflow", () => {
       expect(readFileSync(outputFile, "utf8")).toContain(
         "preview-url=http://generated.preview.example.com",
       );
-      expect(harness.operations).toContain("ListDeploymentsQuery");
+      expect(harness.operations).toContain("ShowDeploymentQuery");
     } finally {
       rmSync(workspace, { recursive: true, force: true });
     }

@@ -58,14 +58,14 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-PREVIEW-050 | CLI + `appaloftdev` | this slice | occupancy tree copies live generated Preview URL | `packages/adapters/cli/test/agent-workspace-command.test.ts`; live `workspace --json` after hello create |
 | WS-REMOTE-PREVIEW-051 | CLI | this slice | missing generated access stays omitted | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
 | WS-REMOTE-DEPLOY-052 | CLI + `appaloftdev` | this slice | occupancy deploy reuses Resource `app` | `packages/adapters/cli/test/deployment-create-command.test.ts`; live `deploy <git-remote>` after occupy |
-| WS-REMOTE-DEPLOY-053 | CLI | this slice | missing occupancy Resource stays fail-closed when non-interactive | `packages/adapters/cli/test/deployment-create-command.test.ts` |
+| WS-REMOTE-DEPLOY-053 | CLI | this slice | new git remote without occupancy creates a new app | `packages/adapters/cli/test/deployment-create-command.test.ts` |
 | WS-REMOTE-EXPOSE-054 | filesystem + application + `appaloftdev` | this slice | occupancy uses a single Dockerfile EXPOSE | `packages/adapters/filesystem/test/source-detector.test.ts`; `packages/application/test/community-workspace-activation-context-initializer.test.ts`; live occupy of `traefik/whoami` |
 | WS-REMOTE-EXPOSE-055 | filesystem + application | this slice | missing or multiple EXPOSE keeps 3000 | `packages/adapters/filesystem/test/source-detector.test.ts`; `packages/application/test/community-workspace-activation-context-initializer.test.ts` |
 | WS-REMOTE-URL-SHORTHAND-028 | CLI + `appaloftdev` | this slice | `owner/repo` occupies GitHub HTTPS | `packages/adapters/cli/test/remote-code-session.test.ts`; live `code traefik/whoami` after occupying examples |
 | WS-REMOTE-URL-SHORTHAND-056 | CLI | this slice | existing local `owner/repo` directory stays a path | `packages/adapters/cli/test/remote-code-session.test.ts` |
-| WS-REMOTE-DEPLOY-057 | CLI + `appaloftdev` | this slice | bare `deploy` reuses latest occupancy Resource `app` | `packages/adapters/cli/test/deployment-create-command.test.ts`; live `deploy` after occupying whoami |
-| WS-REMOTE-DEPLOY-058 | CLI | this slice | bare `deploy` without occupancy fail-closed when non-interactive | `packages/adapters/cli/test/deployment-create-command.test.ts` |
-| WS-REMOTE-DEPLOY-059 | CLI + `appaloftdev` | this slice | occupancy `deploy` prints generated access URL | `packages/adapters/cli/test/deployment-create-command.test.ts`; live `deploy` after occupying whoami |
+| WS-REMOTE-DEPLOY-057 | CLI | this slice | bare `deploy` does not silently reuse a whoami occupancy | `packages/adapters/cli/test/deployment-create-command.test.ts` |
+| WS-REMOTE-DEPLOY-058 | CLI | this slice | bare `deploy` without occupancy uses cwd instead of occupancy fail-closed | `packages/adapters/cli/test/deployment-create-command.test.ts` |
+| WS-REMOTE-DEPLOY-059 | CLI + `appaloftdev` | this slice | occupancy `deploy <git-remote>` prints generated access URL after success | `packages/adapters/cli/test/deployment-create-command.test.ts`; live `deploy <git-remote>` after occupying whoami |
 | WS-REMOTE-DEPLOY-060 | CLI | this slice | missing generated URL stays omitted | `packages/adapters/cli/test/deployment-create-command.test.ts` |
 | WS-REMOTE-BANNER-061 | CLI + `appaloftdev` | this slice | occupancy `code` banner includes generated access URL | `packages/adapters/cli/test/remote-code-session.test.ts`; live `code --no-attach` after occupying+deploying whoami |
 | WS-REMOTE-BANNER-062 | CLI | this slice | missing generated access keeps existing banner | `packages/adapters/cli/test/remote-code-session.test.ts` |
