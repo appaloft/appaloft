@@ -209,6 +209,10 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-MCP-ENV-173 | Occupancy MCP can set local env vars | occupancy OpenCode has first-party `appaloft-tools` | Agent configures the occupied app | first-party binding includes `environments_show`, `environments_set_variable`, `environments_unset_variable`, and `environments_effective_precedence`. Tenant MCP unchanged. |
 | WS-REMOTE-MCP-INSPECT-174 | Occupancy MCP can inspect Resource app | occupancy OpenCode has first-party `appaloft-tools` | Agent inspects logs/health/config | first-party binding includes `resources_runtime_logs`, `resources_health`, `resources_effective_config`, and `resources_diagnostic_summary`. Tenant MCP unchanged. |
 | WS-REMOTE-HARNESS-175 | Occupancy can open Pi | registered Server occupancy | `appaloft code --harness pi --new --no-attach` | occupy uses reserved `stp_appaloft_remote_pi` / profile `appaloft-remote-pi` and does not rewrite the project's OpenCode default. Existing OpenCode Workspace without `--new` stays fail-closed on profile pin mismatch. |
+| WS-REMOTE-PROFILE-AMBIGUOUS-176 | Ambiguous live Profiles are recoverable | two enabled installations share `appaloft-remote` and both have live occupancy | `appaloft code --profile appaloft-remote --no-attach` | fail-closed `workspace_open_profile_ambiguous` lists the selector, both installationIds, and a copy-pasteable `appaloft code --profile <installationId>`. |
+| WS-REMOTE-CODE-PROFILE-177 | `code` accepts `--profile` | logged in + Server | `appaloft code --profile <installationId> --no-attach` | `code --help` documents `--profile`. Dispatch includes that selector. Default OpenCode `code` omits `profile` so Project default or a live occupancy can win. |
+| WS-REMOTE-PROFILE-LIVE-178 | Dead duplicate Profiles do not block first success | two enabled `appaloft-remote` installs; only one has live occupancy | `appaloft code --no-attach` or `appaloft code --profile appaloft-remote` | selects the live installation. With no live occupancy, Project default then oldest wins. Does not dump an internal ambiguous error when a live occupancy exists. |
+| WS-REMOTE-NEW-NO-DUP-179 | Failed `--new` does not install a second same-name Profile | an enabled `appaloft-remote` already exists, or this attempt created an install then later setup failed | `appaloft code --new --no-attach` | initializer reuses the enabled same-name install and does not call install again. A leftover install created by this failed attempt is disabled. Existing user data is not cleared. |
 
 ## Slice Scope
 
@@ -228,7 +232,7 @@ Out of slice 46: host port publish, laptop SSH `-L`, wrapping host-egress with t
 
 ## Public Surfaces
 
-- CLI: default `appaloft code [path|git-remote] [--no-attach] [--local]`. A git remote is a locator, not a local path.
+- CLI: default `appaloft code [path|git-remote] [--no-attach] [--local] [--new] [--profile <name-or-id>]`. A git remote is a locator, not a local path. Default OpenCode omits the invisible `appaloft-remote` name.
 - Catalog: no new field. Existing `workspaces.open` already takes credential-free HTTPS.
 - Persistence: existing Server / Binding / Profile / `workspace_open_entries`.
 - No new aggregate or Cloud table.
@@ -252,6 +256,7 @@ Out of slice 46: host port publish, laptop SSH `-L`, wrapping host-egress with t
 | `workspace_git_ref_ambiguous` | remote HEAD maps to more than one head |
 | `workspace_scratch_remote_rejected` | `--local` with a git-remote locator |
 | `workspace_open_target_server_unavailable` | `targetServerId` is not tenant-visible or not reservable |
+| `workspace_open_profile_ambiguous` | more than one live occupancy shares the requested Profile name; lists installationIds and `appaloft code --profile <id>` |
 | existing `workspace_git_*` | `workspace open` / `workspace create` only |
 | Spec 138 scratch codes | `--local` path Scratch only |
 

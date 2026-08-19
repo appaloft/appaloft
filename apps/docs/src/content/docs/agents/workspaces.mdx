@@ -75,9 +75,10 @@ appaloft workspace open
 ```
 
 这条路径继续走 `workspaces.open`：只用 path 查找 Git root、upstream、branch 和 HEAD SHA，要求
-clean 且已 push。`--profile` 选择 Agent Workspace Profile，不同于全局
-`--control-plane-profile`。脏树、detached、缺 upstream 或 remote tip 不一致会在任何远端创建前
-失败。V1 不做隐式 sync 或 patch upload。
+clean 且已 push。`--profile` 在 `appaloft code` 和 `appaloft workspace open` 上都选择
+Agent Workspace Profile，不同于全局 `--control-plane-profile`。默认 `code` 优先选有
+live occupancy 的安装，而不是被同名死 Profile 挡住。脏树、detached、缺 upstream 或 remote tip
+不一致会在任何远端创建前失败。V1 不做隐式 sync 或 patch upload。
 
 `workspaces.open` 会先验证来源，再读取现有 Repository Binding 和 Project 默认 Profile。如果部署方
 组合了可选的 activation initializer，缺少的 Project、Binding 或默认 Profile 可以在同一次显式

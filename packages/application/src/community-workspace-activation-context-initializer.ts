@@ -1,4 +1,5 @@
 import {
+  type AgentWorkspaceProfileInstallation,
   domainError,
   EnvironmentByProjectAndNameSpec,
   EnvironmentId,
@@ -14,6 +15,7 @@ import {
   ResourceName,
   ResourceSlug,
   type Result,
+  UpdatedAt,
 } from "@appaloft/core";
 
 import { type AgentAdapterInstallationService } from "./agent-adapter";
@@ -23,7 +25,8 @@ import {
   type AgentWorkspaceProfileInstallationService,
   type AgentWorkspaceProfileRegistryRepository,
 } from "./agent-workspace-profile";
-import { COMMUNITY_OCCUPANCY_PI_PROFILE_ID } from "./community-occupancy-pi-template";
+import { selectWorkspaceProfileInstallation } from "./agent-workspace-profile-selector";
+import { COMMUNITY_OCCUPANCY_OPENCODE_PROFILE_ID } from "./community-occupancy-pi-template";
 import { type CommandBus } from "./cqrs";
 import { type ExecutionContext, toRepositoryContext } from "./execution-context";
 import { CreateEnvironmentCommand } from "./operations/environments/create-environment.command";
@@ -49,6 +52,7 @@ type CommunityWorkspaceActivationInitializationResult = Result<{
   readonly project: WorkspaceActivationContextDisposition;
   readonly repositoryBinding: WorkspaceActivationContextDisposition;
   readonly profile: WorkspaceActivationContextDisposition;
+  readonly createdProfileInstallationId?: string;
 }>;
 
 function projectNameForRepository(repositoryIdentity: string): Result<ProjectName> {
@@ -217,6 +221,27 @@ export class CommunityWorkspaceActivationContextInitializer
       });
     }
 
+    const requestedSelector = input.profile ?? COMMUNITY_OCCUPANCY_OPENCODE_PROFILE_ID;
+    const existingBySelector = await this.findEnabledInstallationForSelector(
+      context,
+      requestedSelector,
+    );
+    if (existingBySelector) {
+      if (!project.toState().defaultWorkspaceProfileInstallationId) {
+        const configureExisting = await this.configureProjectDefaultProfile(
+          context,
+          projectId,
+          existingBySelector.id.value,
+        );
+        if (configureExisting.isErr()) return err(configureExisting.error);
+      }
+      return ok({
+        project: projectDisposition,
+        repositoryBinding: bindingDisposition,
+        profile: "reused",
+      });
+    }
+
     const profileValidation = this.dependencies.profiles.validate({
       manifest: requestedProfile.profileManifest,
     });
@@ -234,30 +259,97 @@ export class CommunityWorkspaceActivationContextInitializer
     });
     if (profile.isErr()) return err(profile.error);
     if (!project.toState().defaultWorkspaceProfileInstallationId) {
-      const configure = ConfigureProjectWorkspaceProfileCommand.create({
+      const configured = await this.configureProjectDefaultProfile(
+        context,
         projectId,
-        profileInstallationId: profile.value.installationId,
-      });
-      if (configure.isErr()) return err(configure.error);
-      const configured = await this.dependencies.commandBus.execute(context, configure.value);
+        profile.value.installationId,
+      );
       if (configured.isErr()) {
-        const concurrentlyConfiguredProject = await this.dependencies.projects.findOne(
-          repositoryContext,
-          ProjectByIdSpec.create(ProjectId.rehydrate(projectId)),
-        );
-        if (
-          concurrentlyConfiguredProject?.toState().defaultWorkspaceProfileInstallationId?.value !==
-          profile.value.installationId
-        ) {
-          return err(configured.error);
+        if (!existingProfile) {
+          await this.disableCreatedProfileInstallation(context, profile.value.installationId);
         }
+        return err(configured.error);
       }
     }
     return ok({
       project: projectDisposition,
       repositoryBinding: bindingDisposition,
       profile: existingProfile ? "reused" : "created",
+      ...(!existingProfile ? { createdProfileInstallationId: profile.value.installationId } : {}),
     });
+  }
+
+  private async findEnabledInstallationForSelector(
+    context: ExecutionContext,
+    selector: string,
+  ): Promise<AgentWorkspaceProfileInstallation | undefined> {
+    const installations = await this.dependencies.profileRepository.listInstallations(
+      toRepositoryContext(context),
+      200,
+    );
+    const enabled = installations.filter(
+      (candidate) => candidate.toState().status.value === "enabled",
+    );
+    const exact = enabled.find((candidate) => candidate.id.value === selector);
+    if (exact) return exact;
+    const byProfileId = enabled.filter(
+      (candidate) => candidate.toState().profileId.value === selector,
+    );
+    if (byProfileId.length === 0) return undefined;
+    const selected = selectWorkspaceProfileInstallation({
+      selector,
+      candidates: byProfileId.map((candidate) => ({
+        id: candidate.id.value,
+        installedAt: candidate.toState().installedAt.value,
+      })),
+    });
+    if (selected.isErr()) return byProfileId[0];
+    return byProfileId.find((candidate) => candidate.id.value === selected.value);
+  }
+
+  private async disableCreatedProfileInstallation(
+    context: ExecutionContext,
+    installationId: string,
+  ): Promise<void> {
+    const repositoryContext = toRepositoryContext(context);
+    const installation = await this.dependencies.profileRepository.findInstallation(
+      repositoryContext,
+      installationId,
+    );
+    if (!installation) return;
+    const expectedRevision = installation.toState().revision.value;
+    const disabled = installation.disable(UpdatedAt.rehydrate(new Date().toISOString()));
+    if (disabled.isErr()) return;
+    await this.dependencies.profileRepository.saveInstallation(
+      repositoryContext,
+      installation,
+      expectedRevision,
+    );
+  }
+
+  private async configureProjectDefaultProfile(
+    context: ExecutionContext,
+    projectId: string,
+    profileInstallationId: string,
+  ): Promise<Result<void>> {
+    const configure = ConfigureProjectWorkspaceProfileCommand.create({
+      projectId,
+      profileInstallationId,
+    });
+    if (configure.isErr()) return err(configure.error);
+    const configured = await this.dependencies.commandBus.execute(context, configure.value);
+    if (configured.isOk()) return ok(undefined);
+    const concurrentlyConfiguredProject = await this.dependencies.projects.findOne(
+      toRepositoryContext(context),
+      ProjectByIdSpec.create(ProjectId.rehydrate(projectId)),
+    );
+    if (
+      concurrentlyConfiguredProject?.toState().defaultWorkspaceProfileInstallationId?.value ===
+      profileInstallationId
+    ) {
+      return ok(undefined);
+    }
+    return err(configured.error);
   }
 
   private profileConfigFor(

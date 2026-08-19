@@ -189,6 +189,14 @@ describe("Profile-aware Workspace open persistence", () => {
         runtimeId: "sar_first",
       });
       expect(
+        await entries.findLiveProfileInstallationIds(tenantA, [
+          "awpi_default",
+          "awpi_opencode",
+          "awpi_missing",
+        ]),
+      ).toEqual(expect.arrayContaining(["awpi_default", "awpi_opencode"]));
+      expect(await entries.findLiveProfileInstallationIds(tenantB, ["awpi_default"])).toEqual([]);
+      expect(
         await entries.findPreferred(tenantA, key, {
           profileInstallationId: "awpi_missing",
         }),

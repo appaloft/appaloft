@@ -45,7 +45,10 @@ lifecycle ownership.
 - Without an initializer, missing Binding/default Profile keeps the existing
   `workspace_open_repository_not_bound` / `workspace_open_profile_required` behavior.
 - Invalid initializer evidence returns `workspace_activation_context_evidence_invalid`.
-- State that is still unavailable after initialization returns
+- User-recoverable re-read errors after initialization
+  (`workspace_open_repository_not_bound`, `workspace_open_profile_required`,
+  `workspace_open_profile_ambiguous`, and `not_found`) surface as themselves with
+  copy-pasteable guidance. Unexpected leftover unavailability returns
   `workspace_activation_context_conflict` with the canonical re-read cause code.
 - Invalid or legacy evidence on a new reservation returns
   `workspace_target_selection_evidence_invalid`; the reservation is released before returning.

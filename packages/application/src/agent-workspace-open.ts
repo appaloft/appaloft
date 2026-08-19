@@ -218,6 +218,10 @@ export interface WorkspaceOpenEntryRepository {
       readonly profileInstallationId?: string;
     },
   ): Promise<WorkspaceOpenEntry | undefined>;
+  findLiveProfileInstallationIds(
+    context: ExecutionContext,
+    installationIds: readonly string[],
+  ): Promise<readonly string[]>;
   begin(
     context: ExecutionContext,
     key: WorkspaceOpenKey,

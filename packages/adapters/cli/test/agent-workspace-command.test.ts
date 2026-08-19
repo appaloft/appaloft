@@ -1125,7 +1125,52 @@ describe("Agent Workspace CLI", () => {
       forceNew: true,
       attach: false,
       targetServerId: "srv_1",
-      profile: "appaloft-remote",
+    });
+    expect((commands[0] as OpenAgentWorkspaceCommand).input.profile).toBeUndefined();
+  });
+
+  test("[WS-REMOTE-CODE-PROFILE-177] code --profile passes the selector through", async () => {
+    const commands: Command<unknown>[] = [];
+    const { createCliProgram } = await import("../src");
+    const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return ok({ workspaceId: "sbx_profile", projectId: "prj_billing" } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_profile" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        projectId: "prj_billing",
+        serverId: "srv_1",
+        serverName: "mac-mini",
+      }),
+    });
+
+    await program.parseAsync([
+      "node",
+      "appaloft",
+      "code",
+      "--profile",
+      "awpi_ptlsoktb2iq1",
+      "--no-attach",
+    ]);
+
+    expect((commands[0] as OpenAgentWorkspaceCommand).input).toMatchObject({
+      attach: false,
+      targetServerId: "srv_1",
+      profile: "awpi_ptlsoktb2iq1",
     });
   });
 

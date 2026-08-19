@@ -52,13 +52,15 @@ appaloft deployments recovery-readiness <deploymentId>  # 查询恢复就绪状�
 
 `appaloft code` 登录后占用团队默认已注册 Server 上的 **我的 Sandbox**。源是远端 SHA。
 缺少 Adapter/Profile 时会创建不可见的 `appaloft-remote`。笔记本路径不是 Workspace
-真相，脏树也不会上传。`--no-attach` 只打印占用横幅。`--local` 才是本机 Scratch。
+真相，脏树也不会上传。`--no-attach` 只打印占用横幅。同名 Profile 冲突时用
+`--profile <installationId>`。`--local` 才是本机 Scratch。
 
 ```bash
 appaloft login
 appaloft code
 appaloft code --no-attach
 appaloft code --local
+appaloft code --profile <installationId>
 appaloft workspace open . --profile <workspace-profile> --new
 ```
 

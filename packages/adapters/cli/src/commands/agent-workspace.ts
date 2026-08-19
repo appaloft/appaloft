@@ -484,6 +484,15 @@ function makeWorkspaceOpenCommand() {
 
 const open = makeWorkspaceOpenCommand();
 
+function occupancyCodeProfile(
+  harness: "opencode" | "pi" | "omp",
+  profile?: string,
+): string | undefined {
+  if (profile) return profile;
+  if (harness !== "opencode") return occupancyRemoteProfileId(harness);
+  return undefined;
+}
+
 export const workspaceCodeCommand = EffectCommand.make(
   "code",
   {
@@ -492,6 +501,10 @@ export const workspaceCodeCommand = EffectCommand.make(
     local: Options.boolean("local").pipe(Options.withDefault(false)),
     forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
     open: Options.boolean("open").pipe(Options.withDefault(false)),
+    profile: Options.text("profile").pipe(
+      Options.optional,
+      Options.withDescription("Agent Workspace Profile name or installation id"),
+    ),
     harness: Options.choice("harness", ["opencode", "pi", "omp"] as const).pipe(
       Options.withDefault("opencode" as const),
     ),
@@ -503,7 +516,7 @@ export const workspaceCodeCommand = EffectCommand.make(
       "connections",
     ] as const).pipe(Options.optional),
   },
-  ({ forceNew, harness, local, noAttach, open, openTarget, path }) =>
+  ({ forceNew, harness, local, noAttach, open, openTarget, path, profile }) =>
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
       if (local) {
@@ -596,7 +609,7 @@ export const workspaceCodeCommand = EffectCommand.make(
         catch: (error) => workspaceCliError(error, "remote-code-door"),
       });
       const attach = !noAttach;
-      const profile = occupancyRemoteProfileId(harness);
+      const selectedProfile = occupancyCodeProfile(harness, optionalValue(profile));
       const openInput = {
         repository: door.repository,
         repositoryIdentity: door.repositoryIdentity,
@@ -606,7 +619,7 @@ export const workspaceCodeCommand = EffectCommand.make(
         targetServerId: door.serverId,
         attach,
         forceNew,
-        profile,
+        ...(selectedProfile ? { profile: selectedProfile } : {}),
       };
       const command = yield* resultToEffect(OpenAgentWorkspaceCommand.create(openInput));
       const opened = yield* Effect.promise(() => cli.executeCommand(command));

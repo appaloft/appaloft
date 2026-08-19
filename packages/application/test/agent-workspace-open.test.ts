@@ -146,6 +146,7 @@ describe("Agent Workspace open application workflow", () => {
           selection?.profileInstallationId === "awpi_default" && profileWorkspace
             ? profileWorkspace
             : preferred,
+        findLiveProfileInstallationIds: async () => [],
         begin: async (_context, _key, value) => {
           pendingActivation = value.activation as typeof activation;
           return ok({ workspaceId: "sbx_1", created: true });
@@ -734,6 +735,7 @@ describe("Agent Workspace open application workflow", () => {
         findByWorkspaceIds: async () => new Map(),
         findByWorkspaceId: async () => preferred,
         findPreferred: async () => preferred,
+        findLiveProfileInstallationIds: async () => [],
         begin: async (_context, _key, value) => {
           begun.push({
             profileInstallationId: value.profileInstallationId,

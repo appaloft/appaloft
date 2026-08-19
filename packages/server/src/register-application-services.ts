@@ -4117,6 +4117,9 @@ export function registerApplicationServices(
         placement: dependencyContainer.resolve<WorkspaceOpenPlacementPort>(
           tokens.workspaceOpenPlacement,
         ),
+        occupancies: dependencyContainer.resolve<WorkspaceOpenEntryRepository>(
+          tokens.workspaceOpenEntryRepository,
+        ),
         ...(dependencyContainer.isRegistered(tokens.workspaceActivationContextInitializer, true)
           ? {
               contextInitializer:

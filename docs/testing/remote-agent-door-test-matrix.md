@@ -147,6 +147,10 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-ATTACH-137 | application | this slice | signed gateway URL still wins | same runtime test |
 | WS-REMOTE-ATTACH-138 | application | this slice | raw loopback stays unsafe | same runtime test |
 | WS-REMOTE-ATTACH-139 | CLI | this slice | issued occupancy terminal attaches without `terminal-sessions.show` | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
+| WS-REMOTE-PROFILE-AMBIGUOUS-176 | application / CLI | this slice | duplicate live Profiles list selector, installationIds, and `appaloft code --profile <id>` | `packages/application/test/agent-workspace-profile-selector.test.ts`; `packages/application/test/agent-workspace-open-preflight.test.ts` |
+| WS-REMOTE-CODE-PROFILE-177 | CLI | this slice | `code --profile` is documented and dispatched; default OpenCode `code` omits hardcoded `appaloft-remote` | `packages/adapters/cli/test/agent-workspace-command.test.ts`; `apps/shell/test/help-without-runtime.test.ts` |
+| WS-REMOTE-PROFILE-LIVE-178 | application | this slice | one live occupancy wins over dead same-name Profiles; else Project default then oldest | `packages/application/test/agent-workspace-profile-selector.test.ts`; `packages/application/test/agent-workspace-open-preflight.test.ts` |
+| WS-REMOTE-NEW-NO-DUP-179 | application | this slice | `--new` reuses an enabled same-name Profile; leftover from a failed attempt is disabled | `packages/application/test/community-workspace-activation-context-initializer.test.ts`; `packages/application/test/agent-workspace-open-preflight.test.ts` |
 
 
 
