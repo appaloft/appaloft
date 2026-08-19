@@ -292,6 +292,8 @@ export function createDurableWorkRuntimeRunner(
     startTick(worker.workerId);
   }
 
+  let running = false;
+
   return {
     async start(): Promise<void> {
       if (input.topology.mode === "disabled" || input.topology.queueBackend !== "database") {
@@ -331,6 +333,7 @@ export function createDurableWorkRuntimeRunner(
         workerIds: input.topology.workers.map((worker) => worker.workerId),
         slotAssignment: input.topology.slotAssignment,
       });
+      running = true;
     },
     async stop(): Promise<void> {
       for (const timer of timers.splice(0)) {
@@ -369,7 +372,10 @@ export function createDurableWorkRuntimeRunner(
           ),
         );
       }
-      input.logger.info("durable_work_runtime.drain_stopped");
+      if (running) {
+        input.logger.info("durable_work_runtime.drain_stopped");
+        running = false;
+      }
     },
   };
 }

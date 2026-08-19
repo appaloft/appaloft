@@ -113,6 +113,22 @@ describe("shell domain error formatting", () => {
     expect(output).not.toContain("Workspace activation context is still unavailable");
   });
 
+  test("prints login guidance for unauthenticated remote doors", () => {
+    const output = formatDomainError({
+      code: "workspace_remote_login_required",
+      category: "user",
+      message: "Sign in before opening a remote Agent session",
+      retryable: false,
+      details: {
+        phase: "remote-code-login",
+        guidance: "Run appaloft login, then retry. Use appaloft code --local for this-Mac scratch.",
+      },
+    });
+
+    expect(output).toContain("Sign in before opening a remote Agent session");
+    expect(output).toContain("Run appaloft login");
+  });
+
   test("quarantines an incompatible SSH remote PGlite local mirror before retry", async () => {
     const dataRoot = await mkdtemp(join(tmpdir(), "appaloft-run-error-format-"));
     const pgliteDir = join(dataRoot, "pglite");

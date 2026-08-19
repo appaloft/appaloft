@@ -275,6 +275,7 @@ export interface AppaloftServerExtension {
 export interface AppaloftServerOptions {
   config?: AppConfig;
   flags?: Partial<AppConfig>;
+  loggerDestination?: { write(msg: string): void };
   embeddedWebAssets?: Readonly<Record<string, Blob>>;
   embeddedDocsAssets?: Readonly<Record<string, Blob>>;
   pgliteRuntimeAssets?: PgliteRuntimeAssets;
@@ -1560,7 +1561,7 @@ export async function createAppaloftServer(
   options: AppaloftServerOptions = {},
 ): Promise<AppaloftServer> {
   const config = options.config ?? resolveConfig(options.flags ? { flags: options.flags } : {});
-  const logger = createLogger(config);
+  const logger = createLogger(config, options.loggerDestination);
   const telemetry = await bootstrapOpenTelemetry(config);
   const database = await createReloadableDatabase({
     driver: config.databaseDriver,

@@ -123,6 +123,7 @@ describe("Agent Workspace CLI", () => {
             write: () => true,
           },
         },
+        environment: { APPALOFT_TOKEN: "tok_logged_in_workspace" },
         workspaceControlPresentation: {
           start: async () => {
             presentationStarts += 1;
@@ -150,6 +151,7 @@ describe("Agent Workspace CLI", () => {
     expect(output.join("")).toContain("non-interactive-terminal");
     expect(output.join("")).toContain("no-tui");
     expect(output.join("")).toContain("structured-output");
+    expect(output.join("")).not.toContain("login-required");
   });
 
   test("[WS-REMOTE-CA-033] headless workspace --no-tui prints occupancy tree when login is missing", async () => {
@@ -177,6 +179,7 @@ describe("Agent Workspace CLI", () => {
         stdout: { isTTY: false, write: () => true },
         stderr: { isTTY: false, write: () => true },
       },
+      environment: { APPALOFT_TOKEN: "tok_logged_in_workspace" },
     });
 
     const processWrite = process.stdout.write;
@@ -193,7 +196,53 @@ describe("Agent Workspace CLI", () => {
     const printed = output.join("");
     expect(printed).toContain("appaloft.workspace-occupancy/v1");
     expect(printed).toContain("login-required");
+    expect(printed).toContain("Run appaloft login");
     expect(printed).not.toContain("Product operation requires a valid session");
+    expect(printed).not.toContain('"status": "ready"');
+  });
+
+  test("[WS-REMOTE-CA-033] unauthenticated no-profile empty local backend workspace --json is login-required", async () => {
+    const output: string[] = [];
+    let queryCount = 0;
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: { execute: async () => ok({}) } as unknown as CommandBus,
+      queryBus: {
+        execute: async () => {
+          queryCount += 1;
+          return ok({ items: [] });
+        },
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_workspace_unauthenticated_json" }),
+      },
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+      environment: { APPALOFT_HOME: join(tmpdir(), "appaloft-unauthenticated-workspace") },
+    });
+
+    const processWrite = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "workspace", "--json"]);
+    } finally {
+      process.stdout.write = processWrite;
+    }
+
+    const printed = output.join("");
+    expect(queryCount).toBe(0);
+    expect(printed).toContain("login-required");
+    expect(printed).toContain("Run appaloft login");
+    expect(printed).not.toContain('"status": "ready"');
   });
 
   test("[WS-REMOTE-CA-033][WS-REMOTE-CA-034][WS-REMOTE-CA-036][WS-REMOTE-CA-037][WS-REMOTE-CA-065] headless workspace --json prints current occupancies", async () => {
@@ -237,6 +286,7 @@ describe("Agent Workspace CLI", () => {
         stdout: { isTTY: false, write: () => true },
         stderr: { isTTY: false, write: () => true },
       },
+      environment: { APPALOFT_TOKEN: "tok_logged_in_workspace" },
     });
 
     const processWrite = process.stdout.write;
@@ -379,6 +429,7 @@ describe("Agent Workspace CLI", () => {
         stdout: { isTTY: false, write: () => true },
         stderr: { isTTY: false, write: () => true },
       },
+      environment: { APPALOFT_TOKEN: "tok_logged_in_workspace" },
     });
 
     const processWrite = process.stdout.write;
@@ -945,6 +996,7 @@ describe("Agent Workspace CLI", () => {
 
   test("[WS-REMOTE-LOGIN-001] default code fails closed when logged out", async () => {
     const commands: Command<unknown>[] = [];
+    let queryCount = 0;
     const { createCliProgram } = await import("../src");
     const program = createCliProgram({
       version: "0.1.0-test",
@@ -955,18 +1007,17 @@ describe("Agent Workspace CLI", () => {
           return ok({} as T);
         },
       } as unknown as CommandBus,
-      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      queryBus: {
+        execute: async () => {
+          queryCount += 1;
+          return ok({ items: [] });
+        },
+      } as unknown as QueryBus,
       executionContextFactory: {
         create: (input) => createExecutionContext({ ...input, requestId: "req_remote_login" }),
       },
-      resolveRemoteCodeDoor: async () => {
-        throw {
-          code: "workspace_remote_login_required",
-          category: "conflict",
-          message: "Sign in before opening a remote Agent session",
-          retryable: false,
-          details: { phase: "remote-code-login" },
-        };
+      environment: {
+        APPALOFT_HOME: join(tmpdir(), "appaloft-unauthenticated-code"),
       },
     });
     const originalExitCode = process.exitCode;
@@ -977,11 +1028,14 @@ describe("Agent Workspace CLI", () => {
       throw new Error("Expected login-required remote code to fail");
     } catch (error) {
       expect(String(error)).toContain('"code":"workspace_remote_login_required"');
+      expect(String(error)).toContain("Run appaloft login");
+      expect(String(error)).not.toContain("workspace_remote_server_missing");
     } finally {
       process.stderr.write = write;
       process.exitCode = originalExitCode ?? 0;
     }
     expect(commands).toEqual([]);
+    expect(queryCount).toBe(0);
   });
 
   test("[WS-REMOTE-PROFILE-008][WS-REMOTE-NO-ATTACH-016] missing Profile still occupies via workspaces.open", async () => {

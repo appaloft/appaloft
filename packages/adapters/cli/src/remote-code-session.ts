@@ -1,6 +1,7 @@
 import { existsSync, statSync } from "node:fs";
 
 import { type DomainError } from "@appaloft/core";
+import { hasCliControlPlaneLogin, workspaceRemoteLoginRequiredError } from "./cli-session-login.js";
 import { activeControlPlaneProfile } from "./control-plane-service.js";
 import {
   normalizeWorkspaceRepositoryRemote,
@@ -99,7 +100,6 @@ export interface RemoteCodeOccupancy {
 
 export interface RemoteCodeDoorProbe {
   readonly env?: NodeJS.ProcessEnv;
-  readonly localComposition?: boolean;
   readonly forceNew?: boolean;
   readonly readActiveProfile?: () => Promise<{ readonly auth?: unknown } | null>;
   readonly listServers?: () => Promise<readonly RemoteCodeServerSummary[]>;
@@ -286,22 +286,8 @@ export async function resolveDefaultRemoteCodeDoor(
   path = ".",
 ): Promise<RemoteCodeDoorResolution> {
   const env = probe.env ?? process.env;
-  const profile =
-    probe.readActiveProfile === undefined
-      ? (await activeControlPlaneProfile()).match(
-          (value) => value,
-          () => null,
-        )
-      : await probe.readActiveProfile();
-  if (!probe.localComposition && !hasRemoteCodeLogin(env) && !profile?.auth) {
-    throw remoteCodeError(
-      "workspace_remote_login_required",
-      "Sign in before opening a remote Agent session",
-      {
-        phase: "remote-code-login",
-        guidance: "Run appaloft login, then retry. Use appaloft code --local for this-Mac scratch.",
-      },
-    );
+  if (!(await hasCliControlPlaneLogin(env, probe.readActiveProfile))) {
+    throw workspaceRemoteLoginRequiredError();
   }
 
   const servers = probe.listServers ? await probe.listServers() : [];

@@ -14,9 +14,11 @@ import {
   MemoryCliControlPlaneProfileStore,
   requestControlPlaneOperation,
   resolveCliExecutionTarget,
+  rewriteCliAuthVerificationUri,
   runStandaloneControlPlaneCli,
   useControlPlaneProfile,
 } from "../src";
+import { createCliAuthSession } from "../src/control-plane-client.js";
 
 function jsonResponse(value: unknown, status = 200): Response {
   return new Response(JSON.stringify(value), {
@@ -841,6 +843,146 @@ describe("CLI remote control-plane client", () => {
     expect(rendered.stderr).toContain(
       "https://app.appaloft.com/cli-auth/authorize?user_code=ABCD-EFGH",
     );
+  });
+
+  test("[CONTROL-PLANE-CLI-012] createCliAuthSession coerces Cloud TLS-termination http authorize URLs", async () => {
+    const session = await createCliAuthSession({
+      baseUrl: defaultPublicCloudControlPlaneUrl,
+      fetch: async (request) => {
+        expect(String(request.url)).toBe("https://app.appaloft.com/api/cli-auth/sessions");
+        return jsonResponse(
+          {
+            deviceCode: "dev_cli_fixture",
+            expiresIn: 600,
+            interval: 0,
+            userCode: "ABCD-EFGH",
+            verificationUri: "http://app.appaloft.com/cli-auth/authorize",
+            verificationUriComplete:
+              "http://app.appaloft.com/cli-auth/authorize?user_code=ABCD-EFGH",
+          },
+          201,
+        );
+      },
+    });
+
+    expect(session._unsafeUnwrap()).toMatchObject({
+      userCode: "ABCD-EFGH",
+      verificationUri: "https://app.appaloft.com/cli-auth/authorize",
+      verificationUriComplete: "https://app.appaloft.com/cli-auth/authorize?user_code=ABCD-EFGH",
+    });
+  });
+
+  test("[CONTROL-PLANE-CLI-012] default Cloud opens the coerced https authorize URL", async () => {
+    const opened: string[] = [];
+    const store = new MemoryCliControlPlaneProfileStore();
+    const result = await loginControlPlane(
+      {},
+      {
+        confirmOpenBrowser: () => true,
+        env: {},
+        fetch: createCliAuthExchangeFetch([], {
+          overrides: {
+            "/api/cli-auth/sessions": jsonResponse(
+              {
+                deviceCode: "dev_cli_fixture",
+                expiresIn: 600,
+                interval: 0,
+                userCode: "ABCD-EFGH",
+                verificationUri: "http://app.appaloft.com/cli-auth/authorize",
+                verificationUriComplete:
+                  "http://app.appaloft.com/cli-auth/authorize?user_code=ABCD-EFGH",
+              },
+              201,
+            ),
+          },
+        }),
+        now: () => "2026-05-17T00:00:00.000Z",
+        openBrowser: (url) => {
+          opened.push(url);
+          return true;
+        },
+        store,
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(opened).toEqual(["https://app.appaloft.com/cli-auth/authorize?user_code=ABCD-EFGH"]);
+  });
+
+  test("[CONTROL-PLANE-CLI-012] default Cloud device-code URL is rewritten from http to https", async () => {
+    const requests: Request[] = [];
+    const store = new MemoryCliControlPlaneProfileStore();
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "login", "--no-browser"],
+      env: {},
+      fetch: createCliAuthExchangeFetch(requests, {
+        statuses: ["pending", "authorized"],
+        overrides: {
+          "/api/cli-auth/sessions": jsonResponse(
+            {
+              deviceCode: "dev_cli_fixture",
+              expiresIn: 600,
+              interval: 0,
+              userCode: "ABCD-EFGH",
+              verificationUri: "http://app.appaloft.com/cli-auth/authorize",
+              verificationUriComplete:
+                "http://app.appaloft.com/cli-auth/authorize?user_code=ABCD-EFGH",
+            },
+            201,
+          ),
+        },
+      }),
+      now: () => "2026-05-17T00:00:00.000Z",
+      store,
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const rendered = output.read();
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(rendered.stderr).toContain(
+      "https://app.appaloft.com/cli-auth/authorize?user_code=ABCD-EFGH",
+    );
+    expect(rendered.stderr).not.toContain(
+      "http://app.appaloft.com/cli-auth/authorize?user_code=ABCD-EFGH",
+    );
+    expect(
+      rewriteCliAuthVerificationUri(
+        "http://localhost:3001/cli-auth/authorize?user_code=ABCD-EFGH",
+        "http://localhost:3001",
+      ),
+    ).toBe("http://localhost:3001/cli-auth/authorize?user_code=ABCD-EFGH");
+    expect(
+      rewriteCliAuthVerificationUri(
+        "http://app.appaloft.com/cli-auth/authorize?user_code=ABCD-EFGH",
+        defaultPublicCloudControlPlaneUrl,
+      ),
+    ).toBe("https://app.appaloft.com/cli-auth/authorize?user_code=ABCD-EFGH");
+  });
+
+  test("[CONTROL-PLANE-CLI-012] self-hosted http device-code URL is left alone", async () => {
+    const requests: Request[] = [];
+    const store = new MemoryCliControlPlaneProfileStore();
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "login", "--url", "http://10.0.0.8:8787", "--no-browser"],
+      env: {},
+      fetch: createCliAuthExchangeFetch(requests),
+      now: () => "2026-05-17T00:00:00.000Z",
+      store,
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const rendered = output.read();
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(rendered.stderr).toContain(
+      "http://10.0.0.8:8787/cli-auth/authorize?user_code=ABCD-EFGH",
+    );
+    expect(rendered.stderr).not.toContain("https://10.0.0.8:8787");
   });
 
   test("[CONTROL-PLANE-CLI-012] browser open failure falls back to printed verification URL", async () => {

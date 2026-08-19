@@ -12,12 +12,18 @@ import {
   type DevelopmentCommandRuntime,
   defaultCliControlPlaneProfileStore,
   defaultPublicCloudControlPlaneUrl,
+  deployLoginRequiredError,
   developmentPlanFromSource,
   formatSafeCliError,
+  hasCliControlPlaneLogin,
+  isHeadlessWorkspaceInvocation,
+  loginRequiredWorkspaceOccupancyTree,
+  requiresCloudDeployLogin,
   resolveCliExecutionTarget,
   runStandaloneControlPlaneCli,
   runStandaloneDevelopmentCli,
   runStandaloneServerWorkerCli,
+  workspaceRemoteLoginRequiredError,
 } from "@appaloft/adapter-cli";
 import {
   BunSandboxDockerCommandRunner,
@@ -181,6 +187,11 @@ export function formatDomainError(error: DomainError): string {
     lines.push(`remedy: ${firstSafeRemedy.label}`);
   }
 
+  const guidance = typeof error.details?.guidance === "string" ? error.details.guidance.trim() : "";
+  if (guidance && guidance !== error.message.trim()) {
+    lines.push(guidance);
+  }
+
   return `${lines.join("\n")}\n`;
 }
 
@@ -268,7 +279,12 @@ async function createShellComposition(
     );
   } catch (error) {
     if (!remotePgliteStateSyncSession) {
-      throw error;
+      return err(
+        domainError.infra("Local CLI runtime could not be started", {
+          phase: "local-cli-composition",
+          message: errorMessage(error),
+        }),
+      );
     }
 
     if (!isPgliteInitializationFailure(error)) {
@@ -494,12 +510,53 @@ async function runShellMcpRemoteStdio(argv: readonly string[]): Promise<void> {
   });
 }
 
+async function runHelpWithoutRuntime(argv: readonly string[]): Promise<void> {
+  const helpProgram = createCliHelpProgram({
+    version: process.env.APPALOFT_APP_VERSION ?? "0.0.0",
+  });
+  let exitCode = 0;
+
+  try {
+    await helpProgram.parseAsync(Array.from(argv));
+    process.exitCode = 0;
+  } catch {
+    const currentExitCode = readExitCode();
+    exitCode = currentExitCode !== 0 ? currentExitCode : 1;
+  }
+
+  if (exitCode !== 0) {
+    process.exit(exitCode);
+  }
+}
+
 export async function runShellCli(
   options?: ShellRuntimeOptions,
   capturedStdinText?: string,
 ): Promise<void> {
   const argv = process.argv;
   const mcpCommand = isMcpCommand(argv);
+  const controlPlaneCli = await runStandaloneControlPlaneCli({
+    argv,
+    env: process.env,
+    ...(capturedStdinText === undefined ? {} : { stdinText: capturedStdinText }),
+  });
+  if (controlPlaneCli.handled) {
+    if (controlPlaneCli.exitCode !== 0) {
+      process.exit(controlPlaneCli.exitCode);
+    }
+    return;
+  }
+  const helpCommand = commandArgs(argv)[0];
+  if (
+    isHelpInvocation(argv) &&
+    helpCommand !== "worker" &&
+    helpCommand !== "mcp" &&
+    helpCommand !== "dev"
+  ) {
+    await runHelpWithoutRuntime(argv);
+    return;
+  }
+
   const appaloftHome = process.env.APPALOFT_HOME?.trim() || join(homedir(), ".appaloft");
   const workerRoots = (
     process.env.APPALOFT_SERVER_WORKER_ROOTS?.split(delimiter) ?? [process.cwd()]
@@ -624,17 +681,6 @@ export async function runShellCli(
     if (workerCli.exitCode !== 0) process.exit(workerCli.exitCode);
     return;
   }
-  const controlPlaneCli = await runStandaloneControlPlaneCli({
-    argv,
-    env: process.env,
-    ...(capturedStdinText === undefined ? {} : { stdinText: capturedStdinText }),
-  });
-  if (controlPlaneCli.handled) {
-    if (controlPlaneCli.exitCode !== 0) {
-      process.exit(controlPlaneCli.exitCode);
-    }
-    return;
-  }
 
   const localDevelopmentRuntime = new LocalDevelopmentSessionRuntime({
     planResolver: developmentPlanFromSource,
@@ -687,6 +733,15 @@ export async function runShellCli(
     env: process.env,
   });
   if (executionTarget.isErr()) {
+    const failedArgs = commandArgs(argv);
+    if (
+      failedArgs[0] === "deploy" &&
+      requiresCloudDeployLogin(failedArgs, process.env) &&
+      !(await hasCliControlPlaneLogin(process.env))
+    ) {
+      writeDomainError(deployLoginRequiredError());
+      process.exit(1);
+    }
     writeDomainError(executionTarget.error);
     process.exit(1);
   }
@@ -717,29 +772,31 @@ export async function runShellCli(
     return;
   }
 
-  if (isHelpInvocation(cliArgv)) {
-    const helpProgram = createCliHelpProgram({
-      version: process.env.APPALOFT_APP_VERSION ?? "0.0.0",
-    });
-    let exitCode = 0;
-
-    try {
-      await helpProgram.parseAsync(cliArgv);
-      process.exitCode = 0;
-    } catch {
-      const currentExitCode = readExitCode();
-      exitCode = currentExitCode !== 0 ? currentExitCode : 1;
-    }
-
-    if (exitCode !== 0) {
-      process.exit(exitCode);
-    }
-    return;
-  }
-
   if (mcpCommand && mcpMode(argv) === "remote-stdio") {
     await runShellMcpRemoteStdio(argv);
     return;
+  }
+
+  const localArgs = commandArgs(cliArgv);
+  const localCommand = localArgs[0];
+  const loggedIn = await hasCliControlPlaneLogin(process.env);
+  if (!loggedIn) {
+    if (localCommand === "code" && !localArgs.includes("--local")) {
+      writeDomainError(workspaceRemoteLoginRequiredError());
+      process.exit(1);
+    }
+    if (localCommand === "workspace" && isHeadlessWorkspaceInvocation(localArgs)) {
+      const reason =
+        !process.stdin.isTTY || !process.stdout.isTTY
+          ? "non-interactive-terminal"
+          : localArgs.includes("--json")
+            ? "structured-output"
+            : "no-tui";
+      process.stdout.write(
+        `${JSON.stringify(loginRequiredWorkspaceOccupancyTree(reason), null, 2)}\n`,
+      );
+      return;
+    }
   }
 
   const remotePgliteStateSync = await prepareRemotePgliteStateSync({
@@ -758,8 +815,17 @@ export async function runShellCli(
     process.env.APPALOFT_PGLITE_DATA_DIR = remotePgliteStateSyncSession.localPgliteDataDir;
   }
 
+  const oneShotCli = !cliArgv.includes("serve") && !cliArgv.includes("worker");
+  const discardedCliLogDestination = {
+    write(): boolean {
+      return true;
+    },
+  };
   const appResult = await createShellComposition(
-    options,
+    {
+      ...options,
+      ...(oneShotCli ? { loggerDestination: discardedCliLogDestination } : {}),
+    },
     remotePgliteStateSyncSession,
     capturedStdinText,
   );

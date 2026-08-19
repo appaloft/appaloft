@@ -22,6 +22,7 @@ import {
   type CliControlPlaneHandshake,
   type CliControlPlaneOrganizationContext,
   type CliControlPlaneProfile,
+  rewriteCliAuthVerificationUri,
 } from "./control-plane-profile.js";
 
 const cliUserAgent = "appaloft-cli";
@@ -653,11 +654,16 @@ export async function createCliAuthSession(input: {
     return err(interval.error);
   }
 
+  // Coerce default-Cloud authorize URLs to https before print/open. Cloud
+  // production often returns http://app.appaloft.com after TLS termination.
   return ok({
     deviceCode: deviceCode.value,
     userCode: userCode.value,
-    verificationUri: verificationUri.value,
-    verificationUriComplete: verificationUriComplete.value,
+    verificationUri: rewriteCliAuthVerificationUri(verificationUri.value, input.baseUrl),
+    verificationUriComplete: rewriteCliAuthVerificationUri(
+      verificationUriComplete.value,
+      input.baseUrl,
+    ),
     expiresIn: expiresIn.value,
     interval: interval.value,
   });

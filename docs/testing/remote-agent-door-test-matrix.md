@@ -4,7 +4,7 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 
 | ID | Kind | Status | Proof |
 | --- | --- | --- | --- |
-| WS-REMOTE-LOGIN-001 | unit / CLI | automated | `remote-code-session.test.ts`, `agent-workspace-command.test.ts` |
+| WS-REMOTE-LOGIN-001 | unit / CLI | automated | `remote-code-session.test.ts`, `cli-session-login.test.ts`, `agent-workspace-command.test.ts`, `apps/shell/test/run-control-plane-cli.test.ts` |
 | WS-REMOTE-SERVER-002 | unit | automated | `remote-code-session.test.ts` |
 | WS-REMOTE-OPEN-003 | CLI / application | this slice | default `code` dispatches `workspaces.open` with remote SHA + `targetServerId` |
 | WS-REMOTE-RESUME-004 | application | this slice | same subject resumes preferred Sandbox |
@@ -38,7 +38,7 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-DEST-030 | application + `appaloftdev` | automated | omitted `deployments.plan` destinationId uses Server `default` | `packages/application/test/deployment-plan-preview.test.ts`; live occupancy plan without `--destination` |
 | WS-REMOTE-DEST-031 | application | automated | resource pin wins when present | `packages/application/test/deployment-plan-preview.test.ts` |
 | WS-REMOTE-DEST-032 | application | automated | missing Server `default` fail-closed; plan creates nothing | `packages/application/test/deployment-plan-preview.test.ts` |
-| WS-REMOTE-CA-033 | CLI / unit + `appaloftdev` | this slice | headless `workspace --json` prints occupancy tree | `packages/adapters/cli/test/agent-workspace-command.test.ts`; live `appaloftdev workspace --json` |
+| WS-REMOTE-CA-033 | CLI / unit + `appaloftdev` | this slice | headless `workspace --json` prints occupancy tree; unauthenticated no-profile + empty local backend is `login-required` before queries | `packages/adapters/cli/test/agent-workspace-command.test.ts`; live `appaloftdev workspace --json` |
 | WS-REMOTE-CA-034 | CLI / unit | this slice | `--no-tui` prints the same tree and does not start TUI | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
 | WS-REMOTE-CA-035 | CLI / unit | this slice | interactive `workspace` still starts TUI | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
 | WS-REMOTE-CA-036 | CLI / unit + `appaloftdev` | this slice | occupancy tree includes activation `projectId` | `packages/adapters/cli/test/agent-workspace-command.test.ts`; live `appaloftdev workspace --json` |

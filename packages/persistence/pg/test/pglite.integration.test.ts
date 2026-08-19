@@ -3755,12 +3755,17 @@ describe("pglite persistence integration", () => {
           await Bun.sleep(30);
           const row = await database.db
             .selectFrom("mutation_coordinations")
-            .select(["owner_id", "acquired_at", "lease_expires_at"])
+            .select(["owner_id", "acquired_at", "heartbeat_at", "lease_expires_at"])
             .where("coordination_scope_kind", "=", "domain-binding")
             .where("coordination_scope_key", "=", "dmb_heartbeat")
             .executeTakeFirstOrThrow();
+          const acquiredAtMs = new Date(row.acquired_at).getTime();
+          const heartbeatAtMs = new Date(row.heartbeat_at).getTime();
+          const leaseExpiresAtMs = new Date(row.lease_expires_at).getTime();
           expect(row.owner_id).toBe("req_heartbeat");
-          expect(Date.parse(row.lease_expires_at)).toBeGreaterThan(Date.now());
+          expect(heartbeatAtMs).toBeGreaterThanOrEqual(acquiredAtMs);
+          expect(leaseExpiresAtMs).toBeGreaterThan(acquiredAtMs);
+          expect(leaseExpiresAtMs).toBeGreaterThanOrEqual(Date.now());
           return (await lease?.assertOwned()) ?? ok(undefined);
         },
       });

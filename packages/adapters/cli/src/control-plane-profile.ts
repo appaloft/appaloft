@@ -403,6 +403,26 @@ export function defaultPublicCloudBrowserLoginUrl(
   return loginUrl.toString();
 }
 
+export function rewriteCliAuthVerificationUri(uri: string, baseUrl: string): string {
+  // Cloud builds authorize URLs from request.origin after TLS termination, so
+  // production often returns http://app.appaloft.com while the CLI POSTed https.
+  if (!isDefaultPublicCloudControlPlaneUrl(baseUrl)) {
+    return uri;
+  }
+  try {
+    const parsed = new URL(uri);
+    const cloud = new URL(defaultPublicCloudControlPlaneUrl);
+    if (parsed.hostname !== cloud.hostname) {
+      return uri;
+    }
+    parsed.protocol = cloud.protocol;
+    parsed.port = cloud.port;
+    return parsed.toString();
+  } catch {
+    return uri;
+  }
+}
+
 export function deriveProfileName(url: string, mode: CliControlPlaneMode): string {
   if (mode === "cloud") {
     return "cloud";

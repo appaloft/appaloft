@@ -51,6 +51,11 @@ import { type DomainError, domainError, type Result } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
 import {
+  CLI_LOGIN_GUIDANCE,
+  hasCliControlPlaneLogin,
+  loginRequiredWorkspaceOccupancyTree,
+} from "../cli-session-login.js";
+import {
   resolveLocalGitWorkspaceContext,
   resolveRemoteGitWorkspaceRef,
 } from "../local-git-workspace-context.js";
@@ -240,7 +245,10 @@ function occupancyTreeFromLists(
     schemaVersion: "appaloft.workspace-occupancy/v1",
     status,
     reason,
-    nextAction: "Use workspace show/pause/resume or appaloft code to attach.",
+    nextAction:
+      status === "login-required"
+        ? CLI_LOGIN_GUIDANCE
+        : "Use workspace show/pause/resume or appaloft code to attach.",
     servers: servers.map((server) => ({
       id: server.id,
       ...(typeof server.name === "string" ? { name: server.name } : {}),
@@ -605,7 +613,6 @@ export const workspaceCodeCommand = EffectCommand.make(
               resolveDefaultRemoteCodeDoor(
                 {
                   ...(cli.environment ? { env: cli.environment } : {}),
-                  localComposition: cli.executionTarget !== "remote",
                   forceNew,
                   listServers: async () => {
                     const query = ListServersQuery.create();
@@ -1640,6 +1647,12 @@ export const agentWorkspaceCommand = EffectCommand.make(
               : terminalFallbackReason
                 ? terminalFallbackReason
                 : "presentation-not-composed";
+        const loggedIn = yield* Effect.promise(() =>
+          hasCliControlPlaneLogin(cli.environment ?? process.env),
+        );
+        if (!loggedIn && (!interactive || json || noTui)) {
+          return yield* print(loginRequiredWorkspaceOccupancyTree(reason));
+        }
         const serversQuery = yield* resultToEffect(ListServersQuery.create());
         const serversResult = yield* Effect.promise(() => cli.executeQuery(serversQuery));
         if (serversResult.isErr() && isProductAuthMissing(serversResult.error)) {

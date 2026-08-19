@@ -17,6 +17,10 @@ function addMilliseconds(timestamp: string, milliseconds: number): string {
   return new Date(Date.parse(timestamp) + milliseconds).toISOString();
 }
 
+function timestampMillis(value: string | Date): number {
+  return value instanceof Date ? value.getTime() : Date.parse(value);
+}
+
 function sleep(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
@@ -151,8 +155,8 @@ export class PgMutationCoordinator implements MutationCoordinator {
         if (
           !row ||
           row.owner_id !== input.owner.ownerId ||
-          Date.parse(row.acquired_at) !== Date.parse(acquiredAt) ||
-          Date.parse(row.lease_expires_at) <= Date.parse(this.clock.now())
+          timestampMillis(row.acquired_at) !== timestampMillis(acquiredAt) ||
+          timestampMillis(row.lease_expires_at) <= timestampMillis(this.clock.now())
         ) {
           leaseLost = true;
           return err(leaseLostError());

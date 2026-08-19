@@ -14,6 +14,16 @@ import {
 } from "./runtime.js";
 
 export {
+  CLI_LOGIN_GUIDANCE,
+  deployLoginRequiredError,
+  hasCliControlPlaneLogin,
+  hasExplicitLocalDeployIntent,
+  isHeadlessWorkspaceInvocation,
+  loginRequiredWorkspaceOccupancyTree,
+  requiresCloudDeployLogin,
+  workspaceRemoteLoginRequiredError,
+} from "./cli-session-login.js";
+export {
   FileSystemServerAppliedRouteDesiredStateStore,
   FileSystemSourceLinkStore,
   type ServerAppliedRouteDesiredStateRecord,
@@ -53,6 +63,7 @@ export {
   FileSystemCliControlPlaneProfileStore,
   MemoryCliControlPlaneProfileStore,
   profileView,
+  rewriteCliAuthVerificationUri,
 } from "./control-plane-profile.js";
 export {
   activeControlPlaneProfile,
