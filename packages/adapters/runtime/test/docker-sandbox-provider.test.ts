@@ -259,6 +259,10 @@ describe("DockerSandboxProvider", () => {
           "XDG_STATE_HOME=/workspace/.local/state",
           "-e",
           "XDG_CACHE_HOME=/workspace/.cache",
+          "-e",
+          "TMPDIR=/var/tmp/appaloft-exec",
+          "-e",
+          "BUN_TMPDIR=/var/tmp/appaloft-exec",
           "-w",
           "/workspace/src",
           "appaloft-sbx_demo",
@@ -306,6 +310,10 @@ describe("DockerSandboxProvider", () => {
       "XDG_STATE_HOME=/workspace/.local/state",
       "-e",
       "XDG_CACHE_HOME=/workspace/.cache",
+      "-e",
+      "TMPDIR=/var/tmp/appaloft-exec",
+      "-e",
+      "BUN_TMPDIR=/var/tmp/appaloft-exec",
       "-w",
       "/workspace",
       "appaloft-sbx_demo",
@@ -350,6 +358,10 @@ describe("DockerSandboxProvider", () => {
       "XDG_STATE_HOME=/workspace/.local/state",
       "-e",
       "XDG_CACHE_HOME=/workspace/.cache",
+      "-e",
+      "TMPDIR=/var/tmp/appaloft-exec",
+      "-e",
+      "BUN_TMPDIR=/var/tmp/appaloft-exec",
       "-w",
       "/workspace",
       "appaloft-sbx_demo",
@@ -379,6 +391,8 @@ describe("DockerSandboxProvider", () => {
     expect(create).toContain("/workspace:rw,nosuid,nodev,size=2048m");
     expect(create).toContain("/tmp:rw,noexec,nosuid,size=64m");
     expect(create).toContain("/var/tmp/appaloft-exec:rw,exec,nosuid,nodev,size=64m");
+    expect(create).toContain("TMPDIR=/var/tmp/appaloft-exec");
+    expect(create).toContain("BUN_TMPDIR=/var/tmp/appaloft-exec");
     expect(create).not.toContain("--storage-opt");
     expect(create).toContain("python@sha256:abc123");
     expect(create).not.toContain("sh -lc");
@@ -725,6 +739,10 @@ describe("DockerSandboxProvider", () => {
         "XDG_STATE_HOME=/workspace/.local/state",
         "-e",
         "XDG_CACHE_HOME=/workspace/.cache",
+        "-e",
+        "TMPDIR=/var/tmp/appaloft-exec",
+        "-e",
+        "BUN_TMPDIR=/var/tmp/appaloft-exec",
         "-w",
         "/workspace/src",
         "appaloft-sbx_demo",
@@ -796,6 +814,8 @@ describe("DockerSandboxProvider", () => {
         "XDG_CONFIG_HOME=/workspace/.config",
         "XDG_STATE_HOME=/workspace/.local/state",
         "XDG_CACHE_HOME=/workspace/.cache",
+        "TMPDIR=/var/tmp/appaloft-exec",
+        "BUN_TMPDIR=/var/tmp/appaloft-exec",
       ]),
     );
     expect(launch?.argv.join(" ")).toContain('wait "$child"');
@@ -1149,6 +1169,8 @@ describe("DockerSandboxProvider", () => {
         "XDG_CONFIG_HOME=/workspace/.config",
         "XDG_STATE_HOME=/workspace/.local/state",
         "XDG_CACHE_HOME=/workspace/.cache",
+        "TMPDIR=/var/tmp/appaloft-exec",
+        "BUN_TMPDIR=/var/tmp/appaloft-exec",
       ]),
     );
   });

@@ -1090,6 +1090,8 @@ describe("OpenCodeSandboxAgentHarness", () => {
           "XDG_CONFIG_HOME=/workspace/.config",
           "XDG_STATE_HOME=/workspace/.local/state",
           "XDG_CACHE_HOME=/workspace/.cache",
+          "TMPDIR=/var/tmp/appaloft-exec",
+          "BUN_TMPDIR=/var/tmp/appaloft-exec",
           "opencode",
           "--version",
         ],
