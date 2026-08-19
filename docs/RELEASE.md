@@ -49,9 +49,15 @@ docker build --build-arg APPALOFT_APP_VERSION=0.1.0 -t appaloft-all-in-one:local
 
 ## GitHub Actions
 
-- `ci.yml`: lint, typecheck, unit, integration, build, binary smoke, Docker build smoke.
+- `ci.yml`: lint, typecheck, unit, integration, build, binary smoke, Docker build smoke. Docs-only
+  and release-please version-bump PRs classify as lightweight and skip those heavy jobs; the
+  required `ci` check still succeeds. `workflow_dispatch` uses the same classifier against the
+  default branch so a release-PR dispatch cannot race a green pull-request run with a forced full
+  CI failure.
 - `e2e.yml`: real Postgres, started backend, CLI/API/deployment E2E, web smoke. It runs for every
   pull request so the two stable shard checks can be enforced as branch-protection merge gates.
+  Lightweight and version-bump PRs skip the real shards but still publish `e2e (1, 2)` and
+  `e2e (2, 2)` as success.
 - `nightly.yml`: scheduled Compose/self-host smoke.
 - `release.yml`: manually creates or updates a Release Please PR on `main`, adds roadmap release
   alignment to that PR, and publishes only when the merged release PR pushes a `chore: release ...`

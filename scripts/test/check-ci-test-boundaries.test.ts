@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { findCiTestBoundaryViolations } from "../check-ci-test-boundaries";
+import {
+  findCiChangeClassifierViolations,
+  findCiTestBoundaryViolations,
+} from "../check-ci-test-boundaries";
 
 const validWorkflow = `
 env:
@@ -52,5 +55,35 @@ describe("CI test boundary check", () => {
     expect(findCiTestBoundaryViolations(workflow)).toContainEqual(
       expect.objectContaining({ rule: "build-smoke-disk-budget" }),
     );
+  });
+
+  test("[CI-LIGHTWEIGHT-005] requires ci.yml and e2e.yml to share the change classifier", () => {
+    const ciWorkflow = `${validWorkflow}
+      - run: bun scripts/ci/classify-changed-files.ts
+`;
+    const e2eWorkflow = `
+on:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  e2e:
+    strategy:
+      matrix:
+        shard: [1, 2]
+    steps:
+      - name: Skip E2E
+      - run: bun scripts/ci/classify-changed-files.ts
+`;
+
+    expect(findCiChangeClassifierViolations(ciWorkflow, e2eWorkflow)).toEqual([]);
+    expect(
+      findCiChangeClassifierViolations(
+        `${ciWorkflow}\n            echo "Workflow dispatch; running full CI."\n`,
+        e2eWorkflow,
+      ),
+    ).toContainEqual(expect.objectContaining({ rule: "shared-change-classifier" }));
+    expect(
+      findCiChangeClassifierViolations(ciWorkflow, "on:\n  pull_request:\n  workflow_dispatch:\n"),
+    ).toContainEqual(expect.objectContaining({ rule: "shared-change-classifier" }));
   });
 });

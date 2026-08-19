@@ -73,6 +73,11 @@ test("[RELEASE-HARDENING-009] e2e workflow publishes both required shard checks 
 
   expect(pullRequestTrigger).not.toContain("paths:");
   expect(pullRequestTrigger).not.toContain("paths-ignore:");
+  expect(workflow).toContain("scripts/ci/classify-changed-files.ts");
   expect(workflow).toContain("shard: [1, 2]");
   expect(workflow).toContain("shard_total: [2]");
+  expect(workflow).toContain(
+    `name: e2e (${expression("matrix.shard")}, ${expression("matrix.shard_total")})`,
+  );
+  expect(workflow).toContain("name: Skip E2E");
 });

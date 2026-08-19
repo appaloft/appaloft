@@ -28,6 +28,7 @@ jobs:
     name: Changes
     runs-on: ubuntu-latest
     outputs:
+      change_class: ${{ steps.classify.outputs.change_class }}
       lightweight_only: ${{ steps.classify.outputs.lightweight_only }}
     steps:
       - name: Check out code
@@ -35,54 +36,18 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+
       - name: Classify changed files
         id: classify
-        shell: bash
         env:
           BASE_REF: ${{ github.base_ref }}
           BEFORE_SHA: ${{ github.event.before }}
-        run: |
-          set -euo pipefail
-
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            echo "lightweight_only=false" >> "$GITHUB_OUTPUT"
-            echo "Workflow dispatch; running full CI."
-            exit 0
-          fi
-
-          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            git diff --name-only "origin/${BASE_REF}...HEAD" > changed-files.txt
-          elif [[ -n "${BEFORE_SHA}" && "${BEFORE_SHA}" != "0000000000000000000000000000000000000000" ]]; then
-            git diff --name-only "${BEFORE_SHA}" "${GITHUB_SHA}" > changed-files.txt
-          else
-            git diff --name-only HEAD^ HEAD > changed-files.txt || git ls-files > changed-files.txt
-          fi
-
-          if [[ ! -s changed-files.txt ]]; then
-            echo "lightweight_only=false" >> "$GITHUB_OUTPUT"
-            echo "No changed files detected; running full CI."
-            exit 0
-          fi
-
-          lightweight_only=true
-          while IFS= read -r file; do
-            case "$file" in
-              .github/workflows/*|docs/*|*.md|*.mdx|LICENSE|LICENSE.*)
-                ;;
-              *)
-                lightweight_only=false
-                break
-                ;;
-            esac
-          done < changed-files.txt
-
-          echo "lightweight_only=${lightweight_only}" >> "$GITHUB_OUTPUT"
-          {
-            echo "### Changed files"
-            sed 's/^/- `/' changed-files.txt | sed 's/$/`/'
-            echo
-            echo "lightweight_only=${lightweight_only}"
-          } >> "$GITHUB_STEP_SUMMARY"
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: bun scripts/ci/classify-changed-files.ts
 
   biome:
     name: Biome
