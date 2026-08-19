@@ -52,6 +52,20 @@ jobs:
         with:
           bun-version-file: .bun-version
 
+      - name: Install redis-cli
+        run: |
+          set -euo pipefail
+          if command -v redis-cli >/dev/null 2>&1; then
+            redis-cli --version
+            exit 0
+          fi
+          docker pull redis:7-bookworm
+          container="$(docker create redis:7-bookworm)"
+          docker cp "${container}:/usr/local/bin/redis-cli" /tmp/redis-cli
+          docker rm "${container}"
+          sudo install -m 0755 /tmp/redis-cli /usr/local/bin/redis-cli
+          redis-cli --version
+
       - name: Install
         run: bun install --frozen-lockfile
 
