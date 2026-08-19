@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.10.0](https://github.com/appaloft/appaloft/compare/v1.9.1...v1.10.0) (2026-08-19)
+
+
+### Features
+
+* **cli:** offer allowlisted HOME skills on occupancy ([#1315](https://github.com/appaloft/appaloft/issues/1315)) ([1563ab7](https://github.com/appaloft/appaloft/commit/1563ab7d378b4a5ebbb957dc9afbe1746a7c18db))
+
+
+### Bug Fixes
+
+* **cli:** default `code` picks the live occupancy and surfaces open cause ([#1311](https://github.com/appaloft/appaloft/issues/1311)) ([fc62da3](https://github.com/appaloft/appaloft/commit/fc62da36291ade200527aa1ce2e97ed0d02efd76))
+* **cli:** deploy cwd, allow `.` publish dir, fail on terminal build errors ([#1309](https://github.com/appaloft/appaloft/issues/1309)) ([6f95e70](https://github.com/appaloft/appaloft/commit/6f95e70adacfff8b0a35685f33d1b244c3fb557b))
+* **cli:** login gates for Cloud remote doors, keep local deploy ([#1310](https://github.com/appaloft/appaloft/issues/1310)) ([02f32c0](https://github.com/appaloft/appaloft/commit/02f32c030f32dbcc6f70d49a178e7520602e322e))
+* **cli:** send `/` for source-root publish-dir so live Cloud admits deploy . ([#1313](https://github.com/appaloft/appaloft/issues/1313)) ([3ea7393](https://github.com/appaloft/appaloft/commit/3ea73937d147152256b8e874a789cb45c348d279))
+* **static:** keep relative publish-dir public and SSH Docker context on uploaded workspace ([#1312](https://github.com/appaloft/appaloft/issues/1312)) ([8795eae](https://github.com/appaloft/appaloft/commit/8795eae82a8ab207d7ed768b0ad4992717b1f0d0))
+
 ## [1.9.1](https://github.com/appaloft/appaloft/compare/v1.9.0...v1.9.1) (2026-08-19)
 
 
