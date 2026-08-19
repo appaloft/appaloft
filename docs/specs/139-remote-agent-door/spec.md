@@ -212,7 +212,7 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-PROFILE-AMBIGUOUS-176 | Ambiguous live Profiles are recoverable | two enabled installations share `appaloft-remote` and both have live occupancy | `appaloft code --profile appaloft-remote --no-attach` | fail-closed `workspace_open_profile_ambiguous` lists the selector, both installationIds, and a copy-pasteable `appaloft code --profile <installationId>`. Default `code` without `--profile` does not fail closed on this; it keeps first success. |
 | WS-REMOTE-CODE-PROFILE-177 | `code` accepts `--profile` | logged in + Server | `appaloft code --profile <installationId> --no-attach` | `code --help` documents `--profile` as a fallback pin. Dispatch includes that selector. Default OpenCode `code` omits `profile`. |
 | WS-REMOTE-PROFILE-LIVE-178 | Dead duplicate Profiles do not block first success | two enabled `appaloft-remote` installs; Project default may be the leftover; only the older install has live occupancy | `appaloft code --no-attach` or `appaloft code --new --no-attach` | selects the live installation without asking the human to memorize an installation id. `--profile` is fallback only. With no live occupancy, Project default then oldest wins. |
-| WS-REMOTE-NEW-NO-DUP-179 | Failed `--new` does not install a second same-name Profile | an enabled `appaloft-remote` already exists, or this attempt created an install then later setup failed | `appaloft code --new --no-attach` | initializer reuses the enabled same-name install and does not call install again. A leftover install created by this failed attempt is disabled. Existing user data is not cleared. Default `--new` still occupies with the live install, not a new same-name Profile. |
+| WS-REMOTE-NEW-NO-DUP-179 | Failed `--new` does not install a second same-name Profile | an enabled `appaloft-remote` already exists, or this attempt created an install then later setup failed | `appaloft code --new --no-attach` | `--new` only skips occupancy resume / `findPreferred`. It must not install a Profile. Community initializer reuses an enabled same-name install. Logged-in Cloud uses `CloudWorkspaceActivationContextInitializer` (appaloft-cloud); public CLI omitting `profile` enables Cloud's `existingInstallationId && !input.profile` reuse. Stopping a digest-bump leftover (`awpi_b87sxo84xe7u`) on Cloud still requires Cloud to not call `profiles.install()` for `--new`. Public `install()` still dedupes by definitionDigest only. |
 | WS-REMOTE-OPEN-CAUSE-180 | Failed open names the cwd repo and real cause | logged-in `code --new --no-attach` from another origin (for example `github.com/appaloft/appaloft-cloud`) | initializer or re-read fails | human error says what is missing and which repository is being opened; it does not resume whoami occupancy and does not swallow `causeCode` / guidance. safe-json allowlists `causeCode`, `detailCode`, and `repositoryIdentity`. Cloud activation/placement remains fail-closed. |
 | WS-REMOTE-OPEN-BYOS-181 | Registered BYOS is placement | hostinger `srv_4lifk0yrcecy` is the enrolled Server; no managed pool | `workspace open --new` or `workspace open --server srv_4lifk0yrcecy --new` after local Git check | dispatches `workspaces.open` with `targetServerId=srv_4lifk0yrcecy`. It does not demand managed targets and does not enroll another Server. |
 
@@ -244,8 +244,9 @@ Out of slice 46: host port publish, laptop SSH `-L`, wrapping host-egress with t
 
 - Server, Sandbox, Binding, Profile: existing public aggregates.
 - CLI resolves login, default Server, and remote SHA (from cwd origin **or** positional git remote), then dispatches `workspaces.open`.
-- Community initializer owns invisible `appaloft-remote`.
-- Cloud: later default-Server injection when no BYOS exists. Must honor `targetServerId` and must not override it with managed capacity. Slice 3 needs no Cloud change.
+- Community initializer owns invisible `appaloft-remote` for Community/local only.
+- Logged-in production activation is Cloud `CloudWorkspaceActivationContextInitializer.ensureUnlocked` in appaloft-cloud. Public CLI/preflight cannot make that Cloud init succeed. Public `install()` dedupes by definitionDigest only; a digest bump can create another same-name `awpi_*` if Cloud calls install.
+- Cloud: later default-Server injection when no BYOS exists. Must honor `targetServerId` and must not override it with managed capacity.
 
 ## Error Contract
 
@@ -275,6 +276,7 @@ Missing Binding is not a `code` hard failure. The initializer creates or reuses 
 - Cloud managed as default Server when no BYOS exists.
 - `destinations.list` or expanding `servers.show` with destinations.
 - Parsing GitHub `/tree/` URLs or inferring non-GitHub hosts from `owner/repo`.
+- Editing appaloft-cloud or pretending public CLI success covers Cloud activation/placement.
 
 ## Compatibility
 

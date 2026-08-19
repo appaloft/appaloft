@@ -539,6 +539,8 @@ function occupancyCodeProfile(
 ): string | undefined {
   if (profile) return profile;
   if (harness !== "opencode") return occupancyRemoteProfileId(harness);
+  // Default OpenCode omits profile so findPreferred can resume the live occupancy
+  // and Cloud reuse (`existingInstallationId && !input.profile`) is not skipped.
   return undefined;
 }
 
