@@ -697,10 +697,75 @@ describe("Agent Workspace open preflight", () => {
     expect(result.error.message).not.toContain(
       "Workspace activation context is still unavailable after initialization",
     );
+    expect(result.error.message).toContain("github.com/Acme/Web");
+    expect(result.error.message).toMatch(/Repository Binding/i);
     expect(result.error.details?.code).toBe("workspace_open_repository_not_bound");
+    expect(result.error.details?.causeCode).toBe("workspace_open_repository_not_bound");
+    expect(result.error.details?.repositoryIdentity).toBe("github.com/Acme/Web");
     expect(
       (await profiles.findInstallation(toRepositoryContext(context), "awpi_leftover"))?.toState()
         .status.value,
     ).toBe("disabled");
+  });
+
+  test("[WS-REMOTE-OPEN-CAUSE-180] reread failure names the cwd repository and the real cause", async () => {
+    const { service } = await fixture({
+      omitBinding: true,
+      initializerFactory: () => ({
+        ensure: async () =>
+          ok({
+            project: "created" as const,
+            repositoryBinding: "created" as const,
+            profile: "reused" as const,
+          }),
+        ensureLocalEnvironment: async () => ok(undefined),
+        ensureDefaultResource: async () => ok(undefined),
+      }),
+    });
+
+    const result = await service.resolveContext(context, input);
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) return;
+    expect(result.error.message).toBe("Repository Binding is missing for github.com/Acme/Web");
+    expect(result.error.message).not.toContain(
+      "Workspace activation context is still unavailable after initialization",
+    );
+    expect(result.error.details?.code).toBe("workspace_open_repository_not_bound");
+    expect(result.error.details?.causeCode).toBe("workspace_open_repository_not_bound");
+    expect(result.error.details?.repositoryIdentity).toBe("github.com/Acme/Web");
+    expect(String(result.error.details?.guidance)).toContain("github.com/Acme/Web");
+  });
+
+  test("[WS-REMOTE-OPEN-CAUSE-180] Cloud leftover conflict still names the opened repository", async () => {
+    const { service } = await fixture({
+      omitBinding: true,
+      initializerFactory: () => ({
+        ensure: async () =>
+          err(
+            domainError.conflict(
+              "Workspace activation context is still unavailable after initialization",
+              {
+                code: "workspace_activation_context_conflict",
+                phase: "remote-operation-dispatch",
+              },
+            ),
+          ),
+        ensureLocalEnvironment: async () => ok(undefined),
+        ensureDefaultResource: async () => ok(undefined),
+      }),
+    });
+
+    const result = await service.resolveContext(context, input);
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) return;
+    expect(result.error.message).toContain("github.com/Acme/Web");
+    expect(result.error.message).not.toBe(
+      "Workspace activation context is still unavailable after initialization",
+    );
+    expect(result.error.details?.code).toBe("workspace_activation_context_conflict");
+    expect(result.error.details?.causeCode).toBe("workspace_activation_context_conflict");
+    expect(result.error.details?.repositoryIdentity).toBe("github.com/Acme/Web");
+    expect(String(result.error.details?.guidance)).toContain("github.com/Acme/Web");
+    expect(String(result.error.details?.guidance)).toContain("cannot invent a Workspace");
   });
 });

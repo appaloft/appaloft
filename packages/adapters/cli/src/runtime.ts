@@ -323,11 +323,46 @@ export interface SafeCliErrorEvidence {
   sandboxId: string | null;
   exitCode: number | null;
   retryable: boolean;
+  causeCode: string | null;
+  detailCode: string | null;
+  repositoryIdentity: string | null;
+}
+
+const SAFE_ERROR_CODE = /^[A-Za-z][A-Za-z0-9_-]{0,127}$/;
+const SAFE_REPOSITORY_IDENTITY =
+  /^[A-Za-z0-9][A-Za-z0-9.-]*\.[A-Za-z]{2,}\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/;
+
+function emptySafeCliErrorEvidence(
+  overrides: Partial<SafeCliErrorEvidence> = {},
+): SafeCliErrorEvidence {
+  return {
+    schemaVersion: "appaloft.cli-error/v1",
+    code: "cli_error_unclassified",
+    category: "infra",
+    phase: null,
+    reason: null,
+    stateBackend: null,
+    sourcePostgresMajor: null,
+    requiredPostgresMajor: null,
+    workspaceId: null,
+    sandboxId: null,
+    exitCode: null,
+    retryable: false,
+    causeCode: null,
+    detailCode: null,
+    repositoryIdentity: null,
+    ...overrides,
+  };
 }
 
 function safeErrorDetail(error: DomainError, key: string): string | null {
   const value = error.details?.[key];
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function safeTokenDetail(error: DomainError, key: string, pattern: RegExp): string | null {
+  const value = error.details?.[key];
+  return typeof value === "string" && pattern.test(value) ? value : null;
 }
 
 function safePostgresMajorDetail(error: DomainError, key: string): string | null {
@@ -337,25 +372,11 @@ function safePostgresMajorDetail(error: DomainError, key: string): string | null
 
 export function safeCliErrorEvidence(error: unknown): SafeCliErrorEvidence {
   if (!isDomainError(error)) {
-    return {
-      schemaVersion: "appaloft.cli-error/v1",
-      code: "cli_error_unclassified",
-      category: "infra",
-      phase: null,
-      reason: null,
-      stateBackend: null,
-      sourcePostgresMajor: null,
-      requiredPostgresMajor: null,
-      workspaceId: null,
-      sandboxId: null,
-      exitCode: null,
-      retryable: false,
-    };
+    return emptySafeCliErrorEvidence();
   }
 
   const exitCode = error.details?.exitCode;
-  return {
-    schemaVersion: "appaloft.cli-error/v1",
+  return emptySafeCliErrorEvidence({
     code: error.code,
     category: error.category,
     phase: safeErrorDetail(error, "phase"),
@@ -367,7 +388,10 @@ export function safeCliErrorEvidence(error: unknown): SafeCliErrorEvidence {
     sandboxId: safeErrorDetail(error, "sandboxId"),
     exitCode: typeof exitCode === "number" && Number.isInteger(exitCode) ? exitCode : null,
     retryable: error.retryable,
-  };
+    causeCode: safeTokenDetail(error, "causeCode", SAFE_ERROR_CODE),
+    detailCode: safeTokenDetail(error, "code", SAFE_ERROR_CODE),
+    repositoryIdentity: safeTokenDetail(error, "repositoryIdentity", SAFE_REPOSITORY_IDENTITY),
+  });
 }
 
 export function formatSafeCliError(error: unknown): string {
@@ -391,6 +415,24 @@ function humanErrorGuidance(error: DomainError): string | null {
 export function formatHumanCliError(error: unknown): string {
   if (isDomainError(error)) {
     const lines = [error.message.trim()].filter((line) => line.length > 0);
+    const repositoryIdentity =
+      typeof error.details?.repositoryIdentity === "string"
+        ? error.details.repositoryIdentity.trim()
+        : "";
+    if (repositoryIdentity && !lines.some((line) => line.includes(repositoryIdentity))) {
+      lines.push(`Opening ${repositoryIdentity}.`);
+    }
+    const detailCode = typeof error.details?.code === "string" ? error.details.code.trim() : "";
+    const causeCode =
+      typeof error.details?.causeCode === "string" ? error.details.causeCode.trim() : "";
+    const codes = [...new Set([detailCode, causeCode].filter((code) => code.length > 0))].filter(
+      (code) => code !== error.code && !lines.some((line) => line.includes(code)),
+    );
+    if (codes.length === 1) {
+      lines.push(`Cause: ${codes[0]}`);
+    } else if (codes.length > 1) {
+      lines.push(`Cause: ${codes.join(" / ")}`);
+    }
     const guidance = humanErrorGuidance(error);
     if (guidance) {
       lines.push(guidance);

@@ -77,7 +77,8 @@ appaloft workspace open
 这条路径继续走 `workspaces.open`：只用 path 查找 Git root、upstream、branch 和 HEAD SHA，要求
 clean 且已 push。默认 `appaloft code` 优先选 live occupancy，同名 leftover 不能挡住第一次成功，
 也不要求记住 installation id。`--profile` 只是显式撞名时的兜底，不同于全局
-`--control-plane-profile`。脏树、detached、缺 upstream 或 remote tip
+`--control-plane-profile`。`--new` 仍占用 cwd 源，不会静默 resume whoami occupancy。
+打开失败时会写出缺什么、正在打开哪个仓库，而不会把 Cloud 激活失败伪装成 CLI 成功。脏树、detached、缺 upstream 或 remote tip
 不一致会在任何远端创建前失败。V1 不做隐式 sync 或 patch upload。
 
 `workspaces.open` 会先验证来源，再读取现有 Repository Binding 和 Project 默认 Profile。如果部署方

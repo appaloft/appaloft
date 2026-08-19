@@ -83,6 +83,9 @@ Default `appaloft code` prefers a live occupancy over dead same-name Profiles.
 Do not switch to `workspace open --profile <installationId>` for that case.
 `--profile` on `code` is only a fallback pin when an explicit name still matches
 more than one live occupancy. It is distinct from `--control-plane-profile`.
+`--new` still occupies the cwd origin, not the current whoami occupancy. A failed
+open prints what is missing and which repository was being opened; it does not
+pretend Cloud activation succeeded.
 
 `workspaces.open` validates the source before reading the existing Repository Binding and Project
 default Profile. A deployment may compose the optional activation initializer so missing Project,

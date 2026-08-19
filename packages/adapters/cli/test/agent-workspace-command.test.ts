@@ -1125,6 +1125,8 @@ describe("Agent Workspace CLI", () => {
       forceNew: true,
       attach: false,
       targetServerId: "srv_1",
+      repository: "https://github.com/acme/api.git",
+      repositoryIdentity: "github.com/acme/api",
     });
     expect((commands[0] as OpenAgentWorkspaceCommand).input.profile).toBeUndefined();
   });
