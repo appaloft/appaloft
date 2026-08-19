@@ -432,6 +432,41 @@ describe("remote code door", () => {
     expect(door.commitSha).toBe("e".repeat(40));
   });
 
+  test("[WS-REMOTE-NO-UPLOAD-006] --new from a non-git path occupies the last occupancy repo", async () => {
+    const door = await resolveDefaultRemoteCodeDoor({
+      env: { APPALOFT_TOKEN: "token" },
+      forceNew: true,
+      listServers: async () => [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }],
+      listOccupancies: async () => [
+        {
+          sandboxId: "sbx_live",
+          status: "ready",
+          occupancy: {
+            repositoryIdentity: "github.com/acme/api",
+            commitSha: "d".repeat(40),
+            branch: "main",
+          },
+          lastActivityAt: "2026-08-15T12:30:00.000Z",
+        },
+      ],
+      resolveLocator: async () => {
+        throw Object.assign(new Error("missing origin"), {
+          code: "workspace_remote_repository_missing",
+        });
+      },
+      resolveRemoteRef: async (repository, ref) => ({
+        repositoryIdentity: "github.com/acme/api",
+        credentialFreeHttpsRepository: repository,
+        ref,
+        commitSha: "e".repeat(40),
+      }),
+    });
+    expect(door.repositoryIdentity).toBe("github.com/acme/api");
+    expect(door.repository).toBe("https://github.com/acme/api.git");
+    expect(door.commitSha).toBe("e".repeat(40));
+    expect(door.serverId).toBe("srv_1");
+  });
+
   test("[WS-REMOTE-OPEN-003] --new occupies the cwd origin instead of last occupancy", async () => {
     const door = await resolveDefaultRemoteCodeDoor({
       env: { APPALOFT_TOKEN: "token" },

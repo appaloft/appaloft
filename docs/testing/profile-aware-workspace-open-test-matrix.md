@@ -3,6 +3,10 @@
 | ID | Layer | Scenario | Expected evidence | Automated binding | Status |
 | --- | --- | --- | --- | --- | --- |
 | WS-OPEN-GIT-001 | CLI/unit | Git root/remote/branch/HEAD resolution | Safe local context only; no file upload or remote mutation. | `packages/adapters/cli/test/local-git-workspace-context.test.ts`; `agent-workspace-command.test.ts` | automated |
+| WS-OPEN-LOCATOR-022 | CLI/unit | Clean local worktree still opens | Existing worktree context still dispatches `workspaces.open`. | `packages/adapters/cli/test/workspace-open-source.test.ts`; `agent-workspace-command.test.ts` | automated |
+| WS-OPEN-LOCATOR-023 | CLI/unit | Positional git remote | Occupies without a local clone; does not call worktree inspection. | `packages/adapters/cli/test/workspace-open-source.test.ts`; `agent-workspace-command.test.ts` | automated |
+| WS-OPEN-LOCATOR-024 | CLI/unit | Non-git directory with occupancy | Occupies that occupancy's repository; no `Workspace path is not inside a Git worktree`. | `packages/adapters/cli/test/workspace-open-source.test.ts`; `agent-workspace-command.test.ts`; `remote-code-session.test.ts` | automated |
+| WS-OPEN-LOCATOR-025 | CLI/unit | Non-git directory without occupancy | Fail-closes `workspace_remote_repository_missing`; no fake success. | `packages/adapters/cli/test/workspace-open-source.test.ts` | automated |
 | WS-OPEN-GIT-002 | core/CLI | SSH/HTTPS normalization | Equivalent locators map to one case-preserving Repository Identity; unsafe credentials/query/fragment fail. | `packages/adapters/cli/test/local-git-workspace-context.test.ts` | automated |
 | WS-OPEN-GIT-003 | CLI/unit | Dirty staged/unstaged/untracked checkout | Fails before control-plane request with HEAD SHA and bounded clean/commit guidance. | `packages/adapters/cli/test/local-git-workspace-context.test.ts` | automated |
 | CLI-NPM-PACKAGE-001 | packaging/CLI | Fresh dependency installation | The declared npm CLI launcher is tracked executable, so package installation does not create a false dirty-worktree result. | `scripts/test/npm-cli-packaging.test.ts` | automated |

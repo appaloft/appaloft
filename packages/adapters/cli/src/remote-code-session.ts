@@ -6,6 +6,8 @@ import { activeControlPlaneProfile } from "./control-plane-service.js";
 import {
   normalizeWorkspaceRepositoryRemote,
   type RemoteGitWorkspaceRef,
+  type ResolveGitWorkspaceProgress,
+  resolveLocalGitWorkspaceContext,
   resolveRemoteGitWorkspaceRef,
   type WorkspaceGitCommandRunner,
 } from "./local-git-workspace-context.js";
@@ -186,6 +188,113 @@ function remoteCodeError(
   };
 }
 
+export interface WorkspaceOpenSource {
+  readonly repositoryIdentity: string;
+  readonly credentialFreeHttpsRepository: string;
+  readonly ref: string;
+  readonly branch: string;
+  readonly headSha: string;
+}
+
+export interface ResolveWorkspaceOpenSourceOptions extends ResolveGitWorkspaceProgress {
+  readonly listOccupancies?: () => Promise<readonly RemoteCodeOccupancy[]>;
+}
+
+export function isWorkspaceGitRootUnavailable(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const record = error as { details?: { code?: unknown }; message?: unknown };
+  return (
+    record.details?.code === "workspace_git_root_unavailable" ||
+    record.message === "Workspace path is not inside a Git worktree"
+  );
+}
+
+function workspaceOpenSourceFromOccupancy(
+  occupancy: NonNullable<RemoteCodeOccupancy["occupancy"]>,
+): WorkspaceOpenSource {
+  const normalized = normalizeWorkspaceRepositoryRemote(
+    `https://${occupancy.repositoryIdentity.replace(/\.git$/u, "")}.git`,
+  );
+  const branch = occupancy.branch?.trim() || "main";
+  return {
+    repositoryIdentity: occupancy.repositoryIdentity,
+    credentialFreeHttpsRepository: normalized.credentialFreeHttps,
+    ref: `refs/heads/${branch}`,
+    branch,
+    headSha: occupancy.commitSha,
+  };
+}
+
+async function workspaceOpenSourceFromOccupancyRef(
+  occupancy: NonNullable<RemoteCodeOccupancy["occupancy"]>,
+  runGit?: WorkspaceGitCommandRunner,
+  options: ResolveGitWorkspaceProgress = {},
+): Promise<WorkspaceOpenSource> {
+  const source = workspaceOpenSourceFromOccupancy(occupancy);
+  try {
+    const remote = await resolveRemoteGitWorkspaceRef(
+      source.credentialFreeHttpsRepository,
+      source.ref,
+      runGit,
+      options,
+    );
+    return { ...source, headSha: remote.commitSha };
+  } catch {
+    return source;
+  }
+}
+
+export async function resolveWorkspaceOpenSource(
+  path = ".",
+  runGit?: WorkspaceGitCommandRunner,
+  options: ResolveWorkspaceOpenSourceOptions = {},
+): Promise<WorkspaceOpenSource> {
+  if (isRemoteCodeGitRemoteLocator(path)) {
+    const locator = await resolveRemoteCodeGitRemoteLocator(path, runGit);
+    const remote = await resolveRemoteGitWorkspaceRef(
+      locator.repository,
+      locator.ref,
+      runGit,
+      options,
+    );
+    return {
+      repositoryIdentity: remote.repositoryIdentity,
+      credentialFreeHttpsRepository: remote.credentialFreeHttpsRepository,
+      ref: remote.ref,
+      branch: locator.branch,
+      headSha: remote.commitSha,
+    };
+  }
+
+  try {
+    const local = await resolveLocalGitWorkspaceContext(path, runGit, options);
+    return {
+      repositoryIdentity: local.repositoryIdentity,
+      credentialFreeHttpsRepository: local.credentialFreeHttpsRepository,
+      ref: local.ref,
+      branch: local.branch,
+      headSha: local.headSha,
+    };
+  } catch (error) {
+    if (!isWorkspaceGitRootUnavailable(error)) throw error;
+    const occupancy = selectResumeOccupancy(
+      options.listOccupancies ? await options.listOccupancies() : [],
+    );
+    if (occupancy?.occupancy) {
+      return workspaceOpenSourceFromOccupancyRef(occupancy.occupancy, runGit, options);
+    }
+    throw remoteCodeError(
+      "workspace_remote_repository_missing",
+      "Workspace open needs a git remote or an existing occupancy",
+      {
+        phase: "workspace-open-locator",
+        guidance:
+          "Pass a git remote such as https://github.com/org/repo.git, or occupy once with appaloft code <git-remote>.",
+      },
+    );
+  }
+}
+
 export function isRemoteCodeGitRemoteLocator(value: string): boolean {
   const locator = value.trim();
   if (!locator || locator.includes("\0") || /[\r\n]/u.test(locator)) return false;
@@ -333,9 +442,8 @@ export async function resolveDefaultRemoteCodeDoor(
         ),
       )
     : undefined;
-  const occupancy = probe.forceNew
-    ? undefined
-    : (matchingOccupancy ?? (explicitRemote ? undefined : latestOccupancy));
+  const identityOccupancy = matchingOccupancy ?? (explicitRemote ? undefined : latestOccupancy);
+  const occupancy = probe.forceNew ? undefined : identityOccupancy;
   let locator: {
     readonly repository: string;
     readonly repositoryIdentity: string;
@@ -345,18 +453,25 @@ export async function resolveDefaultRemoteCodeDoor(
   let occupancyResume: RemoteCodeOccupancy["occupancy"];
   if (occupancy?.occupancy && !explicitRemote) {
     occupancyResume = occupancy.occupancy;
-    const normalized = normalizeWorkspaceRepositoryRemote(
-      `https://${occupancy.occupancy.repositoryIdentity.replace(/\.git$/u, "")}.git`,
-    );
+    const source = workspaceOpenSourceFromOccupancy(occupancy.occupancy);
     locator = {
-      repository: normalized.credentialFreeHttps,
-      repositoryIdentity: occupancy.occupancy.repositoryIdentity,
-      ref: `refs/heads/${occupancy.occupancy.branch?.trim() || "main"}`,
-      branch: occupancy.occupancy.branch?.trim() || "main",
+      repository: source.credentialFreeHttpsRepository,
+      repositoryIdentity: source.repositoryIdentity,
+      ref: source.ref,
+      branch: source.branch,
     };
   } else if (requestedLocator) {
     locator = requestedLocator;
     if (occupancy?.occupancy) occupancyResume = occupancy.occupancy;
+  } else if (identityOccupancy?.occupancy) {
+    occupancyResume = identityOccupancy.occupancy;
+    const source = workspaceOpenSourceFromOccupancy(identityOccupancy.occupancy);
+    locator = {
+      repository: source.credentialFreeHttpsRepository,
+      repositoryIdentity: source.repositoryIdentity,
+      ref: source.ref,
+      branch: source.branch,
+    };
   } else {
     throw localLocatorError;
   }

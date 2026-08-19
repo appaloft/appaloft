@@ -36,7 +36,7 @@ import {
 import { type ScratchAgentLauncher, type ScratchHarnessResolver } from "./local-scratch-session.js";
 import { createManagedTerminalBootstrapEchoFilter } from "./managed-terminal-bootstrap-echo.js";
 import { type OperatePresentation } from "./operate-presentation.js";
-import { type RemoteCodeDoorResolver } from "./remote-code-session.js";
+import { type RemoteCodeDoorResolver, type WorkspaceOpenSource } from "./remote-code-session.js";
 import {
   type OpenedNativeWorkspaceTerminal,
   type OpenNativeWorkspaceTerminalInput,
@@ -98,6 +98,7 @@ export interface CliProgramInput {
   sourceLinkStore?: CliSourceLinkStore;
   serverAppliedRouteStore?: ServerAppliedRouteDesiredStateStore;
   resolveLocalWorkspaceGitContext?: (path: string) => Promise<LocalGitWorkspaceContext>;
+  resolveWorkspaceOpenSource?: (path: string) => Promise<WorkspaceOpenSource>;
   resolveRemoteWorkspaceGitRef?: (
     repository: string,
     ref: string,
@@ -176,6 +177,7 @@ export class CliRuntime extends Context.Tag("CliRuntime")<
     readonly sourceLinkStore?: CliSourceLinkStore;
     readonly serverAppliedRouteStore?: ServerAppliedRouteDesiredStateStore;
     readonly resolveLocalWorkspaceGitContext?: (path: string) => Promise<LocalGitWorkspaceContext>;
+    readonly resolveWorkspaceOpenSource?: (path: string) => Promise<WorkspaceOpenSource>;
     readonly resolveRemoteWorkspaceGitRef?: (
       repository: string,
       ref: string,
@@ -263,6 +265,9 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
       : {}),
     ...(input.resolveLocalWorkspaceGitContext
       ? { resolveLocalWorkspaceGitContext: input.resolveLocalWorkspaceGitContext }
+      : {}),
+    ...(input.resolveWorkspaceOpenSource
+      ? { resolveWorkspaceOpenSource: input.resolveWorkspaceOpenSource }
       : {}),
     ...(input.resolveRemoteWorkspaceGitRef
       ? { resolveRemoteWorkspaceGitRef: input.resolveRemoteWorkspaceGitRef }

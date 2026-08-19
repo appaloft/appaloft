@@ -790,6 +790,135 @@ describe("Agent Workspace CLI", () => {
     );
   });
 
+  test("[WS-OPEN-LOCATOR-023] workspace open accepts a git-remote like code", async () => {
+    const commands: OpenAgentWorkspaceCommand[] = [];
+    const localGitCalls: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          expect(command).toBeInstanceOf(OpenAgentWorkspaceCommand);
+          commands.push(command as OpenAgentWorkspaceCommand);
+          return ok({ workspaceId: "sbx_remote", resumed: false } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_workspace_open_remote" }),
+      },
+      resolveLocalWorkspaceGitContext: async (path) => {
+        localGitCalls.push(path);
+        throw new Error("git-remote must not use local worktree inspection");
+      },
+      resolveWorkspaceOpenSource: async (path) => {
+        expect(path).toBe("https://github.com/org/repo.git");
+        return {
+          repositoryIdentity: "github.com/org/repo",
+          credentialFreeHttpsRepository: "https://github.com/org/repo.git",
+          branch: "main",
+          ref: "refs/heads/main",
+          headSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        };
+      },
+    });
+    const write = process.stdout.write;
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    try {
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "workspace",
+        "open",
+        "https://github.com/org/repo.git",
+        "--profile",
+        "opencode-default",
+        "--new",
+        "--no-attach",
+      ]);
+    } finally {
+      process.stdout.write = write;
+    }
+    expect(localGitCalls).toEqual([]);
+    expect(commands).toHaveLength(1);
+    expect(commands[0]?.input).toMatchObject({
+      repository: "https://github.com/org/repo.git",
+      repositoryIdentity: "github.com/org/repo",
+      branch: "main",
+      commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      profile: "opencode-default",
+      forceNew: true,
+      attach: false,
+    });
+  });
+
+  test("[WS-OPEN-LOCATOR-024] workspace open occupies a non-git directory from existing occupancy", async () => {
+    const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-workspace-open-cli-nongit-"));
+    const commands: OpenAgentWorkspaceCommand[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as OpenAgentWorkspaceCommand);
+          return ok({ workspaceId: "sbx_live", resumed: false } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_workspace_open_nongit" }),
+      },
+      resolveLocalWorkspaceGitContext: async () => {
+        throw {
+          code: "validation_error",
+          category: "user",
+          message: "Workspace path is not inside a Git worktree",
+          retryable: false,
+          details: { code: "workspace_git_root_unavailable" },
+        };
+      },
+      resolveWorkspaceOpenSource: async (path) => {
+        expect(path).toBe(emptyDir);
+        return {
+          repositoryIdentity: "github.com/acme/api",
+          credentialFreeHttpsRepository: "https://github.com/acme/api.git",
+          branch: "main",
+          ref: "refs/heads/main",
+          headSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        };
+      },
+    });
+    const write = process.stdout.write;
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    try {
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "workspace",
+        "open",
+        emptyDir,
+        "--profile",
+        "opencode-default",
+        "--new",
+        "--no-attach",
+      ]);
+    } finally {
+      process.stdout.write = write;
+    }
+    expect(commands).toHaveLength(1);
+    expect(commands[0]?.input).toMatchObject({
+      repositoryIdentity: "github.com/acme/api",
+      repository: "https://github.com/acme/api.git",
+      profile: "opencode-default",
+      forceNew: true,
+      attach: false,
+    });
+  });
+
   test("[WS-CODE-CLI-001][WS-CODE-PARITY-002][WS-CODE-COMPAT-010] code native-attaches after remote door; workspace open stays Git-safe", async () => {
     const commands: OpenAgentWorkspaceCommand[] = [];
     const output: string[] = [];

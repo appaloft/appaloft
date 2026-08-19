@@ -36,6 +36,10 @@ resource ids or exposing host credentials.
 | ID | Behavior | Given | When | Then |
 | --- | --- | --- | --- | --- |
 | WS-OPEN-GIT-001 | Resolve local Git context | A path is inside a Git worktree | CLI resolves context | Root, upstream remote, branch, and HEAD SHA are read without uploading files. |
+| WS-OPEN-LOCATOR-022 | Keep worktree open | A path is a clean pushed worktree | `workspace open` | Existing local Git context still dispatches `workspaces.open`. |
+| WS-OPEN-LOCATOR-023 | Accept git remote | Caller passes `https://` / `ssh://` / `git@` / `owner/repo` | `workspace open` | Occupies that repository without requiring a local clone. |
+| WS-OPEN-LOCATOR-024 | Occupy from a non-git directory | Directory has no `.git`; occupancy exists | `workspace open --profile --new` | Occupies that occupancy's repository; does not throw `Workspace path is not inside a Git worktree`. |
+| WS-OPEN-LOCATOR-025 | Missing occupancy stays failed | Directory has no `.git` and no occupancy | `workspace open` | Fail-closes `workspace_remote_repository_missing`; no fake success. |
 | WS-OPEN-GIT-002 | Normalize Repository identity | Remote is scp SSH, `ssh://`, or HTTPS | identity is resolved | Equivalent locators match one connector-neutral identity; credentials, query, and fragment are rejected. |
 | WS-OPEN-GIT-003 | Reject dirty source | Worktree has staged, unstaged, or untracked paths | open runs | It fails before remote calls, prints HEAD SHA and bounded status guidance, and uploads nothing. |
 | WS-OPEN-GIT-004 | Reject unpushed or mismatched source | Upstream is absent, unreadable, missing, ahead, behind, or at another SHA | open runs | It fails before control-plane mutation with safe push/ref guidance. |
@@ -61,7 +65,7 @@ resource ids or exposing host credentials.
 
 - CLI:
   - `appaloft workspace create --profile <name-or-installation-id> --repo <https> --ref <ref> --branch <branch> [--attach]`
-  - `appaloft workspace open [path] [--profile <name-or-id>] [--new] [--no-attach]`
+  - `appaloft workspace open [path|git-remote] [--profile <name-or-id>] [--new] [--no-attach]`
   - existing list/show/connect/attach/task/preview/pause/resume/terminate commands remain.
 - API/oRPC: Repository Binding lifecycle, Project default Profile configuration, Profile
   installation Credential Connection configuration, and `workspaces.open`.
