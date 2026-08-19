@@ -662,6 +662,69 @@ describe("Agent Workspace open preflight", () => {
     expect(String(result.error.details?.guidance)).toContain("appaloft code --profile");
   });
 
+  test("[WS-REMOTE-PROFILE-AMBIGUOUS-176] unbound ensure then reread ambiguous is not wrapped as still unavailable", async () => {
+    const { service } = await fixture({
+      omitBinding: true,
+      duplicateProfile: true,
+      occupancies: {
+        findLiveProfileInstallationIds: async (_context, installationIds) => installationIds,
+      },
+      initializerFactory: ({ binding, repositoryBindings }) => ({
+        ensure: async () => {
+          await repositoryBindings.save(toRepositoryContext(context), binding);
+          return ok({
+            project: "reused" as const,
+            repositoryBinding: "created" as const,
+            profile: "reused" as const,
+          });
+        },
+        ensureLocalEnvironment: async () => ok(undefined),
+        ensureDefaultResource: async () => ok(undefined),
+      }),
+    });
+
+    const result = await service.resolveContext(context, { ...input, profile: "agent-default" });
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) return;
+    expect(result.error.details?.code).toBe("workspace_open_profile_ambiguous");
+    expect(result.error.details?.causeCode).toBe("workspace_open_profile_ambiguous");
+    expect(result.error.details?.installationIds).toEqual(
+      expect.arrayContaining(["awpi_default", "awpi_dead"]),
+    );
+    expect(String(result.error.details?.guidance)).toContain("appaloft code --profile");
+    expect(result.error.message).not.toContain(
+      "Workspace activation context is still unavailable after initialization",
+    );
+    expect(result.error.details?.code).not.toBe("workspace_activation_context_conflict");
+  });
+
+  test("[WS-REMOTE-PROFILE-LIVE-178] unbound whoami-style --new prefers the live install after ensure", async () => {
+    const { service } = await fixture({
+      omitBinding: true,
+      duplicateProfile: true,
+      occupancies: {
+        findLiveProfileInstallationIds: async (_context, installationIds) =>
+          installationIds.filter((id) => id === "awpi_default"),
+      },
+      initializerFactory: ({ binding, repositoryBindings }) => ({
+        ensure: async () => {
+          await repositoryBindings.save(toRepositoryContext(context), binding);
+          return ok({
+            project: "reused" as const,
+            repositoryBinding: "created" as const,
+            profile: "reused" as const,
+          });
+        },
+        ensureLocalEnvironment: async () => ok(undefined),
+        ensureDefaultResource: async () => ok(undefined),
+      }),
+    });
+
+    expect(
+      (await service.resolveContext(context, input))._unsafeUnwrap().profileInstallationId,
+    ).toBe("awpi_default");
+  });
+
   test("[WS-REMOTE-NEW-NO-DUP-179] failed initialization disables the leftover Profile and surfaces the real error", async () => {
     const { profiles, service } = await fixture({
       omitBinding: true,
