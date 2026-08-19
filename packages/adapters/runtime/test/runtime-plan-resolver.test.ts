@@ -194,6 +194,14 @@ describe("DefaultRuntimePlanResolver", () => {
     const dockerBuild = renderStaticSiteDockerBuild({
       publishDirectory: "/dist",
     });
+    const sourceRootBuild = renderStaticSiteDockerBuild({
+      publishDirectory: ".",
+    });
+    expect(sourceRootBuild?.dockerfile).toContain('COPY ["./","/usr/share/nginx/html/"]');
+    const slashRootBuild = renderStaticSiteDockerBuild({
+      publishDirectory: "/",
+    });
+    expect(slashRootBuild?.dockerfile).toContain('COPY ["./","/usr/share/nginx/html/"]');
 
     expect(dockerBuild).toEqual({
       dockerfile: [

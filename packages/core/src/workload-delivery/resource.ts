@@ -306,6 +306,10 @@ function normalizeStaticPublishDirectory(value: string): Result<string> {
     );
   }
 
+  if (isSourceRootStaticPublishDirectory(trimmed)) {
+    return ok("/");
+  }
+
   const withLeadingSlash = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
   const segments = withLeadingSlash.split("/").filter(Boolean);
   if (segments.some((segment) => segment === "." || segment === "..")) {
@@ -318,15 +322,15 @@ function normalizeStaticPublishDirectory(value: string): Result<string> {
   }
 
   if (segments.length === 0) {
-    return err(
-      resourceRuntimeResolutionError("Static publish directory cannot be the source root", {
-        runtimePlanStrategy: "static",
-        publishDirectory: trimmed,
-      }),
-    );
+    return ok("/");
   }
 
   return ok(`/${segments.join("/")}`);
+}
+
+function isSourceRootStaticPublishDirectory(value: string): boolean {
+  const normalized = value.replaceAll("\\", "/").replace(/\/+$/u, "") || "/";
+  return normalized === "." || normalized === "./" || normalized === "/";
 }
 
 function normalizeRuntimeProfileRelativePath(

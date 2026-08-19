@@ -66,14 +66,18 @@ appaloft projects create --name "my-first-project"
 appaloft server register --host 203.0.113.10 --ssh-user deploy --ssh-key ~/.ssh/id_ed25519
 appaloft server capacity inspect --server-id <serverId>
 
-# 4. Start a deployment from the current directory (zero-configuration detection)
+# 4. Start a deployment from the current directory (zero-configuration detection).
+#    This deploys this tree — it does not reuse an unrelated occupancy.
 appaloft deploy
+appaloft deploy .
 
 # 5. Or explicitly point at a config file / profile
 appaloft deploy --config appaloft.yml --config-profile staging
 
-# 6. Already have a built static directory? Skip the build step and publish directly
+# 6. Already have a built static directory? Skip the build step and publish directly.
+#    `.` as --publish-dir means the source root / current directory.
 appaloft deploy ./dist --as static-site
+appaloft deploy . --as static-site --publish-dir .
 
 # 7. Watch deployment status and timeline
 appaloft deployments timeline <deploymentId> --follow --json
@@ -96,6 +100,8 @@ curl -X POST https://your-appaloft-host/api/deployments \
 Full routes and input/output shapes are in the [HTTP API reference](/docs/en/reference/http-api/); you can also inspect the running instance's `/api/openapi.json` or `/api/reference` (Scalar) directly.
 
 ## Expected output and status
+
+`appaloft deploy` waits until the deployment reaches a terminal status. A build failure (including SSH Docker image build failure) exits non-zero and does not print a reserved or previous URL as success.
 
 A successful deployment moves through lifecycle states such as `pending → planning → building → deploying → verifying → healthy` (the exact values are governed by [Status And Events](/docs/en/troubleshoot/status-events/)) and ultimately returns:
 

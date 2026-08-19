@@ -73,7 +73,9 @@ surface available in the session.
   project/environment/resource/server ids when those
   list/show tools are bound. Do not scrape vendor TUI text for PR or deploy state.
 
-- First deployment: inspect source safely, create or select project/server/environment/resource,
+- First deployment: `appaloft deploy` / `deploy .` deploy the current directory as this app; do
+  not silently reuse an unrelated occupancy. Inspect source safely, create or select
+  project/server/environment/resource,
   persist source/runtime/network on the Resource, then `deployments.plan`. If readiness is
   `blocked`, execute each named `nextActions` target and replan before `deployments.create`.
   `missing-internal-port` is `resources.configure-network` with `network.internalPort` from

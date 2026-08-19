@@ -223,7 +223,11 @@ function normalizeStaticPublishDirectory(value: string): string | null {
 
   const segments = trimmed.replace(/^\/+/, "").replace(/\/+$/, "").split("/").filter(Boolean);
 
-  if (segments.length === 0 || segments.some((segment) => segment === "." || segment === "..")) {
+  if (segments.length === 0 || (segments.length === 1 && segments[0] === ".")) {
+    return ".";
+  }
+
+  if (segments.some((segment) => segment === "." || segment === "..")) {
     return null;
   }
 

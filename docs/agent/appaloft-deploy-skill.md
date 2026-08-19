@@ -77,8 +77,14 @@ something. The deploy protocol is part of the full Appaloft skill, not a separat
 - Apply `profiles.<key>` only when trusted CLI/Action input selects `--config-profile` or
   `config-profile`. It is a config overlay, not an Appaloft Environment selector.
 - For local static output, use `appaloft deploy ./dist --as static-site` or the equivalent Web/API
-  workflow. This is only one Appaloft deploy mode; Dockerfile, Compose, prebuilt image, and
+  workflow. `--as static-site` may use publish directory `.` to mean the source root / current
+  directory. This is only one Appaloft deploy mode; Dockerfile, Compose, prebuilt image, and
   workspace-command deployments still use the same resource and deployment operation boundary.
+- `appaloft deploy` and `appaloft deploy .` deploy the current directory as this app. Do not reuse
+  an unrelated occupancy such as traefik/whoami. If there is no current app, ask for a path or
+  `--project`.
+- Treat CLI success as a terminal `succeeded` deployment. If Docker/SSH build fails, exit non-zero
+  and do not present a URL as live.
 
 ## Source Inspection
 
