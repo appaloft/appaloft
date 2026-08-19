@@ -143,8 +143,7 @@ export class PgWorkspaceOpenEntryRepository implements WorkspaceOpenEntryReposit
     installationIds: readonly string[],
   ): Promise<readonly string[]> {
     if (installationIds.length === 0) return [];
-    const subject =
-      context.tenant?.subjectId ?? context.principal?.userId ?? context.actor?.id;
+    const subject = context.tenant?.subjectId ?? context.principal?.userId ?? context.actor?.id;
     if (!subject) return [];
     const rows = await this.db
       .selectFrom("workspace_open_entries")

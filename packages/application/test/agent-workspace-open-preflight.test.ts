@@ -26,6 +26,7 @@ import {
 import {
   AgentWorkspaceOpenPreflightService,
   createExecutionContext,
+  type ExecutionContext,
   InMemoryAgentWorkspaceProfileRegistryRepository,
   InMemoryRepositoryBindingRepository,
   type ProjectRepository,
@@ -136,7 +137,7 @@ async function fixture(
     duplicateProfile?: boolean;
     occupancies?: {
       findLiveProfileInstallationIds: (
-        context: typeof context,
+        executionContext: ExecutionContext,
         installationIds: readonly string[],
       ) => Promise<readonly string[]>;
     };
@@ -560,9 +561,7 @@ describe("Agent Workspace open preflight", () => {
       }),
     });
     const conflicted = await conflict.service.resolveContext(context, input);
-    expect(conflicted._unsafeUnwrapErr().details?.code).toBe(
-      "workspace_open_repository_not_bound",
-    );
+    expect(conflicted._unsafeUnwrapErr().details?.code).toBe("workspace_open_repository_not_bound");
     expect(conflictCalls).toBe(1);
   });
 
@@ -669,8 +668,7 @@ describe("Agent Workspace open preflight", () => {
     );
     expect(result.error.details?.code).toBe("workspace_open_repository_not_bound");
     expect(
-      (await profiles.findInstallation(toRepositoryContext(context), "awpi_leftover"))
-        ?.toState()
+      (await profiles.findInstallation(toRepositoryContext(context), "awpi_leftover"))?.toState()
         .status.value,
     ).toBe("disabled");
   });
