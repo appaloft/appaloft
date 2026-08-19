@@ -63,6 +63,8 @@ describe("CLI quick deploy draft mapping", () => {
     const { StaticPublishDirectory } = await import("@appaloft/core");
     expect(StaticPublishDirectory.create(".").isOk()).toBe(true);
     expect(StaticPublishDirectory.create(".")._unsafeUnwrap().value).toBe("/");
+    expect(StaticPublishDirectory.create("public")._unsafeUnwrap().value).toBe("public");
+    expect(StaticPublishDirectory.create("public")._unsafeUnwrap().value).not.toBe("/public");
     expect(
       normalizeUrlFirstDeploymentEntry({
         entryMode: "static-site",

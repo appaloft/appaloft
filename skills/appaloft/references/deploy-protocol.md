@@ -163,7 +163,8 @@ Use this order:
 7. Built static output: `appaloft deploy ./dist --as static-site`. `--as static-site` may use
    `--publish-dir .` to mean the source root / current directory.
 8. Static source: `appaloft deploy <source> --method static --publish-dir <dir>`.
-   `.` is a legal publish directory (source root). Do not default to a value the validator forbids.
+   `.` is a legal publish directory (source root). Relative dirs such as `public` stay `public` on
+   the plan and Dockerfile `COPY` (not `/public`). Do not default to a value the validator forbids.
 9. Workspace commands: use explicit install, build, start, and port options.
 10. Blueprint catalog: use `appaloft blueprint list/show/plan-install` for neutral catalog discovery
    and dry-run planning. For Web quick deploy, use

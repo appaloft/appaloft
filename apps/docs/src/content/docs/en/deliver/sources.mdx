@@ -128,7 +128,9 @@ appaloft deploy
 appaloft deploy .
 
 # Local directory, explicit static publish
+# (relative dirs stay relative; `public` is not rewritten to `/public`)
 appaloft deploy ./apps/web --method static --publish-dir build
+appaloft deploy . --as static-site --publish-dir public
 
 # Already-built static output directory, skip the build
 appaloft deploy ./dist --as static-site

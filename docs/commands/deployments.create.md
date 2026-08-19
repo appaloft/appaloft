@@ -340,8 +340,10 @@ resource owns `kind = "static-site"`, source binding metadata, `RuntimePlanStrat
 `runtimeProfile.publishDirectory`, optional install/build commands, and
 `ResourceNetworkProfile.internalPort`. Deployment planning packages the resolved publish directory
 into a Docker/OCI image that serves static files over HTTP, typically through an adapter-selected
-static server image. The concrete static server image, generated web-server config, and Docker
-labels are adapter artifacts, not deployment command input.
+static server image. The generated static-server `COPY` source must be relative to the Docker build
+context: user `--publish-dir public` stays `public/` next to the Dockerfile, not `/public`. The
+concrete static server image, generated web-server config, and Docker labels are adapter artifacts,
+not deployment command input.
 
 If a static resource lacks `runtimeProfile.publishDirectory`, or the value cannot be safely
 resolved under the source base directory after optional build commands, deployment admission fails

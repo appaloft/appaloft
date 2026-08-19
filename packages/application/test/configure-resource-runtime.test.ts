@@ -157,7 +157,7 @@ describe("ConfigureResourceRuntimeUseCase", () => {
     const runtimeProfile = persisted?.toState().runtimeProfile;
     expect(runtimeProfile?.strategy.value).toBe("static");
     expect(runtimeProfile?.runtimeName?.value).toBe("preview-123");
-    expect(runtimeProfile?.publishDirectory?.value).toBe("/dist");
+    expect(runtimeProfile?.publishDirectory?.value).toBe("dist");
     expect(runtimeProfile?.replicas?.value).toBe(2);
     expect(runtimeProfile?.healthCheckPath?.value).toBe("/health");
     expect(runtimeProfile?.healthCheck?.http?.path.value).toBe("/health");

@@ -202,6 +202,11 @@ describe("DefaultRuntimePlanResolver", () => {
       publishDirectory: "/",
     });
     expect(slashRootBuild?.dockerfile).toContain('COPY ["./","/usr/share/nginx/html/"]');
+    const publicBuild = renderStaticSiteDockerBuild({
+      publishDirectory: "public",
+    });
+    expect(publicBuild?.dockerfile).toContain('COPY ["public/","/usr/share/nginx/html/"]');
+    expect(publicBuild?.dockerfile).not.toContain('COPY ["/public/","/usr/share/nginx/html/"]');
 
     expect(dockerBuild).toEqual({
       dockerfile: [
@@ -2826,5 +2831,66 @@ describe("DefaultRuntimePlanResolver", () => {
     );
     expect(plan.steps).toContain("Package static site");
     expect(plan.steps).toContain("Run static server container");
+  });
+
+  test("[DEP-CREATE-ADM-026A][RES-CREATE-ADM-037D] relative publish-dir public stays public and COPY public/", async () => {
+    ensureReflectMetadata();
+    const [{ DefaultRuntimePlanResolver }, { generateStaticSiteDockerBuild }, { StaticPublishDirectory }] =
+      await Promise.all([
+        import("../src"),
+        import("../src/workspace-planners"),
+        import("@appaloft/core"),
+      ]);
+    const persistedPublishDirectory = StaticPublishDirectory.create("public");
+    expect(persistedPublishDirectory.isOk()).toBe(true);
+    expect(persistedPublishDirectory._unsafeUnwrap().value).toBe("public");
+    expect(persistedPublishDirectory._unsafeUnwrap().value).not.toBe("/public");
+
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+    const result = await resolver.resolve(context, {
+      id: "plan_static_public",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/appaloft-reverify-public",
+        displayName: "reverify-public",
+      }),
+      server: {
+        id: "srv_static",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_static_public"),
+      detectedReasoning: ["configured static site"],
+      requestedDeployment: {
+        method: "static",
+        publishDirectory: persistedPublishDirectory._unsafeUnwrap().value,
+        port: 80,
+        exposureMode: "reverse-proxy",
+        upstreamProtocol: "http",
+      } as never,
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.runtimeArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        publishDirectory: "public",
+      }),
+    );
+    expect(plan.execution.metadata).toEqual(
+      expect.objectContaining({
+        "static.publishDirectory": "public",
+      }),
+    );
+    expect(plan.runtimeArtifact?.metadata?.publishDirectory).not.toBe("/public");
+    expect(plan.execution.metadata?.["static.publishDirectory"]).not.toBe("/public");
+
+    const dockerBuild = generateStaticSiteDockerBuild({
+      execution: plan.execution,
+      sourceInspection: plan.source.inspection,
+    });
+    expect(dockerBuild?.dockerfile).toContain('COPY ["public/","/usr/share/nginx/html/"]');
+    expect(dockerBuild?.dockerfile).not.toContain('COPY ["/public/","/usr/share/nginx/html/"]');
   });
 });
