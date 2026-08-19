@@ -59,8 +59,9 @@ jobs:
         run: bun run bun:version:check
 
       - name: Install Chromium For WebView
+        if: ${{ matrix.shard == 1 }}
         working-directory: apps/web
-        run: bunx playwright install --with-deps chromium
+        run: bunx playwright install chromium
 
       - name: Prepare Runtime Logs
         run: mkdir -p runtime/logs
