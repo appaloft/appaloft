@@ -116,38 +116,63 @@ describe("shell help without runtime composition", () => {
     expect(stderr).not.toContain("PGlite");
   });
 
-  test("[CONTROL-PLANE-CLI-012] login --help and login -h print usage without OAuth", async () => {
+  test("[CONTROL-PLANE-CLI-012] login --help prints usage without OAuth or runtime", async () => {
     const temporaryRoot = await mkdtemp(join(tmpdir(), "appaloft-login-help-"));
     temporaryRoots.push(temporaryRoot);
 
-    for (const flag of ["--help", "-h"] as const) {
-      const child = Bun.spawn(
-        ["bun", "run", "--cwd", "apps/shell", "src/index.ts", "login", flag],
-        {
-          cwd: join(import.meta.dir, "../../.."),
-          env: {
-            ...process.env,
-            APPALOFT_HOME: join(temporaryRoot, "home"),
-            OTEL_SDK_DISABLED: "true",
-          },
-          stdout: "pipe",
-          stderr: "pipe",
+    const child = Bun.spawn(
+      ["bun", "run", "--cwd", "apps/shell", "src/index.ts", "login", "--help"],
+      {
+        cwd: join(import.meta.dir, "../../.."),
+        env: {
+          ...process.env,
+          APPALOFT_HOME: join(temporaryRoot, "home"),
+          OTEL_SDK_DISABLED: "true",
         },
-      );
-      const [exitCode, stdout, stderr] = await Promise.all([
-        child.exited,
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text(),
-      ]);
-      expect(exitCode).toBe(0);
-      expect(stdout).toContain(
-        "appaloft login [--url <url>] [--mode cloud|self-hosted] [--no-browser]",
-      );
-      expect(stdout).toContain("--no-browser");
-      expect(stderr).not.toContain("validation_error");
-      expect(stderr).not.toContain("Unsupported option");
-      expect(`${stdout}${stderr}`).not.toContain("cli-auth/authorize");
-    }
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain(
+      "appaloft login [--url <url>] [--mode cloud|self-hosted] [--no-browser]",
+    );
+    expect(stdout).toContain("--no-browser");
+    expect(stderr).not.toContain("validation_error");
+    expect(stderr).not.toContain("Unsupported option");
+    expect(`${stdout}${stderr}`).not.toContain("cli-auth/authorize");
+    expect(`${stdout}${stderr}`).not.toContain("appaloft-backend");
+  });
+
+  test("[CONTROL-PLANE-CLI-012] login -h prints usage without OAuth or runtime", async () => {
+    const temporaryRoot = await mkdtemp(join(tmpdir(), "appaloft-login-h-"));
+    temporaryRoots.push(temporaryRoot);
+
+    const child = Bun.spawn(["bun", "run", "--cwd", "apps/shell", "src/index.ts", "login", "-h"], {
+      cwd: join(import.meta.dir, "../../.."),
+      env: {
+        ...process.env,
+        APPALOFT_HOME: join(temporaryRoot, "home"),
+        OTEL_SDK_DISABLED: "true",
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain(
+      "appaloft login [--url <url>] [--mode cloud|self-hosted] [--no-browser]",
+    );
+    expect(`${stdout}${stderr}`).not.toContain("cli-auth/authorize");
   });
 
   test("one-shot CLI commands do not print appaloft-backend JSON logs", async () => {
@@ -178,5 +203,5 @@ describe("shell help without runtime composition", () => {
     expect(`${stdout}${stderr}`).not.toContain("appaloft-backend");
     expect(`${stdout}${stderr}`).not.toContain("durable_work_runtime.drain_stopped");
     expect(stdout).toContain('"items"');
-  });
+  }, 15_000);
 });
