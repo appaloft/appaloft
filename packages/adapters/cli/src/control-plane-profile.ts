@@ -403,6 +403,21 @@ export function defaultPublicCloudBrowserLoginUrl(
   return loginUrl.toString();
 }
 
+export function rewriteCliAuthVerificationUri(uri: string, baseUrl: string): string {
+  try {
+    const parsed = new URL(uri);
+    const base = new URL(baseUrl);
+    if (parsed.hostname !== base.hostname) {
+      return uri;
+    }
+    parsed.protocol = base.protocol;
+    parsed.port = base.port;
+    return parsed.toString();
+  } catch {
+    return uri;
+  }
+}
+
 export function deriveProfileName(url: string, mode: CliControlPlaneMode): string {
   if (mode === "cloud") {
     return "cloud";

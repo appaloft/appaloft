@@ -183,6 +183,81 @@ function bold(value: string): string {
   return `\u001b[1m${value}\u001b[22m`;
 }
 
+function isHelpArgs(args: readonly string[]): boolean {
+  return args.includes("--help") || args.includes("-h");
+}
+
+function renderLoginHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
+  stdout.write(`Appaloft login
+
+Usage:
+  appaloft login [--url <url>] [--mode cloud|self-hosted] [--no-browser]
+  appaloft auth login [--url <url>] [--mode cloud|self-hosted] [--no-browser]
+
+Options:
+  --url <url>              Control plane URL (defaults to https://app.appaloft.com)
+  --mode cloud|self-hosted Control plane mode
+  --no-browser             Print the login URL without opening a browser
+  --profile <name>         Profile name to write
+  --help, -h               Show this help
+`);
+}
+
+function renderAuthStatusHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
+  stdout.write(`Appaloft auth status
+
+Usage:
+  appaloft auth status [--profile <name>]
+
+Options:
+  --profile <name>  Profile to inspect
+  --help, -h        Show this help
+`);
+}
+
+function renderLogoutHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
+  stdout.write(`Appaloft logout
+
+Usage:
+  appaloft logout [--profile <name>]
+  appaloft auth logout [--profile <name>]
+
+Options:
+  --profile <name>  Profile to remove
+  --help, -h        Show this help
+`);
+}
+
+function renderTokenLoginHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
+  stdout.write(`Appaloft token login
+
+Usage:
+  appaloft auth token login [--stdin | --token-file <path>] [--url <url>] [--profile <name>]
+
+Options:
+  --stdin              Read the token from stdin
+  --token-file <path>  Read the token from a file
+  --url <url>          Control plane URL
+  --profile <name>     Profile name to write
+  --help, -h           Show this help
+`);
+}
+
+function renderMcpLoginHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
+  stdout.write(`Appaloft MCP login
+
+Usage:
+  appaloft auth mcp login [--url <url>] [--mode cloud|self-hosted] [--profile <name>] [--no-browser]
+
+Options:
+  --url <url>              Control plane URL (defaults to https://app.appaloft.com)
+  --mode cloud|self-hosted Control plane mode
+  --profile <name>         Profile name to write
+  --no-browser             Print the login URL without opening a browser
+  --help, -h               Show this help
+`);
+}
+
 function renderRootHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
   stdout.write(`Appaloft CLI
 
@@ -267,6 +342,10 @@ async function handleLogin(
   args: readonly string[],
   input: StandaloneControlPlaneCliInput,
 ): Promise<StandaloneControlPlaneCliResult> {
+  if (isHelpArgs(args)) {
+    renderLoginHelp(input.stdout ?? process.stdout);
+    return { handled: true, exitCode: 0 };
+  }
   const parsed = parseOptions(args, ["url", "mode", "profile"], ["no-browser"]);
   if (parsed.isErr()) {
     return finish(parsed, input);
@@ -309,6 +388,10 @@ async function handleMcpLogin(
   args: readonly string[],
   input: StandaloneControlPlaneCliInput,
 ): Promise<StandaloneControlPlaneCliResult> {
+  if (isHelpArgs(args)) {
+    renderMcpLoginHelp(input.stdout ?? process.stdout);
+    return { handled: true, exitCode: 0 };
+  }
   const parsed = parseOptions(args, ["url", "mode", "profile"], ["no-browser"]);
   if (parsed.isErr()) {
     return finish(parsed, input);
@@ -504,6 +587,10 @@ function handleStatus(
   args: readonly string[],
   input: StandaloneControlPlaneCliInput,
 ): Promise<StandaloneControlPlaneCliResult> {
+  if (isHelpArgs(args)) {
+    renderAuthStatusHelp(input.stdout ?? process.stdout);
+    return Promise.resolve({ handled: true, exitCode: 0 });
+  }
   const parsed = parseOptions(args, ["profile"]);
   if (parsed.isErr()) {
     return finish(parsed, input);
@@ -515,6 +602,10 @@ async function handleTokenLogin(
   args: readonly string[],
   input: StandaloneControlPlaneCliInput,
 ): Promise<StandaloneControlPlaneCliResult> {
+  if (isHelpArgs(args)) {
+    renderTokenLoginHelp(input.stdout ?? process.stdout);
+    return { handled: true, exitCode: 0 };
+  }
   const parsed = parseOptions(args, ["url", "mode", "profile", "token-file"], ["stdin"]);
   if (parsed.isErr()) {
     return finish(parsed, input);
@@ -551,6 +642,10 @@ function handleLogout(
   args: readonly string[],
   input: StandaloneControlPlaneCliInput,
 ): Promise<StandaloneControlPlaneCliResult> {
+  if (isHelpArgs(args)) {
+    renderLogoutHelp(input.stdout ?? process.stdout);
+    return Promise.resolve({ handled: true, exitCode: 0 });
+  }
   const parsed = parseOptions(args, ["profile"]);
   if (parsed.isErr()) {
     return finish(parsed, input);
@@ -558,10 +653,27 @@ function handleLogout(
   return finish(logoutControlPlane(parsed.value.values.profile, deps(input)), input);
 }
 
+function renderContextHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
+  stdout.write(`Appaloft context
+
+Usage:
+  appaloft context list
+  appaloft context show [--profile <name>]
+  appaloft context use <profile>
+
+Options:
+  --help, -h  Show this help
+`);
+}
+
 function handleContext(
   args: readonly string[],
   input: StandaloneControlPlaneCliInput,
 ): Promise<StandaloneControlPlaneCliResult> {
+  if (isHelpArgs(args)) {
+    renderContextHelp(input.stdout ?? process.stdout);
+    return Promise.resolve({ handled: true, exitCode: 0 });
+  }
   const subcommand = args[0];
   if (subcommand === "list") {
     return handleStatus(args.slice(1), input);

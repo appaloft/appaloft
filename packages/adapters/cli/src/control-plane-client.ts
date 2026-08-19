@@ -22,6 +22,7 @@ import {
   type CliControlPlaneHandshake,
   type CliControlPlaneOrganizationContext,
   type CliControlPlaneProfile,
+  rewriteCliAuthVerificationUri,
 } from "./control-plane-profile.js";
 
 const cliUserAgent = "appaloft-cli";
@@ -656,8 +657,11 @@ export async function createCliAuthSession(input: {
   return ok({
     deviceCode: deviceCode.value,
     userCode: userCode.value,
-    verificationUri: verificationUri.value,
-    verificationUriComplete: verificationUriComplete.value,
+    verificationUri: rewriteCliAuthVerificationUri(verificationUri.value, input.baseUrl),
+    verificationUriComplete: rewriteCliAuthVerificationUri(
+      verificationUriComplete.value,
+      input.baseUrl,
+    ),
     expiresIn: expiresIn.value,
     interval: interval.value,
   });

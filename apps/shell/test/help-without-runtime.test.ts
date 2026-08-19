@@ -115,4 +115,68 @@ describe("shell help without runtime composition", () => {
     expect(stdout).toContain("--json");
     expect(stderr).not.toContain("PGlite");
   });
+
+  test("[CONTROL-PLANE-CLI-012] login --help and login -h print usage without OAuth", async () => {
+    const temporaryRoot = await mkdtemp(join(tmpdir(), "appaloft-login-help-"));
+    temporaryRoots.push(temporaryRoot);
+
+    for (const flag of ["--help", "-h"] as const) {
+      const child = Bun.spawn(
+        ["bun", "run", "--cwd", "apps/shell", "src/index.ts", "login", flag],
+        {
+          cwd: join(import.meta.dir, "../../.."),
+          env: {
+            ...process.env,
+            APPALOFT_HOME: join(temporaryRoot, "home"),
+            OTEL_SDK_DISABLED: "true",
+          },
+          stdout: "pipe",
+          stderr: "pipe",
+        },
+      );
+      const [exitCode, stdout, stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ]);
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain(
+        "appaloft login [--url <url>] [--mode cloud|self-hosted] [--no-browser]",
+      );
+      expect(stdout).toContain("--no-browser");
+      expect(stderr).not.toContain("validation_error");
+      expect(stderr).not.toContain("Unsupported option");
+      expect(`${stdout}${stderr}`).not.toContain("cli-auth/authorize");
+    }
+  });
+
+  test("one-shot CLI commands do not print appaloft-backend JSON logs", async () => {
+    const temporaryRoot = await mkdtemp(join(tmpdir(), "appaloft-cli-no-backend-logs-"));
+    temporaryRoots.push(temporaryRoot);
+
+    const child = Bun.spawn(
+      ["bun", "run", "--cwd", "apps/shell", "src/index.ts", "server", "list"],
+      {
+        cwd: join(import.meta.dir, "../../.."),
+        env: {
+          ...process.env,
+          APPALOFT_HOME: join(temporaryRoot, "home"),
+          APPALOFT_PGLITE_DATA_DIR: join(temporaryRoot, "pglite"),
+          OTEL_SDK_DISABLED: "true",
+        },
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+
+    expect(exitCode).toBe(0);
+    expect(`${stdout}${stderr}`).not.toContain("appaloft-backend");
+    expect(`${stdout}${stderr}`).not.toContain("durable_work_runtime.drain_stopped");
+    expect(stdout).toContain('"items"');
+  });
 });

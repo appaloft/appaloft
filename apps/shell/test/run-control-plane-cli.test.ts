@@ -492,4 +492,76 @@ describe("shell CLI remote control-plane pre-dispatch", () => {
       );
     }
   }, 15000);
+
+  test("[WS-REMOTE-LOGIN-001] unauthenticated code is login-required before local composition", async () => {
+    const appaloftHome = await mkdtemp(join(tmpdir(), "appaloft-cli-code-login-"));
+    const originalStderrWrite = process.stderr.write;
+    let stderr = "";
+    process.argv = ["node", "appaloft", "code", "--no-attach"];
+    process.env = {
+      ...originalEnv,
+      APPALOFT_HOME: appaloftHome,
+    };
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      stderr += String(chunk);
+      return true;
+    }) as typeof process.stderr.write;
+    process.exit = ((code?: string | number | null) => {
+      throw new Error(`process.exit(${String(code)})`);
+    }) as typeof process.exit;
+
+    await expect(runShellCli()).rejects.toThrow("process.exit(1)");
+    process.stderr.write = originalStderrWrite;
+    expect(stderr).toContain("Sign in before opening a remote Agent session");
+    expect(stderr).toContain("Run appaloft login");
+    expect(stderr).not.toContain("No enrolled Server");
+    expect(stderr).not.toContain("ECONNREFUSED");
+    expect(stderr).not.toContain("appaloft-backend");
+  });
+
+  test("[WS-REMOTE-DEPLOY-057] unauthenticated deploy is login-required before local composition", async () => {
+    const appaloftHome = await mkdtemp(join(tmpdir(), "appaloft-cli-deploy-login-"));
+    const originalStderrWrite = process.stderr.write;
+    let stderr = "";
+    process.argv = ["node", "appaloft", "deploy"];
+    process.env = {
+      ...originalEnv,
+      APPALOFT_HOME: appaloftHome,
+    };
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      stderr += String(chunk);
+      return true;
+    }) as typeof process.stderr.write;
+    process.exit = ((code?: string | number | null) => {
+      throw new Error(`process.exit(${String(code)})`);
+    }) as typeof process.exit;
+
+    await expect(runShellCli()).rejects.toThrow("process.exit(1)");
+    process.stderr.write = originalStderrWrite;
+    expect(stderr).toContain("Sign in before deploying");
+    expect(stderr).toContain("Run appaloft login");
+    expect(stderr).not.toContain("ECONNREFUSED");
+    expect(stderr).not.toContain("127.0.0.1");
+    expect(stderr).not.toContain("at ");
+  });
+
+  test("[WS-REMOTE-CA-033] unauthenticated workspace --json is login-required", async () => {
+    const appaloftHome = await mkdtemp(join(tmpdir(), "appaloft-cli-workspace-login-"));
+    let stdout = "";
+    process.argv = ["node", "appaloft", "workspace", "--json"];
+    process.env = {
+      ...originalEnv,
+      APPALOFT_HOME: appaloftHome,
+    };
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      stdout += String(chunk);
+      return true;
+    }) as typeof process.stdout.write;
+
+    await runShellCli();
+    expect(stdout).toContain("login-required");
+    expect(stdout).toContain("Run appaloft login");
+    expect(stdout).not.toContain('"status": "ready"');
+    expect(stdout).not.toContain("appaloft-backend");
+  });
 });

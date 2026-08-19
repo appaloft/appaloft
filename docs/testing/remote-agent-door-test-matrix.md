@@ -4,7 +4,7 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 
 | ID | Kind | Status | Proof |
 | --- | --- | --- | --- |
-| WS-REMOTE-LOGIN-001 | unit / CLI | automated | `remote-code-session.test.ts`, `agent-workspace-command.test.ts` |
+| WS-REMOTE-LOGIN-001 | unit / CLI | automated | `remote-code-session.test.ts`, `cli-session-login.test.ts`, `agent-workspace-command.test.ts`, `apps/shell/test/run-control-plane-cli.test.ts` |
 | WS-REMOTE-SERVER-002 | unit | automated | `remote-code-session.test.ts` |
 | WS-REMOTE-OPEN-003 | CLI / application | this slice | default `code` dispatches `workspaces.open` with remote SHA + `targetServerId` |
 | WS-REMOTE-RESUME-004 | application | this slice | same subject resumes preferred Sandbox |

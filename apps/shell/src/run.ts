@@ -12,12 +12,18 @@ import {
   type DevelopmentCommandRuntime,
   defaultCliControlPlaneProfileStore,
   defaultPublicCloudControlPlaneUrl,
+  deployLoginRequiredError,
   developmentPlanFromSource,
   formatSafeCliError,
+  hasCliControlPlaneLogin,
+  hasExplicitLocalDeployIntent,
+  isHeadlessWorkspaceInvocation,
+  loginRequiredWorkspaceOccupancyTree,
   resolveCliExecutionTarget,
   runStandaloneControlPlaneCli,
   runStandaloneDevelopmentCli,
   runStandaloneServerWorkerCli,
+  workspaceRemoteLoginRequiredError,
 } from "@appaloft/adapter-cli";
 import {
   BunSandboxDockerCommandRunner,
@@ -181,6 +187,11 @@ export function formatDomainError(error: DomainError): string {
     lines.push(`remedy: ${firstSafeRemedy.label}`);
   }
 
+  const guidance = typeof error.details?.guidance === "string" ? error.details.guidance.trim() : "";
+  if (guidance && guidance !== error.message.trim()) {
+    lines.push(guidance);
+  }
+
   return `${lines.join("\n")}\n`;
 }
 
@@ -268,7 +279,12 @@ async function createShellComposition(
     );
   } catch (error) {
     if (!remotePgliteStateSyncSession) {
-      throw error;
+      return err(
+        domainError.infra("Local CLI runtime could not be started", {
+          phase: "local-cli-composition",
+          message: errorMessage(error),
+        }),
+      );
     }
 
     if (!isPgliteInitializationFailure(error)) {
@@ -742,6 +758,32 @@ export async function runShellCli(
     return;
   }
 
+  const localArgs = commandArgs(cliArgv);
+  const localCommand = localArgs[0];
+  const loggedIn = await hasCliControlPlaneLogin(process.env);
+  if (!loggedIn) {
+    if (localCommand === "code" && !localArgs.includes("--local")) {
+      writeDomainError(workspaceRemoteLoginRequiredError());
+      process.exit(1);
+    }
+    if (localCommand === "deploy" && !hasExplicitLocalDeployIntent(localArgs)) {
+      writeDomainError(deployLoginRequiredError());
+      process.exit(1);
+    }
+    if (localCommand === "workspace" && isHeadlessWorkspaceInvocation(localArgs)) {
+      const reason =
+        !process.stdin.isTTY || !process.stdout.isTTY
+          ? "non-interactive-terminal"
+          : localArgs.includes("--json")
+            ? "structured-output"
+            : "no-tui";
+      process.stdout.write(
+        `${JSON.stringify(loginRequiredWorkspaceOccupancyTree(reason), null, 2)}\n`,
+      );
+      return;
+    }
+  }
+
   const remotePgliteStateSync = await prepareRemotePgliteStateSync({
     argv: cliArgv,
     env: process.env,
@@ -758,8 +800,17 @@ export async function runShellCli(
     process.env.APPALOFT_PGLITE_DATA_DIR = remotePgliteStateSyncSession.localPgliteDataDir;
   }
 
+  const oneShotCli = !cliArgv.includes("serve") && !cliArgv.includes("worker");
+  const discardedCliLogDestination = {
+    write(): boolean {
+      return true;
+    },
+  };
   const appResult = await createShellComposition(
-    options,
+    {
+      ...options,
+      ...(oneShotCli ? { loggerDestination: discardedCliLogDestination } : {}),
+    },
     remotePgliteStateSyncSession,
     capturedStdinText,
   );

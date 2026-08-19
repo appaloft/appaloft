@@ -282,36 +282,24 @@ describe("remote code door", () => {
     );
   });
 
-  test("[WS-REMOTE-LOGIN-001] local composition skips Cloud login", async () => {
-    const door = await resolveDefaultRemoteCodeDoor({
-      env: {},
-      localComposition: true,
-      readActiveProfile: async () => null,
-      listServers: async () => [
-        {
-          id: "srv_1",
-          name: "this-mac",
-          providerKey: "local-shell",
-          lifecycleStatus: "active",
-        },
-      ],
-      resolveLocator: async () => ({
-        repository: "https://github.com/acme/api.git",
-        repositoryIdentity: "github.com/acme/api",
-        ref: "refs/heads/main",
-        branch: "main",
+  test("[WS-REMOTE-LOGIN-001] local composition still requires login", async () => {
+    await expect(
+      resolveDefaultRemoteCodeDoor({
+        env: {},
+        readActiveProfile: async () => null,
+        listServers: async () => [
+          {
+            id: "srv_1",
+            name: "this-mac",
+            providerKey: "local-shell",
+            lifecycleStatus: "active",
+          },
+        ],
       }),
-      showBinding: async () => null,
-      resolveRemoteRef: async () => ({
-        repositoryIdentity: "github.com/acme/api",
-        credentialFreeHttpsRepository: "https://github.com/acme/api.git",
-        ref: "refs/heads/main",
-        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      }),
+    ).rejects.toMatchObject({
+      code: "workspace_remote_login_required",
+      details: { guidance: expect.stringContaining("Run appaloft login") },
     });
-
-    expect(door.serverProviderKey).toBe("local-shell");
-    expect(door.serverName).toBe("this-mac");
   });
 
   test("[WS-REMOTE-NO-UPLOAD-006] uses origin tracking SHA when ls-remote cannot prompt", async () => {
