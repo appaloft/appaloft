@@ -320,11 +320,12 @@ export class AgentWorkspaceOpenPreflightService {
         }),
       );
     }
-    const resolvedProfile = await this.resolveProfile(
-      context,
-      selector,
-      project.toState().defaultWorkspaceProfileInstallationId?.value,
-    );
+    const projectDefaultInstallationId =
+      project.toState().defaultWorkspaceProfileInstallationId?.value;
+    const resolvedProfile = await this.resolveProfile(context, selector, {
+      explicit: Boolean(input.profile),
+      ...(projectDefaultInstallationId ? { projectDefaultInstallationId } : {}),
+    });
     if (resolvedProfile.isErr()) return err(resolvedProfile.error);
     return ok({
       projectId,
@@ -440,14 +441,17 @@ export class AgentWorkspaceOpenPreflightService {
   private async resolveProfile(
     context: ExecutionContext,
     selector: string,
-    projectDefaultInstallationId?: string,
+    options: {
+      readonly explicit: boolean;
+      readonly projectDefaultInstallationId?: string;
+    },
   ): Promise<Result<string>> {
     const repositoryContext = toRepositoryContext(context);
     const installation = await this.dependencies.profiles.findInstallation(
       repositoryContext,
       selector,
     );
-    if (installation) {
+    if (installation && options.explicit) {
       const available = installation.assertAvailableForNewWorkspace();
       return available.isErr() ? err(available.error) : ok(installation.id.value);
     }
@@ -458,24 +462,38 @@ export class AgentWorkspaceOpenPreflightService {
     const available = installations.filter(
       (candidate) => candidate.toState().status.value === "enabled",
     );
+    const siblings = installation
+      ? available.filter(
+          (candidate) =>
+            candidate.toState().profileId.value === installation.toState().profileId.value,
+        )
+      : [];
     const byProfileId = available.filter(
       (candidate) => candidate.toState().profileId.value === selector,
     );
     const candidates =
-      byProfileId.length > 0
-        ? byProfileId
-        : (
-            await Promise.all(
-              available.map(async (candidate) => ({
-                candidate,
-                definition: await this.dependencies.profiles.findDefinition(
-                  candidate.toState().definitionDigest.value,
-                ),
-              })),
+      siblings.length > 0
+        ? siblings
+        : byProfileId.length > 0
+          ? byProfileId
+          : (
+              await Promise.all(
+                available.map(async (candidate) => ({
+                  candidate,
+                  definition: await this.dependencies.profiles.findDefinition(
+                    candidate.toState().definitionDigest.value,
+                  ),
+                })),
+              )
             )
-          )
-            .filter(({ definition }) => definition?.toState().displayName.value === selector)
-            .map(({ candidate }) => candidate);
+              .filter(({ definition }) => definition?.toState().displayName.value === selector)
+              .map(({ candidate }) => candidate);
+    if (candidates.length === 0 && installation) {
+      const availableInstallation = installation.assertAvailableForNewWorkspace();
+      return availableInstallation.isErr()
+        ? err(availableInstallation.error)
+        : ok(installation.id.value);
+    }
     const liveInstallationIds = this.dependencies.occupancies
       ? await this.dependencies.occupancies.findLiveProfileInstallationIds(
           context,
@@ -488,7 +506,10 @@ export class AgentWorkspaceOpenPreflightService {
         id: candidate.id.value,
         installedAt: candidate.toState().installedAt.value,
       })),
-      ...(projectDefaultInstallationId ? { projectDefaultInstallationId } : {}),
+      onMultipleLive: options.explicit ? "ambiguous" : "prefer-default-or-oldest",
+      ...(options.projectDefaultInstallationId
+        ? { projectDefaultInstallationId: options.projectDefaultInstallationId }
+        : {}),
       ...(liveInstallationIds.length > 0 ? { liveInstallationIds } : {}),
     });
   }

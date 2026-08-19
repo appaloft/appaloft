@@ -37,11 +37,12 @@ run this durable workflow and creates no Sandbox, Binding, Profile or Cloud row.
 
 `appaloft workspace open [path]` remains the durable Profile-aware door over this exact workflow
 with local Git fail-closed. `--profile` and `--new` on `code` keep remote-open meaning and do not
-inspect a dirty laptop tree. Default OpenCode `code` omits the invisible `appaloft-remote` name so
-Project default or a live occupancy can win. Duplicate enabled names prefer a live occupancy, then
-Project default, then oldest. Ambiguous live duplicates list installation ids and
-`appaloft code --profile <id>`. A failed `--new` must not leave another enabled same-name
-installation.
+inspect a dirty laptop tree. Default `code` and `code --new` pick a live occupancy or create a
+new occupancy on the live install. Same-name leftover Profiles must not block first success and
+must not require memorizing installation ids. `--profile` is a fallback pin when the human
+explicitly names a colliding Profile that has more than one live occupancy; that error lists
+both ids and `appaloft code --profile <id>`. A failed `--new` must not leave another enabled
+same-name installation.
 
 Control-plane target selection for durable open happens before dispatch through the existing CLI
 resolver. With no trusted remote selection, activation uses local dispatch; explicit remote

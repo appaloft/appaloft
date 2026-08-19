@@ -53,8 +53,9 @@ Every command supports `--help` for the full argument list; interactive prompts 
 after login. Source is the remote SHA. Missing Adapter/Profile create the
 invisible `appaloft-remote`. The laptop path is not Workspace truth, and dirty
 files are not uploaded. Use `--no-attach` to print the occupancy banner
-without attaching. Use `--profile <installationId>` when more than one Profile
-shares a name. Use `--local` for this-Mac Scratch.
+without attaching. Default `code` picks the live occupancy when leftover
+same-name Profiles exist. `--profile` is only a fallback pin. Use `--local`
+for this-Mac Scratch.
 
 ```bash
 appaloft login

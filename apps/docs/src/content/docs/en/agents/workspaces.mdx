@@ -79,9 +79,10 @@ appaloft workspace open
 That path still dispatches `workspaces.open`. The CLI uses the path only to find the Git root,
 upstream remote, branch, and HEAD SHA. Dirty trees, detached HEAD, missing upstream, and remote
 tip mismatch fail before remote creation. V1 never performs implicit sync or patch upload.
-`--profile` selects an Agent Workspace Profile on both `appaloft code` and
-`appaloft workspace open`. It is distinct from `--control-plane-profile`. Default
-`code` prefers a live occupancy over dead same-name Profiles.
+Default `appaloft code` prefers a live occupancy over dead same-name Profiles.
+Do not switch to `workspace open --profile <installationId>` for that case.
+`--profile` on `code` is only a fallback pin when an explicit name still matches
+more than one live occupancy. It is distinct from `--control-plane-profile`.
 
 `workspaces.open` validates the source before reading the existing Repository Binding and Project
 default Profile. A deployment may compose the optional activation initializer so missing Project,

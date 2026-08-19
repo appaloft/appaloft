@@ -52,7 +52,7 @@ describe("Workspace Profile selector", () => {
     expect(oldest._unsafeUnwrap()).toBe("awpi_old");
   });
 
-  test("[WS-REMOTE-PROFILE-AMBIGUOUS-176] stays ambiguous only when more than one live occupancy shares the selector", () => {
+  test("[WS-REMOTE-PROFILE-AMBIGUOUS-176] stays ambiguous only when an explicit name matches more than one live occupancy", () => {
     const selected = selectWorkspaceProfileInstallation({
       selector: "appaloft-remote",
       candidates: [
@@ -66,5 +66,19 @@ describe("Workspace Profile selector", () => {
     expect(selected.error.details?.code).toBe("workspace_open_profile_ambiguous");
     expect(selected.error.details?.installationIds).toEqual(["awpi_a", "awpi_b"]);
     expect(selected.error.details?.guidance).toContain("appaloft code --profile awpi_a");
+  });
+
+  test("[WS-REMOTE-PROFILE-LIVE-178] default code keeps first success when more than one live occupancy exists", () => {
+    const selected = selectWorkspaceProfileInstallation({
+      selector: "awpi_leftover",
+      candidates: [
+        { id: "awpi_leftover", installedAt: "2026-08-19T00:00:00.000Z" },
+        { id: "awpi_live", installedAt: "2026-08-16T00:00:00.000Z" },
+      ],
+      liveInstallationIds: ["awpi_leftover", "awpi_live"],
+      projectDefaultInstallationId: "awpi_leftover",
+      onMultipleLive: "prefer-default-or-oldest",
+    });
+    expect(selected._unsafeUnwrap()).toBe("awpi_leftover");
   });
 });

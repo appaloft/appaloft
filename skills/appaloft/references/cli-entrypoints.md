@@ -42,9 +42,10 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   enrolled Server, dispatches `workspaces.open` with the remote SHA and
   `targetServerId`, then prints
   `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>`.
-  Default harness is OpenCode. Default `code` omits the invisible `appaloft-remote` name so a live
-  occupancy or Project default can win. `--profile` pins a name or installation id; duplicate live
-  names list both ids and `appaloft code --profile <id>`. `--harness pi` occupies reserved
+  Default harness is OpenCode. Default `code` and `code --new` pick the live occupancy / live
+  install. Same-name leftover Profiles must not block first success and must not require
+  memorizing installation ids. `--profile` is a fallback pin; only an explicit colliding name
+  with more than one live occupancy lists both ids and `appaloft code --profile <id>`. `--harness pi` occupies reserved
   `appaloft-remote-pi` and does not rewrite the project's OpenCode default; an existing
   OpenCode Workspace needs `--new`. A positional `https://`, `ssh://`, or `git@host:path` occupies that repository
   without a local clone. Laptop Git is not uploaded. Missing login or Server fails

@@ -28,6 +28,7 @@ export function selectWorkspaceProfileInstallation(input: {
   readonly candidates: readonly WorkspaceProfileInstallationCandidate[];
   readonly projectDefaultInstallationId?: string;
   readonly liveInstallationIds?: readonly string[];
+  readonly onMultipleLive?: "ambiguous" | "prefer-default-or-oldest";
 }): Result<string> {
   const candidates = [...input.candidates];
   if (candidates.length === 0) {
@@ -44,23 +45,30 @@ export function selectWorkspaceProfileInstallation(input: {
   const live = liveIds.size > 0 ? candidates.filter((candidate) => liveIds.has(candidate.id)) : [];
   if (live.length === 1 && live[0]) return ok(live[0].id);
   if (live.length > 1) {
-    return err(
-      workspaceProfileAmbiguousError(
-        input.selector,
-        live.map((candidate) => candidate.id),
-      ),
-    );
+    if (input.onMultipleLive !== "prefer-default-or-oldest") {
+      return err(
+        workspaceProfileAmbiguousError(
+          input.selector,
+          live.map((candidate) => candidate.id),
+        ),
+      );
+    }
+    return ok(preferredInstallationId(live, input.projectDefaultInstallationId));
   }
 
-  const projectDefault = input.projectDefaultInstallationId
-    ? candidates.find((candidate) => candidate.id === input.projectDefaultInstallationId)
-    : undefined;
-  if (projectDefault) return ok(projectDefault.id);
+  return ok(preferredInstallationId(candidates, input.projectDefaultInstallationId));
+}
 
+function preferredInstallationId(
+  candidates: readonly WorkspaceProfileInstallationCandidate[],
+  projectDefaultInstallationId?: string,
+): string {
+  const projectDefault = projectDefaultInstallationId
+    ? candidates.find((candidate) => candidate.id === projectDefaultInstallationId)
+    : undefined;
+  if (projectDefault) return projectDefault.id;
   const [oldest] = [...candidates].sort((left, right) =>
     left.installedAt.localeCompare(right.installedAt),
   );
-  return oldest
-    ? ok(oldest.id)
-    : err(domainError.notFound("AgentWorkspaceProfileInstallation", input.selector));
+  return oldest?.id ?? candidates[0]?.id ?? "";
 }

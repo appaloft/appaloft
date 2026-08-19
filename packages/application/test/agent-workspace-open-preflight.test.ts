@@ -135,6 +135,7 @@ async function fixture(
       repositoryBindings: InMemoryRepositoryBindingRepository;
     }) => WorkspaceActivationContextInitializerPort;
     duplicateProfile?: boolean;
+    defaultProfileInstallationId?: string;
     occupancies?: {
       findLiveProfileInstallationIds: (
         executionContext: ExecutionContext,
@@ -190,7 +191,9 @@ async function fixture(
   if (!options.omitDefaultProfile) {
     project
       .configureWorkspaceProfile({
-        profileInstallationId: AgentWorkspaceProfileInstallationId.rehydrate("awpi_default"),
+        profileInstallationId: AgentWorkspaceProfileInstallationId.rehydrate(
+          options.defaultProfileInstallationId ?? "awpi_default",
+        ),
         configuredAt: UpdatedAt.rehydrate("2026-07-28T00:00:01.000Z"),
       })
       ._unsafeUnwrap();
@@ -591,6 +594,21 @@ describe("Agent Workspace open preflight", () => {
     expect(released).toEqual(["wres_invalid"]);
   });
 
+  test("[WS-REMOTE-PROFILE-LIVE-178] default code prefers the live occupancy over a leftover Project default", async () => {
+    const leftoverDefault = await fixture({
+      duplicateProfile: true,
+      defaultProfileInstallationId: "awpi_dead",
+      occupancies: {
+        findLiveProfileInstallationIds: async (_context, installationIds) =>
+          installationIds.filter((id) => id === "awpi_default"),
+      },
+    });
+    expect(
+      (await leftoverDefault.service.resolveContext(context, input))._unsafeUnwrap()
+        .profileInstallationId,
+    ).toBe("awpi_default");
+  });
+
   test("[WS-REMOTE-PROFILE-LIVE-178] duplicate Profile names prefer live occupancy, then Project default", async () => {
     const live = await fixture({
       duplicateProfile: true,
@@ -611,6 +629,19 @@ describe("Agent Workspace open preflight", () => {
         await fromDefault.service.resolveContext(context, { ...input, profile: "agent-default" })
       )._unsafeUnwrap().profileInstallationId,
     ).toBe("awpi_default");
+  });
+
+  test("[WS-REMOTE-PROFILE-LIVE-178] default code stays first-success when leftover and live installs both exist", async () => {
+    const { service } = await fixture({
+      duplicateProfile: true,
+      defaultProfileInstallationId: "awpi_dead",
+      occupancies: {
+        findLiveProfileInstallationIds: async (_context, installationIds) => installationIds,
+      },
+    });
+    expect(
+      (await service.resolveContext(context, input))._unsafeUnwrap().profileInstallationId,
+    ).toBe("awpi_dead");
   });
 
   test("[WS-REMOTE-PROFILE-AMBIGUOUS-176] duplicate live occupancies list installationIds and a copy-pasteable command", async () => {
