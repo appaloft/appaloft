@@ -496,6 +496,7 @@ describe("CreateResourceUseCase", () => {
       phase: "resource-runtime-resolution",
       runtimePlanStrategy: "static",
       publishDirectory: "../dist",
+      guidance: "Pass --publish-dir public if the site is published from a public directory.",
     });
     expect(eventBus.events).toHaveLength(0);
   });

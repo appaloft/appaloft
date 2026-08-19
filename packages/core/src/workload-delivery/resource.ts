@@ -266,11 +266,24 @@ function resourceRuntimeResolutionError(
   });
 }
 
+const staticPublishDirectoryNextStep =
+  "Pass --publish-dir public if the site is published from a public directory.";
+
+function staticPublishDirectoryError(
+  message: string,
+  details?: Record<string, string | number | boolean>,
+) {
+  return resourceRuntimeResolutionError(message, {
+    guidance: staticPublishDirectoryNextStep,
+    ...(details ?? {}),
+  });
+}
+
 function normalizeStaticPublishDirectory(value: string): Result<string> {
   const trimmed = value.trim();
   if (!trimmed) {
     return err(
-      resourceRuntimeResolutionError("Static publish directory is required", {
+      staticPublishDirectoryError("Static publish directory is required", {
         runtimePlanStrategy: "static",
       }),
     );
@@ -278,7 +291,7 @@ function normalizeStaticPublishDirectory(value: string): Result<string> {
 
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) {
     return err(
-      resourceRuntimeResolutionError("Static publish directory must not be a URL", {
+      staticPublishDirectoryError("Static publish directory must not be a URL", {
         runtimePlanStrategy: "static",
         publishDirectory: trimmed,
       }),
@@ -287,7 +300,7 @@ function normalizeStaticPublishDirectory(value: string): Result<string> {
 
   if (/^[a-z]:[\\/]/i.test(trimmed)) {
     return err(
-      resourceRuntimeResolutionError("Static publish directory must not be a host path", {
+      staticPublishDirectoryError("Static publish directory must not be a host path", {
         runtimePlanStrategy: "static",
         publishDirectory: trimmed,
       }),
@@ -296,7 +309,7 @@ function normalizeStaticPublishDirectory(value: string): Result<string> {
 
   if (/[;&|`$<>]/.test(trimmed)) {
     return err(
-      resourceRuntimeResolutionError(
+      staticPublishDirectoryError(
         "Static publish directory contains unsupported shell characters",
         {
           runtimePlanStrategy: "static",
@@ -314,7 +327,7 @@ function normalizeStaticPublishDirectory(value: string): Result<string> {
   const segments = withLeadingSlash.split("/").filter(Boolean);
   if (segments.some((segment) => segment === "." || segment === "..")) {
     return err(
-      resourceRuntimeResolutionError("Static publish directory must not contain dot segments", {
+      staticPublishDirectoryError("Static publish directory must not contain dot segments", {
         runtimePlanStrategy: "static",
         publishDirectory: trimmed,
       }),

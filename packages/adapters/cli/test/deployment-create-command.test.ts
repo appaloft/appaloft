@@ -208,26 +208,52 @@ describe("CLI deployment create command", () => {
     });
   });
 
-  test("[WS-REMOTE-DEPLOY-053] deploy git-remote without occupancy Resource stays on existing path", async () => {
+  test("[WS-REMOTE-DEPLOY-053] deploy git-remote without occupancy creates a new app", async () => {
     const commands: AppCommand<unknown>[] = [];
     const commandBus = {
       execute: async <T>(_context: unknown, command: AppCommand<T>) => {
         commands.push(command as AppCommand<unknown>);
-        return ok({ id: "dep_unexpected" } as T);
+        const name = command.constructor.name;
+        if (name === "CreateProjectCommand") return ok({ id: "prj_new_hello" } as T);
+        if (name === "CreateEnvironmentCommand") return ok({ id: "env_new_hello" } as T);
+        if (name === "CreateResourceCommand") return ok({ id: "res_new_hello" } as T);
+        if (command instanceof CreateDeploymentCommand) return ok({ id: "dep_new_hello" } as T);
+        return ok({ id: `id_${commands.length}` } as T);
       },
     } as unknown as CommandBus;
     const queryBus = {
       execute: async <T>(_context: unknown, query: AppQuery<T>) => {
-        if (query.constructor.name === "ShowRepositoryBindingQuery") {
-          return ok({
-            bindingId: "bnd_unbound",
-            repositoryIdentity: "github.com/octocat/Hello-World",
-            projectId: "prj_empty",
-            status: "unbound",
-            createdAt: "2026-08-16T00:00:00.000Z",
-          } as T);
+        switch (query.constructor.name) {
+          case "ShowRepositoryBindingQuery":
+            return ok({
+              bindingId: "bnd_unbound",
+              repositoryIdentity: "github.com/octocat/Hello-World",
+              projectId: "prj_empty",
+              status: "unbound",
+              createdAt: "2026-08-16T00:00:00.000Z",
+            } as T);
+          case "ListServersQuery":
+            return ok({
+              items: [
+                {
+                  id: "srv_4lifk0yrcecy",
+                  name: "hostinger",
+                  lifecycleStatus: "active",
+                },
+              ],
+            } as T);
+          case "ShowDeploymentQuery":
+            return ok({
+              schemaVersion: "deployments.show/v1",
+              deployment: {
+                id: "dep_new_hello",
+                resourceId: "res_new_hello",
+                status: "succeeded",
+              },
+            } as T);
+          default:
+            return ok({ items: [] } as T);
         }
-        return ok({ items: [] } as T);
       },
     } as unknown as QueryBus;
     const executionContextFactory: ExecutionContextFactory = {
@@ -254,23 +280,30 @@ describe("CLI deployment create command", () => {
     const writeStdout = process.stdout.write;
     const writeStderr = process.stderr.write;
     const exitCode = process.exitCode;
+    let errorText = "";
     try {
       process.stdout.write = (() => true) as typeof process.stdout.write;
       process.stderr.write = (() => true) as typeof process.stderr.write;
-      await expect(
-        program.parseAsync([
-          "node",
-          "appaloft",
-          "deploy",
-          "https://github.com/octocat/Hello-World.git",
-        ]),
-      ).rejects.toBeDefined();
+      await program
+        .parseAsync(["node", "appaloft", "deploy", "https://github.com/octocat/Hello-World.git"])
+        .catch((error: unknown) => {
+          errorText =
+            error instanceof Error ? `${error.message}\n${JSON.stringify(error)}` : String(error);
+        });
     } finally {
       process.stdout.write = writeStdout;
       process.stderr.write = writeStderr;
       process.exitCode = exitCode ?? 0;
     }
-    expect(commands).toHaveLength(0);
+    expect(errorText).not.toContain("Run appaloft code");
+    expect(errorText).not.toContain("workspace_occupancy_resource_missing");
+    expect(errorText).not.toContain("Occupancy Resource app is required");
+    const occupancyDeploys = commands.filter(
+      (command) =>
+        command instanceof CreateDeploymentCommand && command.resourceId === "res_dfsc156jw98k",
+    );
+    expect(occupancyDeploys).toHaveLength(0);
+    expect(commands.some((command) => command instanceof CreateDeploymentCommand)).toBe(true);
   });
 
   test("[WS-REMOTE-DEPLOY-057] bare deploy does not silently reuse a whoami occupancy", async () => {

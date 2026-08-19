@@ -62,7 +62,6 @@ import {
   print,
   resultToEffect,
   runCommand,
-  runDeploymentCommand,
   runDeploymentCommandResult,
   runDeploymentTimelineQuery,
   runQuery,
@@ -1216,20 +1215,45 @@ function occupancyDeployUrlFromSummary(
   } as DeploymentSummary)[0];
 }
 
-function readCreatedDeploymentUrl(deploymentId: string) {
+function readShownDeployment(deploymentId: string) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
     const query = ShowDeploymentQuery.create({
       deploymentId,
-      includeTimeline: false,
+      includeTimeline: true,
       includeSnapshot: false,
       includeRelatedContext: false,
-      includeLatestFailure: false,
+      includeLatestFailure: true,
     });
     if (query.isErr()) return undefined;
     const result = yield* Effect.promise(() => cli.executeQuery(query.value));
     if (result.isErr()) return undefined;
-    return occupancyDeployUrlFromSummary(result.value?.deployment);
+    const deployment = result.value.deployment;
+    if (!deployment) return undefined;
+    const latestFailure = result.value.latestFailure;
+    const latestFailureMessage = latestFailure?.message?.trim();
+    const timeline = latestFailureMessage
+      ? [
+          {
+            timestamp: latestFailure?.timestamp ?? new Date().toISOString(),
+            source: latestFailure?.source ?? "ssh",
+            phase: latestFailure?.phase ?? "package",
+            level: latestFailure?.level ?? "error",
+            message: latestFailureMessage,
+          },
+        ]
+      : [];
+    return {
+      ...deployment,
+      timeline,
+    } as DeploymentSummary;
+  });
+}
+
+function readCreatedDeploymentUrl(deploymentId: string) {
+  return Effect.gen(function* () {
+    const shown = yield* readShownDeployment(deploymentId);
+    return occupancyDeployUrlFromSummary(shown);
   });
 }
 
@@ -1261,7 +1285,8 @@ function waitForSynchronousDeployment(input: { deploymentId: string; resourceId:
     }
     const deadline = Date.now() + synchronousDeploymentTimeoutMs;
     while (true) {
-      const deployment = yield* readDeploymentSummary(input);
+      const deployment =
+        (yield* readShownDeployment(input.deploymentId)) ?? (yield* readDeploymentSummary(input));
       if (deployment && deploymentTerminalStatuses.has(deployment.status)) {
         if (deployment.status !== "succeeded") {
           return (yield* enrichFailedDeploymentSummary(deployment)) ?? deployment;
@@ -1867,17 +1892,6 @@ export const deployCommand = EffectCommand.make(
             ...(previewOutputFilePath ? { previewOutputFile: previewOutputFilePath } : {}),
           });
         }
-        const interactive = Boolean(cli.terminalIO.stdin.isTTY && cli.terminalIO.stdout.isTTY);
-        if (!interactive) {
-          return yield* Effect.fail(
-            domainError.validation("Occupancy Resource app is required for this git remote", {
-              phase: "occupancy-deploy-reuse",
-              code: "workspace_occupancy_resource_missing",
-              guidance:
-                "Run appaloft code <git-remote> first, or pass --project --environment --resource --server.",
-            }),
-          );
-        }
       }
 
       const configSourceLocator = sourceLocator ?? ".";
@@ -2376,28 +2390,9 @@ const createDeploymentCommand = EffectCommand.make(
       ...(destinationId === undefined ? {} : { destinationId }),
     } satisfies Omit<CreateDeploymentCommandInput, "executionMode">;
 
-    return Effect.gen(function* () {
-      const cli = yield* CliRuntime;
-      if (cli.executionTarget === "remote") {
-        return yield* runDeploymentCommand(
-          CreateDeploymentCommand.create({
-            ...input,
-            executionMode: "detached",
-          }),
-          { appLogLines: 3 },
-        );
-      }
-
-      return yield* runCreateDeploymentCommand(
-        {
-          ...input,
-          executionMode: "synchronous",
-        },
-        {
-          appLogLines: 3,
-          requirePreviewUrl: false,
-        },
-      );
+    return runCreateDeploymentCommand(input, {
+      appLogLines: 3,
+      requirePreviewUrl: false,
     });
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentCreate));

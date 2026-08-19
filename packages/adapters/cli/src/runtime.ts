@@ -420,6 +420,13 @@ function humanErrorGuidance(error: DomainError): string | null {
   return remedy && remedy !== error.message.trim() ? remedy : null;
 }
 
+function humanErrorCode(error: DomainError): string | null {
+  const value = error.details?.errorCode;
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return /^[a-z][a-z0-9_]{2,80}$/u.test(trimmed) ? trimmed : null;
+}
+
 export function formatHumanCliError(error: unknown): string {
   if (isDomainError(error)) {
     const lines = [error.message.trim()].filter((line) => line.length > 0);
@@ -429,6 +436,10 @@ export function formatHumanCliError(error: unknown): string {
         : "";
     if (repositoryIdentity && !lines.some((line) => line.includes(repositoryIdentity))) {
       lines.push(`Opening ${repositoryIdentity}.`);
+    }
+    const errorCode = humanErrorCode(error);
+    if (errorCode && !lines.some((line) => line.includes(errorCode))) {
+      lines.push(errorCode);
     }
     const detailCode = typeof error.details?.code === "string" ? error.details.code.trim() : "";
     const causeCode =

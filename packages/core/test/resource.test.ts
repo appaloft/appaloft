@@ -185,6 +185,7 @@ describe("Resource", () => {
       expect(parent.error.details).toMatchObject({
         phase: "resource-runtime-resolution",
         runtimePlanStrategy: "static",
+        guidance: "Pass --publish-dir public if the site is published from a public directory.",
       });
     }
   });
