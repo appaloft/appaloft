@@ -6,6 +6,10 @@ export interface ChangeClassification {
   readonly lightweightOnly: boolean;
 }
 
+export interface ClassifyChangedFilesOptions {
+  readonly headRef?: string;
+}
+
 export interface ChangedFilesLookupInput {
   readonly baseRef: string;
   readonly beforeSha: string;
@@ -44,13 +48,30 @@ export function isReleaseBumpPath(file: string): boolean {
   return (releaseBumpExactFiles as readonly string[]).includes(file);
 }
 
+export function isReleasePleaseHeadRef(headRef: string): boolean {
+  return headRef.startsWith("release-please--");
+}
+
 export function isLightweightPath(file: string): boolean {
   return isDocsOnlyPath(file) || isReleaseBumpPath(file);
 }
 
-export function classifyChangedFiles(files: readonly string[]): ChangeClassification {
+export function classifyChangedFiles(
+  files: readonly string[],
+  options: ClassifyChangedFilesOptions = {},
+): ChangeClassification {
   const normalized = uniqueSortedFiles(files);
-  if (normalized.length === 0 || !normalized.every((file) => isLightweightPath(file))) {
+  const releasePleaseBranch = isReleasePleaseHeadRef(options.headRef ?? "");
+
+  if (normalized.length === 0) {
+    if (releasePleaseBranch) {
+      return {
+        changeClass: "release_bump",
+        files: normalized,
+        lightweightOnly: true,
+      };
+    }
+
     return {
       changeClass: "full",
       files: normalized,
@@ -58,7 +79,15 @@ export function classifyChangedFiles(files: readonly string[]): ChangeClassifica
     };
   }
 
-  if (normalized.some((file) => isReleaseBumpPath(file))) {
+  if (!normalized.every((file) => isLightweightPath(file))) {
+    return {
+      changeClass: "full",
+      files: normalized,
+      lightweightOnly: false,
+    };
+  }
+
+  if (normalized.some((file) => isReleaseBumpPath(file)) || releasePleaseBranch) {
     return {
       changeClass: "release_bump",
       files: normalized,
@@ -185,7 +214,7 @@ async function writeGitHubLines(path: string | undefined, lines: readonly string
 async function main(): Promise<void> {
   const filesFrom = envValue("CHANGED_FILES_PATH");
   const files = filesFrom ? parseNameOnly(await Bun.file(filesFrom).text()) : listChangedFiles();
-  const classification = classifyChangedFiles(files);
+  const classification = classifyChangedFiles(files, { headRef: envValue("HEAD_REF") });
 
   await writeGitHubLines(envValue("GITHUB_OUTPUT") || undefined, [
     `lightweight_only=${classification.lightweightOnly}`,

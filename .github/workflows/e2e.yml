@@ -50,25 +50,11 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
           BEFORE_SHA: ${{ github.event.before }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          HEAD_REF: ${{ github.head_ref || github.ref_name }}
         run: bun scripts/ci/classify-changed-files.ts
 
-  e2e-skip:
-    name: e2e (${{ matrix.shard }}, ${{ matrix.shard_total }})
-    if: ${{ (github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false) && needs.changes.outputs.lightweight_only == 'true' }}
-    needs: changes
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2]
-        shard_total: [2]
-    steps:
-      - name: Skip E2E
-        run: echo "Lightweight-only change (${{ needs.changes.outputs.change_class }}); skipping real E2E."
-
   e2e:
-    if: ${{ (github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false) && needs.changes.outputs.lightweight_only != 'true' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false }}
     needs: changes
     runs-on: ubuntu-latest
     strategy:
@@ -91,13 +77,20 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     steps:
+      - name: Skip E2E
+        if: ${{ needs.changes.outputs.lightweight_only == 'true' }}
+        run: echo "Lightweight-only change (${{ needs.changes.outputs.change_class }}); skipping real E2E."
+
       - uses: actions/checkout@v4
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
 
       - uses: oven-sh/setup-bun@v2
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         with:
           bun-version-file: .bun-version
 
       - name: Install redis-cli
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         run: |
           set -euo pipefail
           if command -v redis-cli >/dev/null 2>&1; then
@@ -112,37 +105,44 @@ jobs:
           redis-cli --version
 
       - name: Install
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         run: bun install --frozen-lockfile
 
       - name: Verify Bun version sync
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         run: bun run bun:version:check
 
       - name: Install Chromium For WebView
-        if: ${{ matrix.shard == 1 }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' && matrix.shard == 1 }}
         working-directory: apps/web
         run: bunx playwright install chromium
 
       - name: Prepare Runtime Logs
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         run: mkdir -p runtime/logs
 
       - name: Migrate Database
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         run: bun run db:migrate
 
       - name: Start Appaloft Backend
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         run: |
           bun run serve > runtime/logs/e2e-server.log 2>&1 &
           echo $! > .appaloft-server.pid
 
       - name: Wait For Backend
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         run: bun run scripts/test/wait-for-http.ts http://127.0.0.1:3101/api/health 60000
 
       - name: Web WebView Smoke
-        if: ${{ matrix.shard == 1 }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' && matrix.shard == 1 }}
         working-directory: apps/web
         run: bun run test:e2e
 
       - name: Select Shell E2E Shard
         id: shell-e2e-shard
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         run: |
           files="$(bun run scripts/test/select-shell-e2e-shard.ts --shell-root=apps/shell --shard=${{ matrix.shard }} --total=${{ matrix.shard_total }})"
           echo "files=${files}" >> "${GITHUB_OUTPUT}"
@@ -150,18 +150,19 @@ jobs:
           printf '%s\n' "${files}"
 
       - name: Shell CLI + HTTP E2E
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         working-directory: apps/shell
         run: bun test --timeout=900000 ${{ steps.shell-e2e-shard.outputs.files }}
 
       - name: Stop Backend
-        if: always()
+        if: ${{ always() && needs.changes.outputs.lightweight_only != 'true' }}
         run: |
           if [ -f .appaloft-server.pid ]; then
             kill "$(cat .appaloft-server.pid)" || true
           fi
 
       - name: Upload E2E Logs
-        if: always()
+        if: ${{ always() && needs.changes.outputs.lightweight_only != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: appaloft-e2e-logs-shard-${{ matrix.shard }}

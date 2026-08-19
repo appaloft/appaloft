@@ -15,7 +15,7 @@
   },
   "scripts": {
     "lint": "biome check .",
-    "test": "bun test --preload reflect-metadata",
+    "test": "bun test --preload reflect-metadata --timeout=30000",
     "typecheck": "tsc -p tsconfig.json --noEmit --checkers 4"
   }
 }

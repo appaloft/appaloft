@@ -16,7 +16,6 @@ const root = resolve(import.meta.dir, "../..");
 const ciWorkflow = readFileSync(join(root, ".github/workflows/ci.yml"), "utf8");
 const e2eWorkflow = readFileSync(join(root, ".github/workflows/e2e.yml"), "utf8");
 const classifierPath = "scripts/ci/classify-changed-files.ts";
-const expression = (value: string) => ["$", "{{ ", value, " }}"].join("");
 
 const releaseBumpPrFiles = [
   ".github/.release-please-manifest.json",
@@ -106,6 +105,30 @@ describe("CI change classifier", () => {
       changeClass: "full",
       lightweightOnly: false,
     });
+    expect(
+      classifyChangedFiles(["packages/core/src/index.ts"], {
+        headRef: "release-please--branches--main--components--appaloft",
+      }),
+    ).toMatchObject({
+      changeClass: "full",
+      lightweightOnly: false,
+    });
+    expect(
+      classifyChangedFiles(docsOnlyPrFiles, {
+        headRef: "release-please--branches--main--components--appaloft",
+      }),
+    ).toMatchObject({
+      changeClass: "release_bump",
+      lightweightOnly: true,
+    });
+    expect(
+      classifyChangedFiles([], {
+        headRef: "release-please--branches--main--components--appaloft",
+      }),
+    ).toMatchObject({
+      changeClass: "release_bump",
+      lightweightOnly: true,
+    });
   });
 
   test("[CI-LIGHTWEIGHT-004] pull_request and workflow_dispatch both diff against the target branch", () => {
@@ -164,12 +187,18 @@ describe("CI change classifier", () => {
     expect(e2eWorkflow).toContain(classifierPath);
     expect(ciWorkflow).not.toContain("Workflow dispatch; running full CI.");
     expect(ciWorkflow).toContain("name: ci");
-    expect(e2eWorkflow).toContain(
-      `name: e2e (${expression("matrix.shard")}, ${expression("matrix.shard_total")})`,
-    );
+    expect(e2eWorkflow).toContain("  e2e:");
     expect(e2eWorkflow).toContain("shard: [1, 2]");
     expect(e2eWorkflow).toContain("shard_total: [2]");
     expect(e2eWorkflow).toContain("name: Skip E2E");
+    expect(e2eWorkflow).not.toContain("e2e-skip:");
+    const resultVar = ["$", "{result}"].join("");
+    expect(ciWorkflow).toContain(
+      ['if [[ "', resultVar, '" != "success" && "', resultVar, '" != "skipped" ]]; then'].join(""),
+    );
+    expect(ciWorkflow).toContain(
+      ["if: $", "{{ needs.changes.outputs.lightweight_only != 'true' }}"].join(""),
+    );
 
     const pullRequestTrigger = e2eWorkflow.slice(
       e2eWorkflow.indexOf("  pull_request:"),

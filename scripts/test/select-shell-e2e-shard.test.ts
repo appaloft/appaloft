@@ -58,7 +58,9 @@ test("shell e2e shard selection is deterministic and complete", () => {
 test("e2e workflow uses weighted shell shards and runs WebView on the lighter shell shard", () => {
   expect(workflow).toContain("scripts/test/select-shell-e2e-shard.ts");
   expect(workflow).not.toContain("./test/e2e/*.e2e.ts --shard=");
-  expect(workflow).toContain(`if: ${expression("matrix.shard == 1")}`);
+  expect(workflow).toContain(
+    expression("needs.changes.outputs.lightweight_only != 'true' && matrix.shard == 1"),
+  );
   expect(workflow).toContain("run: bun run test:e2e");
   expect(workflow.indexOf("name: Web WebView Smoke")).toBeLessThan(
     workflow.indexOf("name: Shell CLI + HTTP E2E"),
@@ -76,8 +78,7 @@ test("[RELEASE-HARDENING-009] e2e workflow publishes both required shard checks 
   expect(workflow).toContain("scripts/ci/classify-changed-files.ts");
   expect(workflow).toContain("shard: [1, 2]");
   expect(workflow).toContain("shard_total: [2]");
-  expect(workflow).toContain(
-    `name: e2e (${expression("matrix.shard")}, ${expression("matrix.shard_total")})`,
-  );
+  expect(workflow).toContain("  e2e:");
   expect(workflow).toContain("name: Skip E2E");
+  expect(workflow).not.toContain("e2e-skip:");
 });

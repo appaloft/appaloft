@@ -86,10 +86,31 @@ export function findCiChangeClassifierViolations(
     });
   }
 
-  if (!e2eWorkflow.includes("name: Skip E2E") || !e2eWorkflow.includes("shard: [1, 2]")) {
+  if (
+    !e2eWorkflow.includes("name: Skip E2E") ||
+    !e2eWorkflow.includes("shard: [1, 2]") ||
+    e2eWorkflow.includes("e2e-skip:")
+  ) {
     violations.push({
       message:
-        "e2e.yml must keep the two-shard matrix and publish those check names when real E2E is skipped.",
+        "e2e.yml must keep the two-shard matrix and skip inside those jobs so e2e (1, 2) and e2e (2, 2) still succeed.",
+      rule: "shared-change-classifier",
+    });
+  }
+
+  const resultVar = ["$", "{result}"].join("");
+  const skippedOk = [
+    'if [[ "',
+    resultVar,
+    '" != "success" && "',
+    resultVar,
+    '" != "skipped" ]]; then',
+  ].join("");
+  const tuiJobSkip = ["if: $", "{{ needs.changes.outputs.lightweight_only != 'true' }}"].join("");
+  if (!ciWorkflow.includes(skippedOk) || !ciWorkflow.includes(tuiJobSkip)) {
+    violations.push({
+      message:
+        "ci.yml must job-level skip Workspace TUI when lightweight and treat skipped needed jobs as success.",
       rule: "shared-change-classifier",
     });
   }

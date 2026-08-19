@@ -60,6 +60,8 @@ describe("CI test boundary check", () => {
   test("[CI-LIGHTWEIGHT-005] requires ci.yml and e2e.yml to share the change classifier", () => {
     const ciWorkflow = `${validWorkflow}
       - run: bun scripts/ci/classify-changed-files.ts
+    if: \${{ needs.changes.outputs.lightweight_only != 'true' }}
+            if [[ "\${result}" != "success" && "\${result}" != "skipped" ]]; then
 `;
     const e2eWorkflow = `
 on:

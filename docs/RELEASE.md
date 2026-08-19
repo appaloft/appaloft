@@ -51,19 +51,20 @@ docker build --build-arg APPALOFT_APP_VERSION=0.1.0 -t appaloft-all-in-one:local
 
 - `ci.yml`: lint, typecheck, unit, integration, build, binary smoke, Docker build smoke. Docs-only
   and release-please version-bump PRs classify as lightweight and skip those heavy jobs; the
-  required `ci` check still succeeds. `workflow_dispatch` uses the same classifier against the
-  default branch so a release-PR dispatch cannot race a green pull-request run with a forced full
-  CI failure.
+  required `ci` check still succeeds. Workspace TUI is skipped at the job level so the six runners
+  do not boot; the `ci` aggregator treats `skipped` as success. `workflow_dispatch` classifies
+  against the default branch instead of forcing full CI, and `release.yml` does not dispatch CI.
 - `e2e.yml`: real Postgres, started backend, CLI/API/deployment E2E, web smoke. It runs for every
   pull request so the two stable shard checks can be enforced as branch-protection merge gates.
-  Lightweight and version-bump PRs skip the real shards but still publish `e2e (1, 2)` and
-  `e2e (2, 2)` as success.
+  Lightweight and version-bump PRs skip real shards inside the matrix jobs but still publish
+  `e2e (1, 2)` and `e2e (2, 2)` as success.
 - `nightly.yml`: scheduled Compose/self-host smoke.
 - `release.yml`: manually creates or updates a Release Please PR on `main`, adds roadmap release
   alignment to that PR, and publishes only when the merged release PR pushes a `chore: release ...`
   commit to `main`. Release Please uses the dedicated `RELEASE_PLEASE_TOKEN` for release PR, tag,
-  and GitHub Release orchestration. Checkout, roadmap alignment, and explicit CI dispatch keep using
-  the workflow-scoped `github.token`. Public docs deployment is no longer tied to product releases.
+  GitHub Release orchestration, and the follow-up `chore: align release pull request` push so
+  `pull_request` CI/E2E actually run on HEAD. It does not `workflow_dispatch` `ci.yml`. Public docs
+  deployment is no longer tied to product releases.
 - `public-launch-basic-docker-smoke.yml`, `public-launch-github-repo-smoke.yml`, and
   `public-launch-cron-smoke.yml`: GitHub Actions secret-gated public launch smokes used by nightly
   and release. They prove that public Appaloft can register a temporary project/server, deploy a
@@ -181,8 +182,9 @@ The CLI binary bundle embeds:
 
 ## Required Secrets
 
-- `RELEASE_PLEASE_TOKEN`: Appaloft release identity with repository write access, used only by
-  Release Please to create release PRs, tags, and GitHub Releases.
+- `RELEASE_PLEASE_TOKEN`: Appaloft release identity with repository write access, used by
+  Release Please to create release PRs, tags, and GitHub Releases, and to push the roadmap
+  alignment commit so GitHub records usable `pull_request` checks on HEAD.
 - `NPM_TOKEN`: optional fallback for npm publish. Prefer npm trusted publishing/OIDC. Because the
   source repository is private, npm provenance is not requested.
 - `HOMEBREW_TAP_TOKEN`: token with write access to `appaloft/homebrew-tap`.

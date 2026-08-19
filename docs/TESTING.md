@@ -109,16 +109,19 @@ If tests bypass the runtime or write directly to the database to simulate succes
   - generated host build artifacts are reclaimed before the all-in-one Docker rebuild so the
     smoke remains within the hosted runner disk budget
   - `scripts/ci/classify-changed-files.ts` marks docs-only, workflow-yaml-only, LICENSE, and
-    release-please version-bump file sets as `lightweight_only`; those PRs skip Biome, Typecheck,
-    Unit Tests, Integration, Workspace TUI, and Build And Smoke while the required `ci` check still
-    succeeds. Product source, lockfiles, and other Rust stay on the full graph. `workflow_dispatch`
-    classifies the same way against the default branch instead of forcing full CI.
+    release-please version-bump file sets as `lightweight_only`. A `release-please--*` head ref is
+    also treated as `release_bump` when every changed file is already on that allowlist. Those PRs
+    skip Biome, Typecheck, Unit Tests, Integration, and Build And Smoke via skip steps, skip
+    Workspace TUI at the job level, and still publish the required `ci` check. The aggregator
+    treats `skipped` needed jobs as success. Product source, lockfiles, `.github/actions/*`, and
+    other Rust stay on the full graph. `workflow_dispatch` classifies against the default branch;
+    `release.yml` does not dispatch CI.
 - `e2e.yml`
   - real PostgreSQL, started backend, CLI/API/deployment E2E, Playwright smoke
   - runs for every non-draft pull request and always publishes both stable shard checks required by
     branch protection; path filters must not suppress those checks
-  - the same change classifier skips real WebView and shell shards for lightweight/release-bump
-    PRs, but a dedicated skip job still reports `e2e (1, 2)` and `e2e (2, 2)` as success
+  - the same change classifier skips real WebView and shell work inside the two matrix jobs so
+    `e2e (1, 2)` and `e2e (2, 2)` still succeed; those jobs are not skipped at the job level
 - `nightly.yml`
   - higher-cost compose smoke
 
