@@ -29,9 +29,9 @@ Project 是你管理一组资源、环境和部署历史的工作边界。它不
 ## 在 Web / CLI / API 中的体现
 
 ```bash
-appaloft projects create --name "my-first-project"
-appaloft projects list
-appaloft projects show <projectId>
+appaloft project create --name "my-first-project"
+appaloft project list
+appaloft project show <projectId>
 ```
 
 ## 项目生命周期 <a id="project-lifecycle" />
@@ -45,10 +45,10 @@ Project 可以被重命名、排序、设置描述、归档、恢复，并在满
 - **删除** 只对已归档的项目开放，并且必须先通过删除预检（delete-check）——只要还有环境、资源、部署历史、域名、证书、日志、审计或运行时记录依赖这个项目，删除就不会启用。
 
 ```bash
-appaloft projects rename <projectId> --name "new-name"
-appaloft projects archive <projectId>
-appaloft projects delete-check <projectId>
-appaloft projects delete <projectId> --confirm <projectId>
+appaloft project rename <projectId> --name "new-name"
+appaloft project archive <projectId>
+appaloft project delete-check <projectId>
+appaloft project delete <projectId> --confirm <projectId>
 ```
 
 ## 常见误区
