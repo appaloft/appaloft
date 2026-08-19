@@ -51,8 +51,9 @@ Static checks reject known reliability regressions before runtime tests begin. `
 `bun run lint:ci` both execute the same guards. The query-batching guard scans production
 TypeScript and rejects asynchronous `map` callbacks that call `findOne`; callers must expose and
 use a batched read-model or repository query instead. The CI test-boundary guard keeps the
-canonical package-test job database-free and requires PostgreSQL targets to stay scoped to jobs
-that actually start PostgreSQL.
+canonical package-test job database-free, requires PostgreSQL targets to stay scoped to jobs
+that actually start PostgreSQL, and requires `ci.yml` and `e2e.yml` to share the change
+classifier in `scripts/ci/classify-changed-files.ts`.
 
 Current examples:
 
@@ -60,6 +61,8 @@ Current examples:
 - `scripts/test/check-query-batching.test.ts`
 - `scripts/check-ci-test-boundaries.ts`
 - `scripts/test/check-ci-test-boundaries.test.ts`
+- `scripts/ci/classify-changed-files.ts`
+- `scripts/test/classify-changed-files.test.ts`
 
 ### End-To-End
 
@@ -105,10 +108,20 @@ If tests bypass the runtime or write directly to the database to simulate succes
   - `APPALOFT_DATABASE_URL` is scoped to integration and build-smoke jobs that start PostgreSQL
   - generated host build artifacts are reclaimed before the all-in-one Docker rebuild so the
     smoke remains within the hosted runner disk budget
+  - `scripts/ci/classify-changed-files.ts` marks docs-only, workflow-yaml-only, LICENSE, and
+    release-please version-bump file sets as `lightweight_only`. A `release-please--*` head ref is
+    also treated as `release_bump` when every changed file is already on that allowlist. Those PRs
+    skip Biome, Typecheck, Unit Tests, Integration, and Build And Smoke via skip steps, skip
+    Workspace TUI at the job level, and still publish the required `ci` check. The aggregator
+    treats `skipped` needed jobs as success. Product source, lockfiles, `.github/actions/*`, and
+    other Rust stay on the full graph. `workflow_dispatch` classifies against the default branch;
+    `release.yml` does not dispatch CI.
 - `e2e.yml`
   - real PostgreSQL, started backend, CLI/API/deployment E2E, Playwright smoke
   - runs for every non-draft pull request and always publishes both stable shard checks required by
     branch protection; path filters must not suppress those checks
+  - the same change classifier skips real WebView and shell work inside the two matrix jobs so
+    `e2e (1, 2)` and `e2e (2, 2)` still succeed; those jobs are not skipped at the job level
 - `nightly.yml`
   - higher-cost compose smoke
 
