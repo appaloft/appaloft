@@ -68,8 +68,8 @@ appaloft workspace open . --profile <workspace-profile> --new --server <serverId
 ```
 
 `appaloft workspace open [path|git-remote]` 与 `code` 使用同一套定位参数，并走
-`workspaces.open`。Git worktree 仍要求 clean 且已 push；非 git 目录从已有 occupancy 或
-git remote 占用。完整说明见
+`workspaces.open`。Git worktree 仍要求 clean 且已 push；非 git 目录通过 git remote
+占用当前目录，不会复用无关 occupancy。完整说明见
 [从本地目录打开 Agent](/docs/agents/workspaces/#agent-workspace-open)。
 `appaloft workspace` 在受支持的交互式 macOS/Linux 终端中打开 Workspace control TUI；它只消费
 现有公开 operations/read models。`Ctrl+]` 从嵌入的 Agent 释放焦点，`f` 在同一 Session 上切换

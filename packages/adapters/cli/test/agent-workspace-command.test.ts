@@ -854,20 +854,35 @@ describe("Agent Workspace CLI", () => {
     });
   });
 
-  test("[WS-OPEN-LOCATOR-024] workspace open occupies a non-git directory from existing occupancy", async () => {
+  test("[WS-OPEN-LOCATOR-024] workspace open does not occupy an unrelated occupancy from a non-git directory", async () => {
     const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-workspace-open-cli-nongit-"));
-    const commands: OpenAgentWorkspaceCommand[] = [];
+    let commandDispatched = false;
     const { createCliProgram } = await import("../src");
     const program = createCliProgram({
       version: "0.1.0-test",
       startServer: async () => {},
       commandBus: {
-        execute: async <T>(_context: unknown, command: Command<T>) => {
-          commands.push(command as OpenAgentWorkspaceCommand);
-          return ok({ workspaceId: "sbx_live", resumed: false } as T);
+        execute: async () => {
+          commandDispatched = true;
+          return ok({});
         },
       } as unknown as CommandBus,
-      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      queryBus: {
+        execute: async () =>
+          ok({
+            items: [
+              {
+                sandboxId: "sbx_examples",
+                status: "ready",
+                occupancy: {
+                  repositoryIdentity: "github.com/appaloft/examples",
+                  commitSha: "b".repeat(40),
+                  branch: "main",
+                },
+              },
+            ],
+          }),
+      } as unknown as QueryBus,
       executionContextFactory: {
         create: (input) =>
           createExecutionContext({ ...input, requestId: "req_workspace_open_nongit" }),
@@ -881,19 +896,10 @@ describe("Agent Workspace CLI", () => {
           details: { code: "workspace_git_root_unavailable" },
         };
       },
-      resolveWorkspaceOpenSource: async (path) => {
-        expect(path).toBe(emptyDir);
-        return {
-          repositoryIdentity: "github.com/acme/api",
-          credentialFreeHttpsRepository: "https://github.com/acme/api.git",
-          branch: "main",
-          ref: "refs/heads/main",
-          headSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        };
-      },
     });
-    const write = process.stdout.write;
-    process.stdout.write = (() => true) as typeof process.stdout.write;
+    const originalExitCode = process.exitCode;
+    const write = process.stderr.write;
+    process.stderr.write = (() => true) as typeof process.stderr.write;
     try {
       await program.parseAsync([
         "node",
@@ -906,17 +912,79 @@ describe("Agent Workspace CLI", () => {
         "--new",
         "--no-attach",
       ]);
+      throw new Error("Expected non-git directory without this-folder locator to fail");
+    } catch (error) {
+      const errorText = String(error);
+      expect(errorText).toContain("workspace_remote_repository_missing");
+      expect(errorText).not.toContain("Workspace path is not inside a Git worktree");
+      expect(errorText).not.toContain("github.com/appaloft/examples");
     } finally {
-      process.stdout.write = write;
+      process.stderr.write = write;
+      process.exitCode = originalExitCode ?? 0;
     }
-    expect(commands).toHaveLength(1);
-    expect(commands[0]?.input).toMatchObject({
-      repositoryIdentity: "github.com/acme/api",
-      repository: "https://github.com/acme/api.git",
-      profile: "opencode-default",
-      forceNew: true,
-      attach: false,
+    expect(commandDispatched).toBeFalse();
+  });
+
+  test("[WS-OPEN-LOCATOR-024] code --no-attach from a non-git cwd does not resume examples occupancy", async () => {
+    const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-nongit-"));
+    const commands: Command<unknown>[] = [];
+    const { createCliProgram } = await import("../src");
+    const { ListSandboxesQuery, ListServersQuery } = await import("@appaloft/application");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return ok({ workspaceId: "sbx_examples" } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: {
+        execute: async <T>(_context: unknown, query: Query<T>) => {
+          if (query instanceof ListServersQuery) {
+            return ok({
+              items: [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }],
+            } as T);
+          }
+          if (query instanceof ListSandboxesQuery) {
+            return ok({
+              items: [
+                {
+                  sandboxId: "sbx_examples",
+                  status: "ready",
+                  occupancy: {
+                    repositoryIdentity: "github.com/appaloft/examples",
+                    commitSha: "b".repeat(40),
+                    branch: "main",
+                  },
+                },
+              ],
+            } as T);
+          }
+          return ok({ items: [] } as T);
+        },
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_nongit" }),
+      },
+      environment: { APPALOFT_TOKEN: "token" },
     });
+    const originalExitCode = process.exitCode;
+    const write = process.stderr.write;
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", emptyDir, "--no-attach"]);
+      throw new Error("Expected non-git cwd to fail instead of resuming examples");
+    } catch (error) {
+      const errorText = String(error);
+      expect(errorText).toContain("workspace_remote_repository_missing");
+      expect(errorText).not.toContain("Workspace path is not inside a Git worktree");
+      expect(errorText).not.toContain("github.com/appaloft/examples");
+    } finally {
+      process.stderr.write = write;
+      process.exitCode = originalExitCode ?? 0;
+    }
+    expect(commands).toEqual([]);
   });
 
   test("[WS-CODE-CLI-001][WS-CODE-PARITY-002][WS-CODE-COMPAT-010] code native-attaches after remote door; workspace open stays Git-safe", async () => {

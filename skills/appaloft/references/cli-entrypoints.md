@@ -46,7 +46,8 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   install. Same-name leftover Profiles must not block first success and must not require
   memorizing installation ids. `--profile` is a fallback pin; only an explicit colliding name
   with more than one live occupancy lists both ids and `appaloft code --profile <id>`.
-  `--new` occupies the cwd origin and does not silently resume whoami. A failed open names
+  `--new` occupies the cwd origin and does not silently resume whoami. A non-git directory
+  occupies this folder via a git remote and does not resume an unrelated occupancy. A failed open names
   the repository and the missing Binding or Profile, and keeps `causeCode` visible; it does
   not invent a successful occupancy. `--harness pi` occupies reserved
   `appaloft-remote-pi` and does not rewrite the project's OpenCode default; an existing
@@ -70,8 +71,8 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   after the user refuses install. Do not treat scratch as a durable Workspace.
 - `appaloft workspace open [path|git-remote] [--server <id>]` is the durable Profile-aware entrypoint.
   It accepts the same locators as `code`: a local path (Git optional) or a git remote. A clean
-  pushed worktree still fail-closes when dirty; a non-git directory occupies from an existing
-  occupancy or a git remote. When a BYOS Server is registered, open/create pass that Server as
+  pushed worktree still fail-closes when dirty; a non-git directory occupies from a git remote
+  and does not resume an unrelated occupancy. When a BYOS Server is registered, open/create pass that Server as
   `targetServerId` (`--server` pins it) and do not demand managed capacity. No enrolled Server
   stays omitted.
   `workspace create/list/show/pause/resume/terminate/connect/attach/task/preview` remain

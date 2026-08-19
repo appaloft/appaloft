@@ -85,7 +85,6 @@ import {
   isWorkspaceGitRootUnavailable,
   nativeAttachRequiresInteractiveTerminal,
   occupancyCloudCompatError,
-  type RemoteCodeOccupancy,
   type RemoteCodeServerSummary,
   resolveDefaultRemoteCodeDoor,
   resolveOccupancyConnectionsUrl,
@@ -461,13 +460,9 @@ function reportWorkspaceGitProgress(message: string): void {
   createCliLogRenderer().plain({ level: "info", message });
 }
 
-function resolveOpenWorkspaceGitContext(
-  path: string,
-  listOccupancies?: () => Promise<readonly RemoteCodeOccupancy[]>,
-) {
+function resolveOpenWorkspaceGitContext(path: string) {
   return resolveWorkspaceOpenSource(path, undefined, {
     onProgress: reportWorkspaceGitProgress,
-    ...(listOccupancies ? { listOccupancies } : {}),
   });
 }
 
@@ -501,35 +496,6 @@ async function listWorkspaceOpenServers(cli: {
   return Array.isArray(listed.value.items) ? listed.value.items : undefined;
 }
 
-async function listWorkspaceOpenOccupancies(cli: {
-  readonly executeQuery: (message: ListSandboxesQuery) => Promise<Result<unknown>>;
-}): Promise<readonly RemoteCodeOccupancy[]> {
-  const query = ListSandboxesQuery.create({ limit: 100, offset: 0 });
-  if (query.isErr()) return [];
-  const listed = await cli.executeQuery(query.value);
-  if (listed.isErr() || !listed.value || typeof listed.value !== "object") return [];
-  const items = (listed.value as SandboxListResult).items;
-  if (!Array.isArray(items)) return [];
-  return items.map((item) => ({
-    sandboxId: item.sandboxId,
-    status: item.status,
-    ...(typeof item.lastActivityAt === "string" ? { lastActivityAt: item.lastActivityAt } : {}),
-    ...(typeof item.updatedAt === "string" ? { updatedAt: item.updatedAt } : {}),
-    ...(item.occupancy &&
-    typeof item.occupancy === "object" &&
-    typeof item.occupancy.repositoryIdentity === "string" &&
-    typeof item.occupancy.commitSha === "string"
-      ? {
-          occupancy: {
-            repositoryIdentity: item.occupancy.repositoryIdentity,
-            commitSha: item.occupancy.commitSha,
-            ...(typeof item.occupancy.branch === "string" ? { branch: item.occupancy.branch } : {}),
-          },
-        }
-      : {}),
-  }));
-}
-
 function makeWorkspaceOpenCommand() {
   return EffectCommand.make(
     "open",
@@ -548,14 +514,13 @@ function makeWorkspaceOpenCommand() {
             if (cli.resolveWorkspaceOpenSource) {
               return cli.resolveWorkspaceOpenSource(path);
             }
-            const listOccupancies = () => listWorkspaceOpenOccupancies(cli);
             if (cli.resolveLocalWorkspaceGitContext && !isRemoteCodeGitRemoteLocator(path)) {
               return cli.resolveLocalWorkspaceGitContext(path).catch((error) => {
                 if (!isWorkspaceGitRootUnavailable(error)) throw error;
-                return resolveOpenWorkspaceGitContext(path, listOccupancies);
+                return resolveOpenWorkspaceGitContext(path);
               });
             }
-            return resolveOpenWorkspaceGitContext(path, listOccupancies);
+            return resolveOpenWorkspaceGitContext(path);
           },
           catch: (error) => workspaceCliError(error, "workspace-open-git-context"),
         });

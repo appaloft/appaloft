@@ -61,40 +61,23 @@ describe("workspace open locators", () => {
     });
   });
 
-  test("[WS-OPEN-LOCATOR-024] non-git directory occupies from existing occupancy", async () => {
+  test("[WS-OPEN-LOCATOR-024] non-git directory does not resume an unrelated occupancy", async () => {
     const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-workspace-open-nongit-"));
-    const sha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     const runGit: WorkspaceGitCommandRunner = async ({ args }) => {
       if (args[0] === "rev-parse" && args.includes("--show-toplevel")) {
         throw new Error("fatal: not a git repository");
       }
-      if (args[0] === "ls-remote" && args.includes("https://github.com/acme/api.git")) {
-        return { stdout: `${sha}\trefs/heads/main\n`, stderr: "" };
-      }
       throw new Error(args.join(" "));
     };
 
-    await expect(
-      resolveWorkspaceOpenSource(emptyDir, runGit, {
-        listOccupancies: async () => [
-          {
-            sandboxId: "sbx_live",
-            status: "ready",
-            occupancy: {
-              repositoryIdentity: "github.com/acme/api",
-              commitSha: sha,
-              branch: "main",
-            },
-            lastActivityAt: "2026-08-19T12:00:00.000Z",
-          },
-        ],
-      }),
-    ).resolves.toEqual({
-      repositoryIdentity: "github.com/acme/api",
-      credentialFreeHttpsRepository: "https://github.com/acme/api.git",
-      branch: "main",
-      ref: "refs/heads/main",
-      headSha: sha,
+    await expect(resolveWorkspaceOpenSource(emptyDir, runGit)).rejects.toMatchObject({
+      code: "workspace_remote_repository_missing",
+    });
+    await expect(resolveWorkspaceOpenSource(emptyDir, runGit)).rejects.not.toMatchObject({
+      message: "Workspace path is not inside a Git worktree",
+    });
+    await expect(resolveWorkspaceOpenSource(emptyDir, runGit)).rejects.not.toMatchObject({
+      details: { repositoryIdentity: "github.com/appaloft/examples" },
     });
   });
 

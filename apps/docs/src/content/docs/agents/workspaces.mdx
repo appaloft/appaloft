@@ -92,7 +92,7 @@ appaloft workspace open [path|git-remote]
 
 这条路径继续走 `workspaces.open`，定位参数与 `code` 相同：本地路径（可以不是 Git worktree）
 或 git remote（`https://`、`ssh://`、`git@host:path`，以及不是本地目录时的 `owner/repo`）。
-非 git 目录会从已有 occupancy 身份占用。如果路径是 Git worktree，dirty / detached / 缺
+非 git 目录只能通过 git remote 占用当前目录，不会静默复用别人的 occupancy。如果路径是 Git worktree，dirty / detached / 缺
 upstream / remote tip 不一致仍会在远端创建前失败。默认 `appaloft code` 优先选 live occupancy，同名 leftover 不能挡住第一次成功，
 也不要求记住 installation id。`--profile` 只是显式撞名时的兜底，不同于全局
 `--control-plane-profile`。`--new` 仍占用 cwd 源，不会静默 resume whoami occupancy。

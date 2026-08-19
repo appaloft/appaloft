@@ -196,9 +196,7 @@ export interface WorkspaceOpenSource {
   readonly headSha: string;
 }
 
-export interface ResolveWorkspaceOpenSourceOptions extends ResolveGitWorkspaceProgress {
-  readonly listOccupancies?: () => Promise<readonly RemoteCodeOccupancy[]>;
-}
+export interface ResolveWorkspaceOpenSourceOptions extends ResolveGitWorkspaceProgress {}
 
 export function isWorkspaceGitRootUnavailable(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -209,39 +207,39 @@ export function isWorkspaceGitRootUnavailable(error: unknown): boolean {
   );
 }
 
-function workspaceOpenSourceFromOccupancy(
-  occupancy: NonNullable<RemoteCodeOccupancy["occupancy"]>,
-): WorkspaceOpenSource {
-  const normalized = normalizeWorkspaceRepositoryRemote(
-    `https://${occupancy.repositoryIdentity.replace(/\.git$/u, "")}.git`,
-  );
-  const branch = occupancy.branch?.trim() || "main";
-  return {
-    repositoryIdentity: occupancy.repositoryIdentity,
-    credentialFreeHttpsRepository: normalized.credentialFreeHttps,
-    ref: `refs/heads/${branch}`,
-    branch,
-    headSha: occupancy.commitSha,
-  };
+function workspaceLocatorMissingError(
+  message: string,
+  phase: string,
+  guidance: string,
+): DomainError {
+  return remoteCodeError("workspace_remote_repository_missing", message, {
+    phase,
+    guidance,
+  });
 }
 
-async function workspaceOpenSourceFromOccupancyRef(
-  occupancy: NonNullable<RemoteCodeOccupancy["occupancy"]>,
-  runGit?: WorkspaceGitCommandRunner,
-  options: ResolveGitWorkspaceProgress = {},
-): Promise<WorkspaceOpenSource> {
-  const source = workspaceOpenSourceFromOccupancy(occupancy);
-  try {
-    const remote = await resolveRemoteGitWorkspaceRef(
-      source.credentialFreeHttpsRepository,
-      source.ref,
-      runGit,
-      options,
-    );
-    return { ...source, headSha: remote.commitSha };
-  } catch {
-    return source;
+function throwWorkspaceLocatorMissing(
+  error: unknown,
+  phase: "workspace-open-locator" | "remote-code-locator",
+): never {
+  if (error && typeof error === "object" && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    if (code === "workspace_remote_repository_missing" && !isWorkspaceGitRootUnavailable(error)) {
+      throw error;
+    }
   }
+  if (phase === "workspace-open-locator") {
+    throw workspaceLocatorMissingError(
+      "Workspace open needs a git remote for this directory",
+      phase,
+      "Pass a git remote such as https://github.com/org/repo.git, or run from this folder's Git worktree. Do not reuse another occupancy.",
+    );
+  }
+  throw workspaceLocatorMissingError(
+    "Remote code needs a Git repository with an origin or a git remote locator",
+    phase,
+    "Run appaloft code <git-remote> for this folder, or run from this folder's Git worktree. Do not reuse another occupancy.",
+  );
 }
 
 export async function resolveWorkspaceOpenSource(
@@ -277,21 +275,7 @@ export async function resolveWorkspaceOpenSource(
     };
   } catch (error) {
     if (!isWorkspaceGitRootUnavailable(error)) throw error;
-    const occupancy = selectResumeOccupancy(
-      options.listOccupancies ? await options.listOccupancies() : [],
-    );
-    if (occupancy?.occupancy) {
-      return workspaceOpenSourceFromOccupancyRef(occupancy.occupancy, runGit, options);
-    }
-    throw remoteCodeError(
-      "workspace_remote_repository_missing",
-      "Workspace open needs a git remote or an existing occupancy",
-      {
-        phase: "workspace-open-locator",
-        guidance:
-          "Pass a git remote such as https://github.com/org/repo.git, or occupy once with appaloft code <git-remote>.",
-      },
-    );
+    throwWorkspaceLocatorMissing(error, "workspace-open-locator");
   }
 }
 
@@ -412,7 +396,6 @@ export async function resolveDefaultRemoteCodeDoor(
     );
   }
   const occupancies = probe.listOccupancies ? await probe.listOccupancies() : [];
-  const latestOccupancy = selectResumeOccupancy(occupancies);
   const explicitRemote = isRemoteCodeGitRemoteLocator(path)
     ? await resolveRemoteCodeGitRemoteLocator(path, probe.runGit)
     : undefined;
@@ -435,46 +418,18 @@ export async function resolveDefaultRemoteCodeDoor(
     }
   }
   const requestedLocator = explicitRemote ?? localLocator;
-  const matchingOccupancy = requestedLocator
-    ? selectResumeOccupancy(
-        occupancies.filter(
-          (item) => item.occupancy?.repositoryIdentity === requestedLocator.repositoryIdentity,
-        ),
-      )
-    : undefined;
-  const identityOccupancy = matchingOccupancy ?? (explicitRemote ? undefined : latestOccupancy);
-  const occupancy = probe.forceNew ? undefined : identityOccupancy;
-  let locator: {
-    readonly repository: string;
-    readonly repositoryIdentity: string;
-    readonly ref: string;
-    readonly branch: string;
-  };
-  let occupancyResume: RemoteCodeOccupancy["occupancy"];
-  if (occupancy?.occupancy && !explicitRemote) {
-    occupancyResume = occupancy.occupancy;
-    const source = workspaceOpenSourceFromOccupancy(occupancy.occupancy);
-    locator = {
-      repository: source.credentialFreeHttpsRepository,
-      repositoryIdentity: source.repositoryIdentity,
-      ref: source.ref,
-      branch: source.branch,
-    };
-  } else if (requestedLocator) {
-    locator = requestedLocator;
-    if (occupancy?.occupancy) occupancyResume = occupancy.occupancy;
-  } else if (identityOccupancy?.occupancy) {
-    occupancyResume = identityOccupancy.occupancy;
-    const source = workspaceOpenSourceFromOccupancy(identityOccupancy.occupancy);
-    locator = {
-      repository: source.credentialFreeHttpsRepository,
-      repositoryIdentity: source.repositoryIdentity,
-      ref: source.ref,
-      branch: source.branch,
-    };
-  } else {
-    throw localLocatorError;
+  if (!requestedLocator) {
+    throwWorkspaceLocatorMissing(localLocatorError, "remote-code-locator");
   }
+  const matchingOccupancy = selectResumeOccupancy(
+    occupancies.filter(
+      (item) => item.occupancy?.repositoryIdentity === requestedLocator.repositoryIdentity,
+    ),
+  );
+  const occupancy = probe.forceNew ? undefined : matchingOccupancy;
+  const locator = requestedLocator;
+  let occupancyResume: RemoteCodeOccupancy["occupancy"];
+  if (occupancy?.occupancy) occupancyResume = occupancy.occupancy;
 
   const binding = probe.showBinding ? await probe.showBinding(locator.repositoryIdentity) : null;
   let remote: RemoteGitWorkspaceRef;
