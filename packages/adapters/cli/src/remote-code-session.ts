@@ -1,7 +1,7 @@
 import { existsSync, statSync } from "node:fs";
 
 import { type DomainError } from "@appaloft/core";
-import { workspaceRemoteLoginRequiredError } from "./cli-session-login.js";
+import { hasCliControlPlaneLogin, workspaceRemoteLoginRequiredError } from "./cli-session-login.js";
 import { activeControlPlaneProfile } from "./control-plane-service.js";
 import {
   normalizeWorkspaceRepositoryRemote,
@@ -286,14 +286,7 @@ export async function resolveDefaultRemoteCodeDoor(
   path = ".",
 ): Promise<RemoteCodeDoorResolution> {
   const env = probe.env ?? process.env;
-  const profile =
-    probe.readActiveProfile === undefined
-      ? (await activeControlPlaneProfile()).match(
-          (value) => value,
-          () => null,
-        )
-      : await probe.readActiveProfile();
-  if (!hasRemoteCodeLogin(env) && !profile?.auth) {
+  if (!(await hasCliControlPlaneLogin(env, probe.readActiveProfile))) {
     throw workspaceRemoteLoginRequiredError();
   }
 
