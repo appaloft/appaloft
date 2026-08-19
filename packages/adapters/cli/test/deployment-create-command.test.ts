@@ -6,6 +6,7 @@ import {
   type Query as AppQuery,
   type CommandBus,
   CreateDeploymentCommand,
+  CreateResourceCommand,
   createExecutionContext,
   type ExecutionContextFactory,
   type QueryBus,
@@ -878,5 +879,116 @@ describe("CLI deployment create command", () => {
     expect(errorText).toContain("deployment_failed");
     expect(chunks.join("")).not.toContain(failedUrl);
     expect(chunks.join("")).not.toContain('"url"');
+  });
+
+  test("[QUICK-DEPLOY-ENTRY-008A] deploy . / --as static-site / --publish-dir . omit dot publishDirectory on the wire", async () => {
+    const leftoverOccupancyResourceId = "res_dfsc156jw98k";
+    const cases = [
+      ["node", "appaloft", "deploy", ".", "--as", "static-site"],
+      ["node", "appaloft", "deploy", ".", "--method", "static", "--publish-dir", "."],
+    ] as const;
+
+    for (const argv of cases) {
+      const commands: AppCommand<unknown>[] = [];
+      const commandBus = {
+        execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+          commands.push(command as AppCommand<unknown>);
+          const name = command.constructor.name;
+          if (name === "CreateResourceCommand") return ok({ id: "res_static_root" } as T);
+          if (command instanceof CreateDeploymentCommand) return ok({ id: "dep_static_root" } as T);
+          return ok({ id: `id_${commands.length}` } as T);
+        },
+      } as unknown as CommandBus;
+      const queryBus = {
+        execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+          switch (query.constructor.name) {
+            case "ListServersQuery":
+              return ok({
+                items: [
+                  {
+                    id: "srv_4lifk0yrcecy",
+                    name: "hostinger",
+                    lifecycleStatus: "active",
+                  },
+                ],
+              } as T);
+            case "ShowDeploymentQuery":
+              return ok({
+                schemaVersion: "deployments.show/v1",
+                deployment: {
+                  id: "dep_static_root",
+                  resourceId: "res_static_root",
+                  status: "succeeded",
+                },
+              } as T);
+            default:
+              return ok({ items: [] } as T);
+          }
+        },
+      } as unknown as QueryBus;
+      const { createCliProgram } = await import("../src");
+      const program = createCliProgram({
+        version: "0.1.0-test",
+        startServer: async () => {},
+        startWorkerRuntime: async () => {},
+        commandBus,
+        queryBus,
+        executionContextFactory: {
+          create: (input) =>
+            createExecutionContext({
+              ...input,
+              requestId: "req_cli_static_publish_dir_wire",
+            }),
+        },
+        terminalIO: {
+          stdin: { isTTY: false, on: () => undefined },
+          stdout: { isTTY: false, write: () => true },
+          stderr: { isTTY: false, write: () => true },
+        },
+      });
+
+      const writeStdout = process.stdout.write;
+      const writeStderr = process.stderr.write;
+      const exitCode = process.exitCode;
+      try {
+        process.stdout.write = (() => true) as typeof process.stdout.write;
+        process.stderr.write = (() => true) as typeof process.stderr.write;
+        await program.parseAsync([
+          ...argv,
+          "--project",
+          "prj_static",
+          "--environment",
+          "env_static",
+          "--server",
+          "srv_4lifk0yrcecy",
+        ]);
+      } finally {
+        process.stdout.write = writeStdout;
+        process.stderr.write = writeStderr;
+        process.exitCode = exitCode ?? 0;
+      }
+
+      const created = commands.find((command) => command instanceof CreateResourceCommand);
+      expect(created).toBeDefined();
+      expect(created).toMatchObject({
+        projectId: "prj_static",
+        environmentId: "env_static",
+        kind: "static-site",
+        runtimeProfile: {
+          strategy: "static",
+          publishDirectory: "/",
+        },
+      });
+      const wireBody = JSON.stringify(created);
+      expect(JSON.parse(wireBody).runtimeProfile.publishDirectory).toBe("/");
+      expect(wireBody).not.toMatch(/"publishDirectory"\s*:\s*"\.+"/);
+      const occupancyDeploys = commands.filter(
+        (command) =>
+          command instanceof CreateDeploymentCommand &&
+          command.resourceId === leftoverOccupancyResourceId,
+      );
+      expect(occupancyDeploys).toHaveLength(0);
+      expect(commands.some((command) => command instanceof CreateDeploymentCommand)).toBe(true);
+    }
   });
 });

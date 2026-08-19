@@ -381,6 +381,12 @@ policy editing remains separate from resource-owned access-profile configuration
 `resources.configure-access` changes one Resource's generated-access preference, while
 `default-access-domain-policies.configure` owns system/server policy records.
 
+CLI entry workflows serialize source-root publish-directory aliases (`.`, `./`, `/`) as `/` on
+`resources.create` and `resources.configure-runtime` so a live Cloud control plane that still runs
+the pre-#1309 validator (rejecting `.` as a dot segment) can admit the same source-root meaning.
+Local core still accepts `.` and persists `/`. Do not depend on Cloud being redeployed for
+`deploy .` / `--as static-site` / `--publish-dir .` to work against production.
+
 ## Open Questions
 
 - None for the minimum create/profile boundary. New profile concerns must enter through explicit

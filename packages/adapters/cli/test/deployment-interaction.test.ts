@@ -58,7 +58,7 @@ describe("CLI quick deploy draft mapping", () => {
     expect(staticEntry.isOk()).toBe(true);
     expect(staticEntry._unsafeUnwrap()).toEqual({
       deploymentMethod: "static",
-      publishDirectory: ".",
+      publishDirectory: "/",
     });
     const { StaticPublishDirectory } = await import("@appaloft/core");
     expect(StaticPublishDirectory.create(".").isOk()).toBe(true);
@@ -70,6 +70,52 @@ describe("CLI quick deploy draft mapping", () => {
         sourceLocator: "./dist",
       }).isErr(),
     ).toBe(true);
+  });
+
+  test("[QUICK-DEPLOY-ENTRY-008A] source-root publish-dir aliases become / before resources.create", async () => {
+    ensureReflectMetadata();
+    const { normalizeUrlFirstDeploymentEntry, runtimeProfileFromDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { wireCompatibleStaticPublishDirectory } = await import(
+      "../src/commands/static-publish-directory-wire"
+    );
+
+    expect(wireCompatibleStaticPublishDirectory(".")).toBe("/");
+    expect(wireCompatibleStaticPublishDirectory("./")).toBe("/");
+    expect(wireCompatibleStaticPublishDirectory("/")).toBe("/");
+    expect(wireCompatibleStaticPublishDirectory("dist")).toBe("dist");
+    expect(wireCompatibleStaticPublishDirectory("/dist")).toBe("/dist");
+
+    for (const publishDirectory of [".", "./", "/"] as const) {
+      expect(
+        normalizeUrlFirstDeploymentEntry({
+          requestedDeploymentMethod: "static",
+          publishDirectory,
+        })._unsafeUnwrap(),
+      ).toEqual({
+        deploymentMethod: "static",
+        publishDirectory: "/",
+      });
+      expect(runtimeProfileFromDeploymentInput("static", { publishDirectory })).toEqual({
+        strategy: "static",
+        publishDirectory: "/",
+      });
+    }
+
+    const asStaticSite = normalizeUrlFirstDeploymentEntry({
+      entryMode: "static-site",
+      sourceLocator: ".",
+    })._unsafeUnwrap();
+    expect(asStaticSite).toEqual({
+      deploymentMethod: "static",
+      publishDirectory: "/",
+    });
+    const wireBody = JSON.stringify({
+      runtimeProfile: runtimeProfileFromDeploymentInput("static", asStaticSite),
+    });
+    expect(JSON.parse(wireBody).runtimeProfile.publishDirectory).toBe("/");
+    expect(wireBody).not.toMatch(/"publishDirectory"\s*:\s*"\.+"/);
   });
 
   test("[QUICK-DEPLOY-WF-040] keeps non-static CLI drafts on the application defaults", async () => {

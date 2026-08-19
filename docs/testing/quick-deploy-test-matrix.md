@@ -163,6 +163,7 @@ Then:
 | QUICK-DEPLOY-ENTRY-006 | e2e-preferred | Final deploy | `deployments.create` | `deployments.create` | `deployments.create` |
 | QUICK-DEPLOY-ENTRY-007 | e2e-preferred | Domain/TLS | Resource/domain binding surface or follow-up command | Separate `domain-bindings.create` command | Durable domain/TLS requires separate commands |
 | QUICK-DEPLOY-ENTRY-008 | e2e-preferred | Static site draft parity | Collects static publish directory, optional build commands, and defaults internal port 80 before `resources.create` | Collects equivalent static draft fields and maps them to the same command schema | API/automation callers create/select a static resource profile explicitly before deployment |
+| QUICK-DEPLOY-ENTRY-008A | CLI focused | Source-root publish directory wire form | Not applicable unless a local Web agent shells out to the CLI | `deploy .`, `--as static-site` default, and `--publish-dir .` map source-root meaning to `resources.create` / `resources.configure-runtime` with `publishDirectory` `/` (or omit). The JSON leaving the CLI must not contain `publishDirectory: "."` so a live Cloud control plane that still rejects dot segments can admit the request. Bare `deploy` / `deploy .` still deploys this tree and must not silently reuse whoami / latest occupancy. | API/automation callers send an already-accepted source-root value such as `/` |
 | QUICK-DEPLOY-ENTRY-009 | e2e-preferred | Framework detection parity | Uses the same source inspection and planner contract as CLI; may suggest resource name, strategy, commands, publish directory, and internal port before dispatch | Uses the same source inspection and planner contract as Web; prompts for missing explicit fallback commands when needed | API/automation callers provide resource source/runtime/network profile explicitly or rely on deployment planning to reject unsupported evidence |
 | QUICK-DEPLOY-ENTRY-010 | e2e-preferred | Repository config file parity | Local Web agent may read a selected file and must follow the config workflow contract | CLI supports explicit `--config` and implicit discovery through the same parser/normalizer; GitHub Actions invokes the binary as a non-interactive CLI executor with SSH-server `ssh-pglite` by default for SSH targets | API/automation remains explicit-operation first; no hidden config-file deployment schema |
 | QUICK-DEPLOY-ENTRY-011 | contract | Deploy action wrapper parity | Not applicable unless a local Web agent shells out to the CLI | `appaloft/deploy-action` installs a verified released binary, maps trusted inputs to the same CLI flags as direct CLI usage, and invokes the same repository config workflow | API/automation still call explicit operations or use direct CLI; the action wrapper must not introduce a hidden business command |
@@ -215,8 +216,10 @@ shared workflow-contract/schema layer by `packages/contracts/test/quick-deploy-w
 Web QuickDeploy and CLI deploy now expose first-class static site draft UI/flags that map to
 `resources.create`. Browser-level Web entry coverage exists under
 `apps/web/test/e2e-webview/home.webview.test.ts`, and CLI entry helper coverage exists under
-`packages/adapters/cli/test/deployment-interaction.test.ts`. Local Docker static smoke coverage
-exists under `apps/shell/test/e2e/quick-deploy-static-docker.workflow.e2e.ts`, and the generic-SSH
+`packages/adapters/cli/test/deployment-interaction.test.ts`. `QUICK-DEPLOY-ENTRY-008A` is covered
+by CLI helper and `deploy` command tests that assert the `resources.create` payload / JSON wire
+shape uses `/` rather than `.`. Local Docker static smoke coverage exists under
+`apps/shell/test/e2e/quick-deploy-static-docker.workflow.e2e.ts`, and the generic-SSH
 Docker static path is covered by the GitHub Actions secret-gated and local explicit SSH e2e
 harness.
 
