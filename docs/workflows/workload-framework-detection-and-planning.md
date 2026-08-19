@@ -294,8 +294,10 @@ Explicit runtime profile commands always win. Inferred commands are valid only w
 deterministic for the selected framework and source base directory.
 
 - Static planners require a safe `publishDirectory` or a deterministic framework static output
-  convention. If a build command is required to create the output, the build command is a package
-  step before static-server image packaging.
+  convention. Relative user values such as `public` stay `public` on the plan; the generated
+  static-server `COPY` source is relative to the Docker build context (`public/`), not a host path
+  such as `/public`. If a build command is required to create the output, the build command is a
+  package step before static-server image packaging.
 - Serverful and SSR planners require a production start command. A detected `start` script is valid
   when it does not invoke a dev/watch server. Framework-derived start commands are valid only when
   the required server artifact path or app module is known.

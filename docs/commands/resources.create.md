@@ -241,10 +241,13 @@ For first-class static site deployment, the resource must use `kind = "static-si
 explicit static runtime profile with `RuntimePlanStrategy = "static"`. Static strategy resources
 must persist a `runtimeProfile.publishDirectory` value before deployment admission. The publish
 directory is relative to the source binding's `baseDirectory` after optional install/build command
-execution. `.`, `./`, and `/` mean the source root itself and are legal. It must not be a host
-absolute path, URL, or path containing `..` or shell metacharacters. Do not default an entry
-workflow to a publish-directory value the validator forbids. Remaining rejection copy must include
-`--publish-dir public` as the next step.
+execution. Relative values such as `public` stay `public` on the persisted profile, runtime plan,
+and static-server Dockerfile `COPY` source; they must not be rewritten to a host-absolute form such
+as `/public`. A leading `/` on a non-root path is source-root-relative notation, not a host path,
+and is stored without the leading slash. `.`, `./`, and `/` mean the source root itself and are
+legal. It must not be a host absolute path, URL, or path containing `..` or shell metacharacters. Do
+not default an entry workflow to a publish-directory value the validator forbids. Remaining
+rejection copy must include `--publish-dir public` as the next step.
 Entry workflows may display the field as "publish directory", but the durable runtime profile owns
 it as strategy-specific planning state.
 
@@ -380,6 +383,14 @@ Generated default access routes are now exposed through the provider-neutral
 policy editing remains separate from resource-owned access-profile configuration:
 `resources.configure-access` changes one Resource's generated-access preference, while
 `default-access-domain-policies.configure` owns system/server policy records.
+
+CLI entry workflows serialize source-root publish-directory aliases (`.`, `./`, `/`) as `/` on
+`resources.create` and `resources.configure-runtime` so a live Cloud control plane that still runs
+the pre-#1309 validator (rejecting `.` as a dot segment) can admit the same source-root meaning.
+Local core still accepts `.` and persists `/`. Do not depend on Cloud being redeployed for
+`deploy .` / `--as static-site` / `--publish-dir .` to work against production. Relative publish
+directories such as `public` stay relative on the CLI wire; leading-slash COPY packaging is a
+separate companion change.
 
 ## Open Questions
 

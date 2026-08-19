@@ -82,6 +82,7 @@ import {
   runTerminalCommand,
 } from "../runtime.js";
 import { cliCommandDescriptions } from "./docs-help.js";
+import { wireCompatibleStaticPublishDirectory } from "./static-publish-directory-wire.js";
 
 const resourceIdArg = Args.text({ name: "resourceId" });
 const optionalResourceIdArg = Args.text({ name: "resourceId" }).pipe(Args.withDefault(""));
@@ -1615,7 +1616,9 @@ const configureRuntimeCommand = EffectCommand.make(
           ...(buildCommandValue ? { buildCommand: buildCommandValue } : {}),
           ...(startCommandValue ? { startCommand: startCommandValue } : {}),
           ...(runtimeNameValue ? { runtimeName: runtimeNameValue } : {}),
-          ...(publishDirectoryValue ? { publishDirectory: publishDirectoryValue } : {}),
+          ...(publishDirectoryValue
+            ? { publishDirectory: wireCompatibleStaticPublishDirectory(publishDirectoryValue) }
+            : {}),
           ...(dockerfilePathValue ? { dockerfilePath: dockerfilePathValue } : {}),
           ...(dockerComposeFilePathValue
             ? { dockerComposeFilePath: dockerComposeFilePathValue }

@@ -384,7 +384,7 @@ describe("CreateResourceUseCase", () => {
     expect(persisted?.toState().kind.value).toBe("static-site");
     expect(runtimeProfile?.strategy.value).toBe("static");
     expect(runtimeProfile?.buildCommand?.value).toBe("pnpm build");
-    expect(runtimeProfile?.publishDirectory?.value).toBe("/dist");
+    expect(runtimeProfile?.publishDirectory?.value).toBe("dist");
     expect(networkProfile?.internalPort.value).toBe(80);
     expect(networkProfile?.upstreamProtocol.value).toBe("http");
     expect(networkProfile?.exposureMode.value).toBe("reverse-proxy");
@@ -396,12 +396,58 @@ describe("CreateResourceUseCase", () => {
       runtimeProfile: {
         strategy: "static",
         buildCommand: "pnpm build",
-        publishDirectory: "/dist",
+        publishDirectory: "dist",
       },
       networkProfile: {
         internalPort: 80,
         upstreamProtocol: "http",
         exposureMode: "reverse-proxy",
+      },
+    });
+  });
+
+  test("[RES-CREATE-ADM-037D] persists relative publish directory public without /public rewrite", async () => {
+    const { context, eventBus, repositoryContext, resources, useCase } =
+      await seedResourceContext();
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      destinationId: "dst_demo",
+      name: "Public Site",
+      kind: "static-site",
+      source: {
+        kind: "local-folder",
+        locator: "/tmp/appaloft-reverify-public",
+      },
+      runtimeProfile: {
+        strategy: "static",
+        publishDirectory: "public",
+      },
+      networkProfile: {
+        internalPort: 80,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+    } as never);
+
+    expect(result.isOk()).toBe(true);
+    const persisted = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate(result._unsafeUnwrap().id)),
+    );
+    const runtimeProfile = persisted?.toState().runtimeProfile as
+      | { publishDirectory?: { value: string } }
+      | undefined;
+    expect(runtimeProfile?.publishDirectory?.value).toBe("public");
+    expect(runtimeProfile?.publishDirectory?.value).not.toBe("/public");
+
+    const event = resourceCreatedEvent(eventBus.events);
+    expect(event.payload).toMatchObject({
+      kind: "static-site",
+      runtimeProfile: {
+        strategy: "static",
+        publishDirectory: "public",
       },
     });
   });

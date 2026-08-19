@@ -78,7 +78,7 @@ type ConfigureResourceRuntimeCommandInput = {
 | `runtimeProfile.runtimeName` | Optional | Provider-neutral runtime naming intent used to derive effective Docker container or Compose project names for future deployments. |
 | `runtimeProfile.dockerfilePath` | Conditional | Source-root-relative Dockerfile path for Dockerfile strategy. |
 | `runtimeProfile.dockerComposeFilePath` | Conditional | Source-root-relative Compose file path for Compose strategy. |
-| `runtimeProfile.publishDirectory` | Conditional | Source-root-relative static publish directory for static strategy. |
+| `runtimeProfile.publishDirectory` | Conditional | Source-root-relative static publish directory for static strategy. Relative values such as `public` stay `public` and are not rewritten to `/public`. |
 | `runtimeProfile.buildTarget` | Optional | Docker build target when the Dockerfile strategy accepts it. |
 | `services` | Optional | Complete replacement service graph used by future Compose deployment and route planning. Multiple services require a `compose-stack` Resource. |
 | `idempotencyKey` | Optional | Deduplicates retries for the same intended runtime profile change. |

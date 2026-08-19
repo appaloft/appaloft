@@ -117,6 +117,9 @@ the equivalent Resource and Deployment operation flow instead of shelling out.
 4. If a Dockerfile is the clearest source of truth, run `appaloft deploy <source> --method dockerfile`.
 5. If the user points at an already built static directory, run `appaloft deploy <dir> --as static-site`.
 6. If the repository is a static site source, run `appaloft deploy <source> --method static --publish-dir <dir>`.
+   Relative `--publish-dir public` stays `public` (not `/public`) so Docker `COPY` can see `public/`
+   in the uploaded workspace that is also the Docker build context. A missing `public/` fails before
+   image build; a BuildKit `COPY` miss still exits non-zero with no live URL.
 7. Otherwise use workspace commands with explicit install, build, start, and port options.
 
 When Web is the active surface, choose the equivalent Quick Deploy source card and keep advanced
