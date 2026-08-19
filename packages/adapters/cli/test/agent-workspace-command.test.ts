@@ -154,6 +154,41 @@ describe("Agent Workspace CLI", () => {
     expect(output.join("")).not.toContain("login-required");
   });
 
+  test("[WS-OPEN-LOCATOR-023] code and workspace open help name path|git-remote", async () => {
+    const output: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: { execute: async () => ok({}) } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_locator_help" }),
+      },
+    });
+    const writeStdout = process.stdout.write;
+    const writeLog = console.log;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    console.log = (...args: unknown[]) => {
+      output.push(args.map(String).join(" "));
+    };
+    try {
+      await program.parseAsync(["node", "appaloft", "workspace", "open", "--help"]);
+      await program.parseAsync(["node", "appaloft", "code", "--help"]);
+    } finally {
+      process.stdout.write = writeStdout;
+      console.log = writeLog;
+    }
+    const printed = output.join("");
+    expect(printed).toContain("path|git-remote");
+    expect(printed).toContain("Local path (Git optional) or git remote");
+    expect(printed).toContain("$ open");
+    expect(printed).toContain("$ code");
+  });
+
   test("[WS-REMOTE-CA-033] headless workspace --no-tui prints occupancy tree when login is missing", async () => {
     const output: string[] = [];
     const { createCliProgram } = await import("../src");

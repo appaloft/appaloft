@@ -110,6 +110,10 @@ import { terminateWorkspaceWithRuntimes } from "../workspace-lifecycle-actions.j
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const workspaceId = Args.text({ name: "workspaceId" });
+const pathOrGitRemoteArg = Args.text({ name: "path|git-remote" }).pipe(
+  Args.withDefault("."),
+  Args.withDescription("Local path (Git optional) or git remote"),
+);
 const terminalDirectory = Options.text("directory").pipe(Options.optional);
 const terminalRows = Options.text("rows").pipe(Options.withDefault("24"));
 const terminalCols = Options.text("cols").pipe(Options.withDefault("80"));
@@ -500,7 +504,7 @@ function makeWorkspaceOpenCommand() {
   return EffectCommand.make(
     "open",
     {
-      path: Args.text({ name: "path" }).pipe(Args.withDefault(".")),
+      path: pathOrGitRemoteArg,
       profile: Options.text("profile").pipe(Options.optional),
       forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
       noAttach: Options.boolean("no-attach").pipe(Options.withDefault(false)),
@@ -568,7 +572,7 @@ function occupancyCodeProfile(
 export const workspaceCodeCommand = EffectCommand.make(
   "code",
   {
-    path: Args.text({ name: "path" }).pipe(Args.withDefault(".")),
+    path: pathOrGitRemoteArg,
     noAttach: Options.boolean("no-attach").pipe(Options.withDefault(false)),
     local: Options.boolean("local").pipe(Options.withDefault(false)),
     forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
