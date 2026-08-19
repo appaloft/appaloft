@@ -12,6 +12,7 @@ import {
   resolveDefaultRemoteCodeDoor,
   selectDefaultRemoteCodeServer,
   selectResumeOccupancy,
+  selectWorkspaceOpenTargetServerId,
 } from "../src/remote-code-session.js";
 
 describe("remote code door", () => {
@@ -55,6 +56,28 @@ describe("remote code door", () => {
     };
     expect(occupancyCloudCompatError(bound, server)).toEqual(bound);
   });
+  test("[WS-REMOTE-OPEN-BYOS-181] workspace open prefers an explicit Server, then the enrolled BYOS", () => {
+    const hostinger = {
+      id: "srv_4lifk0yrcecy",
+      name: "hostinger",
+      lifecycleStatus: "active",
+      runtimeAvailability: { status: "available" as const },
+    };
+    const leftover = {
+      id: "srv_yundu",
+      name: "yundu",
+      lifecycleStatus: "active",
+    };
+    expect(
+      selectWorkspaceOpenTargetServerId({
+        explicit: "srv_4lifk0yrcecy",
+        servers: [leftover, hostinger],
+      }),
+    ).toBe("srv_4lifk0yrcecy");
+    expect(selectWorkspaceOpenTargetServerId({ servers: [hostinger] })).toBe("srv_4lifk0yrcecy");
+    expect(selectWorkspaceOpenTargetServerId({ servers: [] })).toBeUndefined();
+  });
+
   test("[WS-REMOTE-LOGIN-001] fails closed without login or profile", async () => {
     await expect(
       resolveDefaultRemoteCodeDoor({

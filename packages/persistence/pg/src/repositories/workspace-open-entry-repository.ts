@@ -138,6 +138,25 @@ export class PgWorkspaceOpenEntryRepository implements WorkspaceOpenEntryReposit
     return row ? readEntry(row) : undefined;
   }
 
+  async findLiveProfileInstallationIds(
+    context: ExecutionContext,
+    installationIds: readonly string[],
+  ): Promise<readonly string[]> {
+    if (installationIds.length === 0) return [];
+    const subject = context.tenant?.subjectId ?? context.principal?.userId ?? context.actor?.id;
+    if (!subject) return [];
+    const rows = await this.db
+      .selectFrom("workspace_open_entries")
+      .select("profile_installation_id")
+      .where("tenant_id", "=", tenantId(context))
+      .where("subject_id", "=", subject)
+      .where("status", "!=", "terminal")
+      .where("workspace_id", "is not", null)
+      .where("profile_installation_id", "in", [...installationIds])
+      .execute();
+    return [...new Set(rows.map((row) => row.profile_installation_id))];
+  }
+
   async begin(
     context: ExecutionContext,
     key: WorkspaceOpenKey,

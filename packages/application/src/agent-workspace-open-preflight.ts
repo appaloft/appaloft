@@ -1,4 +1,5 @@
 import {
+  type DomainError,
   domainError,
   err,
   ok,
@@ -6,11 +7,13 @@ import {
   ProjectId,
   RepositoryIdentity,
   type Result,
+  UpdatedAt,
 } from "@appaloft/core";
 import {
   validateWorkspaceTargetSelectionEvidence,
   type WorkspaceActivationContextDisposition,
   type WorkspaceOpenContext,
+  type WorkspaceOpenEntryRepository,
   type WorkspaceOpenInput,
   type WorkspaceOpenOptions,
   type WorkspaceOpenPreflight,
@@ -22,6 +25,7 @@ import {
   type AgentWorkspaceProfileInstallationService,
   type AgentWorkspaceProfileRegistryRepository,
 } from "./agent-workspace-profile";
+import { selectWorkspaceProfileInstallation } from "./agent-workspace-profile-selector";
 import { type ExecutionContext, toRepositoryContext } from "./execution-context";
 import { type ProjectRepository } from "./ports";
 import { type RepositoryBindingRepository } from "./repository-binding";
@@ -78,6 +82,7 @@ export interface WorkspaceActivationContextInitializerPort {
       readonly project: WorkspaceActivationContextDisposition;
       readonly repositoryBinding: WorkspaceActivationContextDisposition;
       readonly profile: WorkspaceActivationContextDisposition;
+      readonly createdProfileInstallationId?: string;
     }>
   >;
   ensureLocalEnvironment(context: ExecutionContext, projectId: string): Promise<Result<void>>;
@@ -190,6 +195,7 @@ export class AgentWorkspaceOpenPreflightService {
       readonly mcpAdmission: WorkspaceOpenMcpAdmissionPort;
       readonly placement: WorkspaceOpenPlacementPort;
       readonly contextInitializer?: WorkspaceActivationContextInitializerPort;
+      readonly occupancies?: Pick<WorkspaceOpenEntryRepository, "findLiveProfileInstallationIds">;
     },
   ) {}
 
@@ -215,36 +221,43 @@ export class AgentWorkspaceOpenPreflightService {
       repositoryBinding: "reused",
       profile: "reused",
     });
-    if (initial.isOk() || !this.dependencies.contextInitializer) return initial;
+    if (initial.isOk()) return initial;
+    if (!this.dependencies.contextInitializer) {
+      return err(surfaceWorkspaceOpenFailure(initial.error, input.repositoryIdentity));
+    }
     const missing = missingActivationContext(initial.error, input.profile);
-    if (!missing) return initial;
+    if (!missing) {
+      return err(surfaceWorkspaceOpenFailure(initial.error, input.repositoryIdentity));
+    }
     const initialized = await this.dependencies.contextInitializer.ensure(context, {
       repository: input.repository,
       repositoryIdentity: input.repositoryIdentity,
       missing,
       ...(input.profile ? { profile: input.profile } : {}),
     });
-    if (initialized.isErr()) return err(initialized.error);
+    if (initialized.isErr()) {
+      return err(surfaceWorkspaceOpenFailure(initialized.error, input.repositoryIdentity));
+    }
     if (!validActivationDispositions(initialized.value)) {
       return err(
-        domainError.validation("Workspace activation initializer returned invalid evidence", {
-          code: "workspace_activation_context_evidence_invalid",
-        }),
-      );
-    }
-    const reread = await this.resolveCanonicalContext(context, input, initialized.value);
-    if (reread.isErr()) {
-      return err(
-        domainError.conflict(
-          "Workspace activation context is still unavailable after initialization",
-          {
-            code: "workspace_activation_context_conflict",
-            causeCode: reread.error.details?.code ?? reread.error.code,
-          },
+        surfaceWorkspaceOpenFailure(
+          domainError.validation("Workspace activation initializer returned invalid evidence", {
+            code: "workspace_activation_context_evidence_invalid",
+          }),
+          input.repositoryIdentity,
         ),
       );
     }
-    return reread;
+    const reread = await this.resolveCanonicalContext(context, input, initialized.value);
+    if (reread.isOk()) return reread;
+    if (initialized.value.createdProfileInstallationId) {
+      await disableCreatedProfileInstallation(
+        this.dependencies.profiles,
+        context,
+        initialized.value.createdProfileInstallationId,
+      );
+    }
+    return err(surfaceWorkspaceOpenFailure(reread.error, input.repositoryIdentity));
   }
 
   private async resolveCanonicalContext(
@@ -268,6 +281,7 @@ export class AgentWorkspaceOpenPreflightService {
           details: {
             ...error.details,
             code: "workspace_open_repository_not_bound",
+            repositoryIdentity: input.repositoryIdentity,
             guidance: `appaloft repository-binding bind --repository ${input.repositoryIdentity} --project <projectId>`,
           },
         }),
@@ -306,11 +320,17 @@ export class AgentWorkspaceOpenPreflightService {
         domainError.conflict("Project does not have a default Agent Workspace Profile", {
           code: "workspace_open_profile_required",
           projectId,
+          repositoryIdentity: input.repositoryIdentity,
           guidance: `appaloft project configure-workspace-profile ${projectId} --profile <installationId>`,
         }),
       );
     }
-    const resolvedProfile = await this.resolveProfile(context, selector);
+    const projectDefaultInstallationId =
+      project.toState().defaultWorkspaceProfileInstallationId?.value;
+    const resolvedProfile = await this.resolveProfile(context, selector, {
+      explicit: Boolean(input.profile),
+      ...(projectDefaultInstallationId ? { projectDefaultInstallationId } : {}),
+    });
     if (resolvedProfile.isErr()) return err(resolvedProfile.error);
     return ok({
       projectId,
@@ -426,13 +446,17 @@ export class AgentWorkspaceOpenPreflightService {
   private async resolveProfile(
     context: ExecutionContext,
     selector: string,
+    options: {
+      readonly explicit: boolean;
+      readonly projectDefaultInstallationId?: string;
+    },
   ): Promise<Result<string>> {
     const repositoryContext = toRepositoryContext(context);
     const installation = await this.dependencies.profiles.findInstallation(
       repositoryContext,
       selector,
     );
-    if (installation) {
+    if (installation && options.explicit) {
       const available = installation.assertAvailableForNewWorkspace();
       return available.isErr() ? err(available.error) : ok(installation.id.value);
     }
@@ -443,41 +467,178 @@ export class AgentWorkspaceOpenPreflightService {
     const available = installations.filter(
       (candidate) => candidate.toState().status.value === "enabled",
     );
+    const siblings = installation
+      ? available.filter(
+          (candidate) =>
+            candidate.toState().profileId.value === installation.toState().profileId.value,
+        )
+      : [];
     const byProfileId = available.filter(
       (candidate) => candidate.toState().profileId.value === selector,
     );
     const candidates =
-      byProfileId.length > 0
-        ? byProfileId
-        : (
-            await Promise.all(
-              available.map(async (candidate) => ({
-                candidate,
-                definition: await this.dependencies.profiles.findDefinition(
-                  candidate.toState().definitionDigest.value,
-                ),
-              })),
+      siblings.length > 0
+        ? siblings
+        : byProfileId.length > 0
+          ? byProfileId
+          : (
+              await Promise.all(
+                available.map(async (candidate) => ({
+                  candidate,
+                  definition: await this.dependencies.profiles.findDefinition(
+                    candidate.toState().definitionDigest.value,
+                  ),
+                })),
+              )
             )
-          )
-            .filter(({ definition }) => definition?.toState().displayName.value === selector)
-            .map(({ candidate }) => candidate);
-    if (candidates.length === 0) {
-      return err(domainError.notFound("AgentWorkspaceProfileInstallation", selector));
+              .filter(({ definition }) => definition?.toState().displayName.value === selector)
+              .map(({ candidate }) => candidate);
+    if (candidates.length === 0 && installation) {
+      const availableInstallation = installation.assertAvailableForNewWorkspace();
+      return availableInstallation.isErr()
+        ? err(availableInstallation.error)
+        : ok(installation.id.value);
     }
-    if (candidates.length > 1) {
-      return err(
-        domainError.conflict("Agent Workspace Profile selector is ambiguous", {
-          code: "workspace_open_profile_ambiguous",
-          selector,
-          installationIds: candidates.map((candidate) => candidate.id.value),
-        }),
-      );
-    }
-    const [candidate] = candidates;
-    return candidate
-      ? ok(candidate.id.value)
-      : err(domainError.notFound("AgentWorkspaceProfileInstallation", selector));
+    const liveInstallationIds = this.dependencies.occupancies
+      ? await this.dependencies.occupancies.findLiveProfileInstallationIds(
+          context,
+          candidates.map((candidate) => candidate.id.value),
+        )
+      : [];
+    return selectWorkspaceProfileInstallation({
+      selector,
+      candidates: candidates.map((candidate) => ({
+        id: candidate.id.value,
+        installedAt: candidate.toState().installedAt.value,
+      })),
+      onMultipleLive: options.explicit ? "ambiguous" : "prefer-default-or-oldest",
+      ...(options.projectDefaultInstallationId
+        ? { projectDefaultInstallationId: options.projectDefaultInstallationId }
+        : {}),
+      ...(liveInstallationIds.length > 0 ? { liveInstallationIds } : {}),
+    });
   }
+}
+
+const SWALLOWED_WORKSPACE_OPEN_MESSAGES = [
+  "Workspace activation context is still unavailable after initialization",
+  "Workspace could not finish opening after setup",
+] as const;
+
+const WORKSPACE_OPEN_MISSING_LABEL: Record<string, string> = {
+  workspace_open_repository_not_bound: "Repository Binding",
+  workspace_open_profile_required: "default Agent Workspace Profile",
+  workspace_open_project_unavailable: "an active Project",
+  workspace_activation_profile_unavailable: "a registered occupancy Profile",
+};
+
+function workspaceOpenCauseCode(error: {
+  readonly code?: string;
+  readonly details?: Readonly<Record<string, unknown>>;
+}): string {
+  if (typeof error.details?.causeCode === "string" && error.details.causeCode.length > 0) {
+    return error.details.causeCode;
+  }
+  if (typeof error.details?.code === "string" && error.details.code.length > 0) {
+    return error.details.code;
+  }
+  return error.code ?? "conflict";
+}
+
+function workspaceOpenHumanMessage(
+  error: { readonly message: string },
+  repositoryIdentity: string,
+  causeCode: string,
+): string {
+  const missing = WORKSPACE_OPEN_MISSING_LABEL[causeCode];
+  if (missing) return `${missing} is missing for ${repositoryIdentity}`;
+  const original = error.message.trim();
+  if (
+    !original ||
+    SWALLOWED_WORKSPACE_OPEN_MESSAGES.includes(
+      original as (typeof SWALLOWED_WORKSPACE_OPEN_MESSAGES)[number],
+    )
+  ) {
+    return `Could not finish opening ${repositoryIdentity}. A Repository Binding or default Agent Workspace Profile is still missing after setup.`;
+  }
+  return original.includes(repositoryIdentity)
+    ? original
+    : `${original} (opening ${repositoryIdentity})`;
+}
+
+function workspaceOpenGuidance(
+  error: { readonly details?: Readonly<Record<string, unknown>> },
+  repositoryIdentity: string,
+  causeCode: string,
+): string | undefined {
+  if (typeof error.details?.guidance === "string" && error.details.guidance.trim()) {
+    return error.details.guidance;
+  }
+  if (causeCode === "workspace_open_repository_not_bound") {
+    return `appaloft repository-binding bind --repository ${repositoryIdentity} --project <projectId>`;
+  }
+  if (causeCode === "workspace_open_profile_required") {
+    return "Set a default Agent Workspace Profile on the Project, or retry appaloft code --profile <installationId>.";
+  }
+  if (causeCode === "workspace_open_profile_ambiguous") {
+    return `Installations are ambiguous. Retry with appaloft code --profile <installationId> for ${repositoryIdentity}.`;
+  }
+  return `Cloud activation/placement could not finish for ${repositoryIdentity}. The CLI cannot invent a Workspace.`;
+}
+
+function isUserFacingWorkspaceOpenError(error: {
+  readonly code?: string;
+  readonly details?: Readonly<Record<string, unknown>>;
+}): boolean {
+  const code = error.details?.code;
+  return (
+    code === "workspace_open_profile_ambiguous" ||
+    code === "workspace_open_profile_required" ||
+    code === "workspace_open_repository_not_bound" ||
+    code === "workspace_open_repository_https_required" ||
+    code === "workspace_open_repository_identity_mismatch" ||
+    code === "workspace_open_project_unavailable" ||
+    code === "workspace_activation_profile_unavailable" ||
+    error.code === "not_found"
+  );
+}
+
+function surfaceWorkspaceOpenFailure(error: DomainError, repositoryIdentity: string): DomainError {
+  const causeCode = workspaceOpenCauseCode(error);
+  const message = workspaceOpenHumanMessage(error, repositoryIdentity, causeCode);
+  const guidance = workspaceOpenGuidance(error, repositoryIdentity, causeCode);
+  if (isUserFacingWorkspaceOpenError(error)) {
+    return {
+      ...error,
+      message,
+      details: {
+        ...error.details,
+        causeCode,
+        repositoryIdentity,
+        ...(guidance ? { guidance } : {}),
+      },
+    };
+  }
+  return domainError.conflict(message, {
+    code: "workspace_activation_context_conflict",
+    causeCode,
+    repositoryIdentity,
+    ...(guidance ? { guidance } : {}),
+  });
+}
+
+async function disableCreatedProfileInstallation(
+  profiles: AgentWorkspaceProfileRegistryRepository,
+  context: ExecutionContext,
+  installationId: string,
+): Promise<void> {
+  const repositoryContext = toRepositoryContext(context);
+  const installation = await profiles.findInstallation(repositoryContext, installationId);
+  if (!installation) return;
+  const expectedRevision = installation.toState().revision.value;
+  const disabled = installation.disable(UpdatedAt.rehydrate(new Date().toISOString()));
+  if (disabled.isErr()) return;
+  await profiles.saveInstallation(repositoryContext, installation, expectedRevision);
 }
 
 function missingActivationContext(

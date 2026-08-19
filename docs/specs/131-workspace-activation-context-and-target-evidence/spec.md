@@ -45,8 +45,18 @@ lifecycle ownership.
 - Without an initializer, missing Binding/default Profile keeps the existing
   `workspace_open_repository_not_bound` / `workspace_open_profile_required` behavior.
 - Invalid initializer evidence returns `workspace_activation_context_evidence_invalid`.
-- State that is still unavailable after initialization returns
-  `workspace_activation_context_conflict` with the canonical re-read cause code.
+- User-recoverable re-read errors after initialization
+  (`workspace_open_repository_not_bound`, `workspace_open_profile_required`,
+  `workspace_open_profile_ambiguous`, and `not_found`) surface as themselves with
+  copy-pasteable guidance, `causeCode`, and the `repositoryIdentity` being opened
+  (cwd origin, not a whoami occupancy). Unexpected leftover unavailability returns
+  `workspace_activation_context_conflict` whose human text names that repository and
+  the canonical re-read cause; it never uses the internal
+  "activation context is still unavailable" sentence as the only human text.
+  Human CLI prints the missing context, repository, `Cause:`, and guidance.
+  `APPALOFT_ERROR_FORMAT=safe-json` allowlists `causeCode`, `detailCode`, and
+  `repositoryIdentity` as safe tokens. Cloud initializer/placement failures stay
+  fail-closed here; public CLI does not invent a successful occupancy.
 - Invalid or legacy evidence on a new reservation returns
   `workspace_target_selection_evidence_invalid`; the reservation is released before returning.
 - Downstream compositions own entitlement/admission errors and must emit them before their

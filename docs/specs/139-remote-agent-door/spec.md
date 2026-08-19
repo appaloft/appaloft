@@ -43,7 +43,7 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-PROFILE-008 | Shared harness pin | Project has no default Profile | `appaloft code` occupies | initializer installs OpenCode-else-Pi `appaloft-remote` with optional `model-api` and no required model credential. Unbound compile still starts vendor-login. Existing default Profile is reused, never overwritten. |
 | WS-REMOTE-AUTH-009 | Personal model login | no team Connection; I never signed in inside my Sandbox | Agent starts | vendor TUI may prompt **me** to log in; occupancy egress allowlist includes `opencode.ai` so unbound OpenCode vendor-login is not blocked by the sandbox proxy. No teammate OAuth file is copied. |
 | WS-REMOTE-LOCAL-010 | Scratch is explicit | any directory | `appaloft code --local` | Spec 138 Scratch contract; no Server/Sandbox required. |
-| WS-REMOTE-OPEN-COMPAT-011 | Delivery open unchanged | `workspace open` / `workspace create` | dirty/non-git laptop | existing `workspace_git_*` fail-closed. Bare `workspace open` does not require `targetServerId`. |
+| WS-REMOTE-OPEN-COMPAT-011 | Delivery open unchanged | `workspace open` / `workspace create` | dirty/non-git laptop | existing `workspace_git_*` fail-closed. When a registered BYOS Server exists, open/create pass that Server as `targetServerId` (or `--server <id>`) and must not demand managed. When no BYOS exists, `targetServerId` stays omitted. |
 | WS-REMOTE-CAPACITY-012 | No silent fallback | default Server has no capacity | `appaloft code` | fail closed; not Scratch; not another teammate’s Sandbox; not a different Server; not managed substitution. |
 | WS-REMOTE-DOCS-013 | Help names doors | `appaloft --help` / `code --help` / Workspace docs | rendered | default `code` occupies my Sandbox; `--local` is Scratch; `workspace` is occupancy tree; `workspace open` is delivery Git-safe; bare `deploy` reuses occupancy. |
 | WS-REMOTE-BANNER-014 | Identity after occupy | `workspaces.open` succeeds | attach or `--no-attach` | stdout has one banner: `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>` and optional ` · <preview-url>` when Resource `app` already has succeeded generated access. No live deploy stream. |
@@ -209,6 +209,12 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-MCP-ENV-173 | Occupancy MCP can set local env vars | occupancy OpenCode has first-party `appaloft-tools` | Agent configures the occupied app | first-party binding includes `environments_show`, `environments_set_variable`, `environments_unset_variable`, and `environments_effective_precedence`. Tenant MCP unchanged. |
 | WS-REMOTE-MCP-INSPECT-174 | Occupancy MCP can inspect Resource app | occupancy OpenCode has first-party `appaloft-tools` | Agent inspects logs/health/config | first-party binding includes `resources_runtime_logs`, `resources_health`, `resources_effective_config`, and `resources_diagnostic_summary`. Tenant MCP unchanged. |
 | WS-REMOTE-HARNESS-175 | Occupancy can open Pi | registered Server occupancy | `appaloft code --harness pi --new --no-attach` | occupy uses reserved `stp_appaloft_remote_pi` / profile `appaloft-remote-pi` and does not rewrite the project's OpenCode default. Existing OpenCode Workspace without `--new` stays fail-closed on profile pin mismatch. |
+| WS-REMOTE-PROFILE-AMBIGUOUS-176 | Ambiguous live Profiles are recoverable | two enabled installations share `appaloft-remote` and both have live occupancy | `appaloft code --profile appaloft-remote --no-attach` | fail-closed `workspace_open_profile_ambiguous` lists the selector, both installationIds, and a copy-pasteable `appaloft code --profile <installationId>`. Shell default `formatDomainError` prints those same fields (arrays must not be dropped). Default `code` without `--profile` does not fail closed on this; it keeps first success. Terminated/failed sandboxes are not selector input. |
+| WS-REMOTE-CODE-PROFILE-177 | `code` accepts `--profile` | logged in + Server | `appaloft code --profile <installationId> --no-attach` | `code --help` documents `--profile` as a fallback pin. Dispatch includes that selector. Default OpenCode `code` omits `profile`. |
+| WS-REMOTE-PROFILE-LIVE-178 | Duplicate enabled Profiles do not block first success | two enabled `appaloft-remote` installs; Project default may be the leftover; only the older install has live occupancy | `appaloft code --no-attach` or `appaloft code --new --no-attach` | selector input is enabled Profile installs, not dead workspaces. `selectResumeOccupancy` already drops terminated/failed sandboxes. First success prefers the live install. `--profile` is fallback only. With no live occupancy, Project default then oldest wins. |
+| WS-REMOTE-NEW-NO-DUP-179 | Failed `--new` does not install a second same-name Profile | an enabled `appaloft-remote` already exists, or this attempt created an install then later setup failed | `appaloft code --new --no-attach` | `--new` only skips occupancy resume / `findPreferred`. It must not install a Profile. Community initializer reuses an enabled same-`profileId` install before `findInstallationByDefinition`; digest mismatch must not call `profiles.install()`. Logged-in Cloud uses `CloudWorkspaceActivationContextInitializer` (appaloft-cloud); public CLI omitting `profile` enables Cloud's `existingInstallationId && !input.profile` reuse. Stopping a digest-bump leftover (`awpi_b87sxo84xe7u`) on Cloud still requires Cloud to not call `profiles.install()` for `--new`. Public `install()` still dedupes by definitionDigest only. Do not treat Cloud initializer failure as CLI success. |
+| WS-REMOTE-OPEN-CAUSE-180 | Failed open names the cwd repo and real cause | logged-in `code --new --no-attach` from another origin (for example `github.com/appaloft/appaloft-cloud`) | initializer or re-read fails | human error says what is missing and which repository is being opened; it does not resume whoami occupancy and does not swallow `causeCode` / guidance. safe-json allowlists `causeCode`, `detailCode`, and `repositoryIdentity`. Cloud activation/placement remains fail-closed. |
+| WS-REMOTE-OPEN-BYOS-181 | Registered BYOS is placement | hostinger `srv_4lifk0yrcecy` is the enrolled Server; no managed pool | `workspace open --new` or `workspace open --server srv_4lifk0yrcecy --new` after local Git check | dispatches `workspaces.open` with `targetServerId=srv_4lifk0yrcecy`. It does not demand managed targets and does not enroll another Server. |
 
 ## Slice Scope
 
@@ -228,7 +234,7 @@ Out of slice 46: host port publish, laptop SSH `-L`, wrapping host-egress with t
 
 ## Public Surfaces
 
-- CLI: default `appaloft code [path|git-remote] [--no-attach] [--local]`. A git remote is a locator, not a local path.
+- CLI: default `appaloft code [path|git-remote] [--no-attach] [--local] [--new] [--profile <name-or-id>]`. A git remote is a locator, not a local path. Default OpenCode omits the invisible `appaloft-remote` name. Durable `workspace open` / `create` accept `--server` and default to the enrolled BYOS Server.
 - Catalog: no new field. Existing `workspaces.open` already takes credential-free HTTPS.
 - Persistence: existing Server / Binding / Profile / `workspace_open_entries`.
 - No new aggregate or Cloud table.
@@ -238,8 +244,9 @@ Out of slice 46: host port publish, laptop SSH `-L`, wrapping host-egress with t
 
 - Server, Sandbox, Binding, Profile: existing public aggregates.
 - CLI resolves login, default Server, and remote SHA (from cwd origin **or** positional git remote), then dispatches `workspaces.open`.
-- Community initializer owns invisible `appaloft-remote`.
-- Cloud: later default-Server injection when no BYOS exists. Must honor `targetServerId` and must not override it with managed capacity. Slice 3 needs no Cloud change.
+- Community initializer owns invisible `appaloft-remote` for Community/local only.
+- Logged-in production activation is Cloud `CloudWorkspaceActivationContextInitializer.ensureUnlocked` in appaloft-cloud. Public CLI/preflight cannot make that Cloud init succeed. Public `install()` dedupes by definitionDigest only; a digest bump can create another same-name `awpi_*` if Cloud calls install.
+- Cloud: later default-Server injection when no BYOS exists. Must honor `targetServerId` and must not override it with managed capacity.
 
 ## Error Contract
 
@@ -252,6 +259,7 @@ Out of slice 46: host port publish, laptop SSH `-L`, wrapping host-egress with t
 | `workspace_git_ref_ambiguous` | remote HEAD maps to more than one head |
 | `workspace_scratch_remote_rejected` | `--local` with a git-remote locator |
 | `workspace_open_target_server_unavailable` | `targetServerId` is not tenant-visible or not reservable |
+| `workspace_open_profile_ambiguous` | more than one enabled Profile install shares the requested name and more than one of those has live occupancy; lists selector, installationIds, and `appaloft code --profile <id>`. Terminated/failed sandboxes are not this input. |
 | existing `workspace_git_*` | `workspace open` / `workspace create` only |
 | Spec 138 scratch codes | `--local` path Scratch only |
 
@@ -268,6 +276,7 @@ Missing Binding is not a `code` hard failure. The initializer creates or reuses 
 - Cloud managed as default Server when no BYOS exists.
 - `destinations.list` or expanding `servers.show` with destinations.
 - Parsing GitHub `/tree/` URLs or inferring non-GitHub hosts from `owner/repo`.
+- Editing appaloft-cloud or pretending public CLI success covers Cloud activation/placement.
 
 ## Compatibility
 

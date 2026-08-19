@@ -26,6 +26,7 @@ import {
 import {
   AgentWorkspaceOpenPreflightService,
   createExecutionContext,
+  type ExecutionContext,
   InMemoryAgentWorkspaceProfileRegistryRepository,
   InMemoryRepositoryBindingRepository,
   type ProjectRepository,
@@ -133,6 +134,14 @@ async function fixture(
       binding: ProjectRepositoryBinding;
       repositoryBindings: InMemoryRepositoryBindingRepository;
     }) => WorkspaceActivationContextInitializerPort;
+    duplicateProfile?: boolean;
+    defaultProfileInstallationId?: string;
+    occupancies?: {
+      findLiveProfileInstallationIds: (
+        executionContext: ExecutionContext,
+        installationIds: readonly string[],
+      ) => Promise<readonly string[]>;
+    };
   } = {},
 ) {
   const profiles = new InMemoryAgentWorkspaceProfileRegistryRepository();
@@ -154,6 +163,26 @@ async function fixture(
     installedAt: CreatedAt.rehydrate("2026-07-28T00:00:00.000Z"),
   })._unsafeUnwrap();
   await profiles.saveInstallation(toRepositoryContext(context), installation, null);
+  if (options.duplicateProfile) {
+    const otherDigest = `sha256:${"9".repeat(64)}`;
+    const otherDefinition = AgentWorkspaceProfileDefinition.register({
+      id: AgentWorkspaceProfileDefinitionDigest.rehydrate(otherDigest),
+      profileId: AgentWorkspaceProfileId.rehydrate("agent-default"),
+      profileVersion: AgentWorkspaceProfileVersion.rehydrate("1.0.1"),
+      displayName: AgentWorkspaceProfileDisplayName.rehydrate("Agent Default"),
+      canonicalManifest: AgentWorkspaceProfileCanonicalManifest.rehydrate("{ }"),
+      registeredAt: CreatedAt.rehydrate("2026-08-19T00:00:00.000Z"),
+    })._unsafeUnwrap();
+    await profiles.saveDefinition(otherDefinition);
+    const otherInstallation = AgentWorkspaceProfileInstallation.install({
+      id: AgentWorkspaceProfileInstallationId.rehydrate("awpi_dead"),
+      definitionDigest: AgentWorkspaceProfileDefinitionDigest.rehydrate(otherDigest),
+      profileId: AgentWorkspaceProfileId.rehydrate("agent-default"),
+      profileVersion: AgentWorkspaceProfileVersion.rehydrate("1.0.1"),
+      installedAt: CreatedAt.rehydrate("2026-08-19T00:00:00.000Z"),
+    })._unsafeUnwrap();
+    await profiles.saveInstallation(toRepositoryContext(context), otherInstallation, null);
+  }
   const project = Project.create({
     id: ProjectId.rehydrate("prj_web"),
     name: ProjectName.rehydrate("Web"),
@@ -162,7 +191,9 @@ async function fixture(
   if (!options.omitDefaultProfile) {
     project
       .configureWorkspaceProfile({
-        profileInstallationId: AgentWorkspaceProfileInstallationId.rehydrate("awpi_default"),
+        profileInstallationId: AgentWorkspaceProfileInstallationId.rehydrate(
+          options.defaultProfileInstallationId ?? "awpi_default",
+        ),
         configuredAt: UpdatedAt.rehydrate("2026-07-28T00:00:01.000Z"),
       })
       ._unsafeUnwrap();
@@ -247,6 +278,7 @@ async function fixture(
       } satisfies WorkspaceOpenMcpAdmissionPort),
     placement,
     ...(contextInitializer ? { contextInitializer } : {}),
+    ...(options.occupancies ? { occupancies: options.occupancies } : {}),
   });
   return {
     compiled,
@@ -532,9 +564,7 @@ describe("Agent Workspace open preflight", () => {
       }),
     });
     const conflicted = await conflict.service.resolveContext(context, input);
-    expect(conflicted._unsafeUnwrapErr().details?.code).toBe(
-      "workspace_activation_context_conflict",
-    );
+    expect(conflicted._unsafeUnwrapErr().details?.code).toBe("workspace_open_repository_not_bound");
     expect(conflictCalls).toBe(1);
   });
 
@@ -562,5 +592,243 @@ describe("Agent Workspace open preflight", () => {
       "workspace_target_selection_evidence_invalid",
     );
     expect(released).toEqual(["wres_invalid"]);
+  });
+
+  test("[WS-REMOTE-PROFILE-LIVE-178] default code prefers the live occupancy over a leftover Project default", async () => {
+    const leftoverDefault = await fixture({
+      duplicateProfile: true,
+      defaultProfileInstallationId: "awpi_dead",
+      occupancies: {
+        findLiveProfileInstallationIds: async (_context, installationIds) =>
+          installationIds.filter((id) => id === "awpi_default"),
+      },
+    });
+    expect(
+      (await leftoverDefault.service.resolveContext(context, input))._unsafeUnwrap()
+        .profileInstallationId,
+    ).toBe("awpi_default");
+  });
+
+  test("[WS-REMOTE-PROFILE-LIVE-178] duplicate Profile names prefer live occupancy, then Project default", async () => {
+    const live = await fixture({
+      duplicateProfile: true,
+      occupancies: {
+        findLiveProfileInstallationIds: async (_context, installationIds) =>
+          installationIds.filter((id) => id === "awpi_default"),
+      },
+    });
+    expect(
+      (
+        await live.service.resolveContext(context, { ...input, profile: "agent-default" })
+      )._unsafeUnwrap().profileInstallationId,
+    ).toBe("awpi_default");
+
+    const fromDefault = await fixture({ duplicateProfile: true });
+    expect(
+      (
+        await fromDefault.service.resolveContext(context, { ...input, profile: "agent-default" })
+      )._unsafeUnwrap().profileInstallationId,
+    ).toBe("awpi_default");
+  });
+
+  test("[WS-REMOTE-PROFILE-LIVE-178] default code stays first-success when leftover and live installs both exist", async () => {
+    const { service } = await fixture({
+      duplicateProfile: true,
+      defaultProfileInstallationId: "awpi_dead",
+      occupancies: {
+        findLiveProfileInstallationIds: async (_context, installationIds) => installationIds,
+      },
+    });
+    expect(
+      (await service.resolveContext(context, input))._unsafeUnwrap().profileInstallationId,
+    ).toBe("awpi_dead");
+  });
+
+  test("[WS-REMOTE-PROFILE-AMBIGUOUS-176] duplicate live occupancies list installationIds and a copy-pasteable command", async () => {
+    const { service } = await fixture({
+      duplicateProfile: true,
+      occupancies: {
+        findLiveProfileInstallationIds: async (_context, installationIds) => installationIds,
+      },
+    });
+    const result = await service.resolveContext(context, { ...input, profile: "agent-default" });
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) return;
+    expect(result.error.details?.code).toBe("workspace_open_profile_ambiguous");
+    expect(result.error.details?.selector).toBe("agent-default");
+    expect(result.error.details?.installationIds).toEqual(
+      expect.arrayContaining(["awpi_default", "awpi_dead"]),
+    );
+    expect(String(result.error.details?.guidance)).toContain("appaloft code --profile");
+  });
+
+  test("[WS-REMOTE-PROFILE-AMBIGUOUS-176] unbound ensure then reread ambiguous is not wrapped as still unavailable", async () => {
+    const { service } = await fixture({
+      omitBinding: true,
+      duplicateProfile: true,
+      occupancies: {
+        findLiveProfileInstallationIds: async (_context, installationIds) => installationIds,
+      },
+      initializerFactory: ({ binding, repositoryBindings }) => ({
+        ensure: async () => {
+          await repositoryBindings.save(toRepositoryContext(context), binding);
+          return ok({
+            project: "reused" as const,
+            repositoryBinding: "created" as const,
+            profile: "reused" as const,
+          });
+        },
+        ensureLocalEnvironment: async () => ok(undefined),
+        ensureDefaultResource: async () => ok(undefined),
+      }),
+    });
+
+    const result = await service.resolveContext(context, { ...input, profile: "agent-default" });
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) return;
+    expect(result.error.details?.code).toBe("workspace_open_profile_ambiguous");
+    expect(result.error.details?.causeCode).toBe("workspace_open_profile_ambiguous");
+    expect(result.error.details?.installationIds).toEqual(
+      expect.arrayContaining(["awpi_default", "awpi_dead"]),
+    );
+    expect(String(result.error.details?.guidance)).toContain("appaloft code --profile");
+    expect(result.error.message).not.toContain(
+      "Workspace activation context is still unavailable after initialization",
+    );
+    expect(result.error.details?.code).not.toBe("workspace_activation_context_conflict");
+  });
+
+  test("[WS-REMOTE-PROFILE-LIVE-178] unbound whoami-style --new prefers the live install after ensure", async () => {
+    const { service } = await fixture({
+      omitBinding: true,
+      duplicateProfile: true,
+      occupancies: {
+        findLiveProfileInstallationIds: async (_context, installationIds) =>
+          installationIds.filter((id) => id === "awpi_default"),
+      },
+      initializerFactory: ({ binding, repositoryBindings }) => ({
+        ensure: async () => {
+          await repositoryBindings.save(toRepositoryContext(context), binding);
+          return ok({
+            project: "reused" as const,
+            repositoryBinding: "created" as const,
+            profile: "reused" as const,
+          });
+        },
+        ensureLocalEnvironment: async () => ok(undefined),
+        ensureDefaultResource: async () => ok(undefined),
+      }),
+    });
+
+    expect(
+      (await service.resolveContext(context, input))._unsafeUnwrap().profileInstallationId,
+    ).toBe("awpi_default");
+  });
+
+  test("[WS-REMOTE-NEW-NO-DUP-179] failed initialization disables the leftover Profile and surfaces the real error", async () => {
+    const { profiles, service } = await fixture({
+      omitBinding: true,
+      initializerFactory: () => ({
+        ensure: async () => {
+          const leftover = AgentWorkspaceProfileInstallation.install({
+            id: AgentWorkspaceProfileInstallationId.rehydrate("awpi_leftover"),
+            definitionDigest: AgentWorkspaceProfileDefinitionDigest.rehydrate(
+              `sha256:${"1".repeat(64)}`,
+            ),
+            profileId: AgentWorkspaceProfileId.rehydrate("agent-default"),
+            profileVersion: AgentWorkspaceProfileVersion.rehydrate("1.0.0"),
+            installedAt: CreatedAt.rehydrate("2026-08-19T00:00:00.000Z"),
+          })._unsafeUnwrap();
+          expect(
+            (await profiles.saveInstallation(toRepositoryContext(context), leftover, null)).isOk(),
+          ).toBe(true);
+          return ok({
+            project: "reused" as const,
+            repositoryBinding: "created" as const,
+            profile: "created" as const,
+            createdProfileInstallationId: "awpi_leftover",
+          });
+        },
+        ensureLocalEnvironment: async () => ok(undefined),
+        ensureDefaultResource: async () => ok(undefined),
+      }),
+    });
+
+    const result = await service.resolveContext(context, { ...input, profile: "agent-default" });
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) return;
+    expect(result.error.message).not.toContain(
+      "Workspace activation context is still unavailable after initialization",
+    );
+    expect(result.error.message).toContain("github.com/Acme/Web");
+    expect(result.error.message).toMatch(/Repository Binding/i);
+    expect(result.error.details?.code).toBe("workspace_open_repository_not_bound");
+    expect(result.error.details?.causeCode).toBe("workspace_open_repository_not_bound");
+    expect(result.error.details?.repositoryIdentity).toBe("github.com/Acme/Web");
+    expect(
+      (await profiles.findInstallation(toRepositoryContext(context), "awpi_leftover"))?.toState()
+        .status.value,
+    ).toBe("disabled");
+  });
+
+  test("[WS-REMOTE-OPEN-CAUSE-180] reread failure names the cwd repository and the real cause", async () => {
+    const { service } = await fixture({
+      omitBinding: true,
+      initializerFactory: () => ({
+        ensure: async () =>
+          ok({
+            project: "created" as const,
+            repositoryBinding: "created" as const,
+            profile: "reused" as const,
+          }),
+        ensureLocalEnvironment: async () => ok(undefined),
+        ensureDefaultResource: async () => ok(undefined),
+      }),
+    });
+
+    const result = await service.resolveContext(context, input);
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) return;
+    expect(result.error.message).toBe("Repository Binding is missing for github.com/Acme/Web");
+    expect(result.error.message).not.toContain(
+      "Workspace activation context is still unavailable after initialization",
+    );
+    expect(result.error.details?.code).toBe("workspace_open_repository_not_bound");
+    expect(result.error.details?.causeCode).toBe("workspace_open_repository_not_bound");
+    expect(result.error.details?.repositoryIdentity).toBe("github.com/Acme/Web");
+    expect(String(result.error.details?.guidance)).toContain("github.com/Acme/Web");
+  });
+
+  test("[WS-REMOTE-OPEN-CAUSE-180] Cloud leftover conflict still names the opened repository", async () => {
+    const { service } = await fixture({
+      omitBinding: true,
+      initializerFactory: () => ({
+        ensure: async () =>
+          err(
+            domainError.conflict(
+              "Workspace activation context is still unavailable after initialization",
+              {
+                code: "workspace_activation_context_conflict",
+                phase: "remote-operation-dispatch",
+              },
+            ),
+          ),
+        ensureLocalEnvironment: async () => ok(undefined),
+        ensureDefaultResource: async () => ok(undefined),
+      }),
+    });
+
+    const result = await service.resolveContext(context, input);
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) return;
+    expect(result.error.message).toContain("github.com/Acme/Web");
+    expect(result.error.message).not.toBe(
+      "Workspace activation context is still unavailable after initialization",
+    );
+    expect(result.error.details?.code).toBe("workspace_activation_context_conflict");
+    expect(result.error.details?.causeCode).toBe("workspace_activation_context_conflict");
+    expect(result.error.details?.repositoryIdentity).toBe("github.com/Acme/Web");
+    expect(String(result.error.details?.guidance)).toContain("github.com/Acme/Web");
+    expect(String(result.error.details?.guidance)).toContain("cannot invent a Workspace");
   });
 });

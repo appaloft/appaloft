@@ -188,13 +188,13 @@ function renderRootHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
 
 Usage:
   appaloft login [--url <url>] [--mode cloud|self-hosted] [--no-browser]
-  appaloft code [path|git-remote] [--no-attach] [--local] [--new] [--harness opencode|pi]
+  appaloft code [path|git-remote] [--no-attach] [--local] [--new] [--profile <name-or-id>] [--harness opencode|pi]
   appaloft workspace [--json]
   appaloft deploy [path|git-remote]
   appaloft server list
   appaloft auth status
   appaloft context show
-  appaloft workspace open [path] [--profile <name-or-id>] [--new] [--no-attach]
+  appaloft workspace open [path] [--profile <name-or-id>] [--new] [--no-attach] [--server <id>]
   appaloft workspace create --profile <name-or-id> --repo <https-url> --ref <git-ref> --branch <branch> [--attach]
   appaloft auth mcp login [--url <url>] [--mode cloud|self-hosted] [--profile <name>] [--no-browser]
   appaloft auth mcp codex install [--profile <name>] [--server-name <name>] [--codex-home <path>] [--command <command>]

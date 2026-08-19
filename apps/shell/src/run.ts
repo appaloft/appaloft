@@ -66,6 +66,21 @@ function formatDetailValue(value: unknown): string | null {
   return null;
 }
 
+function formatInstallationIds(error: DomainError): string[] {
+  const raw = error.details?.installationIds;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (id): id is string => typeof id === "string" && /^[A-Za-z][A-Za-z0-9_-]{2,63}$/.test(id.trim()),
+  );
+}
+
+function isWorkspaceOpenProfileAmbiguous(error: DomainError): boolean {
+  return (
+    error.code === "workspace_open_profile_ambiguous" ||
+    error.details?.code === "workspace_open_profile_ambiguous"
+  );
+}
+
 function formatDetailLine(
   label: string,
   error: DomainError,
@@ -91,7 +106,26 @@ export function formatDomainError(error: DomainError): string {
   ];
   const lines = [error.message, details.join(" ")];
 
-  if (phase === "agent-workspace-runtime-create") {
+  if (isWorkspaceOpenProfileAmbiguous(error)) {
+    const selector =
+      typeof error.details?.selector === "string" ? error.details.selector.trim() : "";
+    if (selector) {
+      lines.push(`selector=${selector}`);
+    }
+    const installationIds = formatInstallationIds(error);
+    if (installationIds.length > 0) {
+      lines.push(`installationIds=${installationIds.join(",")}`);
+    }
+    const guidance =
+      typeof error.details?.guidance === "string" ? error.details.guidance.trim() : "";
+    if (guidance && !lines.some((line) => line.includes(guidance))) {
+      lines.push(guidance);
+    }
+    const preferred = installationIds[0];
+    if (preferred && !lines.some((line) => line.includes("appaloft code --profile"))) {
+      lines.push(`Retry with appaloft code --profile ${preferred}`);
+    }
+  } else if (phase === "agent-workspace-runtime-create") {
     const workspaceLine = formatDetailLine("workspace", error, [
       "workspaceId",
       "sandboxId",

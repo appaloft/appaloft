@@ -82,7 +82,7 @@ export const cliCommandDescriptions = {
     "deployment.operate-and-recover",
   ),
   agentWorkspaceOpen: withDocs(
-    "Create or resume a Profile-aware Workspace from clean, pushed local Git context",
+    "Create or resume a Profile-aware Workspace from clean, pushed local Git context. Places on --server or the enrolled BYOS Server",
     "agent.workspace",
   ),
   agentScratch: withDocs(

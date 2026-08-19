@@ -36,6 +36,9 @@ describe("CLI safe error evidence", () => {
       sandboxId: null,
       exitCode: 23,
       retryable: true,
+      causeCode: null,
+      detailCode: null,
+      repositoryIdentity: null,
     });
 
     const output = formatSafeCliError(error);
@@ -64,6 +67,9 @@ describe("CLI safe error evidence", () => {
       sandboxId: null,
       exitCode: null,
       retryable: false,
+      causeCode: null,
+      detailCode: null,
+      repositoryIdentity: null,
     });
     expect(output).not.toContain("secret-value");
     expect(output).not.toContain("ciphertext-value");
@@ -127,12 +133,75 @@ describe("CLI safe error evidence", () => {
     expect(output).toBe(
       [
         "Git HEAD is detached; check out a pushed branch before opening a Workspace",
+        "Cause: workspace_git_detached",
         "Check out a pushed branch, then retry workspace open.",
         "",
       ].join("\n"),
     );
     expect(output).not.toContain('"error"');
     expect(output).not.toContain("validation_error");
+  });
+
+  test("[WS-REMOTE-OPEN-CAUSE-180] human and safe-json keep workspace open cause and repository", () => {
+    const error: DomainError = {
+      code: "conflict",
+      category: "user",
+      message: "Repository Binding is missing for github.com/appaloft/appaloft-cloud",
+      retryable: false,
+      details: {
+        code: "workspace_open_repository_not_bound",
+        causeCode: "workspace_open_repository_not_bound",
+        repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+        phase: "remote-operation-dispatch",
+        guidance:
+          "appaloft repository-binding bind --repository github.com/appaloft/appaloft-cloud --project <projectId>",
+        host: "203.0.113.10",
+        stderr: "secret-value ciphertext-value",
+      },
+    };
+
+    const human = formatHumanCliError(error);
+    expect(human).toContain("Repository Binding is missing for github.com/appaloft/appaloft-cloud");
+    expect(human).toContain("Cause: workspace_open_repository_not_bound");
+    expect(human).toContain("appaloft repository-binding bind --repository");
+    expect(human).not.toContain("secret-value");
+    expect(human).not.toContain("203.0.113.10");
+
+    const evidence = safeCliErrorEvidence(error);
+    expect(evidence).toMatchObject({
+      code: "conflict",
+      category: "user",
+      phase: "remote-operation-dispatch",
+      causeCode: "workspace_open_repository_not_bound",
+      detailCode: "workspace_open_repository_not_bound",
+      repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+    });
+    const output = formatSafeCliError(error);
+    expect(JSON.parse(output)).toEqual(evidence);
+    expect(output).not.toContain("secret-value");
+    expect(output).not.toContain("ciphertext-value");
+    expect(output).not.toContain("203.0.113.10");
+    expect(output).not.toContain("repository-binding bind");
+  });
+
+  test("[WS-REMOTE-PROFILE-AMBIGUOUS-176] human lists both installationIds when guidance is missing", () => {
+    const output = formatHumanCliError({
+      code: "conflict",
+      category: "user",
+      message: "Agent Workspace Profile selector is ambiguous",
+      retryable: false,
+      details: {
+        code: "workspace_open_profile_ambiguous",
+        selector: "appaloft-remote",
+        installationIds: ["awpi_ptlsoktb2iq1", "awpi_b87sxo84xe7u"],
+      },
+    } satisfies DomainError);
+
+    expect(output).toContain("Agent Workspace Profile selector is ambiguous");
+    expect(output).toContain("awpi_ptlsoktb2iq1");
+    expect(output).toContain("awpi_b87sxo84xe7u");
+    expect(output).toContain("appaloft code --profile awpi_ptlsoktb2iq1");
+    expect(output).not.toContain("Workspace activation context is still unavailable");
   });
 
   test("does not serialize unknown failures in human CLI output", () => {

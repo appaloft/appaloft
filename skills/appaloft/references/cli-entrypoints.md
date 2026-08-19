@@ -38,11 +38,17 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `--preview <previewEnvironmentId>` on logs, health, diagnostics, effective config, runtime
   control, and terminal commands when the user is operating a preview rather than its parent
   resource.
-- `appaloft code [path|git-remote] [--harness opencode|pi]` occupies my Sandbox after login. It requires a default
+- `appaloft code [path|git-remote] [--profile <name-or-id>] [--harness opencode|pi]` occupies my Sandbox after login. It requires a default
   enrolled Server, dispatches `workspaces.open` with the remote SHA and
   `targetServerId`, then prints
   `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>`.
-  Default harness is OpenCode (`appaloft-remote`). `--harness pi` occupies reserved
+  Default harness is OpenCode. Default `code` and `code --new` pick the live occupancy / live
+  install. Same-name leftover Profiles must not block first success and must not require
+  memorizing installation ids. `--profile` is a fallback pin; only an explicit colliding name
+  with more than one live occupancy lists both ids and `appaloft code --profile <id>`.
+  `--new` occupies the cwd origin and does not silently resume whoami. A failed open names
+  the repository and the missing Binding or Profile, and keeps `causeCode` visible; it does
+  not invent a successful occupancy. `--harness pi` occupies reserved
   `appaloft-remote-pi` and does not rewrite the project's OpenCode default; an existing
   OpenCode Workspace needs `--new`. A positional `https://`, `ssh://`, or `git@host:path` occupies that repository
   without a local clone. Laptop Git is not uploaded. Missing login or Server fails
@@ -56,9 +62,11 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `Local scratch · this Mac · not saved remotely`. `--local` plus a git remote fails
   closed. The only other hard failure before attach is a missing OpenCode/Pi binary
   after the user refuses install. Do not treat scratch as a durable Workspace.
-- `appaloft workspace open [path]` is the durable Profile-aware entrypoint. It resolves
+- `appaloft workspace open [path] [--server <id>]` is the durable Profile-aware entrypoint. It resolves
   clean, pushed Git context, creates or resumes the underlying Sandbox, and attaches
-  through the Adapter-declared capability.
+  through the Adapter-declared capability. When a BYOS Server is registered, open/create
+  pass that Server as `targetServerId` (`--server` pins it) and do not demand managed
+  capacity. No enrolled Server stays omitted.
   `workspace create/list/show/pause/resume/terminate/connect/attach/task/preview` remain
   lower-level workflows over Sandbox, Agent Runtime, Terminal Session, and Sandbox Port
   operations. `workspaceId` is the underlying `sandboxId`; do not invent a Workspace
@@ -91,7 +99,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft repository-binding show` - `repository-bindings.show`
 - `appaloft repository-binding unbind` - `repository-bindings.unbind`
 - `appaloft code` - occupy my Sandbox via `workspaces.open`; `--local` is Scratch
-- `appaloft workspace open [path]` - `workspaces.open` with local Git fail-closed
+- `appaloft workspace open [path] [--server <id>]` - `workspaces.open` with local Git fail-closed; enrolled BYOS is placement
 - `appaloft sandbox create` - `sandboxes.create`
 - `appaloft sandbox list` - `sandboxes.list`
 - `appaloft sandbox show <sandboxId>` - `sandboxes.show`

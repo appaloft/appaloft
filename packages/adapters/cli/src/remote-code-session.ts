@@ -221,6 +221,15 @@ export function selectDefaultRemoteCodeServer(
   return active.find((server) => server.runtimeAvailability?.status === "available") ?? active[0];
 }
 
+export function selectWorkspaceOpenTargetServerId(input: {
+  readonly explicit?: string;
+  readonly servers?: readonly RemoteCodeServerSummary[];
+}): string | undefined {
+  const explicit = input.explicit?.trim();
+  if (explicit) return explicit;
+  return selectDefaultRemoteCodeServer(input.servers)?.id;
+}
+
 export function selectResumeOccupancy(
   occupancies: readonly RemoteCodeOccupancy[] | undefined,
 ): RemoteCodeOccupancy | undefined {

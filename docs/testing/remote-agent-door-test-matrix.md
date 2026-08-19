@@ -147,6 +147,12 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-ATTACH-137 | application | this slice | signed gateway URL still wins | same runtime test |
 | WS-REMOTE-ATTACH-138 | application | this slice | raw loopback stays unsafe | same runtime test |
 | WS-REMOTE-ATTACH-139 | CLI | this slice | issued occupancy terminal attaches without `terminal-sessions.show` | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
+| WS-REMOTE-PROFILE-AMBIGUOUS-176 | application / CLI / shell | this slice | duplicate live Profiles list selector, installationIds, and `appaloft code --profile <id>`; shell `formatDomainError` keeps those fields | `packages/application/test/agent-workspace-profile-selector.test.ts`; `packages/application/test/agent-workspace-open-preflight.test.ts`; `packages/adapters/cli/test/runtime-error-format.test.ts`; `apps/shell/test/run-error-format.test.ts` |
+| WS-REMOTE-CODE-PROFILE-177 | CLI | this slice | `code --profile` is documented and dispatched; default OpenCode `code` omits hardcoded `appaloft-remote` | `packages/adapters/cli/test/agent-workspace-command.test.ts`; `apps/shell/test/help-without-runtime.test.ts` |
+| WS-REMOTE-PROFILE-LIVE-178 | application | this slice | selector input is enabled Profile installs, not terminated/failed sandboxes; default `code` prefers the live install | `packages/application/test/agent-workspace-profile-selector.test.ts`; `packages/application/test/agent-workspace-open-preflight.test.ts` |
+| WS-REMOTE-NEW-NO-DUP-179 | application | this slice | Community initializer reuses same-name Profile; `--new` skips resume only. Cloud leftover install is appaloft-cloud | `packages/application/test/community-workspace-activation-context-initializer.test.ts`; `packages/application/test/agent-workspace-open-preflight.test.ts` |
+| WS-REMOTE-OPEN-CAUSE-180 | application / CLI | this slice | failed open names cwd repository + real cause; human and safe-json keep `causeCode` / `repositoryIdentity` | `packages/application/test/agent-workspace-open-preflight.test.ts`; `packages/adapters/cli/test/runtime-error-format.test.ts` |
+| WS-REMOTE-OPEN-BYOS-181 | CLI | this slice | `workspace open` / `create` pass enrolled BYOS or `--server`; do not demand managed | `packages/adapters/cli/test/remote-code-session.test.ts`; `packages/adapters/cli/test/agent-workspace-command.test.ts` |
 
 
 

@@ -41,7 +41,10 @@ describe("Community occupancy initializer", () => {
           throw new Error("unused");
         },
       } as never,
-      profileRepository: { findInstallationByDefinition: async () => null } as never,
+      profileRepository: {
+        findInstallationByDefinition: async () => null,
+        listInstallations: async () => [],
+      } as never,
     });
 
     const result = await initializer.ensure(
@@ -61,6 +64,191 @@ describe("Community occupancy initializer", () => {
     expect(result.isErr()).toBe(true);
     if (result.isOk()) return;
     expect(result.error.details?.code).toBe("workspace_activation_initializer_unavailable");
+  });
+
+  test("[WS-REMOTE-NEW-NO-DUP-179][WS-REMOTE-PROFILE-008] reuses an enabled same-name Profile instead of installing another", async () => {
+    const installed: unknown[] = [];
+    const existing = {
+      id: { value: "awpi_existing" },
+      toState: () => ({
+        status: { value: "enabled" },
+        profileId: { value: "appaloft-remote" },
+        installedAt: { value: "2026-08-16T00:00:00.000Z" },
+      }),
+    };
+    const initializer = new CommunityWorkspaceActivationContextInitializer({
+      commandBus: {
+        execute: async () => ok({ id: "unused" }),
+      } as never,
+      projects: {
+        findOne: async () =>
+          ({
+            id: { value: "prj_demo" },
+            toState: () => ({
+              lifecycleStatus: { value: "active" },
+              defaultWorkspaceProfileInstallationId: { value: "awpi_existing" },
+            }),
+          }) as never,
+        upsert: async () => undefined,
+      },
+      environments: {
+        findOne: async () => ({ id: { value: "env_local" } }),
+        upsert: async () => undefined,
+      } as never,
+      resources: {
+        findOne: async () => ({
+          id: { value: "res_app" },
+          toState: () => ({ networkProfile: { internalPort: { value: 80 } } }),
+        }),
+        upsert: async () => undefined,
+      } as never,
+      repositoryBindings: {
+        findByIdentity: async () => ({
+          binding: {
+            toState: () => ({
+              status: "active",
+              projectId: { value: "prj_demo" },
+            }),
+          },
+        }),
+        save: async () => undefined,
+      } as never,
+      adapters: {
+        install: async (_context: unknown, input: { manifest: unknown }) => {
+          installed.push(input.manifest);
+          return ok({ installationId: "aai_new" });
+        },
+      } as never,
+      profiles: {
+        validate: () => ok({ definitionDigest: "sha256:new" }),
+        install: async (_context: unknown, input: { manifest: unknown }) => {
+          installed.push(input.manifest);
+          return ok({ installationId: "awpi_new" });
+        },
+      } as never,
+      profileRepository: {
+        findInstallationByDefinition: async () => null,
+        listInstallations: async () => [existing],
+      } as never,
+      defaultProfile,
+    });
+
+    const result = await initializer.ensure(
+      createExecutionContext({
+        requestId: "req_reuse_profile",
+        entrypoint: "cli",
+        actor: { kind: "user", id: "usr_1" },
+        tenant: { tenantId: "tenant_1" },
+      }),
+      {
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        missing: "default-profile",
+        profile: "appaloft-remote",
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value.profile).toBe("reused");
+    expect(result.value.createdProfileInstallationId).toBeUndefined();
+    expect(installed).toEqual([]);
+  });
+
+  test("[WS-REMOTE-NEW-NO-DUP-179] reuses by profileId when definition digest does not match", async () => {
+    const installed: unknown[] = [];
+    const older = {
+      id: { value: "awpi_ptlsoktb2iq1" },
+      toState: () => ({
+        status: { value: "enabled" },
+        profileId: { value: "appaloft-remote" },
+        installedAt: { value: "2026-08-16T00:00:00.000Z" },
+      }),
+    };
+    const leftover = {
+      id: { value: "awpi_b87sxo84xe7u" },
+      toState: () => ({
+        status: { value: "enabled" },
+        profileId: { value: "appaloft-remote" },
+        installedAt: { value: "2026-08-19T00:00:00.000Z" },
+      }),
+    };
+    const initializer = new CommunityWorkspaceActivationContextInitializer({
+      commandBus: {
+        execute: async () => ok({ id: "unused" }),
+      } as never,
+      projects: {
+        findOne: async () =>
+          ({
+            id: { value: "prj_demo" },
+            toState: () => ({
+              lifecycleStatus: { value: "active" },
+            }),
+          }) as never,
+        upsert: async () => undefined,
+      },
+      environments: {
+        findOne: async () => ({ id: { value: "env_local" } }),
+        upsert: async () => undefined,
+      } as never,
+      resources: {
+        findOne: async () => ({
+          id: { value: "res_app" },
+          toState: () => ({ networkProfile: { internalPort: { value: 80 } } }),
+        }),
+        upsert: async () => undefined,
+      } as never,
+      repositoryBindings: {
+        findByIdentity: async () => ({
+          binding: {
+            toState: () => ({
+              status: "active",
+              projectId: { value: "prj_demo" },
+            }),
+          },
+        }),
+        save: async () => undefined,
+      } as never,
+      adapters: {
+        install: async (_context: unknown, input: { manifest: unknown }) => {
+          installed.push(input.manifest);
+          return ok({ installationId: "aai_new" });
+        },
+      } as never,
+      profiles: {
+        validate: () => ok({ definitionDigest: "sha256:new" }),
+        install: async (_context: unknown, input: { manifest: unknown }) => {
+          installed.push(input.manifest);
+          return ok({ installationId: "awpi_new" });
+        },
+      } as never,
+      profileRepository: {
+        findInstallationByDefinition: async () => null,
+        listInstallations: async () => [older, leftover],
+      } as never,
+      defaultProfile,
+    });
+
+    const result = await initializer.ensure(
+      createExecutionContext({
+        requestId: "req_reuse_profile_id",
+        entrypoint: "cli",
+        actor: { kind: "user", id: "usr_1" },
+        tenant: { tenantId: "tenant_1" },
+      }),
+      {
+        repository: "https://github.com/traefik/whoami.git",
+        repositoryIdentity: "github.com/traefik/whoami",
+        missing: "default-profile",
+        profile: "appaloft-remote",
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value.profile).toBe("reused");
+    expect(result.value.createdProfileInstallationId).toBeUndefined();
+    expect(installed).toEqual([]);
   });
 
   test("[WS-REMOTE-ENV-040] creates Environment local when the occupancy Project has none", async () => {
@@ -109,7 +297,10 @@ describe("Community occupancy initializer", () => {
         validate: () => ok({ definitionDigest: "sha256:demo" }),
         install: async () => ok({ installationId: "awpi_demo" }),
       } as never,
-      profileRepository: { findInstallationByDefinition: async () => ({}) } as never,
+      profileRepository: {
+        findInstallationByDefinition: async () => ({}),
+        listInstallations: async () => [],
+      } as never,
       defaultProfile,
     });
 
@@ -194,7 +385,10 @@ describe("Community occupancy initializer", () => {
         validate: () => ok({ definitionDigest: "sha256:demo" }),
         install: async () => ok({ installationId: "awpi_demo" }),
       } as never,
-      profileRepository: { findInstallationByDefinition: async () => ({}) } as never,
+      profileRepository: {
+        findInstallationByDefinition: async () => ({}),
+        listInstallations: async () => [],
+      } as never,
       defaultProfile,
     });
 
@@ -257,7 +451,10 @@ describe("Community occupancy initializer", () => {
         validate: () => ok({ definitionDigest: "sha256:demo" }),
         install: async () => ok({ installationId: "awpi_demo" }),
       } as never,
-      profileRepository: { findInstallationByDefinition: async () => ({}) } as never,
+      profileRepository: {
+        findInstallationByDefinition: async () => ({}),
+        listInstallations: async () => [],
+      } as never,
       defaultProfile,
     });
 
@@ -340,7 +537,10 @@ describe("Community occupancy initializer", () => {
         validate: () => ok({ definitionDigest: "sha256:demo" }),
         install: async () => ok({ installationId: "awpi_demo" }),
       } as never,
-      profileRepository: { findInstallationByDefinition: async () => ({}) } as never,
+      profileRepository: {
+        findInstallationByDefinition: async () => ({}),
+        listInstallations: async () => [],
+      } as never,
       defaultProfile,
     });
 
@@ -415,7 +615,10 @@ describe("Community occupancy initializer", () => {
         validate: () => ok({ definitionDigest: "sha256:demo" }),
         install: async () => ok({ installationId: "awpi_demo" }),
       } as never,
-      profileRepository: { findInstallationByDefinition: async () => ({}) } as never,
+      profileRepository: {
+        findInstallationByDefinition: async () => ({}),
+        listInstallations: async () => [],
+      } as never,
       defaultProfile,
       sourceDetector: {
         detect: async () =>
@@ -500,7 +703,10 @@ describe("Community occupancy initializer", () => {
         validate: () => ok({ definitionDigest: "sha256:demo" }),
         install: async () => ok({ installationId: "awpi_demo" }),
       } as never,
-      profileRepository: { findInstallationByDefinition: async () => ({}) } as never,
+      profileRepository: {
+        findInstallationByDefinition: async () => ({}),
+        listInstallations: async () => [],
+      } as never,
       defaultProfile,
       sourceDetector: {
         detect: async () =>
@@ -591,7 +797,10 @@ describe("Community occupancy initializer", () => {
           return ok({ installationId: "awpi_pi" });
         },
       } as never,
-      profileRepository: { findInstallationByDefinition: async () => null } as never,
+      profileRepository: {
+        findInstallationByDefinition: async () => null,
+        listInstallations: async () => [],
+      } as never,
       defaultProfile,
       defaultProfiles: {
         "appaloft-remote": defaultProfile,

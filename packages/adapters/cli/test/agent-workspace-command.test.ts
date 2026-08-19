@@ -613,6 +613,130 @@ describe("Agent Workspace CLI", () => {
         attach: false,
       },
     });
+    expect((commands[0] as OpenAgentWorkspaceCommand).input.targetServerId).toBeUndefined();
+  });
+
+  test("[WS-REMOTE-OPEN-BYOS-181] workspace open --server pins the registered BYOS Server", async () => {
+    const commands: Command<unknown>[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return ok({ workspaceId: "sbx_byos", resumed: false } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: {
+        execute: async () =>
+          ok({
+            items: [
+              {
+                id: "srv_yundu",
+                name: "yundu",
+                lifecycleStatus: "active",
+              },
+            ],
+          }),
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_open_server" }),
+      },
+      resolveLocalWorkspaceGitContext: async () => ({
+        root: "/work/whoami",
+        remoteName: "origin",
+        remote: "git@github.com:traefik/whoami.git",
+        repositoryIdentity: "github.com/traefik/whoami",
+        credentialFreeHttpsRepository: "https://github.com/traefik/whoami.git",
+        branch: "main",
+        ref: "refs/heads/main",
+        headSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      }),
+    });
+    const write = process.stdout.write;
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    try {
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "workspace",
+        "open",
+        ".",
+        "--profile",
+        "appaloft-remote",
+        "--new",
+        "--no-attach",
+        "--server",
+        "srv_4lifk0yrcecy",
+      ]);
+    } finally {
+      process.stdout.write = write;
+    }
+    expect((commands[0] as OpenAgentWorkspaceCommand).input).toMatchObject({
+      targetServerId: "srv_4lifk0yrcecy",
+      forceNew: true,
+      repositoryIdentity: "github.com/traefik/whoami",
+    });
+  });
+
+  test("[WS-REMOTE-OPEN-BYOS-181] workspace open defaults to the enrolled BYOS Server", async () => {
+    const commands: Command<unknown>[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return ok({ workspaceId: "sbx_byos_default", resumed: false } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: {
+        execute: async () =>
+          ok({
+            items: [
+              {
+                id: "srv_4lifk0yrcecy",
+                name: "hostinger",
+                lifecycleStatus: "active",
+                runtimeAvailability: { status: "available" },
+              },
+            ],
+          }),
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_open_byos" }),
+      },
+      resolveLocalWorkspaceGitContext: async () => ({
+        root: "/work/whoami",
+        remoteName: "origin",
+        remote: "git@github.com:traefik/whoami.git",
+        repositoryIdentity: "github.com/traefik/whoami",
+        credentialFreeHttpsRepository: "https://github.com/traefik/whoami.git",
+        branch: "main",
+        ref: "refs/heads/main",
+        headSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      }),
+    });
+    const write = process.stdout.write;
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    try {
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "workspace",
+        "open",
+        ".",
+        "--new",
+        "--no-attach",
+      ]);
+    } finally {
+      process.stdout.write = write;
+    }
+    expect((commands[0] as OpenAgentWorkspaceCommand).input.targetServerId).toBe(
+      "srv_4lifk0yrcecy",
+    );
   });
 
   test("[WS-CODE-CLI-001][WS-CODE-PARITY-002][WS-CODE-COMPAT-010] code native-attaches after remote door; workspace open stays Git-safe", async () => {
@@ -1125,7 +1249,54 @@ describe("Agent Workspace CLI", () => {
       forceNew: true,
       attach: false,
       targetServerId: "srv_1",
-      profile: "appaloft-remote",
+      repository: "https://github.com/acme/api.git",
+      repositoryIdentity: "github.com/acme/api",
+    });
+    expect((commands[0] as OpenAgentWorkspaceCommand).input.profile).toBeUndefined();
+  });
+
+  test("[WS-REMOTE-CODE-PROFILE-177] code --profile passes the selector through", async () => {
+    const commands: Command<unknown>[] = [];
+    const { createCliProgram } = await import("../src");
+    const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return ok({ workspaceId: "sbx_profile", projectId: "prj_billing" } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_profile" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        projectId: "prj_billing",
+        serverId: "srv_1",
+        serverName: "mac-mini",
+      }),
+    });
+
+    await program.parseAsync([
+      "node",
+      "appaloft",
+      "code",
+      "--profile",
+      "awpi_ptlsoktb2iq1",
+      "--no-attach",
+    ]);
+
+    expect((commands[0] as OpenAgentWorkspaceCommand).input).toMatchObject({
+      attach: false,
+      targetServerId: "srv_1",
+      profile: "awpi_ptlsoktb2iq1",
     });
   });
 
@@ -1630,6 +1801,9 @@ describe("Agent Workspace CLI", () => {
     } as unknown as CommandBus;
     const queryBus = {
       execute: async <T>(_context: unknown, query: Query<T>) => {
+        if (query instanceof ListServersQuery) {
+          return ok({ items: [] } as T);
+        }
         throw new Error(`occupancy attach must not re-query ${query.constructor.name}`);
       },
     } as unknown as QueryBus;
