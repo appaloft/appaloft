@@ -5,16 +5,19 @@ the same operation catalog and public docs anchors. Do not invent agent-only ope
 
 ## Install
 
-The one-command local Agent door copies the skill and writes Local MCP into detected hosts:
+The one-command local Agent door copies the skill and writes Local MCP into default-checked hosts:
 
 ```bash
 appaloft login
 appaloft setup agent
 ```
 
-`appaloft setup agent` detects Cursor and OpenCode (also Codex and Claude), copies the Appaloft
-skill into `~/.cursor/skills/appaloft`, `~/.config/opencode/skills/appaloft`, and
-`~/.agents/skills/appaloft`, and writes token-free Local MCP. Tokens stay out of editor config.
+`appaloft setup agent` lists `universal`, `claude-code`, `cursor`, and `opencode`. Defaults copy the
+Appaloft skill byte-identically into `~/.agents/skills/appaloft`, `~/.claude/skills/appaloft` when
+`~/.claude` exists, and `~/.cursor/skills/appaloft` when `~/.cursor` exists, then write token-free
+MCP into `~/.claude.json` and `~/.cursor/mcp.json`. Universal is skills only. OpenCode is listed but
+not default-checked; pass `--agent opencode` or use the sibling install commands. Tokens stay out of
+editor config.
 
 The skill-manager path still only copies skill files:
 
@@ -33,6 +36,8 @@ Explicit MCP siblings remain available:
 
 - Cursor: `appaloft auth mcp cursor install` merges `~/.cursor/mcp.json` `mcpServers.appaloft` to
   launch `appaloft mcp remote-stdio --profile <active>`.
+- Claude Code: `appaloft auth mcp claude-code install` merges `~/.claude.json` `mcpServers.appaloft`
+  for the same launcher.
 - OpenCode: `appaloft auth mcp opencode install` merges `~/.config/opencode/opencode.json`
   `mcp.appaloft` as a local command (`type: "local"`, `enabled: true`) for the same launcher.
 - Codex: `appaloft auth mcp login` then `appaloft auth mcp codex install`.

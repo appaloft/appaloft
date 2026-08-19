@@ -110,6 +110,7 @@ describe("standalone control plane help", () => {
   test("[CONTROL-PLANE-CLI-023][CONTROL-PLANE-CLI-024] auth mcp cursor/opencode install --help prints usage", async () => {
     const cursorChunks: string[] = [];
     const openCodeChunks: string[] = [];
+    const claudeChunks: string[] = [];
     const rootChunks: string[] = [];
 
     const cursor = await runStandaloneControlPlaneCli({
@@ -130,6 +131,15 @@ describe("standalone control plane help", () => {
         },
       },
     });
+    const claude = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "auth", "mcp", "claude-code", "install", "--help"],
+      stdout: {
+        write: (chunk) => {
+          claudeChunks.push(String(chunk));
+          return true;
+        },
+      },
+    });
     const root = await runStandaloneControlPlaneCli({
       argv: ["node", "appaloft", "--help"],
       stdout: {
@@ -142,11 +152,14 @@ describe("standalone control plane help", () => {
 
     expect(cursor).toEqual({ handled: true, exitCode: 0 });
     expect(openCode).toEqual({ handled: true, exitCode: 0 });
+    expect(claude).toEqual({ handled: true, exitCode: 0 });
     expect(root).toEqual({ handled: true, exitCode: 0 });
     expect(cursorChunks.join("")).toContain("appaloft auth mcp cursor install");
     expect(openCodeChunks.join("")).toContain("appaloft auth mcp opencode install");
+    expect(claudeChunks.join("")).toContain("appaloft auth mcp claude-code install");
     expect(rootChunks.join("")).toContain("appaloft auth mcp cursor install");
     expect(rootChunks.join("")).toContain("appaloft auth mcp opencode install");
+    expect(rootChunks.join("")).toContain("appaloft auth mcp claude-code install");
     expect(rootChunks.join("")).toContain("appaloft auth mcp codex install");
     expect(rootChunks.join("")).toContain("appaloft setup agent");
   });
@@ -166,8 +179,10 @@ describe("standalone control plane help", () => {
     const printed = chunks.join("");
     expect(result).toEqual({ handled: true, exitCode: 0 });
     expect(printed).toContain("appaloft setup agent");
-    expect(printed).toContain("--cursor-home");
-    expect(printed).toContain("--opencode-home");
-    expect(printed).toContain("mcp.json or opencode.json");
+    expect(printed).toContain("--agent");
+    expect(printed).toContain("opencode");
+    expect(printed).toContain("not default-checked");
+    expect(printed).toContain("~/.claude.json");
+    expect(printed).toContain("~/.cursor/mcp.json");
   });
 });

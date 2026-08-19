@@ -585,7 +585,7 @@ export const publicDocsHelpTopics = {
     id: "cli.mcp-host-install",
     title: "CLI MCP host install",
     description:
-      "How `appaloft setup agent` and sibling Cursor/OpenCode/Codex install commands write token-free Local MCP host config from an existing Appaloft CLI profile.",
+      "How `appaloft setup agent` and sibling Cursor/Claude Code/OpenCode/Codex install commands write token-free Local MCP host config from an existing Appaloft CLI profile.",
     page: {
       "zh-CN": "reference/cli",
       "en-US": "en/reference/cli",
@@ -599,11 +599,14 @@ export const publicDocsHelpTopics = {
     aliases: [
       "appaloft setup agent",
       "appaloft auth mcp cursor install",
+      "appaloft auth mcp claude-code install",
       "appaloft auth mcp opencode install",
       "appaloft auth mcp codex install",
       "~/.cursor/mcp.json",
+      "~/.claude.json",
       "~/.config/opencode/opencode.json",
       "~/.cursor/skills",
+      "~/.claude/skills",
       "~/.config/opencode/skills",
       "MCP host install",
       "MCP 宿主安装",
@@ -1271,7 +1274,7 @@ export const publicDocsHelpTopics = {
     id: "agent.appaloft-mcp-host-install",
     title: "Appaloft MCP host install",
     description:
-      "How `appaloft setup agent` leaves detected Cursor and OpenCode with both the Appaloft skill and Local MCP, without storing tokens in editor config.",
+      "How `appaloft setup agent` default-checks Cursor and Claude Code, lists OpenCode without installing it, and writes token-free Local MCP without storing tokens in editor config.",
     page: {
       "zh-CN": "agents/mcp",
       "en-US": "en/agents/mcp",
@@ -1285,6 +1288,7 @@ export const publicDocsHelpTopics = {
     aliases: [
       "appaloft setup agent",
       "appaloft auth mcp cursor install",
+      "appaloft auth mcp claude-code install",
       "appaloft auth mcp opencode install",
       "mcpServers.appaloft",
       "mcp.appaloft",

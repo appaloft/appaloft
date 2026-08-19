@@ -361,6 +361,7 @@ describe("public docs operation coverage", () => {
     expect(mcpTools).toContain("appaloft mcp stdio");
     expect(mcpTools).toContain("appaloft setup agent");
     expect(mcpTools).toContain("appaloft auth mcp cursor install");
+    expect(mcpTools).toContain("appaloft auth mcp claude-code install");
     expect(mcpTools).toContain("appaloft auth mcp opencode install");
     expect(mcpTools).toContain("appaloft mcp serve --host 127.0.0.1 --port 3939");
     expect(mcpTools).toContain("npx @appaloft/mcp");

@@ -9,6 +9,7 @@ import {
 } from "./control-plane-profile.js";
 
 export const CURSOR_MCP_INSTALL_SCHEMA_VERSION = "appaloft.cursor.mcp-install/v1";
+export const CLAUDE_CODE_MCP_INSTALL_SCHEMA_VERSION = "appaloft.claude-code.mcp-install/v1";
 export const OPENCODE_MCP_INSTALL_SCHEMA_VERSION = "appaloft.opencode.mcp-install/v1";
 export const CODEX_MCP_INSTALL_SCHEMA_VERSION = "appaloft.codex.mcp-install/v1";
 
@@ -18,6 +19,7 @@ export interface McpHostInstallReport {
   readonly configPath: string;
   readonly command: string;
   readonly args: readonly string[];
+  readonly skipped?: boolean | undefined;
   readonly profile: {
     readonly name: string;
     readonly baseUrl: string;
@@ -197,6 +199,32 @@ function upsertJsonNamedEntry(input: {
   });
 }
 
+function mcpEntryEquals(existing: unknown, next: Record<string, unknown>): boolean {
+  if (!isPlainObject(existing)) {
+    return false;
+  }
+  const keys = new Set([...Object.keys(existing), ...Object.keys(next)]);
+  for (const key of keys) {
+    if (JSON.stringify(existing[key]) !== JSON.stringify(next[key])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function existingNamedEntryEquals(input: {
+  readonly root: Record<string, unknown>;
+  readonly collectionKey: string;
+  readonly serverName: string;
+  readonly entry: Record<string, unknown>;
+}): boolean {
+  const collection = input.root[input.collectionKey];
+  if (!isPlainObject(collection)) {
+    return false;
+  }
+  return mcpEntryEquals(collection[input.serverName], input.entry);
+}
+
 async function writeOwnerOnlyFile(path: string, contents: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
   await writeFile(path, contents, { mode: 0o600 });
@@ -283,12 +311,26 @@ export function resolveAgentsHome(input: {
   return input.explicit?.trim() || input.env?.AGENTS_HOME?.trim() || join(input.home, ".agents");
 }
 
-export async function installCursorMcpHost(
-  input: McpHostInstallOptions & { readonly cursorHome: string },
-): Promise<Result<McpHostInstallReport, DomainError>> {
-  const serverName = input.serverName ?? "appaloft";
-  const command = input.command ?? "appaloft";
-  const configPath = join(input.cursorHome, "mcp.json");
+export function resolveClaudeJsonPath(input: { readonly home: string }): string {
+  return join(input.home, ".claude.json");
+}
+
+async function installJsonMcpNamedHost(input: {
+  readonly store: CliControlPlaneProfileStore;
+  readonly requestedProfile?: string | undefined;
+  readonly serverName: string;
+  readonly command: string;
+  readonly configPath: string;
+  readonly collectionKey: string;
+  readonly entryForArgs: (args: readonly string[]) => Record<string, unknown>;
+  readonly schemaVersion: string;
+  readonly phase: string;
+  readonly code: string;
+  readonly parseMessage: string;
+  readonly collectionMessage: string;
+  readonly writeMessage: string;
+  readonly profileMissingMessage: string;
+}): Promise<Result<McpHostInstallReport, DomainError>> {
   const storeData = await input.store.read();
   if (storeData.isErr()) {
     return err(storeData.error);
@@ -303,64 +345,133 @@ export async function installCursorMcpHost(
     return err(
       profileNotFoundError({
         profileName: selected.profileName,
-        phase: "cursor-mcp-install",
-        message:
-          "Appaloft CLI profile was not found; run appaloft login or appaloft auth mcp login first",
+        phase: input.phase,
+        message: input.profileMissingMessage,
       }),
     );
   }
   const argsForConfig = mcpRemoteStdioArgs(selected.profile.name);
-  const existing = existsSync(configPath) ? await readFile(configPath, "utf8") : "";
+  const entry = input.entryForArgs(argsForConfig);
+  const existing = existsSync(input.configPath) ? await readFile(input.configPath, "utf8") : "";
   const parsedRoot = parseJsonObjectFile({
     existing,
-    configPath,
-    phase: "cursor-mcp-install",
-    code: "cursor_mcp_config_write_failed",
-    message: "Cursor MCP config could not be parsed as a JSON object",
+    configPath: input.configPath,
+    phase: input.phase,
+    code: input.code,
+    message: input.parseMessage,
   });
   if (parsedRoot.isErr()) {
     return err(parsedRoot.error);
   }
+  if (
+    existingNamedEntryEquals({
+      root: parsedRoot.value,
+      collectionKey: input.collectionKey,
+      serverName: input.serverName,
+      entry,
+    })
+  ) {
+    return ok({
+      schemaVersion: input.schemaVersion,
+      serverName: input.serverName,
+      configPath: input.configPath,
+      command: input.command,
+      args: argsForConfig,
+      skipped: true,
+      profile: redactedMcpInstallProfile(selected.profile),
+    });
+  }
   const nextRoot = upsertJsonNamedEntry({
     root: parsedRoot.value,
-    collectionKey: "mcpServers",
-    serverName,
-    entry: {
-      command,
-      args: [...argsForConfig],
-    },
-    configPath,
-    phase: "cursor-mcp-install",
-    code: "cursor_mcp_config_write_failed",
-    message: "Cursor MCP config mcpServers must be a JSON object",
+    collectionKey: input.collectionKey,
+    serverName: input.serverName,
+    entry,
+    configPath: input.configPath,
+    phase: input.phase,
+    code: input.code,
+    message: input.collectionMessage,
   });
   if (nextRoot.isErr()) {
     return err(nextRoot.error);
   }
 
   try {
-    await writeOwnerOnlyFile(configPath, `${JSON.stringify(nextRoot.value, null, 2)}\n`);
+    await writeOwnerOnlyFile(input.configPath, `${JSON.stringify(nextRoot.value, null, 2)}\n`);
     return ok({
-      schemaVersion: CURSOR_MCP_INSTALL_SCHEMA_VERSION,
-      serverName,
-      configPath,
-      command,
+      schemaVersion: input.schemaVersion,
+      serverName: input.serverName,
+      configPath: input.configPath,
+      command: input.command,
       args: argsForConfig,
       profile: redactedMcpInstallProfile(selected.profile),
     });
   } catch (error) {
     return err({
-      code: "cursor_mcp_config_write_failed",
+      code: input.code,
       category: "infra",
-      message: "Cursor MCP config could not be written",
+      message: input.writeMessage,
       retryable: true,
       details: {
-        phase: "cursor-mcp-install",
-        configPath,
+        phase: input.phase,
+        configPath: input.configPath,
         message: error instanceof Error ? error.message : String(error),
       },
     } satisfies DomainError);
   }
+}
+
+export async function installCursorMcpHost(
+  input: McpHostInstallOptions & { readonly cursorHome: string },
+): Promise<Result<McpHostInstallReport, DomainError>> {
+  const serverName = input.serverName ?? "appaloft";
+  const command = input.command ?? "appaloft";
+  return installJsonMcpNamedHost({
+    store: input.store,
+    requestedProfile: input.requestedProfile,
+    serverName,
+    command,
+    configPath: join(input.cursorHome, "mcp.json"),
+    collectionKey: "mcpServers",
+    entryForArgs: (args) => ({
+      command,
+      args: [...args],
+    }),
+    schemaVersion: CURSOR_MCP_INSTALL_SCHEMA_VERSION,
+    phase: "cursor-mcp-install",
+    code: "cursor_mcp_config_write_failed",
+    parseMessage: "Cursor MCP config could not be parsed as a JSON object",
+    collectionMessage: "Cursor MCP config mcpServers must be a JSON object",
+    writeMessage: "Cursor MCP config could not be written",
+    profileMissingMessage:
+      "Appaloft CLI profile was not found; run appaloft login or appaloft auth mcp login first",
+  });
+}
+
+export async function installClaudeCodeMcpHost(
+  input: McpHostInstallOptions & { readonly home: string },
+): Promise<Result<McpHostInstallReport, DomainError>> {
+  const serverName = input.serverName ?? "appaloft";
+  const command = input.command ?? "appaloft";
+  return installJsonMcpNamedHost({
+    store: input.store,
+    requestedProfile: input.requestedProfile,
+    serverName,
+    command,
+    configPath: resolveClaudeJsonPath({ home: input.home }),
+    collectionKey: "mcpServers",
+    entryForArgs: (args) => ({
+      command,
+      args: [...args],
+    }),
+    schemaVersion: CLAUDE_CODE_MCP_INSTALL_SCHEMA_VERSION,
+    phase: "claude-code-mcp-install",
+    code: "claude_mcp_config_write_failed",
+    parseMessage: "Claude Code MCP config could not be parsed as a JSON object",
+    collectionMessage: "Claude Code MCP config mcpServers must be a JSON object",
+    writeMessage: "Claude Code MCP config could not be written",
+    profileMissingMessage:
+      "Appaloft CLI profile was not found; run appaloft login or appaloft auth mcp login first",
+  });
 }
 
 export async function installOpenCodeMcpHost(
@@ -368,80 +479,27 @@ export async function installOpenCodeMcpHost(
 ): Promise<Result<McpHostInstallReport, DomainError>> {
   const serverName = input.serverName ?? "appaloft";
   const command = input.command ?? "appaloft";
-  const configPath = join(input.opencodeHome, "opencode.json");
-  const storeData = await input.store.read();
-  if (storeData.isErr()) {
-    return err(storeData.error);
-  }
-
-  const selected = resolveSelectedMcpProfile({
-    requestedName: input.requestedProfile,
-    activeProfile: storeData.value.activeProfile,
-    profiles: storeData.value.profiles,
-  });
-  if (selected.kind === "missing") {
-    return err(
-      profileNotFoundError({
-        profileName: selected.profileName,
-        phase: "opencode-mcp-install",
-        message:
-          "Appaloft CLI profile was not found; run appaloft login or appaloft auth mcp login first",
-      }),
-    );
-  }
-  const argsForConfig = mcpRemoteStdioArgs(selected.profile.name);
-  const existing = existsSync(configPath) ? await readFile(configPath, "utf8") : "";
-  const parsedRoot = parseJsonObjectFile({
-    existing,
-    configPath,
-    phase: "opencode-mcp-install",
-    code: "opencode_mcp_config_write_failed",
-    message: "OpenCode MCP config could not be parsed as a JSON object",
-  });
-  if (parsedRoot.isErr()) {
-    return err(parsedRoot.error);
-  }
-  const nextRoot = upsertJsonNamedEntry({
-    root: parsedRoot.value,
-    collectionKey: "mcp",
+  return installJsonMcpNamedHost({
+    store: input.store,
+    requestedProfile: input.requestedProfile,
     serverName,
-    entry: {
+    command,
+    configPath: join(input.opencodeHome, "opencode.json"),
+    collectionKey: "mcp",
+    entryForArgs: (args) => ({
       type: "local",
-      command: [command, ...argsForConfig],
+      command: [command, ...args],
       enabled: true,
-    },
-    configPath,
+    }),
+    schemaVersion: OPENCODE_MCP_INSTALL_SCHEMA_VERSION,
     phase: "opencode-mcp-install",
     code: "opencode_mcp_config_write_failed",
-    message: "OpenCode MCP config mcp must be a JSON object",
+    parseMessage: "OpenCode MCP config could not be parsed as a JSON object",
+    collectionMessage: "OpenCode MCP config mcp must be a JSON object",
+    writeMessage: "OpenCode MCP config could not be written",
+    profileMissingMessage:
+      "Appaloft CLI profile was not found; run appaloft login or appaloft auth mcp login first",
   });
-  if (nextRoot.isErr()) {
-    return err(nextRoot.error);
-  }
-
-  try {
-    await writeOwnerOnlyFile(configPath, `${JSON.stringify(nextRoot.value, null, 2)}\n`);
-    return ok({
-      schemaVersion: OPENCODE_MCP_INSTALL_SCHEMA_VERSION,
-      serverName,
-      configPath,
-      command,
-      args: argsForConfig,
-      profile: redactedMcpInstallProfile(selected.profile),
-    });
-  } catch (error) {
-    return err({
-      code: "opencode_mcp_config_write_failed",
-      category: "infra",
-      message: "OpenCode MCP config could not be written",
-      retryable: true,
-      details: {
-        phase: "opencode-mcp-install",
-        configPath,
-        message: error instanceof Error ? error.message : String(error),
-      },
-    } satisfies DomainError);
-  }
 }
 
 export async function installCodexMcpHost(

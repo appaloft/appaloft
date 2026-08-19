@@ -93,13 +93,16 @@ The deploy subprotocol must include:
 - Repository artifact: standard source `skills/appaloft` with references for entrypoint surfaces,
   CLI operation mapping, and deploy protocol.
 - standard install path: `appaloft setup agent` after `appaloft login` is the one-command local
-  Agent door. It detects Cursor and OpenCode (also Codex and Claude), copies the skill into
-  `~/.cursor/skills/appaloft`, `~/.config/opencode/skills/appaloft`, and `~/.agents/skills/appaloft`,
-  and writes token-free Local MCP host config. `npx skills add appaloft/appaloft --skill appaloft
-  --global --agent <agent> --copy --yes` remains the skill-manager-only path; current `npx skills`
-  copies into `~/.agents/skills/appaloft` and does not write MCP. Explicit siblings
-  `appaloft auth mcp cursor install` and `appaloft auth mcp opencode install` remain available.
-  Documented agents include `codex`, `claude-code`, `cursor`, and `opencode`.
+  Agent door. The agent list includes `universal`, `claude-code`, `cursor`, and `opencode`. Defaults
+  copy byte-identical skills into `~/.agents/skills/appaloft`, `~/.claude/skills/appaloft` when
+  `~/.claude` exists, and `~/.cursor/skills/appaloft` when `~/.cursor` exists, then write token-free
+  MCP into `~/.claude.json` and `~/.cursor/mcp.json`. Universal is skills only. OpenCode skill/MCP
+  paths require `--agent opencode` or sibling install commands. `npx skills add appaloft/appaloft
+  --skill appaloft --global --agent <agent> --copy --yes` remains the skill-manager-only path;
+  current `npx skills` copies into `~/.agents/skills/appaloft` and does not write MCP. Explicit
+  siblings `appaloft auth mcp cursor install`, `appaloft auth mcp claude-code install`, and
+  `appaloft auth mcp opencode install` remain available. Documented agents include `codex`,
+  `claude-code`, `cursor`, and `opencode`.
 - eval source: `skills/appaloft/evals/evals.json`, validated by
   `scripts/validate-appaloft-skill-evals.ts`.
 - no Appaloft-owned npm skill installer; this keeps skill installation distinct from the Appaloft

@@ -245,8 +245,9 @@ For Appaloft:
   redeploy, rollback, static/local source, BYOS, or access outcome behavior changes;
 - update `docs/agent/appaloft-skill.md`, public docs anchors, and docs registry/traceability when
   the install path, scope, help topic, or AI-facing semantics change;
-- keep `appaloft setup agent` as the one-command local Agent door that copies the skill and writes
-  Local MCP into detected Cursor and OpenCode hosts; keep `npx skills add appaloft/appaloft` as the
+- keep `appaloft setup agent` as the one-command local Agent door that copies byte-identical skills
+  and writes token-free MCP into default-checked Cursor and Claude Code hosts, while listing
+  OpenCode without default-checking it; keep `npx skills add appaloft/appaloft` as the
   skill-manager-only path unless a governing spec changes that contract; do not add an
   Appaloft-owned npm skill installer because it blurs the boundary with the Appaloft CLI;
 - add or update tests that prove full skill coverage stays synchronized with the operation catalog,

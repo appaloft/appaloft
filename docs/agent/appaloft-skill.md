@@ -18,18 +18,19 @@ semantics aligned with `docs/CORE_OPERATIONS.md` and `packages/application/src/o
 
 ## Install
 
-The one-command local Agent door copies the skill and writes Local MCP into detected Cursor and
-OpenCode hosts:
+The one-command local Agent door copies the skill and writes Local MCP into default-checked hosts:
 
 ```bash
 appaloft login
 appaloft setup agent
 ```
 
-`appaloft setup agent` copies the skill into `~/.cursor/skills/appaloft`,
-`~/.config/opencode/skills/appaloft`, and `~/.agents/skills/appaloft` for detected hosts, then writes
-token-free Local MCP launchers. Tokens stay out of `mcp.json` / `opencode.json`. Cursor and OpenCode
-are on the detection list.
+`appaloft setup agent` lists `universal`, `claude-code`, `cursor`, and `opencode`. Defaults copy
+byte-identical skills into `~/.agents/skills/appaloft`, `~/.claude/skills/appaloft` when `~/.claude`
+exists, and `~/.cursor/skills/appaloft` when `~/.cursor` exists, then write token-free
+`mcp remote-stdio` launchers into `~/.claude.json` and `~/.cursor/mcp.json`. Universal is skills
+only. OpenCode is listed but not default-checked; pass `--agent opencode` or use the sibling
+install commands. Tokens stay out of editor config.
 
 The skill-manager path still only copies skill files:
 
@@ -63,6 +64,7 @@ Explicit MCP siblings remain available:
 
 ```bash
 appaloft auth mcp cursor install
+appaloft auth mcp claude-code install
 appaloft auth mcp opencode install
 ```
 

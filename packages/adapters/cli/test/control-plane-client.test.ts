@@ -1,6 +1,7 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -1777,13 +1778,71 @@ describe("CLI remote control-plane client", () => {
     expect(output.read().stdout).not.toContain("cookie_remote_secret_9999");
   });
 
-  test("[CONTROL-PLANE-CLI-025] setup agent copies skill and token-free MCP into detected Cursor and OpenCode", async () => {
+  test("[CONTROL-PLANE-CLI-026] auth mcp claude-code install writes a token-free ~/.claude.json stdio bridge", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "appaloft-claude-mcp-install-"));
+    const home = join(directory, "home");
+    await mkdir(home, { recursive: true });
+    await writeFile(
+      join(home, ".claude.json"),
+      `${JSON.stringify(
+        {
+          mcpServers: {
+            existing: {
+              command: "existing-mcp",
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: [
+        "node",
+        "appaloft",
+        "auth",
+        "mcp",
+        "claude-code",
+        "install",
+        "--command",
+        "/opt/appaloft/bin/appaloft",
+      ],
+      env: { HOME: home },
+      store: activeProductSessionStore("cloud"),
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const config = JSON.parse(await readFile(join(home, ".claude.json"), "utf8")) as {
+      mcpServers: Record<string, { command?: string; args?: string[] }>;
+    };
+    const rendered = output.read();
+
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(config.mcpServers.existing).toEqual({ command: "existing-mcp" });
+    expect(config.mcpServers.appaloft).toEqual({
+      command: "/opt/appaloft/bin/appaloft",
+      args: ["mcp", "remote-stdio", "--profile", "cloud"],
+    });
+    expect(JSON.stringify(config)).not.toContain("cookie_remote_secret_9999");
+    expect(rendered.stdout).toContain("appaloft.claude-code.mcp-install/v1");
+    expect(rendered.stdout).not.toContain("cookie_remote_secret_9999");
+    expect(rendered.stderr).toBe("");
+  });
+
+  test("[CONTROL-PLANE-CLI-025] setup agent default-checks Cursor and Claude, lists OpenCode without installing it", async () => {
     const directory = await mkdtemp(join(tmpdir(), "appaloft-setup-agent-"));
     const home = join(directory, "home");
-    const cursorHome = join(directory, "cursor");
-    const opencodeHome = join(directory, "opencode");
-    const agentsHome = join(directory, "agents");
+    const cursorHome = join(home, ".cursor");
+    const claudeHome = join(home, ".claude");
+    const opencodeHome = join(home, ".config", "opencode");
     const skillDir = join(import.meta.dir, "../../../../skills/appaloft");
+    await mkdir(cursorHome, { recursive: true });
+    await mkdir(claudeHome, { recursive: true });
+    await mkdir(opencodeHome, { recursive: true });
     const output = captureOutput();
 
     const result = await runStandaloneControlPlaneCli({
@@ -1792,12 +1851,7 @@ describe("CLI remote control-plane client", () => {
         "appaloft",
         "setup",
         "agent",
-        "--cursor-home",
-        cursorHome,
-        "--opencode-home",
-        opencodeHome,
-        "--agents-home",
-        agentsHome,
+        "-y",
         "--skill-dir",
         skillDir,
         "--command",
@@ -1805,24 +1859,28 @@ describe("CLI remote control-plane client", () => {
       ],
       env: { HOME: home },
       store: activeProductSessionStore("cloud"),
-      which: () => null,
       stderr: output.stderr,
       stdout: output.stdout,
     });
 
+    const cursorSkill = await readFile(join(cursorHome, "skills", "appaloft", "SKILL.md"), "utf8");
+    const claudeSkill = await readFile(join(claudeHome, "skills", "appaloft", "SKILL.md"), "utf8");
+    const agentsSkill = await readFile(
+      join(home, ".agents", "skills", "appaloft", "SKILL.md"),
+      "utf8",
+    );
     const cursorConfig = JSON.parse(await readFile(join(cursorHome, "mcp.json"), "utf8")) as {
       mcpServers: Record<string, { command?: string; args?: string[] }>;
     };
-    const openCodeConfig = JSON.parse(
-      await readFile(join(opencodeHome, "opencode.json"), "utf8"),
-    ) as {
-      mcp: Record<string, { type?: string; command?: string[]; enabled?: boolean }>;
+    const claudeConfig = JSON.parse(await readFile(join(home, ".claude.json"), "utf8")) as {
+      mcpServers: Record<string, { command?: string; args?: string[] }>;
     };
     const rendered = output.read();
     const report = JSON.parse(rendered.stdout) as {
       schemaVersion: string;
+      agentList: string[];
       detectionList: string[];
-      detectedHosts: string[];
+      selectedAgents: string[];
       skills: { host: string; path: string }[];
       mcp: { host: string; configPath: string; args: string[] }[];
       profile: { name: string; auth: { redacted: string } };
@@ -1830,76 +1888,62 @@ describe("CLI remote control-plane client", () => {
 
     expect(result).toEqual({ handled: true, exitCode: 0 });
     expect(report.schemaVersion).toBe("appaloft.setup.agent/v1");
-    expect(report.detectionList).toEqual(["cursor", "opencode", "codex", "claude"]);
-    expect(report.detectedHosts).toEqual(expect.arrayContaining(["agents", "cursor", "opencode"]));
-    expect(await readFile(join(cursorHome, "skills", "appaloft", "SKILL.md"), "utf8")).toContain(
-      "AI-facing Appaloft entrypoint",
-    );
-    expect(await readFile(join(opencodeHome, "skills", "appaloft", "SKILL.md"), "utf8")).toContain(
-      "AI-facing Appaloft entrypoint",
-    );
-    expect(await readFile(join(agentsHome, "skills", "appaloft", "SKILL.md"), "utf8")).toContain(
-      "AI-facing Appaloft entrypoint",
-    );
+    expect(report.agentList).toEqual(["universal", "claude-code", "cursor", "opencode"]);
+    expect(report.detectionList).toEqual(["universal", "claude-code", "cursor", "opencode"]);
+    expect(report.selectedAgents).toEqual(["universal", "claude-code", "cursor"]);
+    expect(cursorSkill).toBe(agentsSkill);
+    expect(claudeSkill).toBe(agentsSkill);
+    expect(cursorSkill).toContain("AI-facing Appaloft entrypoint");
+    expect(existsSync(join(opencodeHome, "skills", "appaloft", "SKILL.md"))).toBe(false);
+    expect(existsSync(join(opencodeHome, "opencode.json"))).toBe(false);
     expect(cursorConfig.mcpServers.appaloft).toEqual({
       command: "/opt/appaloft/bin/appaloft",
       args: ["mcp", "remote-stdio", "--profile", "cloud"],
     });
-    expect(openCodeConfig.mcp.appaloft).toEqual({
-      type: "local",
-      command: ["/opt/appaloft/bin/appaloft", "mcp", "remote-stdio", "--profile", "cloud"],
-      enabled: true,
+    expect(claudeConfig.mcpServers.appaloft).toEqual({
+      command: "/opt/appaloft/bin/appaloft",
+      args: ["mcp", "remote-stdio", "--profile", "cloud"],
     });
     expect(JSON.stringify(cursorConfig)).not.toContain("cookie_remote_secret_9999");
-    expect(JSON.stringify(openCodeConfig)).not.toContain("cookie_remote_secret_9999");
+    expect(JSON.stringify(claudeConfig)).not.toContain("cookie_remote_secret_9999");
     expect(rendered.stdout).not.toContain("cookie_remote_secret_9999");
     expect(report.profile.auth.redacted).toBe("***");
-    expect(report.mcp.map((entry) => entry.host)).toEqual(["cursor", "opencode"]);
+    expect(report.mcp.map((entry) => entry.host)).toEqual(["cursor", "claude-code"]);
     expect(rendered.stderr).toBe("");
   });
 
   test("[CONTROL-PLANE-CLI-025] setup agent copies skills then fails MCP when no CLI profile exists", async () => {
     const directory = await mkdtemp(join(tmpdir(), "appaloft-setup-agent-nologin-"));
-    const cursorHome = join(directory, "cursor");
-    const opencodeHome = join(directory, "opencode");
-    const agentsHome = join(directory, "agents");
+    const home = join(directory, "home");
+    const cursorHome = join(home, ".cursor");
+    await mkdir(cursorHome, { recursive: true });
     const skillDir = join(import.meta.dir, "../../../../skills/appaloft");
     const output = captureOutput();
 
     const result = await runStandaloneControlPlaneCli({
-      argv: [
-        "node",
-        "appaloft",
-        "setup",
-        "agent",
-        "--cursor-home",
-        cursorHome,
-        "--opencode-home",
-        opencodeHome,
-        "--agents-home",
-        agentsHome,
-        "--skill-dir",
-        skillDir,
-      ],
-      env: { HOME: join(directory, "home") },
+      argv: ["node", "appaloft", "setup", "agent", "-y", "--skill-dir", skillDir],
+      env: { HOME: home },
       store: new MemoryCliControlPlaneProfileStore(),
-      which: () => null,
       stderr: output.stderr,
       stdout: output.stdout,
     });
 
     expect(result).toEqual({ handled: true, exitCode: 1 });
     expect(output.read().stderr).toContain("run appaloft login");
+    expect(
+      await readFile(join(home, ".agents", "skills", "appaloft", "SKILL.md"), "utf8"),
+    ).toContain("AI-facing Appaloft entrypoint");
     expect(await readFile(join(cursorHome, "skills", "appaloft", "SKILL.md"), "utf8")).toContain(
-      "AI-facing Appaloft entrypoint",
-    );
-    expect(await readFile(join(opencodeHome, "skills", "appaloft", "SKILL.md"), "utf8")).toContain(
       "AI-facing Appaloft entrypoint",
     );
   });
 
-  test("[CONTROL-PLANE-CLI-025] setup agent fails when Cursor and OpenCode are not detected", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "appaloft-setup-agent-empty-"));
+  test("[CONTROL-PLANE-CLI-025] setup agent --agent opencode writes OpenCode skill and MCP only when explicit", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "appaloft-setup-agent-opencode-"));
+    const home = join(directory, "home");
+    const opencodeHome = join(home, ".config", "opencode");
+    const skillDir = join(import.meta.dir, "../../../../skills/appaloft");
+    await mkdir(opencodeHome, { recursive: true });
     const output = captureOutput();
 
     const result = await runStandaloneControlPlaneCli({
@@ -1908,20 +1952,133 @@ describe("CLI remote control-plane client", () => {
         "appaloft",
         "setup",
         "agent",
+        "-y",
+        "--agent",
+        "opencode",
         "--skill-dir",
-        join(import.meta.dir, "../../../../skills/appaloft"),
-        "--agents-home",
-        join(directory, "agents"),
+        skillDir,
+        "--command",
+        "/opt/appaloft/bin/appaloft",
       ],
-      env: { HOME: join(directory, "home") },
+      env: { HOME: home },
       store: activeProductSessionStore("cloud"),
-      which: () => null,
       stderr: output.stderr,
       stdout: output.stdout,
     });
 
-    expect(result).toEqual({ handled: true, exitCode: 1 });
-    expect(output.read().stderr).toContain("Detection list includes cursor and opencode");
+    const openCodeConfig = JSON.parse(
+      await readFile(join(opencodeHome, "opencode.json"), "utf8"),
+    ) as {
+      mcp: Record<string, { type?: string; command?: string[]; enabled?: boolean }>;
+    };
+    const report = JSON.parse(output.read().stdout) as {
+      selectedAgents: string[];
+      mcp: { host: string }[];
+    };
+
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(report.selectedAgents).toEqual(["opencode"]);
+    expect(report.mcp.map((entry) => entry.host)).toEqual(["opencode"]);
+    expect(await readFile(join(opencodeHome, "skills", "appaloft", "SKILL.md"), "utf8")).toContain(
+      "AI-facing Appaloft entrypoint",
+    );
+    expect(existsSync(join(home, ".agents", "skills", "appaloft", "SKILL.md"))).toBe(false);
+    expect(existsSync(join(home, ".cursor", "skills", "appaloft", "SKILL.md"))).toBe(false);
+    expect(openCodeConfig.mcp.appaloft).toEqual({
+      type: "local",
+      command: ["/opt/appaloft/bin/appaloft", "mcp", "remote-stdio", "--profile", "cloud"],
+      enabled: true,
+    });
+    expect(JSON.stringify(openCodeConfig)).not.toContain("cookie_remote_secret_9999");
+  });
+
+  test("[CONTROL-PLANE-CLI-025] setup agent -y skips already-installed skill and MCP entries", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "appaloft-setup-agent-skip-"));
+    const home = join(directory, "home");
+    const cursorHome = join(home, ".cursor");
+    const skillDir = join(import.meta.dir, "../../../../skills/appaloft");
+    await mkdir(cursorHome, { recursive: true });
+    const first = captureOutput();
+
+    const installed = await runStandaloneControlPlaneCli({
+      argv: [
+        "node",
+        "appaloft",
+        "setup",
+        "agent",
+        "-y",
+        "--skill-dir",
+        skillDir,
+        "--command",
+        "/opt/appaloft/bin/appaloft",
+      ],
+      env: { HOME: home },
+      store: activeProductSessionStore("cloud"),
+      stderr: first.stderr,
+      stdout: first.stdout,
+    });
+    const second = captureOutput();
+    const skipped = await runStandaloneControlPlaneCli({
+      argv: [
+        "node",
+        "appaloft",
+        "setup",
+        "agent",
+        "-y",
+        "--skill-dir",
+        skillDir,
+        "--command",
+        "/opt/appaloft/bin/appaloft",
+      ],
+      env: { HOME: home },
+      store: activeProductSessionStore("cloud"),
+      stderr: second.stderr,
+      stdout: second.stdout,
+    });
+
+    const report = JSON.parse(second.read().stdout) as {
+      skills: { host: string; skipped?: boolean }[];
+      mcp: { host: string; skipped?: boolean }[];
+    };
+
+    expect(installed).toEqual({ handled: true, exitCode: 0 });
+    expect(skipped).toEqual({ handled: true, exitCode: 0 });
+    expect(report.skills.every((entry) => entry.skipped === true)).toBe(true);
+    expect(report.mcp.every((entry) => entry.skipped === true)).toBe(true);
+  });
+
+  test("[CONTROL-PLANE-CLI-025] setup agent still writes universal skills when Cursor and Claude are absent", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "appaloft-setup-agent-empty-"));
+    const home = join(directory, "home");
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: [
+        "node",
+        "appaloft",
+        "setup",
+        "agent",
+        "-y",
+        "--skill-dir",
+        join(import.meta.dir, "../../../../skills/appaloft"),
+      ],
+      env: { HOME: home },
+      store: activeProductSessionStore("cloud"),
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const report = JSON.parse(output.read().stdout) as {
+      selectedAgents: string[];
+      mcp: { host: string }[];
+    };
+
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(report.selectedAgents).toEqual(["universal"]);
+    expect(report.mcp).toEqual([]);
+    expect(
+      await readFile(join(home, ".agents", "skills", "appaloft", "SKILL.md"), "utf8"),
+    ).toContain("AI-facing Appaloft entrypoint");
   });
 
   test("[CONTROL-PLANE-CLI-002] failed login does not write a profile", async () => {

@@ -33,7 +33,7 @@ npx @appaloft/mcp serve --host 127.0.0.1 --port 3939
 The standalone `@appaloft/mcp` package exposes the `appaloft-mcp` launcher and delegates to the
 Appaloft CLI/runtime. It does not define another operation list or bypass the application buses.
 
-For Cursor or OpenCode connecting to a logged-in Appaloft Cloud or self-hosted control plane,
+For Cursor or Claude Code connecting to a logged-in Appaloft Cloud or self-hosted control plane,
 run the one-command local Agent door. Do not put tokens into editor config:
 
 ```bash
@@ -41,17 +41,19 @@ appaloft login
 appaloft setup agent
 ```
 
-That copies the skill into detected Cursor/OpenCode skill directories plus `~/.agents/skills`, then
-writes Local MCP. Explicit siblings remain:
+That copies byte-identical skills into default-checked `~/.agents`, `~/.claude`, and `~/.cursor`
+hosts, then writes Local MCP into `~/.cursor/mcp.json` and `~/.claude.json`. OpenCode is listed but
+needs `--agent opencode`. Explicit siblings remain:
 
 ```bash
 appaloft auth mcp cursor install
+appaloft auth mcp claude-code install
 appaloft auth mcp opencode install
 ```
 
-Cursor install merges `~/.cursor/mcp.json` `mcpServers.appaloft`. OpenCode install merges
+Cursor and Claude Code merge `mcpServers.appaloft`. OpenCode install merges
 `~/.config/opencode/opencode.json` `mcp.appaloft` as `{ "type": "local", "command": [...],
-"enabled": true }`. Both launch `appaloft mcp remote-stdio --profile <active-or-requested>`.
+"enabled": true }`. All of those launch `appaloft mcp remote-stdio --profile <active-or-requested>`.
 
 For Codex connecting to hosted Appaloft Cloud, use the dedicated bearer handoff and local bridge:
 

@@ -2146,15 +2146,16 @@ CLI:
   `appaloft context *` manage local uncommitted client state; they must not write secrets to
   `appaloft.yml`, create operation-catalog aliases, or add control-plane fields to
   `deployments.create`
-- `appaloft auth mcp login`, `appaloft auth mcp {codex,cursor,opencode} install`, and
+- `appaloft auth mcp login`, `appaloft auth mcp {codex,cursor,opencode,claude-code} install`, and
   `appaloft setup agent` are local host-config affordances, not operation-catalog entries.
-  `appaloft setup agent` is the one-command local Agent door: it detects Cursor and OpenCode (also
-  Codex and Claude), copies the Appaloft skill into host skill directories including
-  `~/.cursor/skills` and `~/.config/opencode/skills`, and writes token-free Local MCP launchers.
-  Sibling `appaloft auth mcp {codex,cursor,opencode} install` commands remain explicit host-config
-  writers. Credentials stay only in the local CLI profile store. Codex MCP still requires a bearer
-  `mcp` profile. Cursor and OpenCode MCP reuse an already-logged-in product-session or bearer
-  profile. Editor files must not store tokens.
+  `appaloft setup agent` is the one-command local Agent door: the agent list includes `universal`,
+  `claude-code`, `cursor`, and `opencode`; defaults copy byte-identical skills into `~/.agents`,
+  `~/.claude`, and `~/.cursor` when those hosts exist, write token-free MCP into `~/.cursor/mcp.json`
+  and `~/.claude.json`, and leave OpenCode uninstalled unless `--agent opencode`. Universal is skills
+  only. Sibling `appaloft auth mcp {codex,cursor,opencode,claude-code} install` commands remain
+  explicit host-config writers. Credentials stay only in the local CLI profile store. Codex MCP
+  still requires a bearer `mcp` profile. Cursor, Claude Code, and OpenCode MCP reuse an
+  already-logged-in product-session or bearer profile. Editor files must not store tokens.
 - top-level quick deploy/source-package, webhook-signature-only ingestion, terminal attach, and
   streaming/watch behavior remain separate governed entrypoint capabilities until their transport
   contracts are specified

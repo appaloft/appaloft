@@ -54,7 +54,7 @@ Full routes and input/output shapes are in the [HTTP API reference](/docs/en/ref
 
 ### MCP tools (for AI agents)
 
-When an agent host is configured with Appaloft MCP, `appaloft mcp stdio`, `appaloft mcp serve`, or `npx appaloft-mcp` expose the same operation catalog. Copying the skill does not write MCP; Cursor and OpenCode use existing commands to write host config:
+When an agent host is configured with Appaloft MCP, `appaloft mcp stdio`, `appaloft mcp serve`, or `npx appaloft-mcp` expose the same operation catalog. Copying the skill with `npx skills add` does not write MCP. After `appaloft login`, `appaloft setup agent` writes skill plus MCP into default-checked Cursor and Claude Code hosts. OpenCode needs `--agent opencode` or the sibling install:
 
 ```bash
 # Start over stdio (the default transport for most agent hosts)
@@ -63,8 +63,8 @@ appaloft mcp stdio
 # Start as a standalone process for multiple clients to connect to
 appaloft mcp serve
 
-# Write a token-free MCP entry into Cursor or OpenCode
-appaloft auth mcp cursor install
+# One-command local Agent door, then explicit OpenCode if needed
+appaloft setup agent
 appaloft auth mcp opencode install
 ```
 

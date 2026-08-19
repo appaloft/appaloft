@@ -127,14 +127,14 @@ The commands above only manage the local profile/context — they never modify a
 
 ## MCP host install <a id="cli-mcp-host-install" />
 
-One command leaves detected Cursor and OpenCode with both the Appaloft skill and Local MCP. Tokens stay in the Appaloft CLI profile, not in editor config:
+One command leaves default-checked hosts with both the Appaloft skill and Local MCP. Tokens stay in the Appaloft CLI profile, not in editor config:
 
 ```bash
 appaloft login
 appaloft setup agent
 ```
 
-`appaloft setup agent` copies the skill into detected Cursor and OpenCode skill directories (`~/.cursor/skills`, `~/.config/opencode/skills`) plus `~/.agents/skills`, then writes token-free stdio launchers. Cursor merges `~/.cursor/mcp.json` `mcpServers.appaloft`. OpenCode merges `~/.config/opencode/opencode.json` `mcp.appaloft`. Explicit siblings remain: `appaloft auth mcp cursor install` and `appaloft auth mcp opencode install`. `npx skills add` still only copies the skill. Codex still needs the dedicated bearer profile: `appaloft auth mcp login` then `appaloft auth mcp codex install`. A directory without git can be deployed with `appaloft deploy .`.
+`appaloft setup agent` default-checks universal, Claude Code when `~/.claude` exists, and Cursor when `~/.cursor` exists. It copies byte-identical skills into `~/.agents/skills`, `~/.claude/skills`, and `~/.cursor/skills`, then writes token-free stdio launchers into `~/.claude.json` and `~/.cursor/mcp.json`. Universal is skills only. OpenCode is listed but not default-checked; pass `--agent opencode` or `appaloft auth mcp opencode install`. Explicit siblings remain: `appaloft auth mcp cursor install`, `appaloft auth mcp claude-code install`, and `appaloft auth mcp opencode install`. `npx skills add` still only copies the skill. Codex still needs the dedicated bearer profile: `appaloft auth mcp login` then `appaloft auth mcp codex install`. A directory without git can be deployed with `appaloft deploy .`.
 
 ## Non-interactive authentication (AI agents / CI)
 

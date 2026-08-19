@@ -41,16 +41,14 @@ npx appaloft-mcp serve --host 127.0.0.1 --port 3939
 
 ## 宿主安装 <a id="appaloft-mcp-host-install" />
 
-一条命令会给已检测到的 Cursor 和 OpenCode 同时写入 Skill 和 Local MCP。Token 留在 Appaloft CLI profile，不会写入编辑器配置：
+一条命令会给默认勾选的宿主同时写入 Skill 和 Local MCP。Token 留在 Appaloft CLI profile，不会写入编辑器配置：
 
 ```bash
 appaloft login
 appaloft setup agent
 ```
 
-`appaloft setup agent` 会把 Skill 复制到已检测宿主的 `~/.cursor/skills/appaloft`、`~/.config/opencode/skills/appaloft` 和 `~/.agents/skills/appaloft`，再写入与 sibling 命令相同的 Local MCP 启动项。Cursor 合并 `~/.cursor/mcp.json` 的 `mcpServers.appaloft`。OpenCode 合并 `~/.config/opencode/opencode.json` 的 `mcp.appaloft`（`type: "local"`，`command: [...]`，`enabled: true`）。两者都启动 `appaloft mcp remote-stdio --profile <active-or-requested>`。
-
-显式 sibling 仍然可用：`appaloft auth mcp cursor install` 和 `appaloft auth mcp opencode install`。`npx skills add` 仍然只复制 Skill。Codex 仍需要专用 bearer profile：`appaloft auth mcp login` 然后 `appaloft auth mcp codex install`。无 git 的目录可以用 `appaloft deploy .`。
+`appaloft setup agent` 默认勾选 Universal、存在 `~/.claude` 时的 Claude Code、存在 `~/.cursor` 时的 Cursor；把相同 Skill 复制到对应目录，再写入 token-free `mcp remote-stdio` 到 `~/.claude.json` 和 `~/.cursor/mcp.json`。Universal 只写 Skill。OpenCode 在列表里但默认不勾选，需要 `--agent opencode`。显式 sibling：`appaloft auth mcp cursor install`、`appaloft auth mcp claude-code install`、`appaloft auth mcp opencode install`。`npx skills add` 仍然只复制 Skill。Codex 仍需要专用 bearer profile：`appaloft auth mcp login` 然后 `appaloft auth mcp codex install`。无 git 的目录可以用 `appaloft deploy .`。
 
 ## 输入字段与校验：工具模型
 

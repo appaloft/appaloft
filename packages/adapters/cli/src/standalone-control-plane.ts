@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { createInterface } from "node:readline/promises";
 import { type DomainError, err, ok, type Result } from "@appaloft/core";
 import { type AppaloftSdkFetch } from "@appaloft/sdk";
-import { runAgentHostSetup } from "./agent-host-setup.js";
+import { AGENT_SETUP_AGENT_LIST, runAgentHostSetup } from "./agent-host-setup.js";
 import {
   type CliControlPlaneEnvironment,
   type CliControlPlaneMode,
@@ -20,6 +20,7 @@ import {
   useControlPlaneProfile,
 } from "./control-plane-service.js";
 import {
+  installClaudeCodeMcpHost,
   installCodexMcpHost,
   installCursorMcpHost,
   installOpenCodeMcpHost,
@@ -42,7 +43,6 @@ export interface StandaloneControlPlaneCliInput {
   readonly stdinText?: string;
   readonly stdout?: Pick<NodeJS.WriteStream, "write">;
   readonly stderr?: Pick<NodeJS.WriteStream, "write">;
-  readonly which?: ((name: string) => string | null | undefined) | undefined;
 }
 
 export type StandaloneControlPlaneCliResult =
@@ -125,6 +125,38 @@ function parseOptions(
     values,
     positional,
   });
+}
+
+function consumeRepeatedFlag(
+  args: readonly string[],
+  flag: string,
+): Result<{ readonly values: readonly string[]; readonly rest: readonly string[] }> {
+  const values: string[] = [];
+  const rest: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg !== flag) {
+      if (arg !== undefined) {
+        rest.push(arg);
+      }
+      continue;
+    }
+    const value = args[index + 1];
+    if (!value || value.startsWith("-")) {
+      return err({
+        code: "validation_error",
+        category: "user",
+        message: `Option ${flag} requires a value`,
+        retryable: false,
+        details: {
+          phase: "control-plane-cli-parse",
+        },
+      });
+    }
+    values.push(value);
+    index += 1;
+  }
+  return ok({ values, rest });
 }
 
 function parseError(message: string): Result<never> {
@@ -279,8 +311,9 @@ Usage:
   appaloft context show
   appaloft workspace open [path|git-remote] [--profile <name-or-id>] [--new] [--no-attach] [--server <id>]
   appaloft workspace create --profile <name-or-id> --repo <https-url> --ref <git-ref> --branch <branch> [--attach]
-  appaloft setup agent [--profile <name>] [--cursor-home <path>] [--opencode-home <path>] [--command <command>]
+  appaloft setup agent [-y] [--agent <name>] [--profile <name>] [--cursor-home <path>] [--command <command>]
   appaloft auth mcp login [--url <url>] [--mode cloud|self-hosted] [--profile <name>] [--no-browser]
+  appaloft auth mcp claude-code install [--profile <name>] [--server-name <name>] [--command <command>]
   appaloft auth mcp codex install [--profile <name>] [--server-name <name>] [--codex-home <path>] [--command <command>]
   appaloft auth mcp cursor install [--profile <name>] [--server-name <name>] [--cursor-home <path>] [--command <command>]
   appaloft auth mcp opencode install [--profile <name>] [--server-name <name>] [--opencode-home <path>] [--command <command>]
@@ -441,6 +474,20 @@ async function handleMcpLogin(
   }
 }
 
+function renderMcpClaudeCodeInstallHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
+  stdout.write(`Appaloft Claude Code MCP install
+
+Usage:
+  appaloft auth mcp claude-code install [--profile <name>] [--server-name <name>] [--command <command>]
+
+Options:
+  --profile <name>      CLI profile to launch with remote-stdio (defaults to the active profile)
+  --server-name <name>  Claude Code MCP server name (defaults to appaloft)
+  --command <command>   Launcher command (defaults to appaloft)
+  --help, -h            Show this help
+`);
+}
+
 function renderMcpCursorInstallHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
   stdout.write(`Appaloft Cursor MCP install
 
@@ -475,15 +522,18 @@ function renderSetupAgentHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
   stdout.write(`Appaloft agent setup
 
 Usage:
-  appaloft setup agent [--profile <name>] [--cursor-home <path>] [--opencode-home <path>] [--agents-home <path>] [--command <command>] [--skill-dir <path>]
+  appaloft setup agent [-y] [--agent <name>] [--profile <name>] [--cursor-home <path>] [--opencode-home <path>] [--agents-home <path>] [--claude-home <path>] [--command <command>] [--skill-dir <path>]
 
-Detects Cursor and OpenCode (also Codex and Claude) and writes both the Appaloft skill and Local MCP host config. Tokens stay in the Appaloft CLI profile store, not in mcp.json or opencode.json.
+Default-checks universal (~/.agents), Claude Code when ~/.claude exists, and Cursor when ~/.cursor exists. OpenCode is on the agent list (${AGENT_SETUP_AGENT_LIST.join(", ")}) but is not default-checked; pass --agent opencode or use the sibling install commands. Skills are byte-identical copies. MCP reuses appaloft login through remote-stdio: Cursor ~/.cursor/mcp.json and Claude ~/.claude.json. Universal is skills only. Tokens stay in the Appaloft CLI profile store, not in editor config. -y accepts those defaults and skips already-installed skill/MCP entries.
 
 Options:
+  -y, --yes               Skip prompts and accept detected defaults
+  --agent <name>          Target a specific agent instead of defaults (repeatable): ${AGENT_SETUP_AGENT_LIST.join(", ")}
   --profile <name>        CLI profile to launch with remote-stdio (defaults to the active profile)
-  --cursor-home <path>    Cursor home directory (defaults to ~/.cursor); also forces Cursor detection
-  --opencode-home <path>  OpenCode config directory (defaults to ~/.config/opencode); also forces OpenCode detection
+  --cursor-home <path>    Cursor home directory (defaults to ~/.cursor)
+  --opencode-home <path>  OpenCode config directory (defaults to ~/.config/opencode)
   --agents-home <path>    Shared skills directory (defaults to ~/.agents)
+  --claude-home <path>    Claude Code home directory (defaults to ~/.claude)
   --command <command>     Launcher command (defaults to appaloft)
   --skill-dir <path>      Skill source directory (defaults to packaged skills/appaloft)
   --help, -h              Show this help
@@ -514,6 +564,31 @@ async function handleMcpCodexInstall(
         env,
         home: homedir(),
       }),
+    }),
+    input,
+  );
+}
+
+async function handleMcpClaudeCodeInstall(
+  args: readonly string[],
+  input: StandaloneControlPlaneCliInput,
+): Promise<StandaloneControlPlaneCliResult> {
+  if (isHelpArgs(args)) {
+    renderMcpClaudeCodeInstallHelp(input.stdout ?? process.stdout);
+    return { handled: true, exitCode: 0 };
+  }
+  const parsed = parseOptions(args, ["profile", "server-name", "command"]);
+  if (parsed.isErr()) {
+    return finish(parsed, input);
+  }
+  const env = controlPlaneEnv(input);
+  return finish(
+    installClaudeCodeMcpHost({
+      store: input.store ?? defaultCliControlPlaneProfileStore(input.env),
+      requestedProfile: parsed.value.values.profile,
+      serverName: parsed.value.values["server-name"],
+      command: parsed.value.values.command,
+      home: env.HOME?.trim() || homedir(),
     }),
     input,
   );
@@ -585,17 +660,25 @@ async function handleSetupAgent(
     renderSetupAgentHelp(input.stdout ?? process.stdout);
     return { handled: true, exitCode: 0 };
   }
-  const parsed = parseOptions(args, [
-    "profile",
-    "server-name",
-    "cursor-home",
-    "opencode-home",
-    "agents-home",
-    "claude-home",
-    "codex-home",
-    "command",
-    "skill-dir",
-  ]);
+  const normalized = args.map((arg) => (arg === "-y" ? "--yes" : arg));
+  const agents = consumeRepeatedFlag(normalized, "--agent");
+  if (agents.isErr()) {
+    return finish(agents, input);
+  }
+  const parsed = parseOptions(
+    agents.value.rest,
+    [
+      "profile",
+      "server-name",
+      "cursor-home",
+      "opencode-home",
+      "agents-home",
+      "claude-home",
+      "command",
+      "skill-dir",
+    ],
+    ["yes"],
+  );
   if (parsed.isErr()) {
     return finish(parsed, input);
   }
@@ -609,12 +692,11 @@ async function handleSetupAgent(
       serverName: parsed.value.values["server-name"],
       command: parsed.value.values.command,
       skillDir: parsed.value.values["skill-dir"],
+      agents: agents.value.values,
       cursorHome: parsed.value.values["cursor-home"],
       opencodeHome: parsed.value.values["opencode-home"],
       agentsHome: parsed.value.values["agents-home"],
       claudeHome: parsed.value.values["claude-home"],
-      codexHome: parsed.value.values["codex-home"],
-      which: input.which,
     }),
     input,
   );
@@ -761,6 +843,9 @@ export async function runStandaloneControlPlaneCli(
     }
     if (subcommand === "mcp" && args[2] === "login") {
       return handleMcpLogin(args.slice(3), input);
+    }
+    if (subcommand === "mcp" && args[2] === "claude-code" && args[3] === "install") {
+      return handleMcpClaudeCodeInstall(args.slice(4), input);
     }
     if (subcommand === "mcp" && args[2] === "codex" && args[3] === "install") {
       return handleMcpCodexInstall(args.slice(4), input);

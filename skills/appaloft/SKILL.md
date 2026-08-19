@@ -161,10 +161,12 @@ surface available in the session.
 
 ## Installation Boundary
 
-The one-command local Agent door is `appaloft setup agent` after `appaloft login`. It detects Cursor
-and OpenCode (also Codex and Claude), copies this skill into `~/.cursor/skills/appaloft`,
-`~/.config/opencode/skills/appaloft`, and `~/.agents/skills/appaloft`, and writes token-free Local
-MCP. Tokens stay out of `mcp.json` / `opencode.json`.
+The one-command local Agent door is `appaloft setup agent` after `appaloft login`. The agent list
+includes `universal`, `claude-code`, `cursor`, and `opencode`. Defaults copy this skill byte-identically
+into `~/.agents/skills/appaloft`, `~/.claude/skills/appaloft` when `~/.claude` exists, and
+`~/.cursor/skills/appaloft` when `~/.cursor` exists, then write token-free MCP into `~/.claude.json`
+and `~/.cursor/mcp.json`. Universal is skills only. OpenCode is listed but not default-checked.
+Tokens stay out of editor config.
 
 `npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes` installs
 this skill for Codex through the standard skill manager. Use `--agent claude-code` for Claude Code,
@@ -173,7 +175,8 @@ these into `~/.agents/skills/appaloft`; Cursor also reads that path. It does not
 `~/.cursor/skills` or `~/.config/opencode/skills`, install the Appaloft CLI, or write MCP config.
 Verify with `npx skills list --global --agent <agent>` and start a new agent session before treating
 the skill as available. Explicit MCP siblings remain: `appaloft auth mcp cursor install`,
-`appaloft auth mcp opencode install`, or Codex `appaloft auth mcp login` plus
-`appaloft auth mcp codex install`. Skill-manager installation only copies skill files. It does not
+`appaloft auth mcp claude-code install`, `appaloft auth mcp opencode install`, or Codex
+`appaloft auth mcp login` plus `appaloft auth mcp codex install`. OpenCode skill/MCP install is
+explicit (`--agent opencode` or those siblings). Skill-manager installation only copies skill files. It does not
 deploy, create resources, call APIs, or wrap the Appaloft CLI. Appaloft does not ship a separate npm
 skill installer.
