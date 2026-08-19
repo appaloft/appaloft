@@ -94,7 +94,10 @@ The deploy subprotocol must include:
   CLI operation mapping, and deploy protocol.
 - standard install path: `npx skills add appaloft/appaloft --skill appaloft --global --agent
   <agent> --copy --yes`, followed by `npx skills list --global --agent <agent>` and a new agent
-  session so the host reloads its catalog.
+  session so the host reloads its catalog. Documented agents include `codex`, `claude-code`,
+  `cursor`, and `opencode`. Current `npx skills` copies these into `~/.agents/skills/appaloft`
+  and does not write MCP; Cursor/OpenCode MCP host config is written by
+  `appaloft auth mcp cursor install` and `appaloft auth mcp opencode install`.
 - eval source: `skills/appaloft/evals/evals.json`, validated by
   `scripts/validate-appaloft-skill-evals.ts`.
 - no Appaloft-owned npm skill installer; this keeps skill installation distinct from the Appaloft

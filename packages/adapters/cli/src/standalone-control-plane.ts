@@ -8,6 +8,7 @@ import { type AppaloftSdkFetch } from "@appaloft/sdk";
 import {
   type CliControlPlaneEnvironment,
   type CliControlPlaneMode,
+  type CliControlPlaneProfile,
   type CliControlPlaneProfileStore,
   defaultCliControlPlaneProfileStore,
 } from "./control-plane-profile.js";
@@ -273,6 +274,8 @@ Usage:
   appaloft workspace create --profile <name-or-id> --repo <https-url> --ref <git-ref> --branch <branch> [--attach]
   appaloft auth mcp login [--url <url>] [--mode cloud|self-hosted] [--profile <name>] [--no-browser]
   appaloft auth mcp codex install [--profile <name>] [--server-name <name>] [--codex-home <path>] [--command <command>]
+  appaloft auth mcp cursor install [--profile <name>] [--server-name <name>] [--cursor-home <path>] [--command <command>]
+  appaloft auth mcp opencode install [--profile <name>] [--server-name <name>] [--opencode-home <path>] [--command <command>]
   appaloft auth token login [--stdin | --token-file <path>] [--url <url>] [--profile <name>]
 
 Options:
@@ -479,6 +482,191 @@ function upsertCodexMcpServerConfig(input: {
   return `${kept.join("\n")}`;
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function mcpRemoteStdioArgs(profileName: string): readonly string[] {
+  return ["mcp", "remote-stdio", "--profile", profileName];
+}
+
+function redactedMcpInstallProfile(profile: CliControlPlaneProfile): {
+  readonly name: string;
+  readonly baseUrl: string;
+  readonly auth: {
+    readonly kind: CliControlPlaneProfile["auth"]["kind"];
+    readonly redacted: "***";
+  };
+} {
+  return {
+    name: profile.name,
+    baseUrl: profile.baseUrl,
+    auth: {
+      kind: profile.auth.kind,
+      redacted: "***",
+    },
+  };
+}
+
+function parseJsonObjectFile(input: {
+  readonly existing: string;
+  readonly configPath: string;
+  readonly phase: string;
+  readonly code: string;
+  readonly message: string;
+}): Result<Record<string, unknown>> {
+  const trimmed = input.existing.trim();
+  if (!trimmed) {
+    return ok({});
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (!isPlainObject(parsed)) {
+      return err({
+        code: input.code,
+        category: "user",
+        message: input.message,
+        retryable: false,
+        details: {
+          phase: input.phase,
+          configPath: input.configPath,
+          reason: "json-root-not-object",
+        },
+      } satisfies DomainError);
+    }
+    return ok(parsed);
+  } catch (error) {
+    return err({
+      code: input.code,
+      category: "user",
+      message: input.message,
+      retryable: false,
+      details: {
+        phase: input.phase,
+        configPath: input.configPath,
+        reason: "json-parse-failed",
+        message: error instanceof Error ? error.message : String(error),
+      },
+    } satisfies DomainError);
+  }
+}
+
+function upsertJsonNamedEntry(input: {
+  readonly root: Record<string, unknown>;
+  readonly collectionKey: string;
+  readonly serverName: string;
+  readonly entry: Record<string, unknown>;
+  readonly configPath: string;
+  readonly phase: string;
+  readonly code: string;
+  readonly message: string;
+}): Result<Record<string, unknown>> {
+  const existingCollection = input.root[input.collectionKey];
+  if (existingCollection === undefined) {
+    return ok({
+      ...input.root,
+      [input.collectionKey]: {
+        [input.serverName]: input.entry,
+      },
+    });
+  }
+  if (!isPlainObject(existingCollection)) {
+    return err({
+      code: input.code,
+      category: "user",
+      message: input.message,
+      retryable: false,
+      details: {
+        phase: input.phase,
+        configPath: input.configPath,
+        reason: "json-collection-not-object",
+        collectionKey: input.collectionKey,
+      },
+    } satisfies DomainError);
+  }
+
+  return ok({
+    ...input.root,
+    [input.collectionKey]: {
+      ...existingCollection,
+      [input.serverName]: input.entry,
+    },
+  });
+}
+
+async function writeOwnerOnlyFile(path: string, contents: string): Promise<void> {
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  await writeFile(path, contents, { mode: 0o600 });
+  await chmod(path, 0o600).catch(() => undefined);
+}
+
+function profileNotFoundError(input: {
+  readonly profileName: string;
+  readonly phase: string;
+  readonly message: string;
+}): DomainError {
+  return {
+    code: "control_plane_profile_not_found",
+    category: "user",
+    message: input.message,
+    retryable: false,
+    details: {
+      phase: input.phase,
+      profile: input.profileName,
+    },
+  };
+}
+
+function resolveSelectedMcpProfile(input: {
+  readonly requestedName: string | undefined;
+  readonly activeProfile: string | undefined;
+  readonly profiles: Readonly<Record<string, CliControlPlaneProfile>>;
+  readonly defaultName?: string;
+}):
+  | { readonly kind: "missing"; readonly profileName: string }
+  | { readonly kind: "found"; readonly profile: CliControlPlaneProfile } {
+  const profileName = input.requestedName ?? input.activeProfile ?? input.defaultName;
+  if (!profileName) {
+    return { kind: "missing", profileName: input.requestedName ?? "" };
+  }
+  const profile = input.profiles[profileName];
+  if (!profile) {
+    return { kind: "missing", profileName };
+  }
+  return { kind: "found", profile };
+}
+
+function renderMcpCursorInstallHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
+  stdout.write(`Appaloft Cursor MCP install
+
+Usage:
+  appaloft auth mcp cursor install [--profile <name>] [--server-name <name>] [--cursor-home <path>] [--command <command>]
+
+Options:
+  --profile <name>      CLI profile to launch with remote-stdio (defaults to the active profile)
+  --server-name <name>  Cursor MCP server name (defaults to appaloft)
+  --cursor-home <path>  Cursor home directory (defaults to ~/.cursor)
+  --command <command>   Launcher command (defaults to appaloft)
+  --help, -h            Show this help
+`);
+}
+
+function renderMcpOpenCodeInstallHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
+  stdout.write(`Appaloft OpenCode MCP install
+
+Usage:
+  appaloft auth mcp opencode install [--profile <name>] [--server-name <name>] [--opencode-home <path>] [--command <command>]
+
+Options:
+  --profile <name>        CLI profile to launch with remote-stdio (defaults to the active profile)
+  --server-name <name>    OpenCode MCP server name (defaults to appaloft)
+  --opencode-home <path>  OpenCode config directory (defaults to ~/.config/opencode)
+  --command <command>     Launcher command (defaults to appaloft)
+  --help, -h              Show this help
+`);
+}
+
 async function handleMcpCodexInstall(
   args: readonly string[],
   input: StandaloneControlPlaneCliInput,
@@ -506,16 +694,13 @@ async function handleMcpCodexInstall(
   const profile = storeData.value.profiles[profileName];
   if (!profile) {
     return finish(
-      err({
-        code: "control_plane_profile_not_found",
-        category: "user",
-        message: "Appaloft MCP profile was not found; run appaloft auth mcp login first",
-        retryable: false,
-        details: {
+      err(
+        profileNotFoundError({
+          profileName,
           phase: "codex-mcp-install",
-          profile: profileName,
-        },
-      } satisfies DomainError),
+          message: "Appaloft MCP profile was not found; run appaloft auth mcp login first",
+        }),
+      ),
       input,
     );
   }
@@ -535,17 +720,16 @@ async function handleMcpCodexInstall(
     );
   }
 
+  const argsForConfig = mcpRemoteStdioArgs(profileName);
   try {
     const existing = existsSync(configPath) ? await readFile(configPath, "utf8") : "";
     const next = upsertCodexMcpServerConfig({
       existing,
       serverName,
       command,
-      args: ["mcp", "remote-stdio", "--profile", profileName],
+      args: argsForConfig,
     });
-    await mkdir(dirname(configPath), { recursive: true, mode: 0o700 });
-    await writeFile(configPath, next, { mode: 0o600 });
-    await chmod(configPath, 0o600).catch(() => undefined);
+    await writeOwnerOnlyFile(configPath, next);
 
     return finish(
       ok({
@@ -553,15 +737,8 @@ async function handleMcpCodexInstall(
         serverName,
         configPath,
         command,
-        args: ["mcp", "remote-stdio", "--profile", profileName],
-        profile: {
-          name: profile.name,
-          baseUrl: profile.baseUrl,
-          auth: {
-            kind: profile.auth.kind,
-            redacted: "***",
-          },
-        },
+        args: argsForConfig,
+        profile: redactedMcpInstallProfile(profile),
       }),
       input,
     );
@@ -574,6 +751,217 @@ async function handleMcpCodexInstall(
         retryable: true,
         details: {
           phase: "codex-mcp-install",
+          configPath,
+          message: error instanceof Error ? error.message : String(error),
+        },
+      } satisfies DomainError),
+      input,
+    );
+  }
+}
+
+async function handleMcpCursorInstall(
+  args: readonly string[],
+  input: StandaloneControlPlaneCliInput,
+): Promise<StandaloneControlPlaneCliResult> {
+  if (isHelpArgs(args)) {
+    renderMcpCursorInstallHelp(input.stdout ?? process.stdout);
+    return { handled: true, exitCode: 0 };
+  }
+  const parsed = parseOptions(args, ["profile", "server-name", "cursor-home", "command"]);
+  if (parsed.isErr()) {
+    return finish(parsed, input);
+  }
+
+  const serverName = parsed.value.values["server-name"] ?? "appaloft";
+  const command = parsed.value.values.command ?? "appaloft";
+  const cursorHome =
+    parsed.value.values["cursor-home"] ??
+    input.env?.CURSOR_HOME?.trim() ??
+    process.env.CURSOR_HOME?.trim() ??
+    join(homedir(), ".cursor");
+  const configPath = join(cursorHome, "mcp.json");
+  const store = input.store ?? defaultCliControlPlaneProfileStore(input.env);
+  const storeData = await store.read();
+  if (storeData.isErr()) {
+    return finish(storeData, input);
+  }
+
+  const selected = resolveSelectedMcpProfile({
+    requestedName: parsed.value.values.profile,
+    activeProfile: storeData.value.activeProfile,
+    profiles: storeData.value.profiles,
+  });
+  if (selected.kind === "missing") {
+    return finish(
+      err(
+        profileNotFoundError({
+          profileName: selected.profileName,
+          phase: "cursor-mcp-install",
+          message:
+            "Appaloft CLI profile was not found; run appaloft login or appaloft auth mcp login first",
+        }),
+      ),
+      input,
+    );
+  }
+  const argsForConfig = mcpRemoteStdioArgs(selected.profile.name);
+  const existing = existsSync(configPath) ? await readFile(configPath, "utf8") : "";
+  const parsedRoot = parseJsonObjectFile({
+    existing,
+    configPath,
+    phase: "cursor-mcp-install",
+    code: "cursor_mcp_config_write_failed",
+    message: "Cursor MCP config could not be parsed as a JSON object",
+  });
+  if (parsedRoot.isErr()) {
+    return finish(parsedRoot, input);
+  }
+  const nextRoot = upsertJsonNamedEntry({
+    root: parsedRoot.value,
+    collectionKey: "mcpServers",
+    serverName,
+    entry: {
+      command,
+      args: [...argsForConfig],
+    },
+    configPath,
+    phase: "cursor-mcp-install",
+    code: "cursor_mcp_config_write_failed",
+    message: "Cursor MCP config mcpServers must be a JSON object",
+  });
+  if (nextRoot.isErr()) {
+    return finish(nextRoot, input);
+  }
+
+  try {
+    await writeOwnerOnlyFile(configPath, `${JSON.stringify(nextRoot.value, null, 2)}\n`);
+    return finish(
+      ok({
+        schemaVersion: "appaloft.cursor.mcp-install/v1",
+        serverName,
+        configPath,
+        command,
+        args: argsForConfig,
+        profile: redactedMcpInstallProfile(selected.profile),
+      }),
+      input,
+    );
+  } catch (error) {
+    return finish(
+      err({
+        code: "cursor_mcp_config_write_failed",
+        category: "infra",
+        message: "Cursor MCP config could not be written",
+        retryable: true,
+        details: {
+          phase: "cursor-mcp-install",
+          configPath,
+          message: error instanceof Error ? error.message : String(error),
+        },
+      } satisfies DomainError),
+      input,
+    );
+  }
+}
+
+async function handleMcpOpenCodeInstall(
+  args: readonly string[],
+  input: StandaloneControlPlaneCliInput,
+): Promise<StandaloneControlPlaneCliResult> {
+  if (isHelpArgs(args)) {
+    renderMcpOpenCodeInstallHelp(input.stdout ?? process.stdout);
+    return { handled: true, exitCode: 0 };
+  }
+  const parsed = parseOptions(args, ["profile", "server-name", "opencode-home", "command"]);
+  if (parsed.isErr()) {
+    return finish(parsed, input);
+  }
+
+  const serverName = parsed.value.values["server-name"] ?? "appaloft";
+  const command = parsed.value.values.command ?? "appaloft";
+  const xdgConfigHome =
+    input.env?.XDG_CONFIG_HOME?.trim() ?? process.env.XDG_CONFIG_HOME?.trim() ?? "";
+  const opencodeHome =
+    parsed.value.values["opencode-home"] ??
+    (xdgConfigHome ? join(xdgConfigHome, "opencode") : join(homedir(), ".config", "opencode"));
+  const configPath = join(opencodeHome, "opencode.json");
+  const store = input.store ?? defaultCliControlPlaneProfileStore(input.env);
+  const storeData = await store.read();
+  if (storeData.isErr()) {
+    return finish(storeData, input);
+  }
+
+  const selected = resolveSelectedMcpProfile({
+    requestedName: parsed.value.values.profile,
+    activeProfile: storeData.value.activeProfile,
+    profiles: storeData.value.profiles,
+  });
+  if (selected.kind === "missing") {
+    return finish(
+      err(
+        profileNotFoundError({
+          profileName: selected.profileName,
+          phase: "opencode-mcp-install",
+          message:
+            "Appaloft CLI profile was not found; run appaloft login or appaloft auth mcp login first",
+        }),
+      ),
+      input,
+    );
+  }
+  const argsForConfig = mcpRemoteStdioArgs(selected.profile.name);
+  const existing = existsSync(configPath) ? await readFile(configPath, "utf8") : "";
+  const parsedRoot = parseJsonObjectFile({
+    existing,
+    configPath,
+    phase: "opencode-mcp-install",
+    code: "opencode_mcp_config_write_failed",
+    message: "OpenCode MCP config could not be parsed as a JSON object",
+  });
+  if (parsedRoot.isErr()) {
+    return finish(parsedRoot, input);
+  }
+  const nextRoot = upsertJsonNamedEntry({
+    root: parsedRoot.value,
+    collectionKey: "mcp",
+    serverName,
+    entry: {
+      type: "local",
+      command: [command, ...argsForConfig],
+      enabled: true,
+    },
+    configPath,
+    phase: "opencode-mcp-install",
+    code: "opencode_mcp_config_write_failed",
+    message: "OpenCode MCP config mcp must be a JSON object",
+  });
+  if (nextRoot.isErr()) {
+    return finish(nextRoot, input);
+  }
+
+  try {
+    await writeOwnerOnlyFile(configPath, `${JSON.stringify(nextRoot.value, null, 2)}\n`);
+    return finish(
+      ok({
+        schemaVersion: "appaloft.opencode.mcp-install/v1",
+        serverName,
+        configPath,
+        command,
+        args: argsForConfig,
+        profile: redactedMcpInstallProfile(selected.profile),
+      }),
+      input,
+    );
+  } catch (error) {
+    return finish(
+      err({
+        code: "opencode_mcp_config_write_failed",
+        category: "infra",
+        message: "OpenCode MCP config could not be written",
+        retryable: true,
+        details: {
+          phase: "opencode-mcp-install",
           configPath,
           message: error instanceof Error ? error.message : String(error),
         },
@@ -727,6 +1115,12 @@ export async function runStandaloneControlPlaneCli(
     }
     if (subcommand === "mcp" && args[2] === "codex" && args[3] === "install") {
       return handleMcpCodexInstall(args.slice(4), input);
+    }
+    if (subcommand === "mcp" && args[2] === "cursor" && args[3] === "install") {
+      return handleMcpCursorInstall(args.slice(4), input);
+    }
+    if (subcommand === "mcp" && args[2] === "opencode" && args[3] === "install") {
+      return handleMcpOpenCodeInstall(args.slice(4), input);
     }
     if (subcommand === "status") {
       return handleStatus(args.slice(2), input);

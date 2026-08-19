@@ -33,7 +33,10 @@ Install the full Appaloft skill for Codex-compatible skill hosts:
 npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
 ```
 
-Use `--agent claude-code` for Claude Code. Verify with `npx skills list --global --agent <agent>`
+Use `--agent claude-code` for Claude Code, `--agent cursor` for Cursor, and `--agent opencode` for
+OpenCode. Current `npx skills` copies these into `~/.agents/skills/appaloft`. Cursor also reads that
+path. The command does not create `~/.cursor/skills` or `~/.config/opencode/skills`, install the
+CLI, or write MCP config. Verify with `npx skills list --global --agent <agent>`
 and start a new agent session before expecting the skill to appear.
 
 The install command only copies the full Appaloft skill into a skill host. It does not deploy an

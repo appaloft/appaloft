@@ -16,6 +16,11 @@ appaloft deploy .
 ```
 
 ```bash
+appaloft login
+appaloft setup agent
+```
+
+```bash
 npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
 npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
 npx @appaloft/mcp
@@ -108,15 +113,31 @@ appaloft deploy ./docker-compose.yml
 
 ## Agent
 
-教会你已经在用的 coding agent。下面这些复制块今天就能跑。它们是现有的 `npx` 和 CLI
-命令，不是已经发布的一键 host 安装器。
+教会你已经在用的 coding agent。`appaloft login` 之后，`appaloft setup agent` 会复制相同的
+Skill，并给检测到的宿主写入 token-free Local MCP。Universal 只写 Skill（`~/.agents`）。
+存在 `~/.cursor` / `~/.claude` 时写入 Cursor / Claude Code 的 Skill 和 MCP。OpenCode 在列表里，
+但默认不勾选。MCP 复用已经登录的 Appaloft profile（`appaloft mcp remote-stdio --profile <active>`）。
+Token 不会进入编辑器配置。
 
 ```bash
-npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
+appaloft login
+appaloft setup agent
 ```
 
 ```bash
+# 显式 MCP sibling（OpenCode 需显式安装）
+appaloft auth mcp cursor install
+appaloft auth mcp claude-code install
+appaloft auth mcp opencode install
+```
+
+`npx skills add` 仍然只复制 Skill，不安装 CLI，也不写 MCP。
+
+```bash
+npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
 npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
+npx skills add appaloft/appaloft --skill appaloft --global --agent cursor --copy --yes
+npx skills add appaloft/appaloft --skill appaloft --global --agent opencode --copy --yes
 ```
 
 ```bash
@@ -124,10 +145,9 @@ npx @appaloft/mcp
 appaloft mcp stdio
 ```
 
-Skill 安装只用 `--agent codex` 或 `--agent claude-code`。其他 host 参数不在本仓库。用
-`npx skills list --global --agent <agent>` 确认后，新开一个 agent 会话。让它通过
-Appaloft 部署或运维。skill 会约束 agent 走 Appaloft operation，而不是直接调用 Docker、SSH、
-数据库或云厂商。
+skill-manager 复制请用 `npx skills list --global --agent <agent>` 确认后新开一个 agent 会话。
+让它通过 Appaloft 部署或运维。skill 会约束 agent 走 Appaloft operation，而不是直接调用
+Docker、SSH、数据库或云厂商。这是本仓库 CLI 的本地 Agent 门，不是 Cloud 营销站声明。
 
 ## 占用
 
@@ -159,6 +179,7 @@ curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --version 1.9.2
 | Homebrew CLI | `brew install appaloft/tap/appaloft` |
 | GitHub Release | 从 [latest releases](https://github.com/appaloft/appaloft/releases/latest) 下载对应平台 archive。 |
 | MCP launcher | `npx @appaloft/mcp` |
+| Local Agent door | `appaloft login && appaloft setup agent` |
 | AI skill | `npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes` |
 | Self-hosted server | `curl -fsSL https://appaloft.com/install.sh \| sudo sh` |
 | Self-hosted + PGlite | `curl -fsSL https://appaloft.com/install.sh \| sudo sh -s -- --database pglite` |

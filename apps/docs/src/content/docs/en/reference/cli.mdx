@@ -125,6 +125,18 @@ appaloft context use <profile>
 
 The commands above only manage the local profile/context — they never modify any server-side state.
 
+## MCP host install <a id="cli-mcp-host-install" />
+
+`npx skills add` only copies the skill; it does not write MCP. Cursor and OpenCode reuse an already-logged-in Appaloft profile and write a token-free stdio launcher into editor config:
+
+```bash
+appaloft login
+appaloft auth mcp cursor install
+appaloft auth mcp opencode install
+```
+
+Cursor merges `~/.cursor/mcp.json` `mcpServers.appaloft`. OpenCode merges `~/.config/opencode/opencode.json` `mcp.appaloft`. Codex still needs the dedicated bearer profile: `appaloft auth mcp login` then `appaloft auth mcp codex install`. A directory without git can be deployed with `appaloft deploy .`.
+
 ## Non-interactive authentication (AI agents / CI)
 
 Interactive login uses a browser verification-code flow, suited to human operators. **AI agents and CI/automation should not use the browser/verification-code flow as their default authentication path** — they should prefer a scoped, expirable token instead:

@@ -110,8 +110,40 @@ function profile(name: string, baseUrl = "http://127.0.0.1:4310"): CliControlPla
   };
 }
 
+function productSessionProfile(
+  name: string,
+  baseUrl = "https://app.appaloft.com",
+): CliControlPlaneProfile {
+  return {
+    name,
+    mode: "cloud",
+    baseUrl,
+    auth: {
+      kind: "product-session",
+      cookie: "appaloft.session=cookie_remote_secret_9999",
+    },
+    createdAt: "2026-05-17T00:00:00.000Z",
+    updatedAt: "2026-05-17T00:00:00.000Z",
+    lastHandshake: {
+      checkedAt: "2026-05-17T00:00:00.000Z",
+      apiVersion: "v1",
+      version: "0.12.5-test",
+    },
+  };
+}
+
 function activeStore(profileName = "local") {
   const active = profile(profileName);
+  return new MemoryCliControlPlaneProfileStore({
+    activeProfile: active.name,
+    profiles: {
+      [active.name]: active,
+    },
+  });
+}
+
+function activeProductSessionStore(profileName = "cloud") {
+  const active = productSessionProfile(profileName);
   return new MemoryCliControlPlaneProfileStore({
     activeProfile: active.name,
     profiles: {
@@ -1535,6 +1567,214 @@ describe("CLI remote control-plane client", () => {
     expect(rendered.stdout).toContain("/opt/appaloft/bin/appaloft");
     expect(rendered.stdout).not.toContain("tok_remote_secret_1234");
     expect(rendered.stderr).toBe("");
+  });
+
+  test("[CONTROL-PLANE-CLI-018] auth mcp codex install still requires a bearer profile", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "appaloft-codex-mcp-install-session-"));
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: [
+        "node",
+        "appaloft",
+        "auth",
+        "mcp",
+        "codex",
+        "install",
+        "--profile",
+        "cloud",
+        "--codex-home",
+        join(directory, "codex"),
+      ],
+      env: {},
+      store: activeProductSessionStore("cloud"),
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    expect(result).toEqual({ handled: true, exitCode: 1 });
+    expect(output.read().stderr).toContain("Codex MCP install requires a bearer MCP profile");
+  });
+
+  test("[CONTROL-PLANE-CLI-023] auth mcp cursor install writes a token-free Cursor stdio bridge config", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "appaloft-cursor-mcp-install-"));
+    const cursorHome = join(directory, "cursor");
+    await mkdir(cursorHome, { recursive: true });
+    await writeFile(
+      join(cursorHome, "mcp.json"),
+      `${JSON.stringify(
+        {
+          mcpServers: {
+            existing: {
+              command: "existing-mcp",
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: [
+        "node",
+        "appaloft",
+        "auth",
+        "mcp",
+        "cursor",
+        "install",
+        "--cursor-home",
+        cursorHome,
+        "--command",
+        "/opt/appaloft/bin/appaloft",
+      ],
+      env: {},
+      store: activeProductSessionStore("cloud"),
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const config = JSON.parse(await readFile(join(cursorHome, "mcp.json"), "utf8")) as {
+      mcpServers: Record<string, { command?: string; args?: string[] }>;
+    };
+    const rendered = output.read();
+
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(config.mcpServers.existing).toEqual({ command: "existing-mcp" });
+    expect(config.mcpServers.appaloft).toEqual({
+      command: "/opt/appaloft/bin/appaloft",
+      args: ["mcp", "remote-stdio", "--profile", "cloud"],
+    });
+    expect(JSON.stringify(config)).not.toContain("cookie_remote_secret_9999");
+    expect(rendered.stdout).toContain("appaloft.cursor.mcp-install/v1");
+    expect(rendered.stdout).toContain("/opt/appaloft/bin/appaloft");
+    expect(rendered.stdout).not.toContain("cookie_remote_secret_9999");
+    expect(rendered.stderr).toBe("");
+  });
+
+  test("[CONTROL-PLANE-CLI-023] auth mcp cursor install fails when no CLI profile exists", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "appaloft-cursor-mcp-missing-"));
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: [
+        "node",
+        "appaloft",
+        "auth",
+        "mcp",
+        "cursor",
+        "install",
+        "--cursor-home",
+        join(directory, "cursor"),
+      ],
+      env: {},
+      store: new MemoryCliControlPlaneProfileStore(),
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    expect(result).toEqual({ handled: true, exitCode: 1 });
+    expect(output.read().stderr).toContain("run appaloft login");
+  });
+
+  test("[CONTROL-PLANE-CLI-024] auth mcp opencode install writes a token-free OpenCode local MCP entry", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "appaloft-opencode-mcp-install-"));
+    const opencodeHome = join(directory, "opencode");
+    await mkdir(opencodeHome, { recursive: true });
+    await writeFile(
+      join(opencodeHome, "opencode.json"),
+      `${JSON.stringify(
+        {
+          $schema: "https://opencode.ai/config.json",
+          mcp: {
+            existing: {
+              type: "local",
+              command: ["existing-mcp"],
+              enabled: true,
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: [
+        "node",
+        "appaloft",
+        "auth",
+        "mcp",
+        "opencode",
+        "install",
+        "--profile",
+        "local",
+        "--opencode-home",
+        opencodeHome,
+        "--command",
+        "/opt/appaloft/bin/appaloft",
+      ],
+      env: {},
+      store: activeStore("local"),
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const config = JSON.parse(await readFile(join(opencodeHome, "opencode.json"), "utf8")) as {
+      $schema?: string;
+      mcp: Record<string, { type?: string; command?: string[]; enabled?: boolean }>;
+    };
+    const rendered = output.read();
+
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(config.$schema).toBe("https://opencode.ai/config.json");
+    expect(config.mcp.existing).toEqual({
+      type: "local",
+      command: ["existing-mcp"],
+      enabled: true,
+    });
+    expect(config.mcp.appaloft).toEqual({
+      type: "local",
+      command: ["/opt/appaloft/bin/appaloft", "mcp", "remote-stdio", "--profile", "local"],
+      enabled: true,
+    });
+    expect(JSON.stringify(config)).not.toContain("tok_remote_secret_1234");
+    expect(rendered.stdout).toContain("appaloft.opencode.mcp-install/v1");
+    expect(rendered.stdout).not.toContain("tok_remote_secret_1234");
+    expect(rendered.stderr).toBe("");
+  });
+
+  test("[CONTROL-PLANE-CLI-024] auth mcp opencode install uses XDG_CONFIG_HOME when --opencode-home is omitted", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "appaloft-opencode-xdg-"));
+    const xdgConfigHome = join(directory, "config");
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "auth", "mcp", "opencode", "install"],
+      env: { XDG_CONFIG_HOME: xdgConfigHome },
+      store: activeProductSessionStore("cloud"),
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const configPath = join(xdgConfigHome, "opencode", "opencode.json");
+    const config = JSON.parse(await readFile(configPath, "utf8")) as {
+      mcp: Record<string, { command?: string[] }>;
+    };
+
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(config.mcp.appaloft?.command).toEqual([
+      "appaloft",
+      "mcp",
+      "remote-stdio",
+      "--profile",
+      "cloud",
+    ]);
+    expect(output.read().stdout).not.toContain("cookie_remote_secret_9999");
   });
 
   test("[CONTROL-PLANE-CLI-002] failed login does not write a profile", async () => {

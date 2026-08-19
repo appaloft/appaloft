@@ -16,6 +16,11 @@ appaloft deploy .
 ```
 
 ```bash
+appaloft login
+appaloft setup agent
+```
+
+```bash
 npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
 npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
 npx @appaloft/mcp
@@ -110,15 +115,31 @@ CLI is installed. It is optional — not the first command.
 
 ## Agent
 
-Teach the coding agent you already use. These copy blocks run today. They are the existing `npx`
-and CLI commands — not a released one-shot host installer.
+Teach the coding agent you already use. After `appaloft login`, `appaloft setup agent` copies
+byte-identical skills and writes token-free Local MCP into detected hosts. Universal is skills
+only (`~/.agents`). Cursor and Claude Code get skill plus MCP when `~/.cursor` or `~/.claude`
+exist. OpenCode is listed but not default-checked. The MCP launcher reuses the Appaloft login
+profile (`appaloft mcp remote-stdio --profile <active>`). Tokens stay out of editor config.
 
 ```bash
-npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
+appaloft login
+appaloft setup agent
 ```
 
 ```bash
+# Explicit MCP siblings (OpenCode is explicit)
+appaloft auth mcp cursor install
+appaloft auth mcp claude-code install
+appaloft auth mcp opencode install
+```
+
+`npx skills add` still only copies the skill. It does not install the CLI or write MCP config.
+
+```bash
+npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
 npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
+npx skills add appaloft/appaloft --skill appaloft --global --agent cursor --copy --yes
+npx skills add appaloft/appaloft --skill appaloft --global --agent opencode --copy --yes
 ```
 
 ```bash
@@ -126,10 +147,10 @@ npx @appaloft/mcp
 appaloft mcp stdio
 ```
 
-Use `--agent codex` or `--agent claude-code` only. Other host flags are not shipped here. Verify
-with `npx skills list --global --agent <agent>`, then start a new agent session. Ask it to deploy
-or operate through Appaloft. The skill tells the agent to use Appaloft operations instead of
-calling Docker, SSH, databases, or cloud providers directly.
+Verify a skill-manager copy with `npx skills list --global --agent <agent>`, then start a new
+agent session. Ask it to deploy or operate through Appaloft. The skill tells the agent to use
+Appaloft operations instead of calling Docker, SSH, databases, or cloud providers directly.
+This is the public-repo CLI Agent door — not a Cloud marketing-site claim.
 
 ## Occupancy
 
@@ -162,6 +183,7 @@ The installer verifies or installs Docker Engine and the Compose plugin, writes 
 | Homebrew CLI | `brew install appaloft/tap/appaloft` |
 | GitHub Release | Download platform archives from [latest releases](https://github.com/appaloft/appaloft/releases/latest). |
 | MCP launcher | `npx @appaloft/mcp` |
+| Local Agent door | `appaloft login && appaloft setup agent` |
 | AI skill | `npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes` |
 | Self-hosted server | `curl -fsSL https://appaloft.com/install.sh \| sudo sh` |
 | Self-hosted with PGlite | `curl -fsSL https://appaloft.com/install.sh \| sudo sh -s -- --database pglite` |

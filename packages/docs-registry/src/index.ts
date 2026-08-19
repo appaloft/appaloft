@@ -581,6 +581,37 @@ export const publicDocsHelpTopics = {
       "docs/decisions/ADR-046-typescript-sdk-interface-parity.md",
     ],
   },
+  "cli.mcp-host-install": {
+    id: "cli.mcp-host-install",
+    title: "CLI MCP host install",
+    description:
+      "How Cursor, OpenCode, and Codex write token-free MCP host config from an existing Appaloft CLI profile.",
+    page: {
+      "zh-CN": "reference/cli",
+      "en-US": "en/reference/cli",
+    },
+    anchor: "cli-mcp-host-install",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "mcp"],
+    aliases: [
+      "appaloft auth mcp cursor install",
+      "appaloft auth mcp opencode install",
+      "appaloft auth mcp codex install",
+      "~/.cursor/mcp.json",
+      "~/.config/opencode/opencode.json",
+      "MCP host install",
+      "MCP 宿主安装",
+    ],
+    specReferences: [
+      "docs/specs/074-cli-remote-control-plane-client/spec.md",
+      "docs/specs/090-appaloft-as-mcp-transport/spec.md",
+      "docs/testing/control-plane-modes-test-matrix.md",
+      "docs/agent/appaloft-mcp-server.md",
+    ],
+  },
   "project.concept": {
     id: "project.concept",
     title: "Project",
@@ -1176,6 +1207,9 @@ export const publicDocsHelpTopics = {
       "full skill",
       "/appaloft",
       "npx skills add appaloft/appaloft",
+      "--agent cursor",
+      "--agent opencode",
+      "~/.agents/skills",
       "GitHub Action deployment modes",
       "完整 skill",
       "AI 入口",
@@ -1227,6 +1261,36 @@ export const publicDocsHelpTopics = {
     webSurfaces: [
       "apps/docs/src/content/docs/agent/appaloft-mcp-server.md",
       "apps/web Home AI integration section",
+    ],
+  },
+  "agent.appaloft-mcp-host-install": {
+    id: "agent.appaloft-mcp-host-install",
+    title: "Appaloft MCP host install",
+    description:
+      "How an already-running Cursor or OpenCode agent wires Appaloft MCP with existing CLI commands, without storing tokens in editor config.",
+    page: {
+      "zh-CN": "agents/mcp",
+      "en-US": "en/agents/mcp",
+    },
+    anchor: "appaloft-mcp-host-install",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "mcp"],
+    aliases: [
+      "appaloft auth mcp cursor install",
+      "appaloft auth mcp opencode install",
+      "mcpServers.appaloft",
+      "mcp.appaloft",
+      "token-free MCP",
+      "MCP 宿主安装",
+    ],
+    specReferences: [
+      "docs/agent/appaloft-mcp-server.md",
+      "docs/specs/074-cli-remote-control-plane-client/spec.md",
+      "docs/specs/090-appaloft-as-mcp-transport/spec.md",
+      "skills/appaloft/references/mcp-tools.md",
     ],
   },
   "source.auto-deploy-setup": {

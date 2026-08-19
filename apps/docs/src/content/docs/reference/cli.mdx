@@ -117,6 +117,18 @@ appaloft context use <profile>
 
 以上命令只管理本机 Profile/Context,不会修改任何服务端状态。
 
+## MCP 宿主安装 <a id="cli-mcp-host-install" />
+
+`npx skills add` 只复制 Skill，不会写入 MCP。Cursor 和 OpenCode 复用已经登录的 Appaloft profile，把 token-free 的 stdio 启动项写入编辑器配置：
+
+```bash
+appaloft login
+appaloft auth mcp cursor install
+appaloft auth mcp opencode install
+```
+
+Cursor 合并 `~/.cursor/mcp.json` 的 `mcpServers.appaloft`。OpenCode 合并 `~/.config/opencode/opencode.json` 的 `mcp.appaloft`。Codex 仍需要专用 bearer profile：`appaloft auth mcp login` 然后 `appaloft auth mcp codex install`。无 git 的目录可以用 `appaloft deploy .`。
+
 ## 非交互认证(AI Agent / CI)
 
 交互式登录使用浏览器验证码流程,适合人类操作者。**AI Agent 和 CI/自动化不应该使用浏览器/验证码流程作为默认认证路径**,应该优先使用作用域受限、可过期的 Token:

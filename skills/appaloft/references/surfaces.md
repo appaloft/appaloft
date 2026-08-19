@@ -11,9 +11,22 @@ Install the full Appaloft skill through the standard skill manager:
 npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
 ```
 
-Use `--agent claude-code` for Claude Code. Verify the requested host with
+Use `--agent claude-code` for Claude Code, `--agent cursor` for Cursor, and `--agent opencode` for
+OpenCode. Current `npx skills` copies all of these into `~/.agents/skills/appaloft`. Cursor also
+reads that directory. It does not create `~/.cursor/skills` or `~/.config/opencode/skills`, install
+the Appaloft CLI, or write MCP host config. Verify the requested host with
 `npx skills list --global --agent <agent>` and start a new agent session before treating the skill
 as available.
+
+After the skill is copied, wire MCP with existing commands. Do not invent `appaloft setup agent`.
+
+- Cursor: `appaloft login` if no profile exists, then `appaloft auth mcp cursor install`. That
+  merges `~/.cursor/mcp.json` `mcpServers.appaloft` to launch
+  `appaloft mcp remote-stdio --profile <active>`.
+- OpenCode: `appaloft auth mcp opencode install` merges `~/.config/opencode/opencode.json`
+  `mcp.appaloft` as a local command (`type: "local"`, `enabled: true`) for the same launcher.
+- Codex: `appaloft auth mcp login` then `appaloft auth mcp codex install`.
+- Local-only hosts can still run `appaloft mcp stdio` or `npx @appaloft/mcp`.
 
 Appaloft does not provide a separate npm skill installer. Do not suggest an Appaloft-owned npm
 installer; that would blur the boundary between installing an agent skill and running the

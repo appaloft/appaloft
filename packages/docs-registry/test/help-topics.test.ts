@@ -309,7 +309,13 @@ describe("public docs help registry", () => {
     expect(topic.surfaces).toEqual(
       expect.arrayContaining(["cli", "http-api", "web", "repository-config", "mcp"]),
     );
-    expect(topic.aliases).toEqual(expect.arrayContaining(["npx skills add appaloft/appaloft"]));
+    expect(topic.aliases).toEqual(
+      expect.arrayContaining([
+        "npx skills add appaloft/appaloft",
+        "--agent cursor",
+        "--agent opencode",
+      ]),
+    );
     expect(topic.specReferences).toEqual(
       expect.arrayContaining([
         "docs/agent/appaloft-skill.md",
@@ -356,6 +362,38 @@ describe("public docs help registry", () => {
         "docs/specs/090-appaloft-as-mcp-transport/spec.md",
         "packages/ai/mcp/README.md",
         "skills/appaloft/references/mcp-tools.md",
+      ]),
+    );
+  });
+
+  test("[APPALOFT-MCP-018] MCP host install resolves to Cursor and OpenCode install anchors", () => {
+    const cliTopic = publicDocsHelpTopics["cli.mcp-host-install"];
+    const mcpTopic = publicDocsHelpTopics["agent.appaloft-mcp-host-install"];
+
+    expect(resolvePublicDocsHelpHref(cliTopic.id)).toBe(
+      "/docs/reference/cli/#cli-mcp-host-install",
+    );
+    expect(resolvePublicDocsHelpHref(cliTopic.id, { locale: "en-US" })).toBe(
+      "/docs/en/reference/cli/#cli-mcp-host-install",
+    );
+    expect(resolvePublicDocsHelpHref(mcpTopic.id)).toBe(
+      "/docs/agents/mcp/#appaloft-mcp-host-install",
+    );
+    expect(resolvePublicDocsHelpHref(mcpTopic.id, { locale: "en-US" })).toBe(
+      "/docs/en/agents/mcp/#appaloft-mcp-host-install",
+    );
+    expect(cliTopic.aliases).toEqual(
+      expect.arrayContaining([
+        "appaloft auth mcp cursor install",
+        "appaloft auth mcp opencode install",
+        "~/.cursor/mcp.json",
+        "~/.config/opencode/opencode.json",
+      ]),
+    );
+    expect(mcpTopic.aliases).toEqual(
+      expect.arrayContaining([
+        "appaloft auth mcp cursor install",
+        "appaloft auth mcp opencode install",
       ]),
     );
   });

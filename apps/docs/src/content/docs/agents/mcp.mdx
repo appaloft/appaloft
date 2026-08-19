@@ -39,6 +39,18 @@ npx appaloft-mcp serve --host 127.0.0.1 --port 3939
 
 启动 Server 本身**不会**部署应用、创建资源或修改任何状态——只有 MCP 客户端真正调用某个工具时，才会进入 Appaloft 的 command/query 总线。只有在可信反向代理或私有网络已提供安全边界时，才应该把 `--host` 从 `127.0.0.1` 改成其他值。
 
+## 宿主安装 <a id="appaloft-mcp-host-install" />
+
+`npx skills add` 不会写入 MCP。在已经登录的本机 Appaloft profile 上，用同一命令家族写入宿主配置（编辑器文件里不存放 token）：
+
+```bash
+appaloft login
+appaloft auth mcp cursor install
+appaloft auth mcp opencode install
+```
+
+Cursor 会合并 `~/.cursor/mcp.json` 的 `mcpServers.appaloft`。OpenCode 会合并 `~/.config/opencode/opencode.json` 的 `mcp.appaloft`（`type: "local"`、`command: [...]`、`enabled: true`）。两者都启动 `appaloft mcp remote-stdio --profile <当前或指定 profile>`。Codex 仍需要专用 bearer profile：`appaloft auth mcp login` 然后 `appaloft auth mcp codex install`。无 git 的目录可以用 `appaloft deploy .` 部署。
+
 ## 输入字段与校验：工具模型
 
 每个工具都对应一个业务操作 key，命名规则是把 `.` 替换成 `_`：

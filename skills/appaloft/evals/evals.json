@@ -696,7 +696,7 @@
       "id": "appaloft-skill-mcp-transport",
       "family": "mcp-transport",
       "prompt": "Configure my agent to use Appaloft over MCP, list the available tools/resources/prompts, then deploy and recover through MCP if the tools are present.",
-      "expected_output": "A MCP setup/workflow answer that starts appaloft mcp stdio or appaloft mcp serve when HTTP is needed, mentions npx @appaloft/mcp as the standalone launcher package, explains tool naming from operation keys, uses resources/prompts for context, and keeps skill as procedural guidance.",
+      "expected_output": "A MCP setup/workflow answer that starts appaloft mcp stdio or appaloft mcp serve when HTTP is needed, mentions npx @appaloft/mcp as the standalone launcher package, uses appaloft auth mcp cursor install or appaloft auth mcp opencode install to write token-free host config after login, explains tool naming from operation keys, uses resources/prompts for context, and keeps skill as procedural guidance.",
       "expected_operations": [
         "deployments.create",
         "deployments.recovery-readiness",
@@ -711,6 +711,7 @@
       ],
       "assertions": [
         "Uses appaloft mcp stdio for stdio, appaloft mcp serve for local HTTP, or npx @appaloft/mcp as the standalone launcher package.",
+        "Uses appaloft auth mcp cursor install or appaloft auth mcp opencode install to write token-free host config, or appaloft auth mcp login plus appaloft auth mcp codex install for Codex.",
         "Explains that MCP tools map one-to-one to operation catalog keys and dispatch through CommandBus/QueryBus.",
         "Does not present MCP resources or prompts as owning write-side business policy."
       ]
