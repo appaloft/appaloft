@@ -398,6 +398,14 @@ export function formatSafeCliError(error: unknown): string {
   return `${JSON.stringify(safeCliErrorEvidence(error))}\n`;
 }
 
+function humanInstallationIds(error: DomainError): string[] {
+  const raw = error.details?.installationIds;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (id): id is string => typeof id === "string" && /^[A-Za-z][A-Za-z0-9_-]{2,63}$/.test(id.trim()),
+  );
+}
+
 function humanErrorGuidance(error: DomainError): string | null {
   const guidance = error.details?.guidance;
   if (typeof guidance === "string") {
@@ -436,6 +444,17 @@ export function formatHumanCliError(error: unknown): string {
     const guidance = humanErrorGuidance(error);
     if (guidance) {
       lines.push(guidance);
+    }
+    const installationIds = humanInstallationIds(error);
+    if (
+      installationIds.length > 0 &&
+      !lines.some((line) => installationIds.every((id) => line.includes(id)))
+    ) {
+      lines.push(`Installations: ${installationIds.join(", ")}.`);
+    }
+    const preferred = installationIds[0];
+    if (preferred && !lines.some((line) => line.includes("appaloft code --profile"))) {
+      lines.push(`Retry with appaloft code --profile ${preferred}`);
     }
     return `${lines.join("\n")}\n`;
   }

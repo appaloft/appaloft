@@ -184,6 +184,26 @@ describe("CLI safe error evidence", () => {
     expect(output).not.toContain("repository-binding bind");
   });
 
+  test("[WS-REMOTE-PROFILE-AMBIGUOUS-176] human lists both installationIds when guidance is missing", () => {
+    const output = formatHumanCliError({
+      code: "conflict",
+      category: "user",
+      message: "Agent Workspace Profile selector is ambiguous",
+      retryable: false,
+      details: {
+        code: "workspace_open_profile_ambiguous",
+        selector: "appaloft-remote",
+        installationIds: ["awpi_ptlsoktb2iq1", "awpi_b87sxo84xe7u"],
+      },
+    } satisfies DomainError);
+
+    expect(output).toContain("Agent Workspace Profile selector is ambiguous");
+    expect(output).toContain("awpi_ptlsoktb2iq1");
+    expect(output).toContain("awpi_b87sxo84xe7u");
+    expect(output).toContain("appaloft code --profile awpi_ptlsoktb2iq1");
+    expect(output).not.toContain("Workspace activation context is still unavailable");
+  });
+
   test("does not serialize unknown failures in human CLI output", () => {
     const output = formatHumanCliError(
       new Error("secret-value ciphertext-value /private/operator/key"),
