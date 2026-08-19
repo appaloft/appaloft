@@ -62,9 +62,11 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `Local scratch · this Mac · not saved remotely`. `--local` plus a git remote fails
   closed. The only other hard failure before attach is a missing OpenCode/Pi binary
   after the user refuses install. Do not treat scratch as a durable Workspace.
-- `appaloft workspace open [path]` is the durable Profile-aware entrypoint. It resolves
+- `appaloft workspace open [path] [--server <id>]` is the durable Profile-aware entrypoint. It resolves
   clean, pushed Git context, creates or resumes the underlying Sandbox, and attaches
-  through the Adapter-declared capability.
+  through the Adapter-declared capability. When a BYOS Server is registered, open/create
+  pass that Server as `targetServerId` (`--server` pins it) and do not demand managed
+  capacity. No enrolled Server stays omitted.
   `workspace create/list/show/pause/resume/terminate/connect/attach/task/preview` remain
   lower-level workflows over Sandbox, Agent Runtime, Terminal Session, and Sandbox Port
   operations. `workspaceId` is the underlying `sandboxId`; do not invent a Workspace
@@ -97,7 +99,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft repository-binding show` - `repository-bindings.show`
 - `appaloft repository-binding unbind` - `repository-bindings.unbind`
 - `appaloft code` - occupy my Sandbox via `workspaces.open`; `--local` is Scratch
-- `appaloft workspace open [path]` - `workspaces.open` with local Git fail-closed
+- `appaloft workspace open [path] [--server <id>]` - `workspaces.open` with local Git fail-closed; enrolled BYOS is placement
 - `appaloft sandbox create` - `sandboxes.create`
 - `appaloft sandbox list` - `sandboxes.list`
 - `appaloft sandbox show <sandboxId>` - `sandboxes.show`

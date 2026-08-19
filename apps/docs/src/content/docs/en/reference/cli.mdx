@@ -56,7 +56,8 @@ files are not uploaded. Use `--no-attach` to print the occupancy banner
 without attaching. Default `code` picks the live occupancy when leftover
 same-name Profiles exist. `--profile` is only a fallback pin. `--new` occupies
 the cwd origin and does not silently resume whoami. A failed open names the
-repository and the missing Binding or Profile. Use `--local`
+repository and the missing Binding or Profile. Registered BYOS is placement;
+`--server` pins it and managed is not required. Use `--local`
 for this-Mac Scratch.
 
 ```bash
@@ -65,7 +66,7 @@ appaloft code
 appaloft code --no-attach
 appaloft code --local
 appaloft code --profile <installationId>
-appaloft workspace open . --profile <workspace-profile> --new
+appaloft workspace open . --profile <workspace-profile> --new --server <serverId>
 ```
 
 `appaloft workspace open` still requires a clean, pushed Git branch and dispatches

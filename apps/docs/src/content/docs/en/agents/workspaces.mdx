@@ -86,6 +86,8 @@ more than one live occupancy. It is distinct from `--control-plane-profile`.
 `--new` still occupies the cwd origin, not the current whoami occupancy. A failed
 open prints what is missing and which repository was being opened; it does not
 pretend Cloud activation succeeded.
+When a BYOS Server is already registered, `workspace open` and `code` place on
+that Server (`--server <id>` pins it). They do not demand managed capacity.
 
 `workspaces.open` validates the source before reading the existing Repository Binding and Project
 default Profile. A deployment may compose the optional activation initializer so missing Project,

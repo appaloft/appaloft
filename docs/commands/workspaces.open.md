@@ -73,7 +73,7 @@ capabilities.
 
 | Surface | Mapping |
 | --- | --- |
-| CLI | Durable `appaloft workspace open [path]`, Profile-aware `workspace create`, and default `appaloft code` occupancy (ADR-118 / ADR-119). `code` supplies remote SHA + optional `targetServerId`. A positional git remote occupies that repo without a local clone. Laptop Git fail-closed is not used. |
+| CLI | Durable `appaloft workspace open [path] [--server <id>]`, Profile-aware `workspace create`, and default `appaloft code` occupancy (ADR-118 / ADR-119). `code` and `workspace open`/`create` supply `targetServerId` from `--server` or the enrolled BYOS Server when one exists. A positional git remote occupies that repo without a local clone. Laptop Git fail-closed remains on durable open. |
 | SDK | `appaloft.workspaces.open(...)`; Profile-aware `workspaces.create(...)` |
 | oRPC / HTTP | Catalog-backed application command |
 | Console | Workspace create/resume entry |

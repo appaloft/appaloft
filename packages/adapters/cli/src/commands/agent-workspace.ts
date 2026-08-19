@@ -47,7 +47,7 @@ import {
   type WorkspaceOpenResult,
 } from "@appaloft/application";
 import { createCliLogRenderer } from "@appaloft/cli-logging";
-import { type DomainError, domainError } from "@appaloft/core";
+import { type DomainError, domainError, type Result } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
 import {
@@ -79,9 +79,11 @@ import {
   isRemoteCodeGitRemoteLocator,
   nativeAttachRequiresInteractiveTerminal,
   occupancyCloudCompatError,
+  type RemoteCodeServerSummary,
   resolveDefaultRemoteCodeDoor,
   resolveOccupancyConnectionsUrl,
   scratchRemoteRejectedError,
+  selectWorkspaceOpenTargetServerId,
   writeOccupancySessionHints,
 } from "../remote-code-session.js";
 import {
@@ -389,6 +391,13 @@ function completeWorkspaceOpen(
   });
 }
 
+const workspaceOpenServer = Options.text("server").pipe(
+  Options.optional,
+  Options.withDescription(
+    "Registered BYOS Server id. Defaults to the enrolled Server when one exists.",
+  ),
+);
+
 const create = EffectCommand.make(
   "create",
   {
@@ -397,8 +406,9 @@ const create = EffectCommand.make(
     ref: Options.text("ref"),
     branch: Options.text("branch"),
     attach: Options.boolean("attach").pipe(Options.withDefault(false)),
+    server: workspaceOpenServer,
   },
-  ({ attach, branch, profile, ref, repository }) =>
+  ({ attach, branch, profile, ref, repository, server }) =>
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
       const source = yield* Effect.tryPromise({
@@ -406,6 +416,12 @@ const create = EffectCommand.make(
           (cli.resolveRemoteWorkspaceGitRef ?? resolveCreateWorkspaceGitRef)(repository, ref),
         catch: (error) => workspaceCliError(error, "workspace-create-git-ref"),
       });
+      const targetServerId = yield* Effect.promise(() =>
+        resolveWorkspaceOpenTargetServerId(
+          () => listWorkspaceOpenServers(cli),
+          optionalValue(server),
+        ),
+      );
       const command = yield* resultToEffect(
         OpenAgentWorkspaceCommand.create({
           repository: source.credentialFreeHttpsRepository,
@@ -416,6 +432,7 @@ const create = EffectCommand.make(
           profile,
           forceNew: true,
           attach,
+          ...(targetServerId ? { targetServerId } : {}),
         }),
       );
       const result = yield* resultToEffect(
@@ -445,6 +462,30 @@ function resolveCreateWorkspaceGitRef(repository: string, ref: string) {
   });
 }
 
+async function resolveWorkspaceOpenTargetServerId(
+  listServers: () => Promise<readonly RemoteCodeServerSummary[] | undefined>,
+  explicit?: string,
+): Promise<string | undefined> {
+  if (explicit?.trim()) {
+    return selectWorkspaceOpenTargetServerId({ explicit });
+  }
+  return selectWorkspaceOpenTargetServerId({
+    servers: (await listServers()) ?? [],
+  });
+}
+
+async function listWorkspaceOpenServers(cli: {
+  readonly executeQuery: (
+    message: ListServersQuery,
+  ) => Promise<Result<{ items?: readonly RemoteCodeServerSummary[] }>>;
+}): Promise<readonly RemoteCodeServerSummary[] | undefined> {
+  const query = ListServersQuery.create();
+  if (query.isErr()) return undefined;
+  const listed = await cli.executeQuery(query.value);
+  if (listed.isErr()) return undefined;
+  return Array.isArray(listed.value.items) ? listed.value.items : undefined;
+}
+
 function makeWorkspaceOpenCommand() {
   return EffectCommand.make(
     "open",
@@ -453,8 +494,9 @@ function makeWorkspaceOpenCommand() {
       profile: Options.text("profile").pipe(Options.optional),
       forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
       noAttach: Options.boolean("no-attach").pipe(Options.withDefault(false)),
+      server: workspaceOpenServer,
     },
-    ({ forceNew, noAttach, path, profile }) =>
+    ({ forceNew, noAttach, path, profile, server }) =>
       Effect.gen(function* () {
         const cli = yield* CliRuntime;
         const source = yield* Effect.tryPromise({
@@ -462,6 +504,12 @@ function makeWorkspaceOpenCommand() {
           catch: (error) => workspaceCliError(error, "workspace-open-git-context"),
         });
         const attach = !noAttach;
+        const targetServerId = yield* Effect.promise(() =>
+          resolveWorkspaceOpenTargetServerId(
+            () => listWorkspaceOpenServers(cli),
+            optionalValue(server),
+          ),
+        );
         const command = yield* resultToEffect(
           OpenAgentWorkspaceCommand.create({
             repository: source.credentialFreeHttpsRepository,
@@ -472,6 +520,7 @@ function makeWorkspaceOpenCommand() {
             ...(optionalValue(profile) ? { profile: optionalValue(profile) } : {}),
             forceNew,
             attach,
+            ...(targetServerId ? { targetServerId } : {}),
           }),
         );
         const result = yield* resultToEffect(

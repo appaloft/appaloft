@@ -33,8 +33,11 @@ must not use laptop HEAD as Workspace truth.
    launch this-laptop Scratch. `--local` remains Scratch.
 2. `workspaces.open` gains an optional `targetServerId`. When present, placement
    must reserve that tenant-visible Server and must not substitute managed
-   capacity or another Server. When absent, existing R1.1 / ADR-109 target
-   policy is unchanged (`workspace open` stays managed-default when entitled).
+   capacity or another Server. Durable `workspace open` / `workspace create`
+   pass that id from `--server` or, when omitted, from the same enrolled BYOS
+   Server `code` already uses. Managed-default applies only when no registered
+   BYOS Server exists. A registered BYOS Server must not be blocked by a
+   managed-target requirement.
 3. Preference key stays tenant + subject + Project + Repository Identity +
    branch. Subject already isolates disks. Do not add Server to the unique
    preferred index in this slice. Resume returns the preferred Sandbox even if
@@ -62,8 +65,10 @@ must not use laptop HEAD as Workspace truth.
   longer resolve identity without calling `workspaces.open`.
 - Spec 139 first-slice tests that assert default `code` does not dispatch
   `workspaces.open` must flip to occupancy.
-- Cloud may keep managed-default for bare `workspace open`. `code` must pass
-  the door’s Server as `targetServerId`.
+- Cloud may keep managed-default only when no BYOS Server is registered.
+  `code` and `workspace open` / `workspace create` pass the enrolled Server as
+  `targetServerId` (`--server` pins it). They must not demand managed capacity
+  when that BYOS Server is already registered.
 - Expected public SemVer: minor. Catalog/SDK/CLI input gains one optional field.
 
 ## Rejected Alternatives

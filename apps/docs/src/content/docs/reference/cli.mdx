@@ -55,7 +55,7 @@ appaloft deployments recovery-readiness <deploymentId>  # 查询恢复就绪状�
 真相，脏树也不会上传。`--no-attach` 只打印占用横幅。默认 `code` 会选 live occupancy，
 同名 leftover Profile 不能挡住第一次成功。`--profile` 只是兜底。`--new` 占用 cwd
 源，不会静默 resume whoami。打开失败会写出正在打开的仓库以及缺少的 Binding 或
-Profile。`--local` 才是本机
+Profile。已注册 BYOS 就是放置目标，`--server` 可钉死，不要求 managed。`--local` 才是本机
 Scratch。
 
 ```bash
@@ -64,7 +64,7 @@ appaloft code
 appaloft code --no-attach
 appaloft code --local
 appaloft code --profile <installationId>
-appaloft workspace open . --profile <workspace-profile> --new
+appaloft workspace open . --profile <workspace-profile> --new --server <serverId>
 ```
 
 `workspace open` 仍要求 clean 且已 push 的 Git branch，并走 `workspaces.open`。完整说明见
