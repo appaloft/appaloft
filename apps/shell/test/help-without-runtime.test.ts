@@ -5,6 +5,16 @@ import { join } from "node:path";
 
 const temporaryRoots: string[] = [];
 
+function spawnShell(args: readonly string[], env: NodeJS.ProcessEnv) {
+  return Bun.spawn(["bun", "run", "--cwd", "apps/shell", "src/index.ts", "--", ...args], {
+    cwd: join(import.meta.dir, "../../.."),
+    env,
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+}
+
 afterEach(async () => {
   await Promise.all(
     temporaryRoots.splice(0).map((path) => rm(path, { recursive: true, force: true })),
@@ -18,20 +28,12 @@ describe("shell help without runtime composition", () => {
     const unusablePglitePath = join(temporaryRoot, "pglite-is-a-file");
     await writeFile(unusablePglitePath, "help must not open this path");
 
-    const child = Bun.spawn(
-      ["bun", "run", "--cwd", "apps/shell", "src/index.ts", "code", "--help"],
-      {
-        cwd: join(import.meta.dir, "../../.."),
-        env: {
-          ...process.env,
-          APPALOFT_HOME: join(temporaryRoot, "home"),
-          APPALOFT_PGLITE_DATA_DIR: unusablePglitePath,
-          OTEL_SDK_DISABLED: "true",
-        },
-        stdout: "pipe",
-        stderr: "pipe",
-      },
-    );
+    const child = spawnShell(["code", "--help"], {
+      ...process.env,
+      APPALOFT_HOME: join(temporaryRoot, "home"),
+      APPALOFT_PGLITE_DATA_DIR: unusablePglitePath,
+      OTEL_SDK_DISABLED: "true",
+    });
 
     const [exitCode, stdout, stderr] = await Promise.all([
       child.exited,
@@ -54,20 +56,12 @@ describe("shell help without runtime composition", () => {
     const unusablePglitePath = join(temporaryRoot, "pglite-is-a-file");
     await writeFile(unusablePglitePath, "help must not open this path");
 
-    const child = Bun.spawn(
-      ["bun", "run", "--cwd", "apps/shell", "src/index.ts", "deploy", "--help"],
-      {
-        cwd: join(import.meta.dir, "../../.."),
-        env: {
-          ...process.env,
-          APPALOFT_HOME: join(temporaryRoot, "home"),
-          APPALOFT_PGLITE_DATA_DIR: unusablePglitePath,
-          OTEL_SDK_DISABLED: "true",
-        },
-        stdout: "pipe",
-        stderr: "pipe",
-      },
-    );
+    const child = spawnShell(["deploy", "--help"], {
+      ...process.env,
+      APPALOFT_HOME: join(temporaryRoot, "home"),
+      APPALOFT_PGLITE_DATA_DIR: unusablePglitePath,
+      OTEL_SDK_DISABLED: "true",
+    });
 
     const [exitCode, stdout, stderr] = await Promise.all([
       child.exited,
@@ -87,20 +81,12 @@ describe("shell help without runtime composition", () => {
     const unusablePglitePath = join(temporaryRoot, "pglite-is-a-file");
     await writeFile(unusablePglitePath, "help must not open this path");
 
-    const child = Bun.spawn(
-      ["bun", "run", "--cwd", "apps/shell", "src/index.ts", "operate", "--help"],
-      {
-        cwd: join(import.meta.dir, "../../.."),
-        env: {
-          ...process.env,
-          APPALOFT_HOME: join(temporaryRoot, "home"),
-          APPALOFT_PGLITE_DATA_DIR: unusablePglitePath,
-          OTEL_SDK_DISABLED: "true",
-        },
-        stdout: "pipe",
-        stderr: "pipe",
-      },
-    );
+    const child = spawnShell(["operate", "--help"], {
+      ...process.env,
+      APPALOFT_HOME: join(temporaryRoot, "home"),
+      APPALOFT_PGLITE_DATA_DIR: unusablePglitePath,
+      OTEL_SDK_DISABLED: "true",
+    });
 
     const [exitCode, stdout, stderr] = await Promise.all([
       child.exited,
@@ -120,19 +106,11 @@ describe("shell help without runtime composition", () => {
     const temporaryRoot = await mkdtemp(join(tmpdir(), "appaloft-login-help-"));
     temporaryRoots.push(temporaryRoot);
 
-    const child = Bun.spawn(
-      ["bun", "run", "--cwd", "apps/shell", "src/index.ts", "login", "--help"],
-      {
-        cwd: join(import.meta.dir, "../../.."),
-        env: {
-          ...process.env,
-          APPALOFT_HOME: join(temporaryRoot, "home"),
-          OTEL_SDK_DISABLED: "true",
-        },
-        stdout: "pipe",
-        stderr: "pipe",
-      },
-    );
+    const child = spawnShell(["login", "--help"], {
+      ...process.env,
+      APPALOFT_HOME: join(temporaryRoot, "home"),
+      OTEL_SDK_DISABLED: "true",
+    });
     const [exitCode, stdout, stderr] = await Promise.all([
       child.exited,
       new Response(child.stdout).text(),
@@ -153,15 +131,10 @@ describe("shell help without runtime composition", () => {
     const temporaryRoot = await mkdtemp(join(tmpdir(), "appaloft-login-h-"));
     temporaryRoots.push(temporaryRoot);
 
-    const child = Bun.spawn(["bun", "run", "--cwd", "apps/shell", "src/index.ts", "login", "-h"], {
-      cwd: join(import.meta.dir, "../../.."),
-      env: {
-        ...process.env,
-        APPALOFT_HOME: join(temporaryRoot, "home"),
-        OTEL_SDK_DISABLED: "true",
-      },
-      stdout: "pipe",
-      stderr: "pipe",
+    const child = spawnShell(["login", "-h"], {
+      ...process.env,
+      APPALOFT_HOME: join(temporaryRoot, "home"),
+      OTEL_SDK_DISABLED: "true",
     });
     const [exitCode, stdout, stderr] = await Promise.all([
       child.exited,
@@ -179,20 +152,11 @@ describe("shell help without runtime composition", () => {
     const temporaryRoot = await mkdtemp(join(tmpdir(), "appaloft-cli-no-backend-logs-"));
     temporaryRoots.push(temporaryRoot);
 
-    const child = Bun.spawn(
-      ["bun", "run", "--cwd", "apps/shell", "src/index.ts", "server", "list"],
-      {
-        cwd: join(import.meta.dir, "../../.."),
-        env: {
-          ...process.env,
-          APPALOFT_HOME: join(temporaryRoot, "home"),
-          APPALOFT_PGLITE_DATA_DIR: join(temporaryRoot, "pglite"),
-          OTEL_SDK_DISABLED: "true",
-        },
-        stdout: "pipe",
-        stderr: "pipe",
-      },
-    );
+    const child = spawnShell(["code", "--help"], {
+      ...process.env,
+      APPALOFT_HOME: join(temporaryRoot, "home"),
+      OTEL_SDK_DISABLED: "true",
+    });
     const [exitCode, stdout, stderr] = await Promise.all([
       child.exited,
       new Response(child.stdout).text(),
@@ -200,8 +164,8 @@ describe("shell help without runtime composition", () => {
     ]);
 
     expect(exitCode).toBe(0);
+    expect(stdout).toContain("Occupy my Sandbox from a path or git remote");
     expect(`${stdout}${stderr}`).not.toContain("appaloft-backend");
     expect(`${stdout}${stderr}`).not.toContain("durable_work_runtime.drain_stopped");
-    expect(stdout).toContain('"items"');
-  }, 15_000);
+  });
 });

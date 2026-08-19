@@ -33,6 +33,29 @@ function shouldBootstrapOpenTelemetry(env: Record<string, string | undefined>): 
   );
 }
 
+function shellCommandArgs(argv: readonly string[]): readonly string[] {
+  const args = argv.slice(2);
+  return args[0] === "appaloft" ? args.slice(1) : args;
+}
+
+function isHelpFlag(args: readonly string[]): boolean {
+  return args.includes("--help") || args.includes("-h") || args[0] === "help";
+}
+
+const args = shellCommandArgs(process.argv);
+const command = args[0];
+const standaloneCommand =
+  !command ||
+  command === "login" ||
+  command === "logout" ||
+  command === "auth" ||
+  command === "context" ||
+  command === "help" ||
+  command === "--help" ||
+  command === "-h" ||
+  command === "--version" ||
+  command === "version";
+
 const shouldBootstrapOtel = shouldBootstrapOpenTelemetry(process.env);
 const shouldCaptureStdin =
   process.argv.includes("--stdin") ||
@@ -46,6 +69,31 @@ if (shouldCaptureStdin) {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   }
   capturedStdinText = Buffer.concat(chunks).toString("utf8");
+}
+
+if (standaloneCommand) {
+  const { runStandaloneControlPlaneCli } = await import("@appaloft/adapter-cli");
+  const result = await runStandaloneControlPlaneCli({
+    argv: process.argv,
+    env: process.env,
+    ...(capturedStdinText === undefined ? {} : { stdinText: capturedStdinText }),
+  });
+  if (result.handled) {
+    process.exit(result.exitCode);
+  }
+}
+
+if (isHelpFlag(args) && command !== "worker" && command !== "mcp" && command !== "dev") {
+  const { createCliHelpProgram } = await import("@appaloft/adapter-cli");
+  const helpProgram = createCliHelpProgram({
+    version: process.env.APPALOFT_APP_VERSION ?? "0.0.0",
+  });
+  try {
+    await helpProgram.parseAsync(process.argv);
+    process.exit(0);
+  } catch {
+    process.exit(1);
+  }
 }
 
 if (shouldBootstrapOtel) {
