@@ -194,9 +194,25 @@ export function buildRemoteComposeFailureLogsCommand(input: {
 }
 
 function remoteGeneratedDockerBuildAssetPath(remoteWorkdir: string, relativePath: string): string {
-  return `${remoteWorkdir.replace(/\/+$/, "")}/${normalizeGeneratedDockerBuildAssetPath(
+  return `${sshDockerUploadedWorkspaceContextPath(remoteWorkdir)}/${normalizeGeneratedDockerBuildAssetPath(
     relativePath,
   )}`;
+}
+
+export function sshDockerUploadedWorkspaceContextPath(remoteWorkdir: string): string {
+  const trimmed = remoteWorkdir.trim();
+  if (!trimmed || trimmed === ".") {
+    throw new Error("SSH Docker build context requires the uploaded workspace root");
+  }
+
+  return trimmed.replace(/\/+$/, "");
+}
+
+export function sshDockerUploadedWorkspaceFilePath(
+  remoteWorkdir: string,
+  relativePath: string,
+): string {
+  return `${sshDockerUploadedWorkspaceContextPath(remoteWorkdir)}/${relativePath.replace(/^\/+/u, "")}`;
 }
 
 function remoteWriteTextFileCommand(path: string, contents: string): string {
@@ -2263,8 +2279,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             RuntimeCommandBuilder.docker().buildImage({
               image,
               dockerfilePath,
-              contextPath: ".",
-              workingDirectory: remoteWorkdir,
+              contextPath: sshDockerUploadedWorkspaceContextPath(remoteWorkdir),
               labels: dockerLabelsFromAssignments(
                 appaloftDockerContainerLabelsForDeployment(state),
               ),

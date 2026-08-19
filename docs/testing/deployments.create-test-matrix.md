@@ -189,6 +189,7 @@ Then:
 | DEP-CREATE-PKG-002 | adapter integration | Local-shell Git source acquisition failure preserves the previous runtime | A Git-backed Compose replacement supersedes one successful attempt, but clone/ref resolution fails in the new local-shell attempt workspace | Accepted attempt reaches terminal `failed` | `deployment-failed` with `remote_git_clone_failed` or the matching source-resolution code | The new attempt uses its own `local-deployments/<deploymentId>/source` directory; no Docker/Compose mutation occurs; the previous attempt's source workspace and runtime ownership remain untouched |
 | DEP-CREATE-PKG-003 | adapter integration | Generic-SSH Git source acquisition failure preserves the previous runtime | A Git-backed Compose replacement supersedes one successful attempt, but authentication, target-network access, repository availability, or selected-ref resolution fails on the SSH target | Accepted attempt reaches terminal `failed` | `deployment-failed` with `remote_git_clone_failed` or the matching source-resolution code | Remote source commands target only `ssh-deployments/<newDeploymentId>/source`; no Docker/Compose command or superseded-attempt cleanup is dispatched; the previous runtime and source workspace remain untouched |
 | DEP-CREATE-PKG-004 | adapter integration | Local-shell user-authored Compose source remains free of generated ownership overrides | A local-shell deployment selects a user-authored Compose file from a local source workdir | Runtime adapter executes the Compose path through override generation and a deterministic apply failure | No public event; the override is an adapter artifact | The override is created under `local-deployments/<deploymentId>/compose/ownership-labels.override.yml`, is supplied as an explicit additional Compose file, and the selected source workdir remains unchanged |
+| DEP-CREATE-PKG-005 | unit | SSH Docker build context is the uploaded workspace | Generic-SSH static site upload places `public/index.html` under the attempt source workdir and generates `Dockerfile.appaloft-static` | Later terminal result depends on runtime execution | `build-requested` when package/build work is required | Docker `contextPath` is the absolute uploaded `remoteWorkdir` (not `.` and not the parent of `source/`), so `public/index.html` is inside the BuildKit context; `-f` may point at a Dockerfile outside that context |
 
 ## Runtime Backend Smoke Matrix
 
@@ -355,7 +356,9 @@ Static site deployment rows `DEP-CREATE-ADM-026`, `DEP-CREATE-ADM-026A`, `DEP-CR
 the static artifact planning assertion in `packages/adapters/runtime/test/runtime-plan-resolver.test.ts`.
 Current code accepts the static runtime plan strategy, resolves static artifact intent, and covers
 adapter-owned static-server Dockerfile generation in
-`packages/adapters/runtime/test/runtime-plan-resolver.test.ts`. Executable static smoke coverage
+`packages/adapters/runtime/test/runtime-plan-resolver.test.ts`. `DEP-CREATE-PKG-005` is covered by
+`packages/adapters/runtime/test/ssh-source-upload.test.ts`: SSH Docker `contextPath` is the
+absolute uploaded workspace, so `public/index.html` is inside the BuildKit context. Executable static smoke coverage
 now includes the local Docker generated-nginx path and a GitHub Actions secret-gated plus local
 explicit generic-SSH Docker path. The local
 Docker static smoke also verifies ADR-031 routing behavior for directory indexes, extensionless

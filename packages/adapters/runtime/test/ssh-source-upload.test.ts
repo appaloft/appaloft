@@ -2,6 +2,8 @@ import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { spawnSync } from "node:child_process";
 import { describe, expect, test } from "bun:test";
+import { ash } from "@appaloft/ash";
+import { RuntimeCommandBuilder, renderRuntimeCommandString } from "../src/runtime-commands";
 import {
   buildLocalWorkspaceUploadCommand,
   buildLocalWorkspaceUploadTarExcludeArgs,
@@ -10,6 +12,8 @@ import {
   buildRemotePreviewArtifactSweepCommand,
   parseDockerRepoDigestFromInspect,
   parseRemoteDockerImageVersionMetadataOutput,
+  sshDockerUploadedWorkspaceContextPath,
+  sshDockerUploadedWorkspaceFilePath,
   SshExecutionBackend,
 } from "../src/ssh-execution";
 
@@ -52,6 +56,36 @@ describe("SSH source upload", () => {
     expect(command).toContain("else tar -czf -");
     expect(command).toContain("'--exclude' '.turbo'");
     expect(command).toContain("ssh '-p' '22' 'deploy@example.test'");
+  });
+});
+
+describe("SSH Docker build context", () => {
+  test("[DEP-CREATE-PKG-005][DEP-CREATE-ADM-026A] uses the uploaded workspace so public/index.html is in context", () => {
+    const remoteRoot = "/var/lib/appaloft/runtime/ssh-deployments/dep_i28tpjmubc32";
+    const remoteWorkdir = `${remoteRoot}/source`;
+    const uploadedPublicIndex = `${remoteWorkdir}/public/index.html`;
+    const contextPath = sshDockerUploadedWorkspaceContextPath(remoteWorkdir);
+
+    expect(contextPath).toBe(remoteWorkdir);
+    expect(contextPath).not.toBe(".");
+    expect(contextPath).not.toBe(remoteRoot);
+    expect(sshDockerUploadedWorkspaceFilePath(remoteWorkdir, "public/index.html")).toBe(
+      uploadedPublicIndex,
+    );
+    expect(uploadedPublicIndex.startsWith(`${contextPath}/`)).toBe(true);
+
+    const spec = RuntimeCommandBuilder.docker().buildImage({
+      image: "appaloft-image-dep_i28tpjmubc32:latest",
+      dockerfilePath: `${remoteRoot}/Dockerfile.appaloft-static`,
+      contextPath,
+    });
+    const command = renderRuntimeCommandString(spec, { quote: ash.quote });
+
+    expect(spec.contextPath.value).toBe(remoteWorkdir);
+    expect(command).toContain(`'${remoteWorkdir}'`);
+    expect(command).toContain(`-f '${remoteRoot}/Dockerfile.appaloft-static'`);
+    expect(command.endsWith(" '.'")).toBe(false);
+    expect(command).not.toContain("cd ");
   });
 });
 
