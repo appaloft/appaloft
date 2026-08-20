@@ -10,10 +10,11 @@
   </p>
   <p>
     <strong>Deploy</strong> — a folder becomes a URL. Git is optional.
-    Hero command: <code>appaloft deploy .</code>. Success is a live URL for this app.<br />
-    <strong>Agent</strong> — local skill + MCP so the Cursor or OpenCode you already have can use
-    Appaloft. The experience is like Railway <code>setup agent</code>. Appaloft does not ship that
-    command.
+    Hero command: <code>appaloft deploy .</code>. Success is a live URL for this app — not a
+    canned demo address.<br />
+    <strong>Agent</strong> — occupancy: <code>appaloft code</code> opens remote OpenCode or Pi on
+    your server; <code>appaloft code --local</code> is Scratch on this machine. Occupy also copies
+    the public Appaloft skill and allowlisted HOME skills. A one-command host setup is coming.
   </p>
   <p>
     <a href="https://www.appaloft.com">Website</a> ·
@@ -102,38 +103,37 @@ CLI is installed. It is optional — not the first command.
 
 ## Agent
 
-Teach the coding agent you already have. Install a local skill and MCP so Cursor, OpenCode, Codex,
-or Claude Code can call Appaloft. That experience is like Railway `setup agent`. Appaloft does not
-ship that command.
+The honest shipped Agent-adjacent path today is occupancy plus the skill copy that runs when you
+occupy — not a one-shot local MCP or host install.
 
-Skill copy blocks use the hosts documented in this repo (`codex`, `claude-code`). Cursor and
-OpenCode enter through MCP, not an invented `--agent` flag.
+```bash
+appaloft code
+appaloft code --local
+```
+
+`appaloft code` occupies your Sandbox after login and opens remote OpenCode or Pi on an enrolled
+server. `appaloft code --local` is Scratch on this machine: no login, no Sandbox, not saved
+remotely. Occupy writes the public Appaloft skill and may add-only copy allowlisted HOME skill
+directories (`~/.claude/skills`, `~/.codex/skills`, `~/.grok/skills`, `~/.agents/skills`,
+`~/.cursor/skills`, `~/.config/opencode/skills`) into the workspace. Only directories with
+`SKILL.md` are copied; `mcp.json`, tokens, cookies, `.env`, and plugin binaries are not.
+
+A one-command host setup is coming. It is not in this repository yet.
+
+These occupancy commands are listed in the in-repo CLI reference
+([cli-entrypoints.md](./skills/appaloft/references/cli-entrypoints.md)). The currently published
+docs.appaloft.com CLI page may not list them yet.
+
+These pieces also exist. They are not a live one-shot Agent door:
 
 ```bash
 npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
-```
-
-```bash
 npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
-```
-
-Verify with `npx skills list --global --agent <agent>`, then start a new agent session. Ask it to
-deploy or operate through Appaloft. The skill tells the agent to use Appaloft operations instead of
-calling Docker, SSH, databases, or cloud providers directly.
-
-```bash
 npx @appaloft/mcp
 appaloft mcp stdio
 ```
 
-## Occupancy (optional)
-
-Not a door. After the two doors, `appaloft code` is an occupancy add-on: it opens remote OpenCode or
-Pi on your server (analogous to Railway `ca`). `appaloft code --local` is Scratch on this machine.
-
-These commands are listed in the in-repo CLI reference
-([cli-entrypoints.md](./skills/appaloft/references/cli-entrypoints.md)). The currently published
-docs.appaloft.com CLI page may not list them yet.
+Use `--agent codex` or `--agent claude-code` only. Other host flags are not shipped here.
 
 ## Self-host (optional)
 
