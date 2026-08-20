@@ -457,6 +457,7 @@
 - [x] Unit tests WS-REMOTE-PROGRESS-201 / WS-REMOTE-NO-UPLOAD-006 for ancestor git + leftover examples
 - [x] Folder occupancy skips `git init` / clone / source materialization and does not fail `workspace_open_source_materialization_failed`
 - [x] Leftover partial folder occupancy is repaired or replaced without `workspace_open_partial_recovery_required`; git-remote leftover still fail-closes
+- [x] `code --no-attach` door silently replaces a leftover partial folder occupancy and does not emit `workspace_open_partial_recovery_required`
 - [x] Unit tests FOLDER-ONBOARD-007 / WS-REMOTE-PROGRESS-201 for no remote materialize + leftover continue
 
 ## Later
