@@ -9,12 +9,12 @@ export const CODE_OPTION_DESCRIPTIONS = {
   noAttach: "Occupy the Sandbox and print the banner without attaching the agent TUI.",
   local:
     "Open this-Mac scratch instead of occupying a remote Sandbox; rejects a git-remote locator.",
-  forceNew: "Start a new isolated Workspace instead of resuming the live occupancy.",
+  forceNew: "Start a new isolated Workspace instead of resuming the live session.",
   yes: "Skip folder-onboarding prompts and create a project named after this directory.",
   open: "After occupy, print and open the default preview, pull request, or compare URL.",
   openTarget: "Choose which URL --open uses: preview, production, pr, compare, or connections.",
   profile:
-    "Pin an Agent Workspace Profile name or installation id; default OpenCode omits this so the live occupancy can resume.",
+    "Pin an Agent Workspace Profile name or installation id; default OpenCode omits this so the live session can resume.",
   server: "Place the Sandbox on this registered BYOS Server id, defaulting to the enrolled Server.",
   opencode: "Use the OpenCode harness.",
   pi: "Use the Pi harness.",

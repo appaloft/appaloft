@@ -3351,6 +3351,32 @@ mod tests {
     }
 
     #[test]
+    fn code_tui_help_rows_and_footers_never_say_occupancy() {
+        for row in OCCUPANCY_HELP_ROWS {
+            assert!(
+                !row.to_ascii_lowercase().contains("occupancy"),
+                "{row}"
+            );
+        }
+        assert!(!occupancy_loading_footer(true)
+            .to_ascii_lowercase()
+            .contains("occupancy"));
+        assert!(!occupancy_loading_footer(false)
+            .to_ascii_lowercase()
+            .contains("occupancy"));
+        assert!(!OSC52_PASSTHROUGH_DISABLED
+            .to_ascii_lowercase()
+            .contains("occupancy"));
+        for (_, label) in [
+            ("credential", "Checking login"),
+            ("skills", "Preparing skills"),
+            ("disk", "Preparing disk"),
+        ] {
+            assert!(!label.to_ascii_lowercase().contains("occupancy"), "{label}");
+        }
+    }
+
+    #[test]
     fn code_tui_help_lists_ca_keys_without_occupancy_or_y_restore() {
         let mut state = AppState::default();
         state.loading.active = false;

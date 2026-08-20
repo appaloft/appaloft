@@ -569,7 +569,7 @@ export const enUS = {
       githubConnectedAs: "GitHub connected: {{account}}",
       githubConnectionDescription: "Link a GitHub account for repository authorization.",
       githubIdentityOnlyDescription:
-        "GitHub sign-in is identity-only. Authorize repository access to open occupancy PRs.",
+        "GitHub sign-in is identity-only. Authorize repository access to open pull requests.",
       introBody:
         "Manage profile metadata, sign-in security, active sessions, and account deletion.",
       introTitle: "Account settings",

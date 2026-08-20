@@ -130,6 +130,8 @@ test("[WS-REMOTE-CRED-213] explicit vendor without credential fail-closes", asyn
   expect(resolved.isErr()).toBe(true);
   if (resolved.isOk()) return;
   expect(resolved.error.details?.code).toBe("workspace_occupancy_vendor_credential_missing");
+  expect(resolved.error.message).not.toMatch(/occupancy/iu);
+  expect(String(resolved.error.details?.guidance ?? "")).not.toMatch(/occupancy/iu);
   expect(JSON.stringify(resolved.error)).not.toContain("sk-");
 });
 

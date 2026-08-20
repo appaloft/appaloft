@@ -166,7 +166,7 @@ describe("public docs help registry", () => {
     );
     expect(topic.aliases).toEqual(
       expect.arrayContaining([
-        "occupancy skills",
+        "cloud agents skills",
         "home skills",
         "cursor skills",
         "opencode skills",
