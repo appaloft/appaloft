@@ -17,9 +17,9 @@ Teams usually organize work by product line or by customer, not by individual ap
 ## Where you see it in Web, CLI, and API
 
 ```bash
-appaloft projects create --name "my-first-project"
-appaloft projects list
-appaloft projects show <projectId>
+appaloft project create --name "my-first-project"
+appaloft project list
+appaloft project show <projectId>
 appaloft project use <projectId>
 ```
 
@@ -44,10 +44,10 @@ A Project can be renamed, reordered, given a description, archived, restored, an
 - **Delete** is only available for already-archived projects, and only after passing a delete precheck — as long as any environment, resource, deployment history, domain, certificate, log, audit, or runtime record still depends on the project, deletion is not enabled.
 
 ```bash
-appaloft projects rename <projectId> --name "new-name"
-appaloft projects archive <projectId>
-appaloft projects delete-check <projectId>
-appaloft projects delete <projectId> --confirm <projectId>
+appaloft project rename <projectId> --name "new-name"
+appaloft project archive <projectId>
+appaloft project delete-check <projectId>
+appaloft project delete <projectId> --confirm <projectId>
 ```
 
 ## Common mistakes
