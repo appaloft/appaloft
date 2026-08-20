@@ -426,13 +426,21 @@ describe("remote code door", () => {
     expect(door.serverId).toBe("srv_1");
   });
 
-  test("[WS-REMOTE-NO-UPLOAD-006][WS-REMOTE-PROGRESS-201] no-git folder resumes live occupancy without a git remote", async () => {
+  test("[WS-REMOTE-NO-UPLOAD-006][WS-REMOTE-PROGRESS-201] no-git current folder does not resume examples", async () => {
     const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-nongit-door-"));
     let contactedRemote = false;
     try {
       const door = await resolveDefaultRemoteCodeDoor(
         {
           env: { APPALOFT_TOKEN: "token" },
+          folderCwd: emptyDir,
+          folderOnboarding: {
+            projectId: "prj_notes",
+            projectName: "notes",
+            identity: "folder.local/cwd/notes",
+            created: true,
+            reused: false,
+          },
           listServers: async () => [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }],
           listOccupancies: async () => [
             {
@@ -445,19 +453,31 @@ describe("remote code door", () => {
               },
               lastActivityAt: "2026-08-15T12:30:00.000Z",
             },
+            {
+              sandboxId: "sbx_truefile",
+              status: "ready",
+              occupancy: {
+                repositoryIdentity: "github.com/acme/truefile",
+                commitSha: "e".repeat(40),
+                branch: "main",
+              },
+              lastActivityAt: "2026-08-16T12:30:00.000Z",
+            },
           ],
           resolveLocator: async () => {
             throw new Error("no-git occupancy must not wait on a folder locator");
           },
           resolveRemoteRef: async () => {
             contactedRemote = true;
-            throw new Error("live occupancy must not wait on ls-remote");
+            throw new Error("this-folder occupancy must not wait on ls-remote");
           },
         },
         emptyDir,
       );
-      expect(door.repositoryIdentity).toBe("github.com/appaloft/examples");
-      expect(door.commitSha).toBe("d".repeat(40));
+      expect(door.repositoryIdentity).toBe("folder.local/cwd/notes");
+      expect(door.projectName).toBe("notes");
+      expect(door.repositoryIdentity).not.toBe("github.com/appaloft/examples");
+      expect(door.repositoryIdentity).not.toBe("github.com/acme/truefile");
       expect(door.serverName).toBe("hostinger");
       expect(contactedRemote).toBe(false);
     } finally {
@@ -799,6 +819,13 @@ describe("remote code door", () => {
         {
           env: { APPALOFT_TOKEN: "token", HOME: home },
           listServers: async () => [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }],
+          folderOnboarding: {
+            projectId: "prj_silence",
+            projectName: "nux-code-silence-cwd",
+            identity: "folder.local/cwd/nux-code-silence-cwd",
+            created: true,
+            reused: false,
+          },
           listOccupancies: async () => [
             {
               sandboxId: "sbx_examples",
@@ -819,8 +846,8 @@ describe("remote code door", () => {
         },
         silence,
       );
-      expect(door.repositoryIdentity).toBe("github.com/appaloft/examples");
-      expect(door.commitSha).toBe("d".repeat(40));
+      expect(door.repositoryIdentity).toBe("folder.local/cwd/nux-code-silence-cwd");
+      expect(door.repositoryIdentity).not.toBe("github.com/appaloft/examples");
       expect(Date.now() - started).toBeLessThan(3_000);
       expect(contactedRemote).toBe(false);
     } finally {

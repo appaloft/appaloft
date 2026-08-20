@@ -73,7 +73,7 @@ capabilities.
 
 | Surface | Mapping |
 | --- | --- |
-| CLI | Durable `appaloft workspace open [path|git-remote] [--server <id>]`, Profile-aware `workspace create`, and default `appaloft code` occupancy (ADR-118 / ADR-119). `code` and `workspace open`/`create` supply `targetServerId` from `--server` or the enrolled BYOS Server when one exists. A git remote occupies that repo without a local clone. Default `code` from a no-git folder resumes the live occupancy (git is not a `code` gate). `workspace open`/`create` from a non-git directory still require a git remote or this folder's Git worktree and do not resume an unrelated occupancy. Dirty local worktrees still fail closed for delivery open. |
+| CLI | Durable `appaloft workspace open [path|git-remote] [--server <id>]`, Profile-aware `workspace create`, and default `appaloft code` occupancy (ADR-118 / ADR-119). `code` and `workspace open`/`create` supply `targetServerId` from `--server` or the enrolled BYOS Server when one exists. A git remote occupies that repo without a local clone. Default `code` from a no-git folder occupies this folder after onboarding (git is not a `code` gate). `workspace open`/`create` from a non-git directory still require a git remote or this folder's Git worktree and do not resume an unrelated occupancy. Dirty local worktrees still fail closed for delivery open. |
 | SDK | `appaloft.workspaces.open(...)`; Profile-aware `workspaces.create(...)` |
 | oRPC / HTTP | Catalog-backed application command |
 | Console | Workspace create/resume entry |

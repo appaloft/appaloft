@@ -15,6 +15,26 @@ use appaloft_workspace_control_tui::{
     RecoverySubmission, RendererEvent, agent_area, render, terminal_key_bytes,
     terminal_mouse_bytes,
 };
+
+fn key_has(key: &crossterm::event::KeyEvent, modifier: KeyModifiers) -> bool {
+    key.modifiers.contains(modifier)
+}
+
+fn bare_char(key: &crossterm::event::KeyEvent, expected: char) -> bool {
+    matches!(key.code, KeyCode::Char(actual) if actual.eq_ignore_ascii_case(&expected))
+        && !key_has(key, KeyModifiers::CONTROL)
+        && !key_has(key, KeyModifiers::ALT)
+}
+
+fn alt_char(key: &crossterm::event::KeyEvent, expected: char) -> bool {
+    matches!(key.code, KeyCode::Char(actual) if actual.eq_ignore_ascii_case(&expected))
+        && key_has(key, KeyModifiers::ALT)
+}
+
+fn ctrl_char(key: &crossterm::event::KeyEvent, expected: char) -> bool {
+    matches!(key.code, KeyCode::Char(actual) if actual.eq_ignore_ascii_case(&expected))
+        && key_has(key, KeyModifiers::CONTROL)
+}
 use crossterm::event::{
     DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture, Event,
     KeyCode, KeyEventKind, KeyModifiers, poll, read,
@@ -205,6 +225,10 @@ fn main() -> Result<()> {
             ) && state.session_id.is_some()
                 && reconnect_attempts < 3;
             state.apply(message);
+            for sequence in state.take_osc52() {
+                let _ = write!(std::io::stdout(), "{sequence}");
+                let _ = std::io::stdout().flush();
+            }
             if terminal_healthy {
                 reconnect_attempts = 0;
             } else if should_reconnect {
@@ -280,11 +304,23 @@ fn main() -> Result<()> {
                 }
             }
             Event::Key(key) if key.kind == KeyEventKind::Press && state.agent_focused => {
-                if key.code == KeyCode::Char(']') && key.modifiers.contains(KeyModifiers::CONTROL) {
+                if bare_char(&key, 'x') {
+                    state.show_agents_list();
+                } else if alt_char(&key, 'f') {
+                    state.toggle_focus_mode();
+                } else if (key.code == KeyCode::Esc && key_has(&key, KeyModifiers::SHIFT))
+                    || ctrl_char(&key, ']')
+                {
                     state.release_agent_focus();
                 } else if let Some(data) = terminal_key_bytes(key) {
                     send(&mut writer, &RendererEvent::TerminalInput { data })?;
                 }
+            }
+            Event::Key(key)
+                if key.kind == KeyEventKind::Press && ctrl_char(&key, 'c') && !state.agent_focused =>
+            {
+                let _ = send(&mut writer, &RendererEvent::Quit);
+                running = false;
             }
             Event::Key(key)
                 if key.kind == KeyEventKind::Press && state.pending_confirmation.is_some() =>
@@ -418,24 +454,38 @@ fn main() -> Result<()> {
                 }
             }
             Event::Key(key) if key.kind == KeyEventKind::Press => match key.code {
-                KeyCode::Char('q') => {
-                    let _ = send(&mut writer, &RendererEvent::Quit);
-                    running = false;
+                KeyCode::Esc if state.help_open => state.help_open = false,
+                KeyCode::Char('?') => state.toggle_help(),
+                KeyCode::Char('x') | KeyCode::Char('X')
+                    if !key_has(&key, KeyModifiers::CONTROL) && !key_has(&key, KeyModifiers::ALT) =>
+                {
+                    state.show_agents_list();
                 }
-                KeyCode::Char('r') => send(
+                KeyCode::Char('f') | KeyCode::Char('F') if alt_char(&key, 'f') => {
+                    state.toggle_focus_mode();
+                }
+                KeyCode::Char('f') | KeyCode::Char('F')
+                    if bare_char(&key, 'f') && !state.focus_mode =>
+                {
+                    state.toggle_focus_mode();
+                }
+                KeyCode::Char('r') if !key_has(&key, KeyModifiers::CONTROL) => send(
                     &mut writer,
                     &RendererEvent::Refresh {
                         workspace_id: state.selected_workspace_id().map(str::to_owned),
                     },
                 )?,
-                KeyCode::Char('R') => send(&mut writer, &RendererEvent::TerminalReconnect)?,
-                KeyCode::Char('f') => state.toggle_focus_mode(),
+                KeyCode::Char('R') if !key_has(&key, KeyModifiers::ALT) => {
+                    send(&mut writer, &RendererEvent::TerminalReconnect)?;
+                }
                 KeyCode::Char('o') => {
                     if let Some(workspace_id) = state.selected_workspace_id().map(str::to_owned) {
                         send(&mut writer, &RendererEvent::OpenPr { workspace_id })?;
                     }
                 }
-                KeyCode::Char('c') => {
+                KeyCode::Char('c')
+                    if !key_has(&key, KeyModifiers::CONTROL) && !key_has(&key, KeyModifiers::ALT) =>
+                {
                     if let Some(workspace_id) = state.selected_workspace_id().map(str::to_owned) {
                         send(&mut writer, &RendererEvent::OpenCompare { workspace_id })?;
                     }

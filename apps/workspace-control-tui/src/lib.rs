@@ -51,7 +51,7 @@ fn occupancy_commit_message(commit_sha: &str) -> Option<String> {
     if sha.len() < 7 || !sha.bytes().take(7).all(|byte| byte.is_ascii_hexdigit()) {
         return None;
     }
-    Some(format!("Deliver occupancy {}", &sha[..7]))
+    Some(format!("Deliver {}", &sha[..7]))
 }
 
 fn occupancy_github_compare_available(occupancy: &OccupancySummary) -> bool {
@@ -128,10 +128,26 @@ fn occupancy_available_door_footer(detail: Option<&DetailMessage>) -> String {
 
 fn occupancy_control_footer(status_line: &str, detail: Option<&DetailMessage>) -> String {
     format!(
-        " Ctrl+] release  │  {}  │  q quit  ↑↓ select  Enter attach/focus{} a lifecycle  d delivery  s recovery  f Focus Mode  r refresh  R reconnect ",
+        " {}  │  x list  f fullscreen  ⌥f restore tree  ↑↓ select  Enter attach{}  ? help  ^c leave ",
         status_line,
-        occupancy_available_door_footer(detail),
+        occupancy_available_door_footer(detail)
     )
+}
+
+fn occupancy_help_lines() -> Vec<Line<'static>> {
+    [
+        "x              Cloud Agents list",
+        "⌥f             fullscreen / restore tree",
+        "f              fullscreen from list",
+        "shift+esc / ^] stop typing",
+        "Enter          attach",
+        "↑↓             select",
+        "^c             leave from list",
+        "y              confirm delete",
+    ]
+    .into_iter()
+    .map(Line::from)
+    .collect()
 }
 
 fn occupancy_chrome_error_phase(phase: &str) -> bool {
@@ -657,12 +673,22 @@ pub enum ParentMessage {
     },
     Progress {
         message: String,
+        #[serde(default)]
+        step: Option<String>,
     },
     Loading {
         #[serde(default)]
         collapsed: Option<bool>,
         #[serde(default)]
         title: Option<String>,
+        #[serde(default)]
+        project: Option<String>,
+    },
+    Chrome {
+        #[serde(default)]
+        title: Option<String>,
+        #[serde(default)]
+        project: Option<String>,
     },
     Error {
         code: String,
@@ -851,12 +877,53 @@ impl RendererEvent {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct OccupancyPrepareStep {
+    pub id: String,
+    pub label: String,
+    pub status: String,
+}
+
+fn default_prepare_steps() -> Vec<OccupancyPrepareStep> {
+    ["credential", "skills", "disk"]
+        .into_iter()
+        .map(|id| OccupancyPrepareStep {
+            id: id.to_owned(),
+            label: id.to_owned(),
+            status: "pending".to_owned(),
+        })
+        .collect()
+}
+
+fn infer_prepare_step_id(message: &str) -> &'static str {
+    let lower = message.to_ascii_lowercase();
+    if lower.contains("skill") {
+        "skills"
+    } else if lower.contains("login") || lower.contains("server") || lower.contains("credential") {
+        "credential"
+    } else {
+        "disk"
+    }
+}
+
+fn apply_prepare_step(steps: &mut [OccupancyPrepareStep], step_id: &str) {
+    let mut reached = false;
+    for step in steps.iter_mut() {
+        if step.id == step_id {
+            step.status = "active".to_owned();
+            reached = true;
+        } else if !reached {
+            step.status = "done".to_owned();
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct OccupancyLoading {
     pub active: bool,
     pub collapsed: bool,
     pub title: String,
-    pub harness: String,
-    pub steps: Vec<String>,
+    pub project: String,
+    pub steps: Vec<OccupancyPrepareStep>,
     pub tick: usize,
 }
 
@@ -865,9 +932,9 @@ impl Default for OccupancyLoading {
         Self {
             active: true,
             collapsed: true,
-            title: "Appaloft".to_owned(),
-            harness: "occupancy".to_owned(),
-            steps: Vec::new(),
+            title: "Appaloft Cloud Agents".to_owned(),
+            project: String::new(),
+            steps: default_prepare_steps(),
             tick: 0,
         }
     }
@@ -896,6 +963,9 @@ pub struct AppState {
     pub recovery_form: Option<RecoveryForm>,
     pub pending_recovery_confirmation: Option<RecoverySubmission>,
     pub recovery_busy: bool,
+    pub wrap: bool,
+    pub help_open: bool,
+    pub pending_osc52: Vec<String>,
     pub status_line: String,
     pub terminal: vt100::Parser,
     pub terminal_size: (u16, u16),
@@ -926,6 +996,9 @@ impl Default for AppState {
             recovery_form: None,
             pending_recovery_confirmation: None,
             recovery_busy: false,
+            wrap: false,
+            help_open: false,
+            pending_osc52: Vec::new(),
             status_line: "preparing the agent".to_owned(),
             terminal: vt100::Parser::new(24, 80, 10_000),
             terminal_size: (80, 24),
@@ -961,14 +1034,17 @@ impl AppState {
                     self.status_line = "Connected".to_owned();
                 }
             }
-            ParentMessage::Progress { message } => {
+            ParentMessage::Progress { message, step } => {
                 self.loading.active = true;
-                if self.loading.steps.last() != Some(&message) {
-                    self.loading.steps.push(message.clone());
-                }
+                let step_id = step.unwrap_or_else(|| infer_prepare_step_id(&message).to_owned());
+                apply_prepare_step(&mut self.loading.steps, &step_id);
                 self.status_line = message;
             }
-            ParentMessage::Loading { collapsed, title } => {
+            ParentMessage::Loading {
+                collapsed,
+                title,
+                project,
+            } => {
                 self.loading.active = true;
                 if let Some(collapsed) = collapsed {
                     self.loading.collapsed = collapsed;
@@ -976,7 +1052,18 @@ impl AppState {
                 if let Some(title) = title {
                     self.loading.title = title;
                 }
+                if let Some(project) = project {
+                    self.loading.project = project;
+                }
                 self.status_line = "preparing the agent".to_owned();
+            }
+            ParentMessage::Chrome { title, project } => {
+                if let Some(title) = title {
+                    self.loading.title = title;
+                }
+                if let Some(project) = project {
+                    self.loading.project = project;
+                }
             }
             ParentMessage::Workspaces { workspaces } => {
                 let selected_id = self.selected_workspace_id().map(str::to_owned);
@@ -1024,7 +1111,10 @@ impl AppState {
                 }
                 self.status_line = format!("Agent Session {session_id}");
             }
-            ParentMessage::TerminalOutput { data, .. } => self.terminal.process(data.as_bytes()),
+            ParentMessage::TerminalOutput { data, .. } => {
+                self.pending_osc52.extend(extract_osc52_sequences(&data));
+                self.terminal.process(data.as_bytes());
+            }
             ParentMessage::TerminalClosed {
                 reason, exit_code, ..
             } => {
@@ -1090,7 +1180,23 @@ impl AppState {
 
     pub fn release_agent_focus(&mut self) {
         self.agent_focused = false;
+    }
+
+    pub fn show_agents_list(&mut self) {
+        self.agent_focused = false;
         self.focus_mode = false;
+        self.loading.active = false;
+        self.loading.collapsed = false;
+        self.help_open = false;
+        self.status_line = "Appaloft Cloud Agents".to_owned();
+    }
+
+    pub fn take_osc52(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.pending_osc52)
+    }
+
+    pub fn toggle_help(&mut self) {
+        self.help_open = !self.help_open;
     }
 
     pub fn toggle_focus_mode(&mut self) {
@@ -1100,7 +1206,7 @@ impl AppState {
         }
         if self.session_id.is_some() {
             self.focus_mode = !self.focus_mode;
-            self.agent_focused = true;
+            self.agent_focused = self.focus_mode;
         }
     }
 
@@ -1761,37 +1867,60 @@ fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
     }
 }
 
-fn occupancy_loading_step_lines(state: &AppState, width: u16) -> Vec<Line<'static>> {
-    const STEP_ROWS: usize = 9;
-    let steps = &state.loading.steps;
-    let usable = width.saturating_sub(2).max(20) as usize;
-    let mut budget = STEP_ROWS;
-    let mut start = steps.len();
-    for (index, step) in steps.iter().enumerate().rev() {
-        let rows = step.chars().count().div_ceil(usable).max(1);
-        if rows > budget {
-            break;
-        }
-        budget -= rows;
-        start = index;
+fn occupancy_chrome_header(state: &AppState) -> String {
+    if state.loading.project.is_empty() {
+        state.loading.title.clone()
+    } else {
+        format!("{} · {}", state.loading.title, state.loading.project)
     }
-    let last = steps.len().saturating_sub(1);
-    steps[start..]
+}
+
+pub fn extract_osc52_sequences(data: &str) -> Vec<String> {
+    let bytes = data.as_bytes();
+    let mut found = Vec::new();
+    let mut index = 0;
+    while index + 4 < bytes.len() {
+        if bytes[index] == 0x1b && bytes[index + 1] == b']' && bytes[index + 2..].starts_with(b"52;")
+        {
+            let start = index;
+            index += 5;
+            while index < bytes.len() {
+                if bytes[index] == 0x07 {
+                    found.push(data[start..=index].to_owned());
+                    index += 1;
+                    break;
+                }
+                if bytes[index] == 0x1b && bytes.get(index + 1) == Some(&b'\\') {
+                    found.push(data[start..=index + 1].to_owned());
+                    index += 2;
+                    break;
+                }
+                index += 1;
+            }
+        } else {
+            index += 1;
+        }
+    }
+    found
+}
+
+fn occupancy_loading_step_lines(state: &AppState) -> Vec<Line<'static>> {
+    state
+        .loading
+        .steps
         .iter()
-        .enumerate()
-        .map(|(offset, step)| {
-            let index = start + offset;
-            let (marker, style) = if index == last {
-                (
+        .map(|step| {
+            let (marker, style) = match step.status.as_str() {
+                "active" => (
                     format!("{} ", spinner_frame(state.loading.tick)),
                     Style::default().fg(Color::Cyan),
-                )
-            } else {
-                ("✓ ".to_string(), Style::default().fg(Color::DarkGray))
+                ),
+                "done" => ("✓ ".to_string(), Style::default().fg(Color::DarkGray)),
+                _ => ("○ ".to_string(), Style::default().fg(Color::DarkGray)),
             };
             Line::from(vec![
                 Span::styled(marker, style),
-                Span::styled(step.clone(), style),
+                Span::styled(step.label.clone(), style),
             ])
         })
         .collect()
@@ -1799,10 +1928,14 @@ fn occupancy_loading_step_lines(state: &AppState, width: u16) -> Vec<Line<'stati
 
 fn occupancy_loading_footer(collapsed: bool) -> String {
     if collapsed {
-        " q quit  f restore list ".to_owned()
+        " ⌥f restore tree  f fullscreen  shift+esc/^] stop typing  ? help  ^c leave ".to_owned()
     } else {
-        " q quit ".to_owned()
+        " f fullscreen  ⌥f restore tree  ? help  ^c leave ".to_owned()
     }
+}
+
+fn occupancy_session_footer() -> String {
+    " x list  shift+esc/^] stop typing  ⌥f restore tree ".to_owned()
 }
 
 fn render_occupancy_loading(frame: &mut Frame<'_>, state: &AppState, area: Rect) {
@@ -1812,7 +1945,7 @@ fn render_occupancy_loading(frame: &mut Frame<'_>, state: &AppState, area: Rect)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(Color::Cyan))
         .title(Span::styled(
-            format!(" {} · starting ", state.loading.harness),
+            format!(" {} ", occupancy_chrome_header(state)),
             Style::default()
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
@@ -1823,8 +1956,8 @@ fn render_occupancy_loading(frame: &mut Frame<'_>, state: &AppState, area: Rect)
         .loading
         .steps
         .iter()
-        .map(|step| step.chars().count() + 2)
-        .chain(std::iter::once(state.loading.title.chars().count()))
+        .map(|step| step.label.chars().count() + 2)
+        .chain(std::iter::once(occupancy_chrome_header(state).chars().count()))
         .max()
         .unwrap_or(0)
         .clamp(20, inner.width.max(1) as usize) as u16;
@@ -1846,7 +1979,7 @@ fn render_occupancy_loading(frame: &mut Frame<'_>, state: &AppState, area: Rect)
                 Style::default().fg(Color::Cyan),
             ),
             Span::styled(
-                state.loading.title.clone(),
+                occupancy_chrome_header(state),
                 Style::default()
                     .fg(Color::White)
                     .add_modifier(Modifier::BOLD),
@@ -1862,7 +1995,7 @@ fn render_occupancy_loading(frame: &mut Frame<'_>, state: &AppState, area: Rect)
         rows[1],
     );
     frame.render_widget(
-        Paragraph::new(occupancy_loading_step_lines(state, rows[3].width))
+        Paragraph::new(occupancy_loading_step_lines(state))
             .wrap(Wrap { trim: false }),
         rows[3],
     );
@@ -1890,10 +2023,7 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
             frame,
             state,
             body,
-            format!(
-                " Agent — Focus Mode — {} ",
-                state.session_id.as_deref().unwrap_or("not attached")
-            ),
+            format!(" {} ", occupancy_chrome_header(state)),
         );
     } else {
         let columns = Layout::default()
@@ -1925,7 +2055,11 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
                 ]))
             });
         frame.render_widget(
-            List::new(items).block(Block::default().title(" Workspaces ").borders(Borders::ALL)),
+            List::new(items).block(
+                Block::default()
+                    .title(" Appaloft Cloud Agents ")
+                    .borders(Borders::ALL),
+            ),
             columns[0],
         );
         let detail_text = if let Some(detail) = &state.detail {
@@ -2148,10 +2282,11 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
         );
     }
     frame.render_widget(
-        Paragraph::new(occupancy_control_footer(
-            &state.status_line,
-            state.detail.as_ref(),
-        ))
+        Paragraph::new(if state.focus_mode {
+            occupancy_session_footer()
+        } else {
+            occupancy_control_footer(&state.status_line, state.detail.as_ref())
+        })
         .style(Style::default().fg(Color::DarkGray)),
         footer,
     );
@@ -2470,6 +2605,27 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
             dialog,
         );
     }
+    if state.help_open {
+        let width = 52_u16.min(area.width.saturating_sub(2)).max(2);
+        let height = 12_u16.min(area.height.saturating_sub(2)).max(3);
+        let dialog = Rect::new(
+            area.x + area.width.saturating_sub(width) / 2,
+            area.y + area.height.saturating_sub(height) / 2,
+            width,
+            height,
+        );
+        frame.render_widget(Clear, dialog);
+        frame.render_widget(
+            Paragraph::new(occupancy_help_lines())
+                .block(
+                    Block::default()
+                        .title(" Appaloft Cloud Agents ")
+                        .borders(Borders::ALL),
+                )
+                .wrap(Wrap { trim: false }),
+            dialog,
+        );
+    }
 }
 
 #[cfg(test)]
@@ -2520,15 +2676,16 @@ mod tests {
         assert!(state.loading.collapsed);
         state.apply(ParentMessage::HelloOk);
         state.apply(ParentMessage::Progress {
-            message: "Opening occupancy on hostinger…".to_owned(),
+            message: "Preparing disk on hostinger…".to_owned(),
+            step: None,
         });
         state.apply(ParentMessage::Workspaces {
             workspaces: Vec::new(),
         });
-        assert_eq!(state.status_line, "Opening occupancy on hostinger…");
+        assert_eq!(state.status_line, "Preparing disk on hostinger…");
         assert_eq!(
-            state.loading.steps,
-            vec!["Opening occupancy on hostinger…".to_owned()]
+            state.loading.steps.iter().map(|step| step.status.as_str()).collect::<Vec<_>>(),
+            vec!["done", "done", "active"]
         );
         assert!(state.loading.active);
         state.apply(ParentMessage::Workspaces {
@@ -2559,9 +2716,99 @@ mod tests {
         let out = buffer_plain(&terminal);
         assert!(out.contains("preparing the agent"), "{out}");
         assert!(
-            !out.contains(" Workspaces "),
+            !out.contains("sbx_"),
             "first useful frame must stay collapsed:\n{out}"
         );
+        assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
+        assert!(!out.contains("q quit"), "{out}");
+        assert!(out.contains("credential"), "{out}");
+        assert!(out.contains("skills"), "{out}");
+        assert!(out.contains("disk"), "{out}");
+    }
+
+    #[test]
+    fn code_tui_chrome_keeps_preview_url_in_deploy_info_only() {
+        let mut state = occupancy_delivery_ready_state(None);
+        if let Some(detail) = state.detail.as_mut() {
+            detail.preview = Some(OccupancyPreviewChrome {
+                url: "http://app-sc156jw98k.127.0.0.1.sslip.io/".to_owned(),
+            });
+        }
+        state.loading.title = "Appaloft Cloud Agents".to_owned();
+        state.loading.project = "whoami".to_owned();
+        state.focus_mode = true;
+        state.session_id = Some("term_1".to_owned());
+        let backend = ratatui::backend::TestBackend::new(100, 24);
+        let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw focused session");
+        let header = occupancy_chrome_header(&state);
+        assert_eq!(header, "Appaloft Cloud Agents · whoami");
+        assert!(!header.contains("sslip"));
+        assert!(!header.to_ascii_lowercase().contains("occupancy"));
+        state.focus_mode = false;
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw tree detail");
+        let out = buffer_plain(&terminal);
+        assert!(out.contains("Preview  http://app-sc156jw98k.127.0.0.1.sslip.io/"), "{out}");
+        assert!(out.contains("Appaloft Cloud Agents"), "{out}");
+        assert!(!out.contains("q quit"), "{out}");
+        assert!(!out.contains("Y restore"), "{out}");
+    }
+
+    #[test]
+    fn code_tui_x_returns_to_cloud_agents_list_without_quitting() {
+        let mut state = AppState::default();
+        state.apply(ParentMessage::TerminalReady {
+            workspace_id: "sbx_1".to_owned(),
+            runtime_id: "sar_1".to_owned(),
+            session_id: "term_1".to_owned(),
+        });
+        assert!(state.focus_mode);
+        assert!(state.agent_focused);
+        state.show_agents_list();
+        assert!(!state.focus_mode);
+        assert!(!state.agent_focused);
+        assert_eq!(state.status_line, "Appaloft Cloud Agents");
+        assert_eq!(state.session_id.as_deref(), Some("term_1"));
+    }
+
+    #[test]
+    fn code_tui_forwards_osc52_clipboard_from_nested_agent() {
+        let mut state = AppState::default();
+        state.apply(ParentMessage::TerminalOutput {
+            stream: "stdout".to_owned(),
+            data: "hello\u{1b}]52;c;c2FsdA==\u{7}world".to_owned(),
+        });
+        let sequences = state.take_osc52();
+        assert_eq!(sequences, vec!["\u{1b}]52;c;c2FsdA==\u{7}".to_owned()]);
+        assert_eq!(
+            extract_osc52_sequences("pre\u{1b}]52;c;YQ==\u{1b}\\post"),
+            vec!["\u{1b}]52;c;YQ==\u{1b}\\".to_owned()]
+        );
+        assert!(extract_osc52_sequences("no clipboard").is_empty());
+    }
+
+    #[test]
+    fn code_tui_help_lists_ca_keys_without_occupancy_or_y_restore() {
+        let mut state = AppState::default();
+        state.loading.active = false;
+        state.toggle_help();
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw help");
+        let out = buffer_plain(&terminal);
+        assert!(out.contains("Cloud Agents list"), "{out}");
+        assert!(out.contains("fullscreen / restore tree"), "{out}");
+        assert!(out.contains("leave from list"), "{out}");
+        assert!(out.contains("confirm delete"), "{out}");
+        assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
+        assert!(!out.contains("Y restore"), "{out}");
+        assert!(!out.contains("q quit"), "{out}");
     }
 
     #[test]
@@ -2569,13 +2816,16 @@ mod tests {
         let mut state = AppState::default();
         state.apply(ParentMessage::Loading {
             collapsed: Some(true),
-            title: Some("Appaloft".to_owned()),
+            title: Some("Appaloft Cloud Agents".to_owned()),
+            project: Some("hello-static".to_owned()),
         });
         state.apply(ParentMessage::Progress {
             message: "Checking login…".to_owned(),
+            step: None,
         });
         state.apply(ParentMessage::Progress {
-            message: "Opening occupancy on hostinger…".to_owned(),
+            message: "Preparing disk on hostinger…".to_owned(),
+            step: None,
         });
         state.apply(ParentMessage::Workspaces {
             workspaces: vec![WorkspaceSummary {
@@ -2589,10 +2839,16 @@ mod tests {
         assert!(state.loading.active);
         assert!(state.loading.collapsed);
         assert_eq!(
-            state.loading.steps,
+            state
+                .loading
+                .steps
+                .iter()
+                .map(|step| (step.label.as_str(), step.status.as_str()))
+                .collect::<Vec<_>>(),
             vec![
-                "Checking login…".to_owned(),
-                "Opening occupancy on hostinger…".to_owned()
+                ("credential", "done"),
+                ("skills", "done"),
+                ("disk", "active")
             ]
         );
         let backend = ratatui::backend::TestBackend::new(100, 24);
@@ -2602,13 +2858,20 @@ mod tests {
             .expect("draw collapsed loading");
         let out = buffer_plain(&terminal);
         assert!(out.contains("preparing the agent"), "{out}");
-        assert!(out.contains("occupancy · starting"), "{out}");
-        assert!(out.contains("Checking login…"), "{out}");
-        assert!(out.contains("Opening occupancy on hostinger…"), "{out}");
+        assert!(out.contains("Appaloft Cloud Agents"), "{out}");
+        assert!(out.contains("hello-static"), "{out}");
+        assert!(out.contains("credential"), "{out}");
+        assert!(out.contains("skills"), "{out}");
+        assert!(out.contains("disk"), "{out}");
         assert!(out.contains('✓'), "{out}");
-        assert!(out.contains("restore list"), "{out}");
+        assert!(out.contains("restore tree"), "{out}");
+        assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
         assert!(
-            !out.contains(" Workspaces "),
+            !out.contains("Connecting to Appaloft"),
+            "connecting panel must stay step-shaped:\n{out}"
+        );
+        assert!(
+            !out.contains("sbx_1"),
             "collapsed wait must hide the tree:\n{out}"
         );
         state.apply(ParentMessage::TerminalReady {
@@ -2626,7 +2889,8 @@ mod tests {
         let mut state = AppState::default();
         state.apply(ParentMessage::Loading {
             collapsed: Some(true),
-            title: Some("Appaloft".to_owned()),
+            title: Some("Appaloft Cloud Agents".to_owned()),
+            project: None,
         });
         state.apply(ParentMessage::TerminalReady {
             workspace_id: "sbx_1".to_owned(),
@@ -2712,10 +2976,14 @@ mod tests {
         assert!(!lean.contains("p preview"));
         assert!(!lean.contains("P production"));
         assert!(!lean.contains("g connections"));
-        assert!(lean.contains("a lifecycle"));
-        assert!(lean.contains("d delivery"));
-        assert!(lean.contains("s recovery"));
-        assert!(lean.contains("f Focus Mode"));
+        assert!(lean.contains("x list"));
+        assert!(lean.contains("f fullscreen"));
+        assert!(lean.contains("⌥f restore tree"));
+        assert!(lean.contains("^c leave"));
+        assert!(!lean.contains("q quit"));
+        assert!(!lean.contains("Y restore"));
+        assert!(!lean.contains("Focus Mode"));
+        assert!(!lean.to_ascii_lowercase().contains("occupancy"));
     }
 
     #[test]
@@ -3515,7 +3783,7 @@ mod tests {
                 task_run_id: "task_deliver".to_owned(),
                 values: [
                     "feat/occupancy".to_owned(),
-                    "Deliver occupancy 1ce75d0".to_owned(),
+                    "Deliver 1ce75d0".to_owned(),
                     "origin".to_owned(),
                     "feat/occupancy".to_owned(),
                     String::new(),
@@ -3544,7 +3812,7 @@ mod tests {
                 task_run_id: "task_deliver".to_owned(),
                 values: [
                     "feat/occupancy".to_owned(),
-                    "Deliver occupancy 1ce75d0".to_owned(),
+                    "Deliver 1ce75d0".to_owned(),
                     "origin".to_owned(),
                     String::new(),
                     String::new(),

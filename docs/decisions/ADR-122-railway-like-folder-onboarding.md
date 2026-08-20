@@ -43,9 +43,9 @@ present; missing git is not a gate.
 4. Git is correspondence, not a gate. A cwd with `origin` uses that remote as
    occupancy / find-or-create identity. A cwd without git still succeeds with
    a folder occupancy identity `folder.local/cwd/<sanitized-dirname>`.
-5. Default `code` from a no-git folder resumes the live occupancy (Spec 139 /
-   #1319). With no occupancy, it occupies this folder's `folder.local`
-   identity after onboarding. A cwd with `origin` occupies that repository,
+5. Default `code` from a no-git folder occupies this folder's `folder.local`
+   identity after onboarding (Spec 139). It does not silently resume another
+   repository's occupancy. A cwd with `origin` occupies that repository,
    not the last occupancy. Explicit `code <git-remote>` still follows ADR-119.
 6. Folder occupancy skips `git fetch` / checkout. Community activation binds
    Resource source as `local-folder`, not a fake remote-git URL.
@@ -56,9 +56,9 @@ present; missing git is not a gate.
 
 ## Consequences
 
-- Spec 139 WS-REMOTE-RESUME-004 / WS-REMOTE-NO-UPLOAD-006 keep no-git live
-  occupancy resume. Spec 142 folder occupy applies when there is no occupancy
-  to resume, and for `deploy` / `project use`.
+- Spec 139 WS-REMOTE-RESUME-004 / WS-REMOTE-NO-UPLOAD-006 occupy this folder
+  after Spec 142 onboarding. Default `code` does not silently resume another
+  repository's occupancy. Spec 142 also covers `deploy` / `project use`.
 - Help, skill `cli-entrypoints.md`, and public project docs name
   `appaloft project use` and folder create-or-link.
 - Expected public SemVer: minor presentation change. No catalog field.

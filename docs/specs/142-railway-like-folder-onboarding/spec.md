@@ -33,9 +33,9 @@ linked project is one command.
 6. Cwd without git: identity is `folder.local/cwd/<sanitized-dirname>`. Occupy
    and deploy still succeed.
 7. `appaloft project use <projectId>` writes the folder link after `projects.show`.
-8. Default `code` from a no-git folder resumes the live occupancy (Spec 139 /
-   #1319). With no occupancy to resume, it occupies this folder
-   (`folder.local/cwd/<name>`) after folder-project onboarding. A cwd with
+8. Default `code` from a no-git folder occupies this folder
+   (`folder.local/cwd/<name>`) after folder-project onboarding (Spec 139).
+   It does not silently resume another repository's occupancy. A cwd with
    origin still occupies that repository instead of the last occupancy.
    Explicit `code <git-remote>` is unchanged (ADR-119).
 9. Folder occupancy skips remote fetch. Resource source kind is `local-folder`.

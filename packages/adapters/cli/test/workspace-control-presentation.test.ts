@@ -1297,7 +1297,7 @@ describe("Workspace control presentation", () => {
     expect(renderer.closed).toBe(1);
     expect(renderer.messages[0]).toEqual({
       type: "loading",
-      title: "Appaloft",
+      title: "Appaloft Cloud Agents",
     });
     resolveList?.({ items: [{ sandboxId: "sbx_late", status: "ready" }] });
   });
@@ -2074,11 +2074,12 @@ describe("Workspace control presentation", () => {
     let skillBlockers = 0;
     await presentation.start({
       occupyBootstrap: async ({ reportProgress }) => {
-        await reportProgress("Opening occupancy on hostinger…");
+        await reportProgress("Preparing disk on hostinger…");
         await reportProgress("Copying skills…");
         skillBlockers += 1;
         return {
           workspaceId: "sbx_1",
+          projectName: "hello-static",
           attach: {
             workspaceId: "sbx_1",
             runtimeId: "sar_1",
@@ -2109,20 +2110,35 @@ describe("Workspace control presentation", () => {
     expect(renderer.messages[0]).toEqual({
       type: "loading",
       collapsed: true,
-      title: "Appaloft",
+      title: "Appaloft Cloud Agents",
     });
     expect(renderer.messages).toContainEqual({
       type: "progress",
-      message: "Opening occupancy on hostinger…",
+      message: "Preparing disk on hostinger…",
+      step: "disk",
     });
     expect(renderer.messages).toContainEqual({
       type: "progress",
       message: "Copying skills…",
+      step: "skills",
     });
     expect(renderer.messages).toContainEqual({
       type: "progress",
       message: "Attaching…",
+      step: "disk",
     });
+    expect(renderer.messages).toContainEqual({
+      type: "chrome",
+      title: "Appaloft Cloud Agents",
+      project: "hello-static",
+    });
+    expect(
+      renderer.messages.some(
+        (message) =>
+          (message.type === "chrome" || message.type === "loading") &&
+          "previewUrl" in message,
+      ),
+    ).toBeFalse();
     expect(renderer.messages).toContainEqual({
       type: "terminal-ready",
       workspaceId: "sbx_1",
@@ -2170,7 +2186,7 @@ describe("Workspace control presentation", () => {
     });
     await presentation.start({
       occupyBootstrap: async ({ reportProgress }) => {
-        await reportProgress("Opening occupancy on hostinger…");
+        await reportProgress("Preparing disk on hostinger…");
         return {
           workspaceId: "sbx_1",
           attach: {

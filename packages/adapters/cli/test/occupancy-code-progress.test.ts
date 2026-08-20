@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
+  OCCUPANCY_CODE_CHROME_TITLE,
+  OCCUPANCY_CODE_PROGRESS,
+  occupancyChromeHasForbiddenWord,
   occupancyCodeUsesLineProgress,
+  occupancyOpeningProgress,
+  occupancyPrepareStepForProgress,
   occupancyTimeoutMs,
   settleWithTimeout,
 } from "../src/occupancy-code-progress";
@@ -38,5 +43,21 @@ describe("occupancy code progress timeouts", () => {
       occupancyCodeUsesLineProgress({ noAttach: true, stdinIsTty: true, stdoutIsTty: true }),
     ).toBeTrue();
     expect(occupancyCodeUsesLineProgress({ noAttach: false })).toBeTrue();
+  });
+
+  test("code chrome copy stays step-shaped and never says Occupancy", () => {
+    expect(OCCUPANCY_CODE_CHROME_TITLE).toBe("Appaloft Cloud Agents");
+    expect(occupancyChromeHasForbiddenWord(OCCUPANCY_CODE_CHROME_TITLE)).toBeFalse();
+    expect(occupancyChromeHasForbiddenWord(OCCUPANCY_CODE_PROGRESS.connecting)).toBeFalse();
+    expect(OCCUPANCY_CODE_PROGRESS.connecting).toBe("Checking credentials…");
+    expect(OCCUPANCY_CODE_PROGRESS.connecting).not.toContain("Connecting to Appaloft");
+    expect(OCCUPANCY_CODE_PROGRESS.choosingOccupancy).toBe("Opening this folder…");
+    expect(occupancyOpeningProgress("hostinger")).toBe("Preparing disk on hostinger…");
+    expect(occupancyChromeHasForbiddenWord(occupancyOpeningProgress("hostinger"))).toBeFalse();
+    expect(occupancyPrepareStepForProgress(OCCUPANCY_CODE_PROGRESS.checkingLogin)).toBe(
+      "credential",
+    );
+    expect(occupancyPrepareStepForProgress(OCCUPANCY_CODE_PROGRESS.copyingSkills)).toBe("skills");
+    expect(occupancyPrepareStepForProgress(occupancyOpeningProgress("hostinger"))).toBe("disk");
   });
 });

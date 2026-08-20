@@ -21,6 +21,7 @@ import {
   type WorkspaceGitCommandRunner,
 } from "./local-git-workspace-context.js";
 import {
+  occupancyChromeProjectName,
   occupancyConnectionsUrl,
   occupancyGitHubCompareUrl,
   occupancyGitHubPullRequestUrl,
@@ -79,6 +80,7 @@ export interface RemoteCodeDoorResolution {
   readonly branch: string;
   readonly commitSha: string;
   readonly projectId: string;
+  readonly projectName?: string;
   readonly serverId: string;
   readonly serverName: string;
   readonly serverProviderKey?: string;
@@ -453,17 +455,13 @@ export async function resolveDefaultRemoteCodeDoor(
   }
   probe.onProgress?.(OCCUPANCY_CODE_PROGRESS.choosingOccupancy);
   const occupancies = probe.listOccupancies ? await probe.listOccupancies() : [];
-  const latestOccupancy = selectResumeOccupancy(occupancies);
   const explicitRemote = isRemoteCodeGitRemoteLocator(path)
     ? await resolveRemoteCodeGitRemoteLocator(path, probe.runGit)
     : undefined;
   const homeDir = probe.env?.HOME ?? process.env.HOME;
   const folderCwd = probe.folderCwd ?? (explicitRemote ? process.cwd() : path);
   const probeThisFolderGit =
-    Boolean(explicitRemote) ||
-    Boolean(probe.forceNew) ||
-    !latestOccupancy ||
-    folderHasGitWorktree(path, homeDir);
+    Boolean(explicitRemote) || Boolean(probe.forceNew) || folderHasGitWorktree(path, homeDir);
   let folderOnboarding = explicitRemote ? undefined : probe.folderOnboarding;
   const loadFolderOnboarding = async () => {
     if (folderOnboarding || explicitRemote) return folderOnboarding;
@@ -501,13 +499,12 @@ export async function resolveDefaultRemoteCodeDoor(
     }
   }
   const requestedLocator = explicitRemote ?? localLocator;
-  const matchingOccupancy = requestedLocator
-    ? selectResumeOccupancy(
-        occupancies.filter(
-          (item) => item.occupancy?.repositoryIdentity === requestedLocator.repositoryIdentity,
-        ),
-      )
-    : undefined;
+  const matchingOccupancyFor = (identity: string | undefined) =>
+    identity
+      ? selectResumeOccupancy(
+          occupancies.filter((item) => item.occupancy?.repositoryIdentity === identity),
+        )
+      : undefined;
   let locator: {
     readonly repository: string;
     readonly repositoryIdentity: string;
@@ -517,28 +514,24 @@ export async function resolveDefaultRemoteCodeDoor(
   let occupancyResume: RemoteCodeOccupancy["occupancy"];
   if (requestedLocator) {
     locator = requestedLocator;
+    const matchingOccupancy = matchingOccupancyFor(requestedLocator.repositoryIdentity);
     if (!probe.forceNew && matchingOccupancy?.occupancy) {
       occupancyResume = matchingOccupancy.occupancy;
     }
-  } else if (!probe.forceNew && latestOccupancy?.occupancy) {
-    occupancyResume = latestOccupancy.occupancy;
-    const normalized = normalizeWorkspaceRepositoryRemote(
-      `https://${latestOccupancy.occupancy.repositoryIdentity.replace(/\.git$/u, "")}.git`,
-    );
-    locator = {
-      repository: normalized.credentialFreeHttps,
-      repositoryIdentity: latestOccupancy.occupancy.repositoryIdentity,
-      ref: `refs/heads/${latestOccupancy.occupancy.branch?.trim() || "main"}`,
-      branch: latestOccupancy.occupancy.branch?.trim() || "main",
-    };
   } else {
     const onboarded = await loadFolderOnboarding();
-    if (onboarded && isFolderOccupancyIdentity(onboarded.identity)) {
-      locator = {
-        ...folderOccupancyLocator(onboarded.identity.split("/").filter(Boolean).at(-1) ?? "app"),
-        repositoryIdentity: onboarded.identity,
-        repository: `https://${onboarded.identity}.git`,
-      };
+    if (onboarded) {
+      locator = isFolderOccupancyIdentity(onboarded.identity)
+        ? {
+            ...folderOccupancyLocator(onboarded.identity.split("/").filter(Boolean).at(-1) ?? "app"),
+            repositoryIdentity: onboarded.identity,
+            repository: `https://${onboarded.identity}.git`,
+          }
+        : gitOccupancyLocator(onboarded.identity);
+      const matchingOccupancy = matchingOccupancyFor(locator.repositoryIdentity);
+      if (!probe.forceNew && matchingOccupancy?.occupancy) {
+        occupancyResume = matchingOccupancy.occupancy;
+      }
     } else {
       throwWorkspaceLocatorMissing(localLocatorError, "remote-code-locator");
     }
@@ -571,18 +564,25 @@ export async function resolveDefaultRemoteCodeDoor(
         : await probe.resolveRemoteRef(locator.repository, locator.ref);
   }
 
+  const projectId =
+    folderOnboarding?.projectId && folderOnboarding.identity === locator.repositoryIdentity
+      ? folderOnboarding.projectId
+      : binding?.status === "active"
+        ? binding.projectId
+        : "project";
+  const projectName = occupancyChromeProjectName({
+    ...(folderOnboarding?.projectName ? { projectName: folderOnboarding.projectName } : {}),
+    projectId,
+    repositoryIdentity: locator.repositoryIdentity,
+  });
   return {
     repository: remote.credentialFreeHttpsRepository,
     repositoryIdentity: remote.repositoryIdentity,
     ref: remote.ref,
     branch: locator.branch,
     commitSha: remote.commitSha,
-    projectId:
-      folderOnboarding?.projectId && folderOnboarding.identity === locator.repositoryIdentity
-        ? folderOnboarding.projectId
-        : binding?.status === "active"
-          ? binding.projectId
-          : "project",
+    projectId,
+    ...(projectName ? { projectName } : {}),
     serverId: server.id,
     serverName: server.name,
     ...(server.providerKey ? { serverProviderKey: server.providerKey } : {}),

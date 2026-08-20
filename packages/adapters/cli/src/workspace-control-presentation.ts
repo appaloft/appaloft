@@ -37,11 +37,16 @@ import {
   type OccupancyPreviewEnvironment,
   type OccupancyResource,
   occupancyChromeForProject,
+  occupancyChromeProjectName,
   occupancyCompareOrPullUrl,
   occupancyConnectionsUrl,
   occupancyPullRequestFromPreviewEnvironments,
 } from "./occupancy-chrome.js";
-import { OCCUPANCY_CODE_PROGRESS } from "./occupancy-code-progress.js";
+import {
+  OCCUPANCY_CODE_CHROME_TITLE,
+  OCCUPANCY_CODE_PROGRESS,
+  occupancyPrepareStepForProgress,
+} from "./occupancy-code-progress.js";
 import { type OperateRendererEvent, type OperateRendererMessage } from "./operate-presentation.js";
 import { terminateWorkspaceWithRuntimes } from "./workspace-lifecycle-actions.js";
 
@@ -205,8 +210,22 @@ export type WorkspaceControlRendererMessage =
       readonly reason: string;
       readonly exitCode?: number;
     }
-  | { readonly type: "progress"; readonly message: string }
-  | { readonly type: "loading"; readonly collapsed?: boolean; readonly title?: string }
+  | {
+      readonly type: "progress";
+      readonly message: string;
+      readonly step?: "credential" | "skills" | "disk";
+    }
+  | {
+      readonly type: "loading";
+      readonly collapsed?: boolean;
+      readonly title?: string;
+      readonly project?: string;
+    }
+  | {
+      readonly type: "chrome";
+      readonly title?: string;
+      readonly project?: string;
+    }
   | { readonly type: "delivery-complete"; readonly workspaceId: string }
   | { readonly type: "recovery-complete"; readonly workspaceId: string }
   | {
@@ -295,6 +314,7 @@ export interface WorkspaceControlPresentationContext {
     | {
         readonly workspaceId: string;
         readonly attach?: SandboxAgentAttachDescriptor;
+        readonly projectName?: string;
       }
     | undefined
   >;
@@ -990,6 +1010,7 @@ export function createBoundedWorkspaceControlPresentation(
         await renderer.send({
           type: "progress",
           message: OCCUPANCY_CODE_PROGRESS.attaching,
+          step: occupancyPrepareStepForProgress(OCCUPANCY_CODE_PROGRESS.attaching),
         });
         if (descriptor.transport === "managed-terminal") {
           await attachManagedTerminal({
@@ -1026,19 +1047,32 @@ export function createBoundedWorkspaceControlPresentation(
           await renderer.send({
             type: "loading",
             collapsed: true,
-            title: "Appaloft",
+            title: OCCUPANCY_CODE_CHROME_TITLE,
           });
           occupyDone = context
             .occupyBootstrap({
               reportProgress: async (message) => {
                 if (!presentationOpen) return;
-                await renderer.send({ type: "progress", message });
+                await renderer.send({
+                  type: "progress",
+                  message,
+                  step: occupancyPrepareStepForProgress(message),
+                });
               },
             })
             .then(async (occupied) => {
               if (!presentationOpen) return occupied;
               if (occupied?.attach) await attachIssuedDescriptor(occupied.attach);
               if (occupied?.workspaceId) selectedWorkspaceId = occupied.workspaceId;
+              if (occupied?.projectName) {
+                await renderer.send({
+                  type: "chrome",
+                  title: OCCUPANCY_CODE_CHROME_TITLE,
+                  project: occupancyChromeProjectName({
+                    projectName: occupied.projectName,
+                  }),
+                });
+              }
               return occupied;
             })
             .then((occupied) => {
@@ -1056,7 +1090,7 @@ export function createBoundedWorkspaceControlPresentation(
               void renderer.close();
             });
         } else {
-          await renderer.send({ type: "loading", title: "Appaloft" });
+          await renderer.send({ type: "loading", title: OCCUPANCY_CODE_CHROME_TITLE });
           void listWorkspaces(context).then(
             (workspaces) => renderer.send({ type: "workspaces", workspaces }),
             (error) => sendErrorBestEffort(error, "workspace-control-start"),

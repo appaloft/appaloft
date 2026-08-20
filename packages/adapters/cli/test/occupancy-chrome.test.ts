@@ -7,6 +7,7 @@ import {
   occupancyAppResourceId,
   occupancyAvailableDoorHint,
   occupancyChromeForProject,
+  occupancyChromeProjectName,
   occupancyCodeOpenUrl,
   occupancyCompareOrPullUrl,
   occupancyConnectionsUrl,
@@ -444,5 +445,17 @@ describe("occupancy env set", () => {
     expect(parseOccupancyEnvUnsetAssignment(["OCCUPANCY_CLI_SMOKE"])).toEqual({
       key: "OCCUPANCY_CLI_SMOKE",
     });
+  });
+});
+
+describe("occupancy chrome project name", () => {
+  test("prefers the Project name and never invents a public domain", () => {
+    expect(occupancyChromeProjectName({ projectName: "notes" })).toBe("notes");
+    expect(
+      occupancyChromeProjectName({
+        repositoryIdentity: "folder.local/cwd/hello-static",
+      }),
+    ).toBe("hello-static");
+    expect(occupancyChromeProjectName({ projectId: "project" })).toBeUndefined();
   });
 });

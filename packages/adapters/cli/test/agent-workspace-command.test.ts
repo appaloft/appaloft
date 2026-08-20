@@ -964,7 +964,7 @@ describe("Agent Workspace CLI", () => {
     expect(commandDispatched).toBeFalse();
   });
 
-  test("[WS-REMOTE-PROGRESS-201] code --no-attach from a non-git cwd occupies the live occupancy", async () => {
+  test("[WS-REMOTE-PROGRESS-201] code --no-attach from a non-git cwd occupies this folder, not examples", async () => {
     const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-nongit-"));
     const home = await mkdtemp(join(tmpdir(), "appaloft-code-nongit-home-"));
     const commands: Command<unknown>[] = [];
@@ -1035,11 +1035,19 @@ describe("Agent Workspace CLI", () => {
       await rm(emptyDir, { recursive: true, force: true });
       await rm(home, { recursive: true, force: true });
     }
-    expect(commands[0]?.input).toMatchObject({
-      repositoryIdentity: "github.com/appaloft/examples",
-      commitSha: "b".repeat(40),
-      attach: false,
+    const opened = commands.find((command) => command instanceof OpenAgentWorkspaceCommand);
+    expect(opened).toBeDefined();
+    expect(opened).toMatchObject({
+      input: {
+        repositoryIdentity: folderOccupancyIdentity(basename(emptyDir)),
+        branch: "local",
+        attach: false,
+      },
     });
+    expect(opened).not.toMatchObject({
+      input: { repositoryIdentity: "github.com/appaloft/examples" },
+    });
+    expect(commands.some((command) => command instanceof CreateProjectCommand)).toBe(true);
   });
 
   test("[FOLDER-ONBOARD-007] code --no-attach from a non-git cwd occupies this folder when no occupancy exists", async () => {
@@ -1953,7 +1961,7 @@ describe("Agent Workspace CLI", () => {
       commandBus: {
         execute: async <T>(_context: unknown, command: Command<T>) => {
           if (command instanceof OpenAgentWorkspaceCommand) {
-            expect(output.join("")).toContain("Opening occupancy on hostinger…");
+            expect(output.join("")).toContain("Preparing disk on hostinger…");
             events.push("occupy");
             await Bun.sleep(15);
             return ok({ workspaceId: "sbx_progress", projectId: "prj_web" } as T);
@@ -2001,12 +2009,12 @@ describe("Agent Workspace CLI", () => {
     expect(events).toContain("occupy");
     expect(events).not.toContain("attach");
     expect(printed).toContain("Checking login…");
-    expect(printed).toContain("Opening occupancy on hostinger…");
+    expect(printed).toContain("Preparing disk on hostinger…");
     expect(printed).toContain("Copying skills…");
     expect(printed).toContain(
       "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · sbx_progress",
     );
-    expect(printed.indexOf("Opening occupancy on hostinger…")).toBeLessThan(
+    expect(printed.indexOf("Preparing disk on hostinger…")).toBeLessThan(
       printed.indexOf("Remote ·"),
     );
     expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Copying skills…"));
@@ -2095,7 +2103,7 @@ describe("Agent Workspace CLI", () => {
       commandBus: {
         execute: async <T>(_context: unknown, command: Command<T>) => {
           if (command instanceof OpenAgentWorkspaceCommand) {
-            expect(output.join("")).toContain("Opening occupancy on hostinger…");
+            expect(output.join("")).toContain("Preparing disk on hostinger…");
             expect(attached).toBeFalse();
             return ok({
               workspaceId: "sbx_attach_first",
@@ -2146,13 +2154,13 @@ describe("Agent Workspace CLI", () => {
     const printed = output.join("");
     expect(attached).toBeTrue();
     expect(skillCompletedBeforeAttach).toBeFalse();
-    expect(printed).toContain("Opening occupancy on hostinger…");
+    expect(printed).toContain("Preparing disk on hostinger…");
     expect(printed).toContain("Copying skills…");
     expect(printed).toContain("Attaching…");
     expect(printed).toContain(
       "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · sbx_attach_first",
     );
-    expect(printed.indexOf("Opening occupancy on hostinger…")).toBeLessThan(
+    expect(printed.indexOf("Preparing disk on hostinger…")).toBeLessThan(
       printed.indexOf("Remote ·"),
     );
     expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Attaching…"));
