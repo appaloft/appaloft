@@ -112,16 +112,25 @@ If tests bypass the runtime or write directly to the database to simulate succes
     release-please version-bump file sets as `lightweight_only`. A `release-please--*` head ref is
     also treated as `release_bump` when every changed file is already on that allowlist. Those PRs
     skip Biome, Typecheck, Unit Tests, Integration, and Build And Smoke via skip steps, skip
-    Workspace TUI at the job level, and still publish the required `ci` check. The aggregator
-    treats `skipped` needed jobs as success. Product source, lockfiles, `.github/actions/*`, and
-    other Rust stay on the full graph. `workflow_dispatch` classifies against the default branch;
-    `release.yml` does not dispatch CI.
+    Workspace TUI cargo/docker/bridge work inside the six matrix jobs, and still publish the
+    required `ci` check plus `Workspace TUI (*)` names. The aggregator treats `skipped` needed
+    jobs as success. Isolated web, shell e2e files, and most TypeScript packages also skip TUI
+    work inside those jobs. TUI crate, JS bridge, packaging of `appaloft-workspace-tui`, shared
+    rust workspace files, or an empty diff fail closed to the full six-target TUI graph.
+    Product source, lockfiles, `.github/actions/*`, and other Rust stay on the full CI graph.
+    `workflow_dispatch` classifies against the default branch; `release.yml` does not dispatch CI.
 - `e2e.yml`
   - real PostgreSQL, started backend, CLI/API/deployment E2E, Playwright smoke
   - runs for every non-draft pull request and always publishes both stable shard checks required by
     branch protection; path filters must not suppress those checks
-  - the same change classifier skips real WebView and shell work inside the two matrix jobs so
+  - the same change classifier scopes real work inside the two matrix jobs so
     `e2e (1, 2)` and `e2e (2, 2)` still succeed; those jobs are not skipped at the job level
+  - `docs_only` / `release_bump` classify as `e2e_skip` and skip real suites
+  - an isolated `apps/web/**` surface classifies as `e2e_web` and runs only mocked WebView on shard 1
+  - isolated `apps/shell/test/e2e/*.e2e.ts` files classify as `e2e_shell` and run only shell shards
+  - packages, server/CLI composition, lockfiles, shared config, desktop, CI scripts, the e2e
+    harness, mixed surfaces, or an empty diff fail closed to `e2e_full`
+  - Postgres starts as a step when shell E2E runs, so lightweight and web-only shards do not boot it
 - `nightly.yml`
   - higher-cost compose smoke
 

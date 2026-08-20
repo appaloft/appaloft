@@ -58,9 +58,8 @@ test("shell e2e shard selection is deterministic and complete", () => {
 test("e2e workflow uses weighted shell shards and runs WebView on the lighter shell shard", () => {
   expect(workflow).toContain("scripts/test/select-shell-e2e-shard.ts");
   expect(workflow).not.toContain("./test/e2e/*.e2e.ts --shard=");
-  expect(workflow).toContain(
-    expression("needs.changes.outputs.lightweight_only != 'true' && matrix.shard == 1"),
-  );
+  expect(workflow).toContain(expression("steps.shard.outputs.need_web == 'true'"));
+  expect(workflow).toContain(expression("steps.shard.outputs.need_shell == 'true'"));
   expect(workflow).toContain("run: bun run test:e2e");
   expect(workflow.indexOf("name: Web WebView Smoke")).toBeLessThan(
     workflow.indexOf("name: Shell CLI + HTTP E2E"),

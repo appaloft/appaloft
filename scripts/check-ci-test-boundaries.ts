@@ -98,6 +98,23 @@ export function findCiChangeClassifierViolations(
     });
   }
 
+  if (!e2eWorkflow.includes("e2e_run_web") || !e2eWorkflow.includes("e2e_run_shell")) {
+    violations.push({
+      message:
+        "e2e.yml must consume e2e_run_web and e2e_run_shell from the shared change classifier.",
+      rule: "shared-change-classifier",
+    });
+  }
+
+  const e2eJob = yamlBlock(e2eWorkflow, /^ {2}e2e:\s*$/, 2);
+  if (/^ {4}services:\s*$/m.test(e2eJob)) {
+    violations.push({
+      message:
+        "e2e.yml must start Postgres as a step so lightweight and web-only shards do not pay a job-level service tax.",
+      rule: "shared-change-classifier",
+    });
+  }
+
   const resultVar = ["$", "{result}"].join("");
   const skippedOk = [
     'if [[ "',
@@ -106,13 +123,46 @@ export function findCiChangeClassifierViolations(
     resultVar,
     '" != "skipped" ]]; then',
   ].join("");
-  const tuiJobSkip = ["if: $", "{{ needs.changes.outputs.lightweight_only != 'true' }}"].join("");
-  if (!ciWorkflow.includes(skippedOk) || !ciWorkflow.includes(tuiJobSkip)) {
+  if (!ciWorkflow.includes(skippedOk)) {
     violations.push({
       message:
-        "ci.yml must job-level skip Workspace TUI when lightweight and treat skipped needed jobs as success.",
+        "ci.yml must treat skipped needed jobs as success so the required ci check stays green.",
       rule: "shared-change-classifier",
     });
+  }
+
+  if (!ciWorkflow.includes("workspace_tui") || !ciWorkflow.includes("name: Skip Workspace TUI")) {
+    violations.push({
+      message:
+        "ci.yml must consume workspace_tui from the shared classifier and skip cargo/docker/bridge work inside Workspace TUI jobs.",
+      rule: "shared-change-classifier",
+    });
+  }
+
+  const tuiJob = yamlBlock(ciWorkflow, /^ {2}workspace-tui:\s*$/, 2);
+  if (/^ {4}if:/m.test(tuiJob)) {
+    violations.push({
+      message:
+        "ci.yml must not job-level skip workspace-tui; required Workspace TUI (*) names must still conclude.",
+      rule: "shared-change-classifier",
+    });
+  }
+
+  for (const target of [
+    "darwin-arm64",
+    "darwin-x64",
+    "linux-arm64-gnu",
+    "linux-x64-gnu",
+    "linux-arm64-musl",
+    "linux-x64-musl",
+  ]) {
+    if (!tuiJob.includes(`target: ${target}`)) {
+      violations.push({
+        message: `ci.yml must keep the Workspace TUI matrix target ${target}.`,
+        rule: "shared-change-classifier",
+      });
+      break;
+    }
   }
 
   const pullRequestTrigger = e2eWorkflow.slice(

@@ -1,9 +1,13 @@
 export type ChangeClass = "docs_only" | "release_bump" | "full";
+export type E2eClass = "e2e_skip" | "e2e_web" | "e2e_shell" | "e2e_full";
+export type WorkspaceTuiClass = "tui_skip" | "tui_full";
 
 export interface ChangeClassification {
   readonly changeClass: ChangeClass;
+  readonly e2eClass: E2eClass;
   readonly files: readonly string[];
   readonly lightweightOnly: boolean;
+  readonly workspaceTuiClass: WorkspaceTuiClass;
 }
 
 export interface ClassifyChangedFilesOptions {
@@ -56,6 +60,140 @@ export function isLightweightPath(file: string): boolean {
   return isDocsOnlyPath(file) || isReleaseBumpPath(file);
 }
 
+// Isolated WebView surface: the static console and its mocked WebView harness.
+// WebView E2E starts Vite preview plus Bun.serve fixtures and does not use the
+// Appaloft backend or PostgreSQL. Shell CLI E2E does not exercise console UI.
+export function isWebIsolatedE2ePath(file: string): boolean {
+  return file === "apps/web" || file.startsWith("apps/web/");
+}
+
+export function isShellIsolatedE2ePath(file: string): boolean {
+  return /^apps\/shell\/test\/e2e\/[^/]+\.e2e\.ts$/.test(file);
+}
+
+export function e2eNeedsWebView(e2eClass: E2eClass): boolean {
+  return e2eClass === "e2e_web" || e2eClass === "e2e_full";
+}
+
+export function e2eNeedsShell(e2eClass: E2eClass): boolean {
+  return e2eClass === "e2e_shell" || e2eClass === "e2e_full";
+}
+
+export function e2eNeedsBackend(e2eClass: E2eClass): boolean {
+  return e2eNeedsShell(e2eClass);
+}
+
+export function e2eNeedsShardWork(e2eClass: E2eClass, shard: number): boolean {
+  return e2eNeedsShell(e2eClass) || (e2eNeedsWebView(e2eClass) && shard === 1);
+}
+
+const workspaceTuiPackagingPaths = [
+  "scripts/release/build-binary-bundle.ts",
+  "scripts/release/lib/binary-bundle.ts",
+  "scripts/release/lib/targets.ts",
+  "scripts/release/prepare-npm-packages.ts",
+  "scripts/test/binary-bundle.test.ts",
+  "scripts/test/workspace-control-host-terminal.ts",
+  "scripts/test/workspace-control-packaged-tui.ts",
+] as const;
+
+export function isWorkspaceTuiPath(file: string): boolean {
+  if (file === "apps/workspace-control-tui" || file.startsWith("apps/workspace-control-tui/")) {
+    return true;
+  }
+
+  if (
+    file === "Cargo.lock" ||
+    file === "Cargo.toml" ||
+    file === "rust-toolchain" ||
+    file === "rust-toolchain.toml" ||
+    file === "rustfmt.toml" ||
+    file === ".rustfmt.toml"
+  ) {
+    return true;
+  }
+
+  if (
+    file.startsWith("packages/adapters/cli/src/workspace-control-") ||
+    file.startsWith("packages/adapters/cli/src/workspace-tui-") ||
+    file.startsWith("packages/adapters/cli/test/workspace-control-") ||
+    file.startsWith("packages/adapters/cli/test/workspace-tui-") ||
+    file === "packages/adapters/cli/src/commands/agent-workspace.ts" ||
+    file === "packages/adapters/cli/test/agent-workspace-command.test.ts"
+  ) {
+    return true;
+  }
+
+  return (workspaceTuiPackagingPaths as readonly string[]).includes(file);
+}
+
+export function workspaceTuiRequired(workspaceTuiClass: WorkspaceTuiClass): boolean {
+  return workspaceTuiClass === "tui_full";
+}
+
+export function classifyWorkspaceTuiClass(
+  files: readonly string[],
+  changeClass: ChangeClass,
+): WorkspaceTuiClass {
+  if (changeClass === "docs_only" || changeClass === "release_bump") {
+    return "tui_skip";
+  }
+
+  if (files.length === 0) {
+    return "tui_full";
+  }
+
+  const tuiRelevant = files.filter((file) => !isDocsOnlyPath(file));
+  if (tuiRelevant.length === 0) {
+    return "tui_skip";
+  }
+
+  if (tuiRelevant.some((file) => isWorkspaceTuiPath(file))) {
+    return "tui_full";
+  }
+
+  return "tui_skip";
+}
+
+export function classifyE2eClass(files: readonly string[], changeClass: ChangeClass): E2eClass {
+  if (changeClass === "docs_only" || changeClass === "release_bump") {
+    return "e2e_skip";
+  }
+
+  if (files.length === 0) {
+    return "e2e_full";
+  }
+
+  const e2eRelevant = files.filter((file) => !isDocsOnlyPath(file));
+  if (e2eRelevant.length === 0) {
+    return "e2e_skip";
+  }
+
+  if (e2eRelevant.every((file) => isWebIsolatedE2ePath(file))) {
+    return "e2e_web";
+  }
+
+  if (e2eRelevant.every((file) => isShellIsolatedE2ePath(file))) {
+    return "e2e_shell";
+  }
+
+  return "e2e_full";
+}
+
+function classificationFor(
+  changeClass: ChangeClass,
+  files: readonly string[],
+  lightweightOnly: boolean,
+): ChangeClassification {
+  return {
+    changeClass,
+    e2eClass: classifyE2eClass(files, changeClass),
+    files,
+    lightweightOnly,
+    workspaceTuiClass: classifyWorkspaceTuiClass(files, changeClass),
+  };
+}
+
 export function classifyChangedFiles(
   files: readonly string[],
   options: ClassifyChangedFilesOptions = {},
@@ -65,41 +203,21 @@ export function classifyChangedFiles(
 
   if (normalized.length === 0) {
     if (releasePleaseBranch) {
-      return {
-        changeClass: "release_bump",
-        files: normalized,
-        lightweightOnly: true,
-      };
+      return classificationFor("release_bump", normalized, true);
     }
 
-    return {
-      changeClass: "full",
-      files: normalized,
-      lightweightOnly: false,
-    };
+    return classificationFor("full", normalized, false);
   }
 
   if (!normalized.every((file) => isLightweightPath(file))) {
-    return {
-      changeClass: "full",
-      files: normalized,
-      lightweightOnly: false,
-    };
+    return classificationFor("full", normalized, false);
   }
 
   if (normalized.some((file) => isReleaseBumpPath(file)) || releasePleaseBranch) {
-    return {
-      changeClass: "release_bump",
-      files: normalized,
-      lightweightOnly: true,
-    };
+    return classificationFor("release_bump", normalized, true);
   }
 
-  return {
-    changeClass: "docs_only",
-    files: normalized,
-    lightweightOnly: true,
-  };
+  return classificationFor("docs_only", normalized, true);
 }
 
 export function planChangedFilesLookup(input: ChangedFilesLookupInput): ChangedFilesLookupPlan {
@@ -143,6 +261,11 @@ export function formatClassificationSummary(classification: ChangeClassification
     "",
     `change_class=${classification.changeClass}`,
     `lightweight_only=${classification.lightweightOnly}`,
+    `e2e_class=${classification.e2eClass}`,
+    `e2e_run_web=${e2eNeedsWebView(classification.e2eClass)}`,
+    `e2e_run_shell=${e2eNeedsShell(classification.e2eClass)}`,
+    `workspace_tui_class=${classification.workspaceTuiClass}`,
+    `workspace_tui=${workspaceTuiRequired(classification.workspaceTuiClass)}`,
     "",
   ].join("\n");
 }
@@ -219,6 +342,11 @@ async function main(): Promise<void> {
   await writeGitHubLines(envValue("GITHUB_OUTPUT") || undefined, [
     `lightweight_only=${classification.lightweightOnly}`,
     `change_class=${classification.changeClass}`,
+    `e2e_class=${classification.e2eClass}`,
+    `e2e_run_web=${e2eNeedsWebView(classification.e2eClass)}`,
+    `e2e_run_shell=${e2eNeedsShell(classification.e2eClass)}`,
+    `workspace_tui_class=${classification.workspaceTuiClass}`,
+    `workspace_tui=${workspaceTuiRequired(classification.workspaceTuiClass)}`,
   ]);
   await writeGitHubLines(envValue("GITHUB_STEP_SUMMARY") || undefined, [
     formatClassificationSummary(classification),
@@ -227,6 +355,11 @@ async function main(): Promise<void> {
   console.log(`Classified ${classification.files.length} files via ${classifyScriptPath}.`);
   console.log(`change_class=${classification.changeClass}`);
   console.log(`lightweight_only=${classification.lightweightOnly}`);
+  console.log(`e2e_class=${classification.e2eClass}`);
+  console.log(`e2e_run_web=${e2eNeedsWebView(classification.e2eClass)}`);
+  console.log(`e2e_run_shell=${e2eNeedsShell(classification.e2eClass)}`);
+  console.log(`workspace_tui_class=${classification.workspaceTuiClass}`);
+  console.log(`workspace_tui=${workspaceTuiRequired(classification.workspaceTuiClass)}`);
   for (const file of classification.files) {
     console.log(file);
   }
