@@ -62,6 +62,9 @@ occupy / copy skills / attach 作为左对齐步骤（Braille spinner，完成�
 HOME skill 复制限时且失败软处理。`--no-attach` 和非 TTY 脚本仍用一行 stderr 进度（含进程
 启动后的第一字节状态行），并打印 Remote 横幅。
 源码检出（`appaloftdev`）第一次 TTY 运行会查找或 `cargo build` 占用 TUI sidecar。
+查找范围包括正在执行的树和常见兄弟检出（例如
+`appaloft-cloud/community/appaloft` → `appaloft`），以及
+`APPALOFT_WORKSPACE_TUI_BINARY`。
 若缺少 `appaloft-workspace-tui` 且 Rust 低于 1.88，CLI 会点名该二进制，并打印
 `rustup toolchain install stable` 与
 `cargo build --locked --manifest-path apps/workspace-control-tui/Cargo.toml`。

@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import { createServer, type Server, type Socket } from "node:net";
-import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
+import { delimiter, dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { domainError } from "@appaloft/core";
@@ -515,25 +515,55 @@ export async function openLoopbackWorkspaceControlRenderer(
   }
 }
 
-export function workspaceControlRendererCrateDir(
+function hasWorkspaceControlTuiCrate(root: string): boolean {
+  return existsSync(join(root, "apps", "workspace-control-tui", "Cargo.toml"));
+}
+
+export function workspaceControlRendererSearchRoots(
   environment: NodeJS.ProcessEnv = process.env,
-): string | undefined {
-  const starts = [
-    environment.APPALOFT_REPO_ROOT,
-    resolve(dirname(fileURLToPath(import.meta.url)), "../../../.."),
-    process.cwd(),
-  ].filter((value): value is string => Boolean(value));
-  for (const start of starts) {
+): readonly string[] {
+  const roots: string[] = [];
+  const seen = new Set<string>();
+  const addRoot = (value: string) => {
+    const root = resolve(value);
+    if (seen.has(root) || !hasWorkspaceControlTuiCrate(root)) return;
+    seen.add(root);
+    roots.push(root);
+  };
+  const consider = (start: string | undefined) => {
+    if (!start) return;
     let current = resolve(start);
     for (let depth = 0; depth < 8; depth += 1) {
-      const crate = join(current, "apps", "workspace-control-tui");
-      if (existsSync(join(crate, "Cargo.toml"))) return crate;
+      addRoot(current);
+      addRoot(join(current, "appaloft"));
+      addRoot(join(dirname(current), "appaloft"));
+      const communityMarker = `${sep}appaloft-cloud${sep}community${sep}appaloft`;
+      const communityAt = current.lastIndexOf(communityMarker);
+      if (communityAt !== -1) {
+        addRoot(join(current.slice(0, communityAt), "appaloft"));
+      }
       const parent = dirname(current);
       if (parent === current) break;
       current = parent;
     }
+  };
+  const pinnedRoot = environment.APPALOFT_REPO_ROOT?.trim();
+  if (pinnedRoot) {
+    consider(pinnedRoot);
+    return roots;
   }
-  return undefined;
+  consider(resolve(dirname(fileURLToPath(import.meta.url)), "../../../.."));
+  consider(process.cwd());
+  const executed = environment.APPALOFT_EXECUTED_SCRIPT?.trim() || process.argv[1];
+  if (executed) consider(dirname(resolve(executed)));
+  return roots;
+}
+
+export function workspaceControlRendererCrateDir(
+  environment: NodeJS.ProcessEnv = process.env,
+): string | undefined {
+  const root = workspaceControlRendererSearchRoots(environment)[0];
+  return root ? join(root, "apps", "workspace-control-tui") : undefined;
 }
 
 export function resolveWorkspaceControlRendererBinary(
@@ -542,18 +572,19 @@ export function resolveWorkspaceControlRendererBinary(
   const executable =
     process.platform === "win32" ? "appaloft-workspace-tui.exe" : "appaloft-workspace-tui";
   const configured = environment.APPALOFT_WORKSPACE_TUI_BINARY;
-  const crateDir = workspaceControlRendererCrateDir(environment);
   const pathDirs = (environment.PATH ?? process.env.PATH ?? "").split(delimiter).filter(Boolean);
+  const crateTargets = workspaceControlRendererSearchRoots(environment).flatMap((root) => {
+    const crate = join(root, "apps", "workspace-control-tui");
+    return [
+      join(crate, "target", "release", executable),
+      join(crate, "target", "debug", executable),
+    ];
+  });
   const candidates = [
     ...(configured ? [isAbsolute(configured) ? configured : resolve(configured)] : []),
     join(dirname(process.execPath), executable),
     ...pathDirs.map((dir) => join(dir, executable)),
-    ...(crateDir
-      ? [
-          join(crateDir, "target", "release", executable),
-          join(crateDir, "target", "debug", executable),
-        ]
-      : []),
+    ...crateTargets,
   ];
   return candidates.find((candidate) => existsSync(candidate));
 }

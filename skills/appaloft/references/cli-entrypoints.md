@@ -44,7 +44,9 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   with the list collapsed and a centered **preparing the agent** step panel, then
   attaches into the remote session. A source checkout finds or cargo-builds
   `appaloft-workspace-tui` so `appaloftdev code` does not require a manual
-  cargo build when the toolchain can produce it. If the sidecar is missing and
+  cargo build when the toolchain can produce it. Lookup includes the executed
+  tree and sibling/dev checkouts (`appaloft-cloud/community/appaloft` →
+  `appaloft`) plus `APPALOFT_WORKSPACE_TUI_BINARY`. If the sidecar is missing and
   rustc is older than 1.88, the CLI names `appaloft-workspace-tui` and prints
   `rustup toolchain install stable` plus
   `cargo build --locked --manifest-path apps/workspace-control-tui/Cargo.toml`.

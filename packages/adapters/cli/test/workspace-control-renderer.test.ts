@@ -348,4 +348,45 @@ describe("Workspace control renderer channel", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  test("[WS-REMOTE-PROGRESS-200] community pin locates a sibling checkout TUI binary", async () => {
+    const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const {
+      ensureWorkspaceControlRendererBinary,
+      resolveWorkspaceControlRendererBinary,
+      workspaceControlRendererSearchRoots,
+    } = await import("../src/workspace-control-renderer");
+    const workspace = await mkdtemp(join(tmpdir(), "appaloft-sibling-tui-"));
+    const community = join(workspace, "appaloft-cloud", "community", "appaloft");
+    const publicCheckout = join(workspace, "appaloft");
+    const communityCrate = join(community, "apps", "workspace-control-tui");
+    const publicCrate = join(publicCheckout, "apps", "workspace-control-tui");
+    const publicBinary = join(publicCrate, "target", "debug", "appaloft-workspace-tui");
+    await mkdir(communityCrate, { recursive: true });
+    await mkdir(join(publicCrate, "target", "debug"), { recursive: true });
+    await writeFile(join(communityCrate, "Cargo.toml"), '[package]\nname = "tui"\n');
+    await writeFile(join(publicCrate, "Cargo.toml"), '[package]\nname = "tui"\n');
+    await writeFile(publicBinary, "");
+    let built = 0;
+    try {
+      const env = { APPALOFT_REPO_ROOT: community, PATH: "" };
+      const roots = workspaceControlRendererSearchRoots(env);
+      expect(roots).toContain(community);
+      expect(roots).toContain(publicCheckout);
+      expect(resolveWorkspaceControlRendererBinary(env)).toBe(publicBinary);
+      const resolved = await ensureWorkspaceControlRendererBinary(
+        env,
+        async () => {
+          built += 1;
+        },
+        { rustcVersion: "rustc 1.85.0" },
+      );
+      expect(built).toBe(0);
+      expect(resolved).toBe(publicBinary);
+    } finally {
+      await rm(workspace, { recursive: true, force: true });
+    }
+  });
 });

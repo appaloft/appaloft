@@ -431,6 +431,8 @@
 - [x] Unit tests WS-REMOTE-PROGRESS-198
 - [x] Attached occupancy footer hides chrome `conflict at <phase>`
 - [x] Unit tests WS-REMOTE-PROGRESS-199
+- [x] Source-run locates sibling/dev-tree `appaloft-workspace-tui` (community pin)
+- [x] Unit tests WS-REMOTE-PROGRESS-200
 
 ## Later
 

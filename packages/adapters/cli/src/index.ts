@@ -201,6 +201,7 @@ export {
   type WorkspaceControlRendererProcess,
   warmupWorkspaceControlRenderer,
   workspaceControlRendererCrateDir,
+  workspaceControlRendererSearchRoots,
   workspaceControlRendererUnavailableMessage,
 } from "./workspace-control-renderer.js";
 
