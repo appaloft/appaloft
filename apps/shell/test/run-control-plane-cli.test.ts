@@ -7,7 +7,10 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { domainError, err, ok } from "@appaloft/core";
-import { SHELL_OCCUPANCY_PROGRESS } from "../src/occupancy-cli-progress";
+import {
+  resetOccupancyCliStartupReport,
+  SHELL_OCCUPANCY_PROGRESS,
+} from "../src/occupancy-cli-progress";
 import { runShellCli } from "../src/run";
 
 function jsonResponse(value: unknown, status = 200): Response {
@@ -54,6 +57,7 @@ const originalArgv = process.argv;
 const originalEnv = { ...process.env };
 const originalFetch = globalThis.fetch;
 const originalStdoutWrite = process.stdout.write;
+const originalStderrWrite = process.stderr.write;
 const originalExit = process.exit;
 
 async function writeActiveProfile(
@@ -139,7 +143,9 @@ afterEach(() => {
   process.env = { ...originalEnv };
   globalThis.fetch = originalFetch;
   process.stdout.write = originalStdoutWrite;
+  process.stderr.write = originalStderrWrite;
   process.exit = originalExit;
+  resetOccupancyCliStartupReport();
 });
 
 describe("shell CLI remote control-plane pre-dispatch", () => {

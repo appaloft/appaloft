@@ -38,3 +38,22 @@ export function reportOccupancyCliProgress(
 ): void {
   write(`${message}\n`);
 }
+
+let occupancyStartupReported = false;
+
+export function resetOccupancyCliStartupReport(): void {
+  occupancyStartupReported = false;
+}
+
+export function reportOccupancyCliStartupOnce(
+  args: readonly string[],
+  write?: (message: string) => void,
+): string | undefined {
+  const message = occupancyCliStartupProgress(args);
+  if (!message) return undefined;
+  if (occupancyStartupReported) return message;
+  occupancyStartupReported = true;
+  if (write) write(message);
+  else reportOccupancyCliProgress(message);
+  return message;
+}

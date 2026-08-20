@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   occupancyCliCommand,
   occupancyCliStartupProgress,
@@ -30,5 +32,14 @@ describe("occupancy CLI shell progress", () => {
     expect(occupancyCliStartupProgress(args)).toBe(SHELL_OCCUPANCY_PROGRESS.openingScratchSession);
     expect(shouldSkipLocalPgliteForOccupancyCli(args)).toBeFalse();
     expect(shouldKeepOccupancyCliLogs(args)).toBeTrue();
+  });
+
+  test("[WS-REMOTE-PROGRESS-191] shell entry reports progress before importing run.ts", () => {
+    const source = readFileSync(join(import.meta.dir, "../src/index.ts"), "utf8");
+    const startupCall = source.indexOf("reportOccupancyCliStartupOnce");
+    const runImport = source.indexOf('import("./run")');
+    expect(startupCall).toBeGreaterThan(-1);
+    expect(runImport).toBeGreaterThan(-1);
+    expect(startupCall).toBeLessThan(runImport);
   });
 });

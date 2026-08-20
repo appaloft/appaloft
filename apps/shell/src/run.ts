@@ -52,8 +52,7 @@ import {
 } from "@appaloft/server-worker-relay";
 import { type AppComposition, createAppComposition, type ShellRuntimeOptions } from "./composition";
 import {
-  occupancyCliStartupProgress,
-  reportOccupancyCliProgress,
+  reportOccupancyCliStartupOnce,
   shouldKeepOccupancyCliLogs,
   shouldSkipLocalPgliteForOccupancyCli,
 } from "./occupancy-cli-progress";
@@ -552,11 +551,7 @@ export async function runShellCli(
 ): Promise<void> {
   const argv = process.argv;
   const startupArgs = commandArgs(argv);
-  const startupProgress = occupancyCliStartupProgress(startupArgs);
-  if (startupProgress) {
-    if (hooks.writeProgress) hooks.writeProgress(startupProgress);
-    else reportOccupancyCliProgress(startupProgress);
-  }
+  reportOccupancyCliStartupOnce(startupArgs, hooks.writeProgress);
   const preparePglite = hooks.prepareRemotePgliteStateSync ?? prepareRemotePgliteStateSync;
   const composeShell = hooks.createShellComposition ?? createShellComposition;
   const mcpCommand = isMcpCommand(argv);
