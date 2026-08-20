@@ -22,9 +22,6 @@ npx @appaloft/mcp
 appaloft mcp stdio
 ```
 
-占用附加项（不是一扇门）：`appaloft code` 在你的服务器上打开远程 OpenCode 或 Pi。
-`appaloft code --local` 是本机 Scratch。
-
 <div align="center">
   <p>
     <a href="https://www.appaloft.com">官网</a> ·
@@ -132,11 +129,11 @@ Skill 安装只用 `--agent codex` 或 `--agent claude-code`。其他 host 参�
 Appaloft 部署或运维。skill 会约束 agent 走 Appaloft operation，而不是直接调用 Docker、SSH、
 数据库或云厂商。
 
-## Occupancy（附加项）
+## 占用
 
-不是一扇门。`appaloft code` 在你的服务器上打开远程 OpenCode 或 Pi。`appaloft code --local`
-是本机 Scratch。占用命令写在仓库内的 CLI 参考
-（[cli-entrypoints.md](./skills/appaloft/references/cli-entrypoints.md)）。当前线上的
+`appaloft code` 占用你的 Sandbox。`appaloft code --local` 是本机 Scratch。类似 Railway 的
+`ca`，不是 Agent 门。见仓库内 CLI 参考
+（[cli-entrypoints.md](./skills/appaloft/references/cli-entrypoints.md)）；线上
 docs.appaloft.com CLI 页面可能还没有列出它们。
 
 ## Self-host（可选）

@@ -22,9 +22,6 @@ npx @appaloft/mcp
 appaloft mcp stdio
 ```
 
-Occupancy add-on (not a door): `appaloft code` opens remote OpenCode or Pi on your server.
-`appaloft code --local` is Scratch on this machine.
-
 <div align="center">
   <p>
     <a href="https://www.appaloft.com">Website</a> ·
@@ -134,12 +131,12 @@ with `npx skills list --global --agent <agent>`, then start a new agent session.
 or operate through Appaloft. The skill tells the agent to use Appaloft operations instead of
 calling Docker, SSH, databases, or cloud providers directly.
 
-## Occupancy (add-on)
+## Occupancy
 
-Not a door. `appaloft code` opens remote OpenCode or Pi on your server. `appaloft code --local`
-is Scratch on this machine. Occupancy commands are in the in-repo CLI reference
-([cli-entrypoints.md](./skills/appaloft/references/cli-entrypoints.md)). The currently published
-docs.appaloft.com CLI page may not list them yet.
+`appaloft code` occupies your Sandbox. `appaloft code --local` is this-machine scratch. Analogous
+to Railway `ca` — not the Agent door. See the in-repo CLI reference
+([cli-entrypoints.md](./skills/appaloft/references/cli-entrypoints.md)); the live docs.appaloft.com
+CLI page may not list these yet.
 
 ## Self-host (optional)
 
