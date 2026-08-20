@@ -52,8 +52,9 @@ Static checks reject known reliability regressions before runtime tests begin. `
 TypeScript and rejects asynchronous `map` callbacks that call `findOne`; callers must expose and
 use a batched read-model or repository query instead. The CI test-boundary guard keeps the
 canonical package-test job database-free, requires PostgreSQL targets to stay scoped to jobs
-that actually start PostgreSQL, and requires `ci.yml` and `e2e.yml` to share the change
-classifier in `scripts/ci/classify-changed-files.ts`.
+that actually start PostgreSQL, requires `ci.yml` and `e2e.yml` to share the change
+classifier in `scripts/ci/classify-changed-files.ts`, and keeps WebView console e2e out of
+the required `Unit Tests` job.
 
 Current examples:
 
@@ -105,6 +106,10 @@ If tests bypass the runtime or write directly to the database to simulate succes
 - `ci.yml`
   - lint, typecheck, full deterministic package tests, integration, build, packaging, docker smoke
   - the canonical package-test job is hermetic and does not inherit a database target
+  - `Unit Tests` runs `bun run test` (`turbo run test`) for packages, PGlite unit suites, and
+    web vitest. It does not run `@appaloft/web` `test:e2e` / `test:e2e:webview`; that suite
+    belongs to `e2e.yml` (`e2e_web` / `e2e_full` on shard 1) so CLI-only and other product PRs
+    do not pay a second WebView tax
   - `APPALOFT_DATABASE_URL` is scoped to integration and build-smoke jobs that start PostgreSQL
   - generated host build artifacts are reclaimed before the all-in-one Docker rebuild so the
     smoke remains within the hosted runner disk budget
@@ -142,6 +147,7 @@ bun run lint
 
 # Canonical deterministic gate; this is the same package-test entrypoint used by ci.yml.
 # Do not supply provider, control-plane, or database targets to this command.
+# WebView console e2e is not part of this gate; use the apps/web e2e scripts or e2e.yml.
 bun run test
 
 # Faster subset for inner-loop feedback; it does not replace the canonical gate.
@@ -149,4 +155,5 @@ bun run test:unit
 APPALOFT_DATABASE_URL=postgres://postgres:postgres@localhost:5432/appaloft bun run test:integration
 APPALOFT_DATABASE_URL=postgres://postgres:postgres@localhost:5432/appaloft APPALOFT_HTTP_PORT=3101 bun run --cwd apps/shell test:e2e
 APPALOFT_DATABASE_DRIVER=pglite APPALOFT_PGLITE_DATA_DIR=.appaloft/test-data/pglite bun run --cwd apps/shell test:e2e
+bun run --cwd apps/web test:e2e
 ```
