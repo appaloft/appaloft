@@ -1115,7 +1115,7 @@ Server id/host, provider handle, capacity probes or credentials.
 
 | Workspace action | Canonical operations | CLI / SDK |
 | --- | --- | --- |
-| Open remote Agent door | none | default `appaloft code` prints present-tense progress, occupies after login + Server, and native-attaches as soon as my occupancy exists; TTY first useful alt-screen is under 1s and is not blocked on composition; a no-git folder resumes the live occupancy (git is not a gate) instead of staying on `Resolving repository…`; `--profile` is a fallback pin; `--no-attach` prints the same progress and stops; `--local` is Scratch |
+| Open remote Agent door | none | default `appaloft code` prints present-tense progress, occupies after login + Server, and native-attaches as soon as my occupancy exists; TTY first useful alt-screen is under 1s and is not blocked on composition; a no-git folder resumes the live occupancy (git is not a gate) instead of staying on `Resolving repository…`; with no occupancy it create-or-links this folder's Project and occupies `folder.local`; `--profile` is a fallback pin; `--no-attach` prints the same progress and stops; `--local` is Scratch |
 | Open/create-or-resume | `workspaces.open` | durable `appaloft workspace open [path|git-remote]`; `appaloft.workspaces.open(...)` |
 | Profile-aware create | `workspaces.open(forceNew=true)` | `appaloft workspace create --profile ...`; `appaloft.workspaces.create(...)` |
 | Adapter catalog | `sandboxes.agents.harnesses.list` | `appaloft workspace harness list`; Console capability-driven creation |
@@ -1163,10 +1163,12 @@ create provider-specific operation names. See
 [Agent Workspace Workflow](./workflows/agent-workspace.md).
 
 Default `appaloft code` is the remote identity door governed by
-[ADR-117](./decisions/ADR-117-remote-agent-door.md) and
-[Spec 139](./specs/139-remote-agent-door/spec.md). It adds no operation-catalog entry.
-`--local` remains Scratch under ADR-116 / Spec 138. Durable `appaloft workspace open`
-remains `workspaces.open` presentation under ADR-107 / Spec 125.
+[ADR-117](./decisions/ADR-117-remote-agent-door.md),
+[Spec 139](./specs/139-remote-agent-door/spec.md), and folder-project onboarding in
+[ADR-122](./decisions/ADR-122-railway-like-folder-onboarding.md). It adds no
+operation-catalog entry. `--local` remains Scratch under ADR-116 / Spec 138. Durable
+`appaloft workspace open` remains `workspaces.open` presentation under ADR-107 /
+Spec 125.
 
 Brokered model access adds no secret-bearing operation. The existing Profile configuration binds
 one safe `model-api` Connection reference; `workspaces.open` carries the compiled binding into the
@@ -1219,7 +1221,7 @@ Implemented operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
-| Create deployment | Command | `deployments.create` | `CreateDeploymentCommand` | `CreateDeploymentCommandInput` | `appaloft deploy [path-or-source] [--application <config-key>]` or `appaloft deployments create --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]` | `POST /api/deployments` |
+| Create deployment | Command | `deployments.create` | `CreateDeploymentCommand` | `CreateDeploymentCommandInput` | `appaloft deploy [path-or-source] [--yes] [--project <projectId>] [--application <config-key>]` (first unlinked folder may create/link a Project named after the directory, or the only existing Project; git is not required) or `appaloft deployments create --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]` | `POST /api/deployments` |
 | Cleanup preview deployment | Command | `deployments.cleanup-preview` | `CleanupPreviewCommand` | `CleanupPreviewCommandInput` | `appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123` | `POST /api/deployments/cleanup-preview` |
 | Preview deployment plan | Query | `deployments.plan` | `DeploymentPlanQuery` | `DeploymentPlanQueryInput` | `appaloft deployments plan --resource <resourceId> --server <serverId> [--project <projectId>] [--environment <environmentId>] [--destination <destinationId>]` | `GET /api/deployments/plan` |
 | List deployments | Product-session member query | `deployments.list` | `ListDeploymentsQuery` | `ListDeploymentsQueryInput` | `appaloft deployments list` | `GET /api/deployments` |

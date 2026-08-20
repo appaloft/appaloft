@@ -203,7 +203,12 @@ export class CommunityWorkspaceActivationContextInitializer
     }
     const environment = await this.ensureLocalEnvironment(context, projectId);
     if (environment.isErr()) return err(environment.error);
-    const resource = await this.ensureDefaultResource(context, projectId, input.repository);
+    const resource = await this.ensureDefaultResource(
+      context,
+      projectId,
+      input.repository,
+      input.repositoryIdentity,
+    );
     if (resource.isErr()) return err(resource.error);
     const requestedProfile = this.profileConfigFor(input.profile);
     if (!requestedProfile) {
@@ -395,6 +400,7 @@ export class CommunityWorkspaceActivationContextInitializer
     context: ExecutionContext,
     projectId: string,
     repository: string,
+    repositoryIdentity: string,
   ): Promise<Result<void>> {
     const environmentReady = await this.ensureLocalEnvironment(context, projectId);
     if (environmentReady.isErr()) return err(environmentReady.error);
@@ -440,14 +446,15 @@ export class CommunityWorkspaceActivationContextInitializer
         .then((executed) => (executed.isOk() ? ok(undefined) : err(executed.error)));
     }
     const networkProfile = await this.occupancyNetworkProfile(context, repository);
+    const folderOccupancy = repositoryIdentity.startsWith("folder.local/");
     const created = CreateResourceCommand.create({
       projectId,
       environmentId: environment.id.value,
       name: "app",
       kind: "application",
       source: {
-        kind: "remote-git",
-        locator: repository,
+        kind: folderOccupancy ? "local-folder" : "remote-git",
+        locator: folderOccupancy ? "." : repository,
       },
       networkProfile,
     });

@@ -50,6 +50,12 @@ import {
 } from "@appaloft/deployment-config";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect, Either } from "effect";
+import { deployLoginRequiredError, hasCliControlPlaneLogin } from "../cli-session-login.js";
+import {
+  ensureFolderProjectOnboarding,
+  folderOnboardingCwdFromLocator,
+} from "../folder-project-onboarding.js";
+import { effectCliInteraction } from "../interaction.js";
 import { normalizeWorkspaceRepositoryRemote } from "../local-git-workspace-context.js";
 import {
   isRemoteCodeGitRemoteLocator,
@@ -109,6 +115,7 @@ const helmHookPolicyOption = Options.choice("helm-hook-policy", [
 ] as const).pipe(Options.optional);
 const helmTimeoutSecondsOption = Options.text("helm-timeout-seconds").pipe(Options.optional);
 const projectOption = Options.text("project").pipe(Options.optional);
+const yesOption = Options.boolean("yes").pipe(Options.withDefault(false));
 const deploymentCreateProjectOption = Options.text("project");
 const serverOption = Options.text("server").pipe(Options.optional);
 const deploymentCreateServerOption = Options.text("server");
@@ -1657,6 +1664,7 @@ export const deployCommand = EffectCommand.make(
   {
     pathOrSource: pathOrSourceArg,
     project: projectOption,
+    yes: yesOption,
     server: serverOption,
     serverHost: serverHostOption,
     serverName: serverNameOption,
@@ -1761,6 +1769,7 @@ export const deployCommand = EffectCommand.make(
     stateBackend,
     targetServiceName,
     upstreamProtocol,
+    yes,
   }) =>
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
@@ -1783,7 +1792,23 @@ export const deployCommand = EffectCommand.make(
       const requestedDeploymentMethod = urlFirstEntry.deploymentMethod;
       const portValue = optionalNumber(port);
       const configFilePath = optionalValue(config);
-      const projectId = optionalValue(project);
+      const requestedProjectId = optionalValue(project);
+      if (cli.executionTarget === "remote") {
+        const loggedIn = yield* Effect.promise(() =>
+          hasCliControlPlaneLogin(cli.environment ?? process.env),
+        );
+        if (!loggedIn) {
+          return yield* Effect.fail(deployLoginRequiredError());
+        }
+      }
+      const folderOnboarding = yield* ensureFolderProjectOnboarding({
+        cwd: folderOnboardingCwdFromLocator(sourceLocator),
+        yes,
+        interaction: effectCliInteraction,
+        ...(cli.environment ? { env: cli.environment } : {}),
+        ...(requestedProjectId ? { explicitProjectId: requestedProjectId } : {}),
+      });
+      const projectId = folderOnboarding.projectId;
       const serverId = optionalValue(server);
       const serverHostValue = optionalValue(serverHost);
       const serverNameValue = optionalValue(serverName);
@@ -1906,7 +1931,7 @@ export const deployCommand = EffectCommand.make(
       ) {
         const occupancyInput = yield* occupancyDeploymentInputFromGitRemote({
           sourceLocator,
-          ...(projectId ? { projectId } : {}),
+          ...(requestedProjectId ? { projectId: requestedProjectId } : {}),
           ...(environmentId ? { environmentId } : {}),
           ...(resourceId ? { resourceId } : {}),
           ...(serverId ? { serverId } : {}),

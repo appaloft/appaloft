@@ -7,9 +7,9 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-LOGIN-001 | unit / CLI | automated | `remote-code-session.test.ts`, `cli-session-login.test.ts`, `agent-workspace-command.test.ts`, `apps/shell/test/run-control-plane-cli.test.ts` |
 | WS-REMOTE-SERVER-002 | unit | automated | `remote-code-session.test.ts` |
 | WS-REMOTE-OPEN-003 | CLI / application | this slice | default `code` dispatches `workspaces.open` with remote SHA + `targetServerId` |
-| WS-REMOTE-RESUME-004 | application | this slice | same subject resumes preferred Sandbox |
+| WS-REMOTE-RESUME-004 | application | this slice | same subject resumes preferred Sandbox **for this folder identity**; other-repo occupancy is not used. See Spec 142. |
 | WS-REMOTE-OCCUPY-005 | application / persistence | this slice | second subject gets another preferred Sandbox |
-| WS-REMOTE-NO-UPLOAD-006 | CLI | automated | local Git fail-closed not used on `code` |
+| WS-REMOTE-NO-UPLOAD-006 | CLI | automated | local Git fail-closed not used on `code`; missing origin occupies this folder after onboarding |
 | WS-REMOTE-BINDING-007 | application / smoke | this slice | missing Binding is initialized, then occupy |
 | WS-REMOTE-BANNER-014 | CLI | this slice | identity banner includes `workspaceId` |
 | WS-REMOTE-PROFILE-008 | application / runtime | this slice | missing default Profile installs `appaloft-remote` with optional `model-api`; OpenCode occupancy starts without a required model-api binding |

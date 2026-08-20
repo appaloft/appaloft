@@ -625,7 +625,7 @@ export const publicDocsHelpTopics = {
     id: "project.lifecycle",
     title: "Project lifecycle",
     description:
-      "How to read, rename, describe, archive, restore, check delete safety, and delete projects without turning deployments or runtime state into project-owned actions.",
+      "How to read, rename, describe, archive, restore, check delete safety, and delete projects, and how the first deploy/code in a folder create-or-links a project, without turning deployments or runtime state into project-owned actions.",
     page: {
       "zh-CN": "deliver/projects",
       "en-US": "en/deliver/projects",
@@ -646,6 +646,8 @@ export const publicDocsHelpTopics = {
       "project restore",
       "project delete check",
       "project delete",
+      "project use",
+      "folder project link",
       "project lifecycle",
       "project settings",
       "deployment snapshot",
@@ -664,6 +666,8 @@ export const publicDocsHelpTopics = {
       "docs/commands/projects.delete.md",
       "docs/testing/project-lifecycle-test-matrix.md",
       "docs/specs/008-project-lifecycle-settings-closure/spec.md",
+      "docs/specs/142-railway-like-folder-onboarding/spec.md",
+      "docs/decisions/ADR-122-railway-like-folder-onboarding.md",
     ],
     webSurfaces: ["apps/web project detail/settings surfaces with read-only rollups"],
   },

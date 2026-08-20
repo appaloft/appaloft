@@ -90,6 +90,7 @@ export interface WorkspaceActivationContextInitializerPort {
     context: ExecutionContext,
     projectId: string,
     repository: string,
+    repositoryIdentity: string,
   ): Promise<Result<void>>;
 }
 
@@ -310,6 +311,7 @@ export class AgentWorkspaceOpenPreflightService {
         context,
         projectId,
         input.repository,
+        input.repositoryIdentity,
       );
       if (resource.isErr()) return err(resource.error);
     }

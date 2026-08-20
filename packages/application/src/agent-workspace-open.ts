@@ -754,52 +754,55 @@ export class AgentWorkspaceOpenService {
         };
 
         const fetchArgv = ["git", "fetch", "--no-tags", "--depth", "1", "origin", input.ref];
+        const folderOccupancy = input.repositoryIdentity.startsWith("folder.local/");
 
         await requireSourceCommand({ argv: ["git", "init", "."] });
-        await requireSourceCommand({
-          argv: ["git", "remote", "add", "origin", input.repository],
-        });
-        if (sourceCredential.value) {
-          const authenticated = createWorkspaceSourceGitCredentialCommands(
-            input.repository,
-            sourceCredential.value,
-            fetchArgv,
-          );
-          await requireSourceCommand(authenticated.prepare);
-          let sourceFailure: unknown;
-          try {
-            await requireSourceCommand(authenticated.approve);
-            await requireSourceCommand(authenticated.fetch);
-          } catch (error) {
-            sourceFailure = error;
-          }
+        if (!folderOccupancy) {
+          await requireSourceCommand({
+            argv: ["git", "remote", "add", "origin", input.repository],
+          });
+          if (sourceCredential.value) {
+            const authenticated = createWorkspaceSourceGitCredentialCommands(
+              input.repository,
+              sourceCredential.value,
+              fetchArgv,
+            );
+            await requireSourceCommand(authenticated.prepare);
+            let sourceFailure: unknown;
+            try {
+              await requireSourceCommand(authenticated.approve);
+              await requireSourceCommand(authenticated.fetch);
+            } catch (error) {
+              sourceFailure = error;
+            }
 
-          let cleanupFailure: DomainError | undefined;
-          for (const cleanupCommand of authenticated.cleanup) {
-            const cleaned = await executeSourceCommand(cleanupCommand);
-            if (cleaned.isErr() && !cleanupFailure) cleanupFailure = cleaned.error;
+            let cleanupFailure: DomainError | undefined;
+            for (const cleanupCommand of authenticated.cleanup) {
+              const cleaned = await executeSourceCommand(cleanupCommand);
+              if (cleaned.isErr() && !cleanupFailure) cleanupFailure = cleaned.error;
+            }
+            if (cleanupFailure) {
+              throw domainError.conflict("Workspace source credential cleanup failed", {
+                code: "workspace_open_source_credential_cleanup_failed",
+                cleanupFailureCode:
+                  cleanupFailure.details?.code ?? cleanupFailure.code ?? "source_cleanup_failed",
+                ...(isDomainError(sourceFailure)
+                  ? {
+                      sourceFailureCode:
+                        sourceFailure.details?.code ?? sourceFailure.code ?? "source_fetch_failed",
+                    }
+                  : {}),
+              });
+            }
+            if (sourceFailure) throw sourceFailure;
+          } else {
+            await requireSourceCommand({ argv: fetchArgv });
           }
-          if (cleanupFailure) {
-            throw domainError.conflict("Workspace source credential cleanup failed", {
-              code: "workspace_open_source_credential_cleanup_failed",
-              cleanupFailureCode:
-                cleanupFailure.details?.code ?? cleanupFailure.code ?? "source_cleanup_failed",
-              ...(isDomainError(sourceFailure)
-                ? {
-                    sourceFailureCode:
-                      sourceFailure.details?.code ?? sourceFailure.code ?? "source_fetch_failed",
-                  }
-                : {}),
-            });
-          }
-          if (sourceFailure) throw sourceFailure;
-        } else {
-          await requireSourceCommand({ argv: fetchArgv });
+          await requireSourceCommand({
+            argv: ["git", "checkout", "--detach", input.commitSha],
+          });
+          await requireSourceCommand({ argv: ["git", "switch", "-c", input.branch] });
         }
-        await requireSourceCommand({
-          argv: ["git", "checkout", "--detach", input.commitSha],
-        });
-        await requireSourceCommand({ argv: ["git", "switch", "-c", input.branch] });
       }
       for (const initialization of preflight.value.plan.initialization) {
         phase = `workspace-open-initialization:${initialization.id}`;

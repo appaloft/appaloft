@@ -27,7 +27,7 @@ A minimal deployment needs the following inputs:
 
 | Input | Description | Default |
 | --- | --- | --- |
-| Project | The organizing boundary for resources, environments, and deployment history | None — must be explicitly created or selected |
+| Project | The organizing boundary for resources, environments, and deployment history | First `deploy`/`code` in an unlinked folder creates one named after the directory, or uses your only project; `project use` switches |
 | Server | The deployment target machine (must be reachable over SSH) | None — must be registered first |
 | Deployment source | A Git repository, container image, or local static directory | None — must be explicitly provided |
 | Runtime profile | Start command, port, health check path | Attempts zero-configuration detection; falls back to explicit input on failure |
@@ -59,8 +59,9 @@ When a monorepo root has multiple candidate apps, the deployment is blocked unti
 # 1. Log in (connects to Appaloft Cloud by default; self-hosted requires an explicit --url)
 appaloft login --url https://your-appaloft-host
 
-# 2. Create a project (if you don't have one yet)
+# 2. Create a project (optional). First deploy/code also creates one named after this folder
 appaloft projects create --name "my-first-project"
+appaloft project use <projectId>
 
 # 3. Register a server and wait for the connectivity check
 appaloft server register --host 203.0.113.10 --ssh-user deploy --ssh-key ~/.ssh/id_ed25519

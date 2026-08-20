@@ -430,6 +430,10 @@ export const cliCommandDescriptions = {
   projectCreate: withDocs("Create a project", "project.concept"),
   projectList: withDocs("List projects", "project.concept"),
   projectShow: withDocs("Show project identity and lifecycle", "project.lifecycle"),
+  projectUse: withDocs(
+    "Link this folder to an existing project for later deploy and code commands",
+    "project.lifecycle",
+  ),
   projectRename: withDocs("Rename a project", "project.lifecycle"),
   projectReorder: withDocs("Reorder projects for project list display", "project.lifecycle"),
   projectSetDescription: withDocs("Set or clear a project description", "project.lifecycle"),

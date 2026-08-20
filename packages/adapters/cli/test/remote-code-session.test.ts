@@ -466,10 +466,53 @@ describe("remote code door", () => {
     expect(selectResumeOccupancy([])).toBeUndefined();
   });
 
-  test("[WS-REMOTE-RESUME-004] occupies this folder's origin instead of last occupancy", async () => {
+  test("[WS-REMOTE-NO-UPLOAD-006][FOLDER-ONBOARD-007] occupies this folder when the local path has no origin", async () => {
     const door = await resolveDefaultRemoteCodeDoor({
       env: { APPALOFT_TOKEN: "token" },
       listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
+      folderCwd: "/tmp/hello-static",
+      folderOnboarding: {
+        projectId: "prj_hello",
+        projectName: "hello-static",
+        identity: "folder.local/cwd/hello-static",
+        created: true,
+        reused: false,
+      },
+      listOccupancies: async () => [
+        {
+          sandboxId: "sbx_live",
+          status: "ready",
+          occupancy: {
+            repositoryIdentity: "github.com/traefik/whoami",
+            commitSha: "d".repeat(40),
+            branch: "main",
+          },
+          lastActivityAt: "2026-08-15T12:30:00.000Z",
+        },
+      ],
+      resolveLocator: async () => {
+        throw Object.assign(new Error("missing origin"), {
+          code: "workspace_remote_repository_missing",
+        });
+      },
+    });
+    expect(door.repositoryIdentity).toBe("folder.local/cwd/hello-static");
+    expect(door.projectId).toBe("prj_hello");
+    expect(door.branch).toBe("local");
+    expect(door.commitSha).toHaveLength(40);
+    expect(selectResumeOccupancy([])).toBeUndefined();
+  });
+
+  test("[WS-REMOTE-RESUME-004] occupies the cwd origin when it differs from last occupancy", async () => {
+    const door = await resolveDefaultRemoteCodeDoor({
+      env: { APPALOFT_TOKEN: "token" },
+      listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
+      folderOnboarding: {
+        projectId: "prj_cloud",
+        identity: "github.com/appaloft/appaloft-cloud",
+        created: false,
+        reused: false,
+      },
       listOccupancies: async () => [
         {
           sandboxId: "sbx_examples",
@@ -499,6 +542,7 @@ describe("remote code door", () => {
     });
     expect(door.repositoryIdentity).toBe("github.com/appaloft/appaloft-cloud");
     expect(door.commitSha).toBe("f".repeat(40));
+    expect(door.projectId).toBe("prj_cloud");
   });
 
   test("[WS-REMOTE-NO-UPLOAD-006] --new from a non-git path does not occupy the last occupancy repo", async () => {
