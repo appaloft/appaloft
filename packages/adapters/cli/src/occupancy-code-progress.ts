@@ -12,6 +12,7 @@ export const OCCUPANCY_CODE_PROGRESS = {
   usingThisProject: "Using this project…",
   resolvingRepository: "Resolving repository…",
   copyingSkills: "Preparing skills…",
+  copyingCredentials: "Preparing credentials…",
   attaching: "Attaching…",
 } as const;
 

@@ -1,7 +1,7 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import {
@@ -2275,6 +2275,74 @@ describe("Agent Workspace CLI", () => {
       targetServerId: "srv_1",
       profile: "appaloft-remote-pi",
     });
+  });
+
+  test("[WS-REMOTE-VENDOR-204][WS-REMOTE-CRED-208] code --grok writes auth.json onto occupancy disk", async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), "appaloft-code-grok-"));
+    await mkdir(join(homeDir, ".grok"), { recursive: true });
+    await writeFile(join(homeDir, ".grok", "auth.json"), '{"access_token":"grok-secret"}\n');
+    const commands: Command<unknown>[] = [];
+    const output: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const { OpenAgentWorkspaceCommand, WriteSandboxFileCommand } = await import(
+      "@appaloft/application"
+    );
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          if (command instanceof OpenAgentWorkspaceCommand) {
+            return ok({
+              workspaceId: "sbx_grok",
+              sandboxId: "sbx_grok",
+              runtimeId: "sar_grok",
+              projectId: "prj_billing",
+            } as T);
+          }
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_grok" }),
+      },
+      environment: { HOME: homeDir },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        projectId: "prj_billing",
+        serverId: "srv_4lifk0yrcecy",
+        serverName: "hostinger",
+      }),
+    });
+    const write = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--grok", "--new", "--no-attach"]);
+    } finally {
+      process.stdout.write = write;
+    }
+
+    expect((commands[0] as OpenAgentWorkspaceCommand).input).toMatchObject({
+      forceNew: true,
+      attach: false,
+      targetServerId: "srv_4lifk0yrcecy",
+    });
+    expect((commands[0] as OpenAgentWorkspaceCommand).input.profile).toBeUndefined();
+    const written = commands
+      .filter((command) => command instanceof WriteSandboxFileCommand)
+      .map((command) => command.input.path);
+    expect(written).toContain(".grok/auth.json");
+    expect(written).toContain(".mcp.json");
+    expect(output.join("")).not.toContain("grok-secret");
   });
 
   test("[R8-OCC-CODE-008] code resumes the pinned occupancy Workspace when requested SHA moved", async () => {

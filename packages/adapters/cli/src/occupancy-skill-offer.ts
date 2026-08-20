@@ -25,6 +25,9 @@ export const OCCUPANCY_HOME_SKILL_ROOTS = [
   { homeRelative: ".config/opencode/skills", railwayAligned: false },
 ] as const;
 
+// Skill-tree copy still skips auth.json, mcp.json, tokens, and cookies.
+// Vendor occupancy credentials (auth.json / Claude setup-token) use
+// occupancy-credential-offer.ts and write onto occupancy HOME, not skill roots.
 const SKIPPED_BASENAMES = new Set([
   "mcp.json",
   ".mcp.json",

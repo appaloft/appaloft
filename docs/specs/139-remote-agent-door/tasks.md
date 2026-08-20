@@ -460,6 +460,17 @@
 - [x] `code --no-attach` door silently replaces a leftover partial folder occupancy and does not emit `workspace_open_partial_recovery_required`
 - [x] Unit tests FOLDER-ONBOARD-007 / WS-REMOTE-PROGRESS-201 for no remote materialize + leftover continue
 
+## Slice 50 - vendor flags, occupancy-home credentials, connecting-step data
+
+- [x] Grill D157: Railway-like vendor selector + disk credentials; not setup agent; no TUI redesign
+- [x] Expand Spec 139 / ADR-118; `--claude/--codex/--grok` map onto existing harnesses
+- [x] Occupy writes Grok/Codex `auth.json` and Claude setup-token onto occupancy HOME
+- [x] Skill-tree offer still skips `auth.json`; first-party Appaloft skill + secret-free MCP stay
+- [x] Connecting-step data includes credential, skill count, and work-on-disk
+- [x] Unit tests WS-REMOTE-VENDOR-204–207, WS-REMOTE-CRED-208–213, WS-REMOTE-MCP-214, WS-REMOTE-CONNECT-215–216
+- [ ] Ticket `ready-for-agent`
+- [ ] Live Hostinger `srv_4lifk0yrcecy` only if a later operator run is requested; do not occupy other servers
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

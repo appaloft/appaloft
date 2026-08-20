@@ -14,6 +14,9 @@ searchAliases:
   - "sandbox"
   - "occupancy skills"
   - "home skills"
+  - "claude"
+  - "codex"
+  - "grok"
 relatedOperations:
   - "workspaces.open"
   - "sandboxes.create"
@@ -94,9 +97,30 @@ those two roots are **beyond Railway**. Railway docs do not mention plugins, MCP
 config, or those extra roots.
 
 Only directories that contain `SKILL.md` are copied. Existing sandbox files are not
-overwritten. The CLI does not copy `mcp.json`, tokens, cookies, `.env`, or editor
+overwritten. Skill-tree copy does not copy `mcp.json`, tokens, cookies, `.env`, or editor
 plugin binaries. The sandbox never reads laptop HOME; copy happens on the same CLI
 occupy path that already writes files.
+
+## Pick Claude, Codex, or Grok on occupancy <a id="agent-code-vendor" />
+
+`appaloft code --claude`, `--codex`, and `--grok` pick the vendor credential on this
+laptop. They map onto the existing occupancy runtime (OpenCode by default).
+`--harness opencode|pi|omp` remains an advanced override and does not invent a new
+runtime. With no vendor flag, `code` follows what is signed in or installed on this
+laptop.
+
+Occupy writes that credential onto the occupancy disk (`HOME=/workspace`), not as a
+sandbox variable:
+
+- Grok: `~/.grok/auth.json` → occupancy `.grok/auth.json`
+- Codex: `~/.codex/auth.json` → occupancy `.codex/auth.json`
+- Claude: a setup-token (`~/.appaloft/claude-setup-token`, `~/.claude/setup-token`, or
+  laptop `CLAUDE_CODE_OAUTH_TOKEN` written as a file). The Claude chat cookie is not
+  copied.
+
+The occupancy also keeps the public Appaloft skill and a first-party Appaloft MCP
+entry so the remote agent can list workspaces and deploy. Laptop `mcp.json` secrets
+are not copied. Token values are never printed.
 
 Missing login or Server fails closed with guidance. It never becomes Scratch. This-Mac
 Scratch remains explicit:

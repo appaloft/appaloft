@@ -170,7 +170,15 @@ export const publicDocsHelpTopics = {
     },
     surfaces: ["cli"],
     anchor: "agent-workspace-open",
-    aliases: ["appaloft code", "remote agent door", "local scratch", "scratch session"],
+    aliases: [
+      "appaloft code",
+      "remote agent door",
+      "local scratch",
+      "scratch session",
+      "claude",
+      "codex",
+      "grok",
+    ],
     specReferences: [
       "docs/specs/139-remote-agent-door/spec.md",
       "docs/testing/remote-agent-door-test-matrix.md",
@@ -201,6 +209,34 @@ export const publicDocsHelpTopics = {
       "codex skills",
       "cursor skills",
       "opencode skills",
+    ],
+    specReferences: [
+      "docs/specs/139-remote-agent-door/spec.md",
+      "docs/testing/remote-agent-door-test-matrix.md",
+      "docs/decisions/ADR-118-remote-code-occupancy.md",
+    ],
+  },
+  "agent.code-vendor": {
+    id: "agent.code-vendor",
+    title: "Occupancy vendor credential",
+    description:
+      "How appaloft code --claude, --codex, and --grok write laptop vendor credentials onto occupancy disk and map onto existing harnesses.",
+    page: {
+      "zh-CN": "agents/workspaces",
+      "en-US": "en/agents/workspaces",
+    },
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli"],
+    anchor: "agent-code-vendor",
+    aliases: [
+      "appaloft code --claude",
+      "appaloft code --codex",
+      "appaloft code --grok",
+      "occupancy credentials",
+      "setup-token",
     ],
     specReferences: [
       "docs/specs/139-remote-agent-door/spec.md",

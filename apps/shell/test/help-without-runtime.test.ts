@@ -47,6 +47,9 @@ describe("shell help without runtime composition", () => {
     expect(stdout).toContain("--new");
     expect(stdout).toContain("--no-attach");
     expect(stdout).toContain("--local");
+    expect(stdout).toContain("--claude");
+    expect(stdout).toContain("--codex");
+    expect(stdout).toContain("--grok");
     expect(stderr).not.toContain("PGlite");
   });
 

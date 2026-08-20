@@ -65,9 +65,18 @@ must not use laptop HEAD as Workspace truth.
    `~/.config/opencode/skills` because those are the roots Appaloft users
    actually use; they are beyond Railway's documented cloud-agent skill sync.
    Copy is add-only and only for immediate child directories that contain
-   `SKILL.md`. Do not copy `mcp.json`, tokens, cookies, `.env`, editor plugin
-   binaries, or files larger than 10MB. First-party Appaloft skill offer stays.
-   This is not a new command and is not the local Agent door.
+   `SKILL.md`. Skill-tree copy does not copy `mcp.json`, tokens, cookies, `.env`,
+   editor plugin binaries, or files larger than 10MB. First-party Appaloft skill
+   offer stays. This is not a new command and is not the local Agent door.
+9. Occupy may write **my** laptop vendor credential onto **my** occupancy HOME
+   through the same `WriteSandboxFile` path. Grok uses `~/.grok/auth.json`. Codex
+   uses `~/.codex/auth.json`. Claude uses a setup-token (`APPALOFT_HOME/claude-setup-token`,
+   `~/.claude/setup-token`, or laptop `CLAUDE_CODE_OAUTH_TOKEN` written as a file),
+   never the Claude chat cookie. User-facing `--claude` / `--codex` / `--grok` map
+   onto existing occupancy harness IDs and do not invent a new runtime. Default
+   follows what is signed in or installed on this laptop. Never print token
+   values. Never put long-lived secrets into occupancy env vars or `mcp.json`.
+   Teammate disks stay isolated. This is not `appaloft setup agent`.
 
 ## Consequences
 
@@ -86,7 +95,9 @@ must not use laptop HEAD as Workspace truth.
 - Keep identity-only `code` and tell users to run `workspace open`.
 - Add Server to the preferred unique key in the same ticket as occupancy.
 - Silent dirty-laptop upload as remote truth.
-- Sharing host OpenCode/Codex OAuth, MCP config, tokens, cookies, or `.env`.
+- Sharing host OpenCode/Codex OAuth, MCP config, tokens, cookies, or `.env`
+  with teammates or as occupancy env vars. Writing my laptop vendor
+  `auth.json` / Claude setup-token onto my occupancy HOME is accepted.
 - Inventing a setup command or letting the Sandbox read laptop HOME.
 - Implementing `workspace` `ca` in the same ticket.
 - Letting Cloud managed placement override the Server the door already chose.

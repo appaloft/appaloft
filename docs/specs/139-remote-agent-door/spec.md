@@ -3,11 +3,11 @@
 ## Status
 
 - Round: Spec
-- Artifact state: slice 1–45 leftover EXPOSE live-verified 2026-08-17; slice 46 registered-Server OpenCode attach accepted 2026-08-17; slice 48 occupancy HOME skill offer specified 2026-08-19; slice 49 occupy/code progress and attach-first specified 2026-08-20
+- Artifact state: slice 1–45 leftover EXPOSE live-verified 2026-08-17; slice 46 registered-Server OpenCode attach accepted 2026-08-17; slice 48 occupancy HOME skill offer specified 2026-08-19; slice 49 occupy/code progress and attach-first specified 2026-08-20; slice 50 vendor flags + occupancy-home credentials + connecting-step data specified 2026-08-20
 - Discovery: [discovery.md](./discovery.md)
-- Governing decision: ADR-120 plan default destination; ADR-119 locates; ADR-118 occupies and may offer allowlisted HOME skills; ADR-117 remains the login/Server/`--local` door; ADR-116 remains Scratch-only; ADR-103 stays on explicit `workspace open` Git fail-closed
-- Code changes allowed: yes for the occupy/code progress and attach-first slice after this spec update
-- Compatibility: public minor. Occupancy leftover-default 3000 may be replaced by a single remote EXPOSE; registered-Server attach may use in-Sandbox managed-terminal when port publishing is unsupported; HOME skill offer is add-only and adds no catalog field
+- Governing decision: ADR-120 plan default destination; ADR-119 locates; ADR-118 occupies, may offer allowlisted HOME skills, and may write my laptop vendor credential onto my occupancy HOME; ADR-117 remains the login/Server/`--local` door; ADR-116 remains Scratch-only; ADR-103 stays on explicit `workspace open` Git fail-closed
+- Code changes allowed: yes for the vendor-credential and connecting-step slice after this spec update
+- Compatibility: public minor. Occupancy leftover-default 3000 may be replaced by a single remote EXPOSE; registered-Server attach may use in-Sandbox managed-terminal when port publishing is unsupported; HOME skill offer is add-only and adds no catalog field; vendor flags add no catalog field
 
 ## Business Outcome
 
@@ -218,7 +218,7 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-HOME-SKILL-182 | Occupancy offers allowlisted HOME skills | laptop HOME has matching skill directories | `appaloft code --no-attach` occupies | After the first-party Appaloft skill offer, occupy copies allowlisted HOME skill directories into `/workspace/skills/<name>` and `/workspace/.agents/skills/<name>` through the existing CLI `WriteSandboxFile` path, then git-excludes `/skills/` and `/.agents/` as today. Railway-aligned roots are `~/.claude/skills`, `~/.codex/skills`, `~/.grok/skills`, and `~/.agents/skills`. Appaloft also offers `~/.cursor/skills` and `~/.config/opencode/skills` because those are the roots Appaloft users actually use; those two roots are **beyond Railway**. Railway docs do not mention plugins, MCP config, `~/.cursor/skills`, or `~/.config/opencode/skills`. The Sandbox never reads laptop HOME. Same-name skills: first allowlisted root wins. Missing roots are skipped. Write failure is fail-soft. This is not a new setup command and is not the local Agent door. |
 | WS-REMOTE-HOME-SKILL-183 | Missing HOME skill dirs are skipped | some allowlisted roots are absent | occupy | those roots are skipped; occupy does not fail. |
 | WS-REMOTE-HOME-SKILL-184 | Only SKILL.md directories are copied | an allowlisted root has a child without `SKILL.md` | occupy | that child is not copied. Only immediate child directories that contain a `SKILL.md` file are offered. |
-| WS-REMOTE-HOME-SKILL-185 | Secrets and MCP are not copied | a matching skill directory also contains `mcp.json`, tokens, cookies, `.env`, or editor plugin binaries | occupy | those files are not written. Occupy does not upload `mcp.json`, tokens, cookies, `.env` / `.env.*`, `auth.json`, or editor plugin binaries such as `.vsix`. Files larger than 10MB are skipped (Railway fails those uploads). |
+| WS-REMOTE-HOME-SKILL-185 | Secrets and MCP are not copied from skill trees | a matching skill directory also contains `mcp.json`, tokens, cookies, `.env`, or editor plugin binaries | occupy | those files are not written from skill trees. Occupy does not upload skill-tree `mcp.json`, tokens, cookies, `.env` / `.env.*`, `auth.json`, or editor plugin binaries such as `.vsix`. Files larger than 10MB are skipped (Railway fails those uploads). Dedicated vendor credential offer (WS-REMOTE-CRED-208–210) may still write occupancy-HOME `auth.json` / Claude setup-token outside skill roots. |
 | WS-REMOTE-HOME-SKILL-186 | HOME skill offer is add-only | destination `/workspace/skills/<name>/…` or `/workspace/.agents/skills/<name>/…` already exists | occupy | existing user/sandbox files are not overwritten. First-party Appaloft skill is offered first, so a laptop `appaloft` skill does not replace the public Appaloft skill. |
 | WS-REMOTE-PROGRESS-187 | Occupy path never sits silent | login check, server lookup, this-folder pick/create, SSH/worker open, skill prepare, or attach is about to start | `appaloft code` or `appaloft code --no-attach` | CLI prints a short present-tense status line before that slow step (for example `Checking login…`, `Choosing this folder…`, `Using this project…`, `Preparing disk on hostinger…`, `Preparing skills…`, `Attaching…`). No happy-path gap stays silent for more than ~300ms. The word Occupancy does not appear in chrome or status lines. |
 | WS-REMOTE-PROGRESS-188 | `--no-attach` keeps the same progress | occupancy is ready | `appaloft code --no-attach` | occupy progress prints, then the Remote identity banner, then optional skill copy; CLI exits without attach. Skill copy must not block the banner or exit. |
@@ -242,6 +242,19 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-PROGRESS-206 | In-session `x` returns to the Cloud Agents list | TTY `appaloft code`; session exists | user presses `x` | TUI shows Appaloft Cloud Agents plus the project name in the list header, keeps `session_id`, and does not send Quit. No user-visible Occupancy. List footer is `enter connect` / `n new` / `w wake` / `d delete`. |
 | WS-REMOTE-PROGRESS-207 | `?` shows the Railway `ca` key table | TTY `appaloft code` | user presses `?` | Help lists Railway docs keys plus source extras (`?` `q` `j/k` `h/l` `⌥r` `⌥n` `⌥p` `⌥enter` `⌥[` `⌥]` `^o`). Missing capabilities say unavailable. `⌥s` setup is not in this door. s/w/d map to pause/resume/terminate. `q` is unbound and is not quit. |
 | WS-REMOTE-PROGRESS-208 | Source extras keep Railway meanings | TTY `appaloft code` | user presses source-only keys | `j`/`k` move. `h`/`l` open/close (unavailable until the tree expands). `⌥r` refreshes from anywhere. `⌥n`/`⌥p`/`^o` say unavailable and do not invent pickers, prompts, or domains. `⌥enter` connects and types. `⌥[`/`⌥]` cycle already-open sessions, wrap, and skip sleeping agents. Bare `f` on the manage tree is fullscreen; `⌥f` still restores the tree. `y`/`Y` only confirm `d`. Session Ctrl+C still passthrough. `x` still returns to the list. |
+| WS-REMOTE-VENDOR-204 | Vendor flags map onto existing harnesses | logged in + Server | `appaloft code --claude\|--codex\|--grok` | User-facing selector is the vendor flag. Each flag maps onto an existing occupancy harness ID (`opencode` by default). `--harness opencode\|pi\|omp` remains an advanced runtime override and does not invent a new sandbox runtime or image. Default OpenCode still omits `profile`. |
+| WS-REMOTE-VENDOR-205 | Default vendor follows this laptop | `--claude/--codex/--grok` omitted | `appaloft code --no-attach` | CLI picks the first vendor that is signed in on this laptop (Claude setup-token, Codex `~/.codex/auth.json`, Grok `~/.grok/auth.json`), else the first installed vendor binary. No signed-in vendor occupies without a credential offer. |
+| WS-REMOTE-VENDOR-206 | One vendor flag only | two vendor flags | `appaloft code --claude --grok` | fail-closed `workspace_occupancy_vendor_ambiguous`. |
+| WS-REMOTE-VENDOR-207 | `--harness` still overrides runtime | `--grok --harness pi` | occupy | Profile/runtime is Pi; credential offer is still Grok. |
+| WS-REMOTE-CRED-208 | Grok credential lands on occupancy disk | laptop `~/.grok/auth.json` exists | `appaloft code --grok --no-attach` | CLI writes that file to occupancy HOME `.grok/auth.json` through `WriteSandboxFile`. Not a sandbox/occupancy env var. |
+| WS-REMOTE-CRED-209 | Codex credential lands on occupancy disk | laptop `~/.codex/auth.json` exists | `appaloft code --codex --no-attach` | CLI writes occupancy HOME `.codex/auth.json` through `WriteSandboxFile`. |
+| WS-REMOTE-CRED-210 | Claude copies setup-token, not the chat cookie | laptop has `~/.claude/.credentials.json` and a setup-token | `appaloft code --claude --no-attach` | CLI copies `APPALOFT_HOME/claude-setup-token`, `~/.claude/setup-token`, or laptop `CLAUDE_CODE_OAUTH_TOKEN` onto occupancy `.claude/setup-token`. It does not copy `.credentials.json` / chat cookies. |
+| WS-REMOTE-CRED-211 | Long-lived secrets stay off occupancy env and mcp.json | vendor credential is offered | occupy | The credential is a HOME file only. Occupancy env vars and occupancy `.mcp.json` / first-party MCP config contain no token values. Laptop `mcp.json` is not copied. |
+| WS-REMOTE-CRED-212 | Token values are never printed | vendor credential is offered | occupy / `--no-attach` / TUI progress | stdout, stderr, connecting-step data, and errors do not include token or auth.json values. |
+| WS-REMOTE-CRED-213 | Explicit vendor without login fail-closes | `--grok` and no `~/.grok/auth.json` | `appaloft code --grok` | fail-closed `workspace_occupancy_vendor_credential_missing` with sign-in guidance. |
+| WS-REMOTE-MCP-214 | Occupancy offers first-party Appaloft MCP | occupy writes connecting materials | occupy | First-party Appaloft skill offer stays. Occupancy disk gets secret-free `.mcp.json` (`appaloft mcp stdio`). Laptop attach keeps `mcp remote-stdio`. Sandbox first-party `appaloft-tools` stays. Do not copy laptop MCP secrets. |
+| WS-REMOTE-CONNECT-215 | Connecting-step data exists | vendor credential and HOME skills are present | occupy | Structured `appaloft.occupancy-connecting/v1` data includes `using your {Grok\|Codex\|Claude} credential`, `including N skills`, and `work is on its disk`. Tests assert the data. This slice does not redesign the occupancy TUI. |
+| WS-REMOTE-CONNECT-216 | TUI layout is unchanged | TTY `appaloft code` | occupy | No Occupancy chrome change, no full-screen agent redesign, and no agent `:8080` public hostname in this slice. |
 
 ## Slice Scope
 
@@ -264,10 +277,13 @@ Out of slice 48: `auth mcp cursor install`, `appaloft setup agent`, MCP/plugin/s
 Slice 49: default `code` prints present-tense progress before every slow occupy step and attaches as soon as the occupancy exists. HOME skill offer and extra banner sync must not block attach or the Remote banner. `--no-attach` prints the Remote banner as soon as occupy returns; skill copy is after the banner, fail-soft, and time-bounded. Shell `run.ts` prints before login/PGlite/composition; remote `code` skips local PGlite sync and does not discard occupancy logs.
 Out of slice 49: a new setup-agent command, login-fold, deploy-fold, Cloud marketing pages, and live Hostinger deploy.
 
+Slice 50: `appaloft code --claude|--codex|--grok` is the user-facing vendor selector and maps onto existing occupancy harnesses. Occupy writes my laptop vendor credential onto occupancy HOME through `WriteSandboxFile`, add-only HOME skills stay, first-party Appaloft skill + secret-free Appaloft MCP stay, and connecting-step data is produced for a later TUI. Mental verification target is Hostinger `srv_4lifk0yrcecy` only.
+Out of slice 50: TUI layout redesign, an agent `:8080` public hostname, local `setup agent` (#1316), shipping/releasing to production, and inventing a new occupancy runtime.
+
 
 ## Public Surfaces
 
-- CLI: default `appaloft code [path|git-remote] [--no-attach] [--local] [--new] [--profile <name-or-id>]`. A git remote is a locator, not a local path. A no-git folder without an explicit remote occupies this folder after onboarding; git is not a `code` gate. Default OpenCode omits the invisible `appaloft-remote` name. Durable `appaloft workspace open [path|git-remote]` / `create` accept `--server` and default to the enrolled BYOS Server; those delivery doors still fail-close without a this-folder locator.
+- CLI: default `appaloft code [path|git-remote] [--no-attach] [--local] [--new] [--profile <name-or-id>] [--claude|--codex|--grok] [--harness opencode|pi|omp]`. A git remote is a locator, not a local path. A no-git folder without an explicit remote occupies this folder after onboarding; git is not a `code` gate. Vendor flags are the user-facing agent selector and map onto existing harnesses. Default OpenCode omits the invisible `appaloft-remote` name. Durable `appaloft workspace open [path|git-remote]` / `create` accept `--server` and default to the enrolled BYOS Server; those delivery doors still fail-close without a this-folder locator.
 - Catalog: no new field. Existing `workspaces.open` already takes credential-free HTTPS.
 - Persistence: existing Server / Binding / Profile / `workspace_open_entries`.
 - No new aggregate or Cloud table.
@@ -293,6 +309,8 @@ Out of slice 49: a new setup-agent command, login-fold, deploy-fold, Cloud marke
 | `workspace_scratch_remote_rejected` | `--local` with a git-remote locator |
 | `workspace_open_target_server_unavailable` | `targetServerId` is not tenant-visible or not reservable |
 | `workspace_open_profile_ambiguous` | more than one enabled Profile install shares the requested name and more than one of those has live occupancy; lists selector, installationIds, and `appaloft code --profile <id>`. Terminated/failed sandboxes are not this input. |
+| `workspace_occupancy_vendor_ambiguous` | more than one of `--claude`, `--codex`, `--grok` |
+| `workspace_occupancy_vendor_credential_missing` | explicit vendor flag and this laptop has no matching auth.json / setup-token |
 | existing `workspace_git_*` | `workspace open` / `workspace create` only |
 | Spec 138 scratch codes | `--local` path Scratch only |
 
@@ -301,7 +319,8 @@ Missing Binding is not a `code` hard failure. The initializer creates or reuses 
 ## Non-Goals
 
 - Implementing `ca` in the same ticket as occupancy or URL locator.
-- Shared personal OAuth, `mcp.json`, tokens, cookies, `.env`, or editor plugin binaries.
+- Sharing teammate or Server-home OAuth with anyone who can attach. My laptop vendor `auth.json` / Claude setup-token may be written onto **my** occupancy HOME only.
+- Copying laptop `mcp.json` secrets, chat cookies, `.env`, or editor plugin binaries.
 - Dirty-tree upload.
 - A new local Agent door or setup command (`auth mcp cursor install`, `appaloft setup agent`).
 - Sandbox processes reading laptop HOME. HOME skill copy happens only on the CLI occupy `WriteSandboxFile` path.
