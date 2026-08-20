@@ -3,8 +3,10 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { folderOccupancyIdentity } from "../src/folder-project-link.js";
 import { OCCUPANCY_CODE_PROGRESS } from "../src/occupancy-code-progress.js";
 import {
+  folderHasGitWorktree,
   formatRemoteCodeBanner,
   formatRemoteCodeGitHubHint,
   isRemoteCodeGitRemoteLocator,
@@ -49,7 +51,7 @@ describe("remote code door", () => {
       ),
     ).toMatchObject({
       code: "workspace_open_target_server_unsupported",
-      message: "This Cloud does not accept occupancy targeting for hostinger (srv_4lifk0yrcecy)",
+      message: "This Cloud does not accept Server targeting for hostinger (srv_4lifk0yrcecy)",
       details: { serverId: "srv_4lifk0yrcecy" },
     });
     const bound = {
@@ -852,6 +854,109 @@ describe("remote code door", () => {
       expect(contactedRemote).toBe(false);
     } finally {
       await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  test("[WS-REMOTE-PROGRESS-201] no-git cwd under an examples git ancestor does not resume examples", async () => {
+    const ancestor = await mkdtemp(join(tmpdir(), "appaloft-examples-ancestor-"));
+    const scratch = join(ancestor, "scratch");
+    await mkdir(scratch);
+    const git = async (args: readonly string[]) => {
+      const result = await Bun.spawn(["git", ...args], {
+        cwd: ancestor,
+        stdout: "pipe",
+        stderr: "pipe",
+      }).exited;
+      if (result !== 0) throw new Error(`git ${args.join(" ")} failed`);
+    };
+    let contactedRemote = false;
+    let resolvedLocator = false;
+    try {
+      await git(["init"]);
+      await git(["remote", "add", "origin", "https://github.com/appaloft/examples.git"]);
+      expect(folderHasGitWorktree(scratch)).toBe(false);
+      expect(folderHasGitWorktree(ancestor)).toBe(true);
+      const door = await resolveDefaultRemoteCodeDoor(
+        {
+          env: { APPALOFT_TOKEN: "token" },
+          folderCwd: scratch,
+          ensureFolderOnboarding: async () => ({
+            projectId: "prj_scratch",
+            projectName: "scratch",
+            identity: folderOccupancyIdentity("scratch"),
+            created: true,
+            reused: false,
+          }),
+          listServers: async () => [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }],
+          listOccupancies: async () => [
+            {
+              sandboxId: "sbx_c343gwqfn7yd",
+              status: "ready",
+              occupancy: {
+                repositoryIdentity: "github.com/appaloft/examples",
+                commitSha: "1a23b77000000000000000000000000000000000",
+                branch: "main",
+              },
+              lastActivityAt: "2026-08-20T12:30:00.000Z",
+            },
+          ],
+          resolveLocator: async () => {
+            resolvedLocator = true;
+            throw new Error("no-git cwd must not use the ancestor examples locator");
+          },
+          resolveRemoteRef: async () => {
+            contactedRemote = true;
+            throw new Error("no-git cwd must not ls-remote examples");
+          },
+        },
+        scratch,
+      );
+      expect(door.repositoryIdentity).toBe(folderOccupancyIdentity("scratch"));
+      expect(door.repositoryIdentity).not.toBe("github.com/appaloft/examples");
+      expect(door.commitSha).not.toBe("1a23b77000000000000000000000000000000000");
+      expect(resolvedLocator).toBe(false);
+      expect(contactedRemote).toBe(false);
+    } finally {
+      await rm(ancestor, { recursive: true, force: true });
+    }
+  });
+
+  test("[WS-REMOTE-NO-UPLOAD-006] --new from a no-git cwd stays fail-closed and does not resume examples", async () => {
+    const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-new-nongit-"));
+    try {
+      await expect(
+        resolveDefaultRemoteCodeDoor(
+          {
+            env: { APPALOFT_TOKEN: "token" },
+            forceNew: true,
+            folderOnboarding: {
+              projectId: "prj_scratch",
+              identity: folderOccupancyIdentity("scratch"),
+              created: true,
+              reused: false,
+            },
+            listServers: async () => [
+              { id: "srv_1", name: "hostinger", lifecycleStatus: "active" },
+            ],
+            listOccupancies: async () => [
+              {
+                sandboxId: "sbx_c343gwqfn7yd",
+                status: "ready",
+                occupancy: {
+                  repositoryIdentity: "github.com/appaloft/examples",
+                  commitSha: "1a23b77000000000000000000000000000000000",
+                  branch: "main",
+                },
+              },
+            ],
+          },
+          emptyDir,
+        ),
+      ).rejects.toMatchObject({
+        code: "workspace_remote_repository_missing",
+      });
+    } finally {
+      await rm(emptyDir, { recursive: true, force: true });
     }
   });
 

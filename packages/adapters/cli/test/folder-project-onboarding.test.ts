@@ -1,7 +1,7 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -25,6 +25,7 @@ import {
   ensureFolderProjectOnboarding,
   folderOnboardingCanPrompt,
   folderOnboardingStatusLine,
+  peekThisFolderGitIdentity,
   persistFolderProjectAssociation,
 } from "../src/folder-project-onboarding.js";
 import { CliRuntime } from "../src/runtime.js";
@@ -41,6 +42,27 @@ describe("folder project onboarding", () => {
       name: "hello-static",
       identity: folderOccupancyIdentity("hello-static"),
     });
+  });
+
+  test("[WS-REMOTE-PROGRESS-201] peekThisFolderGitIdentity ignores an ancestor examples remote", async () => {
+    const ancestor = await mkdtemp(join(tmpdir(), "appaloft-peek-ancestor-"));
+    const child = join(ancestor, "scratch");
+    await mkdir(child);
+    const git = async (args: readonly string[], cwd = ancestor) => {
+      const result = await Bun.spawn(["git", ...args], {
+        cwd,
+        stdout: "pipe",
+        stderr: "pipe",
+      }).exited;
+      if (result !== 0) throw new Error(`git ${args.join(" ")} failed`);
+    };
+    try {
+      await git(["init"]);
+      await git(["remote", "add", "origin", "https://github.com/appaloft/examples.git"]);
+      expect(await peekThisFolderGitIdentity(child)).toBeUndefined();
+    } finally {
+      await rm(ancestor, { recursive: true, force: true });
+    }
   });
 
   test("[FOLDER-ONBOARD-002] git remote cwd binds to that identity", () => {

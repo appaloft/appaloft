@@ -60,6 +60,7 @@ import {
 import {
   ensureFolderProjectOnboarding,
   folderOnboardingCwdFromLocator,
+  peekThisFolderGitIdentity,
 } from "../folder-project-onboarding.js";
 import { effectCliInteraction } from "../interaction.js";
 import { resolveRemoteGitWorkspaceRef } from "../local-git-workspace-context.js";
@@ -688,6 +689,7 @@ export const workspaceCodeCommand = EffectCommand.make(
                       cwd: folderOnboardingCwdFromLocator(path),
                       yes,
                       interaction: effectCliInteraction,
+                      peekGitIdentity: peekThisFolderGitIdentity,
                       ...(cli.environment ? { env: cli.environment } : {}),
                     }),
                   );

@@ -10,7 +10,7 @@ export const OCCUPANCY_CODE_PROGRESS = {
   lookingUpServers: "Looking up enrolled servers…",
   choosingOccupancy: "Opening this folder…",
   resolvingRepository: "Resolving repository…",
-  copyingSkills: "Copying skills…",
+  copyingSkills: "Preparing skills…",
   attaching: "Attaching…",
 } as const;
 

@@ -1,7 +1,7 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import {
@@ -1050,6 +1050,196 @@ describe("Agent Workspace CLI", () => {
     expect(commands.some((command) => command instanceof CreateProjectCommand)).toBe(true);
   });
 
+  test("[WS-REMOTE-PROGRESS-201] code --no-attach from a no-git cwd does not resume leftover examples", async () => {
+    const ancestor = await mkdtemp(join(tmpdir(), "appaloft-code-examples-ancestor-"));
+    const emptyDir = join(ancestor, "scratch");
+    await mkdir(emptyDir);
+    const home = await mkdtemp(join(tmpdir(), "appaloft-code-examples-home-"));
+    const git = async (args: readonly string[]) => {
+      const result = await Bun.spawn(["git", ...args], {
+        cwd: ancestor,
+        stdout: "pipe",
+        stderr: "pipe",
+      }).exited;
+      if (result !== 0) throw new Error(`git ${args.join(" ")} failed`);
+    };
+    await git(["init"]);
+    await git(["remote", "add", "origin", "https://github.com/appaloft/examples.git"]);
+    const commands: Command<unknown>[] = [];
+    const printed: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          if (command instanceof CreateProjectCommand) return ok({ id: "prj_folder" } as T);
+          return ok({ workspaceId: "sbx_folder" } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: {
+        execute: async <T>(_context: unknown, query: Query<T>) => {
+          if (query instanceof ListServersQuery) {
+            return ok({
+              items: [{ id: "srv_4lifk0yrcecy", name: "hostinger", lifecycleStatus: "active" }],
+            } as T);
+          }
+          if (query instanceof ListSandboxesQuery) {
+            return ok({
+              items: [
+                {
+                  sandboxId: "sbx_c343gwqfn7yd",
+                  status: "ready",
+                  occupancy: {
+                    repositoryIdentity: "github.com/appaloft/examples",
+                    commitSha: "1a23b77000000000000000000000000000000000",
+                    branch: "main",
+                  },
+                  lastActivityAt: "2026-08-20T12:30:00.000Z",
+                },
+              ],
+            } as T);
+          }
+          if (query instanceof ShowProjectQuery) {
+            return ok({
+              id: "prj_folder",
+              name: "scratch",
+              lifecycleStatus: "active",
+            } as T);
+          }
+          if (query instanceof ListProjectsQuery) {
+            return ok({ items: [], total: 0, limit: 100, offset: 0 } as T);
+          }
+          return ok({ items: [] } as T);
+        },
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_nongit_cwd" }),
+      },
+      environment: { APPALOFT_TOKEN: "token", APPALOFT_HOME: home, HOME: home },
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+    });
+    const originalExitCode = process.exitCode;
+    const previousCwd = process.cwd();
+    const writeOut = process.stdout.write;
+    const writeErr = process.stderr.write;
+    const capture = ((chunk: unknown) => {
+      printed.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    process.stdout.write = capture;
+    process.stderr.write = capture;
+    try {
+      process.chdir(emptyDir);
+      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
+    } finally {
+      process.chdir(previousCwd);
+      process.stdout.write = writeOut;
+      process.stderr.write = writeErr;
+      process.exitCode = originalExitCode ?? 0;
+      await rm(ancestor, { recursive: true, force: true });
+      await rm(home, { recursive: true, force: true });
+    }
+    const opened = commands.find((command) => command instanceof OpenAgentWorkspaceCommand);
+    expect(opened).toBeDefined();
+    expect(opened).toMatchObject({
+      input: {
+        repositoryIdentity: folderOccupancyIdentity("scratch"),
+        branch: "local",
+        attach: false,
+      },
+    });
+    expect(opened).not.toMatchObject({
+      input: { repositoryIdentity: "github.com/appaloft/examples" },
+    });
+    expect(opened).not.toMatchObject({
+      input: { workspaceId: "sbx_c343gwqfn7yd" },
+    });
+    const text = printed.join("");
+    expect(text.toLowerCase()).not.toContain("occupancy");
+    expect(text).not.toContain("Copying skills");
+    expect(text).not.toContain("Choosing occupancy");
+    expect(text).not.toContain("github.com/appaloft/examples");
+    expect(text).not.toContain("sslip");
+    expect(text).not.toContain("RAILWAY_PUBLIC_DOMAIN");
+  });
+
+  test("[WS-REMOTE-NO-UPLOAD-006] code --new --no-attach from a no-git cwd stays fail-closed", async () => {
+    const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-new-cwd-"));
+    const home = await mkdtemp(join(tmpdir(), "appaloft-code-new-cwd-home-"));
+    const commands: Command<unknown>[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: {
+        execute: async <T>(_context: unknown, query: Query<T>) => {
+          if (query instanceof ListServersQuery) {
+            return ok({
+              items: [{ id: "srv_4lifk0yrcecy", name: "hostinger", lifecycleStatus: "active" }],
+            } as T);
+          }
+          if (query instanceof ListSandboxesQuery) {
+            return ok({
+              items: [
+                {
+                  sandboxId: "sbx_c343gwqfn7yd",
+                  status: "ready",
+                  occupancy: {
+                    repositoryIdentity: "github.com/appaloft/examples",
+                    commitSha: "1a23b77000000000000000000000000000000000",
+                    branch: "main",
+                  },
+                },
+              ],
+            } as T);
+          }
+          return ok({ items: [] } as T);
+        },
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_new_nongit" }),
+      },
+      environment: { APPALOFT_TOKEN: "token", APPALOFT_HOME: home, HOME: home },
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+    });
+    const originalExitCode = process.exitCode;
+    const previousCwd = process.cwd();
+    const write = process.stderr.write;
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+    try {
+      process.chdir(emptyDir);
+      await program.parseAsync(["node", "appaloft", "code", "--new", "--no-attach"]);
+      throw new Error("Expected --new without a locator to fail closed");
+    } catch (error) {
+      const errorText = String(error);
+      expect(errorText).toContain("workspace_remote_repository_missing");
+      expect(errorText).not.toContain("github.com/appaloft/examples");
+    } finally {
+      process.chdir(previousCwd);
+      process.stderr.write = write;
+      process.exitCode = originalExitCode ?? 0;
+      await rm(emptyDir, { recursive: true, force: true });
+      await rm(home, { recursive: true, force: true });
+    }
+    expect(commands.some((command) => command instanceof OpenAgentWorkspaceCommand)).toBe(false);
+  });
+
   test("[FOLDER-ONBOARD-007] code --no-attach from a non-git cwd occupies this folder when no occupancy exists", async () => {
     const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-nongit-empty-"));
     const home = await mkdtemp(join(tmpdir(), "appaloft-code-nongit-empty-home-"));
@@ -2010,14 +2200,14 @@ describe("Agent Workspace CLI", () => {
     expect(events).not.toContain("attach");
     expect(printed).toContain("Checking login…");
     expect(printed).toContain("Preparing disk on hostinger…");
-    expect(printed).toContain("Copying skills…");
+    expect(printed).toContain("Preparing skills…");
     expect(printed).toContain(
       "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · sbx_progress",
     );
     expect(printed.indexOf("Preparing disk on hostinger…")).toBeLessThan(
       printed.indexOf("Remote ·"),
     );
-    expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Copying skills…"));
+    expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Preparing skills…"));
   });
 
   test("[WS-REMOTE-PROGRESS-192] --no-attach prints Remote banner before a hung skill copy and still exits", async () => {
@@ -2087,8 +2277,8 @@ describe("Agent Workspace CLI", () => {
     expect(printed).toContain(
       "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · sbx_hung_skill",
     );
-    expect(printed).toContain("Copying skills…");
-    expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Copying skills…"));
+    expect(printed).toContain("Preparing skills…");
+    expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Preparing skills…"));
   });
 
   test("[WS-REMOTE-PROGRESS-189][WS-REMOTE-ATTACH-134] default code attaches before optional skill copy finishes", async () => {
@@ -2155,7 +2345,7 @@ describe("Agent Workspace CLI", () => {
     expect(attached).toBeTrue();
     expect(skillCompletedBeforeAttach).toBeFalse();
     expect(printed).toContain("Preparing disk on hostinger…");
-    expect(printed).toContain("Copying skills…");
+    expect(printed).toContain("Preparing skills…");
     expect(printed).toContain("Attaching…");
     expect(printed).toContain(
       "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · sbx_attach_first",
@@ -2164,7 +2354,7 @@ describe("Agent Workspace CLI", () => {
       printed.indexOf("Remote ·"),
     );
     expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Attaching…"));
-    expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Copying skills…"));
+    expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Preparing skills…"));
   });
 
   test("[WS-REMOTE-PROGRESS-193] TTY code enters occupancy TUI without streamed line progress", async () => {

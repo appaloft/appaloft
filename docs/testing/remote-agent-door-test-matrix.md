@@ -179,7 +179,7 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-PROGRESS-198 | CLI / shell | automated | missing `appaloft-workspace-tui` names the binary and `cargo build --locked` next command; rustc 1.85 is called too old | `packages/adapters/cli/test/workspace-control-renderer.test.ts` |
 | WS-REMOTE-PROGRESS-199 | TUI | automated | attached footer hides `conflict at workspace-control-select` / `occupancy-code-bootstrap` | `apps/workspace-control-tui/src/lib.rs` |
 | WS-REMOTE-PROGRESS-200 | CLI | automated | community/dev pin locates sibling checkout `appaloft-workspace-tui` | `packages/adapters/cli/test/workspace-control-renderer.test.ts` |
-| WS-REMOTE-PROGRESS-201 | CLI / TUI | automated | no-git folder occupies this folder without ancestor `ls-remote` and without resuming unrelated occupancy; matching occupancy skips `ls-remote`; `--new` without a locator still fail-closes | `packages/adapters/cli/test/remote-code-session.test.ts`; `packages/adapters/cli/test/agent-workspace-command.test.ts`; `packages/adapters/cli/test/workspace-control-presentation.test.ts` |
+| WS-REMOTE-PROGRESS-201 | CLI / TUI | automated | no-git folder occupies this folder without ancestor `ls-remote` and without resuming leftover `examples` / `truefile`; `--no-attach` from cwd (no path) shares the rule; matching occupancy skips `ls-remote`; `--new` without a locator still fail-closes; chrome never says Occupancy | `packages/adapters/cli/test/remote-code-session.test.ts`; `packages/adapters/cli/test/agent-workspace-command.test.ts`; `packages/adapters/cli/test/folder-project-onboarding.test.ts`; `packages/adapters/cli/test/occupancy-code-progress.test.ts` |
 
 
 

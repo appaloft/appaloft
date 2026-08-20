@@ -218,18 +218,10 @@ export interface ResolveWorkspaceOpenSourceOptions extends ResolveGitWorkspacePr
 
 export function folderHasGitWorktree(
   selectedPath: string,
-  homeDir = process.env.HOME?.trim() || homedir(),
+  _homeDir = process.env.HOME?.trim() || homedir(),
 ): boolean {
-  const ceiling = workspaceGitDiscoveryCeiling(selectedPath, homeDir);
-  let current = resolve(selectedPath.trim() || ".");
-  for (let depth = 0; depth < 16; depth += 1) {
-    if (existsSync(join(current, ".git"))) return true;
-    const parent = dirname(current);
-    if (parent === current) return false;
-    if (ceiling && (current === ceiling || parent === ceiling)) return false;
-    current = parent;
-  }
-  return false;
+  const current = resolve(selectedPath.trim() || ".");
+  return existsSync(join(current, ".git"));
 }
 
 export function workspaceGitDiscoveryCeiling(
@@ -288,13 +280,13 @@ function throwWorkspaceLocatorMissing(
     throw workspaceLocatorMissingError(
       "Workspace open needs a git remote for this directory",
       phase,
-      "Pass a git remote such as https://github.com/org/repo.git, or run from this folder's Git worktree. Do not reuse another occupancy.",
+      "Pass a git remote such as https://github.com/org/repo.git, or run from this folder's Git worktree. Do not reuse another folder's sandbox.",
     );
   }
   throw workspaceLocatorMissingError(
     "Remote code needs a Git repository with an origin or a git remote locator",
     phase,
-    "Run appaloft code <git-remote> for this folder, or run from this folder's Git worktree. Do not reuse another occupancy.",
+    "Run appaloft code <git-remote> for this folder, or run from this folder's Git worktree. Do not reuse another folder's sandbox.",
   );
 }
 
@@ -419,7 +411,7 @@ export function occupancyCloudCompatError(
   if (!unstructured) return error;
   return remoteCodeError(
     "workspace_open_target_server_unsupported",
-    `This Cloud does not accept occupancy targeting for ${server.name} (${server.id})`,
+    `This Cloud does not accept Server targeting for ${server.name} (${server.id})`,
     {
       phase: "remote-code-cloud-compat",
       serverId: server.id,
@@ -460,8 +452,11 @@ export async function resolveDefaultRemoteCodeDoor(
     : undefined;
   const homeDir = probe.env?.HOME ?? process.env.HOME;
   const folderCwd = probe.folderCwd ?? (explicitRemote ? process.cwd() : path);
-  const probeThisFolderGit =
-    Boolean(explicitRemote) || Boolean(probe.forceNew) || folderHasGitWorktree(path, homeDir);
+  const thisFolderGit = folderHasGitWorktree(path, homeDir);
+  if (probe.forceNew && !explicitRemote && !thisFolderGit) {
+    throwWorkspaceLocatorMissing(undefined, "remote-code-locator");
+  }
+  const probeThisFolderGit = Boolean(explicitRemote) || thisFolderGit;
   let folderOnboarding = explicitRemote ? undefined : probe.folderOnboarding;
   const loadFolderOnboarding = async () => {
     if (folderOnboarding || explicitRemote) return folderOnboarding;

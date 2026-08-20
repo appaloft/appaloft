@@ -2075,7 +2075,7 @@ describe("Workspace control presentation", () => {
     await presentation.start({
       occupyBootstrap: async ({ reportProgress }) => {
         await reportProgress("Preparing disk on hostinger…");
-        await reportProgress("Copying skills…");
+        await reportProgress("Preparing skills…");
         skillBlockers += 1;
         return {
           workspaceId: "sbx_1",
@@ -2119,7 +2119,7 @@ describe("Workspace control presentation", () => {
     });
     expect(renderer.messages).toContainEqual({
       type: "progress",
-      message: "Copying skills…",
+      message: "Preparing skills…",
       step: "skills",
     });
     expect(renderer.messages).toContainEqual({

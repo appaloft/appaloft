@@ -451,6 +451,10 @@
 - [x] Unit tests WS-REMOTE-PROGRESS-207
 - [x] Extra Railway source keys (`?` `q` `j/k` `h/l` `⌥r` `⌥n` `⌥p` `⌥enter` `⌥[` `⌥]` `^o`) keep source meanings; `q` is not quit
 - [x] Unit tests WS-REMOTE-PROGRESS-208
+- [x] No-git cwd `code` / `--no-attach` occupies this folder and does not resume leftover `examples`
+- [x] `--new` without a locator stays fail-closed
+- [x] User-visible chrome/status never say Occupancy / `Copying skills` / `Choosing occupancy`
+- [x] Unit tests WS-REMOTE-PROGRESS-201 / WS-REMOTE-NO-UPLOAD-006 for ancestor git + leftover examples
 
 ## Later
 

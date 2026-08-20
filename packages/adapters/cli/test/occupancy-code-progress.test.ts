@@ -52,6 +52,12 @@ describe("occupancy code progress timeouts", () => {
     expect(OCCUPANCY_CODE_PROGRESS.connecting).toBe("Checking credentials…");
     expect(OCCUPANCY_CODE_PROGRESS.connecting).not.toContain("Connecting to Appaloft");
     expect(OCCUPANCY_CODE_PROGRESS.choosingOccupancy).toBe("Opening this folder…");
+    expect(OCCUPANCY_CODE_PROGRESS.copyingSkills).toBe("Preparing skills…");
+    expect(OCCUPANCY_CODE_PROGRESS.copyingSkills).not.toContain("Copying skills");
+    expect(OCCUPANCY_CODE_PROGRESS.choosingOccupancy).not.toContain("Choosing occupancy");
+    for (const message of Object.values(OCCUPANCY_CODE_PROGRESS)) {
+      expect(occupancyChromeHasForbiddenWord(message)).toBeFalse();
+    }
     expect(occupancyOpeningProgress("hostinger")).toBe("Preparing disk on hostinger…");
     expect(occupancyChromeHasForbiddenWord(occupancyOpeningProgress("hostinger"))).toBeFalse();
     expect(occupancyPrepareStepForProgress(OCCUPANCY_CODE_PROGRESS.checkingLogin)).toBe(
