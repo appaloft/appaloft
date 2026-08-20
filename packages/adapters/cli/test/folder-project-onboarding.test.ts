@@ -22,10 +22,14 @@ import {
   writeFolderProjectLink,
 } from "../src/folder-project-link.js";
 import {
+  CODE_SESSION_INQUIRE_CONTINUE,
+  codeSessionInquireCreateMessage,
   decideFolderProjectOnboarding,
   ensureFolderProjectOnboarding,
+  folderOnboardingCancelledError,
   folderOnboardingCanPrompt,
   folderOnboardingStatusLine,
+  isFolderOnboardingCancelled,
   peekThisFolderGitIdentity,
   persistFolderProjectAssociation,
 } from "../src/folder-project-onboarding.js";
@@ -201,7 +205,7 @@ describe("folder project onboarding", () => {
     });
   });
 
-  test("[FOLDER-ONBOARD-009] code session auto-creates by directory name and never prompts", () => {
+  test("[FOLDER-ONBOARD-009] code session inquires before TUI and does not pick from a project list", () => {
     const projects = [
       { id: "prj_a", name: "Alpha", lifecycleStatus: "active" },
       { id: "prj_b", name: "Beta", lifecycleStatus: "active" },
@@ -209,13 +213,50 @@ describe("folder project onboarding", () => {
     expect(
       decideFolderProjectOnboarding({
         directoryName: "scratch",
+        projects: [],
+        canPrompt: true,
+        promptPolicy: "pre-tui-inquire",
+      }),
+    ).toEqual({
+      kind: "inquire",
+      name: "scratch",
+      identity: folderOccupancyIdentity("scratch"),
+    });
+    expect(
+      decideFolderProjectOnboarding({
+        directoryName: "scratch",
         projects,
         canPrompt: true,
-        promptPolicy: "auto-create",
+        promptPolicy: "pre-tui-inquire",
+      }),
+    ).toEqual({
+      kind: "inquire",
+      name: "scratch",
+      identity: folderOccupancyIdentity("scratch"),
+    });
+    expect(
+      decideFolderProjectOnboarding({
+        directoryName: "scratch",
+        projects,
+        canPrompt: true,
+        yes: true,
+        promptPolicy: "pre-tui-inquire",
       }),
     ).toEqual({
       kind: "create",
       name: "scratch",
+      identity: folderOccupancyIdentity("scratch"),
+    });
+    expect(
+      decideFolderProjectOnboarding({
+        directoryName: "scratch",
+        projects: [{ id: "prj_only", name: "Only", lifecycleStatus: "active" }],
+        canPrompt: true,
+        promptPolicy: "pre-tui-inquire",
+      }),
+    ).toEqual({
+      kind: "use-only-project",
+      projectId: "prj_only",
       identity: folderOccupancyIdentity("scratch"),
     });
   });
@@ -341,9 +382,10 @@ describe("folder project onboarding", () => {
     expect((await readFolderProjectLink("/tmp/notes", store))?.projectId).toBe("prj_notes");
   });
 
-  test("[FOLDER-ONBOARD-009] Effect code-session onboarding does not select when several projects exist", async () => {
+  test("[FOLDER-ONBOARD-009] Effect code-session inquire creates the directory project after Continue", async () => {
     const store = memoryFolderProjectLinkStore();
     const commands: AppCommand<unknown>[] = [];
+    const confirms: string[] = [];
     let selected = 0;
     const runtime = Layer.succeed(CliRuntime, {
       version: "test",
@@ -379,18 +421,19 @@ describe("folder project onboarding", () => {
           cwd: "/tmp/scratch",
           store,
           canPrompt: true,
-          promptPolicy: "auto-create",
+          promptPolicy: "pre-tui-inquire",
           peekGitIdentity: async () => undefined,
           interaction: {
             text: () => {
-              throw new Error("code session must not prompt");
+              throw new Error("code session must not collect free text");
             },
             select: () => {
               selected += 1;
               throw new Error("code session must not select a project");
             },
-            confirm: () => {
-              throw new Error("code session must not confirm");
+            confirm: (input) => {
+              confirms.push(input.message);
+              return Effect.succeed(true);
             },
           },
           writeStatus: () => undefined,
@@ -399,12 +442,82 @@ describe("folder project onboarding", () => {
       ),
     );
     expect(selected).toBe(0);
+    expect(confirms).toEqual([
+      CODE_SESSION_INQUIRE_CONTINUE,
+      codeSessionInquireCreateMessage("scratch"),
+    ]);
     expect(commands[0]).toBeInstanceOf(CreateProjectCommand);
     expect(result).toMatchObject({
       projectId: "prj_scratch",
       created: true,
       identity: folderOccupancyIdentity("scratch"),
     });
+  });
+
+  test("[FOLDER-ONBOARD-009] code inquire ^c / decline quits immediately without Workspace CLI hang", async () => {
+    const store = memoryFolderProjectLinkStore();
+    let created = 0;
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      terminalIO: {
+        stdin: { isTTY: true, on: () => undefined },
+        stdout: { isTTY: true, write: () => true },
+        stderr: { isTTY: true, write: () => true },
+      },
+      executeCommand: async <T>() => {
+        created += 1;
+        return ok({ id: "prj_scratch" } as T);
+      },
+      executeQuery: async <T>() =>
+        ok({
+          items: [
+            { id: "prj_a", name: "Alpha", lifecycleStatus: "active" },
+            { id: "prj_b", name: "Beta", lifecycleStatus: "active" },
+          ],
+          total: 2,
+          limit: 100,
+          offset: 0,
+        } as T),
+    } as never);
+
+    const outcome = await Effect.runPromise(
+      Effect.either(
+        Effect.provide(
+          ensureFolderProjectOnboarding({
+            cwd: "/tmp/scratch",
+            store,
+            canPrompt: true,
+            promptPolicy: "pre-tui-inquire",
+            peekGitIdentity: async () => undefined,
+            interaction: {
+              text: () => {
+                throw new Error("code session must not collect free text");
+              },
+              select: () => {
+                throw new Error("code session must not select a project");
+              },
+              confirm: () => Effect.succeed(false),
+            },
+            writeStatus: () => undefined,
+          }),
+          runtime,
+        ),
+      ),
+    );
+    expect(created).toBe(0);
+    expect(outcome._tag).toBe("Left");
+    if (outcome._tag === "Left") {
+      expect(isFolderOnboardingCancelled(outcome.left)).toBeTrue();
+      expect(String(outcome.left.message)).toBe("Cancelled");
+      expect(String(outcome.left.message)).not.toContain("Workspace CLI operation failed");
+    }
+    expect(folderOnboardingCancelledError().details?.code).toBe("folder_onboarding_cancelled");
+    const source = await Bun.file(
+      new URL("../src/folder-project-onboarding.ts", import.meta.url),
+    ).text();
+    expect(source).toContain("process.exit(130)");
+    expect(source).toContain("SIGINT");
   });
 
   test("[FOLDER-ONBOARD-002] Effect onboarding binds a git remote identity", async () => {

@@ -18,8 +18,8 @@ No new command, query, table, or catalog entry. Folder links are a CLI user-file
 
 - `appaloft deploy` and `appaloft code` call folder onboarding before existing
   admission / `workspaces.open`.
-- `code` onboarding uses auto-create/link (no TTY select). An Effect project
-  picker stays off the occupancy alt-screen.
+- `code` onboarding is a pre-TUI inquire (`Continue` → create default project
+  → link), matching Railway `code` rather than `ca`. `^c` quits immediately.
 - `appaloft project use` writes the folder link after `projects.show`.
 - `project show` without an id prefers the folder link over latest occupancy.
 

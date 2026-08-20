@@ -32,6 +32,7 @@ export {
   type RatatuiWorkspaceControlPresentationInput,
   readRustcVersion,
   resetWorkspaceControlRendererWarmup,
+  resolveCodeWorkspaceControlRendererBinary,
   resolveWorkspaceControlRendererBinary,
   rustcTooOldForWorkspaceControlTui,
   WORKSPACE_CONTROL_TUI_BINARY_NAME,
@@ -44,6 +45,7 @@ export {
   warmupWorkspaceControlRenderer,
   workspaceControlRendererCrateDir,
   workspaceControlRendererSearchRoots,
+  workspaceControlRendererSupportsCodeChrome,
   workspaceControlRendererUnavailableMessage,
 } from "./workspace-tui-launch.js";
 

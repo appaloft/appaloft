@@ -29,6 +29,7 @@ import {
   type SourceLinkTarget,
 } from "./commands/deployment-remote-state.js";
 import { type DeploymentStateBackendDecision } from "./commands/deployment-state.js";
+import { type CliInteraction } from "./interaction.js";
 import {
   type LocalGitWorkspaceContext,
   type RemoteGitWorkspaceRef,
@@ -108,6 +109,7 @@ export interface CliProgramInput {
   resolveRemoteCodeDoor?: RemoteCodeDoorResolver;
   launchNativeWorkspaceClient?: (argv: readonly string[]) => Promise<void>;
   workspaceControlPresentation?: WorkspaceControlPresentation;
+  folderOnboardingInteraction?: CliInteraction;
   operatePresentation?: OperatePresentation;
   openNativeWorkspaceTerminal?: (
     input: OpenNativeWorkspaceTerminalInput,
@@ -188,6 +190,7 @@ export class CliRuntime extends Context.Tag("CliRuntime")<
     readonly resolveRemoteCodeDoor?: RemoteCodeDoorResolver;
     readonly launchNativeWorkspaceClient?: (argv: readonly string[]) => Promise<void>;
     readonly workspaceControlPresentation?: WorkspaceControlPresentation;
+    readonly folderOnboardingInteraction?: CliInteraction;
     readonly operatePresentation?: OperatePresentation;
     readonly openNativeWorkspaceTerminal: (
       input: OpenNativeWorkspaceTerminalInput,
@@ -282,6 +285,7 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
     ...(input.workspaceControlPresentation
       ? { workspaceControlPresentation: input.workspaceControlPresentation }
       : {}),
+    folderOnboardingInteraction: input.folderOnboardingInteraction,
     ...(input.operatePresentation ? { operatePresentation: input.operatePresentation } : {}),
     openNativeWorkspaceTerminal:
       input.openNativeWorkspaceTerminal ?? openBunNativeWorkspaceTerminal,

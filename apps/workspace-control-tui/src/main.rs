@@ -103,7 +103,7 @@ fn read_handshake(reader: &mut BufReader<TcpStream>) -> Result<()> {
 
 fn main() -> Result<()> {
     if env::args().any(|argument| argument == "--version") {
-        println!("appaloft-workspace-tui {}", env!("CARGO_PKG_VERSION"));
+        println!("appaloft-workspace-tui {} cloud-agents", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
 

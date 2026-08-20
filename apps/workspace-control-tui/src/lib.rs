@@ -139,7 +139,7 @@ const OCCUPANCY_HELP_ROWS: &[&str] = &[
     "c              copy SSH unavailable",
     "r / ⌥r         refresh (⌥r from anywhere)",
     "t / ^t         set target unavailable",
-    "f / ⌥f         fullscreen / restore tree",
+    "f / ⌥f         fullscreen / restore the tree",
     "shift+enter    leave fullscreen unavailable",
     "⌥[ ⌥]          cycle open sessions (wrap, no wake)",
     "⌥t             theme unavailable",
@@ -2311,24 +2311,61 @@ fn occupancy_loading_step_lines(state: &AppState) -> Vec<Line<'static>> {
 
 fn occupancy_loading_footer(collapsed: bool) -> String {
     if collapsed {
-        " ⌥f restore tree  shift+esc/^] stop typing  ? ".to_owned()
+        " ⌥f restore the tree  shift+esc/^] stop typing  ? ".to_owned()
     } else {
-        " enter connect  n new  w wake  d delete  ? ".to_owned()
+        " ⌥f hide the tree  shift+esc/^] stop typing  ? ".to_owned()
     }
 }
 
 fn occupancy_session_footer(state: &AppState) -> String {
     if state.osc52_passthrough_failed {
         format!(
-            " {}  │  ⌥f restore tree  wrap  shift+esc/^] stop typing ",
+            " {}  │  ⌥f restore the tree  wrap  shift+esc/^] stop typing ",
             OSC52_PASSTHROUGH_DISABLED
         )
     } else {
-        " ⌥f restore tree  wrap  shift+esc/^] stop typing ".to_owned()
+        " ⌥f restore the tree  wrap  shift+esc/^] stop typing ".to_owned()
     }
 }
 
+fn occupancy_agents_tree_lines(state: &AppState) -> Vec<Line<'static>> {
+    let project = if state.loading.project.is_empty() {
+        "this folder".to_owned()
+    } else {
+        state.loading.project.clone()
+    };
+    vec![
+        Line::from(Span::styled(
+            "Appaloft Cloud Agents",
+            Style::default().add_modifier(Modifier::BOLD),
+        )),
+        Line::from(format!("  {project}")),
+        Line::from("    preparing the agent"),
+    ]
+}
+
 fn render_occupancy_loading(frame: &mut Frame<'_>, state: &AppState, area: Rect) {
+    if !state.loading.collapsed {
+        let columns = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(28), Constraint::Percentage(72)])
+            .split(area);
+        frame.render_widget(
+            Paragraph::new(occupancy_agents_tree_lines(state)).block(
+                Block::default()
+                    .title(" Appaloft Cloud Agents ")
+                    .borders(Borders::ALL),
+            ),
+            columns[0],
+        );
+        let wait = columns[1];
+        render_occupancy_prepare_panel(frame, state, wait);
+        return;
+    }
+    render_occupancy_prepare_panel(frame, state, area);
+}
+
+fn render_occupancy_prepare_panel(frame: &mut Frame<'_>, state: &AppState, area: Rect) {
     const STEP_ROWS: u16 = 9;
     let block = Block::default()
         .borders(Borders::ALL)
@@ -3125,7 +3162,7 @@ mod tests {
             "first useful frame must stay collapsed:\n{out}"
         );
         assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
-        assert!(out.contains("restore tree"), "{out}");
+        assert!(out.contains("restore the tree"), "{out}");
         assert!(out.contains("?"), "{out}");
         assert_no_bare_q_quit(&out);
         assert!(!out.contains("^q quit"), "{out}");
@@ -3345,7 +3382,7 @@ mod tests {
         assert!(out.contains("copy SSH unavailable"), "{out}");
         assert!(out.contains("⌥r"), "{out}");
         assert!(
-            out.contains("f / ⌥f         fullscreen / restore tree"),
+            out.contains("f / ⌥f         fullscreen / restore the tree"),
             "{out}"
         );
         assert!(out.contains("cycle open sessions (wrap, no wake)"), "{out}");
@@ -3416,7 +3453,7 @@ mod tests {
         assert!(out.contains("Preparing skills"), "{out}");
         assert!(out.contains("Preparing disk"), "{out}");
         assert!(out.contains('✓'), "{out}");
-        assert!(out.contains("restore tree"), "{out}");
+        assert!(out.contains("restore the tree"), "{out}");
         assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
         assert!(
             !out.contains("Connecting to Appaloft"),
@@ -3426,6 +3463,21 @@ mod tests {
             !out.contains("sbx_1"),
             "collapsed wait must hide the tree:\n{out}"
         );
+        state.loading.collapsed = false;
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw revealed agents tree");
+        let revealed = buffer_plain(&terminal);
+        assert!(revealed.contains("Appaloft Cloud Agents"), "{revealed}");
+        assert!(revealed.contains("hello-static"), "{revealed}");
+        assert!(revealed.contains("preparing the agent"), "{revealed}");
+        assert!(!revealed.to_ascii_lowercase().contains("occupancy"), "{revealed}");
+        assert!(
+            !revealed.contains("Select a Workspace to load bounded detail."),
+            "{revealed}"
+        );
+        assert!(!revealed.contains("src/"), "{revealed}");
+        assert!(revealed.contains("hide the tree"), "{revealed}");
         state.apply(ParentMessage::TerminalReady {
             workspace_id: "sbx_1".to_owned(),
             runtime_id: "sar_1".to_owned(),

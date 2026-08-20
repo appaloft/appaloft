@@ -60,7 +60,7 @@ describe("occupancy CLI shell progress", () => {
 
   test("[WS-REMOTE-PROGRESS-197] TTY occupancy warms the TUI before importing run.ts", () => {
     const tty = { stdin: { isTTY: true }, stdout: { isTTY: true } };
-    expect(shouldWarmOccupancyTui(["code"], tty)).toBeTrue();
+    expect(shouldWarmOccupancyTui(["code"], tty)).toBeFalse();
     expect(shouldWarmOccupancyTui(["workspace"], tty)).toBeTrue();
     expect(shouldWarmOccupancyTui(["code", "--no-attach"], tty)).toBeFalse();
     expect(shouldWarmOccupancyTui(["code", "--help"], tty)).toBeFalse();

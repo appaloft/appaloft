@@ -62,8 +62,10 @@ import { folderDirectoryName, isFolderOccupancyIdentity } from "../folder-projec
 import {
   ensureFolderProjectOnboarding,
   folderOnboardingCwdFromLocator,
+  isFolderOnboardingCancelled,
   peekThisFolderGitIdentity,
 } from "../folder-project-onboarding.js";
+import { codeSessionInquireInteraction } from "../interaction.js";
 import { resolveRemoteGitWorkspaceRef } from "../local-git-workspace-context.js";
 import {
   launchScratchAgent,
@@ -338,6 +340,9 @@ function isFolderOccupancyPartialRecovery(
 }
 
 function workspaceCliError(error: unknown, phase: string): DomainError {
+  if (isFolderOnboardingCancelled(error)) {
+    return error as DomainError;
+  }
   if (
     typeof error === "object" &&
     error !== null &&
@@ -790,8 +795,14 @@ export const workspaceCodeCommand = EffectCommand.make(
                   return Runtime.runPromise(runtime)(
                     ensureFolderProjectOnboarding({
                       cwd: folderOnboardingCwdFromLocator(path),
-                      yes,
-                      promptPolicy: "auto-create",
+                      yes: yes || useOccupancyTui,
+                      ...(useOccupancyTui
+                        ? {}
+                        : {
+                            promptPolicy: "pre-tui-inquire" as const,
+                            interaction:
+                              cli.folderOnboardingInteraction ?? codeSessionInquireInteraction,
+                          }),
                       peekGitIdentity: peekThisFolderGitIdentity,
                       ...(cli.environment ? { env: cli.environment } : {}),
                     }),
@@ -919,6 +930,17 @@ export const workspaceCodeCommand = EffectCommand.make(
       const occupancyTui = cli.workspaceControlPresentation;
       if (useOccupancyTui && occupancyTui) {
         const occupancyFolderName = folderDirectoryName(folderOnboardingCwdFromLocator(path));
+        yield* ensureFolderProjectOnboarding({
+          cwd: folderOnboardingCwdFromLocator(path),
+          yes,
+          promptPolicy: "pre-tui-inquire",
+          canPrompt:
+            cli.folderOnboardingInteraction !== undefined ||
+            (cli.terminalIO.stdin.isTTY === true && cli.terminalIO.stdout.isTTY === true),
+          interaction: cli.folderOnboardingInteraction ?? codeSessionInquireInteraction,
+          peekGitIdentity: peekThisFolderGitIdentity,
+          ...(cli.environment ? { env: cli.environment } : {}),
+        });
         yield* Effect.tryPromise({
           try: () =>
             occupancyTui.start({
@@ -1152,7 +1174,9 @@ export const workspaceCodeCommand = EffectCommand.make(
                   : process.platform === "win32"
                     ? ["cmd", "/c", "start", "", url]
                     : ["xdg-open", url];
-              const child = spawn(openCommand[0]!, openCommand.slice(1), {
+              const [openBin, ...openArgv] = openCommand;
+              if (!openBin) return;
+              const child = spawn(openBin, openArgv, {
                 shell: false,
                 stdio: "ignore",
               });

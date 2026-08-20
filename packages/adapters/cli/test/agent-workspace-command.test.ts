@@ -48,6 +48,7 @@ import {
   TerminateSandboxCommand,
 } from "@appaloft/application";
 import { domainError, err, ok } from "@appaloft/core";
+import { Effect } from "effect";
 
 import { folderDirectoryName, folderOccupancyIdentity } from "../src/folder-project-link.js";
 import { OCCUPANCY_CODE_CHROME_TITLE } from "../src/occupancy-code-progress.js";
@@ -2196,6 +2197,7 @@ describe("Agent Workspace CLI", () => {
 
   test("[R8-OCC-CODE-007] code --new isolates a new occupancy Workspace", async () => {
     const commands: Command<unknown>[] = [];
+    const isolatedHome = await mkdtemp(join(tmpdir(), "appaloft-code-new-home-"));
     const { createCliProgram } = await import("../src");
     const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
     const program = createCliProgram({
@@ -2211,6 +2213,7 @@ describe("Agent Workspace CLI", () => {
       executionContextFactory: {
         create: (input) => createExecutionContext({ ...input, requestId: "req_code_new" }),
       },
+      environment: { HOME: isolatedHome, PATH: "/usr/bin", TERM: "dumb" },
       resolveRemoteCodeDoor: async () => ({
         repository: "https://github.com/acme/api.git",
         repositoryIdentity: "github.com/acme/api",
@@ -2223,7 +2226,11 @@ describe("Agent Workspace CLI", () => {
       }),
     });
 
-    await program.parseAsync(["node", "appaloft", "code", "--new", "--no-attach"]);
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--new", "--no-attach"]);
+    } finally {
+      await rm(isolatedHome, { recursive: true, force: true });
+    }
 
     expect((commands[0] as OpenAgentWorkspaceCommand).input).toMatchObject({
       forceNew: true,
@@ -2961,9 +2968,146 @@ describe("Agent Workspace CLI", () => {
     await expectTtyCodeFirstChrome(["code", "--pi"]);
   });
 
-  test("[FOLDER-ONBOARD-009] code occupy bootstrap never passes Effect select", async () => {
-    const source = await Bun.file(new URL("../src/commands/agent-workspace.ts", import.meta.url)).text();
-    expect(source).toContain('promptPolicy: "auto-create"');
+  test("[FOLDER-ONBOARD-009] code inquire cancel never starts TUI or hangs as Workspace CLI failed", async () => {
+    let presentationStarts = 0;
+    const output: string[] = [];
+    const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-cancel-"));
+    const previousCwd = process.cwd();
+    process.chdir(emptyDir);
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: { execute: async () => ok({}) } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_code_inquire_cancel" }),
+      },
+      terminalIO: {
+        stdin: { isTTY: true, on: () => undefined },
+        stdout: { isTTY: true, write: () => true },
+        stderr: {
+          isTTY: true,
+          write: (chunk) => {
+            output.push(String(chunk));
+            return true;
+          },
+        },
+      },
+      environment: { HOME: emptyDir, PATH: "/usr/bin", TERM: "xterm-256color" },
+      folderOnboardingInteraction: {
+        text: () => {
+          throw new Error("code session must not collect free text");
+        },
+        select: () => {
+          throw new Error("code session must not select a project");
+        },
+        confirm: () => Effect.succeed(false),
+      },
+      workspaceControlPresentation: {
+        start: async () => {
+          presentationStarts += 1;
+        },
+      },
+    });
+    const originalExitCode = process.exitCode;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--pi"]);
+      throw new Error("Expected cancelled inquire to fail closed");
+    } catch (error) {
+      expect(String(error)).toContain("Cancelled");
+      expect(String(error)).not.toContain("Workspace CLI operation failed");
+    } finally {
+      process.exitCode = originalExitCode ?? 0;
+      process.chdir(previousCwd);
+      await rm(emptyDir, { recursive: true, force: true });
+    }
+    expect(presentationStarts).toBe(0);
+    expect(output.join("")).not.toMatch(/occupancy/iu);
+  });
+
+  test("[WS-REMOTE-PROGRESS-219] missing renderer restores TTY after inquire and never shows Occupancy", async () => {
+    const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-missing-tui-"));
+    const previousCwd = process.cwd();
+    process.chdir(emptyDir);
+    const { createCliProgram } = await import("../src");
+    const { workspaceControlRendererUnavailableMessage } = await import(
+      "../src/workspace-tui-launch.js"
+    );
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          if (command instanceof CreateProjectCommand) {
+            return ok({ id: "prj_missing_tui", name: folderDirectoryName(emptyDir) } as T);
+          }
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_code_missing_renderer" }),
+      },
+      terminalIO: {
+        stdin: { isTTY: true, on: () => undefined },
+        stdout: { isTTY: true, write: () => true },
+        stderr: { isTTY: true, write: () => true },
+      },
+      environment: { HOME: emptyDir, PATH: "/usr/bin", TERM: "xterm-256color" },
+      folderOnboardingInteraction: {
+        text: () => {
+          throw new Error("code session must not collect free text");
+        },
+        select: () => {
+          throw new Error("code session must not select a project");
+        },
+        confirm: () => Effect.succeed(true),
+      },
+      workspaceControlPresentation: {
+        start: async () => {
+          throw {
+            code: "infra_error",
+            category: "infra",
+            message: workspaceControlRendererUnavailableMessage({ codeChrome: true }),
+            retryable: false,
+            details: { phase: "workspace-control-renderer", reason: "binary-missing" },
+          };
+        },
+      },
+    });
+    const originalExitCode = process.exitCode;
+    try {
+      await program.parseAsync(["node", "appaloft", "code"]);
+      throw new Error("Expected missing renderer to fail closed");
+    } catch (error) {
+      const text = String(error);
+      expect(text).toContain("Appaloft Cloud Agents");
+      expect(text).toContain("appaloft-workspace-tui");
+      expect(text).not.toMatch(/occupancy/iu);
+      expect(text).not.toContain("rustup");
+      expect(text).not.toContain("cargo build");
+      expect(text).not.toContain("Workspace CLI operation failed");
+      expect(text).not.toContain("Select a Workspace to load bounded detail.");
+    } finally {
+      process.exitCode = originalExitCode ?? 0;
+      process.chdir(previousCwd);
+      await rm(emptyDir, { recursive: true, force: true });
+    }
+  });
+
+  test("[FOLDER-ONBOARD-009] code inquire runs before TUI start and occupy never selects", async () => {
+    const source = await Bun.file(
+      new URL("../src/commands/agent-workspace.ts", import.meta.url),
+    ).text();
+    expect(source).toContain('promptPolicy: "pre-tui-inquire"');
+    expect(source).toContain("codeSessionInquireInteraction");
+    const inquireAt = source.indexOf('promptPolicy: "pre-tui-inquire"');
+    const startAt = source.indexOf("occupancyTui.start(");
+    expect(inquireAt).toBeGreaterThan(-1);
+    expect(startAt).toBeGreaterThan(inquireAt);
     expect(source).not.toContain("interaction: effectCliInteraction");
     expect(source).not.toContain("effectCliInteraction");
   });
@@ -4188,14 +4332,26 @@ describe("Agent Workspace CLI", () => {
 
 async function expectTtyCodeFirstChrome(args: readonly string[]): Promise<void> {
   const output: string[] = [];
+  const inquireMessages: string[] = [];
   let presentationStarts = 0;
   let startedContext: WorkspaceControlPresentationContext | undefined;
   let doorResolved = false;
+  const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-inquire-"));
+  const folderName = folderDirectoryName(emptyDir);
+  const previousCwd = process.cwd();
+  process.chdir(emptyDir);
   const { createCliProgram } = await import("../src");
   const program = createCliProgram({
     version: "0.1.0-test",
     startServer: async () => {},
-    commandBus: { execute: async () => ok({}) } as unknown as CommandBus,
+    commandBus: {
+      execute: async <T>(_context: unknown, command: Command<T>) => {
+        if (command instanceof CreateProjectCommand) {
+          return ok({ id: "prj_code_tui", name: folderName } as T);
+        }
+        return ok({} as T);
+      },
+    } as unknown as CommandBus,
     queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
     executionContextFactory: {
       create: (input) =>
@@ -4221,9 +4377,27 @@ async function expectTtyCodeFirstChrome(args: readonly string[]): Promise<void> 
         },
       },
     },
-    environment: { TERM: "xterm-256color" },
+    environment: {
+      HOME: emptyDir,
+      PATH: "/usr/bin",
+      TERM: "xterm-256color",
+    },
+    folderOnboardingInteraction: {
+      text: () => {
+        throw new Error("code session must not collect free text");
+      },
+      select: () => {
+        throw new Error("code session must not select a project inside TUI");
+      },
+      confirm: (input) => {
+        expect(presentationStarts).toBe(0);
+        inquireMessages.push(input.message);
+        return Effect.succeed(true);
+      },
+    },
     workspaceControlPresentation: {
       start: async (context) => {
+        expect(inquireMessages.length).toBeGreaterThan(0);
         presentationStarts += 1;
         startedContext = context;
       },
@@ -4242,11 +4416,17 @@ async function expectTtyCodeFirstChrome(args: readonly string[]): Promise<void> 
     await program.parseAsync(["node", "appaloft", ...args]);
   } finally {
     process.stdout.write = write;
+    process.chdir(previousCwd);
+    await rm(emptyDir, { recursive: true, force: true });
   }
   const printed = output.join("");
+  expect(inquireMessages[0]).toBe("Continue");
+  expect(
+    inquireMessages.some((message) => message.startsWith("Create default project")),
+  ).toBeTrue();
   expect(presentationStarts).toBe(1);
   expect(startedContext?.occupyBootstrap).toBeTypeOf("function");
-  expect(startedContext?.occupancyChrome?.project).toBe(folderDirectoryName(process.cwd()));
+  expect(startedContext?.occupancyChrome?.project).toBe(folderName);
   expect(doorResolved).toBeFalse();
   expect(printed).not.toContain("Checking login…");
   expect(printed).not.toContain("Opening occupancy");
@@ -4279,7 +4459,7 @@ async function expectTtyCodeFirstChrome(args: readonly string[]): Promise<void> 
     type: "loading",
     collapsed: true,
     title: OCCUPANCY_CODE_CHROME_TITLE,
-    project: folderDirectoryName(process.cwd()),
+    project: folderName,
   });
   expect(JSON.stringify(renderer.messages)).not.toMatch(/occupancy/iu);
   expect(JSON.stringify(renderer.messages)).not.toContain(

@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createServer, type Server, type Socket } from "node:net";
 import { delimiter, dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -565,9 +565,9 @@ export function workspaceControlRendererCrateDir(
   return root ? join(root, "apps", "workspace-control-tui") : undefined;
 }
 
-export function resolveWorkspaceControlRendererBinary(
+export function workspaceControlRendererBinaryCandidates(
   environment: NodeJS.ProcessEnv = process.env,
-): string | undefined {
+): readonly string[] {
   const executable =
     process.platform === "win32" ? "appaloft-workspace-tui.exe" : "appaloft-workspace-tui";
   const configured = environment.APPALOFT_WORKSPACE_TUI_BINARY;
@@ -579,13 +579,44 @@ export function resolveWorkspaceControlRendererBinary(
       join(crate, "target", "debug", executable),
     ];
   });
-  const candidates = [
+  return [
     ...(configured ? [isAbsolute(configured) ? configured : resolve(configured)] : []),
     join(dirname(process.execPath), executable),
     ...pathDirs.map((dir) => join(dir, executable)),
     ...crateTargets,
   ];
-  return candidates.find((candidate) => existsSync(candidate));
+}
+
+export function resolveWorkspaceControlRendererBinary(
+  environment: NodeJS.ProcessEnv = process.env,
+): string | undefined {
+  return workspaceControlRendererBinaryCandidates(environment).find((candidate) =>
+    existsSync(candidate),
+  );
+}
+
+export const WORKSPACE_CONTROL_TUI_CODE_CHROME_TITLE = "Appaloft Cloud Agents";
+export const WORKSPACE_CONTROL_TUI_CODE_CHROME_WAIT = "preparing the agent";
+export const WORKSPACE_CONTROL_TUI_CODE_CHROME_CAPABILITY = "cloud-agents";
+
+export function workspaceControlRendererSupportsCodeChrome(binaryPath: string): boolean {
+  try {
+    const contents = readFileSync(binaryPath);
+    return (
+      contents.includes(Buffer.from(WORKSPACE_CONTROL_TUI_CODE_CHROME_TITLE)) &&
+      contents.includes(Buffer.from(WORKSPACE_CONTROL_TUI_CODE_CHROME_WAIT))
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function resolveCodeWorkspaceControlRendererBinary(
+  environment: NodeJS.ProcessEnv = process.env,
+): string | undefined {
+  return workspaceControlRendererBinaryCandidates(environment).find(
+    (candidate) => existsSync(candidate) && workspaceControlRendererSupportsCodeChrome(candidate),
+  );
 }
 
 export const WORKSPACE_CONTROL_TUI_BINARY_NAME = "appaloft-workspace-tui";
@@ -613,8 +644,15 @@ export function rustcTooOldForWorkspaceControlTui(versionText: string): boolean 
 }
 
 export function workspaceControlRendererUnavailableMessage(
-  input: { readonly rustcVersion?: string; readonly buildFailed?: boolean } = {},
+  input: {
+    readonly rustcVersion?: string;
+    readonly buildFailed?: boolean;
+    readonly codeChrome?: boolean;
+  } = {},
 ): string {
+  if (input.codeChrome) {
+    return "Appaloft Cloud Agents needs a matching workspace renderer. The on-disk appaloft-workspace-tui is missing or older than Cloud Agents chrome.";
+  }
   const rustcVersion = input.rustcVersion?.trim();
   const rustcLabel = rustcVersion?.match(/rustc\s+\d+\.\d+(?:\.\d+)?/)?.[0];
   const tooOld = rustcVersion ? rustcTooOldForWorkspaceControlTui(rustcVersion) : false;
@@ -646,6 +684,7 @@ function workspaceControlRendererUnavailableError(
   input: {
     readonly rustcVersion?: string;
     readonly buildFailed?: boolean;
+    readonly codeChrome?: boolean;
     readonly crateDir?: string;
     readonly exitCode?: number;
   } = {},
@@ -789,10 +828,18 @@ export async function warmupWorkspaceControlRenderer(
   environment: NodeJS.ProcessEnv = process.env,
 ): Promise<WorkspaceTuiLaunchSession> {
   if (!warmedWorkspaceControlRenderer) {
-    const existing = resolveWorkspaceControlRendererBinary(environment);
-    warmedWorkspaceControlRenderer = existing
-      ? openWorkspaceControlRenderer({ environment, binaryPath: existing })
-      : openWorkspaceControlRenderer({ environment });
+    const chrome = resolveCodeWorkspaceControlRendererBinary(environment);
+    if (!chrome) {
+      const stale = resolveWorkspaceControlRendererBinary(environment);
+      throw workspaceControlRendererUnavailableError(
+        stale ? "binary-stale-chrome" : "binary-missing",
+        { codeChrome: true },
+      );
+    }
+    warmedWorkspaceControlRenderer = openWorkspaceControlRenderer({
+      environment,
+      binaryPath: chrome,
+    });
   }
   return warmedWorkspaceControlRenderer;
 }
@@ -801,12 +848,13 @@ export async function openWorkspaceControlRenderer(
   input: RatatuiWorkspaceControlPresentationInput = {},
 ): Promise<WorkspaceTuiLaunchSession> {
   const environment = input.environment ?? process.env;
-  const binaryPath = input.binaryPath ?? (await ensureWorkspaceControlRendererBinary(environment));
-  if (!binaryPath) {
-    const crateDir = workspaceControlRendererCrateDir(environment);
-    throw workspaceControlRendererUnavailableError("binary-missing", {
-      ...(crateDir ? { crateDir } : {}),
-    });
+  const binaryPath = input.binaryPath ?? resolveCodeWorkspaceControlRendererBinary(environment);
+  if (!binaryPath || !workspaceControlRendererSupportsCodeChrome(binaryPath)) {
+    const stale = resolveWorkspaceControlRendererBinary(environment);
+    throw workspaceControlRendererUnavailableError(
+      stale ? "binary-stale-chrome" : "binary-missing",
+      { codeChrome: true },
+    );
   }
   return openLoopbackWorkspaceControlRenderer({
     launch: async ({ port, token }) => {
