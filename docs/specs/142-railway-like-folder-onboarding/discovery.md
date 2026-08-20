@@ -25,8 +25,9 @@ used when present and is not required.
 - GitHub auto-deploy is a separate Railway path from folder `up`.
 - Appaloft `appaloft project` has create/list/show/rename, not `use`/`link`.
 - `appaloft context` is control-plane profile, not folder project link.
-- Default `code` without origin can resume the latest occupancy of another
-  repository (WS-REMOTE-NO-UPLOAD-006 / WS-REMOTE-RESUME-004).
+- Default `code` without origin occupies this folder after create-or-link
+  (WS-REMOTE-NO-UPLOAD-006 / WS-REMOTE-RESUME-004). It must not silently
+  resume another repository's occupancy.
 - Login already fail-closes with `Run appaloft login`.
 - #1314 (path|git-remote, non-git occupies this folder) may still be open.
 

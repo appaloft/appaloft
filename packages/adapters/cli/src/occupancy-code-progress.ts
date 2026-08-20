@@ -1,11 +1,24 @@
+export const OCCUPANCY_CODE_CHROME_TITLE = "Appaloft Cloud Agents";
+
+export const OCCUPANCY_PREPARE_STEP_IDS = ["credential", "skills", "disk"] as const;
+
+export type OccupancyPrepareStepId = (typeof OCCUPANCY_PREPARE_STEP_IDS)[number];
+
 export const OCCUPANCY_CODE_PROGRESS = {
-  connecting: "Connecting to Appaloft…",
+  connecting: "Checking credentials…",
   checkingLogin: "Checking login…",
   lookingUpServers: "Looking up enrolled servers…",
-  choosingOccupancy: "Choosing occupancy…",
+  choosingOccupancy: "Choosing this folder…",
+  usingThisProject: "Using this project…",
   resolvingRepository: "Resolving repository…",
-  copyingSkills: "Copying skills…",
+  copyingSkills: "Preparing skills…",
   attaching: "Attaching…",
+} as const;
+
+export const OCCUPANCY_PREPARE_STEP_LABELS = {
+  credential: "Checking login",
+  skills: "Preparing skills",
+  disk: "Preparing disk",
 } as const;
 
 export function occupancyCodeUsesLineProgress(input: {
@@ -50,7 +63,17 @@ export async function settleWithTimeout<T>(
 
 export function occupancyOpeningProgress(serverName: string): string {
   const name = serverName.trim() || "the enrolled server";
-  return `Opening occupancy on ${name}…`;
+  return `Preparing disk on ${name}…`;
+}
+
+export function occupancyPrepareStepForProgress(message: string): OccupancyPrepareStepId {
+  if (/skill/iu.test(message)) return "skills";
+  if (/login|server|credential/iu.test(message)) return "credential";
+  return "disk";
+}
+
+export function occupancyChromeHasForbiddenWord(text: string): boolean {
+  return /occupancy/iu.test(text);
 }
 
 export function reportOccupancyCodeProgress(
