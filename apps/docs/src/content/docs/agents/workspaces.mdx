@@ -57,9 +57,10 @@ appaloft code
 真相，脏树也不会上传。位置参数若是 git remote（`https://`、`ssh://`、`git@host:path`），
 无需本地 clone 即可占用该仓库。`code` 进程一开始就会打印状态行，不会先静默启动本地数据库或 composition。
 打开占用时会继续打印现在进行时状态行，例如
-`Checking login…`、`Opening occupancy on hostinger…`、`Copying skills…`、`Attaching…`，
-占用一就绪就 attach。HOME skill 复制可以在后台继续。`--no-attach` 打印同样的进度，
-占用后退出。横幅是：
+`Checking login…`、`Opening occupancy on hostinger…`、`Copying skills…`、`Attaching…`。
+占用一返回就打印 Remote 横幅。默认 `code` 随即 attach。HOME skill 复制是限时、失败软处理，
+不得挡住横幅、attach 或 `--no-attach` 退出。`--no-attach` 打印同样的占用进度和横幅后退出。
+横幅是：
 
 ```text
 Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>

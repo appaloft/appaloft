@@ -5,6 +5,7 @@ import {
   occupancyCliCommand,
   occupancyCliStartupProgress,
   SHELL_OCCUPANCY_PROGRESS,
+  shouldExitAfterOccupancyCodeCli,
   shouldKeepOccupancyCliLogs,
   shouldSkipLocalPgliteForOccupancyCli,
 } from "../src/occupancy-cli-progress";
@@ -16,6 +17,7 @@ describe("occupancy CLI shell progress", () => {
     expect(occupancyCliStartupProgress(args)).toBe(SHELL_OCCUPANCY_PROGRESS.openingRemoteSession);
     expect(shouldSkipLocalPgliteForOccupancyCli(args)).toBeTrue();
     expect(shouldKeepOccupancyCliLogs(args)).toBeTrue();
+    expect(shouldExitAfterOccupancyCodeCli(args)).toBeTrue();
   });
 
   test("[WS-REMOTE-PROGRESS-191] workspace keeps logs and does not skip PGlite", () => {

@@ -1917,9 +1917,80 @@ describe("Agent Workspace CLI", () => {
       "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · sbx_progress",
     );
     expect(printed.indexOf("Opening occupancy on hostinger…")).toBeLessThan(
-      printed.indexOf("Copying skills…"),
+      printed.indexOf("Remote ·"),
     );
-    expect(printed.indexOf("Copying skills…")).toBeLessThan(printed.indexOf("Remote ·"));
+    expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Copying skills…"));
+  });
+
+  test("[WS-REMOTE-PROGRESS-192] --no-attach prints Remote banner before a hung skill copy and still exits", async () => {
+    const output: string[] = [];
+    let releaseHang: (() => void) | undefined;
+    const hungSkill = new Promise<void>((resolve) => {
+      releaseHang = resolve;
+    });
+    const previousOfferTimeout = process.env.APPALOFT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS;
+    const previousCommandTimeout = process.env.APPALOFT_OCCUPANCY_SKILL_COMMAND_TIMEOUT_MS;
+    process.env.APPALOFT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS = "25";
+    process.env.APPALOFT_OCCUPANCY_SKILL_COMMAND_TIMEOUT_MS = "25";
+    const { createCliProgram } = await import("../src");
+    const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          if (command instanceof OpenAgentWorkspaceCommand) {
+            return ok({ workspaceId: "sbx_hung_skill", projectId: "prj_web" } as T);
+          }
+          await hungSkill;
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_hung_skill" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        projectId: "prj_web",
+        serverId: "srv_4lifk0yrcecy",
+        serverName: "hostinger",
+      }),
+      launchNativeWorkspaceClient: async () => {
+        throw new Error("hung skill copy must not attach");
+      },
+    });
+    const write = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
+    } finally {
+      process.stdout.write = write;
+      if (previousOfferTimeout === undefined) {
+        delete process.env.APPALOFT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS;
+      } else {
+        process.env.APPALOFT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS = previousOfferTimeout;
+      }
+      if (previousCommandTimeout === undefined) {
+        delete process.env.APPALOFT_OCCUPANCY_SKILL_COMMAND_TIMEOUT_MS;
+      } else {
+        process.env.APPALOFT_OCCUPANCY_SKILL_COMMAND_TIMEOUT_MS = previousCommandTimeout;
+      }
+      releaseHang?.();
+    }
+    const printed = output.join("");
+    expect(printed).toContain(
+      "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · sbx_hung_skill",
+    );
+    expect(printed).toContain("Copying skills…");
+    expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Copying skills…"));
   });
 
   test("[WS-REMOTE-PROGRESS-189][WS-REMOTE-ATTACH-134] default code attaches before optional skill copy finishes", async () => {
@@ -1992,8 +2063,10 @@ describe("Agent Workspace CLI", () => {
       "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · sbx_attach_first",
     );
     expect(printed.indexOf("Opening occupancy on hostinger…")).toBeLessThan(
-      printed.indexOf("Attaching…"),
+      printed.indexOf("Remote ·"),
     );
+    expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Attaching…"));
+    expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Copying skills…"));
   });
 
   test("[WS-REMOTE-COMPAT-128][WS-REMOTE-COMPAT-129][WS-REMOTE-COMPAT-130] unstructured occupancy validation names the enrolled Server", async () => {

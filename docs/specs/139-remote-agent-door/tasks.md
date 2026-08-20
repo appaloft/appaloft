@@ -415,6 +415,8 @@
 - [x] Unit tests WS-REMOTE-PROGRESS-187–190
 - [x] shell entry prints before importing `run.ts`; `run.ts` prints before login/PGlite/composition; remote `code` skips local PGlite
 - [x] Unit tests WS-REMOTE-PROGRESS-191
+- [x] `--no-attach` prints Remote banner before skill copy; skill copy is fail-soft and time-bounded
+- [x] Unit tests WS-REMOTE-PROGRESS-192
 
 ## Later
 

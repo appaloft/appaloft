@@ -53,6 +53,7 @@ import {
 import { type AppComposition, createAppComposition, type ShellRuntimeOptions } from "./composition";
 import {
   reportOccupancyCliStartupOnce,
+  shouldExitAfterOccupancyCodeCli,
   shouldKeepOccupancyCliLogs,
   shouldSkipLocalPgliteForOccupancyCli,
 } from "./occupancy-cli-progress";
@@ -789,6 +790,9 @@ export async function runShellCli(
     if (exitCode !== 0) {
       process.exit(exitCode);
     }
+    if (shouldExitAfterOccupancyCodeCli(commandArgs(cliArgv))) {
+      process.exit(0);
+    }
     return;
   }
 
@@ -912,5 +916,8 @@ export async function runShellCli(
 
   if (exitCode !== 0) {
     process.exit(exitCode);
+  }
+  if (shouldExitAfterOccupancyCodeCli(commandArgs(cliArgv))) {
+    process.exit(0);
   }
 }

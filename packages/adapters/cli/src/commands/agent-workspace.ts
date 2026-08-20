@@ -47,7 +47,7 @@ import {
   type WorkspaceOpenResult,
 } from "@appaloft/application";
 import { createCliLogRenderer } from "@appaloft/cli-logging";
-import { type DomainError, domainError, type Result } from "@appaloft/core";
+import { type DomainError, domainError, err, type Result } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
 import {
@@ -75,9 +75,14 @@ import {
   occupancyPullRequestFromPreviewEnvironments,
 } from "../occupancy-chrome.js";
 import {
+  DEFAULT_OCCUPANCY_BANNER_CHROME_TIMEOUT_MS,
+  DEFAULT_OCCUPANCY_SKILL_COMMAND_TIMEOUT_MS,
+  DEFAULT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS,
   OCCUPANCY_CODE_PROGRESS,
   occupancyOpeningProgress,
+  occupancyTimeoutMs,
   reportOccupancyCodeProgress,
+  settleWithTimeout,
 } from "../occupancy-code-progress.js";
 import {
   occupancyHomeSkillDestinationExists,
@@ -745,24 +750,50 @@ export const workspaceCodeCommand = EffectCommand.make(
           `Pinned · ${workspaceId} @ ${pinnedSha.slice(0, 7)} · requested ${door.commitSha.slice(0, 7)} · use --new for an isolated Workspace\n`,
         );
       }
+      const skillOfferTimeoutMs = occupancyTimeoutMs(
+        "APPALOFT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS",
+        DEFAULT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS,
+      );
+      const skillCommandTimeoutMs = occupancyTimeoutMs(
+        "APPALOFT_OCCUPANCY_SKILL_COMMAND_TIMEOUT_MS",
+        DEFAULT_OCCUPANCY_SKILL_COMMAND_TIMEOUT_MS,
+      );
+      const bannerChromeTimeoutMs = occupancyTimeoutMs(
+        "APPALOFT_OCCUPANCY_BANNER_CHROME_TIMEOUT_MS",
+        DEFAULT_OCCUPANCY_BANNER_CHROME_TIMEOUT_MS,
+      );
+      const timedSkillResult = async <T>(work: Promise<Result<T>>): Promise<Result<T>> => {
+        const settled = await settleWithTimeout(work, skillCommandTimeoutMs);
+        if (settled.status === "timed-out") {
+          return err(
+            domainError.infra("occupancy skill offer timed out", {
+              phase: "occupancy-skill-offer",
+            }),
+          );
+        }
+        return settled.value;
+      };
       const offerSkills = async () => {
         reportProgress(OCCUPANCY_CODE_PROGRESS.copyingSkills);
         try {
           await offerOccupancyAppaloftSkill({
             workspaceId: result.workspaceId,
-            executeCommand: (skillCommand) => cli.executeCommand(skillCommand),
+            executeCommand: (skillCommand) => timedSkillResult(cli.executeCommand(skillCommand)),
           });
           await offerOccupancyHomeSkills({
             workspaceId: result.workspaceId,
-            executeCommand: (skillCommand) => cli.executeCommand(skillCommand),
+            executeCommand: (skillCommand) => timedSkillResult(cli.executeCommand(skillCommand)),
             destinationExists: occupancyHomeSkillDestinationExists({
               workspaceId: result.workspaceId,
-              executeQuery: (query) => cli.executeQuery(query),
+              executeQuery: (query) => timedSkillResult(cli.executeQuery(query)),
             }),
           });
         } catch {
           // occupy still succeeds when skill offer cannot write
         }
+      };
+      const offerSkillsBounded = async () => {
+        await settleWithTimeout(offerSkills(), skillOfferTimeoutMs);
       };
       const loadBannerChrome = async () => {
         const bannerProjectId = result.projectId || door.projectId;
@@ -803,25 +834,12 @@ export const workspaceCodeCommand = EffectCommand.make(
           ...(pullRequestNumber ? { pullRequestNumber } : {}),
         };
       };
-      const writeBannerAndChrome = async (chrome: {
+      const writeBannerFollowup = async (chrome: {
         readonly bannerProjectId: string;
         readonly previewUrl?: string;
         readonly productionUrl?: string;
         readonly pullRequestNumber?: number;
       }) => {
-        process.stdout.write(
-          `${formatRemoteCodeBanner({
-            projectId: chrome.bannerProjectId,
-            repositoryIdentity: door.repositoryIdentity,
-            commitSha: bannerCommitSha,
-            serverName: door.serverName,
-            workspaceId: result.workspaceId,
-            ...(chrome.previewUrl ? { previewUrl: chrome.previewUrl } : {}),
-            ...(chrome.productionUrl ? { productionUrl: chrome.productionUrl } : {}),
-            ...(chrome.pullRequestNumber ? { pullRequestNumber: chrome.pullRequestNumber } : {}),
-            ...(door.branch ? { branch: door.branch } : {}),
-          })}\n`,
-        );
         const connectionsUrl = await resolveOccupancyConnectionsUrl();
         if (open || optionalValue(openTarget)) {
           const url = occupancyCodeOpenUrl({
@@ -864,26 +882,54 @@ export const workspaceCodeCommand = EffectCommand.make(
         });
         if (doorHint) process.stdout.write(`${doorHint}\n`);
       };
+      type OccupancyBannerChrome = {
+        readonly bannerProjectId: string;
+        readonly previewUrl?: string;
+        readonly productionUrl?: string;
+        readonly pullRequestNumber?: number;
+      };
+      const leanChrome: OccupancyBannerChrome = {
+        bannerProjectId: result.projectId || door.projectId,
+      };
+      process.stdout.write(
+        `${formatRemoteCodeBanner({
+          projectId: leanChrome.bannerProjectId,
+          repositoryIdentity: door.repositoryIdentity,
+          commitSha: bannerCommitSha,
+          serverName: door.serverName,
+          workspaceId: result.workspaceId,
+        })}\n`,
+      );
       const wantsChrome = !attach || open || Boolean(optionalValue(openTarget));
-      const skills = offerSkills();
+      const chrome = yield* Effect.promise(async (): Promise<OccupancyBannerChrome> => {
+        if (!wantsChrome) return leanChrome;
+        const settled = await settleWithTimeout(loadBannerChrome(), bannerChromeTimeoutMs);
+        return settled.status === "completed" ? settled.value : leanChrome;
+      });
+      const extras = formatRemoteCodeBanner({
+        projectId: chrome.bannerProjectId,
+        repositoryIdentity: door.repositoryIdentity,
+        commitSha: bannerCommitSha,
+        serverName: door.serverName,
+        workspaceId: result.workspaceId,
+        ...(chrome.previewUrl ? { previewUrl: chrome.previewUrl } : {}),
+        ...(chrome.productionUrl ? { productionUrl: chrome.productionUrl } : {}),
+        ...(chrome.pullRequestNumber ? { pullRequestNumber: chrome.pullRequestNumber } : {}),
+        ...(door.branch ? { branch: door.branch } : {}),
+      })
+        .split("\n")
+        .slice(1);
+      for (const line of extras) process.stdout.write(`${line}\n`);
+      yield* Effect.promise(() => writeBannerFollowup(chrome));
+      yield* Effect.promise(() => writeOccupancySessionHints());
       if (attach) {
-        const chrome = wantsChrome
-          ? yield* Effect.promise(loadBannerChrome)
-          : { bannerProjectId: result.projectId || door.projectId };
-        yield* Effect.promise(() => writeBannerAndChrome(chrome));
         reportProgress(OCCUPANCY_CODE_PROGRESS.attaching);
+        const skills = offerSkillsBounded();
         yield* completeWorkspaceOpen(result, true, cli.launchNativeWorkspaceClient);
-        yield* Effect.promise(async () => {
-          await skills;
-          await writeOccupancySessionHints();
-        });
+        yield* Effect.promise(() => skills);
         return;
       }
-      yield* Effect.promise(() => skills);
-      yield* Effect.promise(async () => {
-        await writeBannerAndChrome(await loadBannerChrome());
-        await writeOccupancySessionHints();
-      });
+      yield* Effect.promise(() => offerSkillsBounded());
     }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.agentScratch));
 

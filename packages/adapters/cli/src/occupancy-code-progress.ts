@@ -7,6 +7,37 @@ export const OCCUPANCY_CODE_PROGRESS = {
   attaching: "Attaching…",
 } as const;
 
+export const DEFAULT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS = 8_000;
+export const DEFAULT_OCCUPANCY_BANNER_CHROME_TIMEOUT_MS = 2_000;
+export const DEFAULT_OCCUPANCY_SKILL_COMMAND_TIMEOUT_MS = 3_000;
+
+export function occupancyTimeoutMs(
+  envName: string,
+  fallback: number,
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  const parsed = Number(env[envName]);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+export async function settleWithTimeout<T>(
+  work: Promise<T>,
+  timeoutMs: number,
+): Promise<{ status: "completed"; value: T } | { status: "timed-out" }> {
+  if (timeoutMs === 0) return { status: "timed-out" };
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work.then((value) => ({ status: "completed" as const, value })),
+      new Promise<{ status: "timed-out" }>((resolve) => {
+        timer = setTimeout(() => resolve({ status: "timed-out" }), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export function occupancyOpeningProgress(serverName: string): string {
   const name = serverName.trim() || "the enrolled server";
   return `Opening occupancy on ${name}…`;

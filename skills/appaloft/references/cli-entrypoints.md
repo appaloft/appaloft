@@ -40,11 +40,10 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   resource.
 - `appaloft code [path|git-remote] [--profile <name-or-id>] [--harness opencode|pi]` occupies my Sandbox after login. It requires a default
   enrolled Server, dispatches `workspaces.open` with the remote SHA and
-  `targetServerId`, prints present-tense progress before each slow step, attaches
-  as soon as the occupancy exists, then prints
-  `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>`.
-  HOME skill copy may finish in the background. `--no-attach` prints the same
-  progress and banner without attaching.
+  `targetServerId`, prints present-tense progress before each slow step, prints
+  `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>`
+  as soon as occupy returns, then attaches. Skill copy is fail-soft and time-bounded.
+  `--no-attach` prints the same progress and banner without attaching.
   Default harness is OpenCode. Default `code` and `code --new` pick the live occupancy / live
   install. Same-name leftover Profiles must not block first success and must not require
   memorizing installation ids. `--profile` is a fallback pin; only an explicit colliding name

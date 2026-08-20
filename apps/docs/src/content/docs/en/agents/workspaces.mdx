@@ -59,8 +59,10 @@ clone. The process prints a status line as soon as `code` starts, before any loc
 database or composition boot. While it opens the occupancy it then prints short
 present-tense status lines such as
 `Checking login…`, `Opening occupancy on hostinger…`, `Copying skills…`, and
-`Attaching…`, then attaches as soon as the occupancy exists. HOME skill copy can finish
-in the background. `--no-attach` prints the same progress and stops after occupy.
+`Attaching…`. The Remote banner prints as soon as occupy returns. Default `code`
+attaches immediately after that. HOME skill copy is fail-soft and time-bounded; it
+must not block the banner, attach, or `--no-attach` exit. `--no-attach` prints the
+same occupy progress and banner, then stops.
 The banner is:
 
 ```text

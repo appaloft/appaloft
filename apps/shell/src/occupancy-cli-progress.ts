@@ -3,6 +3,11 @@ export const SHELL_OCCUPANCY_PROGRESS = {
   openingScratchSession: "Opening scratch session…",
 } as const;
 
+export function shouldExitAfterOccupancyCodeCli(args: readonly string[]): boolean {
+  const command = occupancyCliCommand(args);
+  return command === "code" || command === "code-local";
+}
+
 export function occupancyCliCommand(
   args: readonly string[],
 ): "code" | "workspace" | "code-local" | undefined {
