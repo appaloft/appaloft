@@ -147,18 +147,26 @@ async function resolveFolderLocalProjectId(input: {
   readonly command: OpenAgentWorkspaceCommand;
   readonly bindingRecord: Record<string, unknown>;
 }): Promise<string> {
+  const listed = await listRemoteProjects(input.dispatch);
+  const folderName = input.command.input.repositoryIdentity
+    .split("/")
+    .filter(Boolean)
+    .at(-1)
+    ?.toLowerCase();
+  const named = folderName
+    ? listed.find((project) => {
+        const name = project.name?.toLowerCase();
+        const slug = project.slug?.toLowerCase();
+        return name === folderName || slug === folderName;
+      })
+    : undefined;
+  if (named?.id) return named.id;
+
   const fromBinding =
     readString(input.bindingRecord.projectId) ??
     readString(asRecord(input.bindingRecord.project).id);
   if (fromBinding) return fromBinding;
 
-  const listed = await listRemoteProjects(input.dispatch);
-  const name = input.command.input.repositoryIdentity.split("/").filter(Boolean).at(-1);
-  const named = name
-    ? listed.find((project) => project.name === name || project.slug === name)
-    : undefined;
-  if (named?.id) return named.id;
-  if (listed[0]?.id) return listed[0].id;
   return "prj_folder_local";
 }
 

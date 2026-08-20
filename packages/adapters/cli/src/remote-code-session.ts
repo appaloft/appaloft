@@ -143,6 +143,19 @@ export function hasRemoteCodeLogin(env: NodeJS.ProcessEnv = process.env): boolea
   );
 }
 
+export function remoteOccupyBannerProjectId(input: {
+  readonly repositoryIdentity: string;
+  readonly doorProjectId: string;
+  readonly resultProjectId?: string;
+}): string {
+  const door = input.doorProjectId.trim();
+  const result = input.resultProjectId?.trim();
+  if (isFolderOccupancyIdentity(input.repositoryIdentity) && door && door !== "project") {
+    return door;
+  }
+  return result || door;
+}
+
 export function formatRemoteCodeBanner(input: {
   readonly projectId?: string;
   readonly repositoryIdentity: string;

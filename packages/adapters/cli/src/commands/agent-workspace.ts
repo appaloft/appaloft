@@ -106,6 +106,7 @@ import {
   nativeAttachRequiresInteractiveTerminal,
   occupancyCloudCompatError,
   type RemoteCodeServerSummary,
+  remoteOccupyBannerProjectId,
   resolveDefaultRemoteCodeDoor,
   resolveOccupancyConnectionsUrl,
   resolveWorkspaceOpenSource,
@@ -939,7 +940,11 @@ export const workspaceCodeCommand = EffectCommand.make(
         await settleWithTimeout(offerSkills(), skillOfferTimeoutMs);
       };
       const loadBannerChrome = async () => {
-        const bannerProjectId = result.projectId || door.projectId;
+        const bannerProjectId = remoteOccupyBannerProjectId({
+          repositoryIdentity: door.repositoryIdentity,
+          doorProjectId: door.projectId,
+          ...(result.projectId ? { resultProjectId: result.projectId } : {}),
+        });
         let previewUrl: string | undefined;
         let productionUrl: string | undefined;
         let pullRequestNumber: number | undefined;
@@ -1032,7 +1037,11 @@ export const workspaceCodeCommand = EffectCommand.make(
         readonly pullRequestNumber?: number;
       };
       const leanChrome: OccupancyBannerChrome = {
-        bannerProjectId: result.projectId || door.projectId,
+        bannerProjectId: remoteOccupyBannerProjectId({
+          repositoryIdentity: door.repositoryIdentity,
+          doorProjectId: door.projectId,
+          ...(result.projectId ? { resultProjectId: result.projectId } : {}),
+        }),
       };
       process.stdout.write(
         `${formatRemoteCodeBanner({

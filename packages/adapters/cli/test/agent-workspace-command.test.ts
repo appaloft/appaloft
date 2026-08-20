@@ -2562,6 +2562,57 @@ describe("Agent Workspace CLI", () => {
     expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Preparing skills…"));
   });
 
+  test("[FOLDER-ONBOARD-007] folder.local --no-attach Remote banner uses this-folder project, not leftover binding", async () => {
+    const output: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          if (command instanceof OpenAgentWorkspaceCommand) {
+            return ok({
+              workspaceId: "sbx_folder",
+              projectId: "prj_vlhs6pf8v4yp",
+            } as T);
+          }
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_code_folder_banner_project" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://folder.local/cwd/nux-code-silence-cwd.git",
+        repositoryIdentity: folderOccupancyIdentity("nux-code-silence-cwd"),
+        ref: "refs/heads/local",
+        branch: "local",
+        commitSha: "cafef00d00000000000000000000000000000000",
+        projectId: "prj_7fky4yjn1l1c",
+        serverId: "srv_4lifk0yrcecy",
+        serverName: "hostinger",
+      }),
+    });
+    const write = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
+    } finally {
+      process.stdout.write = write;
+    }
+    const printed = output.join("");
+    expect(printed).toContain(
+      "Remote · prj_7fky4yjn1l1c · folder.local/cwd/nux-code-silence-cwd@cafef00 · hostinger · my sandbox · sbx_folder",
+    );
+    expect(printed).not.toContain("prj_vlhs6pf8v4yp");
+    expect(printed.toLowerCase()).not.toContain("occupancy");
+  });
+
   test("[WS-REMOTE-PROGRESS-192] --no-attach prints Remote banner before a hung skill copy and still exits", async () => {
     const output: string[] = [];
     let releaseHang: (() => void) | undefined;

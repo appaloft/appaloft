@@ -7,7 +7,11 @@ import { basename, join } from "node:path";
 import { type AppaloftSdkFetch } from "@appaloft/sdk";
 
 import { createRemoteCliProgram } from "../src";
-import { folderOccupancyIdentity } from "../src/folder-project-link.js";
+import {
+  fileFolderProjectLinkStore,
+  folderOccupancyIdentity,
+  writeFolderProjectLink,
+} from "../src/folder-project-link.js";
 
 function jsonResponse(value: unknown, status = 200): Response {
   return new Response(JSON.stringify(value), {
@@ -53,6 +57,12 @@ function hostingerFolderLocalFetch(input: {
     readonly commitSha?: string;
     readonly runtimeId?: string;
   };
+  readonly leftoverBindingProjectId?: string;
+  readonly leftoverListedProjects?: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly slug?: string;
+  }[];
 }): AppaloftSdkFetch {
   return async (request) => {
     input.requests.push(request);
@@ -96,6 +106,13 @@ function hostingerFolderLocalFetch(input: {
       }
       return jsonResponse({
         items: [
+          ...(input.leftoverListedProjects ?? []).map((project) => ({
+            id: project.id,
+            name: project.name,
+            slug: project.slug ?? project.name,
+            lifecycleStatus: "active",
+            createdAt: "2026-08-20T00:00:00.000Z",
+          })),
           {
             id: input.projectId,
             name: input.projectName,
@@ -117,7 +134,7 @@ function hostingerFolderLocalFetch(input: {
     }
     if (path.startsWith("/api/repository-bindings/")) {
       return jsonResponse({
-        projectId: input.projectId,
+        projectId: input.leftoverBindingProjectId ?? input.projectId,
         repositoryIdentity: decodeURIComponent(path.slice("/api/repository-bindings/".length)),
         status: "active",
       });
@@ -340,6 +357,78 @@ describe("logged-in folder.local remote occupy", () => {
     expect(captured.text).not.toContain("workspace_open_source_materialization_failed");
     expect(captured.text).not.toContain("workspace_open_partial_recovery_required");
     expect(captured.text).not.toContain("use --new");
+    expect(process.exitCode === undefined || process.exitCode === 0).toBe(true);
+  });
+
+  test("[FOLDER-ONBOARD-007] leftover binding project does not leak into the Remote banner", async () => {
+    const emptyDir = await mkdtemp(join(tmpdir(), "nux-code-silence-cwd-"));
+    const home = await mkdtemp(join(tmpdir(), "nux-code-silence-home-"));
+    const requests: Request[] = [];
+    const projectName = basename(emptyDir);
+    const currentFolderProjectId = "prj_7fky4yjn1l1c";
+    const leftoverBindingProjectId = "prj_vlhs6pf8v4yp";
+    await writeFolderProjectLink(
+      {
+        cwd: emptyDir,
+        projectId: currentFolderProjectId,
+        identity: folderOccupancyIdentity(projectName),
+        projectName,
+      },
+      fileFolderProjectLinkStore({ APPALOFT_HOME: home }),
+    );
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: {
+        name: "cloud",
+        mode: "self-hosted",
+        baseUrl: "https://api.example.test",
+        auth: { kind: "bearer", token: "tok_remote" },
+        createdAt: "2026-08-20T00:00:00.000Z",
+        updatedAt: "2026-08-20T00:00:00.000Z",
+      },
+      fetch: hostingerFolderLocalFetch({
+        requests,
+        projectId: currentFolderProjectId,
+        projectName,
+        leftoverBindingProjectId,
+        leftoverListedProjects: [
+          { id: leftoverBindingProjectId, name: "leftover-examples", slug: "leftover-examples" },
+        ],
+      }),
+      now: () => "2026-08-20T00:00:00.000Z",
+      environment: { APPALOFT_TOKEN: "token", APPALOFT_HOME: home, HOME: home },
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+    });
+
+    const originalExitCode = process.exitCode;
+    const previousCwd = process.cwd();
+    let captured: { text: string };
+    try {
+      process.chdir(emptyDir);
+      captured = await captureProcessOutput(() =>
+        program.parseAsync(["node", "appaloft", "code", "--no-attach"]),
+      );
+    } finally {
+      process.chdir(previousCwd);
+      process.exitCode = originalExitCode ?? 0;
+      await rm(emptyDir, { recursive: true, force: true });
+      await rm(home, { recursive: true, force: true });
+    }
+
+    const paths = requests.map(requestKey);
+    expect(paths).not.toContain("POST /api/workspaces/open");
+    expect(paths.some((path) => path.endsWith("/exec"))).toBe(false);
+    expect(paths).toContain("POST /api/sandboxes");
+    expect(captured.text).toContain(
+      `Using linked project ${projectName} (${currentFolderProjectId})`,
+    );
+    expect(captured.text).toContain(`Remote · ${currentFolderProjectId}`);
+    expect(captured.text).not.toContain(leftoverBindingProjectId);
+    expect(captured.text.toLowerCase()).not.toContain("occupancy");
     expect(process.exitCode === undefined || process.exitCode === 0).toBe(true);
   });
 });

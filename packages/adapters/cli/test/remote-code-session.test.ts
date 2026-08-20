@@ -15,6 +15,7 @@ import {
   REMOTE_CODE_DOOR_HINT,
   REMOTE_CODE_GITHUB_HINT,
   REMOTE_CODE_MODEL_HINT,
+  remoteOccupyBannerProjectId,
   resolveDefaultRemoteCodeDoor,
   selectDefaultRemoteCodeServer,
   selectResumeOccupancy,
@@ -283,6 +284,23 @@ describe("remote code door", () => {
         "mac-mini",
       );
     });
+  });
+
+  test("[FOLDER-ONBOARD-007] folder.local banner prefers the current-folder door project", () => {
+    expect(
+      remoteOccupyBannerProjectId({
+        repositoryIdentity: folderOccupancyIdentity("nux-code-silence-cwd"),
+        doorProjectId: "prj_7fky4yjn1l1c",
+        resultProjectId: "prj_vlhs6pf8v4yp",
+      }),
+    ).toBe("prj_7fky4yjn1l1c");
+    expect(
+      remoteOccupyBannerProjectId({
+        repositoryIdentity: "github.com/acme/api",
+        doorProjectId: "prj_web",
+        resultProjectId: "prj_billing",
+      }),
+    ).toBe("prj_billing");
   });
 
   test("[WS-REMOTE-BANNER-061] occupancy banner includes generated access URL", () => {
