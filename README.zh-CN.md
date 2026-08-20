@@ -9,10 +9,10 @@
     两扇门。选一扇，立刻开始。
   </p>
   <p>
-    <strong>部署</strong> — 一个文件夹变成 URL。Git 可选。<br />
-    <strong>Agent</strong> — 教会你已经在用的 coding agent（skill + MCP）。
-    <code>appaloft code</code> 占用你的 Sandbox。
-    <code>appaloft code --local</code> 是这台 Mac 上的 Scratch。
+    <strong>部署</strong> — 一个文件夹变成 URL。Git 可选。
+    主命令：<code>appaloft deploy .</code>。成功就是这个应用的一条线上 URL。<br />
+    <strong>Agent</strong> — 本地 skill + MCP，让你已经在用的 Cursor 或 OpenCode 能操作
+    Appaloft。体验类似 Railway 的 <code>setup agent</code>。Appaloft 没有这条命令。
   </p>
   <p>
     <a href="https://www.appaloft.com">官网</a> ·
@@ -50,18 +50,12 @@ brew install appaloft/tap/appaloft
 也可以从 [GitHub Releases](https://github.com/appaloft/appaloft/releases/latest) 下载对应平台
 archive。
 
-然后登录。`appaloft login` 默认连 Appaloft Cloud：`https://app.appaloft.com`。Self-hosted
-control plane 请加 `--url`。
-
-```bash
-appaloft login
-appaloft auth status
-appaloft context show
-```
+登录和登记服务器只是需要 Cloud 或 BYOS 时的一行前提，不是这条故事：`appaloft login`
+（self-hosted 加 `--url`）；自己带机器时再用 `appaloft server register`。
 
 ## 部署
 
-在任意项目目录里执行。Git 可选。
+在任意项目目录里执行。Git 可选。成功就是这个应用的一条线上 URL。
 
 ```bash
 appaloft deploy .
@@ -103,17 +97,13 @@ appaloft deploy ./docker-compose.yml
 [`appaloft/examples/hello`](https://github.com/appaloft/examples/tree/main/hello)。它是可选项，
 不是第一条命令。
 
-要用自己的服务器时再走 BYOS。这不是首页主路径：
-
-```bash
-appaloft server register
-```
-
 ## Agent
 
-教会你已经在用的 coding agent。Appaloft 不替换那个 agent。
+教会你已经在用的 coding agent。装本地 skill 和 MCP，让 Cursor、OpenCode、Codex 或 Claude
+Code 能调用 Appaloft。体验类似 Railway 的 `setup agent`。Appaloft 没有那条命令。
 
-安装 Appaloft skill（文档里写明的 host 是 Codex 和 Claude Code）：
+Skill 复制块只用本仓库文档里的 host（`codex`、`claude-code`）。Cursor 和 OpenCode 走 MCP，
+不要编造 `--agent` 参数。
 
 ```bash
 npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
@@ -127,30 +117,17 @@ npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code -
 Appaloft 部署或运维。skill 会约束 agent 走 Appaloft operation，而不是直接调用 Docker、SSH、
 数据库或云厂商。
 
-把 MCP host 指到同一套 operation catalog：
-
 ```bash
 npx @appaloft/mcp
 appaloft mcp stdio
-appaloft mcp serve --host 127.0.0.1 --port 3939
 ```
 
-```bash
-appaloft auth mcp login
-appaloft auth mcp codex install
-```
+## Occupancy（可选）
 
-占用是 Agent 门里靠后的命令，不是第一条命令。登录后，`appaloft code` 占用你已登记服务器上的
-Sandbox。`appaloft code --local` 是这台 Mac 上的 Scratch：不登录、不建 Sandbox、也不远程保存。
-Railway 风格的占用会把你放进托管 code-server / `ca` 式会话；Appaloft 占用的是*你的*
-Sandbox，或本机 Scratch。
+不是一扇门。两扇门之后，`appaloft code` 只是占用附加项：在你的服务器上打开远程 OpenCode 或
+Pi（类似 Railway 的 `ca`）。`appaloft code --local` 是本机 Scratch。
 
-```bash
-appaloft code
-appaloft code --local
-```
-
-这些占用命令写在仓库内的 CLI 参考
+这些命令写在仓库内的 CLI 参考
 （[cli-entrypoints.md](./skills/appaloft/references/cli-entrypoints.md)）。当前线上的
 docs.appaloft.com CLI 页面可能还没有列出它们。
 

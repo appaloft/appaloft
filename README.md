@@ -9,10 +9,11 @@
     Two doors. Pick one and start.
   </p>
   <p>
-    <strong>Deploy</strong> — a folder becomes a URL. Git is optional.<br />
-    <strong>Agent</strong> — teach the coding agent you already have (skill + MCP).
-    <code>appaloft code</code> occupies your Sandbox.
-    <code>appaloft code --local</code> is Scratch on this Mac.
+    <strong>Deploy</strong> — a folder becomes a URL. Git is optional.
+    Hero command: <code>appaloft deploy .</code>. Success is a live URL for this app.<br />
+    <strong>Agent</strong> — local skill + MCP so the Cursor or OpenCode you already have can use
+    Appaloft. The experience is like Railway <code>setup agent</code>. Appaloft does not ship that
+    command.
   </p>
   <p>
     <a href="https://www.appaloft.com">Website</a> ·
@@ -51,18 +52,13 @@ brew install appaloft/tap/appaloft
 Or download a platform archive from
 [GitHub Releases](https://github.com/appaloft/appaloft/releases/latest).
 
-Then sign in. `appaloft login` defaults to Appaloft Cloud at `https://app.appaloft.com`. Use
-`--url` for a self-hosted control plane.
-
-```bash
-appaloft login
-appaloft auth status
-appaloft context show
-```
+Login and a registered server are one-line prerequisites when you need Cloud or BYOS — not the
+story: `appaloft login` (add `--url` for a self-hosted plane) and, if you bring your own machine,
+`appaloft server register`.
 
 ## Deploy
 
-From any project folder. Git is optional.
+From any project folder. Git is optional. Success is a live URL for this app.
 
 ```bash
 appaloft deploy .
@@ -104,17 +100,14 @@ Want a known-good sample? Try the official
 [`appaloft/examples/hello`](https://github.com/appaloft/examples/tree/main/hello) project after the
 CLI is installed. It is optional — not the first command.
 
-Bring your own server when you want BYOS. That is not the hero path:
-
-```bash
-appaloft server register
-```
-
 ## Agent
 
-Teach the coding agent you already have. Appaloft does not replace that agent.
+Teach the coding agent you already have. Install a local skill and MCP so Cursor, OpenCode, Codex,
+or Claude Code can call Appaloft. That experience is like Railway `setup agent`. Appaloft does not
+ship that command.
 
-Install the Appaloft skill (Codex and Claude Code are the documented hosts):
+Skill copy blocks use the hosts documented in this repo (`codex`, `claude-code`). Cursor and
+OpenCode enter through MCP, not an invented `--agent` flag.
 
 ```bash
 npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
@@ -128,30 +121,17 @@ Verify with `npx skills list --global --agent <agent>`, then start a new agent s
 deploy or operate through Appaloft. The skill tells the agent to use Appaloft operations instead of
 calling Docker, SSH, databases, or cloud providers directly.
 
-Point an MCP host at the same operation catalog:
-
 ```bash
 npx @appaloft/mcp
 appaloft mcp stdio
-appaloft mcp serve --host 127.0.0.1 --port 3939
 ```
 
-```bash
-appaloft auth mcp login
-appaloft auth mcp codex install
-```
+## Occupancy (optional)
 
-Occupancy is a later Agent-door command, not the first command. After login, `appaloft code`
-occupies your Sandbox on an enrolled server. `appaloft code --local` is Scratch on this Mac — no
-login, no Sandbox, not saved remotely. Railway-style occupancy puts you in a hosted code-server /
-`ca`-style session; Appaloft occupies *your* Sandbox or this-machine Scratch.
+Not a door. After the two doors, `appaloft code` is an occupancy add-on: it opens remote OpenCode or
+Pi on your server (analogous to Railway `ca`). `appaloft code --local` is Scratch on this machine.
 
-```bash
-appaloft code
-appaloft code --local
-```
-
-These occupancy commands are listed in the in-repo CLI reference
+These commands are listed in the in-repo CLI reference
 ([cli-entrypoints.md](./skills/appaloft/references/cli-entrypoints.md)). The currently published
 docs.appaloft.com CLI page may not list them yet.
 
