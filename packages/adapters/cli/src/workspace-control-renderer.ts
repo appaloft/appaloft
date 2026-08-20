@@ -22,6 +22,7 @@ import {
 
 export {
   buildWorkspaceControlRendererBinary,
+  claimWorkspaceRendererFailureReport,
   consumeWarmedWorkspaceControlRenderer,
   type EnsureWorkspaceControlRendererBinaryOptions,
   ensureWorkspaceControlRendererBinary,
@@ -33,11 +34,13 @@ export {
   type RatatuiWorkspaceControlPresentationInput,
   readRustcVersion,
   resetWorkspaceControlRendererWarmup,
+  resetWorkspaceRendererFailureReport,
   resolveCodeWorkspaceControlRendererBinary,
   resolveWorkspaceControlRendererBinary,
   restoreWorkspaceTuiScrollback,
   rustcTooOldForWorkspaceControlTui,
   sanitizeWorkspaceRendererFailureText,
+  setWorkspaceTuiScrollbackWriter,
   WORKSPACE_CONTROL_TUI_BINARY_NAME,
   WORKSPACE_CONTROL_TUI_BUILD_COMMAND,
   WORKSPACE_CONTROL_TUI_DEFAULT_TOOLCHAIN_COMMAND,

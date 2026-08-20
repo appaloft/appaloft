@@ -628,7 +628,10 @@ export const WORKSPACE_CONTROL_TUI_MIN_RUSTC = { major: 1, minor: 88 } as const;
 export const WORKSPACE_TUI_LEAVE_ALT_SCREEN = "\x1b[?25h\x1b[?1049l";
 export const WORKSPACE_TUI_DISABLE_MOUSE = "\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l";
 const RUSTUP_CARGO_CHOOSER_RE =
-  /rustup could not choose a version of (?:cargo|rustc)|no default is configured/iu;
+  /rustup could not choose a version of (?:cargo|rustc)|no default is configured|help: run 'rustup default stable'|Workspace renderer .* is unavailable/iu;
+type WorkspaceTuiScrollbackWriter = (text: string) => void;
+let workspaceTuiScrollbackWriter: WorkspaceTuiScrollbackWriter | undefined;
+let workspaceRendererFailureReported = false;
 
 export function parseRustcRelease(
   versionText: string,
@@ -696,12 +699,42 @@ export function sanitizeWorkspaceRendererFailureText(text: string): string {
   ].join("\n");
 }
 
+export function setWorkspaceTuiScrollbackWriter(write?: WorkspaceTuiScrollbackWriter): void {
+  workspaceTuiScrollbackWriter = write;
+}
+
+export function resetWorkspaceRendererFailureReport(): void {
+  workspaceRendererFailureReported = false;
+}
+
+export function claimWorkspaceRendererFailureReport(): boolean {
+  if (workspaceRendererFailureReported) return false;
+  workspaceRendererFailureReported = true;
+  return true;
+}
+
 export function restoreWorkspaceTuiScrollback(
-  write: (text: string) => void = (text) => {
-    process.stdout.write(text);
-  },
+  write: WorkspaceTuiScrollbackWriter = workspaceTuiScrollbackWriter ??
+    ((text) => {
+      process.stdout.write(text);
+    }),
 ): void {
   write(`${WORKSPACE_TUI_LEAVE_ALT_SCREEN}${WORKSPACE_TUI_DISABLE_MOUSE}\n`);
+}
+
+function failClosedWorkspaceRenderer(
+  reason: string,
+  input: {
+    readonly rustcVersion?: string;
+    readonly buildFailed?: boolean;
+    readonly rustupMissing?: boolean;
+    readonly codeChrome?: boolean;
+    readonly crateDir?: string;
+    readonly exitCode?: number;
+  } = {},
+): never {
+  restoreWorkspaceTuiScrollback();
+  throw workspaceControlRendererUnavailableError(reason, input);
 }
 
 export function isWorkspaceRendererFailure(error: unknown): boolean {
@@ -743,6 +776,7 @@ function workspaceControlRendererUnavailableError(
 export async function readRustcVersion(
   environment: NodeJS.ProcessEnv = process.env,
 ): Promise<string | undefined> {
+  restoreWorkspaceTuiScrollback();
   const rustc = environment.RUSTC?.trim() || "rustc";
   const child = spawn(rustc, ["--version"], {
     shell: false,
@@ -782,6 +816,7 @@ export async function buildWorkspaceControlRendererBinary(
   crateDir: string,
   environment: NodeJS.ProcessEnv = process.env,
 ): Promise<void> {
+  restoreWorkspaceTuiScrollback();
   const cargo = environment.CARGO?.trim() || "cargo";
   const child = spawn(cargo, ["build", "--locked"], {
     cwd: crateDir,
@@ -796,7 +831,7 @@ export async function buildWorkspaceControlRendererBinary(
     child.once("exit", (code) => resolveExit(code ?? 1));
   });
   if (exitCode !== 0) {
-    throw workspaceControlRendererUnavailableError("binary-build-failed", {
+    failClosedWorkspaceRenderer("binary-build-failed", {
       crateDir,
       buildFailed: true,
       exitCode,
@@ -819,18 +854,19 @@ export async function ensureWorkspaceControlRendererBinary(
 ): Promise<string | undefined> {
   const existing = resolveWorkspaceControlRendererBinary(environment);
   if (existing) return existing;
+  restoreWorkspaceTuiScrollback();
   const crateDir = workspaceControlRendererCrateDir(environment);
   const rustcVersion =
     options.rustcVersion ?? (await (options.readRustcVersion ?? readRustcVersion)(environment));
   if (crateDir && rustcVersion && rustcTooOldForWorkspaceControlTui(rustcVersion)) {
-    throw workspaceControlRendererUnavailableError("toolchain-old", {
+    failClosedWorkspaceRenderer("toolchain-old", {
       crateDir,
       rustcVersion,
     });
   }
   if (!crateDir) return undefined;
   if (!rustcVersion) {
-    throw workspaceControlRendererUnavailableError("rustup-missing", {
+    failClosedWorkspaceRenderer("rustup-missing", {
       crateDir,
       rustupMissing: true,
       codeChrome: true,
@@ -852,7 +888,7 @@ export async function ensureWorkspaceControlRendererBinary(
     ) {
       throw error;
     }
-    throw workspaceControlRendererUnavailableError("binary-build-failed", {
+    failClosedWorkspaceRenderer("binary-build-failed", {
       crateDir,
       ...(rustcVersion ? { rustcVersion } : {}),
       buildFailed: true,
@@ -870,6 +906,8 @@ let warmedWorkspaceControlRenderer: Promise<WorkspaceTuiLaunchSession> | undefin
 
 export function resetWorkspaceControlRendererWarmup(): void {
   warmedWorkspaceControlRenderer = undefined;
+  workspaceTuiScrollbackWriter = undefined;
+  workspaceRendererFailureReported = false;
 }
 
 export function consumeWarmedWorkspaceControlRenderer():
@@ -887,10 +925,9 @@ export async function warmupWorkspaceControlRenderer(
     const chrome = resolveCodeWorkspaceControlRendererBinary(environment);
     if (!chrome) {
       const stale = resolveWorkspaceControlRendererBinary(environment);
-      throw workspaceControlRendererUnavailableError(
-        stale ? "binary-stale-chrome" : "binary-missing",
-        { codeChrome: true },
-      );
+      failClosedWorkspaceRenderer(stale ? "binary-stale-chrome" : "binary-missing", {
+        codeChrome: true,
+      });
     }
     warmedWorkspaceControlRenderer = openWorkspaceControlRenderer({
       environment,
@@ -907,10 +944,9 @@ export async function openWorkspaceControlRenderer(
   const binaryPath = input.binaryPath ?? resolveCodeWorkspaceControlRendererBinary(environment);
   if (!binaryPath || !workspaceControlRendererSupportsCodeChrome(binaryPath)) {
     const stale = resolveWorkspaceControlRendererBinary(environment);
-    throw workspaceControlRendererUnavailableError(
-      stale ? "binary-stale-chrome" : "binary-missing",
-      { codeChrome: true },
-    );
+    failClosedWorkspaceRenderer(stale ? "binary-stale-chrome" : "binary-missing", {
+      codeChrome: true,
+    });
   }
   return openLoopbackWorkspaceControlRenderer({
     launch: async ({ port, token }) => {

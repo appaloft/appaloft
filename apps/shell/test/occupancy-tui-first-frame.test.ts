@@ -76,6 +76,13 @@ describe("occupancy TUI first frame", () => {
     expect(source).toContain("restoreOccupancyAltScreenIfEntered");
     expect(source.indexOf("installOccupancyAltScreenRestore()")).toBeLessThan(firstFrame);
     expect(leaveOnWarmupFail).toBeGreaterThan(firstFrame);
+    const warmupCatch = source.slice(
+      source.indexOf("warmupWorkspaceControlRenderer"),
+      source.indexOf("const standaloneCommand"),
+    );
+    expect(warmupCatch).toContain("leaveOccupancyAltScreen()");
+    expect(warmupCatch).not.toContain("stderr.write");
+    expect(warmupCatch).not.toContain("error:");
     expect(progress).toContain('if (command !== "code" && command !== "workspace") return false');
     expect(source).not.toMatch(/^import .*workspace-tui-launch/m);
     expect(source).not.toContain("workspace-control-renderer");
