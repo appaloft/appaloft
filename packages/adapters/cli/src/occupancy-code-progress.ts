@@ -1,4 +1,5 @@
 export const OCCUPANCY_CODE_PROGRESS = {
+  connecting: "Connecting to Appaloft…",
   checkingLogin: "Checking login…",
   lookingUpServers: "Looking up enrolled servers…",
   choosingOccupancy: "Choosing occupancy…",
@@ -6,6 +7,15 @@ export const OCCUPANCY_CODE_PROGRESS = {
   copyingSkills: "Copying skills…",
   attaching: "Attaching…",
 } as const;
+
+export function occupancyCodeUsesLineProgress(input: {
+  readonly noAttach: boolean;
+  readonly stdinIsTty?: boolean;
+  readonly stdoutIsTty?: boolean;
+}): boolean {
+  if (input.noAttach) return true;
+  return !input.stdinIsTty || !input.stdoutIsTty;
+}
 
 export const DEFAULT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS = 8_000;
 export const DEFAULT_OCCUPANCY_BANNER_CHROME_TIMEOUT_MS = 2_000;

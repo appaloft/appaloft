@@ -55,11 +55,11 @@ appaloft code
 默认 `appaloft code` 占用团队默认已注册 Server 上的 **我的 Sandbox**。源是远端 SHA。
 缺少 Adapter/Profile 时会创建不可见的 `appaloft-remote`。笔记本路径不是 Workspace
 真相，脏树也不会上传。位置参数若是 git remote（`https://`、`ssh://`、`git@host:path`），
-无需本地 clone 即可占用该仓库。`code` 进程一开始就会打印状态行，不会先静默启动本地数据库或 composition。
-打开占用时会继续打印现在进行时状态行，例如
-`Checking login…`、`Opening occupancy on hostinger…`、`Copying skills…`、`Attaching…`。
-占用一返回就打印 Remote 横幅。默认 `code` 随即 attach。HOME skill 复制是限时、失败软处理，
-不得挡住横幅、attach 或 `--no-attach` 退出。`--no-attach` 打印同样的占用进度和横幅后退出。
+无需本地 clone 即可占用该仓库。TTY 上默认 `code` / `workspace` 会立刻进入占用 Workspace TUI
+（备用屏），首帧就在中间/页脚显示进度（`Connecting to Appaloft…`，然后 occupy / copy skills /
+attach），不以刷 stderr 状态行为主 UX。占用一返回就 attach。HOME skill 复制限时且失败软处理。
+`--no-attach` 和非 TTY 脚本仍用一行 stderr 进度（含进程启动后的第一字节状态行），并打印 Remote
+横幅。
 横幅是：
 
 ```text

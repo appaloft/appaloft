@@ -1295,7 +1295,11 @@ describe("Workspace control presentation", () => {
     await listStarted.promise;
     await started;
     expect(renderer.closed).toBe(1);
-    expect(renderer.messages[0]).toEqual({ type: "workspaces", workspaces: [] });
+    expect(renderer.messages[0]).toEqual({
+      type: "progress",
+      message: "Connecting to Appaloft…",
+    });
+    expect(renderer.messages[1]).toEqual({ type: "workspaces", workspaces: [] });
     resolveList?.({ items: [{ sandboxId: "sbx_late", status: "ready" }] });
   });
 
@@ -2037,6 +2041,93 @@ describe("Workspace control presentation", () => {
       code: "occupancy_compare_unavailable",
       phase: "workspace-control-open-compare",
       retryable: false,
+    });
+  });
+
+  test("[WS-REMOTE-PROGRESS-193] occupy bootstrap paints TUI progress and attaches without waiting on skills", async () => {
+    const terminal = {
+      detached: 0,
+      async *[Symbol.asyncIterator](): AsyncIterator<TerminalSessionFrame> {},
+      write: () => Promise.resolve(),
+      resize: () => Promise.resolve(),
+      detach() {
+        this.detached += 1;
+        return Promise.resolve();
+      },
+      close: () => Promise.resolve(),
+    } satisfies TerminalSession & { detached: number };
+    const renderer = new FakeRendererSession([]);
+    renderer.events = async function* events() {
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        if (
+          this.messages.some((message) => message.type === "terminal-ready") ||
+          this.messages.some((message) => message.type === "error")
+        ) {
+          break;
+        }
+        await Promise.resolve();
+      }
+      yield { type: "quit" };
+    };
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+    let skillBlockers = 0;
+    await presentation.start({
+      occupyBootstrap: async ({ reportProgress }) => {
+        await reportProgress("Opening occupancy on hostinger…");
+        await reportProgress("Copying skills…");
+        skillBlockers += 1;
+        return {
+          workspaceId: "sbx_1",
+          attach: {
+            workspaceId: "sbx_1",
+            runtimeId: "sar_1",
+            transport: "managed-terminal",
+            sessionId: "term_occupy",
+            processId: "proc_1",
+            access: {
+              kind: "websocket",
+              path: "/sessions/term_occupy",
+              expiresAt: "2099-01-01T00:00:00.000Z",
+            },
+          },
+        };
+      },
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery) {
+          return ok({ items: [{ sandboxId: "sbx_1", status: "ready" }] } as T);
+        }
+        if (query instanceof ShowSandboxQuery) {
+          return ok({ sandboxId: "sbx_1", status: "ready" } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+      terminalSessionGateway: { attach: () => ok(terminal) },
+    });
+    expect(skillBlockers).toBe(1);
+    expect(renderer.messages[0]).toEqual({
+      type: "progress",
+      message: "Connecting to Appaloft…",
+    });
+    expect(renderer.messages).toContainEqual({
+      type: "progress",
+      message: "Opening occupancy on hostinger…",
+    });
+    expect(renderer.messages).toContainEqual({
+      type: "progress",
+      message: "Copying skills…",
+    });
+    expect(renderer.messages).toContainEqual({
+      type: "progress",
+      message: "Attaching…",
+    });
+    expect(renderer.messages).toContainEqual({
+      type: "terminal-ready",
+      workspaceId: "sbx_1",
+      runtimeId: "sar_1",
+      sessionId: "term_occupy",
     });
   });
 });

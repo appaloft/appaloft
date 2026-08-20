@@ -1,5 +1,8 @@
 import "reflect-metadata";
-import { reportOccupancyCliStartupOnce } from "./occupancy-cli-progress";
+import {
+  reportOccupancyCliStartupOnce,
+  shouldPrintOccupancyLineProgress,
+} from "./occupancy-cli-progress";
 
 function parseBoolean(value: string | undefined): boolean | undefined {
   if (value === undefined) {
@@ -45,7 +48,9 @@ function isHelpFlag(args: readonly string[]): boolean {
 
 const args = shellCommandArgs(process.argv);
 const command = args[0];
-reportOccupancyCliStartupOnce(args);
+if (shouldPrintOccupancyLineProgress(args)) {
+  reportOccupancyCliStartupOnce(args);
+}
 const standaloneCommand =
   !command ||
   command === "login" ||

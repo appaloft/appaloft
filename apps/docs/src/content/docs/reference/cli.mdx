@@ -52,7 +52,7 @@ appaloft deployments recovery-readiness <deploymentId>  # 查询恢复就绪状�
 
 `appaloft code` 登录后占用团队默认已注册 Server 上的 **我的 Sandbox**。源是远端 SHA。
 缺少 Adapter/Profile 时会创建不可见的 `appaloft-remote`。笔记本路径不是 Workspace
-真相，脏树也不会上传。打开时会打印短状态行。占用一返回就打印 Remote 横幅，默认 `code` 随即 attach。skill 复制限时且失败软处理。`--no-attach` 打印同样的进度和占用横幅，不 attach。默认 `code` 会选 live occupancy，
+真相，脏树也不会上传。TTY 上默认 `code` 立刻进入占用 Workspace TUI，中间/页脚显示进度后 attach。`--no-attach` 用一行 stderr 进度和占用横幅，不 attach。默认 `code` 会选 live occupancy，
 同名 leftover Profile 不能挡住第一次成功。`--profile` 只是兜底。`--new` 占用 cwd
 源，不会静默 resume whoami。打开失败会写出正在打开的仓库以及缺少的 Binding 或
 Profile。已注册 BYOS 就是放置目标，`--server` 可钉死，不要求 managed。`--local` 才是本机

@@ -33,7 +33,6 @@ import {
   ResumeAgentTaskRunCommand,
   ShowAgentTaskRunQuery,
   ShowSandboxQuery,
-  ShowTerminalSessionQuery,
   ShowWorkspaceCollaborationQuery,
   SteerAgentTaskRunCommand,
   StopAgentTaskRunCommand,
@@ -2067,6 +2066,69 @@ describe("Agent Workspace CLI", () => {
     );
     expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Attaching…"));
     expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Copying skills…"));
+  });
+
+  test("[WS-REMOTE-PROGRESS-193] TTY code enters occupancy TUI without streamed line progress", async () => {
+    const output: string[] = [];
+    let presentationStarts = 0;
+    let occupyBootstrap:
+      | ((input: { reportProgress: (message: string) => Promise<void> }) => Promise<unknown>)
+      | undefined;
+    let doorResolved = false;
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: { execute: async () => ok({}) } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_tui_progress" }),
+      },
+      terminalIO: {
+        stdin: { isTTY: true, on: () => undefined },
+        stdout: {
+          isTTY: true,
+          write: (chunk: string | Uint8Array) => {
+            output.push(String(chunk));
+            return true;
+          },
+        },
+        stderr: {
+          isTTY: true,
+          write: (chunk: string | Uint8Array) => {
+            output.push(String(chunk));
+            return true;
+          },
+        },
+      },
+      environment: { TERM: "xterm-256color" },
+      workspaceControlPresentation: {
+        start: async (context) => {
+          presentationStarts += 1;
+          occupyBootstrap = context.occupyBootstrap;
+        },
+      },
+      resolveRemoteCodeDoor: async () => {
+        doorResolved = true;
+        throw new Error("TTY code should occupy only after the TUI starts");
+      },
+    });
+    const write = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code"]);
+    } finally {
+      process.stdout.write = write;
+    }
+    expect(presentationStarts).toBe(1);
+    expect(occupyBootstrap).toBeTypeOf("function");
+    expect(doorResolved).toBeFalse();
+    expect(output.join("")).not.toContain("Checking login…");
+    expect(output.join("")).not.toContain("Opening occupancy");
+    expect(output.join("")).not.toContain("Opening remote session…");
   });
 
   test("[WS-REMOTE-COMPAT-128][WS-REMOTE-COMPAT-129][WS-REMOTE-COMPAT-130] unstructured occupancy validation names the enrolled Server", async () => {

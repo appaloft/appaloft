@@ -23,6 +23,7 @@ import {
   ResumeSandboxCommand,
   RetrySandboxPromotionCommand,
   RevokeSandboxPortCommand,
+  type SandboxAgentAttachDescriptor,
   ShowSandboxQuery,
   type TerminalSession,
   type TerminalSessionAttachmentGateway,
@@ -40,6 +41,7 @@ import {
   occupancyConnectionsUrl,
   occupancyPullRequestFromPreviewEnvironments,
 } from "./occupancy-chrome.js";
+import { OCCUPANCY_CODE_PROGRESS } from "./occupancy-code-progress.js";
 import { type OperateRendererEvent, type OperateRendererMessage } from "./operate-presentation.js";
 import { terminateWorkspaceWithRuntimes } from "./workspace-lifecycle-actions.js";
 
@@ -203,6 +205,7 @@ export type WorkspaceControlRendererMessage =
       readonly reason: string;
       readonly exitCode?: number;
     }
+  | { readonly type: "progress"; readonly message: string }
   | { readonly type: "delivery-complete"; readonly workspaceId: string }
   | { readonly type: "recovery-complete"; readonly workspaceId: string }
   | {
@@ -287,6 +290,13 @@ export interface WorkspaceControlPresentationContext {
     readonly runtimeId: string;
     readonly argv: readonly string[];
   }): Promise<{ readonly sessionId: string; readonly session: TerminalSession }>;
+  occupyBootstrap?: (input: { reportProgress: (message: string) => Promise<void> }) => Promise<
+    | {
+        readonly workspaceId: string;
+        readonly attach?: SandboxAgentAttachDescriptor;
+      }
+    | undefined
+  >;
 }
 
 /** Framework-neutral entry point for the interactive Workspace control surface. */
@@ -965,12 +975,71 @@ export function createBoundedWorkspaceControlPresentation(
         await bindTerminal({ ...attachment, ...(await reconnect()), reconnect });
       };
 
+      const attachIssuedDescriptor = async (descriptor: SandboxAgentAttachDescriptor) => {
+        await renderer.send({
+          type: "progress",
+          message: OCCUPANCY_CODE_PROGRESS.attaching,
+        });
+        if (descriptor.transport === "managed-terminal") {
+          await attachManagedTerminal({
+            workspaceId: descriptor.workspaceId,
+            runtimeId: descriptor.runtimeId,
+            sessionId: descriptor.sessionId,
+          });
+          return;
+        }
+        const openNativeTerminal = context.openNativeWorkspaceTerminal;
+        if (!openNativeTerminal) throw new Error("Native attach viewport is unavailable");
+        if (descriptor.clientHandoff !== "local-client-exec") {
+          throw new Error("Native attach descriptor does not permit local execution");
+        }
+        const argv = nativeClientCommand(descriptor as unknown as Record<string, unknown>);
+        const reconnect = () =>
+          openNativeTerminal({
+            workspaceId: descriptor.workspaceId,
+            runtimeId: descriptor.runtimeId,
+            argv,
+          });
+        await bindTerminal({
+          workspaceId: descriptor.workspaceId,
+          runtimeId: descriptor.runtimeId,
+          ...(await reconnect()),
+          reconnect,
+        });
+      };
+
       try {
+        await renderer.send({
+          type: "progress",
+          message: OCCUPANCY_CODE_PROGRESS.connecting,
+        });
         await renderer.send({ type: "workspaces", workspaces: [] });
-        void listWorkspaces(context).then(
-          (workspaces) => renderer.send({ type: "workspaces", workspaces }),
-          (error) => sendErrorBestEffort(error, "workspace-control-start"),
-        );
+        if (context.occupyBootstrap) {
+          void context
+            .occupyBootstrap({
+              reportProgress: async (message) => {
+                if (!presentationOpen) return;
+                await renderer.send({ type: "progress", message });
+              },
+            })
+            .then(async (occupied) => {
+              if (!presentationOpen) return;
+              await renderer.send({
+                type: "workspaces",
+                workspaces: await listWorkspaces(context),
+              });
+              if (!occupied?.workspaceId) return;
+              selectedWorkspaceId = occupied.workspaceId;
+              await sendSelectedDetail(occupied.workspaceId);
+              if (occupied.attach) await attachIssuedDescriptor(occupied.attach);
+            })
+            .catch((error) => sendErrorBestEffort(error, "occupancy-code-bootstrap"));
+        } else {
+          void listWorkspaces(context).then(
+            (workspaces) => renderer.send({ type: "workspaces", workspaces }),
+            (error) => sendErrorBestEffort(error, "workspace-control-start"),
+          );
+        }
         for await (const event of renderer.events()) {
           if (event.type === "quit") break;
           try {
@@ -1211,7 +1280,7 @@ export function createBoundedWorkspaceControlPresentation(
               const task = detail.tasks.find(
                 (candidate) => candidate.taskRunId === event.taskRunId,
               );
-              if (!task || task.status !== "awaiting-approval") {
+              if (task?.status !== "awaiting-approval") {
                 throw new Error("Task is not awaiting approval in the latest Workspace detail");
               }
               resultValue(

@@ -60,9 +60,10 @@ surface available in the session.
 ## Common Workflows
 
 - Occupancy session: after `appaloft login` and an enrolled Server, `appaloft code` occupies
-  my Sandbox, prints present-tense progress, prints the Remote banner as soon as occupy
-  returns, and attaches immediately. Skill copy is fail-soft and time-bounded.
-  `--no-attach` prints the same progress and banner, then stops. From inside OpenCode, use first-party `appaloft-tools` to list/plan/create
+  my Sandbox. On a TTY it enters the occupancy Workspace TUI immediately with
+  centered/footer progress, then attaches. `--no-attach` and non-TTY keep one-line
+  progress and the Remote banner. Skill copy is fail-soft and time-bounded.
+  From inside OpenCode, use first-party `appaloft-tools` to list/plan/create
   deployments, inspect preview environments, expose a sandbox port, or deliver a Task as a
   pull request. After occupy, configure and inspect the occupied app without asking for ids:
   CLI `env set KEY VALUE` / `env unset KEY` / `env show` / `env effective-precedence`, or MCP

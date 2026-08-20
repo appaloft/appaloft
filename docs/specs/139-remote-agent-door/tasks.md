@@ -417,6 +417,8 @@
 - [x] Unit tests WS-REMOTE-PROGRESS-191
 - [x] `--no-attach` prints Remote banner before skill copy; skill copy is fail-soft and time-bounded
 - [x] Unit tests WS-REMOTE-PROGRESS-192
+- [x] TTY `code`/`workspace` enter occupancy TUI with centered/footer progress
+- [x] Unit tests WS-REMOTE-PROGRESS-193
 
 ## Later
 

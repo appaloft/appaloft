@@ -1,6 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap};
@@ -644,6 +644,9 @@ pub enum ParentMessage {
         #[serde(rename = "workspaceId")]
         workspace_id: String,
     },
+    Progress {
+        message: String,
+    },
     Error {
         code: String,
         phase: String,
@@ -908,7 +911,12 @@ impl AppState {
     pub fn apply(&mut self, message: ParentMessage) {
         match message {
             ParentMessage::HelloOk => {
-                self.status_line = "Connected".to_owned();
+                if !self.workspaces.is_empty() {
+                    self.status_line = "Connected".to_owned();
+                }
+            }
+            ParentMessage::Progress { message } => {
+                self.status_line = message;
             }
             ParentMessage::Workspaces { workspaces } => {
                 let selected_id = self.selected_workspace_id().map(str::to_owned);
@@ -921,7 +929,9 @@ impl AppState {
                     })
                     .unwrap_or(0)
                     .min(self.workspaces.len().saturating_sub(1));
-                self.status_line = format!("{} Workspace(s)", self.workspaces.len());
+                if !self.workspaces.is_empty() {
+                    self.status_line = format!("{} Workspace(s)", self.workspaces.len());
+                }
             }
             ParentMessage::Detail { detail } => {
                 self.status_line = format!("Workspace {}", detail.workspace.workspace_id);
@@ -1655,6 +1665,35 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
         .split(area);
     let body = sections[0];
     let footer = sections[1];
+    if state.workspaces.is_empty() && state.detail.is_none() && !state.focus_mode {
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(42),
+                Constraint::Length(3),
+                Constraint::Percentage(42),
+            ])
+            .split(body);
+        frame.render_widget(
+            Paragraph::new(state.status_line.as_str())
+                .alignment(Alignment::Center)
+                .style(
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            rows[1],
+        );
+        frame.render_widget(
+            Paragraph::new(occupancy_control_footer(
+                &state.status_line,
+                state.detail.as_ref(),
+            ))
+            .style(Style::default().fg(Color::DarkGray)),
+            footer,
+        );
+        return;
+    }
     if state.focus_mode {
         render_terminal(
             frame,
@@ -2268,6 +2307,30 @@ mod tests {
         };
         assert_eq!(occupancy_list_label(&occupied), "traefik/whoami@1ce75d0");
         assert_eq!(occupancy_list_label(&lean), "sbx_lean");
+    }
+
+    #[test]
+    fn ws_remote_progress_193_tui_keeps_connecting_status_until_workspaces_arrive() {
+        let mut state = AppState::default();
+        assert_eq!(state.status_line, "Connecting to Appaloft…");
+        state.apply(ParentMessage::HelloOk);
+        state.apply(ParentMessage::Progress {
+            message: "Opening occupancy on hostinger…".to_owned(),
+        });
+        state.apply(ParentMessage::Workspaces {
+            workspaces: Vec::new(),
+        });
+        assert_eq!(state.status_line, "Opening occupancy on hostinger…");
+        state.apply(ParentMessage::Workspaces {
+            workspaces: vec![WorkspaceSummary {
+                workspace_id: "sbx_1".to_owned(),
+                status: "ready".to_owned(),
+                provider_key: None,
+                source_kind: None,
+                occupancy: None,
+            }],
+        });
+        assert_eq!(state.status_line, "1 Workspace(s)");
     }
 
     #[test]

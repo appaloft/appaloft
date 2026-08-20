@@ -7,6 +7,7 @@ import {
   SHELL_OCCUPANCY_PROGRESS,
   shouldExitAfterOccupancyCodeCli,
   shouldKeepOccupancyCliLogs,
+  shouldPrintOccupancyLineProgress,
   shouldSkipLocalPgliteForOccupancyCli,
 } from "../src/occupancy-cli-progress";
 
@@ -18,6 +19,17 @@ describe("occupancy CLI shell progress", () => {
     expect(shouldSkipLocalPgliteForOccupancyCli(args)).toBeTrue();
     expect(shouldKeepOccupancyCliLogs(args)).toBeTrue();
     expect(shouldExitAfterOccupancyCodeCli(args)).toBeTrue();
+    expect(
+      shouldPrintOccupancyLineProgress(args, { stdin: { isTTY: true }, stdout: { isTTY: true } }),
+    ).toBeTrue();
+  });
+
+  test("[WS-REMOTE-PROGRESS-193] TTY code and workspace skip streamed line progress", () => {
+    const tty = { stdin: { isTTY: true }, stdout: { isTTY: true } };
+    expect(shouldPrintOccupancyLineProgress(["code"], tty)).toBeFalse();
+    expect(shouldPrintOccupancyLineProgress(["workspace"], tty)).toBeFalse();
+    expect(shouldPrintOccupancyLineProgress(["code", "--no-attach"], tty)).toBeTrue();
+    expect(shouldPrintOccupancyLineProgress(["code"], { stdin: {}, stdout: {} })).toBeTrue();
   });
 
   test("[WS-REMOTE-PROGRESS-191] workspace keeps logs and does not skip PGlite", () => {

@@ -52,7 +52,7 @@
 | Occupancy banner labels | same `code` banner formatter |
 | Occupancy progress | public CLI `code` present-tense status before each slow occupy step |
 | Occupancy shell bootstrap | `apps/shell` entry + `run.ts` status before login/PGlite/composition; remote `code` skips local PGlite |
-| Occupancy attach-first | public CLI `code` prints Remote banner then attaches after `workspaces.open`; skill copy is fail-soft and time-bounded |
+| Occupancy attach-first | TTY `code` enters occupancy TUI with centered/footer progress then attaches; `--no-attach` / non-TTY keep line progress |
 | Occupancy door hint | public CLI `code` after banner |
 | Occupancy available-door hint | same `code` hint + occupancy URL selector |
 | Occupancy TUI available-door footer | same occupancy URL selector + `workspace` footer |

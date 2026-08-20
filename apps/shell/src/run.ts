@@ -55,6 +55,7 @@ import {
   reportOccupancyCliStartupOnce,
   shouldExitAfterOccupancyCodeCli,
   shouldKeepOccupancyCliLogs,
+  shouldPrintOccupancyLineProgress,
   shouldSkipLocalPgliteForOccupancyCli,
 } from "./occupancy-cli-progress";
 import {
@@ -552,7 +553,9 @@ export async function runShellCli(
 ): Promise<void> {
   const argv = process.argv;
   const startupArgs = commandArgs(argv);
-  reportOccupancyCliStartupOnce(startupArgs, hooks.writeProgress);
+  if (shouldPrintOccupancyLineProgress(startupArgs)) {
+    reportOccupancyCliStartupOnce(startupArgs, hooks.writeProgress);
+  }
   const preparePglite = hooks.prepareRemotePgliteStateSync ?? prepareRemotePgliteStateSync;
   const composeShell = hooks.createShellComposition ?? createShellComposition;
   const mcpCommand = isMcpCommand(argv);

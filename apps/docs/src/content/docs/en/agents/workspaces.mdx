@@ -55,14 +55,13 @@ Default `appaloft code` occupies **my Sandbox** on the team's default enrolled S
 Source is the remote SHA. Adapter and Profile are created if missing. The laptop path
 is not Workspace truth, and dirty files are not uploaded. A positional git remote
 (`https://`, `ssh://`, or `git@host:path`) occupies that repository without a local
-clone. The process prints a status line as soon as `code` starts, before any local
-database or composition boot. While it opens the occupancy it then prints short
-present-tense status lines such as
-`Checking login…`, `Opening occupancy on hostinger…`, `Copying skills…`, and
-`Attaching…`. The Remote banner prints as soon as occupy returns. Default `code`
-attaches immediately after that. HOME skill copy is fail-soft and time-bounded; it
-must not block the banner, attach, or `--no-attach` exit. `--no-attach` prints the
-same occupy progress and banner, then stops.
+clone. On a TTY, default `code` and `workspace` enter the occupancy Workspace TUI
+(alt screen) immediately and show centered/footer progress from the first frame
+(`Connecting to Appaloft…`, then occupy / copy skills / attach). They do not stream
+status lines as the primary UX. Attach starts as soon as occupy returns. HOME skill
+copy is fail-soft and time-bounded. `--no-attach` and non-TTY scripts keep one-line
+stderr progress (including a first-byte status line before local database or
+composition boot) and print the Remote banner.
 The banner is:
 
 ```text

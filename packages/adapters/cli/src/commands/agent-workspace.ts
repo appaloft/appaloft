@@ -79,6 +79,7 @@ import {
   DEFAULT_OCCUPANCY_SKILL_COMMAND_TIMEOUT_MS,
   DEFAULT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS,
   OCCUPANCY_CODE_PROGRESS,
+  occupancyCodeUsesLineProgress,
   occupancyOpeningProgress,
   occupancyTimeoutMs,
   reportOccupancyCodeProgress,
@@ -632,94 +633,111 @@ export const workspaceCodeCommand = EffectCommand.make(
         return;
       }
 
-      const reportProgress = (message: string) => {
-        reportOccupancyCodeProgress(message);
-      };
-      const door = yield* Effect.tryPromise({
-        try: async () => {
-          const injectedDoor = cli.resolveRemoteCodeDoor;
-          if (injectedDoor) {
-            reportProgress(OCCUPANCY_CODE_PROGRESS.checkingLogin);
-            return injectedDoor(path);
-          }
-          return resolveDefaultRemoteCodeDoor(
-            {
-              ...(cli.environment ? { env: cli.environment } : {}),
-              forceNew,
-              onProgress: reportProgress,
-              listServers: async () => {
-                const query = ListServersQuery.create();
-                if (query.isErr()) throw query.error;
-                const listed = await cli.executeQuery(query.value);
-                if (listed.isErr()) throw listed.error;
-                return listed.value.items;
-              },
-              listOccupancies: async () => {
-                const query = ListSandboxesQuery.create({ limit: 100, offset: 0 });
-                if (query.isErr()) throw query.error;
-                const listed = await cli.executeQuery(query.value);
-                if (listed.isErr()) throw listed.error;
-                const items = (listed.value as SandboxListResult).items;
-                return items.map((item) => ({
-                  sandboxId: item.sandboxId,
-                  status: item.status,
-                  ...(typeof item.lastActivityAt === "string"
-                    ? { lastActivityAt: item.lastActivityAt }
-                    : {}),
-                  ...(typeof item.updatedAt === "string" ? { updatedAt: item.updatedAt } : {}),
-                  ...(item.occupancy &&
-                  typeof item.occupancy === "object" &&
-                  typeof item.occupancy.repositoryIdentity === "string" &&
-                  typeof item.occupancy.commitSha === "string"
-                    ? {
-                        occupancy: {
-                          repositoryIdentity: item.occupancy.repositoryIdentity,
-                          commitSha: item.occupancy.commitSha,
-                          ...(typeof item.occupancy.branch === "string"
-                            ? { branch: item.occupancy.branch }
-                            : {}),
-                        },
-                      }
-                    : {}),
-                }));
-              },
-              showBinding: async (repositoryIdentity) => {
-                const query = ShowRepositoryBindingQuery.create({ repositoryIdentity });
-                if (query.isErr()) throw query.error;
-                const shown = await cli.executeQuery(query.value);
-                if (shown.isErr()) return null;
-                return shown.value;
-              },
-              ...(cli.resolveRemoteWorkspaceGitRef
-                ? { resolveRemoteRef: cli.resolveRemoteWorkspaceGitRef }
-                : {}),
-            },
-            path,
-          );
-        },
-        catch: (error) => workspaceCliError(error, "remote-code-door"),
-      });
       const attach = !noAttach;
-      const selectedProfile = occupancyCodeProfile(harness, optionalValue(profile));
-      const openInput = {
-        repository: door.repository,
-        repositoryIdentity: door.repositoryIdentity,
-        ref: door.ref,
-        branch: door.branch,
-        commitSha: door.commitSha,
-        targetServerId: door.serverId,
-        attach,
-        forceNew,
-        ...(selectedProfile ? { profile: selectedProfile } : {}),
+      const interactive = Boolean(cli.terminalIO.stdin.isTTY && cli.terminalIO.stdout.isTTY);
+      const lineProgress = occupancyCodeUsesLineProgress({
+        noAttach,
+        ...(cli.terminalIO.stdin.isTTY === undefined
+          ? {}
+          : { stdinIsTty: cli.terminalIO.stdin.isTTY }),
+        ...(cli.terminalIO.stdout.isTTY === undefined
+          ? {}
+          : { stdoutIsTty: cli.terminalIO.stdout.isTTY }),
+      });
+      const terminalFallbackReason = interactive
+        ? classifyWorkspaceHostTerminal(cli.environment ?? process.env).reason
+        : undefined;
+      const useOccupancyTui =
+        !noAttach &&
+        interactive &&
+        !terminalFallbackReason &&
+        Boolean(cli.workspaceControlPresentation);
+      const reportProgress = (message: string) => {
+        if (lineProgress) reportOccupancyCodeProgress(message);
       };
-      const command = yield* resultToEffect(OpenAgentWorkspaceCommand.create(openInput));
-      reportProgress(occupancyOpeningProgress(door.serverName));
-      const opened = yield* Effect.promise(() => cli.executeCommand(command));
-      let result: WorkspaceOpenResult;
-      let bannerCommitSha = door.commitSha;
-      if (opened.isOk()) {
-        result = opened.value;
-      } else {
+      const occupyRemote = async (
+        onProgress: (message: string) => void,
+        options?: { readonly announcePin?: boolean },
+      ) => {
+        const injectedDoor = cli.resolveRemoteCodeDoor;
+        const door = injectedDoor
+          ? await (async () => {
+              onProgress(OCCUPANCY_CODE_PROGRESS.checkingLogin);
+              return injectedDoor(path);
+            })()
+          : await resolveDefaultRemoteCodeDoor(
+              {
+                ...(cli.environment ? { env: cli.environment } : {}),
+                forceNew,
+                onProgress,
+                listServers: async () => {
+                  const query = ListServersQuery.create();
+                  if (query.isErr()) throw query.error;
+                  const listed = await cli.executeQuery(query.value);
+                  if (listed.isErr()) throw listed.error;
+                  return listed.value.items;
+                },
+                listOccupancies: async () => {
+                  const query = ListSandboxesQuery.create({ limit: 100, offset: 0 });
+                  if (query.isErr()) throw query.error;
+                  const listed = await cli.executeQuery(query.value);
+                  if (listed.isErr()) throw listed.error;
+                  const items = (listed.value as SandboxListResult).items;
+                  return items.map((item) => ({
+                    sandboxId: item.sandboxId,
+                    status: item.status,
+                    ...(typeof item.lastActivityAt === "string"
+                      ? { lastActivityAt: item.lastActivityAt }
+                      : {}),
+                    ...(typeof item.updatedAt === "string" ? { updatedAt: item.updatedAt } : {}),
+                    ...(item.occupancy &&
+                    typeof item.occupancy === "object" &&
+                    typeof item.occupancy.repositoryIdentity === "string" &&
+                    typeof item.occupancy.commitSha === "string"
+                      ? {
+                          occupancy: {
+                            repositoryIdentity: item.occupancy.repositoryIdentity,
+                            commitSha: item.occupancy.commitSha,
+                            ...(typeof item.occupancy.branch === "string"
+                              ? { branch: item.occupancy.branch }
+                              : {}),
+                          },
+                        }
+                      : {}),
+                  }));
+                },
+                showBinding: async (repositoryIdentity) => {
+                  const query = ShowRepositoryBindingQuery.create({ repositoryIdentity });
+                  if (query.isErr()) throw query.error;
+                  const shown = await cli.executeQuery(query.value);
+                  if (shown.isErr()) return null;
+                  return shown.value;
+                },
+                ...(cli.resolveRemoteWorkspaceGitRef
+                  ? { resolveRemoteRef: cli.resolveRemoteWorkspaceGitRef }
+                  : {}),
+              },
+              path,
+            );
+        const selectedProfile = occupancyCodeProfile(harness, optionalValue(profile));
+        const openInput = {
+          repository: door.repository,
+          repositoryIdentity: door.repositoryIdentity,
+          ref: door.ref,
+          branch: door.branch,
+          commitSha: door.commitSha,
+          targetServerId: door.serverId,
+          attach,
+          forceNew,
+          ...(selectedProfile ? { profile: selectedProfile } : {}),
+        };
+        const command = OpenAgentWorkspaceCommand.create(openInput);
+        if (command.isErr()) throw command.error;
+        onProgress(occupancyOpeningProgress(door.serverName));
+        const opened = await cli.executeCommand(command.value);
+        if (opened.isOk()) {
+          return { door, result: opened.value, bannerCommitSha: door.commitSha };
+        }
         const details = opened.error.details;
         const pinnedSha =
           !forceNew &&
@@ -728,28 +746,92 @@ export const workspaceCodeCommand = EffectCommand.make(
             ? details.workspaceCommitSha
             : undefined;
         if (!pinnedSha) {
-          return yield* Effect.fail(
-            occupancyCloudCompatError(opened.error, {
-              id: door.serverId,
-              name: door.serverName,
-            }),
+          throw occupancyCloudCompatError(opened.error, {
+            id: door.serverId,
+            name: door.serverName,
+          });
+        }
+        const retry = OpenAgentWorkspaceCommand.create({
+          ...openInput,
+          commitSha: pinnedSha,
+          forceNew: false,
+        });
+        if (retry.isErr()) throw retry.error;
+        const retried = await cli.executeCommand(retry.value);
+        if (retried.isErr()) throw retried.error;
+        const workspaceId =
+          typeof details?.workspaceId === "string"
+            ? details.workspaceId
+            : retried.value.workspaceId;
+        if (options?.announcePin !== false) {
+          process.stdout.write(
+            `Pinned · ${workspaceId} @ ${pinnedSha.slice(0, 7)} · requested ${door.commitSha.slice(0, 7)} · use --new for an isolated Workspace\n`,
           );
         }
-        const retry = yield* resultToEffect(
-          OpenAgentWorkspaceCommand.create({
-            ...openInput,
-            commitSha: pinnedSha,
-            forceNew: false,
-          }),
-        );
-        result = yield* resultToEffect(yield* Effect.promise(() => cli.executeCommand(retry)));
-        bannerCommitSha = pinnedSha;
-        const workspaceId =
-          typeof details?.workspaceId === "string" ? details.workspaceId : result.workspaceId;
-        process.stdout.write(
-          `Pinned · ${workspaceId} @ ${pinnedSha.slice(0, 7)} · requested ${door.commitSha.slice(0, 7)} · use --new for an isolated Workspace\n`,
-        );
+        return { door, result: retried.value, bannerCommitSha: pinnedSha };
+      };
+      const occupancyTui = cli.workspaceControlPresentation;
+      if (useOccupancyTui && occupancyTui) {
+        yield* Effect.tryPromise({
+          try: () =>
+            occupancyTui.start({
+              executeCommand: (command) => cli.executeCommand(command),
+              executeQuery: (query) => cli.executeQuery(query),
+              ...(cli.terminalSessionGateway
+                ? { terminalSessionGateway: cli.terminalSessionGateway }
+                : {}),
+              ...(cli.openNativeWorkspaceTerminal
+                ? { openNativeWorkspaceTerminal: cli.openNativeWorkspaceTerminal }
+                : {}),
+              occupyBootstrap: async ({ reportProgress: tuiProgress }) => {
+                const occupied = await occupyRemote(
+                  (message) => {
+                    void tuiProgress(message);
+                  },
+                  { announcePin: false },
+                );
+                void settleWithTimeout(
+                  (async () => {
+                    await tuiProgress(OCCUPANCY_CODE_PROGRESS.copyingSkills);
+                    try {
+                      await offerOccupancyAppaloftSkill({
+                        workspaceId: occupied.result.workspaceId,
+                        executeCommand: (skillCommand) => cli.executeCommand(skillCommand),
+                      });
+                      await offerOccupancyHomeSkills({
+                        workspaceId: occupied.result.workspaceId,
+                        executeCommand: (skillCommand) => cli.executeCommand(skillCommand),
+                        destinationExists: occupancyHomeSkillDestinationExists({
+                          workspaceId: occupied.result.workspaceId,
+                          executeQuery: (query) => cli.executeQuery(query),
+                        }),
+                      });
+                    } catch {
+                      // occupy still succeeds when skill offer cannot write
+                    }
+                  })(),
+                  occupancyTimeoutMs(
+                    "APPALOFT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS",
+                    DEFAULT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS,
+                  ),
+                );
+                return {
+                  workspaceId: occupied.result.workspaceId,
+                  ...(occupied.result.attach ? { attach: occupied.result.attach } : {}),
+                };
+              },
+            }),
+          catch: (error) => workspaceCliError(error, "workspace-control-presentation"),
+        });
+        return;
       }
+      const occupied = yield* Effect.tryPromise({
+        try: () => occupyRemote(reportProgress),
+        catch: (error) => workspaceCliError(error, "remote-code-door"),
+      });
+      const door = occupied.door;
+      const result = occupied.result;
+      const bannerCommitSha = occupied.bannerCommitSha;
       const skillOfferTimeoutMs = occupancyTimeoutMs(
         "APPALOFT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS",
         DEFAULT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS,
