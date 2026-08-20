@@ -54,9 +54,10 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `--preview <previewEnvironmentId>` on logs, health, diagnostics, effective config, runtime
   control, and terminal commands when the user is operating a preview rather than its parent
   resource.
-- `appaloft code [path|git-remote] [--yes] [--profile <name-or-id>] [--harness opencode|pi]` occupies my Sandbox after login. A no-git folder create-or-links a Project (directory name, the only Project, or one TTY choice), persists that link, and occupies `folder.local`. Git remote is correspondence when present and is not required. It requires a default
+- `appaloft code [path|git-remote] [--yes] [--profile <name-or-id>] [--server <id>] [--opencode|--pi|--omp|--claude|--codex|--grok]` occupies my Sandbox after login. A no-git folder create-or-links a Project (directory name, the only Project, or one TTY choice), persists that link, and occupies `folder.local`. Git remote is correspondence when present and is not required. It requires a default
   enrolled Server, dispatches `workspaces.open` with the remote SHA and
-  `targetServerId`. On a TTY it enters the occupancy Workspace TUI immediately
+  `targetServerId`. `--server` pins that Server with the same semantics as
+  `workspace open --server`. On a TTY it enters the occupancy Workspace TUI immediately
   with the list collapsed and a centered **preparing the agent** step panel, then
   attaches into the remote session. A source checkout finds or cargo-builds
   `appaloft-workspace-tui` so `appaloftdev code` does not require a manual
@@ -69,7 +70,9 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `--no-attach` and non-TTY print
   one-line progress and
   `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>`.
-  Skill copy is fail-soft and time-bounded.
+  `--no-attach` also prints the connecting steps `using your {Grok|Codex|Claude} credential`,
+  `including N skills`, and `work is on its disk` (`N` is actually copied).
+  Skill copy is fail-soft and time-bounded; a timeout does not block occupy.
   Default harness is OpenCode. Default `code` and `code --new` pick the live occupancy / live
   install. Same-name leftover Profiles must not block first success and must not require
   memorizing installation ids. `--profile` is a fallback pin; only an explicit colliding name
@@ -77,15 +80,20 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `--new` occupies the cwd origin and does not silently resume whoami. A non-git directory
   occupies this folder via a git remote and does not resume an unrelated occupancy. A failed open names
   the repository and the missing Binding or Profile, and keeps `causeCode` visible; it does
-  not invent a successful occupancy. `--harness pi` occupies reserved
+  not invent a successful occupancy.   `--opencode`, `--pi`, `--omp`, `--claude`, `--codex`, and `--grok` are the mutually exclusive user-facing aliases and map onto
+  existing occupancy harnesses (default OpenCode). `--harness` is compatibility only.
+  Default alias follows the saved occupancy-agent preference, then what is signed in or installed on this laptop.
+  `--pi` (or compatibility `--harness pi`) occupies reserved
   `appaloft-remote-pi` and does not rewrite the project's OpenCode default; an existing
   OpenCode Workspace needs `--new`. A positional `https://`, `ssh://`, or `git@host:path` occupies that repository
   without a local clone. Laptop Git is not uploaded. Occupy writes the public Appaloft
-  skill and may add-only copy allowlisted HOME skill directories
+  skill, a secret-free first-party Appaloft MCP file, and may write my laptop vendor
+  credential onto occupancy HOME (`~/.grok/auth.json`, `~/.codex/auth.json`, or a Claude
+  setup-token — not the Claude chat cookie). Occupy may add-only copy allowlisted HOME skill directories
   (`~/.claude/skills`, `~/.codex/skills`, `~/.grok/skills`, `~/.agents/skills`, plus
   `~/.cursor/skills` and `~/.config/opencode/skills` beyond Railway) into
   `/workspace/skills/<name>` and `/workspace/.agents/skills/<name>`. Only directories
-  with `SKILL.md` are copied; `mcp.json`, tokens, cookies, `.env`, and plugin binaries
+  with `SKILL.md` are copied; skill-tree `mcp.json`, tokens, cookies, `.env`, and plugin binaries
   are not. Missing login or Server fails
   closed and never becomes Scratch. `owner/repo` is a local path, not GitHub shorthand.
 - After occupy, omit project/environment/resource ids on `env list|show|set|unset|effective-precedence`,

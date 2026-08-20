@@ -1,7 +1,7 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import {
@@ -829,6 +829,53 @@ describe("Agent Workspace CLI", () => {
     expect((commands[0] as OpenAgentWorkspaceCommand).input.targetServerId).toBe(
       "srv_4lifk0yrcecy",
     );
+  });
+
+  test("[WS-REMOTE-OPEN-BYOS-181] code --server pins hostinger when the injected door is another Server", async () => {
+    const commands: Command<unknown>[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return ok({ workspaceId: "sbx_code_server", projectId: "prj_billing" } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_server" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        projectId: "prj_billing",
+        serverId: "srv_yundu",
+        serverName: "yundu",
+      }),
+    });
+    const write = process.stdout.write;
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    try {
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "code",
+        "--no-attach",
+        "--server",
+        "srv_4lifk0yrcecy",
+      ]);
+    } finally {
+      process.stdout.write = write;
+    }
+    expect((commands[0] as OpenAgentWorkspaceCommand).input).toMatchObject({
+      targetServerId: "srv_4lifk0yrcecy",
+      attach: false,
+    });
   });
 
   test("[WS-OPEN-LOCATOR-023] workspace open accepts a git-remote like code", async () => {
@@ -2277,6 +2324,123 @@ describe("Agent Workspace CLI", () => {
     });
   });
 
+  test("[WS-REMOTE-VENDOR-207] code --pi occupies the Pi profile", async () => {
+    const commands: Command<unknown>[] = [];
+    const { createCliProgram } = await import("../src");
+    const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return ok({
+            workspaceId: "aws_pi_alias",
+            sandboxId: "sbx_pi_alias",
+            runtimeId: "sar_pi_alias",
+          } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_pi_alias" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        projectId: "prj_billing",
+        serverId: "srv_1",
+        serverName: "mac-mini",
+      }),
+    });
+
+    await program.parseAsync(["node", "appaloft", "code", "--pi", "--new", "--no-attach"]);
+
+    expect((commands[0] as OpenAgentWorkspaceCommand).input).toMatchObject({
+      forceNew: true,
+      attach: false,
+      targetServerId: "srv_1",
+      profile: "appaloft-remote-pi",
+    });
+  });
+
+  test("[WS-REMOTE-VENDOR-204][WS-REMOTE-CRED-208] code --grok writes auth.json onto occupancy disk", async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), "appaloft-code-grok-"));
+    await mkdir(join(homeDir, ".grok"), { recursive: true });
+    await writeFile(join(homeDir, ".grok", "auth.json"), '{"access_token":"grok-secret"}\n');
+    const commands: Command<unknown>[] = [];
+    const output: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const { OpenAgentWorkspaceCommand, WriteSandboxFileCommand } = await import(
+      "@appaloft/application"
+    );
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          if (command instanceof OpenAgentWorkspaceCommand) {
+            return ok({
+              workspaceId: "sbx_grok",
+              sandboxId: "sbx_grok",
+              runtimeId: "sar_grok",
+              projectId: "prj_billing",
+            } as T);
+          }
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: {
+        execute: async () => err({ message: "missing" } as never),
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_grok" }),
+      },
+      environment: { HOME: homeDir },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        projectId: "prj_billing",
+        serverId: "srv_4lifk0yrcecy",
+        serverName: "hostinger",
+      }),
+    });
+    const write = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--grok", "--new", "--no-attach"]);
+    } finally {
+      process.stdout.write = write;
+    }
+
+    expect((commands[0] as OpenAgentWorkspaceCommand).input).toMatchObject({
+      forceNew: true,
+      attach: false,
+      targetServerId: "srv_4lifk0yrcecy",
+    });
+    expect((commands[0] as OpenAgentWorkspaceCommand).input.profile).toBeUndefined();
+    const written = commands
+      .filter((command) => command instanceof WriteSandboxFileCommand)
+      .map((command) => command.input.path);
+    expect(written).toContain(".grok/auth.json");
+    expect(written).toContain(".mcp.json");
+    const printed = output.join("");
+    expect(printed).toContain("using your Grok credential");
+    expect(printed).toMatch(/including \d+ skills/);
+    expect(printed).toContain("work is on its disk");
+    expect(printed).not.toContain("grok-secret");
+  });
+
   test("[R8-OCC-CODE-008] code resumes the pinned occupancy Workspace when requested SHA moved", async () => {
     const commands: Command<unknown>[] = [];
     const output: string[] = [];
@@ -2618,6 +2782,10 @@ describe("Agent Workspace CLI", () => {
   });
 
   test("[WS-REMOTE-PROGRESS-192] --no-attach prints Remote banner before a hung skill copy and still exits", async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), "appaloft-code-hung-"));
+    await mkdir(join(homeDir, ".grok", "skills", "plan"), { recursive: true });
+    await writeFile(join(homeDir, ".grok", "auth.json"), '{"access_token":"grok-secret"}\n');
+    await writeFile(join(homeDir, ".grok", "skills", "plan", "SKILL.md"), "# Plan\n");
     const output: string[] = [];
     let releaseHang: (() => void) | undefined;
     const hungSkill = new Promise<void>((resolve) => {
@@ -2628,7 +2796,9 @@ describe("Agent Workspace CLI", () => {
     process.env.APPALOFT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS = "25";
     process.env.APPALOFT_OCCUPANCY_SKILL_COMMAND_TIMEOUT_MS = "25";
     const { createCliProgram } = await import("../src");
-    const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
+    const { OpenAgentWorkspaceCommand, WriteSandboxFileCommand } = await import(
+      "@appaloft/application"
+    );
     const program = createCliProgram({
       version: "0.1.0-test",
       startServer: async () => {},
@@ -2637,7 +2807,12 @@ describe("Agent Workspace CLI", () => {
           if (command instanceof OpenAgentWorkspaceCommand) {
             return ok({ workspaceId: "sbx_hung_skill", projectId: "prj_web" } as T);
           }
-          await hungSkill;
+          if (
+            command instanceof WriteSandboxFileCommand &&
+            command.input.path.includes("skills/")
+          ) {
+            await hungSkill;
+          }
           return ok({} as T);
         },
       } as unknown as CommandBus,
@@ -2645,6 +2820,7 @@ describe("Agent Workspace CLI", () => {
       executionContextFactory: {
         create: (input) => createExecutionContext({ ...input, requestId: "req_code_hung_skill" }),
       },
+      environment: { HOME: homeDir },
       resolveRemoteCodeDoor: async () => ({
         repository: "https://github.com/acme/api.git",
         repositoryIdentity: "github.com/acme/api",
@@ -2665,7 +2841,7 @@ describe("Agent Workspace CLI", () => {
       return true;
     }) as typeof process.stdout.write;
     try {
-      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
+      await program.parseAsync(["node", "appaloft", "code", "--grok", "--no-attach"]);
     } finally {
       process.stdout.write = write;
       if (previousOfferTimeout === undefined) {
@@ -2685,6 +2861,12 @@ describe("Agent Workspace CLI", () => {
       "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · sbx_hung_skill",
     );
     expect(printed).toContain("Preparing skills…");
+    expect(printed).toContain("using your Grok credential");
+    expect(printed).toContain("including 0 skills");
+    expect(printed).toContain("work is on its disk");
+    expect(printed).not.toContain("grok-secret");
+    expect(printed).not.toContain("Copying skills");
+    expect(printed).not.toContain("Opening occupancy");
     expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Preparing skills…"));
   });
 

@@ -14,6 +14,9 @@ searchAliases:
   - "sandbox"
   - "occupancy skills"
   - "home skills"
+  - "claude"
+  - "codex"
+  - "grok"
 relatedOperations:
   - "workspaces.open"
   - "sandboxes.create"
@@ -59,8 +62,11 @@ appaloft code
 工作区列表**折叠**，等待占满整窗。中间面板是标题 spinner 和 **preparing the agent**，
 occupy / copy skills / attach 作为左对齐步骤（Braille spinner，完成后 ✓）。attach
 在同一全屏窗格里接上。`workspace` 打开同一个 TUI 作为导航。不以刷 stderr 状态行为主 UX。
-HOME skill 复制限时且失败软处理。`--no-attach` 和非 TTY 脚本仍用一行 stderr 进度（含进程
-启动后的第一字节状态行），并打印 Remote 横幅。
+HOME skill 复制限时且失败软处理，超时不会阻断 occupy。`--server` 与
+`workspace open --server` 语义相同，用来钉死已注册 Server。`--no-attach` 和非 TTY 脚本仍用一行 stderr 进度（含进程
+启动后的第一字节状态行），并打印 Remote 横幅以及 connecting 三行：
+`using your {Grok|Codex|Claude} credential`、`including N skills`、`work is on its disk`。
+`N` 是实际复制成功的 skill 数。
 源码检出（`appaloftdev`）第一次 TTY 运行会查找或 `cargo build` 占用 TUI sidecar。
 查找范围包括正在执行的树和常见兄弟检出（例如
 `appaloft-cloud/community/appaloft` → `appaloft`），以及
@@ -87,11 +93,41 @@ Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>
 因为这是用户实际使用的根；这两项**超出 Railway 文档范围**。Railway 文档没有写 plugins、
 MCP 配置、或这两个额外根。
 
-只复制包含 `SKILL.md` 的目录。已存在的沙箱文件不会被覆盖。不会复制 `mcp.json`、token、
+只复制包含 `SKILL.md` 的目录。没有 `SKILL.md` 的文件夹（例如只有 references 的
+`use-railway`）整棵跳过。已存在的沙箱文件不会被覆盖。skill 树不会复制 `mcp.json`、token、
 cookie、`.env` 或编辑器插件二进制。沙箱进程看不到笔记本 HOME；复制只发生在本机 occupy
 已经在写文件的那条 CLI 路径上。
 
-未登录或没有 Server 会 fail closed 并给出下一步，不会变成 Scratch。本机 Scratch 必须显式指定：
+## 在 occupancy 上选择 Claude、Codex 或 Grok <a id="agent-code-vendor" />
+
+`appaloft code` 每次只接受一个 agent 别名：
+
+- 我们的：`--opencode`、`--pi`、`--omp`
+- 对齐 Railway 的：`--claude`、`--codex`、`--grok`
+
+`--claude`、`--codex`、`--grok` 选择这台笔记本上的厂商凭证，并映射到现有 OpenCode
+occupancy 运行时。`--opencode`、`--pi`、`--omp` 选择对应 occupancy harness。它们不会
+发明新的运行时。`--harness opencode|pi|omp` 只作兼容。未传别名时，`code` 使用已保存的
+occupancy-agent 偏好，然后跟随这台笔记本已登录或已安装的厂商。
+
+占用会把该凭证写到 occupancy 磁盘（`HOME=/workspace`），而不是沙箱环境变量：
+
+- Grok：`~/.grok/auth.json` → occupancy `.grok/auth.json`
+- Codex：`~/.codex/auth.json` → occupancy `.codex/auth.json`
+- Claude：setup-token（`~/.appaloft/claude-setup-token`、`~/.claude/setup-token`，或把笔记本上的
+  `CLAUDE_CODE_OAUTH_TOKEN` 写成文件）。不会复制 Claude 聊天 cookie。
+
+occupancy 仍提供公开 Appaloft skill 和第一方 Appaloft MCP，让远端 agent 可以列出
+workspace 并部署。不会复制笔记本 `mcp.json` 密钥。永远不会打印 token 值。
+
+多个已注册 Server 时，用 `--server` 钉死其中一个：
+
+```bash
+appaloft code --server srv_4lifk0yrcecy
+```
+
+未登录、没有 Server，或显式 `--claude` / `--codex` / `--grok` 缺少凭证，会 fail closed
+并给出下一步，不会变成 Scratch。本机 Scratch 必须显式指定：
 
 ```bash
 appaloft code --local

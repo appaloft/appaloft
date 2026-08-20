@@ -55,7 +55,9 @@ describe("occupancy code progress timeouts", () => {
     expect(OCCUPANCY_CODE_PROGRESS.choosingOccupancy).toBe("Choosing this folder…");
     expect(OCCUPANCY_CODE_PROGRESS.usingThisProject).toBe("Using this project…");
     expect(OCCUPANCY_CODE_PROGRESS.copyingSkills).toBe("Preparing skills…");
+    expect(OCCUPANCY_CODE_PROGRESS.copyingCredentials).toBe("Preparing credentials…");
     expect(OCCUPANCY_CODE_PROGRESS.copyingSkills).not.toContain("Copying skills");
+    expect(OCCUPANCY_CODE_PROGRESS.copyingCredentials).not.toContain("Copying credentials");
     expect(OCCUPANCY_CODE_PROGRESS.choosingOccupancy).not.toContain("Choosing occupancy");
     expect(OCCUPANCY_CODE_PROGRESS.usingThisProject).not.toContain("occupancy");
     for (const message of Object.values(OCCUPANCY_CODE_PROGRESS)) {

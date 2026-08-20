@@ -56,12 +56,15 @@ appaloft deployments recovery-readiness <deploymentId>  # 查询恢复就绪状�
 **preparing the agent** 后再 attach。`--no-attach` 用一行 stderr 进度和占用横幅，不 attach。默认 `code` 会选 live occupancy，
 同名 leftover Profile 不能挡住第一次成功。`--profile` 只是兜底。`--new` 占用 cwd
 源，不会静默 resume whoami。打开失败会写出正在打开的仓库以及缺少的 Binding 或
-Profile。已注册 BYOS 就是放置目标，`--server` 可钉死，不要求 managed。`--local` 才是本机
+Profile。已注册 BYOS 就是放置目标，`code` 和 `workspace open` 的 `--server` 可钉死，不要求 managed。`--local` 才是本机
 Scratch。
 
 ```bash
 appaloft login
 appaloft code
+appaloft code --grok
+appaloft code --pi
+appaloft code --server <serverId>
 appaloft code --no-attach
 appaloft code --local
 appaloft code --profile <installationId>

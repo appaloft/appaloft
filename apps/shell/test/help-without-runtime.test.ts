@@ -46,7 +46,15 @@ describe("shell help without runtime composition", () => {
     expect(stdout).toContain("--profile");
     expect(stdout).toContain("--new");
     expect(stdout).toContain("--no-attach");
+    expect(stdout).toContain("--server");
     expect(stdout).toContain("--local");
+    expect(stdout).toContain("--opencode");
+    expect(stdout).toContain("--pi");
+    expect(stdout).toContain("--omp");
+    expect(stdout).toContain("--claude");
+    expect(stdout).toContain("--codex");
+    expect(stdout).toContain("--grok");
+    expect(stdout).toContain("Compatibility only");
     expect(stderr).not.toContain("PGlite");
   });
 

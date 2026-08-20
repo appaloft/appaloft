@@ -12,6 +12,7 @@ import {
   isRemoteCodeGitRemoteLocator,
   nativeAttachRequiresInteractiveTerminal,
   occupancyCloudCompatError,
+  pinRemoteCodeDoorServer,
   REMOTE_CODE_DOOR_HINT,
   REMOTE_CODE_GITHUB_HINT,
   REMOTE_CODE_MODEL_HINT,
@@ -94,6 +95,65 @@ describe("remote code door", () => {
     ).toBe("srv_4lifk0yrcecy");
     expect(selectWorkspaceOpenTargetServerId({ servers: [hostinger] })).toBe("srv_4lifk0yrcecy");
     expect(selectWorkspaceOpenTargetServerId({ servers: [] })).toBeUndefined();
+  });
+
+  test("[WS-REMOTE-OPEN-BYOS-181] code --server pins hostinger when another Server is enrolled", async () => {
+    const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-server-pin-"));
+    try {
+      const door = await resolveDefaultRemoteCodeDoor(
+        {
+          env: { APPALOFT_TOKEN: "token" },
+          explicitServerId: "srv_4lifk0yrcecy",
+          folderCwd: emptyDir,
+          folderOnboarding: {
+            projectId: "prj_notes",
+            projectName: "notes",
+            identity: "folder.local/cwd/notes",
+            created: true,
+            reused: false,
+          },
+          listServers: async () => [
+            { id: "srv_yundu", name: "yundu", lifecycleStatus: "active" },
+            {
+              id: "srv_4lifk0yrcecy",
+              name: "hostinger",
+              lifecycleStatus: "active",
+              runtimeAvailability: { status: "available" as const },
+            },
+          ],
+          listOccupancies: async () => [],
+          resolveLocator: async () => {
+            throw new Error("no-git --server pin must occupy folder.local");
+          },
+          resolveRemoteRef: async () => {
+            throw new Error("folder.local --server pin must not wait on ls-remote");
+          },
+        },
+        emptyDir,
+      );
+      expect(door.serverId).toBe("srv_4lifk0yrcecy");
+      expect(door.serverName).toBe("hostinger");
+      expect(door.repositoryIdentity).toBe("folder.local/cwd/notes");
+    } finally {
+      await rm(emptyDir, { recursive: true, force: true });
+    }
+  });
+
+  test("[WS-REMOTE-OPEN-BYOS-181] --server pins hostinger over an already resolved yundu door", () => {
+    const pinned = pinRemoteCodeDoorServer(
+      {
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        projectId: "prj_billing",
+        serverId: "srv_yundu",
+        serverName: "yundu",
+      },
+      "srv_4lifk0yrcecy",
+    );
+    expect(pinned.serverId).toBe("srv_4lifk0yrcecy");
   });
 
   test("[WS-REMOTE-PROGRESS-187][WS-REMOTE-PROGRESS-190] reports status before slow login, server, occupancy, and repository steps", async () => {

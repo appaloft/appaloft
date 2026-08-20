@@ -25,6 +25,9 @@ export const OCCUPANCY_HOME_SKILL_ROOTS = [
   { homeRelative: ".config/opencode/skills", railwayAligned: false },
 ] as const;
 
+// Skill-tree copy still skips auth.json, mcp.json, tokens, and cookies.
+// Vendor occupancy credentials (auth.json / Claude setup-token) use
+// occupancy-credential-offer.ts and write onto occupancy HOME, not skill roots.
 const SKIPPED_BASENAMES = new Set([
   "mcp.json",
   ".mcp.json",
@@ -78,7 +81,21 @@ export async function listOccupancySkillFiles(
     }
   };
   await visit(skillDir);
-  return files.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+  return files.sort(compareOccupancySkillCopyOrder);
+}
+
+export function compareOccupancySkillCopyOrder(
+  left: { readonly relativePath: string },
+  right: { readonly relativePath: string },
+): number {
+  const leftSkillMd = occupancySkillBasename(left.relativePath) === "SKILL.md" ? 0 : 1;
+  const rightSkillMd = occupancySkillBasename(right.relativePath) === "SKILL.md" ? 0 : 1;
+  if (leftSkillMd !== rightSkillMd) return leftSkillMd - rightSkillMd;
+  return left.relativePath.localeCompare(right.relativePath);
+}
+
+function occupancySkillBasename(relativePath: string): string {
+  return relativePath.replaceAll("\\", "/").split("/").pop() ?? relativePath;
 }
 
 export function occupancySkillGitExcludeScript(): string {
@@ -235,35 +252,72 @@ export async function offerOccupancyHomeSkills(input: {
 }): Promise<{
   readonly offered: boolean;
   readonly fileCount: number;
+  readonly skillCount: number;
   readonly skippedExisting: number;
 }> {
   const files = await listOccupancyHomeSkillOfferFiles(input.homeDir ?? homedir());
   if (files.length === 0) {
-    return { offered: false, fileCount: 0, skippedExisting: 0 };
+    return { offered: false, fileCount: 0, skillCount: 0, skippedExisting: 0 };
+  }
+
+  const bySkill = new Map<string, OccupancyHomeSkillOfferFile[]>();
+  for (const file of files) {
+    const current = bySkill.get(file.skillName) ?? [];
+    current.push(file);
+    bySkill.set(file.skillName, current);
   }
 
   let written = 0;
   let skippedExisting = 0;
-  for (const file of files) {
-    const result = await writeOccupancySkillFiles({
+  let skillCount = 0;
+  for (const [skillName, skillFiles] of bySkill) {
+    const ordered = [...skillFiles].sort(compareOccupancySkillCopyOrder);
+    const destinations = OCCUPANCY_HOME_SKILL_DESTINATIONS.map(
+      (destination) => `${destination}/${skillName}`,
+    );
+    const skillMd = ordered.find(
+      (file) => occupancySkillBasename(file.relativePath) === "SKILL.md",
+    );
+    if (!skillMd) continue;
+
+    const manifest = await writeOccupancySkillFiles({
       workspaceId: input.workspaceId,
-      destinations: OCCUPANCY_HOME_SKILL_DESTINATIONS.map(
-        (destination) => `${destination}/${file.skillName}`,
-      ),
-      files: [{ relativePath: file.relativePath, content: file.content }],
+      destinations,
+      files: [{ relativePath: skillMd.relativePath, content: skillMd.content }],
       executeCommand: input.executeCommand,
       destinationExists: input.destinationExists,
     });
-    if (!result) return { offered: false, fileCount: 0, skippedExisting: 0 };
-    written += result.written;
-    skippedExisting += result.skippedExisting;
+    if (!manifest || (manifest.written === 0 && manifest.skippedExisting === 0)) {
+      continue;
+    }
+    written += manifest.written;
+    skippedExisting += manifest.skippedExisting;
+
+    const remainder = ordered.filter((file) => file !== skillMd);
+    if (remainder.length > 0) {
+      const rest = await writeOccupancySkillFiles({
+        workspaceId: input.workspaceId,
+        destinations,
+        files: remainder.map((file) => ({
+          relativePath: file.relativePath,
+          content: file.content,
+        })),
+        executeCommand: input.executeCommand,
+        destinationExists: input.destinationExists,
+      });
+      if (rest) {
+        written += rest.written;
+        skippedExisting += rest.skippedExisting;
+      }
+    }
+    skillCount += 1;
   }
 
-  if (written === 0) {
-    return { offered: false, fileCount: 0, skippedExisting };
+  if (skillCount === 0) {
+    return { offered: false, fileCount: written, skillCount: 0, skippedExisting };
   }
   if (!(await gitExcludeOccupancySkills(input))) {
-    return { offered: false, fileCount: 0, skippedExisting };
+    return { offered: true, fileCount: written, skillCount, skippedExisting };
   }
-  return { offered: true, fileCount: written, skippedExisting };
+  return { offered: true, fileCount: written, skillCount, skippedExisting };
 }

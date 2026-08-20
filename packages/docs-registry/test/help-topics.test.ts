@@ -181,6 +181,25 @@ describe("public docs help registry", () => {
     );
   });
 
+  test("[WS-REMOTE-VENDOR-204] occupancy vendor help names Claude Codex and Grok flags", () => {
+    const topic = publicDocsHelpTopics["agent.code-vendor"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe("/docs/agents/workspaces/#agent-code-vendor");
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/agents/workspaces/#agent-code-vendor",
+    );
+    expect(topic.aliases).toEqual(
+      expect.arrayContaining([
+        "appaloft code --opencode",
+        "appaloft code --pi",
+        "appaloft code --omp",
+        "appaloft code --claude",
+        "appaloft code --codex",
+        "appaloft code --grok",
+      ]),
+    );
+  });
+
   test("[WS-CODE-DOCS-012][WS-ACT-PARITY-008] Workspace activation help keeps the task entry, safe target evidence and compatibility contract", () => {
     const topic = publicDocsHelpTopics["agent.workspace"];
 

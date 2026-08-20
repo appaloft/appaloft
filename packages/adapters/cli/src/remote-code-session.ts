@@ -116,6 +116,7 @@ export interface RemoteCodeOccupancy {
 
 export interface RemoteCodeDoorProbe {
   readonly env?: NodeJS.ProcessEnv;
+  readonly explicitServerId?: string;
   readonly forceNew?: boolean;
   readonly readActiveProfile?: () => Promise<{ readonly auth?: unknown } | null>;
   readonly listServers?: () => Promise<readonly RemoteCodeServerSummary[]>;
@@ -384,6 +385,33 @@ export function selectWorkspaceOpenTargetServerId(input: {
   return selectDefaultRemoteCodeServer(input.servers)?.id;
 }
 
+export function resolveRemoteCodeDoorServer(
+  servers: readonly RemoteCodeServerSummary[] | undefined,
+  explicitServerId?: string,
+): RemoteCodeServerSummary | undefined {
+  const selectedId = selectWorkspaceOpenTargetServerId({
+    ...(servers ? { servers } : {}),
+    ...(explicitServerId?.trim() ? { explicit: explicitServerId } : {}),
+  });
+  if (!selectedId) return undefined;
+  const named = (servers ?? []).find((server) => server.id === selectedId);
+  return named ?? { id: selectedId, name: selectedId };
+}
+
+export function pinRemoteCodeDoorServer(
+  door: RemoteCodeDoorResolution,
+  explicitServerId?: string,
+  servers: readonly RemoteCodeServerSummary[] = [],
+): RemoteCodeDoorResolution {
+  const pinned = resolveRemoteCodeDoorServer(servers, explicitServerId);
+  if (!pinned || !explicitServerId?.trim()) return door;
+  return {
+    ...door,
+    serverId: pinned.id,
+    serverName: pinned.name,
+  };
+}
+
 export function selectResumeOccupancy(
   occupancies: readonly RemoteCodeOccupancy[] | undefined,
 ): RemoteCodeOccupancy | undefined {
@@ -447,7 +475,7 @@ export async function resolveDefaultRemoteCodeDoor(
 
   probe.onProgress?.(OCCUPANCY_CODE_PROGRESS.lookingUpServers);
   const servers = probe.listServers ? await probe.listServers() : [];
-  const server = selectDefaultRemoteCodeServer(servers);
+  const server = resolveRemoteCodeDoorServer(servers, probe.explicitServerId);
   if (!server) {
     throw remoteCodeError(
       "workspace_remote_server_missing",

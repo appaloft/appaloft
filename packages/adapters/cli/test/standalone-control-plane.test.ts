@@ -18,6 +18,8 @@ describe("standalone control plane help", () => {
     const printed = chunks.join("");
     expect(result).toEqual({ handled: true, exitCode: 0 });
     expect(printed.indexOf("appaloft code [path|git-remote]")).toBeGreaterThan(-1);
+    expect(printed).toContain("appaloft code [path|git-remote]");
+    expect(printed).toContain("[--server <id>]");
     expect(printed.indexOf("appaloft workspace [--json]")).toBeGreaterThan(-1);
     expect(printed.indexOf("appaloft workspace open [path|git-remote]")).toBeGreaterThan(-1);
     expect(printed.indexOf("appaloft deploy [path|git-remote]")).toBeGreaterThan(-1);

@@ -94,17 +94,24 @@ import {
   reportOccupancyCodeProgress,
   settleWithTimeout,
 } from "../occupancy-code-progress.js";
+import { offerOccupancyConnectingMaterials } from "../occupancy-connecting-offer.js";
+import {
+  occupancyConnectingStepLines,
+  occupancyConnectingTelemetry,
+} from "../occupancy-connecting-telemetry.js";
 import {
   occupancyHomeSkillDestinationExists,
   offerOccupancyAppaloftSkill,
   offerOccupancyHomeSkills,
 } from "../occupancy-skill-offer.js";
+import { type OccupancyHarness, resolveOccupancyAgent } from "../occupancy-vendor.js";
 import {
   formatRemoteCodeBanner,
   isRemoteCodeGitRemoteLocator,
   isWorkspaceGitRootUnavailable,
   nativeAttachRequiresInteractiveTerminal,
   occupancyCloudCompatError,
+  pinRemoteCodeDoorServer,
   type RemoteCodeServerSummary,
   remoteOccupyBannerProjectId,
   resolveDefaultRemoteCodeDoor,
@@ -599,10 +606,7 @@ function makeWorkspaceOpenCommand() {
 
 const open = makeWorkspaceOpenCommand();
 
-function occupancyCodeProfile(
-  harness: "opencode" | "pi" | "omp",
-  profile?: string,
-): string | undefined {
+function occupancyCodeProfile(harness: OccupancyHarness, profile?: string): string | undefined {
   if (profile) return profile;
   if (harness !== "opencode") return occupancyRemoteProfileId(harness);
   // Default OpenCode omits profile so findPreferred can resume the live occupancy
@@ -623,9 +627,37 @@ export const workspaceCodeCommand = EffectCommand.make(
       Options.optional,
       Options.withDescription("Agent Workspace Profile name or installation id"),
     ),
-    harness: Options.choice("harness", ["opencode", "pi", "omp"] as const).pipe(
-      Options.withDefault("opencode" as const),
+    opencode: Options.boolean("opencode").pipe(
+      Options.withDefault(false),
+      Options.withDescription("Use the OpenCode occupancy harness"),
     ),
+    pi: Options.boolean("pi").pipe(
+      Options.withDefault(false),
+      Options.withDescription("Use the Pi occupancy harness"),
+    ),
+    omp: Options.boolean("omp").pipe(
+      Options.withDefault(false),
+      Options.withDescription("Use the OMP occupancy harness"),
+    ),
+    claude: Options.boolean("claude").pipe(
+      Options.withDefault(false),
+      Options.withDescription("Use your Claude setup-token on occupancy disk"),
+    ),
+    codex: Options.boolean("codex").pipe(
+      Options.withDefault(false),
+      Options.withDescription("Use your Codex ~/.codex/auth.json on occupancy disk"),
+    ),
+    grok: Options.boolean("grok").pipe(
+      Options.withDefault(false),
+      Options.withDescription("Use your Grok ~/.grok/auth.json on occupancy disk"),
+    ),
+    harness: Options.choice("harness", ["opencode", "pi", "omp"] as const).pipe(
+      Options.optional,
+      Options.withDescription(
+        "Compatibility only. Prefer --opencode, --pi, or --omp. Cannot combine with a different agent alias.",
+      ),
+    ),
+    server: workspaceOpenServer,
     openTarget: Options.choice("open-target", [
       "preview",
       "production",
@@ -634,7 +666,24 @@ export const workspaceCodeCommand = EffectCommand.make(
       "connections",
     ] as const).pipe(Options.optional),
   },
-  ({ forceNew, harness, local, noAttach, open, openTarget, path, profile, yes }) =>
+  ({
+    claude,
+    codex,
+    forceNew,
+    grok,
+    harness,
+    local,
+    noAttach,
+    omp,
+    open,
+    openTarget,
+    opencode,
+    path,
+    pi,
+    profile,
+    server,
+    yes,
+  }) =>
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
       const runtime = yield* Effect.runtime<CliRuntime | Prompt.Prompt.Environment>();
@@ -665,6 +714,22 @@ export const workspaceCodeCommand = EffectCommand.make(
         return;
       }
 
+      const occupancyHomeDir = cli.environment?.HOME ?? undefined;
+      const occupancyAgent = yield* Effect.tryPromise({
+        try: () =>
+          resolveOccupancyAgent({
+            flags: { claude, codex, grok, omp, opencode, pi },
+            ...(optionalValue(harness)
+              ? { harness: optionalValue(harness) as OccupancyHarness }
+              : {}),
+            ...(occupancyHomeDir ? { homeDir: occupancyHomeDir } : {}),
+            ...(cli.environment ? { env: cli.environment } : {}),
+          }),
+        catch: (error) => workspaceCliError(error, "occupancy-vendor"),
+      }).pipe(Effect.flatMap((result) => resultToEffect(result)));
+      const selectedHarness = occupancyAgent.harness;
+      const occupancyVendor = occupancyAgent;
+
       const attach = !noAttach;
       const interactive = Boolean(cli.terminalIO.stdin.isTTY && cli.terminalIO.stdout.isTTY);
       const lineProgress = occupancyCodeUsesLineProgress({
@@ -691,8 +756,9 @@ export const workspaceCodeCommand = EffectCommand.make(
         onProgress: (message: string) => void,
         options?: { readonly announcePin?: boolean },
       ) => {
+        const explicitServerId = optionalValue(server);
         const injectedDoor = cli.resolveRemoteCodeDoor;
-        const door = injectedDoor
+        const resolvedDoor = injectedDoor
           ? await (async () => {
               onProgress(OCCUPANCY_CODE_PROGRESS.checkingLogin);
               return injectedDoor(path);
@@ -700,6 +766,7 @@ export const workspaceCodeCommand = EffectCommand.make(
           : await resolveDefaultRemoteCodeDoor(
               {
                 ...(cli.environment ? { env: cli.environment } : {}),
+                ...(explicitServerId ? { explicitServerId } : {}),
                 forceNew,
                 onProgress,
                 folderCwd: folderOnboardingCwdFromLocator(path),
@@ -765,7 +832,8 @@ export const workspaceCodeCommand = EffectCommand.make(
               },
               path,
             );
-        const selectedProfile = occupancyCodeProfile(harness, optionalValue(profile));
+        const door = pinRemoteCodeDoorServer(resolvedDoor, explicitServerId);
+        const selectedProfile = occupancyCodeProfile(selectedHarness, optionalValue(profile));
         const openInput = {
           repository: door.repository,
           repositoryIdentity: door.repositoryIdentity,
@@ -854,6 +922,21 @@ export const workspaceCodeCommand = EffectCommand.make(
                   },
                   { announcePin: false },
                 );
+                await settleWithTimeout(
+                  offerOccupancyConnectingMaterials({
+                    workspaceId: occupied.result.workspaceId,
+                    harness: selectedHarness,
+                    executeCommand: (command) => cli.executeCommand(command),
+                    executeQuery: (query) => cli.executeQuery(query),
+                    ...(occupancyVendor.vendor ? { vendor: occupancyVendor.vendor } : {}),
+                    ...(occupancyHomeDir ? { homeDir: occupancyHomeDir } : {}),
+                    ...(cli.environment ? { env: cli.environment } : {}),
+                  }),
+                  occupancyTimeoutMs(
+                    "APPALOFT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS",
+                    DEFAULT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS,
+                  ),
+                );
                 void settleWithTimeout(
                   (async () => {
                     await tuiProgress(OCCUPANCY_CODE_PROGRESS.copyingSkills);
@@ -920,14 +1003,33 @@ export const workspaceCodeCommand = EffectCommand.make(
         }
         return settled.value;
       };
+      let copiedSkillCount = 0;
+      const offerConnectingMaterials = async () => {
+        if (lineProgress) reportProgress(OCCUPANCY_CODE_PROGRESS.copyingCredentials);
+        try {
+          return await offerOccupancyConnectingMaterials({
+            workspaceId: result.workspaceId,
+            harness: selectedHarness,
+            skillCount: 0,
+            executeCommand: (skillCommand) => timedSkillResult(cli.executeCommand(skillCommand)),
+            executeQuery: (query) => timedSkillResult(cli.executeQuery(query)),
+            ...(occupancyVendor.vendor ? { vendor: occupancyVendor.vendor } : {}),
+            ...(occupancyHomeDir ? { homeDir: occupancyHomeDir } : {}),
+            ...(cli.environment ? { env: cli.environment } : {}),
+          });
+        } catch {
+          return undefined;
+        }
+      };
       const offerSkills = async () => {
         reportProgress(OCCUPANCY_CODE_PROGRESS.copyingSkills);
         try {
-          await offerOccupancyAppaloftSkill({
+          const firstParty = await offerOccupancyAppaloftSkill({
             workspaceId: result.workspaceId,
             executeCommand: (skillCommand) => timedSkillResult(cli.executeCommand(skillCommand)),
           });
-          await offerOccupancyHomeSkills({
+          if (firstParty.offered) copiedSkillCount += 1;
+          const home = await offerOccupancyHomeSkills({
             workspaceId: result.workspaceId,
             executeCommand: (skillCommand) => timedSkillResult(cli.executeCommand(skillCommand)),
             destinationExists: occupancyHomeSkillDestinationExists({
@@ -935,12 +1037,32 @@ export const workspaceCodeCommand = EffectCommand.make(
               executeQuery: (query) => timedSkillResult(cli.executeQuery(query)),
             }),
           });
+          copiedSkillCount += home.skillCount;
         } catch {
           // occupy still succeeds when skill offer cannot write
         }
       };
       const offerSkillsBounded = async () => {
         await settleWithTimeout(offerSkills(), skillOfferTimeoutMs);
+      };
+      const offerConnectingMaterialsBounded = async () => {
+        const settled = await settleWithTimeout(offerConnectingMaterials(), skillOfferTimeoutMs);
+        return settled.status === "completed" ? settled.value : undefined;
+      };
+      const reportConnectingSteps = (
+        materials: Awaited<ReturnType<typeof offerConnectingMaterials>>,
+      ) => {
+        if (!noAttach || !lineProgress) return;
+        const telemetry = occupancyConnectingTelemetry({
+          harness: selectedHarness,
+          skillCount: copiedSkillCount,
+          firstPartyMcp: materials?.mcp.firstParty ?? false,
+          ...(occupancyVendor.vendor ? { vendor: occupancyVendor.vendor } : {}),
+          ...(materials?.credential ? { credential: materials.credential } : {}),
+        });
+        for (const line of occupancyConnectingStepLines(telemetry)) {
+          reportProgress(line);
+        }
       };
       const loadBannerChrome = async () => {
         const bannerProjectId = remoteOccupyBannerProjectId({
@@ -1078,13 +1200,18 @@ export const workspaceCodeCommand = EffectCommand.make(
       yield* Effect.promise(() => writeBannerFollowup(chrome));
       yield* Effect.promise(() => writeOccupancySessionHints());
       if (attach) {
+        yield* Effect.promise(() => offerConnectingMaterialsBounded());
         reportProgress(OCCUPANCY_CODE_PROGRESS.attaching);
         const skills = offerSkillsBounded();
         yield* completeWorkspaceOpen(result, true, cli.launchNativeWorkspaceClient);
         yield* Effect.promise(() => skills);
         return;
       }
-      yield* Effect.promise(() => offerSkillsBounded());
+      yield* Effect.promise(async () => {
+        const materials = await offerConnectingMaterialsBounded();
+        await offerSkillsBounded();
+        reportConnectingSteps(materials);
+      });
     }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.agentScratch));
 
