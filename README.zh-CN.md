@@ -21,6 +21,11 @@
     <a href="https://github.com/appaloft/appaloft/releases/latest">Releases</a> ·
     <a href="./README.md">English</a>
   </p>
+  <p>
+    这是定位，不是 1:1 替换。
+    <a href="https://www.appaloft.com/compare/railway">对比 Railway</a>
+    FAQ 写明：Appaloft 不是 Railway 的完整替代。
+  </p>
 </div>
 
 <p align="center">
@@ -135,8 +140,8 @@ appaloft auth mcp login
 appaloft auth mcp codex install
 ```
 
-占用是另一扇门。登录后，`appaloft code` 占用你已登记服务器上的 Sandbox。
-`appaloft code --local` 是这台 Mac 上的 Scratch：不登录、不建 Sandbox、也不远程保存。
+占用是 Agent 门里靠后的命令，不是第一条命令。登录后，`appaloft code` 占用你已登记服务器上的
+Sandbox。`appaloft code --local` 是这台 Mac 上的 Scratch：不登录、不建 Sandbox、也不远程保存。
 Railway 风格的占用会把你放进托管 code-server / `ca` 式会话；Appaloft 占用的是*你的*
 Sandbox，或本机 Scratch。
 
@@ -144,6 +149,10 @@ Sandbox，或本机 Scratch。
 appaloft code
 appaloft code --local
 ```
+
+这些占用命令写在仓库内的 CLI 参考
+（[cli-entrypoints.md](./skills/appaloft/references/cli-entrypoints.md)）。当前线上的
+docs.appaloft.com CLI 页面可能还没有列出它们。
 
 ## Self-host（可选）
 

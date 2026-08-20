@@ -21,6 +21,11 @@
     <a href="https://github.com/appaloft/appaloft/releases/latest">Releases</a> ·
     <a href="./README.zh-CN.md">中文</a>
   </p>
+  <p>
+    That is positioning, not a 1:1 swap. The
+    <a href="https://www.appaloft.com/compare/railway">Compare Railway</a>
+    FAQ is explicit: Appaloft is not a complete Railway replacement.
+  </p>
 </div>
 
 <p align="center">
@@ -136,15 +141,19 @@ appaloft auth mcp login
 appaloft auth mcp codex install
 ```
 
-Occupancy is a separate door. After login, `appaloft code` occupies your Sandbox on an enrolled
-server. `appaloft code --local` is Scratch on this Mac — no login, no Sandbox, not saved remotely.
-Railway-style occupancy puts you in a hosted code-server / `ca`-style session; Appaloft occupies
-*your* Sandbox or this-machine Scratch.
+Occupancy is a later Agent-door command, not the first command. After login, `appaloft code`
+occupies your Sandbox on an enrolled server. `appaloft code --local` is Scratch on this Mac — no
+login, no Sandbox, not saved remotely. Railway-style occupancy puts you in a hosted code-server /
+`ca`-style session; Appaloft occupies *your* Sandbox or this-machine Scratch.
 
 ```bash
 appaloft code
 appaloft code --local
 ```
+
+These occupancy commands are listed in the in-repo CLI reference
+([cli-entrypoints.md](./skills/appaloft/references/cli-entrypoints.md)). The currently published
+docs.appaloft.com CLI page may not list them yet.
 
 ## Self-host (optional)
 
