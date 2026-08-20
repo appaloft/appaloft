@@ -46,7 +46,7 @@ describe("occupancy TUI first frame", () => {
     expect(performance.now() - started).toBeLessThan(1000);
   });
 
-  test("[WS-REMOTE-PROGRESS-203] workspace warms Cloud Agents alt-screen; code inquires first", () => {
+  test("[WS-REMOTE-PROGRESS-203] TTY code and workspace warm Cloud Agents alt-screen first", () => {
     const source = readFileSync(join(import.meta.dir, "../src/index.ts"), "utf8");
     const progress = readFileSync(
       join(import.meta.dir, "../src/occupancy-cli-progress.ts"),
@@ -76,10 +76,7 @@ describe("occupancy TUI first frame", () => {
     expect(source).toContain("restoreOccupancyAltScreenIfEntered");
     expect(source.indexOf("installOccupancyAltScreenRestore()")).toBeLessThan(firstFrame);
     expect(leaveOnWarmupFail).toBeGreaterThan(firstFrame);
-    expect(leaveOnWarmupFail).toBeLessThan(
-      source.indexOf("process.stderr.write", leaveOnWarmupFail),
-    );
-    expect(progress).toContain('if (command !== "workspace") return false');
+    expect(progress).toContain('if (command !== "code" && command !== "workspace") return false');
     expect(source).not.toMatch(/^import .*workspace-tui-launch/m);
     expect(source).not.toContain("workspace-control-renderer");
     const firstFrameModule = readFileSync(
@@ -90,6 +87,8 @@ describe("occupancy TUI first frame", () => {
     expect(firstFrameModule).not.toContain("workspace-tui-launch");
     expect(firstFrameModule).not.toContain("ensureWorkspaceControlRendererBinary");
     expect(firstFrameModule).not.toContain("resolveWorkspaceControlRendererBinary");
+    expect(firstFrameModule).toContain("OCCUPANCY_LEAVE_ALT_SCREEN}");
+    expect(firstFrameModule).toContain("OCCUPANCY_DISABLE_MOUSE}\\n");
   });
 
   test("[WS-REMOTE-HELP-218] leaveOccupancyAltScreen restores cursor and alt-screen", () => {
@@ -101,6 +100,8 @@ describe("occupancy TUI first frame", () => {
     expect(written).toContain("\x1b[?25h");
     expect(written).toContain("\x1b[?1049l");
     expect(written).toContain(OCCUPANCY_DISABLE_MOUSE);
+    expect(written.endsWith("\n")).toBeTrue();
+    expect(`preparing the agent${written}error: next`).not.toContain("preparing the agenterror:");
   });
 
   test("[WS-REMOTE-HELP-218] teardown emits leave only when alt-screen was entered", () => {

@@ -5,6 +5,12 @@ import {
   resetWorkspaceControlRendererWarmup,
   resolveCodeWorkspaceControlRendererBinary,
   resolveWorkspaceControlRendererBinary,
+  restoreWorkspaceTuiScrollback,
+  sanitizeWorkspaceRendererFailureText,
+  WORKSPACE_CONTROL_TUI_BUILD_COMMAND,
+  WORKSPACE_CONTROL_TUI_DEFAULT_TOOLCHAIN_COMMAND,
+  WORKSPACE_TUI_DISABLE_MOUSE,
+  WORKSPACE_TUI_LEAVE_ALT_SCREEN,
   warmupWorkspaceControlRenderer,
   workspaceControlRendererSupportsCodeChrome,
   workspaceControlRendererUnavailableMessage,
@@ -80,11 +86,12 @@ describe("occupancy TUI slim launch", () => {
         }),
       ).toBeUndefined();
       const message = workspaceControlRendererUnavailableMessage({ codeChrome: true });
-      expect(message).toContain("Appaloft Cloud Agents");
+      expect(message).toContain("appaloft-workspace-tui");
+      expect(message).toContain(WORKSPACE_CONTROL_TUI_DEFAULT_TOOLCHAIN_COMMAND);
+      expect(message).toContain(WORKSPACE_CONTROL_TUI_BUILD_COMMAND);
+      expect(message).toContain("--no-attach");
       expect(message).not.toMatch(/occupancy/iu);
-      expect(message).not.toContain("rustup");
-      expect(message).not.toContain("cargo build");
-      expect(message).not.toContain("--no-attach");
+      expect(message).not.toContain("could not choose a version of cargo");
       resetWorkspaceControlRendererWarmup();
       await expect(
         warmupWorkspaceControlRenderer({
@@ -101,5 +108,114 @@ describe("occupancy TUI slim launch", () => {
       resetWorkspaceControlRendererWarmup();
       await rm(workspace, { recursive: true, force: true });
     }
+  });
+
+  test("[WS-REMOTE-PROGRESS-219] rustup-missing does not spawn cargo", async () => {
+    const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join: joinPath } = await import("node:path");
+    const { ensureWorkspaceControlRendererBinary } = await import("../src/workspace-tui-launch");
+    const root = await mkdtemp(joinPath(tmpdir(), "appaloft-rustup-missing-"));
+    const crate = joinPath(root, "apps", "workspace-control-tui");
+    await mkdir(crate, { recursive: true });
+    await writeFile(joinPath(crate, "Cargo.toml"), '[package]\nname = "tui"\n');
+    let built = 0;
+    try {
+      await expect(
+        ensureWorkspaceControlRendererBinary(
+          { APPALOFT_REPO_ROOT: root, PATH: "" },
+          async () => {
+            built += 1;
+          },
+          { rustcVersion: "" },
+        ),
+      ).rejects.toMatchObject({
+        details: { reason: "rustup-missing" },
+      });
+      expect(built).toBe(0);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("[WS-REMOTE-PROGRESS-219] rustup-missing restores TTY and does not glue or dump cargo-chooser", async () => {
+    const { formatHumanCliError } = await import("../src/runtime.js");
+    const rustupDump =
+      "error: rustup could not choose a version of cargo to run, because one wasn't specified explicitly, and no default is configured.";
+    const human = workspaceControlRendererUnavailableMessage({ rustupMissing: true });
+    expect(human).toContain("TTY attach");
+    expect(human).toContain(WORKSPACE_CONTROL_TUI_DEFAULT_TOOLCHAIN_COMMAND);
+    expect(human).toContain(WORKSPACE_CONTROL_TUI_BUILD_COMMAND);
+    expect(human).toContain("--no-attach");
+    expect(human).not.toMatch(/occupancy/iu);
+    expect(human).not.toContain("could not choose a version of cargo");
+    expect(sanitizeWorkspaceRendererFailureText(`${human}\n${rustupDump}`)).not.toContain(
+      "could not choose a version of cargo",
+    );
+    const printed = formatHumanCliError({
+      code: "infra_error",
+      category: "infra",
+      message: rustupDump,
+      retryable: false,
+      details: { phase: "workspace-control-renderer", reason: "rustup-missing" },
+    });
+    expect(printed).not.toContain("could not choose a version of cargo");
+    expect(printed).toContain("appaloft-workspace-tui");
+    expect(printed).not.toMatch(/occupancy/iu);
+
+    let scrollback = "preparing the agent";
+    restoreWorkspaceTuiScrollback((text) => {
+      scrollback += text;
+    });
+    expect(scrollback).toContain(WORKSPACE_TUI_LEAVE_ALT_SCREEN);
+    expect(scrollback).toContain("\x1b[?25h");
+    expect(scrollback).toContain("\x1b[?1049l");
+    expect(scrollback).toContain(WORKSPACE_TUI_DISABLE_MOUSE);
+    expect(scrollback).toContain("\n");
+    expect(scrollback).not.toContain("preparing the agenterror:");
+  });
+
+  test("[WS-REMOTE-PROGRESS-219] printCliError leaves alt-screen before the human line", async () => {
+    const { Effect } = await import("effect");
+    const { printCliError } = await import("../src/runtime.js");
+    let stdout = "preparing the agent";
+    let stderr = "";
+    const originalStdout = process.stdout.write.bind(process.stdout);
+    const originalStderr = process.stderr.write.bind(process.stderr);
+    const originalExitCode = process.exitCode;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      return true;
+    }) as typeof process.stdout.write;
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      stderr += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      return true;
+    }) as typeof process.stderr.write;
+    try {
+      await Effect.runPromise(
+        printCliError({
+          code: "infra_error",
+          category: "infra",
+          message:
+            "error: rustup could not choose a version of cargo to run, because one wasn't specified explicitly, and no default is configured.",
+          retryable: false,
+          details: { phase: "workspace-control-renderer", reason: "rustup-missing" },
+        }),
+      );
+    } finally {
+      process.stdout.write = originalStdout;
+      process.stderr.write = originalStderr;
+      process.exitCode = originalExitCode ?? 0;
+    }
+    expect(stdout).toContain(WORKSPACE_TUI_LEAVE_ALT_SCREEN);
+    expect(stdout).toContain(WORKSPACE_TUI_DISABLE_MOUSE);
+    expect(stdout).toContain("\n");
+    expect(`${stdout}error:`).not.toContain("preparing the agenterror:");
+    expect(stderr).toContain("appaloft-workspace-tui");
+    expect(stderr).toContain(WORKSPACE_CONTROL_TUI_DEFAULT_TOOLCHAIN_COMMAND);
+    expect(stderr).toContain(WORKSPACE_CONTROL_TUI_BUILD_COMMAND);
+    expect(stderr).toContain("--no-attach");
+    expect(stderr).not.toMatch(/occupancy/iu);
+    expect(stderr).not.toContain("could not choose a version of cargo");
   });
 });

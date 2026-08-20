@@ -2968,7 +2968,7 @@ describe("Agent Workspace CLI", () => {
     await expectTtyCodeFirstChrome(["code", "--pi"]);
   });
 
-  test("[FOLDER-ONBOARD-009] code inquire cancel never starts TUI or hangs as Workspace CLI failed", async () => {
+  test("[FOLDER-ONBOARD-009] code TUI auto-creates and never starts a folder selector", async () => {
     let presentationStarts = 0;
     const output: string[] = [];
     const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-cancel-"));
@@ -3003,7 +3003,9 @@ describe("Agent Workspace CLI", () => {
         select: () => {
           throw new Error("code session must not select a project");
         },
-        confirm: () => Effect.succeed(false),
+        confirm: () => {
+          throw new Error("code TUI must auto-create instead of inquiring");
+        },
       },
       workspaceControlPresentation: {
         start: async () => {
@@ -3011,23 +3013,17 @@ describe("Agent Workspace CLI", () => {
         },
       },
     });
-    const originalExitCode = process.exitCode;
     try {
       await program.parseAsync(["node", "appaloft", "code", "--pi"]);
-      throw new Error("Expected cancelled inquire to fail closed");
-    } catch (error) {
-      expect(String(error)).toContain("Cancelled");
-      expect(String(error)).not.toContain("Workspace CLI operation failed");
     } finally {
-      process.exitCode = originalExitCode ?? 0;
       process.chdir(previousCwd);
       await rm(emptyDir, { recursive: true, force: true });
     }
-    expect(presentationStarts).toBe(0);
+    expect(presentationStarts).toBe(1);
     expect(output.join("")).not.toMatch(/occupancy/iu);
   });
 
-  test("[WS-REMOTE-PROGRESS-219] missing renderer restores TTY after inquire and never shows Occupancy", async () => {
+  test("[WS-REMOTE-PROGRESS-219] missing renderer restores TTY and never shows Occupancy", async () => {
     const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-missing-tui-"));
     const previousCwd = process.cwd();
     process.chdir(emptyDir);
@@ -3084,11 +3080,12 @@ describe("Agent Workspace CLI", () => {
       throw new Error("Expected missing renderer to fail closed");
     } catch (error) {
       const text = String(error);
-      expect(text).toContain("Appaloft Cloud Agents");
       expect(text).toContain("appaloft-workspace-tui");
+      expect(text).toContain("rustup default stable");
+      expect(text).toContain("cargo build");
+      expect(text).toContain("--no-attach");
       expect(text).not.toMatch(/occupancy/iu);
-      expect(text).not.toContain("rustup");
-      expect(text).not.toContain("cargo build");
+      expect(text).not.toContain("could not choose a version of cargo");
       expect(text).not.toContain("Workspace CLI operation failed");
       expect(text).not.toContain("Select a Workspace to load bounded detail.");
     } finally {
@@ -3098,16 +3095,16 @@ describe("Agent Workspace CLI", () => {
     }
   });
 
-  test("[FOLDER-ONBOARD-009] code inquire runs before TUI start and occupy never selects", async () => {
+  test("[FOLDER-ONBOARD-009] code TUI occupy auto-creates and never selects inside alt-screen", async () => {
     const source = await Bun.file(
       new URL("../src/commands/agent-workspace.ts", import.meta.url),
     ).text();
-    expect(source).toContain('promptPolicy: "pre-tui-inquire"');
-    expect(source).toContain("codeSessionInquireInteraction");
-    const inquireAt = source.indexOf('promptPolicy: "pre-tui-inquire"');
-    const startAt = source.indexOf("occupancyTui.start(");
-    expect(inquireAt).toBeGreaterThan(-1);
-    expect(startAt).toBeGreaterThan(inquireAt);
+    expect(source).toContain("yes: yes || useOccupancyTui");
+    const tuiBlockStart = source.indexOf("if (useOccupancyTui && occupancyTui)");
+    const startAt = source.indexOf("occupancyTui.start(", tuiBlockStart);
+    expect(tuiBlockStart).toBeGreaterThan(-1);
+    expect(startAt).toBeGreaterThan(tuiBlockStart);
+    expect(source.slice(tuiBlockStart, startAt)).not.toContain("ensureFolderProjectOnboarding");
     expect(source).not.toContain("interaction: effectCliInteraction");
     expect(source).not.toContain("effectCliInteraction");
   });
@@ -4390,14 +4387,13 @@ async function expectTtyCodeFirstChrome(args: readonly string[]): Promise<void> 
         throw new Error("code session must not select a project inside TUI");
       },
       confirm: (input) => {
-        expect(presentationStarts).toBe(0);
         inquireMessages.push(input.message);
-        return Effect.succeed(true);
+        throw new Error("code TUI must auto-create instead of inquiring");
       },
     },
     workspaceControlPresentation: {
       start: async (context) => {
-        expect(inquireMessages.length).toBeGreaterThan(0);
+        expect(inquireMessages).toEqual([]);
         presentationStarts += 1;
         startedContext = context;
       },
@@ -4420,10 +4416,7 @@ async function expectTtyCodeFirstChrome(args: readonly string[]): Promise<void> 
     await rm(emptyDir, { recursive: true, force: true });
   }
   const printed = output.join("");
-  expect(inquireMessages[0]).toBe("Continue");
-  expect(
-    inquireMessages.some((message) => message.startsWith("Create default project")),
-  ).toBeTrue();
+  expect(inquireMessages).toEqual([]);
   expect(presentationStarts).toBe(1);
   expect(startedContext?.occupyBootstrap).toBeTypeOf("function");
   expect(startedContext?.occupancyChrome?.project).toBe(folderName);

@@ -73,13 +73,8 @@ if (shouldPrintOccupancyLineProgress(args)) {
   enterOccupancyAltScreen();
   void import("@appaloft/adapter-cli/workspace-tui-launch")
     .then(({ warmupWorkspaceControlRenderer }) => warmupWorkspaceControlRenderer())
-    .catch((error) => {
+    .catch(() => {
       leaveOccupancyAltScreen();
-      const message =
-        error && typeof error === "object" && "message" in error
-          ? String((error as { message: unknown }).message)
-          : String(error);
-      process.stderr.write(`error: ${message.trimEnd()}\n`);
     });
 }
 const standaloneCommand =

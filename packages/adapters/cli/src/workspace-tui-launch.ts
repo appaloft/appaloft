@@ -623,7 +623,12 @@ export const WORKSPACE_CONTROL_TUI_BINARY_NAME = "appaloft-workspace-tui";
 export const WORKSPACE_CONTROL_TUI_BUILD_COMMAND =
   "cargo build --locked --manifest-path apps/workspace-control-tui/Cargo.toml";
 export const WORKSPACE_CONTROL_TUI_TOOLCHAIN_COMMAND = "rustup toolchain install stable";
+export const WORKSPACE_CONTROL_TUI_DEFAULT_TOOLCHAIN_COMMAND = "rustup default stable";
 export const WORKSPACE_CONTROL_TUI_MIN_RUSTC = { major: 1, minor: 88 } as const;
+export const WORKSPACE_TUI_LEAVE_ALT_SCREEN = "\x1b[?25h\x1b[?1049l";
+export const WORKSPACE_TUI_DISABLE_MOUSE = "\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l";
+const RUSTUP_CARGO_CHOOSER_RE =
+  /rustup could not choose a version of (?:cargo|rustc)|no default is configured/iu;
 
 export function parseRustcRelease(
   versionText: string,
@@ -647,36 +652,74 @@ export function workspaceControlRendererUnavailableMessage(
   input: {
     readonly rustcVersion?: string;
     readonly buildFailed?: boolean;
+    readonly rustupMissing?: boolean;
     readonly codeChrome?: boolean;
   } = {},
 ): string {
-  if (input.codeChrome) {
-    return "Appaloft Cloud Agents needs a matching workspace renderer. The on-disk appaloft-workspace-tui is missing or older than Cloud Agents chrome.";
-  }
   const rustcVersion = input.rustcVersion?.trim();
   const rustcLabel = rustcVersion?.match(/rustc\s+\d+\.\d+(?:\.\d+)?/)?.[0];
   const tooOld = rustcVersion ? rustcTooOldForWorkspaceControlTui(rustcVersion) : false;
   const lines = [
-    `Workspace renderer ${WORKSPACE_CONTROL_TUI_BINARY_NAME} is unavailable.`,
-    "Install or build it from the Appaloft checkout:",
-    `  ${WORKSPACE_CONTROL_TUI_TOOLCHAIN_COMMAND}`,
+    `TTY attach needs the workspace TUI binary ${WORKSPACE_CONTROL_TUI_BINARY_NAME}.`,
+    "Set a default Rust toolchain, then build the crate from this checkout:",
+    `  ${WORKSPACE_CONTROL_TUI_DEFAULT_TOOLCHAIN_COMMAND}`,
     `  ${WORKSPACE_CONTROL_TUI_BUILD_COMMAND}`,
   ];
   if (tooOld && rustcLabel) {
     lines.push(
-      `${rustcLabel} is too old for ratatui (need Rust ${WORKSPACE_CONTROL_TUI_MIN_RUSTC.major}.${WORKSPACE_CONTROL_TUI_MIN_RUSTC.minor} or newer). Then retry \`appaloftdev code\`.`,
+      `${rustcLabel} is too old (need Rust ${WORKSPACE_CONTROL_TUI_MIN_RUSTC.major}.${WORKSPACE_CONTROL_TUI_MIN_RUSTC.minor} or newer). Then retry \`appaloftdev code\`.`,
     );
+  } else if (input.rustupMissing) {
+    lines.push("No default Rust toolchain is configured on this machine.");
   } else if (input.buildFailed) {
     lines.push(
-      `cargo could not produce ${WORKSPACE_CONTROL_TUI_BINARY_NAME}. This crate needs Rust ${WORKSPACE_CONTROL_TUI_MIN_RUSTC.major}.${WORKSPACE_CONTROL_TUI_MIN_RUSTC.minor} or newer. Then retry \`appaloftdev code\`.`,
-    );
-  } else {
-    lines.push(
-      `This crate needs Rust ${WORKSPACE_CONTROL_TUI_MIN_RUSTC.major}.${WORKSPACE_CONTROL_TUI_MIN_RUSTC.minor} or newer. Then retry \`appaloftdev code\`.`,
+      `The crate needs Rust ${WORKSPACE_CONTROL_TUI_MIN_RUSTC.major}.${WORKSPACE_CONTROL_TUI_MIN_RUSTC.minor} or newer.`,
     );
   }
-  lines.push("TTY attach needs this binary. `--no-attach` works without it.");
-  return lines.join("\n");
+  lines.push("`--no-attach` still works without this binary.");
+  return sanitizeWorkspaceRendererFailureText(lines.join("\n"));
+}
+
+export function sanitizeWorkspaceRendererFailureText(text: string): string {
+  const cleaned = text
+    .split(/\r?\n/u)
+    .filter((line) => !RUSTUP_CARGO_CHOOSER_RE.test(line))
+    .join("\n")
+    .trim();
+  if (cleaned.length > 0 && !RUSTUP_CARGO_CHOOSER_RE.test(cleaned)) return cleaned;
+  return [
+    `TTY attach needs the workspace TUI binary ${WORKSPACE_CONTROL_TUI_BINARY_NAME}.`,
+    "Set a default Rust toolchain, then build the crate from this checkout:",
+    `  ${WORKSPACE_CONTROL_TUI_DEFAULT_TOOLCHAIN_COMMAND}`,
+    `  ${WORKSPACE_CONTROL_TUI_BUILD_COMMAND}`,
+    "`--no-attach` still works without this binary.",
+  ].join("\n");
+}
+
+export function restoreWorkspaceTuiScrollback(
+  write: (text: string) => void = (text) => {
+    process.stdout.write(text);
+  },
+): void {
+  write(`${WORKSPACE_TUI_LEAVE_ALT_SCREEN}${WORKSPACE_TUI_DISABLE_MOUSE}\n`);
+}
+
+export function isWorkspaceRendererFailure(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const record = error as {
+    readonly message?: unknown;
+    readonly details?: { readonly phase?: unknown; readonly reason?: unknown };
+  };
+  const phase = typeof record.details?.phase === "string" ? record.details.phase : "";
+  const reason = typeof record.details?.reason === "string" ? record.details.reason : "";
+  const message = typeof record.message === "string" ? record.message : "";
+  return (
+    phase === "workspace-control-renderer" ||
+    reason.startsWith("binary-") ||
+    reason === "toolchain-old" ||
+    reason === "rustup-missing" ||
+    message.includes(WORKSPACE_CONTROL_TUI_BINARY_NAME)
+  );
 }
 
 function workspaceControlRendererUnavailableError(
@@ -684,6 +727,7 @@ function workspaceControlRendererUnavailableError(
   input: {
     readonly rustcVersion?: string;
     readonly buildFailed?: boolean;
+    readonly rustupMissing?: boolean;
     readonly codeChrome?: boolean;
     readonly crateDir?: string;
     readonly exitCode?: number;
@@ -702,7 +746,7 @@ export async function readRustcVersion(
   const rustc = environment.RUSTC?.trim() || "rustc";
   const child = spawn(rustc, ["--version"], {
     shell: false,
-    stdio: ["ignore", "pipe", "ignore"],
+    stdio: ["ignore", "pipe", "pipe"],
     env: environment,
   });
   let stdout = "";
@@ -710,6 +754,7 @@ export async function readRustcVersion(
   child.stdout?.on("data", (chunk) => {
     stdout += String(chunk);
   });
+  child.stderr?.resume();
   try {
     const exitCode = await new Promise<number>((resolveExit, rejectExit) => {
       const timer = setTimeout(() => {
@@ -741,9 +786,11 @@ export async function buildWorkspaceControlRendererBinary(
   const child = spawn(cargo, ["build", "--locked"], {
     cwd: crateDir,
     shell: false,
-    stdio: "inherit",
+    stdio: ["ignore", "pipe", "pipe"],
     env: environment,
   });
+  child.stdout?.resume();
+  child.stderr?.resume();
   const exitCode = await new Promise<number>((resolveExit, rejectExit) => {
     child.once("error", rejectExit);
     child.once("exit", (code) => resolveExit(code ?? 1));
@@ -782,6 +829,13 @@ export async function ensureWorkspaceControlRendererBinary(
     });
   }
   if (!crateDir) return undefined;
+  if (!rustcVersion) {
+    throw workspaceControlRendererUnavailableError("rustup-missing", {
+      crateDir,
+      rustupMissing: true,
+      codeChrome: true,
+    });
+  }
   try {
     await build(crateDir, environment);
   } catch (error) {
@@ -792,7 +846,9 @@ export async function ensureWorkspaceControlRendererBinary(
       error.details &&
       typeof error.details === "object" &&
       "reason" in error.details &&
-      (error.details.reason === "binary-build-failed" || error.details.reason === "toolchain-old")
+      (error.details.reason === "binary-build-failed" ||
+        error.details.reason === "toolchain-old" ||
+        error.details.reason === "rustup-missing")
     ) {
       throw error;
     }

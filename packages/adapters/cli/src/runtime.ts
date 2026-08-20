@@ -44,6 +44,11 @@ import {
   openBunNativeWorkspaceTerminal,
 } from "./workspace-control-native-terminal.js";
 import { type WorkspaceControlPresentation } from "./workspace-control-presentation.js";
+import {
+  isWorkspaceRendererFailure,
+  restoreWorkspaceTuiScrollback,
+  sanitizeWorkspaceRendererFailureText,
+} from "./workspace-tui-launch.js";
 
 export interface CliSourceLinkStore {
   read(sourceFingerprint: string): Promise<Result<SourceLinkRecord | null>>;
@@ -501,10 +506,10 @@ export function formatHumanCliError(error: unknown): string {
     if (preferred && !lines.some((line) => line.includes("appaloft code --profile"))) {
       lines.push(`Retry with appaloft code --profile ${preferred}`);
     }
-    return `${lines.join("\n")}\n`;
+    return `${sanitizeWorkspaceRendererFailureText(lines.join("\n"))}\n`;
   }
 
-  return "Command failed\n";
+  return `${sanitizeWorkspaceRendererFailureText("Command failed")}\n`;
 }
 
 export const resultToEffect = <T>(result: Result<T>): Effect.Effect<T, DomainError> =>
@@ -1075,6 +1080,9 @@ export const runSandboxAgentRunEventStreamQuery = (
 
 export const printCliError = (error: unknown) =>
   Effect.sync(() => {
+    if (isWorkspaceRendererFailure(error)) {
+      restoreWorkspaceTuiScrollback();
+    }
     if (process.env.APPALOFT_ERROR_FORMAT === "safe-json") {
       process.stderr.write(formatSafeCliError(error));
       process.exitCode = 1;

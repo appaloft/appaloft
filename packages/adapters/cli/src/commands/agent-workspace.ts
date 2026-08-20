@@ -930,17 +930,6 @@ export const workspaceCodeCommand = EffectCommand.make(
       const occupancyTui = cli.workspaceControlPresentation;
       if (useOccupancyTui && occupancyTui) {
         const occupancyFolderName = folderDirectoryName(folderOnboardingCwdFromLocator(path));
-        yield* ensureFolderProjectOnboarding({
-          cwd: folderOnboardingCwdFromLocator(path),
-          yes,
-          promptPolicy: "pre-tui-inquire",
-          canPrompt:
-            cli.folderOnboardingInteraction !== undefined ||
-            (cli.terminalIO.stdin.isTTY === true && cli.terminalIO.stdout.isTTY === true),
-          interaction: cli.folderOnboardingInteraction ?? codeSessionInquireInteraction,
-          peekGitIdentity: peekThisFolderGitIdentity,
-          ...(cli.environment ? { env: cli.environment } : {}),
-        });
         yield* Effect.tryPromise({
           try: () =>
             occupancyTui.start({

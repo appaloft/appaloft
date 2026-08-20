@@ -21,7 +21,7 @@ export function shouldWarmOccupancyTui(
 ): boolean {
   if (isOccupancyHelpArgs(args)) return false;
   const command = occupancyCliCommand(args);
-  if (command !== "workspace") return false;
+  if (command !== "code" && command !== "workspace") return false;
   return !shouldPrintOccupancyLineProgress(args, io);
 }
 

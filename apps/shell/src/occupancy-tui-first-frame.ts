@@ -41,7 +41,7 @@ export function leaveOccupancyAltScreen(
   },
 ): void {
   occupancyAltScreenEntered = false;
-  write(`${OCCUPANCY_LEAVE_ALT_SCREEN}${OCCUPANCY_DISABLE_MOUSE}`);
+  write(`${OCCUPANCY_LEAVE_ALT_SCREEN}${OCCUPANCY_DISABLE_MOUSE}\n`);
 }
 
 export function restoreOccupancyAltScreenIfEntered(
