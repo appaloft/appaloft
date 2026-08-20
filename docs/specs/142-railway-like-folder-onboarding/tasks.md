@@ -11,3 +11,4 @@
 - [x] Update public docs, docs-registry, and skill entrypoints.
 - [x] Run focused tests, `lint:ci`, and affected-package `typecheck`.
 - [x] Open a merge-quality PR against main.
+- [x] Live-walk fix: `code` session auto-creates/links by directory name; no Effect select inside the occupancy TUI (`FOLDER-ONBOARD-009`).

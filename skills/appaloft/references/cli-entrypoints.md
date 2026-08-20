@@ -54,7 +54,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `--preview <previewEnvironmentId>` on logs, health, diagnostics, effective config, runtime
   control, and terminal commands when the user is operating a preview rather than its parent
   resource.
-- `appaloft code [path|git-remote] [--yes] [--profile <name-or-id>] [--server <id>] [--opencode|--pi|--omp|--claude|--codex|--grok]` occupies my Sandbox after login. A no-git folder create-or-links a Project (directory name, the only Project, or one TTY choice), persists that link, and occupies `folder.local`. Git remote is correspondence when present and is not required. It requires a default
+- `appaloft code [path|git-remote] [--yes] [--profile <name-or-id>] [--server <id>] [--opencode|--pi|--omp|--claude|--codex|--grok]` occupies my Sandbox after login. A no-git folder create-or-links a Project named after the directory (or the only Project), persists that link, and occupies `folder.local`. `code` never opens a project picker inside the session TUI. `--pi` only selects the Pi harness and does not change chrome. Git remote is correspondence when present and is not required. It requires a default
   enrolled Server, dispatches `workspaces.open` with the remote SHA and
   `targetServerId`. `--server` pins that Server with the same semantics as
   `workspace open --server`. On a TTY it enters the occupancy Workspace TUI immediately

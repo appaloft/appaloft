@@ -2073,6 +2073,7 @@ describe("Workspace control presentation", () => {
     });
     let skillBlockers = 0;
     await presentation.start({
+      occupancyChrome: { project: "hello-static" },
       occupyBootstrap: async ({ reportProgress }) => {
         await reportProgress("Preparing disk on hostinger…");
         await reportProgress("Preparing skills…");
@@ -2111,6 +2112,7 @@ describe("Workspace control presentation", () => {
       type: "loading",
       collapsed: true,
       title: "Appaloft Cloud Agents",
+      project: "hello-static",
     });
     expect(renderer.messages).toContainEqual({
       type: "progress",

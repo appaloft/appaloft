@@ -36,8 +36,11 @@ present; missing git is not a gate.
    The next command in the same cwd reuses that link.
 2. Unlinked, no-git, non-interactive (`-y` / no TTY) creates a Project named
    after the directory. Exactly one active Project is used. Several Projects
-   on a TTY prompt create-versus-select once. `--yes` creates the directory
-   named Project.
+   on a dedicated onboarding TTY (`deploy` when it prompts, or `project use`)
+   may create-versus-select once. `--yes` creates the directory-named Project.
+   A `code` session never prompts: it auto-creates or links a Project named
+   after the directory (Railway `up` / `--yes` style) so Effect select cannot
+   punch out of the occupancy alt-screen.
 3. `appaloft project use <projectId>` switches the linked Project for this
    folder. `appaloft context` remains control-plane profile selection.
 4. Git is correspondence, not a gate. A cwd with `origin` uses that remote as

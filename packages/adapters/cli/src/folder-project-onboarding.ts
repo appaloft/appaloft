@@ -87,6 +87,8 @@ function findNamedProject(
   );
 }
 
+export type FolderOnboardingPromptPolicy = "allow-select" | "auto-create";
+
 export function decideFolderProjectOnboarding(input: {
   readonly linkedProjectId?: string;
   readonly gitIdentity?: string;
@@ -95,6 +97,7 @@ export function decideFolderProjectOnboarding(input: {
   readonly binding?: FolderOnboardingBinding | null;
   readonly canPrompt: boolean;
   readonly yes?: boolean;
+  readonly promptPolicy?: FolderOnboardingPromptPolicy;
 }): FolderOnboardingDecision {
   const identity = input.gitIdentity ?? folderOccupancyIdentity(input.directoryName);
   const createName = projectNameFromIdentity(identity, input.directoryName);
@@ -127,7 +130,8 @@ export function decideFolderProjectOnboarding(input: {
   if (projects.length === 1 && projects[0]) {
     return { kind: "use-only-project", projectId: projects[0].id, identity };
   }
-  if (input.canPrompt && !input.yes) {
+  const autoCreate = input.promptPolicy === "auto-create" || input.yes;
+  if (input.canPrompt && !autoCreate) {
     return { kind: "prompt", name: createName, identity, projects };
   }
   return { kind: "create", name: createName, identity };
@@ -199,6 +203,7 @@ export function folderOnboardingCanPrompt(
 export function ensureFolderProjectOnboarding(input: {
   readonly cwd?: string;
   readonly yes?: boolean;
+  readonly promptPolicy?: FolderOnboardingPromptPolicy;
   readonly explicitProjectId?: string;
   readonly canPrompt?: boolean;
   readonly interaction?: CliInteraction;
@@ -313,6 +318,7 @@ export function ensureFolderProjectOnboarding(input: {
       binding,
       canPrompt,
       ...(input.yes ? { yes: true } : {}),
+      ...(input.promptPolicy ? { promptPolicy: input.promptPolicy } : {}),
     });
 
     let projectId: string;
@@ -321,6 +327,13 @@ export function ensureFolderProjectOnboarding(input: {
     let reused = decision.kind === "reuse-link";
 
     if (decision.kind === "prompt") {
+      if (input.promptPolicy === "auto-create") {
+        return yield* Effect.fail(
+          domainError.invariant("Code session onboarding must not prompt for a project", {
+            phase: "folder-project-onboarding",
+          }),
+        );
+      }
       if (!input.interaction) {
         return yield* Effect.fail(
           domainError.validation("Choose a project or create one for this folder", {

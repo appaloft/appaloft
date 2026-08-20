@@ -39,8 +39,8 @@ appaloft project use <projectId>
 
 第一次在某个文件夹里运行 `appaloft deploy` 或 `appaloft code` 时，如果这个文件夹还没有关联项目：
 
-- 没有 Git 时，默认按**目录名**创建一个项目（非交互 / `--yes`），或者在你只有一个项目时直接用它。
-- 有多个项目且在终端里时，会问一次：新建还是选用已有项目。
+- 没有 Git 时，默认按**目录名**创建一个项目（非交互 / `--yes` / `appaloft code`），或者在你只有一个项目时直接用它。
+- `appaloft code` 不会在会话 TUI 里弹出项目选择。有多个项目时，用 `deploy` 或 `project use` 来选；`code` 会按目录名创建或关联项目。
 - 有 Git remote 时，用那个 remote 作为对应关系去查找或创建项目。没有 Git 也能继续，Git 不是门槛。
 
 关联保存在用户目录（默认 `~/.appaloft/folder-links.json`），不要求当前目录出现点文件。下一次在同一文件夹再跑命令会复用这个关联。要换项目，运行 `appaloft project use <projectId>`，不要走四步向导。`appaloft context` 仍然只切换控制面 profile。

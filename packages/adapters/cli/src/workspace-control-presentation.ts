@@ -317,6 +317,9 @@ export interface WorkspaceControlPresentationContext {
       }
     | undefined
   >;
+  occupancyChrome?: {
+    readonly project?: string;
+  };
 }
 
 /** Framework-neutral entry point for the interactive Workspace control surface. */
@@ -1047,6 +1050,9 @@ export function createBoundedWorkspaceControlPresentation(
             type: "loading",
             collapsed: true,
             title: OCCUPANCY_CODE_CHROME_TITLE,
+            ...(context.occupancyChrome?.project
+              ? { project: context.occupancyChrome.project }
+              : {}),
           });
           occupyDone = context
             .occupyBootstrap({

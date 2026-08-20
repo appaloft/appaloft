@@ -49,7 +49,12 @@ import {
 } from "@appaloft/application";
 import { domainError, err, ok } from "@appaloft/core";
 
-import { folderOccupancyIdentity } from "../src/folder-project-link.js";
+import { folderDirectoryName, folderOccupancyIdentity } from "../src/folder-project-link.js";
+import { OCCUPANCY_CODE_CHROME_TITLE } from "../src/occupancy-code-progress.js";
+import {
+  createBoundedWorkspaceControlPresentation,
+  type WorkspaceControlPresentationContext,
+} from "../src/workspace-control-presentation.js";
 
 describe("Agent Workspace CLI", () => {
   test("[WS-TUI-ENTRY-001] interactive no-subcommand workspace starts the injected control presentation without mutation", async () => {
@@ -2949,66 +2954,18 @@ describe("Agent Workspace CLI", () => {
   });
 
   test("[WS-REMOTE-PROGRESS-193] TTY code enters occupancy TUI without streamed line progress", async () => {
-    const output: string[] = [];
-    let presentationStarts = 0;
-    let occupyBootstrap:
-      | ((input: { reportProgress: (message: string) => Promise<void> }) => Promise<unknown>)
-      | undefined;
-    let doorResolved = false;
-    const { createCliProgram } = await import("../src");
-    const program = createCliProgram({
-      version: "0.1.0-test",
-      startServer: async () => {},
-      commandBus: { execute: async () => ok({}) } as unknown as CommandBus,
-      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
-      executionContextFactory: {
-        create: (input) => createExecutionContext({ ...input, requestId: "req_code_tui_progress" }),
-      },
-      terminalIO: {
-        stdin: { isTTY: true, on: () => undefined },
-        stdout: {
-          isTTY: true,
-          write: (chunk: string | Uint8Array) => {
-            output.push(String(chunk));
-            return true;
-          },
-        },
-        stderr: {
-          isTTY: true,
-          write: (chunk: string | Uint8Array) => {
-            output.push(String(chunk));
-            return true;
-          },
-        },
-      },
-      environment: { TERM: "xterm-256color" },
-      workspaceControlPresentation: {
-        start: async (context) => {
-          presentationStarts += 1;
-          occupyBootstrap = context.occupyBootstrap;
-        },
-      },
-      resolveRemoteCodeDoor: async () => {
-        doorResolved = true;
-        throw new Error("TTY code should occupy only after the TUI starts");
-      },
-    });
-    const write = process.stdout.write;
-    process.stdout.write = ((chunk) => {
-      output.push(String(chunk));
-      return true;
-    }) as typeof process.stdout.write;
-    try {
-      await program.parseAsync(["node", "appaloft", "code"]);
-    } finally {
-      process.stdout.write = write;
-    }
-    expect(presentationStarts).toBe(1);
-    expect(occupyBootstrap).toBeTypeOf("function");
-    expect(doorResolved).toBeFalse();
-    expect(output.join("")).not.toContain("Checking login…");
-    expect(output.join("")).not.toContain("Opening occupancy");
-    expect(output.join("")).not.toContain("Opening remote session…");
+    await expectTtyCodeFirstChrome(["code"]);
+  });
+
+  test("[FOLDER-ONBOARD-009][WS-REMOTE-PROGRESS-193] TTY code --pi first chrome is Cloud Agents not Occupancy or workspace-list", async () => {
+    await expectTtyCodeFirstChrome(["code", "--pi"]);
+  });
+
+  test("[FOLDER-ONBOARD-009] code occupy bootstrap never passes Effect select", async () => {
+    const source = await Bun.file(new URL("../src/commands/agent-workspace.ts", import.meta.url)).text();
+    expect(source).toContain('promptPolicy: "auto-create"');
+    expect(source).not.toContain("interaction: effectCliInteraction");
+    expect(source).not.toContain("effectCliInteraction");
   });
 
   test("[WS-REMOTE-COMPAT-128][WS-REMOTE-COMPAT-129][WS-REMOTE-COMPAT-130] unstructured occupancy validation names the enrolled Server", async () => {
@@ -4228,6 +4185,107 @@ describe("Agent Workspace CLI", () => {
     expect(printed).toContain("https://github.com/traefik/whoami/compare/master?expand=1");
   });
 });
+
+async function expectTtyCodeFirstChrome(args: readonly string[]): Promise<void> {
+  const output: string[] = [];
+  let presentationStarts = 0;
+  let startedContext: WorkspaceControlPresentationContext | undefined;
+  let doorResolved = false;
+  const { createCliProgram } = await import("../src");
+  const program = createCliProgram({
+    version: "0.1.0-test",
+    startServer: async () => {},
+    commandBus: { execute: async () => ok({}) } as unknown as CommandBus,
+    queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+    executionContextFactory: {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: `req_code_tui_${args.join("_") || "code"}`,
+        }),
+    },
+    terminalIO: {
+      stdin: { isTTY: true, on: () => undefined },
+      stdout: {
+        isTTY: true,
+        write: (chunk: string | Uint8Array) => {
+          output.push(String(chunk));
+          return true;
+        },
+      },
+      stderr: {
+        isTTY: true,
+        write: (chunk: string | Uint8Array) => {
+          output.push(String(chunk));
+          return true;
+        },
+      },
+    },
+    environment: { TERM: "xterm-256color" },
+    workspaceControlPresentation: {
+      start: async (context) => {
+        presentationStarts += 1;
+        startedContext = context;
+      },
+    },
+    resolveRemoteCodeDoor: async () => {
+      doorResolved = true;
+      throw new Error("TTY code should occupy only after the TUI starts");
+    },
+  });
+  const write = process.stdout.write;
+  process.stdout.write = ((chunk) => {
+    output.push(String(chunk));
+    return true;
+  }) as typeof process.stdout.write;
+  try {
+    await program.parseAsync(["node", "appaloft", ...args]);
+  } finally {
+    process.stdout.write = write;
+  }
+  const printed = output.join("");
+  expect(presentationStarts).toBe(1);
+  expect(startedContext?.occupyBootstrap).toBeTypeOf("function");
+  expect(startedContext?.occupancyChrome?.project).toBe(folderDirectoryName(process.cwd()));
+  expect(doorResolved).toBeFalse();
+  expect(printed).not.toContain("Checking login…");
+  expect(printed).not.toContain("Opening occupancy");
+  expect(printed).not.toContain("Opening remote session…");
+  expect(printed).not.toMatch(/occupancy/iu);
+  expect(printed).not.toContain("Select a Workspace to load bounded detail.");
+  expect(printed).not.toContain("Connecting to Appaloft");
+
+  const renderer = {
+    messages: [] as Array<Record<string, unknown>>,
+    send(message: Record<string, unknown>) {
+      this.messages.push(message);
+      return Promise.resolve();
+    },
+    async *events() {
+      yield { type: "quit" as const };
+    },
+    close: () => Promise.resolve(),
+  };
+  const presentation = createBoundedWorkspaceControlPresentation({
+    openRenderer: async () => renderer as never,
+  });
+  await presentation.start({
+    occupyBootstrap: async () => undefined,
+    occupancyChrome: startedContext?.occupancyChrome,
+    executeCommand: async () => ok({}),
+    executeQuery: async <T>() => ok({ items: [] } as T),
+  });
+  expect(renderer.messages[0]).toEqual({
+    type: "loading",
+    collapsed: true,
+    title: OCCUPANCY_CODE_CHROME_TITLE,
+    project: folderDirectoryName(process.cwd()),
+  });
+  expect(JSON.stringify(renderer.messages)).not.toMatch(/occupancy/iu);
+  expect(JSON.stringify(renderer.messages)).not.toContain(
+    "Select a Workspace to load bounded detail.",
+  );
+}
 
 function createCliFolderOccupancyOpen(options: {
   readonly executedCommands: string[][];

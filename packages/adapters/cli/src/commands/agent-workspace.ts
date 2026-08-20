@@ -58,13 +58,12 @@ import {
   workspaceRemoteLoginRequiredError,
 } from "../cli-session-login.js";
 import { CODE_OPTION_DESCRIPTIONS } from "../code-help.js";
-import { isFolderOccupancyIdentity } from "../folder-project-link.js";
+import { folderDirectoryName, isFolderOccupancyIdentity } from "../folder-project-link.js";
 import {
   ensureFolderProjectOnboarding,
   folderOnboardingCwdFromLocator,
   peekThisFolderGitIdentity,
 } from "../folder-project-onboarding.js";
-import { effectCliInteraction } from "../interaction.js";
 import { resolveRemoteGitWorkspaceRef } from "../local-git-workspace-context.js";
 import {
   launchScratchAgent,
@@ -792,7 +791,7 @@ export const workspaceCodeCommand = EffectCommand.make(
                     ensureFolderProjectOnboarding({
                       cwd: folderOnboardingCwdFromLocator(path),
                       yes,
-                      interaction: effectCliInteraction,
+                      promptPolicy: "auto-create",
                       peekGitIdentity: peekThisFolderGitIdentity,
                       ...(cli.environment ? { env: cli.environment } : {}),
                     }),
@@ -919,6 +918,7 @@ export const workspaceCodeCommand = EffectCommand.make(
       };
       const occupancyTui = cli.workspaceControlPresentation;
       if (useOccupancyTui && occupancyTui) {
+        const occupancyFolderName = folderDirectoryName(folderOnboardingCwdFromLocator(path));
         yield* Effect.tryPromise({
           try: () =>
             occupancyTui.start({
@@ -930,6 +930,7 @@ export const workspaceCodeCommand = EffectCommand.make(
               ...(cli.openNativeWorkspaceTerminal
                 ? { openNativeWorkspaceTerminal: cli.openNativeWorkspaceTerminal }
                 : {}),
+              occupancyChrome: { project: occupancyFolderName },
               occupyBootstrap: async ({ reportProgress: tuiProgress }) => {
                 const occupied = await occupyRemote(
                   (message) => {

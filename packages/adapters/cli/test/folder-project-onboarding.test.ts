@@ -9,6 +9,7 @@ import {
   type Command as AppCommand,
   type Query as AppQuery,
   CreateProjectCommand,
+  ListProjectsQuery,
   ShowProjectQuery,
 } from "@appaloft/application";
 import { ok } from "@appaloft/core";
@@ -200,6 +201,25 @@ describe("folder project onboarding", () => {
     });
   });
 
+  test("[FOLDER-ONBOARD-009] code session auto-creates by directory name and never prompts", () => {
+    const projects = [
+      { id: "prj_a", name: "Alpha", lifecycleStatus: "active" },
+      { id: "prj_b", name: "Beta", lifecycleStatus: "active" },
+    ];
+    expect(
+      decideFolderProjectOnboarding({
+        directoryName: "scratch",
+        projects,
+        canPrompt: true,
+        promptPolicy: "auto-create",
+      }),
+    ).toEqual({
+      kind: "create",
+      name: "scratch",
+      identity: folderOccupancyIdentity("scratch"),
+    });
+  });
+
   test("[FOLDER-ONBOARD-007] git is correspondence, not a create gate", () => {
     const noGit = decideFolderProjectOnboarding({
       directoryName: "notes",
@@ -319,6 +339,72 @@ describe("folder project onboarding", () => {
     expect(second.projectId).toBe("prj_notes");
     expect(commands).toHaveLength(1);
     expect((await readFolderProjectLink("/tmp/notes", store))?.projectId).toBe("prj_notes");
+  });
+
+  test("[FOLDER-ONBOARD-009] Effect code-session onboarding does not select when several projects exist", async () => {
+    const store = memoryFolderProjectLinkStore();
+    const commands: AppCommand<unknown>[] = [];
+    let selected = 0;
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      terminalIO: {
+        stdin: { isTTY: true, on: () => undefined },
+        stdout: { isTTY: true, write: () => true },
+        stderr: { isTTY: true, write: () => true },
+      },
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message as AppCommand<unknown>);
+        return ok({ id: "prj_scratch" } as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message instanceof ListProjectsQuery) {
+          return ok({
+            items: [
+              { id: "prj_a", name: "Alpha", lifecycleStatus: "active" },
+              { id: "prj_b", name: "Beta", lifecycleStatus: "active" },
+            ],
+            total: 2,
+            limit: 100,
+            offset: 0,
+          } as T);
+        }
+        return ok({ items: [], total: 0, limit: 100, offset: 0 } as T);
+      },
+    } as never);
+
+    const result = await Effect.runPromise(
+      Effect.provide(
+        ensureFolderProjectOnboarding({
+          cwd: "/tmp/scratch",
+          store,
+          canPrompt: true,
+          promptPolicy: "auto-create",
+          peekGitIdentity: async () => undefined,
+          interaction: {
+            text: () => {
+              throw new Error("code session must not prompt");
+            },
+            select: () => {
+              selected += 1;
+              throw new Error("code session must not select a project");
+            },
+            confirm: () => {
+              throw new Error("code session must not confirm");
+            },
+          },
+          writeStatus: () => undefined,
+        }),
+        runtime,
+      ),
+    );
+    expect(selected).toBe(0);
+    expect(commands[0]).toBeInstanceOf(CreateProjectCommand);
+    expect(result).toMatchObject({
+      projectId: "prj_scratch",
+      created: true,
+      identity: folderOccupancyIdentity("scratch"),
+    });
   });
 
   test("[FOLDER-ONBOARD-002] Effect onboarding binds a git remote identity", async () => {
