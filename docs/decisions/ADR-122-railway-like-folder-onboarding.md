@@ -50,7 +50,9 @@ present; missing git is not a gate.
 6. Folder occupancy skips `git init`, `git fetch`, checkout, clone, and
    source materialization. Community activation binds Resource source as
    `local-folder`, not a fake remote-git URL. A leftover partial folder
-   occupancy continues on that disk instead of fail-closing.
+   occupancy is repaired on that disk, or replaced without dumping
+   `workspace_open_partial_recovery_required` or requiring the user to
+   terminate.
 7. Login stays fail-fast with `Run appaloft login`. No 40s blank cursor. No
    invented live URL. Status lines print on stderr.
 8. No new catalog operation. Folder link is CLI presentation over existing

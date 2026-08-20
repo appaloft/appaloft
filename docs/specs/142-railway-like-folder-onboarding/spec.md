@@ -38,7 +38,7 @@ linked project is one command.
    It does not silently resume another repository's occupancy. A cwd with
    origin still occupies that repository instead of the last occupancy.
    Explicit `code <git-remote>` is unchanged (ADR-119).
-9. Folder occupancy skips remote fetch, `git init`, clone, and source materialization. Resource source kind is `local-folder`. A leftover partial folder occupancy continues on that disk.
+9. Folder occupancy skips remote fetch, `git init`, clone, and source materialization. Resource source kind is `local-folder`. A leftover partial folder occupancy is repaired on that disk, or replaced without dumping `workspace_open_partial_recovery_required`.
 10. Missing login fail-closes immediately with `Run appaloft login`. Status lines
     print on stderr. Failures are non-zero. No fake live URL.
 

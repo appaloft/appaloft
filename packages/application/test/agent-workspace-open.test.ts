@@ -951,6 +951,97 @@ describe("Agent Workspace open application workflow", () => {
     expect(opened._unsafeUnwrap().source.repository).toBe("https://folder.local/cwd/notes.git");
   });
 
+  test("[FOLDER-ONBOARD-007][WS-REMOTE-PROGRESS-201] leftover folder occupancy with a different pin still repairs", async () => {
+    const { service } = createFolderOccupancyOpen({
+      preferred: {
+        workspaceId: "sbx_partial",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        profileInstallationId: "awpi_other",
+        status: "partial",
+        phase: "workspace-open-source-materialization",
+        targetSelection: {
+          targetClass: "registered-server",
+          source: "explicit",
+          reason: "code_target_server",
+        },
+      },
+    });
+    const opened = await service.open(
+      createExecutionContext({
+        requestId: "req_folder_occupancy_pin_mismatch",
+        entrypoint: "cli",
+        actor: { kind: "user", id: "usr_1" },
+        tenant: { tenantId: "ten_1" },
+      }),
+      folderOccupancyInput,
+    );
+
+    expect(opened.isOk()).toBe(true);
+    expect(opened._unsafeUnwrap()).toMatchObject({
+      workspaceId: "sbx_partial",
+      resumed: true,
+      source: { repositoryIdentity: "folder.local/cwd/notes" },
+    });
+  });
+
+  test("[FOLDER-ONBOARD-007][WS-REMOTE-PROGRESS-201] unrepairable leftover folder occupancy replaces without partial_recovery", async () => {
+    const executedCommands: string[][] = [];
+    let materialized = 0;
+    const { service, terminated, begun } = createFolderOccupancyOpen({
+      executedCommands,
+      preferred: {
+        workspaceId: "sbx_partial",
+        commitSha: folderOccupancyInput.commitSha,
+        profileInstallationId: "awpi_default",
+        status: "partial",
+        phase: "workspace-open-source-materialization",
+        targetSelection: {
+          targetClass: "registered-server",
+          source: "explicit",
+          reason: "code_target_server",
+        },
+      },
+      resumeSandbox: async () =>
+        err(
+          domainError.conflict("Sandbox resume failed", {
+            code: "sandbox_resume_failed",
+          }),
+        ),
+    });
+    const opened = await service.open(
+      createExecutionContext({
+        requestId: "req_folder_occupancy_replace",
+        entrypoint: "cli",
+        actor: { kind: "user", id: "usr_1" },
+        tenant: { tenantId: "ten_1" },
+      }),
+      folderOccupancyInput,
+      {
+        sourceMaterializer: {
+          materialize: async () => {
+            materialized += 1;
+            return err(
+              domainError.conflict("Workspace source materialization failed", {
+                code: "workspace_open_source_materialization_failed",
+              }),
+            );
+          },
+        },
+      },
+    );
+
+    expect(opened.isOk()).toBe(true);
+    expect(opened._unsafeUnwrap()).toMatchObject({
+      workspaceId: "sbx_notes",
+      resumed: false,
+      source: { repositoryIdentity: "folder.local/cwd/notes" },
+    });
+    expect(terminated).toEqual(["sbx_partial"]);
+    expect(begun).toEqual([{ forceNew: true }]);
+    expect(materialized).toBe(0);
+    expect(executedCommands).toEqual([]);
+  });
+
   test("[WS-OPEN-PARTIAL-017] git remote leftover still fail-closes for partial recovery", async () => {
     const { service } = createFolderOccupancyOpen({
       preferred: {
@@ -1007,12 +1098,17 @@ function createFolderOccupancyOpen(options: {
     };
   };
   readonly createSandbox?: WorkspaceOpenDependencies["sandboxes"]["create"];
+  readonly resumeSandbox?: WorkspaceOpenDependencies["sandboxes"]["resume"];
 }): {
   readonly service: AgentWorkspaceOpenService;
   readonly sourceCredentials: string[];
+  readonly terminated: string[];
+  readonly begun: Array<{ forceNew: boolean }>;
 } {
   const executedCommands = options.executedCommands ?? [];
   const sourceCredentials: string[] = [];
+  const terminated: string[] = [];
+  const begun: Array<{ forceNew: boolean }> = [];
   const pin = {
     profileInstallationId: "awpi_default",
     profileDefinitionDigest: `sha256:${"a".repeat(64)}`,
@@ -1091,10 +1187,16 @@ function createFolderOccupancyOpen(options: {
       findByWorkspaceId: async () => undefined,
       findPreferred: async () => options.preferred,
       findLiveProfileInstallationIds: async () => [],
-      begin: async () => ok({ workspaceId: "sbx_notes", created: true }),
+      begin: async (_context, _key, value) => {
+        begun.push({ forceNew: value.forceNew });
+        return ok({ workspaceId: "sbx_notes", created: true });
+      },
       complete: async () => ok(undefined),
       fail: async () => ok(undefined),
-      markWorkspaceTerminated: async () => ok({ advanced: true }),
+      markWorkspaceTerminated: async (_context, workspaceId) => {
+        terminated.push(workspaceId);
+        return ok({ advanced: true });
+      },
     },
     sourceCredentials: {
       resolve: async (_context, value) => {
@@ -1105,7 +1207,9 @@ function createFolderOccupancyOpen(options: {
     sandboxes: {
       create:
         options.createSandbox ?? (async () => ok({ sandboxId: "sbx_notes", status: "ready" })),
-      resume: async (_context, workspaceId) => ok({ sandboxId: workspaceId, status: "ready" }),
+      resume:
+        options.resumeSandbox ??
+        (async (_context, workspaceId) => ok({ sandboxId: workspaceId, status: "ready" })),
       exec: async (_context, _workspaceId, command) => {
         executedCommands.push([...command.argv]);
         return ok({ mode: "foreground", frames: [{ kind: "exit", exitCode: 1 }] });
@@ -1148,5 +1252,7 @@ function createFolderOccupancyOpen(options: {
   return {
     service: new AgentWorkspaceOpenService(dependencies),
     sourceCredentials,
+    terminated,
+    begun,
   };
 }

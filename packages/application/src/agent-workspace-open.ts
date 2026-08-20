@@ -563,6 +563,16 @@ export class AgentWorkspaceOpenService {
             : undefined,
         );
     if (preferred && preferred.status !== "terminal") {
+      if (isFolderOccupancyIdentity(input.repositoryIdentity) && !preferred.runtimeId) {
+        return this.continueOrReplaceFolderOccupancy(
+          context,
+          input,
+          options,
+          key,
+          resolved.value,
+          preferred,
+        );
+      }
       if (preferred.commitSha !== input.commitSha) {
         return err(
           domainError.conflict("Preferred Workspace is pinned to another Git commit", {
@@ -590,16 +600,6 @@ export class AgentWorkspaceOpenService {
         );
       }
       if (!preferred.runtimeId) {
-        if (isFolderOccupancyIdentity(input.repositoryIdentity)) {
-          return this.continueFolderOccupancy(
-            context,
-            input,
-            options,
-            key,
-            resolved.value,
-            preferred,
-          );
-        }
         return err(
           domainError.conflict("Preferred Workspace is partially created", {
             code: "workspace_open_partial_recovery_required",
@@ -769,7 +769,28 @@ export class AgentWorkspaceOpenService {
     }
   }
 
-  private async continueFolderOccupancy(
+  private async continueOrReplaceFolderOccupancy(
+    context: ExecutionContext,
+    input: WorkspaceOpenInput,
+    options: WorkspaceOpenOptions,
+    key: WorkspaceOpenKey,
+    resolved: WorkspaceOpenContext,
+    preferred: WorkspaceOpenEntry,
+  ): Promise<Result<WorkspaceOpenResult>> {
+    const repaired = await this.repairFolderOccupancy(
+      context,
+      input,
+      options,
+      key,
+      resolved,
+      preferred,
+    );
+    if (repaired.isOk()) return repaired;
+    await this.dependencies.entries.markWorkspaceTerminated(context, preferred.workspaceId);
+    return this.open(context, { ...input, forceNew: true }, options);
+  }
+
+  private async repairFolderOccupancy(
     context: ExecutionContext,
     input: WorkspaceOpenInput,
     options: WorkspaceOpenOptions,
