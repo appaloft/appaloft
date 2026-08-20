@@ -1,4 +1,5 @@
-import { resolve as resolvePath } from "node:path";
+import { existsSync } from "node:fs";
+import { join, resolve as resolvePath } from "node:path";
 
 import {
   CreateProjectCommand,
@@ -130,6 +131,15 @@ export function decideFolderProjectOnboarding(input: {
     return { kind: "prompt", name: createName, identity, projects };
   }
   return { kind: "create", name: createName, identity };
+}
+
+export async function peekThisFolderGitIdentity(
+  cwd: string,
+  runGit?: WorkspaceGitCommandRunner,
+): Promise<string | undefined> {
+  const root = normalizeFolderCwd(cwd);
+  if (!existsSync(join(root, ".git"))) return undefined;
+  return peekWorkspaceGitIdentity(root, runGit);
 }
 
 export async function peekWorkspaceGitIdentity(

@@ -31,6 +31,28 @@ export interface OccupancyChrome {
   readonly deployment?: OccupancyDeploymentChrome;
 }
 
+export function occupancyChromeProjectName(input: {
+  readonly projectName?: string;
+  readonly projectId?: string;
+  readonly repositoryIdentity?: string;
+}): string | undefined {
+  const named = input.projectName?.trim();
+  if (named) return named;
+  const identity = input.repositoryIdentity?.trim();
+  if (identity) {
+    const segment = identity
+      .split("/")
+      .filter(Boolean)
+      .at(-1)
+      ?.replace(/\.git$/u, "")
+      .trim();
+    if (segment) return segment;
+  }
+  const projectId = input.projectId?.trim();
+  if (projectId && projectId !== "project") return projectId;
+  return undefined;
+}
+
 export interface OccupancyIdentity {
   readonly repositoryIdentity?: string;
   readonly commitSha?: string;

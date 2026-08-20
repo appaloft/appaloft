@@ -1,4 +1,4 @@
-import { type Command as AppCommand, type Query as AppQuery } from "@appaloft/application";
+import { type Command as AppCommand, Query as AppQuery } from "@appaloft/application";
 import {
   findOperationCatalogEntryByKey,
   findOperationCatalogEntryByMessageName,
@@ -18,6 +18,10 @@ import {
   requestControlPlaneStreamOperation,
 } from "./control-plane-client.js";
 import { type CliControlPlaneProfile } from "./control-plane-profile.js";
+import {
+  executeFolderLocalWorkspaceOpen,
+  isFolderLocalWorkspaceOpenCommand,
+} from "./folder-local-remote-open.js";
 import { type OperatePresentation } from "./operate-presentation.js";
 import {
   createRemoteTerminalSessionAttachmentGateway,
@@ -437,6 +441,19 @@ export function createRemoteCliProgram(input: RemoteCliProgramInput): CliProgram
         const compatible = await ensureHandshake();
         if (compatible.isErr()) {
           return err(compatible.error);
+        }
+
+        if (isFolderLocalWorkspaceOpenCommand(message)) {
+          return executeFolderLocalWorkspaceOpen({
+            command: message,
+            dispatch: (inner) =>
+              dispatchRemoteMessage({
+                kind: inner instanceof AppQuery ? "query" : "command",
+                message: inner,
+                profile: input.profile,
+                ...(input.fetch ? { fetch: input.fetch } : {}),
+              }),
+          }) as Promise<Result<T>>;
         }
 
         return dispatchRemoteMessage<T>({

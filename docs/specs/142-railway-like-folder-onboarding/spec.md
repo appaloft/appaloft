@@ -33,12 +33,12 @@ linked project is one command.
 6. Cwd without git: identity is `folder.local/cwd/<sanitized-dirname>`. Occupy
    and deploy still succeed.
 7. `appaloft project use <projectId>` writes the folder link after `projects.show`.
-8. Default `code` from a no-git folder resumes the live occupancy (Spec 139 /
-   #1319). With no occupancy to resume, it occupies this folder
-   (`folder.local/cwd/<name>`) after folder-project onboarding. A cwd with
+8. Default `code` from a no-git folder occupies this folder
+   (`folder.local/cwd/<name>`) after folder-project onboarding (Spec 139).
+   It does not silently resume another repository's occupancy. A cwd with
    origin still occupies that repository instead of the last occupancy.
    Explicit `code <git-remote>` is unchanged (ADR-119).
-9. Folder occupancy skips remote fetch. Resource source kind is `local-folder`.
+9. Folder occupancy skips remote fetch, `git init`, clone, and source materialization. Resource source kind is `local-folder`. A leftover partial folder occupancy is repaired on that disk, or replaced without dumping `workspace_open_partial_recovery_required`.
 10. Missing login fail-closes immediately with `Run appaloft login`. Status lines
     print on stderr. Failures are non-zero. No fake live URL.
 
@@ -52,7 +52,7 @@ linked project is one command.
 | `FOLDER-ONBOARD-004` | `project use` then later command | Subsequent deploy/code use the switched project id. |
 | `FOLDER-ONBOARD-005` | Exactly one existing Project | Uses that Project without prompting. |
 | `FOLDER-ONBOARD-006` | Several Projects | TTY prompts create vs select; `--yes` creates the directory-named Project. |
-| `FOLDER-ONBOARD-007` | No git | Deploy succeeds. Default `code` resumes a live occupancy; with none, occupy this folder. Git is not a gate. |
+| `FOLDER-ONBOARD-007` | No git | Deploy succeeds. Default `code` resumes a live occupancy; with none, occupy this folder. Git is not a gate. Occupy does not clone or materialize a missing remote and does not fail `workspace_open_source_materialization_failed`. |
 | `FOLDER-ONBOARD-008` | Status and failure | Short status lines; login miss is immediate; failures non-zero; no fake URL. |
 
 ## Public Surfaces

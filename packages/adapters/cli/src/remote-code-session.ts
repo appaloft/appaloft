@@ -21,6 +21,7 @@ import {
   type WorkspaceGitCommandRunner,
 } from "./local-git-workspace-context.js";
 import {
+  occupancyChromeProjectName,
   occupancyConnectionsUrl,
   occupancyGitHubCompareUrl,
   occupancyGitHubPullRequestUrl,
@@ -79,6 +80,7 @@ export interface RemoteCodeDoorResolution {
   readonly branch: string;
   readonly commitSha: string;
   readonly projectId: string;
+  readonly projectName?: string;
   readonly serverId: string;
   readonly serverName: string;
   readonly serverProviderKey?: string;
@@ -139,6 +141,19 @@ export function hasRemoteCodeLogin(env: NodeJS.ProcessEnv = process.env): boolea
       env.APPALOFT_AUTHORIZATION?.trim() ||
       env.APPALOFT_AUTH_COOKIE?.trim(),
   );
+}
+
+export function remoteOccupyBannerProjectId(input: {
+  readonly repositoryIdentity: string;
+  readonly doorProjectId: string;
+  readonly resultProjectId?: string;
+}): string {
+  const door = input.doorProjectId.trim();
+  const result = input.resultProjectId?.trim();
+  if (isFolderOccupancyIdentity(input.repositoryIdentity) && door && door !== "project") {
+    return door;
+  }
+  return result || door;
 }
 
 export function formatRemoteCodeBanner(input: {
@@ -216,18 +231,10 @@ export interface ResolveWorkspaceOpenSourceOptions extends ResolveGitWorkspacePr
 
 export function folderHasGitWorktree(
   selectedPath: string,
-  homeDir = process.env.HOME?.trim() || homedir(),
+  _homeDir = process.env.HOME?.trim() || homedir(),
 ): boolean {
-  const ceiling = workspaceGitDiscoveryCeiling(selectedPath, homeDir);
-  let current = resolve(selectedPath.trim() || ".");
-  for (let depth = 0; depth < 16; depth += 1) {
-    if (existsSync(join(current, ".git"))) return true;
-    const parent = dirname(current);
-    if (parent === current) return false;
-    if (ceiling && (current === ceiling || parent === ceiling)) return false;
-    current = parent;
-  }
-  return false;
+  const current = resolve(selectedPath.trim() || ".");
+  return existsSync(join(current, ".git"));
 }
 
 export function workspaceGitDiscoveryCeiling(
@@ -286,13 +293,13 @@ function throwWorkspaceLocatorMissing(
     throw workspaceLocatorMissingError(
       "Workspace open needs a git remote for this directory",
       phase,
-      "Pass a git remote such as https://github.com/org/repo.git, or run from this folder's Git worktree. Do not reuse another occupancy.",
+      "Pass a git remote such as https://github.com/org/repo.git, or run from this folder's Git worktree. Do not reuse another folder's sandbox.",
     );
   }
   throw workspaceLocatorMissingError(
     "Remote code needs a Git repository with an origin or a git remote locator",
     phase,
-    "Run appaloft code <git-remote> for this folder, or run from this folder's Git worktree. Do not reuse another occupancy.",
+    "Run appaloft code <git-remote> for this folder, or run from this folder's Git worktree. Do not reuse another folder's sandbox.",
   );
 }
 
@@ -417,7 +424,7 @@ export function occupancyCloudCompatError(
   if (!unstructured) return error;
   return remoteCodeError(
     "workspace_open_target_server_unsupported",
-    `This Cloud does not accept occupancy targeting for ${server.name} (${server.id})`,
+    `This Cloud does not accept Server targeting for ${server.name} (${server.id})`,
     {
       phase: "remote-code-cloud-compat",
       serverId: server.id,
@@ -453,17 +460,16 @@ export async function resolveDefaultRemoteCodeDoor(
   }
   probe.onProgress?.(OCCUPANCY_CODE_PROGRESS.choosingOccupancy);
   const occupancies = probe.listOccupancies ? await probe.listOccupancies() : [];
-  const latestOccupancy = selectResumeOccupancy(occupancies);
   const explicitRemote = isRemoteCodeGitRemoteLocator(path)
     ? await resolveRemoteCodeGitRemoteLocator(path, probe.runGit)
     : undefined;
   const homeDir = probe.env?.HOME ?? process.env.HOME;
   const folderCwd = probe.folderCwd ?? (explicitRemote ? process.cwd() : path);
-  const probeThisFolderGit =
-    Boolean(explicitRemote) ||
-    Boolean(probe.forceNew) ||
-    !latestOccupancy ||
-    folderHasGitWorktree(path, homeDir);
+  const thisFolderGit = folderHasGitWorktree(path, homeDir);
+  if (probe.forceNew && !explicitRemote && !thisFolderGit) {
+    throwWorkspaceLocatorMissing(undefined, "remote-code-locator");
+  }
+  const probeThisFolderGit = Boolean(explicitRemote) || thisFolderGit;
   let folderOnboarding = explicitRemote ? undefined : probe.folderOnboarding;
   const loadFolderOnboarding = async () => {
     if (folderOnboarding || explicitRemote) return folderOnboarding;
@@ -501,13 +507,12 @@ export async function resolveDefaultRemoteCodeDoor(
     }
   }
   const requestedLocator = explicitRemote ?? localLocator;
-  const matchingOccupancy = requestedLocator
-    ? selectResumeOccupancy(
-        occupancies.filter(
-          (item) => item.occupancy?.repositoryIdentity === requestedLocator.repositoryIdentity,
-        ),
-      )
-    : undefined;
+  const matchingOccupancyFor = (identity: string | undefined) =>
+    identity
+      ? selectResumeOccupancy(
+          occupancies.filter((item) => item.occupancy?.repositoryIdentity === identity),
+        )
+      : undefined;
   let locator: {
     readonly repository: string;
     readonly repositoryIdentity: string;
@@ -517,28 +522,26 @@ export async function resolveDefaultRemoteCodeDoor(
   let occupancyResume: RemoteCodeOccupancy["occupancy"];
   if (requestedLocator) {
     locator = requestedLocator;
+    const matchingOccupancy = matchingOccupancyFor(requestedLocator.repositoryIdentity);
     if (!probe.forceNew && matchingOccupancy?.occupancy) {
       occupancyResume = matchingOccupancy.occupancy;
     }
-  } else if (!probe.forceNew && latestOccupancy?.occupancy) {
-    occupancyResume = latestOccupancy.occupancy;
-    const normalized = normalizeWorkspaceRepositoryRemote(
-      `https://${latestOccupancy.occupancy.repositoryIdentity.replace(/\.git$/u, "")}.git`,
-    );
-    locator = {
-      repository: normalized.credentialFreeHttps,
-      repositoryIdentity: latestOccupancy.occupancy.repositoryIdentity,
-      ref: `refs/heads/${latestOccupancy.occupancy.branch?.trim() || "main"}`,
-      branch: latestOccupancy.occupancy.branch?.trim() || "main",
-    };
   } else {
     const onboarded = await loadFolderOnboarding();
-    if (onboarded && isFolderOccupancyIdentity(onboarded.identity)) {
-      locator = {
-        ...folderOccupancyLocator(onboarded.identity.split("/").filter(Boolean).at(-1) ?? "app"),
-        repositoryIdentity: onboarded.identity,
-        repository: `https://${onboarded.identity}.git`,
-      };
+    if (onboarded) {
+      locator = isFolderOccupancyIdentity(onboarded.identity)
+        ? {
+            ...folderOccupancyLocator(
+              onboarded.identity.split("/").filter(Boolean).at(-1) ?? "app",
+            ),
+            repositoryIdentity: onboarded.identity,
+            repository: `https://${onboarded.identity}.git`,
+          }
+        : gitOccupancyLocator(onboarded.identity);
+      const matchingOccupancy = matchingOccupancyFor(locator.repositoryIdentity);
+      if (!probe.forceNew && matchingOccupancy?.occupancy) {
+        occupancyResume = matchingOccupancy.occupancy;
+      }
     } else {
       throwWorkspaceLocatorMissing(localLocatorError, "remote-code-locator");
     }
@@ -571,18 +574,25 @@ export async function resolveDefaultRemoteCodeDoor(
         : await probe.resolveRemoteRef(locator.repository, locator.ref);
   }
 
+  const projectId =
+    folderOnboarding?.projectId && folderOnboarding.identity === locator.repositoryIdentity
+      ? folderOnboarding.projectId
+      : binding?.status === "active"
+        ? binding.projectId
+        : "project";
+  const projectName = occupancyChromeProjectName({
+    ...(folderOnboarding?.projectName ? { projectName: folderOnboarding.projectName } : {}),
+    projectId,
+    repositoryIdentity: locator.repositoryIdentity,
+  });
   return {
     repository: remote.credentialFreeHttpsRepository,
     repositoryIdentity: remote.repositoryIdentity,
     ref: remote.ref,
     branch: locator.branch,
     commitSha: remote.commitSha,
-    projectId:
-      folderOnboarding?.projectId && folderOnboarding.identity === locator.repositoryIdentity
-        ? folderOnboarding.projectId
-        : binding?.status === "active"
-          ? binding.projectId
-          : "project",
+    projectId,
+    ...(projectName ? { projectName } : {}),
     serverId: server.id,
     serverName: server.name,
     ...(server.providerKey ? { serverProviderKey: server.providerKey } : {}),
