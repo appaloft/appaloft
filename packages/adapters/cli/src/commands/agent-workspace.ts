@@ -57,6 +57,7 @@ import {
   loginRequiredWorkspaceOccupancyTree,
   workspaceRemoteLoginRequiredError,
 } from "../cli-session-login.js";
+import { isFolderOccupancyIdentity } from "../folder-project-link.js";
 import {
   ensureFolderProjectOnboarding,
   folderOnboardingCwdFromLocator,
@@ -306,6 +307,26 @@ function occupancyTreeFromLists(
 function requireOption(value: string | undefined, label: string): string {
   if (value?.trim()) return value.trim();
   throw domainError.validation(`${label} is required`);
+}
+
+function isFolderOccupancyDoor(door: {
+  readonly repositoryIdentity: string;
+  readonly repository: string;
+}): boolean {
+  return (
+    isFolderOccupancyIdentity(door.repositoryIdentity) || door.repository.includes("folder.local")
+  );
+}
+
+function isFolderOccupancyPartialRecovery(
+  error: DomainError,
+  door: { readonly repositoryIdentity: string; readonly repository: string },
+): boolean {
+  if (!isFolderOccupancyDoor(door)) return false;
+  return (
+    error.details?.code === "workspace_open_partial_recovery_required" ||
+    error.code === "workspace_open_partial_recovery_required"
+  );
 }
 
 function workspaceCliError(error: unknown, phase: string): DomainError {
@@ -761,6 +782,21 @@ export const workspaceCodeCommand = EffectCommand.make(
         const opened = await cli.executeCommand(command.value);
         if (opened.isOk()) {
           return { door, result: opened.value, bannerCommitSha: door.commitSha };
+        }
+        if (isFolderOccupancyPartialRecovery(opened.error, door) && !forceNew) {
+          const replace = OpenAgentWorkspaceCommand.create({
+            ...openInput,
+            forceNew: true,
+          });
+          if (replace.isErr()) throw replace.error;
+          const replaced = await cli.executeCommand(replace.value);
+          if (replaced.isOk()) {
+            return { door, result: replaced.value, bannerCommitSha: door.commitSha };
+          }
+          throw occupancyCloudCompatError(replaced.error, {
+            id: door.serverId,
+            name: door.serverName,
+          });
         }
         const details = opened.error.details;
         const pinnedSha =

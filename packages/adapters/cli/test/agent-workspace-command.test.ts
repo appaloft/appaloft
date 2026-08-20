@@ -1241,6 +1241,127 @@ describe("Agent Workspace CLI", () => {
     expect(commands.some((command) => command instanceof OpenAgentWorkspaceCommand)).toBe(false);
   });
 
+  test("[WS-REMOTE-PROGRESS-201][FOLDER-ONBOARD-007] code --no-attach recovers a leftover partial folder occupancy without dumping partial_recovery", async () => {
+    const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-partial-cwd-"));
+    const home = await mkdtemp(join(tmpdir(), "appaloft-code-partial-cwd-home-"));
+    const commands: Command<unknown>[] = [];
+    const printed: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          if (command instanceof CreateProjectCommand) return ok({ id: "prj_7fky4yjn1l1c" } as T);
+          if (command instanceof OpenAgentWorkspaceCommand) {
+            if (!command.input.forceNew) {
+              return err(
+                domainError.conflict("Preferred Workspace is partially created", {
+                  code: "workspace_open_partial_recovery_required",
+                  workspaceId: "sbx_partial",
+                  phase: "workspace-open-source-materialization",
+                  guidance:
+                    "Inspect or terminate the partial Workspace, then use --new to create an isolated replacement.",
+                }),
+              );
+            }
+            return ok({ workspaceId: "sbx_replaced" } as T);
+          }
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: {
+        execute: async <T>(_context: unknown, query: Query<T>) => {
+          if (query instanceof ListServersQuery) {
+            return ok({
+              items: [{ id: "srv_4lifk0yrcecy", name: "hostinger", lifecycleStatus: "active" }],
+            } as T);
+          }
+          if (query instanceof ListSandboxesQuery) {
+            return ok({
+              items: [
+                {
+                  sandboxId: "sbx_partial",
+                  status: "creating",
+                  occupancy: {
+                    repositoryIdentity: folderOccupancyIdentity(basename(emptyDir)),
+                    commitSha: "cafef00d00000000000000000000000000000000",
+                    branch: "local",
+                  },
+                },
+              ],
+            } as T);
+          }
+          if (query instanceof ShowProjectQuery) {
+            return ok({
+              id: "prj_7fky4yjn1l1c",
+              name: basename(emptyDir),
+              lifecycleStatus: "active",
+            } as T);
+          }
+          if (query instanceof ListProjectsQuery) {
+            return ok({ items: [], total: 0, limit: 100, offset: 0 } as T);
+          }
+          return ok({ items: [] } as T);
+        },
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_partial" }),
+      },
+      environment: { APPALOFT_TOKEN: "token", APPALOFT_HOME: home, HOME: home },
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+    });
+    const originalExitCode = process.exitCode;
+    const previousCwd = process.cwd();
+    const writeOut = process.stdout.write;
+    const writeErr = process.stderr.write;
+    const capture = ((chunk: unknown) => {
+      printed.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    process.stdout.write = capture;
+    process.stderr.write = capture;
+    try {
+      process.chdir(emptyDir);
+      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
+    } finally {
+      process.chdir(previousCwd);
+      process.stdout.write = writeOut;
+      process.stderr.write = writeErr;
+      process.exitCode = originalExitCode ?? 0;
+      await rm(emptyDir, { recursive: true, force: true });
+      await rm(home, { recursive: true, force: true });
+    }
+    const opens = commands.filter((command) => command instanceof OpenAgentWorkspaceCommand);
+    expect(opens).toHaveLength(2);
+    expect(opens[0]).toMatchObject({
+      input: {
+        repositoryIdentity: folderOccupancyIdentity(basename(emptyDir)),
+        forceNew: false,
+        attach: false,
+      },
+    });
+    expect(opens[1]).toMatchObject({
+      input: {
+        repositoryIdentity: folderOccupancyIdentity(basename(emptyDir)),
+        forceNew: true,
+        attach: false,
+      },
+    });
+    const text = printed.join("");
+    expect(text).not.toContain("workspace_open_partial_recovery_required");
+    expect(text).not.toContain("Preferred Workspace is partially created");
+    expect(text).not.toContain("use --new to create an isolated replacement");
+    expect(text.toLowerCase()).not.toContain("occupancy");
+    expect(text).not.toContain("sslip");
+    expect(text).not.toContain("github.com/appaloft/examples");
+  });
+
   test("[FOLDER-ONBOARD-007] code --no-attach from a non-git cwd occupies this folder when no occupancy exists", async () => {
     const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-nongit-empty-"));
     const home = await mkdtemp(join(tmpdir(), "appaloft-code-nongit-empty-home-"));
