@@ -3353,20 +3353,23 @@ mod tests {
     #[test]
     fn code_tui_help_rows_and_footers_never_say_occupancy() {
         for row in OCCUPANCY_HELP_ROWS {
-            assert!(
-                !row.to_ascii_lowercase().contains("occupancy"),
-                "{row}"
-            );
+            assert!(!row.to_ascii_lowercase().contains("occupancy"), "{row}");
         }
-        assert!(!occupancy_loading_footer(true)
-            .to_ascii_lowercase()
-            .contains("occupancy"));
-        assert!(!occupancy_loading_footer(false)
-            .to_ascii_lowercase()
-            .contains("occupancy"));
-        assert!(!OSC52_PASSTHROUGH_DISABLED
-            .to_ascii_lowercase()
-            .contains("occupancy"));
+        assert!(
+            !occupancy_loading_footer(true)
+                .to_ascii_lowercase()
+                .contains("occupancy")
+        );
+        assert!(
+            !occupancy_loading_footer(false)
+                .to_ascii_lowercase()
+                .contains("occupancy")
+        );
+        assert!(
+            !OSC52_PASSTHROUGH_DISABLED
+                .to_ascii_lowercase()
+                .contains("occupancy")
+        );
         for (_, label) in [
             ("credential", "Checking login"),
             ("skills", "Preparing skills"),
@@ -3497,7 +3500,10 @@ mod tests {
         assert!(revealed.contains("Appaloft Cloud Agents"), "{revealed}");
         assert!(revealed.contains("hello-static"), "{revealed}");
         assert!(revealed.contains("preparing the agent"), "{revealed}");
-        assert!(!revealed.to_ascii_lowercase().contains("occupancy"), "{revealed}");
+        assert!(
+            !revealed.to_ascii_lowercase().contains("occupancy"),
+            "{revealed}"
+        );
         assert!(
             !revealed.contains("Select a Workspace to load bounded detail."),
             "{revealed}"
