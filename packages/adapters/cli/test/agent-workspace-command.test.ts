@@ -1149,6 +1149,7 @@ describe("Agent Workspace CLI", () => {
     expect(opened).toBeDefined();
     expect(opened).toMatchObject({
       input: {
+        repository: "https://folder.local/cwd/scratch.git",
         repositoryIdentity: folderOccupancyIdentity("scratch"),
         branch: "local",
         attach: false,

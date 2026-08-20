@@ -455,6 +455,9 @@
 - [x] `--new` without a locator stays fail-closed
 - [x] User-visible chrome/status never say Occupancy / `Copying skills` / `Choosing occupancy`
 - [x] Unit tests WS-REMOTE-PROGRESS-201 / WS-REMOTE-NO-UPLOAD-006 for ancestor git + leftover examples
+- [x] Folder occupancy skips `git init` / clone / source materialization and does not fail `workspace_open_source_materialization_failed`
+- [x] Leftover partial folder occupancy continues on that disk; git-remote leftover still fail-closes
+- [x] Unit tests FOLDER-ONBOARD-007 / WS-REMOTE-PROGRESS-201 for no remote materialize + leftover continue
 
 ## Later
 

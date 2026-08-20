@@ -47,8 +47,10 @@ present; missing git is not a gate.
    identity after onboarding (Spec 139). It does not silently resume another
    repository's occupancy. A cwd with `origin` occupies that repository,
    not the last occupancy. Explicit `code <git-remote>` still follows ADR-119.
-6. Folder occupancy skips `git fetch` / checkout. Community activation binds
-   Resource source as `local-folder`, not a fake remote-git URL.
+6. Folder occupancy skips `git init`, `git fetch`, checkout, clone, and
+   source materialization. Community activation binds Resource source as
+   `local-folder`, not a fake remote-git URL. A leftover partial folder
+   occupancy continues on that disk instead of fail-closing.
 7. Login stays fail-fast with `Run appaloft login`. No 40s blank cursor. No
    invented live URL. Status lines print on stderr.
 8. No new catalog operation. Folder link is CLI presentation over existing

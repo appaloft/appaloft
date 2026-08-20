@@ -531,6 +531,10 @@ function isDomainError(value: unknown): value is DomainError {
   );
 }
 
+export function isFolderOccupancyIdentity(repositoryIdentity: string): boolean {
+  return repositoryIdentity.startsWith("folder.local/");
+}
+
 export class AgentWorkspaceOpenService {
   constructor(private readonly dependencies: WorkspaceOpenDependencies) {}
 
@@ -586,6 +590,16 @@ export class AgentWorkspaceOpenService {
         );
       }
       if (!preferred.runtimeId) {
+        if (isFolderOccupancyIdentity(input.repositoryIdentity)) {
+          return this.continueFolderOccupancy(
+            context,
+            input,
+            options,
+            key,
+            resolved.value,
+            preferred,
+          );
+        }
         return err(
           domainError.conflict("Preferred Workspace is partially created", {
             code: "workspace_open_partial_recovery_required",
@@ -648,13 +662,14 @@ export class AgentWorkspaceOpenService {
       );
     }
 
-    const sourceCredentialResult = this.dependencies.sourceCredentials
-      ? await this.dependencies.sourceCredentials.resolve(context, {
-          projectId: resolved.value.projectId,
-          repository: input.repository,
-          repositoryIdentity: input.repositoryIdentity,
-        })
-      : ok(null);
+    const sourceCredentialResult =
+      !isFolderOccupancyIdentity(input.repositoryIdentity) && this.dependencies.sourceCredentials
+        ? await this.dependencies.sourceCredentials.resolve(context, {
+            projectId: resolved.value.projectId,
+            repository: input.repository,
+            repositoryIdentity: input.repositoryIdentity,
+          })
+        : ok(null);
     if (sourceCredentialResult.isErr()) return err(sourceCredentialResult.error);
     const sourceCredential = validateSourceCredential(sourceCredentialResult.value);
     if (sourceCredential.isErr()) return err(sourceCredential.error);
@@ -705,7 +720,7 @@ export class AgentWorkspaceOpenService {
 
     let workspaceId = begun.value.workspaceId;
     let runtimeId: string | undefined;
-    let phase = "workspace-open-sandbox-create";
+    const phase = "workspace-open-sandbox-create";
     try {
       const sandbox = await this.dependencies.sandboxes.create(context, {
         ...preflight.value.plan.sandbox,
@@ -721,90 +736,185 @@ export class AgentWorkspaceOpenService {
       workspaceId = createdWorkspaceId;
       await this.dependencies.reservations.release(context, preflight.value.reservation);
 
-      phase = "workspace-open-source-materialization";
-      if (options.sourceMaterializer) {
-        const materialized = await options.sourceMaterializer.materialize(context, {
-          workspaceId,
-          source: input,
-          ...(sourceCredential.value ? { credential: sourceCredential.value } : {}),
-        });
-        if (materialized.isErr()) throw materialized.error;
-      } else {
-        const executeSourceCommand = async (
-          command: WorkspaceSourceCommand,
-        ): Promise<Result<void>> => {
-          const executed = await this.dependencies.sandboxes.exec(
-            context,
-            createdWorkspaceId,
-            command,
-          );
-          if (executed.isErr()) return err(executed.error);
-          if (!executionSucceeded(executed.value)) {
-            return err(
-              domainError.conflict("Workspace source materialization failed", {
-                code: "workspace_open_source_materialization_failed",
-              }),
-            );
-          }
-          return ok(undefined);
-        };
-        const requireSourceCommand = async (command: WorkspaceSourceCommand): Promise<void> => {
-          const executed = await executeSourceCommand(command);
-          if (executed.isErr()) throw executed.error;
-        };
+      return await this.finishOpen(
+        context,
+        input,
+        options,
+        key,
+        workspaceId,
+        sandbox.value,
+        preflight.value,
+        sourceCredential.value,
+        false,
+      );
+    } catch (cause) {
+      const failure = isDomainError(cause)
+        ? cause
+        : domainError.infra("Workspace open failed", { code: "workspace_open_failed" });
+      await this.dependencies.entries.fail(context, {
+        ...key,
+        ...(workspaceId ? { workspaceId } : {}),
+        ...(runtimeId ? { runtimeId } : {}),
+        commitSha: input.commitSha,
+        phase,
+        code: failure.code,
+      });
+      return err(
+        withPartialEvidence(failure, {
+          ...(workspaceId ? { workspaceId } : {}),
+          ...(runtimeId ? { runtimeId } : {}),
+          phase,
+        }),
+      );
+    }
+  }
 
-        const fetchArgv = ["git", "fetch", "--no-tags", "--depth", "1", "origin", input.ref];
-        const folderOccupancy = input.repositoryIdentity.startsWith("folder.local/");
+  private async continueFolderOccupancy(
+    context: ExecutionContext,
+    input: WorkspaceOpenInput,
+    options: WorkspaceOpenOptions,
+    key: WorkspaceOpenKey,
+    resolved: WorkspaceOpenContext,
+    preferred: WorkspaceOpenEntry,
+  ): Promise<Result<WorkspaceOpenResult>> {
+    const preflight = await this.dependencies.preflight.admit(context, resolved, {
+      ...(options.credentialReferences
+        ? { credentialReferences: options.credentialReferences }
+        : {}),
+      ...(options.precompiledProfilePlan
+        ? { precompiledProfilePlan: options.precompiledProfilePlan }
+        : {}),
+      ...(options.credentialAdmissionScope
+        ? { credentialAdmissionScope: options.credentialAdmissionScope }
+        : {}),
+      ...(options.placementProviderKey
+        ? { placementProviderKey: options.placementProviderKey }
+        : {}),
+      ...(input.targetServerId ? { targetServerId: input.targetServerId } : {}),
+    });
+    if (preflight.isErr()) return err(preflight.error);
+    await this.dependencies.reservations.release(context, preflight.value.reservation);
+    const sandbox = await this.dependencies.sandboxes.resume(context, preferred.workspaceId);
+    if (sandbox.isErr()) return err(sandbox.error);
+    return this.finishOpen(
+      context,
+      input,
+      options,
+      key,
+      preferred.workspaceId,
+      sandbox.value,
+      preflight.value,
+      null,
+      true,
+    );
+  }
 
-        await requireSourceCommand({ argv: ["git", "init", "."] });
-        if (!folderOccupancy) {
-          await requireSourceCommand({
-            argv: ["git", "remote", "add", "origin", input.repository],
-          });
-          if (sourceCredential.value) {
-            const authenticated = createWorkspaceSourceGitCredentialCommands(
-              input.repository,
-              sourceCredential.value,
-              fetchArgv,
-            );
-            await requireSourceCommand(authenticated.prepare);
-            let sourceFailure: unknown;
-            try {
-              await requireSourceCommand(authenticated.approve);
-              await requireSourceCommand(authenticated.fetch);
-            } catch (error) {
-              sourceFailure = error;
-            }
-
-            let cleanupFailure: DomainError | undefined;
-            for (const cleanupCommand of authenticated.cleanup) {
-              const cleaned = await executeSourceCommand(cleanupCommand);
-              if (cleaned.isErr() && !cleanupFailure) cleanupFailure = cleaned.error;
-            }
-            if (cleanupFailure) {
-              throw domainError.conflict("Workspace source credential cleanup failed", {
-                code: "workspace_open_source_credential_cleanup_failed",
-                cleanupFailureCode:
-                  cleanupFailure.details?.code ?? cleanupFailure.code ?? "source_cleanup_failed",
-                ...(isDomainError(sourceFailure)
-                  ? {
-                      sourceFailureCode:
-                        sourceFailure.details?.code ?? sourceFailure.code ?? "source_fetch_failed",
-                    }
-                  : {}),
-              });
-            }
-            if (sourceFailure) throw sourceFailure;
-          } else {
-            await requireSourceCommand({ argv: fetchArgv });
-          }
-          await requireSourceCommand({
-            argv: ["git", "checkout", "--detach", input.commitSha],
-          });
-          await requireSourceCommand({ argv: ["git", "switch", "-c", input.branch] });
-        }
+  private async materializeSource(
+    context: ExecutionContext,
+    input: WorkspaceOpenInput,
+    options: WorkspaceOpenOptions,
+    workspaceId: string,
+    sourceCredential: WorkspaceOpenSourceHttpBasicCredential | null,
+  ): Promise<Result<void>> {
+    if (isFolderOccupancyIdentity(input.repositoryIdentity)) {
+      return ok(undefined);
+    }
+    if (options.sourceMaterializer) {
+      return options.sourceMaterializer.materialize(context, {
+        workspaceId,
+        source: input,
+        ...(sourceCredential ? { credential: sourceCredential } : {}),
+      });
+    }
+    const executeSourceCommand = async (command: WorkspaceSourceCommand): Promise<Result<void>> => {
+      const executed = await this.dependencies.sandboxes.exec(context, workspaceId, command);
+      if (executed.isErr()) return err(executed.error);
+      if (!executionSucceeded(executed.value)) {
+        return err(
+          domainError.conflict("Workspace source materialization failed", {
+            code: "workspace_open_source_materialization_failed",
+          }),
+        );
       }
-      for (const initialization of preflight.value.plan.initialization) {
+      return ok(undefined);
+    };
+    const requireSourceCommand = async (command: WorkspaceSourceCommand): Promise<void> => {
+      const executed = await executeSourceCommand(command);
+      if (executed.isErr()) throw executed.error;
+    };
+
+    const fetchArgv = ["git", "fetch", "--no-tags", "--depth", "1", "origin", input.ref];
+    await requireSourceCommand({ argv: ["git", "init", "."] });
+    await requireSourceCommand({
+      argv: ["git", "remote", "add", "origin", input.repository],
+    });
+    if (sourceCredential) {
+      const authenticated = createWorkspaceSourceGitCredentialCommands(
+        input.repository,
+        sourceCredential,
+        fetchArgv,
+      );
+      await requireSourceCommand(authenticated.prepare);
+      let sourceFailure: unknown;
+      try {
+        await requireSourceCommand(authenticated.approve);
+        await requireSourceCommand(authenticated.fetch);
+      } catch (error) {
+        sourceFailure = error;
+      }
+
+      let cleanupFailure: DomainError | undefined;
+      for (const cleanupCommand of authenticated.cleanup) {
+        const cleaned = await executeSourceCommand(cleanupCommand);
+        if (cleaned.isErr() && !cleanupFailure) cleanupFailure = cleaned.error;
+      }
+      if (cleanupFailure) {
+        throw domainError.conflict("Workspace source credential cleanup failed", {
+          code: "workspace_open_source_credential_cleanup_failed",
+          cleanupFailureCode:
+            cleanupFailure.details?.code ?? cleanupFailure.code ?? "source_cleanup_failed",
+          ...(isDomainError(sourceFailure)
+            ? {
+                sourceFailureCode:
+                  sourceFailure.details?.code ?? sourceFailure.code ?? "source_fetch_failed",
+              }
+            : {}),
+        });
+      }
+      if (sourceFailure) throw sourceFailure;
+    } else {
+      await requireSourceCommand({ argv: fetchArgv });
+    }
+    await requireSourceCommand({
+      argv: ["git", "checkout", "--detach", input.commitSha],
+    });
+    await requireSourceCommand({ argv: ["git", "switch", "-c", input.branch] });
+    return ok(undefined);
+  }
+
+  private async finishOpen(
+    context: ExecutionContext,
+    input: WorkspaceOpenInput,
+    options: WorkspaceOpenOptions,
+    key: WorkspaceOpenKey,
+    workspaceId: string,
+    sandbox: SandboxOpenDescriptor,
+    preflight: WorkspaceOpenPreflight,
+    sourceCredential: WorkspaceOpenSourceHttpBasicCredential | null,
+    resumed: boolean,
+  ): Promise<Result<WorkspaceOpenResult>> {
+    let runtimeId: string | undefined;
+    let phase = "workspace-open-source-materialization";
+    try {
+      const materialized = await this.materializeSource(
+        context,
+        input,
+        options,
+        workspaceId,
+        sourceCredential,
+      );
+      if (materialized.isErr()) throw materialized.error;
+      for (const initialization of preflight.plan.initialization) {
         phase = `workspace-open-initialization:${initialization.id}`;
         const executed = await this.dependencies.sandboxes.exec(context, workspaceId, {
           argv: initialization.argv,
@@ -819,7 +929,7 @@ export class AgentWorkspaceOpenService {
               });
         }
       }
-      for (const port of preflight.value.plan.defaultPorts) {
+      for (const port of preflight.plan.defaultPorts) {
         phase = `workspace-open-default-port:${port.name}`;
         const exposed = await this.dependencies.sandboxes.exposePort(context, workspaceId, {
           port: port.port,
@@ -834,12 +944,12 @@ export class AgentWorkspaceOpenService {
       phase = "workspace-open-runtime-create";
       const runtime = await this.dependencies.agents.createRuntime(context, {
         sandboxId: workspaceId,
-        harnessKey: preflight.value.plan.runtime.harnessKey,
-        harnessTemplateId: preflight.value.plan.runtime.harnessTemplateId,
+        harnessKey: preflight.plan.runtime.harnessKey,
+        harnessTemplateId: preflight.plan.runtime.harnessTemplateId,
         idempotencyKey: `workspace-open:${key.tenantId}:${key.subjectId}:${key.projectId}:${key.repositoryIdentity}:${key.branch}:${input.commitSha}`,
-        projectId: preflight.value.projectId,
-        profileInstallationId: preflight.value.profileInstallationId,
-        profilePlan: preflight.value.plan,
+        projectId: preflight.projectId,
+        profileInstallationId: preflight.profileInstallationId,
+        profilePlan: preflight.plan,
       });
       if (runtime.isErr()) throw runtime.error;
       runtimeId = runtime.value.runtimeId;
@@ -863,13 +973,13 @@ export class AgentWorkspaceOpenService {
       return ok(
         this.result(
           input,
-          preflight.value.projectId,
-          runtime.value.profilePin ?? preflight.value.plan.pin,
-          sandbox.value,
+          preflight.projectId,
+          runtime.value.profilePin ?? preflight.plan.pin,
+          sandbox,
           runtime.value,
-          false,
-          preflight.value.activation,
-          preflight.value.reservation.targetSelection,
+          resumed,
+          preflight.activation,
+          preflight.reservation.targetSelection,
           attach,
         ),
       );

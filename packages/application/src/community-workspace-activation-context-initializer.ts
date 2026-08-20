@@ -19,7 +19,10 @@ import {
 } from "@appaloft/core";
 
 import { type AgentAdapterInstallationService } from "./agent-adapter";
-import { type WorkspaceActivationContextDisposition } from "./agent-workspace-open";
+import {
+  isFolderOccupancyIdentity,
+  type WorkspaceActivationContextDisposition,
+} from "./agent-workspace-open";
 import { type WorkspaceActivationContextInitializerPort } from "./agent-workspace-open-preflight";
 import {
   type AgentWorkspaceProfileInstallationService,
@@ -446,7 +449,7 @@ export class CommunityWorkspaceActivationContextInitializer
         .then((executed) => (executed.isOk() ? ok(undefined) : err(executed.error)));
     }
     const networkProfile = await this.occupancyNetworkProfile(context, repository);
-    const folderOccupancy = repositoryIdentity.startsWith("folder.local/");
+    const folderOccupancy = isFolderOccupancyIdentity(repositoryIdentity);
     const created = CreateResourceCommand.create({
       projectId,
       environmentId: environment.id.value,
