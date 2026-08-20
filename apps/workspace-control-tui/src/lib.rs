@@ -1298,6 +1298,12 @@ impl AppState {
         self.help_open = !self.help_open;
     }
 
+    /// Wait/list chrome (including collapsed preparing) must quit on `^c`.
+    /// Attached agent-focus swallows `^c` and forwards it to the session.
+    pub fn ctrl_c_quits(&self) -> bool {
+        !self.agent_focused
+    }
+
     pub fn toggle_focus_mode(&mut self) {
         if self.loading.active {
             self.loading.collapsed = !self.loading.collapsed;
@@ -1906,6 +1912,12 @@ fn occupancy_option_chrome(key: KeyEvent) -> Option<OccupancyKeyBinding> {
     None
 }
 
+pub fn is_occupancy_ctrl_c(key: KeyEvent) -> bool {
+    matches!(key.code, KeyCode::Char('\u{3}'))
+        || (key.modifiers.contains(KeyModifiers::CONTROL)
+            && matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'c')))
+}
+
 pub fn occupancy_key_binding(
     key: KeyEvent,
     agent_focused: bool,
@@ -1913,8 +1925,7 @@ pub fn occupancy_key_binding(
 ) -> OccupancyKeyBinding {
     let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
-    if ctrl && matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'c'))
-    {
+    if is_occupancy_ctrl_c(key) {
         return if agent_focused {
             OccupancyKeyBinding::PassToAgent
         } else {
@@ -1999,8 +2010,9 @@ pub fn occupancy_key_binding(
 
 /// Signals that restore and stop the occupancy TUI.
 ///
-/// SIGINT is intentionally absent: in-session Ctrl+C is a key to the agent.
-/// List/menu quit is the `^c` key event, not this signal.
+/// SIGINT is absent from this list so an attached session does not die when
+/// the host PTY still has ISIG. Wait/list `^c` is handled as a key or as a
+/// dedicated interrupt flag, not as a process-stop signal.
 pub fn occupancy_stop_signals() -> &'static [i32] {
     &[
         signal_hook::consts::SIGTERM,
@@ -2009,7 +2021,9 @@ pub fn occupancy_stop_signals() -> &'static [i32] {
     ]
 }
 
-/// Signals the occupancy TUI swallows so a leftover ISIG cannot tear it down.
+/// Signals that must not use the process-stop flag.
+///
+/// SIGINT on the wait/list screen is a quit interrupt, not an ignored no-op.
 pub fn occupancy_ignored_signals() -> &'static [i32] {
     &[signal_hook::consts::SIGINT]
 }
@@ -3682,6 +3696,35 @@ mod tests {
         assert_eq!(
             occupancy_key_binding(ctrl_c, false, false),
             OccupancyKeyBinding::Quit
+        );
+        let raw_etx = KeyEvent::new(KeyCode::Char('\u{3}'), KeyModifiers::NONE);
+        assert!(is_occupancy_ctrl_c(raw_etx));
+        assert_eq!(
+            occupancy_key_binding(raw_etx, false, false),
+            OccupancyKeyBinding::Quit
+        );
+        assert_eq!(
+            occupancy_key_binding(raw_etx, true, true),
+            OccupancyKeyBinding::PassToAgent
+        );
+        let mut waiting = AppState::default();
+        assert!(waiting.loading.active);
+        assert!(!waiting.agent_focused);
+        assert!(waiting.ctrl_c_quits());
+        assert_eq!(
+            occupancy_key_binding(ctrl_c, waiting.agent_focused, waiting.session_id.is_some()),
+            OccupancyKeyBinding::Quit
+        );
+        waiting.apply(ParentMessage::TerminalReady {
+            workspace_id: "sbx_1".to_owned(),
+            runtime_id: "sar_1".to_owned(),
+            session_id: "term_1".to_owned(),
+        });
+        assert!(waiting.agent_focused);
+        assert!(!waiting.ctrl_c_quits());
+        assert_eq!(
+            occupancy_key_binding(ctrl_c, waiting.agent_focused, waiting.session_id.is_some()),
+            OccupancyKeyBinding::PassToAgent
         );
         assert_eq!(
             occupancy_key_binding(ctrl_r, true, true),
