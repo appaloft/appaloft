@@ -65,7 +65,6 @@ import {
   isFolderOnboardingCancelled,
   peekThisFolderGitIdentity,
 } from "../folder-project-onboarding.js";
-import { codeSessionInquireInteraction } from "../interaction.js";
 import { resolveRemoteGitWorkspaceRef } from "../local-git-workspace-context.js";
 import {
   launchScratchAgent,
@@ -795,14 +794,9 @@ export const workspaceCodeCommand = EffectCommand.make(
                   return Runtime.runPromise(runtime)(
                     ensureFolderProjectOnboarding({
                       cwd: folderOnboardingCwdFromLocator(path),
-                      yes: yes || useOccupancyTui,
-                      ...(useOccupancyTui
-                        ? {}
-                        : {
-                            promptPolicy: "pre-tui-inquire" as const,
-                            interaction:
-                              cli.folderOnboardingInteraction ?? codeSessionInquireInteraction,
-                          }),
+                      yes,
+                      promptPolicy: "auto-create",
+                      ...(useOccupancyTui ? { writeStatus: () => undefined } : {}),
                       peekGitIdentity: peekThisFolderGitIdentity,
                       ...(cli.environment ? { env: cli.environment } : {}),
                     }),

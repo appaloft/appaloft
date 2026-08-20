@@ -1079,7 +1079,7 @@ export function createBoundedWorkspaceControlPresentation(
               return occupied;
             })
             .then((occupied) => {
-              if (!occupied || !presentationOpen) return;
+              if (!occupied || !presentationOpen || occupied.attach) return;
               void listWorkspaces(context).then(
                 (workspaces) => renderer.send({ type: "workspaces", workspaces }),
                 () => {

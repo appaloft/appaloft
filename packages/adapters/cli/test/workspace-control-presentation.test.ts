@@ -2147,11 +2147,8 @@ describe("Workspace control presentation", () => {
       sessionId: "term_occupy",
     });
     const attachAt = renderer.messages.findIndex((message) => message.type === "terminal-ready");
-    const workspacesAt = renderer.messages.findIndex(
-      (message) => message.type === "workspaces" && message.workspaces.length > 0,
-    );
     expect(attachAt).toBeGreaterThan(-1);
-    expect(workspacesAt).toBeGreaterThan(attachAt);
+    expect(renderer.messages.some((message) => message.type === "workspaces")).toBeFalse();
   });
 
   test("[WS-REMOTE-PROGRESS-196] attach does not surface list or detail conflicts", async () => {

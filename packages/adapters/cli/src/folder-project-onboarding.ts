@@ -88,7 +88,7 @@ function findNamedProject(
   );
 }
 
-export type FolderOnboardingPromptPolicy = "allow-select" | "pre-tui-inquire";
+export type FolderOnboardingPromptPolicy = "allow-select" | "pre-tui-inquire" | "auto-create";
 
 export const FOLDER_ONBOARDING_CANCELLED_CODE = "folder_onboarding_cancelled";
 export const CODE_SESSION_INQUIRE_CONTINUE = "Continue";
@@ -173,8 +173,11 @@ export function decideFolderProjectOnboarding(input: {
   if (projects.length === 1 && projects[0]) {
     return { kind: "use-only-project", projectId: projects[0].id, identity };
   }
+  if (input.promptPolicy === "auto-create" || input.yes) {
+    return { kind: "create", name: createName, identity };
+  }
   if (input.promptPolicy === "pre-tui-inquire") {
-    if (input.yes || !input.canPrompt) {
+    if (!input.canPrompt) {
       return { kind: "create", name: createName, identity };
     }
     return { kind: "inquire", name: createName, identity };
@@ -409,7 +412,7 @@ export function ensureFolderProjectOnboarding(input: {
       projectName = decision.name;
       created = true;
     } else if (decision.kind === "prompt") {
-      if (input.promptPolicy === "pre-tui-inquire") {
+      if (input.promptPolicy === "pre-tui-inquire" || input.promptPolicy === "auto-create") {
         return yield* Effect.fail(
           domainError.invariant(
             "Code session onboarding must not select a project after TUI start",

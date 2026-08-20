@@ -205,6 +205,37 @@ describe("folder project onboarding", () => {
     });
   });
 
+  test("[FOLDER-ONBOARD-009] code auto-creates an unlinked no-git folder and never selects", () => {
+    const projects = [
+      { id: "prj_a", name: "Alpha", lifecycleStatus: "active" },
+      { id: "prj_b", name: "Beta", lifecycleStatus: "active" },
+    ];
+    expect(
+      decideFolderProjectOnboarding({
+        directoryName: "p0-code-pi-nogit",
+        projects,
+        canPrompt: true,
+        promptPolicy: "auto-create",
+      }),
+    ).toEqual({
+      kind: "create",
+      name: "p0-code-pi-nogit",
+      identity: folderOccupancyIdentity("p0-code-pi-nogit"),
+    });
+    expect(
+      decideFolderProjectOnboarding({
+        directoryName: "p0-code-pi-nogit",
+        projects,
+        canPrompt: true,
+        yes: true,
+      }),
+    ).toEqual({
+      kind: "create",
+      name: "p0-code-pi-nogit",
+      identity: folderOccupancyIdentity("p0-code-pi-nogit"),
+    });
+  });
+
   test("[FOLDER-ONBOARD-009] code session inquires before TUI and does not pick from a project list", () => {
     const projects = [
       { id: "prj_a", name: "Alpha", lifecycleStatus: "active" },
@@ -380,6 +411,78 @@ describe("folder project onboarding", () => {
     expect(second.projectId).toBe("prj_notes");
     expect(commands).toHaveLength(1);
     expect((await readFolderProjectLink("/tmp/notes", store))?.projectId).toBe("prj_notes");
+  });
+
+  test("[FOLDER-ONBOARD-009] Effect code auto-create never Prompt.selects an unlinked no-git folder", async () => {
+    const store = memoryFolderProjectLinkStore();
+    const commands: AppCommand<unknown>[] = [];
+    const status: string[] = [];
+    let selected = 0;
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      terminalIO: {
+        stdin: { isTTY: true, on: () => undefined },
+        stdout: { isTTY: true, write: () => true },
+        stderr: { isTTY: true, write: () => true },
+      },
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message as AppCommand<unknown>);
+        return ok({ id: "prj_p0" } as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message instanceof ListProjectsQuery) {
+          return ok({
+            items: [
+              { id: "prj_a", name: "Alpha", lifecycleStatus: "active" },
+              { id: "prj_b", name: "Beta", lifecycleStatus: "active" },
+            ],
+            total: 2,
+            limit: 100,
+            offset: 0,
+          } as T);
+        }
+        return ok({ items: [], total: 0, limit: 100, offset: 0 } as T);
+      },
+    } as never);
+
+    const result = await Effect.runPromise(
+      Effect.provide(
+        ensureFolderProjectOnboarding({
+          cwd: "/tmp/p0-code-pi-nogit",
+          store,
+          canPrompt: true,
+          yes: true,
+          promptPolicy: "auto-create",
+          peekGitIdentity: async () => undefined,
+          interaction: {
+            text: () => {
+              throw new Error("code session must not collect free text");
+            },
+            select: () => {
+              selected += 1;
+              throw new Error("code TTY must not Prompt.select");
+            },
+            confirm: () => {
+              throw new Error("code TTY must auto-create instead of inquiring");
+            },
+          },
+          writeStatus: (text) => {
+            status.push(text);
+          },
+        }),
+        runtime,
+      ),
+    );
+    expect(selected).toBe(0);
+    expect(commands[0]).toBeInstanceOf(CreateProjectCommand);
+    expect(result).toMatchObject({
+      projectId: "prj_p0",
+      created: true,
+      identity: folderOccupancyIdentity("p0-code-pi-nogit"),
+    });
+    expect(status.join("")).not.toMatch(/This folder is not linked/u);
+    expect(status.join("")).not.toMatch(/occupancy/iu);
   });
 
   test("[FOLDER-ONBOARD-009] Effect code-session inquire creates the directory project after Continue", async () => {

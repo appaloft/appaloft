@@ -3099,14 +3099,18 @@ describe("Agent Workspace CLI", () => {
     const source = await Bun.file(
       new URL("../src/commands/agent-workspace.ts", import.meta.url),
     ).text();
-    expect(source).toContain("yes: yes || useOccupancyTui");
+    expect(source).toContain('promptPolicy: "auto-create"');
+    expect(source).toContain("yes,");
+    expect(source).toContain("writeStatus: () => undefined");
     const tuiBlockStart = source.indexOf("if (useOccupancyTui && occupancyTui)");
     const startAt = source.indexOf("occupancyTui.start(", tuiBlockStart);
     expect(tuiBlockStart).toBeGreaterThan(-1);
     expect(startAt).toBeGreaterThan(tuiBlockStart);
     expect(source.slice(tuiBlockStart, startAt)).not.toContain("ensureFolderProjectOnboarding");
+    expect(source).not.toContain("codeSessionInquireInteraction");
     expect(source).not.toContain("interaction: effectCliInteraction");
     expect(source).not.toContain("effectCliInteraction");
+    expect(source).not.toContain("This folder is not linked");
   });
 
   test("[WS-REMOTE-COMPAT-128][WS-REMOTE-COMPAT-129][WS-REMOTE-COMPAT-130] unstructured occupancy validation names the enrolled Server", async () => {
