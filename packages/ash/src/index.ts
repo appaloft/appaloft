@@ -1,3 +1,7 @@
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 const ashScriptBrand: unique symbol = Symbol("AshScript");
 const ashFragmentBrand: unique symbol = Symbol("AshFragment");
 
@@ -148,15 +152,30 @@ export function execute(script: AshScript, options: AshExecuteOptions = {}): Ash
     spawnOptions.env = { ...Bun.env, ...options.env };
   }
 
-  const result = Bun.spawnSync([options.shell ?? "sh", "-lc", script.text], spawnOptions);
-  const exitCode = result.exitCode ?? null;
-  return {
-    exitCode,
-    signalCode: result.signalCode ?? null,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-    success: exitCode === 0,
-  };
+  // Bun 1.4 spawnSync drains piped stdio to EOF (oven-sh/bun#33832). A
+  // background grandchild that inherits those pipes, such as `sleep` in a
+  // heartbeat loop, keeps execute() blocked after the shell exits. Capture
+  // through files so we return when `sh -lc` exits. See oven-sh/bun#28792.
+  const outputRoot = mkdtempSync(join(tmpdir(), "appaloft-ash-"));
+  const stdoutPath = join(outputRoot, "stdout");
+  const stderrPath = join(outputRoot, "stderr");
+  try {
+    const result = Bun.spawnSync([options.shell ?? "sh", "-lc", script.text], {
+      ...spawnOptions,
+      stdout: Bun.file(stdoutPath),
+      stderr: Bun.file(stderrPath),
+    });
+    const exitCode = result.exitCode ?? null;
+    return {
+      exitCode,
+      signalCode: result.signalCode ?? null,
+      stdout: readFileSync(stdoutPath, "utf8"),
+      stderr: readFileSync(stderrPath, "utf8"),
+      success: exitCode === 0,
+    };
+  } finally {
+    rmSync(outputRoot, { force: true, recursive: true });
+  }
 }
 
 function renderInterpolation(value: AshInterpolation): string {
