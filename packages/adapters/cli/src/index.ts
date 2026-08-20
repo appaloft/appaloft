@@ -2,6 +2,7 @@ import { Command as EffectCommand } from "@effect/cli";
 import { NodeContext } from "@effect/platform-node";
 import { Effect, Layer } from "effect";
 
+import { tryHandleCodeHelp } from "./code-help.js";
 import { mainCommand } from "./commands/index.js";
 import {
   type CliProgram,
@@ -23,6 +24,17 @@ export {
   requiresCloudDeployLogin,
   workspaceRemoteLoginRequiredError,
 } from "./cli-session-login.js";
+export {
+  CODE_OPTION_DESCRIPTIONS,
+  cliUserArgs,
+  EFFECT_HELP_GENERIC_BOOLEAN,
+  EFFECT_HELP_GENERIC_TEXT,
+  EFFECT_HELP_OPTIONAL_PROSE,
+  formatCodeHelp,
+  isCodeHelpInvocation,
+  renderCodeHelp,
+  tryHandleCodeHelp,
+} from "./code-help.js";
 export {
   FileSystemServerAppliedRouteDesiredStateStore,
   FileSystemSourceLinkStore,
@@ -218,6 +230,9 @@ export function createCliProgram(input: CliProgramInput): CliProgram {
 
   return {
     parseAsync: async (argv = process.argv) => {
+      if (tryHandleCodeHelp(argv, process.stdout)) {
+        return;
+      }
       capturedStdinText = cliArgvRequestsStdinText(argv) ? sourceStdinReader() : undefined;
       if (capturedStdinText) {
         await capturedStdinText;
@@ -260,14 +275,18 @@ export function createCliHelpProgram(input: { readonly version: string }): CliPr
   const live = Layer.mergeAll(NodeContext.layer, helpOnlyRuntime);
 
   return {
-    parseAsync: (argv = process.argv) =>
-      EffectCommand.run(mainCommand, {
+    parseAsync: async (argv = process.argv) => {
+      if (tryHandleCodeHelp(argv, process.stdout)) {
+        return;
+      }
+      await EffectCommand.run(mainCommand, {
         name: "appaloft",
         version: input.version,
       })(argv).pipe(
         Effect.provide(live),
         Effect.catchAll((error) => printCliError(error).pipe(Effect.zipRight(Effect.fail(error)))),
         Effect.runPromise,
-      ),
+      );
+    },
   };
 }

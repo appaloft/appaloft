@@ -190,9 +190,11 @@ describe("Agent Workspace CLI", () => {
     }
     const printed = output.join("");
     expect(printed).toContain("path|git-remote");
-    expect(printed).toContain("Local path (Git optional) or git remote");
+    expect(printed).toContain("Local path or git remote");
     expect(printed).toContain("$ open");
-    expect(printed).toContain("$ code");
+    expect(printed).toContain("appaloft code [path|git-remote] [options]");
+    expect(printed).toContain("--no-attach");
+    expect(printed).not.toContain("$ code");
   });
 
   test("[WS-REMOTE-CA-033] headless workspace --no-tui prints occupancy tree when login is missing", async () => {

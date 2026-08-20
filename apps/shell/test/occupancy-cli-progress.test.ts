@@ -63,6 +63,9 @@ describe("occupancy CLI shell progress", () => {
     expect(shouldWarmOccupancyTui(["code"], tty)).toBeTrue();
     expect(shouldWarmOccupancyTui(["workspace"], tty)).toBeTrue();
     expect(shouldWarmOccupancyTui(["code", "--no-attach"], tty)).toBeFalse();
+    expect(shouldWarmOccupancyTui(["code", "--help"], tty)).toBeFalse();
+    expect(shouldWarmOccupancyTui(["code", "-h"], tty)).toBeFalse();
+    expect(shouldWarmOccupancyTui(["workspace", "--help"], tty)).toBeFalse();
     const source = readFileSync(join(import.meta.dir, "../src/index.ts"), "utf8");
     const firstFrame = source.indexOf("enterOccupancyAltScreen()");
     const warmup = source.indexOf("warmupWorkspaceControlRenderer");

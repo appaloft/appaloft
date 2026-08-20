@@ -57,6 +57,7 @@ import {
   loginRequiredWorkspaceOccupancyTree,
   workspaceRemoteLoginRequiredError,
 } from "../cli-session-login.js";
+import { CODE_OPTION_DESCRIPTIONS } from "../code-help.js";
 import { isFolderOccupancyIdentity } from "../folder-project-link.js";
 import {
   ensureFolderProjectOnboarding,
@@ -140,7 +141,7 @@ import { cliCommandDescriptions } from "./docs-help.js";
 const workspaceId = Args.text({ name: "workspaceId" });
 const pathOrGitRemoteArg = Args.text({ name: "path|git-remote" }).pipe(
   Args.withDefault("."),
-  Args.withDescription("Local path (Git optional) or git remote"),
+  Args.withDescription(CODE_OPTION_DESCRIPTIONS.path),
 );
 const terminalDirectory = Options.text("directory").pipe(Options.optional);
 const terminalRows = Options.text("rows").pipe(Options.withDefault("24"));
@@ -455,9 +456,7 @@ function completeWorkspaceOpen(
 
 const workspaceOpenServer = Options.text("server").pipe(
   Options.optional,
-  Options.withDescription(
-    "Registered BYOS Server id. Defaults to the enrolled Server when one exists.",
-  ),
+  Options.withDescription(CODE_OPTION_DESCRIPTIONS.server),
 );
 
 const create = EffectCommand.make(
@@ -618,44 +617,57 @@ export const workspaceCodeCommand = EffectCommand.make(
   "code",
   {
     path: pathOrGitRemoteArg,
-    noAttach: Options.boolean("no-attach").pipe(Options.withDefault(false)),
-    local: Options.boolean("local").pipe(Options.withDefault(false)),
-    forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
-    yes: Options.boolean("yes").pipe(Options.withDefault(false)),
-    open: Options.boolean("open").pipe(Options.withDefault(false)),
+    noAttach: Options.boolean("no-attach").pipe(
+      Options.withDefault(false),
+      Options.withDescription(CODE_OPTION_DESCRIPTIONS.noAttach),
+    ),
+    local: Options.boolean("local").pipe(
+      Options.withDefault(false),
+      Options.withDescription(CODE_OPTION_DESCRIPTIONS.local),
+    ),
+    forceNew: Options.boolean("new").pipe(
+      Options.withDefault(false),
+      Options.withDescription(CODE_OPTION_DESCRIPTIONS.forceNew),
+    ),
+    yes: Options.boolean("yes").pipe(
+      Options.withDefault(false),
+      Options.withDescription(CODE_OPTION_DESCRIPTIONS.yes),
+    ),
+    open: Options.boolean("open").pipe(
+      Options.withDefault(false),
+      Options.withDescription(CODE_OPTION_DESCRIPTIONS.open),
+    ),
     profile: Options.text("profile").pipe(
       Options.optional,
-      Options.withDescription("Agent Workspace Profile name or installation id"),
+      Options.withDescription(CODE_OPTION_DESCRIPTIONS.profile),
     ),
     opencode: Options.boolean("opencode").pipe(
       Options.withDefault(false),
-      Options.withDescription("Use the OpenCode occupancy harness"),
+      Options.withDescription(CODE_OPTION_DESCRIPTIONS.opencode),
     ),
     pi: Options.boolean("pi").pipe(
       Options.withDefault(false),
-      Options.withDescription("Use the Pi occupancy harness"),
+      Options.withDescription(CODE_OPTION_DESCRIPTIONS.pi),
     ),
     omp: Options.boolean("omp").pipe(
       Options.withDefault(false),
-      Options.withDescription("Use the OMP occupancy harness"),
+      Options.withDescription(CODE_OPTION_DESCRIPTIONS.omp),
     ),
     claude: Options.boolean("claude").pipe(
       Options.withDefault(false),
-      Options.withDescription("Use your Claude setup-token on occupancy disk"),
+      Options.withDescription(CODE_OPTION_DESCRIPTIONS.claude),
     ),
     codex: Options.boolean("codex").pipe(
       Options.withDefault(false),
-      Options.withDescription("Use your Codex ~/.codex/auth.json on occupancy disk"),
+      Options.withDescription(CODE_OPTION_DESCRIPTIONS.codex),
     ),
     grok: Options.boolean("grok").pipe(
       Options.withDefault(false),
-      Options.withDescription("Use your Grok ~/.grok/auth.json on occupancy disk"),
+      Options.withDescription(CODE_OPTION_DESCRIPTIONS.grok),
     ),
     harness: Options.choice("harness", ["opencode", "pi", "omp"] as const).pipe(
       Options.optional,
-      Options.withDescription(
-        "Compatibility only. Prefer --opencode, --pi, or --omp. Cannot combine with a different agent alias.",
-      ),
+      Options.withDescription(CODE_OPTION_DESCRIPTIONS.harness),
     ),
     server: workspaceOpenServer,
     openTarget: Options.choice("open-target", [
@@ -664,7 +676,10 @@ export const workspaceCodeCommand = EffectCommand.make(
       "pr",
       "compare",
       "connections",
-    ] as const).pipe(Options.optional),
+    ] as const).pipe(
+      Options.optional,
+      Options.withDescription(CODE_OPTION_DESCRIPTIONS.openTarget),
+    ),
   },
   ({
     claude,

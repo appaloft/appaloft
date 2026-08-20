@@ -1,9 +1,15 @@
 import {
+  isOccupancyHelpArgs,
   reportOccupancyCliStartupOnce,
   shouldPrintOccupancyLineProgress,
   shouldWarmOccupancyTui,
 } from "./occupancy-cli-progress";
-import { enterOccupancyAltScreen, leaveOccupancyAltScreen } from "./occupancy-tui-first-frame";
+import {
+  enterOccupancyAltScreen,
+  installOccupancyAltScreenRestore,
+  leaveOccupancyAltScreen,
+  restoreOccupancyAltScreenIfEntered,
+} from "./occupancy-tui-first-frame";
 
 function parseBoolean(value: string | undefined): boolean | undefined {
   if (value === undefined) {
@@ -39,16 +45,28 @@ function shouldBootstrapOpenTelemetry(env: Record<string, string | undefined>): 
 }
 
 function shellCommandArgs(argv: readonly string[]): readonly string[] {
-  const args = argv.slice(2);
+  const args = argv.slice(2).filter((arg) => arg !== "--");
   return args[0] === "appaloft" ? args.slice(1) : args;
 }
 
 function isHelpFlag(args: readonly string[]): boolean {
-  return args.includes("--help") || args.includes("-h") || args[0] === "help";
+  return isOccupancyHelpArgs(args);
 }
+
+function exitProcess(code: number): never {
+  restoreOccupancyAltScreenIfEntered();
+  process.exit(code);
+}
+
+installOccupancyAltScreenRestore();
 
 const args = shellCommandArgs(process.argv);
 const command = args[0];
+if (command === "code" && isHelpFlag(args)) {
+  const { renderCodeHelp } = await import("@appaloft/adapter-cli/code-help");
+  renderCodeHelp(process.stdout);
+  exitProcess(0);
+}
 if (shouldPrintOccupancyLineProgress(args)) {
   reportOccupancyCliStartupOnce(args);
 } else if (shouldWarmOccupancyTui(args)) {
@@ -101,7 +119,7 @@ if (standaloneCommand) {
     ...(capturedStdinText === undefined ? {} : { stdinText: capturedStdinText }),
   });
   if (result.handled) {
-    process.exit(result.exitCode);
+    exitProcess(result.exitCode);
   }
 }
 
@@ -112,9 +130,9 @@ if (isHelpFlag(args) && command !== "worker" && command !== "mcp" && command !==
   });
   try {
     await helpProgram.parseAsync(process.argv);
-    process.exit(0);
+    exitProcess(0);
   } catch {
-    process.exit(1);
+    exitProcess(1);
   }
 }
 
