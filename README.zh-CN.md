@@ -1,22 +1,39 @@
 <div align="center">
-  <a href="https://www.appaloft.com/zh-CN/">
+  <a href="https://www.appaloft.com">
     <img src="./apps/web/src/lib/assets/appaloft-logo-horizontal.svg" alt="Appaloft" width="360" />
   </a>
 
   <p><code>/ˌæp əˈlɔːft/</code></p>
-  <h3>把应用、Docker 和 Compose 部署到你自己的服务器。</h3>
+  <h3>开源 Railway 替代方案。</h3>
   <p>
-    <strong>面向开发者、小团队和 AI coding agent 的开源部署控制面。</strong><br />
-    用一份配置描述 workload，通过 CLI、GitHub Actions、Web、MCP 或 AI skill 部署，
-    再用 health、logs、retry 和 rollback evidence 验证结果。
+    两扇门：<strong>部署</strong> 把文件夹变成 URL（Git 可选），或
+    <strong>Agent</strong> — 教会你已经在用的 coding agent（skill + MCP）。
   </p>
+</div>
+
+```bash
+appaloft deploy .
+```
+
+```bash
+npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
+npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
+npx @appaloft/mcp
+appaloft mcp stdio
+```
+
+<div align="center">
   <p>
-    <a href="https://github.com/appaloft/examples/tree/main/hello">五分钟示例</a> ·
-    <a href="https://www.appaloft.com/zh-CN/">官网</a> ·
-    <a href="https://app.appaloft.com">Cloud</a> ·
-    <a href="https://docs.appaloft.com/">文档</a> ·
+    <a href="https://www.appaloft.com">官网</a> ·
+    <a href="https://docs.appaloft.com">文档</a> ·
+    <a href="https://www.appaloft.com/compare/railway">对比 Railway</a> ·
     <a href="https://github.com/appaloft/appaloft/releases/latest">Releases</a> ·
     <a href="./README.md">English</a>
+  </p>
+  <p>
+    这是定位，不是 1:1 替换。
+    <a href="https://www.appaloft.com/compare/railway">对比 Railway</a>
+    FAQ 写明：Appaloft 不是 Railway 的完整替代。
   </p>
 </div>
 
@@ -24,95 +41,36 @@
   <img src="./docs/assets/appaloft-deploy-loop.gif" alt="Appaloft 部署、健康验证和公开 URL 终端演示" width="920" />
 </p>
 
-## 五分钟运行 Hello 示例
+今天就可以从文件夹、Git URL、镜像、Compose 或 zip 部署。Agent Workspace 和 Sandbox
+仍是 public alpha。这是一句实话，不是形式化正确性或合规声明。
 
-官方 [`appaloft/examples/hello`](https://github.com/appaloft/examples/tree/main/hello) 是一个零依赖
-Node HTTP 应用，包含 Dockerfile、`appaloft.yml`、`/health` 和一个小型 JSON API。先 clone 并验证 workload：
+## 安装
 
-```bash
-git clone --depth 1 https://github.com/appaloft/examples.git
-cd examples/hello
-npm start
-```
-
-在另一个终端执行：
+先装 CLI。部署不需要先装 self-hosted stack。
 
 ```bash
-curl -sS http://127.0.0.1:3000/health
+npm install -g @appaloft/cli
 ```
-
-安装 Appaloft 并选好 target 后，通过同一份单文件配置部署当前目录：
 
 ```bash
-appaloft deploy . --config appaloft.yml
+brew install appaloft/tap/appaloft
 ```
 
-完整示例还记录了本地 Docker 验证、public Git deployment、Cloud Console 设置、health check
-以及准确的 source/runtime contract。
+也可以从 [GitHub Releases](https://github.com/appaloft/appaloft/releases/latest) 下载对应平台
+archive。
 
-## Appaloft 是什么？
+登录和登记服务器只是需要 Cloud 或 BYOS 时的一行前提，不是这条故事：`appaloft login`
+（self-hosted 加 `--url`）；自己带机器时再用 `appaloft server register`。
 
-Appaloft 是一个开源部署控制面，用来把本地开发里的应用发布到你自己的服务器。CLI、HTTP
-API、Web 控制台、MCP tools 和 AI skill 共享同一套 operation catalog，所以人和 Agent 都走同一条产品边界。
+## 部署
 
-适合这些场景：
-
-- 用一个 `appaloft.yml` 描述 source、runtime、network、access、dependency 和 deploy intent。
-- 从本地目录、Git 仓库、zip、Docker 镜像或 Compose bundle 发布。
-- 把部署变成可重复的闭环：detect、plan、execute、verify、observe、retry、redeploy、rollback。
-- 让 AI 能操作部署，但不直接拿数据库、Docker、SSH 或云厂商权限绕过产品。
-- 在自己的 Linux server 或 VM 上 self-host。
-
-## 快速开始
-
-在 Linux 服务器或 VM 上安装 self-hosted stack：
+在任意项目目录里执行。Git 可选。成功就是这个应用的一条线上 URL。
 
 ```bash
-curl -fsSL https://appaloft.com/install.sh | sudo sh
+appaloft deploy .
 ```
 
-固定某个发布版本：
-
-```bash
-curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --version 1.0.1
-```
-
-这个 installer 会安装或校验 Docker Engine 和 Compose plugin，把 self-hosted stack 写到
-`/opt/appaloft`，并启动 Appaloft backend、static console 和 PostgreSQL。
-
-## 当前范围和边界
-
-| 现在可以验证 | 当前边界 |
-| --- | --- |
-| 本地目录、public Git、zip、prebuilt image 和 Compose bundle | 需要由你提供或注册 runtime target，以及连接它所需的 credential。 |
-| Workspace commands、Dockerfile、Docker Compose、prebuilt-image 和 static-artifact plan | Provider capability 不完全相同；mutation 前应检查生成的 plan 和 target readiness。 |
-| Local shell、generic SSH 和 Docker Swarm runtime target | Appaloft 是部署控制面，不是通用 cloud account 或 DNS zone manager。 |
-| CLI、HTTP API、Web console、GitHub Action、MCP 和 AI skill | External edge/DNS provider orchestration 仍属于受治理的 post-1.0 track。 |
-| Health、logs、diagnostics、retry、redeploy、rollback 和 durable work observation | 命令成功不能替代 workload、health 和 access verification。 |
-
-当前公开契约和后续计划见 [Providers](./docs/PROVIDERS.md)、
-[Core operations](./docs/CORE_OPERATIONS.md) 和 [product roadmap](./docs/PRODUCT_ROADMAP.md)。
-
-## 安装方式
-
-按你的使用入口选择安装方式：
-
-| 入口 | 命令 |
-| --- | --- |
-| Self-hosted server | `curl -fsSL https://appaloft.com/install.sh \| sudo sh` |
-| Self-hosted + PGlite | `curl -fsSL https://appaloft.com/install.sh \| sudo sh -s -- --database pglite` |
-| Self-hosted + 域名 | `curl -fsSL https://appaloft.com/install.sh \| sudo sh -s -- --domain console.example.com` |
-| Docker image | `docker pull ghcr.io/appaloft/appaloft:latest` |
-| npm CLI | `npm install -g @appaloft/cli` |
-| Homebrew CLI | `brew install appaloft/tap/appaloft` |
-| GitHub Release | 从 [latest releases](https://github.com/appaloft/appaloft/releases/latest) 下载对应平台 archive。 |
-| MCP launcher | `npx @appaloft/mcp` |
-| AI skill | `npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes` |
-| 源码运行 | `bun install && bun run --cwd apps/shell src/index.ts --help` |
-
-## 单文件部署配置
-
-在项目里创建 `appaloft.yml`：
+可选的单文件配置：
 
 ```yaml
 name: my-app
@@ -129,31 +87,96 @@ access:
   default: public
 ```
 
-然后部署：
-
 ```bash
 appaloft deploy . --config appaloft.yml
 ```
 
-## 常用 CLI 命令
-
-这些命令覆盖日常最常用的路径。
+同一条命令也接受文件夹、Git URL、容器镜像、Compose 文件或 zip：
 
 ```bash
-# 查看 CLI 和当前本地 profile
-appaloft --version
-appaloft auth status
-appaloft context show
-
-# 从 repo、目录、Docker image 或 Compose 项目开始
 appaloft init
 appaloft deploy .
 appaloft deploy ./dist --config appaloft.yml
 appaloft deploy https://github.com/acme/web.git
 appaloft deploy ghcr.io/acme/api:1.7.3
 appaloft deploy ./docker-compose.yml
+```
 
-# 观察和操作 deployment
+想先跑一个已知可用的示例？CLI 装好后再试官方
+[`appaloft/examples/hello`](https://github.com/appaloft/examples/tree/main/hello)。它是可选项，
+不是第一条命令。
+
+## Agent
+
+教会你已经在用的 coding agent。下面这些复制块今天就能跑。它们是现有的 `npx` 和 CLI
+命令，不是已经发布的一键 host 安装器。
+
+```bash
+npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
+```
+
+```bash
+npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
+```
+
+```bash
+npx @appaloft/mcp
+appaloft mcp stdio
+```
+
+Skill 安装只用 `--agent codex` 或 `--agent claude-code`。其他 host 参数不在本仓库。用
+`npx skills list --global --agent <agent>` 确认后，新开一个 agent 会话。让它通过
+Appaloft 部署或运维。skill 会约束 agent 走 Appaloft operation，而不是直接调用 Docker、SSH、
+数据库或云厂商。
+
+## 占用
+
+`appaloft code` 占用你的 Sandbox。`appaloft code --local` 是本机 Scratch。类似 Railway 的
+`ca`，不是 Agent 门。见仓库内 CLI 参考
+（[cli-entrypoints.md](./skills/appaloft/references/cli-entrypoints.md)）；线上
+docs.appaloft.com CLI 页面可能还没有列出它们。
+
+## Self-host（可选）
+
+Linux control plane installer 是可选项。只有你想自己跑 Appaloft 时才从这里开始。
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh
+```
+
+固定某个发布版本：
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --version 1.9.2
+```
+
+这个 installer 会安装或校验 Docker Engine 和 Compose plugin，把 stack 写到 `/opt/appaloft`，
+并启动 Appaloft backend、static console 和 PostgreSQL。
+
+| 入口 | 命令 |
+| --- | --- |
+| npm CLI | `npm install -g @appaloft/cli` |
+| Homebrew CLI | `brew install appaloft/tap/appaloft` |
+| GitHub Release | 从 [latest releases](https://github.com/appaloft/appaloft/releases/latest) 下载对应平台 archive。 |
+| MCP launcher | `npx @appaloft/mcp` |
+| AI skill | `npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes` |
+| Self-hosted server | `curl -fsSL https://appaloft.com/install.sh \| sudo sh` |
+| Self-hosted + PGlite | `curl -fsSL https://appaloft.com/install.sh \| sudo sh -s -- --database pglite` |
+| Self-hosted + 域名 | `curl -fsSL https://appaloft.com/install.sh \| sudo sh -s -- --domain console.example.com` |
+| Docker image | `docker pull ghcr.io/appaloft/appaloft:latest` |
+| 源码运行 | `bun install && bun run --cwd apps/shell src/index.ts --help` |
+
+## 常用 CLI
+
+部署、观察、恢复。完整命令列表：
+[skills/appaloft/references/cli-entrypoints.md](./skills/appaloft/references/cli-entrypoints.md)。
+
+```bash
+appaloft --version
+appaloft auth status
+appaloft context show
+
+appaloft deploy .
 appaloft deployments list
 appaloft deployments show <deploymentId>
 appaloft deployments timeline <deploymentId> --follow --json
@@ -161,79 +184,15 @@ appaloft deployments retry <deploymentId>
 appaloft deployments redeploy <resourceId>
 appaloft deployments rollback <deploymentId> --candidate <deploymentId>
 
-# 项目、环境、资源
-appaloft project list
-appaloft project create
-appaloft env list
-appaloft resource list
-appaloft resource show <resourceId>
 appaloft resource logs <resourceId>
 appaloft resource health <resourceId>
-appaloft resource runtime restart <resourceId>
+appaloft work list
+appaloft work watch <workId> --json
 
-# 注册和准备服务器
 appaloft server register
 appaloft server list
 appaloft server test <serverId>
-appaloft server runtime prepare <serverId>
-appaloft server capacity inspect <serverId>
-
-# 直接发布静态产物
-appaloft static-artifacts publish ./dist
-appaloft static-artifacts publish ./dist.zip
-
-# 使用 Blueprints
-appaloft blueprint list
-appaloft blueprint show pocketbase
-appaloft blueprint plan-install pocketbase
-appaloft blueprint install pocketbase
-appaloft blueprint installation show <installationId>
-
-# 依赖、存储和定时任务
-appaloft dependency list
-appaloft dependency inspect <dependencyResourceId>
-appaloft storage volume list
-appaloft scheduled-task list
-
-# 审计与恢复
-appaloft work list
-appaloft work watch <workId> --json
-appaloft audit-event list --aggregate <aggregateId>
 ```
-
-完整 operation 列表见
-[skills/appaloft/references/cli-entrypoints.md](./skills/appaloft/references/cli-entrypoints.md)。
-
-## MCP 和 AI Skill
-
-Appaloft MCP 把同一套 operation catalog 暴露给 MCP client。它只是 transport surface，不是另一套自动化后门。
-
-```bash
-# 本地 stdio MCP server
-appaloft mcp stdio
-
-# 本地 HTTP MCP server，路径是 /mcp
-appaloft mcp serve --host 127.0.0.1 --port 3939
-
-# 给 MCP host 使用的独立 package launcher
-npx @appaloft/mcp
-npx @appaloft/mcp serve --host 127.0.0.1 --port 3939
-
-# 面向 hosted 或 self-hosted control plane 的浏览器授权与 Codex bridge
-appaloft auth mcp login
-appaloft auth mcp codex install
-```
-
-在支持 skills 的 AI host 里安装 Appaloft skill：
-
-```bash
-npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
-```
-
-Claude Code 请改用 `--agent claude-code`。通过 `npx skills list --global --agent <agent>`
-确认安装后，新开一个 agent 会话。
-
-然后让 Agent 通过 Appaloft 部署或运维项目。skill 会约束 Agent 使用 Appaloft operation，而不是直接绕过产品去操作 Docker、SSH、数据库或云厂商。
 
 ## GitHub Actions
 
@@ -271,8 +230,6 @@ bun run dev
 如果本地要接 PostgreSQL，启动 `docker-compose.dev.yml`，然后设置
 `APPALOFT_DATABASE_DRIVER=postgres` 和 `APPALOFT_DATABASE_URL`。
 
-常用开发命令：
-
 ```bash
 bun run lint:ci
 bun run typecheck
@@ -297,7 +254,11 @@ bun run smoke:local:static
 
 ## 文档入口
 
-- [Self-hosting install](./apps/docs/src/content/docs/self-hosting/install.md)
+- [文档](https://docs.appaloft.com)
+- [第一次部署](https://docs.appaloft.com/start/first-deployment/)
+- [Agents](https://docs.appaloft.com/agents/overview/)
+- [TypeScript SDK](https://docs.appaloft.com/reference/typescript-sdk/)
+- [Self-hosting install](https://docs.appaloft.com/self-hosting/install/)
 - [Architecture](./docs/ARCHITECTURE.md)
 - [Core operations](./docs/CORE_OPERATIONS.md)
 - [MCP server](./docs/agent/appaloft-mcp-server.md)
