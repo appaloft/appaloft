@@ -1796,7 +1796,10 @@ export const deployCommand = EffectCommand.make(
       const requestedProjectId = optionalValue(project);
       if (cli.executionTarget === "remote") {
         const loggedIn = yield* Effect.promise(() =>
-          hasCliControlPlaneLogin(cli.environment ?? process.env),
+          hasCliControlPlaneLogin(
+            cli.environment ?? process.env,
+            cli.readActiveControlPlaneProfile,
+          ),
         );
         if (!loggedIn) {
           return yield* Effect.fail(deployLoginRequiredError());

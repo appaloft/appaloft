@@ -170,6 +170,7 @@ export class CliRuntime extends Context.Tag("CliRuntime")<
     readonly terminalSessionGateway?: TerminalSessionAttachmentGateway;
     readonly terminalIO: CliTerminalIO;
     readonly environment?: NodeJS.ProcessEnv;
+    readonly readActiveControlPlaneProfile?: () => Promise<{ readonly auth?: unknown } | null>;
     readonly readStdinText?: () => Promise<string>;
     readonly prepareDeploymentStateBackend?: (
       decision: DeploymentStateBackendDecision,

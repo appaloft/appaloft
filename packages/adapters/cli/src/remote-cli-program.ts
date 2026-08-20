@@ -465,6 +465,7 @@ export function createRemoteCliProgram(input: RemoteCliProgramInput): CliProgram
       }),
       terminalIO,
       ...(input.environment ? { environment: input.environment } : {}),
+      readActiveControlPlaneProfile: async () => input.profile,
       readStdinText: () => capturedStdinText ?? sourceStdinReader(),
       ...(input.workspaceControlPresentation
         ? { workspaceControlPresentation: input.workspaceControlPresentation }
