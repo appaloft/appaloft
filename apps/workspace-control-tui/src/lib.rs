@@ -3,7 +3,7 @@ use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap};
+use ratatui::widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Wrap};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
@@ -647,6 +647,12 @@ pub enum ParentMessage {
     Progress {
         message: String,
     },
+    Loading {
+        #[serde(default)]
+        collapsed: Option<bool>,
+        #[serde(default)]
+        title: Option<String>,
+    },
     Error {
         code: String,
         phase: String,
@@ -833,12 +839,36 @@ impl RendererEvent {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct OccupancyLoading {
+    pub active: bool,
+    pub collapsed: bool,
+    pub title: String,
+    pub harness: String,
+    pub steps: Vec<String>,
+    pub tick: usize,
+}
+
+impl Default for OccupancyLoading {
+    fn default() -> Self {
+        Self {
+            active: true,
+            collapsed: false,
+            title: "Appaloft".to_owned(),
+            harness: "occupancy".to_owned(),
+            steps: Vec::new(),
+            tick: 0,
+        }
+    }
+}
+
 pub struct AppState {
     pub workspaces: Vec<WorkspaceSummary>,
     pub selected: usize,
     pub detail: Option<DetailMessage>,
     pub agent_focused: bool,
     pub focus_mode: bool,
+    pub loading: OccupancyLoading,
     pub session_id: Option<String>,
     pub runtime_id: Option<String>,
     pub action_menu_open: bool,
@@ -868,6 +898,7 @@ impl Default for AppState {
             detail: None,
             agent_focused: false,
             focus_mode: false,
+            loading: OccupancyLoading::default(),
             session_id: None,
             runtime_id: None,
             action_menu_open: false,
@@ -884,7 +915,7 @@ impl Default for AppState {
             recovery_form: None,
             pending_recovery_confirmation: None,
             recovery_busy: false,
-            status_line: "Connecting to Appaloft…".to_owned(),
+            status_line: "preparing the agent".to_owned(),
             terminal: vt100::Parser::new(24, 80, 10_000),
             terminal_size: (80, 24),
         }
@@ -916,7 +947,21 @@ impl AppState {
                 }
             }
             ParentMessage::Progress { message } => {
+                self.loading.active = true;
+                if self.loading.steps.last() != Some(&message) {
+                    self.loading.steps.push(message.clone());
+                }
                 self.status_line = message;
+            }
+            ParentMessage::Loading { collapsed, title } => {
+                self.loading.active = true;
+                if let Some(collapsed) = collapsed {
+                    self.loading.collapsed = collapsed;
+                }
+                if let Some(title) = title {
+                    self.loading.title = title;
+                }
+                self.status_line = "preparing the agent".to_owned();
             }
             ParentMessage::Workspaces { workspaces } => {
                 let selected_id = self.selected_workspace_id().map(str::to_owned);
@@ -931,9 +976,13 @@ impl AppState {
                     .min(self.workspaces.len().saturating_sub(1));
                 if !self.workspaces.is_empty() {
                     self.status_line = format!("{} Workspace(s)", self.workspaces.len());
+                    if !self.loading.collapsed {
+                        self.loading.active = false;
+                    }
                 }
             }
             ParentMessage::Detail { detail } => {
+                self.loading.active = false;
                 self.status_line = format!("Workspace {}", detail.workspace.workspace_id);
                 self.detail = Some(detail);
                 self.action_busy = false;
@@ -952,6 +1001,10 @@ impl AppState {
                 self.runtime_id = Some(runtime_id);
                 self.session_id = Some(session_id.clone());
                 self.agent_focused = true;
+                self.loading.active = false;
+                if self.loading.collapsed {
+                    self.focus_mode = true;
+                }
                 self.status_line = format!("Agent Session {session_id}");
             }
             ParentMessage::TerminalOutput { data, .. } => self.terminal.process(data.as_bytes()),
@@ -1020,9 +1073,19 @@ impl AppState {
     }
 
     pub fn toggle_focus_mode(&mut self) {
+        if self.loading.active {
+            self.loading.collapsed = !self.loading.collapsed;
+            return;
+        }
         if self.session_id.is_some() {
             self.focus_mode = !self.focus_mode;
             self.agent_focused = true;
+        }
+    }
+
+    pub fn tick_loading(&mut self) {
+        if self.loading.active {
+            self.loading.tick = self.loading.tick.wrapping_add(1);
         }
     }
 
@@ -1657,6 +1720,133 @@ fn render_terminal(frame: &mut Frame<'_>, state: &AppState, area: Rect, title: S
     }
 }
 
+fn occupancy_loading_visible(state: &AppState) -> bool {
+    state.loading.active && state.detail.is_none() && !state.agent_focused && !state.focus_mode
+}
+
+fn spinner_frame(tick: usize) -> char {
+    const FRAMES: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+    FRAMES[tick % FRAMES.len()]
+}
+
+fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
+    let width = width.min(area.width.max(1));
+    let height = height.min(area.height.max(1));
+    Rect {
+        x: area.x + area.width.saturating_sub(width) / 2,
+        y: area.y + area.height.saturating_sub(height) / 2,
+        width,
+        height,
+    }
+}
+
+fn occupancy_loading_step_lines(state: &AppState, width: u16) -> Vec<Line<'static>> {
+    const STEP_ROWS: usize = 9;
+    let steps = &state.loading.steps;
+    let usable = width.saturating_sub(2).max(20) as usize;
+    let mut budget = STEP_ROWS;
+    let mut start = steps.len();
+    for (index, step) in steps.iter().enumerate().rev() {
+        let rows = step.chars().count().div_ceil(usable).max(1);
+        if rows > budget {
+            break;
+        }
+        budget -= rows;
+        start = index;
+    }
+    let last = steps.len().saturating_sub(1);
+    steps[start..]
+        .iter()
+        .enumerate()
+        .map(|(offset, step)| {
+            let index = start + offset;
+            let (marker, style) = if index == last {
+                (
+                    format!("{} ", spinner_frame(state.loading.tick)),
+                    Style::default().fg(Color::Cyan),
+                )
+            } else {
+                ("✓ ".to_string(), Style::default().fg(Color::DarkGray))
+            };
+            Line::from(vec![
+                Span::styled(marker, style),
+                Span::styled(step.clone(), style),
+            ])
+        })
+        .collect()
+}
+
+fn occupancy_loading_footer(collapsed: bool) -> String {
+    if collapsed {
+        " q quit  f restore list ".to_owned()
+    } else {
+        " q quit ".to_owned()
+    }
+}
+
+fn render_occupancy_loading(frame: &mut Frame<'_>, state: &AppState, area: Rect) {
+    const STEP_ROWS: u16 = 9;
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Cyan))
+        .title(Span::styled(
+            format!(" {} · starting ", state.loading.harness),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    let content_w = state
+        .loading
+        .steps
+        .iter()
+        .map(|step| step.chars().count() + 2)
+        .chain(std::iter::once(state.loading.title.chars().count()))
+        .max()
+        .unwrap_or(0)
+        .clamp(20, inner.width.max(1) as usize) as u16;
+    let panel = centered_rect(content_w, (STEP_ROWS + 4).min(inner.height), inner);
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(STEP_ROWS),
+            Constraint::Min(0),
+        ])
+        .split(panel);
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled(
+                format!("{} ", spinner_frame(state.loading.tick)),
+                Style::default().fg(Color::Cyan),
+            ),
+            Span::styled(
+                state.loading.title.clone(),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]))
+        .alignment(Alignment::Center),
+        rows[0],
+    );
+    frame.render_widget(
+        Paragraph::new("preparing the agent")
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(Color::DarkGray)),
+        rows[1],
+    );
+    frame.render_widget(
+        Paragraph::new(occupancy_loading_step_lines(state, rows[3].width))
+            .wrap(Wrap { trim: false }),
+        rows[3],
+    );
+}
+
 pub fn render(frame: &mut Frame<'_>, state: &AppState) {
     let area = frame.area();
     let sections = Layout::default()
@@ -1665,31 +1855,11 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
         .split(area);
     let body = sections[0];
     let footer = sections[1];
-    if state.workspaces.is_empty() && state.detail.is_none() && !state.focus_mode {
-        let rows = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Percentage(42),
-                Constraint::Length(3),
-                Constraint::Percentage(42),
-            ])
-            .split(body);
+    if occupancy_loading_visible(state) {
+        render_occupancy_loading(frame, state, body);
         frame.render_widget(
-            Paragraph::new(state.status_line.as_str())
-                .alignment(Alignment::Center)
-                .style(
-                    Style::default()
-                        .fg(Color::Cyan)
-                        .add_modifier(Modifier::BOLD),
-                ),
-            rows[1],
-        );
-        frame.render_widget(
-            Paragraph::new(occupancy_control_footer(
-                &state.status_line,
-                state.detail.as_ref(),
-            ))
-            .style(Style::default().fg(Color::DarkGray)),
+            Paragraph::new(occupancy_loading_footer(state.loading.collapsed))
+                .style(Style::default().fg(Color::DarkGray)),
             footer,
         );
         return;
@@ -2309,10 +2479,23 @@ mod tests {
         assert_eq!(occupancy_list_label(&lean), "sbx_lean");
     }
 
+    fn buffer_plain(terminal: &ratatui::Terminal<ratatui::backend::TestBackend>) -> String {
+        let buffer = terminal.backend().buffer();
+        let mut out = String::new();
+        for y in 0..buffer.area.height {
+            for x in 0..buffer.area.width {
+                out.push_str(buffer[(x, y)].symbol());
+            }
+            out.push('\n');
+        }
+        out
+    }
+
     #[test]
     fn ws_remote_progress_193_tui_keeps_connecting_status_until_workspaces_arrive() {
         let mut state = AppState::default();
-        assert_eq!(state.status_line, "Connecting to Appaloft…");
+        assert_eq!(state.status_line, "preparing the agent");
+        assert!(state.loading.active);
         state.apply(ParentMessage::HelloOk);
         state.apply(ParentMessage::Progress {
             message: "Opening occupancy on hostinger…".to_owned(),
@@ -2321,6 +2504,11 @@ mod tests {
             workspaces: Vec::new(),
         });
         assert_eq!(state.status_line, "Opening occupancy on hostinger…");
+        assert_eq!(
+            state.loading.steps,
+            vec!["Opening occupancy on hostinger…".to_owned()]
+        );
+        assert!(state.loading.active);
         state.apply(ParentMessage::Workspaces {
             workspaces: vec![WorkspaceSummary {
                 workspace_id: "sbx_1".to_owned(),
@@ -2331,6 +2519,63 @@ mod tests {
             }],
         });
         assert_eq!(state.status_line, "1 Workspace(s)");
+        assert!(!state.loading.active);
+    }
+
+    #[test]
+    fn ws_remote_progress_194_collapsed_launch_gives_the_wait_the_whole_window() {
+        let mut state = AppState::default();
+        state.apply(ParentMessage::Loading {
+            collapsed: Some(true),
+            title: Some("Appaloft".to_owned()),
+        });
+        state.apply(ParentMessage::Progress {
+            message: "Checking login…".to_owned(),
+        });
+        state.apply(ParentMessage::Progress {
+            message: "Opening occupancy on hostinger…".to_owned(),
+        });
+        state.apply(ParentMessage::Workspaces {
+            workspaces: vec![WorkspaceSummary {
+                workspace_id: "sbx_1".to_owned(),
+                status: "ready".to_owned(),
+                provider_key: None,
+                source_kind: None,
+                occupancy: None,
+            }],
+        });
+        assert!(state.loading.active);
+        assert!(state.loading.collapsed);
+        assert_eq!(
+            state.loading.steps,
+            vec![
+                "Checking login…".to_owned(),
+                "Opening occupancy on hostinger…".to_owned()
+            ]
+        );
+        let backend = ratatui::backend::TestBackend::new(100, 24);
+        let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw collapsed loading");
+        let out = buffer_plain(&terminal);
+        assert!(out.contains("preparing the agent"), "{out}");
+        assert!(out.contains("occupancy · starting"), "{out}");
+        assert!(out.contains("Checking login…"), "{out}");
+        assert!(out.contains("Opening occupancy on hostinger…"), "{out}");
+        assert!(out.contains('✓'), "{out}");
+        assert!(out.contains("restore list"), "{out}");
+        assert!(
+            !out.contains(" Workspaces "),
+            "collapsed wait must hide the tree:\n{out}"
+        );
+        state.apply(ParentMessage::TerminalReady {
+            workspace_id: "sbx_1".to_owned(),
+            runtime_id: "sar_1".to_owned(),
+            session_id: "term_1".to_owned(),
+        });
+        assert!(!state.loading.active);
+        assert!(state.focus_mode);
     }
 
     #[test]

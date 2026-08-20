@@ -419,6 +419,8 @@
 - [x] Unit tests WS-REMOTE-PROGRESS-192
 - [x] TTY `code`/`workspace` enter occupancy TUI with centered/footer progress
 - [x] Unit tests WS-REMOTE-PROGRESS-193
+- [x] TTY `code` collapsed tree + centered preparing-the-agent step panel
+- [x] Unit tests WS-REMOTE-PROGRESS-194
 
 ## Later
 

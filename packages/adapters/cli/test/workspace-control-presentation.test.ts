@@ -1296,10 +1296,9 @@ describe("Workspace control presentation", () => {
     await started;
     expect(renderer.closed).toBe(1);
     expect(renderer.messages[0]).toEqual({
-      type: "progress",
-      message: "Connecting to Appaloft…",
+      type: "loading",
+      title: "Appaloft",
     });
-    expect(renderer.messages[1]).toEqual({ type: "workspaces", workspaces: [] });
     resolveList?.({ items: [{ sandboxId: "sbx_late", status: "ready" }] });
   });
 
@@ -2044,7 +2043,7 @@ describe("Workspace control presentation", () => {
     });
   });
 
-  test("[WS-REMOTE-PROGRESS-193] occupy bootstrap paints TUI progress and attaches without waiting on skills", async () => {
+  test("[WS-REMOTE-PROGRESS-193][WS-REMOTE-PROGRESS-194] occupy bootstrap paints collapsed preparing wait then attaches without waiting on skills", async () => {
     const terminal = {
       detached: 0,
       async *[Symbol.asyncIterator](): AsyncIterator<TerminalSessionFrame> {},
@@ -2108,8 +2107,9 @@ describe("Workspace control presentation", () => {
     });
     expect(skillBlockers).toBe(1);
     expect(renderer.messages[0]).toEqual({
-      type: "progress",
-      message: "Connecting to Appaloft…",
+      type: "loading",
+      collapsed: true,
+      title: "Appaloft",
     });
     expect(renderer.messages).toContainEqual({
       type: "progress",
@@ -2129,5 +2129,11 @@ describe("Workspace control presentation", () => {
       runtimeId: "sar_1",
       sessionId: "term_occupy",
     });
+    const attachAt = renderer.messages.findIndex((message) => message.type === "terminal-ready");
+    const workspacesAt = renderer.messages.findIndex(
+      (message) => message.type === "workspaces" && message.workspaces.length > 0,
+    );
+    expect(attachAt).toBeGreaterThan(-1);
+    expect(workspacesAt).toBeGreaterThan(attachAt);
   });
 });

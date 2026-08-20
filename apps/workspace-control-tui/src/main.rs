@@ -216,6 +216,7 @@ fn main() -> Result<()> {
             )?;
             last_terminal_size = terminal_size;
         }
+        state.tick_loading();
         terminal
             .draw(|frame| render(frame, &state))
             .context("render Workspace control TUI")?;

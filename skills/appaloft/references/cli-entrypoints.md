@@ -41,8 +41,8 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft code [path|git-remote] [--profile <name-or-id>] [--harness opencode|pi]` occupies my Sandbox after login. It requires a default
   enrolled Server, dispatches `workspaces.open` with the remote SHA and
   `targetServerId`. On a TTY it enters the occupancy Workspace TUI immediately
-  with centered/footer progress (`Connecting to Appaloft…` / occupy / copy skills /
-  attach), then attaches into the remote session. `--no-attach` and non-TTY print
+  with the list collapsed and a centered **preparing the agent** step panel, then
+  attaches into the remote session. `--no-attach` and non-TTY print
   one-line progress and
   `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>`.
   Skill copy is fail-soft and time-bounded.

@@ -206,6 +206,7 @@ export type WorkspaceControlRendererMessage =
       readonly exitCode?: number;
     }
   | { readonly type: "progress"; readonly message: string }
+  | { readonly type: "loading"; readonly collapsed?: boolean; readonly title?: string }
   | { readonly type: "delivery-complete"; readonly workspaceId: string }
   | { readonly type: "recovery-complete"; readonly workspaceId: string }
   | {
@@ -1009,12 +1010,12 @@ export function createBoundedWorkspaceControlPresentation(
       };
 
       try {
-        await renderer.send({
-          type: "progress",
-          message: OCCUPANCY_CODE_PROGRESS.connecting,
-        });
-        await renderer.send({ type: "workspaces", workspaces: [] });
         if (context.occupyBootstrap) {
+          await renderer.send({
+            type: "loading",
+            collapsed: true,
+            title: "Appaloft",
+          });
           void context
             .occupyBootstrap({
               reportProgress: async (message) => {
@@ -1024,6 +1025,7 @@ export function createBoundedWorkspaceControlPresentation(
             })
             .then(async (occupied) => {
               if (!presentationOpen) return;
+              if (occupied?.attach) await attachIssuedDescriptor(occupied.attach);
               await renderer.send({
                 type: "workspaces",
                 workspaces: await listWorkspaces(context),
@@ -1031,10 +1033,10 @@ export function createBoundedWorkspaceControlPresentation(
               if (!occupied?.workspaceId) return;
               selectedWorkspaceId = occupied.workspaceId;
               await sendSelectedDetail(occupied.workspaceId);
-              if (occupied.attach) await attachIssuedDescriptor(occupied.attach);
             })
             .catch((error) => sendErrorBestEffort(error, "occupancy-code-bootstrap"));
         } else {
+          await renderer.send({ type: "loading", title: "Appaloft" });
           void listWorkspaces(context).then(
             (workspaces) => renderer.send({ type: "workspaces", workspaces }),
             (error) => sendErrorBestEffort(error, "workspace-control-start"),

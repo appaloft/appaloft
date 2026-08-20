@@ -165,6 +165,7 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-PROGRESS-191 | shell / CLI | automated | shell entry writes occupancy progress before importing `run.ts`; `run.ts` writes before PGlite sync or local composition; remote `code` skips PGlite | `apps/shell/test/run-control-plane-cli.test.ts`; `apps/shell/test/occupancy-cli-progress.test.ts` |
 | WS-REMOTE-PROGRESS-192 | CLI | automated | `--no-attach` prints Remote banner before skill copy; hung skill copy is skipped and does not block exit | `packages/adapters/cli/test/agent-workspace-command.test.ts`; `packages/adapters/cli/test/occupancy-code-progress.test.ts` |
 | WS-REMOTE-PROGRESS-193 | TUI / CLI | automated | TTY `code`/`workspace` skip streamed line progress; TUI occupy bootstrap sends progress then attaches | `apps/shell/test/occupancy-cli-progress.test.ts`; `packages/adapters/cli/test/workspace-control-presentation.test.ts`; `packages/adapters/cli/test/agent-workspace-command.test.ts`; `apps/workspace-control-tui/src/lib.rs` |
+| WS-REMOTE-PROGRESS-194 | TUI / CLI | automated | TTY `code` opens collapsed occupancy TUI with centered preparing-the-agent steps; attach replaces the wait; workspaces do not show the tree during the wait | `packages/adapters/cli/test/workspace-control-presentation.test.ts`; `apps/workspace-control-tui/src/lib.rs` |
 
 
 
