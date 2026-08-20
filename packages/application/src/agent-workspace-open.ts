@@ -616,7 +616,16 @@ export class AgentWorkspaceOpenService {
           preferred,
         );
       }
-      if (preferred.commitSha !== input.commitSha) {
+      if (
+        preferred.commitSha !== input.commitSha &&
+        !isFolderOccupancyOpen({
+          repositoryIdentity: input.repositoryIdentity,
+          repository: input.repository,
+          ...(preferred.repositoryIdentity
+            ? { preferredIdentity: preferred.repositoryIdentity }
+            : {}),
+        })
+      ) {
         return err(
           domainError.conflict("Preferred Workspace is pinned to another Git commit", {
             code: "workspace_open_source_pin_mismatch",
