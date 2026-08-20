@@ -621,6 +621,13 @@ describe("folder project onboarding", () => {
     ).text();
     expect(source).toContain("process.exit(130)");
     expect(source).toContain("SIGINT");
+    expect(source).toContain("export async function withImmediateSigintExit");
+    expect(isFolderOnboardingCancelled({ _tag: "Interrupt" })).toBeTrue();
+    expect(isFolderOnboardingCancelled({ _tag: "Quit" })).toBeTrue();
+    expect(folderOnboardingCancelledError().message).toBe("Cancelled");
+    expect(folderOnboardingCancelledError().message).not.toContain(
+      "Workspace CLI operation failed",
+    );
   });
 
   test("[FOLDER-ONBOARD-002] Effect onboarding binds a git remote identity", async () => {

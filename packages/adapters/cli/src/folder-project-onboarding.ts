@@ -135,6 +135,18 @@ export function withImmediateInquireCancel<A, E, R>(
   );
 }
 
+export async function withImmediateSigintExit<T>(work: () => Promise<T>): Promise<T> {
+  const onSigint = () => {
+    process.exit(130);
+  };
+  process.once("SIGINT", onSigint);
+  try {
+    return await work();
+  } finally {
+    process.off("SIGINT", onSigint);
+  }
+}
+
 export function decideFolderProjectOnboarding(input: {
   readonly linkedProjectId?: string;
   readonly gitIdentity?: string;
@@ -431,16 +443,18 @@ export function ensureFolderProjectOnboarding(input: {
           }),
         );
       }
-      const choice = yield* input.interaction.select({
-        message: "This folder is not linked. Create a project or use an existing one?",
-        choices: [
-          { title: `Create ${decision.name}`, value: `create:${decision.name}` },
-          ...decision.projects.map((project) => ({
-            title: `${project.name} (${project.id})`,
-            value: `use:${project.id}`,
-          })),
-        ],
-      });
+      const choice = yield* withImmediateInquireCancel(
+        input.interaction.select({
+          message: "This folder is not linked. Create a project or use an existing one?",
+          choices: [
+            { title: `Create ${decision.name}`, value: `create:${decision.name}` },
+            ...decision.projects.map((project) => ({
+              title: `${project.name} (${project.id})`,
+              value: `use:${project.id}`,
+            })),
+          ],
+        }),
+      );
       if (choice.startsWith("create:")) {
         const createdProject = yield* createOnboardingProject(decision.name);
         projectId = createdProject.id;

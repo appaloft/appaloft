@@ -3100,8 +3100,10 @@ describe("Agent Workspace CLI", () => {
       new URL("../src/commands/agent-workspace.ts", import.meta.url),
     ).text();
     expect(source).toContain('promptPolicy: "auto-create"');
-    expect(source).toContain("yes,");
+    expect(source).toContain("yes: true");
     expect(source).toContain("writeStatus: () => undefined");
+    expect(source).toContain("withImmediateSigintExit");
+    expect(source).toContain("folderOnboardingCancelledError");
     const tuiBlockStart = source.indexOf("if (useOccupancyTui && occupancyTui)");
     const startAt = source.indexOf("occupancyTui.start(", tuiBlockStart);
     expect(tuiBlockStart).toBeGreaterThan(-1);

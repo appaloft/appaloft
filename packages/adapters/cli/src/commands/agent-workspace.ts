@@ -61,9 +61,11 @@ import { CODE_OPTION_DESCRIPTIONS } from "../code-help.js";
 import { folderDirectoryName, isFolderOccupancyIdentity } from "../folder-project-link.js";
 import {
   ensureFolderProjectOnboarding,
+  folderOnboardingCancelledError,
   folderOnboardingCwdFromLocator,
   isFolderOnboardingCancelled,
   peekThisFolderGitIdentity,
+  withImmediateSigintExit,
 } from "../folder-project-onboarding.js";
 import { resolveRemoteGitWorkspaceRef } from "../local-git-workspace-context.js";
 import {
@@ -340,7 +342,7 @@ function isFolderOccupancyPartialRecovery(
 
 function workspaceCliError(error: unknown, phase: string): DomainError {
   if (isFolderOnboardingCancelled(error)) {
-    return error as DomainError;
+    return folderOnboardingCancelledError();
   }
   if (
     typeof error === "object" &&
@@ -703,6 +705,7 @@ export const workspaceCodeCommand = EffectCommand.make(
     yes,
   }) =>
     Effect.gen(function* () {
+      void yes;
       const cli = yield* CliRuntime;
       const runtime = yield* Effect.runtime<CliRuntime | Prompt.Prompt.Environment>();
       if (local) {
@@ -791,15 +794,17 @@ export const workspaceCodeCommand = EffectCommand.make(
                 ensureFolderOnboarding: async () => {
                   const loggedIn = await hasCliControlPlaneLogin(cli.environment ?? process.env);
                   if (!loggedIn) throw workspaceRemoteLoginRequiredError();
-                  return Runtime.runPromise(runtime)(
-                    ensureFolderProjectOnboarding({
-                      cwd: folderOnboardingCwdFromLocator(path),
-                      yes,
-                      promptPolicy: "auto-create",
-                      ...(useOccupancyTui ? { writeStatus: () => undefined } : {}),
-                      peekGitIdentity: peekThisFolderGitIdentity,
-                      ...(cli.environment ? { env: cli.environment } : {}),
-                    }),
+                  return withImmediateSigintExit(() =>
+                    Runtime.runPromise(runtime)(
+                      ensureFolderProjectOnboarding({
+                        cwd: folderOnboardingCwdFromLocator(path),
+                        yes: true,
+                        promptPolicy: "auto-create",
+                        ...(useOccupancyTui ? { writeStatus: () => undefined } : {}),
+                        peekGitIdentity: peekThisFolderGitIdentity,
+                        ...(cli.environment ? { env: cli.environment } : {}),
+                      }),
+                    ),
                   );
                 },
                 listServers: async () => {
@@ -937,11 +942,13 @@ export const workspaceCodeCommand = EffectCommand.make(
                 : {}),
               occupancyChrome: { project: occupancyFolderName },
               occupyBootstrap: async ({ reportProgress: tuiProgress }) => {
-                const occupied = await occupyRemote(
-                  (message) => {
-                    void tuiProgress(message);
-                  },
-                  { announcePin: false },
+                const occupied = await withImmediateSigintExit(() =>
+                  occupyRemote(
+                    (message) => {
+                      void tuiProgress(message);
+                    },
+                    { announcePin: false },
+                  ),
                 );
                 await settleWithTimeout(
                   offerOccupancyConnectingMaterials({
