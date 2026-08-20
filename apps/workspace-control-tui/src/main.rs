@@ -13,7 +13,7 @@ use anyhow::{Context, Result, bail};
 use appaloft_workspace_control_tui::{
     ActionDecision, AppState, DeliveryDecision, DeliverySubmission, ParentMessage,
     RecoverySubmission, RendererEvent, agent_area, render, terminal_key_bytes,
-    terminal_mouse_bytes,
+    terminal_mouse_bytes, write_osc52_passthrough,
 };
 
 fn key_has(key: &crossterm::event::KeyEvent, modifier: KeyModifiers) -> bool {
@@ -225,9 +225,11 @@ fn main() -> Result<()> {
             ) && state.session_id.is_some()
                 && reconnect_attempts < 3;
             state.apply(message);
-            for sequence in state.take_osc52() {
-                let _ = write!(std::io::stdout(), "{sequence}");
-                let _ = std::io::stdout().flush();
+            let sequences = state.take_osc52();
+            if !sequences.is_empty()
+                && write_osc52_passthrough(&mut std::io::stdout(), &sequences).is_err()
+            {
+                state.mark_osc52_passthrough_failed();
             }
             if terminal_healthy {
                 reconnect_attempts = 0;

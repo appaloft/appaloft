@@ -441,6 +441,8 @@
 - [x] Non-git / ancestor-git locator does not hang on `Resolving repository…`
 - [x] Unit tests WS-REMOTE-PROGRESS-201
 - [x] Default `code` from a no-git folder occupies this folder (git is not a gate)
+- [x] TTY `code` forwards nested OSC 52 to the local terminal
+- [x] Unit tests WS-REMOTE-PROGRESS-204
 
 ## Later
 

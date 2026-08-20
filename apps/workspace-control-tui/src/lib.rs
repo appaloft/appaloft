@@ -144,6 +144,7 @@ fn occupancy_help_lines() -> Vec<Line<'static>> {
         "↑↓             select",
         "^c             leave from list",
         "y              confirm delete",
+        "copy           local clipboard via OSC 52",
     ]
     .into_iter()
     .map(Line::from)
@@ -966,6 +967,8 @@ pub struct AppState {
     pub wrap: bool,
     pub help_open: bool,
     pub pending_osc52: Vec<String>,
+    pub osc52_carry: String,
+    pub osc52_passthrough_failed: bool,
     pub status_line: String,
     pub terminal: vt100::Parser,
     pub terminal_size: (u16, u16),
@@ -999,6 +1002,8 @@ impl Default for AppState {
             wrap: false,
             help_open: false,
             pending_osc52: Vec::new(),
+            osc52_carry: String::new(),
+            osc52_passthrough_failed: false,
             status_line: "preparing the agent".to_owned(),
             terminal: vt100::Parser::new(24, 80, 10_000),
             terminal_size: (80, 24),
@@ -1112,8 +1117,10 @@ impl AppState {
                 self.status_line = format!("Agent Session {session_id}");
             }
             ParentMessage::TerminalOutput { data, .. } => {
-                self.pending_osc52.extend(extract_osc52_sequences(&data));
-                self.terminal.process(data.as_bytes());
+                let split = split_osc52(&self.osc52_carry, &data);
+                self.osc52_carry = split.carry;
+                self.pending_osc52.extend(split.sequences);
+                self.terminal.process(split.display.as_bytes());
             }
             ParentMessage::TerminalClosed {
                 reason, exit_code, ..
@@ -1193,6 +1200,11 @@ impl AppState {
 
     pub fn take_osc52(&mut self) -> Vec<String> {
         std::mem::take(&mut self.pending_osc52)
+    }
+
+    pub fn mark_osc52_passthrough_failed(&mut self) {
+        self.osc52_passthrough_failed = true;
+        self.status_line = OSC52_PASSTHROUGH_DISABLED.to_owned();
     }
 
     pub fn toggle_help(&mut self) {
@@ -1875,35 +1887,95 @@ fn occupancy_chrome_header(state: &AppState) -> String {
     }
 }
 
+pub const OSC52_PASSTHROUGH_DISABLED: &str =
+    "Local terminal has OSC 52 disabled. Copy stayed on the remote agent.";
+
+const OSC52_INTRO: &[u8] = b"\x1b]52;";
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Osc52Split {
+    pub display: String,
+    pub sequences: Vec<String>,
+    pub carry: String,
+}
+
 pub fn extract_osc52_sequences(data: &str) -> Vec<String> {
-    let bytes = data.as_bytes();
-    let mut found = Vec::new();
+    split_osc52("", data).sequences
+}
+
+pub fn split_osc52(carry: &str, incoming: &str) -> Osc52Split {
+    let mut input = String::with_capacity(carry.len() + incoming.len());
+    input.push_str(carry);
+    input.push_str(incoming);
+    let bytes = input.as_bytes();
+    let mut display = String::new();
+    let mut sequences = Vec::new();
     let mut index = 0;
-    while index + 4 < bytes.len() {
-        if bytes[index] == 0x1b
-            && bytes[index + 1] == b']'
-            && bytes[index + 2..].starts_with(b"52;")
-        {
+    while index < bytes.len() {
+        if osc52_intro_prefix(&bytes[index..]) {
             let start = index;
-            index += 5;
+            index += OSC52_INTRO.len();
+            let mut ended = None;
             while index < bytes.len() {
                 if bytes[index] == 0x07 {
-                    found.push(data[start..=index].to_owned());
-                    index += 1;
+                    ended = Some(index + 1);
                     break;
                 }
                 if bytes[index] == 0x1b && bytes.get(index + 1) == Some(&b'\\') {
-                    found.push(data[start..=index + 1].to_owned());
-                    index += 2;
+                    ended = Some(index + 2);
                     break;
                 }
                 index += 1;
             }
-        } else {
-            index += 1;
+            if let Some(end) = ended {
+                sequences.push(input[start..end].to_owned());
+                index = end;
+            } else {
+                return Osc52Split {
+                    display,
+                    sequences,
+                    carry: input[start..].to_owned(),
+                };
+            }
+            continue;
         }
+        if bytes[index] == 0x1b && is_possible_osc52_start(&bytes[index..]) {
+            return Osc52Split {
+                display,
+                sequences,
+                carry: input[index..].to_owned(),
+            };
+        }
+        let next = input[index..]
+            .chars()
+            .next()
+            .map_or(1, |character| character.len_utf8());
+        display.push_str(&input[index..index + next]);
+        index += next;
     }
-    found
+    Osc52Split {
+        display,
+        sequences,
+        carry: String::new(),
+    }
+}
+
+fn osc52_intro_prefix(bytes: &[u8]) -> bool {
+    bytes.len() >= OSC52_INTRO.len() && bytes.starts_with(OSC52_INTRO)
+}
+
+fn is_possible_osc52_start(bytes: &[u8]) -> bool {
+    !bytes.is_empty() && OSC52_INTRO.starts_with(bytes)
+}
+
+pub fn write_osc52_passthrough<W: std::io::Write>(
+    writer: &mut W,
+    sequences: &[String],
+) -> std::io::Result<()> {
+    for sequence in sequences {
+        writer.write_all(sequence.as_bytes())?;
+    }
+    writer.flush()
 }
 
 fn occupancy_loading_step_lines(state: &AppState) -> Vec<Line<'static>> {
@@ -1936,8 +2008,15 @@ fn occupancy_loading_footer(collapsed: bool) -> String {
     }
 }
 
-fn occupancy_session_footer() -> String {
-    " x list  shift+esc/^] stop typing  ⌥f restore tree ".to_owned()
+fn occupancy_session_footer(state: &AppState) -> String {
+    if state.osc52_passthrough_failed {
+        format!(
+            " {}  │  x list  shift+esc/^] stop typing  ⌥f restore tree ",
+            OSC52_PASSTHROUGH_DISABLED
+        )
+    } else {
+        " x list  shift+esc/^] stop typing  ⌥f restore tree ".to_owned()
+    }
 }
 
 fn render_occupancy_loading(frame: &mut Frame<'_>, state: &AppState, area: Rect) {
@@ -2286,7 +2365,7 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
     }
     frame.render_widget(
         Paragraph::new(if state.focus_mode {
-            occupancy_session_footer()
+            occupancy_session_footer(state)
         } else {
             occupancy_control_footer(&state.status_line, state.detail.as_ref())
         })
@@ -2800,6 +2879,65 @@ mod tests {
             vec!["\u{1b}]52;c;YQ==\u{1b}\\".to_owned()]
         );
         assert!(extract_osc52_sequences("no clipboard").is_empty());
+        let split = split_osc52("", "hello\u{1b}]52;c;c2FsdA==\u{7}world");
+        assert_eq!(split.display, "helloworld");
+        assert!(split.carry.is_empty());
+        assert!(!split.display.contains("]52;"));
+    }
+
+    #[test]
+    fn code_tui_reassembles_osc52_split_across_terminal_frames() {
+        let mut state = AppState::default();
+        state.apply(ParentMessage::TerminalOutput {
+            stream: "stdout".to_owned(),
+            data: "pre\u{1b}]52;c;".to_owned(),
+        });
+        assert!(state.take_osc52().is_empty());
+        state.apply(ParentMessage::TerminalOutput {
+            stream: "stdout".to_owned(),
+            data: "YQ==\u{7}post".to_owned(),
+        });
+        assert_eq!(state.take_osc52(), vec!["\u{1b}]52;c;YQ==\u{7}".to_owned()]);
+        assert_eq!(
+            split_osc52("\u{1b}]", "52;c;YQ==\u{1b}\\").sequences,
+            vec!["\u{1b}]52;c;YQ==\u{1b}\\".to_owned()]
+        );
+    }
+
+    #[test]
+    fn code_tui_osc52_write_failure_says_local_terminal_disabled() {
+        struct FailWriter;
+        impl std::io::Write for FailWriter {
+            fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::BrokenPipe,
+                    "host tty closed",
+                ))
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        let sequences = vec!["\u{1b}]52;c;YQ==\u{7}".to_owned()];
+        let mut ok = Vec::new();
+        write_osc52_passthrough(&mut ok, &sequences).expect("host tty write");
+        assert_eq!(ok, sequences[0].as_bytes());
+        assert!(write_osc52_passthrough(&mut FailWriter, &sequences).is_err());
+        let mut state = AppState::default();
+        state.focus_mode = true;
+        state.mark_osc52_passthrough_failed();
+        assert_eq!(state.status_line, OSC52_PASSTHROUGH_DISABLED);
+        assert!(!state.status_line.to_ascii_lowercase().contains("occupancy"));
+        assert!(!state.status_line.contains("pbcopy"));
+        let backend = ratatui::backend::TestBackend::new(120, 8);
+        let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw osc52 failure");
+        let out = buffer_plain(&terminal);
+        assert!(out.contains("OSC 52 disabled"), "{out}");
+        assert!(out.contains("remote agent"), "{out}");
+        assert!(!out.to_ascii_lowercase().contains("copied"), "{out}");
     }
 
     #[test]
@@ -2817,6 +2955,7 @@ mod tests {
         assert!(out.contains("fullscreen / restore tree"), "{out}");
         assert!(out.contains("leave from list"), "{out}");
         assert!(out.contains("confirm delete"), "{out}");
+        assert!(out.contains("OSC 52"), "{out}");
         assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
         assert!(!out.contains("Y restore"), "{out}");
         assert!(!out.contains("q quit"), "{out}");
