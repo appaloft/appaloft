@@ -40,8 +40,20 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   resource.
 - `appaloft code [path|git-remote] [--profile <name-or-id>] [--harness opencode|pi]` occupies my Sandbox after login. It requires a default
   enrolled Server, dispatches `workspaces.open` with the remote SHA and
-  `targetServerId`, then prints
+  `targetServerId`. On a TTY it enters the occupancy Workspace TUI immediately
+  with the list collapsed and a centered **preparing the agent** step panel, then
+  attaches into the remote session. A source checkout finds or cargo-builds
+  `appaloft-workspace-tui` so `appaloftdev code` does not require a manual
+  cargo build when the toolchain can produce it. Lookup includes the executed
+  tree and sibling/dev checkouts (`appaloft-cloud/community/appaloft` →
+  `appaloft`) plus `APPALOFT_WORKSPACE_TUI_BINARY`. If the sidecar is missing and
+  rustc is older than 1.88, the CLI names `appaloft-workspace-tui` and prints
+  `rustup toolchain install stable` plus
+  `cargo build --locked --manifest-path apps/workspace-control-tui/Cargo.toml`.
+  `--no-attach` and non-TTY print
+  one-line progress and
   `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>`.
+  Skill copy is fail-soft and time-bounded.
   Default harness is OpenCode. Default `code` and `code --new` pick the live occupancy / live
   install. Same-name leftover Profiles must not block first success and must not require
   memorizing installation ids. `--profile` is a fallback pin; only an explicit colliding name

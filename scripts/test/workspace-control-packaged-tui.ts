@@ -44,8 +44,8 @@ async function waitFor(needle: string): Promise<void> {
 }
 
 try {
-  await waitFor("Workspaces");
   await waitFor("\x1b[?1049h");
+  await waitFor("preparing the agent");
   let exitCode: number | undefined;
   for (let attempt = 0; attempt < 40 && exitCode === undefined; attempt += 1) {
     terminal.write("q");

@@ -1295,7 +1295,10 @@ describe("Workspace control presentation", () => {
     await listStarted.promise;
     await started;
     expect(renderer.closed).toBe(1);
-    expect(renderer.messages[0]).toEqual({ type: "workspaces", workspaces: [] });
+    expect(renderer.messages[0]).toEqual({
+      type: "loading",
+      title: "Appaloft",
+    });
     resolveList?.({ items: [{ sandboxId: "sbx_late", status: "ready" }] });
   });
 
@@ -2038,5 +2041,218 @@ describe("Workspace control presentation", () => {
       phase: "workspace-control-open-compare",
       retryable: false,
     });
+  });
+
+  test("[WS-REMOTE-PROGRESS-193][WS-REMOTE-PROGRESS-194] occupy bootstrap paints collapsed preparing wait then attaches without waiting on skills", async () => {
+    const terminal = {
+      detached: 0,
+      async *[Symbol.asyncIterator](): AsyncIterator<TerminalSessionFrame> {},
+      write: () => Promise.resolve(),
+      resize: () => Promise.resolve(),
+      detach() {
+        this.detached += 1;
+        return Promise.resolve();
+      },
+      close: () => Promise.resolve(),
+    } satisfies TerminalSession & { detached: number };
+    const renderer = new FakeRendererSession([]);
+    renderer.events = async function* events() {
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        if (
+          this.messages.some((message) => message.type === "terminal-ready") ||
+          this.messages.some((message) => message.type === "error")
+        ) {
+          break;
+        }
+        await Promise.resolve();
+      }
+      yield { type: "quit" };
+    };
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+    let skillBlockers = 0;
+    await presentation.start({
+      occupyBootstrap: async ({ reportProgress }) => {
+        await reportProgress("Opening occupancy on hostinger…");
+        await reportProgress("Copying skills…");
+        skillBlockers += 1;
+        return {
+          workspaceId: "sbx_1",
+          attach: {
+            workspaceId: "sbx_1",
+            runtimeId: "sar_1",
+            transport: "managed-terminal",
+            sessionId: "term_occupy",
+            processId: "proc_1",
+            access: {
+              kind: "websocket",
+              path: "/sessions/term_occupy",
+              expiresAt: "2099-01-01T00:00:00.000Z",
+            },
+          },
+        };
+      },
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery) {
+          return ok({ items: [{ sandboxId: "sbx_1", status: "ready" }] } as T);
+        }
+        if (query instanceof ShowSandboxQuery) {
+          return ok({ sandboxId: "sbx_1", status: "ready" } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+      terminalSessionGateway: { attach: () => ok(terminal) },
+    });
+    expect(skillBlockers).toBe(1);
+    expect(renderer.messages[0]).toEqual({
+      type: "loading",
+      collapsed: true,
+      title: "Appaloft",
+    });
+    expect(renderer.messages).toContainEqual({
+      type: "progress",
+      message: "Opening occupancy on hostinger…",
+    });
+    expect(renderer.messages).toContainEqual({
+      type: "progress",
+      message: "Copying skills…",
+    });
+    expect(renderer.messages).toContainEqual({
+      type: "progress",
+      message: "Attaching…",
+    });
+    expect(renderer.messages).toContainEqual({
+      type: "terminal-ready",
+      workspaceId: "sbx_1",
+      runtimeId: "sar_1",
+      sessionId: "term_occupy",
+    });
+    const attachAt = renderer.messages.findIndex((message) => message.type === "terminal-ready");
+    const workspacesAt = renderer.messages.findIndex(
+      (message) => message.type === "workspaces" && message.workspaces.length > 0,
+    );
+    expect(attachAt).toBeGreaterThan(-1);
+    expect(workspacesAt).toBeGreaterThan(attachAt);
+  });
+
+  test("[WS-REMOTE-PROGRESS-196] attach does not surface list or detail conflicts", async () => {
+    const terminal = {
+      detached: 0,
+      async *[Symbol.asyncIterator](): AsyncIterator<TerminalSessionFrame> {},
+      write: () => Promise.resolve(),
+      resize: () => Promise.resolve(),
+      detach() {
+        this.detached += 1;
+        return Promise.resolve();
+      },
+      close: () => Promise.resolve(),
+    } satisfies TerminalSession & { detached: number };
+    const renderer = new FakeRendererSession([
+      { type: "select", workspaceId: "sbx_1" },
+      { type: "quit" },
+    ]);
+    renderer.events = async function* events() {
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        if (this.messages.some((message) => message.type === "terminal-ready")) break;
+        await Promise.resolve();
+      }
+      yield { type: "select", workspaceId: "sbx_1" };
+      yield { type: "quit" };
+    };
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+    const conflict = domainError.conflict("Sandbox port publishing is unsupported", {
+      code: "conflict",
+      phase: "sandbox-ports",
+    });
+    await presentation.start({
+      occupyBootstrap: async ({ reportProgress }) => {
+        await reportProgress("Opening occupancy on hostinger…");
+        return {
+          workspaceId: "sbx_1",
+          attach: {
+            workspaceId: "sbx_1",
+            runtimeId: "sar_1",
+            transport: "managed-terminal",
+            sessionId: "term_occupy",
+            processId: "proc_1",
+            access: {
+              kind: "websocket",
+              path: "/sessions/term_occupy",
+              expiresAt: "2099-01-01T00:00:00.000Z",
+            },
+          },
+        };
+      },
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery) return err(conflict);
+        if (query instanceof ListSandboxPortsQuery) return err(conflict);
+        if (query instanceof ShowSandboxQuery) return err(conflict);
+        return ok({ items: [] } as T);
+      },
+      terminalSessionGateway: { attach: () => ok(terminal) },
+    });
+    expect(renderer.messages).toContainEqual({
+      type: "terminal-ready",
+      workspaceId: "sbx_1",
+      runtimeId: "sar_1",
+      sessionId: "term_occupy",
+    });
+    expect(renderer.messages.some((message) => message.type === "error")).toBeFalse();
+    expect(
+      renderer.messages.some(
+        (message) =>
+          message.type === "error" &&
+          (message.phase === "occupancy-code-bootstrap" ||
+            message.phase === "workspace-control-select"),
+      ),
+    ).toBeFalse();
+  });
+
+  test("[WS-REMOTE-PROGRESS-201] locator miss exits the occupancy TUI instead of staying on Resolving repository", async () => {
+    const renderer = new FakeRendererSession([]);
+    renderer.events = async function* events() {
+      for (let attempt = 0; attempt < 200; attempt += 1) {
+        if (this.closed > 0) break;
+        await Promise.resolve();
+      }
+      yield { type: "quit" };
+    };
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+    const started = Date.now();
+    await expect(
+      presentation.start({
+        occupyBootstrap: async ({ reportProgress }) => {
+          await reportProgress("Resolving repository…");
+          throw {
+            code: "workspace_remote_repository_missing",
+            category: "user" as const,
+            message: "Remote code needs a Git repository with an origin",
+            retryable: false,
+            details: {
+              phase: "remote-code-locator",
+              guidance: "Run appaloft code from a Git repository, or use appaloft code --local.",
+            },
+          };
+        },
+        executeCommand: async () => ok({}),
+        executeQuery: async <T>() => ok({ items: [] } as T),
+      }),
+    ).rejects.toMatchObject({
+      code: "workspace_remote_repository_missing",
+    });
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(renderer.closed).toBeGreaterThan(0);
+    expect(renderer.messages).toContainEqual({
+      type: "progress",
+      message: "Resolving repository…",
+    });
+    expect(renderer.messages.some((message) => message.type === "terminal-ready")).toBeFalse();
   });
 });

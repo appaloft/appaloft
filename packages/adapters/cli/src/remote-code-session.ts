@@ -1,4 +1,6 @@
 import { existsSync, statSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join, resolve, sep } from "node:path";
 
 import { type DomainError } from "@appaloft/core";
 import { hasCliControlPlaneLogin, workspaceRemoteLoginRequiredError } from "./cli-session-login.js";
@@ -16,6 +18,9 @@ import {
   occupancyGitHubCompareUrl,
   occupancyGitHubPullRequestUrl,
 } from "./occupancy-chrome.js";
+import { OCCUPANCY_CODE_PROGRESS } from "./occupancy-code-progress.js";
+
+export const WORKSPACE_GIT_DISCOVERY_TIMEOUT_MS = 3_000;
 
 export const REMOTE_CODE_BANNER_PREFIX = "Remote ·";
 export const REMOTE_CODE_DOOR_HINT =
@@ -115,6 +120,7 @@ export interface RemoteCodeDoorProbe {
   }>;
   readonly resolveRemoteRef?: (repository: string, ref: string) => Promise<RemoteGitWorkspaceRef>;
   readonly runGit?: WorkspaceGitCommandRunner;
+  readonly onProgress?: (message: string) => void;
 }
 
 export function hasRemoteCodeLogin(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -197,6 +203,44 @@ export interface WorkspaceOpenSource {
 }
 
 export interface ResolveWorkspaceOpenSourceOptions extends ResolveGitWorkspaceProgress {}
+
+export function folderHasGitWorktree(
+  selectedPath: string,
+  homeDir = process.env.HOME?.trim() || homedir(),
+): boolean {
+  const ceiling = workspaceGitDiscoveryCeiling(selectedPath, homeDir);
+  let current = resolve(selectedPath.trim() || ".");
+  for (let depth = 0; depth < 16; depth += 1) {
+    if (existsSync(join(current, ".git"))) return true;
+    const parent = dirname(current);
+    if (parent === current) return false;
+    if (ceiling && (current === ceiling || parent === ceiling)) return false;
+    current = parent;
+  }
+  return false;
+}
+
+export function workspaceGitDiscoveryCeiling(
+  selectedPath: string,
+  homeDir = process.env.HOME?.trim() || homedir(),
+): string | undefined {
+  const home = homeDir.trim();
+  if (!home) return undefined;
+  const resolvedHome = resolve(home);
+  const resolvedPath = resolve(selectedPath.trim() || ".");
+  if (resolvedPath === resolvedHome) return undefined;
+  const prefix = resolvedHome.endsWith(sep) ? resolvedHome : `${resolvedHome}${sep}`;
+  if (!resolvedPath.startsWith(prefix)) return undefined;
+  return resolvedHome;
+}
+
+function remoteCodeGitEnv(ceiling?: string): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    GIT_TERMINAL_PROMPT: "0",
+    ...(ceiling ? { GIT_CEILING_DIRECTORIES: ceiling } : {}),
+  };
+}
 
 export function isWorkspaceGitRootUnavailable(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -379,10 +423,12 @@ export async function resolveDefaultRemoteCodeDoor(
   path = ".",
 ): Promise<RemoteCodeDoorResolution> {
   const env = probe.env ?? process.env;
+  probe.onProgress?.(OCCUPANCY_CODE_PROGRESS.checkingLogin);
   if (!(await hasCliControlPlaneLogin(env, probe.readActiveProfile))) {
     throw workspaceRemoteLoginRequiredError();
   }
 
+  probe.onProgress?.(OCCUPANCY_CODE_PROGRESS.lookingUpServers);
   const servers = probe.listServers ? await probe.listServers() : [];
   const server = selectDefaultRemoteCodeServer(servers);
   if (!server) {
@@ -395,10 +441,18 @@ export async function resolveDefaultRemoteCodeDoor(
       },
     );
   }
+  probe.onProgress?.(OCCUPANCY_CODE_PROGRESS.choosingOccupancy);
   const occupancies = probe.listOccupancies ? await probe.listOccupancies() : [];
+  const latestOccupancy = selectResumeOccupancy(occupancies);
   const explicitRemote = isRemoteCodeGitRemoteLocator(path)
     ? await resolveRemoteCodeGitRemoteLocator(path, probe.runGit)
     : undefined;
+  const homeDir = probe.env?.HOME ?? process.env.HOME;
+  const probeThisFolderGit =
+    Boolean(explicitRemote) ||
+    Boolean(probe.forceNew) ||
+    !latestOccupancy ||
+    folderHasGitWorktree(path, homeDir);
   let localLocator:
     | {
         readonly repository: string;
@@ -408,44 +462,75 @@ export async function resolveDefaultRemoteCodeDoor(
       }
     | undefined;
   let localLocatorError: unknown;
-  if (!explicitRemote) {
+  let announcedRepository = false;
+  if (!explicitRemote && probeThisFolderGit) {
+    probe.onProgress?.(OCCUPANCY_CODE_PROGRESS.resolvingRepository);
+    announcedRepository = true;
     try {
       localLocator = probe.resolveLocator
         ? await probe.resolveLocator()
-        : await resolveRemoteCodeLocator(path, probe.runGit);
+        : await resolveRemoteCodeLocator(
+            path,
+            probe.runGit,
+            homeDir === undefined ? {} : { homeDir },
+          );
     } catch (error) {
       localLocatorError = error;
     }
   }
   const requestedLocator = explicitRemote ?? localLocator;
-  if (!requestedLocator) {
+  const matchingOccupancy = requestedLocator
+    ? selectResumeOccupancy(
+        occupancies.filter(
+          (item) => item.occupancy?.repositoryIdentity === requestedLocator.repositoryIdentity,
+        ),
+      )
+    : undefined;
+  let locator: {
+    readonly repository: string;
+    readonly repositoryIdentity: string;
+    readonly ref: string;
+    readonly branch: string;
+  };
+  let occupancyResume: RemoteCodeOccupancy["occupancy"];
+  if (requestedLocator) {
+    locator = requestedLocator;
+    if (!probe.forceNew && matchingOccupancy?.occupancy) {
+      occupancyResume = matchingOccupancy.occupancy;
+    }
+  } else if (!probe.forceNew && latestOccupancy?.occupancy) {
+    occupancyResume = latestOccupancy.occupancy;
+    const normalized = normalizeWorkspaceRepositoryRemote(
+      `https://${latestOccupancy.occupancy.repositoryIdentity.replace(/\.git$/u, "")}.git`,
+    );
+    locator = {
+      repository: normalized.credentialFreeHttps,
+      repositoryIdentity: latestOccupancy.occupancy.repositoryIdentity,
+      ref: `refs/heads/${latestOccupancy.occupancy.branch?.trim() || "main"}`,
+      branch: latestOccupancy.occupancy.branch?.trim() || "main",
+    };
+  } else {
     throwWorkspaceLocatorMissing(localLocatorError, "remote-code-locator");
   }
-  const matchingOccupancy = selectResumeOccupancy(
-    occupancies.filter(
-      (item) => item.occupancy?.repositoryIdentity === requestedLocator.repositoryIdentity,
-    ),
-  );
-  const occupancy = probe.forceNew ? undefined : matchingOccupancy;
-  const locator = requestedLocator;
-  let occupancyResume: RemoteCodeOccupancy["occupancy"];
-  if (occupancy?.occupancy) occupancyResume = occupancy.occupancy;
+
+  if (!occupancyResume && !announcedRepository) {
+    probe.onProgress?.(OCCUPANCY_CODE_PROGRESS.resolvingRepository);
+  }
 
   const binding = probe.showBinding ? await probe.showBinding(locator.repositoryIdentity) : null;
   let remote: RemoteGitWorkspaceRef;
-  try {
-    remote =
-      probe.resolveRemoteRef === undefined
-        ? await resolveRemoteCodeRef(locator, probe.runGit)
-        : await probe.resolveRemoteRef(locator.repository, locator.ref);
-  } catch (error) {
-    if (!occupancyResume) throw error;
+  if (occupancyResume) {
     remote = {
       repositoryIdentity: locator.repositoryIdentity,
       credentialFreeHttpsRepository: locator.repository,
       ref: locator.ref,
       commitSha: occupancyResume.commitSha,
     };
+  } else {
+    remote =
+      probe.resolveRemoteRef === undefined
+        ? await resolveRemoteCodeRef(locator, probe.runGit)
+        : await probe.resolveRemoteRef(locator.repository, locator.ref);
   }
 
   return {
@@ -496,8 +581,9 @@ async function resolveTrackedRemoteCodeSha(
     (async ({ args, cwd }: { args: readonly string[]; cwd: string }) => {
       const result = await execFileAsync("git", [...args], {
         cwd,
-        timeout: 15_000,
+        timeout: WORKSPACE_GIT_DISCOVERY_TIMEOUT_MS,
         encoding: "utf8",
+        env: remoteCodeGitEnv(),
       });
       return { stdout: result.stdout, stderr: result.stderr };
     });
@@ -654,6 +740,7 @@ async function resolveRemoteCodeGitRemoteLocator(
 export async function resolveRemoteCodeLocator(
   path = ".",
   runGit?: WorkspaceGitCommandRunner,
+  options: { readonly homeDir?: string } = {},
 ): Promise<{
   readonly repository: string;
   readonly repositoryIdentity: string;
@@ -663,18 +750,20 @@ export async function resolveRemoteCodeLocator(
   const { execFile } = await import("node:child_process");
   const { promisify } = await import("node:util");
   const execFileAsync = promisify(execFile);
+  const selectedPath = path.trim() || ".";
+  const ceiling = workspaceGitDiscoveryCeiling(selectedPath, options.homeDir);
   const git =
     runGit ??
     (async ({ args, cwd }: { args: readonly string[]; cwd: string }) => {
       const result = await execFileAsync("git", [...args], {
         cwd,
-        timeout: 15_000,
+        timeout: WORKSPACE_GIT_DISCOVERY_TIMEOUT_MS,
         encoding: "utf8",
+        env: remoteCodeGitEnv(ceiling),
       });
       return { stdout: result.stdout, stderr: result.stderr };
     });
 
-  const selectedPath = path.trim() || ".";
   let root: string;
   try {
     const toplevel = await git({ args: ["rev-parse", "--show-toplevel"], cwd: selectedPath });

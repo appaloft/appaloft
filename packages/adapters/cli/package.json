@@ -4,7 +4,9 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./operate-presentation": "./src/operate-presentation.ts"
+    "./operate-presentation": "./src/operate-presentation.ts",
+    "./workspace-control-renderer": "./src/workspace-control-renderer.ts",
+    "./workspace-tui-launch": "./src/workspace-tui-launch.ts"
   },
   "dependencies": {
     "@appaloft/application": "workspace:*",

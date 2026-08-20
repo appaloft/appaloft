@@ -235,4 +235,158 @@ describe("Workspace control renderer channel", () => {
     });
     expect(terminated).toBe(1);
   });
+
+  test("[WS-REMOTE-PROGRESS-195] source checkout cargo-builds a missing occupancy TUI sidecar", async () => {
+    const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { ensureWorkspaceControlRendererBinary, workspaceControlRendererCrateDir } = await import(
+      "../src/workspace-control-renderer"
+    );
+    const root = await mkdtemp(join(tmpdir(), "appaloft-tui-crate-"));
+    const crate = join(root, "apps", "workspace-control-tui");
+    const debugBinary = join(crate, "target", "debug", "appaloft-workspace-tui");
+    await mkdir(crate, { recursive: true });
+    await writeFile(
+      join(crate, "Cargo.toml"),
+      '[package]\nname = "appaloft-workspace-control-tui"\n',
+    );
+    let built = 0;
+    try {
+      expect(workspaceControlRendererCrateDir({ APPALOFT_REPO_ROOT: root, PATH: "" })).toBe(crate);
+      const resolved = await ensureWorkspaceControlRendererBinary(
+        { APPALOFT_REPO_ROOT: root, PATH: "" },
+        async (crateDir) => {
+          built += 1;
+          expect(crateDir).toBe(crate);
+          await mkdir(join(crate, "target", "debug"), { recursive: true });
+          await writeFile(debugBinary, "");
+        },
+        { rustcVersion: "rustc 1.97.0" },
+      );
+      expect(built).toBe(1);
+      expect(resolved).toBe(debugBinary);
+      const again = await ensureWorkspaceControlRendererBinary(
+        { APPALOFT_REPO_ROOT: root, PATH: "" },
+        async () => {
+          built += 1;
+        },
+        { rustcVersion: "rustc 1.97.0" },
+      );
+      expect(built).toBe(1);
+      expect(again).toBe(debugBinary);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("[WS-REMOTE-PROGRESS-198] missing renderer names the binary and next command", async () => {
+    const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const {
+      WORKSPACE_CONTROL_TUI_BINARY_NAME,
+      WORKSPACE_CONTROL_TUI_BUILD_COMMAND,
+      WORKSPACE_CONTROL_TUI_TOOLCHAIN_COMMAND,
+      ensureWorkspaceControlRendererBinary,
+      rustcTooOldForWorkspaceControlTui,
+      workspaceControlRendererUnavailableMessage,
+    } = await import("../src/workspace-control-renderer");
+    const { formatHumanCliError } = await import("../src/runtime");
+    const message = workspaceControlRendererUnavailableMessage({
+      rustcVersion: "rustc 1.85.0 (4d91de4e9 2025-02-17)",
+    });
+    expect(rustcTooOldForWorkspaceControlTui("rustc 1.85.0")).toBeTrue();
+    expect(message).toContain(WORKSPACE_CONTROL_TUI_BINARY_NAME);
+    expect(message).toContain(WORKSPACE_CONTROL_TUI_BUILD_COMMAND);
+    expect(message).toContain(WORKSPACE_CONTROL_TUI_TOOLCHAIN_COMMAND);
+    expect(message).toContain("rustc 1.85");
+    expect(message).toContain("--no-attach");
+    const printed = formatHumanCliError({
+      code: "infra_error",
+      category: "infra",
+      message,
+      retryable: false,
+      details: { phase: "workspace-control-renderer", reason: "toolchain-old" },
+    });
+    expect(printed).toContain(WORKSPACE_CONTROL_TUI_BINARY_NAME);
+    expect(printed).toContain(WORKSPACE_CONTROL_TUI_BUILD_COMMAND);
+    const root = await mkdtemp(join(tmpdir(), "appaloft-tui-old-rustc-"));
+    const crate = join(root, "apps", "workspace-control-tui");
+    await mkdir(crate, { recursive: true });
+    await writeFile(
+      join(crate, "Cargo.toml"),
+      '[package]\nname = "appaloft-workspace-control-tui"\n',
+    );
+    let built = 0;
+    try {
+      let caught: unknown;
+      try {
+        await ensureWorkspaceControlRendererBinary(
+          { APPALOFT_REPO_ROOT: root, PATH: "" },
+          async () => {
+            built += 1;
+          },
+          { rustcVersion: "rustc 1.85.0 (4d91de4e9 2025-02-17)" },
+        );
+      } catch (error) {
+        caught = error;
+      }
+      expect(built).toBe(0);
+      expect(caught).toMatchObject({
+        category: "infra",
+        details: { reason: "toolchain-old" },
+      });
+      expect(String((caught as { message?: string }).message)).toContain(
+        WORKSPACE_CONTROL_TUI_BINARY_NAME,
+      );
+      expect(String((caught as { message?: string }).message)).toContain(
+        WORKSPACE_CONTROL_TUI_BUILD_COMMAND,
+      );
+      expect(String((caught as { message?: string }).message)).toContain("rustc 1.85");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("[WS-REMOTE-PROGRESS-200] community pin locates a sibling checkout TUI binary", async () => {
+    const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const {
+      ensureWorkspaceControlRendererBinary,
+      resolveWorkspaceControlRendererBinary,
+      workspaceControlRendererSearchRoots,
+    } = await import("../src/workspace-control-renderer");
+    const workspace = await mkdtemp(join(tmpdir(), "appaloft-sibling-tui-"));
+    const community = join(workspace, "appaloft-cloud", "community", "appaloft");
+    const publicCheckout = join(workspace, "appaloft");
+    const communityCrate = join(community, "apps", "workspace-control-tui");
+    const publicCrate = join(publicCheckout, "apps", "workspace-control-tui");
+    const publicBinary = join(publicCrate, "target", "debug", "appaloft-workspace-tui");
+    await mkdir(communityCrate, { recursive: true });
+    await mkdir(join(publicCrate, "target", "debug"), { recursive: true });
+    await writeFile(join(communityCrate, "Cargo.toml"), '[package]\nname = "tui"\n');
+    await writeFile(join(publicCrate, "Cargo.toml"), '[package]\nname = "tui"\n');
+    await writeFile(publicBinary, "");
+    let built = 0;
+    try {
+      const env = { APPALOFT_REPO_ROOT: community, PATH: "" };
+      const roots = workspaceControlRendererSearchRoots(env);
+      expect(roots).toContain(community);
+      expect(roots).toContain(publicCheckout);
+      expect(resolveWorkspaceControlRendererBinary(env)).toBe(publicBinary);
+      const resolved = await ensureWorkspaceControlRendererBinary(
+        env,
+        async () => {
+          built += 1;
+        },
+        { rustcVersion: "rustc 1.85.0" },
+      );
+      expect(built).toBe(0);
+      expect(resolved).toBe(publicBinary);
+    } finally {
+      await rm(workspace, { recursive: true, force: true });
+    }
+  });
 });

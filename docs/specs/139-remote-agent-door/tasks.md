@@ -406,6 +406,42 @@
 - [x] Unit tests WS-REMOTE-HOME-SKILL-182–186
 - [x] First-party Appaloft skill offer stays (WS-REMOTE-SKILL-017)
 
+## Slice 49 - occupy/code progress and attach-first
+
+- [x] Present-tense status before login, server, occupancy, occupy, skill copy, and attach
+- [x] Default `code` attaches as soon as occupancy exists; HOME skill / extra chrome do not block attach
+- [x] `--no-attach` prints the same progress and stays occupy-only
+- [x] Login wait is announced before fail-closed logout
+- [x] Unit tests WS-REMOTE-PROGRESS-187–190
+- [x] shell entry prints before importing `run.ts`; `run.ts` prints before login/PGlite/composition; remote `code` skips local PGlite
+- [x] Unit tests WS-REMOTE-PROGRESS-191
+- [x] `--no-attach` prints Remote banner before skill copy; skill copy is fail-soft and time-bounded
+- [x] Unit tests WS-REMOTE-PROGRESS-192
+- [x] TTY `code`/`workspace` enter occupancy TUI with centered/footer progress
+- [x] Unit tests WS-REMOTE-PROGRESS-193
+- [x] TTY `code` collapsed tree + centered preparing-the-agent step panel
+- [x] Unit tests WS-REMOTE-PROGRESS-194
+- [x] Source `appaloftdev` finds or cargo-builds the occupancy TUI sidecar
+- [x] Unit tests WS-REMOTE-PROGRESS-195
+- [x] Attach does not surface list/detail conflict in the TUI footer
+- [x] Unit tests WS-REMOTE-PROGRESS-196
+- [x] TTY warms the occupancy TUI before composition when the sidecar exists
+- [x] Unit tests WS-REMOTE-PROGRESS-197
+- [x] Slim occupancy TUI launch module spawns before reflect-metadata / presentation / composition
+- [x] Occupancy TUI paints collapsed preparing-the-agent before handshake
+- [x] Unit tests WS-REMOTE-PROGRESS-202
+- [x] Parent writes occupancy alt-screen before sidecar lookup/build
+- [x] Unit tests WS-REMOTE-PROGRESS-203
+- [x] Missing TUI sidecar prints binary name + rustup/cargo next step (not one-line unavailable)
+- [x] Unit tests WS-REMOTE-PROGRESS-198
+- [x] Attached occupancy footer hides chrome `conflict at <phase>`
+- [x] Unit tests WS-REMOTE-PROGRESS-199
+- [x] Source-run locates sibling/dev-tree `appaloft-workspace-tui` (community pin)
+- [x] Unit tests WS-REMOTE-PROGRESS-200
+- [x] Non-git / ancestor-git locator does not hang on `Resolving repository…`
+- [x] Unit tests WS-REMOTE-PROGRESS-201
+- [x] Default `code` from a no-git folder resumes live occupancy (git is not a gate)
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

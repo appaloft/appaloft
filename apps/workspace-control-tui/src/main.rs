@@ -105,6 +105,23 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
+    let occupancy_mode = env::var("APPALOFT_TUI_MODE")
+        .ok()
+        .filter(|mode| !mode.is_empty())
+        .is_none();
+    let mut occupancy_restore = None;
+    let mut occupancy_terminal = None;
+    if occupancy_mode {
+        occupancy_restore = Some(TerminalRestore::enter()?);
+        let backend = CrosstermBackend::new(std::io::stdout());
+        let mut terminal = Terminal::new(backend).context("create Ratatui terminal")?;
+        let first_frame = AppState::default();
+        terminal
+            .draw(|frame| render(frame, &first_frame))
+            .context("render occupancy first frame")?;
+        occupancy_terminal = Some(terminal);
+    }
+
     let port = env::var("APPALOFT_WORKSPACE_TUI_PORT")
         .context("APPALOFT_WORKSPACE_TUI_PORT is required")?
         .parse::<u16>()
@@ -127,10 +144,19 @@ fn main() -> Result<()> {
         return operate::run(writer, reader);
     }
 
-    let _restore = TerminalRestore::enter()?;
-    let backend = CrosstermBackend::new(std::io::stdout());
-    let mut terminal = Terminal::new(backend).context("create Ratatui terminal")?;
-    terminal.clear().context("clear TUI surface")?;
+    let _restore = match occupancy_restore {
+        Some(value) => value,
+        None => TerminalRestore::enter()?,
+    };
+    let mut terminal = match occupancy_terminal {
+        Some(terminal) => terminal,
+        None => {
+            let backend = CrosstermBackend::new(std::io::stdout());
+            let mut terminal = Terminal::new(backend).context("create Ratatui terminal")?;
+            terminal.clear().context("clear TUI surface")?;
+            terminal
+        }
+    };
 
     let (message_tx, message_rx) = mpsc::channel::<ParentMessage>();
     std::thread::spawn(move || {
@@ -186,7 +212,8 @@ fn main() -> Result<()> {
                 send(&mut writer, &RendererEvent::TerminalReconnect)?;
             }
             let selected = state.selected_workspace_id().map(str::to_owned);
-            if let Some(workspace_id) = selected
+            if state.should_emit_workspace_select()
+                && let Some(workspace_id) = selected
                 && (before.is_none() || Some(&workspace_id) != last_selected.as_ref())
             {
                 send(
@@ -216,6 +243,7 @@ fn main() -> Result<()> {
             )?;
             last_terminal_size = terminal_size;
         }
+        state.tick_loading();
         terminal
             .draw(|frame| render(frame, &state))
             .context("render Workspace control TUI")?;

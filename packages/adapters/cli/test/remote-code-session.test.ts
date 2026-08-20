@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { OCCUPANCY_CODE_PROGRESS } from "../src/occupancy-code-progress.js";
 import {
   formatRemoteCodeBanner,
   formatRemoteCodeGitHubHint,
@@ -16,6 +17,7 @@ import {
   selectDefaultRemoteCodeServer,
   selectResumeOccupancy,
   selectWorkspaceOpenTargetServerId,
+  workspaceGitDiscoveryCeiling,
 } from "../src/remote-code-session.js";
 
 describe("remote code door", () => {
@@ -79,6 +81,77 @@ describe("remote code door", () => {
     ).toBe("srv_4lifk0yrcecy");
     expect(selectWorkspaceOpenTargetServerId({ servers: [hostinger] })).toBe("srv_4lifk0yrcecy");
     expect(selectWorkspaceOpenTargetServerId({ servers: [] })).toBeUndefined();
+  });
+
+  test("[WS-REMOTE-PROGRESS-187][WS-REMOTE-PROGRESS-190] reports status before slow login, server, occupancy, and repository steps", async () => {
+    const progress: string[] = [];
+    const door = await resolveDefaultRemoteCodeDoor({
+      env: {},
+      onProgress: (message) => progress.push(message),
+      readActiveProfile: async () => {
+        expect(progress).toEqual([OCCUPANCY_CODE_PROGRESS.checkingLogin]);
+        await Bun.sleep(15);
+        return { auth: { token: "token" } };
+      },
+      listServers: async () => {
+        expect(progress).toContain(OCCUPANCY_CODE_PROGRESS.lookingUpServers);
+        expect(progress.indexOf(OCCUPANCY_CODE_PROGRESS.lookingUpServers)).toBeGreaterThan(
+          progress.indexOf(OCCUPANCY_CODE_PROGRESS.checkingLogin),
+        );
+        await Bun.sleep(15);
+        return [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }];
+      },
+      listOccupancies: async () => {
+        expect(progress).toContain(OCCUPANCY_CODE_PROGRESS.choosingOccupancy);
+        await Bun.sleep(15);
+        return [];
+      },
+      resolveLocator: async () => {
+        expect(progress).toContain(OCCUPANCY_CODE_PROGRESS.resolvingRepository);
+        await Bun.sleep(15);
+        return {
+          repository: "https://github.com/acme/api.git",
+          repositoryIdentity: "github.com/acme/api",
+          ref: "refs/heads/main",
+          branch: "main",
+        };
+      },
+      showBinding: async () => null,
+      resolveRemoteRef: async () => ({
+        repositoryIdentity: "github.com/acme/api",
+        credentialFreeHttpsRepository: "https://github.com/acme/api.git",
+        ref: "refs/heads/main",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      }),
+    });
+    expect(door.serverName).toBe("hostinger");
+    expect(progress).toEqual([
+      OCCUPANCY_CODE_PROGRESS.checkingLogin,
+      OCCUPANCY_CODE_PROGRESS.lookingUpServers,
+      OCCUPANCY_CODE_PROGRESS.choosingOccupancy,
+      OCCUPANCY_CODE_PROGRESS.resolvingRepository,
+    ]);
+  });
+
+  test("[WS-REMOTE-PROGRESS-190] announces login before fail-closed logout", async () => {
+    const progress: string[] = [];
+    await expect(
+      resolveDefaultRemoteCodeDoor({
+        env: {},
+        onProgress: (message) => progress.push(message),
+        readActiveProfile: async () => {
+          expect(progress).toEqual([OCCUPANCY_CODE_PROGRESS.checkingLogin]);
+          return null;
+        },
+        listServers: async () => {
+          throw new Error("logout must not look up servers");
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: "workspace_remote_login_required",
+      details: { guidance: expect.stringContaining("Run appaloft login") },
+    });
+    expect(progress).toEqual([OCCUPANCY_CODE_PROGRESS.checkingLogin]);
   });
 
   test("[WS-REMOTE-LOGIN-001] fails closed without login or profile", async () => {
@@ -353,35 +426,43 @@ describe("remote code door", () => {
     expect(door.serverId).toBe("srv_1");
   });
 
-  test("[WS-REMOTE-NO-UPLOAD-006][WS-OPEN-LOCATOR-024] non-git cwd does not resume an unrelated occupancy", async () => {
-    await expect(
-      resolveDefaultRemoteCodeDoor({
-        env: { APPALOFT_TOKEN: "token" },
-        listServers: async () => [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }],
-        listOccupancies: async () => [
-          {
-            sandboxId: "sbx_examples",
-            status: "ready",
-            occupancy: {
-              repositoryIdentity: "github.com/appaloft/examples",
-              commitSha: "d".repeat(40),
-              branch: "main",
+  test("[WS-REMOTE-NO-UPLOAD-006][WS-REMOTE-PROGRESS-201] no-git folder resumes live occupancy without a git remote", async () => {
+    const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-nongit-door-"));
+    let contactedRemote = false;
+    try {
+      const door = await resolveDefaultRemoteCodeDoor(
+        {
+          env: { APPALOFT_TOKEN: "token" },
+          listServers: async () => [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }],
+          listOccupancies: async () => [
+            {
+              sandboxId: "sbx_examples",
+              status: "ready",
+              occupancy: {
+                repositoryIdentity: "github.com/appaloft/examples",
+                commitSha: "d".repeat(40),
+                branch: "main",
+              },
+              lastActivityAt: "2026-08-15T12:30:00.000Z",
             },
-            lastActivityAt: "2026-08-15T12:30:00.000Z",
+          ],
+          resolveLocator: async () => {
+            throw new Error("no-git occupancy must not wait on a folder locator");
           },
-        ],
-        resolveLocator: async () => {
-          throw Object.assign(new Error("missing origin"), {
-            code: "workspace_remote_repository_missing",
-          });
+          resolveRemoteRef: async () => {
+            contactedRemote = true;
+            throw new Error("live occupancy must not wait on ls-remote");
+          },
         },
-        resolveRemoteRef: async () => {
-          throw new Error("unrelated occupancy must not become this folder's locator");
-        },
-      }),
-    ).rejects.toMatchObject({
-      code: "workspace_remote_repository_missing",
-    });
+        emptyDir,
+      );
+      expect(door.repositoryIdentity).toBe("github.com/appaloft/examples");
+      expect(door.commitSha).toBe("d".repeat(40));
+      expect(door.serverName).toBe("hostinger");
+      expect(contactedRemote).toBe(false);
+    } finally {
+      await rm(emptyDir, { recursive: true, force: true });
+    }
     expect(selectResumeOccupancy([])).toBeUndefined();
   });
 
@@ -661,6 +742,93 @@ describe("remote code door", () => {
     expect(door.repositoryIdentity).toBe("github.com/traefik/whoami");
     expect(door.repository).toBe("https://github.com/traefik/whoami.git");
     expect(door.branch).toBe("master");
+  });
+
+  test("[WS-REMOTE-PROGRESS-201] non-git folder under HOME git does not wait on the ancestor remote", async () => {
+    const home = await mkdtemp(join(tmpdir(), "appaloft-home-git-"));
+    const silence = join(home, "nux-code-silence-cwd");
+    await mkdir(silence);
+    const git = async (args: readonly string[]) => {
+      const result = await Bun.spawn(["git", ...args], {
+        cwd: home,
+        stdout: "pipe",
+        stderr: "pipe",
+      }).exited;
+      if (result !== 0) throw new Error(`git ${args.join(" ")} failed`);
+    };
+    try {
+      await git(["init"]);
+      await git(["remote", "add", "origin", "https://github.com/acme/never-resolves.git"]);
+      expect(workspaceGitDiscoveryCeiling(silence, home)).toBe(home);
+      const started = Date.now();
+      let contactedRemote = false;
+      const door = await resolveDefaultRemoteCodeDoor(
+        {
+          env: { APPALOFT_TOKEN: "token", HOME: home },
+          listServers: async () => [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }],
+          listOccupancies: async () => [
+            {
+              sandboxId: "sbx_examples",
+              status: "ready",
+              occupancy: {
+                repositoryIdentity: "github.com/appaloft/examples",
+                commitSha: "d".repeat(40),
+                branch: "main",
+              },
+              lastActivityAt: "2026-08-15T12:30:00.000Z",
+            },
+          ],
+          resolveRemoteRef: async () => {
+            contactedRemote = true;
+            await Bun.sleep(45_000);
+            throw new Error("ancestor remote must not be contacted");
+          },
+        },
+        silence,
+      );
+      expect(door.repositoryIdentity).toBe("github.com/appaloft/examples");
+      expect(door.commitSha).toBe("d".repeat(40));
+      expect(Date.now() - started).toBeLessThan(3_000);
+      expect(contactedRemote).toBe(false);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  test("[WS-REMOTE-PROGRESS-201] matching occupancy uses the stored SHA and does not wait on ls-remote", async () => {
+    const started = Date.now();
+    let contactedRemote = false;
+    const door = await resolveDefaultRemoteCodeDoor({
+      env: { APPALOFT_TOKEN: "token" },
+      listServers: async () => [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }],
+      listOccupancies: async () => [
+        {
+          sandboxId: "sbx_api",
+          status: "ready",
+          occupancy: {
+            repositoryIdentity: "github.com/acme/api",
+            commitSha: "d".repeat(40),
+            branch: "main",
+          },
+          lastActivityAt: "2026-08-15T12:30:00.000Z",
+        },
+      ],
+      resolveLocator: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+      }),
+      resolveRemoteRef: async () => {
+        contactedRemote = true;
+        await Bun.sleep(45_000);
+        throw new Error("matching occupancy must not wait on ls-remote");
+      },
+    });
+    expect(door.commitSha).toBe("d".repeat(40));
+    expect(door.repositoryIdentity).toBe("github.com/acme/api");
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(contactedRemote).toBe(false);
   });
 
   test("[WS-REMOTE-URL-SHORTHAND-056] existing local owner/repo directory stays a path", async () => {

@@ -33,7 +33,6 @@ import {
   ResumeAgentTaskRunCommand,
   ShowAgentTaskRunQuery,
   ShowSandboxQuery,
-  ShowTerminalSessionQuery,
   ShowWorkspaceCollaborationQuery,
   SteerAgentTaskRunCommand,
   StopAgentTaskRunCommand,
@@ -960,7 +959,7 @@ describe("Agent Workspace CLI", () => {
     expect(commandDispatched).toBeFalse();
   });
 
-  test("[WS-OPEN-LOCATOR-024] code --no-attach from a non-git cwd does not resume examples occupancy", async () => {
+  test("[WS-REMOTE-PROGRESS-201] code --no-attach from a non-git cwd occupies the live occupancy", async () => {
     const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-nongit-"));
     const commands: Command<unknown>[] = [];
     const { createCliProgram } = await import("../src");
@@ -1009,17 +1008,15 @@ describe("Agent Workspace CLI", () => {
     process.stderr.write = (() => true) as typeof process.stderr.write;
     try {
       await program.parseAsync(["node", "appaloft", "code", emptyDir, "--no-attach"]);
-      throw new Error("Expected non-git cwd to fail instead of resuming examples");
-    } catch (error) {
-      const errorText = String(error);
-      expect(errorText).toContain("workspace_remote_repository_missing");
-      expect(errorText).not.toContain("Workspace path is not inside a Git worktree");
-      expect(errorText).not.toContain("github.com/appaloft/examples");
     } finally {
       process.stderr.write = write;
       process.exitCode = originalExitCode ?? 0;
     }
-    expect(commands).toEqual([]);
+    expect(commands[0]?.input).toMatchObject({
+      repositoryIdentity: "github.com/appaloft/examples",
+      commitSha: "b".repeat(40),
+      attach: false,
+    });
   });
 
   test("[WS-CODE-CLI-001][WS-CODE-PARITY-002][WS-CODE-COMPAT-010] code native-attaches after remote door; workspace open stays Git-safe", async () => {
@@ -1850,6 +1847,286 @@ describe("Agent Workspace CLI", () => {
     expect(output.join("")).toContain(
       "Remote · prj_billing · github.com/acme/api@aaaaaaa · this-mac · my sandbox · sbx_local",
     );
+  });
+
+  test("[WS-REMOTE-PROGRESS-187][WS-REMOTE-PROGRESS-188][WS-REMOTE-NO-ATTACH-016] --no-attach prints progress before occupy and does not attach", async () => {
+    const output: string[] = [];
+    const events: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          if (command instanceof OpenAgentWorkspaceCommand) {
+            expect(output.join("")).toContain("Opening occupancy on hostinger…");
+            events.push("occupy");
+            await Bun.sleep(15);
+            return ok({ workspaceId: "sbx_progress", projectId: "prj_web" } as T);
+          }
+          events.push("skill");
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_code_progress_no_attach" }),
+      },
+      resolveRemoteCodeDoor: async () => {
+        expect(output.join("")).toContain("Checking login…");
+        events.push("door");
+        await Bun.sleep(15);
+        return {
+          repository: "https://github.com/acme/api.git",
+          repositoryIdentity: "github.com/acme/api",
+          ref: "refs/heads/main",
+          branch: "main",
+          commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          projectId: "prj_web",
+          serverId: "srv_4lifk0yrcecy",
+          serverName: "hostinger",
+        };
+      },
+      launchNativeWorkspaceClient: async () => {
+        events.push("attach");
+      },
+    });
+    const write = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
+    } finally {
+      process.stdout.write = write;
+    }
+    const printed = output.join("");
+    expect(events[0]).toBe("door");
+    expect(events).toContain("occupy");
+    expect(events).not.toContain("attach");
+    expect(printed).toContain("Checking login…");
+    expect(printed).toContain("Opening occupancy on hostinger…");
+    expect(printed).toContain("Copying skills…");
+    expect(printed).toContain(
+      "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · sbx_progress",
+    );
+    expect(printed.indexOf("Opening occupancy on hostinger…")).toBeLessThan(
+      printed.indexOf("Remote ·"),
+    );
+    expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Copying skills…"));
+  });
+
+  test("[WS-REMOTE-PROGRESS-192] --no-attach prints Remote banner before a hung skill copy and still exits", async () => {
+    const output: string[] = [];
+    let releaseHang: (() => void) | undefined;
+    const hungSkill = new Promise<void>((resolve) => {
+      releaseHang = resolve;
+    });
+    const previousOfferTimeout = process.env.APPALOFT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS;
+    const previousCommandTimeout = process.env.APPALOFT_OCCUPANCY_SKILL_COMMAND_TIMEOUT_MS;
+    process.env.APPALOFT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS = "25";
+    process.env.APPALOFT_OCCUPANCY_SKILL_COMMAND_TIMEOUT_MS = "25";
+    const { createCliProgram } = await import("../src");
+    const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          if (command instanceof OpenAgentWorkspaceCommand) {
+            return ok({ workspaceId: "sbx_hung_skill", projectId: "prj_web" } as T);
+          }
+          await hungSkill;
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_hung_skill" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        projectId: "prj_web",
+        serverId: "srv_4lifk0yrcecy",
+        serverName: "hostinger",
+      }),
+      launchNativeWorkspaceClient: async () => {
+        throw new Error("hung skill copy must not attach");
+      },
+    });
+    const write = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
+    } finally {
+      process.stdout.write = write;
+      if (previousOfferTimeout === undefined) {
+        delete process.env.APPALOFT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS;
+      } else {
+        process.env.APPALOFT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS = previousOfferTimeout;
+      }
+      if (previousCommandTimeout === undefined) {
+        delete process.env.APPALOFT_OCCUPANCY_SKILL_COMMAND_TIMEOUT_MS;
+      } else {
+        process.env.APPALOFT_OCCUPANCY_SKILL_COMMAND_TIMEOUT_MS = previousCommandTimeout;
+      }
+      releaseHang?.();
+    }
+    const printed = output.join("");
+    expect(printed).toContain(
+      "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · sbx_hung_skill",
+    );
+    expect(printed).toContain("Copying skills…");
+    expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Copying skills…"));
+  });
+
+  test("[WS-REMOTE-PROGRESS-189][WS-REMOTE-ATTACH-134] default code attaches before optional skill copy finishes", async () => {
+    const output: string[] = [];
+    let attached = false;
+    let skillCompletedBeforeAttach = false;
+    const { createCliProgram } = await import("../src");
+    const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          if (command instanceof OpenAgentWorkspaceCommand) {
+            expect(output.join("")).toContain("Opening occupancy on hostinger…");
+            expect(attached).toBeFalse();
+            return ok({
+              workspaceId: "sbx_attach_first",
+              projectId: "prj_web",
+              attach: {
+                transport: "native-attach",
+                clientHandoff: "local-client-exec",
+                clientCommand: ["opencode", "attach"],
+              },
+            } as T);
+          }
+          await Bun.sleep(40);
+          if (!attached) skillCompletedBeforeAttach = true;
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_code_progress_attach" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        projectId: "prj_web",
+        serverId: "srv_4lifk0yrcecy",
+        serverName: "hostinger",
+      }),
+      launchNativeWorkspaceClient: async (argv) => {
+        expect(argv).toEqual(["opencode", "attach"]);
+        expect(output.join("")).toContain("Attaching…");
+        attached = true;
+      },
+    });
+    const write = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code"]);
+    } finally {
+      process.stdout.write = write;
+    }
+    const printed = output.join("");
+    expect(attached).toBeTrue();
+    expect(skillCompletedBeforeAttach).toBeFalse();
+    expect(printed).toContain("Opening occupancy on hostinger…");
+    expect(printed).toContain("Copying skills…");
+    expect(printed).toContain("Attaching…");
+    expect(printed).toContain(
+      "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · sbx_attach_first",
+    );
+    expect(printed.indexOf("Opening occupancy on hostinger…")).toBeLessThan(
+      printed.indexOf("Remote ·"),
+    );
+    expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Attaching…"));
+    expect(printed.indexOf("Remote ·")).toBeLessThan(printed.indexOf("Copying skills…"));
+  });
+
+  test("[WS-REMOTE-PROGRESS-193] TTY code enters occupancy TUI without streamed line progress", async () => {
+    const output: string[] = [];
+    let presentationStarts = 0;
+    let occupyBootstrap:
+      | ((input: { reportProgress: (message: string) => Promise<void> }) => Promise<unknown>)
+      | undefined;
+    let doorResolved = false;
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: { execute: async () => ok({}) } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_tui_progress" }),
+      },
+      terminalIO: {
+        stdin: { isTTY: true, on: () => undefined },
+        stdout: {
+          isTTY: true,
+          write: (chunk: string | Uint8Array) => {
+            output.push(String(chunk));
+            return true;
+          },
+        },
+        stderr: {
+          isTTY: true,
+          write: (chunk: string | Uint8Array) => {
+            output.push(String(chunk));
+            return true;
+          },
+        },
+      },
+      environment: { TERM: "xterm-256color" },
+      workspaceControlPresentation: {
+        start: async (context) => {
+          presentationStarts += 1;
+          occupyBootstrap = context.occupyBootstrap;
+        },
+      },
+      resolveRemoteCodeDoor: async () => {
+        doorResolved = true;
+        throw new Error("TTY code should occupy only after the TUI starts");
+      },
+    });
+    const write = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code"]);
+    } finally {
+      process.stdout.write = write;
+    }
+    expect(presentationStarts).toBe(1);
+    expect(occupyBootstrap).toBeTypeOf("function");
+    expect(doorResolved).toBeFalse();
+    expect(output.join("")).not.toContain("Checking login…");
+    expect(output.join("")).not.toContain("Opening occupancy");
+    expect(output.join("")).not.toContain("Opening remote session…");
   });
 
   test("[WS-REMOTE-COMPAT-128][WS-REMOTE-COMPAT-129][WS-REMOTE-COMPAT-130] unstructured occupancy validation names the enrolled Server", async () => {

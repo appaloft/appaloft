@@ -1,4 +1,9 @@
-import "reflect-metadata";
+import {
+  reportOccupancyCliStartupOnce,
+  shouldPrintOccupancyLineProgress,
+  shouldWarmOccupancyTui,
+} from "./occupancy-cli-progress";
+import { enterOccupancyAltScreen, leaveOccupancyAltScreen } from "./occupancy-tui-first-frame";
 
 function parseBoolean(value: string | undefined): boolean | undefined {
   if (value === undefined) {
@@ -44,6 +49,21 @@ function isHelpFlag(args: readonly string[]): boolean {
 
 const args = shellCommandArgs(process.argv);
 const command = args[0];
+if (shouldPrintOccupancyLineProgress(args)) {
+  reportOccupancyCliStartupOnce(args);
+} else if (shouldWarmOccupancyTui(args)) {
+  enterOccupancyAltScreen();
+  void import("@appaloft/adapter-cli/workspace-tui-launch")
+    .then(({ warmupWorkspaceControlRenderer }) => warmupWorkspaceControlRenderer())
+    .catch((error) => {
+      leaveOccupancyAltScreen();
+      const message =
+        error && typeof error === "object" && "message" in error
+          ? String((error as { message: unknown }).message)
+          : String(error);
+      process.stderr.write(`error: ${message.trimEnd()}\n`);
+    });
+}
 const standaloneCommand =
   !command ||
   command === "login" ||
@@ -70,6 +90,8 @@ if (shouldCaptureStdin) {
   }
   capturedStdinText = Buffer.concat(chunks).toString("utf8");
 }
+
+await import("reflect-metadata");
 
 if (standaloneCommand) {
   const { runStandaloneControlPlaneCli } = await import("@appaloft/adapter-cli");

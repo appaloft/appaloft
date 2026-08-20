@@ -55,7 +55,23 @@ appaloft code
 默认 `appaloft code` 占用团队默认已注册 Server 上的 **我的 Sandbox**。源是远端 SHA。
 缺少 Adapter/Profile 时会创建不可见的 `appaloft-remote`。笔记本路径不是 Workspace
 真相，脏树也不会上传。位置参数若是 git remote（`https://`、`ssh://`、`git@host:path`），
-无需本地 clone 即可占用该仓库。横幅是：
+无需本地 clone 即可占用该仓库。TTY 上默认 `code` 立刻打开占用 Workspace TUI（备用屏），
+工作区列表**折叠**，等待占满整窗。中间面板是标题 spinner 和 **preparing the agent**，
+occupy / copy skills / attach 作为左对齐步骤（Braille spinner，完成后 ✓）。attach
+在同一全屏窗格里接上。`workspace` 打开同一个 TUI 作为导航。不以刷 stderr 状态行为主 UX。
+HOME skill 复制限时且失败软处理。`--no-attach` 和非 TTY 脚本仍用一行 stderr 进度（含进程
+启动后的第一字节状态行），并打印 Remote 横幅。
+源码检出（`appaloftdev`）第一次 TTY 运行会查找或 `cargo build` 占用 TUI sidecar。
+查找范围包括正在执行的树和常见兄弟检出（例如
+`appaloft-cloud/community/appaloft` → `appaloft`），以及
+`APPALOFT_WORKSPACE_TUI_BINARY`。
+若缺少 `appaloft-workspace-tui` 且 Rust 低于 1.88，CLI 会点名该二进制，并打印
+`rustup toolchain install stable` 与
+`cargo build --locked --manifest-path apps/workspace-control-tui/Cargo.toml`。
+`--no-attach` 不需要 TUI 二进制。
+attach 之后，可选的 list/detail chrome 不得在 footer 画出
+`conflict at workspace-control-select` 或 `conflict at occupancy-code-bootstrap`。
+横幅是：
 
 ```text
 Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>

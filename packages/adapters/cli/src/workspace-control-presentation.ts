@@ -23,6 +23,7 @@ import {
   ResumeSandboxCommand,
   RetrySandboxPromotionCommand,
   RevokeSandboxPortCommand,
+  type SandboxAgentAttachDescriptor,
   ShowSandboxQuery,
   type TerminalSession,
   type TerminalSessionAttachmentGateway,
@@ -40,6 +41,7 @@ import {
   occupancyConnectionsUrl,
   occupancyPullRequestFromPreviewEnvironments,
 } from "./occupancy-chrome.js";
+import { OCCUPANCY_CODE_PROGRESS } from "./occupancy-code-progress.js";
 import { type OperateRendererEvent, type OperateRendererMessage } from "./operate-presentation.js";
 import { terminateWorkspaceWithRuntimes } from "./workspace-lifecycle-actions.js";
 
@@ -203,6 +205,8 @@ export type WorkspaceControlRendererMessage =
       readonly reason: string;
       readonly exitCode?: number;
     }
+  | { readonly type: "progress"; readonly message: string }
+  | { readonly type: "loading"; readonly collapsed?: boolean; readonly title?: string }
   | { readonly type: "delivery-complete"; readonly workspaceId: string }
   | { readonly type: "recovery-complete"; readonly workspaceId: string }
   | {
@@ -287,6 +291,13 @@ export interface WorkspaceControlPresentationContext {
     readonly runtimeId: string;
     readonly argv: readonly string[];
   }): Promise<{ readonly sessionId: string; readonly session: TerminalSession }>;
+  occupyBootstrap?: (input: { reportProgress: (message: string) => Promise<void> }) => Promise<
+    | {
+        readonly workspaceId: string;
+        readonly attach?: SandboxAgentAttachDescriptor;
+      }
+    | undefined
+  >;
 }
 
 /** Framework-neutral entry point for the interactive Workspace control surface. */
@@ -302,14 +313,6 @@ export interface BoundedWorkspaceControlPresentationInput {
 }
 
 interface SandboxListResult {
-  readonly items: readonly Record<string, unknown>[];
-}
-
-interface RuntimeListResult {
-  readonly items: readonly Record<string, unknown>[];
-}
-
-interface ItemListResult {
   readonly items: readonly Record<string, unknown>[];
 }
 
@@ -684,6 +687,21 @@ async function resolveConnectionsUrlSafe(): Promise<string | undefined> {
   }
 }
 
+async function queryItems(
+  context: WorkspaceControlPresentationContext,
+  query: Result<Query<unknown>>,
+): Promise<readonly Record<string, unknown>[]> {
+  if (query.isErr()) return [];
+  try {
+    const result = await context.executeQuery(query.value);
+    if (result.isErr() || !result.value || typeof result.value !== "object") return [];
+    const items = (result.value as { items?: unknown }).items;
+    return Array.isArray(items) ? (items as Record<string, unknown>[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 async function loadDetail(
   context: WorkspaceControlPresentationContext,
   workspaceId: string,
@@ -695,37 +713,31 @@ async function loadDetail(
   const workspace = resultValue(
     await context.executeQuery(operationValue(ShowSandboxQuery.create({ sandboxId: workspaceId }))),
   ) as Record<string, unknown>;
-  const runtimeResult = resultValue(
-    await context.executeQuery(
-      operationValue(ListSandboxAgentRuntimesQuery.create({ sandboxId: workspaceId })),
+  const runtimeResult = {
+    items: await queryItems(
+      context,
+      ListSandboxAgentRuntimesQuery.create({ sandboxId: workspaceId }),
     ),
-  ) as RuntimeListResult;
-  const ports = resultValue(
-    await context.executeQuery(
-      operationValue(ListSandboxPortsQuery.create({ sandboxId: workspaceId })),
-    ),
-  ) as ItemListResult;
-  const snapshots = resultValue(
-    await context.executeQuery(
-      operationValue(ListSandboxSnapshotsQuery.create({ limit: 100, offset: 0 })),
-    ),
-  ) as ItemListResult;
-  const promotions = resultValue(
-    await context.executeQuery(
-      operationValue(ListSandboxPromotionsQuery.create({ sandboxId: workspaceId })),
-    ),
-  ) as ItemListResult;
+  };
+  const ports = {
+    items: await queryItems(context, ListSandboxPortsQuery.create({ sandboxId: workspaceId })),
+  };
+  const snapshots = {
+    items: await queryItems(context, ListSandboxSnapshotsQuery.create({ limit: 100, offset: 0 })),
+  };
+  const promotions = {
+    items: await queryItems(context, ListSandboxPromotionsQuery.create({ sandboxId: workspaceId })),
+  };
   const tasks: WorkspaceControlTaskSummary[] = [];
   for (const runtime of runtimeResult.items) {
     const runtimeId = optionalString(runtime, "runtimeId");
     if (!runtimeId) continue;
-    const taskResult = resultValue(
-      await context.executeQuery(
-        operationValue(ListAgentTaskRunsQuery.create({ workspaceId, runtimeId })),
-      ),
-    ) as ItemListResult;
+    const taskItems = await queryItems(
+      context,
+      ListAgentTaskRunsQuery.create({ workspaceId, runtimeId }),
+    );
     tasks.push(
-      ...taskResult.items
+      ...taskItems
         .map(taskSummary)
         .filter((item): item is WorkspaceControlTaskSummary => item !== undefined),
     );
@@ -736,23 +748,32 @@ async function loadDetail(
     const resourceId = optionalString(promotion, "resourceId");
     let proof: WorkspaceControlPromotionSummary["proof"];
     if (deploymentId) {
-      const result = resultValue(
-        await context.executeQuery(
-          operationValue(
-            DeploymentProofQuery.create({
-              deploymentId,
-              ...(resourceId ? { resourceId } : {}),
-            }),
-          ),
-        ),
-      ) as unknown as Record<string, unknown>;
-      const mismatches = Array.isArray(result.mismatches) ? result.mismatches.length : 0;
-      const unavailableEvidence = Array.isArray(result.unavailableEvidence)
-        ? result.unavailableEvidence.length
-        : 0;
-      const verdict = optionalString(result, "verdict");
-      if (!verdict) throw new Error("Deployment Proof query returned an invalid descriptor");
-      proof = { verdict, mismatchCount: mismatches, unavailableEvidenceCount: unavailableEvidence };
+      try {
+        const created = DeploymentProofQuery.create({
+          deploymentId,
+          ...(resourceId ? { resourceId } : {}),
+        });
+        if (created.isOk()) {
+          const result = await context.executeQuery(created.value);
+          if (result.isOk() && result.value && typeof result.value === "object") {
+            const record = result.value as unknown as Record<string, unknown>;
+            const mismatches = Array.isArray(record.mismatches) ? record.mismatches.length : 0;
+            const unavailableEvidence = Array.isArray(record.unavailableEvidence)
+              ? record.unavailableEvidence.length
+              : 0;
+            const verdict = optionalString(record, "verdict");
+            if (verdict) {
+              proof = {
+                verdict,
+                mismatchCount: mismatches,
+                unavailableEvidenceCount: unavailableEvidence,
+              };
+            }
+          }
+        }
+      } catch {
+        // Proof chrome is optional.
+      }
     }
     const summary = promotionSummary(promotion, proof);
     if (summary) promotionSummaries.push(summary);
@@ -965,18 +986,90 @@ export function createBoundedWorkspaceControlPresentation(
         await bindTerminal({ ...attachment, ...(await reconnect()), reconnect });
       };
 
+      const attachIssuedDescriptor = async (descriptor: SandboxAgentAttachDescriptor) => {
+        await renderer.send({
+          type: "progress",
+          message: OCCUPANCY_CODE_PROGRESS.attaching,
+        });
+        if (descriptor.transport === "managed-terminal") {
+          await attachManagedTerminal({
+            workspaceId: descriptor.workspaceId,
+            runtimeId: descriptor.runtimeId,
+            sessionId: descriptor.sessionId,
+          });
+          return;
+        }
+        const openNativeTerminal = context.openNativeWorkspaceTerminal;
+        if (!openNativeTerminal) throw new Error("Native attach viewport is unavailable");
+        if (descriptor.clientHandoff !== "local-client-exec") {
+          throw new Error("Native attach descriptor does not permit local execution");
+        }
+        const argv = nativeClientCommand(descriptor as unknown as Record<string, unknown>);
+        const reconnect = () =>
+          openNativeTerminal({
+            workspaceId: descriptor.workspaceId,
+            runtimeId: descriptor.runtimeId,
+            argv,
+          });
+        await bindTerminal({
+          workspaceId: descriptor.workspaceId,
+          runtimeId: descriptor.runtimeId,
+          ...(await reconnect()),
+          reconnect,
+        });
+      };
+
+      let occupyFailure: unknown;
+      let occupyDone: Promise<void> = Promise.resolve();
       try {
-        await renderer.send({ type: "workspaces", workspaces: [] });
-        void listWorkspaces(context).then(
-          (workspaces) => renderer.send({ type: "workspaces", workspaces }),
-          (error) => sendErrorBestEffort(error, "workspace-control-start"),
-        );
+        if (context.occupyBootstrap) {
+          await renderer.send({
+            type: "loading",
+            collapsed: true,
+            title: "Appaloft",
+          });
+          occupyDone = context
+            .occupyBootstrap({
+              reportProgress: async (message) => {
+                if (!presentationOpen) return;
+                await renderer.send({ type: "progress", message });
+              },
+            })
+            .then(async (occupied) => {
+              if (!presentationOpen) return occupied;
+              if (occupied?.attach) await attachIssuedDescriptor(occupied.attach);
+              if (occupied?.workspaceId) selectedWorkspaceId = occupied.workspaceId;
+              return occupied;
+            })
+            .then((occupied) => {
+              if (!occupied || !presentationOpen) return;
+              void listWorkspaces(context).then(
+                (workspaces) => renderer.send({ type: "workspaces", workspaces }),
+                () => {
+                  // Restore-list chrome is optional after attach.
+                },
+              );
+            })
+            .catch((error) => {
+              if (activeTerminal) return;
+              occupyFailure = error;
+              void renderer.close();
+            });
+        } else {
+          await renderer.send({ type: "loading", title: "Appaloft" });
+          void listWorkspaces(context).then(
+            (workspaces) => renderer.send({ type: "workspaces", workspaces }),
+            (error) => sendErrorBestEffort(error, "workspace-control-start"),
+          );
+        }
         for await (const event of renderer.events()) {
           if (event.type === "quit") break;
           try {
             if (event.type === "select") {
               selectedWorkspaceId = event.workspaceId;
-              requestSelectedDetail(event.workspaceId, "workspace-control-select");
+              if (!activeTerminal) {
+                requestSelectedDetail(event.workspaceId, "workspace-control-select");
+              }
               continue;
             }
             if (
@@ -1211,7 +1304,7 @@ export function createBoundedWorkspaceControlPresentation(
               const task = detail.tasks.find(
                 (candidate) => candidate.taskRunId === event.taskRunId,
               );
-              if (!task || task.status !== "awaiting-approval") {
+              if (task?.status !== "awaiting-approval") {
                 throw new Error("Task is not awaiting approval in the latest Workspace detail");
               }
               resultValue(
@@ -1339,6 +1432,7 @@ export function createBoundedWorkspaceControlPresentation(
             await sendErrorBestEffort(error, `workspace-control-${event.type}`);
           }
         }
+        await occupyDone;
       } catch (error) {
         await sendErrorBestEffort(error, "workspace-control-start");
       } finally {
@@ -1350,6 +1444,7 @@ export function createBoundedWorkspaceControlPresentation(
         }
         await renderer.close();
       }
+      if (occupyFailure) throw occupyFailure;
     },
   };
 }
