@@ -353,60 +353,48 @@ describe("remote code door", () => {
     expect(door.serverId).toBe("srv_1");
   });
 
-  test("[WS-REMOTE-NO-UPLOAD-006] resumes last occupancy when the local path has no origin", async () => {
-    const door = await resolveDefaultRemoteCodeDoor({
-      env: { APPALOFT_TOKEN: "token" },
-      listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
-      listOccupancies: async () => [
-        {
-          sandboxId: "sbx_old",
-          status: "terminated",
-          occupancy: {
-            repositoryIdentity: "github.com/acme/old",
-            commitSha: "c".repeat(40),
-            branch: "main",
+  test("[WS-REMOTE-NO-UPLOAD-006][WS-OPEN-LOCATOR-024] non-git cwd does not resume an unrelated occupancy", async () => {
+    await expect(
+      resolveDefaultRemoteCodeDoor({
+        env: { APPALOFT_TOKEN: "token" },
+        listServers: async () => [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }],
+        listOccupancies: async () => [
+          {
+            sandboxId: "sbx_examples",
+            status: "ready",
+            occupancy: {
+              repositoryIdentity: "github.com/appaloft/examples",
+              commitSha: "d".repeat(40),
+              branch: "main",
+            },
+            lastActivityAt: "2026-08-15T12:30:00.000Z",
           },
-          lastActivityAt: "2026-08-15T12:00:00.000Z",
+        ],
+        resolveLocator: async () => {
+          throw Object.assign(new Error("missing origin"), {
+            code: "workspace_remote_repository_missing",
+          });
         },
-        {
-          sandboxId: "sbx_live",
-          status: "ready",
-          occupancy: {
-            repositoryIdentity: "github.com/acme/api",
-            commitSha: "d".repeat(40),
-            branch: "main",
-          },
-          lastActivityAt: "2026-08-15T12:30:00.000Z",
+        resolveRemoteRef: async () => {
+          throw new Error("unrelated occupancy must not become this folder's locator");
         },
-      ],
-      resolveLocator: async () => {
-        throw Object.assign(new Error("missing origin"), {
-          code: "workspace_remote_repository_missing",
-        });
-      },
-      resolveRemoteRef: async () => ({
-        repositoryIdentity: "github.com/acme/api",
-        credentialFreeHttpsRepository: "https://github.com/acme/api.git",
-        ref: "refs/heads/main",
-        commitSha: "e".repeat(40),
       }),
+    ).rejects.toMatchObject({
+      code: "workspace_remote_repository_missing",
     });
-    expect(door.repositoryIdentity).toBe("github.com/acme/api");
-    expect(door.repository).toBe("https://github.com/acme/api.git");
-    expect(door.commitSha).toBe("e".repeat(40));
     expect(selectResumeOccupancy([])).toBeUndefined();
   });
 
-  test("[WS-REMOTE-RESUME-004] resumes last occupancy when cwd origin differs", async () => {
+  test("[WS-REMOTE-RESUME-004] occupies this folder's origin instead of last occupancy", async () => {
     const door = await resolveDefaultRemoteCodeDoor({
       env: { APPALOFT_TOKEN: "token" },
       listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
       listOccupancies: async () => [
         {
-          sandboxId: "sbx_live",
+          sandboxId: "sbx_examples",
           status: "ready",
           occupancy: {
-            repositoryIdentity: "github.com/acme/api",
+            repositoryIdentity: "github.com/appaloft/examples",
             commitSha: "d".repeat(40),
             branch: "main",
           },
@@ -422,14 +410,46 @@ describe("remote code door", () => {
       resolveRemoteRef: async (repository) => ({
         repositoryIdentity: repository.includes("appaloft-cloud")
           ? "github.com/appaloft/appaloft-cloud"
-          : "github.com/acme/api",
+          : "github.com/appaloft/examples",
         credentialFreeHttpsRepository: repository,
         ref: "refs/heads/main",
         commitSha: repository.includes("appaloft-cloud") ? "f".repeat(40) : "e".repeat(40),
       }),
     });
-    expect(door.repositoryIdentity).toBe("github.com/acme/api");
-    expect(door.commitSha).toBe("e".repeat(40));
+    expect(door.repositoryIdentity).toBe("github.com/appaloft/appaloft-cloud");
+    expect(door.commitSha).toBe("f".repeat(40));
+  });
+
+  test("[WS-REMOTE-NO-UPLOAD-006] --new from a non-git path does not occupy the last occupancy repo", async () => {
+    await expect(
+      resolveDefaultRemoteCodeDoor({
+        env: { APPALOFT_TOKEN: "token" },
+        forceNew: true,
+        listServers: async () => [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }],
+        listOccupancies: async () => [
+          {
+            sandboxId: "sbx_examples",
+            status: "ready",
+            occupancy: {
+              repositoryIdentity: "github.com/appaloft/examples",
+              commitSha: "d".repeat(40),
+              branch: "main",
+            },
+            lastActivityAt: "2026-08-15T12:30:00.000Z",
+          },
+        ],
+        resolveLocator: async () => {
+          throw Object.assign(new Error("missing origin"), {
+            code: "workspace_remote_repository_missing",
+          });
+        },
+        resolveRemoteRef: async () => {
+          throw new Error("unrelated occupancy must not become this folder's locator");
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: "workspace_remote_repository_missing",
+    });
   });
 
   test("[WS-REMOTE-OPEN-003] --new occupies the cwd origin instead of last occupancy", async () => {

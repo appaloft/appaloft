@@ -5442,7 +5442,7 @@ export const operationCatalog = [
     serviceToken: tokens.agentWorkspaceOpenService,
     transportAccess: { productSession: { minRole: "member" } },
     transports: {
-      cli: "appaloft workspace open [path]",
+      cli: "appaloft workspace open [path|git-remote]",
       orpc: { method: "POST", path: "/api/workspaces/open" },
     },
   },

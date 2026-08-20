@@ -9,9 +9,9 @@ Date: 2026-08-16
 ADR-118 made default `appaloft code` occupy my Sandbox from a remote SHA.
 The door still discovers that remote from the laptop worktree (`git remote
 origin` + `ls-remote`). Empty, non-git, and no-origin directories fail
-`workspace_remote_repository_missing` unless a resumable occupancy already
-exists — and that resume may pick the latest occupancy of a *different*
-repository.
+`workspace_remote_repository_missing`. Resume matches only the same
+`repositoryIdentity`. The latest occupancy of another repository, including
+`examples` or whoami, is not a substitute for this folder.
 
 Codespaces (`gh codespace create -r OWNER/REPO`) and Gitpod
 (`gitpod.io/#<repo-url>`) open from a repo URL with no local clone.

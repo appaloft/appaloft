@@ -14,7 +14,7 @@
 | WS-SCRATCH-SKILL-010 | CLI/unit | scratch launch prep | Public skill/MCP offer recorded; no TUI scrape. | `packages/adapters/cli/test/local-scratch-session.test.ts`; `agent-workspace-command.test.ts` | passing |
 | WS-SCRATCH-MUTATION-011 | CLI/contract | in-session write request | Only existing catalog operations; no auto-approve. | later-slice / skill docs; slice 1 documents the rule | deferred-gap until linked session |
 | WS-SCRATCH-NO-STATE-012 | CLI/unit | start and exit | Zero Sandbox/Binding/Project/Profile/Server commands. | `packages/adapters/cli/test/agent-workspace-command.test.ts` | passing |
-| WS-SCRATCH-COMPAT-013 | CLI/regression | `workspace open` dirty/non-git | Existing `workspace_git_*` fail-closed unchanged. | `packages/adapters/cli/test/agent-workspace-command.test.ts` | passing |
+| WS-SCRATCH-COMPAT-013 | CLI/regression | `workspace open` dirty worktree | Existing dirty/detached/unpushed `workspace_git_*` fail-closed unchanged. Non-git directories use occupancy or git-remote locators. | `packages/adapters/cli/test/agent-workspace-command.test.ts`; `packages/adapters/cli/test/workspace-open-source.test.ts` | passing |
 | WS-SCRATCH-UPGRADE-014 | CLI/unit | logged-in entitled default `code` | Still scratch; no managed initializer. | `packages/adapters/cli/test/agent-workspace-command.test.ts` | passing |
 | WS-SCRATCH-MANAGED-015 | application | explicit remote/managed open | Existing `workspaces.open` / no-capacity fail-closed. | existing Spec 131 / R1.1 tests remain | later-slice reconnect |
 | WS-SCRATCH-PROFILE-016 | CLI/unit | first scratch without `--profile` | No Profile install/write. | `packages/adapters/cli/test/agent-workspace-command.test.ts` | passing |

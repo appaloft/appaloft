@@ -6,6 +6,8 @@ import { activeControlPlaneProfile } from "./control-plane-service.js";
 import {
   normalizeWorkspaceRepositoryRemote,
   type RemoteGitWorkspaceRef,
+  type ResolveGitWorkspaceProgress,
+  resolveLocalGitWorkspaceContext,
   resolveRemoteGitWorkspaceRef,
   type WorkspaceGitCommandRunner,
 } from "./local-git-workspace-context.js";
@@ -186,6 +188,97 @@ function remoteCodeError(
   };
 }
 
+export interface WorkspaceOpenSource {
+  readonly repositoryIdentity: string;
+  readonly credentialFreeHttpsRepository: string;
+  readonly ref: string;
+  readonly branch: string;
+  readonly headSha: string;
+}
+
+export interface ResolveWorkspaceOpenSourceOptions extends ResolveGitWorkspaceProgress {}
+
+export function isWorkspaceGitRootUnavailable(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const record = error as { details?: { code?: unknown }; message?: unknown };
+  return (
+    record.details?.code === "workspace_git_root_unavailable" ||
+    record.message === "Workspace path is not inside a Git worktree"
+  );
+}
+
+function workspaceLocatorMissingError(
+  message: string,
+  phase: string,
+  guidance: string,
+): DomainError {
+  return remoteCodeError("workspace_remote_repository_missing", message, {
+    phase,
+    guidance,
+  });
+}
+
+function throwWorkspaceLocatorMissing(
+  error: unknown,
+  phase: "workspace-open-locator" | "remote-code-locator",
+): never {
+  if (error && typeof error === "object" && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    if (code === "workspace_remote_repository_missing" && !isWorkspaceGitRootUnavailable(error)) {
+      throw error;
+    }
+  }
+  if (phase === "workspace-open-locator") {
+    throw workspaceLocatorMissingError(
+      "Workspace open needs a git remote for this directory",
+      phase,
+      "Pass a git remote such as https://github.com/org/repo.git, or run from this folder's Git worktree. Do not reuse another occupancy.",
+    );
+  }
+  throw workspaceLocatorMissingError(
+    "Remote code needs a Git repository with an origin or a git remote locator",
+    phase,
+    "Run appaloft code <git-remote> for this folder, or run from this folder's Git worktree. Do not reuse another occupancy.",
+  );
+}
+
+export async function resolveWorkspaceOpenSource(
+  path = ".",
+  runGit?: WorkspaceGitCommandRunner,
+  options: ResolveWorkspaceOpenSourceOptions = {},
+): Promise<WorkspaceOpenSource> {
+  if (isRemoteCodeGitRemoteLocator(path)) {
+    const locator = await resolveRemoteCodeGitRemoteLocator(path, runGit);
+    const remote = await resolveRemoteGitWorkspaceRef(
+      locator.repository,
+      locator.ref,
+      runGit,
+      options,
+    );
+    return {
+      repositoryIdentity: remote.repositoryIdentity,
+      credentialFreeHttpsRepository: remote.credentialFreeHttpsRepository,
+      ref: remote.ref,
+      branch: locator.branch,
+      headSha: remote.commitSha,
+    };
+  }
+
+  try {
+    const local = await resolveLocalGitWorkspaceContext(path, runGit, options);
+    return {
+      repositoryIdentity: local.repositoryIdentity,
+      credentialFreeHttpsRepository: local.credentialFreeHttpsRepository,
+      ref: local.ref,
+      branch: local.branch,
+      headSha: local.headSha,
+    };
+  } catch (error) {
+    if (!isWorkspaceGitRootUnavailable(error)) throw error;
+    throwWorkspaceLocatorMissing(error, "workspace-open-locator");
+  }
+}
+
 export function isRemoteCodeGitRemoteLocator(value: string): boolean {
   const locator = value.trim();
   if (!locator || locator.includes("\0") || /[\r\n]/u.test(locator)) return false;
@@ -303,7 +396,6 @@ export async function resolveDefaultRemoteCodeDoor(
     );
   }
   const occupancies = probe.listOccupancies ? await probe.listOccupancies() : [];
-  const latestOccupancy = selectResumeOccupancy(occupancies);
   const explicitRemote = isRemoteCodeGitRemoteLocator(path)
     ? await resolveRemoteCodeGitRemoteLocator(path, probe.runGit)
     : undefined;
@@ -326,40 +418,18 @@ export async function resolveDefaultRemoteCodeDoor(
     }
   }
   const requestedLocator = explicitRemote ?? localLocator;
-  const matchingOccupancy = requestedLocator
-    ? selectResumeOccupancy(
-        occupancies.filter(
-          (item) => item.occupancy?.repositoryIdentity === requestedLocator.repositoryIdentity,
-        ),
-      )
-    : undefined;
-  const occupancy = probe.forceNew
-    ? undefined
-    : (matchingOccupancy ?? (explicitRemote ? undefined : latestOccupancy));
-  let locator: {
-    readonly repository: string;
-    readonly repositoryIdentity: string;
-    readonly ref: string;
-    readonly branch: string;
-  };
-  let occupancyResume: RemoteCodeOccupancy["occupancy"];
-  if (occupancy?.occupancy && !explicitRemote) {
-    occupancyResume = occupancy.occupancy;
-    const normalized = normalizeWorkspaceRepositoryRemote(
-      `https://${occupancy.occupancy.repositoryIdentity.replace(/\.git$/u, "")}.git`,
-    );
-    locator = {
-      repository: normalized.credentialFreeHttps,
-      repositoryIdentity: occupancy.occupancy.repositoryIdentity,
-      ref: `refs/heads/${occupancy.occupancy.branch?.trim() || "main"}`,
-      branch: occupancy.occupancy.branch?.trim() || "main",
-    };
-  } else if (requestedLocator) {
-    locator = requestedLocator;
-    if (occupancy?.occupancy) occupancyResume = occupancy.occupancy;
-  } else {
-    throw localLocatorError;
+  if (!requestedLocator) {
+    throwWorkspaceLocatorMissing(localLocatorError, "remote-code-locator");
   }
+  const matchingOccupancy = selectResumeOccupancy(
+    occupancies.filter(
+      (item) => item.occupancy?.repositoryIdentity === requestedLocator.repositoryIdentity,
+    ),
+  );
+  const occupancy = probe.forceNew ? undefined : matchingOccupancy;
+  const locator = requestedLocator;
+  let occupancyResume: RemoteCodeOccupancy["occupancy"];
+  if (occupancy?.occupancy) occupancyResume = occupancy.occupancy;
 
   const binding = probe.showBinding ? await probe.showBinding(locator.repositoryIdentity) : null;
   let remote: RemoteGitWorkspaceRef;

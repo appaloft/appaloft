@@ -37,8 +37,10 @@ allowlisted laptop HOME skill directories into `/workspace/skills/<name>` and
 `appaloft code --local` remains the Scratch session on this Mac (ADR-116 / Spec 138). It does not
 run this durable workflow and creates no Sandbox, Binding, Profile or Cloud row.
 
-`appaloft workspace open [path]` remains the durable Profile-aware door over this exact workflow
-with local Git fail-closed. `--profile` and `--new` on `code` keep remote-open meaning and do not
+`appaloft workspace open [path|git-remote]` remains the durable Profile-aware door over this exact
+workflow. Locators match `code`: a local path (Git optional) or a git remote. Dirty local
+worktrees still fail closed. A non-git directory occupies from a git remote and does not
+resume an unrelated occupancy. `--profile` and `--new` on `code` keep remote-open meaning and do not
 inspect a dirty laptop tree. Default `code` and `code --new` pick a live occupancy or create a
 new occupancy on the live install. Same-name leftover Profiles must not block first success and
 must not require memorizing installation ids. `--profile` is a fallback pin when the human

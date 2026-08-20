@@ -55,12 +55,8 @@ import {
   hasCliControlPlaneLogin,
   loginRequiredWorkspaceOccupancyTree,
 } from "../cli-session-login.js";
+import { resolveRemoteGitWorkspaceRef } from "../local-git-workspace-context.js";
 import {
-  resolveLocalGitWorkspaceContext,
-  resolveRemoteGitWorkspaceRef,
-} from "../local-git-workspace-context.js";
-import {
-  isolatedOpenCodeConfigHome,
   launchScratchAgent,
   resolveDefaultScratchHarness,
   resolveNativeOpenCodeAttachEnv,
@@ -86,11 +82,13 @@ import {
 import {
   formatRemoteCodeBanner,
   isRemoteCodeGitRemoteLocator,
+  isWorkspaceGitRootUnavailable,
   nativeAttachRequiresInteractiveTerminal,
   occupancyCloudCompatError,
   type RemoteCodeServerSummary,
   resolveDefaultRemoteCodeDoor,
   resolveOccupancyConnectionsUrl,
+  resolveWorkspaceOpenSource,
   scratchRemoteRejectedError,
   selectWorkspaceOpenTargetServerId,
   writeOccupancySessionHints,
@@ -112,6 +110,10 @@ import { terminateWorkspaceWithRuntimes } from "../workspace-lifecycle-actions.j
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const workspaceId = Args.text({ name: "workspaceId" });
+const pathOrGitRemoteArg = Args.text({ name: "path|git-remote" }).pipe(
+  Args.withDefault("."),
+  Args.withDescription("Local path (Git optional) or git remote"),
+);
 const terminalDirectory = Options.text("directory").pipe(Options.optional);
 const terminalRows = Options.text("rows").pipe(Options.withDefault("24"));
 const terminalCols = Options.text("cols").pipe(Options.withDefault("80"));
@@ -463,7 +465,7 @@ function reportWorkspaceGitProgress(message: string): void {
 }
 
 function resolveOpenWorkspaceGitContext(path: string) {
-  return resolveLocalGitWorkspaceContext(path, undefined, {
+  return resolveWorkspaceOpenSource(path, undefined, {
     onProgress: reportWorkspaceGitProgress,
   });
 }
@@ -502,7 +504,7 @@ function makeWorkspaceOpenCommand() {
   return EffectCommand.make(
     "open",
     {
-      path: Args.text({ name: "path" }).pipe(Args.withDefault(".")),
+      path: pathOrGitRemoteArg,
       profile: Options.text("profile").pipe(Options.optional),
       forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
       noAttach: Options.boolean("no-attach").pipe(Options.withDefault(false)),
@@ -512,7 +514,18 @@ function makeWorkspaceOpenCommand() {
       Effect.gen(function* () {
         const cli = yield* CliRuntime;
         const source = yield* Effect.tryPromise({
-          try: () => (cli.resolveLocalWorkspaceGitContext ?? resolveOpenWorkspaceGitContext)(path),
+          try: () => {
+            if (cli.resolveWorkspaceOpenSource) {
+              return cli.resolveWorkspaceOpenSource(path);
+            }
+            if (cli.resolveLocalWorkspaceGitContext && !isRemoteCodeGitRemoteLocator(path)) {
+              return cli.resolveLocalWorkspaceGitContext(path).catch((error) => {
+                if (!isWorkspaceGitRootUnavailable(error)) throw error;
+                return resolveOpenWorkspaceGitContext(path);
+              });
+            }
+            return resolveOpenWorkspaceGitContext(path);
+          },
           catch: (error) => workspaceCliError(error, "workspace-open-git-context"),
         });
         const attach = !noAttach;
@@ -559,7 +572,7 @@ function occupancyCodeProfile(
 export const workspaceCodeCommand = EffectCommand.make(
   "code",
   {
-    path: Args.text({ name: "path" }).pipe(Args.withDefault(".")),
+    path: pathOrGitRemoteArg,
     noAttach: Options.boolean("no-attach").pipe(Options.withDefault(false)),
     local: Options.boolean("local").pipe(Options.withDefault(false)),
     forceNew: Options.boolean("new").pipe(Options.withDefault(false)),

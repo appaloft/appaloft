@@ -87,17 +87,18 @@ appaloft code --local
 交付用的 durable open 仍是：
 
 ```bash
-appaloft workspace open
+appaloft workspace open [path|git-remote]
 ```
 
-这条路径继续走 `workspaces.open`：只用 path 查找 Git root、upstream、branch 和 HEAD SHA，要求
-clean 且已 push。默认 `appaloft code` 优先选 live occupancy，同名 leftover 不能挡住第一次成功，
+这条路径继续走 `workspaces.open`，定位参数与 `code` 相同：本地路径（可以不是 Git worktree）
+或 git remote（`https://`、`ssh://`、`git@host:path`，以及不是本地目录时的 `owner/repo`）。
+非 git 目录只能通过 git remote 占用当前目录，不会静默复用别人的 occupancy。如果路径是 Git worktree，dirty / detached / 缺
+upstream / remote tip 不一致仍会在远端创建前失败。默认 `appaloft code` 优先选 live occupancy，同名 leftover 不能挡住第一次成功，
 也不要求记住 installation id。`--profile` 只是显式撞名时的兜底，不同于全局
 `--control-plane-profile`。`--new` 仍占用 cwd 源，不会静默 resume whoami occupancy。
 打开失败时会写出缺什么、正在打开哪个仓库，而不会把 Cloud 激活失败伪装成 CLI 成功。
 已注册 BYOS Server 时，`workspace open` 和 `code` 放到那台 Server 上（`--server <id>`
-可钉死），不会再索要 managed 容量。脏树、detached、缺 upstream 或 remote tip
-不一致会在任何远端创建前失败。V1 不做隐式 sync 或 patch upload。
+可钉死），不会再索要 managed 容量。V1 不做隐式 sync 或 patch upload。
 
 `workspaces.open` 会先验证来源，再读取现有 Repository Binding 和 Project 默认 Profile。如果部署方
 组合了可选的 activation initializer，缺少的 Project、Binding 或默认 Profile 可以在同一次显式

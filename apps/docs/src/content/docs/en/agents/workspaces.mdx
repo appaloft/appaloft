@@ -92,12 +92,15 @@ The scratch banner is `Local scratch · this Mac · not saved remotely`.
 Durable delivery open still uses:
 
 ```bash
-appaloft workspace open
+appaloft workspace open [path|git-remote]
 ```
 
-That path still dispatches `workspaces.open`. The CLI uses the path only to find the Git root,
-upstream remote, branch, and HEAD SHA. Dirty trees, detached HEAD, missing upstream, and remote
-tip mismatch fail before remote creation. V1 never performs implicit sync or patch upload.
+That path still dispatches `workspaces.open`. Locators match `code`: a local path (Git optional)
+or a git remote (`https://`, `ssh://`, `git@host:path`, or `owner/repo` when that path is not an
+existing directory). A non-git directory occupies this folder via a git remote, not via
+someone else's occupancy. Dirty trees,
+detached HEAD, missing upstream, and remote tip mismatch still fail before remote creation when
+the path is a Git worktree. V1 never performs implicit sync or patch upload.
 Default `appaloft code` prefers a live occupancy over dead same-name Profiles.
 Do not switch to `workspace open --profile <installationId>` for that case.
 `--profile` on `code` is only a fallback pin when an explicit name still matches
