@@ -45,8 +45,10 @@ realRendererTest(
       },
     });
     try {
-      await waitForOutput(() => output, "sbx_real_renderer");
       await waitForOutput(() => output, "Appaloft Cloud Agents");
+      await waitForOutput(() => output, "preparing the agent");
+      expect(output.toLowerCase()).not.toContain("occupancy");
+      expect(output).not.toContain("sbx_real_renderer");
       // List/menu quit is ^c. q is unbound; ^] is stop-typing, not quit.
       let exitCode: number | undefined;
       for (let attempt = 0; attempt < 50 && exitCode === undefined; attempt += 1) {
