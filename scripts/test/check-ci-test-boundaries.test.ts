@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   findCiChangeClassifierViolations,
   findCiTestBoundaryViolations,
+  findUnitTestsWebViewOwnershipViolations,
 } from "../check-ci-test-boundaries";
 
 const expression = (value: string) => ["$", "{{ ", value, " }}"].join("");
@@ -130,6 +131,101 @@ jobs:
       expect.objectContaining({
         message:
           "ci.yml must not job-level skip workspace-tui; required Workspace TUI (*) names must still conclude.",
+      }),
+    );
+  });
+
+  test("[CI-UNIT-SCOPE-001] keeps Unit Tests named and free of WebView e2e", () => {
+    const ciWorkflow = `
+jobs:
+  unit-tests:
+    name: Unit Tests
+    steps:
+      - name: Skip Unit Tests
+      - name: Unit Tests
+        run: bun run test
+`;
+    const e2eWorkflow = `
+      - name: Web WebView Smoke
+        run: bun run test:e2e
+`;
+    const webPackageJson = JSON.stringify({
+      scripts: {
+        test: "bun run test:unit -- --run",
+        "test:e2e": "bun run test:e2e:webview",
+        "test:e2e:webview": "bun run build && bun test test/e2e-webview/home.webview.test.ts",
+      },
+    });
+
+    expect(findUnitTestsWebViewOwnershipViolations(ciWorkflow, e2eWorkflow, webPackageJson)).toEqual(
+      [],
+    );
+    expect(
+      findUnitTestsWebViewOwnershipViolations(
+        ciWorkflow.replace("name: Unit Tests", "name: Package Tests"),
+        e2eWorkflow,
+        webPackageJson,
+      ),
+    ).toContainEqual(
+      expect.objectContaining({
+        message: "The Unit Tests job name must stay exactly Unit Tests.",
+      }),
+    );
+    expect(
+      findUnitTestsWebViewOwnershipViolations(
+        ciWorkflow.replace(
+          "  unit-tests:",
+          ["  unit-tests:\n    if: ", expression("needs.changes.outputs.lightweight_only != 'true'")].join(
+            "",
+          ),
+        ),
+        e2eWorkflow,
+        webPackageJson,
+      ),
+    ).toContainEqual(
+      expect.objectContaining({
+        message:
+          "ci.yml must not job-level skip unit-tests; the required Unit Tests name must still conclude.",
+      }),
+    );
+    expect(
+      findUnitTestsWebViewOwnershipViolations(
+        ciWorkflow.replace("run: bun run test", "run: bun run test:e2e:webview"),
+        e2eWorkflow,
+        webPackageJson,
+      ),
+    ).toContainEqual(
+      expect.objectContaining({
+        message: "The Unit Tests job must not invoke WebView e2e; e2e.yml owns that suite.",
+      }),
+    );
+    expect(
+      findUnitTestsWebViewOwnershipViolations(
+        ciWorkflow,
+        e2eWorkflow,
+        JSON.stringify({
+          scripts: {
+            test: "bun run test:unit -- --run && bun run test:e2e",
+            "test:e2e": "bun run test:e2e:webview",
+            "test:e2e:webview": "bun run build && bun test test/e2e-webview/home.webview.test.ts",
+          },
+        }),
+      ),
+    ).toContainEqual(
+      expect.objectContaining({
+        message:
+          "@appaloft/web `test` must stay vitest-only so turbo run test does not pay the WebView tax.",
+      }),
+    );
+    expect(
+      findUnitTestsWebViewOwnershipViolations(
+        ciWorkflow,
+        e2eWorkflow.replace("run: bun run test:e2e", "run: echo skip"),
+        webPackageJson,
+      ),
+    ).toContainEqual(
+      expect.objectContaining({
+        message: "e2e.yml must keep bun run test:e2e as the WebView owner.",
       }),
     );
   });

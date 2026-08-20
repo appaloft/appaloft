@@ -353,6 +353,36 @@ describe("CI change classifier", () => {
     expect(e2eNeedsShardWork("e2e_skip", 2)).toBe(false);
   });
 
+  test("[CI-UNIT-SCOPE-001] CLI-only files still publish Unit Tests without WebView e2e", () => {
+    const cliOnly = ["packages/adapters/cli/src/commands/deployment.ts"];
+    expect(classifyChangedFiles(cliOnly)).toMatchObject({
+      changeClass: "full",
+      e2eClass: "e2e_full",
+      lightweightOnly: false,
+      workspaceTuiClass: "tui_skip",
+    });
+
+    const unitTestsJob = ciWorkflow.slice(
+      ciWorkflow.indexOf("  unit-tests:"),
+      ciWorkflow.indexOf("  integration-tests:"),
+    );
+    expect(unitTestsJob).toMatch(/^ {4}name: Unit Tests\s*$/m);
+    expect(unitTestsJob).not.toMatch(/^ {4}if:/m);
+    expect(unitTestsJob).toContain("run: bun run test");
+    expect(unitTestsJob).not.toMatch(/\btest:e2e(?::webview)?\b/);
+    expect(ciWorkflow).toContain("name: ci");
+    expect(e2eWorkflow).toContain("name: Web WebView Smoke");
+    expect(e2eWorkflow).toContain("run: bun run test:e2e");
+
+    const webPackageJson = JSON.parse(
+      readFileSync(join(root, "apps/web/package.json"), "utf8"),
+    ) as { scripts?: Record<string, string> };
+    expect(webPackageJson.scripts?.test).toBe("bun run test:unit -- --run");
+    expect(webPackageJson.scripts?.test).not.toMatch(/\btest:e2e(?::webview)?\b/);
+    expect(webPackageJson.scripts?.["test:e2e"]).toBeTruthy();
+    expect(webPackageJson.scripts?.["test:e2e:webview"]).toBeTruthy();
+  });
+
   test("[CI-E2E-SCOPE-004] e2e.yml keeps required shard names and scopes suites inside those jobs", () => {
     expect(e2eWorkflow).toContain("  e2e:");
     expect(e2eWorkflow).toContain("shard: [1, 2]");
