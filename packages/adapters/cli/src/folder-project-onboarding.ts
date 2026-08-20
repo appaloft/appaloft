@@ -28,6 +28,7 @@ import {
   type WorkspaceGitCommandRunner,
 } from "./local-git-workspace-context.js";
 import { CliRuntime, resultToEffect } from "./runtime.js";
+import { restoreWorkspaceTuiScrollback } from "./workspace-tui-launch.js";
 
 export interface FolderOnboardingProject {
   readonly id: string;
@@ -116,34 +117,48 @@ export function isFolderOnboardingCancelled(error: unknown): boolean {
   return false;
 }
 
+const CTRL_C = "\u0003";
+
+export function quitCodeSessionOnCancel(): never {
+  restoreWorkspaceTuiScrollback();
+  process.exit(130);
+}
+
+function installImmediateCancel(): () => void {
+  let uninstall: () => void = () => undefined;
+  const quit = () => {
+    uninstall();
+    quitCodeSessionOnCancel();
+  };
+  const onStdin = (chunk: string | Uint8Array) => {
+    const text = typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("binary");
+    if (text.includes(CTRL_C)) quit();
+  };
+  process.once("SIGINT", quit);
+  process.stdin.on("data", onStdin);
+  uninstall = () => {
+    process.off("SIGINT", quit);
+    process.stdin.off("data", onStdin);
+  };
+  return () => uninstall();
+}
+
 export function withImmediateInquireCancel<A, E, R>(
   effect: Effect.Effect<A, E, R>,
 ): Effect.Effect<A, E, R> {
   return Effect.acquireUseRelease(
-    Effect.sync(() => {
-      const onSigint = () => {
-        process.exit(130);
-      };
-      process.once("SIGINT", onSigint);
-      return onSigint;
-    }),
+    Effect.sync(() => installImmediateCancel()),
     () => effect,
-    (onSigint) =>
-      Effect.sync(() => {
-        process.off("SIGINT", onSigint);
-      }),
+    (uninstall) => Effect.sync(uninstall),
   );
 }
 
 export async function withImmediateSigintExit<T>(work: () => Promise<T>): Promise<T> {
-  const onSigint = () => {
-    process.exit(130);
-  };
-  process.once("SIGINT", onSigint);
+  const uninstall = installImmediateCancel();
   try {
     return await work();
   } finally {
-    process.off("SIGINT", onSigint);
+    uninstall();
   }
 }
 

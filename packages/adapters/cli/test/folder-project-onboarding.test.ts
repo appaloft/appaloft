@@ -32,8 +32,14 @@ import {
   isFolderOnboardingCancelled,
   peekThisFolderGitIdentity,
   persistFolderProjectAssociation,
+  quitCodeSessionOnCancel,
+  withImmediateSigintExit,
 } from "../src/folder-project-onboarding.js";
 import { CliRuntime } from "../src/runtime.js";
+import {
+  setWorkspaceTuiScrollbackWriter,
+  WORKSPACE_TUI_LEAVE_ALT_SCREEN,
+} from "../src/workspace-tui-launch.js";
 
 describe("folder project onboarding", () => {
   test("[FOLDER-ONBOARD-001] unlinked no-git cwd creates a project named after the directory", () => {
@@ -622,12 +628,138 @@ describe("folder project onboarding", () => {
     expect(source).toContain("process.exit(130)");
     expect(source).toContain("SIGINT");
     expect(source).toContain("export async function withImmediateSigintExit");
+    expect(source).toContain("quitCodeSessionOnCancel");
+    expect(source).toContain("restoreWorkspaceTuiScrollback");
     expect(isFolderOnboardingCancelled({ _tag: "Interrupt" })).toBeTrue();
     expect(isFolderOnboardingCancelled({ _tag: "Quit" })).toBeTrue();
     expect(folderOnboardingCancelledError().message).toBe("Cancelled");
     expect(folderOnboardingCancelledError().message).not.toContain(
       "Workspace CLI operation failed",
     );
+  });
+
+  test("[FOLDER-ONBOARD-009] forced select ^c restores TTY and exits without a 45s workspace timeout", async () => {
+    const store = memoryFolderProjectLinkStore();
+    const restored: string[] = [];
+    setWorkspaceTuiScrollbackWriter((text) => {
+      restored.push(text);
+    });
+    const originalExit = process.exit;
+    let exitCode: number | undefined;
+    process.exit = ((code?: number) => {
+      exitCode = code ?? 0;
+    }) as typeof process.exit;
+    let selected = 0;
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      terminalIO: {
+        stdin: { isTTY: true, on: () => undefined },
+        stdout: { isTTY: true, write: () => true },
+        stderr: { isTTY: true, write: () => true },
+      },
+      executeCommand: async <T>() => ok({ id: "prj_forced" } as T),
+      executeQuery: async <T>() =>
+        ok({
+          items: [
+            { id: "prj_vlhs6pf8v4yp", name: "nux-code-silence-cwd", lifecycleStatus: "active" },
+            { id: "prj_7fky4yjn1l1c", name: "leftover", lifecycleStatus: "active" },
+          ],
+          total: 2,
+          limit: 100,
+          offset: 0,
+        } as T),
+    } as never);
+    let selectStarted: (() => void) | undefined;
+    const startedSelect = new Promise<void>((resolve) => {
+      selectStarted = resolve;
+    });
+    const started = Date.now();
+    try {
+      void withImmediateSigintExit(() =>
+        Effect.runPromise(
+          Effect.provide(
+            ensureFolderProjectOnboarding({
+              cwd: "/tmp/nux-code-unlinked-cwd",
+              store,
+              canPrompt: true,
+              promptPolicy: "allow-select",
+              peekGitIdentity: async () => undefined,
+              interaction: {
+                text: () => {
+                  throw new Error("forced-select fixture must not collect free text");
+                },
+                select: () => {
+                  selected += 1;
+                  selectStarted?.();
+                  return Effect.never;
+                },
+                confirm: () => {
+                  throw new Error("forced-select fixture must not inquire");
+                },
+              },
+              writeStatus: () => undefined,
+            }),
+            runtime,
+          ),
+        ),
+      );
+      await startedSelect;
+      process.emit("SIGINT");
+      expect(selected).toBe(1);
+      expect(exitCode).toBe(130);
+      expect(Date.now() - started).toBeLessThan(2_000);
+      expect(restored.join("")).toContain(WORKSPACE_TUI_LEAVE_ALT_SCREEN);
+      expect(restored.join("")).toContain("\x1b[?1049l");
+      expect(restored.join("")).toContain("\n");
+    } finally {
+      process.exit = originalExit;
+      setWorkspaceTuiScrollbackWriter(undefined);
+    }
+  });
+
+  test("[FOLDER-ONBOARD-009] forced select stdin ^C restores TTY without Workspace CLI hang", async () => {
+    const restored: string[] = [];
+    setWorkspaceTuiScrollbackWriter((text) => {
+      restored.push(text);
+    });
+    const originalExit = process.exit;
+    let exitCode: number | undefined;
+    process.exit = ((code?: number) => {
+      exitCode = code ?? 0;
+    }) as typeof process.exit;
+    const started = Date.now();
+    try {
+      void withImmediateSigintExit(() => new Promise(() => undefined));
+      process.stdin.emit("data", Buffer.from("\u0003"));
+      expect(exitCode).toBe(130);
+      expect(Date.now() - started).toBeLessThan(2_000);
+      expect(restored.join("")).toContain(WORKSPACE_TUI_LEAVE_ALT_SCREEN);
+    } finally {
+      process.exit = originalExit;
+      setWorkspaceTuiScrollbackWriter(undefined);
+    }
+  });
+
+  test("[FOLDER-ONBOARD-009] quitCodeSessionOnCancel leaves alt-screen before exit 130", () => {
+    const restored: string[] = [];
+    setWorkspaceTuiScrollbackWriter((text) => {
+      restored.push(text);
+    });
+    const originalExit = process.exit;
+    let exitCode: number | undefined;
+    process.exit = ((code?: number) => {
+      exitCode = code ?? 0;
+    }) as typeof process.exit;
+    try {
+      quitCodeSessionOnCancel();
+      expect(exitCode).toBe(130);
+      expect(restored.join("")).toContain(WORKSPACE_TUI_LEAVE_ALT_SCREEN);
+      expect(restored.join("")).toContain("\x1b[?25h");
+    } finally {
+      process.exit = originalExit;
+      setWorkspaceTuiScrollbackWriter(undefined);
+    }
   });
 
   test("[FOLDER-ONBOARD-002] Effect onboarding binds a git remote identity", async () => {

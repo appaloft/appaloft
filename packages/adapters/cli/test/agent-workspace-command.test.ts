@@ -3104,6 +3104,12 @@ describe("Agent Workspace CLI", () => {
     expect(source).toContain("writeStatus: () => undefined");
     expect(source).toContain("withImmediateSigintExit");
     expect(source).toContain("folderOnboardingCancelledError");
+    const onboarding = await Bun.file(
+      new URL("../src/folder-project-onboarding.ts", import.meta.url),
+    ).text();
+    expect(onboarding).toContain("quitCodeSessionOnCancel");
+    expect(onboarding).toContain("restoreWorkspaceTuiScrollback");
+    expect(onboarding).toContain("\\u0003");
     const tuiBlockStart = source.indexOf("if (useOccupancyTui && occupancyTui)");
     const startAt = source.indexOf("occupancyTui.start(", tuiBlockStart);
     expect(tuiBlockStart).toBeGreaterThan(-1);
