@@ -47,7 +47,7 @@ realRendererTest(
     try {
       await waitForOutput(() => output, "sbx_real_renderer");
       await waitForOutput(() => output, "Workspaces");
-      // First paint is the collapsed occupancy wait (q quit / restore list).
+      // First paint is the collapsed occupancy wait (^q quit / restore list).
       // The release chord arrives on the manage chrome after list+detail replace that frame.
       await waitForOutput(() => output, "Ctrl+]");
       let exitCode: number | undefined;

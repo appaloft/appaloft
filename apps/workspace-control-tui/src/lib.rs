@@ -128,7 +128,7 @@ fn occupancy_available_door_footer(detail: Option<&DetailMessage>) -> String {
 
 fn occupancy_control_footer(status_line: &str, detail: Option<&DetailMessage>) -> String {
     format!(
-        " {}  │  x list  f fullscreen  ⌥f restore tree  ↑↓ select  Enter attach{}  ? help  q quit ",
+        " {}  │  enter connect  ↑↓ select  f fullscreen  ⌥f restore tree{}  ? help  ^q quit ",
         status_line,
         occupancy_available_door_footer(detail)
     )
@@ -141,9 +141,9 @@ fn occupancy_help_lines() -> Vec<Line<'static>> {
         "f              fullscreen from list",
         "shift+esc / ^] stop typing",
         "^c / ^r        pass through to agent",
-        "Enter          attach",
+        "Enter          connect",
         "↑↓             select",
-        "q / ^]         quit when not typing",
+        "^q             quit CLI",
         "y              confirm delete",
         "copy           local clipboard via OSC 52",
     ]
@@ -1737,36 +1737,37 @@ pub fn occupancy_key_binding(
                 OccupancyKeyBinding::Unhandled
             };
         }
+        if matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'q')) {
+            return if agent_focused {
+                OccupancyKeyBinding::PassToAgent
+            } else {
+                OccupancyKeyBinding::Quit
+            };
+        }
         if matches!(key.code, KeyCode::Char(']')) {
             return if agent_focused {
                 OccupancyKeyBinding::StopTyping
             } else {
-                OccupancyKeyBinding::Quit
+                OccupancyKeyBinding::Unhandled
             };
         }
     }
     if matches!(key.code, KeyCode::Esc) && shift {
         return OccupancyKeyBinding::StopTyping;
     }
+    if matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'x'))
+        && !ctrl
+        && !alt
+    {
+        return OccupancyKeyBinding::ShowAgentsList;
+    }
     if agent_focused {
-        if matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'x'))
-            && !ctrl
-            && !alt
-        {
-            return OccupancyKeyBinding::ShowAgentsList;
-        }
         if matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'f'))
             && alt
         {
             return OccupancyKeyBinding::ToggleFullscreen;
         }
         return OccupancyKeyBinding::PassToAgent;
-    }
-    if matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'q'))
-        && !ctrl
-        && !alt
-    {
-        return OccupancyKeyBinding::Quit;
     }
     OccupancyKeyBinding::Unhandled
 }
@@ -2086,9 +2087,9 @@ fn occupancy_loading_step_lines(state: &AppState) -> Vec<Line<'static>> {
 
 fn occupancy_loading_footer(collapsed: bool) -> String {
     if collapsed {
-        " ⌥f restore tree  f fullscreen  shift+esc/^] stop typing  ? help  q quit ".to_owned()
+        " ⌥f restore tree  f fullscreen  shift+esc/^] stop typing  ? help  ^q quit ".to_owned()
     } else {
-        " f fullscreen  ⌥f restore tree  ? help  q quit ".to_owned()
+        " f fullscreen  ⌥f restore tree  ? help  ^q quit ".to_owned()
     }
 }
 
@@ -2223,7 +2224,7 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
         frame.render_widget(
             List::new(items).block(
                 Block::default()
-                    .title(" Appaloft Cloud Agents ")
+                    .title(format!(" {} ", occupancy_chrome_header(state)))
                     .borders(Borders::ALL),
             ),
             columns[0],
@@ -2798,6 +2799,13 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
 mod tests {
     use super::*;
 
+    fn assert_no_bare_q_quit(text: &str) {
+        assert!(
+            !text.replace("^q quit", "").contains("q quit"),
+            "bare q quit leaked:\n{text}"
+        );
+    }
+
     #[test]
     fn ws_remote_ca_069_occupancy_list_label_prefers_repo_sha() {
         let occupied = WorkspaceSummary {
@@ -2891,7 +2899,8 @@ mod tests {
             "first useful frame must stay collapsed:\n{out}"
         );
         assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
-        assert!(out.contains("q quit"), "{out}");
+        assert!(out.contains("^q quit"), "{out}");
+        assert_no_bare_q_quit(&out);
         assert!(!out.contains("^c leave"), "{out}");
         assert!(out.contains("credential"), "{out}");
         assert!(out.contains("skills"), "{out}");
@@ -2930,15 +2939,39 @@ mod tests {
         assert!(out.contains("Appaloft Cloud Agents"), "{out}");
         assert!(!occupancy_chrome_header(&state).contains("sslip"));
         assert!(
-            occupancy_control_footer(&state.status_line, state.detail.as_ref()).contains("q quit")
+            occupancy_control_footer(&state.status_line, state.detail.as_ref()).contains("^q quit")
         );
+        assert_no_bare_q_quit(&out);
         assert!(!out.contains("^c leave"), "{out}");
         assert!(!out.contains("Y restore"), "{out}");
     }
 
     #[test]
     fn code_tui_x_returns_to_cloud_agents_list_without_quitting() {
+        let x = KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE);
+        assert_eq!(
+            occupancy_key_binding(x, true, true),
+            OccupancyKeyBinding::ShowAgentsList
+        );
+        assert_eq!(
+            occupancy_key_binding(x, false, true),
+            OccupancyKeyBinding::ShowAgentsList
+        );
+        assert_ne!(
+            occupancy_key_binding(x, true, true),
+            OccupancyKeyBinding::Quit
+        );
         let mut state = AppState::default();
+        state.loading.project = "whoami".to_owned();
+        state.apply(ParentMessage::Workspaces {
+            workspaces: vec![WorkspaceSummary {
+                workspace_id: "sbx_1".to_owned(),
+                status: "ready".to_owned(),
+                provider_key: None,
+                source_kind: None,
+                occupancy: None,
+            }],
+        });
         state.apply(ParentMessage::TerminalReady {
             workspace_id: "sbx_1".to_owned(),
             runtime_id: "sar_1".to_owned(),
@@ -2950,7 +2983,25 @@ mod tests {
         assert!(!state.focus_mode);
         assert!(!state.agent_focused);
         assert_eq!(state.status_line, "Appaloft Cloud Agents");
+        assert_eq!(
+            occupancy_chrome_header(&state),
+            "Appaloft Cloud Agents · whoami"
+        );
         assert_eq!(state.session_id.as_deref(), Some("term_1"));
+        let backend = ratatui::backend::TestBackend::new(160, 24);
+        let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw cloud agents list");
+        let out = buffer_plain(&terminal);
+        assert!(out.contains("Appaloft Cloud Agents"), "{out}");
+        assert!(out.contains("whoami"), "{out}");
+        assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
+        let list_footer = occupancy_control_footer(&state.status_line, state.detail.as_ref());
+        assert!(list_footer.contains("enter connect"), "{list_footer}");
+        assert!(list_footer.contains("^q quit"), "{list_footer}");
+        assert_no_bare_q_quit(&list_footer);
+        assert_no_bare_q_quit(&out);
     }
 
     #[test]
@@ -3042,7 +3093,9 @@ mod tests {
         assert!(out.contains("Cloud Agents list"), "{out}");
         assert!(out.contains("fullscreen / restore tree"), "{out}");
         assert!(out.contains("pass through"), "{out}");
-        assert!(out.contains("quit when not typing"), "{out}");
+        assert!(out.contains("quit CLI"), "{out}");
+        assert!(out.contains("^q"), "{out}");
+        assert!(!out.contains("quit when not typing"), "{out}");
         assert!(out.contains("confirm delete"), "{out}");
         assert!(out.contains("OSC 52"), "{out}");
         assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
@@ -3215,10 +3268,12 @@ mod tests {
         assert!(!lean.contains("p preview"));
         assert!(!lean.contains("P production"));
         assert!(!lean.contains("g connections"));
-        assert!(lean.contains("x list"));
+        assert!(lean.contains("enter connect"));
         assert!(lean.contains("f fullscreen"));
         assert!(lean.contains("⌥f restore tree"));
-        assert!(lean.contains("q quit"));
+        assert!(lean.contains("^q quit"));
+        assert!(!lean.contains("x list"));
+        assert_no_bare_q_quit(&lean);
         assert!(!lean.contains("^c leave"));
         assert!(!lean.contains("Y restore"));
         assert!(!lean.contains("Focus Mode"));
@@ -3256,6 +3311,7 @@ mod tests {
         let ctrl_c = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL);
         let ctrl_r = KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL);
         let quit = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE);
+        let dedicated_quit = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::CONTROL);
         let stop = KeyEvent::new(KeyCode::Char(']'), KeyModifiers::CONTROL);
         let shift_esc = KeyEvent::new(KeyCode::Esc, KeyModifiers::SHIFT);
         assert_eq!(
@@ -3284,10 +3340,22 @@ mod tests {
         );
         assert_eq!(
             occupancy_key_binding(quit, false, true),
-            OccupancyKeyBinding::Quit
+            OccupancyKeyBinding::Unhandled
         );
         assert_eq!(
             occupancy_key_binding(quit, false, false),
+            OccupancyKeyBinding::Unhandled
+        );
+        assert_eq!(
+            occupancy_key_binding(dedicated_quit, true, true),
+            OccupancyKeyBinding::PassToAgent
+        );
+        assert_eq!(
+            occupancy_key_binding(dedicated_quit, false, true),
+            OccupancyKeyBinding::Quit
+        );
+        assert_eq!(
+            occupancy_key_binding(dedicated_quit, false, false),
             OccupancyKeyBinding::Quit
         );
         assert_eq!(
@@ -3296,7 +3364,7 @@ mod tests {
         );
         assert_eq!(
             occupancy_key_binding(stop, false, true),
-            OccupancyKeyBinding::Quit
+            OccupancyKeyBinding::Unhandled
         );
         assert_eq!(
             occupancy_key_binding(shift_esc, true, true),

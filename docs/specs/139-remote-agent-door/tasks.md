@@ -443,8 +443,10 @@
 - [x] Default `code` from a no-git folder occupies this folder (git is not a gate)
 - [x] TTY `code` forwards nested OSC 52 to the local terminal
 - [x] Unit tests WS-REMOTE-PROGRESS-204
-- [x] TTY `code` Ctrl+C / Ctrl+R pass through; quit is `q` / unfocused `^]`
+- [x] TTY `code` Ctrl+C / Ctrl+R pass through; `q` / `^]` do not quit; unfocused `^q` quits
 - [x] Unit tests WS-REMOTE-PROGRESS-205
+- [x] In-session `x` returns to Appaloft Cloud Agents list without exiting the CLI
+- [x] Unit tests WS-REMOTE-PROGRESS-206
 
 ## Later
 
