@@ -796,7 +796,12 @@ export const workspaceCodeCommand = EffectCommand.make(
             )?.number;
           }
         }
-        return { bannerProjectId, previewUrl, productionUrl, pullRequestNumber };
+        return {
+          bannerProjectId,
+          ...(previewUrl ? { previewUrl } : {}),
+          ...(productionUrl ? { productionUrl } : {}),
+          ...(pullRequestNumber ? { pullRequestNumber } : {}),
+        };
       };
       const writeBannerAndChrome = async (chrome: {
         readonly bannerProjectId: string;
