@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   OCCUPANCY_CODE_CHROME_TITLE,
   OCCUPANCY_CODE_PROGRESS,
+  OCCUPANCY_PREPARE_STEP_LABELS,
   occupancyChromeHasForbiddenWord,
   occupancyCodeUsesLineProgress,
   occupancyOpeningProgress,
@@ -51,15 +52,25 @@ describe("occupancy code progress timeouts", () => {
     expect(occupancyChromeHasForbiddenWord(OCCUPANCY_CODE_PROGRESS.connecting)).toBeFalse();
     expect(OCCUPANCY_CODE_PROGRESS.connecting).toBe("Checking credentials…");
     expect(OCCUPANCY_CODE_PROGRESS.connecting).not.toContain("Connecting to Appaloft");
-    expect(OCCUPANCY_CODE_PROGRESS.choosingOccupancy).toBe("Opening this folder…");
+    expect(OCCUPANCY_CODE_PROGRESS.choosingOccupancy).toBe("Choosing this folder…");
+    expect(OCCUPANCY_CODE_PROGRESS.usingThisProject).toBe("Using this project…");
     expect(OCCUPANCY_CODE_PROGRESS.copyingSkills).toBe("Preparing skills…");
     expect(OCCUPANCY_CODE_PROGRESS.copyingSkills).not.toContain("Copying skills");
     expect(OCCUPANCY_CODE_PROGRESS.choosingOccupancy).not.toContain("Choosing occupancy");
+    expect(OCCUPANCY_CODE_PROGRESS.usingThisProject).not.toContain("occupancy");
     for (const message of Object.values(OCCUPANCY_CODE_PROGRESS)) {
       expect(occupancyChromeHasForbiddenWord(message)).toBeFalse();
     }
     expect(occupancyOpeningProgress("hostinger")).toBe("Preparing disk on hostinger…");
     expect(occupancyChromeHasForbiddenWord(occupancyOpeningProgress("hostinger"))).toBeFalse();
+    expect(OCCUPANCY_PREPARE_STEP_LABELS).toEqual({
+      credential: "Checking login",
+      skills: "Preparing skills",
+      disk: "Preparing disk",
+    });
+    for (const label of Object.values(OCCUPANCY_PREPARE_STEP_LABELS)) {
+      expect(occupancyChromeHasForbiddenWord(label)).toBeFalse();
+    }
     expect(occupancyPrepareStepForProgress(OCCUPANCY_CODE_PROGRESS.checkingLogin)).toBe(
       "credential",
     );

@@ -894,14 +894,18 @@ pub struct OccupancyPrepareStep {
 }
 
 fn default_prepare_steps() -> Vec<OccupancyPrepareStep> {
-    ["credential", "skills", "disk"]
-        .into_iter()
-        .map(|id| OccupancyPrepareStep {
-            id: id.to_owned(),
-            label: id.to_owned(),
-            status: "pending".to_owned(),
-        })
-        .collect()
+    [
+        ("credential", "Checking login"),
+        ("skills", "Preparing skills"),
+        ("disk", "Preparing disk"),
+    ]
+    .into_iter()
+    .map(|(id, label)| OccupancyPrepareStep {
+        id: id.to_owned(),
+        label: label.to_owned(),
+        status: "pending".to_owned(),
+    })
+    .collect()
 }
 
 fn infer_prepare_step_id(message: &str) -> &'static str {
@@ -3126,9 +3130,9 @@ mod tests {
         assert_no_bare_q_quit(&out);
         assert!(!out.contains("^q quit"), "{out}");
         assert!(!out.contains("^c leave"), "{out}");
-        assert!(out.contains("credential"), "{out}");
-        assert!(out.contains("skills"), "{out}");
-        assert!(out.contains("disk"), "{out}");
+        assert!(out.contains("Checking login"), "{out}");
+        assert!(out.contains("Preparing skills"), "{out}");
+        assert!(out.contains("Preparing disk"), "{out}");
     }
 
     #[test]
@@ -3394,9 +3398,9 @@ mod tests {
                 .map(|step| (step.label.as_str(), step.status.as_str()))
                 .collect::<Vec<_>>(),
             vec![
-                ("credential", "done"),
-                ("skills", "done"),
-                ("disk", "active")
+                ("Checking login", "done"),
+                ("Preparing skills", "done"),
+                ("Preparing disk", "active")
             ]
         );
         let backend = ratatui::backend::TestBackend::new(100, 24);
@@ -3408,9 +3412,9 @@ mod tests {
         assert!(out.contains("preparing the agent"), "{out}");
         assert!(out.contains("Appaloft Cloud Agents"), "{out}");
         assert!(out.contains("hello-static"), "{out}");
-        assert!(out.contains("credential"), "{out}");
-        assert!(out.contains("skills"), "{out}");
-        assert!(out.contains("disk"), "{out}");
+        assert!(out.contains("Checking login"), "{out}");
+        assert!(out.contains("Preparing skills"), "{out}");
+        assert!(out.contains("Preparing disk"), "{out}");
         assert!(out.contains('✓'), "{out}");
         assert!(out.contains("restore tree"), "{out}");
         assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");

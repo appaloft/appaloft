@@ -296,6 +296,11 @@ describe("logged-in folder.local remote occupy", () => {
     expect(createBody.source?.kind).toBe("template");
     expect(createBody.source?.templateId).toBe("stp_appaloft_remote_opencode");
     expect(createBody).not.toHaveProperty("repository");
+    expect(captured.text).toContain("Choosing this folder…");
+    expect(captured.text).toContain("Using this project…");
+    expect(captured.text).toContain("Preparing disk on hostinger…");
+    expect(captured.text).not.toContain("Choosing occupancy");
+    expect(captured.text).not.toContain("Opening occupancy");
     expect(captured.text).not.toContain("workspace_open_source_materialization_failed");
     expect(captured.text).not.toContain("Workspace source materialization failed");
     expect(captured.text).not.toContain("workspace_open_partial_recovery_required");
@@ -354,6 +359,10 @@ describe("logged-in folder.local remote occupy", () => {
     expect(paths.some((path) => path.endsWith("/exec"))).toBe(false);
     expect(paths).toContain("POST /api/sandboxes/sbx_partial/resume");
     expect(paths).toContain("POST /api/sandboxes/sbx_partial/agent-runtimes");
+    expect(captured.text).toContain("Choosing this folder…");
+    expect(captured.text).toContain("Using this project…");
+    expect(captured.text).not.toContain("Choosing occupancy");
+    expect(captured.text).not.toContain("Opening occupancy");
     expect(captured.text).not.toContain("workspace_open_source_materialization_failed");
     expect(captured.text).not.toContain("workspace_open_partial_recovery_required");
     expect(captured.text).not.toContain("use --new");

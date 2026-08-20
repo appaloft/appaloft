@@ -2551,8 +2551,12 @@ describe("Agent Workspace CLI", () => {
     expect(events).toContain("occupy");
     expect(events).not.toContain("attach");
     expect(printed).toContain("Checking login…");
+    expect(printed).toContain("Using this project…");
     expect(printed).toContain("Preparing disk on hostinger…");
     expect(printed).toContain("Preparing skills…");
+    expect(printed).not.toContain("Choosing occupancy");
+    expect(printed).not.toContain("Opening occupancy");
+    expect(printed.toLowerCase()).not.toContain("occupancy");
     expect(printed).toContain(
       "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · sbx_progress",
     );

@@ -779,6 +779,9 @@ export const workspaceCodeCommand = EffectCommand.make(
         };
         const command = OpenAgentWorkspaceCommand.create(openInput);
         if (command.isErr()) throw command.error;
+        if (door.projectId && door.projectId !== "project") {
+          onProgress(OCCUPANCY_CODE_PROGRESS.usingThisProject);
+        }
         onProgress(occupancyOpeningProgress(door.serverName));
         const opened = await cli.executeCommand(command.value);
         if (opened.isOk()) {
@@ -910,7 +913,7 @@ export const workspaceCodeCommand = EffectCommand.make(
         const settled = await settleWithTimeout(work, skillCommandTimeoutMs);
         if (settled.status === "timed-out") {
           return err(
-            domainError.infra("occupancy skill offer timed out", {
+            domainError.infra("Skill offer timed out", {
               phase: "occupancy-skill-offer",
             }),
           );
@@ -1339,7 +1342,7 @@ const preview = EffectCommand.make(
       if (!previewUrl) {
         return yield* Effect.fail(
           domainError.conflict(
-            "Occupancy preview is unavailable. Deploy the occupancy resource first, then retry workspace preview.",
+            "Preview is unavailable. Deploy this project first, then retry workspace preview.",
             { code: "occupancy_preview_unavailable" },
           ),
         );
@@ -1350,7 +1353,7 @@ const preview = EffectCommand.make(
         kind: "occupancy-preview",
         url: previewUrl,
         ...(compareUrl ? { compareUrl } : {}),
-        guidance: "sandbox port publishing unsupported; using occupancy resource route",
+        guidance: "sandbox port publishing unsupported; using this project's resource route",
       });
     }),
 );
@@ -1877,7 +1880,7 @@ const workspaceNoTui = Options.boolean("no-tui").pipe(
   Options.withDefault(false),
 );
 const workspaceJson = Options.boolean("json").pipe(
-  Options.withDescription("Print the headless occupancy tree as JSON."),
+  Options.withDescription("Print the headless workspace tree as JSON."),
   Options.withDefault(false),
 );
 

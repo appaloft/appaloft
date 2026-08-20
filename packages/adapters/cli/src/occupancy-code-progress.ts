@@ -8,10 +8,17 @@ export const OCCUPANCY_CODE_PROGRESS = {
   connecting: "Checking credentials…",
   checkingLogin: "Checking login…",
   lookingUpServers: "Looking up enrolled servers…",
-  choosingOccupancy: "Opening this folder…",
+  choosingOccupancy: "Choosing this folder…",
+  usingThisProject: "Using this project…",
   resolvingRepository: "Resolving repository…",
   copyingSkills: "Preparing skills…",
   attaching: "Attaching…",
+} as const;
+
+export const OCCUPANCY_PREPARE_STEP_LABELS = {
+  credential: "Checking login",
+  skills: "Preparing skills",
+  disk: "Preparing disk",
 } as const;
 
 export function occupancyCodeUsesLineProgress(input: {
