@@ -7,14 +7,23 @@
   <h3>开源 Railway 替代方案。</h3>
   <p>
     两扇门：<strong>部署</strong> 把文件夹变成 URL（Git 可选），或
-    <strong>Agent</strong> 占用你的服务器。
+    <strong>Agent</strong> — 教会你已经在用的 coding agent（skill + MCP）。
   </p>
 </div>
 
 ```bash
-appaloft deploy .    # 部署 — 这个文件夹变成 URL
-appaloft code        # Agent — 在你的服务器上占用远程 OpenCode/Pi
+appaloft deploy .
 ```
+
+```bash
+npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
+npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
+npx @appaloft/mcp
+appaloft mcp stdio
+```
+
+占用附加项（不是一扇门）：`appaloft code` 在你的服务器上打开远程 OpenCode 或 Pi。
+`appaloft code --local` 是本机 Scratch。
 
 <div align="center">
   <p>
@@ -102,36 +111,33 @@ appaloft deploy ./docker-compose.yml
 
 ## Agent
 
-今天诚实的 Agent 相邻路径是占用，以及占用时发生的 skill 复制 — 不是一键本地 MCP 或 host 安装。
-
-```bash
-appaloft code
-appaloft code --local
-```
-
-`appaloft code` 在登录后占用你的 Sandbox，并在已登记服务器上打开远程 OpenCode 或 Pi。
-`appaloft code --local` 是本机 Scratch：不登录、不建 Sandbox、也不远程保存。占用会写入公开
-Appaloft skill，并可能只增不改地复制允许名单里的 HOME skill 目录（`~/.claude/skills`、
-`~/.codex/skills`、`~/.grok/skills`、`~/.agents/skills`、`~/.cursor/skills`、
-`~/.config/opencode/skills`）到 workspace。只复制带 `SKILL.md` 的目录；不复制 `mcp.json`、
-token、cookie、`.env` 或插件二进制。
-
-一键 host 安装还在路上。本仓库里还没有。
-
-这些占用命令写在仓库内的 CLI 参考
-（[cli-entrypoints.md](./skills/appaloft/references/cli-entrypoints.md)）。当前线上的
-docs.appaloft.com CLI 页面可能还没有列出它们。
-
-下面这些零件也存在。它们不是一扇已经上线的一键 Agent 门：
+教会你已经在用的 coding agent。下面这些复制块今天就能跑。它们是现有的 `npx` 和 CLI
+命令，不是已经发布的一键 host 安装器。
 
 ```bash
 npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
+```
+
+```bash
 npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
+```
+
+```bash
 npx @appaloft/mcp
 appaloft mcp stdio
 ```
 
-Skill 安装只用 `--agent codex` 或 `--agent claude-code`。其他 host 参数不在本仓库。
+Skill 安装只用 `--agent codex` 或 `--agent claude-code`。其他 host 参数不在本仓库。用
+`npx skills list --global --agent <agent>` 确认后，新开一个 agent 会话。让它通过
+Appaloft 部署或运维。skill 会约束 agent 走 Appaloft operation，而不是直接调用 Docker、SSH、
+数据库或云厂商。
+
+## Occupancy（附加项）
+
+不是一扇门。`appaloft code` 在你的服务器上打开远程 OpenCode 或 Pi。`appaloft code --local`
+是本机 Scratch。占用命令写在仓库内的 CLI 参考
+（[cli-entrypoints.md](./skills/appaloft/references/cli-entrypoints.md)）。当前线上的
+docs.appaloft.com CLI 页面可能还没有列出它们。
 
 ## Self-host（可选）
 
