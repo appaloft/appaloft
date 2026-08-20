@@ -5,9 +5,9 @@ import { join } from "node:path";
 
 import {
   detectOccupancyVendor,
+  OCCUPANCY_VENDOR_HARNESS,
   occupancyHarnessForVendor,
   occupancyVendorCredentialPresent,
-  OCCUPANCY_VENDOR_HARNESS,
   resolveOccupancyVendor,
 } from "../src/occupancy-vendor.js";
 

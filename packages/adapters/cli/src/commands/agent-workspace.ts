@@ -95,10 +95,14 @@ import {
   settleWithTimeout,
 } from "../occupancy-code-progress.js";
 import { offerOccupancyConnectingMaterials } from "../occupancy-connecting-offer.js";
-import { occupancyHomeSkillDestinationExists, offerOccupancyAppaloftSkill, offerOccupancyHomeSkills } from "../occupancy-skill-offer.js";
 import {
-  occupancyHarnessForVendor,
+  occupancyHomeSkillDestinationExists,
+  offerOccupancyAppaloftSkill,
+  offerOccupancyHomeSkills,
+} from "../occupancy-skill-offer.js";
+import {
   type OccupancyHarness,
+  occupancyHarnessForVendor,
   resolveOccupancyVendor,
 } from "../occupancy-vendor.js";
 import {
@@ -601,10 +605,7 @@ function makeWorkspaceOpenCommand() {
 
 const open = makeWorkspaceOpenCommand();
 
-function occupancyCodeProfile(
-  harness: OccupancyHarness,
-  profile?: string,
-): string | undefined {
+function occupancyCodeProfile(harness: OccupancyHarness, profile?: string): string | undefined {
   if (profile) return profile;
   if (harness !== "opencode") return occupancyRemoteProfileId(harness);
   // Default OpenCode omits profile so findPreferred can resume the live occupancy
@@ -651,7 +652,20 @@ export const workspaceCodeCommand = EffectCommand.make(
       "connections",
     ] as const).pipe(Options.optional),
   },
-  ({ claude, codex, forceNew, grok, harness, local, noAttach, open, openTarget, path, profile, yes }) =>
+  ({
+    claude,
+    codex,
+    forceNew,
+    grok,
+    harness,
+    local,
+    noAttach,
+    open,
+    openTarget,
+    path,
+    profile,
+    yes,
+  }) =>
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
       const runtime = yield* Effect.runtime<CliRuntime | Prompt.Prompt.Environment>();

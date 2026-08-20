@@ -1,16 +1,16 @@
 import { homedir } from "node:os";
 
 import {
-  ExecuteSandboxCommand,
-  ReadSandboxFileQuery,
-  WriteSandboxFileCommand,
+  type ExecuteSandboxCommand,
+  type ReadSandboxFileQuery,
+  type WriteSandboxFileCommand,
 } from "@appaloft/application";
 import { type Result } from "@appaloft/core";
 
 import { resolveAppaloftSkillPath } from "./local-scratch-session.js";
 import {
-  occupancyConnectingTelemetry,
   type OccupancyConnectingTelemetry,
+  occupancyConnectingTelemetry,
 } from "./occupancy-connecting-telemetry.js";
 import { offerOccupancyVendorCredential } from "./occupancy-credential-offer.js";
 import { offerOccupancyFirstPartyMcp } from "./occupancy-mcp-offer.js";

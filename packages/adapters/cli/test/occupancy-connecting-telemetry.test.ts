@@ -91,7 +91,9 @@ test("[WS-REMOTE-MCP-214] occupancy MCP offer writes first-party stdio and not l
     expect.arrayContaining([".grok/auth.json", OCCUPANCY_FIRST_PARTY_MCP_PATH]),
   );
   const mcp = commands.find((command) => command.input.path === OCCUPANCY_FIRST_PARTY_MCP_PATH);
-  expect(Buffer.from(mcp!.input.contentBase64, "base64").toString("utf8")).toBe(
+  expect(mcp).toBeDefined();
+  if (!mcp) return;
+  expect(Buffer.from(mcp.input.contentBase64, "base64").toString("utf8")).toBe(
     new TextDecoder().decode(occupancyFirstPartyMcpBytes()),
   );
   expect(

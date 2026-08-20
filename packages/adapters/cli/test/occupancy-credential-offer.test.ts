@@ -3,7 +3,7 @@ import { expect, test } from "bun:test";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { WriteSandboxFileCommand } from "@appaloft/application";
+import { type WriteSandboxFileCommand } from "@appaloft/application";
 import { err, ok } from "@appaloft/core";
 
 import {
@@ -39,9 +39,12 @@ test("[WS-REMOTE-CRED-208] Grok auth.json is written to occupancy HOME", async (
     kind: "auth.json",
   });
   expect(commands).toHaveLength(1);
-  expect(commands[0]?.input.path).toBe(".grok/auth.json");
-  expect(commands[0]?.input.sandboxId).toBe("sbx_ready");
-  expect(Buffer.from(commands[0]!.input.contentBase64, "base64").toString("utf8")).toContain(
+  const written = commands[0];
+  expect(written?.input.path).toBe(".grok/auth.json");
+  expect(written?.input.sandboxId).toBe("sbx_ready");
+  expect(written).toBeDefined();
+  if (!written) return;
+  expect(Buffer.from(written.input.contentBase64, "base64").toString("utf8")).toContain(
     "grok-secret",
   );
 });

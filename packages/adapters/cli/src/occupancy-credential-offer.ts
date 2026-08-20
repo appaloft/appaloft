@@ -5,10 +5,7 @@ import { join } from "node:path";
 import { WriteSandboxFileCommand } from "@appaloft/application";
 import { type Result } from "@appaloft/core";
 
-import {
-  occupancyAppaloftHome,
-  type OccupancyVendor,
-} from "./occupancy-vendor.js";
+import { type OccupancyVendor, occupancyAppaloftHome } from "./occupancy-vendor.js";
 
 export const OCCUPANCY_CREDENTIAL_MAX_FILE_BYTES = 64 * 1024;
 

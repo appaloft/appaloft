@@ -139,8 +139,8 @@ export async function resolveOccupancyVendor(input: {
 > {
   const selected = selectedOccupancyVendorFlags(input.flags);
   if (selected.length > 1) return err(occupancyVendorAmbiguousError());
-  if (selected.length === 1) {
-    const vendor = selected[0]!;
+  const [vendor] = selected;
+  if (selected.length === 1 && vendor) {
     if (!(await occupancyVendorCredentialPresent(vendor, input))) {
       return err(occupancyVendorCredentialMissingError(vendor));
     }
