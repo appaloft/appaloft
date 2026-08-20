@@ -6,16 +6,17 @@
   <p><code>/ˌæp əˈlɔːft/</code></p>
   <h3>Open-source Railway alternative.</h3>
   <p>
-    Two doors. Pick one and start.
+    Two doors: <strong>Deploy</strong> a folder to a URL (Git optional), or
+    <strong>Agent</strong> occupancy on your server.
   </p>
-  <p>
-    <strong>Deploy</strong> — a folder becomes a URL. Git is optional.
-    Hero command: <code>appaloft deploy .</code>. Success is a live URL for this app — not a
-    canned demo address.<br />
-    <strong>Agent</strong> — occupancy: <code>appaloft code</code> opens remote OpenCode or Pi on
-    your server; <code>appaloft code --local</code> is Scratch on this machine. Occupy also copies
-    the public Appaloft skill and allowlisted HOME skills. A one-command host setup is coming.
-  </p>
+</div>
+
+```bash
+appaloft deploy .    # Deploy — this folder becomes a URL
+appaloft code        # Agent — occupy remote OpenCode/Pi on your server
+```
+
+<div align="center">
   <p>
     <a href="https://www.appaloft.com">Website</a> ·
     <a href="https://docs.appaloft.com/en">Docs</a> ·

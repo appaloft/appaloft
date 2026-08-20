@@ -6,15 +6,17 @@
   <p><code>/ˌæp əˈlɔːft/</code></p>
   <h3>开源 Railway 替代方案。</h3>
   <p>
-    两扇门。选一扇，立刻开始。
+    两扇门：<strong>部署</strong> 把文件夹变成 URL（Git 可选），或
+    <strong>Agent</strong> 占用你的服务器。
   </p>
-  <p>
-    <strong>部署</strong> — 一个文件夹变成 URL。Git 可选。
-    主命令：<code>appaloft deploy .</code>。成功就是这个应用的一条线上 URL — 不是事先编好的演示地址。<br />
-    <strong>Agent</strong> — 占用：<code>appaloft code</code> 在你的服务器上打开远程 OpenCode 或
-    Pi；<code>appaloft code --local</code> 是本机 Scratch。占用时还会写入公开 Appaloft skill，
-    并复制允许名单里的 HOME skill。一键 host 安装还在路上。
-  </p>
+</div>
+
+```bash
+appaloft deploy .    # 部署 — 这个文件夹变成 URL
+appaloft code        # Agent — 在你的服务器上占用远程 OpenCode/Pi
+```
+
+<div align="center">
   <p>
     <a href="https://www.appaloft.com">官网</a> ·
     <a href="https://docs.appaloft.com">文档</a> ·
