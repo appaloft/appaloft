@@ -469,7 +469,11 @@ export async function resolveDefaultRemoteCodeDoor(
     try {
       localLocator = probe.resolveLocator
         ? await probe.resolveLocator()
-        : await resolveRemoteCodeLocator(path, probe.runGit, { homeDir });
+        : await resolveRemoteCodeLocator(
+            path,
+            probe.runGit,
+            homeDir === undefined ? {} : { homeDir },
+          );
     } catch (error) {
       localLocatorError = error;
     }

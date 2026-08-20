@@ -2732,8 +2732,12 @@ mod tests {
         });
         assert!(state.terminal.screen().alternate_screen());
         assert!(state.terminal.screen().contents().contains("中文 🚀 é"));
-        state.toggle_focus_mode();
+        assert!(state.focus_mode);
         assert_eq!(state.session_id.as_deref(), Some("term_same"));
+        state.toggle_focus_mode();
+        assert!(!state.focus_mode);
+        assert_eq!(state.session_id.as_deref(), Some("term_same"));
+        state.toggle_focus_mode();
         assert!(state.focus_mode);
         state.release_agent_focus();
         assert_eq!(state.session_id.as_deref(), Some("term_same"));
