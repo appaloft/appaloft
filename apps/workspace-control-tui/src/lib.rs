@@ -864,7 +864,7 @@ impl Default for OccupancyLoading {
     fn default() -> Self {
         Self {
             active: true,
-            collapsed: false,
+            collapsed: true,
             title: "Appaloft".to_owned(),
             harness: "occupancy".to_owned(),
             steps: Vec::new(),
@@ -2517,6 +2517,7 @@ mod tests {
         let mut state = AppState::default();
         assert_eq!(state.status_line, "preparing the agent");
         assert!(state.loading.active);
+        assert!(state.loading.collapsed);
         state.apply(ParentMessage::HelloOk);
         state.apply(ParentMessage::Progress {
             message: "Opening occupancy on hostinger…".to_owned(),
@@ -2540,7 +2541,8 @@ mod tests {
             }],
         });
         assert_eq!(state.status_line, "1 Workspace(s)");
-        assert!(!state.loading.active);
+        assert!(state.loading.active);
+        assert!(state.loading.collapsed);
     }
 
     #[test]

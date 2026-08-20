@@ -69,6 +69,6 @@ describe("occupancy CLI shell progress", () => {
     expect(warmup).toBeGreaterThan(-1);
     expect(runImport).toBeGreaterThan(-1);
     expect(warmup).toBeLessThan(runImport);
-    expect(source).toContain("formatHumanCliError");
+    expect(source).toContain("@appaloft/adapter-cli/workspace-control-renderer");
   });
 });

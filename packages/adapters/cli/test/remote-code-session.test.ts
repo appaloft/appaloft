@@ -426,35 +426,43 @@ describe("remote code door", () => {
     expect(door.serverId).toBe("srv_1");
   });
 
-  test("[WS-REMOTE-NO-UPLOAD-006][WS-OPEN-LOCATOR-024] non-git cwd does not resume an unrelated occupancy", async () => {
-    await expect(
-      resolveDefaultRemoteCodeDoor({
-        env: { APPALOFT_TOKEN: "token" },
-        listServers: async () => [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }],
-        listOccupancies: async () => [
-          {
-            sandboxId: "sbx_examples",
-            status: "ready",
-            occupancy: {
-              repositoryIdentity: "github.com/appaloft/examples",
-              commitSha: "d".repeat(40),
-              branch: "main",
+  test("[WS-REMOTE-NO-UPLOAD-006][WS-REMOTE-PROGRESS-201] no-git folder resumes live occupancy without a git remote", async () => {
+    const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-nongit-door-"));
+    let contactedRemote = false;
+    try {
+      const door = await resolveDefaultRemoteCodeDoor(
+        {
+          env: { APPALOFT_TOKEN: "token" },
+          listServers: async () => [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }],
+          listOccupancies: async () => [
+            {
+              sandboxId: "sbx_examples",
+              status: "ready",
+              occupancy: {
+                repositoryIdentity: "github.com/appaloft/examples",
+                commitSha: "d".repeat(40),
+                branch: "main",
+              },
+              lastActivityAt: "2026-08-15T12:30:00.000Z",
             },
-            lastActivityAt: "2026-08-15T12:30:00.000Z",
+          ],
+          resolveLocator: async () => {
+            throw new Error("no-git occupancy must not wait on a folder locator");
           },
-        ],
-        resolveLocator: async () => {
-          throw Object.assign(new Error("missing origin"), {
-            code: "workspace_remote_repository_missing",
-          });
+          resolveRemoteRef: async () => {
+            contactedRemote = true;
+            throw new Error("live occupancy must not wait on ls-remote");
+          },
         },
-        resolveRemoteRef: async () => {
-          throw new Error("unrelated occupancy must not become this folder's locator");
-        },
-      }),
-    ).rejects.toMatchObject({
-      code: "workspace_remote_repository_missing",
-    });
+        emptyDir,
+      );
+      expect(door.repositoryIdentity).toBe("github.com/appaloft/examples");
+      expect(door.commitSha).toBe("d".repeat(40));
+      expect(door.serverName).toBe("hostinger");
+      expect(contactedRemote).toBe(false);
+    } finally {
+      await rm(emptyDir, { recursive: true, force: true });
+    }
     expect(selectResumeOccupancy([])).toBeUndefined();
   });
 
@@ -754,36 +762,32 @@ describe("remote code door", () => {
       expect(workspaceGitDiscoveryCeiling(silence, home)).toBe(home);
       const started = Date.now();
       let contactedRemote = false;
-      await expect(
-        resolveDefaultRemoteCodeDoor(
-          {
-            env: { APPALOFT_TOKEN: "token", HOME: home },
-            listServers: async () => [
-              { id: "srv_1", name: "hostinger", lifecycleStatus: "active" },
-            ],
-            listOccupancies: async () => [
-              {
-                sandboxId: "sbx_examples",
-                status: "ready",
-                occupancy: {
-                  repositoryIdentity: "github.com/appaloft/examples",
-                  commitSha: "d".repeat(40),
-                  branch: "main",
-                },
-                lastActivityAt: "2026-08-15T12:30:00.000Z",
+      const door = await resolveDefaultRemoteCodeDoor(
+        {
+          env: { APPALOFT_TOKEN: "token", HOME: home },
+          listServers: async () => [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }],
+          listOccupancies: async () => [
+            {
+              sandboxId: "sbx_examples",
+              status: "ready",
+              occupancy: {
+                repositoryIdentity: "github.com/appaloft/examples",
+                commitSha: "d".repeat(40),
+                branch: "main",
               },
-            ],
-            resolveRemoteRef: async () => {
-              contactedRemote = true;
-              await Bun.sleep(45_000);
-              throw new Error("ancestor remote must not be contacted");
+              lastActivityAt: "2026-08-15T12:30:00.000Z",
             },
+          ],
+          resolveRemoteRef: async () => {
+            contactedRemote = true;
+            await Bun.sleep(45_000);
+            throw new Error("ancestor remote must not be contacted");
           },
-          silence,
-        ),
-      ).rejects.toMatchObject({
-        code: "workspace_remote_repository_missing",
-      });
+        },
+        silence,
+      );
+      expect(door.repositoryIdentity).toBe("github.com/appaloft/examples");
+      expect(door.commitSha).toBe("d".repeat(40));
       expect(Date.now() - started).toBeLessThan(3_000);
       expect(contactedRemote).toBe(false);
     } finally {

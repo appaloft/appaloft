@@ -105,6 +105,16 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
+    let occupancy_mode = env::var("APPALOFT_TUI_MODE")
+        .ok()
+        .filter(|mode| !mode.is_empty())
+        .is_none();
+    let restore = if occupancy_mode {
+        Some(TerminalRestore::enter()?)
+    } else {
+        None
+    };
+
     let port = env::var("APPALOFT_WORKSPACE_TUI_PORT")
         .context("APPALOFT_WORKSPACE_TUI_PORT is required")?
         .parse::<u16>()
@@ -127,7 +137,10 @@ fn main() -> Result<()> {
         return operate::run(writer, reader);
     }
 
-    let _restore = TerminalRestore::enter()?;
+    let _restore = match restore {
+        Some(value) => value,
+        None => TerminalRestore::enter()?,
+    };
     let backend = CrosstermBackend::new(std::io::stdout());
     let mut terminal = Terminal::new(backend).context("create Ratatui terminal")?;
     terminal.clear().context("clear TUI surface")?;
