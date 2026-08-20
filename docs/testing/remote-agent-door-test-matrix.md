@@ -193,6 +193,8 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-MCP-214 | CLI | automated | first-party secret-free `.mcp.json` is written; laptop `mcp.json` is not copied | `packages/adapters/cli/test/occupancy-connecting-telemetry.test.ts` |
 | WS-REMOTE-CONNECT-215 | CLI | automated | connecting-step data includes credential, skill count, and work-on-disk; `--no-attach` prints those three lines; `N` is actually copied | `packages/adapters/cli/test/occupancy-connecting-telemetry.test.ts`; `packages/adapters/cli/test/agent-workspace-command.test.ts` |
 | WS-REMOTE-CONNECT-216 | CLI / TUI | automated | this slice does not change occupancy TUI layout or add an agent `:8080` hostname | `packages/adapters/cli/test/occupancy-connecting-telemetry.test.ts` |
+| WS-REMOTE-HELP-217 | CLI / shell | automated | `code --help` / `code -h` print a compact stdout option table and exit 0; no Effect `A true or false value` / repeated `This setting is optional` / `--wizard`; `--yes --open --profile --harness --open-target --local --new --no-attach` have real-use copy | `packages/adapters/cli/test/code-help.test.ts`; `apps/shell/test/help-without-runtime.test.ts` |
+| WS-REMOTE-HELP-218 | shell | automated | TTY `code --help` / `-h` do not warm occupancy or write `\x1b[?1049h`; `leaveOccupancyAltScreen` (`\x1b[?25h\x1b[?1049l`) always runs if alt-screen was entered | `apps/shell/test/occupancy-cli-progress.test.ts`; `apps/shell/test/occupancy-tui-first-frame.test.ts`; `apps/shell/test/help-without-runtime.test.ts` |
 
 
 
