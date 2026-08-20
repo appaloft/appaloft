@@ -112,10 +112,13 @@ If tests bypass the runtime or write directly to the database to simulate succes
     release-please version-bump file sets as `lightweight_only`. A `release-please--*` head ref is
     also treated as `release_bump` when every changed file is already on that allowlist. Those PRs
     skip Biome, Typecheck, Unit Tests, Integration, and Build And Smoke via skip steps, skip
-    Workspace TUI at the job level, and still publish the required `ci` check. The aggregator
-    treats `skipped` needed jobs as success. Product source, lockfiles, `.github/actions/*`, and
-    other Rust stay on the full graph. `workflow_dispatch` classifies against the default branch;
-    `release.yml` does not dispatch CI.
+    Workspace TUI cargo/docker/bridge work inside the six matrix jobs, and still publish the
+    required `ci` check plus `Workspace TUI (*)` names. The aggregator treats `skipped` needed
+    jobs as success. Isolated web, shell e2e files, and most TypeScript packages also skip TUI
+    work inside those jobs. TUI crate, JS bridge, packaging of `appaloft-workspace-tui`, shared
+    rust workspace files, or an empty diff fail closed to the full six-target TUI graph.
+    Product source, lockfiles, `.github/actions/*`, and other Rust stay on the full CI graph.
+    `workflow_dispatch` classifies against the default branch; `release.yml` does not dispatch CI.
 - `e2e.yml`
   - real PostgreSQL, started backend, CLI/API/deployment E2E, Playwright smoke
   - runs for every non-draft pull request and always publishes both stable shard checks required by

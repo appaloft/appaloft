@@ -1,11 +1,13 @@
 export type ChangeClass = "docs_only" | "release_bump" | "full";
 export type E2eClass = "e2e_skip" | "e2e_web" | "e2e_shell" | "e2e_full";
+export type WorkspaceTuiClass = "tui_skip" | "tui_full";
 
 export interface ChangeClassification {
   readonly changeClass: ChangeClass;
   readonly e2eClass: E2eClass;
   readonly files: readonly string[];
   readonly lightweightOnly: boolean;
+  readonly workspaceTuiClass: WorkspaceTuiClass;
 }
 
 export interface ClassifyChangedFilesOptions {
@@ -85,6 +87,74 @@ export function e2eNeedsShardWork(e2eClass: E2eClass, shard: number): boolean {
   return e2eNeedsShell(e2eClass) || (e2eNeedsWebView(e2eClass) && shard === 1);
 }
 
+const workspaceTuiPackagingPaths = [
+  "scripts/release/build-binary-bundle.ts",
+  "scripts/release/lib/binary-bundle.ts",
+  "scripts/release/lib/targets.ts",
+  "scripts/release/prepare-npm-packages.ts",
+  "scripts/test/binary-bundle.test.ts",
+  "scripts/test/workspace-control-host-terminal.ts",
+  "scripts/test/workspace-control-packaged-tui.ts",
+] as const;
+
+export function isWorkspaceTuiPath(file: string): boolean {
+  if (file === "apps/workspace-control-tui" || file.startsWith("apps/workspace-control-tui/")) {
+    return true;
+  }
+
+  if (
+    file === "Cargo.lock" ||
+    file === "Cargo.toml" ||
+    file === "rust-toolchain" ||
+    file === "rust-toolchain.toml" ||
+    file === "rustfmt.toml" ||
+    file === ".rustfmt.toml"
+  ) {
+    return true;
+  }
+
+  if (
+    file.startsWith("packages/adapters/cli/src/workspace-control-") ||
+    file.startsWith("packages/adapters/cli/src/workspace-tui-") ||
+    file.startsWith("packages/adapters/cli/test/workspace-control-") ||
+    file.startsWith("packages/adapters/cli/test/workspace-tui-") ||
+    file === "packages/adapters/cli/src/commands/agent-workspace.ts" ||
+    file === "packages/adapters/cli/test/agent-workspace-command.test.ts"
+  ) {
+    return true;
+  }
+
+  return (workspaceTuiPackagingPaths as readonly string[]).includes(file);
+}
+
+export function workspaceTuiRequired(workspaceTuiClass: WorkspaceTuiClass): boolean {
+  return workspaceTuiClass === "tui_full";
+}
+
+export function classifyWorkspaceTuiClass(
+  files: readonly string[],
+  changeClass: ChangeClass,
+): WorkspaceTuiClass {
+  if (changeClass === "docs_only" || changeClass === "release_bump") {
+    return "tui_skip";
+  }
+
+  if (files.length === 0) {
+    return "tui_full";
+  }
+
+  const tuiRelevant = files.filter((file) => !isDocsOnlyPath(file));
+  if (tuiRelevant.length === 0) {
+    return "tui_skip";
+  }
+
+  if (tuiRelevant.some((file) => isWorkspaceTuiPath(file))) {
+    return "tui_full";
+  }
+
+  return "tui_skip";
+}
+
 export function classifyE2eClass(files: readonly string[], changeClass: ChangeClass): E2eClass {
   if (changeClass === "docs_only" || changeClass === "release_bump") {
     return "e2e_skip";
@@ -120,6 +190,7 @@ function classificationFor(
     e2eClass: classifyE2eClass(files, changeClass),
     files,
     lightweightOnly,
+    workspaceTuiClass: classifyWorkspaceTuiClass(files, changeClass),
   };
 }
 
@@ -193,6 +264,8 @@ export function formatClassificationSummary(classification: ChangeClassification
     `e2e_class=${classification.e2eClass}`,
     `e2e_run_web=${e2eNeedsWebView(classification.e2eClass)}`,
     `e2e_run_shell=${e2eNeedsShell(classification.e2eClass)}`,
+    `workspace_tui_class=${classification.workspaceTuiClass}`,
+    `workspace_tui=${workspaceTuiRequired(classification.workspaceTuiClass)}`,
     "",
   ].join("\n");
 }
@@ -272,6 +345,8 @@ async function main(): Promise<void> {
     `e2e_class=${classification.e2eClass}`,
     `e2e_run_web=${e2eNeedsWebView(classification.e2eClass)}`,
     `e2e_run_shell=${e2eNeedsShell(classification.e2eClass)}`,
+    `workspace_tui_class=${classification.workspaceTuiClass}`,
+    `workspace_tui=${workspaceTuiRequired(classification.workspaceTuiClass)}`,
   ]);
   await writeGitHubLines(envValue("GITHUB_STEP_SUMMARY") || undefined, [
     formatClassificationSummary(classification),
@@ -283,6 +358,8 @@ async function main(): Promise<void> {
   console.log(`e2e_class=${classification.e2eClass}`);
   console.log(`e2e_run_web=${e2eNeedsWebView(classification.e2eClass)}`);
   console.log(`e2e_run_shell=${e2eNeedsShell(classification.e2eClass)}`);
+  console.log(`workspace_tui_class=${classification.workspaceTuiClass}`);
+  console.log(`workspace_tui=${workspaceTuiRequired(classification.workspaceTuiClass)}`);
   for (const file of classification.files) {
     console.log(file);
   }

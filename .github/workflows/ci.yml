@@ -30,6 +30,8 @@ jobs:
     outputs:
       change_class: ${{ steps.classify.outputs.change_class }}
       lightweight_only: ${{ steps.classify.outputs.lightweight_only }}
+      workspace_tui: ${{ steps.classify.outputs.workspace_tui }}
+      workspace_tui_class: ${{ steps.classify.outputs.workspace_tui_class }}
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -172,7 +174,6 @@ jobs:
   workspace-tui:
     name: Workspace TUI (${{ matrix.target }})
     needs: changes
-    if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -198,20 +199,25 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
+      - name: Skip Workspace TUI
+        if: ${{ needs.changes.outputs.workspace_tui != 'true' }}
+        run: echo "Workspace TUI class ${{ needs.changes.outputs.workspace_tui_class }} (${{ needs.changes.outputs.change_class }}); skipping cargo/docker/bridge work on ${{ matrix.target }}."
+
       - name: Check out code
+        if: ${{ needs.changes.outputs.workspace_tui == 'true' }}
         uses: actions/checkout@v4
 
       - name: Set up Bun and caches
-        if: ${{ matrix.bridge == true }}
+        if: ${{ needs.changes.outputs.workspace_tui == 'true' && matrix.bridge == true }}
         uses: ./.github/actions/setup-bun-turbo
 
       - uses: dtolnay/rust-toolchain@stable
-        if: ${{ matrix.musl != true }}
+        if: ${{ needs.changes.outputs.workspace_tui == 'true' && matrix.musl != true }}
         with:
           components: rustfmt
 
       - name: Test and build native Workspace TUI
-        if: ${{ matrix.musl != true }}
+        if: ${{ needs.changes.outputs.workspace_tui == 'true' && matrix.musl != true }}
         run: |
           cargo fmt --check --manifest-path apps/workspace-control-tui/Cargo.toml
           cargo test --locked --manifest-path apps/workspace-control-tui/Cargo.toml
@@ -219,7 +225,7 @@ jobs:
           apps/workspace-control-tui/target/release/appaloft-workspace-tui --version
 
       - name: Test and build native musl Workspace TUI
-        if: ${{ matrix.musl == true }}
+        if: ${{ needs.changes.outputs.workspace_tui == 'true' && matrix.musl == true }}
         run: |
           docker run --rm --platform "${{ matrix.container_platform }}" \
             -v "$PWD:/work:ro" -w /work \
@@ -231,7 +237,7 @@ jobs:
             '
 
       - name: Test Workspace TUI parent bridge
-        if: ${{ matrix.bridge == true }}
+        if: ${{ needs.changes.outputs.workspace_tui == 'true' && matrix.bridge == true }}
         env:
           APPALOFT_WORKSPACE_TUI_REQUIRED: "true"
         run: |

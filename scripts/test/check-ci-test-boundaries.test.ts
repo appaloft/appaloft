@@ -4,6 +4,8 @@ import {
   findCiTestBoundaryViolations,
 } from "../check-ci-test-boundaries";
 
+const expression = (value: string) => ["$", "{{ ", value, " }}"].join("");
+
 const validWorkflow = `
 env:
   APPALOFT_APP_VERSION: 0.1.0-ci
@@ -62,6 +64,20 @@ describe("CI test boundary check", () => {
       - run: bun scripts/ci/classify-changed-files.ts
     if: \${{ needs.changes.outputs.lightweight_only != 'true' }}
             if [[ "\${result}" != "success" && "\${result}" != "skipped" ]]; then
+  workspace-tui:
+    name: Workspace TUI
+    strategy:
+      matrix:
+        include:
+          - target: darwin-arm64
+          - target: darwin-x64
+          - target: linux-arm64-gnu
+          - target: linux-x64-gnu
+          - target: linux-arm64-musl
+          - target: linux-x64-musl
+    steps:
+      - name: Skip Workspace TUI
+      - name: consume workspace_tui
 `;
     const e2eWorkflow = `
 on:
@@ -97,6 +113,23 @@ jobs:
       expect.objectContaining({
         message:
           "e2e.yml must start Postgres as a step so lightweight and web-only shards do not pay a job-level service tax.",
+      }),
+    );
+    expect(
+      findCiChangeClassifierViolations(
+        ciWorkflow.replace(
+          "  workspace-tui:",
+          [
+            "  workspace-tui:\n    if: ",
+            expression("needs.changes.outputs.workspace_tui == 'true'"),
+          ].join(""),
+        ),
+        e2eWorkflow,
+      ),
+    ).toContainEqual(
+      expect.objectContaining({
+        message:
+          "ci.yml must not job-level skip workspace-tui; required Workspace TUI (*) names must still conclude.",
       }),
     );
   });

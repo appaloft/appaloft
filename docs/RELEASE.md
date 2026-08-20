@@ -51,8 +51,9 @@ docker build --build-arg APPALOFT_APP_VERSION=0.1.0 -t appaloft-all-in-one:local
 
 - `ci.yml`: lint, typecheck, unit, integration, build, binary smoke, Docker build smoke. Docs-only
   and release-please version-bump PRs classify as lightweight and skip those heavy jobs; the
-  required `ci` check still succeeds. Workspace TUI is skipped at the job level so the six runners
-  do not boot; the `ci` aggregator treats `skipped` as success. `workflow_dispatch` classifies
+  required `ci` check still succeeds. Workspace TUI keeps all six `Workspace TUI (*)` matrix jobs
+  and skips cargo/docker/bridge work inside those jobs when the diff is not TUI/bridge/related
+  Cargo. The `ci` aggregator treats `skipped` as success. `workflow_dispatch` classifies
   against the default branch instead of forcing full CI, and `release.yml` does not dispatch CI.
 - `e2e.yml`: real Postgres, started backend, CLI/API/deployment E2E, web smoke. It runs for every
   pull request so the two stable shard checks can be enforced as branch-protection merge gates.

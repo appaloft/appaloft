@@ -14,8 +14,10 @@ import {
   isReleaseBumpPath,
   isShellIsolatedE2ePath,
   isWebIsolatedE2ePath,
+  isWorkspaceTuiPath,
   planChangedFilesLookup,
   releaseBumpExactFiles,
+  workspaceTuiRequired,
 } from "../ci/classify-changed-files";
 
 const root = resolve(import.meta.dir, "../..");
@@ -48,6 +50,7 @@ describe("CI change classifier", () => {
       e2eClass: "e2e_skip",
       files: [...docsOnlyPrFiles].sort((left, right) => left.localeCompare(right)),
       lightweightOnly: true,
+      workspaceTuiClass: "tui_skip",
     });
     expect(classifyChangedFiles(["LICENSE.APACHE"])).toMatchObject({
       changeClass: "docs_only",
@@ -70,6 +73,7 @@ describe("CI change classifier", () => {
       e2eClass: "e2e_skip",
       files: [...releaseBumpPrFiles].sort((left, right) => left.localeCompare(right)),
       lightweightOnly: true,
+      workspaceTuiClass: "tui_skip",
     });
     expect(
       classifyChangedFiles([
@@ -221,12 +225,15 @@ describe("CI change classifier", () => {
       e2eClass: "e2e_skip",
       files: ["package.json"],
       lightweightOnly: true,
+      workspaceTuiClass: "tui_skip",
     });
     expect(summary).toContain("lightweight_only=true");
     expect(summary).toContain("change_class=release_bump");
     expect(summary).toContain("e2e_class=e2e_skip");
     expect(summary).toContain("e2e_run_web=false");
     expect(summary).toContain("e2e_run_shell=false");
+    expect(summary).toContain("workspace_tui_class=tui_skip");
+    expect(summary).toContain("workspace_tui=false");
   });
 
   test("[CI-LIGHTWEIGHT-005] classifier CLI writes GitHub outputs for a release-bump file list", () => {
@@ -253,6 +260,8 @@ describe("CI change classifier", () => {
     expect(output).toContain("e2e_class=e2e_skip");
     expect(output).toContain("e2e_run_web=false");
     expect(output).toContain("e2e_run_shell=false");
+    expect(output).toContain("workspace_tui_class=tui_skip");
+    expect(output).toContain("workspace_tui=false");
     rmSync(directory, { force: true, recursive: true });
   });
 
@@ -372,5 +381,93 @@ describe("CI change classifier", () => {
     );
     expect(pullRequestTrigger).not.toContain("paths:");
     expect(pullRequestTrigger).not.toContain("paths-ignore:");
+  });
+
+  test("[CI-TUI-SCOPE-001] web-only, docs-only, and unrelated product files skip TUI work", () => {
+    const skipSets = [
+      docsOnlyPrFiles,
+      releaseBumpPrFiles,
+      ["apps/web/src/routes/+page.svelte"],
+      ["apps/shell/test/e2e/certificates.command.e2e.ts"],
+      ["packages/core/src/index.ts"],
+      ["packages/application/src/tokens.ts"],
+      ["apps/shell/src/index.ts"],
+      ["bun.lock"],
+      ["apps/desktop/src-tauri/src/main.rs"],
+      ["packages/adapters/cli/src/commands/deployment.ts"],
+    ];
+
+    for (const files of skipSets) {
+      expect(classifyChangedFiles(files)).toMatchObject({
+        workspaceTuiClass: "tui_skip",
+      });
+    }
+
+    expect(workspaceTuiRequired("tui_skip")).toBe(false);
+  });
+
+  test("[CI-TUI-SCOPE-002] TUI crate, bridge, packaging, empty, and shared rust stay tui_full", () => {
+    const runSets = [
+      ["apps/workspace-control-tui/src/main.rs"],
+      ["apps/workspace-control-tui/Cargo.lock"],
+      ["packages/adapters/cli/src/workspace-control-renderer.ts"],
+      ["packages/adapters/cli/src/workspace-tui-launch.ts"],
+      ["packages/adapters/cli/test/workspace-control-presentation.test.ts"],
+      ["packages/adapters/cli/test/workspace-tui-launch.test.ts"],
+      ["packages/adapters/cli/src/commands/agent-workspace.ts"],
+      ["packages/adapters/cli/test/agent-workspace-command.test.ts"],
+      ["scripts/release/lib/binary-bundle.ts"],
+      ["scripts/test/workspace-control-packaged-tui.ts"],
+      ["rust-toolchain.toml"],
+      ["Cargo.lock"],
+      [],
+    ];
+
+    for (const files of runSets) {
+      if (files.length > 0) {
+        expect(files.every((file) => isWorkspaceTuiPath(file))).toBe(true);
+      }
+      expect(classifyChangedFiles(files)).toMatchObject({
+        workspaceTuiClass: "tui_full",
+      });
+    }
+
+    expect(workspaceTuiRequired("tui_full")).toBe(true);
+    expect(
+      classifyChangedFiles([
+        "apps/web/src/routes/+page.svelte",
+        "apps/workspace-control-tui/src/lib.rs",
+      ]),
+    ).toMatchObject({
+      e2eClass: "e2e_full",
+      workspaceTuiClass: "tui_full",
+    });
+  });
+
+  test("[CI-TUI-SCOPE-003] workspace-tui keeps all six names and skips work inside the jobs", () => {
+    expect(ciWorkflow).toContain("  workspace-tui:");
+    expect(ciWorkflow).toContain(`name: Workspace TUI (${expression("matrix.target")})`);
+    expect(ciWorkflow).toContain("name: Skip Workspace TUI");
+    expect(ciWorkflow).toContain("target: darwin-arm64");
+    expect(ciWorkflow).toContain("target: darwin-x64");
+    expect(ciWorkflow).toContain("target: linux-arm64-gnu");
+    expect(ciWorkflow).toContain("target: linux-x64-gnu");
+    expect(ciWorkflow).toContain("target: linux-arm64-musl");
+    expect(ciWorkflow).toContain("target: linux-x64-musl");
+    expect(ciWorkflow).toContain("workspace_tui");
+    expect(ciWorkflow).toContain(
+      `if: ${expression("needs.changes.outputs.workspace_tui != 'true'")}`,
+    );
+    expect(ciWorkflow).toContain(
+      `if: ${expression("needs.changes.outputs.workspace_tui == 'true'")}`,
+    );
+    expect(ciWorkflow).toContain("name: ci");
+
+    const tuiJob = ciWorkflow.slice(
+      ciWorkflow.indexOf("  workspace-tui:"),
+      ciWorkflow.indexOf("  build-smoke:"),
+    );
+    expect(tuiJob).not.toMatch(/^ {4}if:/m);
+    expect(tuiJob).toContain("name: Skip Workspace TUI");
   });
 });
