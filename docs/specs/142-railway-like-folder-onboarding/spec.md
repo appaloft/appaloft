@@ -33,9 +33,11 @@ linked project is one command.
 6. Cwd without git: identity is `folder.local/cwd/<sanitized-dirname>`. Occupy
    and deploy still succeed.
 7. `appaloft project use <projectId>` writes the folder link after `projects.show`.
-8. Default `code` resumes only a matching-identity occupancy. It does not resume
-   the latest occupancy of another repository. Explicit `code <git-remote>` is
-   unchanged (ADR-119).
+8. Default `code` from a no-git folder resumes the live occupancy (Spec 139 /
+   #1319). With no occupancy to resume, it occupies this folder
+   (`folder.local/cwd/<name>`) after folder-project onboarding. A cwd with
+   origin still occupies that repository instead of the last occupancy.
+   Explicit `code <git-remote>` is unchanged (ADR-119).
 9. Folder occupancy skips remote fetch. Resource source kind is `local-folder`.
 10. Missing login fail-closes immediately with `Run appaloft login`. Status lines
     print on stderr. Failures are non-zero. No fake live URL.
@@ -50,7 +52,7 @@ linked project is one command.
 | `FOLDER-ONBOARD-004` | `project use` then later command | Subsequent deploy/code use the switched project id. |
 | `FOLDER-ONBOARD-005` | Exactly one existing Project | Uses that Project without prompting. |
 | `FOLDER-ONBOARD-006` | Several Projects | TTY prompts create vs select; `--yes` creates the directory-named Project. |
-| `FOLDER-ONBOARD-007` | No git | Occupy/deploy succeed; git is not a gate. |
+| `FOLDER-ONBOARD-007` | No git | Deploy succeeds. Default `code` resumes a live occupancy; with none, occupy this folder. Git is not a gate. |
 | `FOLDER-ONBOARD-008` | Status and failure | Short status lines; login miss is immediate; failures non-zero; no fake URL. |
 
 ## Public Surfaces
@@ -69,13 +71,12 @@ linked project is one command.
 - Explicit `code <git-remote>` is unchanged.
 - `appaloft context` remains profile selection.
 - Folder links are per user home / `APPALOFT_HOME`, not a required cwd file.
-- Spec 139 resume-from-any-directory rows are superseded for default `code`
-  without an explicit remote locator.
+- Spec 139 no-git `code` resume (#1319) stays: a no-git folder resumes the
+  live occupancy. Spec 142 adds folder occupy only when there is no occupancy
+  to resume, and keeps `deploy` / `project use` folder links.
 - `#1314` `path|git-remote` stays the workspace-open locator: a non-git
   directory without an explicit remote fail-closes
   `workspace_remote_repository_missing` and does not resume another occupancy.
-  Default `code` is additive and occupies this folder (`folder.local`) after
-  onboarding.
 
 ## Non-Goals
 

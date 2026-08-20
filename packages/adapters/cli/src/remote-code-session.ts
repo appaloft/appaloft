@@ -535,9 +535,7 @@ export async function resolveDefaultRemoteCodeDoor(
     const onboarded = await loadFolderOnboarding();
     if (onboarded && isFolderOccupancyIdentity(onboarded.identity)) {
       locator = {
-        ...folderOccupancyLocator(
-          onboarded.identity.split("/").filter(Boolean).at(-1) ?? "app",
-        ),
+        ...folderOccupancyLocator(onboarded.identity.split("/").filter(Boolean).at(-1) ?? "app"),
         repositoryIdentity: onboarded.identity,
         repository: `https://${onboarded.identity}.git`,
       };
@@ -580,7 +578,7 @@ export async function resolveDefaultRemoteCodeDoor(
     branch: locator.branch,
     commitSha: remote.commitSha,
     projectId:
-      isFolderOccupancyIdentity(locator.repositoryIdentity) && folderOnboarding?.projectId
+      folderOnboarding?.projectId && folderOnboarding.identity === locator.repositoryIdentity
         ? folderOnboarding.projectId
         : binding?.status === "active"
           ? binding.projectId

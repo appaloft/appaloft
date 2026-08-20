@@ -38,7 +38,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `--preview <previewEnvironmentId>` on logs, health, diagnostics, effective config, runtime
   control, and terminal commands when the user is operating a preview rather than its parent
   resource.
-- `appaloft code [path|git-remote] [--yes] [--profile <name-or-id>] [--harness opencode|pi]` occupies my Sandbox after login. An unlinked folder create-or-links a Project (directory name, the only Project, or one TTY choice) and persists that link. Git remote is correspondence when present and is not required. Default `code` resumes only this folder's identity and does not resume an unrelated occupancy. It requires a default
+- `appaloft code [path|git-remote] [--yes] [--profile <name-or-id>] [--harness opencode|pi]` occupies my Sandbox after login. A no-git folder resumes the live occupancy. With no occupancy, an unlinked folder create-or-links a Project (directory name, the only Project, or one TTY choice), persists that link, and occupies `folder.local`. Git remote is correspondence when present and is not required. It requires a default
   enrolled Server, dispatches `workspaces.open` with the remote SHA and
   `targetServerId`. On a TTY it enters the occupancy Workspace TUI immediately
   with the list collapsed and a centered **preparing the agent** step panel, then

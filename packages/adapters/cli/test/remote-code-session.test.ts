@@ -466,7 +466,7 @@ describe("remote code door", () => {
     expect(selectResumeOccupancy([])).toBeUndefined();
   });
 
-  test("[WS-REMOTE-NO-UPLOAD-006][FOLDER-ONBOARD-007] occupies this folder when the local path has no origin", async () => {
+  test("[WS-REMOTE-NO-UPLOAD-006][FOLDER-ONBOARD-007] occupies this folder when the local path has no origin and no occupancy", async () => {
     const door = await resolveDefaultRemoteCodeDoor({
       env: { APPALOFT_TOKEN: "token" },
       listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
@@ -478,18 +478,7 @@ describe("remote code door", () => {
         created: true,
         reused: false,
       },
-      listOccupancies: async () => [
-        {
-          sandboxId: "sbx_live",
-          status: "ready",
-          occupancy: {
-            repositoryIdentity: "github.com/traefik/whoami",
-            commitSha: "d".repeat(40),
-            branch: "main",
-          },
-          lastActivityAt: "2026-08-15T12:30:00.000Z",
-        },
-      ],
+      listOccupancies: async () => [],
       resolveLocator: async () => {
         throw Object.assign(new Error("missing origin"), {
           code: "workspace_remote_repository_missing",

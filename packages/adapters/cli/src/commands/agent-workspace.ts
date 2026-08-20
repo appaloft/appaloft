@@ -49,7 +49,8 @@ import {
 import { createCliLogRenderer } from "@appaloft/cli-logging";
 import { type DomainError, domainError, err, type Result } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
-import { Effect, Layer } from "effect";
+import type * as Prompt from "@effect/cli/Prompt";
+import { Effect, Runtime } from "effect";
 import {
   CLI_LOGIN_GUIDANCE,
   hasCliControlPlaneLogin,
@@ -613,6 +614,7 @@ export const workspaceCodeCommand = EffectCommand.make(
   ({ forceNew, harness, local, noAttach, open, openTarget, path, profile, yes }) =>
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
+      const runtime = yield* Effect.runtime<CliRuntime | Prompt.Prompt.Environment>();
       if (local) {
         if (isRemoteCodeGitRemoteLocator(path)) {
           return yield* Effect.fail(scratchRemoteRejectedError());
@@ -679,20 +681,15 @@ export const workspaceCodeCommand = EffectCommand.make(
                 onProgress,
                 folderCwd: folderOnboardingCwdFromLocator(path),
                 ensureFolderOnboarding: async () => {
-                  const loggedIn = await hasCliControlPlaneLogin(
-                    cli.environment ?? process.env,
-                  );
+                  const loggedIn = await hasCliControlPlaneLogin(cli.environment ?? process.env);
                   if (!loggedIn) throw workspaceRemoteLoginRequiredError();
-                  return Effect.runPromise(
-                    Effect.provide(
-                      ensureFolderProjectOnboarding({
-                        cwd: folderOnboardingCwdFromLocator(path),
-                        yes,
-                        interaction: effectCliInteraction,
-                        ...(cli.environment ? { env: cli.environment } : {}),
-                      }),
-                      Layer.succeed(CliRuntime, cli),
-                    ),
+                  return Runtime.runPromise(runtime)(
+                    ensureFolderProjectOnboarding({
+                      cwd: folderOnboardingCwdFromLocator(path),
+                      yes,
+                      interaction: effectCliInteraction,
+                      ...(cli.environment ? { env: cli.environment } : {}),
+                    }),
                   );
                 },
                 listServers: async () => {
