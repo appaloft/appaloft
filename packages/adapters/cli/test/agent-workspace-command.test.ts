@@ -2304,7 +2304,9 @@ describe("Agent Workspace CLI", () => {
           return ok({} as T);
         },
       } as unknown as CommandBus,
-      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      queryBus: {
+        execute: async () => err({ message: "missing" } as never),
+      } as unknown as QueryBus,
       executionContextFactory: {
         create: (input) => createExecutionContext({ ...input, requestId: "req_code_grok" }),
       },

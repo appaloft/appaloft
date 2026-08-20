@@ -3,18 +3,20 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { WriteSandboxFileCommand } from "@appaloft/application";
-import { ok } from "@appaloft/core";
-
-import {
-  occupancyConnectingSteps,
-  occupancyConnectingTelemetry,
-  OCCUPANCY_CONNECTING_TELEMETRY_SCHEMA,
-} from "../src/occupancy-connecting-telemetry.js";
+import { err, ok } from "@appaloft/core";
 import {
   countOccupancyConnectingSkills,
   offerOccupancyConnectingMaterials,
 } from "../src/occupancy-connecting-offer.js";
-import { occupancyFirstPartyMcpBytes, OCCUPANCY_FIRST_PARTY_MCP_PATH } from "../src/occupancy-mcp-offer.js";
+import {
+  OCCUPANCY_CONNECTING_TELEMETRY_SCHEMA,
+  occupancyConnectingSteps,
+  occupancyConnectingTelemetry,
+} from "../src/occupancy-connecting-telemetry.js";
+import {
+  OCCUPANCY_FIRST_PARTY_MCP_PATH,
+  occupancyFirstPartyMcpBytes,
+} from "../src/occupancy-mcp-offer.js";
 
 test("[WS-REMOTE-CONNECT-215] connecting-step data names credential, skill count, and disk", () => {
   const telemetry = occupancyConnectingTelemetry({
@@ -43,12 +45,16 @@ test("[WS-REMOTE-CONNECT-215] connecting-step data names credential, skill count
 });
 
 test("[WS-REMOTE-CONNECT-215] connecting steps exist for Claude and Codex labels", () => {
-  expect(occupancyConnectingSteps({ vendor: "claude", credentialOffered: true, skillCount: 1 })).toEqual([
+  expect(
+    occupancyConnectingSteps({ vendor: "claude", credentialOffered: true, skillCount: 1 }),
+  ).toEqual([
     { id: "credential", message: "using your Claude credential" },
     { id: "skills", message: "including 1 skills" },
     { id: "disk", message: "work is on its disk" },
   ]);
-  expect(occupancyConnectingSteps({ vendor: "codex", credentialOffered: true, skillCount: 2 })[0]).toEqual({
+  expect(
+    occupancyConnectingSteps({ vendor: "codex", credentialOffered: true, skillCount: 2 })[0],
+  ).toEqual({
     id: "credential",
     message: "using your Codex credential",
   });
@@ -60,7 +66,10 @@ test("[WS-REMOTE-MCP-214] occupancy MCP offer writes first-party stdio and not l
   await writeFile(join(homeDir, ".grok", "auth.json"), '{"access_token":"grok-secret"}\n');
   await mkdir(join(homeDir, ".grok", "skills", "plan"), { recursive: true });
   await writeFile(join(homeDir, ".grok", "skills", "plan", "SKILL.md"), "# Plan\n");
-  await writeFile(join(homeDir, ".grok", "skills", "plan", "mcp.json"), '{"token":"laptop-secret"}\n');
+  await writeFile(
+    join(homeDir, ".grok", "skills", "plan", "mcp.json"),
+    '{"token":"laptop-secret"}\n',
+  );
 
   const commands: WriteSandboxFileCommand[] = [];
   const telemetry = await offerOccupancyConnectingMaterials({
@@ -73,7 +82,7 @@ test("[WS-REMOTE-MCP-214] occupancy MCP offer writes first-party stdio and not l
       if (command instanceof WriteSandboxFileCommand) commands.push(command);
       return ok({});
     },
-    executeQuery: async () => ok({}),
+    executeQuery: async () => err({ message: "missing" } as never),
   });
 
   expect(telemetry.steps.map((step) => step.id)).toEqual(["credential", "skills", "disk"]);
@@ -85,9 +94,12 @@ test("[WS-REMOTE-MCP-214] occupancy MCP offer writes first-party stdio and not l
   expect(Buffer.from(mcp!.input.contentBase64, "base64").toString("utf8")).toBe(
     new TextDecoder().decode(occupancyFirstPartyMcpBytes()),
   );
-  expect(commands.some((command) => command.input.path.includes("skills/") && command.input.path.endsWith("mcp.json"))).toBe(
-    false,
-  );
+  expect(
+    commands.some(
+      (command) =>
+        command.input.path.includes("skills/") && command.input.path.endsWith("mcp.json"),
+    ),
+  ).toBe(false);
   expect(JSON.stringify(telemetry)).not.toContain("grok-secret");
   expect(JSON.stringify(telemetry)).not.toContain("laptop-secret");
 });
