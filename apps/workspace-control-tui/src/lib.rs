@@ -123,22 +123,29 @@ fn occupancy_control_footer(status_line: &str, _detail: Option<&DetailMessage>) 
 }
 
 const OCCUPANCY_HELP_ROWS: &[&str] = &[
-    "↑ ↓            move",
-    "→ ←            open/close row unavailable",
+    "?              key list",
+    "↑ ↓ / j k      move",
+    "→ ← / h l      open/close row unavailable",
     "enter          connect",
+    "⌥enter         connect and type",
     "shift+esc / ^] stop typing",
     "n              new session unavailable",
+    "⌥n             new session, choose agent unavailable",
+    "⌥p             new session from a prompt unavailable",
     "x              end session, stay on list",
     "s              sleep (pause)",
     "w              wake (resume)",
-    "d              delete (confirm)",
+    "d              delete (confirm y)",
     "c              copy SSH unavailable",
-    "r              refresh",
+    "r / ⌥r         refresh (⌥r from anywhere)",
     "t / ^t         set target unavailable",
-    "⌥f             fullscreen / restore tree",
+    "f / ⌥f         fullscreen / restore tree",
     "shift+enter    leave fullscreen unavailable",
+    "⌥[ ⌥]          cycle open sessions (wrap, no wake)",
     "⌥t             theme unavailable",
     "⌥s             setup not in this door",
+    "^o             unavailable",
+    "q              unbound (not quit)",
     "esc            return to menu",
     "^c             quit from list/menu",
     "               pass through in session",
@@ -146,7 +153,11 @@ const OCCUPANCY_HELP_ROWS: &[&str] = &[
 ];
 
 fn occupancy_help_lines() -> Vec<Line<'static>> {
-    OCCUPANCY_HELP_ROWS.iter().copied().map(Line::from).collect()
+    OCCUPANCY_HELP_ROWS
+        .iter()
+        .copied()
+        .map(Line::from)
+        .collect()
 }
 
 fn occupancy_chrome_error_phase(phase: &str) -> bool {
@@ -939,6 +950,17 @@ impl Default for OccupancyLoading {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OpenPane {
+    pub workspace_id: String,
+    pub runtime_id: String,
+    pub session_id: String,
+}
+
+fn occupancy_workspace_is_sleeping(status: &str) -> bool {
+    matches!(status, "paused" | "pausing" | "sleeping")
+}
+
 pub struct AppState {
     pub workspaces: Vec<WorkspaceSummary>,
     pub selected: usize,
@@ -964,6 +986,7 @@ pub struct AppState {
     pub recovery_busy: bool,
     pub wrap: bool,
     pub help_open: bool,
+    pub open_panes: Vec<OpenPane>,
     pub pending_osc52: Vec<String>,
     pub osc52_carry: String,
     pub osc52_passthrough_failed: bool,
@@ -999,6 +1022,7 @@ impl Default for AppState {
             recovery_busy: false,
             wrap: false,
             help_open: false,
+            open_panes: Vec::new(),
             pending_osc52: Vec::new(),
             osc52_carry: String::new(),
             osc52_passthrough_failed: false,
@@ -1101,12 +1125,14 @@ impl AppState {
                 self.pending_recovery_confirmation = None;
             }
             ParentMessage::TerminalReady {
+                workspace_id,
                 runtime_id,
                 session_id,
                 ..
             } => {
-                self.runtime_id = Some(runtime_id);
+                self.runtime_id = Some(runtime_id.clone());
                 self.session_id = Some(session_id.clone());
+                self.remember_open_pane(&workspace_id, &runtime_id, &session_id);
                 self.agent_focused = true;
                 self.loading.active = false;
                 if self.loading.collapsed {
@@ -1123,6 +1149,9 @@ impl AppState {
             ParentMessage::TerminalClosed {
                 reason, exit_code, ..
             } => {
+                if let Some(session_id) = self.session_id.as_deref() {
+                    self.open_panes.retain(|pane| pane.session_id != session_id);
+                }
                 self.agent_focused = false;
                 self.focus_mode = false;
                 self.session_id = None;
@@ -1194,6 +1223,60 @@ impl AppState {
         self.loading.collapsed = false;
         self.help_open = false;
         self.status_line = "Appaloft Cloud Agents".to_owned();
+    }
+
+    fn remember_open_pane(&mut self, workspace_id: &str, runtime_id: &str, session_id: &str) {
+        if let Some(existing) = self
+            .open_panes
+            .iter_mut()
+            .find(|pane| pane.workspace_id == workspace_id || pane.session_id == session_id)
+        {
+            existing.workspace_id = workspace_id.to_owned();
+            existing.runtime_id = runtime_id.to_owned();
+            existing.session_id = session_id.to_owned();
+            return;
+        }
+        self.open_panes.push(OpenPane {
+            workspace_id: workspace_id.to_owned(),
+            runtime_id: runtime_id.to_owned(),
+            session_id: session_id.to_owned(),
+        });
+    }
+
+    pub fn cycle_open_session(&mut self, delta: isize) -> Option<(String, String)> {
+        let awake: Vec<OpenPane> = self
+            .open_panes
+            .iter()
+            .filter(|pane| {
+                self.workspaces
+                    .iter()
+                    .find(|workspace| workspace.workspace_id == pane.workspace_id)
+                    .is_some_and(|workspace| !occupancy_workspace_is_sleeping(&workspace.status))
+            })
+            .cloned()
+            .collect();
+        if awake.is_empty() {
+            self.mark_unavailable("switch session");
+            return None;
+        }
+        let current = awake.iter().position(|pane| {
+            Some(pane.session_id.as_str()) == self.session_id.as_deref()
+                || Some(pane.workspace_id.as_str()) == self.selected_workspace_id()
+        });
+        let idx = current.unwrap_or(0);
+        let next = (idx as isize + delta).rem_euclid(awake.len() as isize) as usize;
+        let pane = &awake[next];
+        if let Some(selected) = self
+            .workspaces
+            .iter()
+            .position(|workspace| workspace.workspace_id == pane.workspace_id)
+        {
+            self.selected = selected;
+        }
+        if awake.len() == 1 && Some(pane.session_id.as_str()) == self.session_id.as_deref() {
+            return None;
+        }
+        Some((pane.workspace_id.clone(), pane.runtime_id.clone()))
     }
 
     pub fn take_osc52(&mut self) -> Vec<String> {
@@ -1758,6 +1841,8 @@ pub enum OccupancyKeyBinding {
     ReturnToMenu,
     MoveUp,
     MoveDown,
+    ToggleHelp,
+    CycleOpenSession(i8),
     Unavailable(&'static str),
     Unhandled,
 }
@@ -1770,13 +1855,57 @@ fn occupancy_bare_char(key: KeyEvent, expected: char) -> bool {
         && !alt
 }
 
+fn occupancy_alt_char(key: KeyEvent, expected: char) -> bool {
+    let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+    let alt = key.modifiers.contains(KeyModifiers::ALT);
+    alt && !ctrl
+        && matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&expected))
+}
+
+fn occupancy_option_chrome(key: KeyEvent) -> Option<OccupancyKeyBinding> {
+    if occupancy_alt_char(key, 'f') {
+        return Some(OccupancyKeyBinding::ToggleFullscreen);
+    }
+    if occupancy_alt_char(key, 'r') {
+        return Some(OccupancyKeyBinding::Refresh);
+    }
+    if occupancy_alt_char(key, 'n') {
+        return Some(OccupancyKeyBinding::Unavailable(
+            "new session, choose agent",
+        ));
+    }
+    if occupancy_alt_char(key, 'p') {
+        return Some(OccupancyKeyBinding::Unavailable(
+            "new session from a prompt",
+        ));
+    }
+    if occupancy_alt_char(key, 't') {
+        return Some(OccupancyKeyBinding::Unavailable("theme"));
+    }
+    if occupancy_alt_char(key, 's') {
+        return Some(OccupancyKeyBinding::Unavailable("setup"));
+    }
+    if occupancy_alt_char(key, '[') {
+        return Some(OccupancyKeyBinding::CycleOpenSession(-1));
+    }
+    if occupancy_alt_char(key, ']') {
+        return Some(OccupancyKeyBinding::CycleOpenSession(1));
+    }
+    if key.modifiers.contains(KeyModifiers::ALT)
+        && !key.modifiers.contains(KeyModifiers::CONTROL)
+        && matches!(key.code, KeyCode::Enter)
+    {
+        return Some(OccupancyKeyBinding::Connect);
+    }
+    None
+}
+
 pub fn occupancy_key_binding(
     key: KeyEvent,
     agent_focused: bool,
     _has_session: bool,
 ) -> OccupancyKeyBinding {
     let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-    let alt = key.modifiers.contains(KeyModifiers::ALT);
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
     if ctrl && matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'c'))
     {
@@ -1785,6 +1914,9 @@ pub fn occupancy_key_binding(
         } else {
             OccupancyKeyBinding::Quit
         };
+    }
+    if let Some(binding) = occupancy_option_chrome(key) {
+        return binding;
     }
     if agent_focused {
         if ctrl && matches!(key.code, KeyCode::Char(']')) {
@@ -1796,11 +1928,10 @@ pub fn occupancy_key_binding(
         if occupancy_bare_char(key, 'x') {
             return OccupancyKeyBinding::ShowAgentsList;
         }
-        if alt && matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'f'))
-        {
-            return OccupancyKeyBinding::ToggleFullscreen;
-        }
         return OccupancyKeyBinding::PassToAgent;
+    }
+    if matches!(key.code, KeyCode::Char('?')) && !ctrl {
+        return OccupancyKeyBinding::ToggleHelp;
     }
     if matches!(key.code, KeyCode::Enter) && shift {
         return OccupancyKeyBinding::Unavailable("leave fullscreen connect");
@@ -1835,25 +1966,26 @@ pub fn occupancy_key_binding(
     {
         return OccupancyKeyBinding::SetTarget;
     }
-    if alt && matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'f')) {
+    if occupancy_bare_char(key, 'f') {
         return OccupancyKeyBinding::ToggleFullscreen;
     }
-    if alt && matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'t')) {
-        return OccupancyKeyBinding::Unavailable("theme");
-    }
-    if alt && matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'s')) {
-        return OccupancyKeyBinding::Unavailable("setup");
+    if ctrl && matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'o'))
+    {
+        return OccupancyKeyBinding::Unavailable("ctrl+o");
     }
     if matches!(key.code, KeyCode::Esc) {
         return OccupancyKeyBinding::ReturnToMenu;
     }
-    if matches!(key.code, KeyCode::Up) {
+    if matches!(key.code, KeyCode::Up) || occupancy_bare_char(key, 'k') {
         return OccupancyKeyBinding::MoveUp;
     }
-    if matches!(key.code, KeyCode::Down) {
+    if matches!(key.code, KeyCode::Down) || occupancy_bare_char(key, 'j') {
         return OccupancyKeyBinding::MoveDown;
     }
-    if matches!(key.code, KeyCode::Left | KeyCode::Right) {
+    if matches!(key.code, KeyCode::Left | KeyCode::Right)
+        || occupancy_bare_char(key, 'h')
+        || occupancy_bare_char(key, 'l')
+    {
         return OccupancyKeyBinding::Unavailable("open/close row");
     }
     OccupancyKeyBinding::Unhandled
@@ -3182,20 +3314,39 @@ mod tests {
         let mut state = AppState::default();
         state.loading.active = false;
         state.toggle_help();
-        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let backend = ratatui::backend::TestBackend::new(80, 40);
         let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
         terminal
             .draw(|frame| render(frame, &state))
             .expect("draw help");
         let out = buffer_plain(&terminal);
+        assert!(out.contains("?              key list"), "{out}");
         assert!(out.contains("enter          connect"), "{out}");
+        assert!(out.contains("⌥enter         connect and type"), "{out}");
+        assert!(out.contains("j k"), "{out}");
+        assert!(out.contains("h l"), "{out}");
         assert!(out.contains("new session unavailable"), "{out}");
+        assert!(
+            out.contains("new session, choose agent unavailable"),
+            "{out}"
+        );
+        assert!(
+            out.contains("new session from a prompt unavailable"),
+            "{out}"
+        );
         assert!(out.contains("end session, stay on list"), "{out}");
         assert!(out.contains("sleep (pause)"), "{out}");
         assert!(out.contains("wake (resume)"), "{out}");
-        assert!(out.contains("delete (confirm)"), "{out}");
+        assert!(out.contains("delete (confirm y)"), "{out}");
         assert!(out.contains("copy SSH unavailable"), "{out}");
-        assert!(out.contains("fullscreen / restore tree"), "{out}");
+        assert!(out.contains("⌥r"), "{out}");
+        assert!(
+            out.contains("f / ⌥f         fullscreen / restore tree"),
+            "{out}"
+        );
+        assert!(out.contains("cycle open sessions (wrap, no wake)"), "{out}");
+        assert!(out.contains("^o             unavailable"), "{out}");
+        assert!(out.contains("q              unbound (not quit)"), "{out}");
         assert!(out.contains("quit from list/menu"), "{out}");
         assert!(out.contains("pass through in session"), "{out}");
         assert!(out.contains("setup not in this door"), "{out}");
@@ -3205,6 +3356,7 @@ mod tests {
         assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
         assert!(!out.contains("Y restore"), "{out}");
         assert!(!out.contains("^c leave"), "{out}");
+        assert_no_bare_q_quit(&out);
     }
 
     #[test]
@@ -3342,8 +3494,7 @@ mod tests {
                 url: "http://app-sc156jw98k.127.0.0.1.sslip.io/".to_owned(),
             });
         }
-        let preview_and_pr_doors =
-            occupancy_available_door_keys(preview_and_pr.detail.as_ref());
+        let preview_and_pr_doors = occupancy_available_door_keys(preview_and_pr.detail.as_ref());
         assert!(preview_and_pr_doors.iter().any(|door| *door == "o open PR"));
         assert!(preview_and_pr_doors.iter().any(|door| *door == "p preview"));
         assert!(!preview_and_pr_doors.iter().any(|door| *door == "c compare"));
@@ -3356,9 +3507,11 @@ mod tests {
             number: 928,
             url: Some("https://github.com/traefik/whoami/pull/928".to_owned()),
         }));
-        assert!(occupancy_available_door_keys(existing_pr.detail.as_ref())
-            .iter()
-            .any(|door| *door == "o open PR"));
+        assert!(
+            occupancy_available_door_keys(existing_pr.detail.as_ref())
+                .iter()
+                .any(|door| *door == "o open PR")
+        );
 
         let mut with_connections = occupancy_delivery_ready_state(None);
         if let Some(detail) = with_connections.detail.as_mut() {
@@ -3366,9 +3519,11 @@ mod tests {
                 url: "https://app.appaloft.com/account/connections".to_owned(),
             });
         }
-        assert!(occupancy_available_door_keys(with_connections.detail.as_ref())
-            .iter()
-            .any(|door| *door == "g connections"));
+        assert!(
+            occupancy_available_door_keys(with_connections.detail.as_ref())
+                .iter()
+                .any(|door| *door == "g connections")
+        );
 
         let lean = occupancy_control_footer("", None);
         assert!(lean.contains("enter connect"));
@@ -3446,6 +3601,10 @@ mod tests {
             OccupancyKeyBinding::Unhandled
         );
         assert_ne!(
+            occupancy_key_binding(quit, false, false),
+            OccupancyKeyBinding::Quit
+        );
+        assert_ne!(
             occupancy_key_binding(invented_quit, false, true),
             OccupancyKeyBinding::Quit
         );
@@ -3503,10 +3662,7 @@ mod tests {
         assert_eq!(ready.request_sleep(), Some(LifecycleAction::Pause));
         ready.action_busy = false;
         ready.request_delete();
-        assert_eq!(
-            ready.pending_confirmation,
-            Some(LifecycleAction::Terminate)
-        );
+        assert_eq!(ready.pending_confirmation, Some(LifecycleAction::Terminate));
         let mut paused = occupancy_delivery_ready_state(None);
         if let Some(detail) = paused.detail.as_mut() {
             detail.workspace.status = "paused".to_owned();
@@ -3520,6 +3676,183 @@ mod tests {
         empty.mark_unavailable("copy SSH");
         assert_eq!(empty.status_line, "copy SSH is unavailable");
         assert!(!empty.status_line.to_ascii_lowercase().contains("occupancy"));
+    }
+
+    fn workspace(id: &str, status: &str) -> WorkspaceSummary {
+        WorkspaceSummary {
+            workspace_id: id.to_owned(),
+            status: status.to_owned(),
+            provider_key: None,
+            source_kind: None,
+            occupancy: None,
+        }
+    }
+
+    #[test]
+    fn code_tui_source_extra_ca_keys_keep_railway_meanings() {
+        let help = KeyEvent::new(KeyCode::Char('?'), KeyModifiers::NONE);
+        let quit = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE);
+        let j = KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE);
+        let k = KeyEvent::new(KeyCode::Char('k'), KeyModifiers::NONE);
+        let h = KeyEvent::new(KeyCode::Char('h'), KeyModifiers::NONE);
+        let l = KeyEvent::new(KeyCode::Char('l'), KeyModifiers::NONE);
+        let f = KeyEvent::new(KeyCode::Char('f'), KeyModifiers::NONE);
+        let y = KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE);
+        let shift_y = KeyEvent::new(KeyCode::Char('Y'), KeyModifiers::SHIFT);
+        let alt_f = KeyEvent::new(KeyCode::Char('f'), KeyModifiers::ALT);
+        let alt_r = KeyEvent::new(KeyCode::Char('r'), KeyModifiers::ALT);
+        let alt_n = KeyEvent::new(KeyCode::Char('n'), KeyModifiers::ALT);
+        let alt_p = KeyEvent::new(KeyCode::Char('p'), KeyModifiers::ALT);
+        let alt_enter = KeyEvent::new(KeyCode::Enter, KeyModifiers::ALT);
+        let alt_prev = KeyEvent::new(KeyCode::Char('['), KeyModifiers::ALT);
+        let alt_next = KeyEvent::new(KeyCode::Char(']'), KeyModifiers::ALT);
+        let ctrl_o = KeyEvent::new(KeyCode::Char('o'), KeyModifiers::CONTROL);
+        assert_eq!(
+            occupancy_key_binding(help, false, false),
+            OccupancyKeyBinding::ToggleHelp
+        );
+        assert_eq!(
+            occupancy_key_binding(help, true, true),
+            OccupancyKeyBinding::PassToAgent
+        );
+        assert_eq!(
+            occupancy_key_binding(quit, false, false),
+            OccupancyKeyBinding::Unhandled
+        );
+        assert_ne!(
+            occupancy_key_binding(quit, false, true),
+            OccupancyKeyBinding::Quit
+        );
+        assert_eq!(
+            occupancy_key_binding(quit, true, true),
+            OccupancyKeyBinding::PassToAgent
+        );
+        assert_eq!(
+            occupancy_key_binding(j, false, false),
+            OccupancyKeyBinding::MoveDown
+        );
+        assert_eq!(
+            occupancy_key_binding(k, false, false),
+            OccupancyKeyBinding::MoveUp
+        );
+        assert_eq!(
+            occupancy_key_binding(h, false, false),
+            OccupancyKeyBinding::Unavailable("open/close row")
+        );
+        assert_eq!(
+            occupancy_key_binding(l, false, false),
+            OccupancyKeyBinding::Unavailable("open/close row")
+        );
+        assert_eq!(
+            occupancy_key_binding(f, false, false),
+            OccupancyKeyBinding::ToggleFullscreen
+        );
+        assert_eq!(
+            occupancy_key_binding(f, true, true),
+            OccupancyKeyBinding::PassToAgent
+        );
+        assert_eq!(
+            occupancy_key_binding(alt_f, true, true),
+            OccupancyKeyBinding::ToggleFullscreen
+        );
+        assert_eq!(
+            occupancy_key_binding(y, false, true),
+            OccupancyKeyBinding::Unhandled
+        );
+        assert_eq!(
+            occupancy_key_binding(shift_y, false, true),
+            OccupancyKeyBinding::Unhandled
+        );
+        assert_eq!(
+            occupancy_key_binding(alt_r, false, true),
+            OccupancyKeyBinding::Refresh
+        );
+        assert_eq!(
+            occupancy_key_binding(alt_r, true, true),
+            OccupancyKeyBinding::Refresh
+        );
+        assert_eq!(
+            occupancy_key_binding(alt_n, false, true),
+            OccupancyKeyBinding::Unavailable("new session, choose agent")
+        );
+        assert_eq!(
+            occupancy_key_binding(alt_p, false, true),
+            OccupancyKeyBinding::Unavailable("new session from a prompt")
+        );
+        assert_eq!(
+            occupancy_key_binding(alt_enter, false, true),
+            OccupancyKeyBinding::Connect
+        );
+        assert_eq!(
+            occupancy_key_binding(alt_prev, true, true),
+            OccupancyKeyBinding::CycleOpenSession(-1)
+        );
+        assert_eq!(
+            occupancy_key_binding(alt_next, false, true),
+            OccupancyKeyBinding::CycleOpenSession(1)
+        );
+        assert_eq!(
+            occupancy_key_binding(ctrl_o, false, true),
+            OccupancyKeyBinding::Unavailable("ctrl+o")
+        );
+        assert_eq!(
+            occupancy_key_binding(ctrl_o, true, true),
+            OccupancyKeyBinding::PassToAgent
+        );
+        let mut state = AppState::default();
+        state.apply(ParentMessage::Workspaces {
+            workspaces: vec![
+                workspace("sbx_1", "ready"),
+                workspace("sbx_2", "ready"),
+                workspace("sbx_sleep", "paused"),
+            ],
+        });
+        state.apply(ParentMessage::TerminalReady {
+            workspace_id: "sbx_1".to_owned(),
+            runtime_id: "sar_1".to_owned(),
+            session_id: "term_1".to_owned(),
+        });
+        state.apply(ParentMessage::TerminalReady {
+            workspace_id: "sbx_2".to_owned(),
+            runtime_id: "sar_2".to_owned(),
+            session_id: "term_2".to_owned(),
+        });
+        state.apply(ParentMessage::TerminalReady {
+            workspace_id: "sbx_sleep".to_owned(),
+            runtime_id: "sar_sleep".to_owned(),
+            session_id: "term_sleep".to_owned(),
+        });
+        assert_eq!(
+            state.cycle_open_session(1),
+            Some(("sbx_2".to_owned(), "sar_2".to_owned()))
+        );
+        state.session_id = Some("term_2".to_owned());
+        assert_eq!(
+            state.cycle_open_session(1),
+            Some(("sbx_1".to_owned(), "sar_1".to_owned()))
+        );
+        state.session_id = Some("term_1".to_owned());
+        assert_eq!(
+            state.cycle_open_session(-1),
+            Some(("sbx_2".to_owned(), "sar_2".to_owned()))
+        );
+        assert!(!state.status_line.contains("wake"));
+        assert!(!state.status_line.contains("resume"));
+        let mut only_sleep = AppState::default();
+        only_sleep.apply(ParentMessage::Workspaces {
+            workspaces: vec![workspace("sbx_sleep", "paused")],
+        });
+        only_sleep.apply(ParentMessage::TerminalReady {
+            workspace_id: "sbx_sleep".to_owned(),
+            runtime_id: "sar_sleep".to_owned(),
+            session_id: "term_sleep".to_owned(),
+        });
+        assert_eq!(only_sleep.cycle_open_session(1), None);
+        assert!(
+            only_sleep
+                .status_line
+                .contains("switch session is unavailable")
+        );
     }
 
     #[test]

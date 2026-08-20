@@ -195,6 +195,7 @@ Sandbox on that Server, not one VM per person.
 | D158 | `^c` quits only from the list/menu | Live walk 2026-08-20 + Railway `?`: in-session Ctrl+C passes through and never quits. On the Cloud Agents list/menu, `^c` is Railway quit. Do not invent Appaloft-only quit keys (`q`, `^q`, `^]`). |
 | D159 | In-session `x` returns to the Cloud Agents list | Live walk 2026-08-20: Railway `x` ends the session view and stays on the ca manage list. Header stays Cloud Agents / project. CLI stays up. `q` / `^]` do not exit. |
 | D160 | TTY `code` uses the Railway `ca` key table | Official https://docs.railway.com/cli/ca Keys plus live walk. `?` shows that table. List footer is enter/n/w/d. Session footer is restore tree / wrap / stop typing. s/w/d map to pause/resume/terminate. Missing capabilities say unavailable. Do not implement `⌥s` setup or `--claude` prefs. |
+| D161 | Extra Railway source keys join the `?` table | Railway `ca` binary help (v5.41.2) plus walk, not invented meanings. `?` key list. `j`/`k` move. `h`/`l` open/close row. `⌥r` refresh from anywhere. `⌥n` new session choosing the agent first. `⌥p` new session from a prompt. `⌥enter` connect and type. `⌥[`/`⌥]` switch/cycle already-open sessions, wrap, do not wake sleeping. `^o` is in source but has no attested meaning here so unavailable. `q` is not quit (`^c` stays list/menu quit). Restore tree stays `⌥f`; bare `f` on the manage tree is also fullscreen. `y`/`Y` only confirm `d`. |
 
 ## Rejected
 

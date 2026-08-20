@@ -296,19 +296,57 @@ fn main() -> Result<()> {
                             send(&mut writer, &RendererEvent::TerminalInput { data })?;
                         }
                     }
+                    OccupancyKeyBinding::Refresh => {
+                        send(
+                            &mut writer,
+                            &RendererEvent::Refresh {
+                                workspace_id: state.selected_workspace_id().map(str::to_owned),
+                            },
+                        )?;
+                    }
+                    OccupancyKeyBinding::CycleOpenSession(delta) => {
+                        if let Some((workspace_id, runtime_id)) =
+                            state.cycle_open_session(delta as isize)
+                        {
+                            send(
+                                &mut writer,
+                                &RendererEvent::Attach {
+                                    workspace_id,
+                                    runtime_id,
+                                },
+                            )?;
+                        }
+                    }
+                    OccupancyKeyBinding::Connect => {
+                        if state.session_id.is_some() {
+                            state.agent_focused = true;
+                        } else if let (Some(workspace_id), Some(runtime_id)) = (
+                            state.selected_workspace_id().map(str::to_owned),
+                            state.selected_runtime_id().map(str::to_owned),
+                        ) {
+                            send(
+                                &mut writer,
+                                &RendererEvent::Attach {
+                                    workspace_id,
+                                    runtime_id,
+                                },
+                            )?;
+                        }
+                    }
+                    OccupancyKeyBinding::Unavailable(capability) => {
+                        state.mark_unavailable(capability);
+                    }
                     OccupancyKeyBinding::Quit
-                    | OccupancyKeyBinding::Connect
                     | OccupancyKeyBinding::NewSession
                     | OccupancyKeyBinding::SleepAgent
                     | OccupancyKeyBinding::WakeAgent
                     | OccupancyKeyBinding::DeleteAgent
                     | OccupancyKeyBinding::CopySsh
-                    | OccupancyKeyBinding::Refresh
                     | OccupancyKeyBinding::SetTarget
                     | OccupancyKeyBinding::ReturnToMenu
                     | OccupancyKeyBinding::MoveUp
                     | OccupancyKeyBinding::MoveDown
-                    | OccupancyKeyBinding::Unavailable(_)
+                    | OccupancyKeyBinding::ToggleHelp
                     | OccupancyKeyBinding::Unhandled => {}
                 }
             }
@@ -564,37 +602,29 @@ fn main() -> Result<()> {
                         }
                         continue;
                     }
+                    OccupancyKeyBinding::ToggleHelp => {
+                        state.toggle_help();
+                        continue;
+                    }
+                    OccupancyKeyBinding::CycleOpenSession(delta) => {
+                        if let Some((workspace_id, runtime_id)) =
+                            state.cycle_open_session(delta as isize)
+                        {
+                            send(
+                                &mut writer,
+                                &RendererEvent::Attach {
+                                    workspace_id,
+                                    runtime_id,
+                                },
+                            )?;
+                        }
+                        continue;
+                    }
                     OccupancyKeyBinding::Unavailable(capability) => {
                         state.mark_unavailable(capability);
                         continue;
                     }
                     OccupancyKeyBinding::StopTyping | OccupancyKeyBinding::Unhandled => {}
-                }
-                match key.code {
-                    KeyCode::Char('?') => state.toggle_help(),
-                    KeyCode::Char('k') => {
-                        if let Some(workspace_id) = state.move_selection(-1) {
-                            send(
-                                &mut writer,
-                                &RendererEvent::Select {
-                                    workspace_id: workspace_id.clone(),
-                                },
-                            )?;
-                            last_selected = Some(workspace_id);
-                        }
-                    }
-                    KeyCode::Char('j') => {
-                        if let Some(workspace_id) = state.move_selection(1) {
-                            send(
-                                &mut writer,
-                                &RendererEvent::Select {
-                                    workspace_id: workspace_id.clone(),
-                                },
-                            )?;
-                            last_selected = Some(workspace_id);
-                        }
-                    }
-                    _ => {}
                 }
             }
             _ => {}

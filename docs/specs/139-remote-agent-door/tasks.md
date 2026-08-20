@@ -449,6 +449,8 @@
 - [x] Unit tests WS-REMOTE-PROGRESS-206
 - [x] `?` lists Railway `ca` keys; missing capabilities say unavailable
 - [x] Unit tests WS-REMOTE-PROGRESS-207
+- [x] Extra Railway source keys (`?` `q` `j/k` `h/l` `⌥r` `⌥n` `⌥p` `⌥enter` `⌥[` `⌥]` `^o`) keep source meanings; `q` is not quit
+- [x] Unit tests WS-REMOTE-PROGRESS-208
 
 ## Later
 
