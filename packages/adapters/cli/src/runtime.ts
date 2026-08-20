@@ -285,7 +285,9 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
     ...(input.workspaceControlPresentation
       ? { workspaceControlPresentation: input.workspaceControlPresentation }
       : {}),
-    folderOnboardingInteraction: input.folderOnboardingInteraction,
+    ...(input.folderOnboardingInteraction
+      ? { folderOnboardingInteraction: input.folderOnboardingInteraction }
+      : {}),
     ...(input.operatePresentation ? { operatePresentation: input.operatePresentation } : {}),
     openNativeWorkspaceTerminal:
       input.openNativeWorkspaceTerminal ?? openBunNativeWorkspaceTerminal,
