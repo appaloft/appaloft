@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -17,6 +17,7 @@ import {
   selectDefaultRemoteCodeServer,
   selectResumeOccupancy,
   selectWorkspaceOpenTargetServerId,
+  workspaceGitDiscoveryCeiling,
 } from "../src/remote-code-session.js";
 
 describe("remote code door", () => {
@@ -733,6 +734,97 @@ describe("remote code door", () => {
     expect(door.repositoryIdentity).toBe("github.com/traefik/whoami");
     expect(door.repository).toBe("https://github.com/traefik/whoami.git");
     expect(door.branch).toBe("master");
+  });
+
+  test("[WS-REMOTE-PROGRESS-201] non-git folder under HOME git does not wait on the ancestor remote", async () => {
+    const home = await mkdtemp(join(tmpdir(), "appaloft-home-git-"));
+    const silence = join(home, "nux-code-silence-cwd");
+    await mkdir(silence);
+    const git = async (args: readonly string[]) => {
+      const result = await Bun.spawn(["git", ...args], {
+        cwd: home,
+        stdout: "pipe",
+        stderr: "pipe",
+      }).exited;
+      if (result !== 0) throw new Error(`git ${args.join(" ")} failed`);
+    };
+    try {
+      await git(["init"]);
+      await git(["remote", "add", "origin", "https://github.com/acme/never-resolves.git"]);
+      expect(workspaceGitDiscoveryCeiling(silence, home)).toBe(home);
+      const started = Date.now();
+      let contactedRemote = false;
+      await expect(
+        resolveDefaultRemoteCodeDoor(
+          {
+            env: { APPALOFT_TOKEN: "token", HOME: home },
+            listServers: async () => [
+              { id: "srv_1", name: "hostinger", lifecycleStatus: "active" },
+            ],
+            listOccupancies: async () => [
+              {
+                sandboxId: "sbx_examples",
+                status: "ready",
+                occupancy: {
+                  repositoryIdentity: "github.com/appaloft/examples",
+                  commitSha: "d".repeat(40),
+                  branch: "main",
+                },
+                lastActivityAt: "2026-08-15T12:30:00.000Z",
+              },
+            ],
+            resolveRemoteRef: async () => {
+              contactedRemote = true;
+              await Bun.sleep(45_000);
+              throw new Error("ancestor remote must not be contacted");
+            },
+          },
+          silence,
+        ),
+      ).rejects.toMatchObject({
+        code: "workspace_remote_repository_missing",
+      });
+      expect(Date.now() - started).toBeLessThan(3_000);
+      expect(contactedRemote).toBe(false);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  test("[WS-REMOTE-PROGRESS-201] matching occupancy uses the stored SHA and does not wait on ls-remote", async () => {
+    const started = Date.now();
+    let contactedRemote = false;
+    const door = await resolveDefaultRemoteCodeDoor({
+      env: { APPALOFT_TOKEN: "token" },
+      listServers: async () => [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }],
+      listOccupancies: async () => [
+        {
+          sandboxId: "sbx_api",
+          status: "ready",
+          occupancy: {
+            repositoryIdentity: "github.com/acme/api",
+            commitSha: "d".repeat(40),
+            branch: "main",
+          },
+          lastActivityAt: "2026-08-15T12:30:00.000Z",
+        },
+      ],
+      resolveLocator: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+      }),
+      resolveRemoteRef: async () => {
+        contactedRemote = true;
+        await Bun.sleep(45_000);
+        throw new Error("matching occupancy must not wait on ls-remote");
+      },
+    });
+    expect(door.commitSha).toBe("d".repeat(40));
+    expect(door.repositoryIdentity).toBe("github.com/acme/api");
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(contactedRemote).toBe(false);
   });
 
   test("[WS-REMOTE-URL-SHORTHAND-056] existing local owner/repo directory stays a path", async () => {

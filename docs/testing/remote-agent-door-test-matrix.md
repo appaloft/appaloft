@@ -172,6 +172,7 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-PROGRESS-198 | CLI / shell | automated | missing `appaloft-workspace-tui` names the binary and `cargo build --locked` next command; rustc 1.85 is called too old | `packages/adapters/cli/test/workspace-control-renderer.test.ts` |
 | WS-REMOTE-PROGRESS-199 | TUI | automated | attached footer hides `conflict at workspace-control-select` / `occupancy-code-bootstrap` | `apps/workspace-control-tui/src/lib.rs` |
 | WS-REMOTE-PROGRESS-200 | CLI | automated | community/dev pin locates sibling checkout `appaloft-workspace-tui` | `packages/adapters/cli/test/workspace-control-renderer.test.ts` |
+| WS-REMOTE-PROGRESS-201 | CLI / TUI | automated | non-git folder under `$HOME` git fail-closes quickly without ancestor `ls-remote`; matching occupancy skips `ls-remote`; locator miss exits occupancy TUI | `packages/adapters/cli/test/remote-code-session.test.ts`; `packages/adapters/cli/test/workspace-control-presentation.test.ts` |
 
 
 

@@ -1,4 +1,6 @@
 import { existsSync, statSync } from "node:fs";
+import { homedir } from "node:os";
+import { resolve, sep } from "node:path";
 
 import { type DomainError } from "@appaloft/core";
 import { hasCliControlPlaneLogin, workspaceRemoteLoginRequiredError } from "./cli-session-login.js";
@@ -17,6 +19,8 @@ import {
   occupancyGitHubPullRequestUrl,
 } from "./occupancy-chrome.js";
 import { OCCUPANCY_CODE_PROGRESS } from "./occupancy-code-progress.js";
+
+export const WORKSPACE_GIT_DISCOVERY_TIMEOUT_MS = 3_000;
 
 export const REMOTE_CODE_BANNER_PREFIX = "Remote ·";
 export const REMOTE_CODE_DOOR_HINT =
@@ -199,6 +203,28 @@ export interface WorkspaceOpenSource {
 }
 
 export interface ResolveWorkspaceOpenSourceOptions extends ResolveGitWorkspaceProgress {}
+
+export function workspaceGitDiscoveryCeiling(
+  selectedPath: string,
+  homeDir = process.env.HOME?.trim() || homedir(),
+): string | undefined {
+  const home = homeDir.trim();
+  if (!home) return undefined;
+  const resolvedHome = resolve(home);
+  const resolvedPath = resolve(selectedPath.trim() || ".");
+  if (resolvedPath === resolvedHome) return undefined;
+  const prefix = resolvedHome.endsWith(sep) ? resolvedHome : `${resolvedHome}${sep}`;
+  if (!resolvedPath.startsWith(prefix)) return undefined;
+  return resolvedHome;
+}
+
+function remoteCodeGitEnv(ceiling?: string): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    GIT_TERMINAL_PROMPT: "0",
+    ...(ceiling ? { GIT_CEILING_DIRECTORIES: ceiling } : {}),
+  };
+}
 
 export function isWorkspaceGitRootUnavailable(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -418,7 +444,9 @@ export async function resolveDefaultRemoteCodeDoor(
     try {
       localLocator = probe.resolveLocator
         ? await probe.resolveLocator()
-        : await resolveRemoteCodeLocator(path, probe.runGit);
+        : await resolveRemoteCodeLocator(path, probe.runGit, {
+            homeDir: probe.env?.HOME ?? process.env.HOME,
+          });
     } catch (error) {
       localLocatorError = error;
     }
@@ -439,19 +467,18 @@ export async function resolveDefaultRemoteCodeDoor(
 
   const binding = probe.showBinding ? await probe.showBinding(locator.repositoryIdentity) : null;
   let remote: RemoteGitWorkspaceRef;
-  try {
-    remote =
-      probe.resolveRemoteRef === undefined
-        ? await resolveRemoteCodeRef(locator, probe.runGit)
-        : await probe.resolveRemoteRef(locator.repository, locator.ref);
-  } catch (error) {
-    if (!occupancyResume) throw error;
+  if (occupancyResume) {
     remote = {
       repositoryIdentity: locator.repositoryIdentity,
       credentialFreeHttpsRepository: locator.repository,
       ref: locator.ref,
       commitSha: occupancyResume.commitSha,
     };
+  } else {
+    remote =
+      probe.resolveRemoteRef === undefined
+        ? await resolveRemoteCodeRef(locator, probe.runGit)
+        : await probe.resolveRemoteRef(locator.repository, locator.ref);
   }
 
   return {
@@ -502,8 +529,9 @@ async function resolveTrackedRemoteCodeSha(
     (async ({ args, cwd }: { args: readonly string[]; cwd: string }) => {
       const result = await execFileAsync("git", [...args], {
         cwd,
-        timeout: 15_000,
+        timeout: WORKSPACE_GIT_DISCOVERY_TIMEOUT_MS,
         encoding: "utf8",
+        env: remoteCodeGitEnv(),
       });
       return { stdout: result.stdout, stderr: result.stderr };
     });
@@ -660,6 +688,7 @@ async function resolveRemoteCodeGitRemoteLocator(
 export async function resolveRemoteCodeLocator(
   path = ".",
   runGit?: WorkspaceGitCommandRunner,
+  options: { readonly homeDir?: string } = {},
 ): Promise<{
   readonly repository: string;
   readonly repositoryIdentity: string;
@@ -669,18 +698,20 @@ export async function resolveRemoteCodeLocator(
   const { execFile } = await import("node:child_process");
   const { promisify } = await import("node:util");
   const execFileAsync = promisify(execFile);
+  const selectedPath = path.trim() || ".";
+  const ceiling = workspaceGitDiscoveryCeiling(selectedPath, options.homeDir);
   const git =
     runGit ??
     (async ({ args, cwd }: { args: readonly string[]; cwd: string }) => {
       const result = await execFileAsync("git", [...args], {
         cwd,
-        timeout: 15_000,
+        timeout: WORKSPACE_GIT_DISCOVERY_TIMEOUT_MS,
         encoding: "utf8",
+        env: remoteCodeGitEnv(ceiling),
       });
       return { stdout: result.stdout, stderr: result.stderr };
     });
 
-  const selectedPath = path.trim() || ".";
   let root: string;
   try {
     const toplevel = await git({ args: ["rev-parse", "--show-toplevel"], cwd: selectedPath });

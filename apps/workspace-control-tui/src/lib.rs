@@ -142,7 +142,7 @@ fn occupancy_chrome_error_phase(phase: &str) -> bool {
 }
 
 fn occupancy_hides_error_status(code: &str, phase: &str) -> bool {
-    code == "conflict" || occupancy_chrome_error_phase(phase)
+    code == "conflict" && occupancy_chrome_error_phase(phase)
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]

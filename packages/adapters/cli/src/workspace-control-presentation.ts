@@ -1019,6 +1019,8 @@ export function createBoundedWorkspaceControlPresentation(
         });
       };
 
+      let occupyFailure: unknown;
+      let occupyDone: Promise<void> = Promise.resolve();
       try {
         if (context.occupyBootstrap) {
           await renderer.send({
@@ -1026,7 +1028,7 @@ export function createBoundedWorkspaceControlPresentation(
             collapsed: true,
             title: "Appaloft",
           });
-          void context
+          occupyDone = context
             .occupyBootstrap({
               reportProgress: async (message) => {
                 if (!presentationOpen) return;
@@ -1034,21 +1036,24 @@ export function createBoundedWorkspaceControlPresentation(
               },
             })
             .then(async (occupied) => {
-              if (!presentationOpen) return;
+              if (!presentationOpen) return occupied;
               if (occupied?.attach) await attachIssuedDescriptor(occupied.attach);
-              try {
-                await renderer.send({
-                  type: "workspaces",
-                  workspaces: await listWorkspaces(context),
-                });
-              } catch {
-                // Restore-list chrome is optional after attach.
-              }
               if (occupied?.workspaceId) selectedWorkspaceId = occupied.workspaceId;
+              return occupied;
+            })
+            .then((occupied) => {
+              if (!occupied || !presentationOpen) return;
+              void listWorkspaces(context).then(
+                (workspaces) => renderer.send({ type: "workspaces", workspaces }),
+                () => {
+                  // Restore-list chrome is optional after attach.
+                },
+              );
             })
             .catch((error) => {
               if (activeTerminal) return;
-              void sendErrorBestEffort(error, "occupancy-code-bootstrap");
+              occupyFailure = error;
+              void renderer.close();
             });
         } else {
           await renderer.send({ type: "loading", title: "Appaloft" });
@@ -1427,6 +1432,7 @@ export function createBoundedWorkspaceControlPresentation(
             await sendErrorBestEffort(error, `workspace-control-${event.type}`);
           }
         }
+        await occupyDone;
       } catch (error) {
         await sendErrorBestEffort(error, "workspace-control-start");
       } finally {
@@ -1438,6 +1444,7 @@ export function createBoundedWorkspaceControlPresentation(
         }
         await renderer.close();
       }
+      if (occupyFailure) throw occupyFailure;
     },
   };
 }

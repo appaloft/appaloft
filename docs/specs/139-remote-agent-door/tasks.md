@@ -433,6 +433,8 @@
 - [x] Unit tests WS-REMOTE-PROGRESS-199
 - [x] Source-run locates sibling/dev-tree `appaloft-workspace-tui` (community pin)
 - [x] Unit tests WS-REMOTE-PROGRESS-200
+- [x] Non-git / ancestor-git locator does not hang on `Resolving repository…`
+- [x] Unit tests WS-REMOTE-PROGRESS-201
 
 ## Later
 

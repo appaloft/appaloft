@@ -2212,4 +2212,47 @@ describe("Workspace control presentation", () => {
       ),
     ).toBeFalse();
   });
+
+  test("[WS-REMOTE-PROGRESS-201] locator miss exits the occupancy TUI instead of staying on Resolving repository", async () => {
+    const renderer = new FakeRendererSession([]);
+    renderer.events = async function* events() {
+      for (let attempt = 0; attempt < 200; attempt += 1) {
+        if (this.closed > 0) break;
+        await Promise.resolve();
+      }
+      yield { type: "quit" };
+    };
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+    const started = Date.now();
+    await expect(
+      presentation.start({
+        occupyBootstrap: async ({ reportProgress }) => {
+          await reportProgress("Resolving repository…");
+          throw {
+            code: "workspace_remote_repository_missing",
+            category: "user" as const,
+            message: "Remote code needs a Git repository with an origin",
+            retryable: false,
+            details: {
+              phase: "remote-code-locator",
+              guidance: "Run appaloft code from a Git repository, or use appaloft code --local.",
+            },
+          };
+        },
+        executeCommand: async () => ok({}),
+        executeQuery: async <T>() => ok({ items: [] } as T),
+      }),
+    ).rejects.toMatchObject({
+      code: "workspace_remote_repository_missing",
+    });
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(renderer.closed).toBeGreaterThan(0);
+    expect(renderer.messages).toContainEqual({
+      type: "progress",
+      message: "Resolving repository…",
+    });
+    expect(renderer.messages.some((message) => message.type === "terminal-ready")).toBeFalse();
+  });
 });
