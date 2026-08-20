@@ -158,6 +158,10 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-HOME-SKILL-184 | CLI | automated | entries without `SKILL.md` are skipped | `packages/adapters/cli/test/occupancy-skill-offer.test.ts` |
 | WS-REMOTE-HOME-SKILL-185 | CLI | automated | secrets and `mcp.json` are not uploaded | `packages/adapters/cli/test/occupancy-skill-offer.test.ts` |
 | WS-REMOTE-HOME-SKILL-186 | CLI | automated | HOME skill offer is add-only and does not overwrite existing sandbox files | `packages/adapters/cli/test/occupancy-skill-offer.test.ts` |
+| WS-REMOTE-PROGRESS-187 | CLI / unit | automated | occupy/code prints present-tense status before slow login, server, occupancy, repository, occupy, skill, and attach steps | `packages/adapters/cli/test/remote-code-session.test.ts`; `packages/adapters/cli/test/agent-workspace-command.test.ts` |
+| WS-REMOTE-PROGRESS-188 | CLI | automated | `--no-attach` prints the same progress and does not attach | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
+| WS-REMOTE-PROGRESS-189 | CLI | automated | default `code` attaches before optional skill copy finishes | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
+| WS-REMOTE-PROGRESS-190 | CLI / unit | automated | login wait is announced before fail-closed logout | `packages/adapters/cli/test/remote-code-session.test.ts` |
 
 
 

@@ -1852,6 +1852,150 @@ describe("Agent Workspace CLI", () => {
     );
   });
 
+  test("[WS-REMOTE-PROGRESS-187][WS-REMOTE-PROGRESS-188][WS-REMOTE-NO-ATTACH-016] --no-attach prints progress before occupy and does not attach", async () => {
+    const output: string[] = [];
+    const events: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          if (command instanceof OpenAgentWorkspaceCommand) {
+            expect(output.join("")).toContain("Opening occupancy on hostinger…");
+            events.push("occupy");
+            await Bun.sleep(15);
+            return ok({ workspaceId: "sbx_progress", projectId: "prj_web" } as T);
+          }
+          events.push("skill");
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_code_progress_no_attach" }),
+      },
+      resolveRemoteCodeDoor: async () => {
+        expect(output.join("")).toContain("Checking login…");
+        events.push("door");
+        await Bun.sleep(15);
+        return {
+          repository: "https://github.com/acme/api.git",
+          repositoryIdentity: "github.com/acme/api",
+          ref: "refs/heads/main",
+          branch: "main",
+          commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          projectId: "prj_web",
+          serverId: "srv_4lifk0yrcecy",
+          serverName: "hostinger",
+        };
+      },
+      launchNativeWorkspaceClient: async () => {
+        events.push("attach");
+      },
+    });
+    const write = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
+    } finally {
+      process.stdout.write = write;
+    }
+    const printed = output.join("");
+    expect(events[0]).toBe("door");
+    expect(events).toContain("occupy");
+    expect(events).not.toContain("attach");
+    expect(printed).toContain("Checking login…");
+    expect(printed).toContain("Opening occupancy on hostinger…");
+    expect(printed).toContain("Copying skills…");
+    expect(printed).toContain(
+      "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · sbx_progress",
+    );
+    expect(printed.indexOf("Opening occupancy on hostinger…")).toBeLessThan(
+      printed.indexOf("Copying skills…"),
+    );
+    expect(printed.indexOf("Copying skills…")).toBeLessThan(printed.indexOf("Remote ·"));
+  });
+
+  test("[WS-REMOTE-PROGRESS-189][WS-REMOTE-ATTACH-134] default code attaches before optional skill copy finishes", async () => {
+    const output: string[] = [];
+    let attached = false;
+    let skillCompletedBeforeAttach = false;
+    const { createCliProgram } = await import("../src");
+    const { OpenAgentWorkspaceCommand } = await import("@appaloft/application");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          if (command instanceof OpenAgentWorkspaceCommand) {
+            expect(output.join("")).toContain("Opening occupancy on hostinger…");
+            expect(attached).toBeFalse();
+            return ok({
+              workspaceId: "sbx_attach_first",
+              projectId: "prj_web",
+              attach: {
+                transport: "native-attach",
+                clientHandoff: "local-client-exec",
+                clientCommand: ["opencode", "attach"],
+              },
+            } as T);
+          }
+          await Bun.sleep(40);
+          if (!attached) skillCompletedBeforeAttach = true;
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_code_progress_attach" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        projectId: "prj_web",
+        serverId: "srv_4lifk0yrcecy",
+        serverName: "hostinger",
+      }),
+      launchNativeWorkspaceClient: async (argv) => {
+        expect(argv).toEqual(["opencode", "attach"]);
+        expect(output.join("")).toContain("Attaching…");
+        attached = true;
+      },
+    });
+    const write = process.stdout.write;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code"]);
+    } finally {
+      process.stdout.write = write;
+    }
+    const printed = output.join("");
+    expect(attached).toBeTrue();
+    expect(skillCompletedBeforeAttach).toBeFalse();
+    expect(printed).toContain("Opening occupancy on hostinger…");
+    expect(printed).toContain("Copying skills…");
+    expect(printed).toContain("Attaching…");
+    expect(printed).toContain(
+      "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · sbx_attach_first",
+    );
+    expect(printed.indexOf("Opening occupancy on hostinger…")).toBeLessThan(
+      printed.indexOf("Attaching…"),
+    );
+  });
+
   test("[WS-REMOTE-COMPAT-128][WS-REMOTE-COMPAT-129][WS-REMOTE-COMPAT-130] unstructured occupancy validation names the enrolled Server", async () => {
     const commands: Command<unknown>[] = [];
     const { createCliProgram } = await import("../src");

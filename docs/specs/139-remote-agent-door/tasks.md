@@ -406,6 +406,14 @@
 - [x] Unit tests WS-REMOTE-HOME-SKILL-182–186
 - [x] First-party Appaloft skill offer stays (WS-REMOTE-SKILL-017)
 
+## Slice 49 - occupy/code progress and attach-first
+
+- [x] Present-tense status before login, server, occupancy, occupy, skill copy, and attach
+- [x] Default `code` attaches as soon as occupancy exists; HOME skill / extra chrome do not block attach
+- [x] `--no-attach` prints the same progress and stays occupy-only
+- [x] Login wait is announced before fail-closed logout
+- [x] Unit tests WS-REMOTE-PROGRESS-187–190
+
 ## Later
 
 - [ ] Interactive `workspace` TUI as Railway `ca` navigator

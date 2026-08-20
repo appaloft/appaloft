@@ -16,6 +16,7 @@ import {
   occupancyGitHubCompareUrl,
   occupancyGitHubPullRequestUrl,
 } from "./occupancy-chrome.js";
+import { OCCUPANCY_CODE_PROGRESS } from "./occupancy-code-progress.js";
 
 export const REMOTE_CODE_BANNER_PREFIX = "Remote ·";
 export const REMOTE_CODE_DOOR_HINT =
@@ -115,6 +116,7 @@ export interface RemoteCodeDoorProbe {
   }>;
   readonly resolveRemoteRef?: (repository: string, ref: string) => Promise<RemoteGitWorkspaceRef>;
   readonly runGit?: WorkspaceGitCommandRunner;
+  readonly onProgress?: (message: string) => void;
 }
 
 export function hasRemoteCodeLogin(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -379,10 +381,12 @@ export async function resolveDefaultRemoteCodeDoor(
   path = ".",
 ): Promise<RemoteCodeDoorResolution> {
   const env = probe.env ?? process.env;
+  probe.onProgress?.(OCCUPANCY_CODE_PROGRESS.checkingLogin);
   if (!(await hasCliControlPlaneLogin(env, probe.readActiveProfile))) {
     throw workspaceRemoteLoginRequiredError();
   }
 
+  probe.onProgress?.(OCCUPANCY_CODE_PROGRESS.lookingUpServers);
   const servers = probe.listServers ? await probe.listServers() : [];
   const server = selectDefaultRemoteCodeServer(servers);
   if (!server) {
@@ -395,7 +399,9 @@ export async function resolveDefaultRemoteCodeDoor(
       },
     );
   }
+  probe.onProgress?.(OCCUPANCY_CODE_PROGRESS.choosingOccupancy);
   const occupancies = probe.listOccupancies ? await probe.listOccupancies() : [];
+  probe.onProgress?.(OCCUPANCY_CODE_PROGRESS.resolvingRepository);
   const explicitRemote = isRemoteCodeGitRemoteLocator(path)
     ? await resolveRemoteCodeGitRemoteLocator(path, probe.runGit)
     : undefined;

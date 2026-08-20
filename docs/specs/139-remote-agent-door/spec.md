@@ -3,10 +3,10 @@
 ## Status
 
 - Round: Spec
-- Artifact state: slice 1–45 leftover EXPOSE live-verified 2026-08-17; slice 46 registered-Server OpenCode attach accepted 2026-08-17; slice 48 occupancy HOME skill offer specified 2026-08-19
+- Artifact state: slice 1–45 leftover EXPOSE live-verified 2026-08-17; slice 46 registered-Server OpenCode attach accepted 2026-08-17; slice 48 occupancy HOME skill offer specified 2026-08-19; slice 49 occupy/code progress and attach-first specified 2026-08-20
 - Discovery: [discovery.md](./discovery.md)
 - Governing decision: ADR-120 plan default destination; ADR-119 locates; ADR-118 occupies and may offer allowlisted HOME skills; ADR-117 remains the login/Server/`--local` door; ADR-116 remains Scratch-only; ADR-103 stays on explicit `workspace open` Git fail-closed
-- Code changes allowed: yes for the occupancy HOME skill-offer slice after this spec update
+- Code changes allowed: yes for the occupy/code progress and attach-first slice after this spec update
 - Compatibility: public minor. Occupancy leftover-default 3000 may be replaced by a single remote EXPOSE; registered-Server attach may use in-Sandbox managed-terminal when port publishing is unsupported; HOME skill offer is add-only and adds no catalog field
 
 ## Business Outcome
@@ -220,6 +220,10 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-HOME-SKILL-184 | Only SKILL.md directories are copied | an allowlisted root has a child without `SKILL.md` | occupy | that child is not copied. Only immediate child directories that contain a `SKILL.md` file are offered. |
 | WS-REMOTE-HOME-SKILL-185 | Secrets and MCP are not copied | a matching skill directory also contains `mcp.json`, tokens, cookies, `.env`, or editor plugin binaries | occupy | those files are not written. Occupy does not upload `mcp.json`, tokens, cookies, `.env` / `.env.*`, `auth.json`, or editor plugin binaries such as `.vsix`. Files larger than 10MB are skipped (Railway fails those uploads). |
 | WS-REMOTE-HOME-SKILL-186 | HOME skill offer is add-only | destination `/workspace/skills/<name>/…` or `/workspace/.agents/skills/<name>/…` already exists | occupy | existing user/sandbox files are not overwritten. First-party Appaloft skill is offered first, so a laptop `appaloft` skill does not replace the public Appaloft skill. |
+| WS-REMOTE-PROGRESS-187 | Occupy path never sits silent | login check, server lookup, occupancy pick/create, SSH/worker open, skill copy, or attach is about to start | `appaloft code` or `appaloft code --no-attach` | CLI prints a short present-tense status line before that slow step (for example `Checking login…`, `Opening occupancy on hostinger…`, `Copying skills…`, `Attaching…`). No happy-path gap stays silent for more than ~300ms. |
+| WS-REMOTE-PROGRESS-188 | `--no-attach` keeps the same progress | occupancy is ready | `appaloft code --no-attach` | the same status lines print through occupy and skill copy; CLI exits without attach. |
+| WS-REMOTE-PROGRESS-189 | Attach starts as soon as occupancy exists | default TTY `code`; HOME skill offer or extra banner sync is still running | `appaloft code` | CLI attaches once `workspaces.open` succeeds. Optional HOME skill copy and extra chrome queries must not block attach; they may finish in the background or after attach. |
+| WS-REMOTE-PROGRESS-190 | Waiting on the user is announced | login is missing or a Server must be chosen | `appaloft code` | CLI prints the waiting/checking status immediately, then fail-closes with the real cause. It does not look hung. |
 
 ## Slice Scope
 
@@ -238,6 +242,9 @@ Out of slice 46: host port publish, laptop SSH `-L`, wrapping host-egress with t
 
 Slice 48: occupancy may offer allowlisted laptop HOME skill directories add-only.
 Out of slice 48: `auth mcp cursor install`, `appaloft setup agent`, MCP/plugin/secret copy, a new setup command, and treating `~/.cursor/skills` / `~/.config/opencode/skills` as Railway-aligned.
+
+Slice 49: default `code` prints present-tense progress before every slow occupy step and attaches as soon as the occupancy exists. HOME skill offer and extra banner sync must not block attach. `--no-attach` prints the same progress and stays occupy-only.
+Out of slice 49: a new setup-agent command, login-fold, deploy-fold, Cloud marketing pages, and live Hostinger deploy.
 
 
 ## Public Surfaces

@@ -55,7 +55,11 @@ Default `appaloft code` occupies **my Sandbox** on the team's default enrolled S
 Source is the remote SHA. Adapter and Profile are created if missing. The laptop path
 is not Workspace truth, and dirty files are not uploaded. A positional git remote
 (`https://`, `ssh://`, or `git@host:path`) occupies that repository without a local
-clone. The banner is:
+clone. While it opens the occupancy it prints short present-tense status lines such as
+`Checking login…`, `Opening occupancy on hostinger…`, `Copying skills…`, and
+`Attaching…`, then attaches as soon as the occupancy exists. HOME skill copy can finish
+in the background. `--no-attach` prints the same progress and stops after occupy.
+The banner is:
 
 ```text
 Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>

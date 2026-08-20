@@ -75,6 +75,11 @@ import {
   occupancyPullRequestFromPreviewEnvironments,
 } from "../occupancy-chrome.js";
 import {
+  OCCUPANCY_CODE_PROGRESS,
+  occupancyOpeningProgress,
+  reportOccupancyCodeProgress,
+} from "../occupancy-code-progress.js";
+import {
   occupancyHomeSkillDestinationExists,
   offerOccupancyAppaloftSkill,
   offerOccupancyHomeSkills,
@@ -622,65 +627,71 @@ export const workspaceCodeCommand = EffectCommand.make(
         return;
       }
 
+      const reportProgress = (message: string) => {
+        reportOccupancyCodeProgress(message);
+      };
       const door = yield* Effect.tryPromise({
-        try: () =>
-          (
-            cli.resolveRemoteCodeDoor ??
-            ((selectedPath?: string) =>
-              resolveDefaultRemoteCodeDoor(
-                {
-                  ...(cli.environment ? { env: cli.environment } : {}),
-                  forceNew,
-                  listServers: async () => {
-                    const query = ListServersQuery.create();
-                    if (query.isErr()) throw query.error;
-                    const listed = await cli.executeQuery(query.value);
-                    if (listed.isErr()) throw listed.error;
-                    return listed.value.items;
-                  },
-                  listOccupancies: async () => {
-                    const query = ListSandboxesQuery.create({ limit: 100, offset: 0 });
-                    if (query.isErr()) throw query.error;
-                    const listed = await cli.executeQuery(query.value);
-                    if (listed.isErr()) throw listed.error;
-                    const items = (listed.value as SandboxListResult).items;
-                    return items.map((item) => ({
-                      sandboxId: item.sandboxId,
-                      status: item.status,
-                      ...(typeof item.lastActivityAt === "string"
-                        ? { lastActivityAt: item.lastActivityAt }
-                        : {}),
-                      ...(typeof item.updatedAt === "string" ? { updatedAt: item.updatedAt } : {}),
-                      ...(item.occupancy &&
-                      typeof item.occupancy === "object" &&
-                      typeof item.occupancy.repositoryIdentity === "string" &&
-                      typeof item.occupancy.commitSha === "string"
-                        ? {
-                            occupancy: {
-                              repositoryIdentity: item.occupancy.repositoryIdentity,
-                              commitSha: item.occupancy.commitSha,
-                              ...(typeof item.occupancy.branch === "string"
-                                ? { branch: item.occupancy.branch }
-                                : {}),
-                            },
-                          }
-                        : {}),
-                    }));
-                  },
-                  showBinding: async (repositoryIdentity) => {
-                    const query = ShowRepositoryBindingQuery.create({ repositoryIdentity });
-                    if (query.isErr()) throw query.error;
-                    const shown = await cli.executeQuery(query.value);
-                    if (shown.isErr()) return null;
-                    return shown.value;
-                  },
-                  ...(cli.resolveRemoteWorkspaceGitRef
-                    ? { resolveRemoteRef: cli.resolveRemoteWorkspaceGitRef }
+        try: async () => {
+          const injectedDoor = cli.resolveRemoteCodeDoor;
+          if (injectedDoor) {
+            reportProgress(OCCUPANCY_CODE_PROGRESS.checkingLogin);
+            return injectedDoor(path);
+          }
+          return resolveDefaultRemoteCodeDoor(
+            {
+              ...(cli.environment ? { env: cli.environment } : {}),
+              forceNew,
+              onProgress: reportProgress,
+              listServers: async () => {
+                const query = ListServersQuery.create();
+                if (query.isErr()) throw query.error;
+                const listed = await cli.executeQuery(query.value);
+                if (listed.isErr()) throw listed.error;
+                return listed.value.items;
+              },
+              listOccupancies: async () => {
+                const query = ListSandboxesQuery.create({ limit: 100, offset: 0 });
+                if (query.isErr()) throw query.error;
+                const listed = await cli.executeQuery(query.value);
+                if (listed.isErr()) throw listed.error;
+                const items = (listed.value as SandboxListResult).items;
+                return items.map((item) => ({
+                  sandboxId: item.sandboxId,
+                  status: item.status,
+                  ...(typeof item.lastActivityAt === "string"
+                    ? { lastActivityAt: item.lastActivityAt }
                     : {}),
-                },
-                selectedPath ?? ".",
-              ))
-          )(path),
+                  ...(typeof item.updatedAt === "string" ? { updatedAt: item.updatedAt } : {}),
+                  ...(item.occupancy &&
+                  typeof item.occupancy === "object" &&
+                  typeof item.occupancy.repositoryIdentity === "string" &&
+                  typeof item.occupancy.commitSha === "string"
+                    ? {
+                        occupancy: {
+                          repositoryIdentity: item.occupancy.repositoryIdentity,
+                          commitSha: item.occupancy.commitSha,
+                          ...(typeof item.occupancy.branch === "string"
+                            ? { branch: item.occupancy.branch }
+                            : {}),
+                        },
+                      }
+                    : {}),
+                }));
+              },
+              showBinding: async (repositoryIdentity) => {
+                const query = ShowRepositoryBindingQuery.create({ repositoryIdentity });
+                if (query.isErr()) throw query.error;
+                const shown = await cli.executeQuery(query.value);
+                if (shown.isErr()) return null;
+                return shown.value;
+              },
+              ...(cli.resolveRemoteWorkspaceGitRef
+                ? { resolveRemoteRef: cli.resolveRemoteWorkspaceGitRef }
+                : {}),
+            },
+            path,
+          );
+        },
         catch: (error) => workspaceCliError(error, "remote-code-door"),
       });
       const attach = !noAttach;
@@ -697,6 +708,7 @@ export const workspaceCodeCommand = EffectCommand.make(
         ...(selectedProfile ? { profile: selectedProfile } : {}),
       };
       const command = yield* resultToEffect(OpenAgentWorkspaceCommand.create(openInput));
+      reportProgress(occupancyOpeningProgress(door.serverName));
       const opened = yield* Effect.promise(() => cli.executeCommand(command));
       let result: WorkspaceOpenResult;
       let bannerCommitSha = door.commitSha;
@@ -733,15 +745,16 @@ export const workspaceCodeCommand = EffectCommand.make(
           `Pinned · ${workspaceId} @ ${pinnedSha.slice(0, 7)} · requested ${door.commitSha.slice(0, 7)} · use --new for an isolated Workspace\n`,
         );
       }
-      yield* Effect.promise(async () => {
+      const offerSkills = async () => {
+        reportProgress(OCCUPANCY_CODE_PROGRESS.copyingSkills);
         try {
           await offerOccupancyAppaloftSkill({
             workspaceId: result.workspaceId,
-            executeCommand: (command) => cli.executeCommand(command),
+            executeCommand: (skillCommand) => cli.executeCommand(skillCommand),
           });
           await offerOccupancyHomeSkills({
             workspaceId: result.workspaceId,
-            executeCommand: (command) => cli.executeCommand(command),
+            executeCommand: (skillCommand) => cli.executeCommand(skillCommand),
             destinationExists: occupancyHomeSkillDestinationExists({
               workspaceId: result.workspaceId,
               executeQuery: (query) => cli.executeQuery(query),
@@ -750,100 +763,122 @@ export const workspaceCodeCommand = EffectCommand.make(
         } catch {
           // occupy still succeeds when skill offer cannot write
         }
-      });
-      const bannerProjectId = result.projectId || door.projectId;
-      let previewUrl: string | undefined;
-      let productionUrl: string | undefined;
-      const resourcesQuery = ListResourcesQuery.create({ limit: 100 });
-      if (resourcesQuery.isOk()) {
-        const listed = yield* Effect.promise(() => cli.executeQuery(resourcesQuery.value));
-        if (listed.isOk()) {
-          previewUrl = occupancyPreviewUrlForProject(listed.value.items ?? [], bannerProjectId);
-          productionUrl = occupancyProductionUrlForProject(
-            listed.value.items ?? [],
-            bannerProjectId,
-          );
-        }
-      }
-      let pullRequestNumber: number | undefined;
-      const previewEnvironmentsQuery = ListPreviewEnvironmentsQuery.create({
-        ...(bannerProjectId ? { projectId: bannerProjectId } : {}),
-        limit: 100,
-      });
-      if (previewEnvironmentsQuery.isOk()) {
-        const listed = yield* Effect.promise(() =>
-          cli.executeQuery(previewEnvironmentsQuery.value),
-        );
-        if (listed.isOk()) {
-          pullRequestNumber = occupancyPullRequestFromPreviewEnvironments(
-            listed.value.items ?? [],
-            {
-              repositoryIdentity: door.repositoryIdentity,
-              commitSha: bannerCommitSha,
-            },
-          )?.number;
-        }
-      }
-      process.stdout.write(
-        `${formatRemoteCodeBanner({
-          projectId: bannerProjectId,
-          repositoryIdentity: door.repositoryIdentity,
-          commitSha: bannerCommitSha,
-          serverName: door.serverName,
-          workspaceId: result.workspaceId,
-          ...(previewUrl ? { previewUrl } : {}),
-          ...(productionUrl ? { productionUrl } : {}),
-          ...(pullRequestNumber ? { pullRequestNumber } : {}),
-          ...(door.branch ? { branch: door.branch } : {}),
-        })}\n`,
-      );
-      const connectionsUrl = yield* Effect.promise(() => resolveOccupancyConnectionsUrl());
-      if (open || optionalValue(openTarget)) {
-        const url = occupancyCodeOpenUrl({
-          repositoryIdentity: door.repositoryIdentity,
-          commitSha: bannerCommitSha,
-          ...(previewUrl ? { previewUrl } : {}),
-          ...(productionUrl ? { productionUrl } : {}),
-          ...(connectionsUrl ? { connectionsUrl } : {}),
-          ...(pullRequestNumber ? { pullRequestNumber } : {}),
-          ...(door.branch ? { branch: door.branch } : {}),
-          ...(optionalValue(openTarget)
-            ? { target: optionalValue(openTarget) as OccupancyCodeOpenTarget }
-            : {}),
-        });
-        if (url) {
-          process.stdout.write(`Open · ${url}\n`);
-          if (occupancyBrowserLaunchAllowed()) {
-            const command =
-              process.platform === "darwin"
-                ? ["open", url]
-                : process.platform === "win32"
-                  ? ["cmd", "/c", "start", "", url]
-                  : ["xdg-open", url];
-            const child = spawn(command[0]!, command.slice(1), {
-              shell: false,
-              stdio: "ignore",
-            });
-            child.unref();
+      };
+      const loadBannerChrome = async () => {
+        const bannerProjectId = result.projectId || door.projectId;
+        let previewUrl: string | undefined;
+        let productionUrl: string | undefined;
+        let pullRequestNumber: number | undefined;
+        const resourcesQuery = ListResourcesQuery.create({ limit: 100 });
+        if (resourcesQuery.isOk()) {
+          const listed = await cli.executeQuery(resourcesQuery.value);
+          if (listed.isOk()) {
+            previewUrl = occupancyPreviewUrlForProject(listed.value.items ?? [], bannerProjectId);
+            productionUrl = occupancyProductionUrlForProject(
+              listed.value.items ?? [],
+              bannerProjectId,
+            );
           }
         }
-      }
-      const doorHint = occupancyAvailableDoorHint({
-        repositoryIdentity: door.repositoryIdentity,
-        commitSha: bannerCommitSha,
-        ...(previewUrl ? { previewUrl } : {}),
-        ...(productionUrl ? { productionUrl } : {}),
-        ...(connectionsUrl ? { connectionsUrl } : {}),
-        ...(pullRequestNumber ? { pullRequestNumber } : {}),
-        ...(door.branch ? { branch: door.branch } : {}),
-      });
-      if (doorHint) process.stdout.write(`${doorHint}\n`);
-      if (!attach) {
-        yield* Effect.promise(() => writeOccupancySessionHints());
+        const previewEnvironmentsQuery = ListPreviewEnvironmentsQuery.create({
+          ...(bannerProjectId ? { projectId: bannerProjectId } : {}),
+          limit: 100,
+        });
+        if (previewEnvironmentsQuery.isOk()) {
+          const listed = await cli.executeQuery(previewEnvironmentsQuery.value);
+          if (listed.isOk()) {
+            pullRequestNumber = occupancyPullRequestFromPreviewEnvironments(
+              listed.value.items ?? [],
+              {
+                repositoryIdentity: door.repositoryIdentity,
+                commitSha: bannerCommitSha,
+              },
+            )?.number;
+          }
+        }
+        return { bannerProjectId, previewUrl, productionUrl, pullRequestNumber };
+      };
+      const writeBannerAndChrome = async (chrome: {
+        readonly bannerProjectId: string;
+        readonly previewUrl?: string;
+        readonly productionUrl?: string;
+        readonly pullRequestNumber?: number;
+      }) => {
+        process.stdout.write(
+          `${formatRemoteCodeBanner({
+            projectId: chrome.bannerProjectId,
+            repositoryIdentity: door.repositoryIdentity,
+            commitSha: bannerCommitSha,
+            serverName: door.serverName,
+            workspaceId: result.workspaceId,
+            ...(chrome.previewUrl ? { previewUrl: chrome.previewUrl } : {}),
+            ...(chrome.productionUrl ? { productionUrl: chrome.productionUrl } : {}),
+            ...(chrome.pullRequestNumber ? { pullRequestNumber: chrome.pullRequestNumber } : {}),
+            ...(door.branch ? { branch: door.branch } : {}),
+          })}\n`,
+        );
+        const connectionsUrl = await resolveOccupancyConnectionsUrl();
+        if (open || optionalValue(openTarget)) {
+          const url = occupancyCodeOpenUrl({
+            repositoryIdentity: door.repositoryIdentity,
+            commitSha: bannerCommitSha,
+            ...(chrome.previewUrl ? { previewUrl: chrome.previewUrl } : {}),
+            ...(chrome.productionUrl ? { productionUrl: chrome.productionUrl } : {}),
+            ...(connectionsUrl ? { connectionsUrl } : {}),
+            ...(chrome.pullRequestNumber ? { pullRequestNumber: chrome.pullRequestNumber } : {}),
+            ...(door.branch ? { branch: door.branch } : {}),
+            ...(optionalValue(openTarget)
+              ? { target: optionalValue(openTarget) as OccupancyCodeOpenTarget }
+              : {}),
+          });
+          if (url) {
+            process.stdout.write(`Open · ${url}\n`);
+            if (occupancyBrowserLaunchAllowed()) {
+              const openCommand =
+                process.platform === "darwin"
+                  ? ["open", url]
+                  : process.platform === "win32"
+                    ? ["cmd", "/c", "start", "", url]
+                    : ["xdg-open", url];
+              const child = spawn(openCommand[0]!, openCommand.slice(1), {
+                shell: false,
+                stdio: "ignore",
+              });
+              child.unref();
+            }
+          }
+        }
+        const doorHint = occupancyAvailableDoorHint({
+          repositoryIdentity: door.repositoryIdentity,
+          commitSha: bannerCommitSha,
+          ...(chrome.previewUrl ? { previewUrl: chrome.previewUrl } : {}),
+          ...(chrome.productionUrl ? { productionUrl: chrome.productionUrl } : {}),
+          ...(connectionsUrl ? { connectionsUrl } : {}),
+          ...(chrome.pullRequestNumber ? { pullRequestNumber: chrome.pullRequestNumber } : {}),
+          ...(door.branch ? { branch: door.branch } : {}),
+        });
+        if (doorHint) process.stdout.write(`${doorHint}\n`);
+      };
+      const wantsChrome = !attach || open || Boolean(optionalValue(openTarget));
+      const skills = offerSkills();
+      if (attach) {
+        const chrome = wantsChrome
+          ? yield* Effect.promise(loadBannerChrome)
+          : { bannerProjectId: result.projectId || door.projectId };
+        yield* Effect.promise(() => writeBannerAndChrome(chrome));
+        reportProgress(OCCUPANCY_CODE_PROGRESS.attaching);
+        yield* completeWorkspaceOpen(result, true, cli.launchNativeWorkspaceClient);
+        yield* Effect.promise(async () => {
+          await skills;
+          await writeOccupancySessionHints();
+        });
         return;
       }
-      yield* completeWorkspaceOpen(result, true, cli.launchNativeWorkspaceClient);
-      yield* Effect.promise(() => writeOccupancySessionHints());
+      yield* Effect.promise(() => skills);
+      yield* Effect.promise(async () => {
+        await writeBannerAndChrome(await loadBannerChrome());
+        await writeOccupancySessionHints();
+      });
     }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.agentScratch));
 

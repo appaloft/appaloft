@@ -50,6 +50,8 @@
 | Occupancy `--open-target` | same `code` selector + chosen target |
 | Occupancy production open | same banner / `--open-target` + Resource durable domain |
 | Occupancy banner labels | same `code` banner formatter |
+| Occupancy progress | public CLI `code` present-tense status before each slow occupy step |
+| Occupancy attach-first | public CLI `code` attaches after `workspaces.open`; HOME skill / extra chrome do not block |
 | Occupancy door hint | public CLI `code` after banner |
 | Occupancy available-door hint | same `code` hint + occupancy URL selector |
 | Occupancy TUI available-door footer | same occupancy URL selector + `workspace` footer |

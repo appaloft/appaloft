@@ -3,6 +3,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { OCCUPANCY_CODE_PROGRESS } from "../src/occupancy-code-progress.js";
 import {
   formatRemoteCodeBanner,
   formatRemoteCodeGitHubHint,
@@ -79,6 +80,77 @@ describe("remote code door", () => {
     ).toBe("srv_4lifk0yrcecy");
     expect(selectWorkspaceOpenTargetServerId({ servers: [hostinger] })).toBe("srv_4lifk0yrcecy");
     expect(selectWorkspaceOpenTargetServerId({ servers: [] })).toBeUndefined();
+  });
+
+  test("[WS-REMOTE-PROGRESS-187][WS-REMOTE-PROGRESS-190] reports status before slow login, server, occupancy, and repository steps", async () => {
+    const progress: string[] = [];
+    const door = await resolveDefaultRemoteCodeDoor({
+      env: {},
+      onProgress: (message) => progress.push(message),
+      readActiveProfile: async () => {
+        expect(progress).toEqual([OCCUPANCY_CODE_PROGRESS.checkingLogin]);
+        await Bun.sleep(15);
+        return { auth: { token: "token" } };
+      },
+      listServers: async () => {
+        expect(progress).toContain(OCCUPANCY_CODE_PROGRESS.lookingUpServers);
+        expect(progress.indexOf(OCCUPANCY_CODE_PROGRESS.lookingUpServers)).toBeGreaterThan(
+          progress.indexOf(OCCUPANCY_CODE_PROGRESS.checkingLogin),
+        );
+        await Bun.sleep(15);
+        return [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }];
+      },
+      listOccupancies: async () => {
+        expect(progress).toContain(OCCUPANCY_CODE_PROGRESS.choosingOccupancy);
+        await Bun.sleep(15);
+        return [];
+      },
+      resolveLocator: async () => {
+        expect(progress).toContain(OCCUPANCY_CODE_PROGRESS.resolvingRepository);
+        await Bun.sleep(15);
+        return {
+          repository: "https://github.com/acme/api.git",
+          repositoryIdentity: "github.com/acme/api",
+          ref: "refs/heads/main",
+          branch: "main",
+        };
+      },
+      showBinding: async () => null,
+      resolveRemoteRef: async () => ({
+        repositoryIdentity: "github.com/acme/api",
+        credentialFreeHttpsRepository: "https://github.com/acme/api.git",
+        ref: "refs/heads/main",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      }),
+    });
+    expect(door.serverName).toBe("hostinger");
+    expect(progress).toEqual([
+      OCCUPANCY_CODE_PROGRESS.checkingLogin,
+      OCCUPANCY_CODE_PROGRESS.lookingUpServers,
+      OCCUPANCY_CODE_PROGRESS.choosingOccupancy,
+      OCCUPANCY_CODE_PROGRESS.resolvingRepository,
+    ]);
+  });
+
+  test("[WS-REMOTE-PROGRESS-190] announces login before fail-closed logout", async () => {
+    const progress: string[] = [];
+    await expect(
+      resolveDefaultRemoteCodeDoor({
+        env: {},
+        onProgress: (message) => progress.push(message),
+        readActiveProfile: async () => {
+          expect(progress).toEqual([OCCUPANCY_CODE_PROGRESS.checkingLogin]);
+          return null;
+        },
+        listServers: async () => {
+          throw new Error("logout must not look up servers");
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: "workspace_remote_login_required",
+      details: { guidance: expect.stringContaining("Run appaloft login") },
+    });
+    expect(progress).toEqual([OCCUPANCY_CODE_PROGRESS.checkingLogin]);
   });
 
   test("[WS-REMOTE-LOGIN-001] fails closed without login or profile", async () => {
