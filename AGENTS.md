@@ -43,6 +43,7 @@ Core documentation:
 - Command-owning modules or executable shell construction: run `bun run check:ash` and follow `docs/ai/ASH_COMMAND_CONSTRUCTION.md`.
 - CLI, HTTP, SDK, operation-catalog, or Web changes must converge on the same command/query schema and operation semantics; validate each affected entrypoint rather than only one transport.
 - Docker, SSH, provider, release, and public-launch smokes are explicit opt-in checks. Record prerequisites, external effects, cost, cleanup, and evidence before running them.
+- Rust / `apps/workspace-control-tui` / `code` TUI chrome: before push, run locally `cargo fmt --check --manifest-path apps/workspace-control-tui/Cargo.toml` and `cargo test --manifest-path apps/workspace-control-tui/Cargo.toml --lib`. Do not push if either is red. CI must not be the first place rustfmt or TUI unit tests fail.
 
 ### Common Commands
 
@@ -72,6 +73,8 @@ bun test path/to/file.test.ts
 bun test packages/<workspace>/test
 bun run check:ash
 bun test packages/docs-registry/test
+cargo fmt --check --manifest-path apps/workspace-control-tui/Cargo.toml
+cargo test --manifest-path apps/workspace-control-tui/Cargo.toml --lib
 ```
 
 Replace placeholders with confirmed paths; do not execute `<workspace>` or `path/to/...` literally. Run tests that read repository-level fixtures from the repository root; use `--cwd` only when the workspace script explicitly supports a package-local working directory. `bun run test:unit`, `bun run test:integration`, and `bun run test:e2e` mirror the explicit suite boundaries used by CI. Consult `package.json` and `docs/TESTING.md` before selecting manual smoke commands.

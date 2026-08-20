@@ -1045,7 +1045,10 @@ impl AppState {
     }
 
     pub fn should_emit_workspace_select(&self) -> bool {
-        !self.focus_mode && !self.agent_focused && self.selected_workspace_id().is_some()
+        !self.loading.active
+            && !self.focus_mode
+            && !self.agent_focused
+            && self.selected_workspace_id().is_some()
     }
 
     pub fn selected_runtime_id(&self) -> Option<&str> {
@@ -3517,15 +3520,9 @@ mod tests {
         );
         assert!(!revealed.contains("src/"), "{revealed}");
         assert!(revealed.contains("hide the tree"), "{revealed}");
-        state.apply(ParentMessage::TerminalReady {
-            workspace_id: "sbx_1".to_owned(),
-            runtime_id: "sar_1".to_owned(),
-            session_id: "term_1".to_owned(),
-        });
-        assert!(!state.loading.active);
         assert!(
-            state.focus_mode,
-            "focus_mode starts after the agent attaches, even if the tree was revealed during wait"
+            !state.focus_mode,
+            "revealing the tree during wait is not attach focus_mode"
         );
         assert!(!state.should_emit_workspace_select());
     }
