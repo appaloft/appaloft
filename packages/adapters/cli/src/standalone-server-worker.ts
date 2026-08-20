@@ -1,6 +1,8 @@
 import { type DomainError, type Result } from "@appaloft/core";
 import { type ServerWorkerSafeStatus } from "@appaloft/server-worker-relay";
 
+import { removeProcessListener } from "./remove-process-listener.js";
+
 export interface ServerWorkerCommandRuntime {
   enroll(input: {
     serverId: string;
@@ -141,8 +143,8 @@ export async function runStandaloneServerWorkerCli(
     try {
       result = await input.runtime.run({ signal: abort.signal });
     } finally {
-      process.off("SIGINT", interrupt);
-      process.off("SIGTERM", interrupt);
+      removeProcessListener("SIGINT", interrupt);
+      removeProcessListener("SIGTERM", interrupt);
     }
   } else if (operation === "upgrade") {
     const candidateExecutable = option(args, "candidate")?.trim();

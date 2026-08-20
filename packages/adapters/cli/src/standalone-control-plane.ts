@@ -28,6 +28,7 @@ import {
   resolveCursorHome,
   resolveOpenCodeHome,
 } from "./mcp-host-install.js";
+import { removeProcessListener } from "./remove-process-listener.js";
 
 export interface StandaloneControlPlaneCliInput {
   readonly argv?: readonly string[];
@@ -424,7 +425,7 @@ async function handleLogin(
       input,
     );
   } finally {
-    process.off("SIGINT", abort);
+    removeProcessListener("SIGINT", abort);
   }
 }
 
@@ -470,7 +471,7 @@ async function handleMcpLogin(
       input,
     );
   } finally {
-    process.off("SIGINT", abort);
+    removeProcessListener("SIGINT", abort);
   }
 }
 

@@ -22,6 +22,8 @@ import {
 } from "@appaloft/application";
 import { type DomainError, err, ok, type Result } from "@appaloft/core";
 
+import { removeProcessListener } from "./remove-process-listener.js";
+
 const manifestFileName = "manifest.json";
 const planFileName = "plan.json";
 const statusFileName = "status.json";
@@ -477,8 +479,8 @@ export class LocalDevelopmentSessionRuntime implements DevelopmentSessionRuntime
       process.once("SIGINT", forwardSignal);
       process.once("SIGTERM", forwardSignal);
       await child.exited;
-      process.off("SIGINT", forwardSignal);
-      process.off("SIGTERM", forwardSignal);
+      removeProcessListener("SIGINT", forwardSignal);
+      removeProcessListener("SIGTERM", forwardSignal);
       return ok(
         (await readJson<DevelopmentSessionView>(join(stateDirectory, statusFileName))) ?? manifest,
       );
@@ -915,8 +917,8 @@ export class LocalDevelopmentSessionRuntime implements DevelopmentSessionRuntime
         stopSignal,
         unexpectedExit.then((value) => ({ unexpected: value }) as const),
       ]);
-      process.off("SIGINT", stop);
-      process.off("SIGTERM", stop);
+      removeProcessListener("SIGINT", stop);
+      removeProcessListener("SIGTERM", stop);
       if (!stopRequested && typeof termination === "object") {
         throw developmentRuntimeError(
           "development_process_failed",

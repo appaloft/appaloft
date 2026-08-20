@@ -10,6 +10,7 @@ import {
   tokenLoginControlPlane,
   useControlPlaneProfile,
 } from "../control-plane-service.js";
+import { removeProcessListener } from "../remove-process-listener.js";
 import { optionalValue, print, resultToEffect } from "../runtime.js";
 import { cliCommandDescriptions } from "./docs-help.js";
 
@@ -51,7 +52,7 @@ function loginTask(input: {
           signal: abortController.signal,
         }),
       ),
-    ({ abort }) => Effect.sync(() => process.off("SIGINT", abort)),
+    ({ abort }) => Effect.sync(() => removeProcessListener("SIGINT", abort)),
   );
 }
 
