@@ -75,6 +75,7 @@ jobs:
     steps:
       - name: Skip E2E
       - run: bun scripts/ci/classify-changed-files.ts
+      - name: consume e2e_run_web and e2e_run_shell
 `;
 
     expect(findCiChangeClassifierViolations(ciWorkflow, e2eWorkflow)).toEqual([]);
@@ -87,5 +88,16 @@ jobs:
     expect(
       findCiChangeClassifierViolations(ciWorkflow, "on:\n  pull_request:\n  workflow_dispatch:\n"),
     ).toContainEqual(expect.objectContaining({ rule: "shared-change-classifier" }));
+    expect(
+      findCiChangeClassifierViolations(
+        ciWorkflow,
+        `${e2eWorkflow.replace("    steps:", "    services:\n      postgres:\n    steps:")}`,
+      ),
+    ).toContainEqual(
+      expect.objectContaining({
+        message:
+          "e2e.yml must start Postgres as a step so lightweight and web-only shards do not pay a job-level service tax.",
+      }),
+    );
   });
 });

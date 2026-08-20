@@ -98,6 +98,23 @@ export function findCiChangeClassifierViolations(
     });
   }
 
+  if (!e2eWorkflow.includes("e2e_run_web") || !e2eWorkflow.includes("e2e_run_shell")) {
+    violations.push({
+      message:
+        "e2e.yml must consume e2e_run_web and e2e_run_shell from the shared change classifier.",
+      rule: "shared-change-classifier",
+    });
+  }
+
+  const e2eJob = yamlBlock(e2eWorkflow, /^ {2}e2e:\s*$/, 2);
+  if (/^ {4}services:\s*$/m.test(e2eJob)) {
+    violations.push({
+      message:
+        "e2e.yml must start Postgres as a step so lightweight and web-only shards do not pay a job-level service tax.",
+      rule: "shared-change-classifier",
+    });
+  }
+
   const resultVar = ["$", "{result}"].join("");
   const skippedOk = [
     'if [[ "',

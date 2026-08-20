@@ -120,8 +120,14 @@ If tests bypass the runtime or write directly to the database to simulate succes
   - real PostgreSQL, started backend, CLI/API/deployment E2E, Playwright smoke
   - runs for every non-draft pull request and always publishes both stable shard checks required by
     branch protection; path filters must not suppress those checks
-  - the same change classifier skips real WebView and shell work inside the two matrix jobs so
+  - the same change classifier scopes real work inside the two matrix jobs so
     `e2e (1, 2)` and `e2e (2, 2)` still succeed; those jobs are not skipped at the job level
+  - `docs_only` / `release_bump` classify as `e2e_skip` and skip real suites
+  - an isolated `apps/web/**` surface classifies as `e2e_web` and runs only mocked WebView on shard 1
+  - isolated `apps/shell/test/e2e/*.e2e.ts` files classify as `e2e_shell` and run only shell shards
+  - packages, server/CLI composition, lockfiles, shared config, desktop, CI scripts, the e2e
+    harness, mixed surfaces, or an empty diff fail closed to `e2e_full`
+  - Postgres starts as a step when shell E2E runs, so lightweight and web-only shards do not boot it
 - `nightly.yml`
   - higher-cost compose smoke
 
