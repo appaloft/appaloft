@@ -22,6 +22,7 @@ const root = resolve(import.meta.dir, "../..");
 const ciWorkflow = readFileSync(join(root, ".github/workflows/ci.yml"), "utf8");
 const e2eWorkflow = readFileSync(join(root, ".github/workflows/e2e.yml"), "utf8");
 const classifierPath = "scripts/ci/classify-changed-files.ts";
+const expression = (value: string) => ["$", "{{ ", value, " }}"].join("");
 
 const releaseBumpPrFiles = [
   ".github/.release-please-manifest.json",
@@ -358,12 +359,12 @@ describe("CI change classifier", () => {
     expect(e2eWorkflow).toContain("e2e_run_shell");
     expect(e2eWorkflow).toContain("steps.shard.outputs.need_web == 'true'");
     expect(e2eWorkflow).toContain("steps.shard.outputs.need_shell == 'true'");
-    expect(e2eWorkflow).toContain("if: ${{ steps.shard.outputs.need_work != 'true' }}");
+    expect(e2eWorkflow).toContain(`if: ${expression("steps.shard.outputs.need_work != 'true'")}`);
 
     const e2eJob = e2eWorkflow.slice(e2eWorkflow.indexOf("  e2e:"));
     expect(e2eJob).not.toMatch(/^ {4}if:.*lightweight_only/m);
-    expect(e2eJob).toContain("if: ${{ steps.shard.outputs.need_web == 'true' }}");
-    expect(e2eJob).toContain("if: ${{ steps.shard.outputs.need_shell == 'true' }}");
+    expect(e2eJob).toContain(`if: ${expression("steps.shard.outputs.need_web == 'true'")}`);
+    expect(e2eJob).toContain(`if: ${expression("steps.shard.outputs.need_shell == 'true'")}`);
 
     const pullRequestTrigger = e2eWorkflow.slice(
       e2eWorkflow.indexOf("  pull_request:"),

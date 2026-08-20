@@ -85,10 +85,7 @@ export function e2eNeedsShardWork(e2eClass: E2eClass, shard: number): boolean {
   return e2eNeedsShell(e2eClass) || (e2eNeedsWebView(e2eClass) && shard === 1);
 }
 
-export function classifyE2eClass(
-  files: readonly string[],
-  changeClass: ChangeClass,
-): E2eClass {
+export function classifyE2eClass(files: readonly string[], changeClass: ChangeClass): E2eClass {
   if (changeClass === "docs_only" || changeClass === "release_bump") {
     return "e2e_skip";
   }
