@@ -19,7 +19,7 @@ ask for an ADR, operation-catalog update, workflow/spec change, or test-matrix e
 
 Requirements:
 
-- Bun 1.3.14 or newer
+- Bun 1.4.0 or newer
 - Docker for real runtime smoke tests
 - PostgreSQL only when the selected test path requires it; PGlite covers the embedded path
 
