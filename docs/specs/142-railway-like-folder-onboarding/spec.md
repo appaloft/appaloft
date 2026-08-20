@@ -71,6 +71,11 @@ linked project is one command.
 - Folder links are per user home / `APPALOFT_HOME`, not a required cwd file.
 - Spec 139 resume-from-any-directory rows are superseded for default `code`
   without an explicit remote locator.
+- `#1314` `path|git-remote` stays the workspace-open locator: a non-git
+  directory without an explicit remote fail-closes
+  `workspace_remote_repository_missing` and does not resume another occupancy.
+  Default `code` is additive and occupies this folder (`folder.local`) after
+  onboarding.
 
 ## Non-Goals
 
