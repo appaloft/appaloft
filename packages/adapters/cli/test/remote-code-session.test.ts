@@ -22,6 +22,16 @@ import {
   workspaceGitDiscoveryCeiling,
 } from "../src/remote-code-session.js";
 
+async function withThisFolderGitWorktree<T>(run: (gitDir: string) => Promise<T>): Promise<T> {
+  const gitDir = await mkdtemp(join(tmpdir(), "appaloft-remote-code-git-"));
+  await mkdir(join(gitDir, ".git"));
+  try {
+    return await run(gitDir);
+  } finally {
+    await rm(gitDir, { recursive: true, force: true });
+  }
+}
+
 describe("remote code door", () => {
   test("[WS-REMOTE-HINT-119] occupancy door hint names existing doors", () => {
     expect(REMOTE_CODE_DOOR_HINT).toContain("--open-target");
@@ -86,53 +96,59 @@ describe("remote code door", () => {
   });
 
   test("[WS-REMOTE-PROGRESS-187][WS-REMOTE-PROGRESS-190] reports status before slow login, server, occupancy, and repository steps", async () => {
-    const progress: string[] = [];
-    const door = await resolveDefaultRemoteCodeDoor({
-      env: {},
-      onProgress: (message) => progress.push(message),
-      readActiveProfile: async () => {
-        expect(progress).toEqual([OCCUPANCY_CODE_PROGRESS.checkingLogin]);
-        await Bun.sleep(15);
-        return { auth: { token: "token" } };
-      },
-      listServers: async () => {
-        expect(progress).toContain(OCCUPANCY_CODE_PROGRESS.lookingUpServers);
-        expect(progress.indexOf(OCCUPANCY_CODE_PROGRESS.lookingUpServers)).toBeGreaterThan(
-          progress.indexOf(OCCUPANCY_CODE_PROGRESS.checkingLogin),
-        );
-        await Bun.sleep(15);
-        return [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }];
-      },
-      listOccupancies: async () => {
-        expect(progress).toContain(OCCUPANCY_CODE_PROGRESS.choosingOccupancy);
-        await Bun.sleep(15);
-        return [];
-      },
-      resolveLocator: async () => {
-        expect(progress).toContain(OCCUPANCY_CODE_PROGRESS.resolvingRepository);
-        await Bun.sleep(15);
-        return {
-          repository: "https://github.com/acme/api.git",
-          repositoryIdentity: "github.com/acme/api",
-          ref: "refs/heads/main",
-          branch: "main",
-        };
-      },
-      showBinding: async () => null,
-      resolveRemoteRef: async () => ({
-        repositoryIdentity: "github.com/acme/api",
-        credentialFreeHttpsRepository: "https://github.com/acme/api.git",
-        ref: "refs/heads/main",
-        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      }),
+    await withThisFolderGitWorktree(async (gitDir) => {
+      const progress: string[] = [];
+      const door = await resolveDefaultRemoteCodeDoor(
+        {
+          env: {},
+          folderCwd: gitDir,
+          onProgress: (message) => progress.push(message),
+          readActiveProfile: async () => {
+            expect(progress).toEqual([OCCUPANCY_CODE_PROGRESS.checkingLogin]);
+            await Bun.sleep(15);
+            return { auth: { token: "token" } };
+          },
+          listServers: async () => {
+            expect(progress).toContain(OCCUPANCY_CODE_PROGRESS.lookingUpServers);
+            expect(progress.indexOf(OCCUPANCY_CODE_PROGRESS.lookingUpServers)).toBeGreaterThan(
+              progress.indexOf(OCCUPANCY_CODE_PROGRESS.checkingLogin),
+            );
+            await Bun.sleep(15);
+            return [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }];
+          },
+          listOccupancies: async () => {
+            expect(progress).toContain(OCCUPANCY_CODE_PROGRESS.choosingOccupancy);
+            await Bun.sleep(15);
+            return [];
+          },
+          resolveLocator: async () => {
+            expect(progress).toContain(OCCUPANCY_CODE_PROGRESS.resolvingRepository);
+            await Bun.sleep(15);
+            return {
+              repository: "https://github.com/acme/api.git",
+              repositoryIdentity: "github.com/acme/api",
+              ref: "refs/heads/main",
+              branch: "main",
+            };
+          },
+          showBinding: async () => null,
+          resolveRemoteRef: async () => ({
+            repositoryIdentity: "github.com/acme/api",
+            credentialFreeHttpsRepository: "https://github.com/acme/api.git",
+            ref: "refs/heads/main",
+            commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          }),
+        },
+        gitDir,
+      );
+      expect(door.serverName).toBe("hostinger");
+      expect(progress).toEqual([
+        OCCUPANCY_CODE_PROGRESS.checkingLogin,
+        OCCUPANCY_CODE_PROGRESS.lookingUpServers,
+        OCCUPANCY_CODE_PROGRESS.choosingOccupancy,
+        OCCUPANCY_CODE_PROGRESS.resolvingRepository,
+      ]);
     });
-    expect(door.serverName).toBe("hostinger");
-    expect(progress).toEqual([
-      OCCUPANCY_CODE_PROGRESS.checkingLogin,
-      OCCUPANCY_CODE_PROGRESS.lookingUpServers,
-      OCCUPANCY_CODE_PROGRESS.choosingOccupancy,
-      OCCUPANCY_CODE_PROGRESS.resolvingRepository,
-    ]);
   });
 
   test("[WS-REMOTE-PROGRESS-190] announces login before fail-closed logout", async () => {
@@ -199,62 +215,74 @@ describe("remote code door", () => {
   });
 
   test("[WS-REMOTE-BINDING-007] missing Binding still resolves remote SHA for workspaces.open", async () => {
-    const door = await resolveDefaultRemoteCodeDoor({
-      env: { APPALOFT_TOKEN: "token" },
-      listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
-      resolveLocator: async () => ({
-        repository: "https://github.com/acme/api.git",
-        repositoryIdentity: "github.com/acme/api",
-        ref: "refs/heads/main",
-        branch: "main",
-      }),
-      showBinding: async () => null,
-      resolveRemoteRef: async () => ({
-        repositoryIdentity: "github.com/acme/api",
-        credentialFreeHttpsRepository: "https://github.com/acme/api.git",
-        ref: "refs/heads/main",
-        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      }),
+    await withThisFolderGitWorktree(async (gitDir) => {
+      const door = await resolveDefaultRemoteCodeDoor(
+        {
+          env: { APPALOFT_TOKEN: "token" },
+          folderCwd: gitDir,
+          listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
+          resolveLocator: async () => ({
+            repository: "https://github.com/acme/api.git",
+            repositoryIdentity: "github.com/acme/api",
+            ref: "refs/heads/main",
+            branch: "main",
+          }),
+          showBinding: async () => null,
+          resolveRemoteRef: async () => ({
+            repositoryIdentity: "github.com/acme/api",
+            credentialFreeHttpsRepository: "https://github.com/acme/api.git",
+            ref: "refs/heads/main",
+            commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          }),
+        },
+        gitDir,
+      );
+      expect(door.projectId).toBe("project");
+      expect(door.serverId).toBe("srv_1");
+      expect(door.commitSha).toBe("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     });
-    expect(door.projectId).toBe("project");
-    expect(door.serverId).toBe("srv_1");
-    expect(door.commitSha).toBe("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
   });
 
   test("[WS-REMOTE-OPEN-003][WS-REMOTE-BANNER-014] resolves Binding remote SHA and identity banner", async () => {
-    const door = await resolveDefaultRemoteCodeDoor({
-      env: { APPALOFT_TOKEN: "token" },
-      listServers: async () => [
+    await withThisFolderGitWorktree(async (gitDir) => {
+      const door = await resolveDefaultRemoteCodeDoor(
         {
-          id: "srv_1",
-          name: "mac-mini",
-          lifecycleStatus: "active",
-          runtimeAvailability: { status: "available" },
+          env: { APPALOFT_TOKEN: "token" },
+          folderCwd: gitDir,
+          listServers: async () => [
+            {
+              id: "srv_1",
+              name: "mac-mini",
+              lifecycleStatus: "active",
+              runtimeAvailability: { status: "available" },
+            },
+          ],
+          resolveLocator: async () => ({
+            repository: "https://github.com/acme/api.git",
+            repositoryIdentity: "github.com/acme/api",
+            ref: "refs/heads/main",
+            branch: "main",
+          }),
+          showBinding: async () => ({ projectId: "prj_billing", status: "active" }),
+          resolveRemoteRef: async () => ({
+            repositoryIdentity: "github.com/acme/api",
+            credentialFreeHttpsRepository: "https://github.com/acme/api.git",
+            ref: "refs/heads/main",
+            commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          }),
         },
-      ],
-      resolveLocator: async () => ({
-        repository: "https://github.com/acme/api.git",
-        repositoryIdentity: "github.com/acme/api",
-        ref: "refs/heads/main",
-        branch: "main",
-      }),
-      showBinding: async () => ({ projectId: "prj_billing", status: "active" }),
-      resolveRemoteRef: async () => ({
-        repositoryIdentity: "github.com/acme/api",
-        credentialFreeHttpsRepository: "https://github.com/acme/api.git",
-        ref: "refs/heads/main",
-        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      }),
-    });
+        gitDir,
+      );
 
-    expect(door.commitSha).toBe("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-    expect(door.serverId).toBe("srv_1");
-    expect(formatRemoteCodeBanner({ ...door, workspaceId: "sbx_1" })).toBe(
-      "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · sbx_1\nCompare · https://github.com/acme/api/compare/main?expand=1",
-    );
-    expect(selectDefaultRemoteCodeServer([{ id: "srv_1", name: "mac-mini" }])?.name).toBe(
-      "mac-mini",
-    );
+      expect(door.commitSha).toBe("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+      expect(door.serverId).toBe("srv_1");
+      expect(formatRemoteCodeBanner({ ...door, workspaceId: "sbx_1" })).toBe(
+        "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · sbx_1\nCompare · https://github.com/acme/api/compare/main?expand=1",
+      );
+      expect(selectDefaultRemoteCodeServer([{ id: "srv_1", name: "mac-mini" }])?.name).toBe(
+        "mac-mini",
+      );
+    });
   });
 
   test("[WS-REMOTE-BANNER-061] occupancy banner includes generated access URL", () => {
@@ -404,28 +432,34 @@ describe("remote code door", () => {
   });
 
   test("[WS-REMOTE-NO-UPLOAD-006] uses origin tracking SHA when ls-remote cannot prompt", async () => {
-    const door = await resolveDefaultRemoteCodeDoor({
-      env: { APPALOFT_TOKEN: "token" },
-      listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
-      resolveLocator: async () => ({
-        repository: "https://github.com/acme/api.git",
-        repositoryIdentity: "github.com/acme/api",
-        ref: "refs/heads/main",
-        branch: "main",
-      }),
-      showBinding: async () => null,
-      runGit: async ({ args }) => {
-        if (args[0] === "ls-remote") {
-          throw new Error("ls-remote cannot prompt");
-        }
-        if (args[0] === "rev-parse" && args[1] === "refs/remotes/origin/main") {
-          return { stdout: `${"b".repeat(40)}\n`, stderr: "" };
-        }
-        throw new Error(args.join(" "));
-      },
+    await withThisFolderGitWorktree(async (gitDir) => {
+      const door = await resolveDefaultRemoteCodeDoor(
+        {
+          env: { APPALOFT_TOKEN: "token" },
+          folderCwd: gitDir,
+          listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
+          resolveLocator: async () => ({
+            repository: "https://github.com/acme/api.git",
+            repositoryIdentity: "github.com/acme/api",
+            ref: "refs/heads/main",
+            branch: "main",
+          }),
+          showBinding: async () => null,
+          runGit: async ({ args }) => {
+            if (args[0] === "ls-remote") {
+              throw new Error("ls-remote cannot prompt");
+            }
+            if (args[0] === "rev-parse" && args[1] === "refs/remotes/origin/main") {
+              return { stdout: `${"b".repeat(40)}\n`, stderr: "" };
+            }
+            throw new Error(args.join(" "));
+          },
+        },
+        gitDir,
+      );
+      expect(door.commitSha).toBe("b".repeat(40));
+      expect(door.serverId).toBe("srv_1");
     });
-    expect(door.commitSha).toBe("b".repeat(40));
-    expect(door.serverId).toBe("srv_1");
   });
 
   test("[WS-REMOTE-NO-UPLOAD-006][WS-REMOTE-PROGRESS-201] no-git current folder does not resume examples", async () => {
@@ -589,36 +623,42 @@ describe("remote code door", () => {
   });
 
   test("[WS-REMOTE-OPEN-003] --new occupies the cwd origin instead of last occupancy", async () => {
-    const door = await resolveDefaultRemoteCodeDoor({
-      env: { APPALOFT_TOKEN: "token" },
-      forceNew: true,
-      listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
-      listOccupancies: async () => [
+    await withThisFolderGitWorktree(async (gitDir) => {
+      const door = await resolveDefaultRemoteCodeDoor(
         {
-          sandboxId: "sbx_live",
-          status: "ready",
-          occupancy: {
-            repositoryIdentity: "github.com/acme/api",
-            commitSha: "d".repeat(40),
+          env: { APPALOFT_TOKEN: "token" },
+          folderCwd: gitDir,
+          forceNew: true,
+          listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
+          listOccupancies: async () => [
+            {
+              sandboxId: "sbx_live",
+              status: "ready",
+              occupancy: {
+                repositoryIdentity: "github.com/acme/api",
+                commitSha: "d".repeat(40),
+                branch: "main",
+              },
+            },
+          ],
+          resolveLocator: async () => ({
+            repository: "https://github.com/appaloft/appaloft-cloud.git",
+            repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+            ref: "refs/heads/main",
             branch: "main",
-          },
+          }),
+          resolveRemoteRef: async () => ({
+            repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+            credentialFreeHttpsRepository: "https://github.com/appaloft/appaloft-cloud.git",
+            ref: "refs/heads/main",
+            commitSha: "f".repeat(40),
+          }),
         },
-      ],
-      resolveLocator: async () => ({
-        repository: "https://github.com/appaloft/appaloft-cloud.git",
-        repositoryIdentity: "github.com/appaloft/appaloft-cloud",
-        ref: "refs/heads/main",
-        branch: "main",
-      }),
-      resolveRemoteRef: async () => ({
-        repositoryIdentity: "github.com/appaloft/appaloft-cloud",
-        credentialFreeHttpsRepository: "https://github.com/appaloft/appaloft-cloud.git",
-        ref: "refs/heads/main",
-        commitSha: "f".repeat(40),
-      }),
+        gitDir,
+      );
+      expect(door.repositoryIdentity).toBe("github.com/appaloft/appaloft-cloud");
+      expect(door.commitSha).toBe("f".repeat(40));
     });
-    expect(door.repositoryIdentity).toBe("github.com/appaloft/appaloft-cloud");
-    expect(door.commitSha).toBe("f".repeat(40));
   });
 
   test("[R8-OCC-ATTACH-010] native attach requires an interactive terminal", () => {
@@ -961,39 +1001,45 @@ describe("remote code door", () => {
   });
 
   test("[WS-REMOTE-PROGRESS-201] matching occupancy uses the stored SHA and does not wait on ls-remote", async () => {
-    const started = Date.now();
-    let contactedRemote = false;
-    const door = await resolveDefaultRemoteCodeDoor({
-      env: { APPALOFT_TOKEN: "token" },
-      listServers: async () => [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }],
-      listOccupancies: async () => [
+    await withThisFolderGitWorktree(async (gitDir) => {
+      const started = Date.now();
+      let contactedRemote = false;
+      const door = await resolveDefaultRemoteCodeDoor(
         {
-          sandboxId: "sbx_api",
-          status: "ready",
-          occupancy: {
+          env: { APPALOFT_TOKEN: "token" },
+          folderCwd: gitDir,
+          listServers: async () => [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }],
+          listOccupancies: async () => [
+            {
+              sandboxId: "sbx_api",
+              status: "ready",
+              occupancy: {
+                repositoryIdentity: "github.com/acme/api",
+                commitSha: "d".repeat(40),
+                branch: "main",
+              },
+              lastActivityAt: "2026-08-15T12:30:00.000Z",
+            },
+          ],
+          resolveLocator: async () => ({
+            repository: "https://github.com/acme/api.git",
             repositoryIdentity: "github.com/acme/api",
-            commitSha: "d".repeat(40),
+            ref: "refs/heads/main",
             branch: "main",
+          }),
+          resolveRemoteRef: async () => {
+            contactedRemote = true;
+            await Bun.sleep(45_000);
+            throw new Error("matching occupancy must not wait on ls-remote");
           },
-          lastActivityAt: "2026-08-15T12:30:00.000Z",
         },
-      ],
-      resolveLocator: async () => ({
-        repository: "https://github.com/acme/api.git",
-        repositoryIdentity: "github.com/acme/api",
-        ref: "refs/heads/main",
-        branch: "main",
-      }),
-      resolveRemoteRef: async () => {
-        contactedRemote = true;
-        await Bun.sleep(45_000);
-        throw new Error("matching occupancy must not wait on ls-remote");
-      },
+        gitDir,
+      );
+      expect(door.commitSha).toBe("d".repeat(40));
+      expect(door.repositoryIdentity).toBe("github.com/acme/api");
+      expect(Date.now() - started).toBeLessThan(1_000);
+      expect(contactedRemote).toBe(false);
     });
-    expect(door.commitSha).toBe("d".repeat(40));
-    expect(door.repositoryIdentity).toBe("github.com/acme/api");
-    expect(Date.now() - started).toBeLessThan(1_000);
-    expect(contactedRemote).toBe(false);
   });
 
   test("[WS-REMOTE-URL-SHORTHAND-056] existing local owner/repo directory stays a path", async () => {

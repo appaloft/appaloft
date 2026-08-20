@@ -191,15 +191,28 @@ async function listRemoteProjects(
     ? items.flatMap((item) => {
         if (!item || typeof item !== "object") return [];
         const record = asRecord(item);
+        const id = readString(record.id);
+        const name = readString(record.name);
+        const slug = readString(record.slug);
         return [
           {
-            ...(readString(record.id) ? { id: readString(record.id) } : {}),
-            ...(readString(record.name) ? { name: readString(record.name) } : {}),
-            ...(readString(record.slug) ? { slug: readString(record.slug) } : {}),
+            ...(id ? { id } : {}),
+            ...(name ? { name } : {}),
+            ...(slug ? { slug } : {}),
           },
         ];
       })
     : [];
+}
+
+function folderLocalCompiledPin() {
+  return {
+    ...folderLocalPin,
+    capabilities: {
+      ...folderLocalPin.capabilities,
+      persistentPaths: [...folderLocalPin.capabilities.persistentPaths],
+    },
+  };
 }
 
 function createFolderLocalRemoteOpenDependencies(input: {
@@ -257,7 +270,7 @@ function createFolderLocalRemoteOpenDependencies(input: {
             defaultPorts: [],
             suggestedChecks: [],
             credentialRequirements: [],
-            pin: folderLocalPin,
+            pin: folderLocalCompiledPin(),
           },
           reservation: {
             reservationId: "wres_folder_local",
@@ -346,9 +359,10 @@ function preferredFolderEntry(
   const occupancySha = readString(asRecord(match.occupancy).commitSha) ?? commitSha;
   if (!workspaceId) return undefined;
   const status = readString(match.status);
+  const runtimeId = readString(match.runtimeId);
   return {
     workspaceId,
-    ...(readString(match.runtimeId) ? { runtimeId: readString(match.runtimeId) } : {}),
+    ...(runtimeId ? { runtimeId } : {}),
     commitSha: occupancySha,
     profileInstallationId: folderLocalPin.profileInstallationId,
     status: status === "ready" || status === "terminal" ? status : "partial",
@@ -437,14 +451,15 @@ async function createRemoteRuntime(
 }
 
 function runtimeDescriptor(sandboxId: string, runtimeId: string) {
+  const pin = folderLocalCompiledPin();
   return {
     runtimeId,
     sandboxId,
     harnessKey: FOLDER_LOCAL_HARNESS_KEY,
     harnessTemplateId: FOLDER_LOCAL_HARNESS_TEMPLATE_ID,
     status: "ready",
-    profilePin: folderLocalPin,
-    capabilities: folderLocalPin.capabilities,
+    profilePin: pin,
+    capabilities: pin.capabilities,
     createdAt: "2026-08-20T00:00:00.000Z",
   };
 }

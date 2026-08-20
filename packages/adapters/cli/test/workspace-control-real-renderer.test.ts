@@ -46,15 +46,11 @@ realRendererTest(
     });
     try {
       await waitForOutput(() => output, "sbx_real_renderer");
-      await waitForOutput(() => output, "Workspaces");
-      // First paint is the collapsed occupancy wait (^q quit / restore list).
-      // The release chord arrives on the manage chrome after list+detail replace that frame.
-      await waitForOutput(() => output, "Ctrl+]");
+      await waitForOutput(() => output, "Appaloft Cloud Agents");
+      // List/menu quit is ^c. q is unbound; ^] is stop-typing, not quit.
       let exitCode: number | undefined;
       for (let attempt = 0; attempt < 50 && exitCode === undefined; attempt += 1) {
-        terminal.write("\x1d");
-        await Bun.sleep(20);
-        terminal.write("q");
+        terminal.write("\x03");
         const result = await Promise.race([
           child.exited.then((code) => ({ exited: true as const, code })),
           Bun.sleep(100).then(() => ({ exited: false as const })),
