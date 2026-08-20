@@ -134,6 +134,17 @@ fn occupancy_control_footer(status_line: &str, detail: Option<&DetailMessage>) -
     )
 }
 
+fn occupancy_chrome_error_phase(phase: &str) -> bool {
+    matches!(
+        phase,
+        "occupancy-code-bootstrap" | "workspace-control-select" | "workspace-control-start"
+    )
+}
+
+fn occupancy_hides_error_status(code: &str, phase: &str) -> bool {
+    code == "conflict" || occupancy_chrome_error_phase(phase)
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AttachCapability {
@@ -979,7 +990,9 @@ impl AppState {
                     .unwrap_or(0)
                     .min(self.workspaces.len().saturating_sub(1));
                 if !self.workspaces.is_empty() {
-                    self.status_line = format!("{} Workspace(s)", self.workspaces.len());
+                    if self.session_id.is_none() && !self.agent_focused {
+                        self.status_line = format!("{} Workspace(s)", self.workspaces.len());
+                    }
                     if !self.loading.collapsed {
                         self.loading.active = false;
                     }
@@ -1044,10 +1057,14 @@ impl AppState {
                 self.action_busy = false;
                 self.delivery_busy = false;
                 self.recovery_busy = false;
-                self.status_line = format!(
-                    "{code} at {phase}{}",
-                    if retryable { " — retry with r" } else { "" }
-                );
+                if occupancy_hides_error_status(&code, &phase) {
+                    // Chrome/list/detail conflicts stay off the attached footer.
+                } else {
+                    self.status_line = format!(
+                        "{code} at {phase}{}",
+                        if retryable { " — retry with r" } else { "" }
+                    );
+                }
             }
             ParentMessage::Shutdown => {}
         }
@@ -2581,6 +2598,55 @@ mod tests {
         assert!(!state.loading.active);
         assert!(state.focus_mode);
         assert!(!state.should_emit_workspace_select());
+    }
+
+    #[test]
+    fn ws_remote_progress_199_attached_footer_hides_chrome_conflicts() {
+        let mut state = AppState::default();
+        state.apply(ParentMessage::Loading {
+            collapsed: Some(true),
+            title: Some("Appaloft".to_owned()),
+        });
+        state.apply(ParentMessage::TerminalReady {
+            workspace_id: "sbx_1".to_owned(),
+            runtime_id: "sar_1".to_owned(),
+            session_id: "term_1".to_owned(),
+        });
+        let attached = state.status_line.clone();
+        assert!(attached.contains("Agent Session"), "{attached}");
+        state.apply(ParentMessage::Error {
+            code: "conflict".to_owned(),
+            phase: "workspace-control-select".to_owned(),
+            retryable: false,
+        });
+        state.apply(ParentMessage::Error {
+            code: "conflict".to_owned(),
+            phase: "occupancy-code-bootstrap".to_owned(),
+            retryable: false,
+        });
+        state.apply(ParentMessage::Workspaces {
+            workspaces: vec![WorkspaceSummary {
+                workspace_id: "sbx_1".to_owned(),
+                status: "ready".to_owned(),
+                provider_key: None,
+                source_kind: None,
+                occupancy: None,
+            }],
+        });
+        assert_eq!(state.status_line, attached);
+        assert!(!state.should_emit_workspace_select());
+        let footer = occupancy_control_footer(&state.status_line, state.detail.as_ref());
+        assert!(!footer.contains("conflict at"), "{footer}");
+        assert!(!footer.contains("workspace-control-select"), "{footer}");
+        assert!(!footer.contains("occupancy-code-bootstrap"), "{footer}");
+        let backend = ratatui::backend::TestBackend::new(120, 24);
+        let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw attached session");
+        let out = buffer_plain(&terminal);
+        assert!(!out.contains("conflict at"), "{out}");
+        assert!(!out.contains("workspace-control-select"), "{out}");
     }
 
     #[test]

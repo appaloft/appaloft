@@ -2191,9 +2191,7 @@ describe("Workspace control presentation", () => {
       executeQuery: async <T>(query: Query<T>) => {
         if (query instanceof ListSandboxesQuery) return err(conflict);
         if (query instanceof ListSandboxPortsQuery) return err(conflict);
-        if (query instanceof ShowSandboxQuery) {
-          return ok({ sandboxId: "sbx_1", status: "ready" } as T);
-        }
+        if (query instanceof ShowSandboxQuery) return err(conflict);
         return ok({ items: [] } as T);
       },
       terminalSessionGateway: { attach: () => ok(terminal) },

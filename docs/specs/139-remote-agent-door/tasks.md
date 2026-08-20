@@ -429,6 +429,8 @@
 - [x] Unit tests WS-REMOTE-PROGRESS-197
 - [x] Missing TUI sidecar prints binary name + rustup/cargo next step (not one-line unavailable)
 - [x] Unit tests WS-REMOTE-PROGRESS-198
+- [x] Attached occupancy footer hides chrome `conflict at <phase>`
+- [x] Unit tests WS-REMOTE-PROGRESS-199
 
 ## Later
 

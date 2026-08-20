@@ -1046,7 +1046,10 @@ export function createBoundedWorkspaceControlPresentation(
               }
               if (occupied?.workspaceId) selectedWorkspaceId = occupied.workspaceId;
             })
-            .catch((error) => sendErrorBestEffort(error, "occupancy-code-bootstrap"));
+            .catch((error) => {
+              if (activeTerminal) return;
+              void sendErrorBestEffort(error, "occupancy-code-bootstrap");
+            });
         } else {
           await renderer.send({ type: "loading", title: "Appaloft" });
           void listWorkspaces(context).then(
@@ -1059,7 +1062,9 @@ export function createBoundedWorkspaceControlPresentation(
           try {
             if (event.type === "select") {
               selectedWorkspaceId = event.workspaceId;
-              requestSelectedDetail(event.workspaceId, "workspace-control-select");
+              if (!activeTerminal) {
+                requestSelectedDetail(event.workspaceId, "workspace-control-select");
+              }
               continue;
             }
             if (
