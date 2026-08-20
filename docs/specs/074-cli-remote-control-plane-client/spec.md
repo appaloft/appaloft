@@ -5,9 +5,11 @@
 - Round: Code Round with Post-Implementation Sync for the ordinary CLI remote client bridge.
 - Artifact state: local profile/context, explicit target resolution, pre-dispatch shell routing,
   handshake, default public Cloud endpoint selection, neutral browser auth-session exchange, and
-  generic generated SDK non-streaming operation dispatch, and remote terminal WebSocket attach are
-  implemented and synchronized. OS keychain storage, SSH PGlite adoption, source-package quick
-  deploy, other streaming/watch operations, and advanced MCP gateway discovery remain deferred.
+  generic generated SDK non-streaming operation dispatch, remote terminal WebSocket attach, and
+  token-free Codex/Cursor/Claude Code/OpenCode MCP host install and `appaloft setup agent` one-command local
+  Agent door are implemented and synchronized. OS keychain
+  storage, SSH PGlite adoption, source-package quick deploy, other streaming/watch operations, and
+  advanced MCP gateway discovery remain deferred.
 - Roadmap target: Control-plane mode Phase 1/3 bridge. It makes local CLI login/profile, target
   resolution, and ordinary generated SDK remote operation dispatch concrete without completing
   Cloud-assisted Action, self-hosted adoption, or control-plane-owned source-package execution.
@@ -71,6 +73,23 @@ Initial accepted command shapes:
   browser handoff that stores a bearer-backed `mcp` profile by default
 - `appaloft auth mcp codex install [--profile <name>] [--server-name <name>]` for writing a
   token-free Codex stdio MCP bridge entry after MCP login
+- `appaloft auth mcp cursor install [--profile <name>] [--server-name <name>]` for writing a
+  token-free Cursor `~/.cursor/mcp.json` stdio MCP bridge entry that reuses an already-logged-in
+  product-session or bearer profile
+- `appaloft auth mcp claude-code install [--profile <name>] [--server-name <name>]` for writing a
+  token-free Claude Code `~/.claude.json` stdio MCP bridge entry that reuses an already-logged-in
+  product-session or bearer profile
+- `appaloft auth mcp opencode install [--profile <name>] [--server-name <name>]` for writing a
+  token-free OpenCode `~/.config/opencode/opencode.json` local MCP entry that reuses an
+  already-logged-in product-session or bearer profile
+- `appaloft setup agent [-y] [--agent <name>] [--profile <name>]` as the one-command local Agent
+  door. The agent list includes `universal`, `claude-code`, `cursor`, and `opencode`. `-y` accepts
+  detected defaults: universal skills at `~/.agents/skills/appaloft`, Claude Code when `~/.claude`
+  exists, and Cursor when `~/.cursor` exists. OpenCode is listed but not default-checked. Skills are
+  byte-identical copies. MCP reuses `appaloft login` through `appaloft mcp remote-stdio` into
+  `~/.cursor/mcp.json` and `~/.claude.json`. Universal is skills only. Matching already-installed
+  entries are skipped. Codex MCP still requires a bearer `mcp` profile from
+  `appaloft auth mcp login`.
 - `appaloft auth token login [--stdin | --token-file <path>] [--url <url>] [--profile <name>]`
   for noninteractive scoped token handoff without browser/user-code auth
 - `appaloft auth status [--profile <name>]`
@@ -349,10 +368,11 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
 | CLI-RCPC-SPEC-013 | Browser auth session failure writes no profile | The auth session is pending, denied, expired, times out, is interrupted, exchange fails, or current context verification fails | The operator runs login | The CLI returns a structured auth error, attempts cancellation on interruption, and does not create, update, or activate a profile. |
 | CLI-RCPC-SPEC-014 | Self-hosted auth exchange is capability-gated | A self-hosted URL is supplied and no local credential is present | The operator runs `appaloft login --url <self-hosted-url>` | The CLI uses the same neutral auth-session contract against that endpoint, or returns `control_plane_auth_unsupported` when the endpoint does not support it. |
 | CLI-RCPC-SPEC-015 | MCP login requests bearer material | A remote HTTP MCP client needs bearer auth | The operator runs `appaloft auth mcp login` | The CLI creates the same browser auth session with `requestedCredential: "bearer"`, exchanges only after authorization, verifies current context with the bearer, writes a redacted local `mcp` profile by default, and never prints raw credential material. |
-| CLI-RCPC-SPEC-016 | Codex MCP install keeps bearer outside Codex config | A local bearer-backed `mcp` profile exists | The operator runs `appaloft auth mcp codex install` | The CLI writes or updates a Codex MCP stdio entry that launches `appaloft mcp remote-stdio --profile mcp`, does not copy bearer material into Codex config or stdout, and fails if the profile is missing or not bearer-backed. |
-| CLI-RCPC-SPEC-017 | Unknown command fails before runtime initialization | The operator misspells a top-level command or uses the wrong singular/plural form | The operator runs the invalid command with or without an active remote profile | The CLI returns a structured validation error before creating local shell composition, initializing PGlite, syncing SSH state, handshaking, or dispatching a remote operation. |
-| CLI-RCPC-SPEC-018 | Secret stdin survives entrypoint initialization | A remote-capable command explicitly requests stdin and receives it through a pipe or owner-readable regular file | The operator runs a command such as `dependency import --connection-url-stdin` | The shell captures stdin before parser/runtime initialization, dispatches the exact value only in the typed request body, and never emits it through argv, output, diagnostics, or logs. |
 | CLI-RCPC-SPEC-019 | Remote terminal attach uses the selected control plane | A compatible authenticated profile is active and the selected control plane exposes terminal open plus WebSocket attach | The operator runs `appaloft server terminal <serverId> --attach`, `appaloft resource terminal <resourceId> --attach`, or the equivalent Sandbox terminal command | The CLI performs handshake, dispatches `terminal-sessions.open` through the typed API contract, attaches the local TTY to the control-plane WebSocket, forwards input/resize/output/close frames, restores local TTY state, and never initializes local PGlite or exposes target SSH credentials. |
+| CLI-RCPC-SPEC-023 | Cursor MCP install reuses a logged-in profile | A local product-session or bearer CLI profile is active | The operator runs `appaloft auth mcp cursor install` | The CLI merges a token-free `~/.cursor/mcp.json` `mcpServers.appaloft` stdio entry that launches `appaloft mcp remote-stdio --profile <active-or-requested>`, keeps credential material only in the Appaloft profile store, preserves other MCP servers, and does not require `appaloft auth mcp login`. |
+| CLI-RCPC-SPEC-024 | OpenCode MCP install reuses a logged-in profile | A local product-session or bearer CLI profile is active | The operator runs `appaloft auth mcp opencode install` | The CLI merges a token-free `~/.config/opencode/opencode.json` `mcp.appaloft` local entry (`type: "local"`, `command: [...]`, `enabled: true`) that launches `appaloft mcp remote-stdio --profile <active-or-requested>`, keeps credential material only in the Appaloft profile store, and preserves other MCP servers. |
+| CLI-RCPC-SPEC-025 | One-command agent setup writes skill and Local MCP | `~/.cursor` and/or `~/.claude` exist, OpenCode may also be present, and a local product-session or bearer CLI profile is active | The operator runs `appaloft setup agent -y` | The CLI default-checks universal plus detected Cursor and Claude Code, copies byte-identical skills into `~/.agents/skills/appaloft`, `~/.claude/skills/appaloft`, and `~/.cursor/skills/appaloft`, writes token-free `mcp remote-stdio` launchers into `~/.cursor/mcp.json` and `~/.claude.json`, keeps tokens out of editor files, lists `opencode` on the agent list without installing it, and skips matching already-installed skill/MCP entries. Missing profile copies selected skills then returns `control_plane_profile_not_found`. Explicit `--agent opencode` (or `auth mcp opencode install`) is required for the OpenCode skill path and `opencode.json`. Universal-only runs succeed with skills and no MCP. |
+| CLI-RCPC-SPEC-026 | Claude Code MCP install reuses a logged-in profile | A local product-session or bearer CLI profile is active | The operator runs `appaloft auth mcp claude-code install` | The CLI merges a token-free `~/.claude.json` `mcpServers.appaloft` stdio entry that launches `appaloft mcp remote-stdio --profile <active-or-requested>`, keeps credential material only in the Appaloft profile store, preserves other MCP servers, and does not require `appaloft auth mcp login`. |
 
 ## Public Surfaces
 
@@ -371,7 +391,14 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
 - MCP/tools: no new tool semantics; generated tools continue to use operation catalog entries and
   remote API auth. Remote HTTP MCP bootstrap can use `appaloft auth mcp login` to obtain a local
   bearer profile through the same auth-session exchange contract, then `appaloft auth mcp codex
-  install` to configure Codex through a token-free local stdio bridge.
+  install` to configure Codex through a token-free local stdio bridge. Cursor and OpenCode host
+  install (`appaloft auth mcp cursor install`, `appaloft auth mcp claude-code install`, and
+  `appaloft auth mcp opencode install`) reuse an already-logged-in product-session or bearer profile
+  and write token-free `mcp remote-stdio` launchers into `~/.cursor/mcp.json`, `~/.claude.json`, and
+  `~/.config/opencode/opencode.json`. `appaloft setup agent` is the one-command local Agent door over
+  that same family: it default-checks universal/Claude/Cursor, lists OpenCode without installing it
+  unless `--agent opencode`, copies byte-identical skills, writes Cursor and Claude MCP, and never
+  puts tokens in editor config.
 - Public docs/help: covered by the CLI reference anchors
   `#cli-remote-control-plane-login` and `#cli-remote-control-plane-dispatch`.
 
@@ -425,3 +452,6 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
   through local `CommandBus` and `QueryBus` using the shell composition.
 - OS keychain storage, source-package quick deploy, other remote streaming/watch behavior, MCP
   exposure, and SSH PGlite adoption remain deferred governed work.
+- `appaloft setup agent` currently applies the same detected defaults with or without `-y`; it does
+  not ship an interactive host checkbox UI. OpenCode remains listed and explicit-only. Cloud
+  marketing-site copy is out of scope for this public CLI change.

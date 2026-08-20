@@ -24,6 +24,17 @@ npx appaloft-mcp serve --host 127.0.0.1 --port 3939
 
 Starting the server itself **doesn't** deploy an app, create a resource, or modify any state — only when an MCP client actually calls a tool does it enter Appaloft's command/query bus. Only change `--host` away from `127.0.0.1` when a trusted reverse proxy or private network already provides a security boundary.
 
+## Host install <a id="appaloft-mcp-host-install" />
+
+One command leaves default-checked hosts with both the Appaloft skill and Local MCP. Tokens stay in the Appaloft CLI profile, not in editor config:
+
+```bash
+appaloft login
+appaloft setup agent
+```
+
+`appaloft setup agent` default-checks universal, Claude Code when `~/.claude` exists, and Cursor when `~/.cursor` exists. It copies byte-identical skills and writes token-free `mcp remote-stdio` launchers into `~/.claude.json` and `~/.cursor/mcp.json`. Universal is skills only. OpenCode is listed but not default-checked; pass `--agent opencode`. Explicit siblings remain: `appaloft auth mcp cursor install`, `appaloft auth mcp claude-code install`, and `appaloft auth mcp opencode install`. `npx skills add` still only copies the skill. Codex still needs the dedicated bearer profile: `appaloft auth mcp login` then `appaloft auth mcp codex install`. A directory without git can be deployed with `appaloft deploy .`.
+
 ## Input fields and validation: the tool model
 
 Every tool corresponds to a business operation key, with `.` replaced by `_` in the naming:

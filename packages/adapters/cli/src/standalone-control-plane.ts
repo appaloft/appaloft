@@ -1,10 +1,9 @@
-import { existsSync } from "node:fs";
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { type DomainError, err, ok, type Result } from "@appaloft/core";
 import { type AppaloftSdkFetch } from "@appaloft/sdk";
+import { AGENT_SETUP_AGENT_LIST, runAgentHostSetup } from "./agent-host-setup.js";
 import {
   type CliControlPlaneEnvironment,
   type CliControlPlaneMode,
@@ -20,6 +19,15 @@ import {
   tokenLoginControlPlane,
   useControlPlaneProfile,
 } from "./control-plane-service.js";
+import {
+  installClaudeCodeMcpHost,
+  installCodexMcpHost,
+  installCursorMcpHost,
+  installOpenCodeMcpHost,
+  resolveCodexHome,
+  resolveCursorHome,
+  resolveOpenCodeHome,
+} from "./mcp-host-install.js";
 
 export interface StandaloneControlPlaneCliInput {
   readonly argv?: readonly string[];
@@ -117,6 +125,38 @@ function parseOptions(
     values,
     positional,
   });
+}
+
+function consumeRepeatedFlag(
+  args: readonly string[],
+  flag: string,
+): Result<{ readonly values: readonly string[]; readonly rest: readonly string[] }> {
+  const values: string[] = [];
+  const rest: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg !== flag) {
+      if (arg !== undefined) {
+        rest.push(arg);
+      }
+      continue;
+    }
+    const value = args[index + 1];
+    if (!value || value.startsWith("-")) {
+      return err({
+        code: "validation_error",
+        category: "user",
+        message: `Option ${flag} requires a value`,
+        retryable: false,
+        details: {
+          phase: "control-plane-cli-parse",
+        },
+      });
+    }
+    values.push(value);
+    index += 1;
+  }
+  return ok({ values, rest });
 }
 
 function parseError(message: string): Result<never> {
@@ -271,8 +311,12 @@ Usage:
   appaloft context show
   appaloft workspace open [path|git-remote] [--profile <name-or-id>] [--new] [--no-attach] [--server <id>]
   appaloft workspace create --profile <name-or-id> --repo <https-url> --ref <git-ref> --branch <branch> [--attach]
+  appaloft setup agent [-y] [--agent <name>] [--profile <name>] [--cursor-home <path>] [--command <command>]
   appaloft auth mcp login [--url <url>] [--mode cloud|self-hosted] [--profile <name>] [--no-browser]
+  appaloft auth mcp claude-code install [--profile <name>] [--server-name <name>] [--command <command>]
   appaloft auth mcp codex install [--profile <name>] [--server-name <name>] [--codex-home <path>] [--command <command>]
+  appaloft auth mcp cursor install [--profile <name>] [--server-name <name>] [--cursor-home <path>] [--command <command>]
+  appaloft auth mcp opencode install [--profile <name>] [--server-name <name>] [--opencode-home <path>] [--command <command>]
   appaloft auth token login [--stdin | --token-file <path>] [--url <url>] [--profile <name>]
 
 Options:
@@ -430,53 +474,74 @@ async function handleMcpLogin(
   }
 }
 
-function tomlString(value: string): string {
-  return JSON.stringify(value);
+function renderMcpClaudeCodeInstallHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
+  stdout.write(`Appaloft Claude Code MCP install
+
+Usage:
+  appaloft auth mcp claude-code install [--profile <name>] [--server-name <name>] [--command <command>]
+
+Options:
+  --profile <name>      CLI profile to launch with remote-stdio (defaults to the active profile)
+  --server-name <name>  Claude Code MCP server name (defaults to appaloft)
+  --command <command>   Launcher command (defaults to appaloft)
+  --help, -h            Show this help
+`);
 }
 
-function tomlStringArray(values: readonly string[]): string {
-  return `[${values.map((value) => tomlString(value)).join(", ")}]`;
+function renderMcpCursorInstallHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
+  stdout.write(`Appaloft Cursor MCP install
+
+Usage:
+  appaloft auth mcp cursor install [--profile <name>] [--server-name <name>] [--cursor-home <path>] [--command <command>]
+
+Options:
+  --profile <name>      CLI profile to launch with remote-stdio (defaults to the active profile)
+  --server-name <name>  Cursor MCP server name (defaults to appaloft)
+  --cursor-home <path>  Cursor home directory (defaults to ~/.cursor)
+  --command <command>   Launcher command (defaults to appaloft)
+  --help, -h            Show this help
+`);
 }
 
-function escapeTomlTableSegment(value: string): string {
-  return /^[A-Za-z0-9_-]+$/.test(value) ? value : tomlString(value);
+function renderMcpOpenCodeInstallHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
+  stdout.write(`Appaloft OpenCode MCP install
+
+Usage:
+  appaloft auth mcp opencode install [--profile <name>] [--server-name <name>] [--opencode-home <path>] [--command <command>]
+
+Options:
+  --profile <name>        CLI profile to launch with remote-stdio (defaults to the active profile)
+  --server-name <name>    OpenCode MCP server name (defaults to appaloft)
+  --opencode-home <path>  OpenCode config directory (defaults to ~/.config/opencode)
+  --command <command>     Launcher command (defaults to appaloft)
+  --help, -h              Show this help
+`);
 }
 
-function upsertCodexMcpServerConfig(input: {
-  readonly existing: string;
-  readonly serverName: string;
-  readonly command: string;
-  readonly args: readonly string[];
-}): string {
-  const tablePrefix = `[mcp_servers.${escapeTomlTableSegment(input.serverName)}`;
-  const lines = input.existing.split(/\r?\n/);
-  const kept: string[] = [];
-  let skipping = false;
+function renderSetupAgentHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
+  stdout.write(`Appaloft agent setup
 
-  for (const line of lines) {
-    if (/^\s*\[/.test(line)) {
-      skipping = line.startsWith(tablePrefix);
-    }
-    if (!skipping) {
-      kept.push(line);
-    }
-  }
+Usage:
+  appaloft setup agent [-y] [--agent <name>] [--profile <name>] [--cursor-home <path>] [--opencode-home <path>] [--agents-home <path>] [--claude-home <path>] [--command <command>] [--skill-dir <path>]
 
-  while (kept.length > 0 && kept.at(-1)?.trim() === "") {
-    kept.pop();
-  }
+Default-checks universal (~/.agents), Claude Code when ~/.claude exists, and Cursor when ~/.cursor exists. OpenCode is on the agent list (${AGENT_SETUP_AGENT_LIST.join(", ")}) but is not default-checked; pass --agent opencode or use the sibling install commands. Skills are byte-identical copies. MCP reuses appaloft login through remote-stdio: Cursor ~/.cursor/mcp.json and Claude ~/.claude.json. Universal is skills only. Tokens stay in the Appaloft CLI profile store, not in editor config. -y accepts those defaults and skips already-installed skill/MCP entries.
 
-  kept.push(
-    "",
-    `[mcp_servers.${escapeTomlTableSegment(input.serverName)}]`,
-    `command = ${tomlString(input.command)}`,
-    `args = ${tomlStringArray(input.args)}`,
-    "startup_timeout_sec = 30",
-    "tool_timeout_sec = 120",
-    "",
-  );
+Options:
+  -y, --yes               Skip prompts and accept detected defaults
+  --agent <name>          Target a specific agent instead of defaults (repeatable): ${AGENT_SETUP_AGENT_LIST.join(", ")}
+  --profile <name>        CLI profile to launch with remote-stdio (defaults to the active profile)
+  --cursor-home <path>    Cursor home directory (defaults to ~/.cursor)
+  --opencode-home <path>  OpenCode config directory (defaults to ~/.config/opencode)
+  --agents-home <path>    Shared skills directory (defaults to ~/.agents)
+  --claude-home <path>    Claude Code home directory (defaults to ~/.claude)
+  --command <command>     Launcher command (defaults to appaloft)
+  --skill-dir <path>      Skill source directory (defaults to packaged skills/appaloft)
+  --help, -h              Show this help
+`);
+}
 
-  return `${kept.join("\n")}`;
+function controlPlaneEnv(input: StandaloneControlPlaneCliInput): CliControlPlaneEnvironment {
+  return input.env ?? process.env;
 }
 
 async function handleMcpCodexInstall(
@@ -487,100 +552,154 @@ async function handleMcpCodexInstall(
   if (parsed.isErr()) {
     return finish(parsed, input);
   }
-
-  const profileName = parsed.value.values.profile ?? "mcp";
-  const serverName = parsed.value.values["server-name"] ?? "appaloft";
-  const command = parsed.value.values.command ?? "appaloft";
-  const codexHome =
-    parsed.value.values["codex-home"] ??
-    input.env?.CODEX_HOME?.trim() ??
-    process.env.CODEX_HOME?.trim() ??
-    join(homedir(), ".codex");
-  const configPath = join(codexHome, "config.toml");
-  const store = input.store ?? defaultCliControlPlaneProfileStore(input.env);
-  const storeData = await store.read();
-  if (storeData.isErr()) {
-    return finish(storeData, input);
-  }
-
-  const profile = storeData.value.profiles[profileName];
-  if (!profile) {
-    return finish(
-      err({
-        code: "control_plane_profile_not_found",
-        category: "user",
-        message: "Appaloft MCP profile was not found; run appaloft auth mcp login first",
-        retryable: false,
-        details: {
-          phase: "codex-mcp-install",
-          profile: profileName,
-        },
-      } satisfies DomainError),
-      input,
-    );
-  }
-  if (profile.auth.kind !== "bearer") {
-    return finish(
-      err({
-        code: "validation_error",
-        category: "user",
-        message: "Codex MCP install requires a bearer MCP profile; run appaloft auth mcp login",
-        retryable: false,
-        details: {
-          phase: "codex-mcp-install",
-          profile: profileName,
-        },
-      } satisfies DomainError),
-      input,
-    );
-  }
-
-  try {
-    const existing = existsSync(configPath) ? await readFile(configPath, "utf8") : "";
-    const next = upsertCodexMcpServerConfig({
-      existing,
-      serverName,
-      command,
-      args: ["mcp", "remote-stdio", "--profile", profileName],
-    });
-    await mkdir(dirname(configPath), { recursive: true, mode: 0o700 });
-    await writeFile(configPath, next, { mode: 0o600 });
-    await chmod(configPath, 0o600).catch(() => undefined);
-
-    return finish(
-      ok({
-        schemaVersion: "appaloft.codex.mcp-install/v1",
-        serverName,
-        configPath,
-        command,
-        args: ["mcp", "remote-stdio", "--profile", profileName],
-        profile: {
-          name: profile.name,
-          baseUrl: profile.baseUrl,
-          auth: {
-            kind: profile.auth.kind,
-            redacted: "***",
-          },
-        },
+  const env = controlPlaneEnv(input);
+  return finish(
+    installCodexMcpHost({
+      store: input.store ?? defaultCliControlPlaneProfileStore(input.env),
+      requestedProfile: parsed.value.values.profile,
+      serverName: parsed.value.values["server-name"],
+      command: parsed.value.values.command,
+      codexHome: resolveCodexHome({
+        explicit: parsed.value.values["codex-home"],
+        env,
+        home: homedir(),
       }),
-      input,
-    );
-  } catch (error) {
-    return finish(
-      err({
-        code: "codex_mcp_config_write_failed",
-        category: "infra",
-        message: "Codex MCP config could not be written",
-        retryable: true,
-        details: {
-          phase: "codex-mcp-install",
-          configPath,
-          message: error instanceof Error ? error.message : String(error),
-        },
-      } satisfies DomainError),
-      input,
-    );
+    }),
+    input,
+  );
+}
+
+async function handleMcpClaudeCodeInstall(
+  args: readonly string[],
+  input: StandaloneControlPlaneCliInput,
+): Promise<StandaloneControlPlaneCliResult> {
+  if (isHelpArgs(args)) {
+    renderMcpClaudeCodeInstallHelp(input.stdout ?? process.stdout);
+    return { handled: true, exitCode: 0 };
   }
+  const parsed = parseOptions(args, ["profile", "server-name", "command"]);
+  if (parsed.isErr()) {
+    return finish(parsed, input);
+  }
+  const env = controlPlaneEnv(input);
+  return finish(
+    installClaudeCodeMcpHost({
+      store: input.store ?? defaultCliControlPlaneProfileStore(input.env),
+      requestedProfile: parsed.value.values.profile,
+      serverName: parsed.value.values["server-name"],
+      command: parsed.value.values.command,
+      home: env.HOME?.trim() || homedir(),
+    }),
+    input,
+  );
+}
+
+async function handleMcpCursorInstall(
+  args: readonly string[],
+  input: StandaloneControlPlaneCliInput,
+): Promise<StandaloneControlPlaneCliResult> {
+  if (isHelpArgs(args)) {
+    renderMcpCursorInstallHelp(input.stdout ?? process.stdout);
+    return { handled: true, exitCode: 0 };
+  }
+  const parsed = parseOptions(args, ["profile", "server-name", "cursor-home", "command"]);
+  if (parsed.isErr()) {
+    return finish(parsed, input);
+  }
+  const env = controlPlaneEnv(input);
+  return finish(
+    installCursorMcpHost({
+      store: input.store ?? defaultCliControlPlaneProfileStore(input.env),
+      requestedProfile: parsed.value.values.profile,
+      serverName: parsed.value.values["server-name"],
+      command: parsed.value.values.command,
+      cursorHome: resolveCursorHome({
+        explicit: parsed.value.values["cursor-home"],
+        env,
+        home: homedir(),
+      }),
+    }),
+    input,
+  );
+}
+
+async function handleMcpOpenCodeInstall(
+  args: readonly string[],
+  input: StandaloneControlPlaneCliInput,
+): Promise<StandaloneControlPlaneCliResult> {
+  if (isHelpArgs(args)) {
+    renderMcpOpenCodeInstallHelp(input.stdout ?? process.stdout);
+    return { handled: true, exitCode: 0 };
+  }
+  const parsed = parseOptions(args, ["profile", "server-name", "opencode-home", "command"]);
+  if (parsed.isErr()) {
+    return finish(parsed, input);
+  }
+  const env = controlPlaneEnv(input);
+  return finish(
+    installOpenCodeMcpHost({
+      store: input.store ?? defaultCliControlPlaneProfileStore(input.env),
+      requestedProfile: parsed.value.values.profile,
+      serverName: parsed.value.values["server-name"],
+      command: parsed.value.values.command,
+      opencodeHome: resolveOpenCodeHome({
+        explicit: parsed.value.values["opencode-home"],
+        env,
+        home: homedir(),
+      }),
+    }),
+    input,
+  );
+}
+
+async function handleSetupAgent(
+  args: readonly string[],
+  input: StandaloneControlPlaneCliInput,
+): Promise<StandaloneControlPlaneCliResult> {
+  if (isHelpArgs(args)) {
+    renderSetupAgentHelp(input.stdout ?? process.stdout);
+    return { handled: true, exitCode: 0 };
+  }
+  const normalized = args.map((arg) => (arg === "-y" ? "--yes" : arg));
+  const agents = consumeRepeatedFlag(normalized, "--agent");
+  if (agents.isErr()) {
+    return finish(agents, input);
+  }
+  const parsed = parseOptions(
+    agents.value.rest,
+    [
+      "profile",
+      "server-name",
+      "cursor-home",
+      "opencode-home",
+      "agents-home",
+      "claude-home",
+      "command",
+      "skill-dir",
+    ],
+    ["yes"],
+  );
+  if (parsed.isErr()) {
+    return finish(parsed, input);
+  }
+  const env = controlPlaneEnv(input);
+  return finish(
+    runAgentHostSetup({
+      store: input.store ?? defaultCliControlPlaneProfileStore(input.env),
+      env,
+      home: env.HOME?.trim() || homedir(),
+      requestedProfile: parsed.value.values.profile,
+      serverName: parsed.value.values["server-name"],
+      command: parsed.value.values.command,
+      skillDir: parsed.value.values["skill-dir"],
+      agents: agents.value.values,
+      cursorHome: parsed.value.values["cursor-home"],
+      opencodeHome: parsed.value.values["opencode-home"],
+      agentsHome: parsed.value.values["agents-home"],
+      claudeHome: parsed.value.values["claude-home"],
+    }),
+    input,
+  );
 }
 
 function handleStatus(
@@ -725,8 +844,17 @@ export async function runStandaloneControlPlaneCli(
     if (subcommand === "mcp" && args[2] === "login") {
       return handleMcpLogin(args.slice(3), input);
     }
+    if (subcommand === "mcp" && args[2] === "claude-code" && args[3] === "install") {
+      return handleMcpClaudeCodeInstall(args.slice(4), input);
+    }
     if (subcommand === "mcp" && args[2] === "codex" && args[3] === "install") {
       return handleMcpCodexInstall(args.slice(4), input);
+    }
+    if (subcommand === "mcp" && args[2] === "cursor" && args[3] === "install") {
+      return handleMcpCursorInstall(args.slice(4), input);
+    }
+    if (subcommand === "mcp" && args[2] === "opencode" && args[3] === "install") {
+      return handleMcpOpenCodeInstall(args.slice(4), input);
     }
     if (subcommand === "status") {
       return handleStatus(args.slice(2), input);
@@ -735,6 +863,22 @@ export async function runStandaloneControlPlaneCli(
       return handleLogout(args.slice(2), input);
     }
     return { handled: false };
+  }
+  if (command === "setup") {
+    const subcommand = args[1];
+    if (
+      !subcommand ||
+      subcommand === "--help" ||
+      subcommand === "-h" ||
+      (subcommand === "agent" && isHelpArgs(args.slice(2)))
+    ) {
+      renderSetupAgentHelp(stdout);
+      return { handled: true, exitCode: 0 };
+    }
+    if (subcommand !== "agent") {
+      return finish(parseError("setup requires agent"), input);
+    }
+    return handleSetupAgent(args.slice(2), input);
   }
   if (command === "context") {
     return handleContext(args.slice(1), input);

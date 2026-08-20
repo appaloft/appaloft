@@ -13,15 +13,34 @@ The Appaloft Skill is the complete product entrypoint for AI agents — like the
 
 ## Installation
 
+One command leaves default-checked hosts with both the skill and Local MCP:
+
+```bash
+appaloft login
+appaloft setup agent
+```
+
+`appaloft setup agent` lists `universal`, `claude-code`, `cursor`, and `opencode`. Defaults copy the skill byte-identically into `~/.agents/skills/appaloft`, `~/.claude/skills/appaloft` when `~/.claude` exists, and `~/.cursor/skills/appaloft` when `~/.cursor` exists, then write token-free MCP into `~/.claude.json` and `~/.cursor/mcp.json`. Universal is skills only. OpenCode is listed but not default-checked; pass `--agent opencode` or use the sibling install commands. Tokens stay out of editor config.
+
+The skill-manager path still only copies skill files:
+
 ```bash
 # Codex
 npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
 
 # Claude Code
 npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
+
+# Cursor
+npx skills add appaloft/appaloft --skill appaloft --global --agent cursor --copy --yes
+
+# OpenCode
+npx skills add appaloft/appaloft --skill appaloft --global --agent opencode --copy --yes
 ```
 
-The install command **only copies Skill files** — it doesn't deploy an app, create a resource, or call any API. After installing, run `npx skills list --global --agent codex` (or `claude-code`) to confirm Appaloft appears in the list and that the corresponding `SKILL.md` exists, then start a new agent session so the host reloads the Skill directory.
+`npx skills add` **only copies Skill files** — it doesn't install the Appaloft CLI, write MCP host config, deploy an app, create a resource, or call any API. Current `npx skills` copies Codex, Claude Code, Cursor, and OpenCode into `~/.agents/skills/appaloft`; Cursor also reads that directory. It does **not** create `~/.cursor/skills` or `~/.config/opencode/skills`. After installing, run `npx skills list --global --agent <agent>` to confirm Appaloft appears in the list and that the corresponding `SKILL.md` exists, then start a new agent session so the host reloads the Skill directory.
+
+Explicit MCP siblings remain: `appaloft auth mcp cursor install`, `appaloft auth mcp claude-code install`, and `appaloft auth mcp opencode install`. OpenCode skill/MCP needs `--agent opencode` or those siblings. Codex still uses the dedicated bearer MCP profile: `appaloft auth mcp login` then `appaloft auth mcp codex install`. A directory without git can be deployed with `appaloft deploy .`.
 
 ## Capability scope
 

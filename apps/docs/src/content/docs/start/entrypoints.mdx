@@ -67,7 +67,7 @@ Self-hosted Server Action 使用 HTTP API 表面：显式的 `control-plane-url`
 
 ### MCP 工具（面向 AI Agent）
 
-当 Agent 宿主配置了 Appaloft MCP 时，使用 `appaloft mcp stdio`、`appaloft mcp serve` 或 `npx appaloft-mcp` 暴露同一套 operation catalog：
+当 Agent 宿主配置了 Appaloft MCP 时，使用 `appaloft mcp stdio`、`appaloft mcp serve` 或 `npx appaloft-mcp` 暴露同一套 operation catalog。`npx skills add` 只复制 Skill，不写 MCP。登录后 `appaloft setup agent` 会给默认勾选的 Cursor / Claude Code 写入 Skill 和 MCP。OpenCode 需要 `--agent opencode` 或 sibling 安装：
 
 ```bash
 # 以 stdio 方式启动（大多数 Agent host 的默认接入方式）
@@ -75,6 +75,10 @@ appaloft mcp stdio
 
 # 以独立进程方式启动，供多个客户端连接
 appaloft mcp serve
+
+# 一条命令写入本地 Agent 门；OpenCode 需显式安装
+appaloft setup agent
+appaloft auth mcp opencode install
 ```
 
 MCP 工具复用与 CLI/API 相同的操作、输入解释和恢复说明，详见 [MCP 与工具协议](/docs/agents/mcp/)。

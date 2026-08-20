@@ -18,7 +18,21 @@ semantics aligned with `docs/CORE_OPERATIONS.md` and `packages/application/src/o
 
 ## Install
 
-Install the full AI-facing Appaloft entrypoint:
+The one-command local Agent door copies the skill and writes Local MCP into default-checked hosts:
+
+```bash
+appaloft login
+appaloft setup agent
+```
+
+`appaloft setup agent` lists `universal`, `claude-code`, `cursor`, and `opencode`. Defaults copy
+byte-identical skills into `~/.agents/skills/appaloft`, `~/.claude/skills/appaloft` when `~/.claude`
+exists, and `~/.cursor/skills/appaloft` when `~/.cursor` exists, then write token-free
+`mcp remote-stdio` launchers into `~/.claude.json` and `~/.cursor/mcp.json`. Universal is skills
+only. OpenCode is listed but not default-checked; pass `--agent opencode` or use the sibling
+install commands. Tokens stay out of editor config.
+
+The skill-manager path still only copies skill files:
 
 ```bash
 # Codex
@@ -26,18 +40,40 @@ npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy 
 
 # Claude Code
 npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
+
+# Cursor
+npx skills add appaloft/appaloft --skill appaloft --global --agent cursor --copy --yes
+
+# OpenCode
+npx skills add appaloft/appaloft --skill appaloft --global --agent opencode --copy --yes
 ```
 
-This only copies skill files into the target skill host. It does not deploy, create resources, call
-Appaloft APIs, or wrap the Appaloft CLI.
+This only copies skill files into the target skill host. It does not install the Appaloft CLI, write
+MCP host config, deploy, create resources, call Appaloft APIs, or wrap the Appaloft CLI.
 Appaloft does not provide a separate npm skill installer; `npx skills add appaloft/appaloft` is the
-single skill-manager entrypoint.
+skill-manager entrypoint.
 
-Verify installation with `npx skills list --global --agent codex` or
-`npx skills list --global --agent claude-code`, then start a new agent session so its skill catalog
-is rebuilt. A successful copy alone is not availability evidence unless the list includes
-`appaloft` and the host discovery directory contains `appaloft/SKILL.md` (`~/.agents/skills` for
-Codex and `~/.claude/skills` for Claude Code).
+Current `npx skills` copies Codex, Claude Code, Cursor, and OpenCode installs into
+`~/.agents/skills/appaloft`. Cursor also reads that directory. It does not create
+`~/.cursor/skills` or `~/.config/opencode/skills`. Verify installation with
+`npx skills list --global --agent <agent>`, then start a new agent session so its skill catalog is
+rebuilt. A successful copy alone is not availability evidence unless the list includes `appaloft`
+and the host discovery directory contains `appaloft/SKILL.md`.
+
+Explicit MCP siblings remain available:
+
+```bash
+appaloft auth mcp cursor install
+appaloft auth mcp claude-code install
+appaloft auth mcp opencode install
+```
+
+Codex still uses the dedicated bearer MCP profile:
+
+```bash
+appaloft auth mcp login
+appaloft auth mcp codex install
+```
 
 ## Entry Surface
 

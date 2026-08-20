@@ -106,4 +106,83 @@ describe("standalone control plane help", () => {
     expect(loginChunks.join("")).toContain("appaloft auth login");
     expect(statusChunks.join("")).toContain("appaloft auth status [--profile <name>]");
   });
+
+  test("[CONTROL-PLANE-CLI-023][CONTROL-PLANE-CLI-024] auth mcp cursor/opencode install --help prints usage", async () => {
+    const cursorChunks: string[] = [];
+    const openCodeChunks: string[] = [];
+    const claudeChunks: string[] = [];
+    const rootChunks: string[] = [];
+
+    const cursor = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "auth", "mcp", "cursor", "install", "--help"],
+      stdout: {
+        write: (chunk) => {
+          cursorChunks.push(String(chunk));
+          return true;
+        },
+      },
+    });
+    const openCode = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "auth", "mcp", "opencode", "install", "--help"],
+      stdout: {
+        write: (chunk) => {
+          openCodeChunks.push(String(chunk));
+          return true;
+        },
+      },
+    });
+    const claude = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "auth", "mcp", "claude-code", "install", "--help"],
+      stdout: {
+        write: (chunk) => {
+          claudeChunks.push(String(chunk));
+          return true;
+        },
+      },
+    });
+    const root = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "--help"],
+      stdout: {
+        write: (chunk) => {
+          rootChunks.push(String(chunk));
+          return true;
+        },
+      },
+    });
+
+    expect(cursor).toEqual({ handled: true, exitCode: 0 });
+    expect(openCode).toEqual({ handled: true, exitCode: 0 });
+    expect(claude).toEqual({ handled: true, exitCode: 0 });
+    expect(root).toEqual({ handled: true, exitCode: 0 });
+    expect(cursorChunks.join("")).toContain("appaloft auth mcp cursor install");
+    expect(openCodeChunks.join("")).toContain("appaloft auth mcp opencode install");
+    expect(claudeChunks.join("")).toContain("appaloft auth mcp claude-code install");
+    expect(rootChunks.join("")).toContain("appaloft auth mcp cursor install");
+    expect(rootChunks.join("")).toContain("appaloft auth mcp opencode install");
+    expect(rootChunks.join("")).toContain("appaloft auth mcp claude-code install");
+    expect(rootChunks.join("")).toContain("appaloft auth mcp codex install");
+    expect(rootChunks.join("")).toContain("appaloft setup agent");
+  });
+
+  test("[CONTROL-PLANE-CLI-025] setup agent --help prints usage", async () => {
+    const chunks: string[] = [];
+    const result = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "setup", "agent", "--help"],
+      stdout: {
+        write: (chunk) => {
+          chunks.push(String(chunk));
+          return true;
+        },
+      },
+    });
+
+    const printed = chunks.join("");
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(printed).toContain("appaloft setup agent");
+    expect(printed).toContain("--agent");
+    expect(printed).toContain("opencode");
+    expect(printed).toContain("not default-checked");
+    expect(printed).toContain("~/.claude.json");
+    expect(printed).toContain("~/.cursor/mcp.json");
+  });
 });

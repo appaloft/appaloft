@@ -27,15 +27,34 @@ Appaloft Skill 是面向 AI Agent 的完整产品入口，与 CLI、HTTP API、W
 
 ## 安装
 
+一条命令会给默认勾选的宿主同时写入 Skill 和 Local MCP：
+
+```bash
+appaloft login
+appaloft setup agent
+```
+
+`appaloft setup agent` 的 agent 列表包含 `universal`、`claude-code`、`cursor`、`opencode`。默认把相同的 Skill 复制到 `~/.agents/skills/appaloft`、存在 `~/.claude` 时的 `~/.claude/skills/appaloft`、存在 `~/.cursor` 时的 `~/.cursor/skills/appaloft`，再写入 token-free MCP 到 `~/.claude.json` 和 `~/.cursor/mcp.json`。Universal 只写 Skill。OpenCode 在列表里但默认不勾选，需要 `--agent opencode` 或 sibling 安装命令。Token 不会进入编辑器配置。
+
+Skill manager 路径仍然只复制 Skill 文件：
+
 ```bash
 # Codex
 npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
 
 # Claude Code
 npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
+
+# Cursor
+npx skills add appaloft/appaloft --skill appaloft --global --agent cursor --copy --yes
+
+# OpenCode
+npx skills add appaloft/appaloft --skill appaloft --global --agent opencode --copy --yes
 ```
 
-安装命令**只复制 Skill 文件**——不会部署应用、创建资源或调用 API。安装后运行 `npx skills list --global --agent codex`（或 `claude-code`）确认列表中包含 Appaloft，并确认对应的 `SKILL.md` 已经存在，然后新开一个 Agent 会话让宿主重新加载 Skill 目录。
+`npx skills add` **只复制 Skill 文件**——不会安装 Appaloft CLI、不会写入 MCP 配置、不会部署应用、创建资源或调用 API。当前 `npx skills` 会把 Codex / Claude Code / Cursor / OpenCode 都复制到 `~/.agents/skills/appaloft`；Cursor 也会读取该目录。它**不会**创建 `~/.cursor/skills` 或 `~/.config/opencode/skills`。安装后运行 `npx skills list --global --agent <agent>` 确认列表中包含 Appaloft，并确认对应的 `SKILL.md` 已经存在，然后新开一个 Agent 会话让宿主重新加载 Skill 目录。
+
+显式 MCP sibling 仍然可用：`appaloft auth mcp cursor install`、`appaloft auth mcp claude-code install` 和 `appaloft auth mcp opencode install`。OpenCode Skill/MCP 需要 `--agent opencode` 或这些 sibling。Codex 仍使用专用 bearer MCP profile：`appaloft auth mcp login` 然后 `appaloft auth mcp codex install`。无 git 的目录可以直接 `appaloft deploy .`。
 
 ## 能力范围
 

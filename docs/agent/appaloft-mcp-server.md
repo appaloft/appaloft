@@ -61,9 +61,27 @@ material, verifies current organization context, and writes a redacted local `mc
 default. It does not print raw bearer material. Noninteractive automation can still use
 `APPALOFT_TOKEN` or `appaloft auth token login --stdin` through a trusted local secret channel.
 
-For Codex, install the remote MCP bridge after the `mcp` profile exists:
+The one-command local Agent door copies the skill into default-checked hosts and writes token-free
+MCP that reuses `appaloft login`. Do not copy bearer or session material into editor config:
 
 ```bash
+appaloft login
+appaloft setup agent
+```
+
+Defaults write Cursor `~/.cursor/mcp.json` and Claude `~/.claude.json`. Universal `~/.agents` is
+skills only. OpenCode stays listed and needs `--agent opencode` or `appaloft auth mcp opencode
+install`. Explicit siblings remain `appaloft auth mcp cursor install`,
+`appaloft auth mcp claude-code install`, and `appaloft auth mcp opencode install`.
+
+Cursor and Claude Code merge `mcpServers.appaloft` as `{ command, args }`. OpenCode merges
+`~/.config/opencode/opencode.json` `mcp.appaloft` as a local command (`type: "local"`,
+`enabled: true`). All of those launch `appaloft mcp remote-stdio --profile <active-or-requested>`.
+
+For Codex, install the remote MCP bridge after the dedicated bearer `mcp` profile exists:
+
+```bash
+appaloft auth mcp login
 appaloft auth mcp codex install
 ```
 
@@ -74,7 +92,8 @@ appaloft mcp remote-stdio --profile mcp
 ```
 
 The local stdio bridge reads the Appaloft MCP profile at startup and forwards JSON-RPC to the
-remote `/mcp` endpoint with bearer auth. Codex config stores the launcher command, not the bearer.
+remote `/mcp` endpoint with bearer auth. Host editor files store the launcher command, not the
+bearer.
 
 ## Tool Contract
 

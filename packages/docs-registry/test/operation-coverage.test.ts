@@ -350,6 +350,7 @@ describe("public docs operation coverage", () => {
 
     expect(skill).toContain("appaloft deploy ./dist --as static-site");
     expect(fullSkill).toContain("npx skills add appaloft/appaloft");
+    expect(fullSkill).toContain("appaloft setup agent");
     expect(packagedSkill).toContain("AI-facing Appaloft entrypoint");
     expect(packagedSkill).toContain("references/surfaces.md");
     expect(surfaces).toContain("CLI");
@@ -358,6 +359,10 @@ describe("public docs operation coverage", () => {
     expect(surfaces).toContain("MCP/tools");
     expect(surfaces).toContain("Do not suggest an Appaloft-owned npm");
     expect(mcpTools).toContain("appaloft mcp stdio");
+    expect(mcpTools).toContain("appaloft setup agent");
+    expect(mcpTools).toContain("appaloft auth mcp cursor install");
+    expect(mcpTools).toContain("appaloft auth mcp claude-code install");
+    expect(mcpTools).toContain("appaloft auth mcp opencode install");
     expect(mcpTools).toContain("appaloft mcp serve --host 127.0.0.1 --port 3939");
     expect(mcpTools).toContain("npx @appaloft/mcp");
     expect(mcpTools).toContain("operation catalog");

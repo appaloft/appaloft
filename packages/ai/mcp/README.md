@@ -35,6 +35,11 @@ npx @appaloft/mcp serve --host 127.0.0.1 --port 3939
 The standalone `@appaloft/mcp` package exposes the `appaloft-mcp` launcher and delegates to the same
 Appaloft CLI/runtime instead of shipping a second business implementation.
 
+Cursor and Claude Code hosts should not paste tokens into editor config. After `appaloft login`,
+run `appaloft setup agent` or the sibling `auth mcp cursor|claude-code install` commands. OpenCode
+needs `--agent opencode` or `appaloft auth mcp opencode install`. Local `appaloft mcp stdio` remains
+valid when the host is configured by hand.
+
 ## Release Status
 
 This package is the public MCP transport boundary. `@appaloft/ai-mcp` remains workspace source, and

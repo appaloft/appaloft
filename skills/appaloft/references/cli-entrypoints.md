@@ -12,6 +12,22 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   Enter before opening the browser when enabled, then write a local `cloud` profile only after a
   trusted local credential verifies against the current organization context. This is a human
   interactive login path, not the default AI-agent auth handoff.
+- `appaloft auth mcp login` writes a dedicated bearer `mcp` profile through the same browser
+  handoff. Use it when a host needs a bearer MCP profile. Cursor, Claude Code, and OpenCode host
+  install should reuse an already-logged-in `appaloft login` product-session or bearer profile
+  instead.
+- `appaloft auth mcp cursor install` merges a token-free `~/.cursor/mcp.json`
+  `mcpServers.appaloft` stdio entry that launches `appaloft mcp remote-stdio --profile <active>`.
+  `appaloft auth mcp claude-code install` merges the same launcher into `~/.claude.json`.
+  `appaloft auth mcp opencode install` merges a token-free `~/.config/opencode/opencode.json`
+  `mcp.appaloft` local entry (`type: "local"`, `command: [...]`, `enabled: true`) for the same
+  launcher. `appaloft auth mcp codex install` still requires the bearer `mcp` profile and writes
+  `~/.codex/config.toml`. None of these host files store tokens.
+- `appaloft setup agent` is the one-command local Agent door over that family. It default-checks
+  universal/Claude/Cursor, lists OpenCode without installing it unless `--agent opencode`, and
+  skips matching already-installed skill/MCP entries.
+- `appaloft mcp stdio` and `npx @appaloft/mcp` remain the local stdio transport when a host is
+  configured by hand instead of through `auth mcp <host> install`.
 - `appaloft auth token login [--stdin | --token-file <path>] [--url <url>] [--profile <name>]`
   imports a scoped bearer token from CLI-approved input or `APPALOFT_TOKEN`, verifies the selected
   endpoint and current organization context, then writes a redacted local profile. Do not pass raw

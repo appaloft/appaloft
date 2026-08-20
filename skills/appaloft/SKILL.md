@@ -76,7 +76,8 @@ surface available in the session.
   project/environment/resource/server ids when those
   list/show tools are bound. Do not scrape vendor TUI text for PR or deploy state.
 
-- First deployment: `appaloft deploy` / `deploy .` deploy the current directory as this app; do
+- First deployment: `appaloft deploy` / `deploy .` deploy the current directory as this app; git is
+  not required. Do
   not silently reuse an unrelated occupancy. Inspect source safely, create or select
   project/server/environment/resource,
   persist source/runtime/network on the Resource, then `deployments.plan`. If readiness is
@@ -160,9 +161,22 @@ surface available in the session.
 
 ## Installation Boundary
 
+The one-command local Agent door is `appaloft setup agent` after `appaloft login`. The agent list
+includes `universal`, `claude-code`, `cursor`, and `opencode`. Defaults copy this skill byte-identically
+into `~/.agents/skills/appaloft`, `~/.claude/skills/appaloft` when `~/.claude` exists, and
+`~/.cursor/skills/appaloft` when `~/.cursor` exists, then write token-free MCP into `~/.claude.json`
+and `~/.cursor/mcp.json`. Universal is skills only. OpenCode is listed but not default-checked.
+Tokens stay out of editor config.
+
 `npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes` installs
-this skill for Codex through the standard skill manager; use `--agent claude-code` for Claude Code.
+this skill for Codex through the standard skill manager. Use `--agent claude-code` for Claude Code,
+`--agent cursor` for Cursor, and `--agent opencode` for OpenCode. Current `npx skills` copies all of
+these into `~/.agents/skills/appaloft`; Cursor also reads that path. It does not create
+`~/.cursor/skills` or `~/.config/opencode/skills`, install the Appaloft CLI, or write MCP config.
 Verify with `npx skills list --global --agent <agent>` and start a new agent session before treating
-the skill as available. Installation only copies skill files. It does not deploy, create resources,
-call APIs, or wrap the Appaloft CLI. Appaloft does not ship a separate npm skill installer;
-AI-facing behavior enters through the standard skill manager only.
+the skill as available. Explicit MCP siblings remain: `appaloft auth mcp cursor install`,
+`appaloft auth mcp claude-code install`, `appaloft auth mcp opencode install`, or Codex
+`appaloft auth mcp login` plus `appaloft auth mcp codex install`. OpenCode skill/MCP install is
+explicit (`--agent opencode` or those siblings). Skill-manager installation only copies skill files. It does not
+deploy, create resources, call APIs, or wrap the Appaloft CLI. Appaloft does not ship a separate npm
+skill installer.
