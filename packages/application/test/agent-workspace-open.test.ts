@@ -4,10 +4,13 @@ import { describe, expect, test } from "bun:test";
 import { domainError, err, ok } from "@appaloft/core";
 
 import {
+  AgentWorkspaceOpenCommandHandler,
   AgentWorkspaceOpenService,
   createExecutionContext,
+  OpenAgentWorkspaceCommand,
   type WorkspaceOpenDependencies,
 } from "../src";
+import { shouldSkipWorkspaceSourceMaterialization } from "../src/agent-workspace-open";
 
 const input = {
   repository: "https://github.com/Acme/Web.git",
@@ -1040,6 +1043,64 @@ describe("Agent Workspace open application workflow", () => {
     expect(begun).toEqual([{ forceNew: true }]);
     expect(materialized).toBe(0);
     expect(executedCommands).toEqual([]);
+  });
+
+  test("[FOLDER-ONBOARD-007] folder.local locator skips source materialization without a git remote host", () => {
+    expect(
+      shouldSkipWorkspaceSourceMaterialization({
+        repositoryIdentity: "folder.local/cwd/nux-code-silence-cwd",
+        repository: "https://folder.local/cwd/nux-code-silence-cwd.git",
+      }),
+    ).toBe(true);
+    expect(
+      shouldSkipWorkspaceSourceMaterialization(
+        {
+          repositoryIdentity: "github.com/appaloft/examples",
+          repository: "https://github.com/appaloft/examples.git",
+        },
+        { skipSourceMaterialization: true },
+      ),
+    ).toBe(true);
+    expect(
+      shouldSkipWorkspaceSourceMaterialization({
+        repositoryIdentity: "github.com/appaloft/examples",
+        repository: "https://github.com/appaloft/examples.git",
+      }),
+    ).toBe(false);
+  });
+
+  test("[FOLDER-ONBOARD-007][WS-REMOTE-PROGRESS-201] workspaces.open command for folder.local skips materialize on forceNew", async () => {
+    const executedCommands: string[][] = [];
+    const { service } = createFolderOccupancyOpen({ executedCommands });
+    const handler = new AgentWorkspaceOpenCommandHandler(service);
+    const command = OpenAgentWorkspaceCommand.create({
+      ...folderOccupancyInput,
+      forceNew: true,
+    });
+    expect(command.isOk()).toBe(true);
+    expect(command._unsafeUnwrap().input.repository).toBe("https://folder.local/cwd/notes.git");
+    expect(command._unsafeUnwrap().input.repository).not.toContain("github.com");
+    const opened = await handler.handle(
+      createExecutionContext({
+        requestId: "req_folder_occupancy_command_force_new",
+        entrypoint: "cli",
+        actor: { kind: "user", id: "usr_1" },
+        tenant: { tenantId: "ten_1" },
+      }),
+      command._unsafeUnwrap(),
+    );
+
+    expect(opened.isOk()).toBe(true);
+    expect(opened._unsafeUnwrap()).toMatchObject({
+      workspaceId: "sbx_notes",
+      resumed: false,
+      source: {
+        repositoryIdentity: "folder.local/cwd/notes",
+        repository: "https://folder.local/cwd/notes.git",
+      },
+    });
+    expect(executedCommands).toEqual([]);
+    expect(executedCommands.some((argv) => argv[0] === "git")).toBe(false);
   });
 
   test("[WS-OPEN-PARTIAL-017] git remote leftover still fail-closes for partial recovery", async () => {

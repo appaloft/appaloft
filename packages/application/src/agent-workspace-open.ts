@@ -71,6 +71,7 @@ export interface WorkspaceOpenOptions {
   readonly targetServerId?: string;
   readonly expiresAt?: string;
   readonly sourceMaterializer?: WorkspaceOpenSourceMaterializerPort;
+  readonly skipSourceMaterialization?: boolean;
 }
 
 export interface WorkspaceOpenReservation {
@@ -531,12 +532,24 @@ function isDomainError(value: unknown): value is DomainError {
   );
 }
 
+const FOLDER_OCCUPANCY_HOST = "folder.local";
+
 export function isFolderOccupancyIdentity(repositoryIdentity: string): boolean {
+  const identity = repositoryIdentity.trim().toLowerCase();
   return (
-    repositoryIdentity === "folder.local" ||
-    repositoryIdentity.startsWith("folder.local/") ||
-    repositoryIdentity.includes("folder.local/")
+    identity === FOLDER_OCCUPANCY_HOST ||
+    identity.startsWith(`${FOLDER_OCCUPANCY_HOST}/`) ||
+    identity.includes(`/${FOLDER_OCCUPANCY_HOST}/`)
   );
+}
+
+export function isFolderOccupancyRepository(repository: string): boolean {
+  try {
+    const hostname = new URL(repository.trim()).hostname.toLowerCase();
+    return hostname === FOLDER_OCCUPANCY_HOST || hostname.endsWith(`.${FOLDER_OCCUPANCY_HOST}`);
+  } catch {
+    return repository.includes(FOLDER_OCCUPANCY_HOST);
+  }
 }
 
 export function isFolderOccupancyOpen(input: {
@@ -546,7 +559,14 @@ export function isFolderOccupancyOpen(input: {
 }): boolean {
   if (isFolderOccupancyIdentity(input.repositoryIdentity)) return true;
   if (input.preferredIdentity && isFolderOccupancyIdentity(input.preferredIdentity)) return true;
-  return input.repository.includes("folder.local");
+  return isFolderOccupancyRepository(input.repository);
+}
+
+export function shouldSkipWorkspaceSourceMaterialization(
+  input: Pick<WorkspaceOpenInput, "repositoryIdentity" | "repository">,
+  options: Pick<WorkspaceOpenOptions, "skipSourceMaterialization"> = {},
+): boolean {
+  return Boolean(options.skipSourceMaterialization) || isFolderOccupancyOpen(input);
 }
 
 export class AgentWorkspaceOpenService {
@@ -686,10 +706,8 @@ export class AgentWorkspaceOpenService {
     }
 
     const sourceCredentialResult =
-      !isFolderOccupancyOpen({
-        repositoryIdentity: input.repositoryIdentity,
-        repository: input.repository,
-      }) && this.dependencies.sourceCredentials
+      !shouldSkipWorkspaceSourceMaterialization(input, options) &&
+      this.dependencies.sourceCredentials
         ? await this.dependencies.sourceCredentials.resolve(context, {
             projectId: resolved.value.projectId,
             repository: input.repository,
@@ -863,12 +881,7 @@ export class AgentWorkspaceOpenService {
     workspaceId: string,
     sourceCredential: WorkspaceOpenSourceHttpBasicCredential | null,
   ): Promise<Result<void>> {
-    if (
-      isFolderOccupancyOpen({
-        repositoryIdentity: input.repositoryIdentity,
-        repository: input.repository,
-      })
-    ) {
+    if (shouldSkipWorkspaceSourceMaterialization(input, options)) {
       return ok(undefined);
     }
     if (options.sourceMaterializer) {

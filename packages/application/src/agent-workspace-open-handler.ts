@@ -1,5 +1,9 @@
 import { inject, injectable } from "tsyringe";
-import { type AgentWorkspaceOpenService, type WorkspaceOpenResult } from "./agent-workspace-open";
+import {
+  type AgentWorkspaceOpenService,
+  shouldSkipWorkspaceSourceMaterialization,
+  type WorkspaceOpenResult,
+} from "./agent-workspace-open";
 import { OpenAgentWorkspaceCommand } from "./agent-workspace-open-messages";
 import { CommandHandler, type CommandHandlerContract } from "./cqrs";
 import { type ExecutionContext } from "./execution-context";
@@ -16,6 +20,8 @@ export class AgentWorkspaceOpenCommandHandler
   ) {}
 
   handle(context: ExecutionContext, command: OpenAgentWorkspaceCommand) {
-    return this.service.open(context, command.input);
+    return this.service.open(context, command.input, {
+      skipSourceMaterialization: shouldSkipWorkspaceSourceMaterialization(command.input),
+    });
   }
 }
