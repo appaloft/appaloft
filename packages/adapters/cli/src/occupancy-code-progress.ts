@@ -31,9 +31,9 @@ export function occupancyCodeUsesLineProgress(input: {
   return !input.stdinIsTty || !input.stdoutIsTty;
 }
 
-export const DEFAULT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS = 8_000;
+export const DEFAULT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS = 30_000;
 export const DEFAULT_OCCUPANCY_BANNER_CHROME_TIMEOUT_MS = 2_000;
-export const DEFAULT_OCCUPANCY_SKILL_COMMAND_TIMEOUT_MS = 3_000;
+export const DEFAULT_OCCUPANCY_SKILL_COMMAND_TIMEOUT_MS = 15_000;
 
 export function occupancyTimeoutMs(
   envName: string,

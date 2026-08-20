@@ -10,6 +10,7 @@ import {
 } from "../src/occupancy-connecting-offer.js";
 import {
   OCCUPANCY_CONNECTING_TELEMETRY_SCHEMA,
+  occupancyConnectingStepLines,
   occupancyConnectingSteps,
   occupancyConnectingTelemetry,
 } from "../src/occupancy-connecting-telemetry.js";
@@ -40,6 +41,11 @@ test("[WS-REMOTE-CONNECT-215] connecting-step data names credential, skill count
     { id: "credential", message: "using your Grok credential" },
     { id: "skills", message: "including 4 skills" },
     { id: "disk", message: "work is on its disk" },
+  ]);
+  expect(occupancyConnectingStepLines(telemetry)).toEqual([
+    "using your Grok credential",
+    "including 4 skills",
+    "work is on its disk",
   ]);
   expect(JSON.stringify(telemetry)).not.toMatch(/sk-|oauth|secret|token":/i);
 });

@@ -41,6 +41,7 @@ export async function offerOccupancyConnectingMaterials(input: {
     command: WriteSandboxFileCommand | ExecuteSandboxCommand,
   ) => Promise<Result<unknown>>;
   readonly executeQuery: (query: ReadSandboxFileQuery) => Promise<Result<unknown>>;
+  readonly skillCount?: number;
 }): Promise<OccupancyConnectingTelemetry> {
   const destinationExists = occupancyHomeSkillDestinationExists({
     workspaceId: input.workspaceId,
@@ -76,10 +77,12 @@ export async function offerOccupancyConnectingMaterials(input: {
 
   return occupancyConnectingTelemetry({
     harness: input.harness,
-    skillCount: await countOccupancyConnectingSkills({
-      ...(input.homeDir ? { homeDir: input.homeDir } : {}),
-      ...(input.appaloftSkillDir ? { appaloftSkillDir: input.appaloftSkillDir } : {}),
-    }),
+    skillCount:
+      input.skillCount ??
+      (await countOccupancyConnectingSkills({
+        ...(input.homeDir ? { homeDir: input.homeDir } : {}),
+        ...(input.appaloftSkillDir ? { appaloftSkillDir: input.appaloftSkillDir } : {}),
+      })),
     firstPartyMcp: mcp.offered,
     ...(input.vendor ? { vendor: input.vendor } : {}),
     ...(credential ? { credential } : {}),

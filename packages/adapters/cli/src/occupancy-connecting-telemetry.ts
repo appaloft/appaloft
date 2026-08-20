@@ -55,6 +55,12 @@ export function occupancyConnectingSteps(input: {
   return steps;
 }
 
+export function occupancyConnectingStepLines(
+  telemetry: OccupancyConnectingTelemetry,
+): readonly string[] {
+  return telemetry.steps.map((step) => step.message);
+}
+
 export function occupancyConnectingTelemetry(input: {
   readonly vendor?: OccupancyVendor;
   readonly harness: OccupancyHarness;

@@ -146,6 +146,7 @@ test("[WS-REMOTE-HOME-SKILL-182] copies only allowlisted HOME skill roots", asyn
 
   expect(offered.offered).toBe(true);
   expect(offered.fileCount).toBe(12);
+  expect(offered.skillCount).toBe(6);
   const written = commands
     .filter((command) => command instanceof WriteSandboxFileCommand)
     .map((command) => command.input.path)
@@ -182,17 +183,38 @@ test("[WS-REMOTE-HOME-SKILL-183] skips missing HOME skill directories", async ()
     executeCommand: async () => ok({}),
     destinationExists: async () => false,
   });
-  expect(offered).toEqual({ offered: true, fileCount: 2, skippedExisting: 0 });
+  expect(offered).toEqual({ offered: true, fileCount: 2, skillCount: 1, skippedExisting: 0 });
 });
 
 test("[WS-REMOTE-HOME-SKILL-184] skips entries without SKILL.md", async () => {
   const homeDir = await mkdtemp(join(tmpdir(), "appaloft-home-noskill-"));
   await writeHomeSkill(homeDir, ".claude/skills", "readme-only", { "README.md": "# No skill\n" });
+  await writeHomeSkill(homeDir, ".claude/skills", "use-railway", {
+    "references/railway.md": "# refs only\n",
+  });
   await writeHomeSkill(homeDir, ".claude/skills", "real-skill", { "SKILL.md": "# Real\n" });
   await mkdir(join(homeDir, ".codex/skills", "empty-dir"), { recursive: true });
 
   const listed = await listOccupancyHomeSkillOfferFiles(homeDir);
   expect(listed.map((file) => file.skillName)).toEqual(["real-skill"]);
+
+  const commands: Array<WriteSandboxFileCommand | ExecuteSandboxCommand> = [];
+  const offered = await offerOccupancyHomeSkills({
+    workspaceId: "sbx_ready",
+    homeDir,
+    executeCommand: async (command) => {
+      commands.push(command);
+      return ok({});
+    },
+    destinationExists: async () => false,
+  });
+  expect(offered.skillCount).toBe(1);
+  expect(
+    commands
+      .filter((command) => command instanceof WriteSandboxFileCommand)
+      .map((command) => command.input.path)
+      .some((path) => path.includes("use-railway")),
+  ).toBe(false);
 });
 
 test("[WS-REMOTE-HOME-SKILL-185] skips secrets and does not upload mcp.json", async () => {
@@ -256,7 +278,7 @@ test("[WS-REMOTE-HOME-SKILL-186] HOME skill offer is add-only", async () => {
       path === "skills/existing/SKILL.md" || path === ".agents/skills/existing/SKILL.md",
   });
 
-  expect(offered).toEqual({ offered: true, fileCount: 2, skippedExisting: 2 });
+  expect(offered).toEqual({ offered: true, fileCount: 2, skillCount: 2, skippedExisting: 2 });
   expect(
     commands
       .filter((command) => command instanceof WriteSandboxFileCommand)

@@ -54,9 +54,10 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `--preview <previewEnvironmentId>` on logs, health, diagnostics, effective config, runtime
   control, and terminal commands when the user is operating a preview rather than its parent
   resource.
-- `appaloft code [path|git-remote] [--yes] [--profile <name-or-id>] [--opencode|--pi|--omp|--claude|--codex|--grok]` occupies my Sandbox after login. A no-git folder create-or-links a Project (directory name, the only Project, or one TTY choice), persists that link, and occupies `folder.local`. Git remote is correspondence when present and is not required. It requires a default
+- `appaloft code [path|git-remote] [--yes] [--profile <name-or-id>] [--server <id>] [--opencode|--pi|--omp|--claude|--codex|--grok]` occupies my Sandbox after login. A no-git folder create-or-links a Project (directory name, the only Project, or one TTY choice), persists that link, and occupies `folder.local`. Git remote is correspondence when present and is not required. It requires a default
   enrolled Server, dispatches `workspaces.open` with the remote SHA and
-  `targetServerId`. On a TTY it enters the occupancy Workspace TUI immediately
+  `targetServerId`. `--server` pins that Server with the same semantics as
+  `workspace open --server`. On a TTY it enters the occupancy Workspace TUI immediately
   with the list collapsed and a centered **preparing the agent** step panel, then
   attaches into the remote session. A source checkout finds or cargo-builds
   `appaloft-workspace-tui` so `appaloftdev code` does not require a manual
@@ -69,7 +70,9 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `--no-attach` and non-TTY print
   one-line progress and
   `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>`.
-  Skill copy is fail-soft and time-bounded.
+  `--no-attach` also prints the connecting steps `using your {Grok|Codex|Claude} credential`,
+  `including N skills`, and `work is on its disk` (`N` is actually copied).
+  Skill copy is fail-soft and time-bounded; a timeout does not block occupy.
   Default harness is OpenCode. Default `code` and `code --new` pick the live occupancy / live
   install. Same-name leftover Profiles must not block first success and must not require
   memorizing installation ids. `--profile` is a fallback pin; only an explicit colliding name

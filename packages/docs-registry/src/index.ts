@@ -172,6 +172,7 @@ export const publicDocsHelpTopics = {
     anchor: "agent-workspace-open",
     aliases: [
       "appaloft code",
+      "appaloft code --server",
       "remote agent door",
       "local scratch",
       "scratch session",

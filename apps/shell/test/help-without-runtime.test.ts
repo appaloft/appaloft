@@ -46,6 +46,7 @@ describe("shell help without runtime composition", () => {
     expect(stdout).toContain("--profile");
     expect(stdout).toContain("--new");
     expect(stdout).toContain("--no-attach");
+    expect(stdout).toContain("--server");
     expect(stdout).toContain("--local");
     expect(stdout).toContain("--opencode");
     expect(stdout).toContain("--pi");
