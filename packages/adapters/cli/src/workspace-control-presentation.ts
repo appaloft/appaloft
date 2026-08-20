@@ -37,7 +37,6 @@ import {
   type OccupancyPreviewEnvironment,
   type OccupancyResource,
   occupancyChromeForProject,
-  occupancyChromeProjectName,
   occupancyCompareOrPullUrl,
   occupancyConnectionsUrl,
   occupancyPullRequestFromPreviewEnvironments,
@@ -1068,9 +1067,7 @@ export function createBoundedWorkspaceControlPresentation(
                 await renderer.send({
                   type: "chrome",
                   title: OCCUPANCY_CODE_CHROME_TITLE,
-                  project: occupancyChromeProjectName({
-                    projectName: occupied.projectName,
-                  }),
+                  project: occupied.projectName,
                 });
               }
               return occupied;

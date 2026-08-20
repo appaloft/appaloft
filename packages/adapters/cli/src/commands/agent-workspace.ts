@@ -840,9 +840,7 @@ export const workspaceCodeCommand = EffectCommand.make(
                 return {
                   workspaceId: occupied.result.workspaceId,
                   ...(occupied.result.attach ? { attach: occupied.result.attach } : {}),
-                  ...(occupied.door.projectName
-                    ? { projectName: occupied.door.projectName }
-                    : {}),
+                  ...(occupied.door.projectName ? { projectName: occupied.door.projectName } : {}),
                 };
               },
             }),

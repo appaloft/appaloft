@@ -2135,8 +2135,7 @@ describe("Workspace control presentation", () => {
     expect(
       renderer.messages.some(
         (message) =>
-          (message.type === "chrome" || message.type === "loading") &&
-          "previewUrl" in message,
+          (message.type === "chrome" || message.type === "loading") && "previewUrl" in message,
       ),
     ).toBeFalse();
     expect(renderer.messages).toContainEqual({
@@ -2268,6 +2267,7 @@ describe("Workspace control presentation", () => {
     expect(renderer.messages).toContainEqual({
       type: "progress",
       message: "Resolving repository…",
+      step: "disk",
     });
     expect(renderer.messages.some((message) => message.type === "terminal-ready")).toBeFalse();
   });

@@ -523,7 +523,9 @@ export async function resolveDefaultRemoteCodeDoor(
     if (onboarded) {
       locator = isFolderOccupancyIdentity(onboarded.identity)
         ? {
-            ...folderOccupancyLocator(onboarded.identity.split("/").filter(Boolean).at(-1) ?? "app"),
+            ...folderOccupancyLocator(
+              onboarded.identity.split("/").filter(Boolean).at(-1) ?? "app",
+            ),
             repositoryIdentity: onboarded.identity,
             repository: `https://${onboarded.identity}.git`,
           }

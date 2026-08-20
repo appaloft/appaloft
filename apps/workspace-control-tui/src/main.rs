@@ -317,7 +317,9 @@ fn main() -> Result<()> {
                 }
             }
             Event::Key(key)
-                if key.kind == KeyEventKind::Press && ctrl_char(&key, 'c') && !state.agent_focused =>
+                if key.kind == KeyEventKind::Press
+                    && ctrl_char(&key, 'c')
+                    && !state.agent_focused =>
             {
                 let _ = send(&mut writer, &RendererEvent::Quit);
                 running = false;
@@ -457,7 +459,8 @@ fn main() -> Result<()> {
                 KeyCode::Esc if state.help_open => state.help_open = false,
                 KeyCode::Char('?') => state.toggle_help(),
                 KeyCode::Char('x') | KeyCode::Char('X')
-                    if !key_has(&key, KeyModifiers::CONTROL) && !key_has(&key, KeyModifiers::ALT) =>
+                    if !key_has(&key, KeyModifiers::CONTROL)
+                        && !key_has(&key, KeyModifiers::ALT) =>
                 {
                     state.show_agents_list();
                 }
@@ -484,7 +487,8 @@ fn main() -> Result<()> {
                     }
                 }
                 KeyCode::Char('c')
-                    if !key_has(&key, KeyModifiers::CONTROL) && !key_has(&key, KeyModifiers::ALT) =>
+                    if !key_has(&key, KeyModifiers::CONTROL)
+                        && !key_has(&key, KeyModifiers::ALT) =>
                 {
                     if let Some(workspace_id) = state.selected_workspace_id().map(str::to_owned) {
                         send(&mut writer, &RendererEvent::OpenCompare { workspace_id })?;

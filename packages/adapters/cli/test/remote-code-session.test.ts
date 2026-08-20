@@ -899,28 +899,37 @@ describe("remote code door", () => {
     const local = join(root, "org", "repo");
     await mkdir(local, { recursive: true });
     const previous = process.cwd();
-    let locatorCalled = false;
+    let contactedGithub = false;
     try {
       process.chdir(root);
-      await expect(
-        resolveDefaultRemoteCodeDoor(
-          {
-            env: { APPALOFT_TOKEN: "token" },
-            listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
-            resolveLocator: async () => {
-              locatorCalled = true;
-              throw Object.assign(new Error("missing origin"), {
-                code: "workspace_remote_repository_missing",
-              });
-            },
+      const door = await resolveDefaultRemoteCodeDoor(
+        {
+          env: { APPALOFT_TOKEN: "token" },
+          folderCwd: local,
+          folderOnboarding: {
+            projectId: "prj_repo",
+            projectName: "repo",
+            identity: "folder.local/cwd/repo",
+            created: true,
+            reused: false,
           },
-          "org/repo",
-        ),
-      ).rejects.toMatchObject({ code: "workspace_remote_repository_missing" });
+          listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
+          resolveLocator: async () => {
+            throw new Error("existing owner/repo directory must not use a git locator");
+          },
+          resolveRemoteRef: async () => {
+            contactedGithub = true;
+            throw new Error("existing owner/repo directory must not become a GitHub remote");
+          },
+        },
+        "org/repo",
+      );
+      expect(door.repositoryIdentity).toBe("folder.local/cwd/repo");
+      expect(door.repositoryIdentity).not.toBe("github.com/org/repo");
+      expect(contactedGithub).toBe(false);
     } finally {
       process.chdir(previous);
       await rm(root, { recursive: true, force: true });
     }
-    expect(locatorCalled).toBe(true);
   });
 });

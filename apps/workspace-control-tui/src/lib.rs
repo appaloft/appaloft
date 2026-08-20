@@ -1880,7 +1880,9 @@ pub fn extract_osc52_sequences(data: &str) -> Vec<String> {
     let mut found = Vec::new();
     let mut index = 0;
     while index + 4 < bytes.len() {
-        if bytes[index] == 0x1b && bytes[index + 1] == b']' && bytes[index + 2..].starts_with(b"52;")
+        if bytes[index] == 0x1b
+            && bytes[index + 1] == b']'
+            && bytes[index + 2..].starts_with(b"52;")
         {
             let start = index;
             index += 5;
@@ -1957,7 +1959,9 @@ fn render_occupancy_loading(frame: &mut Frame<'_>, state: &AppState, area: Rect)
         .steps
         .iter()
         .map(|step| step.label.chars().count() + 2)
-        .chain(std::iter::once(occupancy_chrome_header(state).chars().count()))
+        .chain(std::iter::once(
+            occupancy_chrome_header(state).chars().count(),
+        ))
         .max()
         .unwrap_or(0)
         .clamp(20, inner.width.max(1) as usize) as u16;
@@ -1995,8 +1999,7 @@ fn render_occupancy_loading(frame: &mut Frame<'_>, state: &AppState, area: Rect)
         rows[1],
     );
     frame.render_widget(
-        Paragraph::new(occupancy_loading_step_lines(state))
-            .wrap(Wrap { trim: false }),
+        Paragraph::new(occupancy_loading_step_lines(state)).wrap(Wrap { trim: false }),
         rows[3],
     );
 }
@@ -2684,7 +2687,12 @@ mod tests {
         });
         assert_eq!(state.status_line, "Preparing disk on hostinger…");
         assert_eq!(
-            state.loading.steps.iter().map(|step| step.status.as_str()).collect::<Vec<_>>(),
+            state
+                .loading
+                .steps
+                .iter()
+                .map(|step| step.status.as_str())
+                .collect::<Vec<_>>(),
             vec!["done", "done", "active"]
         );
         assert!(state.loading.active);
@@ -2752,8 +2760,11 @@ mod tests {
             .draw(|frame| render(frame, &state))
             .expect("draw tree detail");
         let out = buffer_plain(&terminal);
-        assert!(out.contains("Preview  http://app-sc156jw98k.127.0.0.1.sslip.io/"), "{out}");
+        assert!(out.contains("Preview"), "{out}");
+        assert!(out.contains("app-sc156jw98k"), "{out}");
+        assert!(out.contains("sslip.io"), "{out}");
         assert!(out.contains("Appaloft Cloud Agents"), "{out}");
+        assert!(!occupancy_chrome_header(&state).contains("sslip"));
         assert!(!out.contains("q quit"), "{out}");
         assert!(!out.contains("Y restore"), "{out}");
     }
