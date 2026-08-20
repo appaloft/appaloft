@@ -2546,6 +2546,25 @@ mod tests {
     }
 
     #[test]
+    fn ws_remote_progress_202_default_state_is_the_first_useful_alt_screen() {
+        let state = AppState::default();
+        assert_eq!(state.status_line, "preparing the agent");
+        assert!(state.loading.active);
+        assert!(state.loading.collapsed);
+        let backend = ratatui::backend::TestBackend::new(100, 24);
+        let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw first useful occupancy frame");
+        let out = buffer_plain(&terminal);
+        assert!(out.contains("preparing the agent"), "{out}");
+        assert!(
+            !out.contains(" Workspaces "),
+            "first useful frame must stay collapsed:\n{out}"
+        );
+    }
+
+    #[test]
     fn ws_remote_progress_194_collapsed_launch_gives_the_wait_the_whole_window() {
         let mut state = AppState::default();
         state.apply(ParentMessage::Loading {

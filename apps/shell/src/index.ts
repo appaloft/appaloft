@@ -1,4 +1,4 @@
-import "reflect-metadata";
+import { warmupWorkspaceControlRenderer } from "@appaloft/adapter-cli/workspace-tui-launch";
 import {
   reportOccupancyCliStartupOnce,
   shouldPrintOccupancyLineProgress,
@@ -52,9 +52,6 @@ const command = args[0];
 if (shouldPrintOccupancyLineProgress(args)) {
   reportOccupancyCliStartupOnce(args);
 } else if (shouldWarmOccupancyTui(args)) {
-  const { warmupWorkspaceControlRenderer } = await import(
-    "@appaloft/adapter-cli/workspace-control-renderer"
-  );
   void warmupWorkspaceControlRenderer().catch((error) => {
     const message =
       error && typeof error === "object" && "message" in error
@@ -89,6 +86,8 @@ if (shouldCaptureStdin) {
   }
   capturedStdinText = Buffer.concat(chunks).toString("utf8");
 }
+
+await import("reflect-metadata");
 
 if (standaloneCommand) {
   const { runStandaloneControlPlaneCli } = await import("@appaloft/adapter-cli");

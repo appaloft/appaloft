@@ -109,11 +109,18 @@ fn main() -> Result<()> {
         .ok()
         .filter(|mode| !mode.is_empty())
         .is_none();
-    let restore = if occupancy_mode {
-        Some(TerminalRestore::enter()?)
-    } else {
-        None
-    };
+    let mut occupancy_restore = None;
+    let mut occupancy_terminal = None;
+    if occupancy_mode {
+        occupancy_restore = Some(TerminalRestore::enter()?);
+        let backend = CrosstermBackend::new(std::io::stdout());
+        let mut terminal = Terminal::new(backend).context("create Ratatui terminal")?;
+        let first_frame = AppState::default();
+        terminal
+            .draw(|frame| render(frame, &first_frame))
+            .context("render occupancy first frame")?;
+        occupancy_terminal = Some(terminal);
+    }
 
     let port = env::var("APPALOFT_WORKSPACE_TUI_PORT")
         .context("APPALOFT_WORKSPACE_TUI_PORT is required")?
@@ -137,13 +144,19 @@ fn main() -> Result<()> {
         return operate::run(writer, reader);
     }
 
-    let _restore = match restore {
+    let _restore = match occupancy_restore {
         Some(value) => value,
         None => TerminalRestore::enter()?,
     };
-    let backend = CrosstermBackend::new(std::io::stdout());
-    let mut terminal = Terminal::new(backend).context("create Ratatui terminal")?;
-    terminal.clear().context("clear TUI surface")?;
+    let mut terminal = match occupancy_terminal {
+        Some(terminal) => terminal,
+        None => {
+            let backend = CrosstermBackend::new(std::io::stdout());
+            let mut terminal = Terminal::new(backend).context("create Ratatui terminal")?;
+            terminal.clear().context("clear TUI surface")?;
+            terminal
+        }
+    };
 
     let (message_tx, message_rx) = mpsc::channel::<ParentMessage>();
     std::thread::spawn(move || {

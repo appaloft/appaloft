@@ -427,6 +427,9 @@
 - [x] Unit tests WS-REMOTE-PROGRESS-196
 - [x] TTY warms the occupancy TUI before composition when the sidecar exists
 - [x] Unit tests WS-REMOTE-PROGRESS-197
+- [x] Slim occupancy TUI launch module spawns before reflect-metadata / presentation / composition
+- [x] Occupancy TUI paints collapsed preparing-the-agent before handshake
+- [x] Unit tests WS-REMOTE-PROGRESS-202
 - [x] Missing TUI sidecar prints binary name + rustup/cargo next step (not one-line unavailable)
 - [x] Unit tests WS-REMOTE-PROGRESS-198
 - [x] Attached occupancy footer hides chrome `conflict at <phase>`

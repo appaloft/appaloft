@@ -65,10 +65,31 @@ describe("occupancy CLI shell progress", () => {
     expect(shouldWarmOccupancyTui(["code", "--no-attach"], tty)).toBeFalse();
     const source = readFileSync(join(import.meta.dir, "../src/index.ts"), "utf8");
     const warmup = source.indexOf("warmupWorkspaceControlRenderer");
+    const reflectImport = source.indexOf('import("reflect-metadata")');
     const runImport = source.indexOf('import("./run")');
     expect(warmup).toBeGreaterThan(-1);
+    expect(reflectImport).toBeGreaterThan(-1);
     expect(runImport).toBeGreaterThan(-1);
+    expect(warmup).toBeLessThan(reflectImport);
     expect(warmup).toBeLessThan(runImport);
-    expect(source).toContain("@appaloft/adapter-cli/workspace-control-renderer");
+    expect(source).toContain("@appaloft/adapter-cli/workspace-tui-launch");
+    expect(source).not.toContain("@appaloft/adapter-cli/workspace-control-renderer");
+    expect(source).not.toMatch(/^import ["']reflect-metadata["']/m);
+  });
+
+  test("[WS-REMOTE-PROGRESS-202] occupancy TUI launch stays off composition imports", () => {
+    const launch = readFileSync(
+      join(import.meta.dir, "../../../packages/adapters/cli/src/workspace-tui-launch.ts"),
+      "utf8",
+    );
+    expect(launch).not.toContain("@appaloft/application");
+    expect(launch).not.toContain("@appaloft/core");
+    expect(launch).not.toContain("workspace-control-presentation");
+    expect(launch).not.toContain("operate-presentation");
+    expect(launch).not.toContain("reflect-metadata");
+    const shell = readFileSync(join(import.meta.dir, "../src/index.ts"), "utf8");
+    expect(shell.indexOf("warmupWorkspaceControlRenderer")).toBeLessThan(
+      shell.indexOf('import("reflect-metadata")'),
+    );
   });
 });
