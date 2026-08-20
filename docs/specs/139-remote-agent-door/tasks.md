@@ -427,6 +427,8 @@
 - [x] Unit tests WS-REMOTE-PROGRESS-196
 - [x] TTY warms the occupancy TUI before composition when the sidecar exists
 - [x] Unit tests WS-REMOTE-PROGRESS-197
+- [x] Missing TUI sidecar prints binary name + rustup/cargo next step (not one-line unavailable)
+- [x] Unit tests WS-REMOTE-PROGRESS-198
 
 ## Later
 

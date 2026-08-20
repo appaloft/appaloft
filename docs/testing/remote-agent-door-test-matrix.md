@@ -169,6 +169,7 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-PROGRESS-195 | CLI / shell | automated | source checkout finds or cargo-builds `appaloft-workspace-tui` | `packages/adapters/cli/test/workspace-control-renderer.test.ts` |
 | WS-REMOTE-PROGRESS-196 | TUI / CLI | automated | list/detail/port conflict after attach does not send occupancy-code-bootstrap or workspace-control-select errors | `packages/adapters/cli/test/workspace-control-presentation.test.ts` |
 | WS-REMOTE-PROGRESS-197 | shell | automated | TTY occupancy warms the TUI before importing `run.ts` | `apps/shell/test/occupancy-cli-progress.test.ts` |
+| WS-REMOTE-PROGRESS-198 | CLI / shell | automated | missing `appaloft-workspace-tui` names the binary and `cargo build --locked` next command; rustc 1.85 is called too old | `packages/adapters/cli/test/workspace-control-renderer.test.ts` |
 
 
 

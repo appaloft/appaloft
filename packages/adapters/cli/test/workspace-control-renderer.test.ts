@@ -262,6 +262,7 @@ describe("Workspace control renderer channel", () => {
           await mkdir(join(crate, "target", "debug"), { recursive: true });
           await writeFile(debugBinary, "");
         },
+        { rustcVersion: "rustc 1.97.0" },
       );
       expect(built).toBe(1);
       expect(resolved).toBe(debugBinary);
@@ -270,9 +271,79 @@ describe("Workspace control renderer channel", () => {
         async () => {
           built += 1;
         },
+        { rustcVersion: "rustc 1.97.0" },
       );
       expect(built).toBe(1);
       expect(again).toBe(debugBinary);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("[WS-REMOTE-PROGRESS-198] missing renderer names the binary and next command", async () => {
+    const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const {
+      WORKSPACE_CONTROL_TUI_BINARY_NAME,
+      WORKSPACE_CONTROL_TUI_BUILD_COMMAND,
+      WORKSPACE_CONTROL_TUI_TOOLCHAIN_COMMAND,
+      ensureWorkspaceControlRendererBinary,
+      rustcTooOldForWorkspaceControlTui,
+      workspaceControlRendererUnavailableMessage,
+    } = await import("../src/workspace-control-renderer");
+    const { formatHumanCliError } = await import("../src/runtime");
+    const message = workspaceControlRendererUnavailableMessage({
+      rustcVersion: "rustc 1.85.0 (4d91de4e9 2025-02-17)",
+    });
+    expect(rustcTooOldForWorkspaceControlTui("rustc 1.85.0")).toBeTrue();
+    expect(message).toContain(WORKSPACE_CONTROL_TUI_BINARY_NAME);
+    expect(message).toContain(WORKSPACE_CONTROL_TUI_BUILD_COMMAND);
+    expect(message).toContain(WORKSPACE_CONTROL_TUI_TOOLCHAIN_COMMAND);
+    expect(message).toContain("rustc 1.85");
+    expect(message).toContain("--no-attach");
+    const printed = formatHumanCliError({
+      code: "infra_error",
+      category: "infra",
+      message,
+      retryable: false,
+      details: { phase: "workspace-control-renderer", reason: "toolchain-old" },
+    });
+    expect(printed).toContain(WORKSPACE_CONTROL_TUI_BINARY_NAME);
+    expect(printed).toContain(WORKSPACE_CONTROL_TUI_BUILD_COMMAND);
+    const root = await mkdtemp(join(tmpdir(), "appaloft-tui-old-rustc-"));
+    const crate = join(root, "apps", "workspace-control-tui");
+    await mkdir(crate, { recursive: true });
+    await writeFile(
+      join(crate, "Cargo.toml"),
+      '[package]\nname = "appaloft-workspace-control-tui"\n',
+    );
+    let built = 0;
+    try {
+      let caught: unknown;
+      try {
+        await ensureWorkspaceControlRendererBinary(
+          { APPALOFT_REPO_ROOT: root, PATH: "" },
+          async () => {
+            built += 1;
+          },
+          { rustcVersion: "rustc 1.85.0 (4d91de4e9 2025-02-17)" },
+        );
+      } catch (error) {
+        caught = error;
+      }
+      expect(built).toBe(0);
+      expect(caught).toMatchObject({
+        category: "infra",
+        details: { reason: "toolchain-old" },
+      });
+      expect(String((caught as { message?: string }).message)).toContain(
+        WORKSPACE_CONTROL_TUI_BINARY_NAME,
+      );
+      expect(String((caught as { message?: string }).message)).toContain(
+        WORKSPACE_CONTROL_TUI_BUILD_COMMAND,
+      );
+      expect(String((caught as { message?: string }).message)).toContain("rustc 1.85");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

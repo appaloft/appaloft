@@ -52,11 +52,15 @@ const command = args[0];
 if (shouldPrintOccupancyLineProgress(args)) {
   reportOccupancyCliStartupOnce(args);
 } else if (shouldWarmOccupancyTui(args)) {
-  const { hasCliControlPlaneLogin, warmupWorkspaceControlRenderer } = await import(
-    "@appaloft/adapter-cli"
-  );
+  const { formatHumanCliError, hasCliControlPlaneLogin, warmupWorkspaceControlRenderer } =
+    await import("@appaloft/adapter-cli");
   if (await hasCliControlPlaneLogin(process.env)) {
-    await warmupWorkspaceControlRenderer();
+    try {
+      await warmupWorkspaceControlRenderer();
+    } catch (error) {
+      process.stderr.write(`error: ${formatHumanCliError(error).trimEnd()}\n`);
+      process.exit(1);
+    }
   }
 }
 const standaloneCommand =

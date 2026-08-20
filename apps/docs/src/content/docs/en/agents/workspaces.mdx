@@ -65,7 +65,11 @@ HOME skill copy is fail-soft and time-bounded. `--no-attach` and non-TTY scripts
 keep one-line stderr progress (including a first-byte status line before local
 database or composition boot) and print the Remote banner.
 A source checkout (`appaloftdev`) finds or `cargo build`s the occupancy TUI
-sidecar on first TTY run.
+sidecar on first TTY run. If `appaloft-workspace-tui` is missing and Rust is
+older than 1.88, the CLI names that binary and prints
+`rustup toolchain install stable` plus
+`cargo build --locked --manifest-path apps/workspace-control-tui/Cargo.toml`.
+`--no-attach` does not need the TUI binary.
 The banner is:
 
 ```text

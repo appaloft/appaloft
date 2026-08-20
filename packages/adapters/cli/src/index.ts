@@ -188,13 +188,20 @@ export {
 export {
   createRatatuiOperatePresentation,
   createRatatuiWorkspaceControlPresentation,
+  type EnsureWorkspaceControlRendererBinaryOptions,
   ensureWorkspaceControlRendererBinary,
   openLoopbackWorkspaceControlRenderer,
+  readRustcVersion,
   resetWorkspaceControlRendererWarmup,
   resolveWorkspaceControlRendererBinary,
+  rustcTooOldForWorkspaceControlTui,
+  WORKSPACE_CONTROL_TUI_BINARY_NAME,
+  WORKSPACE_CONTROL_TUI_BUILD_COMMAND,
+  WORKSPACE_CONTROL_TUI_TOOLCHAIN_COMMAND,
   type WorkspaceControlRendererProcess,
   warmupWorkspaceControlRenderer,
   workspaceControlRendererCrateDir,
+  workspaceControlRendererUnavailableMessage,
 } from "./workspace-control-renderer.js";
 
 export function createCliProgram(input: CliProgramInput): CliProgram {
