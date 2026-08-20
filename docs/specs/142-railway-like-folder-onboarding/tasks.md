@@ -9,5 +9,5 @@
 - [x] Update Spec 139 resume rows that conflict.
 - [x] Add CLI/application tests for the acceptance rows.
 - [x] Update public docs, docs-registry, and skill entrypoints.
-- [ ] Run focused tests, `lint:ci`, and `typecheck`.
-- [ ] Open a merge-quality PR against main.
+- [x] Run focused tests, `lint:ci`, and affected-package `typecheck`.
+- [x] Open a merge-quality PR against main.

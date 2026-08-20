@@ -165,7 +165,7 @@ export async function peekWorkspaceGitIdentity(
   }
 }
 
-function writeStatus(message: string, write = (text: string) => process.stderr.write(text)): void {
+function writeStatus(message: string, write: (text: string) => void): void {
   write(`${message}\n`);
 }
 
@@ -191,12 +191,17 @@ export function ensureFolderProjectOnboarding(input: {
     const cwd = normalizeFolderCwd(input.cwd ?? process.cwd());
     const env = input.env ?? process.env;
     const store = input.store ?? fileFolderProjectLinkStore(env);
-    const write = input.writeStatus ?? ((text: string) => process.stderr.write(text));
+    const write =
+      input.writeStatus ??
+      ((text: string) => {
+        process.stderr.write(text);
+      });
     const canPrompt = input.canPrompt ?? Boolean(process.stdin.isTTY && process.stdout.isTTY);
     const cli = yield* CliRuntime;
+    const explicitProjectId = input.explicitProjectId;
 
-    if (input.explicitProjectId) {
-      const shownQuery = ShowProjectQuery.create({ projectId: input.explicitProjectId });
+    if (explicitProjectId) {
+      const shownQuery = ShowProjectQuery.create({ projectId: explicitProjectId });
       if (shownQuery.isErr()) return yield* Effect.fail(shownQuery.error);
       const shown = yield* Effect.promise(() => cli.executeQuery(shownQuery.value));
       if (shown.isErr()) return yield* Effect.fail(shown.error);
@@ -207,7 +212,7 @@ export function ensureFolderProjectOnboarding(input: {
         writeFolderProjectLink(
           {
             cwd,
-            projectId: input.explicitProjectId,
+            projectId: explicitProjectId,
             identity,
             projectName: shown.value.name,
           },
