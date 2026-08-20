@@ -440,7 +440,25 @@
 - [x] Unit tests WS-REMOTE-PROGRESS-200
 - [x] Non-git / ancestor-git locator does not hang on `Resolving repository…`
 - [x] Unit tests WS-REMOTE-PROGRESS-201
-- [x] Default `code` from a no-git folder resumes live occupancy (git is not a gate)
+- [x] Default `code` from a no-git folder occupies this folder (git is not a gate)
+- [x] TTY `code` forwards nested OSC 52 to the local terminal
+- [x] Unit tests WS-REMOTE-PROGRESS-204
+- [x] TTY `code` uses the Railway `ca` key table; `^c` quits only from list/menu
+- [x] Unit tests WS-REMOTE-PROGRESS-205
+- [x] In-session `x` returns to Appaloft Cloud Agents list without exiting the CLI
+- [x] Unit tests WS-REMOTE-PROGRESS-206
+- [x] `?` lists Railway `ca` keys; missing capabilities say unavailable
+- [x] Unit tests WS-REMOTE-PROGRESS-207
+- [x] Extra Railway source keys (`?` `q` `j/k` `h/l` `⌥r` `⌥n` `⌥p` `⌥enter` `⌥[` `⌥]` `^o`) keep source meanings; `q` is not quit
+- [x] Unit tests WS-REMOTE-PROGRESS-208
+- [x] No-git cwd `code` / `--no-attach` occupies this folder and does not resume leftover `examples`
+- [x] `--new` without a locator stays fail-closed
+- [x] User-visible chrome/status never say Occupancy / `Copying skills` / `Choosing occupancy`
+- [x] Unit tests WS-REMOTE-PROGRESS-201 / WS-REMOTE-NO-UPLOAD-006 for ancestor git + leftover examples
+- [x] Folder occupancy skips `git init` / clone / source materialization and does not fail `workspace_open_source_materialization_failed`
+- [x] Leftover partial folder occupancy is repaired or replaced without `workspace_open_partial_recovery_required`; git-remote leftover still fail-closes
+- [x] `code --no-attach` door silently replaces a leftover partial folder occupancy and does not emit `workspace_open_partial_recovery_required`
+- [x] Unit tests FOLDER-ONBOARD-007 / WS-REMOTE-PROGRESS-201 for no remote materialize + leftover continue
 
 ## Later
 

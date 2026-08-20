@@ -57,9 +57,11 @@ import {
   loginRequiredWorkspaceOccupancyTree,
   workspaceRemoteLoginRequiredError,
 } from "../cli-session-login.js";
+import { isFolderOccupancyIdentity } from "../folder-project-link.js";
 import {
   ensureFolderProjectOnboarding,
   folderOnboardingCwdFromLocator,
+  peekThisFolderGitIdentity,
 } from "../folder-project-onboarding.js";
 import { effectCliInteraction } from "../interaction.js";
 import { resolveRemoteGitWorkspaceRef } from "../local-git-workspace-context.js";
@@ -104,6 +106,7 @@ import {
   nativeAttachRequiresInteractiveTerminal,
   occupancyCloudCompatError,
   type RemoteCodeServerSummary,
+  remoteOccupyBannerProjectId,
   resolveDefaultRemoteCodeDoor,
   resolveOccupancyConnectionsUrl,
   resolveWorkspaceOpenSource,
@@ -305,6 +308,26 @@ function occupancyTreeFromLists(
 function requireOption(value: string | undefined, label: string): string {
   if (value?.trim()) return value.trim();
   throw domainError.validation(`${label} is required`);
+}
+
+function isFolderOccupancyDoor(door: {
+  readonly repositoryIdentity: string;
+  readonly repository: string;
+}): boolean {
+  return (
+    isFolderOccupancyIdentity(door.repositoryIdentity) || door.repository.includes("folder.local")
+  );
+}
+
+function isFolderOccupancyPartialRecovery(
+  error: DomainError,
+  door: { readonly repositoryIdentity: string; readonly repository: string },
+): boolean {
+  if (!isFolderOccupancyDoor(door)) return false;
+  return (
+    error.details?.code === "workspace_open_partial_recovery_required" ||
+    error.code === "workspace_open_partial_recovery_required"
+  );
 }
 
 function workspaceCliError(error: unknown, phase: string): DomainError {
@@ -688,6 +711,7 @@ export const workspaceCodeCommand = EffectCommand.make(
                       cwd: folderOnboardingCwdFromLocator(path),
                       yes,
                       interaction: effectCliInteraction,
+                      peekGitIdentity: peekThisFolderGitIdentity,
                       ...(cli.environment ? { env: cli.environment } : {}),
                     }),
                   );
@@ -755,10 +779,28 @@ export const workspaceCodeCommand = EffectCommand.make(
         };
         const command = OpenAgentWorkspaceCommand.create(openInput);
         if (command.isErr()) throw command.error;
+        if (door.projectId && door.projectId !== "project") {
+          onProgress(OCCUPANCY_CODE_PROGRESS.usingThisProject);
+        }
         onProgress(occupancyOpeningProgress(door.serverName));
         const opened = await cli.executeCommand(command.value);
         if (opened.isOk()) {
           return { door, result: opened.value, bannerCommitSha: door.commitSha };
+        }
+        if (isFolderOccupancyPartialRecovery(opened.error, door) && !forceNew) {
+          const replace = OpenAgentWorkspaceCommand.create({
+            ...openInput,
+            forceNew: true,
+          });
+          if (replace.isErr()) throw replace.error;
+          const replaced = await cli.executeCommand(replace.value);
+          if (replaced.isOk()) {
+            return { door, result: replaced.value, bannerCommitSha: door.commitSha };
+          }
+          throw occupancyCloudCompatError(replaced.error, {
+            id: door.serverId,
+            name: door.serverName,
+          });
         }
         const details = opened.error.details;
         const pinnedSha =
@@ -840,6 +882,7 @@ export const workspaceCodeCommand = EffectCommand.make(
                 return {
                   workspaceId: occupied.result.workspaceId,
                   ...(occupied.result.attach ? { attach: occupied.result.attach } : {}),
+                  ...(occupied.door.projectName ? { projectName: occupied.door.projectName } : {}),
                 };
               },
             }),
@@ -870,7 +913,7 @@ export const workspaceCodeCommand = EffectCommand.make(
         const settled = await settleWithTimeout(work, skillCommandTimeoutMs);
         if (settled.status === "timed-out") {
           return err(
-            domainError.infra("occupancy skill offer timed out", {
+            domainError.infra("Skill offer timed out", {
               phase: "occupancy-skill-offer",
             }),
           );
@@ -900,7 +943,11 @@ export const workspaceCodeCommand = EffectCommand.make(
         await settleWithTimeout(offerSkills(), skillOfferTimeoutMs);
       };
       const loadBannerChrome = async () => {
-        const bannerProjectId = result.projectId || door.projectId;
+        const bannerProjectId = remoteOccupyBannerProjectId({
+          repositoryIdentity: door.repositoryIdentity,
+          doorProjectId: door.projectId,
+          ...(result.projectId ? { resultProjectId: result.projectId } : {}),
+        });
         let previewUrl: string | undefined;
         let productionUrl: string | undefined;
         let pullRequestNumber: number | undefined;
@@ -993,7 +1040,11 @@ export const workspaceCodeCommand = EffectCommand.make(
         readonly pullRequestNumber?: number;
       };
       const leanChrome: OccupancyBannerChrome = {
-        bannerProjectId: result.projectId || door.projectId,
+        bannerProjectId: remoteOccupyBannerProjectId({
+          repositoryIdentity: door.repositoryIdentity,
+          doorProjectId: door.projectId,
+          ...(result.projectId ? { resultProjectId: result.projectId } : {}),
+        }),
       };
       process.stdout.write(
         `${formatRemoteCodeBanner({
@@ -1291,7 +1342,7 @@ const preview = EffectCommand.make(
       if (!previewUrl) {
         return yield* Effect.fail(
           domainError.conflict(
-            "Occupancy preview is unavailable. Deploy the occupancy resource first, then retry workspace preview.",
+            "Preview is unavailable. Deploy this project first, then retry workspace preview.",
             { code: "occupancy_preview_unavailable" },
           ),
         );
@@ -1302,7 +1353,7 @@ const preview = EffectCommand.make(
         kind: "occupancy-preview",
         url: previewUrl,
         ...(compareUrl ? { compareUrl } : {}),
-        guidance: "sandbox port publishing unsupported; using occupancy resource route",
+        guidance: "sandbox port publishing unsupported; using this project's resource route",
       });
     }),
 );
@@ -1829,7 +1880,7 @@ const workspaceNoTui = Options.boolean("no-tui").pipe(
   Options.withDefault(false),
 );
 const workspaceJson = Options.boolean("json").pipe(
-  Options.withDescription("Print the headless occupancy tree as JSON."),
+  Options.withDescription("Print the headless workspace tree as JSON."),
   Options.withDefault(false),
 );
 

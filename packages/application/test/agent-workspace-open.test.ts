@@ -4,10 +4,13 @@ import { describe, expect, test } from "bun:test";
 import { domainError, err, ok } from "@appaloft/core";
 
 import {
+  AgentWorkspaceOpenCommandHandler,
   AgentWorkspaceOpenService,
   createExecutionContext,
+  OpenAgentWorkspaceCommand,
   type WorkspaceOpenDependencies,
 } from "../src";
+import { shouldSkipWorkspaceSourceMaterialization } from "../src/agent-workspace-open";
 
 const input = {
   repository: "https://github.com/Acme/Web.git",
@@ -852,134 +855,12 @@ describe("Agent Workspace open application workflow", () => {
     expect(begun).toEqual([{ profileInstallationId: "awpi_default", forceNew: true }]);
   });
 
-  test("[FOLDER-ONBOARD-007] folder occupancy initializes git without fetch or checkout", async () => {
+  test("[FOLDER-ONBOARD-007][WS-REMOTE-PROGRESS-201] folder occupancy occupies without git clone or materialize", async () => {
     const executedCommands: string[][] = [];
-    const pin = {
-      profileInstallationId: "awpi_default",
-      profileDefinitionDigest: `sha256:${"a".repeat(64)}`,
-      profileId: "custom-default",
-      profileVersion: "1.0.0",
-      adapterInstallationId: "aai_custom",
-      adapterDefinitionDigest: `sha256:${"b".repeat(64)}`,
-      adapterId: "custom-agent",
-      adapterVersion: "1.0.0",
-      harnessKey: "custom-agent",
-      harnessTemplateId: "aht_custom",
-      sandboxTemplateId: "sbt_agent",
-      sandboxTemplateVersion: "1",
-      sandboxTemplateDigest: `sha256:${"c".repeat(64)}`,
-      capabilities: {
-        taskMode: true,
-        interactive: true,
-        backgroundRuns: true,
-        nativeSession: false,
-        persistentPaths: ["/workspace"],
-      },
-    };
-    const activation = {
-      project: { projectId: "prj_notes", disposition: "created" as const },
-      repositoryBinding: { bindingId: "rbd_notes", disposition: "created" as const },
-      profile: { profileInstallationId: "awpi_default", disposition: "created" as const },
-    };
-    const dependencies: WorkspaceOpenDependencies = {
-      preflight: {
-        resolveContext: async () =>
-          ok({
-            projectId: "prj_notes",
-            profileInstallationId: "awpi_default",
-            activation,
-          }),
-        admit: async (_context, resolved) =>
-          ok({
-            projectId: resolved.projectId,
-            profileInstallationId: resolved.profileInstallationId,
-            activation: resolved.activation,
-            plan: {
-              sandbox: {
-                source: { kind: "template", templateId: "sbt_agent" },
-                requestedIsolation: "gvisor",
-                limits: {
-                  cpuMillis: 1_000,
-                  memoryBytes: 536_870_912,
-                  diskBytes: 2_147_483_648,
-                  maxProcesses: 32,
-                },
-                networkPolicy: { mode: "allowlist", rules: [] },
-              },
-              initialization: [],
-              runtime: {
-                harnessKey: "custom-agent",
-                harnessTemplateId: "aht_custom",
-                declarativeHarness: {},
-              },
-              defaultPorts: [],
-              suggestedChecks: [],
-              credentialRequirements: [],
-              pin,
-            },
-            reservation: {
-              reservationId: "res_notes",
-              targetSelection: {
-                targetClass: "managed",
-                source: "platform-default",
-                reason: "managed_entitlement_default",
-              },
-            },
-          }),
-      },
-      entries: {
-        findByWorkspaceIds: async () => new Map(),
-        findByWorkspaceId: async () => undefined,
-        findPreferred: async () => undefined,
-        findLiveProfileInstallationIds: async () => [],
-        begin: async () => ok({ workspaceId: "sbx_notes", created: true }),
-        complete: async () => ok(undefined),
-        fail: async () => ok(undefined),
-        markWorkspaceTerminated: async () => ok({ advanced: true }),
-      },
-      sandboxes: {
-        create: async () => ok({ sandboxId: "sbx_notes", status: "ready" }),
-        resume: async (_context, workspaceId) => ok({ sandboxId: workspaceId, status: "ready" }),
-        exec: async (_context, _workspaceId, command) => {
-          executedCommands.push([...command.argv]);
-          return ok({ mode: "foreground", frames: [{ kind: "exit", exitCode: 0 }] });
-        },
-        exposePort: async () => ok(undefined),
-      },
-      agents: {
-        showRuntime: async (_context, value) =>
-          ok({
-            runtimeId: value.runtimeId,
-            sandboxId: value.sandboxId,
-            harnessKey: "custom-agent",
-            harnessTemplateId: "aht_custom",
-            status: "ready",
-            profilePin: pin,
-            capabilities: pin.capabilities,
-            createdAt: "2026-08-20T00:00:00.000Z",
-          }),
-        createRuntime: async () =>
-          ok({
-            runtimeId: "sar_notes",
-            sandboxId: "sbx_notes",
-            harnessKey: "custom-agent",
-            harnessTemplateId: "aht_custom",
-            status: "ready",
-            capabilities: pin.capabilities,
-            createdAt: "2026-08-20T00:00:00.000Z",
-          }),
-        ensureRuntime: async () => ok(undefined),
-        attach: async () => {
-          throw new Error("attach should not run");
-        },
-      },
-      reservations: {
-        consume: async () => ok(undefined),
-        release: async () => ok(undefined),
-      },
-      now: () => "2026-08-20T00:00:00.000Z",
-    };
-    const service = new AgentWorkspaceOpenService(dependencies);
+    let materialized = 0;
+    const { service, sourceCredentials } = createFolderOccupancyOpen({
+      executedCommands,
+    });
     const opened = await service.open(
       createExecutionContext({
         requestId: "req_folder_occupancy_open",
@@ -987,19 +868,452 @@ describe("Agent Workspace open application workflow", () => {
         actor: { kind: "user", id: "usr_1" },
         tenant: { tenantId: "ten_1" },
       }),
+      folderOccupancyInput,
       {
-        repository: "https://folder.local/cwd/notes.git",
-        repositoryIdentity: "folder.local/cwd/notes",
-        ref: "refs/heads/local",
-        branch: "local",
-        commitSha: "cafef00d00000000000000000000000000000000",
-        attach: false,
+        sourceMaterializer: {
+          materialize: async () => {
+            materialized += 1;
+            return err(
+              domainError.conflict("Workspace source materialization failed", {
+                code: "workspace_open_source_materialization_failed",
+              }),
+            );
+          },
+        },
       },
     );
 
     expect(opened.isOk()).toBe(true);
-    expect(executedCommands).toEqual([["git", "init", "."]]);
+    expect(opened._unsafeUnwrap()).toMatchObject({
+      workspaceId: "sbx_notes",
+      resumed: false,
+      source: { repositoryIdentity: "folder.local/cwd/notes" },
+    });
+    expect(executedCommands).toEqual([]);
     expect(executedCommands.some((argv) => argv.includes("fetch"))).toBe(false);
-    expect(executedCommands.some((argv) => argv.includes("checkout"))).toBe(false);
+    expect(executedCommands.some((argv) => argv.includes("clone"))).toBe(false);
+    expect(executedCommands.some((argv) => argv.includes("remote"))).toBe(false);
+    expect(materialized).toBe(0);
+    expect(sourceCredentials).toEqual([]);
+  });
+
+  test("[FOLDER-ONBOARD-007][WS-REMOTE-PROGRESS-201] leftover folder occupancy continues without remote materialize", async () => {
+    const executedCommands: string[][] = [];
+    let createdSandboxes = 0;
+    let materialized = 0;
+    const { service } = createFolderOccupancyOpen({
+      executedCommands,
+      preferred: {
+        workspaceId: "sbx_partial",
+        commitSha: folderOccupancyInput.commitSha,
+        profileInstallationId: "awpi_default",
+        status: "partial",
+        phase: "workspace-open-source-materialization",
+        targetSelection: {
+          targetClass: "registered-server",
+          source: "explicit",
+          reason: "code_target_server",
+        },
+      },
+      createSandbox: async () => {
+        createdSandboxes += 1;
+        throw new Error("folder occupancy leftover must not create another Sandbox");
+      },
+    });
+    const opened = await service.open(
+      createExecutionContext({
+        requestId: "req_folder_occupancy_partial",
+        entrypoint: "cli",
+        actor: { kind: "user", id: "usr_1" },
+        tenant: { tenantId: "ten_1" },
+      }),
+      folderOccupancyInput,
+      {
+        sourceMaterializer: {
+          materialize: async () => {
+            materialized += 1;
+            return err(
+              domainError.conflict("Workspace source materialization failed", {
+                code: "workspace_open_source_materialization_failed",
+              }),
+            );
+          },
+        },
+      },
+    );
+
+    expect(opened.isOk()).toBe(true);
+    expect(opened._unsafeUnwrap()).toMatchObject({
+      workspaceId: "sbx_partial",
+      resumed: true,
+      source: { repositoryIdentity: "folder.local/cwd/notes" },
+    });
+    expect(createdSandboxes).toBe(0);
+    expect(materialized).toBe(0);
+    expect(executedCommands).toEqual([]);
+    expect(opened._unsafeUnwrap().source.repository).toBe("https://folder.local/cwd/notes.git");
+  });
+
+  test("[FOLDER-ONBOARD-007][WS-REMOTE-PROGRESS-201] leftover folder occupancy with a different pin still repairs", async () => {
+    const { service } = createFolderOccupancyOpen({
+      preferred: {
+        workspaceId: "sbx_partial",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        profileInstallationId: "awpi_other",
+        status: "partial",
+        phase: "workspace-open-source-materialization",
+        targetSelection: {
+          targetClass: "registered-server",
+          source: "explicit",
+          reason: "code_target_server",
+        },
+      },
+    });
+    const opened = await service.open(
+      createExecutionContext({
+        requestId: "req_folder_occupancy_pin_mismatch",
+        entrypoint: "cli",
+        actor: { kind: "user", id: "usr_1" },
+        tenant: { tenantId: "ten_1" },
+      }),
+      folderOccupancyInput,
+    );
+
+    expect(opened.isOk()).toBe(true);
+    expect(opened._unsafeUnwrap()).toMatchObject({
+      workspaceId: "sbx_partial",
+      resumed: true,
+      source: { repositoryIdentity: "folder.local/cwd/notes" },
+    });
+  });
+
+  test("[FOLDER-ONBOARD-007][WS-REMOTE-PROGRESS-201] unrepairable leftover folder occupancy replaces without partial_recovery", async () => {
+    const executedCommands: string[][] = [];
+    let materialized = 0;
+    const { service, terminated, begun } = createFolderOccupancyOpen({
+      executedCommands,
+      preferred: {
+        workspaceId: "sbx_partial",
+        commitSha: folderOccupancyInput.commitSha,
+        profileInstallationId: "awpi_default",
+        status: "partial",
+        phase: "workspace-open-source-materialization",
+        targetSelection: {
+          targetClass: "registered-server",
+          source: "explicit",
+          reason: "code_target_server",
+        },
+      },
+      resumeSandbox: async () =>
+        err(
+          domainError.conflict("Sandbox resume failed", {
+            code: "sandbox_resume_failed",
+          }),
+        ),
+    });
+    const opened = await service.open(
+      createExecutionContext({
+        requestId: "req_folder_occupancy_replace",
+        entrypoint: "cli",
+        actor: { kind: "user", id: "usr_1" },
+        tenant: { tenantId: "ten_1" },
+      }),
+      folderOccupancyInput,
+      {
+        sourceMaterializer: {
+          materialize: async () => {
+            materialized += 1;
+            return err(
+              domainError.conflict("Workspace source materialization failed", {
+                code: "workspace_open_source_materialization_failed",
+              }),
+            );
+          },
+        },
+      },
+    );
+
+    expect(opened.isOk()).toBe(true);
+    expect(opened._unsafeUnwrap()).toMatchObject({
+      workspaceId: "sbx_notes",
+      resumed: false,
+      source: { repositoryIdentity: "folder.local/cwd/notes" },
+    });
+    expect(terminated).toEqual(["sbx_partial"]);
+    expect(begun).toEqual([{ forceNew: true }]);
+    expect(materialized).toBe(0);
+    expect(executedCommands).toEqual([]);
+  });
+
+  test("[FOLDER-ONBOARD-007] folder.local locator skips source materialization without a git remote host", () => {
+    expect(
+      shouldSkipWorkspaceSourceMaterialization({
+        repositoryIdentity: "folder.local/cwd/nux-code-silence-cwd",
+        repository: "https://folder.local/cwd/nux-code-silence-cwd.git",
+      }),
+    ).toBe(true);
+    expect(
+      shouldSkipWorkspaceSourceMaterialization(
+        {
+          repositoryIdentity: "github.com/appaloft/examples",
+          repository: "https://github.com/appaloft/examples.git",
+        },
+        { skipSourceMaterialization: true },
+      ),
+    ).toBe(true);
+    expect(
+      shouldSkipWorkspaceSourceMaterialization({
+        repositoryIdentity: "github.com/appaloft/examples",
+        repository: "https://github.com/appaloft/examples.git",
+      }),
+    ).toBe(false);
+  });
+
+  test("[FOLDER-ONBOARD-007][WS-REMOTE-PROGRESS-201] workspaces.open command for folder.local skips materialize on forceNew", async () => {
+    const executedCommands: string[][] = [];
+    const { service } = createFolderOccupancyOpen({ executedCommands });
+    const handler = new AgentWorkspaceOpenCommandHandler(service);
+    const command = OpenAgentWorkspaceCommand.create({
+      ...folderOccupancyInput,
+      forceNew: true,
+    });
+    expect(command.isOk()).toBe(true);
+    expect(command._unsafeUnwrap().input.repository).toBe("https://folder.local/cwd/notes.git");
+    expect(command._unsafeUnwrap().input.repository).not.toContain("github.com");
+    const opened = await handler.handle(
+      createExecutionContext({
+        requestId: "req_folder_occupancy_command_force_new",
+        entrypoint: "cli",
+        actor: { kind: "user", id: "usr_1" },
+        tenant: { tenantId: "ten_1" },
+      }),
+      command._unsafeUnwrap(),
+    );
+
+    expect(opened.isOk()).toBe(true);
+    expect(opened._unsafeUnwrap()).toMatchObject({
+      workspaceId: "sbx_notes",
+      resumed: false,
+      source: {
+        repositoryIdentity: "folder.local/cwd/notes",
+        repository: "https://folder.local/cwd/notes.git",
+      },
+    });
+    expect(executedCommands).toEqual([]);
+    expect(executedCommands.some((argv) => argv[0] === "git")).toBe(false);
+  });
+
+  test("[WS-OPEN-PARTIAL-017] git remote leftover still fail-closes for partial recovery", async () => {
+    const { service } = createFolderOccupancyOpen({
+      preferred: {
+        workspaceId: "sbx_git_partial",
+        commitSha: input.commitSha,
+        profileInstallationId: "awpi_default",
+        status: "partial",
+        phase: "workspace-open-source-materialization",
+        targetSelection: {
+          targetClass: "registered-server",
+          source: "explicit",
+          reason: "code_target_server",
+        },
+      },
+    });
+    const opened = await service.open(
+      createExecutionContext({
+        requestId: "req_git_partial",
+        entrypoint: "cli",
+        actor: { kind: "user", id: "usr_1" },
+        tenant: { tenantId: "ten_1" },
+      }),
+      input,
+    );
+
+    expect(opened.isErr()).toBe(true);
+    expect(opened._unsafeUnwrapErr().details?.code).toBe(
+      "workspace_open_partial_recovery_required",
+    );
   });
 });
+
+const folderOccupancyInput = {
+  repository: "https://folder.local/cwd/notes.git",
+  repositoryIdentity: "folder.local/cwd/notes",
+  ref: "refs/heads/local",
+  branch: "local",
+  commitSha: "cafef00d00000000000000000000000000000000",
+  attach: false,
+};
+
+function createFolderOccupancyOpen(options: {
+  readonly executedCommands?: string[][];
+  readonly preferred?: {
+    readonly workspaceId: string;
+    readonly commitSha: string;
+    readonly profileInstallationId: string;
+    readonly status: "partial" | "ready" | "terminal";
+    readonly phase?: string;
+    readonly targetSelection: {
+      readonly targetClass: "managed" | "registered-server";
+      readonly source: "platform-default" | "explicit";
+      readonly reason: string;
+    };
+  };
+  readonly createSandbox?: WorkspaceOpenDependencies["sandboxes"]["create"];
+  readonly resumeSandbox?: WorkspaceOpenDependencies["sandboxes"]["resume"];
+}): {
+  readonly service: AgentWorkspaceOpenService;
+  readonly sourceCredentials: string[];
+  readonly terminated: string[];
+  readonly begun: Array<{ forceNew: boolean }>;
+} {
+  const executedCommands = options.executedCommands ?? [];
+  const sourceCredentials: string[] = [];
+  const terminated: string[] = [];
+  const begun: Array<{ forceNew: boolean }> = [];
+  const pin = {
+    profileInstallationId: "awpi_default",
+    profileDefinitionDigest: `sha256:${"a".repeat(64)}`,
+    profileId: "custom-default",
+    profileVersion: "1.0.0",
+    adapterInstallationId: "aai_custom",
+    adapterDefinitionDigest: `sha256:${"b".repeat(64)}`,
+    adapterId: "custom-agent",
+    adapterVersion: "1.0.0",
+    harnessKey: "custom-agent",
+    harnessTemplateId: "aht_custom",
+    sandboxTemplateId: "sbt_agent",
+    sandboxTemplateVersion: "1",
+    sandboxTemplateDigest: `sha256:${"c".repeat(64)}`,
+    capabilities: {
+      taskMode: true,
+      interactive: true,
+      backgroundRuns: true,
+      nativeSession: false,
+      persistentPaths: ["/workspace"],
+    },
+  };
+  const activation = {
+    project: { projectId: "prj_notes", disposition: "created" as const },
+    repositoryBinding: { bindingId: "rbd_notes", disposition: "created" as const },
+    profile: { profileInstallationId: "awpi_default", disposition: "created" as const },
+  };
+  const dependencies: WorkspaceOpenDependencies = {
+    preflight: {
+      resolveContext: async () =>
+        ok({
+          projectId: "prj_notes",
+          profileInstallationId: "awpi_default",
+          activation,
+        }),
+      admit: async (_context, resolved) =>
+        ok({
+          projectId: resolved.projectId,
+          profileInstallationId: resolved.profileInstallationId,
+          activation: resolved.activation,
+          plan: {
+            sandbox: {
+              source: { kind: "template", templateId: "sbt_agent" },
+              requestedIsolation: "gvisor",
+              limits: {
+                cpuMillis: 1_000,
+                memoryBytes: 536_870_912,
+                diskBytes: 2_147_483_648,
+                maxProcesses: 32,
+              },
+              networkPolicy: { mode: "allowlist", rules: [] },
+            },
+            initialization: [],
+            runtime: {
+              harnessKey: "custom-agent",
+              harnessTemplateId: "aht_custom",
+              declarativeHarness: {},
+            },
+            defaultPorts: [],
+            suggestedChecks: [],
+            credentialRequirements: [],
+            pin,
+          },
+          reservation: {
+            reservationId: "res_notes",
+            targetSelection: options.preferred?.targetSelection ?? {
+              targetClass: "managed",
+              source: "platform-default",
+              reason: "managed_entitlement_default",
+            },
+          },
+        }),
+    },
+    entries: {
+      findByWorkspaceIds: async () => new Map(),
+      findByWorkspaceId: async () => undefined,
+      findPreferred: async () => options.preferred,
+      findLiveProfileInstallationIds: async () => [],
+      begin: async (_context, _key, value) => {
+        begun.push({ forceNew: value.forceNew });
+        return ok({ workspaceId: "sbx_notes", created: true });
+      },
+      complete: async () => ok(undefined),
+      fail: async () => ok(undefined),
+      markWorkspaceTerminated: async (_context, workspaceId) => {
+        terminated.push(workspaceId);
+        return ok({ advanced: true });
+      },
+    },
+    sourceCredentials: {
+      resolve: async (_context, value) => {
+        sourceCredentials.push(value.repositoryIdentity);
+        return ok(null);
+      },
+    },
+    sandboxes: {
+      create:
+        options.createSandbox ?? (async () => ok({ sandboxId: "sbx_notes", status: "ready" })),
+      resume:
+        options.resumeSandbox ??
+        (async (_context, workspaceId) => ok({ sandboxId: workspaceId, status: "ready" })),
+      exec: async (_context, _workspaceId, command) => {
+        executedCommands.push([...command.argv]);
+        return ok({ mode: "foreground", frames: [{ kind: "exit", exitCode: 1 }] });
+      },
+      exposePort: async () => ok(undefined),
+    },
+    agents: {
+      showRuntime: async (_context, value) =>
+        ok({
+          runtimeId: value.runtimeId,
+          sandboxId: value.sandboxId,
+          harnessKey: "custom-agent",
+          harnessTemplateId: "aht_custom",
+          status: "ready",
+          profilePin: pin,
+          capabilities: pin.capabilities,
+          createdAt: "2026-08-20T00:00:00.000Z",
+        }),
+      createRuntime: async (_context, value) =>
+        ok({
+          runtimeId: value.sandboxId === "sbx_partial" ? "sar_partial" : "sar_notes",
+          sandboxId: value.sandboxId,
+          harnessKey: "custom-agent",
+          harnessTemplateId: "aht_custom",
+          status: "ready",
+          capabilities: pin.capabilities,
+          createdAt: "2026-08-20T00:00:00.000Z",
+        }),
+      ensureRuntime: async () => ok(undefined),
+      attach: async () => {
+        throw new Error("attach should not run");
+      },
+    },
+    reservations: {
+      consume: async () => ok(undefined),
+      release: async () => ok(undefined),
+    },
+    now: () => "2026-08-20T00:00:00.000Z",
+  };
+  return {
+    service: new AgentWorkspaceOpenService(dependencies),
+    sourceCredentials,
+    terminated,
+    begun,
+  };
+}

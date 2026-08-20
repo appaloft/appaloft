@@ -48,7 +48,7 @@ try {
   await waitFor("preparing the agent");
   let exitCode: number | undefined;
   for (let attempt = 0; attempt < 40 && exitCode === undefined; attempt += 1) {
-    terminal.write("q");
+    terminal.write("\x03");
     const result = await Promise.race([
       child.exited.then((code) => ({ exited: true as const, code })),
       Bun.sleep(150).then(() => ({ exited: false as const })),
@@ -57,7 +57,7 @@ try {
   }
   if (exitCode === undefined) {
     throw new Error(
-      `Packaged Workspace TUI did not exit after q; output=${JSON.stringify(output)}`,
+      `Packaged Workspace TUI did not exit after ^c; output=${JSON.stringify(output)}`,
     );
   }
   if (exitCode !== 0) {

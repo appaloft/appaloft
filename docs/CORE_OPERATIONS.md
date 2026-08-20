@@ -1115,7 +1115,7 @@ Server id/host, provider handle, capacity probes or credentials.
 
 | Workspace action | Canonical operations | CLI / SDK |
 | --- | --- | --- |
-| Open remote Agent door | none | default `appaloft code` prints present-tense progress, occupies after login + Server, and native-attaches as soon as my occupancy exists; TTY first useful alt-screen is under 1s and is not blocked on composition; a no-git folder resumes the live occupancy (git is not a gate) instead of staying on `Resolving repository…`; with no occupancy it create-or-links this folder's Project and occupies `folder.local`; `--profile` is a fallback pin; `--no-attach` prints the same progress and stops; `--local` is Scratch |
+| Open remote Agent door | none | default `appaloft code` prints present-tense progress, occupies after login + Server, and native-attaches as soon as my occupancy exists; TTY first useful alt-screen is under 1s and is not blocked on composition; a no-git folder occupies this folder after onboarding (git is not a gate) instead of staying on `Resolving repository…` or resuming an unrelated occupancy; it create-or-links this folder's Project and occupies `folder.local` without cloning or materializing a missing remote; `--profile` is a fallback pin; `--no-attach` prints the same progress and stops; `--local` is Scratch |
 | Open/create-or-resume | `workspaces.open` | durable `appaloft workspace open [path|git-remote]`; `appaloft.workspaces.open(...)` |
 | Profile-aware create | `workspaces.open(forceNew=true)` | `appaloft workspace create --profile ...`; `appaloft.workspaces.create(...)` |
 | Adapter catalog | `sandboxes.agents.harnesses.list` | `appaloft workspace harness list`; Console capability-driven creation |

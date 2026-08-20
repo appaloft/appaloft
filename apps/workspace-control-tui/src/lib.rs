@@ -51,7 +51,7 @@ fn occupancy_commit_message(commit_sha: &str) -> Option<String> {
     if sha.len() < 7 || !sha.bytes().take(7).all(|byte| byte.is_ascii_hexdigit()) {
         return None;
     }
-    Some(format!("Deliver occupancy {}", &sha[..7]))
+    Some(format!("Deliver {}", &sha[..7]))
 }
 
 fn occupancy_github_compare_available(occupancy: &OccupancySummary) -> bool {
@@ -73,6 +73,7 @@ fn occupancy_github_compare_available(occupancy: &OccupancySummary) -> bool {
         .starts_with("github.com/")
 }
 
+#[allow(dead_code)]
 fn occupancy_available_door_keys(detail: Option<&DetailMessage>) -> Vec<&'static str> {
     let Some(detail) = detail else {
         return Vec::new();
@@ -117,21 +118,46 @@ fn occupancy_available_door_keys(detail: Option<&DetailMessage>) -> Vec<&'static
     doors
 }
 
-fn occupancy_available_door_footer(detail: Option<&DetailMessage>) -> String {
-    let doors = occupancy_available_door_keys(detail);
-    if doors.is_empty() {
-        String::new()
-    } else {
-        format!("  {} ", doors.join("  "))
-    }
+fn occupancy_control_footer(status_line: &str, _detail: Option<&DetailMessage>) -> String {
+    format!(" {status_line}  │  enter connect  n new  w wake  d delete  ? ")
 }
 
-fn occupancy_control_footer(status_line: &str, detail: Option<&DetailMessage>) -> String {
-    format!(
-        " Ctrl+] release  │  {}  │  q quit  ↑↓ select  Enter attach/focus{} a lifecycle  d delivery  s recovery  f Focus Mode  r refresh  R reconnect ",
-        status_line,
-        occupancy_available_door_footer(detail),
-    )
+const OCCUPANCY_HELP_ROWS: &[&str] = &[
+    "?              key list",
+    "↑ ↓ / j k      move",
+    "→ ← / h l      open/close row unavailable",
+    "enter          connect",
+    "⌥enter         connect and type",
+    "shift+esc / ^] stop typing",
+    "n              new session unavailable",
+    "⌥n             new session, choose agent unavailable",
+    "⌥p             new session from a prompt unavailable",
+    "x              end session, stay on list",
+    "s              sleep (pause)",
+    "w              wake (resume)",
+    "d              delete (confirm y)",
+    "c              copy SSH unavailable",
+    "r / ⌥r         refresh (⌥r from anywhere)",
+    "t / ^t         set target unavailable",
+    "f / ⌥f         fullscreen / restore tree",
+    "shift+enter    leave fullscreen unavailable",
+    "⌥[ ⌥]          cycle open sessions (wrap, no wake)",
+    "⌥t             theme unavailable",
+    "⌥s             setup not in this door",
+    "^o             unavailable",
+    "q              unbound (not quit)",
+    "esc            return to menu",
+    "^c             quit from list/menu",
+    "               pass through in session",
+    "mouse          wheel / agent clicks; OSC 52 local copy",
+];
+
+fn occupancy_help_lines() -> Vec<Line<'static>> {
+    OCCUPANCY_HELP_ROWS
+        .iter()
+        .copied()
+        .map(Line::from)
+        .collect()
 }
 
 fn occupancy_chrome_error_phase(phase: &str) -> bool {
@@ -657,12 +683,22 @@ pub enum ParentMessage {
     },
     Progress {
         message: String,
+        #[serde(default)]
+        step: Option<String>,
     },
     Loading {
         #[serde(default)]
         collapsed: Option<bool>,
         #[serde(default)]
         title: Option<String>,
+        #[serde(default)]
+        project: Option<String>,
+    },
+    Chrome {
+        #[serde(default)]
+        title: Option<String>,
+        #[serde(default)]
+        project: Option<String>,
     },
     Error {
         code: String,
@@ -851,12 +887,57 @@ impl RendererEvent {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct OccupancyPrepareStep {
+    pub id: String,
+    pub label: String,
+    pub status: String,
+}
+
+fn default_prepare_steps() -> Vec<OccupancyPrepareStep> {
+    [
+        ("credential", "Checking login"),
+        ("skills", "Preparing skills"),
+        ("disk", "Preparing disk"),
+    ]
+    .into_iter()
+    .map(|(id, label)| OccupancyPrepareStep {
+        id: id.to_owned(),
+        label: label.to_owned(),
+        status: "pending".to_owned(),
+    })
+    .collect()
+}
+
+fn infer_prepare_step_id(message: &str) -> &'static str {
+    let lower = message.to_ascii_lowercase();
+    if lower.contains("skill") {
+        "skills"
+    } else if lower.contains("login") || lower.contains("server") || lower.contains("credential") {
+        "credential"
+    } else {
+        "disk"
+    }
+}
+
+fn apply_prepare_step(steps: &mut [OccupancyPrepareStep], step_id: &str) {
+    let mut reached = false;
+    for step in steps.iter_mut() {
+        if step.id == step_id {
+            step.status = "active".to_owned();
+            reached = true;
+        } else if !reached {
+            step.status = "done".to_owned();
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct OccupancyLoading {
     pub active: bool,
     pub collapsed: bool,
     pub title: String,
-    pub harness: String,
-    pub steps: Vec<String>,
+    pub project: String,
+    pub steps: Vec<OccupancyPrepareStep>,
     pub tick: usize,
 }
 
@@ -865,12 +946,23 @@ impl Default for OccupancyLoading {
         Self {
             active: true,
             collapsed: true,
-            title: "Appaloft".to_owned(),
-            harness: "occupancy".to_owned(),
-            steps: Vec::new(),
+            title: "Appaloft Cloud Agents".to_owned(),
+            project: String::new(),
+            steps: default_prepare_steps(),
             tick: 0,
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OpenPane {
+    pub workspace_id: String,
+    pub runtime_id: String,
+    pub session_id: String,
+}
+
+fn occupancy_workspace_is_sleeping(status: &str) -> bool {
+    matches!(status, "paused" | "pausing" | "sleeping")
 }
 
 pub struct AppState {
@@ -896,6 +988,12 @@ pub struct AppState {
     pub recovery_form: Option<RecoveryForm>,
     pub pending_recovery_confirmation: Option<RecoverySubmission>,
     pub recovery_busy: bool,
+    pub wrap: bool,
+    pub help_open: bool,
+    pub open_panes: Vec<OpenPane>,
+    pub pending_osc52: Vec<String>,
+    pub osc52_carry: String,
+    pub osc52_passthrough_failed: bool,
     pub status_line: String,
     pub terminal: vt100::Parser,
     pub terminal_size: (u16, u16),
@@ -926,6 +1024,12 @@ impl Default for AppState {
             recovery_form: None,
             pending_recovery_confirmation: None,
             recovery_busy: false,
+            wrap: false,
+            help_open: false,
+            open_panes: Vec::new(),
+            pending_osc52: Vec::new(),
+            osc52_carry: String::new(),
+            osc52_passthrough_failed: false,
             status_line: "preparing the agent".to_owned(),
             terminal: vt100::Parser::new(24, 80, 10_000),
             terminal_size: (80, 24),
@@ -961,14 +1065,17 @@ impl AppState {
                     self.status_line = "Connected".to_owned();
                 }
             }
-            ParentMessage::Progress { message } => {
+            ParentMessage::Progress { message, step } => {
                 self.loading.active = true;
-                if self.loading.steps.last() != Some(&message) {
-                    self.loading.steps.push(message.clone());
-                }
+                let step_id = step.unwrap_or_else(|| infer_prepare_step_id(&message).to_owned());
+                apply_prepare_step(&mut self.loading.steps, &step_id);
                 self.status_line = message;
             }
-            ParentMessage::Loading { collapsed, title } => {
+            ParentMessage::Loading {
+                collapsed,
+                title,
+                project,
+            } => {
                 self.loading.active = true;
                 if let Some(collapsed) = collapsed {
                     self.loading.collapsed = collapsed;
@@ -976,7 +1083,18 @@ impl AppState {
                 if let Some(title) = title {
                     self.loading.title = title;
                 }
+                if let Some(project) = project {
+                    self.loading.project = project;
+                }
                 self.status_line = "preparing the agent".to_owned();
+            }
+            ParentMessage::Chrome { title, project } => {
+                if let Some(title) = title {
+                    self.loading.title = title;
+                }
+                if let Some(project) = project {
+                    self.loading.project = project;
+                }
             }
             ParentMessage::Workspaces { workspaces } => {
                 let selected_id = self.selected_workspace_id().map(str::to_owned);
@@ -1011,12 +1129,14 @@ impl AppState {
                 self.pending_recovery_confirmation = None;
             }
             ParentMessage::TerminalReady {
+                workspace_id,
                 runtime_id,
                 session_id,
                 ..
             } => {
-                self.runtime_id = Some(runtime_id);
+                self.runtime_id = Some(runtime_id.clone());
                 self.session_id = Some(session_id.clone());
+                self.remember_open_pane(&workspace_id, &runtime_id, &session_id);
                 self.agent_focused = true;
                 self.loading.active = false;
                 if self.loading.collapsed {
@@ -1024,10 +1144,18 @@ impl AppState {
                 }
                 self.status_line = format!("Agent Session {session_id}");
             }
-            ParentMessage::TerminalOutput { data, .. } => self.terminal.process(data.as_bytes()),
+            ParentMessage::TerminalOutput { data, .. } => {
+                let split = split_osc52(&self.osc52_carry, &data);
+                self.osc52_carry = split.carry;
+                self.pending_osc52.extend(split.sequences);
+                self.terminal.process(split.display.as_bytes());
+            }
             ParentMessage::TerminalClosed {
                 reason, exit_code, ..
             } => {
+                if let Some(session_id) = self.session_id.as_deref() {
+                    self.open_panes.retain(|pane| pane.session_id != session_id);
+                }
                 self.agent_focused = false;
                 self.focus_mode = false;
                 self.session_id = None;
@@ -1090,7 +1218,82 @@ impl AppState {
 
     pub fn release_agent_focus(&mut self) {
         self.agent_focused = false;
+    }
+
+    pub fn show_agents_list(&mut self) {
+        self.agent_focused = false;
         self.focus_mode = false;
+        self.loading.active = false;
+        self.loading.collapsed = false;
+        self.help_open = false;
+        self.status_line = "Appaloft Cloud Agents".to_owned();
+    }
+
+    fn remember_open_pane(&mut self, workspace_id: &str, runtime_id: &str, session_id: &str) {
+        if let Some(existing) = self
+            .open_panes
+            .iter_mut()
+            .find(|pane| pane.workspace_id == workspace_id || pane.session_id == session_id)
+        {
+            existing.workspace_id = workspace_id.to_owned();
+            existing.runtime_id = runtime_id.to_owned();
+            existing.session_id = session_id.to_owned();
+            return;
+        }
+        self.open_panes.push(OpenPane {
+            workspace_id: workspace_id.to_owned(),
+            runtime_id: runtime_id.to_owned(),
+            session_id: session_id.to_owned(),
+        });
+    }
+
+    pub fn cycle_open_session(&mut self, delta: isize) -> Option<(String, String)> {
+        let awake: Vec<OpenPane> = self
+            .open_panes
+            .iter()
+            .filter(|pane| {
+                self.workspaces
+                    .iter()
+                    .find(|workspace| workspace.workspace_id == pane.workspace_id)
+                    .is_some_and(|workspace| !occupancy_workspace_is_sleeping(&workspace.status))
+            })
+            .cloned()
+            .collect();
+        if awake.is_empty() {
+            self.mark_unavailable("switch session");
+            return None;
+        }
+        let current = awake.iter().position(|pane| {
+            Some(pane.session_id.as_str()) == self.session_id.as_deref()
+                || Some(pane.workspace_id.as_str()) == self.selected_workspace_id()
+        });
+        let idx = current.unwrap_or(0);
+        let next = (idx as isize + delta).rem_euclid(awake.len() as isize) as usize;
+        let pane = &awake[next];
+        if let Some(selected) = self
+            .workspaces
+            .iter()
+            .position(|workspace| workspace.workspace_id == pane.workspace_id)
+        {
+            self.selected = selected;
+        }
+        if awake.len() == 1 && Some(pane.session_id.as_str()) == self.session_id.as_deref() {
+            return None;
+        }
+        Some((pane.workspace_id.clone(), pane.runtime_id.clone()))
+    }
+
+    pub fn take_osc52(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.pending_osc52)
+    }
+
+    pub fn mark_osc52_passthrough_failed(&mut self) {
+        self.osc52_passthrough_failed = true;
+        self.status_line = OSC52_PASSTHROUGH_DISABLED.to_owned();
+    }
+
+    pub fn toggle_help(&mut self) {
+        self.help_open = !self.help_open;
     }
 
     pub fn toggle_focus_mode(&mut self) {
@@ -1100,7 +1303,7 @@ impl AppState {
         }
         if self.session_id.is_some() {
             self.focus_mode = !self.focus_mode;
-            self.agent_focused = true;
+            self.agent_focused = self.focus_mode;
         }
     }
 
@@ -1126,6 +1329,45 @@ impl AppState {
             .as_ref()
             .map(|detail| lifecycle_actions_for_status(&detail.workspace.status))
             .unwrap_or_default()
+    }
+
+    pub fn mark_unavailable(&mut self, capability: &str) {
+        self.status_line = format!("{capability} is unavailable");
+    }
+
+    pub fn request_sleep(&mut self) -> Option<LifecycleAction> {
+        self.request_lifecycle(LifecycleAction::Pause, "sleep")
+    }
+
+    pub fn request_wake(&mut self) -> Option<LifecycleAction> {
+        self.request_lifecycle(LifecycleAction::Resume, "wake")
+    }
+
+    pub fn request_delete(&mut self) -> bool {
+        if self.action_busy
+            || !self
+                .available_lifecycle_actions()
+                .contains(&LifecycleAction::Terminate)
+        {
+            self.mark_unavailable("delete");
+            return false;
+        }
+        self.pending_confirmation = Some(LifecycleAction::Terminate);
+        self.status_line = "delete agent? y confirm  n cancel".to_owned();
+        true
+    }
+
+    fn request_lifecycle(
+        &mut self,
+        action: LifecycleAction,
+        capability: &str,
+    ) -> Option<LifecycleAction> {
+        if self.action_busy || !self.available_lifecycle_actions().contains(&action) {
+            self.mark_unavailable(capability);
+            return None;
+        }
+        self.action_busy = true;
+        Some(action)
     }
 
     pub fn open_action_menu(&mut self) -> bool {
@@ -1585,6 +1827,191 @@ impl AppState {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OccupancyKeyBinding {
+    Quit,
+    PassToAgent,
+    StopTyping,
+    ShowAgentsList,
+    ToggleFullscreen,
+    Connect,
+    NewSession,
+    SleepAgent,
+    WakeAgent,
+    DeleteAgent,
+    CopySsh,
+    Refresh,
+    SetTarget,
+    ReturnToMenu,
+    MoveUp,
+    MoveDown,
+    ToggleHelp,
+    CycleOpenSession(i8),
+    Unavailable(&'static str),
+    Unhandled,
+}
+
+fn occupancy_bare_char(key: KeyEvent, expected: char) -> bool {
+    let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+    let alt = key.modifiers.contains(KeyModifiers::ALT);
+    matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&expected))
+        && !ctrl
+        && !alt
+}
+
+fn occupancy_alt_char(key: KeyEvent, expected: char) -> bool {
+    let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+    let alt = key.modifiers.contains(KeyModifiers::ALT);
+    alt && !ctrl
+        && matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&expected))
+}
+
+fn occupancy_option_chrome(key: KeyEvent) -> Option<OccupancyKeyBinding> {
+    if occupancy_alt_char(key, 'f') {
+        return Some(OccupancyKeyBinding::ToggleFullscreen);
+    }
+    if occupancy_alt_char(key, 'r') {
+        return Some(OccupancyKeyBinding::Refresh);
+    }
+    if occupancy_alt_char(key, 'n') {
+        return Some(OccupancyKeyBinding::Unavailable(
+            "new session, choose agent",
+        ));
+    }
+    if occupancy_alt_char(key, 'p') {
+        return Some(OccupancyKeyBinding::Unavailable(
+            "new session from a prompt",
+        ));
+    }
+    if occupancy_alt_char(key, 't') {
+        return Some(OccupancyKeyBinding::Unavailable("theme"));
+    }
+    if occupancy_alt_char(key, 's') {
+        return Some(OccupancyKeyBinding::Unavailable("setup"));
+    }
+    if occupancy_alt_char(key, '[') {
+        return Some(OccupancyKeyBinding::CycleOpenSession(-1));
+    }
+    if occupancy_alt_char(key, ']') {
+        return Some(OccupancyKeyBinding::CycleOpenSession(1));
+    }
+    if key.modifiers.contains(KeyModifiers::ALT)
+        && !key.modifiers.contains(KeyModifiers::CONTROL)
+        && matches!(key.code, KeyCode::Enter)
+    {
+        return Some(OccupancyKeyBinding::Connect);
+    }
+    None
+}
+
+pub fn occupancy_key_binding(
+    key: KeyEvent,
+    agent_focused: bool,
+    _has_session: bool,
+) -> OccupancyKeyBinding {
+    let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+    let shift = key.modifiers.contains(KeyModifiers::SHIFT);
+    if ctrl && matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'c'))
+    {
+        return if agent_focused {
+            OccupancyKeyBinding::PassToAgent
+        } else {
+            OccupancyKeyBinding::Quit
+        };
+    }
+    if let Some(binding) = occupancy_option_chrome(key) {
+        return binding;
+    }
+    if agent_focused {
+        if ctrl && matches!(key.code, KeyCode::Char(']')) {
+            return OccupancyKeyBinding::StopTyping;
+        }
+        if matches!(key.code, KeyCode::Esc) && shift {
+            return OccupancyKeyBinding::StopTyping;
+        }
+        if occupancy_bare_char(key, 'x') {
+            return OccupancyKeyBinding::ShowAgentsList;
+        }
+        return OccupancyKeyBinding::PassToAgent;
+    }
+    if matches!(key.code, KeyCode::Char('?')) && !ctrl {
+        return OccupancyKeyBinding::ToggleHelp;
+    }
+    if matches!(key.code, KeyCode::Enter) && shift {
+        return OccupancyKeyBinding::Unavailable("leave fullscreen connect");
+    }
+    if matches!(key.code, KeyCode::Enter) {
+        return OccupancyKeyBinding::Connect;
+    }
+    if occupancy_bare_char(key, 'x') {
+        return OccupancyKeyBinding::ShowAgentsList;
+    }
+    if occupancy_bare_char(key, 'n') {
+        return OccupancyKeyBinding::NewSession;
+    }
+    if occupancy_bare_char(key, 's') {
+        return OccupancyKeyBinding::SleepAgent;
+    }
+    if occupancy_bare_char(key, 'w') {
+        return OccupancyKeyBinding::WakeAgent;
+    }
+    if occupancy_bare_char(key, 'd') {
+        return OccupancyKeyBinding::DeleteAgent;
+    }
+    if occupancy_bare_char(key, 'c') {
+        return OccupancyKeyBinding::CopySsh;
+    }
+    if occupancy_bare_char(key, 'r') {
+        return OccupancyKeyBinding::Refresh;
+    }
+    if occupancy_bare_char(key, 't')
+        || (ctrl
+            && matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'t')))
+    {
+        return OccupancyKeyBinding::SetTarget;
+    }
+    if occupancy_bare_char(key, 'f') {
+        return OccupancyKeyBinding::ToggleFullscreen;
+    }
+    if ctrl && matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'o'))
+    {
+        return OccupancyKeyBinding::Unavailable("ctrl+o");
+    }
+    if matches!(key.code, KeyCode::Esc) {
+        return OccupancyKeyBinding::ReturnToMenu;
+    }
+    if matches!(key.code, KeyCode::Up) || occupancy_bare_char(key, 'k') {
+        return OccupancyKeyBinding::MoveUp;
+    }
+    if matches!(key.code, KeyCode::Down) || occupancy_bare_char(key, 'j') {
+        return OccupancyKeyBinding::MoveDown;
+    }
+    if matches!(key.code, KeyCode::Left | KeyCode::Right)
+        || occupancy_bare_char(key, 'h')
+        || occupancy_bare_char(key, 'l')
+    {
+        return OccupancyKeyBinding::Unavailable("open/close row");
+    }
+    OccupancyKeyBinding::Unhandled
+}
+
+/// Signals that restore and stop the occupancy TUI.
+///
+/// SIGINT is intentionally absent: in-session Ctrl+C is a key to the agent.
+/// List/menu quit is the `^c` key event, not this signal.
+pub fn occupancy_stop_signals() -> &'static [i32] {
+    &[
+        signal_hook::consts::SIGTERM,
+        signal_hook::consts::SIGHUP,
+        signal_hook::consts::SIGQUIT,
+    ]
+}
+
+/// Signals the occupancy TUI swallows so a leftover ISIG cannot tear it down.
+pub fn occupancy_ignored_signals() -> &'static [i32] {
+    &[signal_hook::consts::SIGINT]
+}
+
 pub fn terminal_key_bytes(key: KeyEvent) -> Option<String> {
     if key.modifiers.contains(KeyModifiers::CONTROL)
         && let KeyCode::Char(character) = key.code
@@ -1761,37 +2188,122 @@ fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
     }
 }
 
-fn occupancy_loading_step_lines(state: &AppState, width: u16) -> Vec<Line<'static>> {
-    const STEP_ROWS: usize = 9;
-    let steps = &state.loading.steps;
-    let usable = width.saturating_sub(2).max(20) as usize;
-    let mut budget = STEP_ROWS;
-    let mut start = steps.len();
-    for (index, step) in steps.iter().enumerate().rev() {
-        let rows = step.chars().count().div_ceil(usable).max(1);
-        if rows > budget {
-            break;
-        }
-        budget -= rows;
-        start = index;
+fn occupancy_chrome_header(state: &AppState) -> String {
+    if state.loading.project.is_empty() {
+        state.loading.title.clone()
+    } else {
+        format!("{} · {}", state.loading.title, state.loading.project)
     }
-    let last = steps.len().saturating_sub(1);
-    steps[start..]
+}
+
+pub const OSC52_PASSTHROUGH_DISABLED: &str =
+    "Local terminal has OSC 52 disabled. Copy stayed on the remote agent.";
+
+const OSC52_INTRO: &[u8] = b"\x1b]52;";
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Osc52Split {
+    pub display: String,
+    pub sequences: Vec<String>,
+    pub carry: String,
+}
+
+pub fn extract_osc52_sequences(data: &str) -> Vec<String> {
+    split_osc52("", data).sequences
+}
+
+pub fn split_osc52(carry: &str, incoming: &str) -> Osc52Split {
+    let mut input = String::with_capacity(carry.len() + incoming.len());
+    input.push_str(carry);
+    input.push_str(incoming);
+    let bytes = input.as_bytes();
+    let mut display = String::new();
+    let mut sequences = Vec::new();
+    let mut index = 0;
+    while index < bytes.len() {
+        if osc52_intro_prefix(&bytes[index..]) {
+            let start = index;
+            index += OSC52_INTRO.len();
+            let mut ended = None;
+            while index < bytes.len() {
+                if bytes[index] == 0x07 {
+                    ended = Some(index + 1);
+                    break;
+                }
+                if bytes[index] == 0x1b && bytes.get(index + 1) == Some(&b'\\') {
+                    ended = Some(index + 2);
+                    break;
+                }
+                index += 1;
+            }
+            if let Some(end) = ended {
+                sequences.push(input[start..end].to_owned());
+                index = end;
+            } else {
+                return Osc52Split {
+                    display,
+                    sequences,
+                    carry: input[start..].to_owned(),
+                };
+            }
+            continue;
+        }
+        if bytes[index] == 0x1b && is_possible_osc52_start(&bytes[index..]) {
+            return Osc52Split {
+                display,
+                sequences,
+                carry: input[index..].to_owned(),
+            };
+        }
+        let next = input[index..]
+            .chars()
+            .next()
+            .map_or(1, |character| character.len_utf8());
+        display.push_str(&input[index..index + next]);
+        index += next;
+    }
+    Osc52Split {
+        display,
+        sequences,
+        carry: String::new(),
+    }
+}
+
+fn osc52_intro_prefix(bytes: &[u8]) -> bool {
+    bytes.len() >= OSC52_INTRO.len() && bytes.starts_with(OSC52_INTRO)
+}
+
+fn is_possible_osc52_start(bytes: &[u8]) -> bool {
+    !bytes.is_empty() && OSC52_INTRO.starts_with(bytes)
+}
+
+pub fn write_osc52_passthrough<W: std::io::Write>(
+    writer: &mut W,
+    sequences: &[String],
+) -> std::io::Result<()> {
+    for sequence in sequences {
+        writer.write_all(sequence.as_bytes())?;
+    }
+    writer.flush()
+}
+
+fn occupancy_loading_step_lines(state: &AppState) -> Vec<Line<'static>> {
+    state
+        .loading
+        .steps
         .iter()
-        .enumerate()
-        .map(|(offset, step)| {
-            let index = start + offset;
-            let (marker, style) = if index == last {
-                (
+        .map(|step| {
+            let (marker, style) = match step.status.as_str() {
+                "active" => (
                     format!("{} ", spinner_frame(state.loading.tick)),
                     Style::default().fg(Color::Cyan),
-                )
-            } else {
-                ("✓ ".to_string(), Style::default().fg(Color::DarkGray))
+                ),
+                "done" => ("✓ ".to_string(), Style::default().fg(Color::DarkGray)),
+                _ => ("○ ".to_string(), Style::default().fg(Color::DarkGray)),
             };
             Line::from(vec![
                 Span::styled(marker, style),
-                Span::styled(step.clone(), style),
+                Span::styled(step.label.clone(), style),
             ])
         })
         .collect()
@@ -1799,9 +2311,20 @@ fn occupancy_loading_step_lines(state: &AppState, width: u16) -> Vec<Line<'stati
 
 fn occupancy_loading_footer(collapsed: bool) -> String {
     if collapsed {
-        " q quit  f restore list ".to_owned()
+        " ⌥f restore tree  shift+esc/^] stop typing  ? ".to_owned()
     } else {
-        " q quit ".to_owned()
+        " enter connect  n new  w wake  d delete  ? ".to_owned()
+    }
+}
+
+fn occupancy_session_footer(state: &AppState) -> String {
+    if state.osc52_passthrough_failed {
+        format!(
+            " {}  │  ⌥f restore tree  wrap  shift+esc/^] stop typing ",
+            OSC52_PASSTHROUGH_DISABLED
+        )
+    } else {
+        " ⌥f restore tree  wrap  shift+esc/^] stop typing ".to_owned()
     }
 }
 
@@ -1812,7 +2335,7 @@ fn render_occupancy_loading(frame: &mut Frame<'_>, state: &AppState, area: Rect)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(Color::Cyan))
         .title(Span::styled(
-            format!(" {} · starting ", state.loading.harness),
+            format!(" {} ", occupancy_chrome_header(state)),
             Style::default()
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
@@ -1823,8 +2346,10 @@ fn render_occupancy_loading(frame: &mut Frame<'_>, state: &AppState, area: Rect)
         .loading
         .steps
         .iter()
-        .map(|step| step.chars().count() + 2)
-        .chain(std::iter::once(state.loading.title.chars().count()))
+        .map(|step| step.label.chars().count() + 2)
+        .chain(std::iter::once(
+            occupancy_chrome_header(state).chars().count(),
+        ))
         .max()
         .unwrap_or(0)
         .clamp(20, inner.width.max(1) as usize) as u16;
@@ -1846,7 +2371,7 @@ fn render_occupancy_loading(frame: &mut Frame<'_>, state: &AppState, area: Rect)
                 Style::default().fg(Color::Cyan),
             ),
             Span::styled(
-                state.loading.title.clone(),
+                occupancy_chrome_header(state),
                 Style::default()
                     .fg(Color::White)
                     .add_modifier(Modifier::BOLD),
@@ -1862,8 +2387,7 @@ fn render_occupancy_loading(frame: &mut Frame<'_>, state: &AppState, area: Rect)
         rows[1],
     );
     frame.render_widget(
-        Paragraph::new(occupancy_loading_step_lines(state, rows[3].width))
-            .wrap(Wrap { trim: false }),
+        Paragraph::new(occupancy_loading_step_lines(state)).wrap(Wrap { trim: false }),
         rows[3],
     );
 }
@@ -1890,10 +2414,7 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
             frame,
             state,
             body,
-            format!(
-                " Agent — Focus Mode — {} ",
-                state.session_id.as_deref().unwrap_or("not attached")
-            ),
+            format!(" {} ", occupancy_chrome_header(state)),
         );
     } else {
         let columns = Layout::default()
@@ -1925,7 +2446,11 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
                 ]))
             });
         frame.render_widget(
-            List::new(items).block(Block::default().title(" Workspaces ").borders(Borders::ALL)),
+            List::new(items).block(
+                Block::default()
+                    .title(format!(" {} ", occupancy_chrome_header(state)))
+                    .borders(Borders::ALL),
+            ),
             columns[0],
         );
         let detail_text = if let Some(detail) = &state.detail {
@@ -2148,10 +2673,11 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
         );
     }
     frame.render_widget(
-        Paragraph::new(occupancy_control_footer(
-            &state.status_line,
-            state.detail.as_ref(),
-        ))
+        Paragraph::new(if state.focus_mode {
+            occupancy_session_footer(state)
+        } else {
+            occupancy_control_footer(&state.status_line, state.detail.as_ref())
+        })
         .style(Style::default().fg(Color::DarkGray)),
         footer,
     );
@@ -2470,11 +2996,41 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
             dialog,
         );
     }
+    if state.help_open {
+        let width = 72_u16.min(area.width.saturating_sub(2)).max(2);
+        let height = (OCCUPANCY_HELP_ROWS.len() as u16 + 2)
+            .min(area.height.saturating_sub(2))
+            .max(3);
+        let dialog = Rect::new(
+            area.x + area.width.saturating_sub(width) / 2,
+            area.y + area.height.saturating_sub(height) / 2,
+            width,
+            height,
+        );
+        frame.render_widget(Clear, dialog);
+        frame.render_widget(
+            Paragraph::new(occupancy_help_lines())
+                .block(
+                    Block::default()
+                        .title(" Appaloft Cloud Agents ")
+                        .borders(Borders::ALL),
+                )
+                .wrap(Wrap { trim: false }),
+            dialog,
+        );
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn assert_no_bare_q_quit(text: &str) {
+        assert!(
+            !text.replace("^q quit", "").contains("q quit"),
+            "bare q quit leaked:\n{text}"
+        );
+    }
 
     #[test]
     fn ws_remote_ca_069_occupancy_list_label_prefers_repo_sha() {
@@ -2520,15 +3076,21 @@ mod tests {
         assert!(state.loading.collapsed);
         state.apply(ParentMessage::HelloOk);
         state.apply(ParentMessage::Progress {
-            message: "Opening occupancy on hostinger…".to_owned(),
+            message: "Preparing disk on hostinger…".to_owned(),
+            step: None,
         });
         state.apply(ParentMessage::Workspaces {
             workspaces: Vec::new(),
         });
-        assert_eq!(state.status_line, "Opening occupancy on hostinger…");
+        assert_eq!(state.status_line, "Preparing disk on hostinger…");
         assert_eq!(
-            state.loading.steps,
-            vec!["Opening occupancy on hostinger…".to_owned()]
+            state
+                .loading
+                .steps
+                .iter()
+                .map(|step| step.status.as_str())
+                .collect::<Vec<_>>(),
+            vec!["done", "done", "active"]
         );
         assert!(state.loading.active);
         state.apply(ParentMessage::Workspaces {
@@ -2559,9 +3121,246 @@ mod tests {
         let out = buffer_plain(&terminal);
         assert!(out.contains("preparing the agent"), "{out}");
         assert!(
-            !out.contains(" Workspaces "),
+            !out.contains("sbx_"),
             "first useful frame must stay collapsed:\n{out}"
         );
+        assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
+        assert!(out.contains("restore tree"), "{out}");
+        assert!(out.contains("?"), "{out}");
+        assert_no_bare_q_quit(&out);
+        assert!(!out.contains("^q quit"), "{out}");
+        assert!(!out.contains("^c leave"), "{out}");
+        assert!(out.contains("Checking login"), "{out}");
+        assert!(out.contains("Preparing skills"), "{out}");
+        assert!(out.contains("Preparing disk"), "{out}");
+    }
+
+    #[test]
+    fn code_tui_chrome_keeps_preview_url_in_deploy_info_only() {
+        let mut state = occupancy_delivery_ready_state(None);
+        if let Some(detail) = state.detail.as_mut() {
+            detail.preview = Some(OccupancyPreviewChrome {
+                url: "http://app-sc156jw98k.127.0.0.1.sslip.io/".to_owned(),
+            });
+        }
+        state.loading.title = "Appaloft Cloud Agents".to_owned();
+        state.loading.project = "whoami".to_owned();
+        state.focus_mode = true;
+        state.session_id = Some("term_1".to_owned());
+        let backend = ratatui::backend::TestBackend::new(100, 24);
+        let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw focused session");
+        let header = occupancy_chrome_header(&state);
+        assert_eq!(header, "Appaloft Cloud Agents · whoami");
+        assert!(!header.contains("sslip"));
+        assert!(!header.to_ascii_lowercase().contains("occupancy"));
+        state.focus_mode = false;
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw tree detail");
+        let out = buffer_plain(&terminal);
+        assert!(out.contains("Preview"), "{out}");
+        assert!(out.contains("app-sc156jw98k"), "{out}");
+        assert!(out.contains("sslip.io"), "{out}");
+        assert!(out.contains("Appaloft Cloud Agents"), "{out}");
+        assert!(!occupancy_chrome_header(&state).contains("sslip"));
+        let list_footer = occupancy_control_footer(&state.status_line, state.detail.as_ref());
+        assert!(list_footer.contains("enter connect"), "{list_footer}");
+        assert!(list_footer.contains("n new"), "{list_footer}");
+        assert!(list_footer.contains("w wake"), "{list_footer}");
+        assert!(list_footer.contains("d delete"), "{list_footer}");
+        assert!(!list_footer.contains("^q quit"), "{list_footer}");
+        assert_no_bare_q_quit(&out);
+        assert!(!out.contains("^c leave"), "{out}");
+        assert!(!out.contains("Y restore"), "{out}");
+    }
+
+    #[test]
+    fn code_tui_x_returns_to_cloud_agents_list_without_quitting() {
+        let x = KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE);
+        assert_eq!(
+            occupancy_key_binding(x, true, true),
+            OccupancyKeyBinding::ShowAgentsList
+        );
+        assert_eq!(
+            occupancy_key_binding(x, false, true),
+            OccupancyKeyBinding::ShowAgentsList
+        );
+        assert_ne!(
+            occupancy_key_binding(x, true, true),
+            OccupancyKeyBinding::Quit
+        );
+        let mut state = AppState::default();
+        state.loading.project = "whoami".to_owned();
+        state.apply(ParentMessage::Workspaces {
+            workspaces: vec![WorkspaceSummary {
+                workspace_id: "sbx_1".to_owned(),
+                status: "ready".to_owned(),
+                provider_key: None,
+                source_kind: None,
+                occupancy: None,
+            }],
+        });
+        state.apply(ParentMessage::TerminalReady {
+            workspace_id: "sbx_1".to_owned(),
+            runtime_id: "sar_1".to_owned(),
+            session_id: "term_1".to_owned(),
+        });
+        assert!(state.focus_mode);
+        assert!(state.agent_focused);
+        state.show_agents_list();
+        assert!(!state.focus_mode);
+        assert!(!state.agent_focused);
+        assert_eq!(state.status_line, "Appaloft Cloud Agents");
+        assert_eq!(
+            occupancy_chrome_header(&state),
+            "Appaloft Cloud Agents · whoami"
+        );
+        assert_eq!(state.session_id.as_deref(), Some("term_1"));
+        let backend = ratatui::backend::TestBackend::new(160, 24);
+        let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw cloud agents list");
+        let out = buffer_plain(&terminal);
+        assert!(out.contains("Appaloft Cloud Agents"), "{out}");
+        assert!(out.contains("whoami"), "{out}");
+        assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
+        let list_footer = occupancy_control_footer(&state.status_line, state.detail.as_ref());
+        assert!(list_footer.contains("enter connect"), "{list_footer}");
+        assert!(list_footer.contains("n new"), "{list_footer}");
+        assert!(list_footer.contains("w wake"), "{list_footer}");
+        assert!(list_footer.contains("d delete"), "{list_footer}");
+        assert!(!list_footer.contains("^q quit"), "{list_footer}");
+        assert_no_bare_q_quit(&list_footer);
+        assert_no_bare_q_quit(&out);
+    }
+
+    #[test]
+    fn code_tui_forwards_osc52_clipboard_from_nested_agent() {
+        let mut state = AppState::default();
+        state.apply(ParentMessage::TerminalOutput {
+            stream: "stdout".to_owned(),
+            data: "hello\u{1b}]52;c;c2FsdA==\u{7}world".to_owned(),
+        });
+        let sequences = state.take_osc52();
+        assert_eq!(sequences, vec!["\u{1b}]52;c;c2FsdA==\u{7}".to_owned()]);
+        assert_eq!(
+            extract_osc52_sequences("pre\u{1b}]52;c;YQ==\u{1b}\\post"),
+            vec!["\u{1b}]52;c;YQ==\u{1b}\\".to_owned()]
+        );
+        assert!(extract_osc52_sequences("no clipboard").is_empty());
+        let split = split_osc52("", "hello\u{1b}]52;c;c2FsdA==\u{7}world");
+        assert_eq!(split.display, "helloworld");
+        assert!(split.carry.is_empty());
+        assert!(!split.display.contains("]52;"));
+    }
+
+    #[test]
+    fn code_tui_reassembles_osc52_split_across_terminal_frames() {
+        let mut state = AppState::default();
+        state.apply(ParentMessage::TerminalOutput {
+            stream: "stdout".to_owned(),
+            data: "pre\u{1b}]52;c;".to_owned(),
+        });
+        assert!(state.take_osc52().is_empty());
+        state.apply(ParentMessage::TerminalOutput {
+            stream: "stdout".to_owned(),
+            data: "YQ==\u{7}post".to_owned(),
+        });
+        assert_eq!(state.take_osc52(), vec!["\u{1b}]52;c;YQ==\u{7}".to_owned()]);
+        assert_eq!(
+            split_osc52("\u{1b}]", "52;c;YQ==\u{1b}\\").sequences,
+            vec!["\u{1b}]52;c;YQ==\u{1b}\\".to_owned()]
+        );
+    }
+
+    #[test]
+    fn code_tui_osc52_write_failure_says_local_terminal_disabled() {
+        struct FailWriter;
+        impl std::io::Write for FailWriter {
+            fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::BrokenPipe,
+                    "host tty closed",
+                ))
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        let sequences = vec!["\u{1b}]52;c;YQ==\u{7}".to_owned()];
+        let mut ok = Vec::new();
+        write_osc52_passthrough(&mut ok, &sequences).expect("host tty write");
+        assert_eq!(ok, sequences[0].as_bytes());
+        assert!(write_osc52_passthrough(&mut FailWriter, &sequences).is_err());
+        let mut state = AppState::default();
+        state.focus_mode = true;
+        state.mark_osc52_passthrough_failed();
+        assert_eq!(state.status_line, OSC52_PASSTHROUGH_DISABLED);
+        assert!(!state.status_line.to_ascii_lowercase().contains("occupancy"));
+        assert!(!state.status_line.contains("pbcopy"));
+        let backend = ratatui::backend::TestBackend::new(120, 8);
+        let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw osc52 failure");
+        let out = buffer_plain(&terminal);
+        assert!(out.contains("OSC 52 disabled"), "{out}");
+        assert!(out.contains("remote agent"), "{out}");
+        assert!(!out.to_ascii_lowercase().contains("copied"), "{out}");
+    }
+
+    #[test]
+    fn code_tui_help_lists_ca_keys_without_occupancy_or_y_restore() {
+        let mut state = AppState::default();
+        state.loading.active = false;
+        state.toggle_help();
+        let backend = ratatui::backend::TestBackend::new(80, 40);
+        let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw help");
+        let out = buffer_plain(&terminal);
+        assert!(out.contains("?              key list"), "{out}");
+        assert!(out.contains("enter          connect"), "{out}");
+        assert!(out.contains("⌥enter         connect and type"), "{out}");
+        assert!(out.contains("j k"), "{out}");
+        assert!(out.contains("h l"), "{out}");
+        assert!(out.contains("new session unavailable"), "{out}");
+        assert!(
+            out.contains("new session, choose agent unavailable"),
+            "{out}"
+        );
+        assert!(
+            out.contains("new session from a prompt unavailable"),
+            "{out}"
+        );
+        assert!(out.contains("end session, stay on list"), "{out}");
+        assert!(out.contains("sleep (pause)"), "{out}");
+        assert!(out.contains("wake (resume)"), "{out}");
+        assert!(out.contains("delete (confirm y)"), "{out}");
+        assert!(out.contains("copy SSH unavailable"), "{out}");
+        assert!(out.contains("⌥r"), "{out}");
+        assert!(
+            out.contains("f / ⌥f         fullscreen / restore tree"),
+            "{out}"
+        );
+        assert!(out.contains("cycle open sessions (wrap, no wake)"), "{out}");
+        assert!(out.contains("^o             unavailable"), "{out}");
+        assert!(out.contains("q              unbound (not quit)"), "{out}");
+        assert!(out.contains("quit from list/menu"), "{out}");
+        assert!(out.contains("pass through in session"), "{out}");
+        assert!(out.contains("setup not in this door"), "{out}");
+        assert!(out.contains("OSC 52"), "{out}");
+        assert!(!out.contains("^q"), "{out}");
+        assert!(!out.contains("quit CLI"), "{out}");
+        assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
+        assert!(!out.contains("Y restore"), "{out}");
+        assert!(!out.contains("^c leave"), "{out}");
+        assert_no_bare_q_quit(&out);
     }
 
     #[test]
@@ -2569,13 +3368,16 @@ mod tests {
         let mut state = AppState::default();
         state.apply(ParentMessage::Loading {
             collapsed: Some(true),
-            title: Some("Appaloft".to_owned()),
+            title: Some("Appaloft Cloud Agents".to_owned()),
+            project: Some("hello-static".to_owned()),
         });
         state.apply(ParentMessage::Progress {
             message: "Checking login…".to_owned(),
+            step: None,
         });
         state.apply(ParentMessage::Progress {
-            message: "Opening occupancy on hostinger…".to_owned(),
+            message: "Preparing disk on hostinger…".to_owned(),
+            step: None,
         });
         state.apply(ParentMessage::Workspaces {
             workspaces: vec![WorkspaceSummary {
@@ -2589,10 +3391,16 @@ mod tests {
         assert!(state.loading.active);
         assert!(state.loading.collapsed);
         assert_eq!(
-            state.loading.steps,
+            state
+                .loading
+                .steps
+                .iter()
+                .map(|step| (step.label.as_str(), step.status.as_str()))
+                .collect::<Vec<_>>(),
             vec![
-                "Checking login…".to_owned(),
-                "Opening occupancy on hostinger…".to_owned()
+                ("Checking login", "done"),
+                ("Preparing skills", "done"),
+                ("Preparing disk", "active")
             ]
         );
         let backend = ratatui::backend::TestBackend::new(100, 24);
@@ -2602,13 +3410,20 @@ mod tests {
             .expect("draw collapsed loading");
         let out = buffer_plain(&terminal);
         assert!(out.contains("preparing the agent"), "{out}");
-        assert!(out.contains("occupancy · starting"), "{out}");
-        assert!(out.contains("Checking login…"), "{out}");
-        assert!(out.contains("Opening occupancy on hostinger…"), "{out}");
+        assert!(out.contains("Appaloft Cloud Agents"), "{out}");
+        assert!(out.contains("hello-static"), "{out}");
+        assert!(out.contains("Checking login"), "{out}");
+        assert!(out.contains("Preparing skills"), "{out}");
+        assert!(out.contains("Preparing disk"), "{out}");
         assert!(out.contains('✓'), "{out}");
-        assert!(out.contains("restore list"), "{out}");
+        assert!(out.contains("restore tree"), "{out}");
+        assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
         assert!(
-            !out.contains(" Workspaces "),
+            !out.contains("Connecting to Appaloft"),
+            "connecting panel must stay step-shaped:\n{out}"
+        );
+        assert!(
+            !out.contains("sbx_1"),
             "collapsed wait must hide the tree:\n{out}"
         );
         state.apply(ParentMessage::TerminalReady {
@@ -2626,7 +3441,8 @@ mod tests {
         let mut state = AppState::default();
         state.apply(ParentMessage::Loading {
             collapsed: Some(true),
-            title: Some("Appaloft".to_owned()),
+            title: Some("Appaloft Cloud Agents".to_owned()),
+            project: None,
         });
         state.apply(ParentMessage::TerminalReady {
             workspace_id: "sbx_1".to_owned(),
@@ -2682,20 +3498,24 @@ mod tests {
                 url: "http://app-sc156jw98k.127.0.0.1.sslip.io/".to_owned(),
             });
         }
+        let preview_and_pr_doors = occupancy_available_door_keys(preview_and_pr.detail.as_ref());
+        assert!(preview_and_pr_doors.iter().any(|door| *door == "o open PR"));
+        assert!(preview_and_pr_doors.iter().any(|door| *door == "p preview"));
+        assert!(!preview_and_pr_doors.iter().any(|door| *door == "c compare"));
         let preview_and_pr_footer = occupancy_control_footer("", preview_and_pr.detail.as_ref());
-        assert!(preview_and_pr_footer.contains("o open PR"));
-        assert!(preview_and_pr_footer.contains("p preview"));
-        assert!(!preview_and_pr_footer.contains("c compare"));
-        assert!(!preview_and_pr_footer.contains("P production"));
-        assert!(!preview_and_pr_footer.contains("g connections"));
+        assert!(preview_and_pr_footer.contains("enter connect"));
+        assert!(!preview_and_pr_footer.contains("o open PR"));
+        assert!(!preview_and_pr_footer.contains("p preview"));
 
         let existing_pr = occupancy_delivery_ready_state(Some(OccupancyPullRequestChrome {
             number: 928,
             url: Some("https://github.com/traefik/whoami/pull/928".to_owned()),
         }));
-        let existing_pr_footer = occupancy_control_footer("", existing_pr.detail.as_ref());
-        assert!(existing_pr_footer.contains("o open PR"));
-        assert!(!existing_pr_footer.contains("c compare"));
+        assert!(
+            occupancy_available_door_keys(existing_pr.detail.as_ref())
+                .iter()
+                .any(|door| *door == "o open PR")
+        );
 
         let mut with_connections = occupancy_delivery_ready_state(None);
         if let Some(detail) = with_connections.detail.as_mut() {
@@ -2703,19 +3523,27 @@ mod tests {
                 url: "https://app.appaloft.com/account/connections".to_owned(),
             });
         }
-        let connections_footer = occupancy_control_footer("", with_connections.detail.as_ref());
-        assert!(connections_footer.contains("g connections"));
+        assert!(
+            occupancy_available_door_keys(with_connections.detail.as_ref())
+                .iter()
+                .any(|door| *door == "g connections")
+        );
 
         let lean = occupancy_control_footer("", None);
+        assert!(lean.contains("enter connect"));
+        assert!(lean.contains("n new"));
+        assert!(lean.contains("w wake"));
+        assert!(lean.contains("d delete"));
         assert!(!lean.contains("o open PR"));
         assert!(!lean.contains("c compare"));
         assert!(!lean.contains("p preview"));
-        assert!(!lean.contains("P production"));
-        assert!(!lean.contains("g connections"));
-        assert!(lean.contains("a lifecycle"));
-        assert!(lean.contains("d delivery"));
-        assert!(lean.contains("s recovery"));
-        assert!(lean.contains("f Focus Mode"));
+        assert!(!lean.contains("^q quit"));
+        assert!(!lean.contains("x list"));
+        assert_no_bare_q_quit(&lean);
+        assert!(!lean.contains("^c leave"));
+        assert!(!lean.contains("Y restore"));
+        assert!(!lean.contains("Focus Mode"));
+        assert!(!lean.to_ascii_lowercase().contains("occupancy"));
     }
 
     #[test]
@@ -2742,6 +3570,293 @@ mod tests {
         state.release_agent_focus();
         assert_eq!(state.session_id.as_deref(), Some("term_same"));
         assert!(!state.agent_focused);
+    }
+
+    #[test]
+    fn code_tui_ctrl_c_passes_to_agent_and_never_quits() {
+        let ctrl_c = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL);
+        let ctrl_r = KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL);
+        let quit = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE);
+        let invented_quit = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::CONTROL);
+        let stop = KeyEvent::new(KeyCode::Char(']'), KeyModifiers::CONTROL);
+        let shift_esc = KeyEvent::new(KeyCode::Esc, KeyModifiers::SHIFT);
+        assert_eq!(
+            occupancy_key_binding(ctrl_c, true, true),
+            OccupancyKeyBinding::PassToAgent
+        );
+        assert_eq!(
+            occupancy_key_binding(ctrl_c, false, true),
+            OccupancyKeyBinding::Quit
+        );
+        assert_eq!(
+            occupancy_key_binding(ctrl_c, false, false),
+            OccupancyKeyBinding::Quit
+        );
+        assert_eq!(
+            occupancy_key_binding(ctrl_r, true, true),
+            OccupancyKeyBinding::PassToAgent
+        );
+        assert_eq!(
+            occupancy_key_binding(quit, true, true),
+            OccupancyKeyBinding::PassToAgent
+        );
+        assert_eq!(
+            occupancy_key_binding(quit, false, true),
+            OccupancyKeyBinding::Unhandled
+        );
+        assert_ne!(
+            occupancy_key_binding(quit, false, false),
+            OccupancyKeyBinding::Quit
+        );
+        assert_ne!(
+            occupancy_key_binding(invented_quit, false, true),
+            OccupancyKeyBinding::Quit
+        );
+        assert_eq!(
+            occupancy_key_binding(stop, true, true),
+            OccupancyKeyBinding::StopTyping
+        );
+        assert_ne!(
+            occupancy_key_binding(stop, false, true),
+            OccupancyKeyBinding::Quit
+        );
+        assert_eq!(
+            occupancy_key_binding(shift_esc, true, true),
+            OccupancyKeyBinding::StopTyping
+        );
+        assert_eq!(terminal_key_bytes(ctrl_c), Some("\u{3}".to_owned()));
+        assert_eq!(terminal_key_bytes(ctrl_r), Some("\u{12}".to_owned()));
+        assert!(!occupancy_stop_signals().contains(&signal_hook::consts::SIGINT));
+        assert!(occupancy_ignored_signals().contains(&signal_hook::consts::SIGINT));
+    }
+
+    #[test]
+    fn code_tui_ca_keys_map_sleep_wake_delete_and_say_unavailable() {
+        let n = KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE);
+        let s = KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE);
+        let w = KeyEvent::new(KeyCode::Char('w'), KeyModifiers::NONE);
+        let d = KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE);
+        let c = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::NONE);
+        let t = KeyEvent::new(KeyCode::Char('t'), KeyModifiers::NONE);
+        assert_eq!(
+            occupancy_key_binding(n, false, true),
+            OccupancyKeyBinding::NewSession
+        );
+        assert_eq!(
+            occupancy_key_binding(s, false, true),
+            OccupancyKeyBinding::SleepAgent
+        );
+        assert_eq!(
+            occupancy_key_binding(w, false, true),
+            OccupancyKeyBinding::WakeAgent
+        );
+        assert_eq!(
+            occupancy_key_binding(d, false, true),
+            OccupancyKeyBinding::DeleteAgent
+        );
+        assert_eq!(
+            occupancy_key_binding(c, false, true),
+            OccupancyKeyBinding::CopySsh
+        );
+        assert_eq!(
+            occupancy_key_binding(t, false, true),
+            OccupancyKeyBinding::SetTarget
+        );
+        let mut ready = occupancy_delivery_ready_state(None);
+        assert_eq!(ready.request_sleep(), Some(LifecycleAction::Pause));
+        ready.action_busy = false;
+        ready.request_delete();
+        assert_eq!(ready.pending_confirmation, Some(LifecycleAction::Terminate));
+        let mut paused = occupancy_delivery_ready_state(None);
+        if let Some(detail) = paused.detail.as_mut() {
+            detail.workspace.status = "paused".to_owned();
+        }
+        assert_eq!(paused.request_wake(), Some(LifecycleAction::Resume));
+        paused.request_sleep();
+        assert!(paused.status_line.contains("sleep is unavailable"));
+        let mut empty = AppState::default();
+        empty.mark_unavailable("new session");
+        assert_eq!(empty.status_line, "new session is unavailable");
+        empty.mark_unavailable("copy SSH");
+        assert_eq!(empty.status_line, "copy SSH is unavailable");
+        assert!(!empty.status_line.to_ascii_lowercase().contains("occupancy"));
+    }
+
+    fn workspace(id: &str, status: &str) -> WorkspaceSummary {
+        WorkspaceSummary {
+            workspace_id: id.to_owned(),
+            status: status.to_owned(),
+            provider_key: None,
+            source_kind: None,
+            occupancy: None,
+        }
+    }
+
+    #[test]
+    fn code_tui_source_extra_ca_keys_keep_railway_meanings() {
+        let help = KeyEvent::new(KeyCode::Char('?'), KeyModifiers::NONE);
+        let quit = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE);
+        let j = KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE);
+        let k = KeyEvent::new(KeyCode::Char('k'), KeyModifiers::NONE);
+        let h = KeyEvent::new(KeyCode::Char('h'), KeyModifiers::NONE);
+        let l = KeyEvent::new(KeyCode::Char('l'), KeyModifiers::NONE);
+        let f = KeyEvent::new(KeyCode::Char('f'), KeyModifiers::NONE);
+        let y = KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE);
+        let shift_y = KeyEvent::new(KeyCode::Char('Y'), KeyModifiers::SHIFT);
+        let alt_f = KeyEvent::new(KeyCode::Char('f'), KeyModifiers::ALT);
+        let alt_r = KeyEvent::new(KeyCode::Char('r'), KeyModifiers::ALT);
+        let alt_n = KeyEvent::new(KeyCode::Char('n'), KeyModifiers::ALT);
+        let alt_p = KeyEvent::new(KeyCode::Char('p'), KeyModifiers::ALT);
+        let alt_enter = KeyEvent::new(KeyCode::Enter, KeyModifiers::ALT);
+        let alt_prev = KeyEvent::new(KeyCode::Char('['), KeyModifiers::ALT);
+        let alt_next = KeyEvent::new(KeyCode::Char(']'), KeyModifiers::ALT);
+        let ctrl_o = KeyEvent::new(KeyCode::Char('o'), KeyModifiers::CONTROL);
+        assert_eq!(
+            occupancy_key_binding(help, false, false),
+            OccupancyKeyBinding::ToggleHelp
+        );
+        assert_eq!(
+            occupancy_key_binding(help, true, true),
+            OccupancyKeyBinding::PassToAgent
+        );
+        assert_eq!(
+            occupancy_key_binding(quit, false, false),
+            OccupancyKeyBinding::Unhandled
+        );
+        assert_ne!(
+            occupancy_key_binding(quit, false, true),
+            OccupancyKeyBinding::Quit
+        );
+        assert_eq!(
+            occupancy_key_binding(quit, true, true),
+            OccupancyKeyBinding::PassToAgent
+        );
+        assert_eq!(
+            occupancy_key_binding(j, false, false),
+            OccupancyKeyBinding::MoveDown
+        );
+        assert_eq!(
+            occupancy_key_binding(k, false, false),
+            OccupancyKeyBinding::MoveUp
+        );
+        assert_eq!(
+            occupancy_key_binding(h, false, false),
+            OccupancyKeyBinding::Unavailable("open/close row")
+        );
+        assert_eq!(
+            occupancy_key_binding(l, false, false),
+            OccupancyKeyBinding::Unavailable("open/close row")
+        );
+        assert_eq!(
+            occupancy_key_binding(f, false, false),
+            OccupancyKeyBinding::ToggleFullscreen
+        );
+        assert_eq!(
+            occupancy_key_binding(f, true, true),
+            OccupancyKeyBinding::PassToAgent
+        );
+        assert_eq!(
+            occupancy_key_binding(alt_f, true, true),
+            OccupancyKeyBinding::ToggleFullscreen
+        );
+        assert_eq!(
+            occupancy_key_binding(y, false, true),
+            OccupancyKeyBinding::Unhandled
+        );
+        assert_eq!(
+            occupancy_key_binding(shift_y, false, true),
+            OccupancyKeyBinding::Unhandled
+        );
+        assert_eq!(
+            occupancy_key_binding(alt_r, false, true),
+            OccupancyKeyBinding::Refresh
+        );
+        assert_eq!(
+            occupancy_key_binding(alt_r, true, true),
+            OccupancyKeyBinding::Refresh
+        );
+        assert_eq!(
+            occupancy_key_binding(alt_n, false, true),
+            OccupancyKeyBinding::Unavailable("new session, choose agent")
+        );
+        assert_eq!(
+            occupancy_key_binding(alt_p, false, true),
+            OccupancyKeyBinding::Unavailable("new session from a prompt")
+        );
+        assert_eq!(
+            occupancy_key_binding(alt_enter, false, true),
+            OccupancyKeyBinding::Connect
+        );
+        assert_eq!(
+            occupancy_key_binding(alt_prev, true, true),
+            OccupancyKeyBinding::CycleOpenSession(-1)
+        );
+        assert_eq!(
+            occupancy_key_binding(alt_next, false, true),
+            OccupancyKeyBinding::CycleOpenSession(1)
+        );
+        assert_eq!(
+            occupancy_key_binding(ctrl_o, false, true),
+            OccupancyKeyBinding::Unavailable("ctrl+o")
+        );
+        assert_eq!(
+            occupancy_key_binding(ctrl_o, true, true),
+            OccupancyKeyBinding::PassToAgent
+        );
+        let mut state = AppState::default();
+        state.apply(ParentMessage::Workspaces {
+            workspaces: vec![
+                workspace("sbx_1", "ready"),
+                workspace("sbx_2", "ready"),
+                workspace("sbx_sleep", "paused"),
+            ],
+        });
+        state.apply(ParentMessage::TerminalReady {
+            workspace_id: "sbx_1".to_owned(),
+            runtime_id: "sar_1".to_owned(),
+            session_id: "term_1".to_owned(),
+        });
+        state.apply(ParentMessage::TerminalReady {
+            workspace_id: "sbx_2".to_owned(),
+            runtime_id: "sar_2".to_owned(),
+            session_id: "term_2".to_owned(),
+        });
+        state.apply(ParentMessage::TerminalReady {
+            workspace_id: "sbx_sleep".to_owned(),
+            runtime_id: "sar_sleep".to_owned(),
+            session_id: "term_sleep".to_owned(),
+        });
+        assert_eq!(
+            state.cycle_open_session(1),
+            Some(("sbx_2".to_owned(), "sar_2".to_owned()))
+        );
+        state.session_id = Some("term_2".to_owned());
+        assert_eq!(
+            state.cycle_open_session(1),
+            Some(("sbx_1".to_owned(), "sar_1".to_owned()))
+        );
+        state.session_id = Some("term_1".to_owned());
+        assert_eq!(
+            state.cycle_open_session(-1),
+            Some(("sbx_2".to_owned(), "sar_2".to_owned()))
+        );
+        assert!(!state.status_line.contains("wake"));
+        assert!(!state.status_line.contains("resume"));
+        let mut only_sleep = AppState::default();
+        only_sleep.apply(ParentMessage::Workspaces {
+            workspaces: vec![workspace("sbx_sleep", "paused")],
+        });
+        only_sleep.apply(ParentMessage::TerminalReady {
+            workspace_id: "sbx_sleep".to_owned(),
+            runtime_id: "sar_sleep".to_owned(),
+            session_id: "term_sleep".to_owned(),
+        });
+        assert_eq!(only_sleep.cycle_open_session(1), None);
+        assert!(
+            only_sleep
+                .status_line
+                .contains("switch session is unavailable")
+        );
     }
 
     #[test]
@@ -3515,7 +4630,7 @@ mod tests {
                 task_run_id: "task_deliver".to_owned(),
                 values: [
                     "feat/occupancy".to_owned(),
-                    "Deliver occupancy 1ce75d0".to_owned(),
+                    "Deliver 1ce75d0".to_owned(),
                     "origin".to_owned(),
                     "feat/occupancy".to_owned(),
                     String::new(),
@@ -3544,7 +4659,7 @@ mod tests {
                 task_run_id: "task_deliver".to_owned(),
                 values: [
                     "feat/occupancy".to_owned(),
-                    "Deliver occupancy 1ce75d0".to_owned(),
+                    "Deliver 1ce75d0".to_owned(),
                     "origin".to_owned(),
                     String::new(),
                     String::new(),
