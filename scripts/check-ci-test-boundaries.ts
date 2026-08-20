@@ -7,7 +7,8 @@ export interface CiTestBoundaryViolation {
     | "build-smoke-disk-budget"
     | "hermetic-package-tests"
     | "postgres-job-scope"
-    | "shared-change-classifier";
+    | "shared-change-classifier"
+    | "unit-tests-webview-ownership";
 }
 
 export function findCiTestBoundaryViolations(workflow: string): CiTestBoundaryViolation[] {
@@ -179,6 +180,73 @@ export function findCiChangeClassifierViolations(
   return violations;
 }
 
+export function findUnitTestsWebViewOwnershipViolations(
+  ciWorkflow: string,
+  e2eWorkflow: string,
+  webPackageJson: string,
+): CiTestBoundaryViolation[] {
+  const violations: CiTestBoundaryViolation[] = [];
+  const unitTests = yamlBlock(ciWorkflow, /^ {2}unit-tests:\s*$/, 2);
+
+  if (!/^ {4}name: Unit Tests\s*$/m.test(unitTests)) {
+    violations.push({
+      message: "The Unit Tests job name must stay exactly Unit Tests.",
+      rule: "unit-tests-webview-ownership",
+    });
+  }
+
+  if (/^ {4}if:/m.test(unitTests)) {
+    violations.push({
+      message:
+        "ci.yml must not job-level skip unit-tests; the required Unit Tests name must still conclude.",
+      rule: "unit-tests-webview-ownership",
+    });
+  }
+
+  if (/\btest:e2e(?::webview)?\b/.test(unitTests)) {
+    violations.push({
+      message: "The Unit Tests job must not invoke WebView e2e; e2e.yml owns that suite.",
+      rule: "unit-tests-webview-ownership",
+    });
+  }
+
+  let webScripts: Record<string, string> = {};
+  try {
+    const parsed = JSON.parse(webPackageJson) as { scripts?: Record<string, string> };
+    webScripts = parsed.scripts ?? {};
+  } catch {
+    violations.push({
+      message: "apps/web/package.json must remain valid JSON so Unit Tests can stay vitest-only.",
+      rule: "unit-tests-webview-ownership",
+    });
+    return violations;
+  }
+
+  if (/\btest:e2e(?::webview)?\b/.test(webScripts.test ?? "")) {
+    violations.push({
+      message:
+        "@appaloft/web `test` must stay vitest-only so turbo run test does not pay the WebView tax.",
+      rule: "unit-tests-webview-ownership",
+    });
+  }
+
+  if (!webScripts["test:e2e"] || !webScripts["test:e2e:webview"]) {
+    violations.push({
+      message: "@appaloft/web must keep test:e2e and test:e2e:webview for e2e.yml.",
+      rule: "unit-tests-webview-ownership",
+    });
+  }
+
+  if (!e2eWorkflow.includes("run: bun run test:e2e")) {
+    violations.push({
+      message: "e2e.yml must keep bun run test:e2e as the WebView owner.",
+      rule: "unit-tests-webview-ownership",
+    });
+  }
+
+  return violations;
+}
+
 function yamlBlock(source: string, startPattern: RegExp, indentation: number): string {
   const lines = source.split("\n");
   const start = lines.findIndex((line) => startPattern.test(line));
@@ -199,11 +267,14 @@ function yamlBlock(source: string, startPattern: RegExp, indentation: number): s
 async function checkRepository(): Promise<void> {
   const ciWorkflowPath = resolve(import.meta.dir, "../.github/workflows/ci.yml");
   const e2eWorkflowPath = resolve(import.meta.dir, "../.github/workflows/e2e.yml");
+  const webPackageJsonPath = resolve(import.meta.dir, "../apps/web/package.json");
   const ciWorkflow = await readFile(ciWorkflowPath, "utf8");
   const e2eWorkflow = await readFile(e2eWorkflowPath, "utf8");
+  const webPackageJson = await readFile(webPackageJsonPath, "utf8");
   const violations = [
     ...findCiTestBoundaryViolations(ciWorkflow),
     ...findCiChangeClassifierViolations(ciWorkflow, e2eWorkflow),
+    ...findUnitTestsWebViewOwnershipViolations(ciWorkflow, e2eWorkflow, webPackageJson),
   ];
   if (violations.length > 0) {
     for (const violation of violations) {

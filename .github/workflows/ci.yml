@@ -102,7 +102,9 @@ jobs:
     runs-on: ubuntu-latest
     # A cold cache can spend more than ten minutes in the PGlite suites alone.
     # Keep the full public test graph rather than silently dropping packages
-    # that do not expose a separate test:unit script.
+    # that do not expose a separate test:unit script. WebView console e2e is
+    # owned by e2e.yml (e2e_web / e2e_full on shard 1); @appaloft/web `test`
+    # stays vitest-only so this job does not pay that tax twice.
     timeout-minutes: 20
     steps:
       - name: Skip Unit Tests

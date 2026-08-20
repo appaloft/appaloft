@@ -35,10 +35,10 @@ appaloft workspace                            # Manage Workspaces with an embedd
 appaloft dev                                  # Start the local Development TUI / foreground session
 appaloft dev . --server <serverId>            # Develop remotely through a live outbound Worker
 
-appaloft projects list                        # List projects
-appaloft servers register --host <host>       # Register a server
+appaloft project list                         # List projects
+appaloft server register --host <host>        # Register a server
 appaloft server worker enroll --server <id> --name <name> # Attach an outbound Worker
-appaloft resources create --project <id>      # Create a resource
+appaloft resource create --project <id>       # Create a resource
 
 appaloft deployments timeline <deploymentId>  # View the deployment timeline
 appaloft resource diagnose <resourceId>       # Generate a safe diagnostic summary

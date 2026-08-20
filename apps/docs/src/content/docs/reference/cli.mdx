@@ -36,10 +36,10 @@ appaloft workspace                            # 管理 Workspace，并嵌入 Age
 appaloft dev                                  # 启动本地 Development TUI / foreground 会话
 appaloft dev . --server <serverId>            # 通过 live outbound Worker 远端开发
 
-appaloft projects list                        # 列出项目
-appaloft servers register --host <host>       # 注册服务器
+appaloft project list                         # 列出项目
+appaloft server register --host <host>        # 注册服务器
 appaloft server worker enroll --server <id> --name <name> # 连接出站 Worker
-appaloft resources create --project <id>      # 创建资源
+appaloft resource create --project <id>       # 创建资源
 
 appaloft deployments timeline <deploymentId>  # 查看部署时间线
 appaloft resource diagnose <resourceId>       # 生成安全诊断摘要
