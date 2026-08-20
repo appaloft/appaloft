@@ -443,6 +443,8 @@
 - [x] Default `code` from a no-git folder occupies this folder (git is not a gate)
 - [x] TTY `code` forwards nested OSC 52 to the local terminal
 - [x] Unit tests WS-REMOTE-PROGRESS-204
+- [x] TTY `code` Ctrl+C / Ctrl+R pass through; quit is `q` / unfocused `^]`
+- [x] Unit tests WS-REMOTE-PROGRESS-205
 
 ## Later
 

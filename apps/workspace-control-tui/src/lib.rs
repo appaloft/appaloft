@@ -128,7 +128,7 @@ fn occupancy_available_door_footer(detail: Option<&DetailMessage>) -> String {
 
 fn occupancy_control_footer(status_line: &str, detail: Option<&DetailMessage>) -> String {
     format!(
-        " {}  │  x list  f fullscreen  ⌥f restore tree  ↑↓ select  Enter attach{}  ? help  ^c leave ",
+        " {}  │  x list  f fullscreen  ⌥f restore tree  ↑↓ select  Enter attach{}  ? help  q quit ",
         status_line,
         occupancy_available_door_footer(detail)
     )
@@ -140,9 +140,10 @@ fn occupancy_help_lines() -> Vec<Line<'static>> {
         "⌥f             fullscreen / restore tree",
         "f              fullscreen from list",
         "shift+esc / ^] stop typing",
+        "^c / ^r        pass through to agent",
         "Enter          attach",
         "↑↓             select",
-        "^c             leave from list",
+        "q / ^]         quit when not typing",
         "y              confirm delete",
         "copy           local clipboard via OSC 52",
     ]
@@ -1703,6 +1704,89 @@ impl AppState {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OccupancyKeyBinding {
+    Quit,
+    PassToAgent,
+    StopTyping,
+    ShowAgentsList,
+    ToggleFullscreen,
+    Unhandled,
+}
+
+pub fn occupancy_key_binding(
+    key: KeyEvent,
+    agent_focused: bool,
+    has_session: bool,
+) -> OccupancyKeyBinding {
+    let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+    let alt = key.modifiers.contains(KeyModifiers::ALT);
+    let shift = key.modifiers.contains(KeyModifiers::SHIFT);
+    if ctrl {
+        if matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'c')) {
+            return if has_session {
+                OccupancyKeyBinding::PassToAgent
+            } else {
+                OccupancyKeyBinding::Unhandled
+            };
+        }
+        if matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'r')) {
+            return if has_session {
+                OccupancyKeyBinding::PassToAgent
+            } else {
+                OccupancyKeyBinding::Unhandled
+            };
+        }
+        if matches!(key.code, KeyCode::Char(']')) {
+            return if agent_focused {
+                OccupancyKeyBinding::StopTyping
+            } else {
+                OccupancyKeyBinding::Quit
+            };
+        }
+    }
+    if matches!(key.code, KeyCode::Esc) && shift {
+        return OccupancyKeyBinding::StopTyping;
+    }
+    if agent_focused {
+        if matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'x'))
+            && !ctrl
+            && !alt
+        {
+            return OccupancyKeyBinding::ShowAgentsList;
+        }
+        if matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'f'))
+            && alt
+        {
+            return OccupancyKeyBinding::ToggleFullscreen;
+        }
+        return OccupancyKeyBinding::PassToAgent;
+    }
+    if matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'q'))
+        && !ctrl
+        && !alt
+    {
+        return OccupancyKeyBinding::Quit;
+    }
+    OccupancyKeyBinding::Unhandled
+}
+
+/// Signals that restore and stop the occupancy TUI.
+///
+/// SIGINT is intentionally absent: Ctrl+C is agent interrupt, never process quit.
+pub fn occupancy_stop_signals() -> &'static [i32] {
+    &[
+        signal_hook::consts::SIGTERM,
+        signal_hook::consts::SIGHUP,
+        signal_hook::consts::SIGQUIT,
+    ]
+}
+
+/// Signals the occupancy TUI swallows so a leftover ISIG cannot tear it down.
+pub fn occupancy_ignored_signals() -> &'static [i32] {
+    &[signal_hook::consts::SIGINT]
+}
+
 pub fn terminal_key_bytes(key: KeyEvent) -> Option<String> {
     if key.modifiers.contains(KeyModifiers::CONTROL)
         && let KeyCode::Char(character) = key.code
@@ -2002,9 +2086,9 @@ fn occupancy_loading_step_lines(state: &AppState) -> Vec<Line<'static>> {
 
 fn occupancy_loading_footer(collapsed: bool) -> String {
     if collapsed {
-        " ⌥f restore tree  f fullscreen  shift+esc/^] stop typing  ? help  ^c leave ".to_owned()
+        " ⌥f restore tree  f fullscreen  shift+esc/^] stop typing  ? help  q quit ".to_owned()
     } else {
-        " f fullscreen  ⌥f restore tree  ? help  ^c leave ".to_owned()
+        " f fullscreen  ⌥f restore tree  ? help  q quit ".to_owned()
     }
 }
 
@@ -2807,7 +2891,8 @@ mod tests {
             "first useful frame must stay collapsed:\n{out}"
         );
         assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
-        assert!(!out.contains("q quit"), "{out}");
+        assert!(out.contains("q quit"), "{out}");
+        assert!(!out.contains("^c leave"), "{out}");
         assert!(out.contains("credential"), "{out}");
         assert!(out.contains("skills"), "{out}");
         assert!(out.contains("disk"), "{out}");
@@ -2844,7 +2929,10 @@ mod tests {
         assert!(out.contains("sslip.io"), "{out}");
         assert!(out.contains("Appaloft Cloud Agents"), "{out}");
         assert!(!occupancy_chrome_header(&state).contains("sslip"));
-        assert!(!out.contains("q quit"), "{out}");
+        assert!(
+            occupancy_control_footer(&state.status_line, state.detail.as_ref()).contains("q quit")
+        );
+        assert!(!out.contains("^c leave"), "{out}");
         assert!(!out.contains("Y restore"), "{out}");
     }
 
@@ -2953,12 +3041,13 @@ mod tests {
         let out = buffer_plain(&terminal);
         assert!(out.contains("Cloud Agents list"), "{out}");
         assert!(out.contains("fullscreen / restore tree"), "{out}");
-        assert!(out.contains("leave from list"), "{out}");
+        assert!(out.contains("pass through"), "{out}");
+        assert!(out.contains("quit when not typing"), "{out}");
         assert!(out.contains("confirm delete"), "{out}");
         assert!(out.contains("OSC 52"), "{out}");
         assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
         assert!(!out.contains("Y restore"), "{out}");
-        assert!(!out.contains("q quit"), "{out}");
+        assert!(!out.contains("^c leave"), "{out}");
     }
 
     #[test]
@@ -3129,8 +3218,8 @@ mod tests {
         assert!(lean.contains("x list"));
         assert!(lean.contains("f fullscreen"));
         assert!(lean.contains("⌥f restore tree"));
-        assert!(lean.contains("^c leave"));
-        assert!(!lean.contains("q quit"));
+        assert!(lean.contains("q quit"));
+        assert!(!lean.contains("^c leave"));
         assert!(!lean.contains("Y restore"));
         assert!(!lean.contains("Focus Mode"));
         assert!(!lean.to_ascii_lowercase().contains("occupancy"));
@@ -3160,6 +3249,67 @@ mod tests {
         state.release_agent_focus();
         assert_eq!(state.session_id.as_deref(), Some("term_same"));
         assert!(!state.agent_focused);
+    }
+
+    #[test]
+    fn code_tui_ctrl_c_passes_to_agent_and_never_quits() {
+        let ctrl_c = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL);
+        let ctrl_r = KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL);
+        let quit = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE);
+        let stop = KeyEvent::new(KeyCode::Char(']'), KeyModifiers::CONTROL);
+        let shift_esc = KeyEvent::new(KeyCode::Esc, KeyModifiers::SHIFT);
+        assert_eq!(
+            occupancy_key_binding(ctrl_c, true, true),
+            OccupancyKeyBinding::PassToAgent
+        );
+        assert_eq!(
+            occupancy_key_binding(ctrl_c, false, true),
+            OccupancyKeyBinding::PassToAgent
+        );
+        assert_eq!(
+            occupancy_key_binding(ctrl_c, false, false),
+            OccupancyKeyBinding::Unhandled
+        );
+        assert_eq!(
+            occupancy_key_binding(ctrl_r, true, true),
+            OccupancyKeyBinding::PassToAgent
+        );
+        assert_eq!(
+            occupancy_key_binding(ctrl_r, false, true),
+            OccupancyKeyBinding::PassToAgent
+        );
+        assert_eq!(
+            occupancy_key_binding(quit, true, true),
+            OccupancyKeyBinding::PassToAgent
+        );
+        assert_eq!(
+            occupancy_key_binding(quit, false, true),
+            OccupancyKeyBinding::Quit
+        );
+        assert_eq!(
+            occupancy_key_binding(quit, false, false),
+            OccupancyKeyBinding::Quit
+        );
+        assert_eq!(
+            occupancy_key_binding(stop, true, true),
+            OccupancyKeyBinding::StopTyping
+        );
+        assert_eq!(
+            occupancy_key_binding(stop, false, true),
+            OccupancyKeyBinding::Quit
+        );
+        assert_eq!(
+            occupancy_key_binding(shift_esc, true, true),
+            OccupancyKeyBinding::StopTyping
+        );
+        assert_eq!(terminal_key_bytes(ctrl_c), Some("\u{3}".to_owned()));
+        assert_eq!(terminal_key_bytes(ctrl_r), Some("\u{12}".to_owned()));
+        assert_ne!(
+            occupancy_key_binding(ctrl_c, false, true),
+            OccupancyKeyBinding::Quit
+        );
+        assert!(!occupancy_stop_signals().contains(&signal_hook::consts::SIGINT));
+        assert!(occupancy_ignored_signals().contains(&signal_hook::consts::SIGINT));
     }
 
     #[test]
