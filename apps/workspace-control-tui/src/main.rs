@@ -17,24 +17,9 @@ use appaloft_workspace_control_tui::{
     terminal_mouse_bytes, write_osc52_passthrough,
 };
 
-fn key_has(key: &crossterm::event::KeyEvent, modifier: KeyModifiers) -> bool {
-    key.modifiers.contains(modifier)
-}
-
-fn bare_char(key: &crossterm::event::KeyEvent, expected: char) -> bool {
-    matches!(key.code, KeyCode::Char(actual) if actual.eq_ignore_ascii_case(&expected))
-        && !key_has(key, KeyModifiers::CONTROL)
-        && !key_has(key, KeyModifiers::ALT)
-}
-
-fn alt_char(key: &crossterm::event::KeyEvent, expected: char) -> bool {
-    matches!(key.code, KeyCode::Char(actual) if actual.eq_ignore_ascii_case(&expected))
-        && key_has(key, KeyModifiers::ALT)
-}
-
 use crossterm::event::{
     DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture, Event,
-    KeyCode, KeyEventKind, KeyModifiers, poll, read,
+    KeyCode, KeyEventKind, poll, read,
 };
 use crossterm::execute;
 use crossterm::terminal::{
@@ -311,7 +296,20 @@ fn main() -> Result<()> {
                             send(&mut writer, &RendererEvent::TerminalInput { data })?;
                         }
                     }
-                    OccupancyKeyBinding::Quit | OccupancyKeyBinding::Unhandled => {}
+                    OccupancyKeyBinding::Quit
+                    | OccupancyKeyBinding::Connect
+                    | OccupancyKeyBinding::NewSession
+                    | OccupancyKeyBinding::SleepAgent
+                    | OccupancyKeyBinding::WakeAgent
+                    | OccupancyKeyBinding::DeleteAgent
+                    | OccupancyKeyBinding::CopySsh
+                    | OccupancyKeyBinding::Refresh
+                    | OccupancyKeyBinding::SetTarget
+                    | OccupancyKeyBinding::ReturnToMenu
+                    | OccupancyKeyBinding::MoveUp
+                    | OccupancyKeyBinding::MoveDown
+                    | OccupancyKeyBinding::Unavailable(_)
+                    | OccupancyKeyBinding::Unhandled => {}
                 }
             }
             Event::Key(key)
@@ -458,110 +456,19 @@ fn main() -> Result<()> {
                         }
                         continue;
                     }
-                    OccupancyKeyBinding::ShowAgentsList => {
-                        state.show_agents_list();
+                    OccupancyKeyBinding::ShowAgentsList | OccupancyKeyBinding::ReturnToMenu => {
+                        if state.help_open {
+                            state.help_open = false;
+                        } else {
+                            state.show_agents_list();
+                        }
                         continue;
                     }
                     OccupancyKeyBinding::ToggleFullscreen => {
                         state.toggle_focus_mode();
                         continue;
                     }
-                    OccupancyKeyBinding::StopTyping | OccupancyKeyBinding::Unhandled => {}
-                }
-                match key.code {
-                    KeyCode::Esc if state.help_open => state.help_open = false,
-                    KeyCode::Char('?') => state.toggle_help(),
-                    KeyCode::Char('x') | KeyCode::Char('X')
-                        if !key_has(&key, KeyModifiers::CONTROL)
-                            && !key_has(&key, KeyModifiers::ALT) =>
-                    {
-                        state.show_agents_list();
-                    }
-                    KeyCode::Char('f') | KeyCode::Char('F') if alt_char(&key, 'f') => {
-                        state.toggle_focus_mode();
-                    }
-                    KeyCode::Char('f') | KeyCode::Char('F')
-                        if bare_char(&key, 'f') && !state.focus_mode =>
-                    {
-                        state.toggle_focus_mode();
-                    }
-                    KeyCode::Char('r') if !key_has(&key, KeyModifiers::CONTROL) => send(
-                        &mut writer,
-                        &RendererEvent::Refresh {
-                            workspace_id: state.selected_workspace_id().map(str::to_owned),
-                        },
-                    )?,
-                    KeyCode::Char('R') if !key_has(&key, KeyModifiers::ALT) => {
-                        send(&mut writer, &RendererEvent::TerminalReconnect)?;
-                    }
-                    KeyCode::Char('o') => {
-                        if let Some(workspace_id) = state.selected_workspace_id().map(str::to_owned)
-                        {
-                            send(&mut writer, &RendererEvent::OpenPr { workspace_id })?;
-                        }
-                    }
-                    KeyCode::Char('c')
-                        if !key_has(&key, KeyModifiers::CONTROL)
-                            && !key_has(&key, KeyModifiers::ALT) =>
-                    {
-                        if let Some(workspace_id) = state.selected_workspace_id().map(str::to_owned)
-                        {
-                            send(&mut writer, &RendererEvent::OpenCompare { workspace_id })?;
-                        }
-                    }
-                    KeyCode::Char('p') => {
-                        if let Some(workspace_id) = state.selected_workspace_id().map(str::to_owned)
-                        {
-                            send(&mut writer, &RendererEvent::OpenPreview { workspace_id })?;
-                        }
-                    }
-                    KeyCode::Char('P') => {
-                        if let Some(workspace_id) = state.selected_workspace_id().map(str::to_owned)
-                        {
-                            send(&mut writer, &RendererEvent::OpenProduction { workspace_id })?;
-                        }
-                    }
-                    KeyCode::Char('g') => {
-                        if let Some(workspace_id) = state.selected_workspace_id().map(str::to_owned)
-                        {
-                            send(
-                                &mut writer,
-                                &RendererEvent::OpenConnections { workspace_id },
-                            )?;
-                        }
-                    }
-                    KeyCode::Char('a') => {
-                        state.open_action_menu();
-                    }
-                    KeyCode::Char('d') => {
-                        state.open_delivery_menu();
-                    }
-                    KeyCode::Char('s') => {
-                        state.open_recovery_menu();
-                    }
-                    KeyCode::Up | KeyCode::Char('k') => {
-                        if let Some(workspace_id) = state.move_selection(-1) {
-                            send(
-                                &mut writer,
-                                &RendererEvent::Select {
-                                    workspace_id: workspace_id.clone(),
-                                },
-                            )?;
-                            last_selected = Some(workspace_id);
-                        }
-                    }
-                    KeyCode::Down | KeyCode::Char('j') => {
-                        if let Some(workspace_id) = state.move_selection(1) {
-                            send(
-                                &mut writer,
-                                &RendererEvent::Select {
-                                    workspace_id: workspace_id.clone(),
-                                },
-                            )?;
-                            last_selected = Some(workspace_id);
-                        }
-                    }
-                    KeyCode::Enter => {
+                    OccupancyKeyBinding::Connect => {
                         if state.session_id.is_some() {
                             state.agent_focused = true;
                         } else if let (Some(workspace_id), Some(runtime_id)) = (
@@ -575,6 +482,116 @@ fn main() -> Result<()> {
                                     runtime_id,
                                 },
                             )?;
+                        }
+                        continue;
+                    }
+                    OccupancyKeyBinding::NewSession => {
+                        state.mark_unavailable("new session");
+                        continue;
+                    }
+                    OccupancyKeyBinding::SleepAgent => {
+                        if let (Some(action), Some(workspace_id)) = (
+                            state.request_sleep(),
+                            state.selected_workspace_id().map(str::to_owned),
+                        ) {
+                            send(
+                                &mut writer,
+                                &RendererEvent::LifecycleAction {
+                                    workspace_id,
+                                    action,
+                                },
+                            )?;
+                        }
+                        continue;
+                    }
+                    OccupancyKeyBinding::WakeAgent => {
+                        if let (Some(action), Some(workspace_id)) = (
+                            state.request_wake(),
+                            state.selected_workspace_id().map(str::to_owned),
+                        ) {
+                            send(
+                                &mut writer,
+                                &RendererEvent::LifecycleAction {
+                                    workspace_id,
+                                    action,
+                                },
+                            )?;
+                        }
+                        continue;
+                    }
+                    OccupancyKeyBinding::DeleteAgent => {
+                        state.request_delete();
+                        continue;
+                    }
+                    OccupancyKeyBinding::CopySsh => {
+                        state.mark_unavailable("copy SSH");
+                        continue;
+                    }
+                    OccupancyKeyBinding::Refresh => {
+                        send(
+                            &mut writer,
+                            &RendererEvent::Refresh {
+                                workspace_id: state.selected_workspace_id().map(str::to_owned),
+                            },
+                        )?;
+                        continue;
+                    }
+                    OccupancyKeyBinding::SetTarget => {
+                        state.mark_unavailable("set target");
+                        continue;
+                    }
+                    OccupancyKeyBinding::MoveUp => {
+                        if let Some(workspace_id) = state.move_selection(-1) {
+                            send(
+                                &mut writer,
+                                &RendererEvent::Select {
+                                    workspace_id: workspace_id.clone(),
+                                },
+                            )?;
+                            last_selected = Some(workspace_id);
+                        }
+                        continue;
+                    }
+                    OccupancyKeyBinding::MoveDown => {
+                        if let Some(workspace_id) = state.move_selection(1) {
+                            send(
+                                &mut writer,
+                                &RendererEvent::Select {
+                                    workspace_id: workspace_id.clone(),
+                                },
+                            )?;
+                            last_selected = Some(workspace_id);
+                        }
+                        continue;
+                    }
+                    OccupancyKeyBinding::Unavailable(capability) => {
+                        state.mark_unavailable(capability);
+                        continue;
+                    }
+                    OccupancyKeyBinding::StopTyping | OccupancyKeyBinding::Unhandled => {}
+                }
+                match key.code {
+                    KeyCode::Char('?') => state.toggle_help(),
+                    KeyCode::Char('k') => {
+                        if let Some(workspace_id) = state.move_selection(-1) {
+                            send(
+                                &mut writer,
+                                &RendererEvent::Select {
+                                    workspace_id: workspace_id.clone(),
+                                },
+                            )?;
+                            last_selected = Some(workspace_id);
+                        }
+                    }
+                    KeyCode::Char('j') => {
+                        if let Some(workspace_id) = state.move_selection(1) {
+                            send(
+                                &mut writer,
+                                &RendererEvent::Select {
+                                    workspace_id: workspace_id.clone(),
+                                },
+                            )?;
+                            last_selected = Some(workspace_id);
                         }
                     }
                     _ => {}
