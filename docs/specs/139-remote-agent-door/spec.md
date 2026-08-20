@@ -224,6 +224,7 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-PROGRESS-188 | `--no-attach` keeps the same progress | occupancy is ready | `appaloft code --no-attach` | the same status lines print through occupy and skill copy; CLI exits without attach. |
 | WS-REMOTE-PROGRESS-189 | Attach starts as soon as occupancy exists | default TTY `code`; HOME skill offer or extra banner sync is still running | `appaloft code` | CLI attaches once `workspaces.open` succeeds. Optional HOME skill copy and extra chrome queries must not block attach; they may finish in the background or after attach. |
 | WS-REMOTE-PROGRESS-190 | Waiting on the user is announced | login is missing or a Server must be chosen | `appaloft code` | CLI prints the waiting/checking status immediately, then fail-closes with the real cause. It does not look hung. |
+| WS-REMOTE-PROGRESS-191 | Shell bootstrap is not silent | process starts `code` or `workspace` | `appaloft code --no-attach` | `run.ts` prints a present-tense status line before login, `prepareRemotePgliteStateSync`, or `createShellComposition`. Remote `code` (not `--local`) skips local PGlite sync. Occupancy CLI logs are not discarded. The first stdout/stderr byte is in the first few hundred ms. |
 
 ## Slice Scope
 
@@ -243,7 +244,7 @@ Out of slice 46: host port publish, laptop SSH `-L`, wrapping host-egress with t
 Slice 48: occupancy may offer allowlisted laptop HOME skill directories add-only.
 Out of slice 48: `auth mcp cursor install`, `appaloft setup agent`, MCP/plugin/secret copy, a new setup command, and treating `~/.cursor/skills` / `~/.config/opencode/skills` as Railway-aligned.
 
-Slice 49: default `code` prints present-tense progress before every slow occupy step and attaches as soon as the occupancy exists. HOME skill offer and extra banner sync must not block attach. `--no-attach` prints the same progress and stays occupy-only.
+Slice 49: default `code` prints present-tense progress before every slow occupy step and attaches as soon as the occupancy exists. HOME skill offer and extra banner sync must not block attach. `--no-attach` prints the same progress and stays occupy-only. Shell `run.ts` prints before login/PGlite/composition; remote `code` skips local PGlite sync and does not discard occupancy logs.
 Out of slice 49: a new setup-agent command, login-fold, deploy-fold, Cloud marketing pages, and live Hostinger deploy.
 
 

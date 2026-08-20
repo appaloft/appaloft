@@ -162,6 +162,7 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-PROGRESS-188 | CLI | automated | `--no-attach` prints the same progress and does not attach | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
 | WS-REMOTE-PROGRESS-189 | CLI | automated | default `code` attaches before optional skill copy finishes | `packages/adapters/cli/test/agent-workspace-command.test.ts` |
 | WS-REMOTE-PROGRESS-190 | CLI / unit | automated | login wait is announced before fail-closed logout | `packages/adapters/cli/test/remote-code-session.test.ts` |
+| WS-REMOTE-PROGRESS-191 | shell / CLI | automated | `run.ts` writes occupancy progress before PGlite sync or local composition; remote `code` skips PGlite | `apps/shell/test/run-control-plane-cli.test.ts`; `apps/shell/test/occupancy-cli-progress.test.ts` |
 
 
 

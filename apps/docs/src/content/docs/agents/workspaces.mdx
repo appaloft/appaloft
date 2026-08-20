@@ -55,7 +55,8 @@ appaloft code
 默认 `appaloft code` 占用团队默认已注册 Server 上的 **我的 Sandbox**。源是远端 SHA。
 缺少 Adapter/Profile 时会创建不可见的 `appaloft-remote`。笔记本路径不是 Workspace
 真相，脏树也不会上传。位置参数若是 git remote（`https://`、`ssh://`、`git@host:path`），
-无需本地 clone 即可占用该仓库。打开占用时会立刻打印现在进行时状态行，例如
+无需本地 clone 即可占用该仓库。`code` 进程一开始就会打印状态行，不会先静默启动本地数据库或 composition。
+打开占用时会继续打印现在进行时状态行，例如
 `Checking login…`、`Opening occupancy on hostinger…`、`Copying skills…`、`Attaching…`，
 占用一就绪就 attach。HOME skill 复制可以在后台继续。`--no-attach` 打印同样的进度，
 占用后退出。横幅是：

@@ -6,6 +6,8 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { domainError, err, ok } from "@appaloft/core";
+import { SHELL_OCCUPANCY_PROGRESS } from "../src/occupancy-cli-progress";
 import { runShellCli } from "../src/run";
 
 function jsonResponse(value: unknown, status = 200): Response {
@@ -512,11 +514,97 @@ describe("shell CLI remote control-plane pre-dispatch", () => {
 
     await expect(runShellCli()).rejects.toThrow("process.exit(1)");
     process.stderr.write = originalStderrWrite;
+    expect(stderr).toContain(SHELL_OCCUPANCY_PROGRESS.openingRemoteSession);
     expect(stderr).toContain("Sign in before opening a remote Agent session");
     expect(stderr).toContain("Run appaloft login");
     expect(stderr).not.toContain("No enrolled Server");
     expect(stderr).not.toContain("ECONNREFUSED");
     expect(stderr).not.toContain("appaloft-backend");
+  });
+
+  test("[WS-REMOTE-PROGRESS-191] unauthenticated code writes progress before PGlite sync or composition", async () => {
+    const appaloftHome = await mkdtemp(join(tmpdir(), "appaloft-cli-code-progress-"));
+    const events: string[] = [];
+    const progress: string[] = [];
+    process.argv = ["node", "appaloft", "code", "--no-attach"];
+    process.env = {
+      ...originalEnv,
+      APPALOFT_HOME: appaloftHome,
+    };
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+    process.exit = ((code?: string | number | null) => {
+      throw new Error(`process.exit(${String(code)})`);
+    }) as typeof process.exit;
+
+    await expect(
+      runShellCli(undefined, undefined, {
+        writeProgress: (message) => {
+          progress.push(message);
+          events.push("progress");
+        },
+        prepareRemotePgliteStateSync: async () => {
+          events.push("pglite");
+          return ok(null);
+        },
+        createShellComposition: async () => {
+          events.push("compose");
+          return err(
+            domainError.infra("test composition must not start before progress", {
+              phase: "test-occupancy-progress",
+            }),
+          );
+        },
+      }),
+    ).rejects.toThrow("process.exit(1)");
+
+    expect(progress).toEqual([SHELL_OCCUPANCY_PROGRESS.openingRemoteSession]);
+    expect(events[0]).toBe("progress");
+    expect(events).not.toContain("pglite");
+    expect(events).not.toContain("compose");
+  });
+
+  test("[WS-REMOTE-PROGRESS-191] logged-in local code writes progress and skips PGlite before composition", async () => {
+    const appaloftHome = await mkdtemp(join(tmpdir(), "appaloft-cli-code-pglite-skip-"));
+    const events: string[] = [];
+    const progress: string[] = [];
+    process.argv = ["node", "appaloft", "code", "--no-attach"];
+    process.env = {
+      ...originalEnv,
+      APPALOFT_HOME: appaloftHome,
+      APPALOFT_TOKEN: "tok_progress",
+      APPALOFT_CONTROL_PLANE_MODE: "none",
+    };
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+    process.exit = ((code?: string | number | null) => {
+      throw new Error(`process.exit(${String(code)})`);
+    }) as typeof process.exit;
+
+    await expect(
+      runShellCli(undefined, undefined, {
+        writeProgress: (message) => {
+          progress.push(message);
+          events.push("progress");
+        },
+        prepareRemotePgliteStateSync: async () => {
+          events.push("pglite");
+          throw new Error("remote code must not prepare local PGlite");
+        },
+        createShellComposition: async () => {
+          expect(progress).toEqual([SHELL_OCCUPANCY_PROGRESS.openingRemoteSession]);
+          events.push("compose");
+          return err(
+            domainError.infra("stop after proving progress-before-composition", {
+              phase: "test-occupancy-progress",
+            }),
+          );
+        },
+      }),
+    ).rejects.toThrow("process.exit(1)");
+
+    expect(events[0]).toBe("progress");
+    expect(events).toContain("compose");
+    expect(events).not.toContain("pglite");
+    expect(events.indexOf("progress")).toBeLessThan(events.indexOf("compose"));
   });
 
   test("[WS-REMOTE-DEPLOY-057] unauthenticated Cloud deploy is login-required before local composition", async () => {

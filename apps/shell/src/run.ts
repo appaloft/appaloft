@@ -52,9 +52,25 @@ import {
 } from "@appaloft/server-worker-relay";
 import { type AppComposition, createAppComposition, type ShellRuntimeOptions } from "./composition";
 import {
+  occupancyCliStartupProgress,
+  reportOccupancyCliProgress,
+  shouldKeepOccupancyCliLogs,
+  shouldSkipLocalPgliteForOccupancyCli,
+} from "./occupancy-cli-progress";
+import {
   prepareRemotePgliteStateSync,
   type RemotePgliteStateSyncSession,
 } from "./remote-pglite-state-sync";
+
+export interface ShellCliRunHooks {
+  readonly writeProgress?: (message: string) => void;
+  readonly prepareRemotePgliteStateSync?: typeof prepareRemotePgliteStateSync;
+  readonly createShellComposition?: (
+    options: ShellRuntimeOptions | undefined,
+    remotePgliteStateSyncSession: RemotePgliteStateSyncSession | undefined,
+    capturedStdinText?: string,
+  ) => Promise<Result<AppComposition>>;
+}
 
 function formatDetailValue(value: unknown): string | null {
   if (value === undefined || value === null || value === "") {
@@ -532,8 +548,17 @@ async function runHelpWithoutRuntime(argv: readonly string[]): Promise<void> {
 export async function runShellCli(
   options?: ShellRuntimeOptions,
   capturedStdinText?: string,
+  hooks: ShellCliRunHooks = {},
 ): Promise<void> {
   const argv = process.argv;
+  const startupArgs = commandArgs(argv);
+  const startupProgress = occupancyCliStartupProgress(startupArgs);
+  if (startupProgress) {
+    if (hooks.writeProgress) hooks.writeProgress(startupProgress);
+    else reportOccupancyCliProgress(startupProgress);
+  }
+  const preparePglite = hooks.prepareRemotePgliteStateSync ?? prepareRemotePgliteStateSync;
+  const composeShell = hooks.createShellComposition ?? createShellComposition;
   const mcpCommand = isMcpCommand(argv);
   const controlPlaneCli = await runStandaloneControlPlaneCli({
     argv,
@@ -799,11 +824,16 @@ export async function runShellCli(
     }
   }
 
-  const remotePgliteStateSync = await prepareRemotePgliteStateSync({
-    argv: cliArgv,
-    env: process.env,
-    ...(options?.pgliteRuntimeAssets ? { pgliteRuntimeAssets: options.pgliteRuntimeAssets } : {}),
-  });
+  const skipLocalPglite = shouldSkipLocalPgliteForOccupancyCli(commandArgs(cliArgv));
+  const remotePgliteStateSync = skipLocalPglite
+    ? ok(null)
+    : await preparePglite({
+        argv: cliArgv,
+        env: process.env,
+        ...(options?.pgliteRuntimeAssets
+          ? { pgliteRuntimeAssets: options.pgliteRuntimeAssets }
+          : {}),
+      });
   if (remotePgliteStateSync.isErr()) {
     writeDomainError(remotePgliteStateSync.error);
     process.exit(1);
@@ -816,15 +846,18 @@ export async function runShellCli(
   }
 
   const oneShotCli = !cliArgv.includes("serve") && !cliArgv.includes("worker");
+  const keepOccupancyLogs = shouldKeepOccupancyCliLogs(commandArgs(cliArgv));
   const discardedCliLogDestination = {
     write(): boolean {
       return true;
     },
   };
-  const appResult = await createShellComposition(
+  const appResult = await composeShell(
     {
       ...options,
-      ...(oneShotCli ? { loggerDestination: discardedCliLogDestination } : {}),
+      ...(oneShotCli && !keepOccupancyLogs
+        ? { loggerDestination: discardedCliLogDestination }
+        : {}),
     },
     remotePgliteStateSyncSession,
     capturedStdinText,

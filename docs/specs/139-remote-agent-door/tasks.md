@@ -413,6 +413,8 @@
 - [x] `--no-attach` prints the same progress and stays occupy-only
 - [x] Login wait is announced before fail-closed logout
 - [x] Unit tests WS-REMOTE-PROGRESS-187–190
+- [x] `run.ts` prints before login/PGlite/composition; remote `code` skips local PGlite
+- [x] Unit tests WS-REMOTE-PROGRESS-191
 
 ## Later
 
