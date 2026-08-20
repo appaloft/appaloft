@@ -1,9 +1,9 @@
-import { warmupWorkspaceControlRenderer } from "@appaloft/adapter-cli/workspace-tui-launch";
 import {
   reportOccupancyCliStartupOnce,
   shouldPrintOccupancyLineProgress,
   shouldWarmOccupancyTui,
 } from "./occupancy-cli-progress";
+import { enterOccupancyAltScreen, leaveOccupancyAltScreen } from "./occupancy-tui-first-frame";
 
 function parseBoolean(value: string | undefined): boolean | undefined {
   if (value === undefined) {
@@ -52,13 +52,17 @@ const command = args[0];
 if (shouldPrintOccupancyLineProgress(args)) {
   reportOccupancyCliStartupOnce(args);
 } else if (shouldWarmOccupancyTui(args)) {
-  void warmupWorkspaceControlRenderer().catch((error) => {
-    const message =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message: unknown }).message)
-        : String(error);
-    process.stderr.write(`error: ${message.trimEnd()}\n`);
-  });
+  enterOccupancyAltScreen();
+  void import("@appaloft/adapter-cli/workspace-tui-launch")
+    .then(({ warmupWorkspaceControlRenderer }) => warmupWorkspaceControlRenderer())
+    .catch((error) => {
+      leaveOccupancyAltScreen();
+      const message =
+        error && typeof error === "object" && "message" in error
+          ? String((error as { message: unknown }).message)
+          : String(error);
+      process.stderr.write(`error: ${message.trimEnd()}\n`);
+    });
 }
 const standaloneCommand =
   !command ||
