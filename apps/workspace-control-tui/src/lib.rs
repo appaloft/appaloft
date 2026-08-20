@@ -1139,9 +1139,8 @@ impl AppState {
                 self.remember_open_pane(&workspace_id, &runtime_id, &session_id);
                 self.agent_focused = true;
                 self.loading.active = false;
-                if self.loading.collapsed {
-                    self.focus_mode = true;
-                }
+                // Product lock: focus_mode is after attach, never at launch.
+                self.focus_mode = true;
                 self.status_line = format!("Agent Session {session_id}");
             }
             ParentMessage::TerminalOutput { data, .. } => {
@@ -3456,6 +3455,10 @@ mod tests {
         });
         assert!(state.loading.active);
         assert!(state.loading.collapsed);
+        assert!(
+            !state.focus_mode,
+            "collapsed launch is the wait screen, not attach focus_mode"
+        );
         assert_eq!(
             state
                 .loading
@@ -3492,6 +3495,10 @@ mod tests {
             !out.contains("sbx_1"),
             "collapsed wait must hide the tree:\n{out}"
         );
+        assert!(
+            !out.contains("Select a Workspace to load bounded detail."),
+            "collapsed wait is not Occupancy split:\n{out}"
+        );
         state.loading.collapsed = false;
         terminal
             .draw(|frame| render(frame, &state))
@@ -3516,7 +3523,10 @@ mod tests {
             session_id: "term_1".to_owned(),
         });
         assert!(!state.loading.active);
-        assert!(state.focus_mode);
+        assert!(
+            state.focus_mode,
+            "focus_mode starts after the agent attaches, even if the tree was revealed during wait"
+        );
         assert!(!state.should_emit_workspace_select());
     }
 
