@@ -188,9 +188,13 @@ export {
 export {
   createRatatuiOperatePresentation,
   createRatatuiWorkspaceControlPresentation,
+  ensureWorkspaceControlRendererBinary,
   openLoopbackWorkspaceControlRenderer,
+  resetWorkspaceControlRendererWarmup,
   resolveWorkspaceControlRendererBinary,
   type WorkspaceControlRendererProcess,
+  warmupWorkspaceControlRenderer,
+  workspaceControlRendererCrateDir,
 } from "./workspace-control-renderer.js";
 
 export function createCliProgram(input: CliProgramInput): CliProgram {

@@ -8,6 +8,18 @@ export function shouldExitAfterOccupancyCodeCli(args: readonly string[]): boolea
   return command === "code" || command === "code-local";
 }
 
+export function shouldWarmOccupancyTui(
+  args: readonly string[],
+  io: {
+    readonly stdin: { readonly isTTY?: boolean };
+    readonly stdout: { readonly isTTY?: boolean };
+  } = process,
+): boolean {
+  const command = occupancyCliCommand(args);
+  if (command !== "code" && command !== "workspace") return false;
+  return !shouldPrintOccupancyLineProgress(args, io);
+}
+
 export function shouldPrintOccupancyLineProgress(
   args: readonly string[],
   io: {

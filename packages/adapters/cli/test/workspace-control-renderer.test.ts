@@ -235,4 +235,46 @@ describe("Workspace control renderer channel", () => {
     });
     expect(terminated).toBe(1);
   });
+
+  test("[WS-REMOTE-PROGRESS-195] source checkout cargo-builds a missing occupancy TUI sidecar", async () => {
+    const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { ensureWorkspaceControlRendererBinary, workspaceControlRendererCrateDir } = await import(
+      "../src/workspace-control-renderer"
+    );
+    const root = await mkdtemp(join(tmpdir(), "appaloft-tui-crate-"));
+    const crate = join(root, "apps", "workspace-control-tui");
+    const debugBinary = join(crate, "target", "debug", "appaloft-workspace-tui");
+    await mkdir(crate, { recursive: true });
+    await writeFile(
+      join(crate, "Cargo.toml"),
+      '[package]\nname = "appaloft-workspace-control-tui"\n',
+    );
+    let built = 0;
+    try {
+      expect(workspaceControlRendererCrateDir({ APPALOFT_REPO_ROOT: root, PATH: "" })).toBe(crate);
+      const resolved = await ensureWorkspaceControlRendererBinary(
+        { APPALOFT_REPO_ROOT: root, PATH: "" },
+        async (crateDir) => {
+          built += 1;
+          expect(crateDir).toBe(crate);
+          await mkdir(join(crate, "target", "debug"), { recursive: true });
+          await writeFile(debugBinary, "");
+        },
+      );
+      expect(built).toBe(1);
+      expect(resolved).toBe(debugBinary);
+      const again = await ensureWorkspaceControlRendererBinary(
+        { APPALOFT_REPO_ROOT: root, PATH: "" },
+        async () => {
+          built += 1;
+        },
+      );
+      expect(built).toBe(1);
+      expect(again).toBe(debugBinary);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });

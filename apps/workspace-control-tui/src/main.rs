@@ -186,7 +186,8 @@ fn main() -> Result<()> {
                 send(&mut writer, &RendererEvent::TerminalReconnect)?;
             }
             let selected = state.selected_workspace_id().map(str::to_owned);
-            if let Some(workspace_id) = selected
+            if state.should_emit_workspace_select()
+                && let Some(workspace_id) = selected
                 && (before.is_none() || Some(&workspace_id) != last_selected.as_ref())
             {
                 send(

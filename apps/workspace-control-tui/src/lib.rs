@@ -929,6 +929,10 @@ impl AppState {
             .map(|workspace| workspace.workspace_id.as_str())
     }
 
+    pub fn should_emit_workspace_select(&self) -> bool {
+        !self.focus_mode && !self.agent_focused && self.selected_workspace_id().is_some()
+    }
+
     pub fn selected_runtime_id(&self) -> Option<&str> {
         self.detail.as_ref().and_then(|detail| {
             detail
@@ -2576,6 +2580,7 @@ mod tests {
         });
         assert!(!state.loading.active);
         assert!(state.focus_mode);
+        assert!(!state.should_emit_workspace_select());
     }
 
     #[test]

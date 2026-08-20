@@ -316,14 +316,6 @@ interface SandboxListResult {
   readonly items: readonly Record<string, unknown>[];
 }
 
-interface RuntimeListResult {
-  readonly items: readonly Record<string, unknown>[];
-}
-
-interface ItemListResult {
-  readonly items: readonly Record<string, unknown>[];
-}
-
 function resultValue<T>(result: Result<T>): T {
   if (result.isErr()) throw result.error;
   return result.value;
@@ -695,6 +687,21 @@ async function resolveConnectionsUrlSafe(): Promise<string | undefined> {
   }
 }
 
+async function queryItems(
+  context: WorkspaceControlPresentationContext,
+  query: Result<Query<unknown>>,
+): Promise<readonly Record<string, unknown>[]> {
+  if (query.isErr()) return [];
+  try {
+    const result = await context.executeQuery(query.value);
+    if (result.isErr() || !result.value || typeof result.value !== "object") return [];
+    const items = (result.value as { items?: unknown }).items;
+    return Array.isArray(items) ? (items as Record<string, unknown>[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 async function loadDetail(
   context: WorkspaceControlPresentationContext,
   workspaceId: string,
@@ -706,37 +713,31 @@ async function loadDetail(
   const workspace = resultValue(
     await context.executeQuery(operationValue(ShowSandboxQuery.create({ sandboxId: workspaceId }))),
   ) as Record<string, unknown>;
-  const runtimeResult = resultValue(
-    await context.executeQuery(
-      operationValue(ListSandboxAgentRuntimesQuery.create({ sandboxId: workspaceId })),
+  const runtimeResult = {
+    items: await queryItems(
+      context,
+      ListSandboxAgentRuntimesQuery.create({ sandboxId: workspaceId }),
     ),
-  ) as RuntimeListResult;
-  const ports = resultValue(
-    await context.executeQuery(
-      operationValue(ListSandboxPortsQuery.create({ sandboxId: workspaceId })),
-    ),
-  ) as ItemListResult;
-  const snapshots = resultValue(
-    await context.executeQuery(
-      operationValue(ListSandboxSnapshotsQuery.create({ limit: 100, offset: 0 })),
-    ),
-  ) as ItemListResult;
-  const promotions = resultValue(
-    await context.executeQuery(
-      operationValue(ListSandboxPromotionsQuery.create({ sandboxId: workspaceId })),
-    ),
-  ) as ItemListResult;
+  };
+  const ports = {
+    items: await queryItems(context, ListSandboxPortsQuery.create({ sandboxId: workspaceId })),
+  };
+  const snapshots = {
+    items: await queryItems(context, ListSandboxSnapshotsQuery.create({ limit: 100, offset: 0 })),
+  };
+  const promotions = {
+    items: await queryItems(context, ListSandboxPromotionsQuery.create({ sandboxId: workspaceId })),
+  };
   const tasks: WorkspaceControlTaskSummary[] = [];
   for (const runtime of runtimeResult.items) {
     const runtimeId = optionalString(runtime, "runtimeId");
     if (!runtimeId) continue;
-    const taskResult = resultValue(
-      await context.executeQuery(
-        operationValue(ListAgentTaskRunsQuery.create({ workspaceId, runtimeId })),
-      ),
-    ) as ItemListResult;
+    const taskItems = await queryItems(
+      context,
+      ListAgentTaskRunsQuery.create({ workspaceId, runtimeId }),
+    );
     tasks.push(
-      ...taskResult.items
+      ...taskItems
         .map(taskSummary)
         .filter((item): item is WorkspaceControlTaskSummary => item !== undefined),
     );
@@ -747,23 +748,32 @@ async function loadDetail(
     const resourceId = optionalString(promotion, "resourceId");
     let proof: WorkspaceControlPromotionSummary["proof"];
     if (deploymentId) {
-      const result = resultValue(
-        await context.executeQuery(
-          operationValue(
-            DeploymentProofQuery.create({
-              deploymentId,
-              ...(resourceId ? { resourceId } : {}),
-            }),
-          ),
-        ),
-      ) as unknown as Record<string, unknown>;
-      const mismatches = Array.isArray(result.mismatches) ? result.mismatches.length : 0;
-      const unavailableEvidence = Array.isArray(result.unavailableEvidence)
-        ? result.unavailableEvidence.length
-        : 0;
-      const verdict = optionalString(result, "verdict");
-      if (!verdict) throw new Error("Deployment Proof query returned an invalid descriptor");
-      proof = { verdict, mismatchCount: mismatches, unavailableEvidenceCount: unavailableEvidence };
+      try {
+        const created = DeploymentProofQuery.create({
+          deploymentId,
+          ...(resourceId ? { resourceId } : {}),
+        });
+        if (created.isOk()) {
+          const result = await context.executeQuery(created.value);
+          if (result.isOk() && result.value && typeof result.value === "object") {
+            const record = result.value as unknown as Record<string, unknown>;
+            const mismatches = Array.isArray(record.mismatches) ? record.mismatches.length : 0;
+            const unavailableEvidence = Array.isArray(record.unavailableEvidence)
+              ? record.unavailableEvidence.length
+              : 0;
+            const verdict = optionalString(record, "verdict");
+            if (verdict) {
+              proof = {
+                verdict,
+                mismatchCount: mismatches,
+                unavailableEvidenceCount: unavailableEvidence,
+              };
+            }
+          }
+        }
+      } catch {
+        // Proof chrome is optional.
+      }
     }
     const summary = promotionSummary(promotion, proof);
     if (summary) promotionSummaries.push(summary);
@@ -1026,13 +1036,15 @@ export function createBoundedWorkspaceControlPresentation(
             .then(async (occupied) => {
               if (!presentationOpen) return;
               if (occupied?.attach) await attachIssuedDescriptor(occupied.attach);
-              await renderer.send({
-                type: "workspaces",
-                workspaces: await listWorkspaces(context),
-              });
-              if (!occupied?.workspaceId) return;
-              selectedWorkspaceId = occupied.workspaceId;
-              await sendSelectedDetail(occupied.workspaceId);
+              try {
+                await renderer.send({
+                  type: "workspaces",
+                  workspaces: await listWorkspaces(context),
+                });
+              } catch {
+                // Restore-list chrome is optional after attach.
+              }
+              if (occupied?.workspaceId) selectedWorkspaceId = occupied.workspaceId;
             })
             .catch((error) => sendErrorBestEffort(error, "occupancy-code-bootstrap"));
         } else {

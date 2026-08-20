@@ -2,6 +2,7 @@ import "reflect-metadata";
 import {
   reportOccupancyCliStartupOnce,
   shouldPrintOccupancyLineProgress,
+  shouldWarmOccupancyTui,
 } from "./occupancy-cli-progress";
 
 function parseBoolean(value: string | undefined): boolean | undefined {
@@ -50,6 +51,13 @@ const args = shellCommandArgs(process.argv);
 const command = args[0];
 if (shouldPrintOccupancyLineProgress(args)) {
   reportOccupancyCliStartupOnce(args);
+} else if (shouldWarmOccupancyTui(args)) {
+  const { hasCliControlPlaneLogin, warmupWorkspaceControlRenderer } = await import(
+    "@appaloft/adapter-cli"
+  );
+  if (await hasCliControlPlaneLogin(process.env)) {
+    await warmupWorkspaceControlRenderer();
+  }
 }
 const standaloneCommand =
   !command ||

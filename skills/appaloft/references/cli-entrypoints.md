@@ -42,7 +42,9 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   enrolled Server, dispatches `workspaces.open` with the remote SHA and
   `targetServerId`. On a TTY it enters the occupancy Workspace TUI immediately
   with the list collapsed and a centered **preparing the agent** step panel, then
-  attaches into the remote session. `--no-attach` and non-TTY print
+  attaches into the remote session. A source checkout finds or cargo-builds
+  `appaloft-workspace-tui` so `appaloftdev code` does not require a manual
+  cargo build. `--no-attach` and non-TTY print
   one-line progress and
   `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>`.
   Skill copy is fail-soft and time-bounded.

@@ -421,6 +421,12 @@
 - [x] Unit tests WS-REMOTE-PROGRESS-193
 - [x] TTY `code` collapsed tree + centered preparing-the-agent step panel
 - [x] Unit tests WS-REMOTE-PROGRESS-194
+- [x] Source `appaloftdev` finds or cargo-builds the occupancy TUI sidecar
+- [x] Unit tests WS-REMOTE-PROGRESS-195
+- [x] Attach does not surface list/detail conflict in the TUI footer
+- [x] Unit tests WS-REMOTE-PROGRESS-196
+- [x] TTY warms the occupancy TUI before composition when the sidecar exists
+- [x] Unit tests WS-REMOTE-PROGRESS-197
 
 ## Later
 

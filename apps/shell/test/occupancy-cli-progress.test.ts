@@ -9,6 +9,7 @@ import {
   shouldKeepOccupancyCliLogs,
   shouldPrintOccupancyLineProgress,
   shouldSkipLocalPgliteForOccupancyCli,
+  shouldWarmOccupancyTui,
 } from "../src/occupancy-cli-progress";
 
 describe("occupancy CLI shell progress", () => {
@@ -55,5 +56,18 @@ describe("occupancy CLI shell progress", () => {
     expect(startupCall).toBeGreaterThan(-1);
     expect(runImport).toBeGreaterThan(-1);
     expect(startupCall).toBeLessThan(runImport);
+  });
+
+  test("[WS-REMOTE-PROGRESS-197] TTY occupancy warms the TUI before importing run.ts", () => {
+    const tty = { stdin: { isTTY: true }, stdout: { isTTY: true } };
+    expect(shouldWarmOccupancyTui(["code"], tty)).toBeTrue();
+    expect(shouldWarmOccupancyTui(["workspace"], tty)).toBeTrue();
+    expect(shouldWarmOccupancyTui(["code", "--no-attach"], tty)).toBeFalse();
+    const source = readFileSync(join(import.meta.dir, "../src/index.ts"), "utf8");
+    const warmup = source.indexOf("warmupWorkspaceControlRenderer");
+    const runImport = source.indexOf('import("./run")');
+    expect(warmup).toBeGreaterThan(-1);
+    expect(runImport).toBeGreaterThan(-1);
+    expect(warmup).toBeLessThan(runImport);
   });
 });

@@ -2136,4 +2136,82 @@ describe("Workspace control presentation", () => {
     expect(attachAt).toBeGreaterThan(-1);
     expect(workspacesAt).toBeGreaterThan(attachAt);
   });
+
+  test("[WS-REMOTE-PROGRESS-196] attach does not surface list or detail conflicts", async () => {
+    const terminal = {
+      detached: 0,
+      async *[Symbol.asyncIterator](): AsyncIterator<TerminalSessionFrame> {},
+      write: () => Promise.resolve(),
+      resize: () => Promise.resolve(),
+      detach() {
+        this.detached += 1;
+        return Promise.resolve();
+      },
+      close: () => Promise.resolve(),
+    } satisfies TerminalSession & { detached: number };
+    const renderer = new FakeRendererSession([
+      { type: "select", workspaceId: "sbx_1" },
+      { type: "quit" },
+    ]);
+    renderer.events = async function* events() {
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        if (this.messages.some((message) => message.type === "terminal-ready")) break;
+        await Promise.resolve();
+      }
+      yield { type: "select", workspaceId: "sbx_1" };
+      yield { type: "quit" };
+    };
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+    const conflict = domainError.conflict("Sandbox port publishing is unsupported", {
+      code: "conflict",
+      phase: "sandbox-ports",
+    });
+    await presentation.start({
+      occupyBootstrap: async ({ reportProgress }) => {
+        await reportProgress("Opening occupancy on hostinger…");
+        return {
+          workspaceId: "sbx_1",
+          attach: {
+            workspaceId: "sbx_1",
+            runtimeId: "sar_1",
+            transport: "managed-terminal",
+            sessionId: "term_occupy",
+            processId: "proc_1",
+            access: {
+              kind: "websocket",
+              path: "/sessions/term_occupy",
+              expiresAt: "2099-01-01T00:00:00.000Z",
+            },
+          },
+        };
+      },
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery) return err(conflict);
+        if (query instanceof ListSandboxPortsQuery) return err(conflict);
+        if (query instanceof ShowSandboxQuery) {
+          return ok({ sandboxId: "sbx_1", status: "ready" } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+      terminalSessionGateway: { attach: () => ok(terminal) },
+    });
+    expect(renderer.messages).toContainEqual({
+      type: "terminal-ready",
+      workspaceId: "sbx_1",
+      runtimeId: "sar_1",
+      sessionId: "term_occupy",
+    });
+    expect(renderer.messages.some((message) => message.type === "error")).toBeFalse();
+    expect(
+      renderer.messages.some(
+        (message) =>
+          message.type === "error" &&
+          (message.phase === "occupancy-code-bootstrap" ||
+            message.phase === "workspace-control-select"),
+      ),
+    ).toBeFalse();
+  });
 });

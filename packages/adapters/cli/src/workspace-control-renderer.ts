@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import { createServer, type Server, type Socket } from "node:net";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { domainError } from "@appaloft/core";
@@ -511,20 +511,134 @@ export async function openLoopbackWorkspaceControlRenderer(
   }
 }
 
+export function workspaceControlRendererCrateDir(
+  environment: NodeJS.ProcessEnv = process.env,
+): string | undefined {
+  const starts = [
+    environment.APPALOFT_REPO_ROOT,
+    resolve(dirname(fileURLToPath(import.meta.url)), "../../../.."),
+    process.cwd(),
+  ].filter((value): value is string => Boolean(value));
+  for (const start of starts) {
+    let current = resolve(start);
+    for (let depth = 0; depth < 8; depth += 1) {
+      const crate = join(current, "apps", "workspace-control-tui");
+      if (existsSync(join(crate, "Cargo.toml"))) return crate;
+      const parent = dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
+  }
+  return undefined;
+}
+
 export function resolveWorkspaceControlRendererBinary(
   environment: NodeJS.ProcessEnv = process.env,
 ): string | undefined {
   const executable =
     process.platform === "win32" ? "appaloft-workspace-tui.exe" : "appaloft-workspace-tui";
   const configured = environment.APPALOFT_WORKSPACE_TUI_BINARY;
-  const moduleRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
+  const crateDir = workspaceControlRendererCrateDir(environment);
+  const pathDirs = (environment.PATH ?? process.env.PATH ?? "").split(delimiter).filter(Boolean);
   const candidates = [
     ...(configured ? [isAbsolute(configured) ? configured : resolve(configured)] : []),
     join(dirname(process.execPath), executable),
-    join(moduleRoot, "apps", "workspace-control-tui", "target", "release", executable),
-    join(moduleRoot, "apps", "workspace-control-tui", "target", "debug", executable),
+    ...pathDirs.map((dir) => join(dir, executable)),
+    ...(crateDir
+      ? [
+          join(crateDir, "target", "release", executable),
+          join(crateDir, "target", "debug", executable),
+        ]
+      : []),
   ];
   return candidates.find((candidate) => existsSync(candidate));
+}
+
+export async function buildWorkspaceControlRendererBinary(
+  crateDir: string,
+  environment: NodeJS.ProcessEnv = process.env,
+): Promise<void> {
+  const cargo = environment.CARGO?.trim() || "cargo";
+  const child = spawn(cargo, ["build", "--locked"], {
+    cwd: crateDir,
+    shell: false,
+    stdio: "inherit",
+    env: environment,
+  });
+  const exitCode = await new Promise<number>((resolveExit, rejectExit) => {
+    child.once("error", rejectExit);
+    child.once("exit", (code) => resolveExit(code ?? 1));
+  });
+  if (exitCode !== 0) {
+    throw rendererError("Workspace renderer build failed", "binary-build-failed", {
+      crateDir,
+      exitCode,
+    });
+  }
+}
+
+export async function ensureWorkspaceControlRendererBinary(
+  environment: NodeJS.ProcessEnv = process.env,
+  build: (
+    crateDir: string,
+    env: NodeJS.ProcessEnv,
+  ) => Promise<void> = buildWorkspaceControlRendererBinary,
+): Promise<string | undefined> {
+  const existing = resolveWorkspaceControlRendererBinary(environment);
+  if (existing) return existing;
+  const crateDir = workspaceControlRendererCrateDir(environment);
+  if (!crateDir) return undefined;
+  await build(crateDir, environment);
+  return resolveWorkspaceControlRendererBinary(environment);
+}
+
+let warmedWorkspaceControlRenderer: Promise<WorkspaceControlRendererSession> | undefined;
+
+export function resetWorkspaceControlRendererWarmup(): void {
+  warmedWorkspaceControlRenderer = undefined;
+}
+
+export async function warmupWorkspaceControlRenderer(
+  environment: NodeJS.ProcessEnv = process.env,
+): Promise<WorkspaceControlRendererSession> {
+  warmedWorkspaceControlRenderer ??= openWorkspaceControlRenderer({ environment });
+  return warmedWorkspaceControlRenderer;
+}
+
+async function openWorkspaceControlRenderer(
+  input: RatatuiWorkspaceControlPresentationInput = {},
+): Promise<WorkspaceControlRendererSession> {
+  const environment = input.environment ?? process.env;
+  const binaryPath = input.binaryPath ?? (await ensureWorkspaceControlRendererBinary(environment));
+  if (!binaryPath) {
+    throw rendererError("Workspace renderer is unavailable", "binary-missing", {
+      platform: process.platform,
+      architecture: process.arch,
+    });
+  }
+  return openLoopbackWorkspaceControlRenderer({
+    launch: async ({ port, token }) => {
+      const child = spawn(binaryPath, [], {
+        shell: false,
+        stdio: "inherit",
+        env: {
+          ...environment,
+          APPALOFT_WORKSPACE_TUI_PORT: String(port),
+          APPALOFT_WORKSPACE_TUI_TOKEN: token,
+        },
+      });
+      const exited = new Promise<void>((resolveExit, rejectExit) => {
+        child.once("error", rejectExit);
+        child.once("exit", () => resolveExit());
+      });
+      return {
+        exited,
+        terminate() {
+          child.kill();
+        },
+      };
+    },
+  });
 }
 
 export interface RatatuiWorkspaceControlPresentationInput {
@@ -537,37 +651,12 @@ export function createRatatuiWorkspaceControlPresentation(
 ): WorkspaceControlPresentation {
   return createBoundedWorkspaceControlPresentation({
     openRenderer: async () => {
-      const environment = input.environment ?? process.env;
-      const binaryPath = input.binaryPath ?? resolveWorkspaceControlRendererBinary(environment);
-      if (!binaryPath) {
-        throw rendererError("Workspace renderer is unavailable", "binary-missing", {
-          platform: process.platform,
-          architecture: process.arch,
-        });
+      if (warmedWorkspaceControlRenderer) {
+        const session = warmedWorkspaceControlRenderer;
+        warmedWorkspaceControlRenderer = undefined;
+        return session;
       }
-      return openLoopbackWorkspaceControlRenderer({
-        launch: async ({ port, token }) => {
-          const child = spawn(binaryPath, [], {
-            shell: false,
-            stdio: "inherit",
-            env: {
-              ...environment,
-              APPALOFT_WORKSPACE_TUI_PORT: String(port),
-              APPALOFT_WORKSPACE_TUI_TOKEN: token,
-            },
-          });
-          const exited = new Promise<void>((resolveExit, rejectExit) => {
-            child.once("error", rejectExit);
-            child.once("exit", () => resolveExit());
-          });
-          return {
-            exited,
-            terminate() {
-              child.kill();
-            },
-          };
-        },
-      });
+      return openWorkspaceControlRenderer(input);
     },
     openUrl: async (url) => {
       const environment = input.environment ?? process.env;
