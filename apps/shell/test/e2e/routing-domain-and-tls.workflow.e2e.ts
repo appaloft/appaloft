@@ -121,6 +121,7 @@ describe("routing/domain/TLS workflow e2e", () => {
     const resource = await waitForCliDurableRoute({
       expectedUrl,
       options: fixture.cliOptions,
+      projectId: context.projectId,
       resourceId: context.resourceId,
     });
     await waitForCliDomainBindingStatus({

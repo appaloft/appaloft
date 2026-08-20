@@ -338,6 +338,83 @@ describe("Community occupancy initializer", () => {
     });
   });
 
+  test("[FOLDER-ONBOARD-007] folder occupancy creates Resource app with local-folder source", async () => {
+    const executed: unknown[] = [];
+    let environment: { id: { value: string } } | null = null;
+    const initializer = new CommunityWorkspaceActivationContextInitializer({
+      commandBus: {
+        execute: async (_context: unknown, command: unknown) => {
+          executed.push(command);
+          if (command instanceof CreateEnvironmentCommand) {
+            environment = { id: { value: "env_created" } };
+            return ok({ id: "env_created" });
+          }
+          return ok({ id: "res_created" });
+        },
+      } as never,
+      projects: {
+        findOne: async () =>
+          ({
+            id: { value: "prj_notes" },
+            toState: () => ({
+              lifecycleStatus: { value: "active" },
+              defaultWorkspaceProfileInstallationId: { value: "awpi_demo" },
+            }),
+          }) as never,
+        upsert: async () => undefined,
+      },
+      environments: {
+        findOne: async () => environment,
+        upsert: async () => undefined,
+      } as never,
+      resources: { findOne: async () => null, upsert: async () => undefined },
+      repositoryBindings: {
+        findByIdentity: async () => ({
+          binding: {
+            toState: () => ({
+              status: "active",
+              projectId: { value: "prj_notes" },
+            }),
+          },
+        }),
+        save: async () => undefined,
+      } as never,
+      adapters: { install: async () => ok({ installationId: "aai_demo" }) } as never,
+      profiles: {
+        validate: () => ok({ definitionDigest: "sha256:demo" }),
+        install: async () => ok({ installationId: "awpi_demo" }),
+      } as never,
+      profileRepository: {
+        findInstallationByDefinition: async () => ({}),
+        listInstallations: async () => [],
+      } as never,
+      defaultProfile,
+    });
+
+    const result = await initializer.ensure(
+      createExecutionContext({
+        requestId: "req_folder_occupancy_resource",
+        entrypoint: "cli",
+        actor: { kind: "user", id: "usr_1" },
+        tenant: { tenantId: "tenant_1" },
+      }),
+      {
+        repository: "https://folder.local/cwd/notes.git",
+        repositoryIdentity: "folder.local/cwd/notes",
+        missing: "repository-binding",
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(executed.some((command) => command instanceof CreateResourceCommand)).toBe(true);
+    expect(executed.find((command) => command instanceof CreateResourceCommand)).toMatchObject({
+      source: {
+        kind: "local-folder",
+        locator: ".",
+      },
+    });
+  });
+
   test("[WS-REMOTE-ENV-041][WS-REMOTE-RES-043][WS-REMOTE-NET-045] reuses existing Environment local, Resource app, and network", async () => {
     const executed: unknown[] = [];
     const initializer = new CommunityWorkspaceActivationContextInitializer({
@@ -726,6 +803,7 @@ describe("Community occupancy initializer", () => {
       }),
       "prj_demo",
       "https://github.com/traefik/whoami.git",
+      "github.com/traefik/whoami",
     );
 
     expect(result.isOk()).toBe(true);

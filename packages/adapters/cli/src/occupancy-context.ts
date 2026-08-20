@@ -4,7 +4,7 @@ import {
   ListSandboxesQuery,
 } from "@appaloft/application";
 import { Effect } from "effect";
-
+import { resolveFolderLinkedProjectId } from "./folder-project-onboarding.js";
 import {
   type OccupancyEnvironment,
   type OccupancyResource,
@@ -46,6 +46,12 @@ export function occupancyProjectIdFromSandboxes(
 export function resolveLatestOccupancyProjectId() {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
+    const linkedProjectId = yield* resolveFolderLinkedProjectId(
+      process.cwd(),
+      undefined,
+      cli.environment,
+    );
+    if (linkedProjectId) return linkedProjectId;
     const sandboxesQuery = ListSandboxesQuery.create({ limit: 100, offset: 0 });
     if (sandboxesQuery.isErr()) return undefined;
     const sandboxesResult = yield* Effect.promise(() => cli.executeQuery(sandboxesQuery.value));

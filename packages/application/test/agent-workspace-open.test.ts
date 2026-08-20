@@ -851,4 +851,155 @@ describe("Agent Workspace open application workflow", () => {
     });
     expect(begun).toEqual([{ profileInstallationId: "awpi_default", forceNew: true }]);
   });
+
+  test("[FOLDER-ONBOARD-007] folder occupancy initializes git without fetch or checkout", async () => {
+    const executedCommands: string[][] = [];
+    const pin = {
+      profileInstallationId: "awpi_default",
+      profileDefinitionDigest: `sha256:${"a".repeat(64)}`,
+      profileId: "custom-default",
+      profileVersion: "1.0.0",
+      adapterInstallationId: "aai_custom",
+      adapterDefinitionDigest: `sha256:${"b".repeat(64)}`,
+      adapterId: "custom-agent",
+      adapterVersion: "1.0.0",
+      harnessKey: "custom-agent",
+      harnessTemplateId: "aht_custom",
+      sandboxTemplateId: "sbt_agent",
+      sandboxTemplateVersion: "1",
+      sandboxTemplateDigest: `sha256:${"c".repeat(64)}`,
+      capabilities: {
+        taskMode: true,
+        interactive: true,
+        backgroundRuns: true,
+        nativeSession: false,
+        persistentPaths: ["/workspace"],
+      },
+    };
+    const activation = {
+      project: { projectId: "prj_notes", disposition: "created" as const },
+      repositoryBinding: { bindingId: "rbd_notes", disposition: "created" as const },
+      profile: { profileInstallationId: "awpi_default", disposition: "created" as const },
+    };
+    const dependencies: WorkspaceOpenDependencies = {
+      preflight: {
+        resolveContext: async () =>
+          ok({
+            projectId: "prj_notes",
+            profileInstallationId: "awpi_default",
+            activation,
+          }),
+        admit: async (_context, resolved) =>
+          ok({
+            projectId: resolved.projectId,
+            profileInstallationId: resolved.profileInstallationId,
+            activation: resolved.activation,
+            plan: {
+              sandbox: {
+                source: { kind: "template", templateId: "sbt_agent" },
+                requestedIsolation: "gvisor",
+                limits: {
+                  cpuMillis: 1_000,
+                  memoryBytes: 536_870_912,
+                  diskBytes: 2_147_483_648,
+                  maxProcesses: 32,
+                },
+                networkPolicy: { mode: "allowlist", rules: [] },
+              },
+              initialization: [],
+              runtime: {
+                harnessKey: "custom-agent",
+                harnessTemplateId: "aht_custom",
+                declarativeHarness: {},
+              },
+              defaultPorts: [],
+              suggestedChecks: [],
+              credentialRequirements: [],
+              pin,
+            },
+            reservation: {
+              reservationId: "res_notes",
+              targetSelection: {
+                targetClass: "managed",
+                source: "platform-default",
+                reason: "managed_entitlement_default",
+              },
+            },
+          }),
+      },
+      entries: {
+        findByWorkspaceIds: async () => new Map(),
+        findByWorkspaceId: async () => undefined,
+        findPreferred: async () => undefined,
+        findLiveProfileInstallationIds: async () => [],
+        begin: async () => ok({ workspaceId: "sbx_notes", created: true }),
+        complete: async () => ok(undefined),
+        fail: async () => ok(undefined),
+        markWorkspaceTerminated: async () => ok({ advanced: true }),
+      },
+      sandboxes: {
+        create: async () => ok({ sandboxId: "sbx_notes", status: "ready" }),
+        resume: async (_context, workspaceId) => ok({ sandboxId: workspaceId, status: "ready" }),
+        exec: async (_context, _workspaceId, command) => {
+          executedCommands.push([...command.argv]);
+          return ok({ mode: "foreground", frames: [{ kind: "exit", exitCode: 0 }] });
+        },
+        exposePort: async () => ok(undefined),
+      },
+      agents: {
+        showRuntime: async (_context, value) =>
+          ok({
+            runtimeId: value.runtimeId,
+            sandboxId: value.sandboxId,
+            harnessKey: "custom-agent",
+            harnessTemplateId: "aht_custom",
+            status: "ready",
+            profilePin: pin,
+            capabilities: pin.capabilities,
+            createdAt: "2026-08-20T00:00:00.000Z",
+          }),
+        createRuntime: async () =>
+          ok({
+            runtimeId: "sar_notes",
+            sandboxId: "sbx_notes",
+            harnessKey: "custom-agent",
+            harnessTemplateId: "aht_custom",
+            status: "ready",
+            capabilities: pin.capabilities,
+            createdAt: "2026-08-20T00:00:00.000Z",
+          }),
+        ensureRuntime: async () => ok(undefined),
+        attach: async () => {
+          throw new Error("attach should not run");
+        },
+      },
+      reservations: {
+        consume: async () => ok(undefined),
+        release: async () => ok(undefined),
+      },
+      now: () => "2026-08-20T00:00:00.000Z",
+    };
+    const service = new AgentWorkspaceOpenService(dependencies);
+    const opened = await service.open(
+      createExecutionContext({
+        requestId: "req_folder_occupancy_open",
+        entrypoint: "cli",
+        actor: { kind: "user", id: "usr_1" },
+        tenant: { tenantId: "ten_1" },
+      }),
+      {
+        repository: "https://folder.local/cwd/notes.git",
+        repositoryIdentity: "folder.local/cwd/notes",
+        ref: "refs/heads/local",
+        branch: "local",
+        commitSha: "cafef00d00000000000000000000000000000000",
+        attach: false,
+      },
+    );
+
+    expect(opened.isOk()).toBe(true);
+    expect(executedCommands).toEqual([["git", "init", "."]]);
+    expect(executedCommands.some((argv) => argv.includes("fetch"))).toBe(false);
+    expect(executedCommands.some((argv) => argv.includes("checkout"))).toBe(false);
+  });
 });

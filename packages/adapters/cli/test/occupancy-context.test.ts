@@ -1,5 +1,11 @@
 import { expect, test } from "bun:test";
+import { Effect } from "effect";
 
+import {
+  memoryFolderProjectLinkStore,
+  writeFolderProjectLink,
+} from "../src/folder-project-link.js";
+import { resolveFolderLinkedProjectId } from "../src/folder-project-onboarding.js";
 import { occupancyProjectIdFromSandboxes } from "../src/occupancy-context.js";
 
 test("[WS-REMOTE-ENV-149][WS-REMOTE-RES-151][WS-REMOTE-PROJSHOW-169] copies occupancy activation projectId", () => {
@@ -38,4 +44,18 @@ test("[WS-REMOTE-ENV-150][WS-REMOTE-RES-152][WS-REMOTE-PROJSHOW-170] missing occ
       },
     ]),
   ).toBeUndefined();
+});
+
+test("[FOLDER-ONBOARD-004] folder link wins over latest occupancy project", async () => {
+  const store = memoryFolderProjectLinkStore();
+  await writeFolderProjectLink(
+    {
+      cwd: "/tmp/hello-static",
+      projectId: "prj_folder",
+      identity: "folder.local/cwd/hello-static",
+    },
+    store,
+  );
+  const linked = await Effect.runPromise(resolveFolderLinkedProjectId("/tmp/hello-static", store));
+  expect(linked).toBe("prj_folder");
 });

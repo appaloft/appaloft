@@ -49,12 +49,19 @@ import {
 import { createCliLogRenderer } from "@appaloft/cli-logging";
 import { type DomainError, domainError, err, type Result } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
-import { Effect } from "effect";
+import type * as Prompt from "@effect/cli/Prompt";
+import { Effect, Runtime } from "effect";
 import {
   CLI_LOGIN_GUIDANCE,
   hasCliControlPlaneLogin,
   loginRequiredWorkspaceOccupancyTree,
+  workspaceRemoteLoginRequiredError,
 } from "../cli-session-login.js";
+import {
+  ensureFolderProjectOnboarding,
+  folderOnboardingCwdFromLocator,
+} from "../folder-project-onboarding.js";
+import { effectCliInteraction } from "../interaction.js";
 import { resolveRemoteGitWorkspaceRef } from "../local-git-workspace-context.js";
 import {
   launchScratchAgent,
@@ -587,6 +594,7 @@ export const workspaceCodeCommand = EffectCommand.make(
     noAttach: Options.boolean("no-attach").pipe(Options.withDefault(false)),
     local: Options.boolean("local").pipe(Options.withDefault(false)),
     forceNew: Options.boolean("new").pipe(Options.withDefault(false)),
+    yes: Options.boolean("yes").pipe(Options.withDefault(false)),
     open: Options.boolean("open").pipe(Options.withDefault(false)),
     profile: Options.text("profile").pipe(
       Options.optional,
@@ -603,9 +611,10 @@ export const workspaceCodeCommand = EffectCommand.make(
       "connections",
     ] as const).pipe(Options.optional),
   },
-  ({ forceNew, harness, local, noAttach, open, openTarget, path, profile }) =>
+  ({ forceNew, harness, local, noAttach, open, openTarget, path, profile, yes }) =>
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
+      const runtime = yield* Effect.runtime<CliRuntime | Prompt.Prompt.Environment>();
       if (local) {
         if (isRemoteCodeGitRemoteLocator(path)) {
           return yield* Effect.fail(scratchRemoteRejectedError());
@@ -670,6 +679,19 @@ export const workspaceCodeCommand = EffectCommand.make(
                 ...(cli.environment ? { env: cli.environment } : {}),
                 forceNew,
                 onProgress,
+                folderCwd: folderOnboardingCwdFromLocator(path),
+                ensureFolderOnboarding: async () => {
+                  const loggedIn = await hasCliControlPlaneLogin(cli.environment ?? process.env);
+                  if (!loggedIn) throw workspaceRemoteLoginRequiredError();
+                  return Runtime.runPromise(runtime)(
+                    ensureFolderProjectOnboarding({
+                      cwd: folderOnboardingCwdFromLocator(path),
+                      yes,
+                      interaction: effectCliInteraction,
+                      ...(cli.environment ? { env: cli.environment } : {}),
+                    }),
+                  );
+                },
                 listServers: async () => {
                   const query = ListServersQuery.create();
                   if (query.isErr()) throw query.error;

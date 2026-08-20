@@ -20,7 +20,18 @@ Teams usually organize work by product line or by customer, not by individual ap
 appaloft projects create --name "my-first-project"
 appaloft projects list
 appaloft projects show <projectId>
+appaloft project use <projectId>
 ```
+
+## Link this folder to a project <a id="folder-project-link" />
+
+The first `appaloft deploy` or `appaloft code` in a folder that is not linked yet:
+
+- With no Git, creates a project named after the directory (`--yes` / non-interactive), or uses your only project when you have exactly one.
+- With several projects in a TTY, asks once: create or select.
+- With a Git remote, uses that remote as correspondence to find or create the project. Missing Git still succeeds; Git is not a gate.
+
+The link is stored in the user home (default `~/.appaloft/folder-links.json`). The next command in the same folder reuses it. Switch with `appaloft project use <projectId>`. `appaloft context` still only switches the control-plane profile.
 
 ## Project lifecycle <a id="project-lifecycle" />
 

@@ -15,8 +15,9 @@ import { domainError } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
 
+import { ensureFolderProjectOnboarding } from "../folder-project-onboarding.js";
 import { resolveLatestOccupancyProjectId } from "../occupancy-context.js";
-import { optionalValue, runCommand, runQuery } from "../runtime.js";
+import { CliRuntime, optionalValue, print, runCommand, runQuery } from "../runtime.js";
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const projectIdArg = Args.text({ name: "projectId" });
@@ -84,6 +85,22 @@ const showCommand = EffectCommand.make(
       return yield* runQuery(ShowProjectQuery.create({ projectId: resolvedProjectId }));
     }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.projectShow));
+
+const useCommand = EffectCommand.make("use", { projectId: projectIdArg }, ({ projectId }) =>
+  Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const result = yield* ensureFolderProjectOnboarding({
+      explicitProjectId: projectId,
+      ...(cli.environment ? { env: cli.environment } : {}),
+    });
+    yield* print({
+      linked: true,
+      projectId: result.projectId,
+      identity: result.identity,
+      ...(result.projectName ? { projectName: result.projectName } : {}),
+    });
+  }),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.projectUse));
 
 const renameCommand = EffectCommand.make(
   "rename",
@@ -194,6 +211,7 @@ export const projectCommand = EffectCommand.make("project").pipe(
     createCommand,
     listCommand,
     showCommand,
+    useCommand,
     renameCommand,
     reorderCommand,
     setDescriptionCommand,

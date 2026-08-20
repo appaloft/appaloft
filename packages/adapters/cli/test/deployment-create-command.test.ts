@@ -1,6 +1,9 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   type Command as AppCommand,
   type Query as AppQuery,
@@ -12,6 +15,16 @@ import {
   type QueryBus,
 } from "@appaloft/application";
 import { ok } from "@appaloft/core";
+
+import {
+  fileFolderProjectLinkStore,
+  folderOccupancyIdentity,
+  writeFolderProjectLink,
+} from "../src/folder-project-link.js";
+
+async function isolatedCliHome(label: string): Promise<string> {
+  return mkdtemp(join(tmpdir(), `appaloft-folder-onboard-${label}-`));
+}
 
 describe("CLI deployment create command", () => {
   test("[DEP-CREATE-ENTRY-009] local deployments create progresses synchronously", async () => {
@@ -176,6 +189,16 @@ describe("CLI deployment create command", () => {
           requestId: "req_cli_occupancy_deploy_reuse",
         }),
     };
+    const home = await isolatedCliHome("052");
+    await writeFolderProjectLink(
+      {
+        cwd: process.cwd(),
+        projectId: "prj_static",
+        identity: folderOccupancyIdentity("workspace"),
+        projectName: "static",
+      },
+      fileFolderProjectLinkStore({ APPALOFT_HOME: home }),
+    );
     const { createCliProgram } = await import("../src");
     const program = createCliProgram({
       version: "0.1.0-test",
@@ -184,6 +207,7 @@ describe("CLI deployment create command", () => {
       commandBus,
       queryBus,
       executionContextFactory,
+      environment: { APPALOFT_HOME: home },
     });
 
     const writeStdout = process.stdout.write;
@@ -197,6 +221,7 @@ describe("CLI deployment create command", () => {
       ]);
     } finally {
       process.stdout.write = writeStdout;
+      await rm(home, { recursive: true, force: true });
     }
 
     expect(commands).toHaveLength(1);
@@ -264,6 +289,7 @@ describe("CLI deployment create command", () => {
           requestId: "req_cli_occupancy_deploy_missing",
         }),
     };
+    const home = await isolatedCliHome("053");
     const { createCliProgram } = await import("../src");
     const program = createCliProgram({
       version: "0.1.0-test",
@@ -272,6 +298,7 @@ describe("CLI deployment create command", () => {
       commandBus,
       queryBus,
       executionContextFactory,
+      environment: { APPALOFT_HOME: home },
       terminalIO: {
         stdin: { isTTY: false, on: () => undefined },
         stdout: { isTTY: false, write: () => true },
@@ -295,6 +322,7 @@ describe("CLI deployment create command", () => {
       process.stdout.write = writeStdout;
       process.stderr.write = writeStderr;
       process.exitCode = exitCode ?? 0;
+      await rm(home, { recursive: true, force: true });
     }
     expect(errorText).not.toContain("Run appaloft code");
     expect(errorText).not.toContain("workspace_occupancy_resource_missing");
@@ -390,6 +418,7 @@ describe("CLI deployment create command", () => {
           requestId: "req_cli_bare_occupancy_deploy",
         }),
     };
+    const home = await isolatedCliHome("057");
     const { createCliProgram } = await import("../src");
     const program = createCliProgram({
       version: "0.1.0-test",
@@ -398,6 +427,7 @@ describe("CLI deployment create command", () => {
       commandBus,
       queryBus,
       executionContextFactory,
+      environment: { APPALOFT_HOME: home },
       terminalIO: {
         stdin: { isTTY: false, on: () => undefined },
         stdout: { isTTY: false, write: () => true },
@@ -425,6 +455,7 @@ describe("CLI deployment create command", () => {
       process.stdout.write = writeStdout;
       process.stderr.write = writeStderr;
       process.exitCode = exitCode ?? 0;
+      await rm(home, { recursive: true, force: true });
     }
 
     expect(queried).not.toContain("ListSandboxesQuery");
@@ -474,6 +505,7 @@ describe("CLI deployment create command", () => {
           requestId: "req_cli_bare_occupancy_missing",
         }),
     };
+    const home = await isolatedCliHome("058");
     const { createCliProgram } = await import("../src");
     const program = createCliProgram({
       version: "0.1.0-test",
@@ -482,6 +514,7 @@ describe("CLI deployment create command", () => {
       commandBus,
       queryBus,
       executionContextFactory,
+      environment: { APPALOFT_HOME: home },
       terminalIO: {
         stdin: { isTTY: false, on: () => undefined },
         stdout: { isTTY: false, write: () => true },
@@ -505,6 +538,7 @@ describe("CLI deployment create command", () => {
       process.stdout.write = writeStdout;
       process.stderr.write = writeStderr;
       process.exitCode = exitCode ?? 0;
+      await rm(home, { recursive: true, force: true });
     }
     expect(queried).not.toContain("ListSandboxesQuery");
   });
@@ -596,6 +630,7 @@ describe("CLI deployment create command", () => {
           requestId: "req_cli_occupancy_deploy_url",
         }),
     };
+    const home = await isolatedCliHome("059");
     const { createCliProgram } = await import("../src");
     const program = createCliProgram({
       version: "0.1.0-test",
@@ -605,6 +640,7 @@ describe("CLI deployment create command", () => {
       commandBus,
       queryBus,
       executionContextFactory,
+      environment: { APPALOFT_TOKEN: "test", APPALOFT_HOME: home },
       terminalIO: {
         stdin: { isTTY: false, on: () => undefined },
         stdout: { isTTY: false, write: () => true },
@@ -626,6 +662,7 @@ describe("CLI deployment create command", () => {
       ]);
     } finally {
       process.stdout.write = writeStdout;
+      await rm(home, { recursive: true, force: true });
     }
     expect(commands).toHaveLength(1);
     expect(chunks.join("")).toContain("http://app-sc156jw98k.127.0.0.1.sslip.io");
@@ -698,6 +735,7 @@ describe("CLI deployment create command", () => {
           requestId: "req_cli_occupancy_deploy_nourl",
         }),
     };
+    const home = await isolatedCliHome("060");
     const { createCliProgram } = await import("../src");
     const program = createCliProgram({
       version: "0.1.0-test",
@@ -706,6 +744,7 @@ describe("CLI deployment create command", () => {
       commandBus,
       queryBus,
       executionContextFactory,
+      environment: { APPALOFT_HOME: home },
       terminalIO: {
         stdin: { isTTY: false, on: () => undefined },
         stdout: { isTTY: false, write: () => true },
@@ -727,6 +766,7 @@ describe("CLI deployment create command", () => {
       ]);
     } finally {
       process.stdout.write = writeStdout;
+      await rm(home, { recursive: true, force: true });
     }
     const stdout = chunks.join("");
     expect(commands).toHaveLength(1);
@@ -837,6 +877,7 @@ describe("CLI deployment create command", () => {
           requestId: "req_cli_remote_deploy_failed",
         }),
     };
+    const home = await isolatedCliHome("010");
     const { createCliProgram } = await import("../src");
     const program = createCliProgram({
       version: "0.1.0-test",
@@ -846,6 +887,10 @@ describe("CLI deployment create command", () => {
       commandBus,
       queryBus,
       executionContextFactory,
+      environment: {
+        APPALOFT_TOKEN: "test",
+        APPALOFT_HOME: home,
+      },
       terminalIO: {
         stdin: { isTTY: false, on: () => undefined },
         stdout: { isTTY: false, write: () => true },
@@ -875,6 +920,7 @@ describe("CLI deployment create command", () => {
       process.stdout.write = writeStdout;
       process.stderr.write = writeStderr;
       process.exitCode = exitCode ?? 0;
+      await rm(home, { recursive: true, force: true });
     }
 
     expect(commands).toHaveLength(1);
@@ -935,6 +981,7 @@ describe("CLI deployment create command", () => {
           }
         },
       } as unknown as QueryBus;
+      const home = await isolatedCliHome("008a");
       const { createCliProgram } = await import("../src");
       const program = createCliProgram({
         version: "0.1.0-test",
@@ -949,6 +996,7 @@ describe("CLI deployment create command", () => {
               requestId: "req_cli_static_publish_dir_wire",
             }),
         },
+        environment: { APPALOFT_HOME: home },
         terminalIO: {
           stdin: { isTTY: false, on: () => undefined },
           stdout: { isTTY: false, write: () => true },
@@ -975,6 +1023,7 @@ describe("CLI deployment create command", () => {
         process.stdout.write = writeStdout;
         process.stderr.write = writeStderr;
         process.exitCode = exitCode ?? 0;
+        await rm(home, { recursive: true, force: true });
       }
 
       const created = commands.find((command) => command instanceof CreateResourceCommand);

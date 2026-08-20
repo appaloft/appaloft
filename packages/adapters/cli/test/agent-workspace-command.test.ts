@@ -3,7 +3,7 @@ import "../../../application/node_modules/reflect-metadata/Reflect.js";
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import {
   AcquireWorkspaceWriterLeaseCommand,
   AddWorkspaceCollaborationLaneCommand,
@@ -13,6 +13,7 @@ import {
   type Command,
   type CommandBus,
   CreateAgentTaskRunCommand,
+  CreateProjectCommand,
   CreateWorkspaceCollaborationCommand,
   createExecutionContext,
   DeliverAgentTaskRunCommand,
@@ -22,6 +23,7 @@ import {
   IssueWorkspaceCollaborationNativeAttachCommand,
   IssueWorkspaceCollaborationTerminalAccessCommand,
   ListAgentTaskRunsQuery,
+  ListProjectsQuery,
   ListResourcesQuery,
   ListSandboxAgentRuntimesQuery,
   ListSandboxesQuery,
@@ -32,6 +34,7 @@ import {
   type QueryBus,
   ResumeAgentTaskRunCommand,
   ShowAgentTaskRunQuery,
+  ShowProjectQuery,
   ShowSandboxQuery,
   ShowWorkspaceCollaborationQuery,
   SteerAgentTaskRunCommand,
@@ -43,6 +46,8 @@ import {
   TerminateSandboxCommand,
 } from "@appaloft/application";
 import { domainError, err, ok } from "@appaloft/core";
+
+import { folderOccupancyIdentity } from "../src/folder-project-link.js";
 
 describe("Agent Workspace CLI", () => {
   test("[WS-TUI-ENTRY-001] interactive no-subcommand workspace starts the injected control presentation without mutation", async () => {
@@ -961,16 +966,17 @@ describe("Agent Workspace CLI", () => {
 
   test("[WS-REMOTE-PROGRESS-201] code --no-attach from a non-git cwd occupies the live occupancy", async () => {
     const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-nongit-"));
+    const home = await mkdtemp(join(tmpdir(), "appaloft-code-nongit-home-"));
     const commands: Command<unknown>[] = [];
     const { createCliProgram } = await import("../src");
-    const { ListSandboxesQuery, ListServersQuery } = await import("@appaloft/application");
     const program = createCliProgram({
       version: "0.1.0-test",
       startServer: async () => {},
       commandBus: {
         execute: async <T>(_context: unknown, command: Command<T>) => {
           commands.push(command as Command<unknown>);
-          return ok({ workspaceId: "sbx_examples" } as T);
+          if (command instanceof CreateProjectCommand) return ok({ id: "prj_folder" } as T);
+          return ok({ workspaceId: "sbx_folder" } as T);
         },
       } as unknown as CommandBus,
       queryBus: {
@@ -995,13 +1001,28 @@ describe("Agent Workspace CLI", () => {
               ],
             } as T);
           }
+          if (query instanceof ShowProjectQuery) {
+            return ok({
+              id: "prj_folder",
+              name: basename(emptyDir),
+              lifecycleStatus: "active",
+            } as T);
+          }
+          if (query instanceof ListProjectsQuery) {
+            return ok({ items: [], total: 0, limit: 100, offset: 0 } as T);
+          }
           return ok({ items: [] } as T);
         },
       } as unknown as QueryBus,
       executionContextFactory: {
         create: (input) => createExecutionContext({ ...input, requestId: "req_code_nongit" }),
       },
-      environment: { APPALOFT_TOKEN: "token" },
+      environment: { APPALOFT_TOKEN: "token", APPALOFT_HOME: home },
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
     });
     const originalExitCode = process.exitCode;
     const write = process.stderr.write;
@@ -1011,12 +1032,84 @@ describe("Agent Workspace CLI", () => {
     } finally {
       process.stderr.write = write;
       process.exitCode = originalExitCode ?? 0;
+      await rm(emptyDir, { recursive: true, force: true });
+      await rm(home, { recursive: true, force: true });
     }
     expect(commands[0]?.input).toMatchObject({
       repositoryIdentity: "github.com/appaloft/examples",
       commitSha: "b".repeat(40),
       attach: false,
     });
+  });
+
+  test("[FOLDER-ONBOARD-007] code --no-attach from a non-git cwd occupies this folder when no occupancy exists", async () => {
+    const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-nongit-empty-"));
+    const home = await mkdtemp(join(tmpdir(), "appaloft-code-nongit-empty-home-"));
+    const commands: Command<unknown>[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          if (command instanceof CreateProjectCommand) return ok({ id: "prj_folder" } as T);
+          return ok({ workspaceId: "sbx_folder" } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: {
+        execute: async <T>(_context: unknown, query: Query<T>) => {
+          if (query instanceof ListServersQuery) {
+            return ok({
+              items: [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }],
+            } as T);
+          }
+          if (query instanceof ListSandboxesQuery) {
+            return ok({ items: [] } as T);
+          }
+          if (query instanceof ShowProjectQuery) {
+            return ok({
+              id: "prj_folder",
+              name: basename(emptyDir),
+              lifecycleStatus: "active",
+            } as T);
+          }
+          if (query instanceof ListProjectsQuery) {
+            return ok({ items: [], total: 0, limit: 100, offset: 0 } as T);
+          }
+          return ok({ items: [] } as T);
+        },
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_nongit_empty" }),
+      },
+      environment: { APPALOFT_TOKEN: "token", APPALOFT_HOME: home },
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+    });
+    const originalExitCode = process.exitCode;
+    const write = process.stderr.write;
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", emptyDir, "--no-attach"]);
+    } finally {
+      process.stderr.write = write;
+      process.exitCode = originalExitCode ?? 0;
+      await rm(emptyDir, { recursive: true, force: true });
+      await rm(home, { recursive: true, force: true });
+    }
+    const opened = commands.find((command) => command instanceof OpenAgentWorkspaceCommand);
+    expect(opened).toBeDefined();
+    expect(opened).toMatchObject({
+      input: {
+        repositoryIdentity: folderOccupancyIdentity(basename(emptyDir)),
+        branch: "local",
+      },
+    });
+    expect(commands.some((command) => command instanceof CreateProjectCommand)).toBe(true);
   });
 
   test("[WS-CODE-CLI-001][WS-CODE-PARITY-002][WS-CODE-COMPAT-010] code native-attaches after remote door; workspace open stays Git-safe", async () => {

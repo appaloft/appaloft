@@ -137,6 +137,8 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-118: Remote Code Occupancy](./ADR-118-remote-code-occupancy.md) | Accepted | Default `code` occupies my Sandbox via `workspaces.open` + optional `targetServerId`. Registered BYOS is placement for `code` and `workspace open`; managed-default only when no BYOS exists. Occupy may add-only offer allowlisted HOME skill directories (Railway-aligned plus Appaloft cursor/opencode roots beyond Railway); no MCP/secret copy. |
 | [ADR-119: Remote Code Repo-URL Locator](./ADR-119-remote-code-repo-url.md) | Accepted | `appaloft code <git-remote>` occupies that repo from remote HEAD; no clone; URL wins over other occupancy. |
 | [ADR-120: Plan Preview Resolves Server Default Destination](./ADR-120-plan-default-destination.md) | Accepted | Omitted `deployments.plan` destinationId read-only resolves resource pin or Server Destination named `default`. |
+| [ADR-121: Source Event Required Check Gate](./ADR-121-source-event-required-check-gate.md) | Accepted | Optional named GitHub check names on Resource git-push auto-deploy policy wait for accepted conclusions before ordinary dispatch. |
+| [ADR-122: Railway-Like Folder Project Onboarding](./ADR-122-railway-like-folder-onboarding.md) | Accepted | First `deploy`/`code` in an unlinked folder create-or-links a Project; git is correspondence not a gate; `project use` switches the folder link. |
 
 ## Authoring Rules
 

@@ -46,6 +46,9 @@ slice. Scratch stays `--local`. Empty/logged-out stays fail-closed.
 
 - Spec 139 WS-REMOTE-RESUME-004 / WS-REMOTE-NO-UPLOAD-006 must distinguish
   cwd-origin discovery from an explicit remote locator.
+- [ADR-122](./ADR-122-railway-like-folder-onboarding.md) supersedes the
+  “resume latest occupancy from any cwd” clause: default `code` without an
+  explicit remote uses this folder’s git remote or folder identity.
 - Help, skill `cli-entrypoints.md`, and `agent.scratch` / workspace docs
   must name `appaloft code <git-remote-url>`.
 - Expected public SemVer: minor presentation change. No catalog field.

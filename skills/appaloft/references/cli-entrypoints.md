@@ -38,7 +38,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `--preview <previewEnvironmentId>` on logs, health, diagnostics, effective config, runtime
   control, and terminal commands when the user is operating a preview rather than its parent
   resource.
-- `appaloft code [path|git-remote] [--profile <name-or-id>] [--harness opencode|pi]` occupies my Sandbox after login. It requires a default
+- `appaloft code [path|git-remote] [--yes] [--profile <name-or-id>] [--harness opencode|pi]` occupies my Sandbox after login. A no-git folder resumes the live occupancy. With no occupancy, an unlinked folder create-or-links a Project (directory name, the only Project, or one TTY choice), persists that link, and occupies `folder.local`. Git remote is correspondence when present and is not required. It requires a default
   enrolled Server, dispatches `workspaces.open` with the remote SHA and
   `targetServerId`. On a TTY it enters the occupancy Workspace TUI immediately
   with the list collapsed and a centered **preparing the agent** step panel, then
@@ -74,8 +74,9 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   closed and never becomes Scratch. `owner/repo` is a local path, not GitHub shorthand.
 - After occupy, omit project/environment/resource ids on `env list|show|set|unset|effective-precedence`,
   `project show`, `resource list|show|logs|health|diagnose|effective-config|terminal|runtime restart`,
-  and `deploy`. Those reuse the latest occupancy Project, Environment `local`, and Resource `app`.
-  Explicit ids still win. Missing occupancy stays fail-closed.
+  and `deploy`. Those reuse this folder's linked Project when present, otherwise the matching
+  occupancy Project, Environment `local`, and Resource `app`. `appaloft project use <projectId>`
+  switches the folder link. Explicit ids still win. Missing occupancy stays fail-closed.
 - `appaloft code --local [path]` is a local Scratch session on this Mac. It does not
   require Git, login, Binding, Profile or Cloud, creates no Sandbox, and prints
   `Local scratch · this Mac · not saved remotely`. `--local` plus a git remote fails
@@ -222,6 +223,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft project list` - `projects.list`
 - `appaloft project count` - `projects.count`
 - `appaloft project show <projectId>` - `projects.show`
+- `appaloft project use <projectId>` - CLI-local folder link; no catalog operation. Persists this cwd to the shown Project for later `deploy`/`code`
 - `appaloft project rename <projectId> --name <name>` - `projects.rename`
 - `appaloft project reorder --project-ids <ids>` - `projects.reorder`
 - `appaloft project set-description <projectId> --description <description>` - `projects.set-description`
@@ -410,7 +412,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft env sync-profile <environmentId> <targetEnvironmentId> --resource-ids <ids>` - `environments.sync-profile`
 - `appaloft env promote <environmentId> <targetName>` - `environments.promote`
 - `appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123` - `deployments.cleanup-preview`
-- `appaloft deploy [path-or-source] [--config appaloft.yml] [--application <config-key>] [--env KEY=VALUE] [--secret KEY=ci-env:NAME] [--preview pull-request]; appaloft deployments create --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]` - `deployments.create`; repeat `--application` to deploy a named subset of a repository application graph, or omit it to deploy every declared application; the namespaced form is ids-only and supports remote control-plane profiles after explicit Resource profile and target setup
+- `appaloft deploy [path-or-source] [--yes] [--project <projectId>] [--config appaloft.yml] [--application <config-key>] [--env KEY=VALUE] [--secret KEY=ci-env:NAME] [--preview pull-request]; appaloft deployments create --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]` - `deployments.create`; first unlinked folder may create/link a Project named after the directory (git is not required); repeat `--application` to deploy a named subset of a repository application graph, or omit it to deploy every declared application; the namespaced form is ids-only and supports remote control-plane profiles after explicit Resource profile and target setup
 - `appaloft deployments retry <deploymentId>` - `deployments.retry`
 - `appaloft deployments redeploy <resourceId>` - `deployments.redeploy`
 - `appaloft deployments force-redeploy <resourceId>` - `deployments.force-redeploy`

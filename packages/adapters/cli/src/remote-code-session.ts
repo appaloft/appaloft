@@ -6,6 +6,13 @@ import { type DomainError } from "@appaloft/core";
 import { hasCliControlPlaneLogin, workspaceRemoteLoginRequiredError } from "./cli-session-login.js";
 import { activeControlPlaneProfile } from "./control-plane-service.js";
 import {
+  folderOccupancyCommitSha,
+  folderOccupancyLocator,
+  gitOccupancyLocator,
+  isFolderOccupancyIdentity,
+} from "./folder-project-link.js";
+import { type FolderOnboardingResult } from "./folder-project-onboarding.js";
+import {
   normalizeWorkspaceRepositoryRemote,
   type RemoteGitWorkspaceRef,
   type ResolveGitWorkspaceProgress,
@@ -121,6 +128,9 @@ export interface RemoteCodeDoorProbe {
   readonly resolveRemoteRef?: (repository: string, ref: string) => Promise<RemoteGitWorkspaceRef>;
   readonly runGit?: WorkspaceGitCommandRunner;
   readonly onProgress?: (message: string) => void;
+  readonly folderOnboarding?: FolderOnboardingResult;
+  readonly ensureFolderOnboarding?: () => Promise<FolderOnboardingResult>;
+  readonly folderCwd?: string;
 }
 
 export function hasRemoteCodeLogin(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -448,11 +458,18 @@ export async function resolveDefaultRemoteCodeDoor(
     ? await resolveRemoteCodeGitRemoteLocator(path, probe.runGit)
     : undefined;
   const homeDir = probe.env?.HOME ?? process.env.HOME;
+  const folderCwd = probe.folderCwd ?? (explicitRemote ? process.cwd() : path);
   const probeThisFolderGit =
     Boolean(explicitRemote) ||
     Boolean(probe.forceNew) ||
     !latestOccupancy ||
     folderHasGitWorktree(path, homeDir);
+  let folderOnboarding = explicitRemote ? undefined : probe.folderOnboarding;
+  const loadFolderOnboarding = async () => {
+    if (folderOnboarding || explicitRemote) return folderOnboarding;
+    folderOnboarding = await probe.ensureFolderOnboarding?.();
+    return folderOnboarding;
+  };
   let localLocator:
     | {
         readonly repository: string;
@@ -476,6 +493,11 @@ export async function resolveDefaultRemoteCodeDoor(
           );
     } catch (error) {
       localLocatorError = error;
+      const onboarded = await loadFolderOnboarding();
+      if (onboarded && !isFolderOccupancyIdentity(onboarded.identity)) {
+        localLocator = gitOccupancyLocator(onboarded.identity);
+        localLocatorError = undefined;
+      }
     }
   }
   const requestedLocator = explicitRemote ?? localLocator;
@@ -510,7 +532,16 @@ export async function resolveDefaultRemoteCodeDoor(
       branch: latestOccupancy.occupancy.branch?.trim() || "main",
     };
   } else {
-    throwWorkspaceLocatorMissing(localLocatorError, "remote-code-locator");
+    const onboarded = await loadFolderOnboarding();
+    if (onboarded && isFolderOccupancyIdentity(onboarded.identity)) {
+      locator = {
+        ...folderOccupancyLocator(onboarded.identity.split("/").filter(Boolean).at(-1) ?? "app"),
+        repositoryIdentity: onboarded.identity,
+        repository: `https://${onboarded.identity}.git`,
+      };
+    } else {
+      throwWorkspaceLocatorMissing(localLocatorError, "remote-code-locator");
+    }
   }
 
   if (!occupancyResume && !announcedRepository) {
@@ -519,7 +550,14 @@ export async function resolveDefaultRemoteCodeDoor(
 
   const binding = probe.showBinding ? await probe.showBinding(locator.repositoryIdentity) : null;
   let remote: RemoteGitWorkspaceRef;
-  if (occupancyResume) {
+  if (isFolderOccupancyIdentity(locator.repositoryIdentity)) {
+    remote = {
+      repositoryIdentity: locator.repositoryIdentity,
+      credentialFreeHttpsRepository: locator.repository,
+      ref: locator.ref,
+      commitSha: folderOccupancyCommitSha(folderCwd),
+    };
+  } else if (occupancyResume) {
     remote = {
       repositoryIdentity: locator.repositoryIdentity,
       credentialFreeHttpsRepository: locator.repository,
@@ -539,7 +577,12 @@ export async function resolveDefaultRemoteCodeDoor(
     ref: remote.ref,
     branch: locator.branch,
     commitSha: remote.commitSha,
-    projectId: binding?.status === "active" ? binding.projectId : "project",
+    projectId:
+      folderOnboarding?.projectId && folderOnboarding.identity === locator.repositoryIdentity
+        ? folderOnboarding.projectId
+        : binding?.status === "active"
+          ? binding.projectId
+          : "project",
     serverId: server.id,
     serverName: server.name,
     ...(server.providerKey ? { serverProviderKey: server.providerKey } : {}),

@@ -1,7 +1,7 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type AppaloftSdkFetch } from "@appaloft/sdk";
@@ -2964,10 +2964,12 @@ describe("CLI remote control-plane client", () => {
   });
 
   test("[CONTROL-PLANE-CLI-008][DEP-CREATE-ENTRY-008] top-level deploy dispatches detached through the remote control plane", async () => {
+    const home = await mkdtemp(join(tmpdir(), "appaloft-remote-deploy-"));
     const requests: Request[] = [];
     const program = createRemoteCliProgram({
       version: "0.12.5-test",
       profile: profile("local"),
+      environment: { APPALOFT_HOME: home },
       fetch: createControlPlaneFetch(requests, {
         "/api/deployments": jsonResponse({ id: "dep_remote" }, 202),
         "/api/deployments/dep_remote": jsonResponse({
@@ -2982,21 +2984,26 @@ describe("CLI remote control-plane client", () => {
       now: () => "2026-05-17T00:00:00.000Z",
     });
 
-    const created = await captureProcessOutput(() =>
-      program.parseAsync([
-        "node",
-        "appaloft",
-        "deploy",
-        "--project",
-        "prj_remote",
-        "--environment",
-        "env_production",
-        "--resource",
-        "res_api",
-        "--server",
-        "srv_remote",
-      ]),
-    );
+    let created: Awaited<ReturnType<typeof captureProcessOutput>>;
+    try {
+      created = await captureProcessOutput(() =>
+        program.parseAsync([
+          "node",
+          "appaloft",
+          "deploy",
+          "--project",
+          "prj_remote",
+          "--environment",
+          "env_production",
+          "--resource",
+          "res_api",
+          "--server",
+          "srv_remote",
+        ]),
+      );
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
 
     expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
       [
