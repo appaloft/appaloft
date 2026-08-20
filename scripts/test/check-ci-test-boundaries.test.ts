@@ -157,9 +157,9 @@ jobs:
       },
     });
 
-    expect(findUnitTestsWebViewOwnershipViolations(ciWorkflow, e2eWorkflow, webPackageJson)).toEqual(
-      [],
-    );
+    expect(
+      findUnitTestsWebViewOwnershipViolations(ciWorkflow, e2eWorkflow, webPackageJson),
+    ).toEqual([]);
     expect(
       findUnitTestsWebViewOwnershipViolations(
         ciWorkflow.replace("name: Unit Tests", "name: Package Tests"),
@@ -175,9 +175,10 @@ jobs:
       findUnitTestsWebViewOwnershipViolations(
         ciWorkflow.replace(
           "  unit-tests:",
-          ["  unit-tests:\n    if: ", expression("needs.changes.outputs.lightweight_only != 'true'")].join(
-            "",
-          ),
+          [
+            "  unit-tests:\n    if: ",
+            expression("needs.changes.outputs.lightweight_only != 'true'"),
+          ].join(""),
         ),
         e2eWorkflow,
         webPackageJson,
