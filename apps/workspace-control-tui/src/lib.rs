@@ -1299,9 +1299,9 @@ impl AppState {
     }
 
     /// Wait/list chrome (including collapsed preparing) must quit on `^c`.
-    /// Attached agent-focus swallows `^c` and forwards it to the session.
+    /// Only an attached harness session may swallow `^c` and forward it.
     pub fn ctrl_c_quits(&self) -> bool {
-        !self.agent_focused
+        self.loading.active || !self.agent_focused
     }
 
     pub fn toggle_focus_mode(&mut self) {
@@ -3721,10 +3721,16 @@ mod tests {
             session_id: "term_1".to_owned(),
         });
         assert!(waiting.agent_focused);
+        assert!(!waiting.loading.active);
         assert!(!waiting.ctrl_c_quits());
         assert_eq!(
             occupancy_key_binding(ctrl_c, waiting.agent_focused, waiting.session_id.is_some()),
             OccupancyKeyBinding::PassToAgent
+        );
+        waiting.loading.active = true;
+        assert!(
+            waiting.ctrl_c_quits(),
+            "preparing must still list-quit before harness focus"
         );
         assert_eq!(
             occupancy_key_binding(ctrl_r, true, true),

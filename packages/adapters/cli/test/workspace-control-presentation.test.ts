@@ -41,11 +41,17 @@ import {
 class FakeRendererSession implements WorkspaceControlRendererSession {
   readonly messages: WorkspaceControlRendererMessage[] = [];
   closed = 0;
+  private readonly hang: ReturnType<typeof Promise.withResolvers<void>> | undefined;
 
   constructor(
     private readonly rendererEvents: readonly WorkspaceControlRendererEvent[],
-    private readonly options: { readonly allowQuitDuringDetail?: boolean } = {},
-  ) {}
+    private readonly options: {
+      readonly allowQuitDuringDetail?: boolean;
+      readonly hangUntilClose?: boolean;
+    } = {},
+  ) {
+    this.hang = options.hangUntilClose ? Promise.withResolvers() : undefined;
+  }
 
   send(message: WorkspaceControlRendererMessage): Promise<void> {
     this.messages.push(message);
@@ -54,6 +60,10 @@ class FakeRendererSession implements WorkspaceControlRendererSession {
 
   async *events(): AsyncIterable<WorkspaceControlRendererEvent> {
     await Promise.resolve();
+    if (this.hang) {
+      await this.hang.promise;
+      return;
+    }
     for (const [index, event] of this.rendererEvents.entries()) {
       const next = this.rendererEvents[index + 1];
       yield event;
@@ -69,6 +79,7 @@ class FakeRendererSession implements WorkspaceControlRendererSession {
 
   close(): Promise<void> {
     this.closed += 1;
+    this.hang?.resolve();
     return Promise.resolve();
   }
 }
@@ -1300,6 +1311,30 @@ describe("Workspace control presentation", () => {
       title: "Appaloft Cloud Agents",
     });
     resolveList?.({ items: [{ sandboxId: "sbx_late", status: "ready" }] });
+  });
+
+  test("[WS-TUI-ENTRY-001] wait-screen SIGINT quits before harness focus", async () => {
+    const renderer = new FakeRendererSession([], { hangUntilClose: true });
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+    const started = presentation.start({
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery) return ok({ items: [] } as T);
+        throw new Error(`unexpected query ${query.constructor.name}`);
+      },
+    });
+    for (let attempt = 0; attempt < 50 && renderer.messages.length === 0; attempt += 1) {
+      await Bun.sleep(10);
+    }
+    expect(renderer.messages[0]).toEqual({
+      type: "loading",
+      title: "Appaloft Cloud Agents",
+    });
+    process.emit("SIGINT");
+    await started;
+    expect(renderer.closed).toBeGreaterThanOrEqual(1);
   });
 
   test("[WS-TUI-ENTRY-001] quit is accepted while occupancy detail is still loading", async () => {

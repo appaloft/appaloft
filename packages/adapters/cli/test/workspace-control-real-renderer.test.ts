@@ -49,10 +49,12 @@ realRendererTest(
       await waitForOutput(() => output, "preparing the agent");
       expect(output.toLowerCase()).not.toContain("occupancy");
       expect(output).not.toContain("sbx_real_renderer");
-      // List/menu quit is ^c. q is unbound; ^] is stop-typing, not quit.
+      // List/menu quit is ^c before harness focus. q is unbound; ^] is stop-typing.
+      // darwin host PTYs often deliver ^c as SIGINT to the parent, not a TUI key.
       let exitCode: number | undefined;
       for (let attempt = 0; attempt < 50 && exitCode === undefined; attempt += 1) {
         terminal.write("\x03");
+        child.kill("SIGINT");
         const result = await Promise.race([
           child.exited.then((code) => ({ exited: true as const, code })),
           Bun.sleep(100).then(() => ({ exited: false as const })),

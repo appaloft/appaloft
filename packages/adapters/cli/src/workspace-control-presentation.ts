@@ -894,6 +894,12 @@ export function createBoundedWorkspaceControlPresentation(
           }
         | undefined;
       const terminalPumps = new Set<Promise<void>>();
+      const quitWaitScreen = () => {
+        if (activeTerminal) return;
+        presentationOpen = false;
+        void renderer.close();
+      };
+      process.on("SIGINT", quitWaitScreen);
 
       const sendSelectedDetail = async (workspaceId: string) => {
         const generation = ++detailGeneration;
@@ -1473,6 +1479,7 @@ export function createBoundedWorkspaceControlPresentation(
       } catch (error) {
         await sendErrorBestEffort(error, "workspace-control-start");
       } finally {
+        process.off("SIGINT", quitWaitScreen);
         presentationOpen = false;
         detailGeneration += 1;
         await detachActiveTerminal();
