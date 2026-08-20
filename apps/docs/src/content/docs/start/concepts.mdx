@@ -73,7 +73,7 @@ Deployment 是一次尝试，不是长期配置容器。Appaloft 会围绕一次
 
 | 概念 | Web 控制台 | CLI | HTTP/API |
 | --- | --- | --- | --- |
-| Project | 顶部项目切换器 | `appaloft projects create` / `list` / `show` | `POST /api/projects` |
+| Project | 顶部项目切换器 | `appaloft project create` / `list` / `show` | `POST /api/projects` |
 | Resource | Resources 列表与详情页 | `appaloft resource show <resourceId>` | `GET /api/resources/{id}` |
 | Server | Servers 列表与详情页 | `appaloft server register` / `server capacity inspect` | `POST /api/servers` |
 | Environment | 项目下的 Environments 标签页 | 环境变量相关命令见[配置优先级](/docs/configuration/precedence/) | `GET /api/environments/{id}` |
