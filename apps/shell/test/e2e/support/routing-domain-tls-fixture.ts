@@ -310,12 +310,13 @@ export async function waitForCliDomainBindingStatus(input: {
 export async function waitForCliDurableRoute(input: {
   expectedUrl: string;
   options: ShellCliOptions;
+  projectId: string;
   resourceId: string;
 }): Promise<ResourceSummary> {
   let lastOutput = "";
 
   for (let attempt = 0; attempt < 120; attempt += 1) {
-    const listed = runShellCli(["resource", "list"], input.options);
+    const listed = runShellCli(["resource", "list", "--project", input.projectId], input.options);
     expectCliSuccess(listed, "list resources");
     lastOutput = listed.stdout;
 

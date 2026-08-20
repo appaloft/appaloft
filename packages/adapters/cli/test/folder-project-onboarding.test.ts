@@ -23,7 +23,9 @@ import {
 import {
   decideFolderProjectOnboarding,
   ensureFolderProjectOnboarding,
+  folderOnboardingCanPrompt,
   folderOnboardingStatusLine,
+  persistFolderProjectAssociation,
 } from "../src/folder-project-onboarding.js";
 import { CliRuntime } from "../src/runtime.js";
 
@@ -125,6 +127,29 @@ describe("folder project onboarding", () => {
       projectId: "prj_only",
       identity: folderOccupancyIdentity("scratch"),
     });
+  });
+
+  test("[FOLDER-ONBOARD-006] CI and noninteractive environments do not prompt", () => {
+    expect(folderOnboardingCanPrompt({ CI: "true" })).toBe(false);
+    expect(folderOnboardingCanPrompt({ APPALOFT_NONINTERACTIVE: "true" })).toBe(false);
+    expect(folderOnboardingCanPrompt({ CI: "true" }, true)).toBe(true);
+  });
+
+  test("[FOLDER-ONBOARD-003] persist association writes the folder link without creating a project", async () => {
+    const home = await mkdtemp(join(tmpdir(), "appaloft-folder-persist-"));
+    const cwd = join(home, "notes");
+    try {
+      const store = fileFolderProjectLinkStore({ APPALOFT_HOME: home });
+      await persistFolderProjectAssociation({
+        cwd,
+        projectId: "prj_from_config",
+        store,
+        peekGitIdentity: async () => undefined,
+      });
+      expect((await readFolderProjectLink(cwd, store))?.projectId).toBe("prj_from_config");
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
   });
 
   test("[FOLDER-ONBOARD-006] several projects prompt on TTY and create on --yes", () => {

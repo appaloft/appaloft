@@ -52,10 +52,10 @@ import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect, Either } from "effect";
 import { deployLoginRequiredError, hasCliControlPlaneLogin } from "../cli-session-login.js";
 import {
-  ensureFolderProjectOnboarding,
   folderOnboardingCwdFromLocator,
+  persistFolderProjectAssociation,
+  resolveFolderLinkedProjectId,
 } from "../folder-project-onboarding.js";
-import { effectCliInteraction } from "../interaction.js";
 import { normalizeWorkspaceRepositoryRemote } from "../local-git-workspace-context.js";
 import {
   isRemoteCodeGitRemoteLocator,
@@ -1772,6 +1772,7 @@ export const deployCommand = EffectCommand.make(
     yes,
   }) =>
     Effect.gen(function* () {
+      void yes;
       const cli = yield* CliRuntime;
       const sourceLocator = optionalValue(pathOrSource);
       const requestedEntryMode = optionalValue(entryMode);
@@ -1801,14 +1802,6 @@ export const deployCommand = EffectCommand.make(
           return yield* Effect.fail(deployLoginRequiredError());
         }
       }
-      const folderOnboarding = yield* ensureFolderProjectOnboarding({
-        cwd: folderOnboardingCwdFromLocator(sourceLocator),
-        yes,
-        interaction: effectCliInteraction,
-        ...(cli.environment ? { env: cli.environment } : {}),
-        ...(requestedProjectId ? { explicitProjectId: requestedProjectId } : {}),
-      });
-      const projectId = folderOnboarding.projectId;
       const serverId = optionalValue(server);
       const serverHostValue = optionalValue(serverHost);
       const serverNameValue = optionalValue(serverName);
@@ -1903,13 +1896,20 @@ export const deployCommand = EffectCommand.make(
         !configFilePath &&
         !previewContext &&
         !hasProfileOverrides &&
-        projectId &&
+        requestedProjectId &&
         serverId &&
         environmentId &&
         resourceId
       ) {
+        yield* Effect.promise(() =>
+          persistFolderProjectAssociation({
+            cwd: folderOnboardingCwdFromLocator(sourceLocator),
+            projectId: requestedProjectId,
+            ...(cli.environment ? { env: cli.environment } : {}),
+          }),
+        );
         const input = {
-          projectId,
+          projectId: requestedProjectId,
           serverId,
           environmentId,
           resourceId,
@@ -1993,7 +1993,7 @@ export const deployCommand = EffectCommand.make(
         }
       }
       const configuredDeploymentContext = effectiveConfig?.controlPlane?.deploymentContext;
-      const effectiveProjectId = projectId ?? configuredDeploymentContext?.projectId;
+      const configuredProjectId = configuredDeploymentContext?.projectId;
       const effectiveServerId = serverId ?? configuredDeploymentContext?.serverId;
       const effectiveDestinationId = destinationId ?? configuredDeploymentContext?.destinationId;
       const effectiveEnvironmentId = environmentId ?? configuredDeploymentContext?.environmentId;
@@ -2192,6 +2192,33 @@ export const deployCommand = EffectCommand.make(
               ...(previewContext ? { previewContext } : {}),
             })
           : undefined;
+      let sourceLinkProjectId: string | undefined;
+      const sourceLinkStore = cli.sourceLinkStore;
+      if (sourceFingerprint && sourceLinkStore) {
+        const existingSourceLink = yield* Effect.promise(() =>
+          sourceLinkStore.read(sourceFingerprint),
+        );
+        if (existingSourceLink.isOk() && existingSourceLink.value?.projectId) {
+          sourceLinkProjectId = existingSourceLink.value.projectId;
+        }
+      }
+      const folderCwd = folderOnboardingCwdFromLocator(sourceLocator ?? configuredSourceLocator);
+      const linkedFolderProjectId = yield* resolveFolderLinkedProjectId(
+        folderCwd,
+        undefined,
+        cli.environment,
+      );
+      const effectiveProjectId =
+        requestedProjectId ?? configuredProjectId ?? sourceLinkProjectId ?? linkedFolderProjectId;
+      if (effectiveProjectId) {
+        yield* Effect.promise(() =>
+          persistFolderProjectAssociation({
+            cwd: folderCwd,
+            projectId: effectiveProjectId,
+            ...(cli.environment ? { env: cli.environment } : {}),
+          }),
+        );
+      }
       const sourceProfile = {
         ...configSeed.sourceProfile,
         ...(sourceBaseDirectoryValue ? { baseDirectory: sourceBaseDirectoryValue } : {}),
@@ -2218,6 +2245,15 @@ export const deployCommand = EffectCommand.make(
             ...(sourceLocatorForSeed ? { sourceLocator: sourceLocatorForSeed } : {}),
           };
           const input = yield* resolveInteractiveDeploymentInput(seed);
+          if (input.projectId) {
+            yield* Effect.promise(() =>
+              persistFolderProjectAssociation({
+                cwd: folderCwd,
+                projectId: input.projectId,
+                ...(cli.environment ? { env: cli.environment } : {}),
+              }),
+            );
+          }
 
           return yield* runCreateDeploymentCommand(input, {
             appLogLines: parseAppLogLines(appLogLines),
@@ -2386,6 +2422,15 @@ export const deployCommand = EffectCommand.make(
           ...(stateSession ? { stateBackendPrepared: true } : {}),
           ...(configuredSourceLocator ? { sourceLocator: configuredSourceLocator } : {}),
         });
+        if (input.projectId) {
+          yield* Effect.promise(() =>
+            persistFolderProjectAssociation({
+              cwd: folderCwd,
+              projectId: input.projectId,
+              ...(cli.environment ? { env: cli.environment } : {}),
+            }),
+          );
+        }
 
         return yield* runCreateDeploymentCommand(input, {
           appLogLines: parseAppLogLines(appLogLines),

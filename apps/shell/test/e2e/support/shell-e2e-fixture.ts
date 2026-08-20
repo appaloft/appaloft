@@ -69,7 +69,10 @@ export function createShellE2eWorkspace(
     httpPort,
     pgliteDataDir,
     ...(options.appVersion ? { appVersion: options.appVersion } : {}),
-    ...(options.env ? { env: options.env } : {}),
+    env: {
+      APPALOFT_HOME: join(workspaceDir, ".appaloft-home"),
+      ...options.env,
+    },
   };
 
   return {

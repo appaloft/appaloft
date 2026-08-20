@@ -478,6 +478,7 @@ describe("domain-bindings command e2e", () => {
     const resource = await waitForCliDurableRoute({
       expectedUrl,
       options: fixture.cliOptions,
+      projectId: context.projectId,
       resourceId: context.resourceId,
     });
 

@@ -10,6 +10,7 @@ import { domainError } from "@appaloft/core";
 import { Effect } from "effect";
 
 import {
+  type FolderProjectLink,
   type FolderProjectLinkEnvironment,
   type FolderProjectLinkStore,
   fileFolderProjectLinkStore,
@@ -176,6 +177,15 @@ export function folderOnboardingStatusLine(result: FolderOnboardingResult): stri
   return `Linked this folder to ${name}(${result.projectId})`;
 }
 
+export function folderOnboardingCanPrompt(
+  env: FolderProjectLinkEnvironment = process.env,
+  override?: boolean,
+): boolean {
+  if (override !== undefined) return override;
+  if (env.CI === "true" || env.APPALOFT_NONINTERACTIVE === "true") return false;
+  return Boolean(process.stdin.isTTY && process.stdout.isTTY);
+}
+
 export function ensureFolderProjectOnboarding(input: {
   readonly cwd?: string;
   readonly yes?: boolean;
@@ -196,7 +206,7 @@ export function ensureFolderProjectOnboarding(input: {
       ((text: string) => {
         process.stderr.write(text);
       });
-    const canPrompt = input.canPrompt ?? Boolean(process.stdin.isTTY && process.stdout.isTTY);
+    const canPrompt = folderOnboardingCanPrompt(env, input.canPrompt);
     const cli = yield* CliRuntime;
     const explicitProjectId = input.explicitProjectId;
 
@@ -364,12 +374,26 @@ export function ensureFolderProjectOnboarding(input: {
   });
 }
 
+function createdProjectId(value: unknown): string | undefined {
+  if (typeof value !== "object" || value === null || !("id" in value)) return undefined;
+  return typeof value.id === "string" && value.id.length > 0 ? value.id : undefined;
+}
+
 function createOnboardingProject(name: string) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
     const command = yield* resultToEffect(CreateProjectCommand.create({ name }));
     const created = yield* Effect.promise(() => cli.executeCommand(command));
-    return yield* resultToEffect(created);
+    const project = yield* resultToEffect(created);
+    const id = createdProjectId(project);
+    if (!id) {
+      return yield* Effect.fail(
+        domainError.invariant("Create project did not return an id", {
+          phase: "folder-project-onboarding",
+        }),
+      );
+    }
+    return { id };
   });
 }
 
@@ -383,6 +407,29 @@ export function resolveFolderLinkedProjectId(
     const link = yield* Effect.promise(() => readFolderProjectLink(cwd, resolvedStore));
     return link?.projectId;
   });
+}
+
+export async function persistFolderProjectAssociation(input: {
+  readonly cwd: string;
+  readonly projectId: string;
+  readonly projectName?: string;
+  readonly store?: FolderProjectLinkStore;
+  readonly env?: FolderProjectLinkEnvironment;
+  readonly peekGitIdentity?: (cwd: string) => Promise<string | undefined>;
+}): Promise<FolderProjectLink> {
+  const store = input.store ?? fileFolderProjectLinkStore(input.env ?? process.env);
+  const identity =
+    (await (input.peekGitIdentity ?? peekWorkspaceGitIdentity)(input.cwd)) ??
+    folderOccupancyIdentity(folderDirectoryName(input.cwd));
+  return writeFolderProjectLink(
+    {
+      cwd: input.cwd,
+      projectId: input.projectId,
+      identity,
+      ...(input.projectName ? { projectName: input.projectName } : {}),
+    },
+    store,
+  );
 }
 
 export function folderOnboardingCwdFromLocator(sourceLocator?: string): string {
