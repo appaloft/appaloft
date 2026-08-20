@@ -96,9 +96,15 @@ cookie、`.env` 或编辑器插件二进制。沙箱进程看不到笔记本 HOM
 
 ## 在 occupancy 上选择 Claude、Codex 或 Grok <a id="agent-code-vendor" />
 
-`appaloft code --claude`、`--codex`、`--grok` 选择这台笔记本上的厂商凭证。它们映射到
-现有 occupancy 运行时（默认 OpenCode）。`--harness opencode|pi|omp` 仍是高级覆盖，
-不会发明新的运行时。未传厂商旗标时，`code` 跟随这台笔记本已登录或已安装的厂商。
+`appaloft code` 每次只接受一个 agent 别名：
+
+- 我们的：`--opencode`、`--pi`、`--omp`
+- 对齐 Railway 的：`--claude`、`--codex`、`--grok`
+
+`--claude`、`--codex`、`--grok` 选择这台笔记本上的厂商凭证，并映射到现有 OpenCode
+occupancy 运行时。`--opencode`、`--pi`、`--omp` 选择对应 occupancy harness。它们不会
+发明新的运行时。`--harness opencode|pi|omp` 只作兼容。未传别名时，`code` 使用已保存的
+occupancy-agent 偏好，然后跟随这台笔记本已登录或已安装的厂商。
 
 占用会把该凭证写到 occupancy 磁盘（`HOME=/workspace`），而不是沙箱环境变量：
 

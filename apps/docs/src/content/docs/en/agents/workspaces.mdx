@@ -103,11 +103,16 @@ occupy path that already writes files.
 
 ## Pick Claude, Codex, or Grok on occupancy <a id="agent-code-vendor" />
 
-`appaloft code --claude`, `--codex`, and `--grok` pick the vendor credential on this
-laptop. They map onto the existing occupancy runtime (OpenCode by default).
-`--harness opencode|pi|omp` remains an advanced override and does not invent a new
-runtime. With no vendor flag, `code` follows what is signed in or installed on this
-laptop.
+`appaloft code` takes one agent alias per run:
+
+- Ours: `--opencode`, `--pi`, `--omp`
+- Railway-aligned: `--claude`, `--codex`, `--grok`
+
+`--claude`, `--codex`, and `--grok` pick the vendor credential on this laptop and
+map onto the existing OpenCode occupancy runtime. `--opencode`, `--pi`, and `--omp`
+pick that occupancy harness. They do not invent a new runtime. `--harness
+opencode|pi|omp` is compatibility only. With no alias, `code` uses the saved
+occupancy-agent preference, then what is signed in or installed on this laptop.
 
 Occupy writes that credential onto the occupancy disk (`HOME=/workspace`), not as a
 sandbox variable:

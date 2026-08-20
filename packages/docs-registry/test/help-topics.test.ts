@@ -190,6 +190,9 @@ describe("public docs help registry", () => {
     );
     expect(topic.aliases).toEqual(
       expect.arrayContaining([
+        "appaloft code --opencode",
+        "appaloft code --pi",
+        "appaloft code --omp",
         "appaloft code --claude",
         "appaloft code --codex",
         "appaloft code --grok",

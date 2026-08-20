@@ -72,9 +72,12 @@ must not use laptop HEAD as Workspace truth.
    through the same `WriteSandboxFile` path. Grok uses `~/.grok/auth.json`. Codex
    uses `~/.codex/auth.json`. Claude uses a setup-token (`APPALOFT_HOME/claude-setup-token`,
    `~/.claude/setup-token`, or laptop `CLAUDE_CODE_OAUTH_TOKEN` written as a file),
-   never the Claude chat cookie. User-facing `--claude` / `--codex` / `--grok` map
-   onto existing occupancy harness IDs and do not invent a new runtime. Default
-   follows what is signed in or installed on this laptop. Never print token
+   never the Claude chat cookie. User-facing aliases are `--opencode` / `--pi` /
+   `--omp` (ours) and `--claude` / `--codex` / `--grok` (Railway-aligned). They are
+   mutually exclusive and map onto existing occupancy harness IDs; they do not
+   invent a new runtime. `--harness opencode|pi|omp` is compatibility only.
+   Default follows the saved `APPALOFT_HOME/occupancy-agent.json` preference, then
+   what is signed in or installed on this laptop. Never print token
    values. Never put long-lived secrets into occupancy env vars or `mcp.json`.
    Teammate disks stay isolated. This is not `appaloft setup agent`.
 

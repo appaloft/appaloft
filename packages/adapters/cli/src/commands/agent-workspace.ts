@@ -100,11 +100,7 @@ import {
   offerOccupancyAppaloftSkill,
   offerOccupancyHomeSkills,
 } from "../occupancy-skill-offer.js";
-import {
-  type OccupancyHarness,
-  occupancyHarnessForVendor,
-  resolveOccupancyVendor,
-} from "../occupancy-vendor.js";
+import { type OccupancyHarness, resolveOccupancyAgent } from "../occupancy-vendor.js";
 import {
   formatRemoteCodeBanner,
   isRemoteCodeGitRemoteLocator,
@@ -626,11 +622,17 @@ export const workspaceCodeCommand = EffectCommand.make(
       Options.optional,
       Options.withDescription("Agent Workspace Profile name or installation id"),
     ),
-    harness: Options.choice("harness", ["opencode", "pi", "omp"] as const).pipe(
-      Options.optional,
-      Options.withDescription(
-        "Occupancy runtime override. Prefer --claude, --codex, or --grok; those map onto existing harnesses and do not invent a new runtime.",
-      ),
+    opencode: Options.boolean("opencode").pipe(
+      Options.withDefault(false),
+      Options.withDescription("Use the OpenCode occupancy harness"),
+    ),
+    pi: Options.boolean("pi").pipe(
+      Options.withDefault(false),
+      Options.withDescription("Use the Pi occupancy harness"),
+    ),
+    omp: Options.boolean("omp").pipe(
+      Options.withDefault(false),
+      Options.withDescription("Use the OMP occupancy harness"),
     ),
     claude: Options.boolean("claude").pipe(
       Options.withDefault(false),
@@ -643,6 +645,12 @@ export const workspaceCodeCommand = EffectCommand.make(
     grok: Options.boolean("grok").pipe(
       Options.withDefault(false),
       Options.withDescription("Use your Grok ~/.grok/auth.json on occupancy disk"),
+    ),
+    harness: Options.choice("harness", ["opencode", "pi", "omp"] as const).pipe(
+      Options.optional,
+      Options.withDescription(
+        "Compatibility only. Prefer --opencode, --pi, or --omp. Cannot combine with a different agent alias.",
+      ),
     ),
     openTarget: Options.choice("open-target", [
       "preview",
@@ -660,9 +668,12 @@ export const workspaceCodeCommand = EffectCommand.make(
     harness,
     local,
     noAttach,
+    omp,
     open,
     openTarget,
+    opencode,
     path,
+    pi,
     profile,
     yes,
   }) =>
@@ -697,19 +708,20 @@ export const workspaceCodeCommand = EffectCommand.make(
       }
 
       const occupancyHomeDir = cli.environment?.HOME ?? undefined;
-      const occupancyVendor = yield* Effect.tryPromise({
+      const occupancyAgent = yield* Effect.tryPromise({
         try: () =>
-          resolveOccupancyVendor({
-            flags: { claude, codex, grok },
+          resolveOccupancyAgent({
+            flags: { claude, codex, grok, omp, opencode, pi },
+            ...(optionalValue(harness)
+              ? { harness: optionalValue(harness) as OccupancyHarness }
+              : {}),
             ...(occupancyHomeDir ? { homeDir: occupancyHomeDir } : {}),
             ...(cli.environment ? { env: cli.environment } : {}),
           }),
         catch: (error) => workspaceCliError(error, "occupancy-vendor"),
       }).pipe(Effect.flatMap((result) => resultToEffect(result)));
-      const selectedHarness = occupancyHarnessForVendor(
-        occupancyVendor.vendor,
-        optionalValue(harness) as OccupancyHarness | undefined,
-      );
+      const selectedHarness = occupancyAgent.harness;
+      const occupancyVendor = occupancyAgent;
 
       const attach = !noAttach;
       const interactive = Boolean(cli.terminalIO.stdin.isTTY && cli.terminalIO.stdout.isTTY);

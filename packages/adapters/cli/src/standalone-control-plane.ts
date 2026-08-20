@@ -303,7 +303,7 @@ function renderRootHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
 
 Usage:
   appaloft login [--url <url>] [--mode cloud|self-hosted] [--no-browser]
-  appaloft code [path|git-remote] [--no-attach] [--local] [--new] [--profile <name-or-id>] [--claude|--codex|--grok] [--harness opencode|pi|omp]
+  appaloft code [path|git-remote] [--no-attach] [--local] [--new] [--profile <name-or-id>] [--opencode|--pi|--omp|--claude|--codex|--grok]
   appaloft workspace [--json]
   appaloft deploy [path|git-remote]
   appaloft server list

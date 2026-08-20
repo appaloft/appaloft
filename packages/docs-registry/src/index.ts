@@ -220,7 +220,7 @@ export const publicDocsHelpTopics = {
     id: "agent.code-vendor",
     title: "Occupancy vendor credential",
     description:
-      "How appaloft code --claude, --codex, and --grok write laptop vendor credentials onto occupancy disk and map onto existing harnesses.",
+      "How appaloft code --opencode, --pi, --omp, --claude, --codex, and --grok select one occupancy agent and write laptop vendor credentials onto occupancy disk.",
     page: {
       "zh-CN": "agents/workspaces",
       "en-US": "en/agents/workspaces",
@@ -232,6 +232,9 @@ export const publicDocsHelpTopics = {
     surfaces: ["cli"],
     anchor: "agent-code-vendor",
     aliases: [
+      "appaloft code --opencode",
+      "appaloft code --pi",
+      "appaloft code --omp",
       "appaloft code --claude",
       "appaloft code --codex",
       "appaloft code --grok",

@@ -463,7 +463,7 @@
 ## Slice 50 - vendor flags, occupancy-home credentials, connecting-step data
 
 - [x] Grill D157: Railway-like vendor selector + disk credentials; not setup agent; no TUI redesign
-- [x] Expand Spec 139 / ADR-118; `--claude/--codex/--grok` map onto existing harnesses
+- [x] Expand Spec 139 / ADR-118; `--opencode/--pi/--omp/--claude/--codex/--grok` are mutually exclusive aliases
 - [x] Occupy writes Grok/Codex `auth.json` and Claude setup-token onto occupancy HOME
 - [x] Skill-tree offer still skips `auth.json`; first-party Appaloft skill + secret-free MCP stay
 - [x] Connecting-step data includes credential, skill count, and work-on-disk

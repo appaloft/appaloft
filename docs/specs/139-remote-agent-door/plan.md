@@ -61,7 +61,7 @@
 | Cloud default Server | later Cloud ticket; must honor `targetServerId` |
 | Occupancy leftover EXPOSE | detector + occupancy initializer; live-verified whoami 80 |
 | Occupancy HOME skill offer | public CLI `occupancy-skill-offer` after first-party Appaloft skill; `WriteSandboxFile` + add-only `ReadSandboxFile` |
-| Occupancy vendor flags | public CLI `--claude/--codex/--grok` mapped onto existing harness IDs |
+| Occupancy vendor flags | public CLI `--opencode/--pi/--omp/--claude/--codex/--grok` (mutually exclusive); `--harness` compatibility only |
 | Occupancy vendor credential | public CLI `occupancy-credential-offer` onto occupancy HOME via `WriteSandboxFile` |
 | Occupancy first-party MCP file | public CLI secret-free `.mcp.json`; laptop attach still `mcp remote-stdio` |
 | Occupancy connecting-step data | public CLI `occupancy-connecting-telemetry`; TUI layout unchanged |

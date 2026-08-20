@@ -54,7 +54,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `--preview <previewEnvironmentId>` on logs, health, diagnostics, effective config, runtime
   control, and terminal commands when the user is operating a preview rather than its parent
   resource.
-- `appaloft code [path|git-remote] [--yes] [--profile <name-or-id>] [--claude|--codex|--grok] [--harness opencode|pi|omp]` occupies my Sandbox after login. A no-git folder create-or-links a Project (directory name, the only Project, or one TTY choice), persists that link, and occupies `folder.local`. Git remote is correspondence when present and is not required. It requires a default
+- `appaloft code [path|git-remote] [--yes] [--profile <name-or-id>] [--opencode|--pi|--omp|--claude|--codex|--grok]` occupies my Sandbox after login. A no-git folder create-or-links a Project (directory name, the only Project, or one TTY choice), persists that link, and occupies `folder.local`. Git remote is correspondence when present and is not required. It requires a default
   enrolled Server, dispatches `workspaces.open` with the remote SHA and
   `targetServerId`. On a TTY it enters the occupancy Workspace TUI immediately
   with the list collapsed and a centered **preparing the agent** step panel, then
@@ -77,10 +77,10 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `--new` occupies the cwd origin and does not silently resume whoami. A non-git directory
   occupies this folder via a git remote and does not resume an unrelated occupancy. A failed open names
   the repository and the missing Binding or Profile, and keeps `causeCode` visible; it does
-  not invent a successful occupancy.   `--claude`, `--codex`, and `--grok` are the user-facing vendor selector and map onto
-  existing occupancy harnesses (default OpenCode). `--harness` remains the runtime
-  override. Default vendor follows what is signed in or installed on this laptop.
-  `--harness pi` occupies reserved
+  not invent a successful occupancy.   `--opencode`, `--pi`, `--omp`, `--claude`, `--codex`, and `--grok` are the mutually exclusive user-facing aliases and map onto
+  existing occupancy harnesses (default OpenCode). `--harness` is compatibility only.
+  Default alias follows the saved occupancy-agent preference, then what is signed in or installed on this laptop.
+  `--pi` (or compatibility `--harness pi`) occupies reserved
   `appaloft-remote-pi` and does not rewrite the project's OpenCode default; an existing
   OpenCode Workspace needs `--new`. A positional `https://`, `ssh://`, or `git@host:path` occupies that repository
   without a local clone. Laptop Git is not uploaded. Occupy writes the public Appaloft

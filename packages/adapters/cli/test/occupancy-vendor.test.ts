@@ -5,32 +5,57 @@ import { join } from "node:path";
 
 import {
   detectOccupancyVendor,
+  loadOccupancyAgentPreference,
   OCCUPANCY_VENDOR_HARNESS,
-  occupancyHarnessForVendor,
+  occupancyHarnessForAlias,
   occupancyVendorCredentialPresent,
-  resolveOccupancyVendor,
+  resolveOccupancyAgent,
 } from "../src/occupancy-vendor.js";
 
 async function tempHome(): Promise<string> {
   return mkdtemp(join(tmpdir(), "appaloft-occupancy-vendor-"));
 }
 
-test("[WS-REMOTE-VENDOR-204] vendor flags map onto existing occupancy harnesses", () => {
+test("[WS-REMOTE-VENDOR-204] vendor and harness aliases map onto existing occupancy harnesses", () => {
   expect(OCCUPANCY_VENDOR_HARNESS).toEqual({
     claude: "opencode",
     codex: "opencode",
     grok: "opencode",
   });
-  expect(occupancyHarnessForVendor("grok")).toBe("opencode");
-  expect(occupancyHarnessForVendor("claude", "pi")).toBe("pi");
-  expect(occupancyHarnessForVendor(undefined)).toBe("opencode");
+  expect(occupancyHarnessForAlias("grok")).toBe("opencode");
+  expect(occupancyHarnessForAlias("opencode")).toBe("opencode");
+  expect(occupancyHarnessForAlias("pi")).toBe("pi");
+  expect(occupancyHarnessForAlias("omp")).toBe("omp");
+  expect(occupancyHarnessForAlias()).toBe("opencode");
 });
 
-test("[WS-REMOTE-VENDOR-205] default vendor follows laptop login then install", async () => {
+test("[WS-REMOTE-VENDOR-205] default alias follows saved preference then laptop login", async () => {
   const homeDir = await tempHome();
   await mkdir(join(homeDir, ".grok"), { recursive: true });
+  await mkdir(join(homeDir, ".codex"), { recursive: true });
   await writeFile(join(homeDir, ".grok", "auth.json"), '{"token":"redacted"}\n');
-  expect(await detectOccupancyVendor({ homeDir, which: () => undefined })).toBe("grok");
+  await writeFile(join(homeDir, ".codex", "auth.json"), '{"token":"redacted"}\n');
+
+  const first = await resolveOccupancyAgent({
+    flags: { grok: true },
+    homeDir,
+    env: {},
+    which: () => undefined,
+  });
+  expect(first.isOk()).toBe(true);
+  if (first.isErr()) return;
+  expect(first.value).toMatchObject({ alias: "grok", vendor: "grok", harness: "opencode" });
+  expect(await loadOccupancyAgentPreference({ homeDir, env: {} })).toBe("grok");
+
+  const saved = await resolveOccupancyAgent({
+    flags: {},
+    homeDir,
+    env: {},
+    which: () => undefined,
+  });
+  expect(saved.isOk()).toBe(true);
+  if (saved.isErr()) return;
+  expect(saved.value.alias).toBe("grok");
 
   const emptyHome = await tempHome();
   expect(
@@ -42,19 +67,62 @@ test("[WS-REMOTE-VENDOR-205] default vendor follows laptop login then install", 
   ).toBe("codex");
 });
 
-test("[WS-REMOTE-VENDOR-206] multiple vendor flags fail closed", async () => {
-  const resolved = await resolveOccupancyVendor({
+test("[WS-REMOTE-VENDOR-206] agent aliases are mutually exclusive", async () => {
+  const homeDir = await tempHome();
+  const twoVendors = await resolveOccupancyAgent({
     flags: { claude: true, grok: true },
-    homeDir: await tempHome(),
+    homeDir,
     env: {},
   });
-  expect(resolved.isErr()).toBe(true);
-  if (resolved.isOk()) return;
-  expect(resolved.error.details?.code).toBe("workspace_occupancy_vendor_ambiguous");
+  expect(twoVendors.isErr()).toBe(true);
+  if (twoVendors.isOk()) return;
+  expect(twoVendors.error.details?.code).toBe("workspace_occupancy_vendor_ambiguous");
+
+  const vendorAndHarness = await resolveOccupancyAgent({
+    flags: { grok: true, pi: true },
+    homeDir,
+    env: {},
+  });
+  expect(vendorAndHarness.isErr()).toBe(true);
+  if (vendorAndHarness.isOk()) return;
+  expect(vendorAndHarness.error.details?.code).toBe("workspace_occupancy_vendor_ambiguous");
+
+  const aliasAndHarness = await resolveOccupancyAgent({
+    flags: { grok: true },
+    harness: "pi",
+    homeDir,
+    env: {},
+  });
+  expect(aliasAndHarness.isErr()).toBe(true);
+  if (aliasAndHarness.isOk()) return;
+  expect(aliasAndHarness.error.details?.code).toBe("workspace_occupancy_vendor_ambiguous");
+});
+
+test("[WS-REMOTE-VENDOR-207] --harness is compatibility for the matching harness alias", async () => {
+  const homeDir = await tempHome();
+  const viaHarness = await resolveOccupancyAgent({
+    flags: {},
+    harness: "pi",
+    homeDir,
+    env: {},
+  });
+  expect(viaHarness.isOk()).toBe(true);
+  if (viaHarness.isErr()) return;
+  expect(viaHarness.value).toMatchObject({ alias: "pi", harness: "pi", explicit: true });
+
+  const sameTwice = await resolveOccupancyAgent({
+    flags: { pi: true },
+    harness: "pi",
+    homeDir,
+    env: {},
+  });
+  expect(sameTwice.isOk()).toBe(true);
+  if (sameTwice.isErr()) return;
+  expect(sameTwice.value.alias).toBe("pi");
 });
 
 test("[WS-REMOTE-CRED-213] explicit vendor without credential fail-closes", async () => {
-  const resolved = await resolveOccupancyVendor({
+  const resolved = await resolveOccupancyAgent({
     flags: { grok: true },
     homeDir: await tempHome(),
     env: {},
