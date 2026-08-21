@@ -12,7 +12,7 @@ searchAliases:
   - "OpenCode"
   - "Pi"
   - "sandbox"
-  - "occupancy skills"
+  - "cloud agents skills"
   - "home skills"
   - "claude"
   - "codex"
@@ -58,7 +58,7 @@ Default `appaloft code` occupies **my Sandbox** on the team's default enrolled S
 Source is the remote SHA. Adapter and Profile are created if missing. The laptop path
 is not Workspace truth, and dirty files are not uploaded. A positional git remote
 (`https://`, `ssh://`, or `git@host:path`) occupies that repository without a local
-clone. On a TTY, default `code` opens the occupancy Workspace TUI (alt screen)
+clone. On a TTY, default `code` opens the Cloud Agents TUI (alt screen)
 immediately with the workspace list **collapsed**, so the wait gets the whole
 window. The centered panel shows a title spinner and **preparing the agent**,
 then occupy / copy skills / attach as a left-aligned step list (Braille spinner,
@@ -71,7 +71,7 @@ keep one-line stderr progress (including a first-byte status line before local
 database or composition boot) and print the Remote banner plus the connecting
 steps `using your {Grok|Codex|Claude} credential`, `including N skills`, and
 `work is on its disk`. `N` is the number of skills actually copied.
-A source checkout (`appaloftdev`) finds or `cargo build`s the occupancy TUI
+A source checkout (`appaloftdev`) finds or `cargo build`s the workspace TUI
 sidecar on first TTY run. Lookup includes the executed tree and common sibling
 checkouts (for example `appaloft-cloud/community/appaloft` → `appaloft`), plus
 `APPALOFT_WORKSPACE_TUI_BINARY`. If `appaloft-workspace-tui` is missing and Rust is
@@ -80,7 +80,7 @@ older than 1.88, the CLI names that binary and prints
 `cargo build --locked --manifest-path apps/workspace-control-tui/Cargo.toml`.
 `--no-attach` does not need the TUI binary.
 After attach, optional list/detail chrome must not paint
-`conflict at workspace-control-select` or `conflict at occupancy-code-bootstrap`
+`conflict at workspace-control-select` or a leftover bootstrap conflict
 in the footer.
 The banner is:
 
@@ -106,7 +106,7 @@ overwritten. Skill-tree copy does not copy `mcp.json`, tokens, cookies, `.env`, 
 plugin binaries. The sandbox never reads laptop HOME; copy happens on the same CLI
 occupy path that already writes files.
 
-## Pick Claude, Codex, or Grok on occupancy <a id="agent-code-vendor" />
+## Pick Claude, Codex, or Grok in Cloud Agents <a id="agent-code-vendor" />
 
 `appaloft code` takes one agent alias per run:
 
@@ -114,21 +114,21 @@ occupy path that already writes files.
 - Railway-aligned: `--claude`, `--codex`, `--grok`
 
 `--claude`, `--codex`, and `--grok` pick the vendor credential on this laptop and
-map onto the existing OpenCode occupancy runtime. `--opencode`, `--pi`, and `--omp`
-pick that occupancy harness. They do not invent a new runtime. `--harness
+map onto the existing OpenCode Cloud Agents runtime. `--opencode`, `--pi`, and `--omp`
+pick that Cloud Agents harness. They do not invent a new runtime. `--harness
 opencode|pi|omp` is compatibility only. With no alias, `code` uses the saved
-occupancy-agent preference, then what is signed in or installed on this laptop.
+Cloud Agents preference, then what is signed in or installed on this laptop.
 
-Occupy writes that credential onto the occupancy disk (`HOME=/workspace`), not as a
+Occupy writes that credential onto the session disk (`HOME=/workspace`), not as a
 sandbox variable:
 
-- Grok: `~/.grok/auth.json` → occupancy `.grok/auth.json`
-- Codex: `~/.codex/auth.json` → occupancy `.codex/auth.json`
+- Grok: `~/.grok/auth.json` → session `.grok/auth.json`
+- Codex: `~/.codex/auth.json` → session `.codex/auth.json`
 - Claude: a setup-token (`~/.appaloft/claude-setup-token`, `~/.claude/setup-token`, or
   laptop `CLAUDE_CODE_OAUTH_TOKEN` written as a file). The Claude chat cookie is not
   copied.
 
-The occupancy also keeps the public Appaloft skill and a first-party Appaloft MCP
+The session also keeps the public Appaloft skill and a first-party Appaloft MCP
 entry so the remote agent can list workspaces and deploy. Laptop `mcp.json` secrets
 are not copied. Token values are never printed.
 
@@ -159,14 +159,14 @@ appaloft workspace open [path|git-remote]
 That path still dispatches `workspaces.open`. Locators match `code`: a local path (Git optional)
 or a git remote (`https://`, `ssh://`, `git@host:path`, or `owner/repo` when that path is not an
 existing directory). A non-git directory occupies this folder via a git remote, not via
-someone else's occupancy. Dirty trees,
+someone else's session. Dirty trees,
 detached HEAD, missing upstream, and remote tip mismatch still fail before remote creation when
 the path is a Git worktree. V1 never performs implicit sync or patch upload.
-Default `appaloft code` prefers a live occupancy over dead same-name Profiles.
+Default `appaloft code` prefers a live session over dead same-name Profiles.
 Do not switch to `workspace open --profile <installationId>` for that case.
 `--profile` on `code` is only a fallback pin when an explicit name still matches
-more than one live occupancy. It is distinct from `--control-plane-profile`.
-`--new` still occupies the cwd origin, not the current whoami occupancy. A failed
+more than one live session. It is distinct from `--control-plane-profile`.
+`--new` still occupies the cwd origin, not the current whoami session. A failed
 open prints what is missing and which repository was being opened; it does not
 pretend Cloud activation succeeded.
 When a BYOS Server is already registered, `workspace open` and `code` place on

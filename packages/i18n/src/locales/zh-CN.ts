@@ -520,7 +520,7 @@ export const zhCN = {
       authorizingGitHubRepo: "正在授权仓库访问",
       githubConnectedAs: "GitHub 已连接：{{account}}",
       githubConnectionDescription: "链接 GitHub 账号，用于仓库授权。",
-      githubIdentityOnlyDescription: "GitHub 登录只用于身份。授权仓库访问后，occupancy 才能开 PR。",
+      githubIdentityOnlyDescription: "GitHub 登录只用于身份。授权仓库访问后，才能开 PR。",
       introBody: "管理资料元数据、登录安全、活跃会话和账号删除。",
       introTitle: "账号设置",
       lastActiveAt: "最近活跃",

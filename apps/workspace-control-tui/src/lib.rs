@@ -139,7 +139,7 @@ const OCCUPANCY_HELP_ROWS: &[&str] = &[
     "c              copy SSH unavailable",
     "r / ⌥r         refresh (⌥r from anywhere)",
     "t / ^t         set target unavailable",
-    "f / ⌥f         fullscreen / restore tree",
+    "f / ⌥f         fullscreen / restore the tree",
     "shift+enter    leave fullscreen unavailable",
     "⌥[ ⌥]          cycle open sessions (wrap, no wake)",
     "⌥t             theme unavailable",
@@ -1045,7 +1045,10 @@ impl AppState {
     }
 
     pub fn should_emit_workspace_select(&self) -> bool {
-        !self.focus_mode && !self.agent_focused && self.selected_workspace_id().is_some()
+        !self.loading.active
+            && !self.focus_mode
+            && !self.agent_focused
+            && self.selected_workspace_id().is_some()
     }
 
     pub fn selected_runtime_id(&self) -> Option<&str> {
@@ -1139,9 +1142,8 @@ impl AppState {
                 self.remember_open_pane(&workspace_id, &runtime_id, &session_id);
                 self.agent_focused = true;
                 self.loading.active = false;
-                if self.loading.collapsed {
-                    self.focus_mode = true;
-                }
+                // Product lock: focus_mode is after attach, never at launch.
+                self.focus_mode = true;
                 self.status_line = format!("Agent Session {session_id}");
             }
             ParentMessage::TerminalOutput { data, .. } => {
@@ -1294,6 +1296,12 @@ impl AppState {
 
     pub fn toggle_help(&mut self) {
         self.help_open = !self.help_open;
+    }
+
+    /// Wait/list chrome (including collapsed preparing) must quit on `^c`.
+    /// Only an attached harness session may swallow `^c` and forward it.
+    pub fn ctrl_c_quits(&self) -> bool {
+        self.loading.active || !self.agent_focused
     }
 
     pub fn toggle_focus_mode(&mut self) {
@@ -1904,6 +1912,12 @@ fn occupancy_option_chrome(key: KeyEvent) -> Option<OccupancyKeyBinding> {
     None
 }
 
+pub fn is_occupancy_ctrl_c(key: KeyEvent) -> bool {
+    matches!(key.code, KeyCode::Char('\u{3}'))
+        || (key.modifiers.contains(KeyModifiers::CONTROL)
+            && matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'c')))
+}
+
 pub fn occupancy_key_binding(
     key: KeyEvent,
     agent_focused: bool,
@@ -1911,8 +1925,7 @@ pub fn occupancy_key_binding(
 ) -> OccupancyKeyBinding {
     let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
-    if ctrl && matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'c'))
-    {
+    if is_occupancy_ctrl_c(key) {
         return if agent_focused {
             OccupancyKeyBinding::PassToAgent
         } else {
@@ -1997,8 +2010,9 @@ pub fn occupancy_key_binding(
 
 /// Signals that restore and stop the occupancy TUI.
 ///
-/// SIGINT is intentionally absent: in-session Ctrl+C is a key to the agent.
-/// List/menu quit is the `^c` key event, not this signal.
+/// SIGINT is absent from this list so an attached session does not die when
+/// the host PTY still has ISIG. Wait/list `^c` is handled as a key or as a
+/// dedicated interrupt flag, not as a process-stop signal.
 pub fn occupancy_stop_signals() -> &'static [i32] {
     &[
         signal_hook::consts::SIGTERM,
@@ -2007,7 +2021,9 @@ pub fn occupancy_stop_signals() -> &'static [i32] {
     ]
 }
 
-/// Signals the occupancy TUI swallows so a leftover ISIG cannot tear it down.
+/// Signals that must not use the process-stop flag.
+///
+/// SIGINT on the wait/list screen is a quit interrupt, not an ignored no-op.
 pub fn occupancy_ignored_signals() -> &'static [i32] {
     &[signal_hook::consts::SIGINT]
 }
@@ -2311,24 +2327,61 @@ fn occupancy_loading_step_lines(state: &AppState) -> Vec<Line<'static>> {
 
 fn occupancy_loading_footer(collapsed: bool) -> String {
     if collapsed {
-        " ⌥f restore tree  shift+esc/^] stop typing  ? ".to_owned()
+        " ⌥f restore the tree  shift+esc/^] stop typing  ? ".to_owned()
     } else {
-        " enter connect  n new  w wake  d delete  ? ".to_owned()
+        " ⌥f hide the tree  shift+esc/^] stop typing  ? ".to_owned()
     }
 }
 
 fn occupancy_session_footer(state: &AppState) -> String {
     if state.osc52_passthrough_failed {
         format!(
-            " {}  │  ⌥f restore tree  wrap  shift+esc/^] stop typing ",
+            " {}  │  ⌥f restore the tree  wrap  shift+esc/^] stop typing ",
             OSC52_PASSTHROUGH_DISABLED
         )
     } else {
-        " ⌥f restore tree  wrap  shift+esc/^] stop typing ".to_owned()
+        " ⌥f restore the tree  wrap  shift+esc/^] stop typing ".to_owned()
     }
 }
 
+fn occupancy_agents_tree_lines(state: &AppState) -> Vec<Line<'static>> {
+    let project = if state.loading.project.is_empty() {
+        "this folder".to_owned()
+    } else {
+        state.loading.project.clone()
+    };
+    vec![
+        Line::from(Span::styled(
+            "Appaloft Cloud Agents",
+            Style::default().add_modifier(Modifier::BOLD),
+        )),
+        Line::from(format!("  {project}")),
+        Line::from("    preparing the agent"),
+    ]
+}
+
 fn render_occupancy_loading(frame: &mut Frame<'_>, state: &AppState, area: Rect) {
+    if !state.loading.collapsed {
+        let columns = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(28), Constraint::Percentage(72)])
+            .split(area);
+        frame.render_widget(
+            Paragraph::new(occupancy_agents_tree_lines(state)).block(
+                Block::default()
+                    .title(" Appaloft Cloud Agents ")
+                    .borders(Borders::ALL),
+            ),
+            columns[0],
+        );
+        let wait = columns[1];
+        render_occupancy_prepare_panel(frame, state, wait);
+        return;
+    }
+    render_occupancy_prepare_panel(frame, state, area);
+}
+
+fn render_occupancy_prepare_panel(frame: &mut Frame<'_>, state: &AppState, area: Rect) {
     const STEP_ROWS: u16 = 9;
     let block = Block::default()
         .borders(Borders::ALL)
@@ -3125,7 +3178,7 @@ mod tests {
             "first useful frame must stay collapsed:\n{out}"
         );
         assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
-        assert!(out.contains("restore tree"), "{out}");
+        assert!(out.contains("restore the tree"), "{out}");
         assert!(out.contains("?"), "{out}");
         assert_no_bare_q_quit(&out);
         assert!(!out.contains("^q quit"), "{out}");
@@ -3314,6 +3367,35 @@ mod tests {
     }
 
     #[test]
+    fn code_tui_help_rows_and_footers_never_say_occupancy() {
+        for row in OCCUPANCY_HELP_ROWS {
+            assert!(!row.to_ascii_lowercase().contains("occupancy"), "{row}");
+        }
+        assert!(
+            !occupancy_loading_footer(true)
+                .to_ascii_lowercase()
+                .contains("occupancy")
+        );
+        assert!(
+            !occupancy_loading_footer(false)
+                .to_ascii_lowercase()
+                .contains("occupancy")
+        );
+        assert!(
+            !OSC52_PASSTHROUGH_DISABLED
+                .to_ascii_lowercase()
+                .contains("occupancy")
+        );
+        for (_, label) in [
+            ("credential", "Checking login"),
+            ("skills", "Preparing skills"),
+            ("disk", "Preparing disk"),
+        ] {
+            assert!(!label.to_ascii_lowercase().contains("occupancy"), "{label}");
+        }
+    }
+
+    #[test]
     fn code_tui_help_lists_ca_keys_without_occupancy_or_y_restore() {
         let mut state = AppState::default();
         state.loading.active = false;
@@ -3345,7 +3427,7 @@ mod tests {
         assert!(out.contains("copy SSH unavailable"), "{out}");
         assert!(out.contains("⌥r"), "{out}");
         assert!(
-            out.contains("f / ⌥f         fullscreen / restore tree"),
+            out.contains("f / ⌥f         fullscreen / restore the tree"),
             "{out}"
         );
         assert!(out.contains("cycle open sessions (wrap, no wake)"), "{out}");
@@ -3390,6 +3472,10 @@ mod tests {
         });
         assert!(state.loading.active);
         assert!(state.loading.collapsed);
+        assert!(
+            !state.focus_mode,
+            "collapsed launch is the wait screen, not attach focus_mode"
+        );
         assert_eq!(
             state
                 .loading
@@ -3416,7 +3502,7 @@ mod tests {
         assert!(out.contains("Preparing skills"), "{out}");
         assert!(out.contains("Preparing disk"), "{out}");
         assert!(out.contains('✓'), "{out}");
-        assert!(out.contains("restore tree"), "{out}");
+        assert!(out.contains("restore the tree"), "{out}");
         assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
         assert!(
             !out.contains("Connecting to Appaloft"),
@@ -3426,13 +3512,32 @@ mod tests {
             !out.contains("sbx_1"),
             "collapsed wait must hide the tree:\n{out}"
         );
-        state.apply(ParentMessage::TerminalReady {
-            workspace_id: "sbx_1".to_owned(),
-            runtime_id: "sar_1".to_owned(),
-            session_id: "term_1".to_owned(),
-        });
-        assert!(!state.loading.active);
-        assert!(state.focus_mode);
+        assert!(
+            !out.contains("Select a Workspace to load bounded detail."),
+            "collapsed wait is not Occupancy split:\n{out}"
+        );
+        state.loading.collapsed = false;
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw revealed agents tree");
+        let revealed = buffer_plain(&terminal);
+        assert!(revealed.contains("Appaloft Cloud Agents"), "{revealed}");
+        assert!(revealed.contains("hello-static"), "{revealed}");
+        assert!(revealed.contains("preparing the agent"), "{revealed}");
+        assert!(
+            !revealed.to_ascii_lowercase().contains("occupancy"),
+            "{revealed}"
+        );
+        assert!(
+            !revealed.contains("Select a Workspace to load bounded detail."),
+            "{revealed}"
+        );
+        assert!(!revealed.contains("src/"), "{revealed}");
+        assert!(revealed.contains("hide the tree"), "{revealed}");
+        assert!(
+            !state.focus_mode,
+            "revealing the tree during wait is not attach focus_mode"
+        );
         assert!(!state.should_emit_workspace_select());
     }
 
@@ -3591,6 +3696,41 @@ mod tests {
         assert_eq!(
             occupancy_key_binding(ctrl_c, false, false),
             OccupancyKeyBinding::Quit
+        );
+        let raw_etx = KeyEvent::new(KeyCode::Char('\u{3}'), KeyModifiers::NONE);
+        assert!(is_occupancy_ctrl_c(raw_etx));
+        assert_eq!(
+            occupancy_key_binding(raw_etx, false, false),
+            OccupancyKeyBinding::Quit
+        );
+        assert_eq!(
+            occupancy_key_binding(raw_etx, true, true),
+            OccupancyKeyBinding::PassToAgent
+        );
+        let mut waiting = AppState::default();
+        assert!(waiting.loading.active);
+        assert!(!waiting.agent_focused);
+        assert!(waiting.ctrl_c_quits());
+        assert_eq!(
+            occupancy_key_binding(ctrl_c, waiting.agent_focused, waiting.session_id.is_some()),
+            OccupancyKeyBinding::Quit
+        );
+        waiting.apply(ParentMessage::TerminalReady {
+            workspace_id: "sbx_1".to_owned(),
+            runtime_id: "sar_1".to_owned(),
+            session_id: "term_1".to_owned(),
+        });
+        assert!(waiting.agent_focused);
+        assert!(!waiting.loading.active);
+        assert!(!waiting.ctrl_c_quits());
+        assert_eq!(
+            occupancy_key_binding(ctrl_c, waiting.agent_focused, waiting.session_id.is_some()),
+            OccupancyKeyBinding::PassToAgent
+        );
+        waiting.loading.active = true;
+        assert!(
+            waiting.ctrl_c_quits(),
+            "preparing must still list-quit before harness focus"
         );
         assert_eq!(
             occupancy_key_binding(ctrl_r, true, true),

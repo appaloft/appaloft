@@ -29,6 +29,7 @@ import {
   type SourceLinkTarget,
 } from "./commands/deployment-remote-state.js";
 import { type DeploymentStateBackendDecision } from "./commands/deployment-state.js";
+import { type CliInteraction } from "./interaction.js";
 import {
   type LocalGitWorkspaceContext,
   type RemoteGitWorkspaceRef,
@@ -43,6 +44,12 @@ import {
   openBunNativeWorkspaceTerminal,
 } from "./workspace-control-native-terminal.js";
 import { type WorkspaceControlPresentation } from "./workspace-control-presentation.js";
+import {
+  claimWorkspaceRendererFailureReport,
+  isWorkspaceRendererFailure,
+  restoreWorkspaceTuiScrollback,
+  sanitizeWorkspaceRendererFailureText,
+} from "./workspace-tui-launch.js";
 
 export interface CliSourceLinkStore {
   read(sourceFingerprint: string): Promise<Result<SourceLinkRecord | null>>;
@@ -108,6 +115,7 @@ export interface CliProgramInput {
   resolveRemoteCodeDoor?: RemoteCodeDoorResolver;
   launchNativeWorkspaceClient?: (argv: readonly string[]) => Promise<void>;
   workspaceControlPresentation?: WorkspaceControlPresentation;
+  folderOnboardingInteraction?: CliInteraction;
   operatePresentation?: OperatePresentation;
   openNativeWorkspaceTerminal?: (
     input: OpenNativeWorkspaceTerminalInput,
@@ -188,6 +196,7 @@ export class CliRuntime extends Context.Tag("CliRuntime")<
     readonly resolveRemoteCodeDoor?: RemoteCodeDoorResolver;
     readonly launchNativeWorkspaceClient?: (argv: readonly string[]) => Promise<void>;
     readonly workspaceControlPresentation?: WorkspaceControlPresentation;
+    readonly folderOnboardingInteraction?: CliInteraction;
     readonly operatePresentation?: OperatePresentation;
     readonly openNativeWorkspaceTerminal: (
       input: OpenNativeWorkspaceTerminalInput,
@@ -281,6 +290,9 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
       : {}),
     ...(input.workspaceControlPresentation
       ? { workspaceControlPresentation: input.workspaceControlPresentation }
+      : {}),
+    ...(input.folderOnboardingInteraction
+      ? { folderOnboardingInteraction: input.folderOnboardingInteraction }
       : {}),
     ...(input.operatePresentation ? { operatePresentation: input.operatePresentation } : {}),
     openNativeWorkspaceTerminal:
@@ -495,10 +507,10 @@ export function formatHumanCliError(error: unknown): string {
     if (preferred && !lines.some((line) => line.includes("appaloft code --profile"))) {
       lines.push(`Retry with appaloft code --profile ${preferred}`);
     }
-    return `${lines.join("\n")}\n`;
+    return `${sanitizeWorkspaceRendererFailureText(lines.join("\n"))}\n`;
   }
 
-  return "Command failed\n";
+  return `${sanitizeWorkspaceRendererFailureText("Command failed")}\n`;
 }
 
 export const resultToEffect = <T>(result: Result<T>): Effect.Effect<T, DomainError> =>
@@ -1069,6 +1081,13 @@ export const runSandboxAgentRunEventStreamQuery = (
 
 export const printCliError = (error: unknown) =>
   Effect.sync(() => {
+    if (isWorkspaceRendererFailure(error)) {
+      restoreWorkspaceTuiScrollback();
+      if (!claimWorkspaceRendererFailureReport()) {
+        process.exitCode = 1;
+        return;
+      }
+    }
     if (process.env.APPALOFT_ERROR_FORMAT === "safe-json") {
       process.stderr.write(formatSafeCliError(error));
       process.exitCode = 1;

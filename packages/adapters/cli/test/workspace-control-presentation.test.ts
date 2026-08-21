@@ -33,6 +33,7 @@ import {
 import { domainError, err, ok } from "@appaloft/core";
 import {
   createBoundedWorkspaceControlPresentation,
+  handleWorkspaceControlWaitScreenInterrupt,
   type WorkspaceControlRendererEvent,
   type WorkspaceControlRendererMessage,
   type WorkspaceControlRendererSession,
@@ -41,11 +42,17 @@ import {
 class FakeRendererSession implements WorkspaceControlRendererSession {
   readonly messages: WorkspaceControlRendererMessage[] = [];
   closed = 0;
+  private readonly hang: ReturnType<typeof Promise.withResolvers<void>> | undefined;
 
   constructor(
     private readonly rendererEvents: readonly WorkspaceControlRendererEvent[],
-    private readonly options: { readonly allowQuitDuringDetail?: boolean } = {},
-  ) {}
+    private readonly options: {
+      readonly allowQuitDuringDetail?: boolean;
+      readonly hangUntilClose?: boolean;
+    } = {},
+  ) {
+    this.hang = options.hangUntilClose ? Promise.withResolvers() : undefined;
+  }
 
   send(message: WorkspaceControlRendererMessage): Promise<void> {
     this.messages.push(message);
@@ -54,6 +61,10 @@ class FakeRendererSession implements WorkspaceControlRendererSession {
 
   async *events(): AsyncIterable<WorkspaceControlRendererEvent> {
     await Promise.resolve();
+    if (this.hang) {
+      await this.hang.promise;
+      return;
+    }
     for (const [index, event] of this.rendererEvents.entries()) {
       const next = this.rendererEvents[index + 1];
       yield event;
@@ -69,6 +80,7 @@ class FakeRendererSession implements WorkspaceControlRendererSession {
 
   close(): Promise<void> {
     this.closed += 1;
+    this.hang?.resolve();
     return Promise.resolve();
   }
 }
@@ -1302,6 +1314,49 @@ describe("Workspace control presentation", () => {
     resolveList?.({ items: [{ sandboxId: "sbx_late", status: "ready" }] });
   });
 
+  test("[WS-TUI-ENTRY-001] wait-screen SIGINT quits before harness focus", async () => {
+    const renderer = new FakeRendererSession([], { hangUntilClose: true });
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+    const started = presentation.start({
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>(query: Query<T>) => {
+        if (query instanceof ListSandboxesQuery) return ok({ items: [] } as T);
+        throw new Error(`unexpected query ${query.constructor.name}`);
+      },
+    });
+    for (let attempt = 0; attempt < 50 && renderer.messages.length === 0; attempt += 1) {
+      await Bun.sleep(10);
+    }
+    expect(renderer.messages[0]).toEqual({
+      type: "loading",
+      title: "Appaloft Cloud Agents",
+    });
+    handleWorkspaceControlWaitScreenInterrupt({
+      attached: false,
+      close: () => renderer.close(),
+      exitProcess: false,
+    });
+    await started;
+    expect(renderer.closed).toBeGreaterThanOrEqual(1);
+    const source = await Bun.file(
+      new URL("../src/workspace-control-presentation.ts", import.meta.url),
+    ).text();
+    expect(source).toContain("restoreWorkspaceTuiScrollback");
+    expect(source).toContain("process.exit(0)");
+    expect(source).not.toContain("process.exit(130)");
+    let attachedClosed = 0;
+    handleWorkspaceControlWaitScreenInterrupt({
+      attached: true,
+      close: async () => {
+        attachedClosed += 1;
+      },
+      exitProcess: false,
+    });
+    expect(attachedClosed).toBe(0);
+  });
+
   test("[WS-TUI-ENTRY-001] quit is accepted while occupancy detail is still loading", async () => {
     let resolveDetail: ((value: Record<string, unknown>) => void) | undefined;
     const detailStarted = Promise.withResolvers<void>();
@@ -2073,6 +2128,7 @@ describe("Workspace control presentation", () => {
     });
     let skillBlockers = 0;
     await presentation.start({
+      occupancyChrome: { project: "hello-static" },
       occupyBootstrap: async ({ reportProgress }) => {
         await reportProgress("Preparing disk on hostinger…");
         await reportProgress("Preparing skills…");
@@ -2111,6 +2167,7 @@ describe("Workspace control presentation", () => {
       type: "loading",
       collapsed: true,
       title: "Appaloft Cloud Agents",
+      project: "hello-static",
     });
     expect(renderer.messages).toContainEqual({
       type: "progress",
@@ -2145,11 +2202,8 @@ describe("Workspace control presentation", () => {
       sessionId: "term_occupy",
     });
     const attachAt = renderer.messages.findIndex((message) => message.type === "terminal-ready");
-    const workspacesAt = renderer.messages.findIndex(
-      (message) => message.type === "workspaces" && message.workspaces.length > 0,
-    );
     expect(attachAt).toBeGreaterThan(-1);
-    expect(workspacesAt).toBeGreaterThan(attachAt);
+    expect(renderer.messages.some((message) => message.type === "workspaces")).toBeFalse();
   });
 
   test("[WS-REMOTE-PROGRESS-196] attach does not surface list or detail conflicts", async () => {

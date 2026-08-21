@@ -12,7 +12,7 @@ mod operate;
 use anyhow::{Context, Result, bail};
 use appaloft_workspace_control_tui::{
     ActionDecision, AppState, DeliveryDecision, DeliverySubmission, OccupancyKeyBinding,
-    ParentMessage, RecoverySubmission, RendererEvent, agent_area, occupancy_ignored_signals,
+    ParentMessage, RecoverySubmission, RendererEvent, agent_area, is_occupancy_ctrl_c,
     occupancy_key_binding, occupancy_stop_signals, render, terminal_key_bytes,
     terminal_mouse_bytes, write_osc52_passthrough,
 };
@@ -103,7 +103,10 @@ fn read_handshake(reader: &mut BufReader<TcpStream>) -> Result<()> {
 
 fn main() -> Result<()> {
     if env::args().any(|argument| argument == "--version") {
-        println!("appaloft-workspace-tui {}", env!("CARGO_PKG_VERSION"));
+        println!(
+            "appaloft-workspace-tui {} cloud-agents",
+            env!("CARGO_PKG_VERSION")
+        );
         return Ok(());
     }
 
@@ -178,10 +181,9 @@ fn main() -> Result<()> {
         signal_hook::flag::register(*signal, Arc::clone(&stop))
             .context("register terminal restore signal")?;
     }
-    for signal in occupancy_ignored_signals() {
-        signal_hook::flag::register(*signal, Arc::new(AtomicBool::new(false)))
-            .context("ignore occupancy interrupt signal")?;
-    }
+    let interrupt = Arc::new(AtomicBool::new(false));
+    signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&interrupt))
+        .context("register wait-screen interrupt")?;
 
     let mut state = AppState::default();
     let mut last_selected: Option<String> = None;
@@ -189,6 +191,11 @@ fn main() -> Result<()> {
     let mut reconnect_attempts = 0_u8;
     let mut running = true;
     while running && !stop.load(Ordering::Relaxed) {
+        if interrupt.swap(false, Ordering::Relaxed) && state.ctrl_c_quits() {
+            let _ = send(&mut writer, &RendererEvent::Quit);
+            running = false;
+            continue;
+        }
         for message in message_rx.try_iter() {
             if matches!(message, ParentMessage::Shutdown) {
                 running = false;
@@ -259,6 +266,11 @@ fn main() -> Result<()> {
             continue;
         }
         match read().context("read terminal input")? {
+            Event::Key(key) if is_occupancy_ctrl_c(key) && state.ctrl_c_quits() => {
+                let _ = send(&mut writer, &RendererEvent::Quit);
+                running = false;
+                continue;
+            }
             Event::Resize(_, _) => {}
             Event::Paste(data) if state.delivery_form.is_some() => {
                 for character in data.chars() {

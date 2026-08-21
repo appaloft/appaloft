@@ -54,19 +54,16 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `--preview <previewEnvironmentId>` on logs, health, diagnostics, effective config, runtime
   control, and terminal commands when the user is operating a preview rather than its parent
   resource.
-- `appaloft code [path|git-remote] [--yes] [--profile <name-or-id>] [--server <id>] [--opencode|--pi|--omp|--claude|--codex|--grok]` occupies my Sandbox after login. A no-git folder create-or-links a Project (directory name, the only Project, or one TTY choice), persists that link, and occupies `folder.local`. Git remote is correspondence when present and is not required. It requires a default
+- `appaloft code [path|git-remote] [--yes] [--profile <name-or-id>] [--server <id>] [--opencode|--pi|--omp|--claude|--codex|--grok]` occupies my Sandbox after login. A no-git folder on a TTY inquires before the session TUI (`Continue` → create a default Project named after the directory → link this folder); `--yes` / non-interactive create-or-links without asking. `^c` quits that inquire immediately. `code` never overlays a project picker on the Cloud Agents alt-screen. `--pi` only selects the Pi harness and does not change chrome. Git remote is correspondence when present and is not required. It requires a default
   enrolled Server, dispatches `workspaces.open` with the remote SHA and
   `targetServerId`. `--server` pins that Server with the same semantics as
-  `workspace open --server`. On a TTY it enters the occupancy Workspace TUI immediately
-  with the list collapsed and a centered **preparing the agent** step panel, then
-  attaches into the remote session. A source checkout finds or cargo-builds
-  `appaloft-workspace-tui` so `appaloftdev code` does not require a manual
-  cargo build when the toolchain can produce it. Lookup includes the executed
-  tree and sibling/dev checkouts (`appaloft-cloud/community/appaloft` →
-  `appaloft`) plus `APPALOFT_WORKSPACE_TUI_BINARY`. If the sidecar is missing and
-  rustc is older than 1.88, the CLI names `appaloft-workspace-tui` and prints
-  `rustup toolchain install stable` plus
-  `cargo build --locked --manifest-path apps/workspace-control-tui/Cargo.toml`.
+  `workspace open --server`.   On a TTY, after that inquire, it enters the Cloud Agents session page
+  with the tree hidden and a centered **preparing the agent** wait, then
+  attaches into the remote session. A matching Cloud Agents `appaloft-workspace-tui`
+  is required. Lookup includes the executed tree and sibling/dev checkouts
+  (`appaloft-cloud/community/appaloft` → `appaloft`) plus
+  `APPALOFT_WORKSPACE_TUI_BINARY`.   A missing or stale renderer is not launched; `code` restores the TTY and
+  prints one human message.
   `--no-attach` and non-TTY print
   one-line progress and
   `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>`.

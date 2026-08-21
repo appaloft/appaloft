@@ -28,6 +28,7 @@ import {
   type WorkspaceGitCommandRunner,
 } from "./local-git-workspace-context.js";
 import { CliRuntime, resultToEffect } from "./runtime.js";
+import { restoreWorkspaceTuiScrollback } from "./workspace-tui-launch.js";
 
 export interface FolderOnboardingProject {
   readonly id: string;
@@ -48,6 +49,7 @@ export type FolderOnboardingDecision =
   | { readonly kind: "reuse-named"; readonly projectId: string; readonly identity: string }
   | { readonly kind: "use-only-project"; readonly projectId: string; readonly identity: string }
   | { readonly kind: "create"; readonly name: string; readonly identity: string }
+  | { readonly kind: "inquire"; readonly name: string; readonly identity: string }
   | {
       readonly kind: "prompt";
       readonly name: string;
@@ -87,6 +89,79 @@ function findNamedProject(
   );
 }
 
+export type FolderOnboardingPromptPolicy = "allow-select" | "pre-tui-inquire" | "auto-create";
+
+export const FOLDER_ONBOARDING_CANCELLED_CODE = "folder_onboarding_cancelled";
+export const CODE_SESSION_INQUIRE_CONTINUE = "Continue";
+
+export function codeSessionInquireCreateMessage(directoryName: string): string {
+  return `Create default project ${directoryName} and link this directory?`;
+}
+
+export function folderOnboardingCancelledError() {
+  return domainError.validation("Cancelled", {
+    phase: "folder-project-onboarding",
+    code: FOLDER_ONBOARDING_CANCELLED_CODE,
+  });
+}
+
+export function isFolderOnboardingCancelled(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const record = error as {
+    readonly details?: { readonly code?: unknown };
+    readonly _tag?: unknown;
+    readonly message?: unknown;
+  };
+  if (record.details?.code === FOLDER_ONBOARDING_CANCELLED_CODE) return true;
+  if (record._tag === "Quit" || record._tag === "Interrupt") return true;
+  return false;
+}
+
+const CTRL_C = "\u0003";
+
+export function quitCodeSessionOnCancel(): never {
+  restoreWorkspaceTuiScrollback();
+  process.exit(130);
+}
+
+function installImmediateCancel(): () => void {
+  let uninstall: () => void = () => undefined;
+  const quit = () => {
+    uninstall();
+    quitCodeSessionOnCancel();
+  };
+  const onStdin = (chunk: string | Uint8Array) => {
+    const text = typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("binary");
+    if (text.includes(CTRL_C)) quit();
+  };
+  process.once("SIGINT", quit);
+  process.stdin.on("data", onStdin);
+  uninstall = () => {
+    process.off("SIGINT", quit);
+    process.stdin.off("data", onStdin);
+  };
+  return () => uninstall();
+}
+
+export function withImmediateInquireCancel<A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+): Effect.Effect<A, E, R> {
+  return Effect.acquireUseRelease(
+    Effect.sync(() => installImmediateCancel()),
+    () => effect,
+    (uninstall) => Effect.sync(uninstall),
+  );
+}
+
+export async function withImmediateSigintExit<T>(work: () => Promise<T>): Promise<T> {
+  const uninstall = installImmediateCancel();
+  try {
+    return await work();
+  } finally {
+    uninstall();
+  }
+}
+
 export function decideFolderProjectOnboarding(input: {
   readonly linkedProjectId?: string;
   readonly gitIdentity?: string;
@@ -95,6 +170,7 @@ export function decideFolderProjectOnboarding(input: {
   readonly binding?: FolderOnboardingBinding | null;
   readonly canPrompt: boolean;
   readonly yes?: boolean;
+  readonly promptPolicy?: FolderOnboardingPromptPolicy;
 }): FolderOnboardingDecision {
   const identity = input.gitIdentity ?? folderOccupancyIdentity(input.directoryName);
   const createName = projectNameFromIdentity(identity, input.directoryName);
@@ -121,11 +197,20 @@ export function decideFolderProjectOnboarding(input: {
     return { kind: "create", name: createName, identity };
   }
 
-  if (projects.length === 0) {
-    return { kind: "create", name: createName, identity };
-  }
   if (projects.length === 1 && projects[0]) {
     return { kind: "use-only-project", projectId: projects[0].id, identity };
+  }
+  if (input.promptPolicy === "auto-create" || input.yes) {
+    return { kind: "create", name: createName, identity };
+  }
+  if (input.promptPolicy === "pre-tui-inquire") {
+    if (!input.canPrompt) {
+      return { kind: "create", name: createName, identity };
+    }
+    return { kind: "inquire", name: createName, identity };
+  }
+  if (projects.length === 0) {
+    return { kind: "create", name: createName, identity };
   }
   if (input.canPrompt && !input.yes) {
     return { kind: "prompt", name: createName, identity, projects };
@@ -199,6 +284,7 @@ export function folderOnboardingCanPrompt(
 export function ensureFolderProjectOnboarding(input: {
   readonly cwd?: string;
   readonly yes?: boolean;
+  readonly promptPolicy?: FolderOnboardingPromptPolicy;
   readonly explicitProjectId?: string;
   readonly canPrompt?: boolean;
   readonly interaction?: CliInteraction;
@@ -216,8 +302,8 @@ export function ensureFolderProjectOnboarding(input: {
       ((text: string) => {
         process.stderr.write(text);
       });
-    const canPrompt = folderOnboardingCanPrompt(env, input.canPrompt);
     const cli = yield* CliRuntime;
+    const canPrompt = folderOnboardingCanPrompt(env, input.canPrompt);
     const explicitProjectId = input.explicitProjectId;
 
     if (explicitProjectId) {
@@ -313,6 +399,7 @@ export function ensureFolderProjectOnboarding(input: {
       binding,
       canPrompt,
       ...(input.yes ? { yes: true } : {}),
+      ...(input.promptPolicy ? { promptPolicy: input.promptPolicy } : {}),
     });
 
     let projectId: string;
@@ -320,7 +407,48 @@ export function ensureFolderProjectOnboarding(input: {
     let created = false;
     let reused = decision.kind === "reuse-link";
 
-    if (decision.kind === "prompt") {
+    if (decision.kind === "inquire") {
+      const inquire = input.interaction;
+      if (!inquire) {
+        return yield* Effect.fail(
+          domainError.validation("Continue to create a default project for this folder", {
+            phase: "folder-project-onboarding",
+            guidance: "Pass --yes to create a project named after this directory.",
+          }),
+        );
+      }
+      const confirmed = yield* withImmediateInquireCancel(
+        Effect.gen(function* () {
+          const continued = yield* inquire.confirm({
+            message: CODE_SESSION_INQUIRE_CONTINUE,
+            defaultValue: true,
+          });
+          if (!continued) return false;
+          return yield* inquire.confirm({
+            message: codeSessionInquireCreateMessage(decision.name),
+            defaultValue: true,
+          });
+        }),
+      );
+      if (!confirmed) {
+        return yield* Effect.fail(folderOnboardingCancelledError());
+      }
+      writeStatus(`Creating project ${decision.name}…`, write);
+      const createdProject = yield* createOnboardingProject(decision.name);
+      projectId = createdProject.id;
+      projectName = decision.name;
+      created = true;
+    } else if (decision.kind === "prompt") {
+      if (input.promptPolicy === "pre-tui-inquire" || input.promptPolicy === "auto-create") {
+        return yield* Effect.fail(
+          domainError.invariant(
+            "Code session onboarding must not select a project after TUI start",
+            {
+              phase: "folder-project-onboarding",
+            },
+          ),
+        );
+      }
       if (!input.interaction) {
         return yield* Effect.fail(
           domainError.validation("Choose a project or create one for this folder", {
@@ -330,16 +458,18 @@ export function ensureFolderProjectOnboarding(input: {
           }),
         );
       }
-      const choice = yield* input.interaction.select({
-        message: "This folder is not linked. Create a project or use an existing one?",
-        choices: [
-          { title: `Create ${decision.name}`, value: `create:${decision.name}` },
-          ...decision.projects.map((project) => ({
-            title: `${project.name} (${project.id})`,
-            value: `use:${project.id}`,
-          })),
-        ],
-      });
+      const choice = yield* withImmediateInquireCancel(
+        input.interaction.select({
+          message: "This folder is not linked. Create a project or use an existing one?",
+          choices: [
+            { title: `Create ${decision.name}`, value: `create:${decision.name}` },
+            ...decision.projects.map((project) => ({
+              title: `${project.name} (${project.id})`,
+              value: `use:${project.id}`,
+            })),
+          ],
+        }),
+      );
       if (choice.startsWith("create:")) {
         const createdProject = yield* createOnboardingProject(decision.name);
         projectId = createdProject.id;

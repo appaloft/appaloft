@@ -48,6 +48,18 @@ import {
 } from "./occupancy-code-progress.js";
 import { type OperateRendererEvent, type OperateRendererMessage } from "./operate-presentation.js";
 import { terminateWorkspaceWithRuntimes } from "./workspace-lifecycle-actions.js";
+import { restoreWorkspaceTuiScrollback } from "./workspace-tui-launch.js";
+
+export function handleWorkspaceControlWaitScreenInterrupt(input: {
+  readonly attached: boolean;
+  readonly close: () => Promise<void>;
+  readonly exitProcess?: boolean;
+}): void {
+  if (input.attached) return;
+  restoreWorkspaceTuiScrollback();
+  void input.close();
+  if (input.exitProcess !== false) process.exit(0);
+}
 
 export interface WorkspaceControlOccupancySummary {
   readonly repositoryIdentity: string;
@@ -317,6 +329,9 @@ export interface WorkspaceControlPresentationContext {
       }
     | undefined
   >;
+  occupancyChrome?: {
+    readonly project?: string;
+  };
 }
 
 /** Framework-neutral entry point for the interactive Workspace control surface. */
@@ -891,6 +906,16 @@ export function createBoundedWorkspaceControlPresentation(
           }
         | undefined;
       const terminalPumps = new Set<Promise<void>>();
+      const quitWaitScreen = () => {
+        handleWorkspaceControlWaitScreenInterrupt({
+          attached: Boolean(activeTerminal),
+          close: async () => {
+            presentationOpen = false;
+            await renderer.close();
+          },
+        });
+      };
+      process.on("SIGINT", quitWaitScreen);
 
       const sendSelectedDetail = async (workspaceId: string) => {
         const generation = ++detailGeneration;
@@ -1047,6 +1072,9 @@ export function createBoundedWorkspaceControlPresentation(
             type: "loading",
             collapsed: true,
             title: OCCUPANCY_CODE_CHROME_TITLE,
+            ...(context.occupancyChrome?.project
+              ? { project: context.occupancyChrome.project }
+              : {}),
           });
           occupyDone = context
             .occupyBootstrap({
@@ -1073,7 +1101,7 @@ export function createBoundedWorkspaceControlPresentation(
               return occupied;
             })
             .then((occupied) => {
-              if (!occupied || !presentationOpen) return;
+              if (!occupied || !presentationOpen || occupied.attach) return;
               void listWorkspaces(context).then(
                 (workspaces) => renderer.send({ type: "workspaces", workspaces }),
                 () => {
@@ -1467,6 +1495,7 @@ export function createBoundedWorkspaceControlPresentation(
       } catch (error) {
         await sendErrorBestEffort(error, "workspace-control-start");
       } finally {
+        process.off("SIGINT", quitWaitScreen);
         presentationOpen = false;
         detailGeneration += 1;
         await detachActiveTerminal();

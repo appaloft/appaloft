@@ -52,10 +52,10 @@ Every command supports `--help` for the full argument list; interactive prompts 
 `appaloft code` occupies **my Sandbox** on the team's default enrolled Server
 after login. Source is the remote SHA. Missing Adapter/Profile create the
 invisible `appaloft-remote`. The laptop path is not Workspace truth, and dirty
-files are not uploaded. On a TTY, default `code` enters the occupancy Workspace
+files are not uploaded. On a TTY, default `code` enters the Cloud Agents
 TUI immediately with the list collapsed and a centered **preparing the agent**
 wait, then attaches. Use `--no-attach`
-for one-line stderr progress and the occupancy banner without attaching. Default `code` picks the live occupancy when leftover
+for one-line stderr progress and the session banner without attaching. Default `code` picks the live session when leftover
 same-name Profiles exist. `--profile` is only a fallback pin. `--new` occupies
 the cwd origin and does not silently resume whoami. A failed open names the
 repository and the missing Binding or Profile. Registered BYOS is placement;
@@ -76,7 +76,7 @@ appaloft workspace open . --profile <workspace-profile> --new --server <serverId
 
 `appaloft workspace open [path|git-remote]` accepts the same locators as `code` and dispatches
 `workspaces.open`. A Git worktree still must be clean and pushed; a non-git directory occupies
-this folder via a git remote and does not resume an unrelated occupancy. See
+this folder via a git remote and does not resume an unrelated session. See
 [Open an Agent from a local directory](/docs/en/agents/workspaces/#agent-workspace-open) for
 scratch versus durable-open guidance.
 

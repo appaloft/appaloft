@@ -28,7 +28,7 @@ appaloft project use <projectId>
 The first `appaloft deploy` or `appaloft code` in a folder that is not linked yet:
 
 - With no Git, creates a project named after the directory (`--yes` / non-interactive), or uses your only project when you have exactly one.
-- With several projects in a TTY, asks once: create or select.
+- `appaloft code` on a TTY asks **before** the session TUI: Continue → create a default project named after the directory → link this folder. `^c` quits that ask immediately. It never overlays a project picker on the Cloud Agents screen.
 - With a Git remote, uses that remote as correspondence to find or create the project. Missing Git still succeeds; Git is not a gate.
 
 The link is stored in the user home (default `~/.appaloft/folder-links.json`). The next command in the same folder reuses it. Switch with `appaloft project use <projectId>`. `appaloft context` still only switches the control-plane profile.

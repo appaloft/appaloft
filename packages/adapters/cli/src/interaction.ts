@@ -1,3 +1,4 @@
+import { domainError } from "@appaloft/core";
 import * as Prompt from "@effect/cli/Prompt";
 import { Effect } from "effect";
 
@@ -55,6 +56,22 @@ export const effectCliInteraction: CliInteraction = {
       Prompt.confirm({
         message: input.message,
         ...(input.defaultValue !== undefined ? { initial: input.defaultValue } : {}),
+      }),
+    ),
+};
+
+export const codeSessionInquireInteraction: CliInteraction = {
+  confirm: effectCliInteraction.confirm,
+  text: () =>
+    Effect.fail(
+      domainError.invariant("Code session inquire must not collect free text", {
+        phase: "folder-project-onboarding",
+      }),
+    ),
+  select: () =>
+    Effect.fail(
+      domainError.invariant("Code session inquire must not select an existing project", {
+        phase: "folder-project-onboarding",
       }),
     ),
 };

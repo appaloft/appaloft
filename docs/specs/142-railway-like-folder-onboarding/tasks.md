@@ -11,3 +11,5 @@
 - [x] Update public docs, docs-registry, and skill entrypoints.
 - [x] Run focused tests, `lint:ci`, and affected-package `typecheck`.
 - [x] Open a merge-quality PR against main.
+- [x] Live-walk fix: `code` TUI auto-creates/links by directory name; no Effect folder-not-linked selector inside Cloud Agents (`FOLDER-ONBOARD-009`).
+- [x] Product lock: first chrome is Appaloft Cloud Agents + preparing the agent; missing/rustup-broken renderer restores the TTY before the human message; no Occupancy; no rustup cargo-chooser dump.
