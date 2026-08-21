@@ -52,6 +52,7 @@ import {
   parseDockerRepoDigestFromInspect,
   parseRemoteDockerImageVersionMetadataOutput,
   resolveLocalWorkspaceWorkdir,
+  localSourceWorkdirMissingMessage,
   recoverLocalSourceFolderFromCwd,
   resolveSshPackageLocalWorkdir,
   sshDockerUploadedWorkspaceContextPath,
@@ -241,6 +242,119 @@ describe("SSH source upload", () => {
         originalLocator: folder,
       }),
     );
+  });
+
+  test("[DEP-CREATE-PKG-007] hyphenated appaloft-cloud under projects is not reported as the parent", () => {
+    const parent = "/Users/nichenqin/projects";
+    const folder = `${parent}/appaloft-cloud`;
+
+    expect(
+      recoverLocalSourceFolderFromCwd({
+        plannedRoot: parent,
+        locator: parent,
+        displayName: "projects",
+      }),
+    ).toBe(parent);
+    expect(
+      recoverLocalSourceFolderFromCwd({
+        plannedRoot: parent,
+        locator: parent,
+        displayName: "appaloft-cloud",
+      }),
+    ).toBe(folder);
+    expect(
+      recoverLocalSourceFolderFromCwd({
+        plannedRoot: parent,
+        locator: parent,
+        originalLocator: folder,
+        displayName: "workspace",
+      }),
+    ).toBe(folder);
+    expect(
+      resolveSshPackageLocalWorkdir({
+        locator: parent,
+        workingDirectory: parent,
+        displayName: "appaloft-cloud",
+      }),
+    ).toBe(folder);
+
+    const parentMissing = localSourceWorkdirMissingMessage(parent);
+    expect(parentMissing).not.toBe(`Source working directory does not exist: ${parent}`);
+    expect(parentMissing.endsWith("/projects")).toBe(false);
+    expect(localSourceWorkdirMissingMessage(folder)).toBe(
+      `Source working directory does not exist: ${folder}`,
+    );
+    expect(localSourceWorkdirMissingMessage(folder)).toContain("appaloft-cloud");
+  });
+
+  test("[DEP-CREATE-PKG-007] detached worker does not name the projects parent for appaloft-cloud", async () => {
+    const parent = "/Users/nichenqin/projects";
+    const runtimeDir = mkdtempSync(join(tmpdir(), "appaloft-runtime-"));
+    const previousCwd = process.cwd();
+    const deployment = runningStaticSshDeployment({
+      deploymentId: "dep_appaloft_cloud_parent",
+      locator: parent,
+      workingDirectory: parent,
+      displayName: "projects",
+      emptyMetadata: true,
+    });
+    const backend = new SshExecutionBackend(
+      runtimeDir,
+      { warn: () => undefined } as never,
+      { record: async () => ({ isErr: () => false }) } as never,
+      { report: () => undefined } as never,
+    );
+
+    try {
+      process.chdir(runtimeDir);
+      const prepared = await (
+        backend as never as {
+          prepareSshSource: (
+            context: ExecutionContext,
+            current: Deployment,
+            timeline: unknown[],
+            input: {
+              runtimeDir: string;
+              remoteRoot: string;
+              target: { host: string; publicHost: string; port: string };
+              env: NodeJS.ProcessEnv;
+            },
+          ) => Promise<
+            | { prepared: true }
+            | { prepared: false; deployment: Deployment }
+          >;
+        }
+      ).prepareSshSource(
+        { requestId: "req_pkg_007_cloud", entrypoint: "cli" } as ExecutionContext,
+        deployment,
+        [],
+        {
+          runtimeDir,
+          remoteRoot: "/var/lib/appaloft/runtime/ssh-deployments/dep_appaloft_cloud_parent",
+          target: { host: "deploy@example.test", publicHost: "example.test", port: "22" },
+          env: {},
+        },
+      );
+
+      expect(prepared.prepared).toBe(false);
+      if (prepared.prepared) {
+        throw new Error("expected SSH package to fail without a CLI-host archive");
+      }
+
+      const messages = prepared.deployment.toState().timeline.map((entry) => entry.message);
+      const missing = messages.find((message) =>
+        message.startsWith("Source working directory does not exist:"),
+      );
+      expect(missing).toBeDefined();
+      expect(missing).not.toBe(`Source working directory does not exist: ${parent}`);
+      expect(missing?.endsWith("/projects")).toBe(false);
+      expect(prepared.deployment.toState().runtimePlan.execution.metadata?.errorCode).toBe(
+        "source_workdir_missing",
+      );
+    } finally {
+      process.chdir(previousCwd);
+      rmSync(runtimeDir, { recursive: true, force: true });
+    }
   });
 
   test("[DEP-CREATE-PKG-007] recovers the hyphenated cwd when locator and workdir are already the parent", () => {

@@ -2,6 +2,8 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync }
 import { dirname, join, resolve } from "node:path";
 import { ash } from "@appaloft/ash";
 import {
+  isGenericLocalSourceWorkdir,
+  localSourceWorkdirMissingMessage,
   resolveSshPackageLocalWorkdir,
   safeLocalSourceBaseDirectory,
 } from "./local-source-workdir";
@@ -241,6 +243,8 @@ export function summarizeSshCommandFailureOutput(input: {
 }
 
 export {
+  isGenericLocalSourceWorkdir,
+  localSourceWorkdirMissingMessage,
   normalizeLocalSourceWorkingDirectory,
   recoverLocalSourceFolderFromCwd,
   resolveLocalWorkspaceWorkdir,
@@ -2044,8 +2048,8 @@ export class SshExecutionBackend implements ExecutionBackend {
       }
     }
 
-    if (!localArchivePath && !existsSync(localWorkdir)) {
-      const message = `Source working directory does not exist: ${localWorkdir}`;
+    if (!localArchivePath && (isGenericLocalSourceWorkdir(localWorkdir) || !existsSync(localWorkdir))) {
+      const message = localSourceWorkdirMissingMessage(localWorkdir);
       timeline.push(phaseLog("package", message, "error"));
       return {
         prepared: false,

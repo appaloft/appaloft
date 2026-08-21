@@ -1,10 +1,13 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import { CLI_PACKED_SOURCE_ARCHIVE_MAX_BYTES } from "@appaloft/application";
+import { basename, join, resolve } from "node:path";
+import {
+  CLI_PACKED_SOURCE_ARCHIVE_MAX_BYTES,
+  isGenericLocalSourceLeaf,
+} from "@appaloft/application";
 import { domainError, err, ok, type Result } from "@appaloft/core";
 
-import { isRemoteOrImageSource } from "./deployment-source.js";
+import { isRemoteOrImageSource, resolveCliHostLocalSourceFolder } from "./deployment-source.js";
 
 const localWorkspaceArchiveExcludePatterns = [
   ".git",
@@ -78,11 +81,15 @@ export function packageLocalFolderSourceOnCliHost(folderPath: string): Result<st
 export function packageLocalFolderSourceOnCliHostIfPresent(
   locator: string | undefined,
 ): Result<string | undefined> {
-  if (!locator || isRemoteOrImageSource(locator)) {
+  if (locator && isRemoteOrImageSource(locator)) {
     return ok(undefined);
   }
 
-  const resolved = resolve(locator);
+  const resolved = resolveCliHostLocalSourceFolder(locator);
+  if (isGenericLocalSourceLeaf(basename(resolved.replace(/\/+$/, "") || resolved))) {
+    return ok(undefined);
+  }
+
   if (!existsSync(resolved) || !statSync(resolved).isDirectory()) {
     return ok(undefined);
   }
