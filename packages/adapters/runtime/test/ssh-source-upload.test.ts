@@ -14,6 +14,7 @@ import {
   buildRemoteDockerImageVersionMetadataCommand,
   buildRemotePreviewArtifactSweepCommand,
   buildRemoteStaticPublishDirectoryPresenceCommand,
+  normalizeLocalSourceWorkingDirectory,
   parseDockerRepoDigestFromInspect,
   parseRemoteDockerImageVersionMetadataOutput,
   sshDockerUploadedWorkspaceContextPath,
@@ -25,6 +26,16 @@ import {
 import { generateStaticSiteDockerBuild } from "../src/workspace-planners";
 
 describe("SSH source upload", () => {
+  test("[DEP-CREATE-PKG-007] source workdir keeps the hyphenated folder when it is missing here", () => {
+    const locator = "/Users/nichenqin/projects/nux-fb4bd8c5-static";
+    const workdir = normalizeLocalSourceWorkingDirectory(locator);
+
+    expect(workdir).toBe(locator);
+    expect(workdir).toContain("nux-fb4bd8c5-static");
+    expect(workdir).not.toBe("/Users/nichenqin/projects");
+    expect(workdir.endsWith("/projects")).toBe(false);
+  });
+
   test("[DEP-CREATE-PKG-001] local workspace upload excludes cache and dependency directories", () => {
     const args = buildLocalWorkspaceUploadTarExcludeArgs();
 

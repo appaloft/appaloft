@@ -83,6 +83,7 @@ appaloft server register --host 203.0.113.10 --ssh-user deploy --ssh-key ~/.ssh/
 appaloft server capacity inspect --server-id <serverId>
 
 # 4. 从当前目录发起部署（零配置检测）。不要复用别人的会话。
+#    目录里有 public/index.html 时会自动选 static，不必再写 --method。
 appaloft deploy
 appaloft deploy .
 

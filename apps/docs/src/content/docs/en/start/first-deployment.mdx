@@ -69,6 +69,7 @@ appaloft server capacity inspect --server-id <serverId>
 
 # 4. Start a deployment from the current directory (zero-configuration detection).
 #    This deploys this tree — it does not reuse an unrelated session.
+#    A folder with public/index.html auto-selects static (no --method needed).
 appaloft deploy
 appaloft deploy .
 

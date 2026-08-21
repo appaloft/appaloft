@@ -12,6 +12,7 @@ import {
 import { createServer } from "node:net";
 import { dirname, resolve } from "node:path";
 import { ash } from "@appaloft/ash";
+import { normalizeLocalSourceWorkingDirectory } from "./local-source-workdir";
 import {
   createDeploymentProgressEvent,
   deploymentProgressSteps,
@@ -149,12 +150,7 @@ function phaseLog(
 }
 
 function normalizeWorkingDirectory(locator: string): string {
-  const resolved = resolve(locator);
-  if (existsSync(resolved)) {
-    return resolved;
-  }
-
-  return dirname(resolved);
+  return normalizeLocalSourceWorkingDirectory(locator);
 }
 
 function isGitHubHttpsLocator(locator: string): boolean {

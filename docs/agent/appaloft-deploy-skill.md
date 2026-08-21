@@ -119,7 +119,9 @@ the equivalent Resource and Deployment operation flow instead of shelling out.
 3. If Docker Compose is the clearest source of truth, run `appaloft deploy <source> --method docker-compose`.
 4. If a Dockerfile is the clearest source of truth, run `appaloft deploy <source> --method dockerfile`.
 5. If the user points at an already built static directory, run `appaloft deploy <dir> --as static-site`.
-6. If the repository is a static site source, run `appaloft deploy <source> --method static --publish-dir <dir>`.
+6. If the folder has `public/index.html`, run `appaloft deploy .` / `appaloft deploy . --yes`.
+   Do not require `--method static` or `--publish-dir`. The CLI auto-selects static and `public`.
+   If you do pass `--method static`, omit `--publish-dir` only when that default applies.
    Relative `--publish-dir public` stays `public` (not `/public`) so Docker `COPY` can see `public/`
    in the uploaded workspace that is also the Docker build context. A missing `public/` fails before
    image build; a BuildKit `COPY` miss still exits non-zero with no live URL.

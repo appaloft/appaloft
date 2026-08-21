@@ -385,12 +385,13 @@ policy editing remains separate from resource-owned access-profile configuration
 `default-access-domain-policies.configure` owns system/server policy records.
 
 CLI entry workflows serialize source-root publish-directory aliases (`.`, `./`, `/`) as `/` on
-`resources.create` and `resources.configure-runtime` so a live Cloud control plane that still runs
-the pre-#1309 validator (rejecting `.` as a dot segment) can admit the same source-root meaning.
-Local core still accepts `.` and persists `/`. Do not depend on Cloud being redeployed for
-`deploy .` / `--as static-site` / `--publish-dir .` to work against production. Relative publish
-directories such as `public` stay relative on the CLI wire; leading-slash COPY packaging is a
-separate companion change.
+`resources.create` and `resources.configure-runtime`. Public core still accepts `.` and persists
+`/`. A live Cloud control plane may still reject source-root (`/` or `.`) with
+`Static publish directory cannot be the source root`; that message is not in this public
+repository. Do not silently edit Cloud. When `public/index.html` exists, `deploy .` / `--yes`
+auto-selects static and sends `publishDirectory` `public` so the live control plane can admit the
+request and Docker `COPY` can find `public/`. Relative publish directories such as `public` stay
+relative on the CLI wire.
 
 ## Open Questions
 

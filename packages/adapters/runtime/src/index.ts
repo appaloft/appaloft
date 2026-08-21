@@ -89,6 +89,10 @@ import { basename, dirname } from "node:path";
 import { LocalExecutionBackend } from "./local-execution";
 import { SshExecutionBackend } from "./ssh-execution";
 import { resolveStaticFrameworkPlan } from "./workspace-planners/javascript/static-frameworks";
+import {
+  detectLocalStaticPublishDirectory,
+  wireLocalStaticPublishDirectory,
+} from "./workspace-planners/local-static-site";
 import { resolveWorkspaceRuntimePlan } from "./workspace-planners";
 import {
   generatedReplicatedWorkloadComposeFile,
@@ -406,6 +410,10 @@ function workspaceMethodFromInspection(
   }
 
   if (resolveStaticFrameworkPlan({ source, requestedDeployment })) {
+    return "static";
+  }
+
+  if (detectLocalStaticPublishDirectory(source.locator)) {
     return "static";
   }
 
@@ -1093,7 +1101,13 @@ function chooseStrategies(input: {
 
   if (requestedMethod === "static") {
     const staticFrameworkPlan = resolveStaticFrameworkPlan({ source, requestedDeployment });
-    const publishDirectory = requestedDeployment.publishDirectory ?? staticFrameworkPlan?.publishDirectory;
+    const detectedPublishDirectory = detectLocalStaticPublishDirectory(source.locator);
+    const publishDirectory =
+      requestedDeployment.publishDirectory ??
+      staticFrameworkPlan?.publishDirectory ??
+      (detectedPublishDirectory
+        ? wireLocalStaticPublishDirectory(detectedPublishDirectory)
+        : undefined);
     const installCommand = requestedDeployment.installCommand ?? staticFrameworkPlan?.installCommand;
     const buildCommand = requestedDeployment.buildCommand ?? staticFrameworkPlan?.buildCommand;
     if (!publishDirectory) {

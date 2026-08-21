@@ -2893,4 +2893,96 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(dockerBuild?.dockerfile).toContain('COPY ["public/","/usr/share/nginx/html/"]');
     expect(dockerBuild?.dockerfile).not.toContain('COPY ["/public/","/usr/share/nginx/html/"]');
   });
+
+  test("[QUICK-DEPLOY-ENTRY-008B] auto method selects static when public/index.html exists", async () => {
+    ensureReflectMetadata();
+    const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const sourceRoot = mkdtempSync(join(tmpdir(), "appaloft-auto-static-"));
+    mkdirSync(join(sourceRoot, "public"), { recursive: true });
+    writeFileSync(join(sourceRoot, "public", "index.html"), "<!doctype html><title>nux</title>");
+    try {
+      const { DefaultRuntimePlanResolver } = await import("../src");
+      const resolver = new DefaultRuntimePlanResolver();
+      const result = await resolver.resolve(createTestExecutionContext(), {
+        id: "plan_auto_static_public",
+        source: createSource({
+          kind: "local-folder",
+          locator: sourceRoot,
+          displayName: "nux-fb4bd8c5-static",
+        }),
+        server: {
+          id: "srv_4lifk0yrcecy",
+          providerKey: "generic-ssh",
+        },
+        environmentSnapshot: createEnvironmentSnapshot("snap_auto_static_public"),
+        detectedReasoning: ["local folder with public/index.html"],
+        requestedDeployment: {
+          method: "auto",
+          port: 80,
+        },
+        generatedAt: "2026-08-21T00:00:00.000Z",
+      });
+
+      expect(result.isOk()).toBe(true);
+      const plan = result._unsafeUnwrap();
+      expect(plan.buildStrategy).toBe("static-artifact");
+      expect(plan.execution.metadata).toEqual(
+        expect.objectContaining({
+          "static.publishDirectory": "public",
+        }),
+      );
+    } finally {
+      rmSync(sourceRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[RES-CREATE-ADM-037C] source-root publish-dir . is legal and COPY ./", async () => {
+    ensureReflectMetadata();
+    const [{ DefaultRuntimePlanResolver }, { generateStaticSiteDockerBuild }, { StaticPublishDirectory }] =
+      await Promise.all([
+        import("../src"),
+        import("../src/workspace-planners"),
+        import("@appaloft/core"),
+      ]);
+    const sourceRootPublish = StaticPublishDirectory.create(".");
+    expect(sourceRootPublish.isOk()).toBe(true);
+    expect(sourceRootPublish._unsafeUnwrap().value).toBe("/");
+
+    const resolver = new DefaultRuntimePlanResolver();
+    const result = await resolver.resolve(createTestExecutionContext(), {
+      id: "plan_static_source_root",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/nux-fb4bd8c5-static",
+        displayName: "nux-fb4bd8c5-static",
+      }),
+      server: {
+        id: "srv_4lifk0yrcecy",
+        providerKey: "generic-ssh",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_static_source_root"),
+      detectedReasoning: ["explicit source-root static"],
+      requestedDeployment: {
+        method: "static",
+        publishDirectory: sourceRootPublish._unsafeUnwrap().value,
+        port: 80,
+      } as never,
+      generatedAt: "2026-08-21T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.execution.metadata).toEqual(
+      expect.objectContaining({
+        "static.publishDirectory": "/",
+      }),
+    );
+    const dockerBuild = generateStaticSiteDockerBuild({
+      execution: plan.execution,
+      sourceInspection: plan.source.inspection,
+    });
+    expect(dockerBuild?.dockerfile).toContain('COPY ["./","/usr/share/nginx/html/"]');
+  });
 });
