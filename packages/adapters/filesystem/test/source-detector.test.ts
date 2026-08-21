@@ -374,6 +374,38 @@ describe("FileSystemSourceDetector", () => {
     expect(result._unsafeUnwrap().source.locator).not.toBe("/Users/nichenqin/projects");
     expect(result._unsafeUnwrap().source.kind).toBe("local-folder");
   });
+
+  test("[DEP-CREATE-PKG-007] keeps an existing hyphenated folder when the parent is a git repo", async () => {
+    ensureReflectMetadata();
+    const [{ createExecutionContext }, { FileSystemSourceDetector }] = await Promise.all([
+      import("@appaloft/application"),
+      import("../src"),
+    ]);
+    const { mkdtemp, mkdir } = await import("node:fs/promises");
+    const parent = await mkdtemp(join(tmpdir(), "projects-"));
+    const locator = join(parent, "nux-c79876d8-static");
+    await mkdir(join(locator, "public"), { recursive: true });
+    await Bun.write(join(locator, "public", "index.html"), "<!doctype html><title>ok</title>");
+    const git = (args: string[]) =>
+      Bun.spawnSync(["git", "-C", parent, ...args], { stdout: "pipe", stderr: "pipe" });
+    expect(git(["init"]).success).toBe(true);
+
+    try {
+      const result = await new FileSystemSourceDetector().detect(
+        createExecutionContext({ entrypoint: "cli", requestId: "req_hyphenated_exists" }),
+        locator,
+        { allowUnrecognizedRoot: true },
+      );
+
+      expect(result.isOk()).toBe(true);
+      expect(result._unsafeUnwrap().source.locator).toBe(locator);
+      expect(result._unsafeUnwrap().source.locator).not.toBe(parent);
+      expect(result._unsafeUnwrap().source.displayName).toBe("nux-c79876d8-static");
+    } finally {
+      const { rm } = await import("node:fs/promises");
+      await rm(parent, { recursive: true, force: true });
+    }
+  });
 });
 
 async function createGitRemote(name: string, files: Record<string, string>): Promise<string> {

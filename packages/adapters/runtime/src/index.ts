@@ -87,7 +87,7 @@ import {
 import { i18nKeys } from "@appaloft/i18n";
 import { basename, dirname } from "node:path";
 import { LocalExecutionBackend } from "./local-execution";
-import { normalizeLocalSourceWorkingDirectory } from "./local-source-workdir";
+import { resolveLocalWorkspaceWorkdir } from "./local-source-workdir";
 import { SshExecutionBackend } from "./ssh-execution";
 import { resolveStaticFrameworkPlan } from "./workspace-planners/javascript/static-frameworks";
 import {
@@ -1125,7 +1125,11 @@ function chooseStrategies(input: {
     const execution = RuntimeExecutionPlan.rehydrate({
       kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
       workingDirectory: FilePathText.rehydrate(
-        normalizeLocalSourceWorkingDirectory(source.locator),
+        resolveLocalWorkspaceWorkdir({
+          locator: source.locator,
+          displayName: source.displayName,
+          ...(source.metadata ? { metadata: source.metadata } : {}),
+        }),
       ),
       dockerfilePath: FilePathText.rehydrate(dockerfilePath),
       ...(installCommand ? { installCommand: CommandText.rehydrate(installCommand) } : {}),

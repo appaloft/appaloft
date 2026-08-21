@@ -1984,6 +1984,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         ? { workingDirectory: state.runtimePlan.execution.workingDirectory }
         : {}),
       locator: source.locator,
+      displayName: source.displayName,
       ...(source.metadata ? { metadata: source.metadata } : {}),
     });
 
