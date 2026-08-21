@@ -36,6 +36,7 @@ import {
   printCliError,
   readProcessStdinText,
 } from "./runtime.js";
+import { tryHandleSetupHelp } from "./setup-help.js";
 import { openBunNativeWorkspaceTerminal } from "./workspace-control-native-terminal.js";
 import { type WorkspaceControlPresentation } from "./workspace-control-presentation.js";
 
@@ -495,7 +496,7 @@ export function createRemoteCliProgram(input: RemoteCliProgramInput): CliProgram
 
   return {
     parseAsync: async (argv = process.argv) => {
-      if (tryHandleCodeHelp(argv, process.stdout)) {
+      if (tryHandleCodeHelp(argv, process.stdout) || tryHandleSetupHelp(argv, process.stdout)) {
         return;
       }
       capturedStdinText = cliArgvRequestsStdinText(argv) ? sourceStdinReader() : undefined;

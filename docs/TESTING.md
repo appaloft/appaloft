@@ -126,15 +126,18 @@ If tests bypass the runtime or write directly to the database to simulate succes
     `workflow_dispatch` classifies against the default branch; `release.yml` does not dispatch CI.
 - `e2e.yml`
   - real PostgreSQL, started backend, CLI/API/deployment E2E, Playwright smoke
-  - runs for every non-draft pull request and always publishes both stable shard checks required by
-    branch protection; path filters must not suppress those checks
+  - runs for every pull request including drafts and always publishes both stable shard checks
+    required by branch protection; path filters and job-level draft skips must not suppress those
+    checks
   - the same change classifier scopes real work inside the two matrix jobs so
     `e2e (1, 2)` and `e2e (2, 2)` still succeed; those jobs are not skipped at the job level
   - `docs_only` / `release_bump` classify as `e2e_skip` and skip real suites
   - an isolated `apps/web/**` surface classifies as `e2e_web` and runs only mocked WebView on shard 1
-  - isolated `apps/shell/test/e2e/*.e2e.ts` files classify as `e2e_shell` and run only shell shards
-  - packages, server/CLI composition, lockfiles, shared config, desktop, CI scripts, the e2e
-    harness, mixed surfaces, or an empty diff fail closed to `e2e_full`
+  - product diffs that do not touch `apps/web/**`, including CLI / adapter-cli / setup-help /
+    inquire and isolated `apps/shell/test/e2e/*.e2e.ts` files, classify as `e2e_shell` and run only
+    shell shards (no Chromium, no WebView)
+  - mixed `apps/web/**` plus other product files, an empty diff, `workflow_dispatch`, or an `e2e`
+    label fail closed to `e2e_full`
   - Postgres starts as a step when shell E2E runs, so lightweight and web-only shards do not boot it
 - `nightly.yml`
   - higher-cost compose smoke

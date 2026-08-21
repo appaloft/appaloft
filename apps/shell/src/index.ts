@@ -73,6 +73,11 @@ if (command === "code" && isHelpFlag(args)) {
   renderCodeHelp(process.stdout);
   exitProcess(0);
 }
+if (command === "setup" && isHelpFlag(args)) {
+  const { renderSetupHelp } = await import("@appaloft/adapter-cli/setup-help");
+  renderSetupHelp(process.stdout);
+  exitProcess(0);
+}
 if (shouldPrintOccupancyLineProgress(args)) {
   reportOccupancyCliStartupOnce(args);
 } else if (shouldWarmOccupancyTui(args)) {
@@ -124,7 +129,13 @@ if (standaloneCommand) {
   }
 }
 
-if (isHelpFlag(args) && command !== "worker" && command !== "mcp" && command !== "dev") {
+if (
+  isHelpFlag(args) &&
+  command !== "worker" &&
+  command !== "mcp" &&
+  command !== "dev" &&
+  command !== "setup"
+) {
   const { createCliHelpProgram } = await import("@appaloft/adapter-cli");
   const helpProgram = createCliHelpProgram({
     version: process.env.APPALOFT_APP_VERSION ?? "0.0.0",

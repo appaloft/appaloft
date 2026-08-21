@@ -133,6 +133,20 @@ jobs:
           "ci.yml must not job-level skip workspace-tui; required Workspace TUI (*) names must still conclude.",
       }),
     );
+    expect(
+      findCiChangeClassifierViolations(
+        ciWorkflow,
+        e2eWorkflow.replace(
+          "  e2e:",
+          ["  e2e:\n    if: ", expression("github.event.pull_request.draft == false")].join(""),
+        ),
+      ),
+    ).toContainEqual(
+      expect.objectContaining({
+        message:
+          "e2e.yml must not job-level skip e2e (including drafts); required e2e (1, 2) and e2e (2, 2) names must still conclude.",
+      }),
+    );
   });
 
   test("[CI-UNIT-SCOPE-001] keeps Unit Tests named and free of WebView e2e", () => {

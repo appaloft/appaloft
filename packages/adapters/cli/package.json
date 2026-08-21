@@ -7,7 +7,8 @@
     "./operate-presentation": "./src/operate-presentation.ts",
     "./workspace-control-renderer": "./src/workspace-control-renderer.ts",
     "./workspace-tui-launch": "./src/workspace-tui-launch.ts",
-    "./code-help": "./src/code-help.ts"
+    "./code-help": "./src/code-help.ts",
+    "./setup-help": "./src/setup-help.ts"
   },
   "dependencies": {
     "@appaloft/application": "workspace:*",

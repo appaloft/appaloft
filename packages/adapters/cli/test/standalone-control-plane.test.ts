@@ -166,7 +166,7 @@ describe("standalone control plane help", () => {
     expect(rootChunks.join("")).toContain("appaloft setup agent");
   });
 
-  test("[CONTROL-PLANE-CLI-025] setup agent --help prints usage", async () => {
+  test("[CONTROL-PLANE-CLI-025][CONTROL-PLANE-CLI-027] setup agent --help prints usage", async () => {
     const chunks: string[] = [];
     const result = await runStandaloneControlPlaneCli({
       argv: ["node", "appaloft", "setup", "agent", "--help"],
@@ -186,5 +186,28 @@ describe("standalone control plane help", () => {
     expect(printed).toContain("not default-checked");
     expect(printed).toContain("~/.claude.json");
     expect(printed).toContain("~/.cursor/mcp.json");
+    expect(printed).not.toContain("A true or false value");
+    expect(printed).not.toContain("This setting is optional");
+    expect(printed).not.toMatch(/occupancy/iu);
+  });
+
+  test("[CONTROL-PLANE-CLI-027] setup agent -h prints the same compact usage", async () => {
+    const chunks: string[] = [];
+    const result = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "setup", "agent", "-h"],
+      stdout: {
+        write: (chunk) => {
+          chunks.push(String(chunk));
+          return true;
+        },
+      },
+    });
+
+    const printed = chunks.join("");
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(printed).toContain("appaloft setup agent");
+    expect(printed).toContain("-y, --yes");
+    expect(printed).not.toContain("A true or false value");
+    expect(printed).not.toMatch(/occupancy/iu);
   });
 });
