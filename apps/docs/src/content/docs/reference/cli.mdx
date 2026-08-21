@@ -106,7 +106,7 @@ appaloft login
 appaloft login --url https://appaloft.internal.example.com
 ```
 
-`appaloft login` 和 `appaloft auth login` 默认连接 Appaloft Cloud（`https://app.appaloft.com`）。要连接自托管 Appaloft 或其他受信任端点，需要显式传入 `--url <url>`。登录成功后，CLI 会把端点、Profile 名称、认证引用和握手摘要保存到本机 CLI Profile——这个 Profile 位于 `APPALOFT_HOME` 或用户本机 Appaloft home 目录，**不属于仓库配置**，不会被提交到 `appaloft.yml`。
+`appaloft login` 和 `appaloft auth login` 默认连接 Appaloft Cloud（`https://app.appaloft.com`）。第一次 Cloud `appaloft deploy` 在没有 Profile 时会启动同一套浏览器登录，然后继续部署——不必先单独跑 `appaloft login`。要连接自托管 Appaloft 或其他受信任端点，需要显式传入 `--url <url>`。登录成功后，CLI 会把端点、Profile 名称、认证引用和握手摘要保存到本机 CLI Profile——这个 Profile 位于 `APPALOFT_HOME` 或用户本机 Appaloft home 目录，**不属于仓库配置**，不会被提交到 `appaloft.yml`。
 
 登录不是部署接管，也不会创建 Project、Resource、Deployment、Source Link 或域名绑定,更不会把控制面配置塞进部署请求或把 Token/Cookie 写进已提交的配置文件。
 
@@ -133,7 +133,7 @@ appaloft setup agent
 
 ## 非交互认证(AI Agent / CI)
 
-交互式登录使用浏览器验证码流程,适合人类操作者。**AI Agent 和 CI/自动化不应该使用浏览器/验证码流程作为默认认证路径**,应该优先使用作用域受限、可过期的 Token:
+交互式登录使用浏览器验证码流程,适合人类操作者。当设置了 `CLAUDECODE`、`CLAUDE_CODE_ENTRYPOINT`、`CURSOR_AGENT`、`AIDER_MODEL` 或 `CODEX_CLI`，或进程是非 TTY / `CI=1` 时，`appaloft deploy` 和 `appaloft setup agent` 会打印将要做的事，除非传入 `--yes`，否则不会创建项目、部署或写入 Skill。**AI Agent 和 CI/自动化不应该使用浏览器/验证码流程作为默认认证路径**,应该优先使用作用域受限、可过期的 Token:
 
 ```bash
 # 一次性非交互命令

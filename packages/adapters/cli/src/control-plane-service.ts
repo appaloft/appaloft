@@ -562,6 +562,8 @@ export async function loginControlPlane(
   });
 }
 
+export type LoginControlPlaneFn = typeof loginControlPlane;
+
 export function mcpLoginControlPlane(
   input: Omit<CliControlPlaneLoginInput, "requestedCredential">,
   deps?: CliControlPlaneDependencies,

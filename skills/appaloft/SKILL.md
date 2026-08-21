@@ -77,7 +77,10 @@ surface available in the session.
   list/show tools are bound. Do not scrape vendor TUI text for PR or deploy state.
 
 - First deployment: `appaloft deploy` / `deploy .` deploy the current directory as this app; git is
-  not required. Do
+  not required. Human TTY Cloud deploy starts the existing browser login in the same command when
+  no profile exists. If `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `CURSOR_AGENT`, `AIDER_MODEL`, or
+  `CODEX_CLI` is set, or the process is non-TTY / `CI=1`, print the plan and do not create a
+  project, deploy, or write skills unless `--yes` is present. Do
   not silently reuse an unrelated occupancy. Inspect source safely, create or select
   project/server/environment/resource,
   persist source/runtime/network on the Resource, then `deployments.plan`. If readiness is

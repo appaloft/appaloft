@@ -5,6 +5,11 @@ import { type DomainError, err, ok, type Result } from "@appaloft/core";
 import { type AppaloftSdkFetch } from "@appaloft/sdk";
 import { runAgentHostSetup } from "./agent-host-setup.js";
 import {
+  cliMutationConfirmationRequiredError,
+  formatCliMutationPlan,
+  requiresExplicitYesForMutation,
+} from "./coding-agent-environment.js";
+import {
   type CliControlPlaneEnvironment,
   type CliControlPlaneMode,
   type CliControlPlaneProfileStore,
@@ -43,6 +48,8 @@ export interface StandaloneControlPlaneCliInput {
   readonly openBrowser?: (url: string) => Promise<boolean> | boolean;
   readonly sleep?: (milliseconds: number) => Promise<void>;
   readonly stdinText?: string;
+  readonly stdinIsTty?: boolean;
+  readonly stdoutIsTty?: boolean;
   readonly stdout?: Pick<NodeJS.WriteStream, "write">;
   readonly stderr?: Pick<NodeJS.WriteStream, "write">;
 }
@@ -667,6 +674,18 @@ async function handleSetupAgent(
     return finish(parsed, input);
   }
   const env = controlPlaneEnv(input);
+  if (
+    requiresExplicitYesForMutation({
+      env,
+      stdinIsTty: input.stdinIsTty ?? true,
+      stdoutIsTty: input.stdoutIsTty ?? true,
+    }) &&
+    !parsed.value.booleans.yes
+  ) {
+    const stderr = input.stderr ?? process.stderr;
+    stderr.write(`${formatCliMutationPlan({ door: "setup-agent" })}\n`);
+    return finish(err(cliMutationConfirmationRequiredError({ door: "setup-agent" })), input);
+  }
   return finish(
     runAgentHostSetup({
       store: input.store ?? defaultCliControlPlaneProfileStore(input.env),

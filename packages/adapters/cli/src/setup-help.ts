@@ -1,7 +1,7 @@
 export const SETUP_AGENT_LIST = ["universal", "claude-code", "cursor", "opencode"] as const;
 
 export const SETUP_AGENT_OPTION_DESCRIPTIONS = {
-  yes: "Skip prompts and accept detected defaults.",
+  yes: "Skip prompts, accept detected defaults, and confirm skill/MCP writes in coding-agent or CI environments.",
   agent: `Target a specific agent instead of defaults (repeatable): ${SETUP_AGENT_LIST.join(", ")}.`,
   profile: "CLI profile to launch with remote-stdio (defaults to the active profile).",
   cursorHome: "Cursor home directory (defaults to ~/.cursor).",

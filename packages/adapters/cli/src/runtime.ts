@@ -29,6 +29,7 @@ import {
   type SourceLinkTarget,
 } from "./commands/deployment-remote-state.js";
 import { type DeploymentStateBackendDecision } from "./commands/deployment-state.js";
+import { type LoginControlPlaneFn } from "./control-plane-service.js";
 import { type CliInteraction } from "./interaction.js";
 import {
   type LocalGitWorkspaceContext,
@@ -116,6 +117,7 @@ export interface CliProgramInput {
   launchNativeWorkspaceClient?: (argv: readonly string[]) => Promise<void>;
   workspaceControlPresentation?: WorkspaceControlPresentation;
   folderOnboardingInteraction?: CliInteraction;
+  loginControlPlane?: LoginControlPlaneFn;
   operatePresentation?: OperatePresentation;
   openNativeWorkspaceTerminal?: (
     input: OpenNativeWorkspaceTerminalInput,
@@ -197,6 +199,7 @@ export class CliRuntime extends Context.Tag("CliRuntime")<
     readonly launchNativeWorkspaceClient?: (argv: readonly string[]) => Promise<void>;
     readonly workspaceControlPresentation?: WorkspaceControlPresentation;
     readonly folderOnboardingInteraction?: CliInteraction;
+    readonly loginControlPlane?: LoginControlPlaneFn;
     readonly operatePresentation?: OperatePresentation;
     readonly openNativeWorkspaceTerminal: (
       input: OpenNativeWorkspaceTerminalInput,
@@ -294,6 +297,7 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
     ...(input.folderOnboardingInteraction
       ? { folderOnboardingInteraction: input.folderOnboardingInteraction }
       : {}),
+    ...(input.loginControlPlane ? { loginControlPlane: input.loginControlPlane } : {}),
     ...(input.operatePresentation ? { operatePresentation: input.operatePresentation } : {}),
     openNativeWorkspaceTerminal:
       input.openNativeWorkspaceTerminal ?? openBunNativeWorkspaceTerminal,

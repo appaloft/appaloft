@@ -1912,6 +1912,31 @@ describe("CLI remote control-plane client", () => {
     expect(rendered.stderr).toBe("");
   });
 
+  test("[DEPLOY-DOOR-LOGIN-002] setup agent in agent-env without --yes does not write skills", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "appaloft-setup-agent-guard-"));
+    const home = join(directory, "home");
+    const cursorHome = join(home, ".cursor");
+    await mkdir(cursorHome, { recursive: true });
+    const skillDir = join(import.meta.dir, "../../../../skills/appaloft");
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "setup", "agent", "--skill-dir", skillDir],
+      env: { HOME: home, CURSOR_AGENT: "1" },
+      store: new MemoryCliControlPlaneProfileStore(),
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    expect(result).toEqual({ handled: true, exitCode: 1 });
+    expect(output.read().stderr).toContain("Would install Appaloft skills");
+    expect(output.read().stderr).toContain("Pass --yes to continue.");
+    expect(output.read().stderr).not.toContain("Run appaloft login");
+    expect(output.read().stderr).not.toContain("Occupancy");
+    expect(existsSync(join(home, ".agents", "skills", "appaloft", "SKILL.md"))).toBe(false);
+    expect(existsSync(join(cursorHome, "skills", "appaloft", "SKILL.md"))).toBe(false);
+  });
+
   test("[CONTROL-PLANE-CLI-025] setup agent copies skills then fails MCP when no CLI profile exists", async () => {
     const directory = await mkdtemp(join(tmpdir(), "appaloft-setup-agent-nologin-"));
     const home = join(directory, "home");

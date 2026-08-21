@@ -71,8 +71,11 @@ Monorepo 根目录下存在多个候选应用时，部署会被阻塞，直到�
 ## CLI 操作步骤
 
 ```bash
-# 1. 登录（默认连接 Appaloft Cloud，自托管请显式传 --url）
-appaloft login --url https://your-appaloft-host
+# 1. 第一次 deploy 会在需要时直接登录（Railway `up` 手感）。自托管仍可先跑
+#    `appaloft login --url https://your-appaloft-host`。
+#    编码 Agent / CI / 非 TTY 环境会先打印计划，除非传入 --yes。
+appaloft deploy
+appaloft deploy .
 
 # 2. 创建项目（可选）。第一次 deploy/code 也会按目录名创建并记住这个文件夹
 appaloft project create --name "my-first-project"
@@ -82,10 +85,8 @@ appaloft project use <projectId>
 appaloft server register --host 203.0.113.10 --ssh-user deploy --ssh-key ~/.ssh/id_ed25519
 appaloft server capacity inspect --server-id <serverId>
 
-# 4. 从当前目录发起部署（零配置检测）。不要复用别人的会话。
+# 4. 已经登录时，同一条文件夹 deploy 会继续创建或复用这个应用。
 #    目录里有 public/index.html 时会自动选 static，不必再写 --method。
-appaloft deploy
-appaloft deploy .
 
 # 5. 或者显式指定配置文件 / profile
 appaloft deploy --config appaloft.yml --config-profile staging

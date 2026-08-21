@@ -114,7 +114,7 @@ appaloft login
 appaloft login --url https://appaloft.internal.example.com
 ```
 
-`appaloft login` and `appaloft auth login` connect to Appaloft Cloud (`https://app.appaloft.com`) by default. To connect to a self-hosted Appaloft instance or another trusted endpoint, pass `--url <url>` explicitly. After a successful login, the CLI saves the endpoint, profile name, auth reference, and handshake digest to a local CLI profile — this profile lives under `APPALOFT_HOME` or the user's local Appaloft home directory, **it is not repository config**, and it's never committed to `appaloft.yml`.
+`appaloft login` and `appaloft auth login` connect to Appaloft Cloud (`https://app.appaloft.com`) by default. First Cloud `appaloft deploy` starts that same browser login when no profile exists, then continues — you do not need a separate `appaloft login` first. To connect to a self-hosted Appaloft instance or another trusted endpoint, pass `--url <url>` explicitly. After a successful login, the CLI saves the endpoint, profile name, auth reference, and handshake digest to a local CLI profile — this profile lives under `APPALOFT_HOME` or the user's local Appaloft home directory, **it is not repository config**, and it's never committed to `appaloft.yml`.
 
 Logging in doesn't take over deployment, and doesn't create a Project, Resource, Deployment, Source Link, or domain binding — nor does it stuff control-plane configuration into a deployment request or write a token/cookie into a committed config file.
 
@@ -141,7 +141,7 @@ appaloft setup agent
 
 ## Non-interactive authentication (AI agents / CI)
 
-Interactive login uses a browser verification-code flow, suited to human operators. **AI agents and CI/automation should not use the browser/verification-code flow as their default authentication path** — they should prefer a scoped, expirable token instead:
+Interactive login uses a browser verification-code flow, suited to human operators. When `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `CURSOR_AGENT`, `AIDER_MODEL`, or `CODEX_CLI` is set, or the process is non-TTY / `CI=1`, `appaloft deploy` and `appaloft setup agent` print what they would do and do not create a project, deploy, or write skills unless `--yes` is present. **AI agents and CI/automation should not use the browser/verification-code flow as their default authentication path** — they should prefer a scoped, expirable token instead:
 
 ```bash
 # A one-off non-interactive command

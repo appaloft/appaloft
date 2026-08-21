@@ -12,13 +12,17 @@ import {
   type DevelopmentCommandRuntime,
   defaultCliControlPlaneProfileStore,
   defaultPublicCloudControlPlaneUrl,
-  deployLoginRequiredError,
   developmentPlanFromSource,
+  ensureDeployControlPlaneLogin,
+  formatCliMutationPlan,
   formatSafeCliError,
   hasCliControlPlaneLogin,
+  hasExplicitYesFlag,
   isHeadlessWorkspaceInvocation,
+  type LoginControlPlaneFn,
   loginRequiredWorkspaceOccupancyTree,
   requiresCloudDeployLogin,
+  requiresExplicitYesForMutation,
   resolveCliExecutionTarget,
   runStandaloneControlPlaneCli,
   runStandaloneDevelopmentCli,
@@ -72,6 +76,28 @@ export interface ShellCliRunHooks {
     remotePgliteStateSyncSession: RemotePgliteStateSyncSession | undefined,
     capturedStdinText?: string,
   ) => Promise<Result<AppComposition>>;
+  readonly mutationGuard?: {
+    readonly env?: NodeJS.ProcessEnv;
+    readonly stdinIsTty?: boolean;
+    readonly stdoutIsTty?: boolean;
+  };
+  readonly loginControlPlane?: LoginControlPlaneFn;
+}
+
+function shellMutationGuard(hooks: ShellCliRunHooks): {
+  readonly env: NodeJS.ProcessEnv;
+  readonly stdinIsTty?: boolean;
+  readonly stdoutIsTty?: boolean;
+} {
+  return {
+    env: hooks.mutationGuard?.env ?? process.env,
+    ...(hooks.mutationGuard?.stdinIsTty === undefined
+      ? {}
+      : { stdinIsTty: hooks.mutationGuard.stdinIsTty }),
+    ...(hooks.mutationGuard?.stdoutIsTty === undefined
+      ? {}
+      : { stdoutIsTty: hooks.mutationGuard.stdoutIsTty }),
+  };
 }
 
 function formatDetailValue(value: unknown): string | null {
@@ -561,9 +587,14 @@ export async function runShellCli(
   const preparePglite = hooks.prepareRemotePgliteStateSync ?? prepareRemotePgliteStateSync;
   const composeShell = hooks.createShellComposition ?? createShellComposition;
   const mcpCommand = isMcpCommand(argv);
+  const mutationGuard = shellMutationGuard(hooks);
+  const controlPlaneStdinIsTty = mutationGuard.stdinIsTty ?? process.stdin.isTTY;
+  const controlPlaneStdoutIsTty = mutationGuard.stdoutIsTty ?? process.stdout.isTTY;
   const controlPlaneCli = await runStandaloneControlPlaneCli({
     argv,
     env: process.env,
+    ...(controlPlaneStdinIsTty === undefined ? {} : { stdinIsTty: controlPlaneStdinIsTty }),
+    ...(controlPlaneStdoutIsTty === undefined ? {} : { stdoutIsTty: controlPlaneStdoutIsTty }),
     ...(capturedStdinText === undefined ? {} : { stdinText: capturedStdinText }),
   });
   if (controlPlaneCli.handled) {
@@ -581,6 +612,16 @@ export async function runShellCli(
   ) {
     await runHelpWithoutRuntime(argv);
     return;
+  }
+
+  if (
+    startupArgs[0] === "deploy" &&
+    requiresExplicitYesForMutation(mutationGuard) &&
+    !hasExplicitYesFlag(startupArgs)
+  ) {
+    const loggedIn = await hasCliControlPlaneLogin(process.env);
+    process.stderr.write(`${formatCliMutationPlan({ door: "deploy", loggedIn })}\n`);
+    process.exit(1);
   }
 
   const appaloftHome = process.env.APPALOFT_HOME?.trim() || join(homedir(), ".appaloft");
@@ -754,22 +795,50 @@ export async function runShellCli(
     return;
   }
 
-  const executionTarget = await resolveCliExecutionTarget({
+  let executionTarget = await resolveCliExecutionTarget({
     argv,
     env: process.env,
   });
   if (executionTarget.isErr()) {
     const failedArgs = commandArgs(argv);
+    const guard = shellMutationGuard(hooks);
+    const mutationBlocked =
+      requiresExplicitYesForMutation(guard) && !hasExplicitYesFlag(failedArgs);
     if (
       failedArgs[0] === "deploy" &&
       requiresCloudDeployLogin(failedArgs, process.env) &&
       !(await hasCliControlPlaneLogin(process.env))
     ) {
-      writeDomainError(deployLoginRequiredError());
+      if (mutationBlocked) {
+        process.stderr.write(`${formatCliMutationPlan({ door: "deploy", loggedIn: false })}\n`);
+        process.exit(1);
+      }
+      const folded = await ensureDeployControlPlaneLogin({
+        env: process.env,
+        yes: hasExplicitYesFlag(failedArgs),
+        ...(guard.stdinIsTty === undefined ? {} : { stdinIsTty: guard.stdinIsTty }),
+        ...(guard.stdoutIsTty === undefined ? {} : { stdoutIsTty: guard.stdoutIsTty }),
+        ...(hooks.loginControlPlane ? { login: hooks.loginControlPlane } : {}),
+        writeStatus: (text) => {
+          process.stderr.write(text);
+        },
+      });
+      if (folded.isErr()) {
+        writeDomainError(folded.error);
+        process.exit(1);
+      }
+      executionTarget = await resolveCliExecutionTarget({
+        argv,
+        env: process.env,
+      });
+      if (executionTarget.isErr()) {
+        writeDomainError(executionTarget.error);
+        process.exit(1);
+      }
+    } else {
+      writeDomainError(executionTarget.error);
       process.exit(1);
     }
-    writeDomainError(executionTarget.error);
-    process.exit(1);
   }
 
   const target = executionTarget.value;
@@ -778,6 +847,7 @@ export async function runShellCli(
     const remoteCliProgram = createRemoteCliProgram({
       version: process.env.APPALOFT_APP_VERSION ?? "0.0.0",
       profile: target.profile,
+      environment: process.env,
       workspaceControlPresentation: createRatatuiWorkspaceControlPresentation(),
       operatePresentation: createRatatuiOperatePresentation(),
       ...(capturedStdinText === undefined ? {} : { readStdinText: async () => capturedStdinText }),

@@ -150,8 +150,10 @@ Use this order:
    create --project <projectId> --environment <environmentId> --resource <resourceId> --server
    <serverId> [--destination <destinationId>]`; it is ids-only and does not replace source/profile
    configuration or proof verification.
-2. Current directory: `appaloft deploy` and `appaloft deploy .` deploy this tree as this app. Do
-   not silently reuse an unrelated occupancy such as traefik/whoami. If `public/index.html` exists,
+2. Current directory: `appaloft deploy` and `appaloft deploy .` deploy this tree as this app. Human
+   TTY Cloud deploy starts the existing browser login in the same command when no profile exists.
+   Coding-agent / CI / non-TTY runs print a plan unless `--yes` is present. Do
+   not silently reuse an unrelated session such as traefik/whoami. If `public/index.html` exists,
    auto-select static and publish-dir `public` without requiring `--method` or `--publish-dir`. If
    there is no current app, ask for a path or `--project`.
 3. Existing Appaloft config: `appaloft deploy <source>`; for an application graph, repeat

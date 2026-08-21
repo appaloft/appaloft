@@ -50,7 +50,13 @@ import {
 } from "@appaloft/deployment-config";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect, Either } from "effect";
-import { deployLoginRequiredError, hasCliControlPlaneLogin } from "../cli-session-login.js";
+import { ensureDeployControlPlaneLogin, hasCliControlPlaneLogin } from "../cli-session-login.js";
+import {
+  cliMutationConfirmationRequiredError,
+  formatCliMutationPlan,
+  isCiEnvironment,
+  isCodingAgentEnvironment,
+} from "../coding-agent-environment.js";
 import {
   folderOnboardingCwdFromLocator,
   persistFolderProjectAssociation,
@@ -1772,7 +1778,6 @@ export const deployCommand = EffectCommand.make(
     yes,
   }) =>
     Effect.gen(function* () {
-      void yes;
       const cli = yield* CliRuntime;
       const sourceLocator = optionalValue(pathOrSource);
       const requestedEntryMode = optionalValue(entryMode);
@@ -1794,15 +1799,39 @@ export const deployCommand = EffectCommand.make(
       const portValue = optionalNumber(port);
       const configFilePath = optionalValue(config);
       const requestedProjectId = optionalValue(project);
-      if (cli.executionTarget === "remote") {
+      const deployEnv = cli.environment ?? process.env;
+      const writeStatus = (text: string) => {
+        cli.terminalIO.stderr.write(text);
+      };
+      if ((isCodingAgentEnvironment(deployEnv) || isCiEnvironment(deployEnv)) && !yes) {
         const loggedIn = yield* Effect.promise(() =>
-          hasCliControlPlaneLogin(
-            cli.environment ?? process.env,
-            cli.readActiveControlPlaneProfile,
-          ),
+          hasCliControlPlaneLogin(deployEnv, cli.readActiveControlPlaneProfile),
         );
-        if (!loggedIn) {
-          return yield* Effect.fail(deployLoginRequiredError());
+        writeStatus(`${formatCliMutationPlan({ door: "deploy", loggedIn })}\n`);
+        return yield* Effect.fail(
+          cliMutationConfirmationRequiredError({ door: "deploy", loggedIn }),
+        );
+      }
+      if (cli.executionTarget === "remote") {
+        const login = yield* Effect.promise(() =>
+          ensureDeployControlPlaneLogin({
+            env: deployEnv,
+            yes,
+            ...(cli.terminalIO.stdin.isTTY === undefined
+              ? {}
+              : { stdinIsTty: cli.terminalIO.stdin.isTTY }),
+            ...(cli.terminalIO.stdout.isTTY === undefined
+              ? {}
+              : { stdoutIsTty: cli.terminalIO.stdout.isTTY }),
+            ...(cli.readActiveControlPlaneProfile
+              ? { readActiveProfile: cli.readActiveControlPlaneProfile }
+              : {}),
+            ...(cli.loginControlPlane ? { login: cli.loginControlPlane } : {}),
+            writeStatus,
+          }),
+        );
+        if (login.isErr()) {
+          return yield* Effect.fail(login.error);
         }
       }
       const serverId = optionalValue(server);

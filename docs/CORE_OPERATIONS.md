@@ -2145,7 +2145,9 @@ CLI:
 - `appaloft login`, `appaloft auth token login`, `appaloft logout`, `appaloft auth status`, and
   `appaloft context *` manage local uncommitted client state; they must not write secrets to
   `appaloft.yml`, create operation-catalog aliases, or add control-plane fields to
-  `deployments.create`
+  `deployments.create`. First Cloud `appaloft deploy` reuses that same login and profile store
+  instead of telling the operator to run a separate login command. Coding-agent, CI, and
+  non-TTY `deploy` / `setup agent` print a plan and do not mutate without `--yes`.
 - `appaloft auth mcp login`, `appaloft auth mcp {codex,cursor,opencode,claude-code} install`, and
   `appaloft setup agent` are local host-config affordances, not operation-catalog entries.
   `appaloft setup agent` is the one-command local Agent door: the agent list includes `universal`,

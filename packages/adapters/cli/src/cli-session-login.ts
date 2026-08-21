@@ -1,9 +1,13 @@
-import { type DomainError } from "@appaloft/core";
+import { type DomainError, err, ok, type Result } from "@appaloft/core";
+import {
+  cliMutationConfirmationRequiredError,
+  requiresExplicitYesForMutation,
+} from "./coding-agent-environment.js";
 import {
   defaultCliControlPlaneProfileStore,
   isDefaultPublicCloudControlPlaneUrl,
 } from "./control-plane-profile.js";
-import { activeControlPlaneProfile } from "./control-plane-service.js";
+import { activeControlPlaneProfile, loginControlPlane } from "./control-plane-service.js";
 
 export const CLI_LOGIN_GUIDANCE = "Run appaloft login";
 export const CLI_LOGIN_REQUIRED_WORKSPACE_STATUS = "login-required" as const;
@@ -67,6 +71,38 @@ export function deployLoginRequiredError(): DomainError {
         "Run appaloft login, then retry. Enroll this Mac or a VPS with appaloft server enroll if no Server is available.",
     },
   };
+}
+
+export async function ensureDeployControlPlaneLogin(input: {
+  readonly env?: NodeJS.ProcessEnv;
+  readonly yes?: boolean;
+  readonly stdinIsTty?: boolean;
+  readonly stdoutIsTty?: boolean;
+  readonly readActiveProfile?: () => Promise<{ readonly auth?: unknown } | null>;
+  readonly login?: typeof loginControlPlane;
+  readonly writeStatus?: (text: string) => void;
+}): Promise<Result<{ readonly folded: boolean }>> {
+  const env = input.env ?? process.env;
+  if (await hasCliControlPlaneLogin(env, input.readActiveProfile)) {
+    return ok({ folded: false });
+  }
+  if (
+    requiresExplicitYesForMutation({
+      env,
+      stdinIsTty: input.stdinIsTty ?? true,
+      stdoutIsTty: input.stdoutIsTty ?? true,
+    }) &&
+    !input.yes
+  ) {
+    return err(cliMutationConfirmationRequiredError({ door: "deploy", loggedIn: false }));
+  }
+  input.writeStatus?.("Signing in…\n");
+  const login = input.login ?? loginControlPlane;
+  const result = await login({});
+  if (result.isErr()) {
+    return err(result.error);
+  }
+  return ok({ folded: true });
 }
 
 export function loginRequiredWorkspaceOccupancyTree(

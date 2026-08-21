@@ -56,8 +56,11 @@ When a monorepo root has multiple candidate apps, the deployment is blocked unti
 ## CLI steps
 
 ```bash
-# 1. Log in (connects to Appaloft Cloud by default; self-hosted requires an explicit --url)
-appaloft login --url https://your-appaloft-host
+# 1. First deploy signs you in when needed (Railway `up` feel). Self-hosted can still
+#    run `appaloft login --url https://your-appaloft-host` first.
+#    Coding-agent / CI / non-TTY runs print a plan unless you pass --yes.
+appaloft deploy
+appaloft deploy .
 
 # 2. Create a project (optional). First deploy/code also creates one named after this folder
 appaloft project create --name "my-first-project"
@@ -67,11 +70,8 @@ appaloft project use <projectId>
 appaloft server register --host 203.0.113.10 --ssh-user deploy --ssh-key ~/.ssh/id_ed25519
 appaloft server capacity inspect --server-id <serverId>
 
-# 4. Start a deployment from the current directory (zero-configuration detection).
-#    This deploys this tree — it does not reuse an unrelated session.
+# 4. Already signed in? The same folder deploy continues to create or reuse this app.
 #    A folder with public/index.html auto-selects static (no --method needed).
-appaloft deploy
-appaloft deploy .
 
 # 5. Or explicitly point at a config file / profile
 appaloft deploy --config appaloft.yml --config-profile staging

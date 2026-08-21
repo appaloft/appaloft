@@ -217,7 +217,9 @@ sys.exit(os.waitstatus_to_exitcode(status))
     expect(stdout).toContain("Usage:");
     expect(stdout).toContain("-y, --yes");
     expect(stdout).toContain("--agent");
-    expect(stdout).toContain("Skip prompts and accept detected defaults");
+    expect(stdout).toContain(
+      "Skip prompts, accept detected defaults, and confirm skill/MCP writes",
+    );
     expect(stdout).toContain("not default-checked");
     expect(stdout).toContain("~/.cursor/mcp.json");
     expect(stdout).not.toContain("A true or false value");

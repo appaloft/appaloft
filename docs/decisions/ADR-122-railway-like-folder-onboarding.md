@@ -58,8 +58,13 @@ present; missing git is not a gate.
    occupancy is repaired on that disk, or replaced without dumping
    `workspace_open_partial_recovery_required` or requiring the user to
    terminate.
-7. Login stays fail-fast with `Run appaloft login`. No 40s blank cursor. No
-   invented live URL. Status lines print on stderr.
+7. First Cloud `appaloft deploy` folds the existing browser login into the same
+   command and writes the current local profile store. Coding-agent, CI, and
+   non-TTY environments print what they would do and do not create a project,
+   deploy, or write skills unless `--yes` is present. Human TTY deploy proceeds
+   after folded login. Remote `code` / `workspace` doors still fail-fast with
+   `Run appaloft login`. No invented live URL. Status lines print on stderr.
+   See [ADR-123](./ADR-123-first-deploy-login-fold-and-agent-env-guard.md).
 8. No new catalog operation. Folder link is CLI presentation over existing
    `projects.create` / `projects.list` / `projects.show`.
 

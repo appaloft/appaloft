@@ -584,9 +584,12 @@ export const publicDocsHelpTopics = {
     ],
     specReferences: [
       "docs/specs/074-cli-remote-control-plane-client/spec.md",
+      "docs/specs/143-first-deploy-login-and-agent-env-guard/spec.md",
       "docs/workflows/control-plane-mode-selection-and-adoption.md",
       "docs/testing/control-plane-modes-test-matrix.md",
+      "docs/testing/first-deploy-login-and-agent-env-test-matrix.md",
       "docs/decisions/ADR-025-control-plane-modes-and-action-execution.md",
+      "docs/decisions/ADR-123-first-deploy-login-fold-and-agent-env-guard.md",
     ],
   },
   "cli.remote-control-plane-dispatch": {
