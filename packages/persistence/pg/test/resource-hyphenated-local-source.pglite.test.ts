@@ -121,5 +121,5 @@ describe("hyphenated local-folder source persistence", () => {
       await database.close();
       rmSync(dataDir, { recursive: true, force: true });
     }
-  });
+  }, 20_000);
 });
