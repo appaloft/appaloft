@@ -159,6 +159,29 @@ describe("SSH source upload", () => {
     expect(missingMessage).not.toBe(`Source working directory does not exist: ${parent}`);
   });
 
+  test("[DEP-CREATE-PKG-007] recovers the hyphenated cwd when locator and workdir are already the parent", () => {
+    const parent = mkdtempSync(join(tmpdir(), "projects-"));
+    const locator = join(parent, hyphenatedStaticLeaf);
+    mkdirSync(join(locator, "public"), { recursive: true });
+    writeFileSync(join(locator, "public", "index.html"), "<!doctype html><title>ok</title>");
+
+    try {
+      const packaged = resolveLocalWorkspaceWorkdir({
+        workingDirectory: parent,
+        locator: parent,
+        displayName: hyphenatedStaticLeaf,
+        metadata: { baseDirectory: "/" },
+        cwd: locator,
+      });
+
+      expect(packaged).toBe(locator);
+      expect(packaged).toContain(hyphenatedStaticLeaf);
+      expect(packaged).not.toBe(parent);
+    } finally {
+      rmSync(parent, { recursive: true, force: true });
+    }
+  });
+
   test("[DEP-CREATE-PKG-007] SSH package exists-check uses the full cwd when workingDirectory is already the parent", async () => {
     const locator = hyphenatedStaticLocator;
     const parent = hyphenatedStaticParent;

@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 import type { ExecutionContext } from "@appaloft/application";
 import {
@@ -2969,6 +2972,51 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(plan.execution.workingDirectory).toBe(locator);
     expect(plan.execution.workingDirectory).not.toBe("/Users/nichenqin/projects");
     expect(plan.source.locator).toBe(locator);
+  });
+
+  test("[DEP-CREATE-PKG-007] static plan writes the hyphenated cwd when locator is already the parent", async () => {
+    ensureReflectMetadata();
+    const parent = mkdtempSync(join(tmpdir(), "projects-"));
+    const locator = join(parent, "nux-c79876d8-static");
+    mkdirSync(join(locator, "public"), { recursive: true });
+    writeFileSync(join(locator, "public", "index.html"), "<!doctype html><title>ok</title>");
+    const previousCwd = process.cwd();
+
+    try {
+      process.chdir(locator);
+      const { DefaultRuntimePlanResolver } = await import("../src");
+      const resolver = new DefaultRuntimePlanResolver();
+      const result = await resolver.resolve(createTestExecutionContext(), {
+        id: "plan_hyphenated_cwd_static",
+        source: createSource({
+          kind: "local-folder",
+          locator: parent,
+          displayName: "nux-c79876d8-static",
+          metadata: { baseDirectory: "/" },
+        }),
+        server: {
+          id: "srv_4lifk0yrcecy",
+          providerKey: "generic-ssh",
+        },
+        environmentSnapshot: createEnvironmentSnapshot("snap_hyphenated_cwd_static"),
+        detectedReasoning: ["hyphenated cwd after upstream dirname"],
+        requestedDeployment: {
+          method: "static",
+          publishDirectory: "public",
+          port: 80,
+        } as never,
+        generatedAt: "2026-08-21T00:00:00.000Z",
+      });
+
+      expect(result.isOk()).toBe(true);
+      const plan = result._unsafeUnwrap();
+      expect(plan.execution.workingDirectory).toBe(locator);
+      expect(plan.execution.workingDirectory).not.toBe(parent);
+      expect(plan.execution.workingDirectory).toContain("nux-c79876d8-static");
+    } finally {
+      process.chdir(previousCwd);
+      rmSync(parent, { recursive: true, force: true });
+    }
   });
 
   test("[RES-CREATE-ADM-037C] source-root publish-dir . is legal and COPY ./", async () => {

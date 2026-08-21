@@ -121,8 +121,9 @@ the equivalent Resource and Deployment operation flow instead of shelling out.
 5. If the user points at an already built static directory, run `appaloft deploy <dir> --as static-site`.
 6. If the folder has `public/index.html`, run `appaloft deploy .` / `appaloft deploy . --yes`.
    Do not require `--method static` or `--publish-dir`. The CLI auto-selects static and `public`.
-   Keep the real cwd folder; SSH package must use that full folder, not a dirname'd parent.
-   A missing-workdir error names the full folder.
+   Keep the real cwd folder; the static plan writes that folder, and SSH package uses it even if
+   locator and workingDirectory were already walked to the parent. A missing-workdir error names
+   the full folder.
    If you do pass `--method static`, omit `--publish-dir` only when that default applies.
    Relative `--publish-dir public` stays `public` (not `/public`) so Docker `COPY` can see `public/`
    in the uploaded workspace that is also the Docker build context. A missing `public/` fails before
