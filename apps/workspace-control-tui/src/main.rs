@@ -11,9 +11,9 @@ mod operate;
 
 use anyhow::{Context, Result, bail};
 use appaloft_workspace_control_tui::{
-    ActionDecision, AppState, DeliveryDecision, DeliverySubmission, OccupancyKeyBinding,
-    ParentMessage, RecoverySubmission, RendererEvent, agent_area, is_occupancy_ctrl_c,
-    occupancy_key_binding, occupancy_stop_signals, render, terminal_key_bytes,
+    ActionDecision, AppState, DeliveryDecision, DeliverySubmission, OCCUPANCY_FIRST_SCREEN_LAYOUT,
+    OccupancyKeyBinding, ParentMessage, RecoverySubmission, RendererEvent, agent_area,
+    is_occupancy_ctrl_c, occupancy_key_binding, occupancy_stop_signals, render, terminal_key_bytes,
     terminal_mouse_bytes, write_osc52_passthrough,
 };
 
@@ -104,7 +104,7 @@ fn read_handshake(reader: &mut BufReader<TcpStream>) -> Result<()> {
 fn main() -> Result<()> {
     if env::args().any(|argument| argument == "--version") {
         println!(
-            "appaloft-workspace-tui {} cloud-agents",
+            "appaloft-workspace-tui {} cloud-agents {OCCUPANCY_FIRST_SCREEN_LAYOUT}",
             env!("CARGO_PKG_VERSION")
         );
         return Ok(());
@@ -120,6 +120,9 @@ fn main() -> Result<()> {
         occupancy_restore = Some(TerminalRestore::enter()?);
         let backend = CrosstermBackend::new(std::io::stdout());
         let mut terminal = Terminal::new(backend).context("create Ratatui terminal")?;
+        terminal
+            .clear()
+            .context("clear occupancy first frame leftover")?;
         let first_frame = AppState::default();
         terminal
             .draw(|frame| render(frame, &first_frame))

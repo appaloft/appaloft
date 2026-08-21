@@ -13,9 +13,9 @@ let occupancyWarmupInterruptInstalled = false;
 export function isErrnoEpipe(error: unknown): boolean {
   return Boolean(
     error &&
-      typeof error === "object" &&
-      "code" in error &&
-      (error as { readonly code?: unknown }).code === "EPIPE",
+    typeof error === "object" &&
+    "code" in error &&
+    (error as { readonly code?: unknown }).code === "EPIPE",
   );
 }
 
@@ -27,12 +27,21 @@ export function writeOccupancyTerminalBytes(write: (text: string) => void, text:
   }
 }
 
-export function occupancyFirstFrameBytes(rows = 24, cols = 80): string {
-  const titleRow = Math.max(1, Math.floor(rows / 2) - 1);
-  const waitRow = titleRow + 1;
-  const titleCol = Math.max(1, Math.floor((cols - OCCUPANCY_FIRST_FRAME_CHROME.length) / 2) + 1);
-  const waitCol = Math.max(1, Math.floor((cols - OCCUPANCY_FIRST_FRAME_TITLE.length) / 2) + 1);
-  return `${OCCUPANCY_ALT_SCREEN}\x1b[?25l\x1b[2J\x1b[H\x1b[${titleRow};${titleCol}H${OCCUPANCY_FIRST_FRAME_CHROME}\x1b[${waitRow};${waitCol}H${OCCUPANCY_FIRST_FRAME_TITLE}`;
+export function occupancyFirstFrameChromeForWidth(cols = 80): string {
+  const max = Math.max(1, Math.floor(cols));
+  if (OCCUPANCY_FIRST_FRAME_CHROME.length <= max) return OCCUPANCY_FIRST_FRAME_CHROME;
+  let fitted = "";
+  for (const word of OCCUPANCY_FIRST_FRAME_CHROME.split(" ")) {
+    const next = fitted ? `${fitted} ${word}` : word;
+    if (next.length > max) break;
+    fitted = next;
+  }
+  return fitted;
+}
+
+export function occupancyFirstFrameBytes(_rows = 24, cols = 80): string {
+  const title = occupancyFirstFrameChromeForWidth(cols);
+  return `${OCCUPANCY_ALT_SCREEN}\x1b[?25l\x1b[2J\x1b[H${title}\r\n${OCCUPANCY_FIRST_FRAME_TITLE}`;
 }
 
 export function occupancyAltScreenWasEntered(): boolean {
