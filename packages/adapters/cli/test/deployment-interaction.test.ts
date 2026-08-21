@@ -328,6 +328,16 @@ describe("CLI quick deploy draft mapping", () => {
         deploymentMethod: "static",
         publishDirectory: "public",
       });
+
+      const emptyRoot = join(parent, "empty-static-method");
+      mkdirSync(emptyRoot, { recursive: true });
+      const methodWithoutFiles = normalizeUrlFirstDeploymentEntry({
+        requestedDeploymentMethod: "static",
+        sourceLocator: emptyRoot,
+      });
+      expect(methodWithoutFiles._unsafeUnwrap()).toEqual({
+        deploymentMethod: "static",
+      });
     } finally {
       process.chdir(previousCwd);
       if (previousPwd === undefined) {

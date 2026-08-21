@@ -401,10 +401,10 @@ export function normalizeUrlFirstDeploymentEntry(input: {
       });
     }
 
+    // Flag or local files only. Do not invent `/` for bare `--method static`;
+    // that would clobber config `runtime.publishDirectory`.
     const detectedPublishDirectory =
-      flaggedPublishDirectory ??
-      detectLocalStaticPublishDirectory(input.sourceLocator ?? ".") ??
-      (explicitMethod === "static" ? "." : undefined);
+      flaggedPublishDirectory ?? detectLocalStaticPublishDirectory(input.sourceLocator ?? ".");
     const deploymentMethod = explicitMethod ?? (detectedPublishDirectory ? "static" : undefined);
     const publishDirectory = detectedPublishDirectory
       ? wireCompatibleStaticPublishDirectory(detectedPublishDirectory)
