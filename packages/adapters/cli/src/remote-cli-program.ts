@@ -158,11 +158,26 @@ function pathParamNames(path: string): string[] {
   return [...path.matchAll(/\{([^}]+)\}/g)].map((match) => match[1] as string);
 }
 
+function payloadWithLoggedInOrganization(
+  payload: Record<string, unknown>,
+  operationKey: string,
+  organizationId: string | undefined,
+): Record<string, unknown> {
+  if (operationKey !== "projects.create" || !organizationId?.trim()) {
+    return payload;
+  }
+  if (typeof payload.organizationId === "string" && payload.organizationId.trim()) {
+    return payload;
+  }
+  return { ...payload, organizationId };
+}
+
 function requestForOperation(input: {
   readonly message: RemoteOperationMessage;
   readonly operation: CliControlPlaneOperation;
+  readonly payload?: Record<string, unknown>;
 }): Result<AppaloftSdkFacadeInput> {
-  const payload = readMessagePayload(input.message);
+  const payload = input.payload ?? readMessagePayload(input.message);
   const pathParams: Record<string, string> = {};
   const pathKeys = new Set(pathParamNames(input.operation.route.path));
 
@@ -353,18 +368,23 @@ async function dispatchRemoteMessage<TResult>(input: {
   readonly kind: "command" | "query";
   readonly message: RemoteOperationMessage;
   readonly profile: CliControlPlaneProfile;
+  readonly organizationId?: string;
   readonly fetch?: AppaloftSdkFetch;
 }): Promise<Result<TResult>> {
-  const payload = readMessagePayload(input.message);
   const catalogEntry = operationForMessage({
     kind: input.kind,
     message: input.message,
-    payload,
+    payload: readMessagePayload(input.message),
   });
   if (catalogEntry.isErr()) {
     return err(catalogEntry.error);
   }
 
+  const payload = payloadWithLoggedInOrganization(
+    readMessagePayload(input.message),
+    catalogEntry.value.key,
+    input.organizationId ?? input.profile.currentOrganization?.organizationId,
+  );
   const operation = findControlPlaneOperation(catalogEntry.value.key);
   if (operation.isErr()) {
     return err(operation.error);
@@ -378,6 +398,7 @@ async function dispatchRemoteMessage<TResult>(input: {
   const request = requestForOperation({
     message: input.message,
     operation: operation.value,
+    payload,
   });
   if (request.isErr()) {
     return err(request.error);
@@ -416,16 +437,33 @@ export function createRemoteCliProgram(input: RemoteCliProgramInput): CliProgram
   const sourceStdinReader = input.readStdinText ?? readProcessStdinText;
   let capturedStdinText: Promise<string> | undefined;
   let handshake: Promise<Result<void>> | undefined;
+  let loggedInOrganizationId = input.profile.currentOrganization?.organizationId;
   const ensureHandshake = async (): Promise<Result<void>> => {
     handshake ??= performControlPlaneHandshake({
       baseUrl: input.profile.baseUrl,
       auth: input.profile.auth,
       checkedAt: input.now?.() ?? new Date().toISOString(),
       ...(input.fetch ? { fetch: input.fetch } : {}),
-    }).then((result) => result.map(() => undefined));
+    }).then((result) => {
+      if (result.isOk() && result.value.currentOrganization?.organizationId) {
+        loggedInOrganizationId = result.value.currentOrganization.organizationId;
+      }
+      return result.map(() => undefined);
+    });
 
     return handshake;
   };
+  const dispatch = <T>(
+    kind: "command" | "query",
+    message: RemoteOperationMessage,
+  ): Promise<Result<T>> =>
+    dispatchRemoteMessage<T>({
+      kind,
+      message,
+      profile: input.profile,
+      ...(loggedInOrganizationId ? { organizationId: loggedInOrganizationId } : {}),
+      ...(input.fetch ? { fetch: input.fetch } : {}),
+    });
   const terminalIO = input.terminalIO ?? {
     stdin: process.stdin,
     stdout: process.stdout,
@@ -449,21 +487,11 @@ export function createRemoteCliProgram(input: RemoteCliProgramInput): CliProgram
           return executeFolderLocalWorkspaceOpen({
             command: message,
             dispatch: (inner) =>
-              dispatchRemoteMessage({
-                kind: inner instanceof AppQuery ? "query" : "command",
-                message: inner,
-                profile: input.profile,
-                ...(input.fetch ? { fetch: input.fetch } : {}),
-              }),
+              dispatch(inner instanceof AppQuery ? "query" : "command", inner),
           }) as Promise<Result<T>>;
         }
 
-        return dispatchRemoteMessage<T>({
-          kind: "command",
-          message: message as RemoteOperationMessage,
-          profile: input.profile,
-          ...(input.fetch ? { fetch: input.fetch } : {}),
-        });
+        return dispatch<T>("command", message as RemoteOperationMessage);
       },
       executeQuery: async <T>(message: AppQuery<T>) => {
         const compatible = await ensureHandshake();
@@ -471,12 +499,7 @@ export function createRemoteCliProgram(input: RemoteCliProgramInput): CliProgram
           return err(compatible.error);
         }
 
-        return dispatchRemoteMessage<T>({
-          kind: "query",
-          message: message as RemoteOperationMessage,
-          profile: input.profile,
-          ...(input.fetch ? { fetch: input.fetch } : {}),
-        });
+        return dispatch<T>("query", message as RemoteOperationMessage);
       },
       terminalSessionGateway: createRemoteTerminalSessionAttachmentGateway({
         baseUrl: input.profile.baseUrl,

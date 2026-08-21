@@ -246,6 +246,103 @@ describe("CLI safe error evidence", () => {
     expect(output).not.toContain("infra_error");
   });
 
+  test("[WS-REMOTE-COMPAT-221] Creating project operationCheckDenied prints operation, reason, and next step", () => {
+    const output = formatHumanCliError({
+      code: "operation_check_denied",
+      category: "user",
+      message: "Operation check denied",
+      retryable: false,
+      details: {
+        operationKey: "projects.create",
+        operationName: "CreateProjectCommand",
+        reason: "missing-organization",
+        checkKey: "cloud.admission",
+        checkKind: "authorization",
+      },
+    } satisfies DomainError);
+
+    expect(output.trim()).not.toBe("Operation check denied");
+    expect(output).toContain("Cloud denied projects.create");
+    expect(output).toContain("cloud.admission");
+    expect(output).toContain("missing-organization");
+    expect(output).toMatch(/login|organization|retry|Cloud/i);
+    expect(output.toLowerCase()).not.toContain("occupancy");
+    expect(output).not.toContain("sbx_");
+  });
+
+  test("[WS-REMOTE-COMPAT-221] deploy . operationCheckDenied is not the bare string", () => {
+    const output = formatHumanCliError({
+      code: "operation_check_denied",
+      category: "user",
+      message: "Operation check denied",
+      retryable: false,
+      details: {
+        operationKey: "deployments.create",
+        operationName: "CreateDeploymentCommand",
+        reason: "entitlement-denied",
+        checkKey: "cloud.entitlement",
+        checkKind: "entitlement",
+      },
+    } satisfies DomainError);
+
+    expect(output.trim()).not.toBe("Operation check denied");
+    expect(output).toContain("Cloud denied deployments.create");
+    expect(output).toContain("entitlement-denied");
+    expect(output).toMatch(/quota|entitlement|retry|Cloud/i);
+    expect(output.toLowerCase()).not.toContain("occupancy");
+    expect(output).not.toContain("sbx_");
+  });
+
+  test("[WS-REMOTE-COMPAT-221] operationCheckDenied with dropped details still names a next step", async () => {
+    const { Effect } = await import("effect");
+    const { printCliError } = await import("../src/runtime.js");
+    const { setWorkspaceTuiScrollbackWriter } = await import("../src/workspace-tui-launch.js");
+    const restored: string[] = [];
+    setWorkspaceTuiScrollbackWriter((text) => {
+      restored.push(text);
+    });
+    let stdout = "";
+    let stderr = "";
+    const originalStdout = process.stdout.write.bind(process.stdout);
+    const originalStderr = process.stderr.write.bind(process.stderr);
+    const originalExitCode = process.exitCode;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      return true;
+    }) as typeof process.stdout.write;
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      stderr += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      return true;
+    }) as typeof process.stderr.write;
+    try {
+      await Effect.runPromise(
+        printCliError({
+          code: "operation_check_denied",
+          category: "user",
+          message: "Operation check denied",
+          retryable: false,
+          details: {
+            phase: "remote-operation-dispatch",
+          },
+        } satisfies DomainError),
+      );
+    } finally {
+      process.stdout.write = originalStdout;
+      process.stderr.write = originalStderr;
+      process.exitCode = originalExitCode ?? 0;
+      setWorkspaceTuiScrollbackWriter(undefined);
+    }
+
+    const printed = `${stdout}${stderr}`;
+    expect(restored.join("")).toContain("\x1b[?1049l");
+    expect(printed.trim()).not.toBe("error: Operation check denied");
+    expect(printed).not.toContain("error: Operation check denied\n");
+    expect(printed).toContain("Cloud denied this operation");
+    expect(printed).toMatch(/login|retry|Cloud/i);
+    expect(printed.toLowerCase()).not.toContain("occupancy");
+    expect(printed).not.toContain("sbx_");
+  });
+
   test("[WS-REMOTE-COMPAT-220] folder.local unstructured validation prints a human next step", async () => {
     const { occupancyCloudCompatError } = await import("../src/remote-code-session.js");
     const error = occupancyCloudCompatError(

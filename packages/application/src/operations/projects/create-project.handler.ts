@@ -20,6 +20,7 @@ export class CreateProjectCommandHandler
     return this.useCase.execute(context, {
       name: command.name,
       ...(command.description ? { description: command.description } : {}),
+      ...(command.organizationId ? { organizationId: command.organizationId } : {}),
     });
   }
 }

@@ -134,6 +134,32 @@ describe("operation guard extension boundary", () => {
     });
   });
 
+  test("[OP-GUARD-007] CreateProjectCommand keeps organizationId on the check request when principal details are dropped", () => {
+    const entry = findOperationCatalogEntryByKey("projects.create");
+    expect(entry).toBeDefined();
+    const command = CreateProjectCommand.create({
+      name: "nux-722327ee-unlinked",
+      organizationId: "org_logged_in",
+    })._unsafeUnwrap();
+    const context = createExecutionContext({
+      entrypoint: "cli",
+      requestId: "req_create_project_org_kept",
+    });
+
+    expect(command.organizationId).toBe("org_logged_in");
+    expect(
+      createOperationCheckRequest({
+        context,
+        entry: entry as NonNullable<typeof entry>,
+        message: command,
+      }),
+    ).toMatchObject({
+      kind: "command",
+      operationKey: "projects.create",
+      organizationId: "org_logged_in",
+    });
+  });
+
   test("[OP-GUARD-003] request shape preserves actor, organization role, and resource refs", () => {
     const entry = findOperationCatalogEntryByKey("projects.archive");
     expect(entry).toBeDefined();

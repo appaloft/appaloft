@@ -475,9 +475,60 @@ function humanFailureLogTail(error: DomainError): string | null {
   return lines.length > 0 ? lines.join("\n") : null;
 }
 
+function humanDetailString(error: DomainError, key: string): string | undefined {
+  const value = error.details?.[key];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function isOperationCheckDenied(error: DomainError): boolean {
+  return (
+    error.code === "operation_check_denied" ||
+    error.message === "Operation check denied" ||
+    error.message === "Operation scope denied"
+  );
+}
+
+function operationCheckDeniedNextStep(error: DomainError): string {
+  const haystack = [
+    humanDetailString(error, "reason"),
+    humanDetailString(error, "checkKey"),
+    humanDetailString(error, "checkKind"),
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(" ")
+    .toLowerCase();
+  if (/login|auth|session|unauthor|credential|token/.test(haystack)) {
+    return "Log in again with appaloft auth login, then retry.";
+  }
+  if (/enroll/.test(haystack)) {
+    return "Enroll this machine or VPS with appaloft server enroll, then retry.";
+  }
+  if (/quota|entitlement|billing|plan/.test(haystack)) {
+    return "This Cloud account is missing quota or entitlement for that operation. Update Cloud or retry after quota resets.";
+  }
+  if (/organiz|tenant/.test(haystack)) {
+    return "Retry after appaloft auth login so this CLI can send your current organization.";
+  }
+  return "Confirm appaloft auth status still shows a login, then retry. If that still fails, this Cloud needs an update that allows this operation.";
+}
+
+function operationCheckDeniedHumanLines(error: DomainError): string[] {
+  const operationKey = humanDetailString(error, "operationKey");
+  const reason = humanDetailString(error, "reason");
+  const checkKey = humanDetailString(error, "checkKey");
+  const checkKind = humanDetailString(error, "checkKind");
+  const whoBits = [checkKind, checkKey].filter((value): value is string => Boolean(value));
+  const denied = operationKey ? `Cloud denied ${operationKey}` : "Cloud denied this operation";
+  const who = whoBits.length > 0 ? `${denied} (${whoBits.join(" / ")})` : denied;
+  const why = reason ? ` because ${reason}` : "";
+  return [`${who}${why}.`, operationCheckDeniedNextStep(error)];
+}
+
 export function formatHumanCliError(error: unknown): string {
   if (isDomainError(error)) {
-    const lines = [error.message.trim()].filter((line) => line.length > 0);
+    const lines = (
+      isOperationCheckDenied(error) ? operationCheckDeniedHumanLines(error) : [error.message.trim()]
+    ).filter((line) => line.length > 0);
     const repositoryIdentity =
       typeof error.details?.repositoryIdentity === "string"
         ? error.details.repositoryIdentity.trim()
