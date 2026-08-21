@@ -77,6 +77,7 @@ function runningStaticSshDeployment(input: {
   cliResolvedSource?: string;
   originalLocator?: string;
   packedSourceArchive?: string;
+  executionPackedSourceArchive?: string;
   emptyMetadata?: boolean;
   resourceName?: string;
 }): Deployment {
@@ -117,6 +118,9 @@ function runningStaticSshDeployment(input: {
           "artifact.source": "static-site",
           "static.publishDirectory": "public",
           ...(input.resourceName ? { "context.resourceName": input.resourceName } : {}),
+          ...(input.executionPackedSourceArchive
+            ? { cliPackedSourceTarGz: input.executionPackedSourceArchive }
+            : {}),
         },
       }),
       target: DeploymentTargetDescriptor.rehydrate({
@@ -536,6 +540,104 @@ describe("SSH source upload", () => {
         expect(
           prepared.deployment.toState().runtimePlan.execution.metadata?.publicUrl,
         ).toBeUndefined();
+      }
+    } finally {
+      process.chdir(previousCwd);
+      rmSync(hostRoot, { recursive: true, force: true });
+      rmSync(runtimeDir, { recursive: true, force: true });
+    }
+  });
+
+  test("[DEP-CREATE-PKG-007][QUICK-DEPLOY-ENTRY-008B] applies the CLI archive from execution.metadata when source.metadata is empty", async () => {
+    const hostRoot = mkdtempSync(join(tmpdir(), "appaloft-nux-04a0bb31-"));
+    const parent = join(hostRoot, "projects");
+    const leaf = "nux-04a0bb31-static";
+    const folder = join(parent, leaf);
+    const macParent = "/Users/nichenqin/projects";
+    const macFolder = `${macParent}/${leaf}`;
+    const runtimeDir = mkdtempSync(join(tmpdir(), "appaloft-runtime-"));
+    const previousCwd = process.cwd();
+    mkdirSync(join(folder, "public"), { recursive: true });
+    writeFileSync(join(folder, "public", "index.html"), "<!doctype html><title>nux</title>");
+    expect(existsSync(join(folder, ".git"))).toBe(false);
+
+    const archiveFile = join(hostRoot, "source.tgz");
+    const packed = spawnSync("tar", ["-czf", archiveFile, "-C", folder, "."], {
+      encoding: "utf8",
+    });
+    expect(packed.status).toBe(0);
+    const packedSourceArchive = readFileSync(archiveFile).toString("base64");
+    expect(packedSourceArchive.length).toBeGreaterThan(0);
+
+    const deployment = runningStaticSshDeployment({
+      deploymentId: "dep_pzxguqavq8jw",
+      locator: macParent,
+      workingDirectory: macParent,
+      displayName: "projects",
+      emptyMetadata: true,
+      executionPackedSourceArchive: packedSourceArchive,
+    });
+    expect(deployment.toState().runtimePlan.source.metadata).toBeUndefined();
+    expect(deployment.toState().runtimePlan.execution.metadata?.cliPackedSourceTarGz).toBe(
+      packedSourceArchive,
+    );
+    const backend = new SshExecutionBackend(
+      runtimeDir,
+      { warn: () => undefined } as never,
+      { record: async () => ({ isErr: () => false }) } as never,
+      { report: () => undefined } as never,
+    );
+
+    try {
+      process.chdir(runtimeDir);
+      expect(process.cwd()).toBe(runtimeDir);
+      expect(existsSync(macParent)).toBe(false);
+      expect(existsSync(macFolder)).toBe(false);
+
+      const prepared = await (
+        backend as never as {
+          prepareSshSource: (
+            context: ExecutionContext,
+            current: Deployment,
+            timeline: unknown[],
+            input: {
+              runtimeDir: string;
+              remoteRoot: string;
+              target: { host: string; publicHost: string; port: string };
+              env: NodeJS.ProcessEnv;
+            },
+          ) => Promise<
+            | { prepared: true }
+            | { prepared: false; deployment: Deployment }
+          >;
+        }
+      ).prepareSshSource(
+        { requestId: "req_pkg_007_execution_archive", entrypoint: "cli" } as ExecutionContext,
+        deployment,
+        [],
+        {
+          runtimeDir,
+          remoteRoot: "/var/lib/appaloft/runtime/ssh-deployments/dep_pzxguqavq8jw",
+          target: { host: "127.0.0.1", publicHost: "127.0.0.1", port: "1" },
+          env: {},
+        },
+      );
+
+      const messages = prepared.prepared
+        ? []
+        : prepared.deployment.toState().timeline.map((entry) => entry.message);
+      expect(
+        messages.some((message) =>
+          message.startsWith("Source working directory does not exist:"),
+        ),
+      ).toBe(false);
+      expect(messages).not.toContain(`Source working directory does not exist: ${macParent}`);
+      expect(messages.some((message) => message.endsWith("/projects"))).toBe(false);
+      expect(existsSync(join(runtimeDir, "cli-source.tgz"))).toBe(true);
+      if (!prepared.prepared) {
+        expect(prepared.deployment.toState().runtimePlan.execution.metadata?.errorCode).not.toBe(
+          "source_workdir_missing",
+        );
       }
     } finally {
       process.chdir(previousCwd);

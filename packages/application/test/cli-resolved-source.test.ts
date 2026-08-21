@@ -3,7 +3,10 @@ import { DisplayNameText, SourceDescriptor, SourceKindValue, SourceLocator } fro
 import {
   CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY,
   CLI_RESOLVED_SOURCE_METADATA_KEY,
+  ORIGINAL_LOCATOR_METADATA_KEY,
+  cliPackedSourceArchiveFromLocalSource,
   explicitCliResolvedSource,
+  localFolderSourceExecutionMetadata,
   retainCliResolvedSource,
   retainLocalFolderSourceFields,
 } from "../src/cli-resolved-source";
@@ -80,5 +83,34 @@ describe("CLI-resolved source", () => {
     expect(retained.locator).toBe(parent);
     expect(retained.metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(packedSourceArchive);
     expect(retained.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]).toBeUndefined();
+  });
+
+  test("[DEP-CREATE-PKG-007] reads the CLI archive from execution.metadata when source.metadata is empty", () => {
+    const packedSourceArchive = "H4sIAAAAAAAAAytKLSpILC4u1gMA";
+    const folder = "/Users/nichenqin/projects/nux-04a0bb31-static";
+
+    expect(
+      cliPackedSourceArchiveFromLocalSource({
+        sourceMetadata: { baseDirectory: "/" },
+        executionMetadata: {
+          "artifact.source": "static-site",
+          [CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]: packedSourceArchive,
+        },
+      }),
+    ).toBe(packedSourceArchive);
+    expect(
+      cliPackedSourceArchiveFromLocalSource({
+        sourceMetadata: { baseDirectory: "/" },
+      }),
+    ).toBeUndefined();
+
+    const stamped = localFolderSourceExecutionMetadata({
+      workingDirectory: folder,
+      packedSourceArchive,
+    });
+    expect(stamped[ORIGINAL_LOCATOR_METADATA_KEY]).toBe(folder);
+    expect(stamped[CLI_RESOLVED_SOURCE_METADATA_KEY]).toBe(folder);
+    expect(stamped[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(packedSourceArchive);
+    expect(stamped[ORIGINAL_LOCATOR_METADATA_KEY]).not.toBe("/Users/nichenqin/projects");
   });
 });

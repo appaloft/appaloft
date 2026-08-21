@@ -8,7 +8,9 @@ import {
   safeLocalSourceBaseDirectory,
 } from "./local-source-workdir";
 import {
-  cliPackedSourceArchiveFromMetadata,
+  cliPackedSourceArchiveFromLocalSource,
+  explicitCliResolvedSource,
+  explicitOriginalLocator,
   createDeploymentProgressEvent,
   deploymentProgressSteps,
   type AppLogger,
@@ -2010,29 +2012,11 @@ export class SshExecutionBackend implements ExecutionBackend {
       };
     }
 
-    const packedSourceArchive = cliPackedSourceArchiveFromMetadata(source.metadata);
     const executionMetadata = state.runtimePlan.execution.metadata;
-    const resourceName =
-      executionMetadata?.["context.resourceName"] ??
-      executionMetadata?.["context.resourceSlug"] ??
-      source.metadata?.["context.resourceName"] ??
-      source.metadata?.["context.resourceSlug"];
-    const localWorkdir = resolveSshPackageLocalWorkdir({
-      locator: source.locator,
-      ...(state.runtimePlan.execution.workingDirectory
-        ? { workingDirectory: state.runtimePlan.execution.workingDirectory }
-        : {}),
-      ...(source.displayName ? { displayName: source.displayName } : {}),
-      ...(source.metadata?.originalLocator
-        ? { originalLocator: source.metadata.originalLocator }
-        : {}),
-      ...(resourceName ? { resourceName } : {}),
-      metadata: {
-        ...(source.metadata ?? {}),
-        ...(resourceName ? { "context.resourceName": resourceName } : {}),
-      },
+    const packedSourceArchive = cliPackedSourceArchiveFromLocalSource({
+      ...(source.metadata ? { sourceMetadata: source.metadata } : {}),
+      ...(executionMetadata ? { executionMetadata } : {}),
     });
-
     let localArchivePath: string | undefined;
     if (packedSourceArchive) {
       try {
@@ -2051,14 +2035,52 @@ export class SshExecutionBackend implements ExecutionBackend {
             errorCode: "cli_packed_source_materialize_failed",
             retryable: false,
             metadata: {
-              localWorkdir,
+              localWorkdir: source.locator,
             },
           }),
         };
       }
     }
 
-    if (!localArchivePath && (isGenericLocalSourceWorkdir(localWorkdir) || !existsSync(localWorkdir))) {
+    const originalLocator =
+      explicitOriginalLocator({
+        ...(source.metadata ? { metadata: source.metadata } : {}),
+      }) ??
+      explicitOriginalLocator({
+        ...(executionMetadata ? { metadata: executionMetadata } : {}),
+      });
+    const cliResolvedSource =
+      explicitCliResolvedSource({
+        ...(source.metadata ? { metadata: source.metadata } : {}),
+      }) ??
+      explicitCliResolvedSource({
+        ...(executionMetadata ? { metadata: executionMetadata } : {}),
+      });
+    const resourceName =
+      executionMetadata?.["context.resourceName"] ??
+      executionMetadata?.["context.resourceSlug"] ??
+      source.metadata?.["context.resourceName"] ??
+      source.metadata?.["context.resourceSlug"];
+    const localWorkdir = resolveSshPackageLocalWorkdir({
+      locator: source.locator,
+      ...(state.runtimePlan.execution.workingDirectory
+        ? { workingDirectory: state.runtimePlan.execution.workingDirectory }
+        : {}),
+      ...(source.displayName ? { displayName: source.displayName } : {}),
+      ...(originalLocator ? { originalLocator } : {}),
+      ...(cliResolvedSource ? { cliResolvedSource } : {}),
+      ...(resourceName ? { resourceName } : {}),
+      metadata: {
+        ...(source.metadata ?? {}),
+        ...(executionMetadata ?? {}),
+        ...(resourceName ? { "context.resourceName": resourceName } : {}),
+      },
+    });
+
+    if (
+      !localArchivePath &&
+      (isGenericLocalSourceWorkdir(localWorkdir) || !existsSync(localWorkdir))
+    ) {
       const message = localSourceWorkdirMissingMessage(localWorkdir);
       timeline.push(phaseLog("package", message, "error"));
       return {
