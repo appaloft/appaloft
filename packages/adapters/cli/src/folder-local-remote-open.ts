@@ -308,7 +308,9 @@ function createFolderLocalRemoteOpenDependencies(input: {
     sandboxes: {
       create: async (_context, value) =>
         createRemoteSandbox(input.dispatch, {
-          providerKey: value.providerKey ?? input.providerKey,
+          ...((value.providerKey ?? input.providerKey)
+            ? { providerKey: value.providerKey ?? input.providerKey }
+            : {}),
           ...(value.name ? { name: value.name } : {}),
           ...(value.directoryName ? { directoryName: value.directoryName } : {}),
           ...(value.repositoryIdentity ? { repositoryIdentity: value.repositoryIdentity } : {}),
