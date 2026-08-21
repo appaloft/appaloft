@@ -12,7 +12,7 @@ searchAliases:
   - "Pi"
   - "workspace"
   - "sandbox"
-  - "occupancy skills"
+  - "cloud agents skills"
   - "home skills"
   - "claude"
   - "codex"
@@ -76,7 +76,7 @@ HOME skill 复制限时且失败软处理，超时不会阻断 occupy。`--serve
 `cargo build --locked --manifest-path apps/workspace-control-tui/Cargo.toml`。
 `--no-attach` 不需要 TUI 二进制。
 attach 之后，可选的 list/detail chrome 不得在 footer 画出
-`conflict at workspace-control-select` 或 `conflict at occupancy-code-bootstrap`。
+`conflict at workspace-control-select` 或残留的 bootstrap 冲突。
 横幅是：
 
 ```text
@@ -98,7 +98,7 @@ MCP 配置、或这两个额外根。
 cookie、`.env` 或编辑器插件二进制。沙箱进程看不到笔记本 HOME；复制只发生在本机 occupy
 已经在写文件的那条 CLI 路径上。
 
-## 在 occupancy 上选择 Claude、Codex 或 Grok <a id="agent-code-vendor" />
+## 在 Cloud Agents 上选择 Claude、Codex 或 Grok <a id="agent-code-vendor" />
 
 `appaloft code` 每次只接受一个 agent 别名：
 
@@ -106,18 +106,18 @@ cookie、`.env` 或编辑器插件二进制。沙箱进程看不到笔记本 HOM
 - 对齐 Railway 的：`--claude`、`--codex`、`--grok`
 
 `--claude`、`--codex`、`--grok` 选择这台笔记本上的厂商凭证，并映射到现有 OpenCode
-occupancy 运行时。`--opencode`、`--pi`、`--omp` 选择对应 occupancy harness。它们不会
+Cloud Agents 运行时。`--opencode`、`--pi`、`--omp` 选择对应 Cloud Agents harness。它们不会
 发明新的运行时。`--harness opencode|pi|omp` 只作兼容。未传别名时，`code` 使用已保存的
-occupancy-agent 偏好，然后跟随这台笔记本已登录或已安装的厂商。
+Cloud Agents 偏好，然后跟随这台笔记本已登录或已安装的厂商。
 
-占用会把该凭证写到 occupancy 磁盘（`HOME=/workspace`），而不是沙箱环境变量：
+占用会把该凭证写到会话磁盘（`HOME=/workspace`），而不是沙箱环境变量：
 
-- Grok：`~/.grok/auth.json` → occupancy `.grok/auth.json`
-- Codex：`~/.codex/auth.json` → occupancy `.codex/auth.json`
+- Grok：`~/.grok/auth.json` → 会话 `.grok/auth.json`
+- Codex：`~/.codex/auth.json` → 会话 `.codex/auth.json`
 - Claude：setup-token（`~/.appaloft/claude-setup-token`、`~/.claude/setup-token`，或把笔记本上的
   `CLAUDE_CODE_OAUTH_TOKEN` 写成文件）。不会复制 Claude 聊天 cookie。
 
-occupancy 仍提供公开 Appaloft skill 和第一方 Appaloft MCP，让远端 agent 可以列出
+会话仍提供公开 Appaloft skill 和第一方 Appaloft MCP，让远端 agent 可以列出
 workspace 并部署。不会复制笔记本 `mcp.json` 密钥。永远不会打印 token 值。
 
 多个已注册 Server 时，用 `--server` 钉死其中一个：
@@ -144,10 +144,10 @@ appaloft workspace open [path|git-remote]
 
 这条路径继续走 `workspaces.open`，定位参数与 `code` 相同：本地路径（可以不是 Git worktree）
 或 git remote（`https://`、`ssh://`、`git@host:path`，以及不是本地目录时的 `owner/repo`）。
-非 git 目录只能通过 git remote 占用当前目录，不会静默复用别人的 occupancy。如果路径是 Git worktree，dirty / detached / 缺
-upstream / remote tip 不一致仍会在远端创建前失败。默认 `appaloft code` 优先选 live occupancy，同名 leftover 不能挡住第一次成功，
+非 git 目录只能通过 git remote 占用当前目录，不会静默复用别人的会话。如果路径是 Git worktree，dirty / detached / 缺
+upstream / remote tip 不一致仍会在远端创建前失败。默认 `appaloft code` 优先选 live 会话，同名 leftover 不能挡住第一次成功，
 也不要求记住 installation id。`--profile` 只是显式撞名时的兜底，不同于全局
-`--control-plane-profile`。`--new` 仍占用 cwd 源，不会静默 resume whoami occupancy。
+`--control-plane-profile`。`--new` 仍占用 cwd 源，不会静默 resume whoami 会话。
 打开失败时会写出缺什么、正在打开哪个仓库，而不会把 Cloud 激活失败伪装成 CLI 成功。
 已注册 BYOS Server 时，`workspace open` 和 `code` 放到那台 Server 上（`--server <id>`
 可钉死），不会再索要 managed 容量。V1 不做隐式 sync 或 patch upload。

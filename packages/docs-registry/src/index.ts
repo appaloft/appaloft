@@ -190,7 +190,7 @@ export const publicDocsHelpTopics = {
   },
   "agent.occupancy-skills": {
     id: "agent.occupancy-skills",
-    title: "Occupancy skill offer",
+    title: "Cloud Agents skill offer",
     description:
       "How occupy writes the public Appaloft skill and may add-only copy allowlisted laptop HOME skill directories into the sandbox.",
     page: {
@@ -204,7 +204,7 @@ export const publicDocsHelpTopics = {
     surfaces: ["cli"],
     anchor: "agent-workspace-occupancy-skills",
     aliases: [
-      "occupancy skills",
+      "cloud agents skills",
       "home skills",
       "claude skills",
       "codex skills",
@@ -219,9 +219,9 @@ export const publicDocsHelpTopics = {
   },
   "agent.code-vendor": {
     id: "agent.code-vendor",
-    title: "Occupancy vendor credential",
+    title: "Cloud Agents vendor credential",
     description:
-      "How appaloft code --opencode, --pi, --omp, --claude, --codex, and --grok select one occupancy agent and write laptop vendor credentials onto occupancy disk.",
+      "How appaloft code --opencode, --pi, --omp, --claude, --codex, and --grok select one agent and write laptop vendor credentials onto the session disk.",
     page: {
       "zh-CN": "agents/workspaces",
       "en-US": "en/agents/workspaces",
@@ -239,7 +239,7 @@ export const publicDocsHelpTopics = {
       "appaloft code --claude",
       "appaloft code --codex",
       "appaloft code --grok",
-      "occupancy credentials",
+      "cloud agents credentials",
       "setup-token",
     ],
     specReferences: [

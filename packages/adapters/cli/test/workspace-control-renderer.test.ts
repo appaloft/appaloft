@@ -287,7 +287,6 @@ describe("Workspace control renderer channel", () => {
     const {
       WORKSPACE_CONTROL_TUI_BINARY_NAME,
       WORKSPACE_CONTROL_TUI_BUILD_COMMAND,
-      WORKSPACE_CONTROL_TUI_TOOLCHAIN_COMMAND,
       ensureWorkspaceControlRendererBinary,
       rustcTooOldForWorkspaceControlTui,
       workspaceControlRendererUnavailableMessage,
@@ -299,7 +298,7 @@ describe("Workspace control renderer channel", () => {
     expect(rustcTooOldForWorkspaceControlTui("rustc 1.85.0")).toBeTrue();
     expect(message).toContain(WORKSPACE_CONTROL_TUI_BINARY_NAME);
     expect(message).toContain(WORKSPACE_CONTROL_TUI_BUILD_COMMAND);
-    expect(message).toContain(WORKSPACE_CONTROL_TUI_TOOLCHAIN_COMMAND);
+    expect(message).toContain("rustup default stable");
     expect(message).toContain("rustc 1.85");
     expect(message).toContain("--no-attach");
     const printed = formatHumanCliError({

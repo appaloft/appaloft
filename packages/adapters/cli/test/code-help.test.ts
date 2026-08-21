@@ -57,6 +57,7 @@ describe("compact code help", () => {
     expect(help).not.toContain("--wizard");
     expect(help).not.toContain("USAGE");
     expect(help).not.toContain("$ code");
+    expect(help).not.toMatch(/occupancy/iu);
   });
 
   test("[WS-REMOTE-HELP-217] tryHandleCodeHelp writes compact stdout and skips Effect", () => {

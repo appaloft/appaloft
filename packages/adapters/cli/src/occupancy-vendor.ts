@@ -121,7 +121,7 @@ export function occupancyVendorCredentialMissingError(
   const label = OCCUPANCY_VENDOR_LABEL[vendor];
   const guidance =
     vendor === "claude"
-      ? "Run claude setup-token on this laptop, save it under APPALOFT_HOME/claude-setup-token or ~/.claude/setup-token, then retry appaloft code --claude. Occupancy does not copy the Claude chat cookie."
+      ? "Run claude setup-token on this laptop, save it under APPALOFT_HOME/claude-setup-token or ~/.claude/setup-token, then retry appaloft code --claude. This command does not copy the Claude chat cookie."
       : vendor === "codex"
         ? "Sign in so ~/.codex/auth.json exists, then retry appaloft code --codex."
         : "Sign in so ~/.grok/auth.json exists, then retry appaloft code --grok.";

@@ -58,13 +58,15 @@ import {
   workspaceRemoteLoginRequiredError,
 } from "../cli-session-login.js";
 import { CODE_OPTION_DESCRIPTIONS } from "../code-help.js";
-import { isFolderOccupancyIdentity } from "../folder-project-link.js";
+import { folderDirectoryName, isFolderOccupancyIdentity } from "../folder-project-link.js";
 import {
   ensureFolderProjectOnboarding,
+  folderOnboardingCancelledError,
   folderOnboardingCwdFromLocator,
+  isFolderOnboardingCancelled,
   peekThisFolderGitIdentity,
+  withImmediateSigintExit,
 } from "../folder-project-onboarding.js";
-import { effectCliInteraction } from "../interaction.js";
 import { resolveRemoteGitWorkspaceRef } from "../local-git-workspace-context.js";
 import {
   launchScratchAgent,
@@ -339,6 +341,9 @@ function isFolderOccupancyPartialRecovery(
 }
 
 function workspaceCliError(error: unknown, phase: string): DomainError {
+  if (isFolderOnboardingCancelled(error)) {
+    return folderOnboardingCancelledError();
+  }
   if (
     typeof error === "object" &&
     error !== null &&
@@ -700,6 +705,7 @@ export const workspaceCodeCommand = EffectCommand.make(
     yes,
   }) =>
     Effect.gen(function* () {
+      void yes;
       const cli = yield* CliRuntime;
       const runtime = yield* Effect.runtime<CliRuntime | Prompt.Prompt.Environment>();
       if (local) {
@@ -788,14 +794,17 @@ export const workspaceCodeCommand = EffectCommand.make(
                 ensureFolderOnboarding: async () => {
                   const loggedIn = await hasCliControlPlaneLogin(cli.environment ?? process.env);
                   if (!loggedIn) throw workspaceRemoteLoginRequiredError();
-                  return Runtime.runPromise(runtime)(
-                    ensureFolderProjectOnboarding({
-                      cwd: folderOnboardingCwdFromLocator(path),
-                      yes,
-                      interaction: effectCliInteraction,
-                      peekGitIdentity: peekThisFolderGitIdentity,
-                      ...(cli.environment ? { env: cli.environment } : {}),
-                    }),
+                  return withImmediateSigintExit(() =>
+                    Runtime.runPromise(runtime)(
+                      ensureFolderProjectOnboarding({
+                        cwd: folderOnboardingCwdFromLocator(path),
+                        yes: true,
+                        promptPolicy: "auto-create",
+                        ...(useOccupancyTui ? { writeStatus: () => undefined } : {}),
+                        peekGitIdentity: peekThisFolderGitIdentity,
+                        ...(cli.environment ? { env: cli.environment } : {}),
+                      }),
+                    ),
                   );
                 },
                 listServers: async () => {
@@ -919,6 +928,7 @@ export const workspaceCodeCommand = EffectCommand.make(
       };
       const occupancyTui = cli.workspaceControlPresentation;
       if (useOccupancyTui && occupancyTui) {
+        const occupancyFolderName = folderDirectoryName(folderOnboardingCwdFromLocator(path));
         yield* Effect.tryPromise({
           try: () =>
             occupancyTui.start({
@@ -930,12 +940,15 @@ export const workspaceCodeCommand = EffectCommand.make(
               ...(cli.openNativeWorkspaceTerminal
                 ? { openNativeWorkspaceTerminal: cli.openNativeWorkspaceTerminal }
                 : {}),
+              occupancyChrome: { project: occupancyFolderName },
               occupyBootstrap: async ({ reportProgress: tuiProgress }) => {
-                const occupied = await occupyRemote(
-                  (message) => {
-                    void tuiProgress(message);
-                  },
-                  { announcePin: false },
+                const occupied = await withImmediateSigintExit(() =>
+                  occupyRemote(
+                    (message) => {
+                      void tuiProgress(message);
+                    },
+                    { announcePin: false },
+                  ),
                 );
                 await settleWithTimeout(
                   offerOccupancyConnectingMaterials({
@@ -1151,7 +1164,9 @@ export const workspaceCodeCommand = EffectCommand.make(
                   : process.platform === "win32"
                     ? ["cmd", "/c", "start", "", url]
                     : ["xdg-open", url];
-              const child = spawn(openCommand[0]!, openCommand.slice(1), {
+              const [openBin, ...openArgv] = openCommand;
+              if (!openBin) return;
+              const child = spawn(openBin, openArgv, {
                 shell: false,
                 stdio: "ignore",
               });
