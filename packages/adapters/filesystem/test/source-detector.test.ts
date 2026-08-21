@@ -355,6 +355,55 @@ describe("FileSystemSourceDetector", () => {
     });
   });
 
+  test("[DEP-CREATE-PKG-007] keeps originalLocator and a hyphenated displayName when locator is already the parent", async () => {
+    ensureReflectMetadata();
+    const [{ createExecutionContext }, { FileSystemSourceDetector }] = await Promise.all([
+      import("@appaloft/application"),
+      import("../src"),
+    ]);
+    const parent = "/Users/nichenqin/projects";
+    const folder = `${parent}/nux-67e3a052-static`;
+
+    const result = await new FileSystemSourceDetector().detect(
+      createExecutionContext({ entrypoint: "cli", requestId: "req_original_locator_parent" }),
+      parent,
+      {
+        allowUnrecognizedRoot: true,
+        originalLocator: folder,
+        displayName: "nux-67e3a052-static",
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().source.locator).toBe(folder);
+    expect(result._unsafeUnwrap().source.locator).not.toBe(parent);
+    expect(result._unsafeUnwrap().source.displayName).toBe("nux-67e3a052-static");
+    expect(result._unsafeUnwrap().source.displayName).not.toBe("projects");
+    expect(result._unsafeUnwrap().source.metadata?.originalLocator).toBe(folder);
+  });
+
+  test("[DEP-CREATE-PKG-007] does not clobber a hyphenated displayName with basename(parent)", async () => {
+    ensureReflectMetadata();
+    const [{ createExecutionContext }, { FileSystemSourceDetector }] = await Promise.all([
+      import("@appaloft/application"),
+      import("../src"),
+    ]);
+    const parent = "/Users/nichenqin/projects";
+
+    const result = await new FileSystemSourceDetector().detect(
+      createExecutionContext({ entrypoint: "cli", requestId: "req_keep_hyphenated_name" }),
+      parent,
+      {
+        allowUnrecognizedRoot: true,
+        displayName: "nux-67e3a052-static",
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().source.displayName).toBe("nux-67e3a052-static");
+    expect(result._unsafeUnwrap().source.displayName).not.toBe("projects");
+  });
+
   test("[DEP-CREATE-PKG-007] persists the CLI-resolved source when locator is already the parent", async () => {
     ensureReflectMetadata();
     const [

@@ -241,6 +241,7 @@ export function summarizeSshCommandFailureOutput(input: {
 
 export {
   normalizeLocalSourceWorkingDirectory,
+  recoverLocalSourceFolderFromCwd,
   resolveLocalWorkspaceWorkdir,
   resolveSshPackageLocalWorkdir,
 } from "./local-source-workdir";
@@ -1986,6 +1987,9 @@ export class SshExecutionBackend implements ExecutionBackend {
         ? { workingDirectory: state.runtimePlan.execution.workingDirectory }
         : {}),
       ...(source.displayName ? { displayName: source.displayName } : {}),
+      ...(source.metadata?.originalLocator
+        ? { originalLocator: source.metadata.originalLocator }
+        : {}),
       ...(source.metadata ? { metadata: source.metadata } : {}),
     });
 

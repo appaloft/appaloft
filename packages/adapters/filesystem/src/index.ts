@@ -23,7 +23,9 @@ import { inflateRawSync } from "node:zlib";
 import {
   type ActivateStaticArtifactRouteInput,
   appaloftTraceAttributes,
+  isSpecificLocalSourceLeaf,
   withCliResolvedSourceMetadata,
+  withOriginalLocatorMetadata,
   createAdapterSpanName,
   type DeploymentConfigReader,
   type DeploymentConfigSnapshot,
@@ -1525,19 +1527,40 @@ export class FileSystemSourceDetector implements SourceDetector {
 
           const resolvedLocator =
             locator.startsWith(".") || locator.startsWith("/") ? absolutePath : locator;
+          const originalLocator = input?.originalLocator?.trim() || undefined;
+          const incomingDisplayName = input?.displayName?.trim();
+          const originalLeaf = originalLocator ? basename(originalLocator) : undefined;
+          const locatorLeaf = basename(locator) || basename(absolutePath);
+          const displayName = isSpecificLocalSourceLeaf(incomingDisplayName)
+            ? incomingDisplayName
+            : isSpecificLocalSourceLeaf(originalLeaf)
+              ? originalLeaf
+              : isSpecificLocalSourceLeaf(locatorLeaf)
+                ? locatorLeaf
+                : (incomingDisplayName ?? locatorLeaf);
+          const storedLocator =
+            originalLocator &&
+            isSpecificLocalSourceLeaf(basename(originalLocator)) &&
+            !isSpecificLocalSourceLeaf(basename(resolvedLocator))
+              ? originalLocator
+              : resolvedLocator;
           const metadata = withCliResolvedSourceMetadata(
-            workspace
-              ? {
-                  baseDirectory: workspace.evidence.selectedRoot,
-                  detectedSourceRoot: workspace.evidence.selectedRoot,
-                }
-              : undefined,
+            withOriginalLocatorMetadata(
+              workspace
+                ? {
+                    baseDirectory: workspace.evidence.selectedRoot,
+                    detectedSourceRoot: workspace.evidence.selectedRoot,
+                  }
+                : undefined,
+              originalLocator ??
+                (isSpecificLocalSourceLeaf(basename(storedLocator)) ? storedLocator : undefined),
+            ),
             input?.cliResolvedSource,
           );
           const source = SourceDescriptor.rehydrate({
             kind: SourceKindValue.rehydrate(resolved.kind),
-            locator: SourceLocator.rehydrate(resolvedLocator),
-            displayName: DisplayNameText.rehydrate(basename(locator) || basename(absolutePath)),
+            locator: SourceLocator.rehydrate(storedLocator),
+            displayName: DisplayNameText.rehydrate(displayName),
             ...(resolved.inspection ? { inspection: resolved.inspection } : {}),
             ...(metadata ? { metadata } : {}),
           });

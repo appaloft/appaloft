@@ -13,7 +13,11 @@ import {
 } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
-import { explicitCliResolvedSource, retainCliResolvedSource } from "../../cli-resolved-source";
+import {
+  explicitCliResolvedSource,
+  explicitOriginalLocator,
+  retainLocalFolderSourceFields,
+} from "../../cli-resolved-source";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import {
   type ControlPlaneSecretProtector,
@@ -751,18 +755,28 @@ export class DeploymentPlanQueryService {
         const cliResolvedSource = explicitCliResolvedSource({
           ...(resourceSource.source.metadata ? { metadata: resourceSource.source.metadata } : {}),
         });
+        const originalLocator = explicitOriginalLocator({
+          ...(resourceSource.source.metadata ? { metadata: resourceSource.source.metadata } : {}),
+        });
         detected = yield* await sourceDetector.detect(context, resourceSource.source.locator, {
           ...(resourceSource.source.metadata?.baseDirectory
             ? { baseDirectory: resourceSource.source.metadata.baseDirectory }
             : {}),
           ...(cliResolvedSource ? { cliResolvedSource } : {}),
+          ...(originalLocator ? { originalLocator } : {}),
+          ...(resourceSource.source.displayName
+            ? { displayName: resourceSource.source.displayName }
+            : {}),
           ...(resource.toState().runtimeProfile?.strategy.value !== "auto"
             ? { allowUnrecognizedRoot: true }
             : {}),
         });
         detected = {
           ...detected,
-          source: retainCliResolvedSource(detected.source, cliResolvedSource),
+          source: retainLocalFolderSourceFields(detected.source, {
+            ...(cliResolvedSource ? { cliResolvedSource } : {}),
+            ...(originalLocator ? { originalLocator } : {}),
+          }),
         };
       }
 

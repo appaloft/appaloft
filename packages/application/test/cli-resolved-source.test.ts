@@ -4,6 +4,7 @@ import {
   CLI_RESOLVED_SOURCE_METADATA_KEY,
   explicitCliResolvedSource,
   retainCliResolvedSource,
+  retainLocalFolderSourceFields,
 } from "../src/cli-resolved-source";
 
 describe("CLI-resolved source", () => {
@@ -40,10 +41,27 @@ describe("CLI-resolved source", () => {
     });
 
     const retained = retainCliResolvedSource(source, folder);
-    expect(retained.locator).toBe(parent);
+    expect(retained.locator).toBe(folder);
+    expect(retained.metadata?.originalLocator).toBe(folder);
     expect(retained.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]).toBe(folder);
     expect(
       retainCliResolvedSource(source, undefined).metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY],
     ).toBe(undefined);
+  });
+
+  test("[DEP-CREATE-PKG-007] restores locator from originalLocator without cliResolvedSource", () => {
+    const parent = "/Users/nichenqin/projects";
+    const folder = `${parent}/nux-67e3a052-static`;
+    const source = SourceDescriptor.rehydrate({
+      kind: SourceKindValue.rehydrate("local-folder"),
+      locator: SourceLocator.rehydrate(parent),
+      displayName: DisplayNameText.rehydrate("workspace"),
+      metadata: { baseDirectory: "/" },
+    });
+
+    const retained = retainLocalFolderSourceFields(source, { originalLocator: folder });
+    expect(retained.locator).toBe(folder);
+    expect(retained.metadata?.originalLocator).toBe(folder);
+    expect(retained.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]).toBeUndefined();
   });
 });

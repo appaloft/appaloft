@@ -564,6 +564,7 @@ export function sourceBindingForDeploymentInput(
     ...(profile.helmChart ? { helmChart: profile.helmChart } : {}),
     ...(!isRemoteOrImageSource(sourceLocator) && isLocalFilesystemSourceKind(kind)
       ? {
+          originalLocator: sourceLocator,
           metadata: {
             [CLI_RESOLVED_SOURCE_METADATA_KEY]: sourceLocator,
           },
@@ -1823,8 +1824,12 @@ export function sourceProfilesMatch(input: {
     ...(input.current.baseDirectory ? { baseDirectory: input.current.baseDirectory } : {}),
     ...(input.current.helmChart ? { helmChart: input.current.helmChart } : {}),
     ...(isLocalFilesystemSourceKind(input.desired.kind) &&
-    input.current.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]
-      ? { cliResolvedSource: input.current.metadata[CLI_RESOLVED_SOURCE_METADATA_KEY] }
+    (input.current.originalLocator || input.current.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY])
+      ? {
+          originalLocator:
+            input.current.originalLocator ??
+            input.current.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY],
+        }
       : {}),
   };
   const desired = {
@@ -1836,8 +1841,12 @@ export function sourceProfilesMatch(input: {
     ...(input.desired.baseDirectory ? { baseDirectory: input.desired.baseDirectory } : {}),
     ...(input.desired.helmChart ? { helmChart: input.desired.helmChart } : {}),
     ...(isLocalFilesystemSourceKind(input.desired.kind) &&
-    input.desired.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]
-      ? { cliResolvedSource: input.desired.metadata[CLI_RESOLVED_SOURCE_METADATA_KEY] }
+    (input.desired.originalLocator || input.desired.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY])
+      ? {
+          originalLocator:
+            input.desired.originalLocator ??
+            input.desired.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY],
+        }
       : {}),
   };
 
