@@ -6,8 +6,8 @@
   <p><code>/ˌæp əˈlɔːft/</code></p>
   <h3>Open-source Railway alternative.</h3>
   <p>
-    Two doors: <strong>Deploy</strong> a folder to a URL (Git optional), or
-    <strong>Agent</strong> — teach the coding agent you already use (skill + MCP).
+    Two doors: <strong>Deploy</strong> a folder to a live URL (Git optional), or
+    <strong>Agent</strong> — teach Cursor, OpenCode, and the other detected hosts you already use.
   </p>
 </div>
 
@@ -16,16 +16,10 @@ appaloft deploy .
 ```
 
 ```bash
-appaloft login
 appaloft setup agent
 ```
 
-```bash
-npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
-npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
-npx @appaloft/mcp
-appaloft mcp stdio
-```
+If you are not logged in, you will be asked to log in.
 
 <div align="center">
   <p>
@@ -65,17 +59,18 @@ brew install appaloft/tap/appaloft
 Or download a platform archive from
 [GitHub Releases](https://github.com/appaloft/appaloft/releases/latest).
 
-Login and a registered server are one-line prerequisites when you need Cloud or BYOS — not the
-story: `appaloft login` (add `--url` for a self-hosted plane) and, if you bring your own machine,
-`appaloft server register`.
+If you bring your own machine, register it with `appaloft server register`. For a self-hosted
+plane, pass `--url` when you log in.
 
 ## Deploy
 
-From any project folder. Git is optional. Success is a live URL for this app.
+From any project folder. Git is optional. A folder is enough. Success is a live URL for this app.
 
 ```bash
 appaloft deploy .
 ```
+
+If the folder has `public/index.html`, `appaloft deploy . --yes` auto-selects static.
 
 Optional one-file config:
 
@@ -115,16 +110,18 @@ CLI is installed. It is optional — not the first command.
 
 ## Agent
 
-Teach the coding agent you already use. After `appaloft login`, `appaloft setup agent` copies
-byte-identical skills and writes token-free Local MCP into detected hosts. Universal is skills
-only (`~/.agents`). Cursor and Claude Code get skill plus MCP when `~/.cursor` or `~/.claude`
-exist. OpenCode is listed but not default-checked. The MCP launcher reuses the Appaloft login
-profile (`appaloft mcp remote-stdio --profile <active>`). Tokens stay out of editor config.
+`appaloft setup agent` teaches Cursor, OpenCode, and the other detected hosts you already have.
+That is the Agent door.
 
 ```bash
-appaloft login
 appaloft setup agent
 ```
+
+It copies byte-identical skills and writes token-free Local MCP into detected hosts. Universal is
+skills only (`~/.agents`). Cursor and Claude Code get skill plus MCP when `~/.cursor` or `~/.claude`
+exist. OpenCode is listed but not default-checked; pass `--agent opencode` or use a sibling
+install. The MCP launcher reuses the Appaloft login profile
+(`appaloft mcp remote-stdio --profile <active>`). Tokens stay out of editor config.
 
 ```bash
 # Explicit MCP siblings (OpenCode is explicit)
@@ -133,7 +130,8 @@ appaloft auth mcp claude-code install
 appaloft auth mcp opencode install
 ```
 
-`npx skills add` still only copies the skill. It does not install the CLI or write MCP config.
+Skill-only and MCP launcher notes (secondary): `npx skills add` only copies the skill. It does not
+install the CLI or write MCP config.
 
 ```bash
 npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
@@ -151,13 +149,6 @@ Verify a skill-manager copy with `npx skills list --global --agent <agent>`, the
 agent session. Ask it to deploy or operate through Appaloft. The skill tells the agent to use
 Appaloft operations instead of calling Docker, SSH, databases, or cloud providers directly.
 This is the public-repo CLI Agent door — not a Cloud marketing-site claim.
-
-## Occupancy
-
-`appaloft code` occupies your Sandbox. `appaloft code --local` is this-machine scratch. Analogous
-to Railway `ca` — not the Agent door. See the in-repo CLI reference
-([cli-entrypoints.md](./skills/appaloft/references/cli-entrypoints.md)); the live docs.appaloft.com
-CLI page may not list these yet.
 
 ## Self-host (optional)
 
@@ -183,7 +174,7 @@ The installer verifies or installs Docker Engine and the Compose plugin, writes 
 | Homebrew CLI | `brew install appaloft/tap/appaloft` |
 | GitHub Release | Download platform archives from [latest releases](https://github.com/appaloft/appaloft/releases/latest). |
 | MCP launcher | `npx @appaloft/mcp` |
-| Local Agent door | `appaloft login && appaloft setup agent` |
+| Local Agent door | `appaloft setup agent` |
 | AI skill | `npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes` |
 | Self-hosted server | `curl -fsSL https://appaloft.com/install.sh \| sudo sh` |
 | Self-hosted with PGlite | `curl -fsSL https://appaloft.com/install.sh \| sudo sh -s -- --database pglite` |
