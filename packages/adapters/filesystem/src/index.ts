@@ -1531,13 +1531,14 @@ export class FileSystemSourceDetector implements SourceDetector {
           const incomingDisplayName = input?.displayName?.trim();
           const originalLeaf = originalLocator ? basename(originalLocator) : undefined;
           const locatorLeaf = basename(locator) || basename(absolutePath);
-          const displayName = isSpecificLocalSourceLeaf(incomingDisplayName)
-            ? incomingDisplayName
-            : isSpecificLocalSourceLeaf(originalLeaf)
-              ? originalLeaf
-              : isSpecificLocalSourceLeaf(locatorLeaf)
-                ? locatorLeaf
-                : (incomingDisplayName ?? locatorLeaf);
+          const displayName =
+            (incomingDisplayName && isSpecificLocalSourceLeaf(incomingDisplayName)
+              ? incomingDisplayName
+              : undefined) ??
+            (originalLeaf && isSpecificLocalSourceLeaf(originalLeaf) ? originalLeaf : undefined) ??
+            (isSpecificLocalSourceLeaf(locatorLeaf) ? locatorLeaf : undefined) ??
+            incomingDisplayName ??
+            locatorLeaf;
           const storedLocator =
             originalLocator &&
             isSpecificLocalSourceLeaf(basename(originalLocator)) &&
