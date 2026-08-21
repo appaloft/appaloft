@@ -355,7 +355,7 @@ Accepted target model:
   `Resource`, `DeploymentTarget`, terminal session, or AI-agent orchestration record.
 - `Sandbox` persists a display name (`SandboxDisplayName`) beside `sandboxId`. The id stays
   `sbx_*`. User-facing list, inquire, details, help, and errors show the display name.
-  Linked folder or git opens prefer the directory name or `repo@short-sha`; unlinked
+  Linked or cwd opens prefer the directory name or `repo@short-sha`; unlinked
   opens generate a memorable kebab name (Appaloft's generator is adjective-noun).
   See [ADR-124](./decisions/ADR-124-sandbox-display-name.md).
 - `SandboxTemplate` owns reusable admitted startup policy; `SandboxSnapshot` owns reusable captured

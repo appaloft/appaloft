@@ -38,7 +38,7 @@ credentials or resolved secret values.
 - optional absolute TTL;
 - validated network policy;
 - optional display-name hints: `name`, `directoryName`, `repositoryIdentity`, and
-  `commitSha`. These persist a Railway-like display name and never replace `sandboxId`.
+  `commitSha`. These persist a readable display name and never replace `sandboxId`.
 
 Provider-specific fields, raw Docker/Kubernetes/VM settings, SSH credentials and tenant ids are not
 accepted through the public command.

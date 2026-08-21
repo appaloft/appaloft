@@ -84,10 +84,11 @@ Remote · <project> · <repo@sha> · <server> · my sandbox · <name>
 ```
 
 <a id="agent-workspace-display-name" />
-`<name>` 是可读的 Workspace 名，不是 `sbx_…`。已关联的文件夹用目录名；git 仓库用
-`repo@short-sha`；未关联的打开会生成 kebab 名，例如 `resonant-silence`。再次打开
-仍是同一个名字。Cloud Agents 列表和详情用这个名字。JSON / `--json` 仍可带
-`workspaceId`。`workspace show|pause|resume|terminate` 接受这个展示名。
+`<name>` 是可读的 Workspace 名，不是 `sbx_…`。已关联或当前文件夹用目录名；git
+仓库用 `repo@short-sha`；未关联或未命名的打开会得到 Appaloft 生成的 kebab 名，
+例如 `resonant-silence`。再次打开仍是同一个名字。Cloud Agents 列表和详情用这个
+名字。JSON / `--json` 仍可带 `workspaceId`。`workspace show|pause|resume|terminate`
+接受这个展示名。
 
 占用成功后，CLI 会把公开的 Appaloft skill 写入 `/workspace/skills/appaloft` 和
 `/workspace/.agents/skills/appaloft`。如果这台笔记本 HOME 里有匹配的 skill 目录，占用还会
