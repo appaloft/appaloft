@@ -134,6 +134,7 @@ import {
   MemoryProjectRepository,
   MemoryResourceDependencyBindingReadModel,
   MemoryResourceDependencyBindingRepository,
+  MemoryResourceReadModel,
   MemoryResourceRepository,
   MemoryServerRepository,
   NoopLogger,
@@ -177,8 +178,10 @@ const unavailableSecretProtector: ControlPlaneSecretProtector = {
 
 import {
   CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY,
+  CLI_RESOLVED_SOURCE_METADATA_KEY,
   ORIGINAL_LOCATOR_METADATA_KEY,
 } from "../src/cli-resolved-source";
+import { CreateResourceCommand } from "../src/messages";
 import { DeploymentTimelineProgressRecorder } from "../src/deployment-progress-recorder";
 import {
   type DurableWorkClaimInput,
@@ -240,6 +243,7 @@ import {
   BindResourceDependencyUseCase,
   CreateDependencyResourceBackupUseCase,
   CreateDeploymentUseCase,
+  CreateResourceUseCase,
   DefaultAccessDomainRuntimePlanResolver,
   DeploymentContextBootstrapService,
   DeploymentContextDefaultsFactory,
@@ -5205,6 +5209,117 @@ describe("CreateDeploymentUseCase", () => {
     expect(
       deployment?.toState().runtimePlan.toState().source.toState().locator,
     ).not.toBeUndefined();
+  });
+
+  test("[DEP-CREATE-PKG-007] create-resource persist still gives plan the hyphenated leaf and archive", async () => {
+    const parent = "/Users/nichenqin/projects";
+    const folder = `${parent}/nux-ae9c38f3-static`;
+    const packedSourceArchive = "H4sIAAAAAAAAAytKLSpILC4u1gMA";
+    const {
+      clock,
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      destinations,
+      deployments,
+      environments,
+      eventBus,
+      logger,
+      projects,
+      repositoryContext,
+      resources,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+      executionBackend: new FailingStaticPackageExecutionBackend(),
+    });
+    const command = CreateResourceCommand.create({
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      destinationId: "dst_demo",
+      name: "nux-ae9c38f3-static",
+      kind: "static-site",
+      source: {
+        kind: "local-folder",
+        locator: folder,
+        displayName: "nux-ae9c38f3-static",
+        originalLocator: folder,
+        metadata: {
+          [CLI_RESOLVED_SOURCE_METADATA_KEY]: folder,
+          [CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]: packedSourceArchive,
+        },
+      },
+      runtimeProfile: {
+        strategy: "static",
+        publishDirectory: "public",
+      },
+      networkProfile: {
+        internalPort: 80,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+    });
+    expect(command.isOk()).toBe(true);
+    const remotePayload = Object.fromEntries(
+      Object.entries(command._unsafeUnwrap() as unknown as Record<string, unknown>).filter(
+        ([, value]) => value !== undefined,
+      ),
+    );
+    const reparsed = CreateResourceCommand.create(remotePayload as never);
+    expect(reparsed.isOk()).toBe(true);
+    const created = await new CreateResourceUseCase(
+      projects,
+      environments,
+      destinations,
+      resources,
+      clock,
+      new SequenceIdGenerator(),
+      eventBus,
+      logger,
+      undefined,
+      new MemoryResourceReadModel(resources),
+    ).execute(context, {
+      projectId: reparsed._unsafeUnwrap().projectId,
+      environmentId: reparsed._unsafeUnwrap().environmentId,
+      name: reparsed._unsafeUnwrap().name,
+      kind: reparsed._unsafeUnwrap().kind,
+      ...(reparsed._unsafeUnwrap().destinationId
+        ? { destinationId: reparsed._unsafeUnwrap().destinationId }
+        : {}),
+      ...(reparsed._unsafeUnwrap().source ? { source: reparsed._unsafeUnwrap().source } : {}),
+      ...(reparsed._unsafeUnwrap().runtimeProfile
+        ? { runtimeProfile: reparsed._unsafeUnwrap().runtimeProfile }
+        : {}),
+      ...(reparsed._unsafeUnwrap().networkProfile
+        ? { networkProfile: reparsed._unsafeUnwrap().networkProfile }
+        : {}),
+    });
+    expect(created.isOk()).toBe(true);
+    const resourceId = created._unsafeUnwrap().id;
+    const persisted = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate(resourceId)),
+    );
+    const binding = persisted?.toState().sourceBinding;
+    expect(binding?.locator.value).toBe(folder);
+    expect(binding?.originalLocator?.value).toBe(folder);
+    expect(binding?.metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(packedSourceArchive);
+    expect(binding?.locator.value).not.toBe(parent);
+
+    const result = await createDeploymentUseCase.execute(context, {
+      ...createDeploymentInput,
+      resourceId,
+    });
+    expect(result.isOk()).toBe(true);
+    const deployment = await deployments.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate(result._unsafeUnwrap().id)),
+    );
+    const runtimePlan = deployment?.toState().runtimePlan.toState();
+    const executionMetadata = runtimePlan?.execution.toState().metadata;
+    expect(executionMetadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(packedSourceArchive);
+    expect(executionMetadata?.[ORIGINAL_LOCATOR_METADATA_KEY]).toBe(folder);
+    expect(executionMetadata?.[ORIGINAL_LOCATOR_METADATA_KEY]).not.toBe(parent);
+    expect(runtimePlan?.source.toState().locator).toBe(folder);
+    expect(runtimePlan?.source.toState().locator).not.toBe(parent);
   });
 
   test.skip("bootstraps a default local deployment context when ids are omitted", async () => {

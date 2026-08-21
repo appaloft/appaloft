@@ -222,7 +222,9 @@ by CLI helper and `deploy` command tests that assert the `resources.create` payl
 shape uses `/` rather than `.`. `QUICK-DEPLOY-ENTRY-008B` is covered by the same CLI helper and
 `deploy` command tests plus runtime-plan auto-method coverage: a folder with `public/index.html`
 becomes static without `--method`, defaults `--publish-dir` to `public`, and keeps the real source
-folder name. Local Docker static smoke coverage exists under
+folder name. Persist / rehydrate / plan after `resources.create` / `configureSource` must still
+carry the hyphenated leaf or `cliPackedSourceTarGz` on the command the worker consumes;
+create-resource send-fields unit tests alone are not a pass. Local Docker static smoke coverage exists under
 `apps/shell/test/e2e/quick-deploy-static-docker.workflow.e2e.ts`, and the generic-SSH
 Docker static path is covered by the GitHub Actions secret-gated and local explicit SSH e2e
 harness.

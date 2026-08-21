@@ -249,6 +249,60 @@ function restoreLocalFolderLocator(locator: string, originalLocator: string | un
   return resolved;
 }
 
+export function localFolderSourceFieldsFromResourceBinding(input: {
+  locator?: string;
+  originalLocator?: string;
+  metadata?: Record<string, string>;
+}): {
+  originalLocator?: string;
+  cliResolvedSource?: string;
+  packedSourceArchive?: string;
+} {
+  const originalLocator =
+    explicitOriginalLocator({
+      ...(input.originalLocator ? { originalLocator: input.originalLocator } : {}),
+      ...(input.metadata ? { metadata: input.metadata } : {}),
+    }) ??
+    (isSpecificLocalSourceLeaf(pathBasename(input.locator ?? ""))
+      ? input.locator?.trim()
+      : undefined);
+  const cliResolvedSource = explicitCliResolvedSource({
+    ...(input.metadata ? { metadata: input.metadata } : {}),
+  });
+  const packedSourceArchive = explicitCliPackedSourceArchive({
+    ...(input.metadata ? { metadata: input.metadata } : {}),
+  });
+
+  return {
+    ...(originalLocator ? { originalLocator } : {}),
+    ...(cliResolvedSource ? { cliResolvedSource } : {}),
+    ...(packedSourceArchive ? { packedSourceArchive } : {}),
+  };
+}
+
+/**
+ * Live create-resource persist keeps leaf / archive on the resource
+ * binding (first-class originalLocator plus metadata). Plan detect must
+ * read those fields from the binding, not only from a SourceDescriptor
+ * whose metadata live rehydrate may empty.
+ */
+export function retainLocalFolderSourceFieldsFromResourceBinding(
+  source: SourceDescriptor,
+  binding:
+    | {
+        locator?: string;
+        originalLocator?: string;
+        metadata?: Record<string, string>;
+      }
+    | undefined,
+): SourceDescriptor {
+  if (!binding) {
+    return source;
+  }
+
+  return retainLocalFolderSourceFields(source, localFolderSourceFieldsFromResourceBinding(binding));
+}
+
 export function retainCliResolvedSource(
   source: SourceDescriptor,
   cliResolvedSource: string | undefined,

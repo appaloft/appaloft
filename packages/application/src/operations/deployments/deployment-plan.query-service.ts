@@ -18,7 +18,9 @@ import {
   explicitCliResolvedSource,
   explicitOriginalLocator,
   localFolderSourceExecutionMetadataFromSource,
+  localFolderSourceFieldsFromResourceBinding,
   retainLocalFolderSourceFields,
+  retainLocalFolderSourceFieldsFromResourceBinding,
 } from "../../cli-resolved-source";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import {
@@ -57,11 +59,27 @@ import { type RuntimePlanResolutionInputBuilder } from "./runtime-plan-resolutio
 
 const deploymentRuntimeRole = ServerWorkloadRoleValue.rehydrate("deployment-runtime");
 
+function persistedLocalFolderSourceBinding(resource: Resource) {
+  const binding = resource.toState().sourceBinding;
+  if (!binding) {
+    return undefined;
+  }
+
+  return {
+    locator: binding.locator.value,
+    ...(binding.originalLocator ? { originalLocator: binding.originalLocator.value } : {}),
+    ...(binding.metadata ? { metadata: binding.metadata } : {}),
+  };
+}
+
 function createResourceSourceDescriptor(
   resource: Resource,
 ): Result<{ source: SourceDescriptor; reasoning: string[] }> {
   return resource.createDeploymentSourceDescriptor().map((descriptor) => ({
-    source: SourceDescriptor.rehydrate(descriptor.source),
+    source: retainLocalFolderSourceFieldsFromResourceBinding(
+      SourceDescriptor.rehydrate(descriptor.source),
+      persistedLocalFolderSourceBinding(resource),
+    ),
     reasoning: descriptor.reasoning,
   }));
 }
@@ -754,13 +772,25 @@ export class DeploymentPlanQueryService {
       const resourceSource = yield* createResourceSourceDescriptor(resource);
       let detected = resourceSource;
       if (shouldEnrichSourceFromDetector(resource)) {
+        const persistedFields = localFolderSourceFieldsFromResourceBinding(
+          persistedLocalFolderSourceBinding(resource) ?? {},
+        );
         const cliResolvedSource = explicitCliResolvedSource({
+          ...(persistedFields.cliResolvedSource
+            ? { cliResolvedSource: persistedFields.cliResolvedSource }
+            : {}),
           ...(resourceSource.source.metadata ? { metadata: resourceSource.source.metadata } : {}),
         });
         const originalLocator = explicitOriginalLocator({
+          ...(persistedFields.originalLocator
+            ? { originalLocator: persistedFields.originalLocator }
+            : {}),
           ...(resourceSource.source.metadata ? { metadata: resourceSource.source.metadata } : {}),
         });
         const packedSourceArchive = explicitCliPackedSourceArchive({
+          ...(persistedFields.packedSourceArchive
+            ? { packedSourceArchive: persistedFields.packedSourceArchive }
+            : {}),
           ...(resourceSource.source.metadata ? { metadata: resourceSource.source.metadata } : {}),
         });
         detected = yield* await sourceDetector.detect(context, resourceSource.source.locator, {

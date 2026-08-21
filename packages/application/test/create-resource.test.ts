@@ -6,6 +6,7 @@ import {
   DeploymentTarget,
   DeploymentTargetId,
   DeploymentTargetName,
+  DisplayNameText,
   Destination,
   DestinationId,
   DestinationKindValue,
@@ -25,6 +26,9 @@ import {
   ProviderKey,
   ResourceByIdSpec,
   ResourceId,
+  SourceDescriptor,
+  SourceKindValue,
+  SourceLocator,
   UpsertDeploymentTargetSpec,
   UpsertDestinationSpec,
   UpsertEnvironmentSpec,
@@ -50,6 +54,12 @@ import {
   type OperationGuardPort,
   toRepositoryContext,
 } from "../src";
+import {
+  CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY,
+  CLI_RESOLVED_SOURCE_METADATA_KEY,
+  ORIGINAL_LOCATOR_METADATA_KEY,
+  retainLocalFolderSourceFieldsFromResourceBinding,
+} from "../src/cli-resolved-source";
 import { CreateResourceCommand } from "../src/messages";
 import { type DefaultAccessDomainProvider } from "../src/ports";
 import { CreateResourceUseCase, ListResourcesQueryService } from "../src/use-cases";
@@ -883,5 +893,103 @@ describe("CreateResourceUseCase", () => {
       proxyKind: "traefik",
       targetPort: 3000,
     });
+  });
+
+  test("[DEP-CREATE-PKG-007] live create-resource payload keeps the hyphenated leaf and archive after persist", async () => {
+    const parent = "/Users/nichenqin/projects";
+    const folder = `${parent}/nux-ae9c38f3-static`;
+    const packedSourceArchive = "H4sIAAAAAAAAAytKLSpILC4u1gMA";
+    const { context, repositoryContext, resources, useCase } = await seedResourceContext();
+    const liveInput = {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      destinationId: "dst_demo",
+      name: "nux-ae9c38f3-static",
+      kind: "static-site" as const,
+      source: {
+        kind: "local-folder" as const,
+        locator: folder,
+        displayName: "nux-ae9c38f3-static",
+        originalLocator: folder,
+        metadata: {
+          [CLI_RESOLVED_SOURCE_METADATA_KEY]: folder,
+          [CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]: packedSourceArchive,
+        },
+      },
+      runtimeProfile: {
+        strategy: "static" as const,
+        publishDirectory: "public",
+      },
+      networkProfile: {
+        internalPort: 80,
+        upstreamProtocol: "http" as const,
+        exposureMode: "reverse-proxy" as const,
+      },
+    };
+    const command = CreateResourceCommand.create(liveInput);
+    expect(command.isOk()).toBe(true);
+    const remotePayload = Object.fromEntries(
+      Object.entries(command._unsafeUnwrap() as unknown as Record<string, unknown>).filter(
+        ([, value]) => value !== undefined,
+      ),
+    );
+    const sourcePayload = remotePayload.source as {
+      locator?: string;
+      originalLocator?: string;
+      metadata?: Record<string, string>;
+    };
+    expect(sourcePayload.locator).toBe(folder);
+    expect(sourcePayload.originalLocator).toBe(folder);
+    expect(sourcePayload.metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(
+      packedSourceArchive,
+    );
+    expect(sourcePayload.locator).not.toBe(parent);
+    expect(sourcePayload.originalLocator).not.toBe(parent);
+
+    const reparsed = CreateResourceCommand.create(remotePayload as never);
+    expect(reparsed.isOk()).toBe(true);
+    const created = await useCase.execute(context, {
+      projectId: reparsed._unsafeUnwrap().projectId,
+      environmentId: reparsed._unsafeUnwrap().environmentId,
+      name: reparsed._unsafeUnwrap().name,
+      kind: reparsed._unsafeUnwrap().kind,
+      ...(reparsed._unsafeUnwrap().destinationId
+        ? { destinationId: reparsed._unsafeUnwrap().destinationId }
+        : {}),
+      ...(reparsed._unsafeUnwrap().source ? { source: reparsed._unsafeUnwrap().source } : {}),
+      ...(reparsed._unsafeUnwrap().runtimeProfile
+        ? { runtimeProfile: reparsed._unsafeUnwrap().runtimeProfile }
+        : {}),
+      ...(reparsed._unsafeUnwrap().networkProfile
+        ? { networkProfile: reparsed._unsafeUnwrap().networkProfile }
+        : {}),
+    });
+    expect(created.isOk()).toBe(true);
+    const persisted = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate(created._unsafeUnwrap().id)),
+    );
+    const binding = persisted?.toState().sourceBinding;
+    expect(binding?.locator.value).toBe(folder);
+    expect(binding?.originalLocator?.value).toBe(folder);
+    expect(binding?.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]).toBe(folder);
+    expect(binding?.metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(packedSourceArchive);
+    expect(binding?.locator.value).not.toBe(parent);
+    expect(binding?.originalLocator?.value).not.toBe(parent);
+
+    const emptiedDescriptor = SourceDescriptor.rehydrate({
+      kind: SourceKindValue.rehydrate("local-folder"),
+      locator: SourceLocator.rehydrate(parent),
+      displayName: DisplayNameText.rehydrate("projects"),
+    });
+    const planSource = retainLocalFolderSourceFieldsFromResourceBinding(emptiedDescriptor, {
+      locator: binding?.locator.value,
+      originalLocator: binding?.originalLocator?.value,
+      metadata: binding?.metadata,
+    });
+    expect(planSource.locator).toBe(folder);
+    expect(planSource.locator).not.toBe(parent);
+    expect(planSource.metadata?.[ORIGINAL_LOCATOR_METADATA_KEY]).toBe(folder);
+    expect(planSource.metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(packedSourceArchive);
   });
 });
