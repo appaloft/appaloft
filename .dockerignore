@@ -8,6 +8,8 @@
 !package.json
 !tsconfig.base.json
 !tsconfig.json
+!scripts
+!scripts/install-git-hooks.ts
 
 !apps/
 apps/*

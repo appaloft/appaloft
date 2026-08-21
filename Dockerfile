@@ -11,7 +11,7 @@ COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
 
 COPY . .
 
-RUN bun install --frozen-lockfile
+RUN bun install --frozen-lockfile --ignore-scripts
 RUN bun run --cwd apps/shell build
 RUN bun run --cwd apps/web build
 RUN bun run --cwd apps/docs build

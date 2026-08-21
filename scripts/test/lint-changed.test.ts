@@ -85,6 +85,10 @@ describe("changed-file JS lint selection", () => {
     const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
       readonly scripts: { readonly prepare: string };
     };
+    const dockerignore = readFileSync(join(root, ".dockerignore"), "utf8");
+    const dockerfile = readFileSync(join(root, "Dockerfile"), "utf8");
     expect(packageJson.scripts.prepare).toBe("bun run scripts/install-git-hooks.ts");
+    expect(dockerignore).toContain("!scripts/install-git-hooks.ts");
+    expect(dockerfile).toContain("bun install --frozen-lockfile --ignore-scripts");
   });
 });
