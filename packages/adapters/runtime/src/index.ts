@@ -67,7 +67,7 @@ import {
   type RollbackPlan,
 } from "@appaloft/core";
 import {
-  cliPackedSourceArchiveFromMetadata,
+  cliPackedSourceArchiveFromLocalSource,
   explicitCliResolvedSource,
   explicitOriginalLocator,
   localFolderSourceExecutionMetadata,
@@ -1126,13 +1126,30 @@ function chooseStrategies(input: {
 
     const dockerfilePath = "Dockerfile.appaloft-static";
     const port = dockerContainerPort(requestedDeployment);
-    const originalLocator = explicitOriginalLocator({
-      ...(source.metadata ? { metadata: source.metadata } : {}),
+    const originalLocator =
+      explicitOriginalLocator({
+        ...(source.metadata ? { metadata: source.metadata } : {}),
+      }) ??
+      explicitOriginalLocator({
+        ...(requestedDeployment.runtimeMetadata
+          ? { metadata: requestedDeployment.runtimeMetadata }
+          : {}),
+      });
+    const cliResolvedSource =
+      explicitCliResolvedSource({
+        ...(source.metadata ? { metadata: source.metadata } : {}),
+      }) ??
+      explicitCliResolvedSource({
+        ...(requestedDeployment.runtimeMetadata
+          ? { metadata: requestedDeployment.runtimeMetadata }
+          : {}),
+      });
+    const packedSourceArchive = cliPackedSourceArchiveFromLocalSource({
+      ...(source.metadata ? { sourceMetadata: source.metadata } : {}),
+      ...(requestedDeployment.runtimeMetadata
+        ? { executionMetadata: requestedDeployment.runtimeMetadata }
+        : {}),
     });
-    const cliResolvedSource = explicitCliResolvedSource({
-      ...(source.metadata ? { metadata: source.metadata } : {}),
-    });
-    const packedSourceArchive = cliPackedSourceArchiveFromMetadata(source.metadata);
     const workingDirectory = resolveLocalWorkspaceWorkdir({
       locator: source.locator,
       displayName: source.displayName,

@@ -17,6 +17,7 @@ import {
   explicitCliPackedSourceArchive,
   explicitCliResolvedSource,
   explicitOriginalLocator,
+  localFolderSourceExecutionMetadataFromSource,
   retainLocalFolderSourceFields,
 } from "../../cli-resolved-source";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
@@ -851,10 +852,20 @@ export class DeploymentPlanQueryService {
         desiredState: query.includeAccessPlan ? serverAppliedRouteDesiredState : null,
         proxyKind: proxyKindFromServer(server),
       });
-      const requestedDeploymentWithRuntimeMetadata = requestedDeploymentWithRuntimeContextMetadata(
+      const requestedDeploymentWithRuntimeContext = requestedDeploymentWithRuntimeContextMetadata(
         requestedDeployment,
         { project, environment, resource, server, destination },
       );
+      const localFolderExecutionMetadata = localFolderSourceExecutionMetadataFromSource({
+        source: detected.source,
+      });
+      const requestedDeploymentWithRuntimeMetadata = {
+        ...requestedDeploymentWithRuntimeContext,
+        runtimeMetadata: {
+          ...(requestedDeploymentWithRuntimeContext.runtimeMetadata ?? {}),
+          ...localFolderExecutionMetadata,
+        },
+      };
       const runtimePlanInput = yield* runtimePlanResolutionInputBuilder.build({
         source: detected.source,
         server,
@@ -881,7 +892,14 @@ export class DeploymentPlanQueryService {
           }),
         );
       }
-      const runtimePlan = runtimePlanResult.value;
+      const runtimePlan = runtimePlanResult.value.withExecutionMetadata({
+        ...localFolderSourceExecutionMetadataFromSource({
+          source: detected.source,
+          ...(runtimePlanResult.value.execution.workingDirectory
+            ? { workingDirectory: runtimePlanResult.value.execution.workingDirectory }
+            : {}),
+        }),
+      });
       const runtimeTargetBackend = runtimeTargetBackendRegistry.find({
         targetKind: runtimePlan.target.kind,
         providerKey: runtimePlan.target.providerKey,

@@ -7,6 +7,7 @@ import {
   cliPackedSourceArchiveFromLocalSource,
   explicitCliResolvedSource,
   localFolderSourceExecutionMetadata,
+  localFolderSourceExecutionMetadataFromSource,
   retainCliResolvedSource,
   retainLocalFolderSourceFields,
 } from "../src/cli-resolved-source";
@@ -112,5 +113,20 @@ describe("CLI-resolved source", () => {
     expect(stamped[CLI_RESOLVED_SOURCE_METADATA_KEY]).toBe(folder);
     expect(stamped[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(packedSourceArchive);
     expect(stamped[ORIGINAL_LOCATOR_METADATA_KEY]).not.toBe("/Users/nichenqin/projects");
+
+    const fromSource = localFolderSourceExecutionMetadataFromSource({
+      source: SourceDescriptor.rehydrate({
+        kind: SourceKindValue.rehydrate("local-folder"),
+        locator: SourceLocator.rehydrate("/Users/nichenqin/projects"),
+        displayName: DisplayNameText.rehydrate("projects"),
+        metadata: {
+          [ORIGINAL_LOCATOR_METADATA_KEY]: folder,
+          [CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]: packedSourceArchive,
+        },
+      }),
+    });
+    expect(fromSource[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(packedSourceArchive);
+    expect(fromSource[ORIGINAL_LOCATOR_METADATA_KEY]).toBe(folder);
+    expect(fromSource[ORIGINAL_LOCATOR_METADATA_KEY]).not.toBe("/Users/nichenqin/projects");
   });
 });

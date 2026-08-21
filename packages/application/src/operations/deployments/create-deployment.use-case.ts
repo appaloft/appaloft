@@ -24,6 +24,7 @@ import {
   explicitCliPackedSourceArchive,
   explicitCliResolvedSource,
   explicitOriginalLocator,
+  localFolderSourceExecutionMetadataFromSource,
   retainLocalFolderSourceFields,
 } from "../../cli-resolved-source";
 import { deploymentProgressSteps, reportDeploymentProgress } from "../../deployment-progress";
@@ -1064,7 +1065,7 @@ export class CreateDeploymentUseCase {
         desiredState: serverAppliedRouteDesiredState,
         proxyKind: proxyKindFromServer(server),
       });
-      const requestedDeploymentWithRuntimeMetadata = requestedDeploymentWithRuntimeContextMetadata(
+      const requestedDeploymentWithRuntimeContext = requestedDeploymentWithRuntimeContextMetadata(
         requestedDeployment,
         {
           project,
@@ -1074,6 +1075,16 @@ export class CreateDeploymentUseCase {
           destination,
         },
       );
+      const localFolderExecutionMetadata = localFolderSourceExecutionMetadataFromSource({
+        source: detected.source,
+      });
+      const requestedDeploymentWithRuntimeMetadata = {
+        ...requestedDeploymentWithRuntimeContext,
+        runtimeMetadata: {
+          ...(requestedDeploymentWithRuntimeContext.runtimeMetadata ?? {}),
+          ...localFolderExecutionMetadata,
+        },
+      };
       const runtimePlanInputResult = runtimePlanResolutionInputBuilder.build({
         source: detected.source,
         server,
@@ -1083,7 +1094,15 @@ export class CreateDeploymentUseCase {
       });
       const runtimePlanInput = yield* runtimePlanInputResult;
       const runtimePlanResult = await runtimePlanResolver.resolve(context, runtimePlanInput);
-      const runtimePlan = yield* runtimePlanResult;
+      const resolvedRuntimePlan = yield* runtimePlanResult;
+      const runtimePlan = resolvedRuntimePlan.withExecutionMetadata({
+        ...localFolderSourceExecutionMetadataFromSource({
+          source: detected.source,
+          ...(resolvedRuntimePlan.execution.workingDirectory
+            ? { workingDirectory: resolvedRuntimePlan.execution.workingDirectory }
+            : {}),
+        }),
+      });
       const runtimeTargetBackend = runtimeTargetBackendRegistry.find({
         targetKind: runtimePlan.target.kind,
         providerKey: runtimePlan.target.providerKey,

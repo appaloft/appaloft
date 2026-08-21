@@ -2077,10 +2077,25 @@ export class SshExecutionBackend implements ExecutionBackend {
       },
     });
 
-    if (
-      !localArchivePath &&
-      (isGenericLocalSourceWorkdir(localWorkdir) || !existsSync(localWorkdir))
-    ) {
+    // Never tar a generic parent such as /Users/.../projects. The Mac disk
+    // is not on this worker; existsSync of that parent is the live throw.
+    if (!localArchivePath && isGenericLocalSourceWorkdir(localWorkdir)) {
+      const message = localSourceWorkdirMissingMessage(localWorkdir);
+      timeline.push(phaseLog("package", message, "error"));
+      return {
+        prepared: false,
+        deployment: this.applyFailure(deployment, {
+          timeline,
+          errorCode: "source_workdir_missing",
+          retryable: false,
+          metadata: {
+            localWorkdir,
+          },
+        }),
+      };
+    }
+
+    if (!localArchivePath && !existsSync(localWorkdir)) {
       const message = localSourceWorkdirMissingMessage(localWorkdir);
       timeline.push(phaseLog("package", message, "error"));
       return {

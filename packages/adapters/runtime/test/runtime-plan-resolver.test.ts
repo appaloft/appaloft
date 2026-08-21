@@ -3177,6 +3177,50 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(plan.execution.metadata?.[ORIGINAL_LOCATOR_METADATA_KEY]).not.toBe(parent);
   });
 
+  test("[DEP-CREATE-PKG-007] static plan reads the CLI archive from runtimeMetadata when source.metadata is empty", async () => {
+    ensureReflectMetadata();
+    const parent = "/Users/nichenqin/projects";
+    const leaf = "nux-04a0bb31-static";
+    const folder = `${parent}/${leaf}`;
+    const packedSourceArchive = "H4sIAAAAAAAAAytKLSpILC4u1gMA";
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const { CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY, ORIGINAL_LOCATOR_METADATA_KEY } =
+      await import("@appaloft/application");
+    const resolver = new DefaultRuntimePlanResolver();
+    const result = await resolver.resolve(createTestExecutionContext(), {
+      id: "plan_nux_04a0bb31_runtime_metadata_archive",
+      source: createSource({
+        kind: "local-folder",
+        locator: parent,
+        displayName: "projects",
+      }),
+      server: {
+        id: "srv_4lifk0yrcecy",
+        providerKey: "generic-ssh",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_nux_04a0bb31_runtime_metadata_archive"),
+      detectedReasoning: ["CLI-host archive travels on runtimeMetadata"],
+      requestedDeployment: {
+        method: "static",
+        publishDirectory: "public",
+        port: 80,
+        runtimeMetadata: {
+          [ORIGINAL_LOCATOR_METADATA_KEY]: folder,
+          [CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]: packedSourceArchive,
+        },
+      } as never,
+      generatedAt: "2026-08-21T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.execution.metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(
+      packedSourceArchive,
+    );
+    expect(plan.execution.workingDirectory).toBe(folder);
+    expect(plan.execution.workingDirectory).not.toBe(parent);
+  });
+
   test("[RES-CREATE-ADM-037C] source-root publish-dir . is legal and COPY ./", async () => {
     ensureReflectMetadata();
     const [{ DefaultRuntimePlanResolver }, { generateStaticSiteDockerBuild }, { StaticPublishDirectory }] =
