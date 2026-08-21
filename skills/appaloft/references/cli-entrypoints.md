@@ -68,7 +68,11 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   prints one human message that names `cargo build --locked --manifest-path apps/workspace-control-tui/Cargo.toml`. Homebrew rustc/cargo is enough; rustup is not required.
   `--no-attach` and non-TTY print
   one-line progress and
-  `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>`.
+  `Remote · <project> · <repo@sha> · <server> · my sandbox · <name>`.
+  `<name>` is the persisted display name (directory, `repo@short-sha`, or an
+  Appaloft-generated kebab such as `resonant-silence`). Never print `sbx_*` on
+  that banner, TUI list, or TUI detail. JSON / `--json` may still include
+  `workspaceId`.
   `--no-attach` also prints the connecting steps `using your {Grok|Codex|Claude} credential`,
   `including N skills`, and `work is on its disk` (`N` is actually copied).
   Skill copy is fail-soft and time-bounded; a timeout does not block occupy.

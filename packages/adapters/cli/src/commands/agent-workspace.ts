@@ -142,7 +142,9 @@ import { classifyWorkspaceHostTerminal } from "../workspace-control-terminal";
 import { terminateWorkspaceWithRuntimes } from "../workspace-lifecycle-actions.js";
 import { cliCommandDescriptions } from "./docs-help.js";
 
-const workspaceId = Args.text({ name: "workspaceId" });
+const workspaceId = Args.text({ name: "name" }).pipe(
+  Args.withDescription("Workspace display name. Scripts may pass the sandbox id from JSON/--json."),
+);
 const pathOrGitRemoteArg = Args.text({ name: "path|git-remote" }).pipe(
   Args.withDefault("."),
   Args.withDescription(CODE_OPTION_DESCRIPTIONS.path),
@@ -169,6 +171,7 @@ const collaborationPurpose = Options.choice("purpose", [
 
 interface SandboxResult {
   readonly sandboxId: string;
+  readonly name?: string;
   readonly status: string;
   readonly lastActivityAt?: string;
   readonly updatedAt?: string;
@@ -307,6 +310,7 @@ function occupancyTreeFromLists(
         const deployment = projectId ? deploymentByProjectId.get(projectId) : undefined;
         return {
           workspaceId: sandbox.sandboxId,
+          ...(sandbox.name ? { name: sandbox.name } : {}),
           status: sandbox.status,
           ...(sandbox.occupancy ? { occupancy: sandbox.occupancy } : {}),
           ...(projectId ? { projectId } : {}),
@@ -316,6 +320,38 @@ function occupancyTreeFromLists(
       }),
   };
 }
+
+function humanWorkspaceName(value: { readonly name?: string }): string {
+  const named = value.name?.trim();
+  if (named && !named.toLowerCase().startsWith("sbx_")) return named;
+  return "workspace";
+}
+
+function isSandboxIdToken(token: string): boolean {
+  return /^sbx_[A-Za-z0-9_.-]+$/u.test(token);
+}
+
+const resolveWorkspaceRef = (token: string): Effect.Effect<string, DomainError, CliRuntime> =>
+  Effect.gen(function* () {
+    const trimmed = token.trim();
+    if (isSandboxIdToken(trimmed)) return trimmed;
+    const cli = yield* CliRuntime;
+    const query = yield* resultToEffect(ListSandboxesQuery.create({ limit: 100 }));
+    const listed = (yield* resultToEffect(
+      yield* Effect.promise(() => cli.executeQuery(query)),
+    )) as { readonly items: readonly SandboxResult[] };
+    const matches = listed.items.filter((item) => item.name === trimmed);
+    if (matches.length === 1 && matches[0]) return matches[0].sandboxId;
+    if (matches.length > 1) {
+      return yield* Effect.fail(
+        domainError.conflict(`Multiple workspaces are named ${trimmed}`, {
+          code: "workspace_name_ambiguous",
+          name: trimmed,
+        }),
+      );
+    }
+    return yield* Effect.fail(domainError.notFound("Workspace", trimmed));
+  });
 
 function requireOption(value: string | undefined, label: string): string {
   if (value?.trim()) return value.trim();
@@ -922,7 +958,7 @@ export const workspaceCodeCommand = EffectCommand.make(
             : retried.value.workspaceId;
         if (options?.announcePin !== false) {
           process.stdout.write(
-            `Pinned · ${workspaceId} @ ${pinnedSha.slice(0, 7)} · requested ${door.commitSha.slice(0, 7)} · use --new for an isolated Workspace\n`,
+            `Pinned · ${humanWorkspaceName(retried.value)} @ ${pinnedSha.slice(0, 7)} · requested ${door.commitSha.slice(0, 7)} · use --new for an isolated Workspace\n`,
           );
         }
         return { door, result: retried.value, bannerCommitSha: pinnedSha };
@@ -1222,7 +1258,7 @@ export const workspaceCodeCommand = EffectCommand.make(
           repositoryIdentity: door.repositoryIdentity,
           commitSha: bannerCommitSha,
           serverName: door.serverName,
-          workspaceId: result.workspaceId,
+          name: result.name,
         })}\n`,
       );
       const wantsChrome = !attach || open || Boolean(optionalValue(openTarget));
@@ -1236,7 +1272,7 @@ export const workspaceCodeCommand = EffectCommand.make(
         repositoryIdentity: door.repositoryIdentity,
         commitSha: bannerCommitSha,
         serverName: door.serverName,
-        workspaceId: result.workspaceId,
+        name: result.name,
         ...(chrome.previewUrl ? { previewUrl: chrome.previewUrl } : {}),
         ...(chrome.productionUrl ? { productionUrl: chrome.productionUrl } : {}),
         ...(chrome.pullRequestNumber ? { pullRequestNumber: chrome.pullRequestNumber } : {}),
@@ -1292,6 +1328,7 @@ const list = EffectCommand.make(
             )) as AgentRuntimeListResult;
             return {
               workspaceId: sandbox.sandboxId,
+              name: sandbox.name,
               sandbox,
               agents: agents.items,
             };
@@ -1306,9 +1343,10 @@ const list = EffectCommand.make(
 const show = EffectCommand.make("show", { workspaceId }, ({ workspaceId }) =>
   Effect.gen(function* () {
     const cli = yield* CliRuntime;
-    const sandboxQuery = yield* resultToEffect(ShowSandboxQuery.create({ sandboxId: workspaceId }));
+    const resolved = yield* resolveWorkspaceRef(workspaceId);
+    const sandboxQuery = yield* resultToEffect(ShowSandboxQuery.create({ sandboxId: resolved }));
     const runtimeQuery = yield* resultToEffect(
-      ListSandboxAgentRuntimesQuery.create({ sandboxId: workspaceId }),
+      ListSandboxAgentRuntimesQuery.create({ sandboxId: resolved }),
     );
     const [sandbox, agents] = yield* Effect.all(
       [
@@ -1318,7 +1356,8 @@ const show = EffectCommand.make("show", { workspaceId }, ({ workspaceId }) =>
       { concurrency: 2 },
     );
     yield* print({
-      workspaceId,
+      workspaceId: resolved,
+      name: (sandbox as SandboxResult).name,
       sandbox,
       agents: (agents as AgentRuntimeListResult).items,
     });
@@ -1326,16 +1365,23 @@ const show = EffectCommand.make("show", { workspaceId }, ({ workspaceId }) =>
 );
 
 const pause = EffectCommand.make("pause", { workspaceId }, ({ workspaceId }) =>
-  runCommand(PauseSandboxCommand.create({ sandboxId: workspaceId })),
+  Effect.gen(function* () {
+    const resolved = yield* resolveWorkspaceRef(workspaceId);
+    return yield* runCommand(PauseSandboxCommand.create({ sandboxId: resolved }));
+  }),
 );
 const resume = EffectCommand.make("resume", { workspaceId }, ({ workspaceId }) =>
-  runCommand(ResumeSandboxCommand.create({ sandboxId: workspaceId })),
+  Effect.gen(function* () {
+    const resolved = yield* resolveWorkspaceRef(workspaceId);
+    return yield* runCommand(ResumeSandboxCommand.create({ sandboxId: resolved }));
+  }),
 );
 const terminate = EffectCommand.make("terminate", { workspaceId }, ({ workspaceId }) =>
   Effect.gen(function* () {
     const cli = yield* CliRuntime;
+    const resolved = yield* resolveWorkspaceRef(workspaceId);
     const result = yield* resultToEffect(
-      yield* Effect.promise(() => terminateWorkspaceWithRuntimes(cli, workspaceId)),
+      yield* Effect.promise(() => terminateWorkspaceWithRuntimes(cli, resolved)),
     );
     yield* print(result);
   }),
@@ -1351,19 +1397,22 @@ const terminal = EffectCommand.make(
     attach: attachTerminal,
   },
   ({ attach, cols, directory, rows, workspaceId }) =>
-    runTerminalCommand(
-      OpenTerminalSessionCommand.create({
-        scope: { kind: "sandbox", sandboxId: workspaceId },
-        ...(optionalValue(directory) ? { relativeDirectory: optionalValue(directory) } : {}),
-        initialRows: Number(rows),
-        initialCols: Number(cols),
-      }),
-      {
-        attach,
-        initialRows: Number(rows),
-        initialCols: Number(cols),
-      },
-    ),
+    Effect.gen(function* () {
+      const resolved = yield* resolveWorkspaceRef(workspaceId);
+      return yield* runTerminalCommand(
+        OpenTerminalSessionCommand.create({
+          scope: { kind: "sandbox", sandboxId: resolved },
+          ...(optionalValue(directory) ? { relativeDirectory: optionalValue(directory) } : {}),
+          initialRows: Number(rows),
+          initialCols: Number(cols),
+        }),
+        {
+          attach,
+          initialRows: Number(rows),
+          initialCols: Number(cols),
+        },
+      );
+    }),
 );
 
 const connect = EffectCommand.make(
@@ -1375,27 +1424,33 @@ const connect = EffectCommand.make(
     cols: terminalCols,
     sessionId: terminalSessionId,
   },
-  ({ cols, directory, rows, sessionId, workspaceId }) => {
-    const existingSessionId = optionalValue(sessionId);
-    return existingSessionId
-      ? attachTerminalSession(ShowTerminalSessionQuery.create({ sessionId: existingSessionId }), {
-          initialRows: Number(rows),
-          initialCols: Number(cols),
-        })
-      : runTerminalCommand(
-          OpenTerminalSessionCommand.create({
-            scope: { kind: "sandbox", sandboxId: workspaceId },
-            ...(optionalValue(directory) ? { relativeDirectory: optionalValue(directory) } : {}),
-            initialRows: Number(rows),
-            initialCols: Number(cols),
-          }),
+  ({ cols, directory, rows, sessionId, workspaceId }) =>
+    Effect.gen(function* () {
+      const existingSessionId = optionalValue(sessionId);
+      if (existingSessionId) {
+        return yield* attachTerminalSession(
+          ShowTerminalSessionQuery.create({ sessionId: existingSessionId }),
           {
-            attach: true,
             initialRows: Number(rows),
             initialCols: Number(cols),
           },
         );
-  },
+      }
+      const resolved = yield* resolveWorkspaceRef(workspaceId);
+      return yield* runTerminalCommand(
+        OpenTerminalSessionCommand.create({
+          scope: { kind: "sandbox", sandboxId: resolved },
+          ...(optionalValue(directory) ? { relativeDirectory: optionalValue(directory) } : {}),
+          initialRows: Number(rows),
+          initialCols: Number(cols),
+        }),
+        {
+          attach: true,
+          initialRows: Number(rows),
+          initialCols: Number(cols),
+        },
+      );
+    }),
 ).pipe(
   EffectCommand.withDescription(
     "Connect to a Workspace through the managed terminal gateway without host SSH credentials",
@@ -1412,8 +1467,9 @@ const nativeAttach = EffectCommand.make(
   ({ expiresAt, noAttach, workspaceId }) =>
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
+      const resolved = yield* resolveWorkspaceRef(workspaceId);
       const runtimeQuery = yield* resultToEffect(
-        ListSandboxAgentRuntimesQuery.create({ sandboxId: workspaceId }),
+        ListSandboxAgentRuntimesQuery.create({ sandboxId: resolved }),
       );
       const runtimes = (yield* resultToEffect(
         yield* Effect.promise(() => cli.executeQuery(runtimeQuery)),
@@ -1427,13 +1483,13 @@ const nativeAttach = EffectCommand.make(
       if (!runtime?.interaction) {
         throw domainError.conflict("Workspace Runtime does not support Agent attach", {
           code: "agent_workspace_attach_unavailable",
-          workspaceId,
+          name: humanWorkspaceName({ name: workspaceId }),
         });
       }
       const defaultExpiry = new Date(Date.now() + 60 * 60_000).toISOString();
       const command = yield* resultToEffect(
         IssueSandboxAgentAttachAccessCommand.create({
-          sandboxId: workspaceId,
+          sandboxId: resolved,
           runtimeId: runtime.runtimeId,
           expiresAt: optionalValue(expiresAt) ?? defaultExpiry,
         }),

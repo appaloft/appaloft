@@ -1,3 +1,4 @@
+export * from "./display-name";
 export * from "./network-policy";
 export * from "./sandbox";
 export * from "./snapshot";

@@ -1841,9 +1841,7 @@ async function runManagedDependencyTargetCommand(
   }
 }
 
-class ShellManagedDependencyResourcePostgresQueryExecutor
-  implements ManagedDependencyResourcePostgresQueryExecutor
-{
+class ShellManagedDependencyResourcePostgresQueryExecutor implements ManagedDependencyResourcePostgresQueryExecutor {
   constructor(private readonly serverRepository: ServerRepository) {}
 
   async execute(
@@ -2251,9 +2249,7 @@ function redisLogicalBackupError(
   );
 }
 
-export class BunDependencyResourceNativeCommandRunner
-  implements ShellDependencyResourceNativeCommandRunner
-{
+export class BunDependencyResourceNativeCommandRunner implements ShellDependencyResourceNativeCommandRunner {
   async run(input: ShellDependencyResourceNativeCommandInput): Promise<Result<void, DomainError>> {
     if (input.operation === "redis-backup") {
       return await this.runRedisBackup(input);
@@ -4172,9 +4168,14 @@ export function registerApplicationServices(
                 : {}),
               ...(input.providerKey ? { providerKey: input.providerKey } : {}),
               ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
+              ...(input.name ? { name: input.name } : {}),
+              ...(input.directoryName ? { directoryName: input.directoryName } : {}),
+              ...(input.repositoryIdentity ? { repositoryIdentity: input.repositoryIdentity } : {}),
+              ...(input.commitSha ? { commitSha: input.commitSha } : {}),
             });
             return created.map((sandbox) => ({
               sandboxId: sandbox.sandboxId,
+              name: sandbox.name,
               status: sandbox.status,
             }));
           },
@@ -4182,6 +4183,7 @@ export function registerApplicationServices(
             const resumed = await sandboxService.resume(context, workspaceId);
             return resumed.map((sandbox) => ({
               sandboxId: sandbox.sandboxId,
+              name: sandbox.name,
               status: sandbox.status,
             }));
           },
@@ -4282,18 +4284,16 @@ export function registerApplicationServices(
   });
   if (!container.isRegistered(tokens.durableWorkHandlerRegistry, true)) {
     container.register(tokens.durableWorkHandlerRegistry, {
-      useFactory: instanceCachingFactory(
-        (dependencyContainer): DurableWorkHandlerRegistry => ({
-          resolve(item) {
-            return item.kind === sandboxAgentDeliveryDurableWorkKind
-              ? new SandboxAgentDurableWorkHandler(
-                  dependencyContainer.resolve(tokens.sandboxAgentDeliveryService),
-                  dependencyContainer.resolve(tokens.agentTaskRunService),
-                )
-              : undefined;
-          },
-        }),
-      ),
+      useFactory: instanceCachingFactory((dependencyContainer): DurableWorkHandlerRegistry => ({
+        resolve(item) {
+          return item.kind === sandboxAgentDeliveryDurableWorkKind
+            ? new SandboxAgentDurableWorkHandler(
+                dependencyContainer.resolve(tokens.sandboxAgentDeliveryService),
+                dependencyContainer.resolve(tokens.agentTaskRunService),
+              )
+            : undefined;
+        },
+      })),
     });
   }
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);

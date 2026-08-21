@@ -211,11 +211,11 @@ describe("Agent Workspace open application workflow", () => {
               }),
             );
           }
-          return ok({ sandboxId: "sbx_1", status: "ready" });
+          return ok({ sandboxId: "sbx_1", name: "resonant-silence", status: "ready" });
         },
         resume: async (_context, workspaceId) => {
           phases.push("sandbox-resume");
-          return ok({ sandboxId: workspaceId, status: "ready" });
+          return ok({ sandboxId: workspaceId, name: "resonant-silence", status: "ready" });
         },
         exec: async (_context, _workspaceId, command) => {
           executedCommands.push({
@@ -751,8 +751,9 @@ describe("Agent Workspace open application workflow", () => {
         markWorkspaceTerminated: async () => ok({ advanced: true }),
       },
       sandboxes: {
-        create: async () => ok({ sandboxId: "sbx_new", status: "ready" }),
-        resume: async (_context, workspaceId) => ok({ sandboxId: workspaceId, status: "ready" }),
+        create: async () => ok({ sandboxId: "sbx_new", name: "resonant-silence", status: "ready" }),
+        resume: async (_context, workspaceId) =>
+          ok({ sandboxId: workspaceId, name: "resonant-silence", status: "ready" }),
         exec: async () => ok({ mode: "foreground", frames: [{ kind: "exit", exitCode: 0 }] }),
         exposePort: async () => ok(undefined),
       },
@@ -1267,10 +1268,12 @@ function createFolderOccupancyOpen(options: {
     },
     sandboxes: {
       create:
-        options.createSandbox ?? (async () => ok({ sandboxId: "sbx_notes", status: "ready" })),
+        options.createSandbox ??
+        (async () => ok({ sandboxId: "sbx_notes", name: "resonant-silence", status: "ready" })),
       resume:
         options.resumeSandbox ??
-        (async (_context, workspaceId) => ok({ sandboxId: workspaceId, status: "ready" })),
+        (async (_context, workspaceId) =>
+          ok({ sandboxId: workspaceId, name: "resonant-silence", status: "ready" })),
       exec: async (_context, _workspaceId, command) => {
         executedCommands.push([...command.argv]);
         return ok({ mode: "foreground", frames: [{ kind: "exit", exitCode: 1 }] });

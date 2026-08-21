@@ -181,6 +181,20 @@ describe("public docs help registry", () => {
     );
   });
 
+  test("[SBX-DOM-005] workspace display-name help never points at sbx_ as the row name", () => {
+    const topic = publicDocsHelpTopics["agent.workspace-display-name"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe(
+      "/docs/agents/workspaces/#agent-workspace-display-name",
+    );
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/agents/workspaces/#agent-workspace-display-name",
+    );
+    expect(topic.aliases).toEqual(
+      expect.arrayContaining(["workspace name", "sandbox display name", "resonant-silence"]),
+    );
+  });
+
   test("[WS-REMOTE-VENDOR-204] occupancy vendor help names Claude Codex and Grok flags", () => {
     const topic = publicDocsHelpTopics["agent.code-vendor"];
 

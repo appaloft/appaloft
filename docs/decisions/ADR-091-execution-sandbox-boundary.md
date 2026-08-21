@@ -41,7 +41,11 @@ Enterprise customer-owned execution while creating a private replacement for pub
    - `microvm`: dedicated microVM isolation.
    A provider may satisfy a stronger requested level, never a weaker one.
 8. Public callers receive `sandboxId` and safe access descriptors. They do not receive host SSH
-   credentials, raw host/provider addresses, provider credentials or unmasked secret values.
+  credentials, raw host/provider addresses, provider credentials or unmasked secret values.
+  `sandboxId` remains the storage/API/docker identity (`sbx_[A-Za-z0-9_.-]+`). User-facing CLI,
+  TUI, Cloud Agents list/inquire/details/help/errors show a persisted display name instead of
+  `sbx_*`. JSON/`--json` may still include the id. Display-name generation and persistence are
+  governed by [ADR-124](./ADR-124-sandbox-display-name.md).
 9. Workspace file operations are confined below the provider-declared workspace root. Network
    policy is deny-by-default for untrusted execution; credential grants use secret references and
    destination-bound brokerage rather than plaintext result fields.

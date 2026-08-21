@@ -139,8 +139,8 @@ export interface RemoteCodeDoorProbe {
 export function hasRemoteCodeLogin(env: NodeJS.ProcessEnv = process.env): boolean {
   return Boolean(
     env.APPALOFT_TOKEN?.trim() ||
-      env.APPALOFT_AUTHORIZATION?.trim() ||
-      env.APPALOFT_AUTH_COOKIE?.trim(),
+    env.APPALOFT_AUTHORIZATION?.trim() ||
+    env.APPALOFT_AUTH_COOKIE?.trim(),
   );
 }
 
@@ -157,11 +157,18 @@ export function remoteOccupyBannerProjectId(input: {
   return result || door;
 }
 
+function humanSandboxName(value: string | undefined): string | undefined {
+  const named = value?.trim();
+  if (!named || named.toLowerCase().startsWith("sbx_")) return undefined;
+  return named;
+}
+
 export function formatRemoteCodeBanner(input: {
   readonly projectId?: string;
   readonly repositoryIdentity: string;
   readonly commitSha: string;
   readonly serverName: string;
+  readonly name?: string;
   readonly workspaceId?: string;
   readonly previewUrl?: string;
   readonly productionUrl?: string;
@@ -170,9 +177,8 @@ export function formatRemoteCodeBanner(input: {
 }): string {
   const sha = input.commitSha.slice(0, 7);
   const project = input.projectId?.trim() || "project";
-  const occupancy = input.workspaceId?.trim()
-    ? `my sandbox · ${input.workspaceId.trim()}`
-    : "my sandbox";
+  const displayName = humanSandboxName(input.name) ?? humanSandboxName(input.workspaceId);
+  const occupancy = displayName ? `my sandbox · ${displayName}` : "my sandbox";
   const lines = [
     `Remote · ${project} · ${input.repositoryIdentity}@${sha} · ${input.serverName} · ${occupancy}`,
   ];

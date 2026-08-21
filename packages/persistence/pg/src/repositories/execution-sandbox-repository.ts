@@ -12,6 +12,7 @@ import {
   ExpiresAt,
   Sandbox,
   SandboxCredentialGrant,
+  SandboxDisplayName,
   SandboxId,
   SandboxIsolationLevel,
   SandboxNetworkPolicy,
@@ -34,6 +35,7 @@ type SnapshotRow = Selectable<Database["execution_sandbox_snapshots"]>;
 type TemplateRow = Selectable<Database["execution_sandbox_templates"]>;
 
 type SerializedSandboxState = {
+  name?: string;
   source:
     | { kind: "image"; image: string }
     | { kind: "template"; templateId: string }
@@ -75,6 +77,7 @@ function sandboxState(sandbox: Sandbox): SerializedSandboxState {
         ? { kind: "template", templateId: state.source.templateId.value }
         : { kind: "snapshot", snapshotId: state.source.snapshotId.value };
   return {
+    name: state.name.value,
     source,
     limits: state.limits.toState(),
     networkPolicy: state.networkPolicy.toState(),
@@ -103,6 +106,9 @@ function sandboxFromRow(row: SandboxRow): Sandbox {
           };
   return Sandbox.rehydrate({
     id: SandboxId.rehydrate(row.id),
+    name: state.name
+      ? SandboxDisplayName.rehydrate(state.name)
+      : SandboxDisplayName.fromLegacySandboxId(row.id),
     source,
     status: SandboxStatusValue.rehydrate(
       row.status as Parameters<typeof SandboxStatusValue.rehydrate>[0],

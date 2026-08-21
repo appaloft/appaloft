@@ -268,6 +268,7 @@ export interface WorkspaceOpenKey {
 
 export interface WorkspaceOpenResult {
   readonly workspaceId: string;
+  readonly name: string;
   readonly resumed: boolean;
   readonly projectId: string;
   readonly source: {
@@ -287,6 +288,7 @@ export interface WorkspaceOpenResult {
 
 export interface SandboxOpenDescriptor {
   readonly sandboxId: string;
+  readonly name: string;
   readonly status: string;
 }
 
@@ -327,6 +329,10 @@ export interface WorkspaceOpenDependencies {
         readonly placementReservationId?: string;
         readonly providerKey?: string;
         readonly expiresAt?: string;
+        readonly name?: string;
+        readonly directoryName?: string;
+        readonly repositoryIdentity?: string;
+        readonly commitSha?: string;
       },
     ): Promise<Result<SandboxOpenDescriptor>>;
     resume(context: ExecutionContext, workspaceId: string): Promise<Result<SandboxOpenDescriptor>>;
@@ -778,6 +784,8 @@ export class AgentWorkspaceOpenService {
       const sandbox = await this.dependencies.sandboxes.create(context, {
         ...preflight.value.plan.sandbox,
         placementReservationId: preflight.value.reservation.reservationId,
+        repositoryIdentity: input.repositoryIdentity,
+        commitSha: input.commitSha,
         ...(options.placementProviderKey ? { providerKey: options.placementProviderKey } : {}),
         ...(options.expiresAt ? { expiresAt: options.expiresAt } : {}),
       });
@@ -1092,6 +1100,7 @@ export class AgentWorkspaceOpenService {
   ): WorkspaceOpenResult {
     return {
       workspaceId: sandbox.sandboxId,
+      name: sandbox.name,
       resumed,
       projectId,
       source: {

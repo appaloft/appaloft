@@ -8,6 +8,7 @@ import {
   ok,
   type Result,
   Sandbox,
+  SandboxDisplayName,
   SandboxCredentialGrant,
   type SandboxCredentialGrantState,
   SandboxId,
@@ -709,6 +710,7 @@ export class InMemorySandboxRepository implements SandboxRepository {
 
 export interface SandboxDescriptor {
   sandboxId: string;
+  name: string;
   status: string;
   sourceKind: string;
   source:
@@ -771,6 +773,7 @@ function descriptor(stored: StoredSandbox): SandboxDescriptor {
         : { kind: "template" as const, templateId: state.source.templateId.value };
   return {
     sandboxId: state.id.value,
+    name: stored.sandbox.displayName().value,
     status: state.status.value,
     sourceKind: state.source.kind,
     source,
@@ -1213,6 +1216,10 @@ export class ExecutionSandboxService {
       expiresAt?: string;
       providerKey?: string;
       placementReservationId?: string;
+      name?: string;
+      directoryName?: string;
+      repositoryIdentity?: string;
+      commitSha?: string;
     },
   ): Promise<Result<SandboxDescriptor>> {
     const isolation = SandboxIsolationLevel.create(input.requestedIsolation);
@@ -1327,6 +1334,12 @@ export class ExecutionSandboxService {
     if (expiresAt?.isErr()) return err(expiresAt.error);
     const sandbox = Sandbox.create({
       id: SandboxId.rehydrate(this.idGenerator.next("sbx")),
+      name: SandboxDisplayName.resolve({
+        ...(input.name ? { name: input.name } : {}),
+        ...(input.directoryName ? { directoryName: input.directoryName } : {}),
+        ...(input.repositoryIdentity ? { repositoryIdentity: input.repositoryIdentity } : {}),
+        ...(input.commitSha ? { commitSha: input.commitSha } : {}),
+      }),
       source,
       requestedIsolation: isolation.value,
       limits: limits.value,

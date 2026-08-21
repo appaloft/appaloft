@@ -110,10 +110,10 @@ Sandbox on that Server, not one VM per person.
 | D73 | Slice 22 top-level `--help` names `login` / `code` / `workspace` / `deploy` | Live `appaloftdev --help` still lists `workspace open` and `deploy <path>` as the door. Railway users type `login` then `code` then `up`. |
 | D74 | Keep durable `workspace open` / `workspace create` as later lines | Do not delete the Git-safe delivery door. Do not invent a wizard. |
 | D75 | `deploy` help line is optional locator | Bare `deploy` already reuses occupancy. Required `<path>` is a lie. |
-| D76 | Slice 23 TUI workspace list shows occupancy repo@sha when present | Live TTY `workspace` still paints `sbx_*`. Railway `ca` names the current repo. `workspace --json` already has occupancy identity. |
+| D76 | Slice 23 TUI workspace list shows occupancy repo@sha when present | Closed by ADR-124: TTY list paints the persisted display name (directory, `repo@short-sha`, or generated kebab). Never `sbx_*`. JSON may still include the id. |
 | D77 | TUI list omits `terminated` / `failed` leftovers | Same D70 policy. `workspace list` stays the full catalog. |
 | D78 | Preview URL / last deploy / PR number stay out of this TUI list | JSON tree already has preview + last deployment. Do not pull Resource list into the TUI protocol this slice. |
-| D79 | Slice 24 TUI detail copies occupancy Preview URL and last deployment | Live TUI detail still paints Recovery / `sbx_*`. JSON tree already has `preview.url` and `deployment`. Railway `ca` shows the current URL. |
+| D79 | Slice 24 TUI detail copies occupancy Preview URL and last deployment | Closed by ADR-124: TUI detail title uses the persisted display name, never `sbx_*`. Preview/deploy chrome stays as specified. |
 | D80 | Missing preview or last deployment stays omitted | Do not invent sslip or `dep_*`. Resource list failure stays lean. |
 | D81 | PR number stays out; list stays identity-only | Same D78. `d` delivery palette already exists. Do not add a new command. |
 | D82 | Slice 25 TUI detail copies open PR from existing `preview-environments.list` | Delivery chrome already said `workspace` is the PR navigator. Do not scrape `gh` or vendor TUI. |

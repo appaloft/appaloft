@@ -70,6 +70,7 @@ export interface WorkspaceControlOccupancySummary {
 
 export interface WorkspaceControlWorkspaceSummary {
   readonly workspaceId: string;
+  readonly name: string;
   readonly status: string;
   readonly providerKey?: string;
   readonly sourceKind?: string;
@@ -480,6 +481,28 @@ function occupancySummary(
   };
 }
 
+function occupancyDisplayName(record: Record<string, unknown>): string | undefined {
+  const occupancy = occupancySummary(record);
+  if (!occupancy) return undefined;
+  const sha = occupancy.commitSha.slice(0, 7);
+  if (!sha) return undefined;
+  const repo = occupancy.repositoryIdentity
+    .replace(/^(github\.com|gitlab\.com|bitbucket\.org)\//iu, "")
+    .trim();
+  if (!repo || repo.toLowerCase().startsWith("sbx_")) return undefined;
+  return `${repo}@${sha}`;
+}
+
+function workspaceDisplayName(record: Record<string, unknown>, workspaceId: string): string {
+  const named = optionalString(record, "name");
+  if (named && !named.startsWith("sbx_")) return named;
+  const occupancyName = occupancyDisplayName(record);
+  if (occupancyName) return occupancyName;
+  return workspaceId.startsWith("sbx_")
+    ? workspaceId.slice("sbx_".length) || "workspace"
+    : workspaceId;
+}
+
 function workspaceSummary(record: Record<string, unknown>): WorkspaceControlWorkspaceSummary {
   const workspaceId = optionalString(record, "sandboxId");
   const status = optionalString(record, "status");
@@ -494,6 +517,7 @@ function workspaceSummary(record: Record<string, unknown>): WorkspaceControlWork
   const occupancy = occupancySummary(record);
   return {
     workspaceId,
+    name: workspaceDisplayName(record, workspaceId),
     status,
     ...(providerKey ? { providerKey } : {}),
     ...(sourceKind ? { sourceKind } : {}),

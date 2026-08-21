@@ -53,6 +53,10 @@ export const createSandboxCommandInputSchema = z
     ]),
     expiresAt: z.iso.datetime().optional(),
     providerKey: z.string().trim().min(1).max(120).optional(),
+    name: z.string().trim().min(1).max(80).optional(),
+    directoryName: z.string().trim().min(1).max(80).optional(),
+    repositoryIdentity: z.string().trim().min(1).max(2_048).optional(),
+    commitSha: z.string().trim().min(7).max(64).optional(),
   })
   .strict();
 export const listSandboxesQueryInputSchema = paginationSchema;

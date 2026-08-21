@@ -36,7 +36,9 @@ credentials or resolved secret values.
 - requested isolation minimum;
 - vCPU, memory, disk and process limits;
 - optional absolute TTL;
-- validated network policy.
+- validated network policy;
+- optional display-name hints: `name`, `directoryName`, `repositoryIdentity`, and
+  `commitSha`. These persist a readable display name and never replace `sandboxId`.
 
 Provider-specific fields, raw Docker/Kubernetes/VM settings, SSH credentials and tenant ids are not
 accepted through the public command.

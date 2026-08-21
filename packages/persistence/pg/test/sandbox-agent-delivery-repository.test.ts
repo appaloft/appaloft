@@ -10,6 +10,7 @@ import {
   ExpiresAt,
   PromotionCandidatePreviewId,
   Sandbox,
+  SandboxDisplayName,
   SandboxAgentApproval,
   SandboxAgentApprovalId,
   SandboxAgentRun,
@@ -65,6 +66,7 @@ describe("PgSandboxAgentDeliveryRepository", () => {
       const sandboxRepository = new PgExecutionSandboxRepository(database.db);
       const sandbox = Sandbox.create({
         id: SandboxId.rehydrate("sbx_agent_pg"),
+        name: SandboxDisplayName.rehydrate("resonant-silence"),
         source: { kind: "image", image: "agent@sha256:abc123" },
         requestedIsolation: SandboxIsolationLevel.gvisor(),
         limits: SandboxResourceLimits.create({
