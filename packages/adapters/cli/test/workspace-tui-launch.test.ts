@@ -14,6 +14,7 @@ import {
   WORKSPACE_TUI_DISABLE_MOUSE,
   WORKSPACE_TUI_LEAVE_ALT_SCREEN,
   warmupWorkspaceControlRenderer,
+  WORKSPACE_CONTROL_TUI_CODE_CHROME_LAYOUT,
   workspaceControlRendererSupportsCodeChrome,
   workspaceControlRendererUnavailableMessage,
 } from "../src/workspace-tui-launch";
@@ -118,6 +119,33 @@ describe("occupancy TUI slim launch", () => {
       expect(existsSync(launched)).toBeFalse();
     } finally {
       resetWorkspaceControlRendererWarmup();
+      await rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[WS-REMOTE-PROGRESS-194] inner-clip sidecar without one-top-row-title is stale chrome", async () => {
+    const { chmod, mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join: joinPath } = await import("node:path");
+    const workspace = await mkdtemp(joinPath(tmpdir(), "appaloft-inner-clip-tui-"));
+    const binDir = joinPath(workspace, "bin");
+    const stale = joinPath(binDir, "appaloft-workspace-tui");
+    await mkdir(binDir, { recursive: true });
+    await writeFile(
+      stale,
+      "#!/bin/sh\n# Appaloft Cloud Agents\n# preparing the agent\n# ⠋ Appaloft Cloud Agen\nexit 0\n",
+    );
+    await chmod(stale, 0o755);
+    try {
+      expect(workspaceControlRendererSupportsCodeChrome(stale)).toBeFalse();
+      expect(
+        resolveCodeWorkspaceControlRendererBinary({
+          APPALOFT_WORKSPACE_TUI_BINARY: stale,
+          PATH: "",
+        }),
+      ).toBeUndefined();
+      expect(WORKSPACE_CONTROL_TUI_CODE_CHROME_LAYOUT).toBe("one-top-row-title");
+    } finally {
       await rm(workspace, { recursive: true, force: true });
     }
   });

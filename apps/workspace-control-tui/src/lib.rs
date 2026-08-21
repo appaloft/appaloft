@@ -1143,7 +1143,7 @@ impl AppState {
                     self.loading.title = title;
                 }
                 if let Some(project) = project {
-                    self.loading.project = project;
+                    self.loading.project = occupancy_display_project(&project);
                 }
                 self.status_line = OCCUPANCY_WAIT_TITLE.to_owned();
             }
@@ -1152,7 +1152,7 @@ impl AppState {
                     self.loading.title = title;
                 }
                 if let Some(project) = project {
-                    self.loading.project = project;
+                    self.loading.project = occupancy_display_project(&project);
                 }
             }
             ParentMessage::Workspaces { workspaces } => {
@@ -2267,6 +2267,17 @@ fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
 }
 
 const OCCUPANCY_WAIT_TITLE: &str = "preparing the agent";
+pub const OCCUPANCY_FIRST_SCREEN_LAYOUT: &str = "one-top-row-title";
+
+fn occupancy_display_project(project: &str) -> String {
+    let trimmed = project.trim();
+    if let Some(start) = trimmed.rfind(" (prj_")
+        && trimmed.ends_with(')')
+    {
+        return trimmed[..start].trim().to_owned();
+    }
+    trimmed.to_owned()
+}
 
 fn occupancy_chrome_header(state: &AppState) -> String {
     occupancy_chrome_header_for_width(state, u16::MAX)
@@ -2275,8 +2286,9 @@ fn occupancy_chrome_header(state: &AppState) -> String {
 fn occupancy_chrome_header_for_width(state: &AppState, width: u16) -> String {
     let max = usize::from(width.max(1));
     let title = state.loading.title.as_str();
-    if !state.loading.project.is_empty() {
-        let with_project = format!("{title} · {}", state.loading.project);
+    let project = occupancy_display_project(&state.loading.project);
+    if !project.is_empty() {
+        let with_project = format!("{title} · {project}");
         if with_project.chars().count() <= max {
             return with_project;
         }
@@ -3330,6 +3342,25 @@ mod tests {
             first.contains("Appaloft Cloud Agents"),
             "product title must be the first row, not inside the wait panel:\n{out}"
         );
+        assert!(
+            !out.lines().any(|line| line.contains("Appaloft Cloud")
+                && ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏', '⣗']
+                    .into_iter()
+                    .any(|marker| line.contains(marker))),
+            "wait panel must not paint spinner + product title (live inner clip):\n{out}"
+        );
+        assert_eq!(
+            out.lines()
+                .skip(1)
+                .filter(|line| line.contains("Appaloft Cloud Agents"))
+                .count(),
+            0,
+            "do not stack a second product title inside the wait box:\n{out}"
+        );
+        assert!(
+            !out.contains("Appaloft Cloud Agen") || out.contains("Appaloft Cloud Agents"),
+            "{out}"
+        );
         assert_eq!(
             out.matches("Checking login").count(),
             1,
@@ -3528,6 +3559,72 @@ mod tests {
         assert!(
             !narrow.to_ascii_lowercase().contains("occupancy"),
             "{narrow}"
+        );
+    }
+
+    #[test]
+    fn ws_remote_progress_194_live_inner_header_must_not_clip_agen() {
+        let mut state = AppState::default();
+        state.apply(ParentMessage::Loading {
+            collapsed: Some(true),
+            title: Some("Appaloft Cloud Agents".to_owned()),
+            project: Some("appaloft-cloud (prj_rhdu3hxcj5sh)".to_owned()),
+        });
+        assert_eq!(state.loading.project, "appaloft-cloud");
+        assert_eq!(
+            occupancy_chrome_header(&state),
+            "Appaloft Cloud Agents · appaloft-cloud"
+        );
+        let backend = ratatui::backend::TestBackend::new(120, 24);
+        let mut terminal = ratatui::Terminal::new(backend).expect("wide terminal");
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw live first screen");
+        let out = buffer_plain(&terminal);
+        assert_first_screen_one_prepare_column(&out);
+        assert!(
+            out.contains("Appaloft Cloud Agents · appaloft-cloud"),
+            "cwd kebab must stay untruncated:\n{out}"
+        );
+        assert!(
+            !out.lines()
+                .any(|line| line.replace("appaloft-cloud", "").contains("appaloft-clo")),
+            "kebab must not clip to appaloft-clo:\n{out}"
+        );
+        assert!(!out.contains("prj_rhdu3hxcj5sh"), "{out}");
+        assert!(
+            !out.lines().next().unwrap_or("").contains('╭'),
+            "first paint is not a box-titled inner clip:\n{out}"
+        );
+        state.apply(ParentMessage::Progress {
+            message: "Checking login…".to_owned(),
+            step: Some("credential".to_owned()),
+        });
+        state.apply(ParentMessage::Progress {
+            message: "Preparing skills…".to_owned(),
+            step: Some("skills".to_owned()),
+        });
+        state.apply(ParentMessage::Progress {
+            message: "Preparing disk on hostinger…".to_owned(),
+            step: Some("disk".to_owned()),
+        });
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw live progress screen");
+        let progressed = buffer_plain(&terminal);
+        assert_first_screen_one_prepare_column(&progressed);
+        assert!(
+            progressed.contains("Appaloft Cloud Agents · appaloft-cloud"),
+            "{progressed}"
+        );
+        let (login, skills, disk) = first_screen_step_columns(&progressed);
+        assert_eq!(
+            login, skills,
+            "progress must not open a second step column:\n{progressed}"
+        );
+        assert_eq!(
+            skills, disk,
+            "progress must not open a second step column:\n{progressed}"
         );
     }
 

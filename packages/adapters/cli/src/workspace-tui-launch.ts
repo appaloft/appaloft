@@ -636,6 +636,7 @@ export function resolveWorkspaceControlRendererBinary(
 
 export const WORKSPACE_CONTROL_TUI_CODE_CHROME_TITLE = "Appaloft Cloud Agents";
 export const WORKSPACE_CONTROL_TUI_CODE_CHROME_WAIT = "preparing the agent";
+export const WORKSPACE_CONTROL_TUI_CODE_CHROME_LAYOUT = "one-top-row-title";
 export const WORKSPACE_CONTROL_TUI_CODE_CHROME_CAPABILITY = "cloud-agents";
 
 export function workspaceControlRendererSupportsCodeChrome(binaryPath: string): boolean {
@@ -643,7 +644,8 @@ export function workspaceControlRendererSupportsCodeChrome(binaryPath: string): 
     const contents = readFileSync(binaryPath);
     return (
       contents.includes(Buffer.from(WORKSPACE_CONTROL_TUI_CODE_CHROME_TITLE)) &&
-      contents.includes(Buffer.from(WORKSPACE_CONTROL_TUI_CODE_CHROME_WAIT))
+      contents.includes(Buffer.from(WORKSPACE_CONTROL_TUI_CODE_CHROME_WAIT)) &&
+      contents.includes(Buffer.from(WORKSPACE_CONTROL_TUI_CODE_CHROME_LAYOUT))
     );
   } catch {
     return false;
@@ -964,6 +966,36 @@ export async function ensureWorkspaceControlRendererBinary(
   return resolveWorkspaceControlRendererBinary(environment);
 }
 
+export async function ensureCodeWorkspaceControlRendererBinary(
+  environment: NodeJS.ProcessEnv = process.env,
+  build: (
+    crateDir: string,
+    env: NodeJS.ProcessEnv,
+  ) => Promise<void> = buildWorkspaceControlRendererBinary,
+): Promise<string | undefined> {
+  const chrome = resolveCodeWorkspaceControlRendererBinary(environment);
+  if (chrome) return chrome;
+  const crateDir = workspaceControlRendererCrateDir(environment);
+  if (!crateDir) return undefined;
+  restoreWorkspaceTuiScrollback();
+  const rustcVersion = await readRustcVersion(environment);
+  if (rustcVersion && rustcTooOldForWorkspaceControlTui(rustcVersion)) {
+    failClosedWorkspaceRenderer("toolchain-old", {
+      crateDir,
+      rustcVersion,
+    });
+  }
+  if (!rustcVersion) {
+    failClosedWorkspaceRenderer("rustup-missing", {
+      crateDir,
+      rustupMissing: true,
+      codeChrome: true,
+    });
+  }
+  await build(crateDir, environment);
+  return resolveCodeWorkspaceControlRendererBinary(environment);
+}
+
 export interface RatatuiWorkspaceControlPresentationInput {
   readonly binaryPath?: string;
   readonly environment?: NodeJS.ProcessEnv;
@@ -1009,7 +1041,10 @@ export async function openWorkspaceControlRenderer(
   input: RatatuiWorkspaceControlPresentationInput = {},
 ): Promise<WorkspaceTuiLaunchSession> {
   const environment = input.environment ?? process.env;
-  const binaryPath = input.binaryPath ?? resolveCodeWorkspaceControlRendererBinary(environment);
+  let binaryPath = input.binaryPath ?? resolveCodeWorkspaceControlRendererBinary(environment);
+  if (!binaryPath || !workspaceControlRendererSupportsCodeChrome(binaryPath)) {
+    binaryPath = await ensureCodeWorkspaceControlRendererBinary(environment);
+  }
   if (!binaryPath || !workspaceControlRendererSupportsCodeChrome(binaryPath)) {
     const stale = resolveWorkspaceControlRendererBinary(environment);
     failClosedWorkspaceRenderer(stale ? "binary-stale-chrome" : "binary-missing", {
