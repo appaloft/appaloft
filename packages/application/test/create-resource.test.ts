@@ -982,10 +982,11 @@ describe("CreateResourceUseCase", () => {
       locator: SourceLocator.rehydrate(parent),
       displayName: DisplayNameText.rehydrate("projects"),
     });
+    expect(binding).toBeDefined();
     const planSource = retainLocalFolderSourceFieldsFromResourceBinding(emptiedDescriptor, {
-      locator: binding?.locator.value,
-      originalLocator: binding?.originalLocator?.value,
-      metadata: binding?.metadata,
+      locator: binding?.locator.value ?? folder,
+      ...(binding?.originalLocator ? { originalLocator: binding.originalLocator.value } : {}),
+      ...(binding?.metadata ? { metadata: binding.metadata } : {}),
     });
     expect(planSource.locator).toBe(folder);
     expect(planSource.locator).not.toBe(parent);
