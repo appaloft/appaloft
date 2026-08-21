@@ -1,0 +1,49 @@
+import { describe, expect, test } from "bun:test";
+import { DisplayNameText, SourceDescriptor, SourceKindValue, SourceLocator } from "@appaloft/core";
+import {
+  CLI_RESOLVED_SOURCE_METADATA_KEY,
+  explicitCliResolvedSource,
+  retainCliResolvedSource,
+} from "../src/cli-resolved-source";
+
+describe("CLI-resolved source", () => {
+  test("[DEP-CREATE-PKG-007] does not treat a dirname'd locator as the CLI-resolved path", () => {
+    const parent = "/Users/nichenqin/projects";
+    const folder = `${parent}/nux-772b6112-static`;
+
+    expect(
+      explicitCliResolvedSource({
+        metadata: { baseDirectory: "/" },
+      }),
+    ).toBeUndefined();
+    expect(
+      explicitCliResolvedSource({
+        metadata: { [CLI_RESOLVED_SOURCE_METADATA_KEY]: folder },
+      }),
+    ).toBe(folder);
+    expect(
+      explicitCliResolvedSource({
+        cliResolvedSource: folder,
+        metadata: { [CLI_RESOLVED_SOURCE_METADATA_KEY]: parent },
+      }),
+    ).toBe(folder);
+  });
+
+  test("[DEP-CREATE-PKG-007] keeps the CLI-resolved path on a detected parent locator", () => {
+    const parent = "/Users/nichenqin/projects";
+    const folder = `${parent}/nux-772b6112-static`;
+    const source = SourceDescriptor.rehydrate({
+      kind: SourceKindValue.rehydrate("local-folder"),
+      locator: SourceLocator.rehydrate(parent),
+      displayName: DisplayNameText.rehydrate("workspace"),
+      metadata: { baseDirectory: "/" },
+    });
+
+    const retained = retainCliResolvedSource(source, folder);
+    expect(retained.locator).toBe(parent);
+    expect(retained.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]).toBe(folder);
+    expect(
+      retainCliResolvedSource(source, undefined).metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY],
+    ).toBe(undefined);
+  });
+});

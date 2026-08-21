@@ -266,6 +266,61 @@ describe("CLI quick deploy draft mapping", () => {
     ).toBe(true);
   });
 
+  test("[DEP-CREATE-PKG-007] threads the CLI-resolved deploy path into source metadata", async () => {
+    ensureReflectMetadata();
+    const { sourceBindingForDeploymentInput } =
+      await import("../src/commands/deployment-interaction");
+    const { CLI_RESOLVED_SOURCE_METADATA_KEY } = await import("@appaloft/application");
+    const locator = "/Users/nichenqin/projects/nux-772b6112-static";
+
+    expect(sourceBindingForDeploymentInput(locator, "static")).toEqual({
+      kind: "local-folder",
+      locator,
+      displayName: "nux-772b6112-static",
+      metadata: {
+        [CLI_RESOLVED_SOURCE_METADATA_KEY]: locator,
+      },
+    });
+    expect(
+      sourceBindingForDeploymentInput("https://github.com/acme/docs.git", "static").metadata,
+    ).toBe(undefined);
+    expect(
+      sourceBindingForDeploymentInput("ghcr.io/acme/api:1.7.3", "prebuilt-image").metadata,
+    ).toBe(undefined);
+  });
+
+  test("[DEP-CREATE-PKG-007] refreshes a reused static source when CLI-resolved metadata is missing", async () => {
+    ensureReflectMetadata();
+    const { sourceBindingForDeploymentInput, sourceProfilesMatch } =
+      await import("../src/commands/deployment-interaction");
+    const locator = "/Users/nichenqin/projects/nux-772b6112-static";
+    const desired = sourceBindingForDeploymentInput(locator, "static");
+
+    expect(
+      sourceProfilesMatch({
+        current: {
+          kind: "local-folder",
+          locator,
+          displayName: "nux-772b6112-static",
+          sourceBindingFingerprint: "fp_missing_cli_resolved",
+        },
+        desired,
+      }),
+    ).toBe(false);
+    expect(
+      sourceProfilesMatch({
+        current: {
+          kind: "local-folder",
+          locator,
+          displayName: "nux-772b6112-static",
+          sourceBindingFingerprint: "fp_with_cli_resolved",
+          metadata: { cliResolvedSource: locator },
+        },
+        desired,
+      }),
+    ).toBe(true);
+  });
+
   test("[QUICK-DEPLOY-WF-067] reuses an enrolled localhost local-shell instead of registering 127.0.0.1", async () => {
     ensureReflectMetadata();
     const { findServer } = await import("../src/commands/deployment-interaction");

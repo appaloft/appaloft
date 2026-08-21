@@ -1,5 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
+import { explicitCliResolvedSource } from "@appaloft/application";
 
 /**
  * Keep the real source folder, including hyphenated names that do not exist on
@@ -174,9 +175,10 @@ export function recoverLocalSourceFolderFromCwd(input: {
 
 /**
  * First write of the static-plan workingDirectory and the SSH package root.
- * Recovers the hyphenated cwd when locator/workdir were already dirname'd
- * upstream. Must not only wrap a helper after the value is already the parent,
- * and must not wait for existsSync or a matching process.cwd().
+ * Prefer the exact CLI-resolved `deploy .` path (summary.Source) when supplied.
+ * Recovers the hyphenated cwd only when that path is absent and locator/workdir
+ * were already dirname'd upstream. Must not wait for existsSync or a matching
+ * process.cwd().
  */
 export function resolveLocalWorkspaceWorkdir(input: {
   workingDirectory?: string;
@@ -184,7 +186,19 @@ export function resolveLocalWorkspaceWorkdir(input: {
   displayName?: string;
   metadata?: Record<string, string>;
   cwd?: string;
+  cliResolvedSource?: string;
 }): string {
+  const cliResolvedSource = explicitCliResolvedSource({
+    ...(input.cliResolvedSource ? { cliResolvedSource: input.cliResolvedSource } : {}),
+    ...(input.metadata ? { metadata: input.metadata } : {}),
+  });
+  if (cliResolvedSource) {
+    return applyLocalSourceBaseDirectory(
+      normalizeLocalSourceWorkingDirectory(cliResolvedSource),
+      input.metadata,
+    );
+  }
+
   const locatorRoot = normalizeLocalSourceWorkingDirectory(input.locator);
   const preferred = preferLocalSourceRoot(
     locatorRoot,
@@ -202,4 +216,27 @@ export function resolveLocalWorkspaceWorkdir(input: {
     }),
     input.metadata,
   );
+}
+
+/**
+ * Path `prepareSshSource` existsSync-checks and tars. Prefer the persisted
+ * CLI-resolved `deploy .` folder. Do not treat locator as that path, and do
+ * not use runtimeDir as the source cwd.
+ */
+export function resolveSshPackageLocalWorkdir(input: {
+  locator: string;
+  workingDirectory?: string;
+  displayName?: string;
+  metadata?: Record<string, string>;
+}): string {
+  const cliResolvedSource = explicitCliResolvedSource({
+    ...(input.metadata ? { metadata: input.metadata } : {}),
+  });
+  return resolveLocalWorkspaceWorkdir({
+    locator: input.locator,
+    ...(input.workingDirectory ? { workingDirectory: input.workingDirectory } : {}),
+    ...(input.displayName ? { displayName: input.displayName } : {}),
+    ...(input.metadata ? { metadata: input.metadata } : {}),
+    ...(cliResolvedSource ? { cliResolvedSource } : {}),
+  });
 }

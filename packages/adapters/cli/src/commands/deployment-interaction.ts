@@ -27,6 +27,7 @@ import {
   CreateSshCredentialCommand,
   type CreateSshCredentialCommandInput,
   CreateStorageVolumeCommand,
+  CLI_RESOLVED_SOURCE_METADATA_KEY,
   compareResourceProfileDrift,
   DeleteDependencyResourceCommand,
   type DependencyResourceBackupPolicyRead,
@@ -528,6 +529,10 @@ function githubRepositoryFullNameFromLocator(locator: string | undefined): strin
   }
 }
 
+function isLocalFilesystemSourceKind(kind: ResourceSourceInput["kind"]): boolean {
+  return kind === "local-folder" || kind === "local-git" || kind === "compose";
+}
+
 export function sourceBindingForDeploymentInput(
   sourceLocator: string,
   deploymentMethod: DeploymentMethod,
@@ -545,8 +550,9 @@ export function sourceBindingForDeploymentInput(
     >
   > = {},
 ): ResourceSourceInput {
+  const kind = profile.kind ?? sourceKindForDeploymentInput(sourceLocator, deploymentMethod);
   return {
-    kind: profile.kind ?? sourceKindForDeploymentInput(sourceLocator, deploymentMethod),
+    kind,
     locator: sourceLocator,
     displayName: inferNameFromSource(sourceLocator),
     ...(profile.gitRef ? { gitRef: profile.gitRef } : {}),
@@ -556,6 +562,13 @@ export function sourceBindingForDeploymentInput(
     ...(profile.version ? { version: profile.version } : {}),
     ...(profile.versionKind ? { versionKind: profile.versionKind } : {}),
     ...(profile.helmChart ? { helmChart: profile.helmChart } : {}),
+    ...(!isRemoteOrImageSource(sourceLocator) && isLocalFilesystemSourceKind(kind)
+      ? {
+          metadata: {
+            [CLI_RESOLVED_SOURCE_METADATA_KEY]: sourceLocator,
+          },
+        }
+      : {}),
   };
 }
 
@@ -1793,7 +1806,7 @@ function previewPolicyMatchesConfig(input: {
   );
 }
 
-function sourceProfilesMatch(input: {
+export function sourceProfilesMatch(input: {
   current: ResourceDetail["source"] | undefined;
   desired: ConfigurableResourceSourceInput;
 }): boolean {
@@ -1809,6 +1822,10 @@ function sourceProfilesMatch(input: {
     ...(input.current.commitSha ? { commitSha: input.current.commitSha } : {}),
     ...(input.current.baseDirectory ? { baseDirectory: input.current.baseDirectory } : {}),
     ...(input.current.helmChart ? { helmChart: input.current.helmChart } : {}),
+    ...(isLocalFilesystemSourceKind(input.desired.kind) &&
+    input.current.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]
+      ? { cliResolvedSource: input.current.metadata[CLI_RESOLVED_SOURCE_METADATA_KEY] }
+      : {}),
   };
   const desired = {
     kind: input.desired.kind,
@@ -1818,6 +1835,10 @@ function sourceProfilesMatch(input: {
     ...(input.desired.commitSha ? { commitSha: input.desired.commitSha } : {}),
     ...(input.desired.baseDirectory ? { baseDirectory: input.desired.baseDirectory } : {}),
     ...(input.desired.helmChart ? { helmChart: input.desired.helmChart } : {}),
+    ...(isLocalFilesystemSourceKind(input.desired.kind) &&
+    input.desired.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]
+      ? { cliResolvedSource: input.desired.metadata[CLI_RESOLVED_SOURCE_METADATA_KEY] }
+      : {}),
   };
 
   return JSON.stringify(current) === JSON.stringify(desired);

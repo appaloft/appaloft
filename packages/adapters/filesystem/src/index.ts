@@ -23,6 +23,7 @@ import { inflateRawSync } from "node:zlib";
 import {
   type ActivateStaticArtifactRouteInput,
   appaloftTraceAttributes,
+  withCliResolvedSourceMetadata,
   createAdapterSpanName,
   type DeploymentConfigReader,
   type DeploymentConfigSnapshot,
@@ -1522,21 +1523,23 @@ export class FileSystemSourceDetector implements SourceDetector {
               : "Compose manifest not detected",
           ];
 
+          const resolvedLocator =
+            locator.startsWith(".") || locator.startsWith("/") ? absolutePath : locator;
+          const metadata = withCliResolvedSourceMetadata(
+            workspace
+              ? {
+                  baseDirectory: workspace.evidence.selectedRoot,
+                  detectedSourceRoot: workspace.evidence.selectedRoot,
+                }
+              : undefined,
+            input?.cliResolvedSource,
+          );
           const source = SourceDescriptor.rehydrate({
             kind: SourceKindValue.rehydrate(resolved.kind),
-            locator: SourceLocator.rehydrate(
-              locator.startsWith(".") || locator.startsWith("/") ? absolutePath : locator,
-            ),
+            locator: SourceLocator.rehydrate(resolvedLocator),
             displayName: DisplayNameText.rehydrate(basename(locator) || basename(absolutePath)),
             ...(resolved.inspection ? { inspection: resolved.inspection } : {}),
-            ...(workspace
-              ? {
-                  metadata: {
-                    baseDirectory: workspace.evidence.selectedRoot,
-                    detectedSourceRoot: workspace.evidence.selectedRoot,
-                  },
-                }
-              : {}),
+            ...(metadata ? { metadata } : {}),
           });
 
           return ok({

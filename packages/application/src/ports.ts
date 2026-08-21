@@ -1283,9 +1283,7 @@ export class ServerAppliedRouteStateByTargetSpec implements ServerAppliedRouteSt
   }
 }
 
-export class ServerAppliedRouteStateByRouteSetIdSpec
-  implements ServerAppliedRouteStateSelectionSpec
-{
+export class ServerAppliedRouteStateByRouteSetIdSpec implements ServerAppliedRouteStateSelectionSpec {
   private constructor(public readonly routeSetId: string) {}
 
   static create(routeSetId: string): ServerAppliedRouteStateByRouteSetIdSpec {
@@ -1300,9 +1298,7 @@ export class ServerAppliedRouteStateByRouteSetIdSpec
   }
 }
 
-export class ServerAppliedRouteStateBySourceFingerprintSpec
-  implements ServerAppliedRouteStateSelectionSpec
-{
+export class ServerAppliedRouteStateBySourceFingerprintSpec implements ServerAppliedRouteStateSelectionSpec {
   private constructor(public readonly sourceFingerprint: string) {}
 
   static create(sourceFingerprint: string): ServerAppliedRouteStateBySourceFingerprintSpec {
@@ -3228,9 +3224,7 @@ export interface ResourceAccessFailureEvidenceSelectionSpec {
   ): ResourceAccessFailureEvidenceSelectionSpec;
 }
 
-abstract class BaseResourceAccessFailureEvidenceSelectionSpec
-  implements ResourceAccessFailureEvidenceSelectionSpec
-{
+abstract class BaseResourceAccessFailureEvidenceSelectionSpec implements ResourceAccessFailureEvidenceSelectionSpec {
   abstract accept<TResult>(
     query: TResult,
     visitor: ResourceAccessFailureEvidenceSelectionSpecVisitor<TResult>,
@@ -4490,8 +4484,7 @@ export interface ResourceRuntimeControlAttemptPruneStoreResult {
   affectedDeploymentCount: number;
 }
 
-export interface ResourceRuntimeControlAttemptPruneResult
-  extends ResourceRuntimeControlAttemptPruneStoreResult {
+export interface ResourceRuntimeControlAttemptPruneResult extends ResourceRuntimeControlAttemptPruneStoreResult {
   schemaVersion: "resources.runtime-control-attempts.prune/v1";
   before: string;
   deploymentId?: string;
@@ -5001,8 +4994,7 @@ export interface ResourceRuntimeLogArchiveShowResult {
   archive: ResourceRuntimeLogArchiveDetail;
 }
 
-export interface ResourceRuntimeLogArchivePruneResult
-  extends ResourceRuntimeLogArchivePruneStoreResult {
+export interface ResourceRuntimeLogArchivePruneResult extends ResourceRuntimeLogArchivePruneStoreResult {
   schemaVersion: "resources.runtime-log-archives.prune/v1";
   before: string;
   resourceId?: string;
@@ -10055,6 +10047,8 @@ export interface SourceWorkspaceDiscoveryEvidence {
 export interface SourceDetectionInput {
   baseDirectory?: string;
   allowUnrecognizedRoot?: boolean;
+  /** Exact CLI `deploy .` path printed as summary.Source. */
+  cliResolvedSource?: string;
 }
 
 export type RequestedDeploymentMethod =
@@ -10317,9 +10311,7 @@ export interface DefaultAccessDomainPolicyUpsertSpec {
   accept<TResult>(visitor: DefaultAccessDomainPolicyUpsertSpecVisitor<TResult>): TResult;
 }
 
-export class DefaultAccessDomainPolicyByScopeSpec
-  implements DefaultAccessDomainPolicySelectionSpec
-{
+export class DefaultAccessDomainPolicyByScopeSpec implements DefaultAccessDomainPolicySelectionSpec {
   private constructor(public readonly scope: DefaultAccessDomainPolicyScope) {}
 
   static create(scope: DefaultAccessDomainPolicyScope): DefaultAccessDomainPolicyByScopeSpec {
