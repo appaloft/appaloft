@@ -45,3 +45,11 @@ Spec confirmed from owner product lock 2026-08-21.
 - A second credentials file
 - Changing `code` / `workspace` fail-fast login
 - Token paste into chat or env-var export as the human path
+
+## Current Implementation Notes And Migration Gaps
+
+- CLI unit-test preload strips inherited `CI` and coding-agent keys so GitHub
+  Actions / agent hosts do not trip the product guard. Tests that want the
+  guard pass a dedicated env object. User CI without `--yes` still blocks.
+- Shell e2e `runShellCli` confirms `deploy` with `--yes` because those helpers
+  are non-TTY operators that intend to mutate.

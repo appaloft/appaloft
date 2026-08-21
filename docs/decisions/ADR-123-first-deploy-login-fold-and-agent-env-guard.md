@@ -42,6 +42,8 @@ second credentials file; never expose Occupancy in CLI chrome; doors stay
 - Spec 142 `FOLDER-ONBOARD-008` login miss on `deploy` now starts login.
 - Public first-deployment and CLI login docs describe folded login and `--yes`.
 - Expected public SemVer: minor CLI presentation change.
+- Appaloft's own unit/e2e helpers strip inherited `CI` / coding-agent keys
+  and confirm e2e `deploy` with `--yes`. User CI still requires `--yes`.
 
 ## Rejected Alternatives
 
