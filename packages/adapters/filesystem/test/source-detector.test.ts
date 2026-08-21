@@ -354,6 +354,26 @@ describe("FileSystemSourceDetector", () => {
       affectedProfileField: "source.baseDirectory",
     });
   });
+
+  test("[DEP-CREATE-PKG-007] keeps a missing hyphenated local-folder locator", async () => {
+    ensureReflectMetadata();
+    const [{ createExecutionContext }, { FileSystemSourceDetector }] = await Promise.all([
+      import("@appaloft/application"),
+      import("../src"),
+    ]);
+    const locator = "/Users/nichenqin/projects/nux-9859a0e9-static";
+
+    const result = await new FileSystemSourceDetector().detect(
+      createExecutionContext({ entrypoint: "cli", requestId: "req_missing_hyphenated" }),
+      locator,
+      { allowUnrecognizedRoot: true },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().source.locator).toBe(locator);
+    expect(result._unsafeUnwrap().source.locator).not.toBe("/Users/nichenqin/projects");
+    expect(result._unsafeUnwrap().source.kind).toBe("local-folder");
+  });
 });
 
 async function createGitRemote(name: string, files: Record<string, string>): Promise<string> {

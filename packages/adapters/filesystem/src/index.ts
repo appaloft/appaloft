@@ -1470,7 +1470,7 @@ export class FileSystemSourceDetector implements SourceDetector {
         const checkoutRoot = remoteCheckout.value;
 
         try {
-          const absolutePath = checkoutRoot ?? resolve(locator);
+          const absolutePath = checkoutRoot ?? (isAbsolute(locator) ? locator : resolve(locator));
           const localWorkspace =
             existsSync(absolutePath) && statSync(absolutePath).isDirectory()
               ? discoverLocalWorkspace(absolutePath, input)

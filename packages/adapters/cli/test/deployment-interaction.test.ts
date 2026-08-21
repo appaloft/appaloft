@@ -259,6 +259,14 @@ describe("CLI quick deploy draft mapping", () => {
         deploymentMethod: "workspace-commands",
       }),
     ).toBe(false);
+
+    expect(
+      shouldConfigureReusableResourceSource({
+        seed: {},
+        sourceLocator: "/Users/nichenqin/projects/nux-9859a0e9-static",
+        deploymentMethod: "static",
+      }),
+    ).toBe(true);
   });
 
   test("[QUICK-DEPLOY-WF-067] reuses an enrolled localhost local-shell instead of registering 127.0.0.1", async () => {

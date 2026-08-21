@@ -1832,6 +1832,7 @@ export function shouldConfigureReusableResourceSource(input: {
     input.deploymentMethod === "prebuilt-image" ||
       input.deploymentMethod === "docker-compose" ||
       input.deploymentMethod === "helm" ||
+      input.deploymentMethod === "static" ||
       isRemoteOrImageSource(input.sourceLocator) ||
       input.seed.sourceProfile?.gitRef ||
       input.seed.sourceProfile?.commitSha ||

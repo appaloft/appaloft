@@ -1,7 +1,10 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { ash } from "@appaloft/ash";
-import { normalizeLocalSourceWorkingDirectory } from "./local-source-workdir";
+import {
+  resolveLocalWorkspaceWorkdir,
+  safeLocalSourceBaseDirectory,
+} from "./local-source-workdir";
 import {
   createDeploymentProgressEvent,
   deploymentProgressSteps,
@@ -236,7 +239,10 @@ export function summarizeSshCommandFailureOutput(input: {
   return summary.length > 800 ? `${summary.slice(0, 797)}...` : summary;
 }
 
-export { normalizeLocalSourceWorkingDirectory } from "./local-source-workdir";
+export {
+  normalizeLocalSourceWorkingDirectory,
+  resolveLocalWorkspaceWorkdir,
+} from "./local-source-workdir";
 
 export function sshStaticPublishDirectoryRelativePath(publishDirectory: string): string | null {
   return staticPublishDirectoryForDockerCopy(publishDirectory);
@@ -290,10 +296,6 @@ function redactSecrets(input: string, secrets: readonly string[] = []): string {
     (text, secret) => (secret.length > 0 ? text.replaceAll(secret, "[redacted]") : text),
     input,
   );
-}
-
-function normalizeWorkingDirectory(locator: string): string {
-  return normalizeLocalSourceWorkingDirectory(locator);
 }
 
 function normalizeDockerImage(locator: string): string {
@@ -494,18 +496,8 @@ export function buildLocalWorkspaceUploadCommand(input: {
   ].join(" ");
 }
 
-function sourceBaseDirectory(metadata?: Record<string, string>): string | undefined {
-  const baseDirectory = metadata?.baseDirectory?.replace(/^\/+/, "").replace(/\/+$/, "");
-  return baseDirectory ? baseDirectory : undefined;
-}
-
-function localSourceWorkdir(root: string, metadata?: Record<string, string>): string {
-  const baseDirectory = sourceBaseDirectory(metadata);
-  return baseDirectory ? resolve(root, baseDirectory) : root;
-}
-
 function remoteSourceWorkdir(root: string, metadata?: Record<string, string>): string {
-  const baseDirectory = sourceBaseDirectory(metadata);
+  const baseDirectory = safeLocalSourceBaseDirectory(metadata);
   return baseDirectory ? `${root}/${baseDirectory}` : root;
 }
 
@@ -1987,10 +1979,13 @@ export class SshExecutionBackend implements ExecutionBackend {
       };
     }
 
-    const localWorkdir = localSourceWorkdir(
-      normalizeWorkingDirectory(state.runtimePlan.execution.workingDirectory ?? source.locator),
-      source.metadata,
-    );
+    const localWorkdir = resolveLocalWorkspaceWorkdir({
+      ...(state.runtimePlan.execution.workingDirectory
+        ? { workingDirectory: state.runtimePlan.execution.workingDirectory }
+        : {}),
+      locator: source.locator,
+      ...(source.metadata ? { metadata: source.metadata } : {}),
+    });
 
     if (!existsSync(localWorkdir)) {
       const message = `Source working directory does not exist: ${localWorkdir}`;

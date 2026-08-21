@@ -87,6 +87,7 @@ appaloft server capacity inspect --server-id <serverId>
 
 # 4. 已经登录时，同一条文件夹 deploy 会继续创建或复用这个应用。
 #    目录里有 public/index.html 时会自动选 static，不必再写 --method。
+#    源目录保持当前文件夹本身（带连字符的名字也合法），不会收成上一级。
 
 # 5. 或者显式指定配置文件 / profile
 appaloft deploy --config appaloft.yml --config-profile staging
