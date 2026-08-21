@@ -49,7 +49,11 @@ import {
 import { type OperateRendererEvent, type OperateRendererMessage } from "./operate-presentation.js";
 import { removeProcessListener } from "./remove-process-listener.js";
 import { terminateWorkspaceWithRuntimes } from "./workspace-lifecycle-actions.js";
-import { restoreWorkspaceTuiScrollback } from "./workspace-tui-launch.js";
+import {
+  leaveWorkspaceTuiOnce,
+  resetWorkspaceTuiScrollbackRestoreState,
+  restoreWorkspaceTuiScrollback,
+} from "./workspace-tui-launch.js";
 
 export function handleWorkspaceControlWaitScreenInterrupt(input: {
   readonly attached: boolean;
@@ -230,6 +234,7 @@ export type WorkspaceControlRendererMessage =
       readonly type: "progress";
       readonly message: string;
       readonly step?: "credential" | "skills" | "disk";
+      readonly status?: "retrying" | "failed";
     }
   | {
       readonly type: "loading";
@@ -315,6 +320,7 @@ export interface WorkspaceControlRendererSession {
   send(message: WorkspaceControlRendererMessage): Promise<void>;
   events(): AsyncIterable<WorkspaceControlRendererEvent>;
   close(): Promise<void>;
+  readonly ownsLeaveAltScreen?: boolean;
 }
 
 export interface WorkspaceControlPresentationContext {
@@ -326,7 +332,12 @@ export interface WorkspaceControlPresentationContext {
     readonly runtimeId: string;
     readonly argv: readonly string[];
   }): Promise<{ readonly sessionId: string; readonly session: TerminalSession }>;
-  occupyBootstrap?: (input: { reportProgress: (message: string) => Promise<void> }) => Promise<
+  occupyBootstrap?: (input: {
+    reportProgress: (
+      message: string,
+      options?: { readonly status?: "retrying" | "failed" },
+    ) => Promise<void>;
+  }) => Promise<
     | {
         readonly workspaceId: string;
         readonly attach?: SandboxAgentAttachDescriptor;
@@ -917,6 +928,7 @@ export function createBoundedWorkspaceControlPresentation(
 ): WorkspaceControlPresentation {
   return {
     async start(context) {
+      resetWorkspaceTuiScrollbackRestoreState();
       let selectedWorkspaceId: string | undefined;
       let selectedDetail: Extract<WorkspaceControlRendererMessage, { type: "detail" }> | undefined;
       let selectedPromotionRecords: readonly Record<string, unknown>[] = [];
@@ -1099,6 +1111,12 @@ export function createBoundedWorkspaceControlPresentation(
 
       let occupyFailure: unknown;
       let occupyDone: Promise<void> = Promise.resolve();
+      let lastPrepareStep:
+        | {
+            readonly message: string;
+            readonly step: ReturnType<typeof occupancyPrepareStepForProgress>;
+          }
+        | undefined;
       try {
         if (context.occupyBootstrap) {
           await renderer.send({
@@ -1111,12 +1129,17 @@ export function createBoundedWorkspaceControlPresentation(
           });
           occupyDone = context
             .occupyBootstrap({
-              reportProgress: async (message) => {
+              reportProgress: async (message, options) => {
                 if (!presentationOpen) return;
+                lastPrepareStep = {
+                  message,
+                  step: occupancyPrepareStepForProgress(message),
+                };
                 await renderer.send({
                   type: "progress",
                   message,
-                  step: occupancyPrepareStepForProgress(message),
+                  step: lastPrepareStep.step,
+                  ...(options?.status ? { status: options.status } : {}),
                 });
               },
             })
@@ -1145,8 +1168,19 @@ export function createBoundedWorkspaceControlPresentation(
             .catch(async (error) => {
               if (activeTerminal) return;
               occupyFailure = error;
-              restoreWorkspaceTuiScrollback();
-              await renderer.close();
+              if (presentationOpen && lastPrepareStep) {
+                try {
+                  await renderer.send({
+                    type: "progress",
+                    message: lastPrepareStep.message,
+                    step: lastPrepareStep.step,
+                    status: "failed",
+                  });
+                } catch {
+                  // Best-effort failed mark before a single clean leave.
+                }
+              }
+              await leaveWorkspaceTuiOnce(renderer);
             });
         } else {
           await renderer.send({ type: "loading", title: OCCUPANCY_CODE_CHROME_TITLE });

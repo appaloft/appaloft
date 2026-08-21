@@ -812,7 +812,10 @@ export const workspaceCodeCommand = EffectCommand.make(
         if (lineProgress) reportOccupancyCodeProgress(message);
       };
       const occupyRemote = async (
-        onProgress: (message: string) => void,
+        onProgress: (
+          message: string,
+          progress?: { readonly status?: "retrying" | "failed" },
+        ) => void,
         options?: { readonly announcePin?: boolean },
       ) => {
         const explicitServerId = optionalValue(server);
@@ -916,7 +919,7 @@ export const workspaceCodeCommand = EffectCommand.make(
         const openDisk = (workspaceCommand: OpenAgentWorkspaceCommand) =>
           openWorkspaceWithOccupyDiskGatewayRetry(() => cli.executeCommand(workspaceCommand), {
             onRetry: () => {
-              onProgress(occupancyOpeningProgress(door.serverName));
+              onProgress(occupancyOpeningProgress(door.serverName), { status: "retrying" });
             },
           });
         const opened = await openDisk(command.value);
@@ -1021,8 +1024,8 @@ export const workspaceCodeCommand = EffectCommand.make(
               occupyBootstrap: async ({ reportProgress: tuiProgress }) => {
                 const occupied = await withImmediateSigintExit(() =>
                   occupyRemote(
-                    (message) => {
-                      void tuiProgress(message);
+                    (message, progress) => {
+                      void tuiProgress(message, progress);
                     },
                     { announcePin: false },
                   ),

@@ -104,6 +104,7 @@ export interface WorkspaceTuiLaunchSession {
   send(message: unknown): Promise<void>;
   events(): AsyncIterable<WorkspaceTuiLaunchEvent>;
   close(): Promise<void>;
+  readonly ownsLeaveAltScreen?: boolean;
 }
 
 function parseRendererEvent(value: unknown): WorkspaceTuiLaunchEvent | undefined {
@@ -366,9 +367,9 @@ function listen(server: Server): Promise<number> {
 function isErrnoEpipe(error: unknown): boolean {
   return Boolean(
     error &&
-      typeof error === "object" &&
-      "code" in error &&
-      (error as { readonly code?: unknown }).code === "EPIPE",
+    typeof error === "object" &&
+    "code" in error &&
+    (error as { readonly code?: unknown }).code === "EPIPE",
   );
 }
 
@@ -521,6 +522,7 @@ export async function openLoopbackWorkspaceControlRenderer(
     return {
       send: (message) => writeMessage(socket, message),
       events: () => events.iterable(),
+      ownsLeaveAltScreen: true,
       close: async () => {
         if (closed) return;
         closed = true;
@@ -669,6 +671,7 @@ const RUSTUP_CARGO_CHOOSER_RE =
 type WorkspaceTuiScrollbackWriter = (text: string) => void;
 let workspaceTuiScrollbackWriter: WorkspaceTuiScrollbackWriter | undefined;
 let workspaceRendererFailureReported = false;
+let workspaceTuiScrollbackRestored = false;
 
 export function parseRustcRelease(
   versionText: string,
@@ -736,6 +739,15 @@ export function sanitizeWorkspaceRendererFailureText(text: string): string {
 
 export function setWorkspaceTuiScrollbackWriter(write?: WorkspaceTuiScrollbackWriter): void {
   workspaceTuiScrollbackWriter = write;
+  workspaceTuiScrollbackRestored = false;
+}
+
+export function resetWorkspaceTuiScrollbackRestoreState(): void {
+  workspaceTuiScrollbackRestored = false;
+}
+
+export function markWorkspaceTuiScrollbackRestored(): void {
+  workspaceTuiScrollbackRestored = true;
 }
 
 export function resetWorkspaceRendererFailureReport(): void {
@@ -748,17 +760,33 @@ export function claimWorkspaceRendererFailureReport(): boolean {
   return true;
 }
 
-export function restoreWorkspaceTuiScrollback(
-  write: WorkspaceTuiScrollbackWriter = workspaceTuiScrollbackWriter ??
-    ((text) => {
+export function restoreWorkspaceTuiScrollback(write?: WorkspaceTuiScrollbackWriter): void {
+  const explicit = write !== undefined;
+  if (!explicit && workspaceTuiScrollbackRestored) return;
+  workspaceTuiScrollbackRestored = true;
+  const sink =
+    write ??
+    workspaceTuiScrollbackWriter ??
+    ((text: string) => {
       process.stdout.write(text);
-    }),
-): void {
+    });
   try {
-    write(`${WORKSPACE_TUI_LEAVE_ALT_SCREEN}${WORKSPACE_TUI_DISABLE_MOUSE}\n`);
+    sink(`${WORKSPACE_TUI_LEAVE_ALT_SCREEN}${WORKSPACE_TUI_DISABLE_MOUSE}\n`);
   } catch (error) {
     if (!isErrnoEpipe(error)) throw error;
   }
+}
+
+export async function leaveWorkspaceTuiOnce(renderer: {
+  close(): Promise<void> | void;
+  readonly ownsLeaveAltScreen?: boolean;
+}): Promise<void> {
+  await renderer.close();
+  if (renderer.ownsLeaveAltScreen) {
+    markWorkspaceTuiScrollbackRestored();
+    return;
+  }
+  restoreWorkspaceTuiScrollback();
 }
 
 function failClosedWorkspaceRenderer(
@@ -947,6 +975,7 @@ export function resetWorkspaceControlRendererWarmup(): void {
   warmedWorkspaceControlRenderer = undefined;
   workspaceTuiScrollbackWriter = undefined;
   workspaceRendererFailureReported = false;
+  workspaceTuiScrollbackRestored = false;
 }
 
 export function consumeWarmedWorkspaceControlRenderer():

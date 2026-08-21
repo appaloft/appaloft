@@ -86,9 +86,12 @@ must not use laptop HEAD as Workspace truth.
     immediate TUI tear-down. The Cloud Agents wait panel stays up; attach waits
     until disk prep succeeds. This is occupy-door recovery only and does not
     replay other commands, drop `targetServerId`, or change Cloud admission.
-    After the bounded retries are exhausted, restore the TTY (`1049l`) and print
-    the human next step from decision-adjacent WS-REMOTE-COMPAT-222. Do not print
-    the Appaloft error-contract sentence while alt-screen is still up.
+    The wait-panel disk step is marked retrying while those retries run, or
+    failed on the last attempt. After the bounded retries are exhausted, close
+    the renderer first so rust Drop leaves alt-screen once, skip a second JS
+    `1049l`, and print the human next step from decision-adjacent
+    WS-REMOTE-COMPAT-222. Do not print the Appaloft error-contract sentence
+    while alt-screen is still up.
 
 ## Consequences
 

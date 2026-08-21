@@ -715,6 +715,8 @@ pub enum ParentMessage {
         message: String,
         #[serde(default)]
         step: Option<String>,
+        #[serde(default)]
+        status: Option<String>,
     },
     Loading {
         #[serde(default)]
@@ -949,13 +951,19 @@ fn infer_prepare_step_id(message: &str) -> &'static str {
     }
 }
 
-fn apply_prepare_step(steps: &mut [OccupancyPrepareStep], step_id: &str) {
+fn apply_prepare_step(steps: &mut [OccupancyPrepareStep], step_id: &str, status: Option<&str>) {
+    let next_status = match status {
+        Some("failed") => "failed",
+        Some("retrying") => "retrying",
+        Some("done") => "done",
+        _ => "active",
+    };
     let mut reached = false;
     for step in steps.iter_mut() {
         if step.id == step_id {
-            step.status = "active".to_owned();
+            step.status = next_status.to_owned();
             reached = true;
-        } else if !reached {
+        } else if !reached && step.status != "failed" {
             step.status = "done".to_owned();
         }
     }
@@ -1112,10 +1120,14 @@ impl AppState {
                     self.status_line = "Connected".to_owned();
                 }
             }
-            ParentMessage::Progress { message, step } => {
+            ParentMessage::Progress {
+                message,
+                step,
+                status,
+            } => {
                 self.loading.active = true;
                 let step_id = step.unwrap_or_else(|| infer_prepare_step_id(&message).to_owned());
-                apply_prepare_step(&mut self.loading.steps, &step_id);
+                apply_prepare_step(&mut self.loading.steps, &step_id, status.as_deref());
                 self.status_line = message;
             }
             ParentMessage::Loading {
@@ -2379,6 +2391,11 @@ fn occupancy_loading_step_lines(state: &AppState) -> Vec<Line<'static>> {
                     format!("{} ", spinner_frame(state.loading.tick)),
                     Style::default().fg(Color::Cyan),
                 ),
+                "retrying" => (
+                    format!("{} ", spinner_frame(state.loading.tick)),
+                    Style::default().fg(Color::Yellow),
+                ),
+                "failed" => ("! ".to_string(), Style::default().fg(Color::Red)),
                 "done" => ("✓ ".to_string(), Style::default().fg(Color::DarkGray)),
                 _ => ("○ ".to_string(), Style::default().fg(Color::DarkGray)),
             };
@@ -3311,6 +3328,7 @@ mod tests {
         state.apply(ParentMessage::Progress {
             message: "Preparing disk on hostinger…".to_owned(),
             step: None,
+            status: None,
         });
         state.apply(ParentMessage::Workspaces {
             workspaces: Vec::new(),
@@ -3386,14 +3404,17 @@ mod tests {
         state.apply(ParentMessage::Progress {
             message: "Checking login…".to_owned(),
             step: None,
+            status: None,
         });
         state.apply(ParentMessage::Progress {
             message: "Preparing skills…".to_owned(),
             step: Some("skills".to_owned()),
+            status: None,
         });
         state.apply(ParentMessage::Progress {
             message: "Preparing disk on hostinger…".to_owned(),
             step: Some("disk".to_owned()),
+            status: None,
         });
         assert_eq!(
             occupancy_chrome_header(&state),
@@ -3704,10 +3725,12 @@ mod tests {
         state.apply(ParentMessage::Progress {
             message: "Checking login…".to_owned(),
             step: None,
+            status: None,
         });
         state.apply(ParentMessage::Progress {
             message: "Preparing disk on hostinger…".to_owned(),
             step: None,
+            status: None,
         });
         state.apply(ParentMessage::Workspaces {
             workspaces: vec![WorkspaceSummary {
@@ -3789,6 +3812,91 @@ mod tests {
             "revealing the tree during wait is not attach focus_mode"
         );
         assert!(!state.should_emit_workspace_select());
+    }
+
+    #[test]
+    fn ws_remote_progress_223_disk_step_marks_retrying_then_failed() {
+        let mut state = AppState::default();
+        state.apply(ParentMessage::Loading {
+            collapsed: Some(true),
+            title: Some("Appaloft Cloud Agents".to_owned()),
+            project: Some("appaloft-clo-cloud".to_owned()),
+        });
+        state.apply(ParentMessage::Progress {
+            message: "Checking login…".to_owned(),
+            step: Some("credential".to_owned()),
+            status: None,
+        });
+        state.apply(ParentMessage::Progress {
+            message: "Preparing skills…".to_owned(),
+            step: Some("skills".to_owned()),
+            status: None,
+        });
+        state.apply(ParentMessage::Progress {
+            message: "Preparing disk on hostinger…".to_owned(),
+            step: Some("disk".to_owned()),
+            status: None,
+        });
+        state.apply(ParentMessage::Progress {
+            message: "Preparing disk on hostinger…".to_owned(),
+            step: Some("disk".to_owned()),
+            status: Some("retrying".to_owned()),
+        });
+        assert_eq!(
+            state
+                .loading
+                .steps
+                .iter()
+                .map(|step| (step.label.as_str(), step.status.as_str()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("Checking login", "done"),
+                ("Preparing skills", "done"),
+                ("Preparing disk", "retrying")
+            ]
+        );
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw retrying disk");
+        let retrying = buffer_plain(&terminal);
+        assert_first_screen_one_prepare_column(&retrying);
+        assert!(retrying.contains("Preparing disk"), "{retrying}");
+        assert!(!retrying.contains('!'), "{retrying}");
+        state.apply(ParentMessage::Progress {
+            message: "Preparing disk on hostinger…".to_owned(),
+            step: Some("disk".to_owned()),
+            status: Some("failed".to_owned()),
+        });
+        assert_eq!(
+            state
+                .loading
+                .steps
+                .iter()
+                .map(|step| step.status.as_str())
+                .collect::<Vec<_>>(),
+            vec!["done", "done", "failed"]
+        );
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw failed disk");
+        let failed = buffer_plain(&terminal);
+        assert!(failed.contains("Appaloft Cloud Agents"), "{failed}");
+        assert!(failed.contains("preparing the agent"), "{failed}");
+        assert!(
+            !failed.lines().any(line_clips_agents_title),
+            "title must not clip to Appaloft Cloud Agen:\n{failed}"
+        );
+        assert_eq!(failed.matches("Checking login").count(), 1, "{failed}");
+        assert_eq!(failed.matches("Preparing skills").count(), 1, "{failed}");
+        assert_eq!(failed.matches("Preparing disk").count(), 1, "{failed}");
+        assert!(failed.contains('!'), "{failed}");
+        assert!(
+            !failed.to_ascii_lowercase().contains("occupancy"),
+            "{failed}"
+        );
+        assert!(!state.focus_mode);
     }
 
     #[test]

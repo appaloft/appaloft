@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  leaveWorkspaceTuiOnce,
   resetWorkspaceControlRendererWarmup,
+  resetWorkspaceTuiScrollbackRestoreState,
   resolveCodeWorkspaceControlRendererBinary,
   resolveWorkspaceControlRendererBinary,
   restoreWorkspaceTuiScrollback,
@@ -330,5 +332,38 @@ describe("occupancy TUI slim launch", () => {
     expect(stderr).not.toMatch(/occupancy/iu);
     const combined = `${stdout}${stderr}`;
     expect(combined.indexOf("\x1b[?1049l")).toBeLessThan(combined.indexOf("error:"));
+  });
+
+  test("[WS-REMOTE-PROGRESS-219] restoreWorkspaceTuiScrollback writes 1049l once", () => {
+    resetWorkspaceTuiScrollbackRestoreState();
+    const writes: string[] = [];
+    setWorkspaceTuiScrollbackWriter((text) => {
+      writes.push(text);
+    });
+    restoreWorkspaceTuiScrollback();
+    restoreWorkspaceTuiScrollback();
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toContain(WORKSPACE_TUI_LEAVE_ALT_SCREEN);
+    expect(writes[0]).toContain("\x1b[?1049l");
+    resetWorkspaceControlRendererWarmup();
+  });
+
+  test("[WS-REMOTE-PROGRESS-223] leaveWorkspaceTuiOnce closes rust first and skips a second 1049l", async () => {
+    resetWorkspaceTuiScrollbackRestoreState();
+    const writes: string[] = [];
+    setWorkspaceTuiScrollbackWriter((text) => {
+      writes.push(text);
+    });
+    const rustLeaves: string[] = [];
+    await leaveWorkspaceTuiOnce({
+      ownsLeaveAltScreen: true,
+      close: () => {
+        rustLeaves.push(WORKSPACE_TUI_LEAVE_ALT_SCREEN);
+      },
+    });
+    restoreWorkspaceTuiScrollback();
+    expect(rustLeaves).toHaveLength(1);
+    expect(writes).toHaveLength(0);
+    resetWorkspaceControlRendererWarmup();
   });
 });
