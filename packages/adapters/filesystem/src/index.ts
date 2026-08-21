@@ -284,7 +284,7 @@ function matchesNodeFrameworkSignal(input: {
   return Boolean(
     (input.signal.packages &&
       hasAnyPackage(input.dependencies, input.devDependencies, input.signal.packages)) ||
-      (input.signal.files && hasAnyFile(input.path, input.signal.files)),
+    (input.signal.files && hasAnyFile(input.path, input.signal.files)),
   );
 }
 
@@ -1172,11 +1172,11 @@ function isDeployableInspection(path: string, inspection: SourceInspectionSnapsh
 
   return Boolean(
     !isNodeWorkspaceContainer &&
-      (inspection.runtimeFamily ||
-        inspection.applicationShape ||
-        inspection.framework ||
-        inspection.hasDetectedFile("dockerfile") ||
-        inspection.hasDetectedFile("compose-manifest")),
+    (inspection.runtimeFamily ||
+      inspection.applicationShape ||
+      inspection.framework ||
+      inspection.hasDetectedFile("dockerfile") ||
+      inspection.hasDetectedFile("compose-manifest")),
   );
 }
 

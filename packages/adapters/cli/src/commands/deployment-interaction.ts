@@ -1830,13 +1830,13 @@ export function shouldConfigureReusableResourceSource(input: {
 }): boolean {
   return Boolean(
     input.deploymentMethod === "prebuilt-image" ||
-      input.deploymentMethod === "docker-compose" ||
-      input.deploymentMethod === "helm" ||
-      input.deploymentMethod === "static" ||
-      isRemoteOrImageSource(input.sourceLocator) ||
-      input.seed.sourceProfile?.gitRef ||
-      input.seed.sourceProfile?.commitSha ||
-      input.seed.sourceProfile?.baseDirectory,
+    input.deploymentMethod === "docker-compose" ||
+    input.deploymentMethod === "helm" ||
+    input.deploymentMethod === "static" ||
+    isRemoteOrImageSource(input.sourceLocator) ||
+    input.seed.sourceProfile?.gitRef ||
+    input.seed.sourceProfile?.commitSha ||
+    input.seed.sourceProfile?.baseDirectory,
   );
 }
 
@@ -1964,10 +1964,10 @@ function networkProfilesMatch(input: {
 function shouldConfigureReusableResourceNetwork(seed: DeploymentPromptSeed): boolean {
   return Boolean(
     seed.port ||
-      seed.upstreamProtocol ||
-      seed.exposureMode ||
-      seed.targetServiceName ||
-      seed.hostPort,
+    seed.upstreamProtocol ||
+    seed.exposureMode ||
+    seed.targetServiceName ||
+    seed.hostPort,
   );
 }
 
@@ -1993,14 +1993,14 @@ function resolveReusableResourceNetworkProfile(input: {
 function shouldConfigureReusableResourceRuntime(seed: DeploymentPromptSeed): boolean {
   return Boolean(
     (seed.deploymentMethod && seed.deploymentMethod !== "workspace-commands") ||
-      seed.installCommand ||
-      seed.buildCommand ||
-      seed.startCommand ||
-      seed.runtimeName ||
-      seed.publishDirectory ||
-      seed.dockerfilePath ||
-      seed.dockerComposeFilePath ||
-      seed.buildTarget,
+    seed.installCommand ||
+    seed.buildCommand ||
+    seed.startCommand ||
+    seed.runtimeName ||
+    seed.publishDirectory ||
+    seed.dockerfilePath ||
+    seed.dockerComposeFilePath ||
+    seed.buildTarget,
   );
 }
 
@@ -2199,9 +2199,9 @@ function isManagedDependencyResource(
 ): resource is DependencyResourceSummary {
   return Boolean(
     resource &&
-      resource.kind === dependency.kind &&
-      !resource.deletedAt &&
-      (resource.providerManaged || resource.sourceMode === "appaloft-managed"),
+    resource.kind === dependency.kind &&
+    !resource.deletedAt &&
+    (resource.providerManaged || resource.sourceMode === "appaloft-managed"),
   );
 }
 
@@ -2211,11 +2211,11 @@ function isImportedDependencyResource(
 ): resource is DependencyResourceSummary {
   return Boolean(
     resource &&
-      resource.kind === dependency.kind &&
-      !resource.deletedAt &&
-      resource.sourceMode === "imported-external" &&
-      resource.lifecycleStatus === "ready" &&
-      resource.bindingReadiness.status !== "blocked",
+    resource.kind === dependency.kind &&
+    !resource.deletedAt &&
+    resource.sourceMode === "imported-external" &&
+    resource.lifecycleStatus === "ready" &&
+    resource.bindingReadiness.status !== "blocked",
   );
 }
 
@@ -2234,11 +2234,11 @@ function isReadyManagedDependencyResource(
 ): boolean {
   return Boolean(
     isManagedDependencyResource(resource, dependency) &&
-      resource.lifecycleStatus === "ready" &&
-      resource.bindingReadiness.status === "ready" &&
-      (resource.sourceMode !== "appaloft-managed" ||
-        !resource.providerManaged ||
-        resource.providerRealization?.status === "ready"),
+    resource.lifecycleStatus === "ready" &&
+    resource.bindingReadiness.status === "ready" &&
+    (resource.sourceMode !== "appaloft-managed" ||
+      !resource.providerManaged ||
+      resource.providerRealization?.status === "ready"),
   );
 }
 
@@ -2972,10 +2972,10 @@ function isManagedStorageVolume(
 ): storageVolume is StorageVolumeSummary {
   return Boolean(
     storageVolume &&
-      storageVolume.kind === "named-volume" &&
-      storageVolume.lifecycleStatus === "active" &&
-      !storageVolume.deletedAt &&
-      !storageVolume.sourcePath,
+    storageVolume.kind === "named-volume" &&
+    storageVolume.lifecycleStatus === "active" &&
+    !storageVolume.deletedAt &&
+    !storageVolume.sourcePath,
   );
 }
 
@@ -4479,21 +4479,21 @@ function resolveAdvancedDeploymentConfig(input: {
     const isStatic = input.deploymentMethod === "static";
     const hasSeedAdvancedConfig = Boolean(
       input.seed.installCommand ||
-        input.seed.buildCommand ||
-        input.seed.startCommand ||
-        input.seed.runtimeName ||
-        input.seed.publishDirectory ||
-        input.seed.dockerfilePath ||
-        input.seed.dockerComposeFilePath ||
-        input.seed.buildTarget ||
-        input.seed.replicas ||
-        input.seed.port ||
-        input.seed.upstreamProtocol ||
-        input.seed.exposureMode ||
-        input.seed.targetServiceName ||
-        input.seed.hostPort ||
-        input.seed.healthCheckPath ||
-        input.seed.healthCheck,
+      input.seed.buildCommand ||
+      input.seed.startCommand ||
+      input.seed.runtimeName ||
+      input.seed.publishDirectory ||
+      input.seed.dockerfilePath ||
+      input.seed.dockerComposeFilePath ||
+      input.seed.buildTarget ||
+      input.seed.replicas ||
+      input.seed.port ||
+      input.seed.upstreamProtocol ||
+      input.seed.exposureMode ||
+      input.seed.targetServiceName ||
+      input.seed.hostPort ||
+      input.seed.healthCheckPath ||
+      input.seed.healthCheck,
     );
     const shouldConfigure =
       isStatic ||
