@@ -2034,7 +2034,11 @@ describe("Agent Workspace CLI", () => {
       commandBus: {
         execute: async <T>(_context: unknown, command: Command<T>) => {
           commands.push(command as Command<unknown>);
-          return ok({ workspaceId: "sbx_billing", name: "api@aaaaaaa", projectId: "prj_billing" } as T);
+          return ok({
+            workspaceId: "sbx_billing",
+            name: "api@aaaaaaa",
+            projectId: "prj_billing",
+          } as T);
         },
       } as unknown as CommandBus,
       queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
@@ -2086,7 +2090,11 @@ describe("Agent Workspace CLI", () => {
       startServer: async () => {},
       commandBus: {
         execute: async <T>() =>
-          ok({ workspaceId: "sbx_whoami", name: "whoami@1ce75d0", projectId: "prj_tk5lovqu2vj8" } as T),
+          ok({
+            workspaceId: "sbx_whoami",
+            name: "whoami@1ce75d0",
+            projectId: "prj_tk5lovqu2vj8",
+          } as T),
       } as unknown as CommandBus,
       queryBus: {
         execute: async <T>() =>
@@ -2151,7 +2159,11 @@ describe("Agent Workspace CLI", () => {
       startServer: async () => {},
       commandBus: {
         execute: async <T>() =>
-          ok({ workspaceId: "sbx_whoami", name: "whoami@1ce75d0", projectId: "prj_tk5lovqu2vj8" } as T),
+          ok({
+            workspaceId: "sbx_whoami",
+            name: "whoami@1ce75d0",
+            projectId: "prj_tk5lovqu2vj8",
+          } as T),
       } as unknown as CommandBus,
       queryBus: {
         execute: async <T>() =>
@@ -2395,9 +2407,8 @@ describe("Agent Workspace CLI", () => {
     const commands: Command<unknown>[] = [];
     const output: string[] = [];
     const { createCliProgram } = await import("../src");
-    const { OpenAgentWorkspaceCommand, WriteSandboxFileCommand } = await import(
-      "@appaloft/application"
-    );
+    const { OpenAgentWorkspaceCommand, WriteSandboxFileCommand } =
+      await import("@appaloft/application");
     const program = createCliProgram({
       version: "0.1.0-test",
       startServer: async () => {},
@@ -2694,7 +2705,11 @@ describe("Agent Workspace CLI", () => {
             expect(output.join("")).toContain("Preparing disk on hostinger…");
             events.push("occupy");
             await Bun.sleep(15);
-            return ok({ workspaceId: "sbx_progress", name: "api@aaaaaaa", projectId: "prj_web" } as T);
+            return ok({
+              workspaceId: "sbx_progress",
+              name: "api@aaaaaaa",
+              projectId: "prj_web",
+            } as T);
           }
           events.push("skill");
           return ok({} as T);
@@ -2821,16 +2836,19 @@ describe("Agent Workspace CLI", () => {
     process.env.APPALOFT_OCCUPANCY_SKILL_OFFER_TIMEOUT_MS = "25";
     process.env.APPALOFT_OCCUPANCY_SKILL_COMMAND_TIMEOUT_MS = "25";
     const { createCliProgram } = await import("../src");
-    const { OpenAgentWorkspaceCommand, WriteSandboxFileCommand } = await import(
-      "@appaloft/application"
-    );
+    const { OpenAgentWorkspaceCommand, WriteSandboxFileCommand } =
+      await import("@appaloft/application");
     const program = createCliProgram({
       version: "0.1.0-test",
       startServer: async () => {},
       commandBus: {
         execute: async <T>(_context: unknown, command: Command<T>) => {
           if (command instanceof OpenAgentWorkspaceCommand) {
-            return ok({ workspaceId: "sbx_hung_skill", name: "api@aaaaaaa", projectId: "prj_web" } as T);
+            return ok({
+              workspaceId: "sbx_hung_skill",
+              name: "api@aaaaaaa",
+              projectId: "prj_web",
+            } as T);
           }
           if (
             command instanceof WriteSandboxFileCommand &&
@@ -3059,9 +3077,8 @@ describe("Agent Workspace CLI", () => {
     const previousCwd = process.cwd();
     process.chdir(emptyDir);
     const { createCliProgram } = await import("../src");
-    const { workspaceControlRendererUnavailableMessage } = await import(
-      "../src/workspace-tui-launch.js"
-    );
+    const { workspaceControlRendererUnavailableMessage } =
+      await import("../src/workspace-tui-launch.js");
     const program = createCliProgram({
       version: "0.1.0-test",
       startServer: async () => {},
@@ -4618,7 +4635,8 @@ function createCliFolderOccupancyOpen(options: {
         },
       },
       sandboxes: {
-        create: async () => ok({ sandboxId: "sbx_notes", name: "resonant-silence", status: "ready" }),
+        create: async () =>
+          ok({ sandboxId: "sbx_notes", name: "resonant-silence", status: "ready" }),
         resume: async (_context, workspaceId) =>
           ok({ sandboxId: workspaceId, name: "resonant-silence", status: "ready" }),
         exec: async (_context, _workspaceId, command) => {

@@ -267,9 +267,9 @@ describe("ExecutionSandboxService", () => {
     const namedApp = service(provider().adapter);
     const named = await namedApp.create(context, { ...createInput, directoryName: "hello-static" });
     expect(named._unsafeUnwrap().name).toBe("hello-static");
-    expect((await namedApp.show(context, named._unsafeUnwrap().sandboxId))._unsafeUnwrap().name).toBe(
-      "hello-static",
-    );
+    expect(
+      (await namedApp.show(context, named._unsafeUnwrap().sandboxId))._unsafeUnwrap().name,
+    ).toBe("hello-static");
   });
 
   test("[SBX-API-003] public create closes provisioning for synchronous external callers", async () => {

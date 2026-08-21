@@ -174,12 +174,7 @@ export const publicDocsHelpTopics = {
     surfaces: ["cli"],
     anchor: "agent-workspace-display-name",
     relatedOperation: "workspaces.open",
-    aliases: [
-      "workspace name",
-      "sandbox display name",
-      "resonant-silence",
-      "repo@sha",
-    ],
+    aliases: ["workspace name", "sandbox display name", "resonant-silence", "repo@sha"],
     specReferences: [
       "docs/decisions/ADR-124-sandbox-display-name.md",
       "docs/specs/139-remote-agent-door/spec.md",

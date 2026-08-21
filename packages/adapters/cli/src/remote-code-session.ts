@@ -139,8 +139,8 @@ export interface RemoteCodeDoorProbe {
 export function hasRemoteCodeLogin(env: NodeJS.ProcessEnv = process.env): boolean {
   return Boolean(
     env.APPALOFT_TOKEN?.trim() ||
-      env.APPALOFT_AUTHORIZATION?.trim() ||
-      env.APPALOFT_AUTH_COOKIE?.trim(),
+    env.APPALOFT_AUTHORIZATION?.trim() ||
+    env.APPALOFT_AUTH_COOKIE?.trim(),
   );
 }
 

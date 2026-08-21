@@ -143,9 +143,7 @@ import { terminateWorkspaceWithRuntimes } from "../workspace-lifecycle-actions.j
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const workspaceId = Args.text({ name: "name" }).pipe(
-  Args.withDescription(
-    "Workspace display name. Scripts may pass the sandbox id from JSON/--json.",
-  ),
+  Args.withDescription("Workspace display name. Scripts may pass the sandbox id from JSON/--json."),
 );
 const pathOrGitRemoteArg = Args.text({ name: "path|git-remote" }).pipe(
   Args.withDefault("."),
@@ -333,9 +331,7 @@ function isSandboxIdToken(token: string): boolean {
   return /^sbx_[A-Za-z0-9_.-]+$/u.test(token);
 }
 
-const resolveWorkspaceRef = (
-  token: string,
-): Effect.Effect<string, DomainError, CliRuntime> =>
+const resolveWorkspaceRef = (token: string): Effect.Effect<string, DomainError, CliRuntime> =>
   Effect.gen(function* () {
     const trimmed = token.trim();
     if (isSandboxIdToken(trimmed)) return trimmed;
