@@ -53,11 +53,13 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
           BEFORE_SHA: ${{ github.event.before }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          FORCE_E2E_FULL: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'e2e') }}
           HEAD_REF: ${{ github.head_ref || github.ref_name }}
         run: bun scripts/ci/classify-changed-files.ts
 
+  # Never job-level skip: required names e2e (1, 2) and e2e (2, 2) stay Waiting
+  # if this job does not start (drafts included). Echo-skip inside the shards.
   e2e:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false }}
     needs: changes
     runs-on: ubuntu-latest
     strategy:

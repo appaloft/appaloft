@@ -108,6 +108,14 @@ export function findCiChangeClassifierViolations(
   }
 
   const e2eJob = yamlBlock(e2eWorkflow, /^ {2}e2e:\s*$/, 2);
+  if (/^ {4}if:/m.test(e2eJob)) {
+    violations.push({
+      message:
+        "e2e.yml must not job-level skip e2e (including drafts); required e2e (1, 2) and e2e (2, 2) names must still conclude.",
+      rule: "shared-change-classifier",
+    });
+  }
+
   if (/^ {4}services:\s*$/m.test(e2eJob)) {
     violations.push({
       message:

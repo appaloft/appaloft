@@ -315,20 +315,11 @@ describe("CI change classifier", () => {
     }
   });
 
-  test("[CI-E2E-SCOPE-003] product runtime, lockfiles, harness, and empty diffs stay full E2E", () => {
+  test("[CI-E2E-SCOPE-003] mixed web+product, empty diffs, and force stay full E2E", () => {
     const fullSets = [
-      ["packages/core/src/index.ts"],
-      ["apps/shell/src/index.ts"],
-      ["apps/shell/test/e2e/support/shell-e2e-fixture.ts"],
-      ["apps/shell/test/help-without-runtime.test.ts"],
       ["apps/shell/test/e2e/certificates.command.e2e.ts", "apps/web/src/routes/+page.svelte"],
       ["apps/web/src/routes/+page.svelte", "package.json"],
-      ["bun.lock"],
-      ["scripts/ci/classify-changed-files.ts"],
-      ["scripts/test/wait-for-http.ts"],
-      ["apps/desktop/src-tauri/src/main.rs"],
-      [".github/actions/setup-bun-turbo/action.yml"],
-      ["apps/shell/package.json"],
+      ["apps/web/src/routes/+page.svelte", "packages/core/src/index.ts"],
     ];
 
     for (const files of fullSets) {
@@ -344,6 +335,18 @@ describe("CI change classifier", () => {
       e2eClass: "e2e_full",
       lightweightOnly: false,
     });
+    expect(
+      classifyChangedFiles(["packages/adapters/cli/src/setup-help.ts"], { forceE2eFull: true }),
+    ).toMatchObject({
+      changeClass: "full",
+      e2eClass: "e2e_full",
+      lightweightOnly: false,
+    });
+    expect(classifyChangedFiles(docsOnlyPrFiles, { forceE2eFull: true })).toMatchObject({
+      changeClass: "docs_only",
+      e2eClass: "e2e_full",
+      lightweightOnly: true,
+    });
     expect(e2eNeedsWebView("e2e_full")).toBe(true);
     expect(e2eNeedsShell("e2e_full")).toBe(true);
     expect(e2eNeedsBackend("e2e_full")).toBe(true);
@@ -353,11 +356,74 @@ describe("CI change classifier", () => {
     expect(e2eNeedsShardWork("e2e_skip", 2)).toBe(false);
   });
 
+  test("[CI-E2E-SCOPE-005] CLI, setup-help, and inquire-only files are e2e_shell without web", () => {
+    const setupHelpFiles = [
+      "apps/shell/src/index.ts",
+      "apps/shell/test/help-without-runtime.test.ts",
+      "apps/shell/test/occupancy-tui-first-frame.test.ts",
+      "packages/adapters/cli/package.json",
+      "packages/adapters/cli/src/index.ts",
+      "packages/adapters/cli/src/remote-cli-program.ts",
+      "packages/adapters/cli/src/setup-help.ts",
+      "packages/adapters/cli/src/standalone-control-plane.ts",
+      "packages/adapters/cli/test/setup-help.test.ts",
+      "packages/adapters/cli/test/standalone-control-plane.test.ts",
+      "packages/adapters/cli/test/user-visible-occupancy-forbidden.test.ts",
+    ];
+    const inquireFiles = [
+      "apps/shell/src/index.ts",
+      "apps/shell/src/occupancy-cli-progress.ts",
+      "apps/shell/src/occupancy-tui-first-frame.ts",
+      "apps/shell/test/occupancy-cli-progress.test.ts",
+      "apps/shell/test/occupancy-tui-first-frame.test.ts",
+      "packages/adapters/cli/src/commands/agent-workspace.ts",
+      "packages/adapters/cli/src/runtime.ts",
+      "packages/adapters/cli/src/workspace-tui-launch.ts",
+      "packages/adapters/cli/test/agent-workspace-command.test.ts",
+      "packages/adapters/cli/test/workspace-control-renderer.test.ts",
+      "packages/adapters/cli/test/workspace-tui-launch.test.ts",
+      "skills/appaloft/references/cli-entrypoints.md",
+    ];
+    const shellOnlySets = [
+      setupHelpFiles,
+      inquireFiles,
+      ["packages/adapters/cli/src/commands/deployment.ts"],
+      ["packages/core/src/index.ts"],
+      ["apps/shell/src/index.ts"],
+      ["apps/shell/test/e2e/support/shell-e2e-fixture.ts"],
+      ["apps/shell/test/help-without-runtime.test.ts"],
+      ["bun.lock"],
+      ["scripts/ci/classify-changed-files.ts"],
+      ["scripts/test/wait-for-http.ts"],
+      ["apps/desktop/src-tauri/src/main.rs"],
+      [".github/actions/setup-bun-turbo/action.yml"],
+      ["apps/shell/package.json"],
+    ];
+
+    for (const files of shellOnlySets) {
+      expect(classifyChangedFiles(files)).toMatchObject({
+        changeClass: "full",
+        e2eClass: "e2e_shell",
+        lightweightOnly: false,
+      });
+      expect(e2eNeedsWebView("e2e_shell")).toBe(false);
+      expect(e2eNeedsShell("e2e_shell")).toBe(true);
+      expect(e2eNeedsBackend("e2e_shell")).toBe(true);
+    }
+
+    expect(classifyChangedFiles(inquireFiles)).toMatchObject({
+      workspaceTuiClass: "tui_full",
+    });
+    expect(classifyChangedFiles(setupHelpFiles)).toMatchObject({
+      workspaceTuiClass: "tui_skip",
+    });
+  });
+
   test("[CI-UNIT-SCOPE-001] CLI-only files still publish Unit Tests without WebView e2e", () => {
     const cliOnly = ["packages/adapters/cli/src/commands/deployment.ts"];
     expect(classifyChangedFiles(cliOnly)).toMatchObject({
       changeClass: "full",
-      e2eClass: "e2e_full",
+      e2eClass: "e2e_shell",
       lightweightOnly: false,
       workspaceTuiClass: "tui_skip",
     });
@@ -401,7 +467,9 @@ describe("CI change classifier", () => {
     expect(e2eWorkflow).toContain(`if: ${expression("steps.shard.outputs.need_work != 'true'")}`);
 
     const e2eJob = e2eWorkflow.slice(e2eWorkflow.indexOf("  e2e:"));
-    expect(e2eJob).not.toMatch(/^ {4}if:.*lightweight_only/m);
+    expect(e2eJob).not.toMatch(/^ {4}if:/m);
+    expect(e2eJob).not.toContain("draft == false");
+    expect(e2eWorkflow).toContain("FORCE_E2E_FULL");
     expect(e2eJob).toContain(`if: ${expression("steps.shard.outputs.need_web == 'true'")}`);
     expect(e2eJob).toContain(`if: ${expression("steps.shard.outputs.need_shell == 'true'")}`);
 
