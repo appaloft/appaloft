@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -111,6 +111,17 @@ describe("shell domain error formatting", () => {
     expect(output).toContain("installationIds=awpi_ptlsoktb2iq1,awpi_b87sxo84xe7u");
     expect(output).toContain("appaloft code --profile awpi_ptlsoktb2iq1");
     expect(output).not.toContain("Workspace activation context is still unavailable");
+  });
+
+  test("[WS-REMOTE-PROGRESS-219] writeDomainError restores alt-screen before stderr", () => {
+    const source = readFileSync(join(import.meta.dir, "../src/run.ts"), "utf8");
+    const fnAt = source.indexOf("function writeDomainError");
+    const restoreAt = source.indexOf("restoreOccupancyAltScreenIfEntered()", fnAt);
+    const writeAt = source.indexOf("process.stderr.write", fnAt);
+    expect(fnAt).toBeGreaterThan(-1);
+    expect(restoreAt).toBeGreaterThan(fnAt);
+    expect(restoreAt).toBeLessThan(writeAt);
+    expect(source).toContain('from "./occupancy-tui-first-frame"');
   });
 
   test("prints login guidance for unauthenticated remote doors", () => {

@@ -2706,6 +2706,45 @@ describe("CLI remote control-plane client", () => {
     expect(requests).toHaveLength(1);
   });
 
+  test("[CONTROL-PLANE-CLI-021] unstructured JSON keeps HTTP status and a truncated body preview", async () => {
+    const result = await requestControlPlaneOperation({
+      profile: profile("local"),
+      operationKey: "workspaces.open",
+      body: {
+        repository: "https://github.com/appaloft/appaloft.git",
+        repositoryIdentity: "github.com/appaloft/appaloft",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "a".repeat(40),
+      },
+      fetch: async () =>
+        jsonResponse(
+          {
+            error: "exec failed",
+            code: "runtime_exec_failed",
+            detail: "command not found",
+          },
+          500,
+        ),
+      phase: "remote-operation-dispatch",
+    });
+
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("sdk_unstructured_error");
+    expect(error.message).toContain(
+      "The server returned an error that did not match the Appaloft error contract.",
+    );
+    expect(error.message).toContain("HTTP 500");
+    expect(error.message).toContain("code runtime_exec_failed");
+    expect(error.message).toContain("command not found");
+    expect(error.details).toMatchObject({
+      phase: "remote-operation-dispatch",
+      status: 500,
+      remoteCode: "runtime_exec_failed",
+    });
+    expect(error.message).not.toMatch(/occupancy/iu);
+  });
+
   test("[CONTROL-PLANE-CLI-021] preserves structured JSON command errors despite an HTML content type", async () => {
     const result = await requestControlPlaneOperation({
       profile: profile("local"),

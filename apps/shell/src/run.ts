@@ -58,6 +58,7 @@ import {
   shouldPrintOccupancyLineProgress,
   shouldSkipLocalPgliteForOccupancyCli,
 } from "./occupancy-cli-progress";
+import { restoreOccupancyAltScreenIfEntered } from "./occupancy-tui-first-frame";
 import {
   prepareRemotePgliteStateSync,
   type RemotePgliteStateSyncSession,
@@ -213,6 +214,7 @@ export function formatDomainError(error: DomainError): string {
 }
 
 function writeDomainError(error: DomainError): void {
+  restoreOccupancyAltScreenIfEntered();
   process.stderr.write(
     process.env.APPALOFT_ERROR_FORMAT === "safe-json"
       ? formatSafeCliError(error)

@@ -281,4 +281,54 @@ describe("occupancy TUI slim launch", () => {
     expect(stderr).not.toContain("Workspace renderer appaloft-workspace-tui is unavailable");
     expect(stderr.split("TTY attach needs").length - 1).toBe(1);
   });
+
+  test("[WS-REMOTE-PROGRESS-219] printCliError restores TTY before a control-plane unstructured error", async () => {
+    const { Effect } = await import("effect");
+    const { printCliError } = await import("../src/runtime.js");
+    resetWorkspaceControlRendererWarmup();
+    let stdout = "preparing the agent";
+    let stderr = "";
+    const originalStdout = process.stdout.write.bind(process.stdout);
+    const originalStderr = process.stderr.write.bind(process.stderr);
+    const originalExitCode = process.exitCode;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      return true;
+    }) as typeof process.stdout.write;
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      stderr += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      return true;
+    }) as typeof process.stderr.write;
+    const unstructured = {
+      code: "sdk_unstructured_error",
+      category: "infra",
+      message:
+        'The server returned an error that did not match the Appaloft error contract. HTTP 500 code exec_failed. Body: {"error":"omp: not found"}',
+      retryable: false,
+      details: {
+        status: 500,
+        remoteCode: "exec_failed",
+        bodyPreview: '{"error":"omp: not found"}',
+      },
+    };
+    try {
+      await Effect.runPromise(printCliError(unstructured));
+    } finally {
+      process.stdout.write = originalStdout;
+      process.stderr.write = originalStderr;
+      process.exitCode = originalExitCode ?? 0;
+      resetWorkspaceControlRendererWarmup();
+    }
+    const leaveAt = stdout.indexOf(WORKSPACE_TUI_LEAVE_ALT_SCREEN);
+    expect(leaveAt).toBeGreaterThan(-1);
+    expect(stdout).toContain("\x1b[?1049l");
+    expect(stdout).toContain(WORKSPACE_TUI_DISABLE_MOUSE);
+    expect(`${stdout}error:`).not.toContain("preparing the agenterror:");
+    expect(stdout).not.toContain("error:");
+    expect(stderr).toContain("HTTP 500");
+    expect(stderr).toContain("omp: not found");
+    expect(stderr).not.toMatch(/occupancy/iu);
+    const combined = `${stdout}${stderr}`;
+    expect(combined.indexOf("\x1b[?1049l")).toBeLessThan(combined.indexOf("error:"));
+  });
 });

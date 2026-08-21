@@ -283,6 +283,46 @@ describe("Appaloft SDK auth and structured errors", () => {
     });
   });
 
+  test("[TS-SDK-ERROR-002] unstructured JSON includes HTTP status and a truncated body preview", async () => {
+    const client = createAppaloftSdkClient({
+      baseUrl: "https://appaloft.example/api",
+      fetch: async () =>
+        Response.json(
+          {
+            error: "exec failed",
+            code: "runtime_exec_failed",
+            detail: "command not found",
+          },
+          { status: 500 },
+        ),
+    });
+
+    const result = await client.request({
+      operation: productSessionOperation,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(500);
+      expect(result.error.code).toBe("sdk_unstructured_error");
+      expect(result.error.retryable).toBe(false);
+      expect(result.error.message).toContain(
+        "The server returned an error that did not match the Appaloft error contract.",
+      );
+      expect(result.error.message).toContain("HTTP 500");
+      expect(result.error.message).toContain("code runtime_exec_failed");
+      expect(result.error.message).toContain("Body:");
+      expect(result.error.message).toContain("command not found");
+      expect(result.error.details).toMatchObject({
+        status: 500,
+        remoteCode: "runtime_exec_failed",
+      });
+      expect(typeof result.error.details?.bodyPreview).toBe("string");
+      expect(String(result.error.details?.bodyPreview).length).toBeLessThanOrEqual(241);
+      expect(result.error.message).not.toMatch(/occupancy/iu);
+    }
+  });
+
   test("[TS-SDK-ERROR-002] does not classify a JSON gateway problem document as HTML", async () => {
     const client = createAppaloftSdkClient({
       baseUrl: "https://appaloft.example/api",

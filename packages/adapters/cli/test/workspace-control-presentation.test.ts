@@ -38,6 +38,11 @@ import {
   type WorkspaceControlRendererMessage,
   type WorkspaceControlRendererSession,
 } from "../src/workspace-control-presentation";
+import {
+  setWorkspaceTuiScrollbackWriter,
+  WORKSPACE_TUI_DISABLE_MOUSE,
+  WORKSPACE_TUI_LEAVE_ALT_SCREEN,
+} from "../src/workspace-tui-launch";
 
 class FakeRendererSession implements WorkspaceControlRendererSession {
   readonly messages: WorkspaceControlRendererMessage[] = [];
@@ -2324,5 +2329,108 @@ describe("Workspace control presentation", () => {
       step: "disk",
     });
     expect(renderer.messages.some((message) => message.type === "terminal-ready")).toBeFalse();
+  });
+
+  test("[WS-REMOTE-PROGRESS-219] occupy failure after TUI is drawn restores then prints on the normal screen", async () => {
+    const { Effect } = await import("effect");
+    const { printCliError } = await import("../src/runtime.js");
+    const renderer = new FakeRendererSession([], { hangUntilClose: true });
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+    const timeline: string[] = [];
+    setWorkspaceTuiScrollbackWriter((text) => {
+      timeline.push(`restore:${text}`);
+    });
+    let stdout = "";
+    let stderr = "";
+    const originalStdout = process.stdout.write.bind(process.stdout);
+    const originalStderr = process.stderr.write.bind(process.stderr);
+    const originalExitCode = process.exitCode;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      return true;
+    }) as typeof process.stdout.write;
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      const text = typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      stderr += text;
+      if (text.includes("error:")) timeline.push("error-print");
+      return true;
+    }) as typeof process.stderr.write;
+    const unstructured = {
+      code: "sdk_unstructured_error",
+      category: "infra" as const,
+      message:
+        'The server returned an error that did not match the Appaloft error contract. HTTP 500 code exec_failed. Body: {"error":"omp: not found"}',
+      retryable: false,
+      details: {
+        status: 500,
+        remoteCode: "exec_failed",
+        bodyPreview: '{"error":"omp: not found"}',
+      },
+    };
+    try {
+      await expect(
+        presentation.start({
+          occupyBootstrap: async ({ reportProgress }) => {
+            await reportProgress("Checking login…");
+            throw unstructured;
+          },
+          executeCommand: async () => ok({}),
+          executeQuery: async <T>() => ok({ items: [] } as T),
+        }),
+      ).rejects.toMatchObject({
+        code: "sdk_unstructured_error",
+      });
+      expect(renderer.messages[0]).toEqual({
+        type: "loading",
+        collapsed: true,
+        title: "Appaloft Cloud Agents",
+      });
+      expect(renderer.messages).toContainEqual({
+        type: "progress",
+        message: "Checking login…",
+        step: "credential",
+      });
+      expect(renderer.messages.some((message) => message.type === "error")).toBeFalse();
+      expect(renderer.closed).toBeGreaterThan(0);
+      expect(timeline.some((entry) => entry.startsWith("restore:"))).toBeTrue();
+      expect(timeline.includes("error-print")).toBeFalse();
+      const restoredBeforePrint = timeline.filter((entry) => entry.startsWith("restore:")).join("");
+      expect(restoredBeforePrint).toContain(WORKSPACE_TUI_LEAVE_ALT_SCREEN);
+      expect(restoredBeforePrint).toContain("\x1b[?1049l");
+      expect(restoredBeforePrint).toContain("\x1b[?25h");
+      expect(restoredBeforePrint).toContain(WORKSPACE_TUI_DISABLE_MOUSE);
+
+      await Effect.runPromise(printCliError(unstructured));
+
+      expect(timeline.includes("error-print")).toBeTrue();
+      expect(timeline.findIndex((entry) => entry.startsWith("restore:"))).toBeLessThan(
+        timeline.indexOf("error-print"),
+      );
+      expect(stdout).not.toContain("error:");
+      expect(stderr).toContain("HTTP 500");
+      expect(stderr).toContain("omp: not found");
+      expect(stderr).not.toMatch(/occupancy/iu);
+      expect(JSON.stringify(renderer.messages)).not.toMatch(/occupancy/iu);
+      const source = await Bun.file(
+        new URL("../src/workspace-control-presentation.ts", import.meta.url),
+      ).text();
+      const occupyFailureAt = source.indexOf("occupyFailure = error");
+      const restoreAt = source.indexOf("restoreWorkspaceTuiScrollback()", occupyFailureAt);
+      const closeAt = source.indexOf("renderer.close()", occupyFailureAt);
+      expect(occupyFailureAt).toBeGreaterThan(-1);
+      expect(restoreAt).toBeGreaterThan(occupyFailureAt);
+      expect(closeAt).toBeGreaterThan(restoreAt);
+      const throwAt = source.lastIndexOf("throw occupyFailure");
+      const restoreBeforeThrowAt = source.lastIndexOf("restoreWorkspaceTuiScrollback()", throwAt);
+      expect(restoreBeforeThrowAt).toBeGreaterThan(occupyFailureAt);
+      expect(restoreBeforeThrowAt).toBeLessThan(throwAt);
+    } finally {
+      process.stdout.write = originalStdout;
+      process.stderr.write = originalStderr;
+      process.exitCode = originalExitCode ?? 0;
+      setWorkspaceTuiScrollbackWriter(undefined);
+    }
   });
 });

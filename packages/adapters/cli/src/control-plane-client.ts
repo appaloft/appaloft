@@ -968,7 +968,7 @@ async function requestControlPlaneCatalogRoute(input: {
           {
             ok: false,
             status: response.status,
-            error: domainErrorFromJsonPayload(data.value),
+            error: domainErrorFromJsonPayload(data.value, response.status),
           },
           input.phase,
         ),
@@ -1032,7 +1032,47 @@ function interpolateCatalogRoutePath(
   });
 }
 
-function domainErrorFromJsonPayload(value: unknown): {
+const unstructuredBodyPreviewLimit = 240;
+
+function truncateUnstructuredPreview(text: string): string | undefined {
+  const compact = text.replace(/\s+/g, " ").trim();
+  if (compact.length === 0) return undefined;
+  if (compact.length <= unstructuredBodyPreviewLimit) return compact;
+  return `${compact.slice(0, unstructuredBodyPreviewLimit)}…`;
+}
+
+function unstructuredPayloadPreview(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "string") return truncateUnstructuredPreview(value);
+  try {
+    return truncateUnstructuredPreview(JSON.stringify(value));
+  } catch {
+    return undefined;
+  }
+}
+
+function looseRemoteErrorCode(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined;
+  const candidate = isRecord(value.error) ? value.error : value;
+  if (typeof candidate.code !== "string") return undefined;
+  const code = candidate.code.trim();
+  return code.length > 0 && code.length <= 80 ? code : undefined;
+}
+
+function formatUnstructuredControlPlaneErrorMessage(value: unknown, status?: number): string {
+  const parts = ["Control plane returned an error that did not match the Appaloft error contract."];
+  if (typeof status === "number") parts.push(`HTTP ${status}`);
+  const remoteCode = looseRemoteErrorCode(value);
+  if (remoteCode) parts.push(`code ${remoteCode}`);
+  const body = unstructuredPayloadPreview(value);
+  if (body) parts.push(`Body: ${body}`);
+  return parts.join(" ");
+}
+
+function domainErrorFromJsonPayload(
+  value: unknown,
+  status?: number,
+): {
   readonly code: string;
   readonly category: DomainError["category"];
   readonly message: string;
@@ -1058,11 +1098,18 @@ function domainErrorFromJsonPayload(value: unknown): {
     }
   }
 
+  const remoteCode = looseRemoteErrorCode(value);
+  const body = unstructuredPayloadPreview(value);
   return {
     code: "control_plane_unstructured_error",
     category: "infra",
-    message: "Control plane returned an error that did not match the Appaloft error contract.",
-    retryable: false,
+    message: formatUnstructuredControlPlaneErrorMessage(value, status),
+    retryable: status === 502 || status === 503 || status === 504,
+    details: {
+      ...(typeof status === "number" ? { status } : {}),
+      ...(remoteCode ? { remoteCode } : {}),
+      ...(body ? { bodyPreview: body } : {}),
+    },
   };
 }
 

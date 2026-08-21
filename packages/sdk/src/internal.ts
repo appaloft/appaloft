@@ -844,6 +844,47 @@ export function isAppaloftSdkErrorCode<TCode extends string>(
   return error.code === code;
 }
 
+const unstructuredBodyPreviewLimit = 240;
+
+function truncateUnstructuredPreview(text: string): string | undefined {
+  const compact = text.replace(/\s+/g, " ").trim();
+  if (compact.length === 0) return undefined;
+  if (compact.length <= unstructuredBodyPreviewLimit) return compact;
+  return `${compact.slice(0, unstructuredBodyPreviewLimit)}…`;
+}
+
+function unstructuredPayloadPreview(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "string") return truncateUnstructuredPreview(value);
+  try {
+    return truncateUnstructuredPreview(JSON.stringify(value));
+  } catch {
+    return undefined;
+  }
+}
+
+function looseRemoteErrorCode(value: unknown): string | undefined {
+  if (!isObject(value)) return undefined;
+  const candidate = isObject(value.error) ? value.error : value;
+  if (typeof candidate.code !== "string") return undefined;
+  const code = candidate.code.trim();
+  return code.length > 0 && code.length <= 80 ? code : undefined;
+}
+
+function formatUnstructuredControlPlaneErrorMessage(
+  value: unknown,
+  status?: number,
+  lead = "The server returned an error that did not match the Appaloft error contract.",
+): string {
+  const parts = [lead];
+  if (typeof status === "number") parts.push(`HTTP ${status}`);
+  const remoteCode = looseRemoteErrorCode(value);
+  if (remoteCode) parts.push(`code ${remoteCode}`);
+  const body = unstructuredPayloadPreview(value);
+  if (body) parts.push(`Body: ${body}`);
+  return parts.join(" ");
+}
+
 function parseDomainError(value: unknown, status?: number): DomainErrorResponse {
   if (isDomainErrorResponse(value)) {
     return value;
@@ -856,11 +897,18 @@ function parseDomainError(value: unknown, status?: number): DomainErrorResponse 
     }
   }
 
+  const remoteCode = looseRemoteErrorCode(value);
+  const body = unstructuredPayloadPreview(value);
   return {
     code: "sdk_unstructured_error",
     category: "infra",
-    message: "The server returned an error that did not match the Appaloft error contract.",
+    message: formatUnstructuredControlPlaneErrorMessage(value, status),
     retryable: status === 502 || status === 503 || status === 504,
+    details: {
+      ...(typeof status === "number" ? { status } : {}),
+      ...(remoteCode ? { remoteCode } : {}),
+      ...(body ? { bodyPreview: body } : {}),
+    },
   };
 }
 

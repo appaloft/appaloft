@@ -1110,10 +1110,11 @@ export function createBoundedWorkspaceControlPresentation(
                 },
               );
             })
-            .catch((error) => {
+            .catch(async (error) => {
               if (activeTerminal) return;
               occupyFailure = error;
-              void renderer.close();
+              restoreWorkspaceTuiScrollback();
+              await renderer.close();
             });
         } else {
           await renderer.send({ type: "loading", title: OCCUPANCY_CODE_CHROME_TITLE });
@@ -1505,7 +1506,10 @@ export function createBoundedWorkspaceControlPresentation(
         }
         await renderer.close();
       }
-      if (occupyFailure) throw occupyFailure;
+      if (occupyFailure) {
+        restoreWorkspaceTuiScrollback();
+        throw occupyFailure;
+      }
     },
   };
 }
