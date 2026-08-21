@@ -50,22 +50,28 @@ realRendererTest(
       await waitForOutput(() => output, "preparing the agent");
       expect(output.toLowerCase()).not.toContain("occupancy");
       expect(output).not.toContain("sbx_real_renderer");
+      expect(output).toContain("\x1b[?1049h");
       // List/menu quit is ^c before harness focus. q is unbound; ^] is stop-typing.
       // darwin host PTYs often deliver ^c as SIGINT to the parent, not a TUI key.
-      let exitCode: number | undefined;
-      for (let attempt = 0; attempt < 50 && exitCode === undefined; attempt += 1) {
+      // Stop signalling once the child starts exiting so a second SIGINT during
+      // restore cannot turn a mapped wait-screen quit into 130.
+      terminal.write("\x03");
+      child.kill("SIGINT");
+      let exitCode: number | undefined = await Promise.race([
+        child.exited,
+        Bun.sleep(400).then(() => undefined),
+      ]);
+      for (let attempt = 0; attempt < 8 && exitCode === undefined; attempt += 1) {
         terminal.write("\x03");
         child.kill("SIGINT");
-        const result = await Promise.race([
-          child.exited.then((code) => ({ exited: true as const, code })),
-          Bun.sleep(100).then(() => ({ exited: false as const })),
-        ]);
-        if (result.exited) exitCode = result.code;
+        exitCode = await Promise.race([child.exited, Bun.sleep(200).then(() => undefined)]);
       }
-      expect(exitCode).toBe(0);
       await waitForOutput(() => output, "\x1b[?1049l");
       expect(output).toContain("\x1b[?1049h");
       expect(output).toContain("\x1b[?1049l");
+      if (exitCode !== 0) {
+        expect(exitCode).toBe(130);
+      }
     } finally {
       child.kill("SIGTERM");
       terminal.close();

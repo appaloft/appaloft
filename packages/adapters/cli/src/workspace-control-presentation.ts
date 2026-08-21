@@ -59,7 +59,10 @@ export function handleWorkspaceControlWaitScreenInterrupt(input: {
   if (input.attached) return;
   restoreWorkspaceTuiScrollback();
   void input.close();
-  if (input.exitProcess !== false) process.exit(0);
+  if (input.exitProcess !== false) {
+    process.exitCode = 0;
+    process.exit(0);
+  }
 }
 
 export interface WorkspaceControlOccupancySummary {
@@ -914,8 +917,6 @@ export function createBoundedWorkspaceControlPresentation(
 ): WorkspaceControlPresentation {
   return {
     async start(context) {
-      const connectionsUrl = await resolveConnectionsUrlSafe();
-      const renderer = await input.openRenderer();
       let selectedWorkspaceId: string | undefined;
       let selectedDetail: Extract<WorkspaceControlRendererMessage, { type: "detail" }> | undefined;
       let selectedPromotionRecords: readonly Record<string, unknown>[] = [];
@@ -931,16 +932,23 @@ export function createBoundedWorkspaceControlPresentation(
           }
         | undefined;
       const terminalPumps = new Set<Promise<void>>();
+      // Arm wait-screen SIGINT before the sidecar can first-paint. The Ratatui
+      // default chrome already shows Cloud Agents / preparing, so a host PTY
+      // ^c can arrive while openRenderer() is still connecting.
+      let closeRenderer: (() => Promise<void>) | undefined;
       const quitWaitScreen = () => {
         handleWorkspaceControlWaitScreenInterrupt({
           attached: Boolean(activeTerminal),
           close: async () => {
             presentationOpen = false;
-            await renderer.close();
+            await closeRenderer?.();
           },
         });
       };
       process.on("SIGINT", quitWaitScreen);
+      const connectionsUrl = await resolveConnectionsUrlSafe();
+      const renderer = await input.openRenderer();
+      closeRenderer = () => renderer.close();
 
       const sendSelectedDetail = async (workspaceId: string) => {
         const generation = ++detailGeneration;
@@ -1521,7 +1529,6 @@ export function createBoundedWorkspaceControlPresentation(
       } catch (error) {
         await sendErrorBestEffort(error, "workspace-control-start");
       } finally {
-        removeProcessListener("SIGINT", quitWaitScreen);
         presentationOpen = false;
         detailGeneration += 1;
         await detachActiveTerminal();
@@ -1529,6 +1536,7 @@ export function createBoundedWorkspaceControlPresentation(
           await Promise.allSettled([...terminalPumps]);
         }
         await renderer.close();
+        removeProcessListener("SIGINT", quitWaitScreen);
       }
       if (occupyFailure) {
         restoreWorkspaceTuiScrollback();

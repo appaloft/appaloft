@@ -1351,6 +1351,11 @@ describe("Workspace control presentation", () => {
     expect(source).toContain("restoreWorkspaceTuiScrollback");
     expect(source).toContain("process.exit(0)");
     expect(source).not.toContain("process.exit(130)");
+    const sigintArm = source.indexOf('process.on("SIGINT", quitWaitScreen)');
+    const openRenderer = source.indexOf("await input.openRenderer()");
+    expect(sigintArm).toBeGreaterThan(-1);
+    expect(openRenderer).toBeGreaterThan(-1);
+    expect(sigintArm).toBeLessThan(openRenderer);
     let attachedClosed = 0;
     handleWorkspaceControlWaitScreenInterrupt({
       attached: true,
