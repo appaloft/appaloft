@@ -4,7 +4,6 @@ import { createInterface } from "node:readline/promises";
 import { type DomainError, err, ok, type Result } from "@appaloft/core";
 import { type AppaloftSdkFetch } from "@appaloft/sdk";
 import { runAgentHostSetup } from "./agent-host-setup.js";
-import { renderSetupHelp } from "./setup-help.js";
 import {
   type CliControlPlaneEnvironment,
   type CliControlPlaneMode,
@@ -30,6 +29,7 @@ import {
   resolveOpenCodeHome,
 } from "./mcp-host-install.js";
 import { removeProcessListener } from "./remove-process-listener.js";
+import { renderSetupHelp } from "./setup-help.js";
 
 export interface StandaloneControlPlaneCliInput {
   readonly argv?: readonly string[];

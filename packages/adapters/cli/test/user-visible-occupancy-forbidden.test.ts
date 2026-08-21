@@ -11,7 +11,6 @@ import {
 } from "../../../../apps/shell/src/occupancy-tui-first-frame.ts";
 import { enUS, zhCN } from "../../../i18n/src/resources.ts";
 import { CODE_OPTION_DESCRIPTIONS, formatCodeHelp } from "../src/code-help.js";
-import { SETUP_AGENT_OPTION_DESCRIPTIONS, formatSetupHelp } from "../src/setup-help.js";
 import { cliCommandDescriptions } from "../src/commands/docs-help.js";
 import { occupancyAvailableDoorHint } from "../src/occupancy-chrome.js";
 import {
@@ -27,6 +26,7 @@ import {
   occupancyVendorCredentialMissingError,
 } from "../src/occupancy-vendor.js";
 import { occupancyCloudCompatError } from "../src/remote-code-session.js";
+import { formatSetupHelp, SETUP_AGENT_OPTION_DESCRIPTIONS } from "../src/setup-help.js";
 import { workspaceControlRendererUnavailableMessage } from "../src/workspace-tui-launch.js";
 
 const FORBIDDEN = /occupancy/iu;

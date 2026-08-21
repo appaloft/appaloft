@@ -7,10 +7,10 @@ import {
   EFFECT_HELP_OPTIONAL_PROSE,
 } from "../src/code-help";
 import {
-  SETUP_AGENT_LIST,
-  SETUP_AGENT_OPTION_DESCRIPTIONS,
   formatSetupHelp,
   isSetupHelpInvocation,
+  SETUP_AGENT_LIST,
+  SETUP_AGENT_OPTION_DESCRIPTIONS,
   tryHandleSetupHelp,
 } from "../src/setup-help";
 

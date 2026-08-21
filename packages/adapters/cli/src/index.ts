@@ -3,7 +3,6 @@ import { NodeContext } from "@effect/platform-node";
 import { Effect, Layer } from "effect";
 
 import { tryHandleCodeHelp } from "./code-help.js";
-import { tryHandleSetupHelp } from "./setup-help.js";
 import { mainCommand } from "./commands/index.js";
 import {
   type CliProgram,
@@ -14,6 +13,7 @@ import {
   printCliError,
   readProcessStdinText,
 } from "./runtime.js";
+import { tryHandleSetupHelp } from "./setup-help.js";
 
 export {
   CLI_LOGIN_GUIDANCE,
@@ -36,14 +36,6 @@ export {
   renderCodeHelp,
   tryHandleCodeHelp,
 } from "./code-help.js";
-export {
-  SETUP_AGENT_LIST,
-  SETUP_AGENT_OPTION_DESCRIPTIONS,
-  formatSetupHelp,
-  isSetupHelpInvocation,
-  renderSetupHelp,
-  tryHandleSetupHelp,
-} from "./setup-help.js";
 export {
   FileSystemServerAppliedRouteDesiredStateStore,
   FileSystemSourceLinkStore,
@@ -180,6 +172,14 @@ export {
   type SafeCliErrorEvidence,
   safeCliErrorEvidence,
 } from "./runtime.js";
+export {
+  formatSetupHelp,
+  isSetupHelpInvocation,
+  renderSetupHelp,
+  SETUP_AGENT_LIST,
+  SETUP_AGENT_OPTION_DESCRIPTIONS,
+  tryHandleSetupHelp,
+} from "./setup-help.js";
 export { runStandaloneControlPlaneCli } from "./standalone-control-plane.js";
 export {
   type DevelopmentCommandRuntime,

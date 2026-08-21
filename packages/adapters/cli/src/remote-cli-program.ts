@@ -10,7 +10,6 @@ import { Command as EffectCommand } from "@effect/cli";
 import { NodeContext } from "@effect/platform-node";
 import { Effect, Layer } from "effect";
 import { tryHandleCodeHelp } from "./code-help.js";
-import { tryHandleSetupHelp } from "./setup-help.js";
 import { mainCommand } from "./commands/index.js";
 import {
   type CliControlPlaneOperation,
@@ -37,6 +36,7 @@ import {
   printCliError,
   readProcessStdinText,
 } from "./runtime.js";
+import { tryHandleSetupHelp } from "./setup-help.js";
 import { openBunNativeWorkspaceTerminal } from "./workspace-control-native-terminal.js";
 import { type WorkspaceControlPresentation } from "./workspace-control-presentation.js";
 
