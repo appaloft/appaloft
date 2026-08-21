@@ -1,7 +1,7 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
@@ -42,6 +42,8 @@ import { RuntimeCommandBuilder, renderRuntimeCommandString } from "../src/runtim
 import {
   buildLocalWorkspaceUploadCommand,
   buildLocalWorkspaceUploadTarExcludeArgs,
+  buildPackedSourceUploadCommand,
+  materializeCliPackedSourceArchive,
   buildRemoteComposeFailureLogsCommand,
   buildRemoteDockerImageVersionMetadataCommand,
   buildRemotePreviewArtifactSweepCommand,
@@ -73,6 +75,7 @@ function runningStaticSshDeployment(input: {
   omitDisplayName?: boolean;
   cliResolvedSource?: string;
   originalLocator?: string;
+  packedSourceArchive?: string;
   emptyMetadata?: boolean;
 }): Deployment {
   const deployment = Deployment.create({
@@ -90,13 +93,16 @@ function runningStaticSshDeployment(input: {
         displayName: DisplayNameText.rehydrate(
           input.omitDisplayName ? "workspace" : (input.displayName ?? hyphenatedStaticLeaf),
         ),
-        ...(input.emptyMetadata
+        ...(input.emptyMetadata && !input.packedSourceArchive
           ? {}
           : {
               metadata: {
-                baseDirectory: "/",
+                ...(input.emptyMetadata ? {} : { baseDirectory: "/" }),
                 ...(input.cliResolvedSource ? { cliResolvedSource: input.cliResolvedSource } : {}),
                 ...(input.originalLocator ? { originalLocator: input.originalLocator } : {}),
+                ...(input.packedSourceArchive
+                  ? { cliPackedSourceTarGz: input.packedSourceArchive }
+                  : {}),
               },
             }),
       }),
@@ -738,6 +744,124 @@ describe("SSH source upload", () => {
       );
     } finally {
       process.chdir(previousCwd);
+      rmSync(runtimeDir, { recursive: true, force: true });
+    }
+  });
+
+  test("[DEP-CREATE-PKG-007][QUICK-DEPLOY-ENTRY-008B] detached worker applies the CLI-host archive when the hyphenated cwd is absent", async () => {
+    const hostRoot = mkdtempSync(join(tmpdir(), "appaloft-pkg-007-cli-pack-"));
+    const parent = join(hostRoot, "projects");
+    const leaf = "nux-055483c0-static";
+    const folder = join(parent, leaf);
+    const runtimeDir = mkdtempSync(join(tmpdir(), "appaloft-runtime-"));
+    const previousCwd = process.cwd();
+    mkdirSync(join(folder, "public"), { recursive: true });
+    writeFileSync(join(folder, "public", "index.html"), "<!doctype html><title>ok</title>");
+
+    const archiveFile = join(hostRoot, "source.tgz");
+    const packed = spawnSync("tar", ["-czf", archiveFile, "-C", folder, "."], {
+      encoding: "utf8",
+    });
+    expect(packed.status).toBe(0);
+    const packedSourceArchive = readFileSync(archiveFile).toString("base64");
+    expect(packedSourceArchive.length).toBeGreaterThan(0);
+
+    rmSync(folder, { recursive: true, force: true });
+    expect(existsSync(folder)).toBe(false);
+    expect(existsSync(join(folder, "public", "index.html"))).toBe(false);
+
+    const listingArchive = materializeCliPackedSourceArchive({
+      runtimeDir,
+      packedSourceArchive,
+    });
+    const listing = spawnSync("tar", ["-tzf", listingArchive], { encoding: "utf8" });
+    expect(listing.status).toBe(0);
+    expect(listing.stdout).toContain("public/index.html");
+    expect(listing.stdout).not.toContain(`${leaf}/`);
+    expect(listing.stdout.split("\n").some((line) => line.endsWith("/projects"))).toBe(false);
+
+    const macParent = "/Users/nichenqin/projects";
+    const deployment = runningStaticSshDeployment({
+      deploymentId: "dep_055483c0_packed",
+      locator: macParent,
+      workingDirectory: macParent,
+      omitDisplayName: true,
+      emptyMetadata: true,
+      packedSourceArchive,
+    });
+    const backend = new SshExecutionBackend(
+      runtimeDir,
+      { warn: () => undefined } as never,
+      { record: async () => ({ isErr: () => false }) } as never,
+      { report: () => undefined } as never,
+    );
+
+    try {
+      process.chdir(runtimeDir);
+      expect(process.cwd()).toBe(runtimeDir);
+      expect(existsSync(folder)).toBe(false);
+      expect(existsSync(macParent)).toBe(false);
+
+      const uploadCommand = buildPackedSourceUploadCommand({
+        localArchivePath: listingArchive,
+        remotePrepareCommand: "mkdir -p /var/lib/appaloft/runtime/source",
+        sshArgs: ["-p", "22", "deploy@example.test"],
+      });
+      expect(uploadCommand).toContain(listingArchive);
+      expect(uploadCommand).not.toContain(macParent);
+      expect(uploadCommand).not.toContain(folder);
+
+      const prepared = await (
+        backend as never as {
+          prepareSshSource: (
+            context: ExecutionContext,
+            current: Deployment,
+            timeline: unknown[],
+            input: {
+              runtimeDir: string;
+              remoteRoot: string;
+              target: { host: string; publicHost: string; port: string };
+              env: NodeJS.ProcessEnv;
+            },
+          ) => Promise<
+            | { prepared: true }
+            | { prepared: false; deployment: Deployment }
+          >;
+        }
+      ).prepareSshSource(
+        { requestId: "req_pkg_007_cli_packed", entrypoint: "cli" } as ExecutionContext,
+        deployment,
+        [],
+        {
+          runtimeDir,
+          remoteRoot: "/var/lib/appaloft/runtime/ssh-deployments/dep_055483c0_packed",
+          target: { host: "127.0.0.1", publicHost: "127.0.0.1", port: "1" },
+          env: {},
+        },
+      );
+
+      const messages = prepared.prepared
+        ? []
+        : prepared.deployment.toState().timeline.map((entry) => entry.message);
+      expect(
+        messages.some((message) =>
+          message.startsWith("Source working directory does not exist:"),
+        ),
+      ).toBe(false);
+      expect(messages.some((message) => message.endsWith(macParent))).toBe(false);
+      expect(messages.some((message) => message.endsWith("/projects"))).toBe(false);
+      if (!prepared.prepared) {
+        expect(prepared.deployment.toState().runtimePlan.execution.metadata?.errorCode).not.toBe(
+          "source_workdir_missing",
+        );
+        expect(prepared.deployment.toState().runtimePlan.execution.metadata?.url).toBeUndefined();
+        expect(
+          prepared.deployment.toState().runtimePlan.execution.metadata?.publicUrl,
+        ).toBeUndefined();
+      }
+    } finally {
+      process.chdir(previousCwd);
+      rmSync(hostRoot, { recursive: true, force: true });
       rmSync(runtimeDir, { recursive: true, force: true });
     }
   });

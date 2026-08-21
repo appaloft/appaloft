@@ -3,6 +3,8 @@ import { SourceDescriptor, SourceLocator } from "@appaloft/core";
 
 export const CLI_RESOLVED_SOURCE_METADATA_KEY = "cliResolvedSource";
 export const ORIGINAL_LOCATOR_METADATA_KEY = "originalLocator";
+export const CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY = "cliPackedSourceTarGz";
+export const CLI_PACKED_SOURCE_ARCHIVE_MAX_BYTES = 16 * 1024 * 1024;
 
 const GENERIC_PARENT_LEAFS = new Set([
   "projects",
@@ -118,6 +120,42 @@ export function withOriginalLocatorMetadata(
   };
 }
 
+export function explicitCliPackedSourceArchive(input: {
+  packedSourceArchive?: string;
+  metadata?: Record<string, string>;
+}): string | undefined {
+  const fromInput = input.packedSourceArchive?.trim();
+  if (fromInput) {
+    return fromInput;
+  }
+
+  const fromMetadata = input.metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]?.trim();
+  return fromMetadata || undefined;
+}
+
+export function withCliPackedSourceArchiveMetadata(
+  metadata: Record<string, string> | undefined,
+  packedSourceArchive: string | undefined,
+): Record<string, string> | undefined {
+  const resolved = packedSourceArchive?.trim();
+  if (!resolved) {
+    return metadata;
+  }
+
+  return {
+    ...(metadata ?? {}),
+    [CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]: resolved,
+  };
+}
+
+export function cliPackedSourceArchiveFromMetadata(
+  metadata: Record<string, string> | undefined,
+): string | undefined {
+  return explicitCliPackedSourceArchive({
+    ...(metadata ? { metadata } : {}),
+  });
+}
+
 function withLocalFolderSourceMetadata(
   metadata: Record<string, string> | undefined,
   input: { originalLocator?: string; cliResolvedSource?: string },
@@ -157,7 +195,11 @@ export function retainCliResolvedSource(
  */
 export function retainLocalFolderSourceFields(
   source: SourceDescriptor,
-  input: { originalLocator?: string; cliResolvedSource?: string },
+  input: {
+    originalLocator?: string;
+    cliResolvedSource?: string;
+    packedSourceArchive?: string;
+  },
 ): SourceDescriptor {
   const originalLocator = explicitOriginalLocator({
     ...(input.originalLocator ? { originalLocator: input.originalLocator } : {}),
@@ -167,24 +209,40 @@ export function retainLocalFolderSourceFields(
     ...(input.cliResolvedSource ? { cliResolvedSource: input.cliResolvedSource } : {}),
     ...(source.metadata ? { metadata: source.metadata } : {}),
   });
+  const packedSourceArchive = explicitCliPackedSourceArchive({
+    ...(input.packedSourceArchive ? { packedSourceArchive: input.packedSourceArchive } : {}),
+    ...(source.metadata ? { metadata: source.metadata } : {}),
+  });
   const persistedPath = originalLocator ?? cliResolvedSource;
-  if (!persistedPath) {
+  if (!persistedPath && !packedSourceArchive) {
     return source;
   }
 
-  const locator = restoreLocalFolderLocator(source.locator, persistedPath);
-  const metadata = withLocalFolderSourceMetadata(source.metadata, {
-    ...(originalLocator || persistedPath
-      ? { originalLocator: originalLocator ?? persistedPath }
-      : {}),
-    ...(cliResolvedSource ? { cliResolvedSource } : {}),
-  }) ?? {
-    [ORIGINAL_LOCATOR_METADATA_KEY]: persistedPath,
-  };
+  const locator = persistedPath
+    ? restoreLocalFolderLocator(source.locator, persistedPath)
+    : source.locator;
+  const metadata = withCliPackedSourceArchiveMetadata(
+    persistedPath
+      ? (withLocalFolderSourceMetadata(source.metadata, {
+          ...(originalLocator || persistedPath
+            ? { originalLocator: originalLocator ?? persistedPath }
+            : {}),
+          ...(cliResolvedSource ? { cliResolvedSource } : {}),
+        }) ?? {
+          [ORIGINAL_LOCATOR_METADATA_KEY]: persistedPath,
+        })
+      : source.metadata,
+    packedSourceArchive,
+  ) ??
+    (persistedPath
+      ? {
+          [ORIGINAL_LOCATOR_METADATA_KEY]: persistedPath,
+        }
+      : undefined);
 
   return SourceDescriptor.rehydrate({
     ...source.toState(),
     locator: SourceLocator.rehydrate(locator),
-    metadata,
+    ...(metadata ? { metadata } : {}),
   });
 }

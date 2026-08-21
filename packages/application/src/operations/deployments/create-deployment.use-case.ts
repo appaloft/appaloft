@@ -21,6 +21,7 @@ import {
 import { i18nKeys } from "@appaloft/i18n";
 import { inject, injectable } from "tsyringe";
 import {
+  explicitCliPackedSourceArchive,
   explicitCliResolvedSource,
   explicitOriginalLocator,
   retainLocalFolderSourceFields,
@@ -927,12 +928,16 @@ export class CreateDeploymentUseCase {
         const originalLocator = explicitOriginalLocator({
           ...(resourceSource.source.metadata ? { metadata: resourceSource.source.metadata } : {}),
         });
+        const packedSourceArchive = explicitCliPackedSourceArchive({
+          ...(resourceSource.source.metadata ? { metadata: resourceSource.source.metadata } : {}),
+        });
         const detectedResult = await sourceDetector.detect(context, resourceSource.source.locator, {
           ...(resourceSource.source.metadata?.baseDirectory
             ? { baseDirectory: resourceSource.source.metadata.baseDirectory }
             : {}),
           ...(cliResolvedSource ? { cliResolvedSource } : {}),
           ...(originalLocator ? { originalLocator } : {}),
+          ...(packedSourceArchive ? { packedSourceArchive } : {}),
           ...(resourceSource.source.displayName
             ? { displayName: resourceSource.source.displayName }
             : {}),
@@ -946,6 +951,7 @@ export class CreateDeploymentUseCase {
           source: retainLocalFolderSourceFields(detected.source, {
             ...(cliResolvedSource ? { cliResolvedSource } : {}),
             ...(originalLocator ? { originalLocator } : {}),
+            ...(packedSourceArchive ? { packedSourceArchive } : {}),
           }),
         };
       }
