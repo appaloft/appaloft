@@ -116,7 +116,7 @@ If tests bypass the runtime or write directly to the database to simulate succes
   - `scripts/ci/classify-changed-files.ts` marks docs-only, workflow-yaml-only, LICENSE, and
     release-please version-bump file sets as `lightweight_only`. A `release-please--*` head ref is
     also treated as `release_bump` when every changed file is already on that allowlist. Those PRs
-    skip Biome, Typecheck, Unit Tests, Integration, and Build And Smoke via skip steps, skip
+    skip Lint, Typecheck, Unit Tests, Integration, and Build And Smoke via skip steps, skip
     Workspace TUI cargo/docker/bridge work inside the six matrix jobs, and still publish the
     required `ci` check plus `Workspace TUI (*)` names. The aggregator treats `skipped` needed
     jobs as success. Isolated web, shell e2e files, and most TypeScript packages also skip TUI

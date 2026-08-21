@@ -1,0 +1,18 @@
+# Lefthook owns Git hooks for the JS/TS toolchain.
+# rustfmt stays the Workspace TUI policy and is not invoked here.
+pre-commit:
+  parallel: true
+  commands:
+    oxlint:
+      glob: "*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}"
+      run: bunx oxlint --fix {staged_files}
+      stage_fixed: true
+    oxfmt:
+      glob: "*.{js,jsx,ts,tsx,mjs,cjs,mts,cts,json,jsonc,css,html,graphql,gql}"
+      run: bunx oxfmt {staged_files}
+      stage_fixed: true
+
+pre-push:
+  commands:
+    typecheck:
+      run: bun run typecheck

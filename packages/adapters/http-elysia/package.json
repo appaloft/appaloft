@@ -21,7 +21,7 @@
     "reflect-metadata": "^0.2.2"
   },
   "scripts": {
-    "lint": "biome check .",
+    "lint": "oxlint .",
     "test": "bun test --max-concurrency=1",
     "typecheck": "tsc -p tsconfig.json --noEmit --checkers 4"
   }

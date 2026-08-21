@@ -10,7 +10,7 @@
     "@appaloft/core": "workspace:*"
   },
   "scripts": {
-    "lint": "biome check .",
+    "lint": "oxlint .",
     "typecheck": "tsc -p tsconfig.json --noEmit --checkers 4",
     "test": "bun test --pass-with-no-tests"
   }

@@ -30,7 +30,7 @@
     "@appaloft/sdk-generator": "workspace:*"
   },
   "scripts": {
-    "lint": "biome check .",
+    "lint": "oxlint .",
     "test": "bun test --preload ./test/setup.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit --checkers 4"
   }

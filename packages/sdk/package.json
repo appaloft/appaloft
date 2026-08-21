@@ -31,7 +31,7 @@
   "scripts": {
     "build": "bun run generate:operations && rm -rf dist && tsc -p tsconfig.build.json",
     "generate:operations": "bun run ../../scripts/release/generate-typescript-sdk-operations.ts",
-    "lint": "biome check package.json tsconfig.json tsconfig.build.json src/index.ts test",
+    "lint": "oxlint package.json tsconfig.json tsconfig.build.json src/index.ts test",
     "test": "bun test",
     "typecheck": "tsc -p tsconfig.json --noEmit --checkers 4"
   }

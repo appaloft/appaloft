@@ -21,7 +21,7 @@
     "pino": "^10.3.1"
   },
   "scripts": {
-    "lint": "biome check .",
+    "lint": "oxlint .",
     "test": "bun test",
     "trace:analyze": "bun scripts/analyze-jaeger-trace.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit --checkers 4"

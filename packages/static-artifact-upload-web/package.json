@@ -34,7 +34,7 @@
     "vitest": "^4.1.9"
   },
   "scripts": {
-    "lint": "biome check .",
+    "lint": "oxlint .",
     "test": "vitest --run",
     "typecheck": "svelte-check --tsconfig ./tsconfig.json"
   }

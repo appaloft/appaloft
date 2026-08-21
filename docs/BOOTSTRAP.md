@@ -19,9 +19,7 @@ bunx sv@latest create apps/web --template minimal --types ts --add eslint pretti
 Repository lint/format toolchain migration:
 
 ```bash
-bun add -d @biomejs/biome husky lint-staged
-bunx @biomejs/biome init --jsonc
-bunx husky init
+bun add -d oxlint oxfmt lefthook
 ```
 
 shadcn-svelte help was consulted before initialization:
@@ -51,12 +49,13 @@ bun x shadcn-svelte@latest add sidebar input textarea select dropdown-menu colla
 - `sv` was used to scaffold SvelteKit, Tailwind, Vitest, and Playwright in one official flow.
 - `create-turbo` established the monorepo baseline.
 - `shadcn-svelte` was used for design-system primitives instead of hand-copying components.
-- The initial `sv` template included ESLint and Prettier, but the repository was later standardized on Biome for supported file types plus Husky/lint-staged for staged-file autofix.
+- The initial `sv` template included ESLint and Prettier. The repository later used Biome plus Husky/lint-staged, then moved to Oxlint, Oxfmt, and Lefthook.
 - Everything else added afterwards was project-specific architecture, domain model, persistence, docs, and tests.
 
 ## Current Standard
 
-- The repository standard is `Biome`, not `ESLint` or `Prettier`.
-- Staged-file auto-fix is handled by `lint-staged` through `.husky/pre-commit`.
-- CI runs `bun run lint:ci`, which maps to `biome ci .`.
-- `.svelte` files are still validated with `svelte-check`; Biome is not used as the Svelte semantic checker.
+- The repository standard is Oxlint plus Oxfmt, not Biome, ESLint, or Prettier.
+- Lefthook owns Git hooks. Staged JS/TS files are linted with Oxlint and formatted with Oxfmt.
+- rustfmt stays the Workspace TUI formatter and is not invoked from Lefthook.
+- CI runs `bun run lint:ci`, which fail-closes Oxlint/Oxfmt on changed files, then runs the architecture guards.
+- `.svelte` files are still validated with `svelte-check`; Oxlint is not used as the Svelte semantic checker.

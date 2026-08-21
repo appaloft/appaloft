@@ -4,13 +4,13 @@
   "devDependencies": {
     "@appaloft/adapter-packaging": "workspace:*",
     "@appaloft/ash": "workspace:*",
-    "@biomejs/biome": "^2.5.1",
     "@types/node": "^22.20.0",
     "@types/semver": "^7.7.1",
     "@typescript/native": "npm:typescript@7.0.2",
     "bun-types": "^1.4.0",
-    "husky": "^9.1.7",
-    "lint-staged": "17.0.8",
+    "lefthook": "^2.1.10",
+    "oxfmt": "^0.64.0",
+    "oxlint": "^1.79.0",
     "skills": "1.5.9",
     "turbo": "^2.10.0",
     "typescript": "6.0.3"
@@ -19,11 +19,6 @@
     "bun": ">=1.4.0"
   },
   "license": "Apache-2.0",
-  "lint-staged": {
-    "*.{js,jsx,ts,tsx,mjs,cjs,mts,cts,json,jsonc,css,graphql,gql,html}": [
-      "biome check --write --no-errors-on-unmatched"
-    ]
-  },
   "packageManager": "bun@1.4.0",
   "private": true,
   "scripts": {
@@ -32,10 +27,10 @@
     "dev:all": "turbo run dev --parallel",
     "bun:version:sync": "bun run scripts/sync-bun-version.ts",
     "bun:version:check": "bun run scripts/sync-bun-version.ts --check",
-    "lint": "biome check . && bun run check:ash && bun run check:query-batching && bun run check:ci-test-boundaries && bun test scripts/test/classify-changed-files.test.ts",
-    "lint:fix": "biome check --write .",
-    "lint:ci": "biome ci . && bun run check:ash && bun run check:query-batching && bun run check:ci-test-boundaries && bun test scripts/test/classify-changed-files.test.ts",
-    "lint:staged": "lint-staged",
+    "lint": "oxlint . && bun run check:ash && bun run check:query-batching && bun run check:ci-test-boundaries && bun test scripts/test/classify-changed-files.test.ts scripts/test/lint-changed.test.ts",
+    "lint:fix": "oxlint --fix .",
+    "lint:ci": "bun run scripts/ci/lint-changed.ts && bun run check:ash && bun run check:query-batching && bun run check:ci-test-boundaries && bun test scripts/test/classify-changed-files.test.ts scripts/test/lint-changed.test.ts",
+    "lint:staged": "lefthook run pre-commit --force",
     "check:ash": "bun run scripts/check-ash-command-construction.ts",
     "check:query-batching": "bun run scripts/check-query-batching.ts",
     "check:ci-test-boundaries": "bun run scripts/check-ci-test-boundaries.ts",
@@ -45,7 +40,7 @@
     "test:unit": "turbo run test:unit && bun test scripts/test/appaloft-skill-evals.test.ts",
     "test:integration": "turbo run test:integration",
     "test:e2e": "turbo run test:e2e",
-    "format": "biome format --write .",
+    "format": "oxfmt .",
     "serve": "bun run --cwd apps/shell src/index.ts serve",
     "doctor": "bun run --cwd apps/shell src/index.ts doctor",
     "db:migrate": "bun run --cwd apps/shell src/index.ts db migrate",
@@ -110,7 +105,7 @@
     "smoke:public-launch:basic-docker:evidence:verify": "bun run scripts/release/verify-ssh-smoke-evidence.ts --suite basic-docker --path dist/release/public-launch-basic-docker-evidence.json",
     "smoke:public-launch:github-repo:evidence:verify": "bun run scripts/release/verify-ssh-smoke-evidence.ts --suite github-repo --path dist/release/public-launch-github-repo-evidence.json",
     "smoke:public-launch:scheduled-task-cron:evidence:verify": "bun run scripts/release/verify-ssh-smoke-evidence.ts --suite scheduled-task-cron --path dist/release/public-launch-cron-evidence.json",
-    "prepare": "husky"
+    "prepare": "lefthook install"
   },
   "type": "module",
   "workspaces": [
