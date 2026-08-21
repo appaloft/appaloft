@@ -360,6 +360,7 @@
 - [x] Ticket `ready-for-agent` - [#1237](https://github.com/appaloft/appaloft/issues/1237)
 - [x] `code` names unstructured `targetServerId` rejection
 - [x] Unit tests WS-REMOTE-COMPAT-128-130
+- [x] folder.local `--server` / `--pi` does not remap nested Cloud validation to `workspace_open_target_server_unsupported` (WS-REMOTE-COMPAT-220)
 - [x] `appaloftdev code --no-attach` would name the enrolled Server
 
 ## Slice 44 - occupancy resume keeps preferred Profile

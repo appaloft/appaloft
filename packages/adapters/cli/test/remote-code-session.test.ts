@@ -75,6 +75,39 @@ describe("remote code door", () => {
     };
     expect(occupancyCloudCompatError(bound, server)).toEqual(bound);
   });
+  test("[WS-REMOTE-COMPAT-220][WS-REMOTE-OPEN-BYOS-181] folder.local unstructured validation is not remapped to Server targeting", () => {
+    const server = { id: "srv_4lifk0yrcecy", name: "hostinger" };
+    const cloud = {
+      code: "bad_request" as const,
+      category: "user" as const,
+      message: "Input validation failed",
+      retryable: false,
+      details: { phase: "orpc-error-normalization", orpcCode: "BAD_REQUEST" },
+    };
+    expect(
+      occupancyCloudCompatError(cloud, server, {
+        repositoryIdentity: "folder.local/cwd/nux-54065181-unlinked",
+        repository: "https://folder.local/cwd/nux-54065181-unlinked.git",
+      }),
+    ).toEqual(cloud);
+  });
+  test("[WS-REMOTE-OPEN-BYOS-181] --server pin keeps the enrolled Server name when the door already selected it", () => {
+    const pinned = pinRemoteCodeDoorServer(
+      {
+        repository: "https://folder.local/cwd/notes.git",
+        repositoryIdentity: "folder.local/cwd/notes",
+        ref: "refs/heads/local",
+        branch: "local",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        projectId: "prj_notes",
+        serverId: "srv_4lifk0yrcecy",
+        serverName: "hostinger",
+      },
+      "srv_4lifk0yrcecy",
+    );
+    expect(pinned.serverId).toBe("srv_4lifk0yrcecy");
+    expect(pinned.serverName).toBe("hostinger");
+  });
   test("[WS-REMOTE-OPEN-BYOS-181] workspace open prefers an explicit Server, then the enrolled BYOS", () => {
     const hostinger = {
       id: "srv_4lifk0yrcecy",

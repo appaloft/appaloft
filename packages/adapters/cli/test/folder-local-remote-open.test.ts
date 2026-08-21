@@ -63,6 +63,10 @@ function hostingerFolderLocalFetch(input: {
     readonly name: string;
     readonly slug?: string;
   }[];
+  readonly sandboxCreateError?: {
+    readonly status: number;
+    readonly body: Record<string, unknown>;
+  };
 }): AppaloftSdkFetch {
   return async (request) => {
     input.requests.push(request);
@@ -158,6 +162,9 @@ function hostingerFolderLocalFetch(input: {
       });
     }
     if (path === "/api/sandboxes" && request.method === "POST") {
+      if (input.sandboxCreateError) {
+        return jsonResponse(input.sandboxCreateError.body, input.sandboxCreateError.status);
+      }
       const body = (await request.clone().json()) as {
         readonly source?: { readonly kind?: string; readonly repository?: string };
       };
@@ -177,6 +184,22 @@ function hostingerFolderLocalFetch(input: {
         );
       }
       return jsonResponse({ sandboxId: "sbx_folder_local", status: "ready" }, 202);
+    }
+    if (path.endsWith("/attach") && request.method === "POST") {
+      const sandboxId = path.split("/")[3] ?? "sbx_folder_local";
+      const runtimeId = path.split("/")[5] ?? `sar_${sandboxId}`;
+      return jsonResponse({
+        workspaceId: sandboxId,
+        runtimeId,
+        transport: "managed-terminal",
+        sessionId: "ts_folder_local",
+        processId: "proc_folder_local",
+        access: {
+          kind: "websocket",
+          path: `/api/terminal-sessions/ts_folder_local`,
+          expiresAt: "2026-08-20T01:00:00.000Z",
+        },
+      });
     }
     if (path === "/api/sandboxes/sbx_partial/resume" && request.method === "POST") {
       return jsonResponse({ sandboxId: "sbx_partial", status: "ready" });
@@ -439,5 +462,162 @@ describe("logged-in folder.local remote occupy", () => {
     expect(captured.text).not.toContain(leftoverBindingProjectId);
     expect(captured.text.toLowerCase()).not.toContain("occupancy");
     expect(process.exitCode === undefined || process.exitCode === 0).toBe(true);
+  });
+
+  test("[WS-REMOTE-OPEN-BYOS-181][WS-REMOTE-HARNESS-175] code --pi --server occupies hostinger folder.local without workspaces.open", async () => {
+    const emptyDir = await mkdtemp(join(tmpdir(), "nux-54065181-unlinked-"));
+    const home = await mkdtemp(join(tmpdir(), "nux-54065181-unlinked-home-"));
+    const requests: Request[] = [];
+    const projectName = basename(emptyDir);
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: {
+        name: "cloud",
+        mode: "self-hosted",
+        baseUrl: "https://api.example.test",
+        auth: { kind: "bearer", token: "tok_remote" },
+        createdAt: "2026-08-20T00:00:00.000Z",
+        updatedAt: "2026-08-20T00:00:00.000Z",
+      },
+      fetch: hostingerFolderLocalFetch({
+        requests,
+        projectId: "prj_i7tt42okmrgn",
+        projectName,
+      }),
+      now: () => "2026-08-20T00:00:00.000Z",
+      environment: { APPALOFT_TOKEN: "token", APPALOFT_HOME: home, HOME: home },
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+    });
+
+    const originalExitCode = process.exitCode;
+    const previousCwd = process.cwd();
+    let captured: { text: string };
+    try {
+      process.chdir(emptyDir);
+      captured = await captureProcessOutput(() =>
+        program.parseAsync([
+          "node",
+          "appaloft",
+          "code",
+          "--pi",
+          "--server",
+          "srv_4lifk0yrcecy",
+          "--no-attach",
+        ]),
+      );
+    } finally {
+      process.chdir(previousCwd);
+      process.exitCode = originalExitCode ?? 0;
+      await rm(emptyDir, { recursive: true, force: true });
+      await rm(home, { recursive: true, force: true });
+    }
+
+    const paths = requests.map(requestKey);
+    expect(paths).not.toContain("POST /api/workspaces/open");
+    expect(paths).toContain("POST /api/sandboxes");
+    const createBody = (await requests
+      .find((request) => requestKey(request) === "POST /api/sandboxes")
+      ?.clone()
+      .json()) as {
+      readonly source?: { readonly templateId?: string };
+      readonly providerKey?: string;
+    };
+    expect(createBody.source?.templateId).toBe("stp_appaloft_remote_pi");
+    expect(createBody.providerKey).toBe("hostinger");
+    const runtimeBody = (await requests
+      .find((request) => requestKey(request).endsWith("/agent-runtimes"))
+      ?.clone()
+      .json()) as { readonly harnessKey?: string };
+    expect(runtimeBody.harnessKey).toBe("pi");
+    expect(captured.text).toContain("Preparing disk on hostinger…");
+    expect(captured.text).not.toContain("This Cloud does not accept Server targeting");
+    expect(captured.text).not.toContain("Deploy a Cloud that accepts workspaces.open");
+    expect(captured.text.toLowerCase()).not.toContain("occupancy");
+    expect(process.exitCode === undefined || process.exitCode === 0).toBe(true);
+  });
+
+  test("[WS-REMOTE-COMPAT-220] folder.local Cloud validation is not remapped to Server targeting", async () => {
+    const emptyDir = await mkdtemp(join(tmpdir(), "nux-54065181-unlinked-fail-"));
+    const home = await mkdtemp(join(tmpdir(), "nux-54065181-unlinked-fail-home-"));
+    const requests: Request[] = [];
+    const projectName = basename(emptyDir);
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: {
+        name: "cloud",
+        mode: "self-hosted",
+        baseUrl: "https://api.example.test",
+        auth: { kind: "bearer", token: "tok_remote" },
+        createdAt: "2026-08-20T00:00:00.000Z",
+        updatedAt: "2026-08-20T00:00:00.000Z",
+      },
+      fetch: hostingerFolderLocalFetch({
+        requests,
+        projectId: "prj_i7tt42okmrgn",
+        projectName,
+        sandboxCreateError: {
+          status: 400,
+          body: {
+            error: {
+              code: "bad_request",
+              category: "user",
+              message: "Input validation failed",
+              retryable: false,
+              details: { phase: "orpc-error-normalization", orpcCode: "BAD_REQUEST" },
+            },
+          },
+        },
+      }),
+      now: () => "2026-08-20T00:00:00.000Z",
+      environment: { APPALOFT_TOKEN: "token", APPALOFT_HOME: home, HOME: home },
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+    });
+
+    const originalExitCode = process.exitCode;
+    const previousCwd = process.cwd();
+    let captured = { text: "" };
+    let thrown: unknown;
+    try {
+      process.chdir(emptyDir);
+      captured = await captureProcessOutput(async () => {
+        try {
+          await program.parseAsync([
+            "node",
+            "appaloft",
+            "code",
+            "--pi",
+            "--server",
+            "srv_4lifk0yrcecy",
+            "--no-attach",
+          ]);
+        } catch (error) {
+          thrown = error;
+        }
+      });
+    } finally {
+      process.chdir(previousCwd);
+      process.exitCode = originalExitCode ?? 0;
+      await rm(emptyDir, { recursive: true, force: true });
+      await rm(home, { recursive: true, force: true });
+    }
+
+    const paths = requests.map(requestKey);
+    expect(paths).not.toContain("POST /api/workspaces/open");
+    expect(paths).toContain("POST /api/sandboxes");
+    expect(thrown).toBeDefined();
+    expect(String(thrown)).toContain("Input validation failed");
+    expect(String(thrown)).not.toContain("workspace_open_target_server_unsupported");
+    expect(String(thrown)).not.toContain("This Cloud does not accept Server targeting");
+    expect(captured.text).not.toContain("This Cloud does not accept Server targeting");
+    expect(captured.text).not.toContain("Deploy a Cloud that accepts workspaces.open");
+    expect(`${captured.text}\n${String(thrown)}`.toLowerCase()).not.toContain("occupancy");
   });
 });

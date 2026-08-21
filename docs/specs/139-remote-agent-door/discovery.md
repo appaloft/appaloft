@@ -170,7 +170,7 @@ Sandbox on that Server, not one VM per person.
 | D133 | Slice 42 TUI footer lists only occupancy doors that exist now | Railway `ca` does not advertise missing services. Static `o`/`c`/`p`/`P` overpromises. |
 | D134 | Keys stay paired: `o open PR`, `c compare`, `p preview`, `P production` | Existing PR still omits compare. No invented create-PR write. |
 | D135 | No available door stays lean | Footer keeps lifecycle / delivery / recovery / focus. Catalog create-PR write stays later. |
-| D136 | Slice 43 occupancy `Input validation failed` names the enrolled Server | Live Cloud `9ba333eb` rejects `targetServerId` as unstructured `BAD_REQUEST`. Railway would not say only "validation failed". |
+| D136 | Slice 43 occupancy `Input validation failed` names the enrolled Server | Live Cloud `9ba333eb` rejects git-remote `workspaces.open` `targetServerId` as unstructured `BAD_REQUEST`. Railway would not say only "validation failed". Live pin `54065181` / Cloud #1051 folder.local `--server` hostinger must not reuse this remap: that door does not POST `/workspaces/open`. |
 | D137 | Do not retry `workspaces.open` without `targetServerId` | A successful retry would occupy managed capacity. No silent Server substitution. |
 | D138 | Newer Cloud Binding / Profile errors stay specific | Compat copy is only for unstructured occupancy validation. Catalog create-PR write stays later. |
 | D139 | Slice 44 default occupancy resume keeps the preferred Sandbox Profile | Railway reconnects the same machine. A newer default Profile must not block `code`. |
