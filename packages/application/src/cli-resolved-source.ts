@@ -156,6 +156,76 @@ export function cliPackedSourceArchiveFromMetadata(
   });
 }
 
+/**
+ * Live persist can empty `source.metadata` on the detached worker while
+ * `execution.metadata` still carries static-plan fields. Read the CLI-host
+ * archive from either bag so packaging does not `existsSync` a Mac path.
+ */
+export function cliPackedSourceArchiveFromLocalSource(input: {
+  packedSourceArchive?: string;
+  sourceMetadata?: Record<string, string>;
+  executionMetadata?: Record<string, string>;
+}): string | undefined {
+  return (
+    explicitCliPackedSourceArchive({
+      ...(input.packedSourceArchive ? { packedSourceArchive: input.packedSourceArchive } : {}),
+      ...(input.sourceMetadata ? { metadata: input.sourceMetadata } : {}),
+    }) ?? cliPackedSourceArchiveFromMetadata(input.executionMetadata)
+  );
+}
+
+export function localFolderSourceExecutionMetadata(input: {
+  workingDirectory: string;
+  originalLocator?: string;
+  cliResolvedSource?: string;
+  packedSourceArchive?: string;
+}): Record<string, string> {
+  const originalLocator =
+    explicitOriginalLocator({
+      ...(input.originalLocator ? { originalLocator: input.originalLocator } : {}),
+    }) ??
+    (isSpecificLocalSourceLeaf(pathBasename(input.workingDirectory))
+      ? input.workingDirectory
+      : undefined);
+  const cliResolvedSource =
+    explicitCliResolvedSource({
+      ...(input.cliResolvedSource ? { cliResolvedSource: input.cliResolvedSource } : {}),
+    }) ?? originalLocator;
+  const packedSourceArchive = explicitCliPackedSourceArchive({
+    ...(input.packedSourceArchive ? { packedSourceArchive: input.packedSourceArchive } : {}),
+  });
+
+  return {
+    ...(originalLocator ? { [ORIGINAL_LOCATOR_METADATA_KEY]: originalLocator } : {}),
+    ...(cliResolvedSource ? { [CLI_RESOLVED_SOURCE_METADATA_KEY]: cliResolvedSource } : {}),
+    ...(packedSourceArchive
+      ? { [CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]: packedSourceArchive }
+      : {}),
+  };
+}
+
+/**
+ * Stamp the CLI-host archive onto the bag that persist keeps
+ * (`execution.metadata` / `runtimeMetadata`). Do not leave it only on
+ * `source.metadata` — live rehydrate empties that bag before the worker
+ * packages.
+ */
+export function localFolderSourceExecutionMetadataFromSource(input: {
+  source: SourceDescriptor;
+  workingDirectory?: string;
+}): Record<string, string> {
+  return localFolderSourceExecutionMetadata({
+    workingDirectory: input.workingDirectory ?? input.source.locator,
+    ...(input.source.metadata ? { originalLocator: input.source.metadata.originalLocator } : {}),
+    ...(input.source.metadata
+      ? { cliResolvedSource: input.source.metadata[CLI_RESOLVED_SOURCE_METADATA_KEY] }
+      : {}),
+    ...(input.source.metadata
+      ? { packedSourceArchive: input.source.metadata[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY] }
+      : {}),
+  });
+}
+
 function withLocalFolderSourceMetadata(
   metadata: Record<string, string> | undefined,
   input: { originalLocator?: string; cliResolvedSource?: string },

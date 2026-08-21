@@ -175,6 +175,10 @@ const unavailableSecretProtector: ControlPlaneSecretProtector = {
     }),
 };
 
+import {
+  CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY,
+  ORIGINAL_LOCATOR_METADATA_KEY,
+} from "../src/cli-resolved-source";
 import { DeploymentTimelineProgressRecorder } from "../src/deployment-progress-recorder";
 import {
   type DurableWorkClaimInput,
@@ -1440,7 +1444,14 @@ async function createActiveManagedRedisBinding(input: {
   );
 }
 
-function createStaticSiteResource(input: { publishDirectory?: string } = {}): Resource {
+function createStaticSiteResource(
+  input: {
+    publishDirectory?: string;
+    sourceLocator?: string;
+    sourceDisplayName?: string;
+    sourceMetadata?: Record<string, string>;
+  } = {},
+): Resource {
   return Resource.rehydrate({
     id: ResourceId.rehydrate("res_demo"),
     projectId: ProjectId.rehydrate("prj_demo"),
@@ -1452,9 +1463,10 @@ function createStaticSiteResource(input: { publishDirectory?: string } = {}): Re
     services: [],
     sourceBinding: {
       kind: SourceKindValue.rehydrate("local-folder"),
-      locator: SourceLocator.rehydrate("."),
-      displayName: DisplayNameText.rehydrate("workspace"),
+      locator: SourceLocator.rehydrate(input.sourceLocator ?? "."),
+      displayName: DisplayNameText.rehydrate(input.sourceDisplayName ?? "workspace"),
       baseDirectory: SourceBaseDirectory.rehydrate("/site"),
+      ...(input.sourceMetadata ? { metadata: input.sourceMetadata } : {}),
     },
     runtimeProfile: {
       strategy: RuntimePlanStrategyValue.rehydrate("static"),
@@ -5144,6 +5156,55 @@ describe("CreateDeploymentUseCase", () => {
       runtimePlanStrategy: "static",
       publishDirectory: "/dist",
     });
+  });
+
+  test("[DEP-CREATE-PKG-007] persists the CLI archive on execution.metadata before the worker packages", async () => {
+    const parent = "/Users/nichenqin/projects";
+    const folder = `${parent}/nux-04a0bb31-static`;
+    const packedSourceArchive = "H4sIAAAAAAAAAytKLSpILC4u1gMA";
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      deployments,
+      resources,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+      executionBackend: new FailingStaticPackageExecutionBackend(),
+    });
+    const staticResource = createStaticSiteResource({
+      publishDirectory: "public",
+      sourceLocator: parent,
+      sourceDisplayName: "projects",
+      sourceMetadata: {
+        [ORIGINAL_LOCATOR_METADATA_KEY]: folder,
+        [CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]: packedSourceArchive,
+      },
+    });
+
+    await resources.upsert(
+      repositoryContext,
+      staticResource,
+      UpsertResourceSpec.fromResource(staticResource),
+    );
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    expect(result.isOk()).toBe(true);
+    const deploymentId = result._unsafeUnwrap().id;
+    const deployment = await deployments.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate(deploymentId)),
+    );
+    const executionMetadata = deployment
+      ?.toState()
+      .runtimePlan.toState()
+      .execution.toState().metadata;
+    expect(executionMetadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(packedSourceArchive);
+    expect(executionMetadata?.[ORIGINAL_LOCATOR_METADATA_KEY]).toBe(folder);
+    expect(executionMetadata?.[ORIGINAL_LOCATOR_METADATA_KEY]).not.toBe(parent);
+    expect(
+      deployment?.toState().runtimePlan.toState().source.toState().locator,
+    ).not.toBeUndefined();
   });
 
   test.skip("bootstraps a default local deployment context when ids are omitted", async () => {

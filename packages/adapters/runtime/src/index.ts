@@ -67,7 +67,10 @@ import {
   type RollbackPlan,
 } from "@appaloft/core";
 import {
-  CLI_RESOLVED_SOURCE_METADATA_KEY,
+  cliPackedSourceArchiveFromLocalSource,
+  explicitCliResolvedSource,
+  explicitOriginalLocator,
+  localFolderSourceExecutionMetadata,
   createAdapterSpanName,
   createDeploymentProgressEvent,
   deploymentProgressSteps,
@@ -1123,24 +1126,43 @@ function chooseStrategies(input: {
 
     const dockerfilePath = "Dockerfile.appaloft-static";
     const port = dockerContainerPort(requestedDeployment);
+    const originalLocator =
+      explicitOriginalLocator({
+        ...(source.metadata ? { metadata: source.metadata } : {}),
+      }) ??
+      explicitOriginalLocator({
+        ...(requestedDeployment.runtimeMetadata
+          ? { metadata: requestedDeployment.runtimeMetadata }
+          : {}),
+      });
+    const cliResolvedSource =
+      explicitCliResolvedSource({
+        ...(source.metadata ? { metadata: source.metadata } : {}),
+      }) ??
+      explicitCliResolvedSource({
+        ...(requestedDeployment.runtimeMetadata
+          ? { metadata: requestedDeployment.runtimeMetadata }
+          : {}),
+      });
+    const packedSourceArchive = cliPackedSourceArchiveFromLocalSource({
+      ...(source.metadata ? { sourceMetadata: source.metadata } : {}),
+      ...(requestedDeployment.runtimeMetadata
+        ? { executionMetadata: requestedDeployment.runtimeMetadata }
+        : {}),
+    });
+    const workingDirectory = resolveLocalWorkspaceWorkdir({
+      locator: source.locator,
+      displayName: source.displayName,
+      ...(source.metadata ? { metadata: source.metadata } : {}),
+      ...(originalLocator ? { originalLocator } : {}),
+      ...(cliResolvedSource ? { cliResolvedSource } : {}),
+      ...(requestedDeployment.runtimeMetadata?.["context.resourceName"]
+        ? { resourceName: requestedDeployment.runtimeMetadata["context.resourceName"] }
+        : {}),
+    });
     const execution = RuntimeExecutionPlan.rehydrate({
       kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
-      workingDirectory: FilePathText.rehydrate(
-        resolveLocalWorkspaceWorkdir({
-          locator: source.locator,
-          displayName: source.displayName,
-          ...(source.metadata ? { metadata: source.metadata } : {}),
-          ...(source.metadata?.originalLocator
-            ? { originalLocator: source.metadata.originalLocator }
-            : {}),
-          ...(source.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]
-            ? { cliResolvedSource: source.metadata[CLI_RESOLVED_SOURCE_METADATA_KEY] }
-            : {}),
-          ...(requestedDeployment.runtimeMetadata?.["context.resourceName"]
-            ? { resourceName: requestedDeployment.runtimeMetadata["context.resourceName"] }
-            : {}),
-        }),
-      ),
+      workingDirectory: FilePathText.rehydrate(workingDirectory),
       dockerfilePath: FilePathText.rehydrate(dockerfilePath),
       ...(installCommand ? { installCommand: CommandText.rehydrate(installCommand) } : {}),
       ...(buildCommand ? { buildCommand: CommandText.rehydrate(buildCommand) } : {}),
@@ -1152,6 +1174,12 @@ function chooseStrategies(input: {
         "static.publishDirectory": publishDirectory,
         "static.server": "adapter-owned",
         "static.serverConfig": "appaloft-nginx",
+        ...localFolderSourceExecutionMetadata({
+          workingDirectory,
+          ...(originalLocator ? { originalLocator } : {}),
+          ...(cliResolvedSource ? { cliResolvedSource } : {}),
+          ...(packedSourceArchive ? { packedSourceArchive } : {}),
+        }),
         ...(staticFrameworkPlan?.metadata
           ? Object.fromEntries(
               Object.entries(staticFrameworkPlan.metadata).map(([key, value]) => [

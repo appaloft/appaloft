@@ -364,6 +364,7 @@ export function resolveSshPackageLocalWorkdir(input: {
   workingDirectory?: string;
   displayName?: string;
   originalLocator?: string;
+  cliResolvedSource?: string;
   resourceName?: string;
   metadata?: Record<string, string>;
 }): string {
@@ -372,6 +373,7 @@ export function resolveSshPackageLocalWorkdir(input: {
     ...(input.workingDirectory ? { workingDirectory: input.workingDirectory } : {}),
     ...(input.displayName ? { displayName: input.displayName } : {}),
     ...(input.originalLocator ? { originalLocator: input.originalLocator } : {}),
+    ...(input.cliResolvedSource ? { cliResolvedSource: input.cliResolvedSource } : {}),
     ...(input.resourceName ? { resourceName: input.resourceName } : {}),
     ...(input.metadata ? { metadata: input.metadata } : {}),
   });
