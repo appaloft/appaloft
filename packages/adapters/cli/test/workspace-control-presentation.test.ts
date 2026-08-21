@@ -33,6 +33,7 @@ import {
 import { domainError, err, ok } from "@appaloft/core";
 import {
   createBoundedWorkspaceControlPresentation,
+  handleWorkspaceControlWaitScreenInterrupt,
   type WorkspaceControlRendererEvent,
   type WorkspaceControlRendererMessage,
   type WorkspaceControlRendererSession,
@@ -1332,9 +1333,28 @@ describe("Workspace control presentation", () => {
       type: "loading",
       title: "Appaloft Cloud Agents",
     });
-    process.emit("SIGINT");
+    handleWorkspaceControlWaitScreenInterrupt({
+      attached: false,
+      close: () => renderer.close(),
+      exitProcess: false,
+    });
     await started;
     expect(renderer.closed).toBeGreaterThanOrEqual(1);
+    const source = await Bun.file(
+      new URL("../src/workspace-control-presentation.ts", import.meta.url),
+    ).text();
+    expect(source).toContain("restoreWorkspaceTuiScrollback");
+    expect(source).toContain("process.exit(0)");
+    expect(source).not.toContain("process.exit(130)");
+    let attachedClosed = 0;
+    handleWorkspaceControlWaitScreenInterrupt({
+      attached: true,
+      close: async () => {
+        attachedClosed += 1;
+      },
+      exitProcess: false,
+    });
+    expect(attachedClosed).toBe(0);
   });
 
   test("[WS-TUI-ENTRY-001] quit is accepted while occupancy detail is still loading", async () => {
