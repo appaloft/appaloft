@@ -363,6 +363,7 @@
 - [x] folder.local `--server` / `--pi` does not remap nested Cloud validation to `workspace_open_target_server_unsupported` (WS-REMOTE-COMPAT-220)
 - [x] folder.local unstructured `Input validation failed` after the Cloud Agents screen is a human next step (`1049l` then print); `sandboxes.create` omits Cloud-unknown name hints
 - [x] folder.local / `deploy .` `Operation check denied` is a human next step (operation + reason + login/enroll/retry/Cloud update); logged-in create-project keeps handshake org (WS-REMOTE-COMPAT-221)
+- [x] occupy / Preparing disk HTTP 502/503 or Cloudflare bad-gateway / origin-incomplete after TUI first paint is a human next step (`1049l` then print); `--omp` retry names hostinger `srv_4lifk0yrcecy`; `--pi` stays Occupancy-free (WS-REMOTE-COMPAT-222)
 - [x] `appaloftdev code --no-attach` would name the enrolled Server
 
 ## Slice 44 - occupancy resume keeps preferred Profile

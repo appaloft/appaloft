@@ -133,6 +133,12 @@ workspace 并部署。不会复制笔记本 `mcp.json` 密钥。永远不会打�
 appaloft code --server srv_4lifk0yrcecy
 ```
 
+<a id="agent-workspace-preparing-disk" />
+若 **Preparing disk** 因为 Cloud 暂时不可达而失败（HTTP 502 / 503，包括
+Cloudflare bad-gateway 页面），Cloud Agents 画面会先恢复终端，再打印下一步，
+例如 `appaloft code --omp --server srv_4lifk0yrcecy`。`--omp` 是 OpenCode
+harness；若你打开的是 Pi，用 `--pi`。CLI 会保留 HTTP 状态，不会倾倒网关页面。
+
 未登录、没有 Server，或显式 `--claude` / `--codex` / `--grok` 缺少凭证，会 fail closed
 并给出下一步，不会变成 Scratch。本机 Scratch 必须显式指定：
 

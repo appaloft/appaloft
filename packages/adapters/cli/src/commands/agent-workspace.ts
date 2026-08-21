@@ -936,6 +936,7 @@ export const workspaceCodeCommand = EffectCommand.make(
               repositoryIdentity: door.repositoryIdentity,
               repository: door.repository,
             },
+            occupancyAgent,
           );
         }
         const details = opened.error.details;
@@ -956,6 +957,7 @@ export const workspaceCodeCommand = EffectCommand.make(
               repositoryIdentity: door.repositoryIdentity,
               repository: door.repository,
             },
+            occupancyAgent,
           );
         }
         const retry = OpenAgentWorkspaceCommand.create({
