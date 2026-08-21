@@ -50,6 +50,7 @@ import {
   parseDockerRepoDigestFromInspect,
   parseRemoteDockerImageVersionMetadataOutput,
   resolveLocalWorkspaceWorkdir,
+  recoverLocalSourceFolderFromCwd,
   resolveSshPackageLocalWorkdir,
   sshDockerUploadedWorkspaceContextPath,
   sshDockerUploadedWorkspaceFilePath,
@@ -71,6 +72,8 @@ function runningStaticSshDeployment(input: {
   displayName?: string;
   omitDisplayName?: boolean;
   cliResolvedSource?: string;
+  originalLocator?: string;
+  emptyMetadata?: boolean;
 }): Deployment {
   const deployment = Deployment.create({
     id: DeploymentId.rehydrate(input.deploymentId),
@@ -87,10 +90,15 @@ function runningStaticSshDeployment(input: {
         displayName: DisplayNameText.rehydrate(
           input.omitDisplayName ? "workspace" : (input.displayName ?? hyphenatedStaticLeaf),
         ),
-        metadata: {
-          baseDirectory: "/",
-          ...(input.cliResolvedSource ? { cliResolvedSource: input.cliResolvedSource } : {}),
-        },
+        ...(input.emptyMetadata
+          ? {}
+          : {
+              metadata: {
+                baseDirectory: "/",
+                ...(input.cliResolvedSource ? { cliResolvedSource: input.cliResolvedSource } : {}),
+                ...(input.originalLocator ? { originalLocator: input.originalLocator } : {}),
+              },
+            }),
       }),
       buildStrategy: BuildStrategyKindValue.rehydrate("static-artifact"),
       packagingMode: PackagingModeValue.rehydrate("all-in-one-docker"),
@@ -166,6 +174,67 @@ describe("SSH source upload", () => {
     const missingMessage = `Source working directory does not exist: ${dirnameAlready}`;
     expect(missingMessage).toContain(hyphenatedStaticLeaf);
     expect(missingMessage).not.toBe(`Source working directory does not exist: ${parent}`);
+  });
+
+  test("[DEP-CREATE-PKG-007] recover refuses a generic parent basename as the source leaf", () => {
+    const parent = "/Users/nichenqin/projects";
+    const folder = `${parent}/nux-67e3a052-static`;
+
+    expect(
+      recoverLocalSourceFolderFromCwd({
+        plannedRoot: parent,
+        locator: parent,
+      }),
+    ).not.toBe(folder);
+    expect(
+      recoverLocalSourceFolderFromCwd({
+        plannedRoot: parent,
+        locator: parent,
+        displayName: "workspace",
+      }),
+    ).not.toBe(folder);
+    expect(
+      recoverLocalSourceFolderFromCwd({
+        plannedRoot: parent,
+        locator: parent,
+        displayName: "projects",
+      }),
+    ).not.toBe(folder);
+    expect(
+      recoverLocalSourceFolderFromCwd({
+        plannedRoot: parent,
+        locator: parent,
+        originalLocator: folder,
+      }),
+    ).toBe(folder);
+    expect(
+      recoverLocalSourceFolderFromCwd({
+        plannedRoot: parent,
+        locator: parent,
+        displayName: "workspace",
+        originalLocator: folder,
+      }),
+    ).toBe(folder);
+    expect(
+      recoverLocalSourceFolderFromCwd({
+        plannedRoot: parent,
+        locator: parent,
+        displayName: "projects",
+        originalLocator: folder,
+      }),
+    ).toBe(folder);
+    expect(
+      recoverLocalSourceFolderFromCwd({
+        plannedRoot: parent,
+        locator: parent,
+      }),
+    ).not.toEqual(
+      recoverLocalSourceFolderFromCwd({
+        plannedRoot: parent,
+        locator: parent,
+        originalLocator: folder,
+      }),
+    );
   });
 
   test("[DEP-CREATE-PKG-007] recovers the hyphenated cwd when locator and workdir are already the parent", () => {
@@ -256,6 +325,127 @@ describe("SSH source upload", () => {
     expect(prepared.deployment.toState().runtimePlan.execution.metadata?.errorCode).toBe(
       "source_workdir_missing",
     );
+  });
+
+  test("[DEP-CREATE-PKG-007][QUICK-DEPLOY-ENTRY-008B] SSH package uses originalLocator when locator, workdir, and metadata are the parent live shape", async () => {
+    const parent = "/Users/nichenqin/projects";
+    const leaf = "nux-67e3a052-static";
+    const folder = join(parent, leaf);
+    const runtimeDir = mkdtempSync(join(tmpdir(), "appaloft-runtime-"));
+    const previousCwd = process.cwd();
+    const hostRoot = mkdtempSync(join(tmpdir(), "appaloft-pkg-007-live-"));
+    const hostParent = join(hostRoot, "projects");
+    const hostFolder = join(hostParent, leaf);
+    mkdirSync(join(hostFolder, "public"), { recursive: true });
+    writeFileSync(join(hostFolder, "public", "index.html"), "<!doctype html><title>ok</title>");
+
+    try {
+      process.chdir(runtimeDir);
+
+      const packaged = resolveSshPackageLocalWorkdir({
+        locator: parent,
+        workingDirectory: parent,
+        displayName: "workspace",
+        originalLocator: hostFolder,
+      });
+      expect(packaged).toBe(hostFolder);
+      expect(packaged).not.toBe(parent);
+      expect(existsSync(packaged)).toBe(true);
+      expect(existsSync(join(packaged, "public", "index.html"))).toBe(true);
+
+      const fromProjectsDisplayName = resolveSshPackageLocalWorkdir({
+        locator: parent,
+        workingDirectory: parent,
+        displayName: "projects",
+        originalLocator: hostFolder,
+      });
+      expect(fromProjectsDisplayName).toBe(hostFolder);
+
+      const archive = join(runtimeDir, "source.tgz");
+      const packed = spawnSync("tar", ["-czf", archive, "-C", packaged, "."], {
+        encoding: "utf8",
+      });
+      expect(packed.status).toBe(0);
+      const listing = spawnSync("tar", ["-tzf", archive], { encoding: "utf8" });
+      expect(listing.status).toBe(0);
+      expect(listing.stdout).toContain("public/index.html");
+      expect(listing.stdout.split("\n").some((line) => line.endsWith("/projects"))).toBe(false);
+
+      const missing = resolveSshPackageLocalWorkdir({
+        locator: parent,
+        workingDirectory: parent,
+        displayName: "workspace",
+        originalLocator: folder,
+      });
+      expect(missing).toBe(folder);
+      expect(missing).toContain(leaf);
+      expect(`Source working directory does not exist: ${missing}`).toContain(leaf);
+      expect(`Source working directory does not exist: ${missing}`).not.toBe(
+        `Source working directory does not exist: ${parent}`,
+      );
+
+      const deployment = runningStaticSshDeployment({
+        deploymentId: "dep_67e3a052_live",
+        locator: parent,
+        workingDirectory: parent,
+        omitDisplayName: true,
+        originalLocator: folder,
+      });
+      expect(deployment.toState().runtimePlan.source.metadata?.cliResolvedSource).toBeUndefined();
+      const backend = new SshExecutionBackend(
+        runtimeDir,
+        { warn: () => undefined } as never,
+        { record: async () => ({ isErr: () => false }) } as never,
+        { report: () => undefined } as never,
+      );
+      const prepared = await (
+        backend as never as {
+          prepareSshSource: (
+            context: ExecutionContext,
+            current: Deployment,
+            timeline: unknown[],
+            input: {
+              runtimeDir: string;
+              remoteRoot: string;
+              target: { host: string; publicHost: string; port: string };
+              env: NodeJS.ProcessEnv;
+            },
+          ) => Promise<
+            | { prepared: true }
+            | { prepared: false; deployment: Deployment }
+          >;
+        }
+      ).prepareSshSource(
+        { requestId: "req_pkg_007_live_original", entrypoint: "cli" } as ExecutionContext,
+        deployment,
+        [],
+        {
+          runtimeDir,
+          remoteRoot: "/var/lib/appaloft/runtime/ssh-deployments/dep_67e3a052_live",
+          target: { host: "deploy@example.test", publicHost: "example.test", port: "22" },
+          env: {},
+        },
+      );
+
+      expect(prepared.prepared).toBe(false);
+      if (prepared.prepared) {
+        throw new Error("expected SSH package to fail when the Mac cwd is missing here");
+      }
+      const messages = prepared.deployment.toState().timeline.map((entry) => entry.message);
+      const missingMessage = messages.find((message) =>
+        message.startsWith("Source working directory does not exist:"),
+      );
+      expect(missingMessage).toBe(`Source working directory does not exist: ${folder}`);
+      expect(missingMessage).toContain(leaf);
+      expect(missingMessage).not.toBe(`Source working directory does not exist: ${parent}`);
+      expect(prepared.deployment.toState().runtimePlan.execution.metadata?.errorCode).toBe(
+        "source_workdir_missing",
+      );
+    } finally {
+      process.chdir(previousCwd);
+      rmSync(hostRoot, { recursive: true, force: true });
+      rmSync(runtimeDir, { recursive: true, force: true });
+    }
   });
 
   test("[DEP-CREATE-PKG-007] SSH package exists-check uses the CLI-resolved source when locator and workdir are already the parent, displayName is omitted, and cwd is runtimeDir", async () => {

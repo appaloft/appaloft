@@ -20,7 +20,11 @@ import {
 } from "@appaloft/core";
 import { i18nKeys } from "@appaloft/i18n";
 import { inject, injectable } from "tsyringe";
-import { explicitCliResolvedSource, retainCliResolvedSource } from "../../cli-resolved-source";
+import {
+  explicitCliResolvedSource,
+  explicitOriginalLocator,
+  retainLocalFolderSourceFields,
+} from "../../cli-resolved-source";
 import { deploymentProgressSteps, reportDeploymentProgress } from "../../deployment-progress";
 import { type DurableWorkQueueAdapter } from "../../durable-work";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
@@ -920,11 +924,18 @@ export class CreateDeploymentUseCase {
         const cliResolvedSource = explicitCliResolvedSource({
           ...(resourceSource.source.metadata ? { metadata: resourceSource.source.metadata } : {}),
         });
+        const originalLocator = explicitOriginalLocator({
+          ...(resourceSource.source.metadata ? { metadata: resourceSource.source.metadata } : {}),
+        });
         const detectedResult = await sourceDetector.detect(context, resourceSource.source.locator, {
           ...(resourceSource.source.metadata?.baseDirectory
             ? { baseDirectory: resourceSource.source.metadata.baseDirectory }
             : {}),
           ...(cliResolvedSource ? { cliResolvedSource } : {}),
+          ...(originalLocator ? { originalLocator } : {}),
+          ...(resourceSource.source.displayName
+            ? { displayName: resourceSource.source.displayName }
+            : {}),
           ...(resourceState.runtimeProfile?.strategy.value !== "auto"
             ? { allowUnrecognizedRoot: true }
             : {}),
@@ -932,7 +943,10 @@ export class CreateDeploymentUseCase {
         detected = yield* detectedResult;
         detected = {
           ...detected,
-          source: retainCliResolvedSource(detected.source, cliResolvedSource),
+          source: retainLocalFolderSourceFields(detected.source, {
+            ...(cliResolvedSource ? { cliResolvedSource } : {}),
+            ...(originalLocator ? { originalLocator } : {}),
+          }),
         };
       }
       if (sourceVersionDetector && detected.source.kind !== "docker-image") {

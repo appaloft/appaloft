@@ -277,6 +277,7 @@ describe("CLI quick deploy draft mapping", () => {
       kind: "local-folder",
       locator,
       displayName: "nux-772b6112-static",
+      originalLocator: locator,
       metadata: {
         [CLI_RESOLVED_SOURCE_METADATA_KEY]: locator,
       },
@@ -313,8 +314,8 @@ describe("CLI quick deploy draft mapping", () => {
           kind: "local-folder",
           locator,
           displayName: "nux-772b6112-static",
-          sourceBindingFingerprint: "fp_with_cli_resolved",
-          metadata: { cliResolvedSource: locator },
+          sourceBindingFingerprint: "fp_with_original_locator",
+          originalLocator: locator,
         },
         desired,
       }),

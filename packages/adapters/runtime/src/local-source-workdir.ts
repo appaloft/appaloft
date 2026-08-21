@@ -1,6 +1,19 @@
 import { existsSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
-import { explicitCliResolvedSource } from "@appaloft/application";
+import {
+  explicitCliResolvedSource,
+  isGenericLocalSourceLeaf,
+  isSpecificLocalSourceLeaf,
+} from "@appaloft/application";
+
+function stripTrailingSeparators(path: string): string {
+  const stripped = path.replace(/\/+$/, "");
+  return stripped || path;
+}
+
+function pathBasename(path: string): string {
+  return basename(stripTrailingSeparators(path));
+}
 
 /**
  * Keep the real source folder, including hyphenated names that do not exist on
@@ -92,41 +105,106 @@ function preferLocalSourceRoot(locatorRoot: string, workingDirectory?: string): 
   return workingDirectory;
 }
 
-function sourceFolderLeaf(input: { locator: string; displayName?: string }): string | undefined {
+function leafFromResourceName(resourceName: string | undefined): string | undefined {
+  const normalized = resourceName?.trim();
+  if (!normalized) {
+    return undefined;
+  }
+
+  const withoutGeneratedSuffix = normalized.replace(/-[a-z0-9]{6}$/iu, "");
+  if (isSpecificLocalSourceLeaf(withoutGeneratedSuffix) && withoutGeneratedSuffix.includes("-")) {
+    return withoutGeneratedSuffix;
+  }
+
+  return isSpecificLocalSourceLeaf(normalized) ? normalized : undefined;
+}
+
+function leafFromOriginalLocator(originalLocator: string | undefined): string | undefined {
+  if (!originalLocator) {
+    return undefined;
+  }
+
+  const leaf = pathBasename(originalLocator);
+  return isSpecificLocalSourceLeaf(leaf) ? leaf : undefined;
+}
+
+function sourceFolderLeaf(input: {
+  locator: string;
+  displayName?: string;
+  originalLocator?: string;
+  resourceName?: string;
+}): string | undefined {
+  const fromOriginal = leafFromOriginalLocator(input.originalLocator);
+  if (fromOriginal) {
+    return fromOriginal;
+  }
+
   const fromName = input.displayName?.trim().replace(/\/+$/, "");
-  if (fromName && fromName !== "." && fromName !== ".." && !fromName.includes("/")) {
+  if (isSpecificLocalSourceLeaf(fromName)) {
     return fromName;
   }
 
-  const fromLocator = basename(input.locator.replace(/\/+$/, ""));
-  if (fromLocator && fromLocator !== "." && fromLocator !== "..") {
+  const fromResource = leafFromResourceName(input.resourceName);
+  if (fromResource) {
+    return fromResource;
+  }
+
+  const fromLocator = pathBasename(input.locator);
+  if (isSpecificLocalSourceLeaf(fromLocator)) {
     return fromLocator;
   }
 
   return undefined;
 }
 
-function stripTrailingSeparators(path: string): string {
-  const stripped = path.replace(/\/+$/, "");
-  return stripped || path;
+function firstClassLocalFolderPath(input: {
+  originalLocator?: string;
+  workingDirectory?: string;
+  locator: string;
+  displayName?: string;
+  resourceName?: string;
+}): string | undefined {
+  const knownLeaf = sourceFolderLeaf(input);
+  for (const candidate of [input.originalLocator, input.workingDirectory, input.locator]) {
+    const trimmed = candidate?.trim();
+    if (!trimmed || !isSpecificLocalSourceLeaf(pathBasename(trimmed))) {
+      continue;
+    }
+
+    if (knownLeaf && pathBasename(trimmed) !== knownLeaf) {
+      continue;
+    }
+
+    return trimmed;
+  }
+
+  return undefined;
 }
 
 /**
  * When locator and workingDirectory are already the parent (upstream dirname),
- * reconstruct the hyphenated `deploy .` folder from displayName/leaf.
- * Do not require existsSync or process.cwd(): SSH `prepareSshSource` packages
- * with `cwd: runtimeDir` and may run on a host that does not have the Mac folder.
+ * reconstruct the hyphenated `deploy .` folder from originalLocator / displayName
+ * / resource name. Never treat a generic parent basename (`projects`, `Users`,
+ * `home`, `src`) as the source leaf. Do not require existsSync or process.cwd().
  */
 export function recoverLocalSourceFolderFromCwd(input: {
   plannedRoot: string;
   locator: string;
   displayName?: string;
+  originalLocator?: string;
+  resourceName?: string;
   cwd?: string;
 }): string {
+  const originalLocator = input.originalLocator?.trim();
+  if (originalLocator && isSpecificLocalSourceLeaf(pathBasename(originalLocator))) {
+    return originalLocator;
+  }
+
   const leaf = sourceFolderLeaf(input);
   const plannedRoot = stripTrailingSeparators(input.plannedRoot);
   const locatorRoot = stripTrailingSeparators(input.locator);
-  const plannedIsAlreadyLeaf = Boolean(leaf) && basename(plannedRoot) === leaf;
+  const plannedIsAlreadyLeaf =
+    Boolean(leaf) && !isGenericLocalSourceLeaf(leaf) && pathBasename(plannedRoot) === leaf;
   if (plannedIsAlreadyLeaf) {
     return input.plannedRoot;
   }
@@ -135,9 +213,9 @@ export function recoverLocalSourceFolderFromCwd(input: {
   // existsSync of `join(parent, leaf)` is a no-op on workers and when cwd is
   // runtimeDir. Only do this when plannedRoot is still the locator (both
   // already the parent); a kept monorepo child workdir must not gain the leaf.
-  if (leaf && plannedRoot === locatorRoot) {
+  if (leaf && !isGenericLocalSourceLeaf(leaf) && plannedRoot === locatorRoot) {
     const reconstructed = resolve(plannedRoot, leaf);
-    if (basename(stripTrailingSeparators(reconstructed)) === leaf) {
+    if (pathBasename(reconstructed) === leaf) {
       return reconstructed;
     }
   }
@@ -147,7 +225,7 @@ export function recoverLocalSourceFolderFromCwd(input: {
     return input.plannedRoot;
   }
 
-  const cwdIsNamedSource = Boolean(leaf) && basename(cwd) === leaf;
+  const cwdIsNamedSource = Boolean(leaf) && pathBasename(cwd) === leaf;
   const cwdIsLocator = cwd === input.locator || cwd === input.plannedRoot;
   if (!cwdIsNamedSource && !cwdIsLocator) {
     return input.plannedRoot;
@@ -175,24 +253,41 @@ export function recoverLocalSourceFolderFromCwd(input: {
 
 /**
  * First write of the static-plan workingDirectory and the SSH package root.
- * Prefer the exact CLI-resolved `deploy .` path (summary.Source) when supplied.
- * Recovers the hyphenated cwd only when that path is absent and locator/workdir
- * were already dirname'd upstream. Must not wait for existsSync or a matching
- * process.cwd().
+ * Prefer originalLocator, then execution.workingDirectory, then locator.
+ * Legacy metadata.cliResolvedSource is only a last-resort explicit path.
+ * Recovers the hyphenated cwd when those fields are already the parent.
  */
 export function resolveLocalWorkspaceWorkdir(input: {
   workingDirectory?: string;
   locator: string;
   displayName?: string;
+  originalLocator?: string;
+  resourceName?: string;
   metadata?: Record<string, string>;
   cwd?: string;
   cliResolvedSource?: string;
 }): string {
+  const originalLocator =
+    input.originalLocator?.trim() || input.metadata?.originalLocator?.trim() || undefined;
+  const firstClass = firstClassLocalFolderPath({
+    locator: input.locator,
+    ...(originalLocator ? { originalLocator } : {}),
+    ...(input.workingDirectory ? { workingDirectory: input.workingDirectory } : {}),
+    ...(input.displayName ? { displayName: input.displayName } : {}),
+    ...(input.resourceName ? { resourceName: input.resourceName } : {}),
+  });
+  if (firstClass && isSpecificLocalSourceLeaf(pathBasename(firstClass))) {
+    return applyLocalSourceBaseDirectory(
+      normalizeLocalSourceWorkingDirectory(firstClass),
+      input.metadata,
+    );
+  }
+
   const cliResolvedSource = explicitCliResolvedSource({
     ...(input.cliResolvedSource ? { cliResolvedSource: input.cliResolvedSource } : {}),
     ...(input.metadata ? { metadata: input.metadata } : {}),
   });
-  if (cliResolvedSource) {
+  if (cliResolvedSource && isSpecificLocalSourceLeaf(pathBasename(cliResolvedSource))) {
     return applyLocalSourceBaseDirectory(
       normalizeLocalSourceWorkingDirectory(cliResolvedSource),
       input.metadata,
@@ -211,7 +306,9 @@ export function resolveLocalWorkspaceWorkdir(input: {
     recoverLocalSourceFolderFromCwd({
       plannedRoot: preferred,
       locator: locatorRoot,
+      ...(originalLocator ? { originalLocator } : {}),
       ...(input.displayName ? { displayName: input.displayName } : {}),
+      ...(input.resourceName ? { resourceName: input.resourceName } : {}),
       ...(input.cwd ? { cwd: input.cwd } : {}),
     }),
     input.metadata,
@@ -219,24 +316,24 @@ export function resolveLocalWorkspaceWorkdir(input: {
 }
 
 /**
- * Path `prepareSshSource` existsSync-checks and tars. Prefer the persisted
- * CLI-resolved `deploy .` folder. Do not treat locator as that path, and do
- * not use runtimeDir as the source cwd.
+ * Path `prepareSshSource` existsSync-checks and tars. Prefer originalLocator,
+ * then execution.workingDirectory, then locator. Never treat a generic parent
+ * basename as the source leaf. Do not use runtimeDir as the source cwd.
  */
 export function resolveSshPackageLocalWorkdir(input: {
   locator: string;
   workingDirectory?: string;
   displayName?: string;
+  originalLocator?: string;
+  resourceName?: string;
   metadata?: Record<string, string>;
 }): string {
-  const cliResolvedSource = explicitCliResolvedSource({
-    ...(input.metadata ? { metadata: input.metadata } : {}),
-  });
   return resolveLocalWorkspaceWorkdir({
     locator: input.locator,
     ...(input.workingDirectory ? { workingDirectory: input.workingDirectory } : {}),
     ...(input.displayName ? { displayName: input.displayName } : {}),
+    ...(input.originalLocator ? { originalLocator: input.originalLocator } : {}),
+    ...(input.resourceName ? { resourceName: input.resourceName } : {}),
     ...(input.metadata ? { metadata: input.metadata } : {}),
-    ...(cliResolvedSource ? { cliResolvedSource } : {}),
   });
 }

@@ -1130,6 +1130,9 @@ function chooseStrategies(input: {
           locator: source.locator,
           displayName: source.displayName,
           ...(source.metadata ? { metadata: source.metadata } : {}),
+          ...(source.metadata?.originalLocator
+            ? { originalLocator: source.metadata.originalLocator }
+            : {}),
           ...(source.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]
             ? { cliResolvedSource: source.metadata[CLI_RESOLVED_SOURCE_METADATA_KEY] }
             : {}),

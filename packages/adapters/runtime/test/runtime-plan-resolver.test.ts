@@ -3010,6 +3010,41 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(plan.source.locator).toBe(parent);
   });
 
+  test("[DEP-CREATE-PKG-007][QUICK-DEPLOY-ENTRY-008B] static plan writes originalLocator when locator is already the parent and metadata has no cliResolvedSource", async () => {
+    ensureReflectMetadata();
+    const parent = "/Users/nichenqin/projects";
+    const originalLocator = `${parent}/nux-67e3a052-static`;
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const result = await resolver.resolve(createTestExecutionContext(), {
+      id: "plan_original_locator_static",
+      source: createSource({
+        kind: "local-folder",
+        locator: parent,
+        displayName: "workspace",
+        metadata: { originalLocator },
+      }),
+      server: {
+        id: "srv_4lifk0yrcecy",
+        providerKey: "generic-ssh",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_original_locator_static"),
+      detectedReasoning: ["first-class originalLocator after persist/rehydrate"],
+      requestedDeployment: {
+        method: "static",
+        publishDirectory: "public",
+        port: 80,
+      } as never,
+      generatedAt: "2026-08-21T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.execution.workingDirectory).toBe(originalLocator);
+    expect(plan.execution.workingDirectory).not.toBe(parent);
+    expect(plan.execution.workingDirectory).toContain("nux-67e3a052-static");
+  });
+
   test("[DEP-CREATE-PKG-007] static plan writes the hyphenated cwd when locator is already the parent", async () => {
     ensureReflectMetadata();
     const parent = mkdtempSync(join(tmpdir(), "projects-"));

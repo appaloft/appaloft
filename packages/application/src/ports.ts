@@ -10049,6 +10049,10 @@ export interface SourceDetectionInput {
   allowUnrecognizedRoot?: boolean;
   /** Exact CLI `deploy .` path printed as summary.Source. */
   cliResolvedSource?: string;
+  /** Typed local-folder original locator; absolute host paths are allowed. */
+  originalLocator?: string;
+  /** Resource/CLI display name; detector must not replace a hyphenated leaf. */
+  displayName?: string;
 }
 
 export type RequestedDeploymentMethod =
