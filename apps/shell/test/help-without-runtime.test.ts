@@ -195,6 +195,63 @@ sys.exit(os.waitstatus_to_exitcode(status))
     expect(stderr).not.toContain("PGlite");
   });
 
+  test("[CONTROL-PLANE-CLI-027] setup agent --help prints compact usage without runtime", async () => {
+    const temporaryRoot = await mkdtemp(join(tmpdir(), "appaloft-setup-help-no-runtime-"));
+    temporaryRoots.push(temporaryRoot);
+    const unusablePglitePath = join(temporaryRoot, "pglite-is-a-file");
+    await writeFile(unusablePglitePath, "help must not open this path");
+
+    const child = spawnShell(["setup", "agent", "--help"], {
+      ...process.env,
+      APPALOFT_HOME: join(temporaryRoot, "home"),
+      APPALOFT_PGLITE_DATA_DIR: unusablePglitePath,
+      OTEL_SDK_DISABLED: "true",
+    });
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("appaloft setup agent");
+    expect(stdout).toContain("Usage:");
+    expect(stdout).toContain("-y, --yes");
+    expect(stdout).toContain("--agent");
+    expect(stdout).toContain("Skip prompts and accept detected defaults");
+    expect(stdout).toContain("not default-checked");
+    expect(stdout).toContain("~/.cursor/mcp.json");
+    expect(stdout).not.toContain("A true or false value");
+    expect(stdout).not.toContain("A user-defined piece of text");
+    expect(stdout.split("This setting is optional").length - 1).toBe(0);
+    expect(stdout).not.toContain("--wizard");
+    expect(stdout).not.toMatch(/occupancy/iu);
+    expect(`${stdout}${stderr}`).not.toContain("\x1b[?1049h");
+    expect(`${stdout}${stderr}`).not.toContain("\x1b[?25l");
+    expect(stderr).not.toContain("PGlite");
+  });
+
+  test("[CONTROL-PLANE-CLI-027] setup agent -h prints the same compact table", async () => {
+    const temporaryRoot = await mkdtemp(join(tmpdir(), "appaloft-setup-h-"));
+    temporaryRoots.push(temporaryRoot);
+
+    const child = spawnShell(["setup", "agent", "-h"], {
+      ...process.env,
+      APPALOFT_HOME: join(temporaryRoot, "home"),
+      OTEL_SDK_DISABLED: "true",
+    });
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("appaloft setup agent");
+    expect(stdout).toContain("-y, --yes");
+    expect(stdout).not.toContain("A true or false value");
+    expect(stdout).not.toMatch(/occupancy/iu);
+    expect(`${stdout}${stderr}`).not.toContain("\x1b[?1049h");
+  });
+
   test("[CONTROL-PLANE-CLI-012] login --help prints usage without OAuth or runtime", async () => {
     const temporaryRoot = await mkdtemp(join(tmpdir(), "appaloft-login-help-"));
     temporaryRoots.push(temporaryRoot);

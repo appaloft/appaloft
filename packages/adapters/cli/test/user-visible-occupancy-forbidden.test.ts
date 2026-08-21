@@ -26,6 +26,7 @@ import {
   occupancyVendorCredentialMissingError,
 } from "../src/occupancy-vendor.js";
 import { occupancyCloudCompatError } from "../src/remote-code-session.js";
+import { formatSetupHelp, SETUP_AGENT_OPTION_DESCRIPTIONS } from "../src/setup-help.js";
 import { workspaceControlRendererUnavailableMessage } from "../src/workspace-tui-launch.js";
 
 const FORBIDDEN = /occupancy/iu;
@@ -86,6 +87,8 @@ describe("user-visible Occupancy is forbidden", () => {
     expectNoOccupancyLeaves("shell-progress", SHELL_OCCUPANCY_PROGRESS);
     expectNoOccupancyLeaves("code-help.options", CODE_OPTION_DESCRIPTIONS);
     expectNoOccupancy("code-help", formatCodeHelp());
+    expectNoOccupancyLeaves("setup-help.options", SETUP_AGENT_OPTION_DESCRIPTIONS);
+    expectNoOccupancy("setup-help", formatSetupHelp());
     expectNoOccupancyLeaves("cli-descriptions", cliCommandDescriptions);
     expectNoOccupancyLeaves(
       "connecting-steps",

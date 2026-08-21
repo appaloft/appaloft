@@ -13,6 +13,7 @@ import {
   printCliError,
   readProcessStdinText,
 } from "./runtime.js";
+import { tryHandleSetupHelp } from "./setup-help.js";
 
 export {
   CLI_LOGIN_GUIDANCE,
@@ -171,6 +172,14 @@ export {
   type SafeCliErrorEvidence,
   safeCliErrorEvidence,
 } from "./runtime.js";
+export {
+  formatSetupHelp,
+  isSetupHelpInvocation,
+  renderSetupHelp,
+  SETUP_AGENT_LIST,
+  SETUP_AGENT_OPTION_DESCRIPTIONS,
+  tryHandleSetupHelp,
+} from "./setup-help.js";
 export { runStandaloneControlPlaneCli } from "./standalone-control-plane.js";
 export {
   type DevelopmentCommandRuntime,
@@ -232,7 +241,7 @@ export function createCliProgram(input: CliProgramInput): CliProgram {
 
   return {
     parseAsync: async (argv = process.argv) => {
-      if (tryHandleCodeHelp(argv, process.stdout)) {
+      if (tryHandleCodeHelp(argv, process.stdout) || tryHandleSetupHelp(argv, process.stdout)) {
         return;
       }
       capturedStdinText = cliArgvRequestsStdinText(argv) ? sourceStdinReader() : undefined;
@@ -278,7 +287,7 @@ export function createCliHelpProgram(input: { readonly version: string }): CliPr
 
   return {
     parseAsync: async (argv = process.argv) => {
-      if (tryHandleCodeHelp(argv, process.stdout)) {
+      if (tryHandleCodeHelp(argv, process.stdout) || tryHandleSetupHelp(argv, process.stdout)) {
         return;
       }
       await EffectCommand.run(mainCommand, {
