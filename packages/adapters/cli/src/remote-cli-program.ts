@@ -486,8 +486,7 @@ export function createRemoteCliProgram(input: RemoteCliProgramInput): CliProgram
         if (isFolderLocalWorkspaceOpenCommand(message)) {
           return executeFolderLocalWorkspaceOpen({
             command: message,
-            dispatch: (inner) =>
-              dispatch(inner instanceof AppQuery ? "query" : "command", inner),
+            dispatch: (inner) => dispatch(inner instanceof AppQuery ? "query" : "command", inner),
           }) as Promise<Result<T>>;
         }
 
