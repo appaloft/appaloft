@@ -13,6 +13,7 @@ import {
   OCCUPANCY_LEAVE_ALT_SCREEN,
   occupancyAltScreenWasEntered,
   occupancyFirstFrameBytes,
+  occupancyFirstFrameChromeForWidth,
   resetOccupancyAltScreenState,
   restoreOccupancyAltScreenIfEntered,
   writeOccupancyTerminalBytes,
@@ -28,6 +29,12 @@ describe("occupancy TUI first frame", () => {
     expect(frame.startsWith(OCCUPANCY_ALT_SCREEN)).toBeTrue();
     expect(frame).toContain(OCCUPANCY_FIRST_FRAME_CHROME);
     expect(frame).toContain(OCCUPANCY_FIRST_FRAME_TITLE);
+    expect(frame).toContain(
+      `\x1b[H${OCCUPANCY_FIRST_FRAME_CHROME}\r\n${OCCUPANCY_FIRST_FRAME_TITLE}`,
+    );
+    expect(frame).not.toContain("\x1b[11;");
+    expect(occupancyFirstFrameChromeForWidth(19)).toBe("Appaloft Cloud");
+    expect(occupancyFirstFrameChromeForWidth(19)).not.toContain("Agen");
     expect(frame).not.toMatch(/occupancy/iu);
     let written = "";
     enterOccupancyAltScreen((text) => {

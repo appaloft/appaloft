@@ -120,6 +120,9 @@ fn main() -> Result<()> {
         occupancy_restore = Some(TerminalRestore::enter()?);
         let backend = CrosstermBackend::new(std::io::stdout());
         let mut terminal = Terminal::new(backend).context("create Ratatui terminal")?;
+        terminal
+            .clear()
+            .context("clear occupancy first frame leftover")?;
         let first_frame = AppState::default();
         terminal
             .draw(|frame| render(frame, &first_frame))
