@@ -88,4 +88,48 @@ describe("CLI-host local source package", () => {
       rmSync(hostRoot, { recursive: true, force: true });
     }
   });
+
+  test("[DEP-CREATE-PKG-007][QUICK-DEPLOY-ENTRY-008B] packs a non-git hyphenated nux leaf under projects, not the parent", () => {
+    const hostRoot = mkdtempSync(join(tmpdir(), "appaloft-cli-pack-nux-"));
+    const parent = join(hostRoot, "projects");
+    const leaf = "nux-d73d53b6-static";
+    const folder = join(parent, leaf);
+    mkdirSync(join(folder, "public"), { recursive: true });
+    writeFileSync(join(folder, "public", "index.html"), "<!doctype html><title>nux</title>");
+    const previousCwd = process.cwd();
+    const previousPwd = process.env.PWD;
+
+    try {
+      process.chdir(folder);
+      process.env.PWD = parent;
+
+      const fromParentLocator = packageLocalFolderSourceOnCliHostIfPresent(parent);
+      expect(fromParentLocator.isOk()).toBe(true);
+      const archive = fromParentLocator._unsafeUnwrap();
+      expect(typeof archive).toBe("string");
+      expect((archive ?? "").length).toBeGreaterThan(0);
+
+      const fromDot = packageLocalFolderSourceOnCliHostIfPresent(".");
+      expect(fromDot.isOk()).toBe(true);
+      expect(typeof fromDot._unsafeUnwrap()).toBe("string");
+
+      const listingDir = mkdtempSync(join(tmpdir(), "appaloft-cli-pack-nux-list-"));
+      const archivePath = join(listingDir, "source.tgz");
+      writeFileSync(archivePath, Buffer.from(archive ?? "", "base64"));
+      const listing = spawnSync("tar", ["-tzf", archivePath], { encoding: "utf8" });
+      expect(listing.status).toBe(0);
+      expect(listing.stdout).toContain("public/index.html");
+      expect(listing.stdout).not.toContain(`${leaf}/`);
+      expect(listing.stdout.split("\n").some((line) => line.endsWith("/projects"))).toBe(false);
+      rmSync(listingDir, { recursive: true, force: true });
+    } finally {
+      process.chdir(previousCwd);
+      if (previousPwd === undefined) {
+        delete process.env.PWD;
+      } else {
+        process.env.PWD = previousPwd;
+      }
+      rmSync(hostRoot, { recursive: true, force: true });
+    }
+  });
 });

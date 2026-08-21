@@ -184,8 +184,9 @@ function firstClassLocalFolderPath(input: {
 /**
  * When locator and workingDirectory are already the parent (upstream dirname),
  * reconstruct the hyphenated `deploy .` folder from originalLocator / displayName
- * / resource name. Never treat a generic parent basename (`projects`, `Users`,
- * `home`, `src`) as the source leaf. Do not require existsSync or process.cwd().
+ * / resource name (including generated `nux-*-static-<suffix>` names). Never
+ * treat a generic parent basename (`projects`, `Users`, `home`, `src`) as the
+ * source leaf. Do not require existsSync or process.cwd().
  */
 export function recoverLocalSourceFolderFromCwd(input: {
   plannedRoot: string;

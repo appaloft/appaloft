@@ -2011,6 +2011,9 @@ export class SshExecutionBackend implements ExecutionBackend {
     }
 
     const packedSourceArchive = cliPackedSourceArchiveFromMetadata(source.metadata);
+    const resourceName =
+      state.runtimePlan.execution.metadata?.["context.resourceName"] ??
+      state.runtimePlan.execution.metadata?.["context.resourceSlug"];
     const localWorkdir = resolveSshPackageLocalWorkdir({
       locator: source.locator,
       ...(state.runtimePlan.execution.workingDirectory
@@ -2020,6 +2023,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       ...(source.metadata?.originalLocator
         ? { originalLocator: source.metadata.originalLocator }
         : {}),
+      ...(resourceName ? { resourceName } : {}),
       ...(source.metadata ? { metadata: source.metadata } : {}),
     });
 

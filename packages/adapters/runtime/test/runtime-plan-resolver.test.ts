@@ -3090,6 +3090,45 @@ describe("DefaultRuntimePlanResolver", () => {
     }
   });
 
+  test("[DEP-CREATE-PKG-007][QUICK-DEPLOY-ENTRY-008B] static plan reconstructs a nux leaf under projects from context.resourceName", async () => {
+    ensureReflectMetadata();
+    const parent = "/Users/nichenqin/projects";
+    const leaf = "nux-d73d53b6-static";
+    const folder = `${parent}/${leaf}`;
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const result = await resolver.resolve(createTestExecutionContext(), {
+      id: "plan_nux_resource_name_static",
+      source: createSource({
+        kind: "local-folder",
+        locator: parent,
+        displayName: "projects",
+        metadata: { baseDirectory: "/" },
+      }),
+      server: {
+        id: "srv_4lifk0yrcecy",
+        providerKey: "generic-ssh",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_nux_resource_name_static"),
+      detectedReasoning: ["resource name after persist/rehydrate dropped originalLocator"],
+      requestedDeployment: {
+        method: "static",
+        publishDirectory: "public",
+        port: 80,
+        runtimeMetadata: {
+          "context.resourceName": `${leaf}-8xrly6`,
+        },
+      } as never,
+      generatedAt: "2026-08-21T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.execution.workingDirectory).toBe(folder);
+    expect(plan.execution.workingDirectory).toContain(leaf);
+    expect(plan.execution.workingDirectory).not.toBe(parent);
+  });
+
   test("[RES-CREATE-ADM-037C] source-root publish-dir . is legal and COPY ./", async () => {
     ensureReflectMetadata();
     const [{ DefaultRuntimePlanResolver }, { generateStaticSiteDockerBuild }, { StaticPublishDirectory }] =
