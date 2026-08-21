@@ -105,11 +105,16 @@ function sourceFolderLeaf(input: { locator: string; displayName?: string }): str
   return undefined;
 }
 
+function stripTrailingSeparators(path: string): string {
+  const stripped = path.replace(/\/+$/, "");
+  return stripped || path;
+}
+
 /**
  * When locator and workingDirectory are already the parent (upstream dirname),
- * the folder that still exists on this host is `deploy .`'s cwd. Match it by
- * leaf name (`nux-c79876d8-static`) so we do not package `/Users/nichenqin/projects`
- * or a worker cwd that just happens to exist.
+ * reconstruct the hyphenated `deploy .` folder from displayName/leaf.
+ * Do not require existsSync or process.cwd(): SSH `prepareSshSource` packages
+ * with `cwd: runtimeDir` and may run on a host that does not have the Mac folder.
  */
 export function recoverLocalSourceFolderFromCwd(input: {
   plannedRoot: string;
@@ -118,11 +123,22 @@ export function recoverLocalSourceFolderFromCwd(input: {
   cwd?: string;
 }): string {
   const leaf = sourceFolderLeaf(input);
-  const plannedIsAlreadyLeaf = Boolean(leaf) && basename(input.plannedRoot.replace(/\/+$/, "")) === leaf;
-  const namedChild =
-    leaf && !plannedIsAlreadyLeaf ? existingDirectory(resolve(input.plannedRoot, leaf)) : undefined;
-  if (namedChild && basename(namedChild) === leaf) {
-    return namedChild;
+  const plannedRoot = stripTrailingSeparators(input.plannedRoot);
+  const locatorRoot = stripTrailingSeparators(input.locator);
+  const plannedIsAlreadyLeaf = Boolean(leaf) && basename(plannedRoot) === leaf;
+  if (plannedIsAlreadyLeaf) {
+    return input.plannedRoot;
+  }
+
+  // Reconstruct even when the check host does not have the folder. An
+  // existsSync of `join(parent, leaf)` is a no-op on workers and when cwd is
+  // runtimeDir. Only do this when plannedRoot is still the locator (both
+  // already the parent); a kept monorepo child workdir must not gain the leaf.
+  if (leaf && plannedRoot === locatorRoot) {
+    const reconstructed = resolve(plannedRoot, leaf);
+    if (basename(stripTrailingSeparators(reconstructed)) === leaf) {
+      return reconstructed;
+    }
   }
 
   const cwd = existingDirectory(input.cwd ?? process.cwd());
@@ -159,7 +175,8 @@ export function recoverLocalSourceFolderFromCwd(input: {
 /**
  * First write of the static-plan workingDirectory and the SSH package root.
  * Recovers the hyphenated cwd when locator/workdir were already dirname'd
- * upstream. Must not only wrap a helper after the value is already the parent.
+ * upstream. Must not only wrap a helper after the value is already the parent,
+ * and must not wait for existsSync or a matching process.cwd().
  */
 export function resolveLocalWorkspaceWorkdir(input: {
   workingDirectory?: string;
@@ -169,19 +186,16 @@ export function resolveLocalWorkspaceWorkdir(input: {
   cwd?: string;
 }): string {
   const locatorRoot = normalizeLocalSourceWorkingDirectory(input.locator);
-  const planned = applyLocalSourceBaseDirectory(
-    preferLocalSourceRoot(
-      locatorRoot,
-      input.workingDirectory
-        ? normalizeLocalSourceWorkingDirectory(input.workingDirectory)
-        : undefined,
-    ),
-    input.metadata,
+  const preferred = preferLocalSourceRoot(
+    locatorRoot,
+    input.workingDirectory
+      ? normalizeLocalSourceWorkingDirectory(input.workingDirectory)
+      : undefined,
   );
 
   return applyLocalSourceBaseDirectory(
     recoverLocalSourceFolderFromCwd({
-      plannedRoot: planned,
+      plannedRoot: preferred,
       locator: locatorRoot,
       ...(input.displayName ? { displayName: input.displayName } : {}),
       ...(input.cwd ? { cwd: input.cwd } : {}),
