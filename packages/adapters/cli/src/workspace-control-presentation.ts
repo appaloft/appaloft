@@ -481,13 +481,26 @@ function occupancySummary(
   };
 }
 
-function workspaceDisplayName(
-  record: Record<string, unknown>,
-  workspaceId: string,
-): string {
+function occupancyDisplayName(record: Record<string, unknown>): string | undefined {
+  const occupancy = occupancySummary(record);
+  if (!occupancy) return undefined;
+  const sha = occupancy.commitSha.slice(0, 7);
+  if (!sha) return undefined;
+  const repo = occupancy.repositoryIdentity
+    .replace(/^(github\.com|gitlab\.com|bitbucket\.org)\//iu, "")
+    .trim();
+  if (!repo || repo.toLowerCase().startsWith("sbx_")) return undefined;
+  return `${repo}@${sha}`;
+}
+
+function workspaceDisplayName(record: Record<string, unknown>, workspaceId: string): string {
   const named = optionalString(record, "name");
   if (named && !named.startsWith("sbx_")) return named;
-  return workspaceId.startsWith("sbx_") ? workspaceId.slice("sbx_".length) || "workspace" : workspaceId;
+  const occupancyName = occupancyDisplayName(record);
+  if (occupancyName) return occupancyName;
+  return workspaceId.startsWith("sbx_")
+    ? workspaceId.slice("sbx_".length) || "workspace"
+    : workspaceId;
 }
 
 function workspaceSummary(record: Record<string, unknown>): WorkspaceControlWorkspaceSummary {

@@ -371,6 +371,7 @@ describe("remote code door", () => {
         commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         serverName: "mac-mini",
         workspaceId: "sbx_hidden",
+        branch: "main",
       }),
     ).toBe(
       "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox\nCompare · https://github.com/acme/api/compare/main?expand=1",

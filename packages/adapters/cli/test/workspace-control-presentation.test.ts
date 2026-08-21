@@ -1445,6 +1445,7 @@ describe("Workspace control presentation", () => {
       workspaces: [
         {
           workspaceId: "sbx_ready",
+          name: "traefik/whoami@1ce75d0",
           status: "ready",
           occupancy: {
             repositoryIdentity: "github.com/traefik/whoami",
@@ -1452,7 +1453,7 @@ describe("Workspace control presentation", () => {
             branch: "master",
           },
         },
-        { workspaceId: "sbx_provisioning", status: "provisioning" },
+        { workspaceId: "sbx_provisioning", name: "provisioning", status: "provisioning" },
       ],
     });
   });

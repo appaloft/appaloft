@@ -30,6 +30,27 @@ pub struct WorkspaceSummary {
     pub occupancy: Option<OccupancySummary>,
 }
 
+fn occupancy_repo_label(occupancy: &OccupancySummary) -> Option<String> {
+    let sha = occupancy
+        .commit_sha
+        .get(..7)
+        .unwrap_or(&occupancy.commit_sha);
+    if sha.is_empty() {
+        return None;
+    }
+    let repo = occupancy
+        .repository_identity
+        .strip_prefix("github.com/")
+        .or_else(|| occupancy.repository_identity.strip_prefix("gitlab.com/"))
+        .or_else(|| occupancy.repository_identity.strip_prefix("bitbucket.org/"))
+        .unwrap_or(&occupancy.repository_identity)
+        .trim();
+    if repo.is_empty() || repo.starts_with("sbx_") {
+        return None;
+    }
+    Some(format!("{repo}@{sha}"))
+}
+
 fn workspace_list_label(workspace: &WorkspaceSummary) -> String {
     if let Some(name) = workspace
         .name
@@ -38,6 +59,14 @@ fn workspace_list_label(workspace: &WorkspaceSummary) -> String {
         .filter(|value| !value.is_empty() && !value.starts_with("sbx_"))
     {
         return name.to_owned();
+    }
+    if let Some(occupancy) = workspace
+        .occupancy
+        .as_ref()
+        .and_then(occupancy_repo_label)
+        .filter(|value| !value.starts_with("sbx_"))
+    {
+        return occupancy;
     }
     workspace
         .workspace_id
@@ -1136,10 +1165,7 @@ impl AppState {
             }
             ParentMessage::Detail { detail } => {
                 self.loading.active = false;
-                self.status_line = format!(
-                    "Workspace {}",
-                    workspace_list_label(&detail.workspace)
-                );
+                self.status_line = format!("Workspace {}", workspace_list_label(&detail.workspace));
                 self.detail = Some(detail);
                 self.action_busy = false;
                 self.delivery_busy = false;
@@ -3152,12 +3178,29 @@ mod tests {
             source_kind: None,
             occupancy: None,
         };
+        let occupancy_only = WorkspaceSummary {
+            workspace_id: "sbx_1".to_owned(),
+            status: "ready".to_owned(),
+            name: None,
+            provider_key: None,
+            source_kind: None,
+            occupancy: Some(OccupancySummary {
+                repository_identity: "github.com/traefik/whoami".to_owned(),
+                commit_sha: "1ce75d01b6978863647da42557a707a479da3a51".to_owned(),
+                branch: Some("master".to_owned()),
+            }),
+        };
         assert_eq!(workspace_list_label(&named), "whoami@1ce75d0");
         assert_eq!(workspace_list_label(&generated), "resonant-silence");
         assert_eq!(workspace_list_label(&legacy), "lean");
+        assert_eq!(
+            workspace_list_label(&occupancy_only),
+            "traefik/whoami@1ce75d0"
+        );
         assert!(!workspace_list_label(&named).contains("sbx_"));
         assert!(!workspace_list_label(&generated).contains("sbx_"));
         assert!(!workspace_list_label(&legacy).contains("sbx_"));
+        assert!(!workspace_list_label(&occupancy_only).contains("sbx_"));
     }
 
     #[test]
@@ -4442,6 +4485,7 @@ mod tests {
             workspace: WorkspaceSummary {
                 workspace_id: "sbx_1".to_owned(),
                 status: "terminated".to_owned(),
+                name: None,
                 provider_key: Some("registered-server".to_owned()),
                 source_kind: Some("template".to_owned()),
                 occupancy: None,

@@ -42,9 +42,9 @@ describe("Sandbox display name", () => {
   });
 
   test("[SBX-DOM-005] linked folder and git sources prefer directory or repo@sha over random", () => {
-    expect(
-      SandboxDisplayName.resolve({ directoryName: "hello-static" }).value,
-    ).toBe("hello-static");
+    expect(SandboxDisplayName.resolve({ directoryName: "hello-static" }).value).toBe(
+      "hello-static",
+    );
     expect(
       SandboxDisplayName.resolve({
         repositoryIdentity: "github.com/traefik/whoami",
