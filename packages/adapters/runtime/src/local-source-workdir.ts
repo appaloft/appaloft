@@ -184,8 +184,9 @@ function firstClassLocalFolderPath(input: {
 /**
  * When locator and workingDirectory are already the parent (upstream dirname),
  * reconstruct the hyphenated `deploy .` folder from originalLocator / displayName
- * / resource name. Never treat a generic parent basename (`projects`, `Users`,
- * `home`, `src`) as the source leaf. Do not require existsSync or process.cwd().
+ * / resource name (including generated `nux-*-static-<suffix>` names). Never
+ * treat a generic parent basename (`projects`, `Users`, `home`, `src`) as the
+ * source leaf. Do not require existsSync or process.cwd().
  */
 export function recoverLocalSourceFolderFromCwd(input: {
   plannedRoot: string;
@@ -260,6 +261,22 @@ export function recoverLocalSourceFolderFromCwd(input: {
   return refuseGenericParent(input.plannedRoot);
 }
 
+function resourceNameFromLocalSourceInput(input: {
+  resourceName?: string;
+  metadata?: Record<string, string>;
+}): string | undefined {
+  const fromInput = input.resourceName?.trim();
+  if (fromInput) {
+    return fromInput;
+  }
+
+  return (
+    input.metadata?.["context.resourceName"]?.trim() ||
+    input.metadata?.["context.resourceSlug"]?.trim() ||
+    undefined
+  );
+}
+
 /**
  * First write of the static-plan workingDirectory and the SSH package root.
  * Prefer originalLocator, then execution.workingDirectory, then locator.
@@ -278,12 +295,13 @@ export function resolveLocalWorkspaceWorkdir(input: {
 }): string {
   const originalLocator =
     input.originalLocator?.trim() || input.metadata?.originalLocator?.trim() || undefined;
+  const resourceName = resourceNameFromLocalSourceInput(input);
   const firstClass = firstClassLocalFolderPath({
     locator: input.locator,
     ...(originalLocator ? { originalLocator } : {}),
     ...(input.workingDirectory ? { workingDirectory: input.workingDirectory } : {}),
     ...(input.displayName ? { displayName: input.displayName } : {}),
-    ...(input.resourceName ? { resourceName: input.resourceName } : {}),
+    ...(resourceName ? { resourceName } : {}),
   });
   if (firstClass && isSpecificLocalSourceLeaf(pathBasename(firstClass))) {
     return applyLocalSourceBaseDirectory(
@@ -317,7 +335,7 @@ export function resolveLocalWorkspaceWorkdir(input: {
       locator: locatorRoot,
       ...(originalLocator ? { originalLocator } : {}),
       ...(input.displayName ? { displayName: input.displayName } : {}),
-      ...(input.resourceName ? { resourceName: input.resourceName } : {}),
+      ...(resourceName ? { resourceName } : {}),
       ...(input.cwd ? { cwd: input.cwd } : {}),
     }),
     input.metadata,

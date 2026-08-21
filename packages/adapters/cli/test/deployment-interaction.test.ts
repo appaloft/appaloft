@@ -487,6 +487,48 @@ describe("CLI quick deploy draft mapping", () => {
     }
   });
 
+  test("[DEP-CREATE-PKG-007][QUICK-DEPLOY-ENTRY-008B] deploy . keeps a non-git hyphenated nux leaf under projects", async () => {
+    ensureReflectMetadata();
+    const { normalizeCliPathOrSource, resolveCliHostLocalSourceFolder } =
+      await import("../src/commands/deployment-source");
+    const { normalizeUrlFirstDeploymentEntry } =
+      await import("../src/commands/deployment-interaction");
+
+    const hostRoot = mkdtempSync(join(tmpdir(), "appaloft-nux-cwd-"));
+    const parent = join(hostRoot, "projects");
+    const leaf = "nux-d73d53b6-static";
+    const folder = join(parent, leaf);
+    mkdirSync(join(folder, "public"), { recursive: true });
+    writeFileSync(join(folder, "public", "index.html"), "<!doctype html><title>nux</title>");
+    const previousCwd = process.cwd();
+    const previousPwd = process.env.PWD;
+
+    try {
+      process.chdir(folder);
+      process.env.PWD = parent;
+      expect(normalizeCliPathOrSource(".", "auto")).toBe(resolve(folder));
+      expect(normalizeCliPathOrSource(parent, "auto")).toBe(resolve(folder));
+      expect(resolveCliHostLocalSourceFolder(parent)).toBe(resolve(folder));
+      expect(normalizeCliPathOrSource(".", "auto")).not.toBe(resolve(parent));
+
+      const autoEntry = normalizeUrlFirstDeploymentEntry({
+        sourceLocator: ".",
+      });
+      expect(autoEntry._unsafeUnwrap()).toEqual({
+        deploymentMethod: "static",
+        publishDirectory: "public",
+      });
+    } finally {
+      process.chdir(previousCwd);
+      if (previousPwd === undefined) {
+        delete process.env.PWD;
+      } else {
+        process.env.PWD = previousPwd;
+      }
+      rmSync(hostRoot, { recursive: true, force: true });
+    }
+  });
+
   test("[QUICK-DEPLOY-ENTRY-008B][RES-CREATE-ADM-037C] root index.html defaults to source-root publish-dir", async () => {
     ensureReflectMetadata();
     const { normalizeUrlFirstDeploymentEntry } =

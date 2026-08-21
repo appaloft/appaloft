@@ -58,9 +58,9 @@ function isExistingChildDirectory(parent: string, child: string): boolean {
 
 /**
  * Folder the CLI process can actually tar. Prefer a hyphenated leaf such as
- * `appaloft-cloud` under a parent named `projects`. A stale PWD that is the
- * parent must not win over cwd; a generic-parent cwd must not win over an
- * existing PWD/locator child.
+ * `nux-*-static` or `appaloft-cloud` under a parent named `projects`. A stale
+ * PWD that is the parent must not win over cwd; a generic-parent cwd must not
+ * win over an existing PWD/locator child.
  */
 export function resolveCliHostLocalSourceFolder(locator?: string): string {
   const cwdPath = resolve(process.cwd());

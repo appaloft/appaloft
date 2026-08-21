@@ -1136,6 +1136,9 @@ function chooseStrategies(input: {
           ...(source.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]
             ? { cliResolvedSource: source.metadata[CLI_RESOLVED_SOURCE_METADATA_KEY] }
             : {}),
+          ...(requestedDeployment.runtimeMetadata?.["context.resourceName"]
+            ? { resourceName: requestedDeployment.runtimeMetadata["context.resourceName"] }
+            : {}),
         }),
       ),
       dockerfilePath: FilePathText.rehydrate(dockerfilePath),
