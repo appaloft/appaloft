@@ -11,6 +11,7 @@ export interface ChangeClassification {
 }
 
 export interface ClassifyChangedFilesOptions {
+  readonly forceE2eFull?: boolean;
   readonly headRef?: string;
 }
 
@@ -62,7 +63,9 @@ export function isLightweightPath(file: string): boolean {
 
 // Isolated WebView surface: the static console and its mocked WebView harness.
 // WebView E2E starts Vite preview plus Bun.serve fixtures and does not use the
-// Appaloft backend or PostgreSQL. Shell CLI E2E does not exercise console UI.
+// Appaloft backend or PostgreSQL. Product diffs that do not touch apps/web are
+// e2e_shell (shell HTTP e2e only). Mixed apps/web plus other product files,
+// empty diffs, or FORCE_E2E_FULL stay e2e_full.
 export function isWebIsolatedE2ePath(file: string): boolean {
   return file === "apps/web" || file.startsWith("apps/web/");
 }
@@ -155,7 +158,15 @@ export function classifyWorkspaceTuiClass(
   return "tui_skip";
 }
 
-export function classifyE2eClass(files: readonly string[], changeClass: ChangeClass): E2eClass {
+export function classifyE2eClass(
+  files: readonly string[],
+  changeClass: ChangeClass,
+  options: ClassifyChangedFilesOptions = {},
+): E2eClass {
+  if (options.forceE2eFull === true) {
+    return "e2e_full";
+  }
+
   if (changeClass === "docs_only" || changeClass === "release_bump") {
     return "e2e_skip";
   }
@@ -173,21 +184,22 @@ export function classifyE2eClass(files: readonly string[], changeClass: ChangeCl
     return "e2e_web";
   }
 
-  if (e2eRelevant.every((file) => isShellIsolatedE2ePath(file))) {
-    return "e2e_shell";
+  if (e2eRelevant.some((file) => isWebIsolatedE2ePath(file))) {
+    return "e2e_full";
   }
 
-  return "e2e_full";
+  return "e2e_shell";
 }
 
 function classificationFor(
   changeClass: ChangeClass,
   files: readonly string[],
   lightweightOnly: boolean,
+  options: ClassifyChangedFilesOptions = {},
 ): ChangeClassification {
   return {
     changeClass,
-    e2eClass: classifyE2eClass(files, changeClass),
+    e2eClass: classifyE2eClass(files, changeClass, options),
     files,
     lightweightOnly,
     workspaceTuiClass: classifyWorkspaceTuiClass(files, changeClass),
@@ -203,21 +215,21 @@ export function classifyChangedFiles(
 
   if (normalized.length === 0) {
     if (releasePleaseBranch) {
-      return classificationFor("release_bump", normalized, true);
+      return classificationFor("release_bump", normalized, true, options);
     }
 
-    return classificationFor("full", normalized, false);
+    return classificationFor("full", normalized, false, options);
   }
 
   if (!normalized.every((file) => isLightweightPath(file))) {
-    return classificationFor("full", normalized, false);
+    return classificationFor("full", normalized, false, options);
   }
 
   if (normalized.some((file) => isReleaseBumpPath(file)) || releasePleaseBranch) {
-    return classificationFor("release_bump", normalized, true);
+    return classificationFor("release_bump", normalized, true, options);
   }
 
-  return classificationFor("docs_only", normalized, true);
+  return classificationFor("docs_only", normalized, true, options);
 }
 
 export function planChangedFilesLookup(input: ChangedFilesLookupInput): ChangedFilesLookupPlan {
@@ -337,7 +349,10 @@ async function writeGitHubLines(path: string | undefined, lines: readonly string
 async function main(): Promise<void> {
   const filesFrom = envValue("CHANGED_FILES_PATH");
   const files = filesFrom ? parseNameOnly(await Bun.file(filesFrom).text()) : listChangedFiles();
-  const classification = classifyChangedFiles(files, { headRef: envValue("HEAD_REF") });
+  const classification = classifyChangedFiles(files, {
+    forceE2eFull: envValue("FORCE_E2E_FULL") === "true",
+    headRef: envValue("HEAD_REF"),
+  });
 
   await writeGitHubLines(envValue("GITHUB_OUTPUT") || undefined, [
     `lightweight_only=${classification.lightweightOnly}`,
