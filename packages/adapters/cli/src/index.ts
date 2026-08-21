@@ -18,6 +18,7 @@ import { tryHandleSetupHelp } from "./setup-help.js";
 export {
   CLI_LOGIN_GUIDANCE,
   deployLoginRequiredError,
+  ensureDeployControlPlaneLogin,
   hasCliControlPlaneLogin,
   hasExplicitLocalDeployIntent,
   isHeadlessWorkspaceInvocation,
@@ -36,6 +37,17 @@ export {
   renderCodeHelp,
   tryHandleCodeHelp,
 } from "./code-help.js";
+export {
+  CLI_MUTATION_CONFIRMATION_REQUIRED_CODE,
+  CODING_AGENT_ENV_KEYS,
+  cliMutationConfirmationRequiredError,
+  formatCliMutationPlan,
+  hasExplicitYesFlag,
+  isCiEnvironment,
+  isCodingAgentEnvironment,
+  isInteractiveTty,
+  requiresExplicitYesForMutation,
+} from "./coding-agent-environment.js";
 export {
   FileSystemServerAppliedRouteDesiredStateStore,
   FileSystemSourceLinkStore,
@@ -82,6 +94,7 @@ export {
   activeControlPlaneProfile,
   controlPlaneStatus,
   dispatchRemoteProjectOperation,
+  type LoginControlPlaneFn,
   loginControlPlane,
   logoutControlPlane,
   mcpLoginControlPlane,

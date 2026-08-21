@@ -450,7 +450,7 @@ describe("shell CLI remote control-plane pre-dispatch", () => {
       const path = request.url ? new URL(request.url, "http://127.0.0.1").pathname : "/";
       requests.push({
         path,
-        authorization: headerValue(request.headers["authorization"]),
+        authorization: headerValue(request.headers.authorization),
         cookie: headerValue(request.headers.cookie),
       });
       response.setHeader("content-type", "application/json");
@@ -613,7 +613,7 @@ describe("shell CLI remote control-plane pre-dispatch", () => {
     expect(events.indexOf("progress")).toBeLessThan(events.indexOf("compose"));
   });
 
-  test("[WS-REMOTE-DEPLOY-057] unauthenticated Cloud deploy is login-required before local composition", async () => {
+  test("[WS-REMOTE-DEPLOY-057][DEPLOY-DOOR-LOGIN-002] agent-env Cloud deploy without --yes prints a plan", async () => {
     const appaloftHome = await mkdtemp(join(tmpdir(), "appaloft-cli-deploy-login-"));
     const originalStderrWrite = process.stderr.write;
     let stderr = "";
@@ -623,6 +623,7 @@ describe("shell CLI remote control-plane pre-dispatch", () => {
       APPALOFT_HOME: appaloftHome,
       APPALOFT_CONTROL_PLANE_MODE: "cloud",
       APPALOFT_CONTROL_PLANE_URL: "https://app.appaloft.com",
+      CURSOR_AGENT: "1",
     };
     process.stderr.write = ((chunk: string | Uint8Array) => {
       stderr += String(chunk);
@@ -634,11 +635,69 @@ describe("shell CLI remote control-plane pre-dispatch", () => {
 
     await expect(runShellCli()).rejects.toThrow("process.exit(1)");
     process.stderr.write = originalStderrWrite;
-    expect(stderr).toContain("Sign in before deploying");
-    expect(stderr).toContain("Run appaloft login");
+    expect(stderr).toContain("Would sign in and deploy this folder.");
+    expect(stderr).toContain("Pass --yes to continue.");
+    expect(stderr).not.toContain("Run appaloft login");
     expect(stderr).not.toContain("ECONNREFUSED");
     expect(stderr).not.toContain("127.0.0.1");
     expect(stderr).not.toContain("at ");
+    expect(stderr).not.toContain("Occupancy");
+  });
+
+  test("[DEPLOY-DOOR-LOGIN-001] unauthenticated Cloud deploy starts login instead of a separate command", async () => {
+    const appaloftHome = await mkdtemp(join(tmpdir(), "appaloft-cli-deploy-fold-"));
+    const originalStderrWrite = process.stderr.write;
+    let stderr = "";
+    let loginCalls = 0;
+    process.argv = ["node", "appaloft", "deploy"];
+    process.env = {
+      ...originalEnv,
+      APPALOFT_HOME: appaloftHome,
+      APPALOFT_CONTROL_PLANE_MODE: "cloud",
+      APPALOFT_CONTROL_PLANE_URL: "https://app.appaloft.com",
+    };
+    delete process.env.CURSOR_AGENT;
+    delete process.env.CLAUDECODE;
+    delete process.env.CLAUDE_CODE_ENTRYPOINT;
+    delete process.env.AIDER_MODEL;
+    delete process.env.CODEX_CLI;
+    delete process.env.CI;
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      stderr += String(chunk);
+      return true;
+    }) as typeof process.stderr.write;
+    process.exit = ((code?: string | number | null) => {
+      throw new Error(`process.exit(${String(code)})`);
+    }) as typeof process.exit;
+
+    await expect(
+      runShellCli(undefined, undefined, {
+        mutationGuard: {
+          env: {
+            APPALOFT_HOME: appaloftHome,
+            APPALOFT_CONTROL_PLANE_MODE: "cloud",
+            APPALOFT_CONTROL_PLANE_URL: "https://app.appaloft.com",
+          },
+          stdinIsTty: true,
+          stdoutIsTty: true,
+        },
+        loginControlPlane: async () => {
+          loginCalls += 1;
+          return ok({
+            name: "cloud",
+            mode: "cloud",
+            baseUrl: "https://app.appaloft.com",
+            active: true,
+            auth: { kind: "bearer", redacted: "***" },
+          });
+        },
+      }),
+    ).rejects.toThrow("process.exit(1)");
+    process.stderr.write = originalStderrWrite;
+    expect(loginCalls).toBe(1);
+    expect(stderr).toContain("Signing in");
+    expect(stderr).not.toContain("Run appaloft login");
+    expect(stderr).not.toContain("Occupancy");
   });
 
   test("[WS-REMOTE-CA-033] unauthenticated workspace --json is login-required", async () => {

@@ -100,6 +100,12 @@ function shellCliEnv(options: ShellCliOptions): Record<string, string | undefine
 
   delete env.APPALOFT_CONTROL_PLANE_URL;
   delete env.APPALOFT_DATABASE_URL;
+  delete env.CI;
+  delete env.CLAUDECODE;
+  delete env.CLAUDE_CODE_ENTRYPOINT;
+  delete env.CURSOR_AGENT;
+  delete env.AIDER_MODEL;
+  delete env.CODEX_CLI;
 
   return {
     ...env,
@@ -126,13 +132,23 @@ export function cleanupWorkspace(workspaceDir: string): void {
   rmSync(workspaceDir, { recursive: true, force: true });
 }
 
+function withConfirmedDeploy(args: readonly string[]): string[] {
+  if (!args.includes("deploy") || args.includes("--yes") || args.includes("-y")) {
+    return [...args];
+  }
+  return [...args, "--yes"];
+}
+
 export function runShellCli(args: string[], options: ShellCliOptions): CliResult {
-  const result = Bun.spawnSync([process.execPath, "run", "src/index.ts", ...args], {
-    cwd: shellRoot,
-    env: shellCliEnv(options),
-    stderr: "pipe",
-    stdout: "pipe",
-  });
+  const result = Bun.spawnSync(
+    [process.execPath, "run", "src/index.ts", ...withConfirmedDeploy(args)],
+    {
+      cwd: shellRoot,
+      env: shellCliEnv(options),
+      stderr: "pipe",
+      stdout: "pipe",
+    },
+  );
 
   return {
     exitCode: result.exitCode,

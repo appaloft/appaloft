@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
+import { ok } from "@appaloft/core";
+
 import {
   deployLoginRequiredError,
+  ensureDeployControlPlaneLogin,
   hasCliControlPlaneLogin,
   hasExplicitLocalDeployIntent,
   isHeadlessWorkspaceInvocation,
@@ -34,6 +37,55 @@ describe("CLI session login gates", () => {
       nextAction: "Run appaloft login",
       servers: [],
     });
+  });
+
+  test("[DEPLOY-DOOR-LOGIN-001] unauthenticated deploy starts the existing login instead of a separate command", async () => {
+    const status: string[] = [];
+    let loginCalls = 0;
+    const folded = await ensureDeployControlPlaneLogin({
+      env: {},
+      readActiveProfile: async () => null,
+      login: async () => {
+        loginCalls += 1;
+        return ok({
+          name: "cloud",
+          mode: "cloud",
+          baseUrl: "https://app.appaloft.com",
+          active: true,
+          auth: { kind: "bearer", redacted: "***" },
+        });
+      },
+      writeStatus: (text) => {
+        status.push(text);
+      },
+    });
+    expect(folded.isOk()).toBe(true);
+    expect(folded._unsafeUnwrap().folded).toBe(true);
+    expect(loginCalls).toBe(1);
+    expect(status.join("")).toContain("Signing in");
+    expect(status.join("")).not.toContain("Run appaloft login");
+  });
+
+  test("[DEPLOY-DOOR-LOGIN-002] agent-env deploy without --yes does not start login", async () => {
+    let loginCalls = 0;
+    const blocked = await ensureDeployControlPlaneLogin({
+      env: { CURSOR_AGENT: "1" },
+      readActiveProfile: async () => null,
+      login: async () => {
+        loginCalls += 1;
+        return ok({
+          name: "cloud",
+          mode: "cloud",
+          baseUrl: "https://app.appaloft.com",
+          active: true,
+          auth: { kind: "bearer", redacted: "***" },
+        });
+      },
+    });
+    expect(blocked.isErr()).toBe(true);
+    expect(blocked._unsafeUnwrapErr().code).toBe("cli_mutation_confirmation_required");
+    expect(blocked._unsafeUnwrapErr().message).not.toContain("Run appaloft login");
+    expect(loginCalls).toBe(0);
   });
 
   test("headless workspace and explicit local deploy intent", () => {

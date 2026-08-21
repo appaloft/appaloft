@@ -122,6 +122,8 @@ if (standaloneCommand) {
   const result = await runStandaloneControlPlaneCli({
     argv: process.argv,
     env: process.env,
+    ...(process.stdin.isTTY === undefined ? {} : { stdinIsTty: process.stdin.isTTY }),
+    ...(process.stdout.isTTY === undefined ? {} : { stdoutIsTty: process.stdout.isTTY }),
     ...(capturedStdinText === undefined ? {} : { stdinText: capturedStdinText }),
   });
   if (result.handled) {

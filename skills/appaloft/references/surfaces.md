@@ -8,9 +8,12 @@ the same operation catalog and public docs anchors. Do not invent agent-only ope
 The one-command local Agent door copies the skill and writes Local MCP into default-checked hosts:
 
 ```bash
-appaloft login
-appaloft setup agent
+appaloft setup agent --yes
 ```
+
+Human TTY first Cloud `appaloft deploy` folds browser login into the same command. In a coding-agent,
+CI, or non-TTY environment, `setup agent` and `deploy` print a plan and do not write skills or
+deploy unless `--yes` is present. Do not paste tokens into chat.
 
 `appaloft setup agent` lists `universal`, `claude-code`, `cursor`, and `opencode`. Defaults copy the
 Appaloft skill byte-identically into `~/.agents/skills/appaloft`, `~/.claude/skills/appaloft` when

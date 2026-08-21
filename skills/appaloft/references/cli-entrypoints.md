@@ -10,8 +10,10 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   catalog entries. Without `--url`, they default to the public Appaloft Cloud control plane at
   `https://app.appaloft.com`, print the Cloud browser login URL and user code, wait for explicit
   Enter before opening the browser when enabled, then write a local `cloud` profile only after a
-  trusted local credential verifies against the current organization context. This is a human
-  interactive login path, not the default AI-agent auth handoff.
+  trusted local credential verifies against the current organization context. First Cloud
+  `appaloft deploy` folds that same login into the deploy command for a human TTY. Coding-agent,
+  CI, and non-TTY `deploy` / `setup agent` print a plan and do not mutate without `--yes`. This
+  is a human interactive login path, not the default AI-agent auth handoff.
 - `appaloft auth mcp login` writes a dedicated bearer `mcp` profile through the same browser
   handoff. Use it when a host needs a bearer MCP profile. Cursor, Claude Code, and OpenCode host
   install should reuse an already-logged-in `appaloft login` product-session or bearer profile

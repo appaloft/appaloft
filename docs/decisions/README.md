@@ -139,6 +139,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-120: Plan Preview Resolves Server Default Destination](./ADR-120-plan-default-destination.md) | Accepted | Omitted `deployments.plan` destinationId read-only resolves resource pin or Server Destination named `default`. |
 | [ADR-121: Source Event Required Check Gate](./ADR-121-source-event-required-check-gate.md) | Accepted | Optional named GitHub check names on Resource git-push auto-deploy policy wait for accepted conclusions before ordinary dispatch. |
 | [ADR-122: Railway-Like Folder Project Onboarding](./ADR-122-railway-like-folder-onboarding.md) | Accepted | First `deploy`/`code` in an unlinked folder create-or-links a Project; git is correspondence not a gate; `project use` switches the folder link. |
+| [ADR-123: First Deploy Login Fold And Agent-Env Guard](./ADR-123-first-deploy-login-fold-and-agent-env-guard.md) | Accepted | First Cloud `deploy` folds existing browser login; coding-agent/CI/non-TTY doors print a plan and do not mutate without `--yes`. |
 
 ## Authoring Rules
 
