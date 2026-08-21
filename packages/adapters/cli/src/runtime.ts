@@ -1081,12 +1081,10 @@ export const runSandboxAgentRunEventStreamQuery = (
 
 export const printCliError = (error: unknown) =>
   Effect.sync(() => {
-    if (isWorkspaceRendererFailure(error)) {
-      restoreWorkspaceTuiScrollback();
-      if (!claimWorkspaceRendererFailureReport()) {
-        process.exitCode = 1;
-        return;
-      }
+    restoreWorkspaceTuiScrollback();
+    if (isWorkspaceRendererFailure(error) && !claimWorkspaceRendererFailureReport()) {
+      process.exitCode = 1;
+      return;
     }
     if (process.env.APPALOFT_ERROR_FORMAT === "safe-json") {
       process.stderr.write(formatSafeCliError(error));

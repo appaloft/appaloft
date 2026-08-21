@@ -2381,6 +2381,14 @@ fn render_occupancy_loading(frame: &mut Frame<'_>, state: &AppState, area: Rect)
     render_occupancy_prepare_panel(frame, state, area);
 }
 
+fn occupancy_prepare_panel_content_width(desired: usize, inner_width: u16) -> u16 {
+    let max_width = usize::from(inner_width.max(1));
+    if max_width < 20 {
+        return max_width as u16;
+    }
+    desired.clamp(20, max_width) as u16
+}
+
 fn render_occupancy_prepare_panel(frame: &mut Frame<'_>, state: &AppState, area: Rect) {
     const STEP_ROWS: u16 = 9;
     let block = Block::default()
@@ -2395,17 +2403,22 @@ fn render_occupancy_prepare_panel(frame: &mut Frame<'_>, state: &AppState, area:
         ));
     let inner = block.inner(area);
     frame.render_widget(block, area);
-    let content_w = state
-        .loading
-        .steps
-        .iter()
-        .map(|step| step.label.chars().count() + 2)
-        .chain(std::iter::once(
-            occupancy_chrome_header(state).chars().count(),
-        ))
-        .max()
-        .unwrap_or(0)
-        .clamp(20, inner.width.max(1) as usize) as u16;
+    if inner.width == 0 || inner.height == 0 {
+        return;
+    }
+    let content_w = occupancy_prepare_panel_content_width(
+        state
+            .loading
+            .steps
+            .iter()
+            .map(|step| step.label.chars().count() + 2)
+            .chain(std::iter::once(
+                occupancy_chrome_header(state).chars().count(),
+            ))
+            .max()
+            .unwrap_or(0),
+        inner.width,
+    );
     let panel = centered_rect(content_w, (STEP_ROWS + 4).min(inner.height), inner);
     let rows = Layout::default()
         .direction(Direction::Vertical)
@@ -3186,6 +3199,22 @@ mod tests {
         assert!(out.contains("Checking login"), "{out}");
         assert!(out.contains("Preparing skills"), "{out}");
         assert!(out.contains("Preparing disk"), "{out}");
+    }
+
+    #[test]
+    fn ws_remote_progress_219_tiny_pty_prepare_panel_does_not_panic() {
+        assert_eq!(occupancy_prepare_panel_content_width(24, 1), 1);
+        assert_eq!(occupancy_prepare_panel_content_width(24, 19), 19);
+        assert_eq!(occupancy_prepare_panel_content_width(10, 80), 20);
+        assert_eq!(occupancy_prepare_panel_content_width(24, 80), 24);
+        let state = AppState::default();
+        for (cols, rows) in [(1, 1), (4, 3), (10, 8)] {
+            let backend = ratatui::backend::TestBackend::new(cols, rows);
+            let mut terminal = ratatui::Terminal::new(backend).expect("tiny terminal");
+            terminal
+                .draw(|frame| render(frame, &state))
+                .unwrap_or_else(|error| panic!("tiny pty {cols}x{rows} must not panic: {error}"));
+        }
     }
 
     #[test]
