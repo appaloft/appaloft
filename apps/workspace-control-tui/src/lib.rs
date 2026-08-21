@@ -3599,14 +3599,17 @@ mod tests {
         state.apply(ParentMessage::Progress {
             message: "Checking login…".to_owned(),
             step: Some("credential".to_owned()),
+            status: None,
         });
         state.apply(ParentMessage::Progress {
             message: "Preparing skills…".to_owned(),
             step: Some("skills".to_owned()),
+            status: None,
         });
         state.apply(ParentMessage::Progress {
             message: "Preparing disk on hostinger…".to_owned(),
             step: Some("disk".to_owned()),
+            status: None,
         });
         terminal
             .draw(|frame| render(frame, &state))
