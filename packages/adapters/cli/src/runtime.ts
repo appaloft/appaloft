@@ -428,6 +428,14 @@ function humanInstallationIds(error: DomainError): string[] {
   );
 }
 
+function humanValidationIssueMessages(error: DomainError): string[] {
+  const raw = error.details?.validationIssueMessages;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (message): message is string => typeof message === "string" && message.trim().length > 0,
+  );
+}
+
 function humanErrorGuidance(error: DomainError): string | null {
   const guidance = error.details?.guidance;
   if (typeof guidance === "string") {
@@ -491,6 +499,13 @@ export function formatHumanCliError(error: unknown): string {
       lines.push(`Cause: ${codes[0]}`);
     } else if (codes.length > 1) {
       lines.push(`Cause: ${codes.join(" / ")}`);
+    }
+    const issueMessages = humanValidationIssueMessages(error);
+    if (
+      issueMessages.length > 0 &&
+      !lines.some((line) => issueMessages.every((message) => line.includes(message)))
+    ) {
+      lines.push(issueMessages.join("\n"));
     }
     const guidance = humanErrorGuidance(error);
     if (guidance) {

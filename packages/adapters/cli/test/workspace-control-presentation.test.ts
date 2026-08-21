@@ -1351,6 +1351,11 @@ describe("Workspace control presentation", () => {
     expect(source).toContain("restoreWorkspaceTuiScrollback");
     expect(source).toContain("process.exit(0)");
     expect(source).not.toContain("process.exit(130)");
+    const sigintArm = source.indexOf('process.on("SIGINT", quitWaitScreen)');
+    const openRenderer = source.indexOf("await input.openRenderer()");
+    expect(sigintArm).toBeGreaterThan(-1);
+    expect(openRenderer).toBeGreaterThan(-1);
+    expect(sigintArm).toBeLessThan(openRenderer);
     let attachedClosed = 0;
     handleWorkspaceControlWaitScreenInterrupt({
       attached: true,
@@ -2427,6 +2432,96 @@ describe("Workspace control presentation", () => {
       const restoreBeforeThrowAt = source.lastIndexOf("restoreWorkspaceTuiScrollback()", throwAt);
       expect(restoreBeforeThrowAt).toBeGreaterThan(occupyFailureAt);
       expect(restoreBeforeThrowAt).toBeLessThan(throwAt);
+    } finally {
+      process.stdout.write = originalStdout;
+      process.stderr.write = originalStderr;
+      process.exitCode = originalExitCode ?? 0;
+      setWorkspaceTuiScrollbackWriter(undefined);
+    }
+  });
+
+  test("[WS-REMOTE-COMPAT-220][WS-REMOTE-PROGRESS-219] folder.local unstructured validation after TUI restores then prints a human next step", async () => {
+    const { Effect } = await import("effect");
+    const { printCliError } = await import("../src/runtime.js");
+    const { occupancyCloudCompatError } = await import("../src/remote-code-session.js");
+    const renderer = new FakeRendererSession([], { hangUntilClose: true });
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+    const timeline: string[] = [];
+    setWorkspaceTuiScrollbackWriter((text) => {
+      timeline.push(`restore:${text}`);
+    });
+    let stdout = "";
+    let stderr = "";
+    const originalStdout = process.stdout.write.bind(process.stdout);
+    const originalStderr = process.stderr.write.bind(process.stderr);
+    const originalExitCode = process.exitCode;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      return true;
+    }) as typeof process.stdout.write;
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      const text = typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      stderr += text;
+      if (text.includes("error:")) timeline.push("error-print");
+      return true;
+    }) as typeof process.stderr.write;
+    const remapped = occupancyCloudCompatError(
+      {
+        code: "bad_request",
+        category: "user",
+        message: "Input validation failed",
+        retryable: false,
+        details: { phase: "orpc-error-normalization", orpcCode: "BAD_REQUEST" },
+      },
+      { id: "srv_4lifk0yrcecy", name: "hostinger" },
+      {
+        repositoryIdentity: "folder.local/cwd/nux-67e3a052-unlinked",
+        repository: "https://folder.local/cwd/nux-67e3a052-unlinked.git",
+      },
+    );
+    try {
+      await expect(
+        presentation.start({
+          occupyBootstrap: async ({ reportProgress }) => {
+            await reportProgress("Preparing disk on hostinger…");
+            throw remapped;
+          },
+          executeCommand: async () => ok({}),
+          executeQuery: async <T>() => ok({ items: [] } as T),
+        }),
+      ).rejects.toMatchObject({
+        code: "workspace_open_folder_local_input_invalid",
+      });
+      expect(renderer.messages[0]).toEqual({
+        type: "loading",
+        collapsed: true,
+        title: "Appaloft Cloud Agents",
+      });
+      expect(renderer.messages.some((message) => message.type === "error")).toBeFalse();
+      expect(renderer.closed).toBeGreaterThan(0);
+      expect(timeline.some((entry) => entry.startsWith("restore:"))).toBeTrue();
+      expect(timeline.includes("error-print")).toBeFalse();
+      const restoredBeforePrint = timeline.filter((entry) => entry.startsWith("restore:")).join("");
+      expect(restoredBeforePrint).toContain(WORKSPACE_TUI_LEAVE_ALT_SCREEN);
+      expect(restoredBeforePrint).toContain("\x1b[?1049l");
+
+      await Effect.runPromise(printCliError(remapped));
+
+      expect(timeline.includes("error-print")).toBeTrue();
+      expect(timeline.findIndex((entry) => entry.startsWith("restore:"))).toBeLessThan(
+        timeline.indexOf("error-print"),
+      );
+      expect(stdout).not.toContain("error:");
+      expect(stderr).not.toBe("Input validation failed");
+      expect(stderr).not.toContain("error: Input validation failed\n");
+      expect(stderr).toContain("Cloud could not start this folder session on hostinger");
+      expect(stderr).toContain("appaloft code --pi --server srv_4lifk0yrcecy");
+      expect(stderr).not.toContain("This Cloud does not accept Server targeting");
+      expect(stderr).not.toMatch(/occupancy/iu);
+      expect(stderr).not.toContain("sbx_");
+      expect(JSON.stringify(renderer.messages)).not.toMatch(/occupancy/iu);
     } finally {
       process.stdout.write = originalStdout;
       process.stderr.write = originalStderr;

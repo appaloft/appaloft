@@ -75,7 +75,7 @@ describe("remote code door", () => {
     };
     expect(occupancyCloudCompatError(bound, server)).toEqual(bound);
   });
-  test("[WS-REMOTE-COMPAT-220][WS-REMOTE-OPEN-BYOS-181] folder.local unstructured validation is not remapped to Server targeting", () => {
+  test("[WS-REMOTE-COMPAT-220][WS-REMOTE-OPEN-BYOS-181] folder.local unstructured validation is a human next step, not Server targeting", () => {
     const server = { id: "srv_4lifk0yrcecy", name: "hostinger" };
     const cloud = {
       code: "bad_request" as const,
@@ -84,12 +84,27 @@ describe("remote code door", () => {
       retryable: false,
       details: { phase: "orpc-error-normalization", orpcCode: "BAD_REQUEST" },
     };
-    expect(
-      occupancyCloudCompatError(cloud, server, {
-        repositoryIdentity: "folder.local/cwd/nux-54065181-unlinked",
-        repository: "https://folder.local/cwd/nux-54065181-unlinked.git",
-      }),
-    ).toEqual(cloud);
+    const remapped = occupancyCloudCompatError(cloud, server, {
+      repositoryIdentity: "folder.local/cwd/nux-54065181-unlinked",
+      repository: "https://folder.local/cwd/nux-54065181-unlinked.git",
+    });
+    expect(remapped.code).toBe("workspace_open_folder_local_input_invalid");
+    expect(remapped.message).not.toBe("Input validation failed");
+    expect(remapped.message).toContain("Cloud could not start this folder session on hostinger");
+    expect(String(remapped.details?.guidance)).toContain(
+      "appaloft code --pi --server srv_4lifk0yrcecy",
+    );
+    expect(String(remapped.details?.guidance)).toContain(
+      "this Cloud needs an update that accepts folder workspace create",
+    );
+    expect(remapped.message).not.toContain("This Cloud does not accept Server targeting");
+    expect(remapped.message).not.toContain("workspace_open_target_server_unsupported");
+    expect(remapped.message.toLowerCase()).not.toContain("occupancy");
+    expect(remapped.message).not.toContain("sbx_");
+    expect(remapped.details).toMatchObject({
+      serverId: "srv_4lifk0yrcecy",
+      repositoryIdentity: "folder.local/cwd/nux-54065181-unlinked",
+    });
   });
   test("[WS-REMOTE-OPEN-BYOS-181] --server pin keeps the enrolled Server name when the door already selected it", () => {
     const pinned = pinRemoteCodeDoorServer(
