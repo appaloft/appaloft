@@ -156,8 +156,9 @@ Use this order:
    not silently reuse an unrelated session such as traefik/whoami. If `public/index.html` exists,
    auto-select static and publish-dir `public` without requiring `--method` or `--publish-dir`. Keep
    the real cwd folder (hyphenated names are legal). The static plan writes that folder, and SSH
-   package uses it even if locator and `workingDirectory` were already walked to the parent. A
-   missing-workdir error names the full folder.
+   package reconstructs it from leaf/`displayName` even if locator and `workingDirectory` were
+   already walked to the parent, the package host does not have that folder, and cwd is a
+   runtimeDir. A missing-workdir error names the full folder.
    If there is no current app, ask for a path or `--project`.
 3. Existing Appaloft config: `appaloft deploy <source>`; for an application graph, repeat
    `--application <key>` to deploy only the requested applications or omit it to deploy all entries.

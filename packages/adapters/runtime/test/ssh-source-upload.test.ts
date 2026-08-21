@@ -67,6 +67,7 @@ function runningStaticSshDeployment(input: {
   deploymentId: string;
   locator: string;
   workingDirectory: string;
+  displayName?: string;
 }): Deployment {
   const deployment = Deployment.create({
     id: DeploymentId.rehydrate(input.deploymentId),
@@ -80,7 +81,7 @@ function runningStaticSshDeployment(input: {
       source: SourceDescriptor.rehydrate({
         kind: SourceKindValue.rehydrate("local-folder"),
         locator: SourceLocator.rehydrate(input.locator),
-        displayName: DisplayNameText.rehydrate(hyphenatedStaticLeaf),
+        displayName: DisplayNameText.rehydrate(input.displayName ?? hyphenatedStaticLeaf),
         metadata: { baseDirectory: "/" },
       }),
       buildStrategy: BuildStrategyKindValue.rehydrate("static-artifact"),
@@ -247,6 +248,96 @@ describe("SSH source upload", () => {
     expect(prepared.deployment.toState().runtimePlan.execution.metadata?.errorCode).toBe(
       "source_workdir_missing",
     );
+  });
+
+  test("[DEP-CREATE-PKG-007] SSH package exists-check reconstructs the hyphenated folder when locator and workdir are already the parent and cwd is runtimeDir", async () => {
+    const parent = "/Users/nichenqin/projects";
+    const leaf = "nux-54065181-static";
+    const expected = join(parent, leaf);
+    const runtimeDir = mkdtempSync(join(tmpdir(), "appaloft-runtime-"));
+    const previousCwd = process.cwd();
+    const deployment = runningStaticSshDeployment({
+      deploymentId: "dep_54065181_pkg",
+      locator: parent,
+      workingDirectory: parent,
+      displayName: leaf,
+    });
+    const backend = new SshExecutionBackend(
+      runtimeDir,
+      { warn: () => undefined } as never,
+      { record: async () => ({ isErr: () => false }) } as never,
+      { report: () => undefined } as never,
+    );
+
+    expect(deployment.toState().runtimePlan.source.locator).toBe(parent);
+    expect(deployment.toState().runtimePlan.execution.workingDirectory).toBe(parent);
+    expect(deployment.toState().runtimePlan.source.displayName).toBe(leaf);
+
+    try {
+      process.chdir(runtimeDir);
+
+      const localWorkdir = resolveLocalWorkspaceWorkdir({
+        workingDirectory: parent,
+        locator: parent,
+        displayName: leaf,
+        metadata: { baseDirectory: "/" },
+      });
+      expect(localWorkdir).toBe(expected);
+      expect(localWorkdir).toContain(leaf);
+      expect(localWorkdir).not.toBe(parent);
+      expect(process.cwd()).toBe(runtimeDir);
+      expect(process.cwd()).not.toBe(expected);
+
+      const prepared = await (
+        backend as never as {
+          prepareSshSource: (
+            context: ExecutionContext,
+            current: Deployment,
+            timeline: unknown[],
+            input: {
+              runtimeDir: string;
+              remoteRoot: string;
+              target: { host: string; publicHost: string; port: string };
+              env: NodeJS.ProcessEnv;
+            },
+          ) => Promise<
+            | { prepared: true }
+            | { prepared: false; deployment: Deployment }
+          >;
+        }
+      ).prepareSshSource(
+        { requestId: "req_pkg_007_runtime_dir", entrypoint: "cli" } as ExecutionContext,
+        deployment,
+        [],
+        {
+          runtimeDir,
+          remoteRoot: "/var/lib/appaloft/runtime/ssh-deployments/dep_54065181_pkg",
+          target: { host: "deploy@example.test", publicHost: "example.test", port: "22" },
+          env: {},
+        },
+      );
+
+      expect(prepared.prepared).toBe(false);
+      if (prepared.prepared) {
+        throw new Error("expected SSH package to fail when the Mac cwd is missing here");
+      }
+
+      const messages = prepared.deployment.toState().timeline.map((entry) => entry.message);
+      const missing = messages.find((message) =>
+        message.startsWith("Source working directory does not exist:"),
+      );
+
+      expect(missing).toBe(`Source working directory does not exist: ${expected}`);
+      expect(missing).toContain(leaf);
+      expect(missing).not.toBe(`Source working directory does not exist: ${parent}`);
+      expect(missing?.endsWith("/projects")).toBe(false);
+      expect(prepared.deployment.toState().runtimePlan.execution.metadata?.errorCode).toBe(
+        "source_workdir_missing",
+      );
+    } finally {
+      process.chdir(previousCwd);
+      rmSync(runtimeDir, { recursive: true, force: true });
+    }
   });
 
   test("[DEP-CREATE-PKG-001] local workspace upload excludes cache and dependency directories", () => {
