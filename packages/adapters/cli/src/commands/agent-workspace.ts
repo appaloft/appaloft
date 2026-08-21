@@ -65,8 +65,10 @@ import {
   folderOnboardingCwdFromLocator,
   isFolderOnboardingCancelled,
   peekThisFolderGitIdentity,
+  quitCodeSessionOnCancel,
   withImmediateSigintExit,
 } from "../folder-project-onboarding.js";
+import { codeSessionInquireInteraction } from "../interaction.js";
 import { resolveRemoteGitWorkspaceRef } from "../local-git-workspace-context.js";
 import {
   launchScratchAgent,
@@ -705,7 +707,6 @@ export const workspaceCodeCommand = EffectCommand.make(
     yes,
   }) =>
     Effect.gen(function* () {
-      void yes;
       const cli = yield* CliRuntime;
       const runtime = yield* Effect.runtime<CliRuntime | Prompt.Prompt.Environment>();
       if (local) {
@@ -927,6 +928,23 @@ export const workspaceCodeCommand = EffectCommand.make(
         return { door, result: retried.value, bannerCommitSha: pinnedSha };
       };
       const occupancyTui = cli.workspaceControlPresentation;
+      if (useOccupancyTui && !yes) {
+        yield* ensureFolderProjectOnboarding({
+          cwd: folderOnboardingCwdFromLocator(path),
+          canPrompt: true,
+          promptPolicy: "pre-tui-inquire",
+          interaction: cli.folderOnboardingInteraction ?? codeSessionInquireInteraction,
+          peekGitIdentity: peekThisFolderGitIdentity,
+          ...(cli.environment ? { env: cli.environment } : {}),
+        }).pipe(
+          Effect.catchAll((error) => {
+            if (isFolderOnboardingCancelled(error)) {
+              quitCodeSessionOnCancel();
+            }
+            return Effect.fail(workspaceCliError(error, "folder-project-onboarding"));
+          }),
+        );
+      }
       if (useOccupancyTui && occupancyTui) {
         const occupancyFolderName = folderDirectoryName(folderOnboardingCwdFromLocator(path));
         yield* Effect.tryPromise({

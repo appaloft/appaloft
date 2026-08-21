@@ -6,6 +6,8 @@ import {
 } from "./occupancy-cli-progress";
 import {
   enterOccupancyAltScreen,
+  exitQuietlyOnOccupancyEpipe,
+  ignoreOccupancyTerminalEpipe,
   installOccupancyAltScreenRestore,
   leaveOccupancyAltScreen,
   restoreOccupancyAltScreenIfEntered,
@@ -59,6 +61,10 @@ function exitProcess(code: number): never {
 }
 
 installOccupancyAltScreenRestore();
+process.stdout.on("error", ignoreOccupancyTerminalEpipe);
+process.stderr.on("error", ignoreOccupancyTerminalEpipe);
+process.on("uncaughtException", exitQuietlyOnOccupancyEpipe);
+process.on("unhandledRejection", exitQuietlyOnOccupancyEpipe);
 
 const args = shellCommandArgs(process.argv);
 const command = args[0];

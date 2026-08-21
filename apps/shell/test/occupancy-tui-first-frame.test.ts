@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   enterOccupancyAltScreen,
+  exitQuietlyOnOccupancyEpipe,
+  isErrnoEpipe,
   leaveOccupancyAltScreen,
   OCCUPANCY_ALT_SCREEN,
   OCCUPANCY_DISABLE_MOUSE,
@@ -13,6 +15,7 @@ import {
   occupancyFirstFrameBytes,
   resetOccupancyAltScreenState,
   restoreOccupancyAltScreenIfEntered,
+  writeOccupancyTerminalBytes,
 } from "../src/occupancy-tui-first-frame";
 
 describe("occupancy TUI first frame", () => {
@@ -96,6 +99,36 @@ describe("occupancy TUI first frame", () => {
     expect(firstFrameModule).not.toContain("resolveWorkspaceControlRendererBinary");
     expect(firstFrameModule).toContain("OCCUPANCY_LEAVE_ALT_SCREEN}");
     expect(firstFrameModule).toContain("OCCUPANCY_DISABLE_MOUSE}\\n");
+    expect(firstFrameModule).toContain('process.on("SIGINT"');
+    expect(firstFrameModule).toContain("restoreAndExit(130)");
+    expect(firstFrameModule).toContain("isErrnoEpipe");
+    expect(source).toContain("exitQuietlyOnOccupancyEpipe");
+    expect(source).toContain("ignoreOccupancyTerminalEpipe");
+  });
+
+  test("[WS-REMOTE-PROGRESS-219] JS warmup leave and EPIPE swallow restore TTY without a stack", () => {
+    expect(isErrnoEpipe({ code: "EPIPE" })).toBeTrue();
+    expect(isErrnoEpipe({ code: "EIO" })).toBeFalse();
+    writeOccupancyTerminalBytes(() => {
+      throw Object.assign(new Error("write EPIPE"), { code: "EPIPE" });
+    }, "ignored");
+    let written = "";
+    leaveOccupancyAltScreen((text) => {
+      written = text;
+    });
+    expect(written).toContain("\x1b[?1049l");
+    const originalExit = process.exit;
+    let exitCode: number | undefined;
+    process.exit = ((code?: number) => {
+      exitCode = code ?? 0;
+    }) as typeof process.exit;
+    try {
+      enterOccupancyAltScreen(() => undefined);
+      exitQuietlyOnOccupancyEpipe({ code: "EPIPE" });
+      expect(exitCode).toBe(0);
+    } finally {
+      process.exit = originalExit;
+    }
   });
 
   test("[WS-REMOTE-HELP-218] leaveOccupancyAltScreen restores cursor and alt-screen", () => {

@@ -366,7 +366,7 @@ function listen(server: Server): Promise<number> {
 function writeMessage(socket: Socket, message: unknown): Promise<void> {
   return new Promise((resolveWrite, rejectWrite) => {
     socket.write(`${JSON.stringify(message)}\n`, (error) => {
-      if (error) rejectWrite(error);
+      if (error && !isErrnoEpipe(error)) rejectWrite(error);
       else resolveWrite();
     });
   });
@@ -651,6 +651,14 @@ export function rustcTooOldForWorkspaceControlTui(versionText: string): boolean 
   );
 }
 
+function workspaceControlRendererHumanBuildHelp(): readonly string[] {
+  return [
+    `TTY attach needs the Cloud Agents workspace TUI binary ${WORKSPACE_CONTROL_TUI_BINARY_NAME}.`,
+    "Build it from this checkout with rustc/cargo (Homebrew rustc is enough; rustup is not required):",
+    `  ${WORKSPACE_CONTROL_TUI_BUILD_COMMAND}`,
+  ];
+}
+
 export function workspaceControlRendererUnavailableMessage(
   input: {
     readonly rustcVersion?: string;
@@ -662,18 +670,11 @@ export function workspaceControlRendererUnavailableMessage(
   const rustcVersion = input.rustcVersion?.trim();
   const rustcLabel = rustcVersion?.match(/rustc\s+\d+\.\d+(?:\.\d+)?/)?.[0];
   const tooOld = rustcVersion ? rustcTooOldForWorkspaceControlTui(rustcVersion) : false;
-  const lines = [
-    `TTY attach needs the workspace TUI binary ${WORKSPACE_CONTROL_TUI_BINARY_NAME}.`,
-    "Set a default Rust toolchain, then build the crate from this checkout:",
-    `  ${WORKSPACE_CONTROL_TUI_DEFAULT_TOOLCHAIN_COMMAND}`,
-    `  ${WORKSPACE_CONTROL_TUI_BUILD_COMMAND}`,
-  ];
+  const lines = [...workspaceControlRendererHumanBuildHelp()];
   if (tooOld && rustcLabel) {
     lines.push(
       `${rustcLabel} is too old (need Rust ${WORKSPACE_CONTROL_TUI_MIN_RUSTC.major}.${WORKSPACE_CONTROL_TUI_MIN_RUSTC.minor} or newer). Then retry \`appaloftdev code\`.`,
     );
-  } else if (input.rustupMissing) {
-    lines.push("No default Rust toolchain is configured on this machine.");
   } else if (input.buildFailed) {
     lines.push(
       `The crate needs Rust ${WORKSPACE_CONTROL_TUI_MIN_RUSTC.major}.${WORKSPACE_CONTROL_TUI_MIN_RUSTC.minor} or newer.`,
@@ -691,10 +692,7 @@ export function sanitizeWorkspaceRendererFailureText(text: string): string {
     .trim();
   if (cleaned.length > 0 && !RUSTUP_CARGO_CHOOSER_RE.test(cleaned)) return cleaned;
   return [
-    `TTY attach needs the workspace TUI binary ${WORKSPACE_CONTROL_TUI_BINARY_NAME}.`,
-    "Set a default Rust toolchain, then build the crate from this checkout:",
-    `  ${WORKSPACE_CONTROL_TUI_DEFAULT_TOOLCHAIN_COMMAND}`,
-    `  ${WORKSPACE_CONTROL_TUI_BUILD_COMMAND}`,
+    ...workspaceControlRendererHumanBuildHelp(),
     "`--no-attach` still works without this binary.",
   ].join("\n");
 }
@@ -713,13 +711,26 @@ export function claimWorkspaceRendererFailureReport(): boolean {
   return true;
 }
 
+function isErrnoEpipe(error: unknown): boolean {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { readonly code?: unknown }).code === "EPIPE",
+  );
+}
+
 export function restoreWorkspaceTuiScrollback(
   write: WorkspaceTuiScrollbackWriter = workspaceTuiScrollbackWriter ??
     ((text) => {
       process.stdout.write(text);
     }),
 ): void {
-  write(`${WORKSPACE_TUI_LEAVE_ALT_SCREEN}${WORKSPACE_TUI_DISABLE_MOUSE}\n`);
+  try {
+    write(`${WORKSPACE_TUI_LEAVE_ALT_SCREEN}${WORKSPACE_TUI_DISABLE_MOUSE}\n`);
+  } catch (error) {
+    if (!isErrnoEpipe(error)) throw error;
+  }
 }
 
 function failClosedWorkspaceRenderer(

@@ -63,7 +63,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   is required. Lookup includes the executed tree and sibling/dev checkouts
   (`appaloft-cloud/community/appaloft` → `appaloft`) plus
   `APPALOFT_WORKSPACE_TUI_BINARY`.   A missing or stale renderer is not launched; `code` restores the TTY and
-  prints one human message.
+  prints one human message that names `cargo build --locked --manifest-path apps/workspace-control-tui/Cargo.toml`. Homebrew rustc/cargo is enough; rustup is not required.
   `--no-attach` and non-TTY print
   one-line progress and
   `Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>`.

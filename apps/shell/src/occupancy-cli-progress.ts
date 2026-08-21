@@ -1,7 +1,33 @@
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { resolve } from "node:path";
+
 export const SHELL_OCCUPANCY_PROGRESS = {
   openingRemoteSession: "Opening remote session…",
   openingScratchSession: "Opening scratch session…",
 } as const;
+
+export function folderHasPersistedProjectLink(
+  cwd: string,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  const root = env.APPALOFT_HOME?.trim() || resolve(homedir(), ".appaloft");
+  const storePath = resolve(root, "folder-links.json");
+  if (!existsSync(storePath)) return false;
+  try {
+    const parsed = JSON.parse(readFileSync(storePath, "utf8")) as {
+      readonly links?: Record<string, { readonly projectId?: unknown }>;
+    };
+    const link = parsed.links?.[resolve(cwd.trim() || ".")];
+    return typeof link?.projectId === "string" && link.projectId.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+export function occupancyCodeSkipsFolderInquire(args: readonly string[]): boolean {
+  return args.includes("--yes") || args.includes("-y");
+}
 
 export function shouldExitAfterOccupancyCodeCli(args: readonly string[]): boolean {
   const command = occupancyCliCommand(args);
@@ -18,11 +44,23 @@ export function shouldWarmOccupancyTui(
     readonly stdin: { readonly isTTY?: boolean };
     readonly stdout: { readonly isTTY?: boolean };
   } = process,
+  options: {
+    readonly folderLinked?: boolean;
+    readonly cwd?: string;
+    readonly env?: NodeJS.ProcessEnv;
+  } = {},
 ): boolean {
   if (isOccupancyHelpArgs(args)) return false;
   const command = occupancyCliCommand(args);
   if (command !== "code" && command !== "workspace") return false;
-  return !shouldPrintOccupancyLineProgress(args, io);
+  if (shouldPrintOccupancyLineProgress(args, io)) return false;
+  if (command === "code" && !occupancyCodeSkipsFolderInquire(args)) {
+    const linked =
+      options.folderLinked ??
+      folderHasPersistedProjectLink(options.cwd ?? process.cwd(), options.env ?? process.env);
+    if (!linked) return false;
+  }
+  return true;
 }
 
 export function shouldPrintOccupancyLineProgress(

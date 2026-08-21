@@ -2,8 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  folderHasPersistedProjectLink,
   occupancyCliCommand,
   occupancyCliStartupProgress,
+  occupancyCodeSkipsFolderInquire,
   SHELL_OCCUPANCY_PROGRESS,
   shouldExitAfterOccupancyCodeCli,
   shouldKeepOccupancyCliLogs,
@@ -58,13 +60,30 @@ describe("occupancy CLI shell progress", () => {
     expect(startupCall).toBeLessThan(runImport);
   });
 
+  test("[FOLDER-ONBOARD-009][WS-REMOTE-PROGRESS-197] unlinked TTY code does not warm alt-screen before inquire", () => {
+    const tty = { stdin: { isTTY: true }, stdout: { isTTY: true } };
+    expect(occupancyCodeSkipsFolderInquire(["code"])).toBeFalse();
+    expect(occupancyCodeSkipsFolderInquire(["code", "--yes"])).toBeTrue();
+    expect(occupancyCodeSkipsFolderInquire(["code", "-y"])).toBeTrue();
+    expect(shouldWarmOccupancyTui(["code"], tty, { folderLinked: false })).toBeFalse();
+    expect(shouldWarmOccupancyTui(["code", "--yes"], tty, { folderLinked: false })).toBeTrue();
+    expect(shouldWarmOccupancyTui(["code"], tty, { folderLinked: true })).toBeTrue();
+    expect(
+      folderHasPersistedProjectLink("/tmp/missing-folder-link", {
+        APPALOFT_HOME: "/tmp/missing-appaloft-home",
+      }),
+    ).toBeFalse();
+  });
+
   test("[WS-REMOTE-PROGRESS-197] TTY occupancy warms the TUI before importing run.ts", () => {
     const tty = { stdin: { isTTY: true }, stdout: { isTTY: true } };
-    expect(shouldWarmOccupancyTui(["code"], tty)).toBeTrue();
+    expect(shouldWarmOccupancyTui(["code"], tty, { folderLinked: true })).toBeTrue();
     expect(shouldWarmOccupancyTui(["workspace"], tty)).toBeTrue();
-    expect(shouldWarmOccupancyTui(["code", "--no-attach"], tty)).toBeFalse();
-    expect(shouldWarmOccupancyTui(["code", "--help"], tty)).toBeFalse();
-    expect(shouldWarmOccupancyTui(["code", "-h"], tty)).toBeFalse();
+    expect(
+      shouldWarmOccupancyTui(["code", "--no-attach"], tty, { folderLinked: true }),
+    ).toBeFalse();
+    expect(shouldWarmOccupancyTui(["code", "--help"], tty, { folderLinked: true })).toBeFalse();
+    expect(shouldWarmOccupancyTui(["code", "-h"], tty, { folderLinked: true })).toBeFalse();
     expect(shouldWarmOccupancyTui(["workspace", "--help"], tty)).toBeFalse();
     const source = readFileSync(join(import.meta.dir, "../src/index.ts"), "utf8");
     const firstFrame = source.indexOf("enterOccupancyAltScreen()");

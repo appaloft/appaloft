@@ -1094,9 +1094,22 @@ export const printCliError = (error: unknown) =>
       return;
     }
 
-    createCliLogRenderer().plain({
-      level: "error",
-      message: formatHumanCliError(error).trimEnd(),
-    });
+    try {
+      createCliLogRenderer().plain({
+        level: "error",
+        message: formatHumanCliError(error).trimEnd(),
+      });
+    } catch (writeError) {
+      if (
+        !(
+          writeError &&
+          typeof writeError === "object" &&
+          "code" in writeError &&
+          writeError.code === "EPIPE"
+        )
+      ) {
+        throw writeError;
+      }
+    }
     process.exitCode = 1;
   });

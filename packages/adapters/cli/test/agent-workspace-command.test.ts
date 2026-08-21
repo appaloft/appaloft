@@ -49,8 +49,15 @@ import {
 } from "@appaloft/application";
 import { domainError, err, ok } from "@appaloft/core";
 import { Effect } from "effect";
-
-import { folderDirectoryName, folderOccupancyIdentity } from "../src/folder-project-link.js";
+import {
+  folderDirectoryName,
+  folderOccupancyIdentity,
+  sanitizeFolderIdentitySegment,
+} from "../src/folder-project-link.js";
+import {
+  CODE_SESSION_INQUIRE_CONTINUE,
+  codeSessionInquireCreateMessage,
+} from "../src/folder-project-onboarding.js";
 import { OCCUPANCY_CODE_CHROME_TITLE } from "../src/occupancy-code-progress.js";
 import {
   createBoundedWorkspaceControlPresentation,
@@ -2968,17 +2975,26 @@ describe("Agent Workspace CLI", () => {
     await expectTtyCodeFirstChrome(["code", "--pi"]);
   });
 
-  test("[FOLDER-ONBOARD-009] code TUI auto-creates and never starts a folder selector", async () => {
+  test("[FOLDER-ONBOARD-009] code TUI inquires before start and never starts a folder selector", async () => {
     let presentationStarts = 0;
     const output: string[] = [];
+    const confirms: string[] = [];
     const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-cancel-"));
+    const folderName = sanitizeFolderIdentitySegment(folderDirectoryName(emptyDir));
     const previousCwd = process.cwd();
     process.chdir(emptyDir);
     const { createCliProgram } = await import("../src");
     const program = createCliProgram({
       version: "0.1.0-test",
       startServer: async () => {},
-      commandBus: { execute: async () => ok({}) } as unknown as CommandBus,
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          if (command instanceof CreateProjectCommand) {
+            return ok({ id: "prj_code_inquire", name: folderName } as T);
+          }
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
       queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
       executionContextFactory: {
         create: (input) =>
@@ -3003,12 +3019,17 @@ describe("Agent Workspace CLI", () => {
         select: () => {
           throw new Error("code session must not select a project");
         },
-        confirm: () => {
-          throw new Error("code TUI must auto-create instead of inquiring");
+        confirm: (input) => {
+          confirms.push(input.message);
+          return Effect.succeed(true);
         },
       },
       workspaceControlPresentation: {
         start: async () => {
+          expect(confirms).toEqual([
+            CODE_SESSION_INQUIRE_CONTINUE,
+            codeSessionInquireCreateMessage(folderName),
+          ]);
           presentationStarts += 1;
         },
       },
@@ -3019,8 +3040,13 @@ describe("Agent Workspace CLI", () => {
       process.chdir(previousCwd);
       await rm(emptyDir, { recursive: true, force: true });
     }
+    expect(confirms).toEqual([
+      CODE_SESSION_INQUIRE_CONTINUE,
+      codeSessionInquireCreateMessage(folderName),
+    ]);
     expect(presentationStarts).toBe(1);
     expect(output.join("")).not.toMatch(/occupancy/iu);
+    expect(output.join("")).not.toMatch(/This folder is not linked/u);
   });
 
   test("[WS-REMOTE-PROGRESS-219] missing renderer restores TTY and never shows Occupancy", async () => {
@@ -3081,7 +3107,8 @@ describe("Agent Workspace CLI", () => {
     } catch (error) {
       const text = String(error);
       expect(text).toContain("appaloft-workspace-tui");
-      expect(text).toContain("rustup default stable");
+      expect(text).toContain("Homebrew rustc");
+      expect(text).not.toContain("rustup default");
       expect(text).toContain("cargo build");
       expect(text).toContain("--no-attach");
       expect(text).not.toMatch(/occupancy/iu);
@@ -3095,11 +3122,12 @@ describe("Agent Workspace CLI", () => {
     }
   });
 
-  test("[FOLDER-ONBOARD-009] code TUI occupy auto-creates and never selects inside alt-screen", async () => {
+  test("[FOLDER-ONBOARD-009] code TUI occupy inquires before alt-screen and never selects inside it", async () => {
     const source = await Bun.file(
       new URL("../src/commands/agent-workspace.ts", import.meta.url),
     ).text();
-    expect(source).toContain('promptPolicy: "auto-create"');
+    expect(source).toContain('promptPolicy: "pre-tui-inquire"');
+    expect(source).toContain("codeSessionInquireInteraction");
     expect(source).toContain("yes: true");
     expect(source).toContain("writeStatus: () => undefined");
     expect(source).toContain("withImmediateSigintExit");
@@ -3110,14 +3138,14 @@ describe("Agent Workspace CLI", () => {
     expect(onboarding).toContain("quitCodeSessionOnCancel");
     expect(onboarding).toContain("restoreWorkspaceTuiScrollback");
     expect(onboarding).toContain("\\u0003");
+    const inquireAt = source.indexOf('promptPolicy: "pre-tui-inquire"');
     const tuiBlockStart = source.indexOf("if (useOccupancyTui && occupancyTui)");
     const startAt = source.indexOf("occupancyTui.start(", tuiBlockStart);
-    expect(tuiBlockStart).toBeGreaterThan(-1);
+    expect(inquireAt).toBeGreaterThan(-1);
+    expect(tuiBlockStart).toBeGreaterThan(inquireAt);
     expect(startAt).toBeGreaterThan(tuiBlockStart);
     expect(source.slice(tuiBlockStart, startAt)).not.toContain("ensureFolderProjectOnboarding");
-    expect(source).not.toContain("codeSessionInquireInteraction");
     expect(source).not.toContain("interaction: effectCliInteraction");
-    expect(source).not.toContain("effectCliInteraction");
     expect(source).not.toContain("This folder is not linked");
   });
 
@@ -4346,7 +4374,8 @@ async function expectTtyCodeFirstChrome(args: readonly string[]): Promise<void> 
   let startedContext: WorkspaceControlPresentationContext | undefined;
   let doorResolved = false;
   const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-code-inquire-"));
-  const folderName = folderDirectoryName(emptyDir);
+  const folderName = sanitizeFolderIdentitySegment(folderDirectoryName(emptyDir));
+  const chromeProject = folderDirectoryName(emptyDir);
   const previousCwd = process.cwd();
   process.chdir(emptyDir);
   const { createCliProgram } = await import("../src");
@@ -4400,12 +4429,15 @@ async function expectTtyCodeFirstChrome(args: readonly string[]): Promise<void> 
       },
       confirm: (input) => {
         inquireMessages.push(input.message);
-        throw new Error("code TUI must auto-create instead of inquiring");
+        return Effect.succeed(true);
       },
     },
     workspaceControlPresentation: {
       start: async (context) => {
-        expect(inquireMessages).toEqual([]);
+        expect(inquireMessages).toEqual([
+          CODE_SESSION_INQUIRE_CONTINUE,
+          codeSessionInquireCreateMessage(folderName),
+        ]);
         presentationStarts += 1;
         startedContext = context;
       },
@@ -4428,10 +4460,13 @@ async function expectTtyCodeFirstChrome(args: readonly string[]): Promise<void> 
     await rm(emptyDir, { recursive: true, force: true });
   }
   const printed = output.join("");
-  expect(inquireMessages).toEqual([]);
+  expect(inquireMessages).toEqual([
+    CODE_SESSION_INQUIRE_CONTINUE,
+    codeSessionInquireCreateMessage(folderName),
+  ]);
   expect(presentationStarts).toBe(1);
   expect(startedContext?.occupyBootstrap).toBeTypeOf("function");
-  expect(startedContext?.occupancyChrome?.project).toBe(folderName);
+  expect(startedContext?.occupancyChrome?.project).toBe(chromeProject);
   expect(doorResolved).toBeFalse();
   expect(printed).not.toContain("Checking login…");
   expect(printed).not.toContain("Opening occupancy");
@@ -4464,7 +4499,7 @@ async function expectTtyCodeFirstChrome(args: readonly string[]): Promise<void> 
     type: "loading",
     collapsed: true,
     title: OCCUPANCY_CODE_CHROME_TITLE,
-    project: folderName,
+    project: chromeProject,
   });
   expect(JSON.stringify(renderer.messages)).not.toMatch(/occupancy/iu);
   expect(JSON.stringify(renderer.messages)).not.toContain(

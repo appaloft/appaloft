@@ -8,6 +8,24 @@ export const OCCUPANCY_FIRST_FRAME_TITLE = "preparing the agent";
 
 let occupancyAltScreenEntered = false;
 let occupancyAltScreenRestoreInstalled = false;
+let occupancyWarmupInterruptInstalled = false;
+
+export function isErrnoEpipe(error: unknown): boolean {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { readonly code?: unknown }).code === "EPIPE",
+  );
+}
+
+export function writeOccupancyTerminalBytes(write: (text: string) => void, text: string): void {
+  try {
+    write(text);
+  } catch (error) {
+    if (!isErrnoEpipe(error)) throw error;
+  }
+}
 
 export function occupancyFirstFrameBytes(rows = 24, cols = 80): string {
   const titleRow = Math.max(1, Math.floor(rows / 2) - 1);
@@ -25,6 +43,22 @@ export function resetOccupancyAltScreenState(): void {
   occupancyAltScreenEntered = false;
 }
 
+function installOccupancyWarmupInterrupt(write: (text: string) => void): void {
+  if (occupancyWarmupInterruptInstalled) return;
+  occupancyWarmupInterruptInstalled = true;
+  const restoreAndExit = (code: number) => {
+    writeOccupancyTerminalBytes(write, `${OCCUPANCY_LEAVE_ALT_SCREEN}${OCCUPANCY_DISABLE_MOUSE}\n`);
+    occupancyAltScreenEntered = false;
+    process.exit(code);
+  };
+  process.on("SIGINT", () => {
+    restoreAndExit(130);
+  });
+  process.on("SIGTERM", () => {
+    restoreAndExit(143);
+  });
+}
+
 export function enterOccupancyAltScreen(
   write: (text: string) => void = (text) => {
     writeSync(1, text);
@@ -32,7 +66,8 @@ export function enterOccupancyAltScreen(
   size: { readonly rows?: number; readonly columns?: number } = process.stdout,
 ): void {
   occupancyAltScreenEntered = true;
-  write(occupancyFirstFrameBytes(size.rows ?? 24, size.columns ?? 80));
+  installOccupancyWarmupInterrupt(write);
+  writeOccupancyTerminalBytes(write, occupancyFirstFrameBytes(size.rows ?? 24, size.columns ?? 80));
 }
 
 export function leaveOccupancyAltScreen(
@@ -41,7 +76,7 @@ export function leaveOccupancyAltScreen(
   },
 ): void {
   occupancyAltScreenEntered = false;
-  write(`${OCCUPANCY_LEAVE_ALT_SCREEN}${OCCUPANCY_DISABLE_MOUSE}\n`);
+  writeOccupancyTerminalBytes(write, `${OCCUPANCY_LEAVE_ALT_SCREEN}${OCCUPANCY_DISABLE_MOUSE}\n`);
 }
 
 export function restoreOccupancyAltScreenIfEntered(
@@ -64,4 +99,14 @@ export function installOccupancyAltScreenRestore(
   process.on("exit", () => {
     restoreOccupancyAltScreenIfEntered(write);
   });
+}
+
+export function ignoreOccupancyTerminalEpipe(error: NodeJS.ErrnoException): void {
+  if (error.code === "EPIPE") return;
+}
+
+export function exitQuietlyOnOccupancyEpipe(error: unknown): void {
+  if (!isErrnoEpipe(error)) throw error;
+  restoreOccupancyAltScreenIfEntered();
+  process.exit(typeof process.exitCode === "number" ? process.exitCode : 0);
 }
