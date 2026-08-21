@@ -65,9 +65,29 @@ export function applyLocalSourceBaseDirectory(
 }
 
 /**
+ * Prefer the source locator (what CLI summary.Source prints) when
+ * `workingDirectory` is already the parent or otherwise outside that folder.
+ * A child workingDirectory (monorepo subdir) is kept. Must not package
+ * `/Users/nichenqin/projects` when the locator is the hyphenated cwd.
+ */
+function preferLocalSourceRoot(locatorRoot: string, workingDirectory?: string): string {
+  if (!workingDirectory || workingDirectory === locatorRoot) {
+    return locatorRoot;
+  }
+
+  const relativeWorkdir = relative(locatorRoot, workingDirectory);
+  if (!relativeWorkdir || relativeWorkdir.startsWith("..") || isAbsolute(relativeWorkdir)) {
+    return locatorRoot;
+  }
+
+  return workingDirectory;
+}
+
+/**
  * Same composition SSH package uses before the exists-check:
- * `workingDirectory ?? locator`, then keep the folder, then apply a safe
- * relative baseDirectory. Must not dirname a missing hyphenated folder.
+ * keep the locator folder, accept a child workingDirectory only, then apply
+ * a safe relative baseDirectory. Must not dirname a missing hyphenated folder
+ * and must not prefer a workingDirectory that was already walked to the parent.
  */
 export function resolveLocalWorkspaceWorkdir(input: {
   workingDirectory?: string;
@@ -75,7 +95,12 @@ export function resolveLocalWorkspaceWorkdir(input: {
   metadata?: Record<string, string>;
 }): string {
   return applyLocalSourceBaseDirectory(
-    normalizeLocalSourceWorkingDirectory(input.workingDirectory ?? input.locator),
+    preferLocalSourceRoot(
+      normalizeLocalSourceWorkingDirectory(input.locator),
+      input.workingDirectory
+        ? normalizeLocalSourceWorkingDirectory(input.workingDirectory)
+        : undefined,
+    ),
     input.metadata,
   );
 }

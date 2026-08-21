@@ -5,6 +5,38 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
+import {
+  BuildStrategyKindValue,
+  ConfigScopeValue,
+  CreatedAt,
+  Deployment,
+  DeploymentId,
+  DeploymentTargetDescriptor,
+  DeploymentTargetId,
+  DestinationId,
+  DetectSummary,
+  DisplayNameText,
+  EnvironmentConfigSnapshot,
+  EnvironmentId,
+  EnvironmentSnapshotId,
+  ExecutionStrategyKindValue,
+  FilePathText,
+  GeneratedAt,
+  PackagingModeValue,
+  PlanStepText,
+  ProjectId,
+  ProviderKey,
+  ResourceId,
+  RuntimeExecutionPlan,
+  RuntimePlan,
+  RuntimePlanId,
+  SourceDescriptor,
+  SourceKindValue,
+  SourceLocator,
+  StartedAt,
+  TargetKindValue,
+} from "@appaloft/core";
+import type { ExecutionContext } from "@appaloft/application";
 import { ash } from "@appaloft/ash";
 import { RuntimeCommandBuilder, renderRuntimeCommandString } from "../src/runtime-commands";
 import {
@@ -26,14 +58,74 @@ import {
 } from "../src/ssh-execution";
 import { generateStaticSiteDockerBuild } from "../src/workspace-planners";
 
+const hyphenatedStaticLocator = "/Users/nichenqin/projects/nux-c79876d8-static";
+const hyphenatedStaticParent = "/Users/nichenqin/projects";
+const hyphenatedStaticLeaf = "nux-c79876d8-static";
+const startedAt = StartedAt.rehydrate("2026-08-21T00:00:00.000Z");
+
+function runningStaticSshDeployment(input: {
+  deploymentId: string;
+  locator: string;
+  workingDirectory: string;
+}): Deployment {
+  const deployment = Deployment.create({
+    id: DeploymentId.rehydrate(input.deploymentId),
+    projectId: ProjectId.rehydrate("prj_hyphenated_static"),
+    environmentId: EnvironmentId.rehydrate("env_local"),
+    resourceId: ResourceId.rehydrate("res_static"),
+    serverId: DeploymentTargetId.rehydrate("srv_4lifk0yrcecy"),
+    destinationId: DestinationId.rehydrate("dst_hostinger"),
+    runtimePlan: RuntimePlan.rehydrate({
+      id: RuntimePlanId.rehydrate(`plan_${input.deploymentId}`),
+      source: SourceDescriptor.rehydrate({
+        kind: SourceKindValue.rehydrate("local-folder"),
+        locator: SourceLocator.rehydrate(input.locator),
+        displayName: DisplayNameText.rehydrate(hyphenatedStaticLeaf),
+        metadata: { baseDirectory: "/" },
+      }),
+      buildStrategy: BuildStrategyKindValue.rehydrate("static-artifact"),
+      packagingMode: PackagingModeValue.rehydrate("all-in-one-docker"),
+      execution: RuntimeExecutionPlan.rehydrate({
+        kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
+        workingDirectory: FilePathText.rehydrate(input.workingDirectory),
+        metadata: {
+          "artifact.source": "static-site",
+          "static.publishDirectory": "public",
+        },
+      }),
+      target: DeploymentTargetDescriptor.rehydrate({
+        kind: TargetKindValue.rehydrate("single-server"),
+        providerKey: ProviderKey.rehydrate("generic-ssh"),
+        serverIds: [DeploymentTargetId.rehydrate("srv_4lifk0yrcecy")],
+      }),
+      detectSummary: DetectSummary.rehydrate("Static site from public/index.html"),
+      steps: [PlanStepText.rehydrate("Upload source workspace over SSH")],
+      generatedAt: GeneratedAt.rehydrate("2026-08-21T00:00:00.000Z"),
+    }),
+    environmentSnapshot: EnvironmentConfigSnapshot.rehydrate({
+      id: EnvironmentSnapshotId.rehydrate(`snap_${input.deploymentId}`),
+      environmentId: EnvironmentId.rehydrate("env_local"),
+      createdAt: GeneratedAt.rehydrate("2026-08-21T00:00:00.000Z"),
+      precedence: [ConfigScopeValue.rehydrate("environment")],
+      variables: [],
+    }),
+    createdAt: CreatedAt.rehydrate("2026-08-21T00:00:00.000Z"),
+  })._unsafeUnwrap();
+
+  deployment.markPlanning(startedAt)._unsafeUnwrap();
+  deployment.markPlanned(startedAt)._unsafeUnwrap();
+  deployment.start(startedAt)._unsafeUnwrap();
+  return deployment;
+}
+
 describe("SSH source upload", () => {
   test("[DEP-CREATE-PKG-007] source workdir keeps the hyphenated folder when it is missing here", () => {
-    const locator = "/Users/nichenqin/projects/nux-9859a0e9-static";
-    const parent = "/Users/nichenqin/projects";
+    const locator = hyphenatedStaticLocator;
+    const parent = hyphenatedStaticParent;
     const workdir = normalizeLocalSourceWorkingDirectory(locator);
 
     expect(workdir).toBe(locator);
-    expect(workdir).toContain("nux-9859a0e9-static");
+    expect(workdir).toContain(hyphenatedStaticLeaf);
     expect(workdir).not.toBe(parent);
     expect(workdir.endsWith("/projects")).toBe(false);
 
@@ -53,9 +145,85 @@ describe("SSH source upload", () => {
     expect(escaped).toBe(locator);
     expect(escaped).not.toBe(parent);
 
-    const missingMessage = `Source working directory does not exist: ${packaged}`;
-    expect(missingMessage).toContain("nux-9859a0e9-static");
+    const dirnameAlready = resolveLocalWorkspaceWorkdir({
+      workingDirectory: parent,
+      locator,
+      metadata: { baseDirectory: "/" },
+    });
+    expect(dirnameAlready).toBe(locator);
+    expect(dirnameAlready).toContain(hyphenatedStaticLeaf);
+    expect(dirnameAlready).not.toBe(parent);
+
+    const missingMessage = `Source working directory does not exist: ${dirnameAlready}`;
+    expect(missingMessage).toContain(hyphenatedStaticLeaf);
     expect(missingMessage).not.toBe(`Source working directory does not exist: ${parent}`);
+  });
+
+  test("[DEP-CREATE-PKG-007] SSH package exists-check uses the full cwd when workingDirectory is already the parent", async () => {
+    const locator = hyphenatedStaticLocator;
+    const parent = hyphenatedStaticParent;
+    const deployment = runningStaticSshDeployment({
+      deploymentId: "dep_n9usn2o434m1",
+      locator,
+      workingDirectory: parent,
+    });
+    const backend = new SshExecutionBackend(
+      "/tmp/appaloft-runtime",
+      { warn: () => undefined } as never,
+      { record: async () => ({ isErr: () => false }) } as never,
+      { report: () => undefined } as never,
+    );
+
+    expect(deployment.toState().runtimePlan.source.locator).toBe(locator);
+    expect(deployment.toState().runtimePlan.execution.workingDirectory).toBe(parent);
+
+    const prepared = await (
+      backend as never as {
+        prepareSshSource: (
+          context: ExecutionContext,
+          current: Deployment,
+          timeline: unknown[],
+          input: {
+            runtimeDir: string;
+            remoteRoot: string;
+            target: { host: string; publicHost: string; port: string };
+            env: NodeJS.ProcessEnv;
+          },
+        ) => Promise<
+          | { prepared: true }
+          | { prepared: false; deployment: Deployment }
+        >;
+      }
+    ).prepareSshSource(
+      { requestId: "req_pkg_007", entrypoint: "cli" } as ExecutionContext,
+      deployment,
+      [],
+      {
+        runtimeDir: "/tmp/appaloft-runtime",
+        remoteRoot: "/var/lib/appaloft/runtime/ssh-deployments/dep_n9usn2o434m1",
+        target: { host: "deploy@example.test", publicHost: "example.test", port: "22" },
+        env: {},
+      },
+    );
+
+    expect(prepared.prepared).toBe(false);
+    if (prepared.prepared) {
+      throw new Error("expected SSH package to fail when the Mac cwd is missing here");
+    }
+
+    const messages = prepared.deployment
+      .toState()
+      .timeline.map((entry) => entry.message);
+    const missing = messages.find((message) =>
+      message.startsWith("Source working directory does not exist:"),
+    );
+
+    expect(missing).toBe(`Source working directory does not exist: ${locator}`);
+    expect(missing).toContain(hyphenatedStaticLeaf);
+    expect(missing).not.toBe(`Source working directory does not exist: ${parent}`);
+    expect(prepared.deployment.toState().runtimePlan.execution.metadata?.errorCode).toBe(
+      "source_workdir_missing",
+    );
   });
 
   test("[DEP-CREATE-PKG-001] local workspace upload excludes cache and dependency directories", () => {

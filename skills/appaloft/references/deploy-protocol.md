@@ -155,7 +155,8 @@ Use this order:
    Coding-agent / CI / non-TTY runs print a plan unless `--yes` is present. Do
    not silently reuse an unrelated session such as traefik/whoami. If `public/index.html` exists,
    auto-select static and publish-dir `public` without requiring `--method` or `--publish-dir`. Keep
-   the real cwd folder (hyphenated names are legal). Do not dirname a missing folder to its parent.
+   the real cwd folder (hyphenated names are legal). SSH package must use that full folder even if
+   `workingDirectory` was already walked to the parent. A missing-workdir error names the full folder.
    If there is no current app, ask for a path or `--project`.
 3. Existing Appaloft config: `appaloft deploy <source>`; for an application graph, repeat
    `--application <key>` to deploy only the requested applications or omit it to deploy all entries.

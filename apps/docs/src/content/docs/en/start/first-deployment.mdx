@@ -73,6 +73,7 @@ appaloft server capacity inspect --server-id <serverId>
 # 4. Already signed in? The same folder deploy continues to create or reuse this app.
 #    A folder with public/index.html auto-selects static (no --method needed).
 #    The source folder stays this directory (hyphenated names are legal), not the parent.
+#    SSH package uses this full folder; a missing-workdir error names it, never the parent.
 
 # 5. Or explicitly point at a config file / profile
 appaloft deploy --config appaloft.yml --config-profile staging
