@@ -1,54 +1,88 @@
 import {
   AgentWorkspaceOpenService,
   COMMUNITY_OCCUPANCY_OPENCODE_LIMITS,
+  COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_DIGEST,
   COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID,
+  COMMUNITY_OCCUPANCY_OPENCODE_VERSION,
+  COMMUNITY_OCCUPANCY_PI_LIMITS,
+  COMMUNITY_OCCUPANCY_PI_PROFILE_ID,
+  COMMUNITY_OCCUPANCY_PI_TEMPLATE_DIGEST,
+  COMMUNITY_OCCUPANCY_PI_TEMPLATE_ID,
+  COMMUNITY_OCCUPANCY_PI_VERSION,
   COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY,
   type Command,
   CreateSandboxAgentRuntimeCommand,
   CreateSandboxCommand,
   createExecutionContext,
+  IssueSandboxAgentAttachAccessCommand,
   ListProjectsQuery,
   ListSandboxesQuery,
   ListServersQuery,
   OpenAgentWorkspaceCommand,
+  occupancyRemoteProfileId,
   type Query,
   ResumeSandboxCommand,
+  type SandboxAgentAttachDescriptor,
   ShowRepositoryBindingQuery,
   shouldSkipWorkspaceSourceMaterialization,
   TerminateSandboxCommand,
   type WorkspaceOpenDependencies,
   type WorkspaceOpenEntry,
+  type WorkspaceOpenInput,
   type WorkspaceOpenResult,
 } from "@appaloft/application";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 
 type RemoteDispatch = <T>(message: Command<T> | Query<T>) => Promise<Result<T>>;
 
-const FOLDER_LOCAL_HARNESS_KEY = "opencode";
-const FOLDER_LOCAL_HARNESS_TEMPLATE_ID = "aht_opencode_managed_v1";
-
-const folderLocalPin = {
-  profileInstallationId: "awpi_folder_local",
-  profileDefinitionDigest: `sha256:${"a".repeat(64)}`,
-  profileId: "appaloft-remote",
-  profileVersion: "1.0.0",
-  adapterInstallationId: "aai_folder_local",
-  adapterDefinitionDigest: `sha256:${"b".repeat(64)}`,
-  adapterId: "opencode",
-  adapterVersion: "1.0.0",
-  harnessKey: FOLDER_LOCAL_HARNESS_KEY,
-  harnessTemplateId: FOLDER_LOCAL_HARNESS_TEMPLATE_ID,
+const FOLDER_LOCAL_OPENCODE_HARNESS = {
+  harnessKey: "opencode",
+  harnessTemplateId: "aht_opencode_managed_v1",
   sandboxTemplateId: COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID,
-  sandboxTemplateVersion: "1",
-  sandboxTemplateDigest: `sha256:${"c".repeat(64)}`,
-  capabilities: {
-    taskMode: true,
-    interactive: true,
-    backgroundRuns: true,
-    nativeSession: false,
-    persistentPaths: ["/workspace"],
-  },
+  sandboxTemplateVersion: COMMUNITY_OCCUPANCY_OPENCODE_VERSION,
+  sandboxTemplateDigest: COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_DIGEST,
+  limits: COMMUNITY_OCCUPANCY_OPENCODE_LIMITS,
 } as const;
+const FOLDER_LOCAL_PI_HARNESS = {
+  harnessKey: "pi",
+  harnessTemplateId: "aht_pi_managed_v1",
+  sandboxTemplateId: COMMUNITY_OCCUPANCY_PI_TEMPLATE_ID,
+  sandboxTemplateVersion: COMMUNITY_OCCUPANCY_PI_VERSION,
+  sandboxTemplateDigest: COMMUNITY_OCCUPANCY_PI_TEMPLATE_DIGEST,
+  limits: COMMUNITY_OCCUPANCY_PI_LIMITS,
+} as const;
+
+function folderLocalHarnessForProfile(profile?: string) {
+  return profile === COMMUNITY_OCCUPANCY_PI_PROFILE_ID || profile === occupancyRemoteProfileId("pi")
+    ? FOLDER_LOCAL_PI_HARNESS
+    : FOLDER_LOCAL_OPENCODE_HARNESS;
+}
+
+function folderLocalPinFor(profile?: string) {
+  const harness = folderLocalHarnessForProfile(profile);
+  return {
+    profileInstallationId: "awpi_folder_local",
+    profileDefinitionDigest: `sha256:${"a".repeat(64)}`,
+    profileId: occupancyRemoteProfileId(harness.harnessKey),
+    profileVersion: "1.0.0",
+    adapterInstallationId: "aai_folder_local",
+    adapterDefinitionDigest: `sha256:${"b".repeat(64)}`,
+    adapterId: harness.harnessKey,
+    adapterVersion: "1.0.0",
+    harnessKey: harness.harnessKey,
+    harnessTemplateId: harness.harnessTemplateId,
+    sandboxTemplateId: harness.sandboxTemplateId,
+    sandboxTemplateVersion: harness.sandboxTemplateVersion,
+    sandboxTemplateDigest: harness.sandboxTemplateDigest,
+    capabilities: {
+      taskMode: true,
+      interactive: true,
+      backgroundRuns: true,
+      nativeSession: false,
+      persistentPaths: ["/workspace"],
+    },
+  };
+}
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
@@ -64,13 +98,30 @@ function isGitSourceArgv(argv: readonly string[]): boolean {
   );
 }
 
+function isWorkspaceOpenInput(value: unknown): value is WorkspaceOpenInput {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.repository === "string" &&
+    typeof record.repositoryIdentity === "string" &&
+    typeof record.ref === "string" &&
+    typeof record.branch === "string" &&
+    typeof record.commitSha === "string"
+  );
+}
+
+function workspaceOpenInputFromMessage(message: unknown): WorkspaceOpenInput | undefined {
+  if (message instanceof OpenAgentWorkspaceCommand) return message.input;
+  if (!message || typeof message !== "object" || !("input" in message)) return undefined;
+  const input = (message as { input: unknown }).input;
+  return isWorkspaceOpenInput(input) ? input : undefined;
+}
+
 export function isFolderLocalWorkspaceOpenCommand(
   message: unknown,
 ): message is OpenAgentWorkspaceCommand {
-  return (
-    message instanceof OpenAgentWorkspaceCommand &&
-    shouldSkipWorkspaceSourceMaterialization(message.input)
-  );
+  const input = workspaceOpenInputFromMessage(message);
+  return Boolean(input && shouldSkipWorkspaceSourceMaterialization(input));
 }
 
 export async function executeFolderLocalWorkspaceOpen(input: {
@@ -112,6 +163,7 @@ export async function executeFolderLocalWorkspaceOpen(input: {
       repositoryIdentity: input.command.input.repositoryIdentity,
       branch: input.command.input.branch,
       commitSha: input.command.input.commitSha,
+      ...(input.command.input.profile ? { profile: input.command.input.profile } : {}),
       ...(providerKey ? { providerKey } : {}),
     }),
   );
@@ -213,12 +265,13 @@ async function listRemoteProjects(
     : [];
 }
 
-function folderLocalCompiledPin() {
+function folderLocalCompiledPin(profile?: string) {
+  const pin = folderLocalPinFor(profile);
   return {
-    ...folderLocalPin,
+    ...pin,
     capabilities: {
-      ...folderLocalPin.capabilities,
-      persistentPaths: [...folderLocalPin.capabilities.persistentPaths],
+      ...pin.capabilities,
+      persistentPaths: [...pin.capabilities.persistentPaths],
     },
   };
 }
@@ -230,13 +283,16 @@ function createFolderLocalRemoteOpenDependencies(input: {
   readonly repositoryIdentity: string;
   readonly branch: string;
   readonly commitSha: string;
+  readonly profile?: string;
   readonly providerKey?: string;
 }): WorkspaceOpenDependencies {
+  const pin = folderLocalCompiledPin(input.profile);
+  const harness = folderLocalHarnessForProfile(input.profile);
   const activation = {
     project: { projectId: input.projectId, disposition: "reused" as const },
     repositoryBinding: { bindingId: "rbd_folder_local", disposition: "reused" as const },
     profile: {
-      profileInstallationId: folderLocalPin.profileInstallationId,
+      profileInstallationId: pin.profileInstallationId,
       disposition: "reused" as const,
     },
   };
@@ -251,7 +307,7 @@ function createFolderLocalRemoteOpenDependencies(input: {
       resolveContext: async () =>
         ok({
           projectId: input.projectId,
-          profileInstallationId: folderLocalPin.profileInstallationId,
+          profileInstallationId: pin.profileInstallationId,
           activation,
         }),
       admit: async (_context, resolved) =>
@@ -263,22 +319,22 @@ function createFolderLocalRemoteOpenDependencies(input: {
             sandbox: {
               source: {
                 kind: "template" as const,
-                templateId: COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID,
+                templateId: harness.sandboxTemplateId,
               },
               requestedIsolation: "container-trusted" as const,
-              limits: { ...COMMUNITY_OCCUPANCY_OPENCODE_LIMITS },
+              limits: { ...harness.limits },
               networkPolicy: COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY,
             },
             initialization: [],
             runtime: {
-              harnessKey: FOLDER_LOCAL_HARNESS_KEY,
-              harnessTemplateId: FOLDER_LOCAL_HARNESS_TEMPLATE_ID,
+              harnessKey: harness.harnessKey,
+              harnessTemplateId: harness.harnessTemplateId,
               declarativeHarness: {},
             },
             defaultPorts: [],
             suggestedChecks: [],
             credentialRequirements: [],
-            pin: folderLocalCompiledPin(),
+            pin,
           },
           reservation: {
             reservationId: "wres_folder_local",
@@ -308,6 +364,8 @@ function createFolderLocalRemoteOpenDependencies(input: {
     sandboxes: {
       create: async (_context, value) =>
         createRemoteSandbox(input.dispatch, {
+          templateId: harness.sandboxTemplateId,
+          limits: harness.limits,
           ...((value.providerKey ?? input.providerKey)
             ? { providerKey: value.providerKey ?? input.providerKey }
             : {}),
@@ -331,16 +389,12 @@ function createFolderLocalRemoteOpenDependencies(input: {
     },
     agents: {
       showRuntime: async (_context, value) =>
-        ok(runtimeDescriptor(value.sandboxId, value.runtimeId)),
+        ok(runtimeDescriptor(value.sandboxId, value.runtimeId, input.profile)),
       createRuntime: async (_context, value) =>
-        createRemoteRuntime(input.dispatch, value.sandboxId, value.projectId),
+        createRemoteRuntime(input.dispatch, value.sandboxId, value.projectId, input.profile),
       ensureRuntime: async () => ok(undefined),
-      attach: async () =>
-        err(
-          domainError.conflict("folder.local --no-attach must not attach", {
-            code: "workspace_open_folder_local_attach_forbidden",
-          }),
-        ),
+      attach: async (_context, value) =>
+        issueRemoteAttach(input.dispatch, value.sandboxId, value.runtimeId, value.expiresAt),
     },
     reservations: {
       consume: async () => ok(undefined),
@@ -380,7 +434,7 @@ function preferredFolderEntry(
     workspaceId,
     ...(runtimeId ? { runtimeId } : {}),
     commitSha: occupancySha,
-    profileInstallationId: folderLocalPin.profileInstallationId,
+    profileInstallationId: folderLocalPinFor().profileInstallationId,
     status: status === "ready" || status === "terminal" ? status : "partial",
     phase: "workspace-open-source-materialization",
     repositoryIdentity,
@@ -414,6 +468,8 @@ function sandboxDisplayNameFromRecord(record: Record<string, unknown>, fallback:
 async function createRemoteSandbox(
   dispatch: RemoteDispatch,
   input: {
+    readonly templateId: string;
+    readonly limits: typeof COMMUNITY_OCCUPANCY_OPENCODE_LIMITS;
     readonly providerKey?: string;
     readonly name?: string;
     readonly directoryName?: string;
@@ -422,9 +478,9 @@ async function createRemoteSandbox(
   },
 ): Promise<Result<{ sandboxId: string; name: string; status: string }>> {
   const command = CreateSandboxCommand.create({
-    source: { kind: "template", templateId: COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID },
+    source: { kind: "template", templateId: input.templateId },
     requestedIsolation: "container-trusted",
-    limits: { ...COMMUNITY_OCCUPANCY_OPENCODE_LIMITS },
+    limits: { ...input.limits },
     networkPolicy: COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY,
     ...(input.providerKey ? { providerKey: input.providerKey } : {}),
     ...(input.name ? { name: input.name } : {}),
@@ -471,11 +527,13 @@ async function createRemoteRuntime(
   dispatch: RemoteDispatch,
   sandboxId: string,
   projectId: string,
+  profile?: string,
 ): Promise<Result<ReturnType<typeof runtimeDescriptor>>> {
+  const harness = folderLocalHarnessForProfile(profile);
   const command = CreateSandboxAgentRuntimeCommand.create({
     sandboxId,
-    harnessKey: FOLDER_LOCAL_HARNESS_KEY,
-    harnessTemplateId: FOLDER_LOCAL_HARNESS_TEMPLATE_ID,
+    harnessKey: harness.harnessKey,
+    harnessTemplateId: harness.harnessTemplateId,
     idempotencyKey: `folder-local:${sandboxId}`,
     projectId,
   });
@@ -484,16 +542,60 @@ async function createRemoteRuntime(
   if (created.isErr()) return err(created.error);
   const record = asRecord(created.value);
   const runtimeId = readString(record.runtimeId) ?? readString(record.id) ?? `sar_${sandboxId}`;
-  return ok(runtimeDescriptor(sandboxId, runtimeId));
+  return ok(runtimeDescriptor(sandboxId, runtimeId, profile));
 }
 
-function runtimeDescriptor(sandboxId: string, runtimeId: string) {
-  const pin = folderLocalCompiledPin();
+async function issueRemoteAttach(
+  dispatch: RemoteDispatch,
+  sandboxId: string,
+  runtimeId: string,
+  expiresAt: string,
+): Promise<Result<SandboxAgentAttachDescriptor>> {
+  const command = IssueSandboxAgentAttachAccessCommand.create({
+    sandboxId,
+    runtimeId,
+    expiresAt,
+  });
+  if (command.isErr()) return err(command.error);
+  const issued = await dispatch(command.value);
+  if (issued.isErr()) return err(issued.error);
+  const record = asRecord(issued.value);
+  const transport = readString(record.transport);
+  const sessionId = readString(record.sessionId);
+  const processId = readString(record.processId);
+  const access = asRecord(record.access);
+  if (transport === "managed-terminal" && sessionId && processId && readString(access.path)) {
+    return ok({
+      workspaceId: readString(record.workspaceId) ?? sandboxId,
+      runtimeId: readString(record.runtimeId) ?? runtimeId,
+      transport: "managed-terminal",
+      sessionId,
+      processId,
+      access: {
+        kind: "websocket",
+        path: readString(access.path) ?? "",
+        expiresAt: readString(access.expiresAt) ?? expiresAt,
+      },
+    });
+  }
+  if (transport === "native-attach") {
+    return ok(issued.value as SandboxAgentAttachDescriptor);
+  }
+  return err(
+    domainError.conflict("folder.local attach did not return a usable session", {
+      code: "workspace_open_folder_local_attach_unsupported",
+    }),
+  );
+}
+
+function runtimeDescriptor(sandboxId: string, runtimeId: string, profile?: string) {
+  const pin = folderLocalCompiledPin(profile);
+  const harness = folderLocalHarnessForProfile(profile);
   return {
     runtimeId,
     sandboxId,
-    harnessKey: FOLDER_LOCAL_HARNESS_KEY,
-    harnessTemplateId: FOLDER_LOCAL_HARNESS_TEMPLATE_ID,
+    harnessKey: harness.harnessKey,
+    harnessTemplateId: harness.harnessTemplateId,
     status: "ready",
     profilePin: pin,
     capabilities: pin.capabilities,

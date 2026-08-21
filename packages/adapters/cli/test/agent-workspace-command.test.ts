@@ -3223,6 +3223,72 @@ describe("Agent Workspace CLI", () => {
     );
   });
 
+  test("[WS-REMOTE-COMPAT-220][WS-REMOTE-OPEN-BYOS-181] folder.local Cloud validation is not remapped to Server targeting", async () => {
+    const commands: Command<unknown>[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          return err({
+            code: "bad_request",
+            category: "user",
+            message: "Input validation failed",
+            retryable: false,
+            details: { phase: "orpc-error-normalization", orpcCode: "BAD_REQUEST" },
+          });
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_folder_compat" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://folder.local/cwd/nux-54065181-unlinked.git",
+        repositoryIdentity: "folder.local/cwd/nux-54065181-unlinked",
+        ref: "refs/heads/local",
+        branch: "local",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        projectId: "prj_i7tt42okmrgn",
+        serverId: "srv_4lifk0yrcecy",
+        serverName: "hostinger",
+      }),
+    });
+    const originalExitCode = process.exitCode;
+    const write = process.stderr.write;
+    let stderr = "";
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      stderr += String(chunk);
+      return true;
+    }) as typeof process.stderr.write;
+    try {
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "code",
+        "--pi",
+        "--server",
+        "srv_4lifk0yrcecy",
+        "--no-attach",
+      ]);
+      throw new Error("Expected folder.local Cloud validation to fail");
+    } catch (error) {
+      expect(String(error)).toContain("Input validation failed");
+      expect(String(error)).not.toContain("workspace_open_target_server_unsupported");
+      expect(String(error)).not.toContain("This Cloud does not accept Server targeting");
+    } finally {
+      process.stderr.write = write;
+      process.exitCode = originalExitCode ?? 0;
+    }
+    expect(stderr).not.toContain("Deploy a Cloud that accepts workspaces.open");
+    expect(commands).toHaveLength(1);
+    expect((commands[0] as OpenAgentWorkspaceCommand).input.targetServerId).toBe(
+      "srv_4lifk0yrcecy",
+    );
+  });
+
   test("[WS-SCRATCH-INSTALL-007] refused install is the only hard scratch failure", async () => {
     let commandDispatched = false;
     const { createCliProgram } = await import("../src");

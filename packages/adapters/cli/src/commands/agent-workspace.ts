@@ -926,10 +926,17 @@ export const workspaceCodeCommand = EffectCommand.make(
           if (replaced.isOk()) {
             return { door, result: replaced.value, bannerCommitSha: door.commitSha };
           }
-          throw occupancyCloudCompatError(replaced.error, {
-            id: door.serverId,
-            name: door.serverName,
-          });
+          throw occupancyCloudCompatError(
+            replaced.error,
+            {
+              id: door.serverId,
+              name: door.serverName,
+            },
+            {
+              repositoryIdentity: door.repositoryIdentity,
+              repository: door.repository,
+            },
+          );
         }
         const details = opened.error.details;
         const pinnedSha =
@@ -939,10 +946,17 @@ export const workspaceCodeCommand = EffectCommand.make(
             ? details.workspaceCommitSha
             : undefined;
         if (!pinnedSha) {
-          throw occupancyCloudCompatError(opened.error, {
-            id: door.serverId,
-            name: door.serverName,
-          });
+          throw occupancyCloudCompatError(
+            opened.error,
+            {
+              id: door.serverId,
+              name: door.serverName,
+            },
+            {
+              repositoryIdentity: door.repositoryIdentity,
+              repository: door.repository,
+            },
+          );
         }
         const retry = OpenAgentWorkspaceCommand.create({
           ...openInput,
