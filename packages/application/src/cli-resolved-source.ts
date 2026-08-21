@@ -221,19 +221,20 @@ export function retainLocalFolderSourceFields(
   const locator = persistedPath
     ? restoreLocalFolderLocator(source.locator, persistedPath)
     : source.locator;
-  const metadata = withCliPackedSourceArchiveMetadata(
-    persistedPath
-      ? (withLocalFolderSourceMetadata(source.metadata, {
-          ...(originalLocator || persistedPath
-            ? { originalLocator: originalLocator ?? persistedPath }
-            : {}),
-          ...(cliResolvedSource ? { cliResolvedSource } : {}),
-        }) ?? {
-          [ORIGINAL_LOCATOR_METADATA_KEY]: persistedPath,
-        })
-      : source.metadata,
-    packedSourceArchive,
-  ) ??
+  const metadata =
+    withCliPackedSourceArchiveMetadata(
+      persistedPath
+        ? (withLocalFolderSourceMetadata(source.metadata, {
+            ...(originalLocator || persistedPath
+              ? { originalLocator: originalLocator ?? persistedPath }
+              : {}),
+            ...(cliResolvedSource ? { cliResolvedSource } : {}),
+          }) ?? {
+            [ORIGINAL_LOCATOR_METADATA_KEY]: persistedPath,
+          })
+        : source.metadata,
+      packedSourceArchive,
+    ) ??
     (persistedPath
       ? {
           [ORIGINAL_LOCATOR_METADATA_KEY]: persistedPath,

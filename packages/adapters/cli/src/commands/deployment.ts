@@ -1898,30 +1898,30 @@ export const deployCommand = EffectCommand.make(
       );
       const hasProfileOverrides = Boolean(
         requestedDeploymentMethod ||
-          installCommand ||
-          buildCommand ||
-          startCommand ||
-          runtimeNameValue ||
-          publishDirectory ||
-          sourceBaseDirectoryValue ||
-          helmChartVersionValue ||
-          helmValuesSecretReference.length > 0 ||
-          helmHookPolicyValue ||
-          helmTimeoutSecondsValue !== undefined ||
-          dockerfilePathValue ||
-          dockerComposeFilePathValue ||
-          buildTargetValue ||
-          portValue !== undefined ||
-          upstreamProtocolValue ||
-          exposureModeValue ||
-          targetServiceNameValue ||
-          hostPortValue !== undefined ||
-          healthCheckPath ||
-          requestedConfigProfile ||
-          requestedApplicationKeys.length > 0 ||
-          flagEnvironmentVariables.length > 0 ||
-          requestedPreviewDomainTemplate ||
-          requestedPreviewTlsMode,
+        installCommand ||
+        buildCommand ||
+        startCommand ||
+        runtimeNameValue ||
+        publishDirectory ||
+        sourceBaseDirectoryValue ||
+        helmChartVersionValue ||
+        helmValuesSecretReference.length > 0 ||
+        helmHookPolicyValue ||
+        helmTimeoutSecondsValue !== undefined ||
+        dockerfilePathValue ||
+        dockerComposeFilePathValue ||
+        buildTargetValue ||
+        portValue !== undefined ||
+        upstreamProtocolValue ||
+        exposureModeValue ||
+        targetServiceNameValue ||
+        hostPortValue !== undefined ||
+        healthCheckPath ||
+        requestedConfigProfile ||
+        requestedApplicationKeys.length > 0 ||
+        flagEnvironmentVariables.length > 0 ||
+        requestedPreviewDomainTemplate ||
+        requestedPreviewTlsMode,
       );
 
       if (

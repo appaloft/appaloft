@@ -292,9 +292,8 @@ describe("CLI quick deploy draft mapping", () => {
 
   test("[DEP-CREATE-PKG-007][QUICK-DEPLOY-ENTRY-008B] attaches the CLI-host packed archive to local-folder source metadata", async () => {
     ensureReflectMetadata();
-    const { sourceBindingForDeploymentInput, sourceProfilesMatch } = await import(
-      "../src/commands/deployment-interaction"
-    );
+    const { sourceBindingForDeploymentInput, sourceProfilesMatch } =
+      await import("../src/commands/deployment-interaction");
     const { CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY, CLI_RESOLVED_SOURCE_METADATA_KEY } =
       await import("@appaloft/application");
     const locator = "/Users/nichenqin/projects/nux-055483c0-static";
