@@ -4172,9 +4172,14 @@ export function registerApplicationServices(
                 : {}),
               ...(input.providerKey ? { providerKey: input.providerKey } : {}),
               ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
+              ...(input.name ? { name: input.name } : {}),
+              ...(input.directoryName ? { directoryName: input.directoryName } : {}),
+              ...(input.repositoryIdentity ? { repositoryIdentity: input.repositoryIdentity } : {}),
+              ...(input.commitSha ? { commitSha: input.commitSha } : {}),
             });
             return created.map((sandbox) => ({
               sandboxId: sandbox.sandboxId,
+              name: sandbox.name,
               status: sandbox.status,
             }));
           },
@@ -4182,6 +4187,7 @@ export function registerApplicationServices(
             const resumed = await sandboxService.resume(context, workspaceId);
             return resumed.map((sandbox) => ({
               sandboxId: sandbox.sandboxId,
+              name: sandbox.name,
               status: sandbox.status,
             }));
           },

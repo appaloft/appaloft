@@ -307,7 +307,13 @@ function createFolderLocalRemoteOpenDependencies(input: {
     },
     sandboxes: {
       create: async (_context, value) =>
-        createRemoteSandbox(input.dispatch, value.providerKey ?? input.providerKey),
+        createRemoteSandbox(input.dispatch, {
+          providerKey: value.providerKey ?? input.providerKey,
+          ...(value.name ? { name: value.name } : {}),
+          ...(value.directoryName ? { directoryName: value.directoryName } : {}),
+          ...(value.repositoryIdentity ? { repositoryIdentity: value.repositoryIdentity } : {}),
+          ...(value.commitSha ? { commitSha: value.commitSha } : {}),
+        }),
       resume: async (_context, workspaceId) => resumeRemoteSandbox(input.dispatch, workspaceId),
       exec: async (_context, _workspaceId, command) => {
         if (isGitSourceArgv(command.argv)) {
@@ -397,16 +403,32 @@ function identityFromRepository(repository?: string): string | undefined {
   }
 }
 
+function sandboxDisplayNameFromRecord(record: Record<string, unknown>, fallback: string): string {
+  const named = readString(record.name);
+  if (named && !named.toLowerCase().startsWith("sbx_")) return named;
+  return fallback;
+}
+
 async function createRemoteSandbox(
   dispatch: RemoteDispatch,
-  providerKey?: string,
-): Promise<Result<{ sandboxId: string; status: string }>> {
+  input: {
+    readonly providerKey?: string;
+    readonly name?: string;
+    readonly directoryName?: string;
+    readonly repositoryIdentity?: string;
+    readonly commitSha?: string;
+  },
+): Promise<Result<{ sandboxId: string; name: string; status: string }>> {
   const command = CreateSandboxCommand.create({
     source: { kind: "template", templateId: COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID },
     requestedIsolation: "container-trusted",
     limits: { ...COMMUNITY_OCCUPANCY_OPENCODE_LIMITS },
     networkPolicy: COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY,
-    ...(providerKey ? { providerKey } : {}),
+    ...(input.providerKey ? { providerKey: input.providerKey } : {}),
+    ...(input.name ? { name: input.name } : {}),
+    ...(input.directoryName ? { directoryName: input.directoryName } : {}),
+    ...(input.repositoryIdentity ? { repositoryIdentity: input.repositoryIdentity } : {}),
+    ...(input.commitSha ? { commitSha: input.commitSha } : {}),
   });
   if (command.isErr()) return err(command.error);
   const created = await dispatch(command.value);
@@ -420,13 +442,17 @@ async function createRemoteSandbox(
       }),
     );
   }
-  return ok({ sandboxId, status: readString(record.status) ?? "ready" });
+  return ok({
+    sandboxId,
+    name: sandboxDisplayNameFromRecord(record, input.directoryName ?? input.name ?? "workspace"),
+    status: readString(record.status) ?? "ready",
+  });
 }
 
 async function resumeRemoteSandbox(
   dispatch: RemoteDispatch,
   workspaceId: string,
-): Promise<Result<{ sandboxId: string; status: string }>> {
+): Promise<Result<{ sandboxId: string; name: string; status: string }>> {
   const command = ResumeSandboxCommand.create({ sandboxId: workspaceId });
   if (command.isErr()) return err(command.error);
   const resumed = await dispatch(command.value);
@@ -434,6 +460,7 @@ async function resumeRemoteSandbox(
   const record = asRecord(resumed.value);
   return ok({
     sandboxId: readString(record.sandboxId) ?? workspaceId,
+    name: sandboxDisplayNameFromRecord(record, "workspace"),
     status: readString(record.status) ?? "ready",
   });
 }
