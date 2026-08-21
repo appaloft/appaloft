@@ -38,9 +38,11 @@ present; missing git is not a gate.
    after the directory. Exactly one active Project is used. Several Projects
    on a dedicated onboarding TTY (`deploy` when it prompts, or `project use`)
    may create-versus-select once. `--yes` creates the directory-named Project.
-   A `code` session auto-creates or links a Project named after the directory.
-   It must not overlay clack or Effect select onto an already-entered Cloud
-   Agents alt-screen.
+   A TTY `code` session inquires on the normal screen first (Continue →
+   create the directory-named Project → link) before any Cloud Agents
+   alt-screen. `--yes` or no TTY creates without that inquire. It must not
+   silently create+link, and must not overlay clack or Effect select onto an
+   already-entered Cloud Agents alt-screen.
 3. `appaloft project use <projectId>` switches the linked Project for this
    folder. `appaloft context` remains control-plane profile selection.
 4. Git is correspondence, not a gate. A cwd with `origin` uses that remote as

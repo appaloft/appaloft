@@ -26,9 +26,11 @@ linked project is one command.
 2. Unlinked folder + exactly one active Project: use it and persist the link.
 3. Unlinked folder + several Projects + TTY + no `--yes`: a dedicated
    onboarding command may show one create-versus-select prompt. `--yes` or no
-   TTY creates the directory-named Project. A `code` session auto-creates or
-   links a Project named after the directory. It never overlays Effect select
-   on the Cloud Agents alt-screen.
+   TTY creates the directory-named Project. A TTY `code` session runs a
+   fullscreen inquire on the normal screen first (Continue → create the
+   directory-named Project → link), then enters Cloud Agents. It never
+   silently creates+links, and never overlays Effect select / clack on the
+   Cloud Agents alt-screen.
 4. Linked folder: reuse the persisted project id after `projects.show` confirms
    it is still active.
 5. Cwd with `origin`: identity is that remote. Find-or-create the matching
@@ -54,18 +56,18 @@ linked project is one command.
 | `FOLDER-ONBOARD-003` | Second command in the same cwd | Reuses the persisted folder link; does not create another Project. |
 | `FOLDER-ONBOARD-004` | `project use` then later command | Subsequent deploy/code use the switched project id. |
 | `FOLDER-ONBOARD-005` | Exactly one existing Project | Uses that Project without prompting. |
-| `FOLDER-ONBOARD-006` | Several Projects | Dedicated onboarding TTY (`deploy` / `project use`) may prompt create vs select; `--yes` creates the directory-named Project. A `code` session does not use that select menu: it auto-creates or links by directory name (`FOLDER-ONBOARD-009`). |
+| `FOLDER-ONBOARD-006` | Several Projects | Dedicated onboarding TTY (`deploy` / `project use`) may prompt create vs select; `--yes` creates the directory-named Project. A TTY `code` session does not use that select menu: it inquires Continue → create+link by directory name before any alt-screen (`FOLDER-ONBOARD-009`). |
 | `FOLDER-ONBOARD-007` | No git | Deploy succeeds. Default `code` resumes a live occupancy; with none, occupy this folder. Git is not a gate. Occupy does not clone or materialize a missing remote and does not fail `workspace_open_source_materialization_failed`. |
 | `FOLDER-ONBOARD-008` | Status and failure | Short status lines; login miss is immediate; failures non-zero; no fake URL. |
-| `FOLDER-ONBOARD-009` | `code` unlinked folder | TTY `code` / `code --pi` auto-creates/links by directory name (`--yes` / Railway `up`). No Effect `Prompt.select` / clack / folder-not-linked selector inside alt-screen, including no-git cwd with several Projects. If a selector still appears, `^c` (SIGINT or stdin `^C`) restores TTY and exits immediately (exit 130 / Cancelled) and must not hang 45s as `Workspace CLI operation failed`. First chrome is Appaloft Cloud Agents + centered preparing the agent. After occupy: Cloud Agents + project name, tree collapsed, coding agent full-screen. `--pi` does not change chrome. Occupancy is an internal occupy-a-slot name only: TUI chrome, progress, help, errors, i18n, and public docs body must never show the word Occupancy. |
+| `FOLDER-ONBOARD-009` | `code` unlinked folder | TTY `code` / `code --pi` runs a fullscreen inquire **before** any alt-screen / Cloud Agents TUI (Continue → Create default project named after the directory → link). `--yes` or no TTY creates without that inquire. No silent create+link on TTY. No Effect `Prompt.select` / clack / folder-not-linked selector inside alt-screen, including no-git cwd with several Projects. If a selector still appears, `^c` (SIGINT or stdin `^C`) restores TTY and exits immediately (exit 130 / Cancelled) and must not hang 45s as `Workspace CLI operation failed`. After inquire, first chrome is Appaloft Cloud Agents + centered preparing the agent. After occupy: Cloud Agents + project name, tree collapsed, coding agent full-screen. `--pi` does not change chrome. Occupancy is an internal occupy-a-slot name only: TUI chrome, progress, help, errors, i18n, and public docs body must never show the word Occupancy. |
 
 ## Public Surfaces
 
 - `appaloft deploy [path] [--yes] [--project <id>]` creates or reuses the folder
   link, then continues existing deployment admission.
-- `appaloft code [path] [--yes]` auto-creates or links a Project named after
-  the directory, then occupies that identity. No Effect folder-not-linked
-  selector inside the Cloud Agents TUI.
+- `appaloft code [path] [--yes]` inquires on the normal screen first (or
+  creates immediately with `--yes` / no TTY), then occupies that identity.
+  No Effect folder-not-linked selector inside the Cloud Agents TUI.
 - `appaloft project use <projectId>` is CLI-local folder association. No new
   catalog operation.
 - Public docs: `deliver/projects#folder-project-link` and first-deployment CLI.

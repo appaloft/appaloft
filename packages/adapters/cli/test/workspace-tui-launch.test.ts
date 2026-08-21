@@ -9,7 +9,6 @@ import {
   sanitizeWorkspaceRendererFailureText,
   setWorkspaceTuiScrollbackWriter,
   WORKSPACE_CONTROL_TUI_BUILD_COMMAND,
-  WORKSPACE_CONTROL_TUI_DEFAULT_TOOLCHAIN_COMMAND,
   WORKSPACE_TUI_DISABLE_MOUSE,
   WORKSPACE_TUI_LEAVE_ALT_SCREEN,
   warmupWorkspaceControlRenderer,
@@ -97,9 +96,10 @@ describe("occupancy TUI slim launch", () => {
       ).toBeUndefined();
       const message = workspaceControlRendererUnavailableMessage({ codeChrome: true });
       expect(message).toContain("appaloft-workspace-tui");
-      expect(message).toContain(WORKSPACE_CONTROL_TUI_DEFAULT_TOOLCHAIN_COMMAND);
+      expect(message).toContain("Homebrew rustc");
       expect(message).toContain(WORKSPACE_CONTROL_TUI_BUILD_COMMAND);
       expect(message).toContain("--no-attach");
+      expect(message).not.toContain("rustup default");
       expect(message).not.toMatch(/occupancy/iu);
       expect(message).not.toContain("could not choose a version of cargo");
       resetWorkspaceControlRendererWarmup();
@@ -184,9 +184,10 @@ describe("occupancy TUI slim launch", () => {
       "error: rustup could not choose a version of cargo to run, because one wasn't specified explicitly, and no default is configured.";
     const human = workspaceControlRendererUnavailableMessage({ rustupMissing: true });
     expect(human).toContain("TTY attach");
-    expect(human).toContain(WORKSPACE_CONTROL_TUI_DEFAULT_TOOLCHAIN_COMMAND);
+    expect(human).toContain("Homebrew rustc");
     expect(human).toContain(WORKSPACE_CONTROL_TUI_BUILD_COMMAND);
     expect(human).toContain("--no-attach");
+    expect(human).not.toContain("rustup default");
     expect(human).not.toMatch(/occupancy/iu);
     expect(human).not.toContain("could not choose a version of cargo");
     expect(
@@ -220,6 +221,10 @@ describe("occupancy TUI slim launch", () => {
     expect(scrollback).toContain(WORKSPACE_TUI_DISABLE_MOUSE);
     expect(scrollback).toContain("\n");
     expect(scrollback).not.toContain("preparing the agenterror:");
+    const source = readFileSync(join(import.meta.dir, "../src/workspace-tui-launch.ts"), "utf8");
+    expect(source).toContain("export function writeWorkspaceControlRendererLine");
+    expect(source).toContain("isWorkspaceControlRendererSocketReset");
+    expect(source).toContain("isErrnoEpipe");
   });
 
   test("[WS-REMOTE-PROGRESS-219] printCliError leaves alt-screen before a single human line", async () => {
@@ -267,7 +272,8 @@ describe("occupancy TUI slim launch", () => {
     expect(stdout).toContain("\n");
     expect(`${stdout}error:`).not.toContain("preparing the agenterror:");
     expect(stderr).toContain("appaloft-workspace-tui");
-    expect(stderr).toContain(WORKSPACE_CONTROL_TUI_DEFAULT_TOOLCHAIN_COMMAND);
+    expect(stderr).toContain("Homebrew rustc");
+    expect(stderr).not.toContain("rustup default");
     expect(stderr).toContain(WORKSPACE_CONTROL_TUI_BUILD_COMMAND);
     expect(stderr).toContain("--no-attach");
     expect(stderr).not.toMatch(/occupancy/iu);

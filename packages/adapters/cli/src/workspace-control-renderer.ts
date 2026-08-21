@@ -56,6 +56,7 @@ export {
   workspaceControlRendererSearchRoots,
   workspaceControlRendererSupportsCodeChrome,
   workspaceControlRendererUnavailableMessage,
+  writeWorkspaceControlRendererLine,
 } from "./workspace-tui-launch.js";
 
 export function createRatatuiWorkspaceControlPresentation(
