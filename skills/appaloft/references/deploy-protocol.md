@@ -151,8 +151,9 @@ Use this order:
    <serverId> [--destination <destinationId>]`; it is ids-only and does not replace source/profile
    configuration or proof verification.
 2. Current directory: `appaloft deploy` and `appaloft deploy .` deploy this tree as this app. Do
-   not silently reuse an unrelated occupancy such as traefik/whoami. If there is no current app,
-   ask for a path or `--project`.
+   not silently reuse an unrelated occupancy such as traefik/whoami. If `public/index.html` exists,
+   auto-select static and publish-dir `public` without requiring `--method` or `--publish-dir`. If
+   there is no current app, ask for a path or `--project`.
 3. Existing Appaloft config: `appaloft deploy <source>`; for an application graph, repeat
    `--application <key>` to deploy only the requested applications or omit it to deploy all entries.
    `source.type: image` in config is a Resource source/runtime profile declaration, not a deployment
@@ -163,7 +164,9 @@ Use this order:
 7. Built static output: `appaloft deploy ./dist --as static-site`. `--as static-site` may use
    `--publish-dir .` to mean the source root / current directory.
 8. Static source: `appaloft deploy <source> --method static --publish-dir <dir>`.
-   `.` is a legal publish directory (source root). Relative dirs such as `public` stay `public` on
+   Outside a TTY, omit `--publish-dir` only when a usable default exists: `public` if
+   `public/index.html` is present, otherwise `.` (source root, wire `/`). `.` is a legal
+   publish directory on the public validator. Relative dirs such as `public` stay `public` on
    the plan and Dockerfile `COPY` (not `/public`). Do not default to a value the validator forbids.
 9. Workspace commands: use explicit install, build, start, and port options.
 10. Blueprint catalog: use `appaloft blueprint list/show/plan-install` for neutral catalog discovery

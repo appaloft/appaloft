@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { isAbsolute, resolve } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 
 export type DeploymentMethod =
   | "auto"
@@ -29,6 +29,34 @@ export function isRemoteOrImageSource(locator: string): boolean {
   );
 }
 
+export function resolveLocalSourceRoot(locator: string): string {
+  if (isRemoteOrImageSource(locator) || isAbsolute(locator)) {
+    return locator;
+  }
+
+  return resolve(process.cwd(), locator);
+}
+
+/**
+ * Folder→URL static hint. Prefer `public` when `public/index.html` exists so
+ * the live control plane can admit the request and Docker COPY can find the
+ * files. Root `index.html` uses `.` (source root).
+ */
+export function detectLocalStaticPublishDirectory(sourceLocator: string): string | undefined {
+  if (isRemoteOrImageSource(sourceLocator)) {
+    return undefined;
+  }
+
+  const root = resolveLocalSourceRoot(sourceLocator);
+  if (existsSync(join(root, "public", "index.html"))) {
+    return "public";
+  }
+  if (existsSync(join(root, "index.html"))) {
+    return ".";
+  }
+  return undefined;
+}
+
 export function normalizeCliPathOrSource(locator: string, method: DeploymentMethod): string {
   if (
     method === "prebuilt-image" ||
@@ -39,15 +67,7 @@ export function normalizeCliPathOrSource(locator: string, method: DeploymentMeth
     return locator;
   }
 
-  const bases = [process.env.PWD, process.cwd()].filter(
-    (base): base is string => typeof base === "string" && base.length > 0,
-  );
-  for (const base of bases) {
-    const candidate = resolve(base, locator);
-    if (existsSync(candidate)) {
-      return candidate;
-    }
-  }
-
-  return locator;
+  // Resolve against process.cwd() first. A stale PWD that is the parent of
+  // cwd would otherwise truncate `deploy .` to the parent folder.
+  return resolve(process.cwd(), locator);
 }

@@ -1,6 +1,7 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { ash } from "@appaloft/ash";
+import { normalizeLocalSourceWorkingDirectory } from "./local-source-workdir";
 import {
   createDeploymentProgressEvent,
   deploymentProgressSteps,
@@ -235,6 +236,8 @@ export function summarizeSshCommandFailureOutput(input: {
   return summary.length > 800 ? `${summary.slice(0, 797)}...` : summary;
 }
 
+export { normalizeLocalSourceWorkingDirectory } from "./local-source-workdir";
+
 export function sshStaticPublishDirectoryRelativePath(publishDirectory: string): string | null {
   return staticPublishDirectoryForDockerCopy(publishDirectory);
 }
@@ -290,12 +293,7 @@ function redactSecrets(input: string, secrets: readonly string[] = []): string {
 }
 
 function normalizeWorkingDirectory(locator: string): string {
-  const resolved = resolve(locator);
-  if (existsSync(resolved)) {
-    return resolved;
-  }
-
-  return dirname(resolved);
+  return normalizeLocalSourceWorkingDirectory(locator);
 }
 
 function normalizeDockerImage(locator: string): string {

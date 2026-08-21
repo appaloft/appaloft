@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 function ensureReflectMetadata(): void {
   const reflectObject = Reflect as typeof Reflect & {
@@ -281,5 +284,98 @@ describe("CLI quick deploy draft mapping", () => {
         providerKey: "local-shell",
       })?.id,
     ).toBe("srv_uil9cpctplou");
+  });
+
+  test("[QUICK-DEPLOY-ENTRY-008B] auto-detects static from public/index.html and defaults publish-dir", async () => {
+    ensureReflectMetadata();
+    const { detectLocalStaticPublishDirectory, normalizeCliPathOrSource } = await import(
+      "../src/commands/deployment-source"
+    );
+    const { normalizeUrlFirstDeploymentEntry } = await import(
+      "../src/commands/deployment-interaction"
+    );
+
+    const parent = mkdtempSync(join(tmpdir(), "appaloft-deploy-door-"));
+    const sourceRoot = join(parent, "nux-fb4bd8c5-static");
+    mkdirSync(join(sourceRoot, "public"), { recursive: true });
+    writeFileSync(join(sourceRoot, "public", "index.html"), "<!doctype html><title>nux</title>");
+    const previousCwd = process.cwd();
+    const previousPwd = process.env.PWD;
+    try {
+      process.chdir(sourceRoot);
+      process.env.PWD = parent;
+
+      expect(detectLocalStaticPublishDirectory(".")).toBe("public");
+      expect(detectLocalStaticPublishDirectory(sourceRoot)).toBe("public");
+      expect(normalizeCliPathOrSource(".", "auto")).toBe(resolve(sourceRoot));
+      expect(normalizeCliPathOrSource(".", "auto")).toContain("nux-fb4bd8c5-static");
+      expect(normalizeCliPathOrSource(".", "auto")).not.toBe(resolve(parent));
+
+      const autoEntry = normalizeUrlFirstDeploymentEntry({
+        sourceLocator: ".",
+      });
+      expect(autoEntry.isOk()).toBe(true);
+      expect(autoEntry._unsafeUnwrap()).toEqual({
+        deploymentMethod: "static",
+        publishDirectory: "public",
+      });
+
+      const methodOnly = normalizeUrlFirstDeploymentEntry({
+        requestedDeploymentMethod: "static",
+        sourceLocator: ".",
+      });
+      expect(methodOnly._unsafeUnwrap()).toEqual({
+        deploymentMethod: "static",
+        publishDirectory: "public",
+      });
+
+      const emptyRoot = join(parent, "empty-static-method");
+      mkdirSync(emptyRoot, { recursive: true });
+      const methodWithoutFiles = normalizeUrlFirstDeploymentEntry({
+        requestedDeploymentMethod: "static",
+        sourceLocator: emptyRoot,
+      });
+      expect(methodWithoutFiles._unsafeUnwrap()).toEqual({
+        deploymentMethod: "static",
+      });
+    } finally {
+      process.chdir(previousCwd);
+      if (previousPwd === undefined) {
+        delete process.env.PWD;
+      } else {
+        process.env.PWD = previousPwd;
+      }
+      rmSync(parent, { recursive: true, force: true });
+    }
+  });
+
+  test("[QUICK-DEPLOY-ENTRY-008B][RES-CREATE-ADM-037C] root index.html defaults to source-root publish-dir", async () => {
+    ensureReflectMetadata();
+    const { normalizeUrlFirstDeploymentEntry } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const rootSite = mkdtempSync(join(tmpdir(), "appaloft-static-root-"));
+    writeFileSync(join(rootSite, "index.html"), "<!doctype html><title>root</title>");
+    const previousCwd = process.cwd();
+    try {
+      process.chdir(rootSite);
+      const entry = normalizeUrlFirstDeploymentEntry({
+        requestedDeploymentMethod: "static",
+        sourceLocator: ".",
+      });
+      expect(entry._unsafeUnwrap()).toEqual({
+        deploymentMethod: "static",
+        publishDirectory: "/",
+      });
+      const dotted = normalizeUrlFirstDeploymentEntry({
+        requestedDeploymentMethod: "static",
+        publishDirectory: ".",
+        sourceLocator: ".",
+      });
+      expect(dotted._unsafeUnwrap().publishDirectory).toBe("/");
+    } finally {
+      process.chdir(previousCwd);
+      rmSync(rootSite, { recursive: true, force: true });
+    }
   });
 });

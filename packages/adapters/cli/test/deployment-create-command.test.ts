@@ -1049,4 +1049,134 @@ describe("CLI deployment create command", () => {
       expect(commands.some((command) => command instanceof CreateDeploymentCommand)).toBe(true);
     }
   });
+
+  test("[QUICK-DEPLOY-ENTRY-008B] deploy . --yes auto-detects static from public/index.html", async () => {
+    const leftoverOccupancyResourceId = "res_dfsc156jw98k";
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        const name = command.constructor.name;
+        if (name === "CreateResourceCommand") return ok({ id: "res_static_public" } as T);
+        if (command instanceof CreateDeploymentCommand) return ok({ id: "dep_static_public" } as T);
+        return ok({ id: `id_${commands.length}` } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        switch (query.constructor.name) {
+          case "ListServersQuery":
+            return ok({
+              items: [
+                {
+                  id: "srv_4lifk0yrcecy",
+                  name: "hostinger",
+                  lifecycleStatus: "active",
+                },
+              ],
+            } as T);
+          case "ShowDeploymentQuery":
+            return ok({
+              schemaVersion: "deployments.show/v1",
+              deployment: {
+                id: "dep_static_public",
+                resourceId: "res_static_public",
+                status: "succeeded",
+              },
+            } as T);
+          default:
+            return ok({ items: [] } as T);
+        }
+      },
+    } as unknown as QueryBus;
+    const home = await isolatedCliHome("008b");
+    const parent = await mkdtemp(join(tmpdir(), "appaloft-nux-parent-"));
+    const sourceRoot = join(parent, "nux-fb4bd8c5-static");
+    const { mkdir, writeFile } = await import("node:fs/promises");
+    await mkdir(join(sourceRoot, "public"), { recursive: true });
+    await writeFile(join(sourceRoot, "public", "index.html"), "<!doctype html><title>nux</title>");
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      startWorkerRuntime: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({
+            ...input,
+            requestId: "req_cli_static_auto_public",
+          }),
+      },
+      environment: { APPALOFT_HOME: home },
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+    });
+
+    const previousCwd = process.cwd();
+    const previousPwd = process.env.PWD;
+    const writeStdout = process.stdout.write;
+    const writeStderr = process.stderr.write;
+    const exitCode = process.exitCode;
+    try {
+      process.chdir(sourceRoot);
+      process.env.PWD = parent;
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      process.stderr.write = (() => true) as typeof process.stderr.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "deploy",
+        ".",
+        "--yes",
+        "--project",
+        "prj_static",
+        "--environment",
+        "env_static",
+        "--server",
+        "srv_4lifk0yrcecy",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+      process.stderr.write = writeStderr;
+      process.exitCode = exitCode ?? 0;
+      process.chdir(previousCwd);
+      if (previousPwd === undefined) {
+        delete process.env.PWD;
+      } else {
+        process.env.PWD = previousPwd;
+      }
+      await rm(home, { recursive: true, force: true });
+      await rm(parent, { recursive: true, force: true });
+    }
+
+    const created = commands.find((command) => command instanceof CreateResourceCommand);
+    expect(created).toBeDefined();
+    expect(created).toMatchObject({
+      projectId: "prj_static",
+      environmentId: "env_static",
+      kind: "static-site",
+      runtimeProfile: {
+        strategy: "static",
+        publishDirectory: "public",
+      },
+    });
+    expect(JSON.stringify(created)).not.toMatch(/"publishDirectory"\s*:\s*"\.+"/);
+    expect((created as CreateResourceCommand | undefined)?.source?.locator).toContain(
+      "nux-fb4bd8c5-static",
+    );
+    expect((created as CreateResourceCommand | undefined)?.source?.locator).not.toBe(parent);
+    expect(
+      commands.filter(
+        (command) =>
+          command instanceof CreateDeploymentCommand &&
+          command.resourceId === leftoverOccupancyResourceId,
+      ),
+    ).toHaveLength(0);
+    expect(commands.some((command) => command instanceof CreateDeploymentCommand)).toBe(true);
+  });
 });

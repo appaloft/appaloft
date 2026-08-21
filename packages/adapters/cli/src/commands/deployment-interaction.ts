@@ -127,6 +127,7 @@ import {
 import {
   type DeploymentMethod,
   deploymentMethods,
+  detectLocalStaticPublishDirectory,
   isRemoteOrImageSource,
   normalizeCliPathOrSource,
 } from "./deployment-source.js";
@@ -337,7 +338,6 @@ const defaultServerProviderKey = "local-shell";
 const defaultRemoteServerProviderKey = "generic-ssh";
 const defaultApplicationInternalPort = 3000;
 const defaultStaticInternalPort = 80;
-const defaultStaticPublishDirectory = "/dist";
 const ciEnvSecretReferencePrefix = "ci-env:";
 const resourceSecretReferencePrefix = "resource-secret:";
 
@@ -386,14 +386,32 @@ export function normalizeUrlFirstDeploymentEntry(input: {
   publishDirectory?: string;
 }> {
   if (!input.entryMode) {
-    const publishDirectory = input.publishDirectory
+    const explicitMethod =
+      input.requestedDeploymentMethod && input.requestedDeploymentMethod !== "auto"
+        ? input.requestedDeploymentMethod
+        : undefined;
+    const flaggedPublishDirectory = input.publishDirectory
       ? withWireCompatibleStaticPublishDirectory({ publishDirectory: input.publishDirectory })
           .publishDirectory
       : undefined;
+    if (explicitMethod && explicitMethod !== "static") {
+      return ok({
+        deploymentMethod: explicitMethod,
+        ...(flaggedPublishDirectory ? { publishDirectory: flaggedPublishDirectory } : {}),
+      });
+    }
+
+    // Flag or local files only. Do not invent `/` for bare `--method static`;
+    // that would clobber config `runtime.publishDirectory`.
+    const detectedPublishDirectory =
+      flaggedPublishDirectory ?? detectLocalStaticPublishDirectory(input.sourceLocator ?? ".");
+    const deploymentMethod = explicitMethod ?? (detectedPublishDirectory ? "static" : undefined);
+    const publishDirectory = detectedPublishDirectory
+      ? wireCompatibleStaticPublishDirectory(detectedPublishDirectory)
+      : undefined;
+
     return ok({
-      ...(input.requestedDeploymentMethod
-        ? { deploymentMethod: input.requestedDeploymentMethod }
-        : {}),
+      ...(deploymentMethod ? { deploymentMethod } : {}),
       ...(publishDirectory ? { publishDirectory } : {}),
     });
   }
@@ -414,8 +432,12 @@ export function normalizeUrlFirstDeploymentEntry(input: {
   }
 
   const sourceLocator = input.sourceLocator?.trim();
+  const detectedPublishDirectory = sourceLocator
+    ? detectLocalStaticPublishDirectory(sourceLocator)
+    : undefined;
   const defaultPublishDirectory =
-    sourceLocator && !isRemoteOrImageSource(sourceLocator) ? "/" : undefined;
+    detectedPublishDirectory ??
+    (sourceLocator && !isRemoteOrImageSource(sourceLocator) ? "/" : undefined);
   const requestedPublishDirectory = input.publishDirectory ?? defaultPublishDirectory;
   const publishDirectory = requestedPublishDirectory
     ? wireCompatibleStaticPublishDirectory(requestedPublishDirectory)
@@ -4498,20 +4520,8 @@ function resolveAdvancedDeploymentConfig(input: {
       };
     }
 
-    if (isStatic && !input.seed.publishDirectory && !canPrompt) {
-      yield* Effect.sync(() => {
-        process.exitCode = 1;
-      });
-      return yield* Effect.fail(
-        domainError.validation(
-          "Static deployments require --publish-dir outside an interactive terminal",
-          {
-            phase: "input-collection",
-            runtimePlanStrategy: "static",
-          },
-        ),
-      );
-    }
+    const staticPublishDirectoryDefault =
+      detectLocalStaticPublishDirectory(input.seed.sourceLocator ?? ".") ?? ".";
 
     const installCommand =
       input.seed.installCommand ??
@@ -4550,11 +4560,11 @@ function resolveAdvancedDeploymentConfig(input: {
           ? trimToUndefined(
               yield* input.interaction.text({
                 message: "Static publish directory",
-                defaultValue: defaultStaticPublishDirectory,
+                defaultValue: staticPublishDirectoryDefault,
                 validate: requireNonEmpty("Static publish directory"),
               }),
             )
-          : undefined))
+          : wireCompatibleStaticPublishDirectory(staticPublishDirectoryDefault)))
       : undefined;
     const dockerfilePath = input.seed.dockerfilePath;
     const dockerComposeFilePath = input.seed.dockerComposeFilePath;
