@@ -47,6 +47,7 @@ import {
   occupancyPrepareStepForProgress,
 } from "./occupancy-code-progress.js";
 import { type OperateRendererEvent, type OperateRendererMessage } from "./operate-presentation.js";
+import { removeProcessListener } from "./remove-process-listener.js";
 import { terminateWorkspaceWithRuntimes } from "./workspace-lifecycle-actions.js";
 import { restoreWorkspaceTuiScrollback } from "./workspace-tui-launch.js";
 
@@ -1495,7 +1496,7 @@ export function createBoundedWorkspaceControlPresentation(
       } catch (error) {
         await sendErrorBestEffort(error, "workspace-control-start");
       } finally {
-        process.off("SIGINT", quitWaitScreen);
+        removeProcessListener("SIGINT", quitWaitScreen);
         presentationOpen = false;
         detailGeneration += 1;
         await detachActiveTerminal();

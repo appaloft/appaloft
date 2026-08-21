@@ -27,6 +27,7 @@ import {
   normalizeWorkspaceRepositoryRemote,
   type WorkspaceGitCommandRunner,
 } from "./local-git-workspace-context.js";
+import { removeProcessListener } from "./remove-process-listener.js";
 import { CliRuntime, resultToEffect } from "./runtime.js";
 import { restoreWorkspaceTuiScrollback } from "./workspace-tui-launch.js";
 
@@ -137,7 +138,7 @@ function installImmediateCancel(): () => void {
   process.once("SIGINT", quit);
   process.stdin.on("data", onStdin);
   uninstall = () => {
-    process.off("SIGINT", quit);
+    removeProcessListener("SIGINT", quit);
     process.stdin.off("data", onStdin);
   };
   return () => uninstall();

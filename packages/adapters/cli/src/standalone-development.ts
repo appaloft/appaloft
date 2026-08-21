@@ -5,6 +5,7 @@ import { type DomainError, err, ok, type Result } from "@appaloft/core";
 
 import { type DevelopmentPlanInput } from "./development-plan.js";
 import { type DevelopmentControlPresentation } from "./development-presentation.js";
+import { removeProcessListener } from "./remove-process-listener.js";
 
 export interface DevelopmentCommandRuntime extends DevelopmentSessionRuntime {
   plan(input: DevelopmentPlanInput): Promise<Result<DevelopmentPlan>>;
@@ -289,8 +290,8 @@ export async function runStandaloneDevelopmentCli(
           await new Promise((resolveTick) => setTimeout(resolveTick, 250));
         }
       } finally {
-        process.off("SIGINT", interrupt);
-        process.off("SIGTERM", interrupt);
+        removeProcessListener("SIGINT", interrupt);
+        removeProcessListener("SIGTERM", interrupt);
       }
       return { handled: true, exitCode: 0 };
     }

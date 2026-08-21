@@ -36,6 +36,22 @@ describe("@appaloft/ash execution", () => {
     );
   });
 
+  test("[ASH-INT-003] returns when the shell exits even if a background job is still running", () => {
+    const started = Date.now();
+    const result = ash.execute(ash`
+      sleep 8 &
+      printf 'done\n'
+    `);
+
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(result).toMatchObject({
+      exitCode: 0,
+      stderr: "",
+      stdout: "done\n",
+      success: true,
+    });
+  });
+
   test("[ASH-INT-002] returns failure status without throwing", () => {
     const result = ash.execute(ash`
       printf 'before-failure\n'
