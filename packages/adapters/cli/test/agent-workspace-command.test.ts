@@ -3318,6 +3318,8 @@ describe("Agent Workspace CLI", () => {
       serverId: "srv_4lifk0yrcecy",
       serverName: "hostinger",
     };
+    const previousDelay = process.env.APPALOFT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS;
+    process.env.APPALOFT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS = "0";
     const run = async (alias: "--omp" | "--pi") => {
       const { createCliProgram } = await import("../src");
       const program = createCliProgram({
@@ -3367,6 +3369,113 @@ describe("Agent Workspace CLI", () => {
     };
     await run("--omp");
     await run("--pi");
+    if (previousDelay === undefined) {
+      delete process.env.APPALOFT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS;
+    } else {
+      process.env.APPALOFT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS = previousDelay;
+    }
+  });
+
+  test("[WS-REMOTE-PROGRESS-223] occupy disk 502 then 503 retries on hostinger and attaches after success", async () => {
+    const cloudflare502 = {
+      code: "sdk_unstructured_error",
+      category: "infra" as const,
+      message:
+        "The server returned an error that did not match the Appaloft error contract. HTTP 502 Body: {cloudflare 502 bad gateway, origin invalid or incomplete response}",
+      retryable: true,
+      details: {
+        status: 502,
+        bodyPreview: "{cloudflare 502 bad gateway, origin invalid or incomplete response}",
+      },
+    };
+    const html503 = {
+      code: "control_plane_unexpected_html_response",
+      category: "infra" as const,
+      message: "Control plane returned HTML instead of JSON.",
+      retryable: true,
+      details: { status: 503, bodyKind: "html" },
+    };
+    const commands: Command<unknown>[] = [];
+    const previousDelay = process.env.APPALOFT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS;
+    process.env.APPALOFT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS = "0";
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          if (command instanceof OpenAgentWorkspaceCommand) {
+            const opens = commands.filter((item) => item instanceof OpenAgentWorkspaceCommand);
+            if (opens.length === 1) return err(cloudflare502);
+            if (opens.length === 2) return err(html503);
+            return ok({
+              workspaceId: "ws_hostinger",
+              resumed: true,
+              targetServerId: command.input.targetServerId,
+            } as T);
+          }
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_disk_retry" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/appaloft/appaloft-cloud.git",
+        repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "414d63e8aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        projectId: "prj_rhdu3hxcj5sh",
+        projectName: "appaloft-clo-cloud",
+        serverId: "srv_4lifk0yrcecy",
+        serverName: "hostinger",
+      }),
+    });
+    const originalExitCode = process.exitCode;
+    const write = process.stdout.write;
+    const errWrite = process.stderr.write;
+    let printed = "";
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      printed += String(chunk);
+      return true;
+    }) as typeof process.stdout.write;
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      printed += String(chunk);
+      return true;
+    }) as typeof process.stderr.write;
+    try {
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "code",
+        "--omp",
+        "--server",
+        "srv_4lifk0yrcecy",
+        "--no-attach",
+      ]);
+    } finally {
+      process.stdout.write = write;
+      process.stderr.write = errWrite;
+      process.exitCode = originalExitCode ?? 0;
+      if (previousDelay === undefined) {
+        delete process.env.APPALOFT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS;
+      } else {
+        process.env.APPALOFT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS = previousDelay;
+      }
+    }
+    const opens = commands.filter((command) => command instanceof OpenAgentWorkspaceCommand);
+    expect(opens).toHaveLength(3);
+    expect(
+      opens.every((command) => command.input.targetServerId === "srv_4lifk0yrcecy"),
+    ).toBeTrue();
+    expect(printed).toContain("Preparing disk on hostinger…");
+    expect(printed).not.toContain("did not match the Appaloft error contract");
+    expect(printed).not.toContain("cloudflare 502 bad gateway");
+    expect(printed.toLowerCase()).not.toContain("occupancy");
+    expect(printed).not.toContain("sbx_");
   });
 
   test("[WS-SCRATCH-INSTALL-007] refused install is the only hard scratch failure", async () => {

@@ -80,6 +80,15 @@ must not use laptop HEAD as Workspace truth.
    what is signed in or installed on this laptop. Never print token
    values. Never put long-lived secrets into occupancy env vars or `mcp.json`.
    Teammate disks stay isolated. This is not `appaloft setup agent`.
+10. Occupy-door **Preparing disk** (`workspaces.open` on the enrolled BYOS
+    Server) treats origin HTTP 502/503, Cloudflare bad-gateway, and incomplete
+    origin responses as a bounded automatic retry of that same open, not as an
+    immediate TUI tear-down. The Cloud Agents wait panel stays up; attach waits
+    until disk prep succeeds. This is occupy-door recovery only and does not
+    replay other commands, drop `targetServerId`, or change Cloud admission.
+    After the bounded retries are exhausted, restore the TTY (`1049l`) and print
+    the human next step from decision-adjacent WS-REMOTE-COMPAT-222. Do not print
+    the Appaloft error-contract sentence while alt-screen is still up.
 
 ## Consequences
 
