@@ -1,7 +1,7 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
@@ -50,6 +50,7 @@ import {
   parseDockerRepoDigestFromInspect,
   parseRemoteDockerImageVersionMetadataOutput,
   resolveLocalWorkspaceWorkdir,
+  resolveSshPackageLocalWorkdir,
   sshDockerUploadedWorkspaceContextPath,
   sshDockerUploadedWorkspaceFilePath,
   sshStaticPublishDirectoryMissingMessage,
@@ -349,6 +350,114 @@ describe("SSH source upload", () => {
       );
     } finally {
       process.chdir(previousCwd);
+      rmSync(runtimeDir, { recursive: true, force: true });
+    }
+  });
+
+  test("[DEP-CREATE-PKG-007] SSH package exists-check and tar read the hyphenated folder that exists on disk", async () => {
+    const hostRoot = mkdtempSync(join(tmpdir(), "appaloft-pkg-007-host-"));
+    const parent = join(hostRoot, "projects");
+    const leaf = "nux-772b6112-static";
+    const folder = join(parent, leaf);
+    const runtimeDir = mkdtempSync(join(tmpdir(), "appaloft-runtime-"));
+    const previousCwd = process.cwd();
+    mkdirSync(join(folder, "public"), { recursive: true });
+    writeFileSync(join(folder, "public", "index.html"), "<!doctype html><title>ok</title>");
+
+    const deployment = runningStaticSshDeployment({
+      deploymentId: "dep_772b6112_disk",
+      locator: parent,
+      workingDirectory: parent,
+      omitDisplayName: true,
+      cliResolvedSource: folder,
+    });
+    const backend = new SshExecutionBackend(
+      runtimeDir,
+      { warn: () => undefined } as never,
+      { record: async () => ({ isErr: () => false }) } as never,
+      { report: () => undefined } as never,
+    );
+
+    try {
+      process.chdir(runtimeDir);
+
+      const localWorkdir = resolveSshPackageLocalWorkdir({
+        locator: parent,
+        workingDirectory: parent,
+        metadata: { baseDirectory: "/", cliResolvedSource: folder },
+      });
+      expect(localWorkdir).toBe(folder);
+      expect(localWorkdir).not.toBe(parent);
+      expect(existsSync(localWorkdir)).toBe(true);
+      expect(existsSync(join(localWorkdir, "public", "index.html"))).toBe(true);
+      expect(process.cwd()).toBe(runtimeDir);
+      expect(process.cwd()).not.toBe(folder);
+
+      const archive = join(runtimeDir, "source.tgz");
+      const packed = spawnSync("tar", ["-czf", archive, "-C", localWorkdir, "."], {
+        encoding: "utf8",
+      });
+      expect(packed.status).toBe(0);
+      const listing = spawnSync("tar", ["-tzf", archive], { encoding: "utf8" });
+      expect(listing.status).toBe(0);
+      expect(listing.stdout).toContain("public/index.html");
+      expect(listing.stdout).not.toContain(`${leaf}/`);
+      expect(listing.stdout.split("\n").some((line) => line.endsWith("/projects"))).toBe(false);
+
+      const uploadCommand = buildLocalWorkspaceUploadCommand({
+        localWorkdir,
+        remotePrepareCommand: "mkdir -p /var/lib/appaloft/runtime/source",
+        sshArgs: ["-p", "22", "deploy@example.test"],
+      });
+      expect(uploadCommand).toContain(ash.quote(folder));
+      expect(uploadCommand).not.toContain(ash.quote(parent));
+
+      const prepared = await (
+        backend as never as {
+          prepareSshSource: (
+            context: ExecutionContext,
+            current: Deployment,
+            timeline: unknown[],
+            input: {
+              runtimeDir: string;
+              remoteRoot: string;
+              target: { host: string; publicHost: string; port: string };
+              env: NodeJS.ProcessEnv;
+            },
+          ) => Promise<
+            | { prepared: true }
+            | { prepared: false; deployment: Deployment }
+          >;
+        }
+      ).prepareSshSource(
+        { requestId: "req_pkg_007_disk", entrypoint: "cli" } as ExecutionContext,
+        deployment,
+        [],
+        {
+          runtimeDir,
+          remoteRoot: "/var/lib/appaloft/runtime/ssh-deployments/dep_772b6112_disk",
+          target: { host: "127.0.0.1", publicHost: "127.0.0.1", port: "1" },
+          env: {},
+        },
+      );
+
+      const messages = prepared.prepared
+        ? []
+        : prepared.deployment.toState().timeline.map((entry) => entry.message);
+      expect(
+        messages.some((message) =>
+          message.startsWith("Source working directory does not exist:"),
+        ),
+      ).toBe(false);
+      expect(messages.some((message) => message.endsWith(parent))).toBe(false);
+      if (!prepared.prepared) {
+        expect(prepared.deployment.toState().runtimePlan.execution.metadata?.errorCode).not.toBe(
+          "source_workdir_missing",
+        );
+      }
+    } finally {
+      process.chdir(previousCwd);
+      rmSync(hostRoot, { recursive: true, force: true });
       rmSync(runtimeDir, { recursive: true, force: true });
     }
   });

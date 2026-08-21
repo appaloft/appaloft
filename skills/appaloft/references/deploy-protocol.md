@@ -155,11 +155,11 @@ Use this order:
    Coding-agent / CI / non-TTY runs print a plan unless `--yes` is present. Do
    not silently reuse an unrelated session such as traefik/whoami. If `public/index.html` exists,
    auto-select static and publish-dir `public` without requiring `--method` or `--publish-dir`. Keep
-   the real cwd folder (hyphenated names are legal). The CLI threads that exact resolved
-   `deploy .` path into the SSH package exists-check and tar even if locator and
-   `workingDirectory` were already walked to the parent, displayName is omitted, the package host
-   does not have that folder, and cwd is a runtimeDir. A missing-workdir error names the full
-   folder.
+   the real cwd folder (hyphenated names are legal). Persist that exact resolved
+   `deploy .` path as source metadata. The SSH package exists-check and tar read that
+   path directly; do not substitute a dirname'd locator or a runtimeDir cwd. When the
+   folder exists on the package host, tar packages that folder and the command can
+   print this app's live URL. A missing-workdir error names the full folder.
    If there is no current app, ask for a path or `--project`.
 3. Existing Appaloft config: `appaloft deploy <source>`; for an application graph, repeat
    `--application <key>` to deploy only the requested applications or omit it to deploy all entries.

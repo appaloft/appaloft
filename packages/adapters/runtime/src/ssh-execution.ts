@@ -2,11 +2,10 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync }
 import { dirname, resolve } from "node:path";
 import { ash } from "@appaloft/ash";
 import {
-  resolveLocalWorkspaceWorkdir,
+  resolveSshPackageLocalWorkdir,
   safeLocalSourceBaseDirectory,
 } from "./local-source-workdir";
 import {
-  CLI_RESOLVED_SOURCE_METADATA_KEY,
   createDeploymentProgressEvent,
   deploymentProgressSteps,
   type AppLogger,
@@ -243,6 +242,7 @@ export function summarizeSshCommandFailureOutput(input: {
 export {
   normalizeLocalSourceWorkingDirectory,
   resolveLocalWorkspaceWorkdir,
+  resolveSshPackageLocalWorkdir,
 } from "./local-source-workdir";
 
 export function sshStaticPublishDirectoryRelativePath(publishDirectory: string): string | null {
@@ -1980,17 +1980,13 @@ export class SshExecutionBackend implements ExecutionBackend {
       };
     }
 
-    const localWorkdir = resolveLocalWorkspaceWorkdir({
+    const localWorkdir = resolveSshPackageLocalWorkdir({
+      locator: source.locator,
       ...(state.runtimePlan.execution.workingDirectory
         ? { workingDirectory: state.runtimePlan.execution.workingDirectory }
         : {}),
-      locator: source.locator,
       ...(source.displayName ? { displayName: source.displayName } : {}),
       ...(source.metadata ? { metadata: source.metadata } : {}),
-      ...(source.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]
-        ? { cliResolvedSource: source.metadata[CLI_RESOLVED_SOURCE_METADATA_KEY] }
-        : {}),
-      cwd: input.runtimeDir,
     });
 
     if (!existsSync(localWorkdir)) {

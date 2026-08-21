@@ -217,3 +217,26 @@ export function resolveLocalWorkspaceWorkdir(input: {
     input.metadata,
   );
 }
+
+/**
+ * Path `prepareSshSource` existsSync-checks and tars. Prefer the persisted
+ * CLI-resolved `deploy .` folder. Do not treat locator as that path, and do
+ * not use runtimeDir as the source cwd.
+ */
+export function resolveSshPackageLocalWorkdir(input: {
+  locator: string;
+  workingDirectory?: string;
+  displayName?: string;
+  metadata?: Record<string, string>;
+}): string {
+  const cliResolvedSource = explicitCliResolvedSource({
+    ...(input.metadata ? { metadata: input.metadata } : {}),
+  });
+  return resolveLocalWorkspaceWorkdir({
+    locator: input.locator,
+    ...(input.workingDirectory ? { workingDirectory: input.workingDirectory } : {}),
+    ...(input.displayName ? { displayName: input.displayName } : {}),
+    ...(input.metadata ? { metadata: input.metadata } : {}),
+    ...(cliResolvedSource ? { cliResolvedSource } : {}),
+  });
+}

@@ -1801,7 +1801,7 @@ function previewPolicyMatchesConfig(input: {
   );
 }
 
-function sourceProfilesMatch(input: {
+export function sourceProfilesMatch(input: {
   current: ResourceDetail["source"] | undefined;
   desired: ConfigurableResourceSourceInput;
 }): boolean {
@@ -1817,6 +1817,9 @@ function sourceProfilesMatch(input: {
     ...(input.current.commitSha ? { commitSha: input.current.commitSha } : {}),
     ...(input.current.baseDirectory ? { baseDirectory: input.current.baseDirectory } : {}),
     ...(input.current.helmChart ? { helmChart: input.current.helmChart } : {}),
+    ...(input.current.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]
+      ? { cliResolvedSource: input.current.metadata[CLI_RESOLVED_SOURCE_METADATA_KEY] }
+      : {}),
   };
   const desired = {
     kind: input.desired.kind,
@@ -1826,6 +1829,9 @@ function sourceProfilesMatch(input: {
     ...(input.desired.commitSha ? { commitSha: input.desired.commitSha } : {}),
     ...(input.desired.baseDirectory ? { baseDirectory: input.desired.baseDirectory } : {}),
     ...(input.desired.helmChart ? { helmChart: input.desired.helmChart } : {}),
+    ...(input.desired.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]
+      ? { cliResolvedSource: input.desired.metadata[CLI_RESOLVED_SOURCE_METADATA_KEY] }
+      : {}),
   };
 
   return JSON.stringify(current) === JSON.stringify(desired);

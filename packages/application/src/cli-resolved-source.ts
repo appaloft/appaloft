@@ -1,9 +1,15 @@
+import { SourceDescriptor } from "@appaloft/core";
+
 export const CLI_RESOLVED_SOURCE_METADATA_KEY = "cliResolvedSource";
 
+/**
+ * Exact `deploy .` path the CLI already printed as summary.Source.
+ * Only an explicit value or persisted metadata counts. Locator is not a
+ * fallback: after an upstream dirname it is already the parent.
+ */
 export function explicitCliResolvedSource(input: {
   cliResolvedSource?: string;
   metadata?: Record<string, string>;
-  locator?: string;
 }): string | undefined {
   const fromInput = input.cliResolvedSource?.trim();
   if (fromInput) {
@@ -11,12 +17,7 @@ export function explicitCliResolvedSource(input: {
   }
 
   const fromMetadata = input.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]?.trim();
-  if (fromMetadata) {
-    return fromMetadata;
-  }
-
-  const locator = input.locator?.trim();
-  return locator || undefined;
+  return fromMetadata || undefined;
 }
 
 export function withCliResolvedSourceMetadata(
@@ -32,4 +33,24 @@ export function withCliResolvedSourceMetadata(
     ...(metadata ?? {}),
     [CLI_RESOLVED_SOURCE_METADATA_KEY]: resolved,
   };
+}
+
+export function retainCliResolvedSource(
+  source: SourceDescriptor,
+  cliResolvedSource: string | undefined,
+): SourceDescriptor {
+  const resolved = explicitCliResolvedSource({
+    ...(cliResolvedSource ? { cliResolvedSource } : {}),
+    ...(source.metadata ? { metadata: source.metadata } : {}),
+  });
+  if (!resolved) {
+    return source;
+  }
+
+  return SourceDescriptor.rehydrate({
+    ...source.toState(),
+    metadata: withCliResolvedSourceMetadata(source.metadata, resolved) ?? {
+      [CLI_RESOLVED_SOURCE_METADATA_KEY]: resolved,
+    },
+  });
 }

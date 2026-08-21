@@ -13,7 +13,7 @@ import {
 } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
-import { explicitCliResolvedSource } from "../../cli-resolved-source";
+import { explicitCliResolvedSource, retainCliResolvedSource } from "../../cli-resolved-source";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import {
   type ControlPlaneSecretProtector,
@@ -750,7 +750,6 @@ export class DeploymentPlanQueryService {
       if (shouldEnrichSourceFromDetector(resource)) {
         const cliResolvedSource = explicitCliResolvedSource({
           ...(resourceSource.source.metadata ? { metadata: resourceSource.source.metadata } : {}),
-          locator: resourceSource.source.locator,
         });
         detected = yield* await sourceDetector.detect(context, resourceSource.source.locator, {
           ...(resourceSource.source.metadata?.baseDirectory
@@ -761,6 +760,10 @@ export class DeploymentPlanQueryService {
             ? { allowUnrecognizedRoot: true }
             : {}),
         });
+        detected = {
+          ...detected,
+          source: retainCliResolvedSource(detected.source, cliResolvedSource),
+        };
       }
 
       const snapshot = yield* deploymentSnapshotFactory.create(environment, resource);
