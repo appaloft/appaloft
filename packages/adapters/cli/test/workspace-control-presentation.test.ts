@@ -2398,11 +2398,19 @@ describe("Workspace control presentation", () => {
         message: "Checking login…",
         step: "credential",
       });
+      expect(renderer.messages).toContainEqual({
+        type: "progress",
+        message: "Checking login…",
+        step: "credential",
+        status: "failed",
+      });
       expect(renderer.messages.some((message) => message.type === "error")).toBeFalse();
       expect(renderer.closed).toBeGreaterThan(0);
       expect(timeline.some((entry) => entry.startsWith("restore:"))).toBeTrue();
       expect(timeline.includes("error-print")).toBeFalse();
-      const restoredBeforePrint = timeline.filter((entry) => entry.startsWith("restore:")).join("");
+      const restoreEntries = timeline.filter((entry) => entry.startsWith("restore:"));
+      expect(restoreEntries).toHaveLength(1);
+      const restoredBeforePrint = restoreEntries.join("");
       expect(restoredBeforePrint).toContain(WORKSPACE_TUI_LEAVE_ALT_SCREEN);
       expect(restoredBeforePrint).toContain("\x1b[?1049l");
       expect(restoredBeforePrint).toContain("\x1b[?25h");
@@ -2423,15 +2431,20 @@ describe("Workspace control presentation", () => {
         new URL("../src/workspace-control-presentation.ts", import.meta.url),
       ).text();
       const occupyFailureAt = source.indexOf("occupyFailure = error");
-      const restoreAt = source.indexOf("restoreWorkspaceTuiScrollback()", occupyFailureAt);
-      const closeAt = source.indexOf("renderer.close()", occupyFailureAt);
-      expect(occupyFailureAt).toBeGreaterThan(-1);
-      expect(restoreAt).toBeGreaterThan(occupyFailureAt);
-      expect(closeAt).toBeGreaterThan(restoreAt);
+      const leaveAt = source.indexOf("leaveWorkspaceTuiOnce(renderer)", occupyFailureAt);
       const throwAt = source.lastIndexOf("throw occupyFailure");
-      const restoreBeforeThrowAt = source.lastIndexOf("restoreWorkspaceTuiScrollback()", throwAt);
-      expect(restoreBeforeThrowAt).toBeGreaterThan(occupyFailureAt);
-      expect(restoreBeforeThrowAt).toBeLessThan(throwAt);
+      expect(occupyFailureAt).toBeGreaterThan(-1);
+      expect(leaveAt).toBeGreaterThan(occupyFailureAt);
+      expect(leaveAt).toBeLessThan(throwAt);
+      const launchSource = await Bun.file(
+        new URL("../src/workspace-tui-launch.ts", import.meta.url),
+      ).text();
+      const leaveFnAt = launchSource.indexOf("export async function leaveWorkspaceTuiOnce");
+      const closeInLeaveAt = launchSource.indexOf("await renderer.close()", leaveFnAt);
+      const restoreInLeaveAt = launchSource.indexOf("restoreWorkspaceTuiScrollback()", leaveFnAt);
+      expect(leaveFnAt).toBeGreaterThan(-1);
+      expect(closeInLeaveAt).toBeGreaterThan(leaveFnAt);
+      expect(restoreInLeaveAt).toBeGreaterThan(closeInLeaveAt);
     } finally {
       process.stdout.write = originalStdout;
       process.stderr.write = originalStderr;
@@ -2499,11 +2512,19 @@ describe("Workspace control presentation", () => {
         collapsed: true,
         title: "Appaloft Cloud Agents",
       });
+      expect(renderer.messages).toContainEqual({
+        type: "progress",
+        message: "Preparing disk on hostinger…",
+        step: "disk",
+        status: "failed",
+      });
       expect(renderer.messages.some((message) => message.type === "error")).toBeFalse();
       expect(renderer.closed).toBeGreaterThan(0);
       expect(timeline.some((entry) => entry.startsWith("restore:"))).toBeTrue();
       expect(timeline.includes("error-print")).toBeFalse();
-      const restoredBeforePrint = timeline.filter((entry) => entry.startsWith("restore:")).join("");
+      const restoreEntries = timeline.filter((entry) => entry.startsWith("restore:"));
+      expect(restoreEntries).toHaveLength(1);
+      const restoredBeforePrint = restoreEntries.join("");
       expect(restoredBeforePrint).toContain(WORKSPACE_TUI_LEAVE_ALT_SCREEN);
       expect(restoredBeforePrint).toContain("\x1b[?1049l");
 
@@ -2601,11 +2622,19 @@ describe("Workspace control presentation", () => {
         message: "Preparing disk on hostinger…",
         step: "disk",
       });
+      expect(renderer.messages).toContainEqual({
+        type: "progress",
+        message: "Preparing disk on hostinger…",
+        step: "disk",
+        status: "failed",
+      });
       expect(renderer.messages.some((message) => message.type === "error")).toBeFalse();
       expect(renderer.closed).toBeGreaterThan(0);
       expect(timeline.some((entry) => entry.startsWith("restore:"))).toBeTrue();
       expect(timeline.includes("error-print")).toBeFalse();
-      const restoredBeforePrint = timeline.filter((entry) => entry.startsWith("restore:")).join("");
+      const restoreEntries = timeline.filter((entry) => entry.startsWith("restore:"));
+      expect(restoreEntries).toHaveLength(1);
+      const restoredBeforePrint = restoreEntries.join("");
       expect(restoredBeforePrint).toContain(WORKSPACE_TUI_LEAVE_ALT_SCREEN);
       expect(restoredBeforePrint).toContain("\x1b[?1049l");
       expect(restoredBeforePrint).toContain("\x1b[?25h");
@@ -2627,6 +2656,402 @@ describe("Workspace control presentation", () => {
       expect(stderr).not.toMatch(/occupancy/iu);
       expect(stderr).not.toContain("sbx_");
       expect(JSON.stringify(renderer.messages)).not.toMatch(/occupancy/iu);
+    } finally {
+      process.stdout.write = originalStdout;
+      process.stderr.write = originalStderr;
+      process.exitCode = originalExitCode ?? 0;
+      setWorkspaceTuiScrollbackWriter(undefined);
+    }
+  });
+
+  test("[WS-REMOTE-PROGRESS-223] Preparing disk 502/503 keeps the wait panel up, retries, then attaches", async () => {
+    const { err, ok } = await import("@appaloft/core");
+    const { occupancyCloudCompatError, openWorkspaceWithOccupyDiskGatewayRetry } =
+      await import("../src/remote-code-session.js");
+    const cloudflare502 = {
+      code: "sdk_unstructured_error",
+      category: "infra" as const,
+      message:
+        "The server returned an error that did not match the Appaloft error contract. HTTP 502 Body: {cloudflare 502 bad gateway, origin invalid or incomplete response}",
+      retryable: true,
+      details: {
+        status: 502,
+        bodyPreview: "{cloudflare 502 bad gateway, origin invalid or incomplete response}",
+      },
+    };
+    const html503 = {
+      code: "control_plane_unexpected_html_response",
+      category: "infra" as const,
+      message: "Control plane returned HTML instead of JSON.",
+      retryable: true,
+      details: { status: 503, bodyKind: "html" },
+    };
+    const terminal = {
+      detached: 0,
+      async *[Symbol.asyncIterator](): AsyncIterator<TerminalSessionFrame> {},
+      write: () => Promise.resolve(),
+      resize: () => Promise.resolve(),
+      detach() {
+        this.detached += 1;
+        return Promise.resolve();
+      },
+      close: () => Promise.resolve(),
+    } satisfies TerminalSession & { detached: number };
+    const renderer = new FakeRendererSession([]);
+    renderer.events = async function* events() {
+      for (let attempt = 0; attempt < 80; attempt += 1) {
+        if (this.messages.some((message) => message.type === "terminal-ready") || this.closed > 0) {
+          break;
+        }
+        await Promise.resolve();
+      }
+      yield { type: "quit" };
+    };
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+    const timeline: string[] = [];
+    setWorkspaceTuiScrollbackWriter((text) => {
+      timeline.push(`restore:${text}`);
+    });
+    let stdout = "";
+    let stderr = "";
+    const originalStdout = process.stdout.write.bind(process.stdout);
+    const originalStderr = process.stderr.write.bind(process.stderr);
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      return true;
+    }) as typeof process.stdout.write;
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      stderr += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      return true;
+    }) as typeof process.stderr.write;
+    let opens = 0;
+    let closedDuringRetry = -1;
+    let restoreDuringRetry = false;
+    try {
+      await presentation.start({
+        occupancyChrome: { project: "appaloft-clo-cloud" },
+        occupyBootstrap: async ({ reportProgress }) => {
+          await reportProgress("Checking login…");
+          await reportProgress("Preparing skills…");
+          await reportProgress("Preparing disk on hostinger…");
+          const opened = await openWorkspaceWithOccupyDiskGatewayRetry(
+            async () => {
+              opens += 1;
+              if (opens === 1) return err(cloudflare502);
+              if (opens === 2) return err(html503);
+              return ok({ workspaceId: "ws_hostinger" });
+            },
+            {
+              delayMs: 0,
+              onRetry: async () => {
+                closedDuringRetry = renderer.closed;
+                restoreDuringRetry = timeline.some((entry) => entry.startsWith("restore:"));
+                await reportProgress("Preparing disk on hostinger…", { status: "retrying" });
+              },
+            },
+          );
+          if (opened.isErr()) {
+            throw occupancyCloudCompatError(
+              opened.error,
+              { id: "srv_4lifk0yrcecy", name: "hostinger" },
+              undefined,
+              { alias: "omp", harness: "omp" },
+            );
+          }
+          return {
+            workspaceId: "ws_hostinger",
+            projectName: "appaloft-clo-cloud",
+            attach: {
+              workspaceId: "ws_hostinger",
+              runtimeId: "sar_1",
+              transport: "managed-terminal",
+              sessionId: "term_occupy",
+              processId: "proc_1",
+              access: {
+                kind: "websocket",
+                path: "/sessions/term_occupy",
+                expiresAt: "2099-01-01T00:00:00.000Z",
+              },
+            },
+          };
+        },
+        executeCommand: async () => ok({}),
+        executeQuery: async <T>() => ok({ items: [] } as T),
+        terminalSessionGateway: { attach: () => ok(terminal) },
+      });
+      expect(opens).toBe(3);
+      expect(closedDuringRetry).toBe(0);
+      expect(restoreDuringRetry).toBeFalse();
+      expect(renderer.messages[0]).toEqual({
+        type: "loading",
+        collapsed: true,
+        title: "Appaloft Cloud Agents",
+        project: "appaloft-clo-cloud",
+      });
+      expect(renderer.messages).toContainEqual({
+        type: "progress",
+        message: "Preparing disk on hostinger…",
+        step: "disk",
+      });
+      expect(renderer.messages).toContainEqual({
+        type: "progress",
+        message: "Preparing disk on hostinger…",
+        step: "disk",
+        status: "retrying",
+      });
+      expect(
+        renderer.messages.some(
+          (message) => message.type === "progress" && message.status === "failed",
+        ),
+      ).toBeFalse();
+      expect(renderer.messages.some((message) => message.type === "error")).toBeFalse();
+      expect(renderer.messages).toContainEqual({
+        type: "terminal-ready",
+        workspaceId: "ws_hostinger",
+        runtimeId: "sar_1",
+        sessionId: "term_occupy",
+      });
+      const attachAt = renderer.messages.findIndex((message) => message.type === "terminal-ready");
+      const restoreBeforeAttach = timeline.filter((entry) => entry.startsWith("restore:")).join("");
+      expect(attachAt).toBeGreaterThan(-1);
+      expect(restoreBeforeAttach).not.toContain("\x1b[?1049l");
+      expect(`${stdout}${stderr}`).not.toContain("did not match the Appaloft error contract");
+      expect(`${stdout}${stderr}`).not.toContain("cloudflare 502 bad gateway");
+      expect(`${stdout}${stderr}`.toLowerCase()).not.toContain("occupancy");
+      expect(JSON.stringify(renderer.messages)).not.toMatch(/occupancy/iu);
+      expect(JSON.stringify(renderer.messages)).not.toContain("sbx_");
+      expect(JSON.stringify(renderer.messages)).not.toContain("focus_mode");
+    } finally {
+      process.stdout.write = originalStdout;
+      process.stderr.write = originalStderr;
+      setWorkspaceTuiScrollbackWriter(undefined);
+    }
+  });
+
+  test("[WS-REMOTE-PROGRESS-223][WS-REMOTE-COMPAT-222] exhausted Preparing disk 502 leaves alt-screen then prints a human next step", async () => {
+    const { Effect } = await import("effect");
+    const { printCliError } = await import("../src/runtime.js");
+    const { err } = await import("@appaloft/core");
+    const { occupancyCloudCompatError, openWorkspaceWithOccupyDiskGatewayRetry } =
+      await import("../src/remote-code-session.js");
+    const cloudflare502 = {
+      code: "sdk_unstructured_error",
+      category: "infra" as const,
+      message:
+        "The server returned an error that did not match the Appaloft error contract. HTTP 502 Body: {cloudflare 502 bad gateway, origin invalid or incomplete response}",
+      retryable: true,
+      details: {
+        status: 502,
+        bodyPreview: "{cloudflare 502 bad gateway, origin invalid or incomplete response}",
+      },
+    };
+    const renderer = new FakeRendererSession([], { hangUntilClose: true });
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+    const timeline: string[] = [];
+    setWorkspaceTuiScrollbackWriter((text) => {
+      timeline.push(`restore:${text}`);
+    });
+    let stdout = "";
+    let stderr = "";
+    const originalStdout = process.stdout.write.bind(process.stdout);
+    const originalStderr = process.stderr.write.bind(process.stderr);
+    const originalExitCode = process.exitCode;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      return true;
+    }) as typeof process.stdout.write;
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      const text = typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      stderr += text;
+      if (text.includes("error:")) timeline.push("error-print");
+      return true;
+    }) as typeof process.stderr.write;
+    let opens = 0;
+    let closedDuringRetry = -1;
+    try {
+      await expect(
+        presentation.start({
+          occupyBootstrap: async ({ reportProgress }) => {
+            await reportProgress("Checking login…");
+            await reportProgress("Preparing skills…");
+            await reportProgress("Preparing disk on hostinger…");
+            const opened = await openWorkspaceWithOccupyDiskGatewayRetry(
+              async () => {
+                opens += 1;
+                return err(cloudflare502);
+              },
+              {
+                delayMs: 0,
+                attempts: 3,
+                onRetry: async () => {
+                  closedDuringRetry = renderer.closed;
+                  await reportProgress("Preparing disk on hostinger…", { status: "retrying" });
+                },
+              },
+            );
+            if (opened.isErr()) {
+              throw occupancyCloudCompatError(
+                opened.error,
+                { id: "srv_4lifk0yrcecy", name: "hostinger" },
+                undefined,
+                { alias: "omp", harness: "omp" },
+              );
+            }
+            return { workspaceId: "ws_hostinger" };
+          },
+          executeCommand: async () => ok({}),
+          executeQuery: async <T>() => ok({ items: [] } as T),
+        }),
+      ).rejects.toMatchObject({
+        code: "workspace_open_cloud_temporarily_unreachable",
+      });
+      expect(opens).toBe(3);
+      expect(closedDuringRetry).toBe(0);
+      expect(renderer.messages).toContainEqual({
+        type: "progress",
+        message: "Preparing disk on hostinger…",
+        step: "disk",
+        status: "retrying",
+      });
+      expect(renderer.messages).toContainEqual({
+        type: "progress",
+        message: "Preparing disk on hostinger…",
+        step: "disk",
+        status: "failed",
+      });
+      expect(renderer.messages.some((message) => message.type === "error")).toBeFalse();
+      expect(renderer.closed).toBeGreaterThan(0);
+      expect(timeline.some((entry) => entry.startsWith("restore:"))).toBeTrue();
+      expect(timeline.includes("error-print")).toBeFalse();
+      const restoreEntries = timeline.filter((entry) => entry.startsWith("restore:"));
+      expect(restoreEntries).toHaveLength(1);
+      const restoredBeforePrint = restoreEntries.join("");
+      expect(restoredBeforePrint).toContain(WORKSPACE_TUI_LEAVE_ALT_SCREEN);
+      expect(restoredBeforePrint).toContain("\x1b[?1049l");
+      expect(timeline.join("").split("\x1b[?1049l").length - 1).toBe(1);
+      expect(`${stdout}${stderr}`).not.toContain("did not match the Appaloft error contract");
+
+      const remapped = occupancyCloudCompatError(
+        cloudflare502,
+        { id: "srv_4lifk0yrcecy", name: "hostinger" },
+        undefined,
+        { alias: "omp", harness: "omp" },
+      );
+      await Effect.runPromise(printCliError(remapped));
+
+      expect(timeline.includes("error-print")).toBeTrue();
+      expect(timeline.findIndex((entry) => entry.startsWith("restore:"))).toBeLessThan(
+        timeline.indexOf("error-print"),
+      );
+      expect(stderr).toContain("Cloud is temporarily unreachable");
+      expect(stderr).toContain("HTTP 502");
+      expect(stderr).toContain("appaloft code --omp --server srv_4lifk0yrcecy");
+      expect(stderr).not.toContain("did not match the Appaloft error contract");
+      expect(stderr.toLowerCase()).not.toContain("occupancy");
+      expect(stderr).not.toContain("sbx_");
+      expect(timeline.join("").split("\x1b[?1049l").length - 1).toBe(1);
+    } finally {
+      process.stdout.write = originalStdout;
+      process.stderr.write = originalStderr;
+      process.exitCode = originalExitCode ?? 0;
+      setWorkspaceTuiScrollbackWriter(undefined);
+    }
+  });
+
+  test("[WS-REMOTE-PROGRESS-223][WS-REMOTE-COMPAT-222] live TUI exhausted 502 leaves alt-screen once then prints", async () => {
+    const { Effect } = await import("effect");
+    const { printCliError } = await import("../src/runtime.js");
+    const { occupancyCloudCompatError } = await import("../src/remote-code-session.js");
+    class RustOwnedRenderer extends FakeRendererSession {
+      readonly ownsLeaveAltScreen = true;
+      override close(): Promise<void> {
+        if (this.closed === 0) {
+          process.stdout.write(WORKSPACE_TUI_LEAVE_ALT_SCREEN);
+        }
+        return super.close();
+      }
+    }
+    const renderer = new RustOwnedRenderer([], { hangUntilClose: true });
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+    const timeline: string[] = [];
+    setWorkspaceTuiScrollbackWriter((text) => {
+      timeline.push(`restore:${text}`);
+    });
+    let stdout = "";
+    let stderr = "";
+    const originalStdout = process.stdout.write.bind(process.stdout);
+    const originalStderr = process.stderr.write.bind(process.stderr);
+    const originalExitCode = process.exitCode;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      return true;
+    }) as typeof process.stdout.write;
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      const text = typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      stderr += text;
+      if (text.includes("error:")) timeline.push("error-print");
+      return true;
+    }) as typeof process.stderr.write;
+    const remapped = occupancyCloudCompatError(
+      {
+        code: "sdk_unstructured_error",
+        category: "infra",
+        message:
+          "The server returned an error that did not match the Appaloft error contract. HTTP 502 Body: {cloudflare 502 bad gateway, origin invalid or incomplete response}",
+        retryable: true,
+        details: {
+          status: 502,
+          bodyPreview: "{cloudflare 502 bad gateway, origin invalid or incomplete response}",
+        },
+      },
+      { id: "srv_4lifk0yrcecy", name: "hostinger" },
+      undefined,
+      { alias: "omp", harness: "omp" },
+    );
+    try {
+      await expect(
+        presentation.start({
+          occupyBootstrap: async ({ reportProgress }) => {
+            await reportProgress("Checking login…");
+            await reportProgress("Preparing skills…");
+            await reportProgress("Preparing disk on hostinger…");
+            throw remapped;
+          },
+          executeCommand: async () => ok({}),
+          executeQuery: async <T>() => ok({ items: [] } as T),
+        }),
+      ).rejects.toMatchObject({
+        code: "workspace_open_cloud_temporarily_unreachable",
+      });
+      expect(renderer.messages).toContainEqual({
+        type: "progress",
+        message: "Preparing disk on hostinger…",
+        step: "disk",
+        status: "failed",
+      });
+      expect(timeline.some((entry) => entry.startsWith("restore:"))).toBeFalse();
+      expect(stdout.split("\x1b[?1049l").length - 1).toBe(1);
+      expect(timeline.includes("error-print")).toBeFalse();
+
+      await Effect.runPromise(printCliError(remapped));
+
+      expect(timeline.includes("error-print")).toBeTrue();
+      expect(stdout.split("\x1b[?1049l").length - 1).toBe(1);
+      expect(timeline.some((entry) => entry.startsWith("restore:"))).toBeFalse();
+      expect(`${stdout}${stderr}`.indexOf("\x1b[?1049l")).toBeLessThan(
+        `${stdout}${stderr}`.indexOf("Cloud is temporarily unreachable"),
+      );
+      expect(stderr).toContain("Cloud is temporarily unreachable");
+      expect(stderr).toContain("HTTP 502");
+      expect(stderr).toContain("appaloft code --omp --server srv_4lifk0yrcecy");
+      expect(stderr).not.toContain("did not match the Appaloft error contract");
+      expect(`${stdout}${stderr}`).not.toMatch(/occupancy/iu);
     } finally {
       process.stdout.write = originalStdout;
       process.stderr.write = originalStderr;

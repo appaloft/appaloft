@@ -147,9 +147,12 @@ appaloft code --server srv_4lifk0yrcecy
 ```
 
 <a id="agent-workspace-preparing-disk" />
-If **Preparing disk** fails because Cloud is temporarily unreachable (HTTP 502 or
-503, including a Cloudflare bad-gateway page), the Cloud Agents screen restores
-the terminal first, then prints a next step such as
+If **Preparing disk** hits a temporary Cloud gateway failure (HTTP 502 or
+503, including a Cloudflare bad-gateway or incomplete origin page), the Cloud
+Agents wait stays up, marks that disk step as retrying, and retries disk
+preparation on the same enrolled Server. Attach starts only after disk prep
+succeeds. If those retries are exhausted, the disk step is marked failed, the
+screen restores the terminal once, then prints a next step such as
 `appaloft code --omp --server srv_4lifk0yrcecy`. `--omp` is the OpenCode
 harness; use `--pi` when that is the agent you opened. The CLI keeps the HTTP
 status and does not dump the gateway page.

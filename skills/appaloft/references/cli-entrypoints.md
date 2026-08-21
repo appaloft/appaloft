@@ -61,7 +61,12 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `targetServerId`. `--server` pins that Server with the same semantics as
   `workspace open --server`.   On a TTY, after that inquire, it enters the Cloud Agents session page
   with the tree hidden and a centered **preparing the agent** wait, then
-  attaches into the remote session. A matching Cloud Agents `appaloft-workspace-tui`
+  attaches into the remote session. Origin HTTP 502/503 or a Cloudflare
+  bad-gateway / incomplete origin response during **Preparing disk** keeps
+  that wait panel up, marks the disk step retrying, and retries
+  `workspaces.open` on the enrolled Server; attach waits for disk prep.
+  Exhausted failure marks the disk step failed, restores the TTY once, and
+  prints a human next step, not the Appaloft error-contract dump. A matching Cloud Agents `appaloft-workspace-tui`
   is required. Lookup includes the executed tree and sibling/dev checkouts
   (`appaloft-cloud/community/appaloft` → `appaloft`) plus
   `APPALOFT_WORKSPACE_TUI_BINARY`.   A missing or stale renderer is not launched; `code` restores the TTY and

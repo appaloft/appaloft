@@ -2,7 +2,7 @@ import { existsSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve, sep } from "node:path";
 
-import { type DomainError } from "@appaloft/core";
+import { type DomainError, type Result } from "@appaloft/core";
 import { hasCliControlPlaneLogin, workspaceRemoteLoginRequiredError } from "./cli-session-login.js";
 import { activeControlPlaneProfile } from "./control-plane-service.js";
 import {
@@ -482,6 +482,43 @@ export function occupancyRetryAgentFlag(agent?: {
   readonly harness?: string;
 }): "--omp" | "--pi" {
   return agent?.alias === "pi" || agent?.harness === "pi" ? "--pi" : "--omp";
+}
+
+export const DEFAULT_OCCUPY_DISK_GATEWAY_ATTEMPTS = 4;
+export const DEFAULT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS = 750;
+export const OCCUPY_DISK_GATEWAY_RETRY_DELAY_ENV = "APPALOFT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS";
+
+export function occupyDiskGatewayRetryDelayMs(env: NodeJS.ProcessEnv = process.env): number {
+  const parsed = Number(env[OCCUPY_DISK_GATEWAY_RETRY_DELAY_ENV]);
+  return Number.isFinite(parsed) && parsed >= 0
+    ? parsed
+    : DEFAULT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS;
+}
+
+export function isOccupyDiskGatewayTransientError(error: DomainError): boolean {
+  return isCloudTemporarilyUnreachableError(error);
+}
+
+export async function openWorkspaceWithOccupyDiskGatewayRetry<T>(
+  open: () => Promise<Result<T>>,
+  options?: {
+    readonly attempts?: number;
+    readonly delayMs?: number;
+    readonly sleep?: (ms: number) => Promise<void>;
+    readonly onRetry?: (error: DomainError, remainingAttempts: number) => void | Promise<void>;
+  },
+): Promise<Result<T>> {
+  const attempts = options?.attempts ?? DEFAULT_OCCUPY_DISK_GATEWAY_ATTEMPTS;
+  const delayMs = options?.delayMs ?? occupyDiskGatewayRetryDelayMs();
+  const sleep = options?.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  let last = await open();
+  for (let attempt = 1; last.isErr() && attempt < attempts; attempt += 1) {
+    if (!isOccupyDiskGatewayTransientError(last.error)) return last;
+    await options?.onRetry?.(last.error, attempts - attempt);
+    if (delayMs > 0) await sleep(delayMs);
+    last = await open();
+  }
+  return last;
 }
 
 function isCloudTemporarilyUnreachableError(error: DomainError): boolean {

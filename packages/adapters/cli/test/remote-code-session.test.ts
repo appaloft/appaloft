@@ -3,15 +3,20 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { err, ok } from "@appaloft/core";
+
 import { folderOccupancyIdentity } from "../src/folder-project-link.js";
 import { OCCUPANCY_CODE_PROGRESS } from "../src/occupancy-code-progress.js";
 import {
+  DEFAULT_OCCUPY_DISK_GATEWAY_ATTEMPTS,
   folderHasGitWorktree,
   formatRemoteCodeBanner,
   formatRemoteCodeGitHubHint,
+  isOccupyDiskGatewayTransientError,
   isRemoteCodeGitRemoteLocator,
   nativeAttachRequiresInteractiveTerminal,
   occupancyCloudCompatError,
+  openWorkspaceWithOccupyDiskGatewayRetry,
   pinRemoteCodeDoorServer,
   REMOTE_CODE_DOOR_HINT,
   REMOTE_CODE_GITHUB_HINT,
@@ -176,6 +181,76 @@ describe("remote code door", () => {
     );
     expect(execFailed.code).toBe("sdk_unstructured_error");
     expect(execFailed.message).toContain("did not match the Appaloft error contract");
+  });
+  test("[WS-REMOTE-PROGRESS-223] occupy disk 502/503 retries then succeeds without remapping first", async () => {
+    const cloudflare502 = {
+      code: "sdk_unstructured_error" as const,
+      category: "infra" as const,
+      message:
+        "The server returned an error that did not match the Appaloft error contract. HTTP 502 Body: {cloudflare 502 bad gateway, origin invalid or incomplete response}",
+      retryable: true,
+      details: {
+        status: 502,
+        bodyPreview: "{cloudflare 502 bad gateway, origin invalid or incomplete response}",
+      },
+    };
+    const html503 = {
+      code: "control_plane_unexpected_html_response" as const,
+      category: "infra" as const,
+      message: "Control plane returned HTML instead of JSON.",
+      retryable: true,
+      details: { status: 503, bodyKind: "html" },
+    };
+    expect(isOccupyDiskGatewayTransientError(cloudflare502)).toBeTrue();
+    expect(isOccupyDiskGatewayTransientError(html503)).toBeTrue();
+    let opens = 0;
+    const retried = await openWorkspaceWithOccupyDiskGatewayRetry(
+      async () => {
+        opens += 1;
+        if (opens === 1) return err(cloudflare502);
+        if (opens === 2) return err(html503);
+        return ok({ workspaceId: "ws_hostinger", targetServerId: "srv_4lifk0yrcecy" });
+      },
+      { delayMs: 0 },
+    );
+    expect(opens).toBe(3);
+    expect(retried.isOk()).toBeTrue();
+    if (retried.isOk()) {
+      expect(retried.value).toEqual({
+        workspaceId: "ws_hostinger",
+        targetServerId: "srv_4lifk0yrcecy",
+      });
+    }
+    let exhaustedOpens = 0;
+    const exhausted = await openWorkspaceWithOccupyDiskGatewayRetry(
+      async () => {
+        exhaustedOpens += 1;
+        return err(cloudflare502);
+      },
+      { delayMs: 0, attempts: DEFAULT_OCCUPY_DISK_GATEWAY_ATTEMPTS },
+    );
+    expect(exhaustedOpens).toBe(DEFAULT_OCCUPY_DISK_GATEWAY_ATTEMPTS);
+    expect(exhausted.isErr()).toBeTrue();
+    if (exhausted.isErr()) {
+      expect(exhausted.error.code).toBe("sdk_unstructured_error");
+      expect(isOccupyDiskGatewayTransientError(exhausted.error)).toBeTrue();
+    }
+    let validationOpens = 0;
+    const validation = await openWorkspaceWithOccupyDiskGatewayRetry(
+      async () => {
+        validationOpens += 1;
+        return err({
+          code: "bad_request",
+          category: "user",
+          message: "Input validation failed",
+          retryable: false,
+          details: { phase: "orpc-error-normalization", orpcCode: "BAD_REQUEST" },
+        });
+      },
+      { delayMs: 0 },
+    );
+    expect(validationOpens).toBe(1);
+    expect(validation.isErr()).toBeTrue();
   });
   test("[WS-REMOTE-OPEN-BYOS-181] --server pin keeps the enrolled Server name when the door already selected it", () => {
     const pinned = pinRemoteCodeDoorServer(

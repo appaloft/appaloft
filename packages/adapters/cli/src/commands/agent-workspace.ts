@@ -116,6 +116,7 @@ import {
   isWorkspaceGitRootUnavailable,
   nativeAttachRequiresInteractiveTerminal,
   occupancyCloudCompatError,
+  openWorkspaceWithOccupyDiskGatewayRetry,
   pinRemoteCodeDoorServer,
   type RemoteCodeServerSummary,
   remoteOccupyBannerProjectId,
@@ -811,7 +812,10 @@ export const workspaceCodeCommand = EffectCommand.make(
         if (lineProgress) reportOccupancyCodeProgress(message);
       };
       const occupyRemote = async (
-        onProgress: (message: string) => void,
+        onProgress: (
+          message: string,
+          progress?: { readonly status?: "retrying" | "failed" },
+        ) => void,
         options?: { readonly announcePin?: boolean },
       ) => {
         const explicitServerId = optionalValue(server);
@@ -912,7 +916,13 @@ export const workspaceCodeCommand = EffectCommand.make(
           onProgress(OCCUPANCY_CODE_PROGRESS.usingThisProject);
         }
         onProgress(occupancyOpeningProgress(door.serverName));
-        const opened = await cli.executeCommand(command.value);
+        const openDisk = (workspaceCommand: OpenAgentWorkspaceCommand) =>
+          openWorkspaceWithOccupyDiskGatewayRetry(() => cli.executeCommand(workspaceCommand), {
+            onRetry: () => {
+              onProgress(occupancyOpeningProgress(door.serverName), { status: "retrying" });
+            },
+          });
+        const opened = await openDisk(command.value);
         if (opened.isOk()) {
           return { door, result: opened.value, bannerCommitSha: door.commitSha };
         }
@@ -922,7 +932,7 @@ export const workspaceCodeCommand = EffectCommand.make(
             forceNew: true,
           });
           if (replace.isErr()) throw replace.error;
-          const replaced = await cli.executeCommand(replace.value);
+          const replaced = await openDisk(replace.value);
           if (replaced.isOk()) {
             return { door, result: replaced.value, bannerCommitSha: door.commitSha };
           }
@@ -966,7 +976,7 @@ export const workspaceCodeCommand = EffectCommand.make(
           forceNew: false,
         });
         if (retry.isErr()) throw retry.error;
-        const retried = await cli.executeCommand(retry.value);
+        const retried = await openDisk(retry.value);
         if (retried.isErr()) throw retried.error;
         const workspaceId =
           typeof details?.workspaceId === "string"
@@ -1014,8 +1024,8 @@ export const workspaceCodeCommand = EffectCommand.make(
               occupyBootstrap: async ({ reportProgress: tuiProgress }) => {
                 const occupied = await withImmediateSigintExit(() =>
                   occupyRemote(
-                    (message) => {
-                      void tuiProgress(message);
+                    (message, progress) => {
+                      void tuiProgress(message, progress);
                     },
                     { announcePin: false },
                   ),
