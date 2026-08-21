@@ -6,8 +6,8 @@
   <p><code>/ˌæp əˈlɔːft/</code></p>
   <h3>开源 Railway 替代方案。</h3>
   <p>
-    两扇门：<strong>部署</strong> 把文件夹变成 URL（Git 可选），或
-    <strong>Agent</strong> — 教会你已经在用的 coding agent（skill + MCP）。
+    两扇门：<strong>部署</strong> 把文件夹变成线上 URL（Git 可选），或
+    <strong>Agent</strong> — 教会你已经在用的 Cursor、OpenCode 和其他已检测到的宿主。
   </p>
 </div>
 
@@ -16,16 +16,10 @@ appaloft deploy .
 ```
 
 ```bash
-appaloft login
 appaloft setup agent
 ```
 
-```bash
-npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
-npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
-npx @appaloft/mcp
-appaloft mcp stdio
-```
+如果还没登录，你会被要求登录。
 
 <div align="center">
   <p>
@@ -64,16 +58,17 @@ brew install appaloft/tap/appaloft
 也可以从 [GitHub Releases](https://github.com/appaloft/appaloft/releases/latest) 下载对应平台
 archive。
 
-登录和登记服务器只是需要 Cloud 或 BYOS 时的一行前提，不是这条故事：`appaloft login`
-（self-hosted 加 `--url`）；自己带机器时再用 `appaloft server register`。
+自己带机器时用 `appaloft server register`。Self-hosted plane 登录时加 `--url`。
 
 ## 部署
 
-在任意项目目录里执行。Git 可选。成功就是这个应用的一条线上 URL。
+在任意项目目录里执行。Git 可选。一个文件夹就够。成功就是这个应用的一条线上 URL。
 
 ```bash
 appaloft deploy .
 ```
+
+目录里有 `public/index.html` 时，`appaloft deploy . --yes` 会自动选 static。
 
 可选的单文件配置：
 
@@ -113,16 +108,16 @@ appaloft deploy ./docker-compose.yml
 
 ## Agent
 
-教会你已经在用的 coding agent。`appaloft login` 之后，`appaloft setup agent` 会复制相同的
-Skill，并给检测到的宿主写入 token-free Local MCP。Universal 只写 Skill（`~/.agents`）。
-存在 `~/.cursor` / `~/.claude` 时写入 Cursor / Claude Code 的 Skill 和 MCP。OpenCode 在列表里，
-但默认不勾选。MCP 复用已经登录的 Appaloft profile（`appaloft mcp remote-stdio --profile <active>`）。
-Token 不会进入编辑器配置。
+`appaloft setup agent` 会教会你已经在用的 Cursor、OpenCode 和其他已检测到的宿主。这是 Agent 门。
 
 ```bash
-appaloft login
 appaloft setup agent
 ```
+
+它会复制相同的 Skill，并给检测到的宿主写入 token-free Local MCP。Universal 只写 Skill
+（`~/.agents`）。存在 `~/.cursor` / `~/.claude` 时写入 Cursor / Claude Code 的 Skill 和 MCP。
+OpenCode 在列表里，但默认不勾选；需要 `--agent opencode` 或 sibling 安装。MCP 复用已经登录的
+Appaloft profile（`appaloft mcp remote-stdio --profile <active>`）。Token 不会进入编辑器配置。
 
 ```bash
 # 显式 MCP sibling（OpenCode 需显式安装）
@@ -131,7 +126,7 @@ appaloft auth mcp claude-code install
 appaloft auth mcp opencode install
 ```
 
-`npx skills add` 仍然只复制 Skill，不安装 CLI，也不写 MCP。
+仅复制 Skill / MCP launcher（次要）：`npx skills add` 只复制 Skill，不安装 CLI，也不写 MCP。
 
 ```bash
 npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
@@ -148,13 +143,6 @@ appaloft mcp stdio
 skill-manager 复制请用 `npx skills list --global --agent <agent>` 确认后新开一个 agent 会话。
 让它通过 Appaloft 部署或运维。skill 会约束 agent 走 Appaloft operation，而不是直接调用
 Docker、SSH、数据库或云厂商。这是本仓库 CLI 的本地 Agent 门，不是 Cloud 营销站声明。
-
-## 占用
-
-`appaloft code` 占用你的 Sandbox。`appaloft code --local` 是本机 Scratch。类似 Railway 的
-`ca`，不是 Agent 门。见仓库内 CLI 参考
-（[cli-entrypoints.md](./skills/appaloft/references/cli-entrypoints.md)）；线上
-docs.appaloft.com CLI 页面可能还没有列出它们。
 
 ## Self-host（可选）
 
@@ -179,7 +167,7 @@ curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --version 1.9.2
 | Homebrew CLI | `brew install appaloft/tap/appaloft` |
 | GitHub Release | 从 [latest releases](https://github.com/appaloft/appaloft/releases/latest) 下载对应平台 archive。 |
 | MCP launcher | `npx @appaloft/mcp` |
-| Local Agent door | `appaloft login && appaloft setup agent` |
+| Local Agent door | `appaloft setup agent` |
 | AI skill | `npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes` |
 | Self-hosted server | `curl -fsSL https://appaloft.com/install.sh \| sudo sh` |
 | Self-hosted + PGlite | `curl -fsSL https://appaloft.com/install.sh \| sudo sh -s -- --database pglite` |
