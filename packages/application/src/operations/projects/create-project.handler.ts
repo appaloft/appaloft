@@ -8,9 +8,10 @@ import { type CreateProjectUseCase } from "./create-project.use-case";
 
 @CommandHandler(CreateProjectCommand)
 @injectable()
-export class CreateProjectCommandHandler
-  implements CommandHandlerContract<CreateProjectCommand, { id: string }>
-{
+export class CreateProjectCommandHandler implements CommandHandlerContract<
+  CreateProjectCommand,
+  { id: string }
+> {
   constructor(
     @inject(tokens.createProjectUseCase)
     private readonly useCase: CreateProjectUseCase,
@@ -20,6 +21,7 @@ export class CreateProjectCommandHandler
     return this.useCase.execute(context, {
       name: command.name,
       ...(command.description ? { description: command.description } : {}),
+      ...(command.organizationId ? { organizationId: command.organizationId } : {}),
     });
   }
 }

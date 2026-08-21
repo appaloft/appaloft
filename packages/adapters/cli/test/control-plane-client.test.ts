@@ -2674,6 +2674,105 @@ describe("CLI remote control-plane client", () => {
     });
   });
 
+  test("[WS-REMOTE-COMPAT-221] logged-in create-project keeps handshake organization when profile details were dropped", async () => {
+    const requests: Request[] = [];
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: productSessionProfile("cloud"),
+      fetch: async (request) => {
+        requests.push(request);
+        const url = new URL(request.url);
+        if (url.pathname === "/api/version") {
+          return jsonResponse({
+            name: "Appaloft",
+            version: "0.12.5-test",
+            apiVersion: "v1",
+            mode: "cloud",
+          });
+        }
+        if (url.pathname === "/api/organizations/current-context") {
+          return jsonResponse({
+            currentOrganization: {
+              organizationId: "org_logged_in",
+              name: "Logged In",
+              slug: "logged-in",
+              role: "owner",
+            },
+          });
+        }
+        if (url.pathname === "/api/projects" && request.method === "POST") {
+          const body = (await request.clone().json()) as { organizationId?: string; name?: string };
+          if (!body.organizationId) {
+            return jsonResponse(
+              {
+                defined: false,
+                code: "FORBIDDEN",
+                status: 403,
+                message: "Operation check denied",
+                data: {
+                  domainCode: "operation_check_denied",
+                  details: {
+                    operationKey: "projects.create",
+                    reason: "missing-organization",
+                    checkKey: "cloud.admission",
+                    checkKind: "authorization",
+                  },
+                },
+              },
+              403,
+            );
+          }
+          return jsonResponse({ id: "prj_nux_722327ee" }, 201);
+        }
+        return jsonResponse({ message: `unexpected ${request.method} ${url.pathname}` }, 404);
+      },
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+
+    const created = await captureProcessOutput(() =>
+      program.parseAsync([
+        "node",
+        "appaloft",
+        "project",
+        "create",
+        "--name",
+        "nux-722327ee-unlinked",
+      ]),
+    );
+
+    const createRequest = requests.find(
+      (request) => request.method === "POST" && new URL(request.url).pathname === "/api/projects",
+    );
+    expect(createRequest).toBeDefined();
+    expect(await createRequest?.json()).toMatchObject({
+      name: "nux-722327ee-unlinked",
+      organizationId: "org_logged_in",
+    });
+    expect(created.stderr).not.toContain("Operation check denied");
+    expect(created.stdout).toContain("prj_nux_722327ee");
+  });
+
+  test("[WS-REMOTE-COMPAT-221] deploy . operationCheckDenied is not printed as the bare string", async () => {
+    const { formatHumanCliError } = await import("../src/runtime.js");
+    const output = formatHumanCliError({
+      code: "operation_check_denied",
+      category: "user",
+      message: "Operation check denied",
+      retryable: false,
+      details: {
+        operationKey: "deployments.create",
+        reason: "entitlement-denied",
+        checkKey: "cloud.entitlement",
+        checkKind: "entitlement",
+        phase: "remote-operation-dispatch",
+      },
+    });
+    expect(output.trim()).not.toBe("Operation check denied");
+    expect(output).toContain("Cloud denied deployments.create");
+    expect(output).toMatch(/quota|entitlement|retry|Cloud/i);
+    expect(output.toLowerCase()).not.toContain("occupancy");
+  });
+
   test("[CONTROL-PLANE-CLI-021] retries a transient HTML gateway response once for a catalog query", async () => {
     const requests: Request[] = [];
     let attempt = 0;

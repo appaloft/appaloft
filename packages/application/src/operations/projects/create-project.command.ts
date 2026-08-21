@@ -16,13 +16,19 @@ export class CreateProjectCommand extends Command<{ id: string }> {
   constructor(
     public readonly name: string,
     public readonly description?: string,
+    public readonly organizationId?: string,
   ) {
     super();
   }
 
   static create(input: CreateProjectCommandInput): Result<CreateProjectCommand> {
     return parseOperationInput(createProjectCommandInputSchema, input).map(
-      (parsed) => new CreateProjectCommand(parsed.name, trimToUndefined(parsed.description)),
+      (parsed) =>
+        new CreateProjectCommand(
+          parsed.name,
+          trimToUndefined(parsed.description),
+          trimToUndefined(parsed.organizationId),
+        ),
     );
   }
 }

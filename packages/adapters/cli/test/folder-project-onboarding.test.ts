@@ -12,7 +12,7 @@ import {
   ListProjectsQuery,
   ShowProjectQuery,
 } from "@appaloft/application";
-import { ok } from "@appaloft/core";
+import { err, ok } from "@appaloft/core";
 import { Effect, Layer } from "effect";
 import {
   fileFolderProjectLinkStore,
@@ -35,7 +35,7 @@ import {
   quitCodeSessionOnCancel,
   withImmediateSigintExit,
 } from "../src/folder-project-onboarding.js";
-import { CliRuntime } from "../src/runtime.js";
+import { CliRuntime, formatHumanCliError } from "../src/runtime.js";
 import {
   setWorkspaceTuiScrollbackWriter,
   WORKSPACE_TUI_LEAVE_ALT_SCREEN,
@@ -561,6 +561,73 @@ describe("folder project onboarding", () => {
       created: true,
       identity: folderOccupancyIdentity("scratch"),
     });
+  });
+
+  test("[WS-REMOTE-COMPAT-221] Creating project path prints operationCheckDenied with a next step", async () => {
+    const store = memoryFolderProjectLinkStore();
+    const denied = {
+      code: "operation_check_denied",
+      category: "user" as const,
+      message: "Operation check denied",
+      retryable: false,
+      details: {
+        operationKey: "projects.create",
+        operationName: "CreateProjectCommand",
+        reason: "missing-organization",
+        checkKey: "cloud.admission",
+        checkKind: "authorization",
+      },
+    };
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      terminalIO: {
+        stdin: { isTTY: true, on: () => undefined },
+        stdout: { isTTY: true, write: () => true },
+        stderr: { isTTY: true, write: () => true },
+      },
+      executeCommand: async <T>() => err(denied) as never,
+      executeQuery: async <T>() => ok({ items: [], total: 0, limit: 100, offset: 0 } as T),
+    } as never);
+
+    const result = await Effect.runPromise(
+      Effect.either(
+        Effect.provide(
+          ensureFolderProjectOnboarding({
+            cwd: "/tmp/nux-722327ee-unlinked",
+            store,
+            canPrompt: true,
+            promptPolicy: "pre-tui-inquire",
+            peekGitIdentity: async () => undefined,
+            interaction: {
+              text: () => {
+                throw new Error("code session must not collect free text");
+              },
+              select: () => {
+                throw new Error("code session must not select a project");
+              },
+              confirm: () => Effect.succeed(true),
+            },
+            writeStatus: () => undefined,
+          }),
+          runtime,
+        ),
+      ),
+    );
+
+    expect(result._tag).toBe("Left");
+    if (result._tag !== "Left") {
+      throw new Error("expected Creating project to fail");
+    }
+    const printed = formatHumanCliError(result.left);
+    expect(printed.trim()).not.toBe("Operation check denied");
+    expect(printed).toContain("Cloud denied projects.create");
+    expect(printed).toContain("missing-organization");
+    expect(printed).toContain("cloud.admission");
+    expect(printed).toMatch(/login|organization|retry|Cloud/i);
+    expect(printed.toLowerCase()).not.toContain("occupancy");
+    expect(printed).not.toContain("sbx_");
+    expect(await readFolderProjectLink("/tmp/nux-722327ee-unlinked", store)).toBeUndefined();
   });
 
   test("[FOLDER-ONBOARD-009] code inquire ^c / decline quits immediately without Workspace CLI hang", async () => {
