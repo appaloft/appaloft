@@ -303,9 +303,13 @@ describe("occupancy TUI slim launch", () => {
       code: "sdk_unstructured_error",
       category: "infra",
       message:
-        "The server returned an error that did not match the Appaloft error contract. HTTP 500 code exec_failed. Body: {\"error\":\"omp: not found\"}",
+        'The server returned an error that did not match the Appaloft error contract. HTTP 500 code exec_failed. Body: {"error":"omp: not found"}',
       retryable: false,
-      details: { status: 500, remoteCode: "exec_failed", bodyPreview: '{"error":"omp: not found"}' },
+      details: {
+        status: 500,
+        remoteCode: "exec_failed",
+        bodyPreview: '{"error":"omp: not found"}',
+      },
     };
     try {
       await Effect.runPromise(printCliError(unstructured));
