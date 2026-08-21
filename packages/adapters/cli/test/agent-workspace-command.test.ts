@@ -3223,7 +3223,7 @@ describe("Agent Workspace CLI", () => {
     );
   });
 
-  test("[WS-REMOTE-COMPAT-220][WS-REMOTE-OPEN-BYOS-181] folder.local Cloud validation is not remapped to Server targeting", async () => {
+  test("[WS-REMOTE-COMPAT-220][WS-REMOTE-OPEN-BYOS-181] folder.local Cloud validation is a human next step, not Server targeting", async () => {
     const commands: Command<unknown>[] = [];
     const { createCliProgram } = await import("../src");
     const program = createCliProgram({
@@ -3275,9 +3275,15 @@ describe("Agent Workspace CLI", () => {
       ]);
       throw new Error("Expected folder.local Cloud validation to fail");
     } catch (error) {
-      expect(String(error)).toContain("Input validation failed");
-      expect(String(error)).not.toContain("workspace_open_target_server_unsupported");
-      expect(String(error)).not.toContain("This Cloud does not accept Server targeting");
+      const printed = `${stderr}\n${JSON.stringify(error)}\n${String((error as { message?: string }).message ?? error)}`;
+      expect(printed).not.toBe("Input validation failed");
+      expect(printed).toContain("Cloud could not start this folder session on hostinger");
+      expect(printed).toContain("appaloft code --pi --server srv_4lifk0yrcecy");
+      expect(printed).toContain("this Cloud needs an update that accepts folder workspace create");
+      expect(printed).not.toContain("workspace_open_target_server_unsupported");
+      expect(printed).not.toContain("This Cloud does not accept Server targeting");
+      expect(printed.toLowerCase()).not.toContain("occupancy");
+      expect(printed).not.toContain("sbx_");
     } finally {
       process.stderr.write = write;
       process.exitCode = originalExitCode ?? 0;

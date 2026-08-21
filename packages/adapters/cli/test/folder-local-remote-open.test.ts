@@ -528,6 +528,10 @@ describe("logged-in folder.local remote occupy", () => {
     };
     expect(createBody.source?.templateId).toBe("stp_appaloft_remote_pi");
     expect(createBody.providerKey).toBe("hostinger");
+    expect(createBody).not.toHaveProperty("repositoryIdentity");
+    expect(createBody).not.toHaveProperty("commitSha");
+    expect(createBody).not.toHaveProperty("name");
+    expect(createBody).not.toHaveProperty("directoryName");
     const runtimeBody = (await requests
       .find((request) => requestKey(request).endsWith("/agent-runtimes"))
       ?.clone()
@@ -540,7 +544,7 @@ describe("logged-in folder.local remote occupy", () => {
     expect(process.exitCode === undefined || process.exitCode === 0).toBe(true);
   });
 
-  test("[WS-REMOTE-COMPAT-220] folder.local Cloud validation is not remapped to Server targeting", async () => {
+  test("[WS-REMOTE-COMPAT-220] folder.local Cloud validation is a human next step, not Server targeting", async () => {
     const emptyDir = await mkdtemp(join(tmpdir(), "nux-54065181-unlinked-fail-"));
     const home = await mkdtemp(join(tmpdir(), "nux-54065181-unlinked-fail-home-"));
     const requests: Request[] = [];
@@ -613,11 +617,16 @@ describe("logged-in folder.local remote occupy", () => {
     expect(paths).not.toContain("POST /api/workspaces/open");
     expect(paths).toContain("POST /api/sandboxes");
     expect(thrown).toBeDefined();
-    expect(String(thrown)).toContain("Input validation failed");
-    expect(String(thrown)).not.toContain("workspace_open_target_server_unsupported");
-    expect(String(thrown)).not.toContain("This Cloud does not accept Server targeting");
+    const printed = `${captured.text}\n${JSON.stringify(thrown)}\n${String((thrown as { message?: string }).message ?? thrown)}`;
+    expect(printed).not.toBe("Input validation failed");
+    expect(printed).toContain("Cloud could not start this folder session on hostinger");
+    expect(printed).toContain("appaloft code --pi --server srv_4lifk0yrcecy");
+    expect(printed).toContain("this Cloud needs an update that accepts folder workspace create");
+    expect(printed).not.toContain("workspace_open_target_server_unsupported");
+    expect(printed).not.toContain("This Cloud does not accept Server targeting");
     expect(captured.text).not.toContain("This Cloud does not accept Server targeting");
     expect(captured.text).not.toContain("Deploy a Cloud that accepts workspaces.open");
-    expect(`${captured.text}\n${String(thrown)}`.toLowerCase()).not.toContain("occupancy");
+    expect(printed.toLowerCase()).not.toContain("occupancy");
+    expect(printed).not.toContain("sbx_");
   });
 });

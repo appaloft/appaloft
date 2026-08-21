@@ -246,6 +246,38 @@ describe("CLI safe error evidence", () => {
     expect(output).not.toContain("infra_error");
   });
 
+  test("[WS-REMOTE-COMPAT-220] folder.local unstructured validation prints a human next step", async () => {
+    const { occupancyCloudCompatError } = await import("../src/remote-code-session.js");
+    const error = occupancyCloudCompatError(
+      {
+        code: "bad_request",
+        category: "user",
+        message: "Input validation failed",
+        retryable: false,
+        details: {
+          phase: "orpc-error-normalization",
+          orpcCode: "BAD_REQUEST",
+          validationIssuePaths: ["repositoryIdentity"],
+          validationIssueMessages: ["Unsupported field: repositoryIdentity"],
+        },
+      },
+      { id: "srv_4lifk0yrcecy", name: "hostinger" },
+      {
+        repositoryIdentity: "folder.local/cwd/nux-67e3a052-unlinked",
+        repository: "https://folder.local/cwd/nux-67e3a052-unlinked.git",
+      },
+    );
+    const output = formatHumanCliError(error);
+    expect(output.trim()).not.toBe("Input validation failed");
+    expect(output).toContain("Cloud could not start this folder session on hostinger");
+    expect(output).toContain("appaloft code --pi --server srv_4lifk0yrcecy");
+    expect(output).toContain("repositoryIdentity");
+    expect(output).toContain("Unsupported field: repositoryIdentity");
+    expect(output).not.toContain("This Cloud does not accept Server targeting");
+    expect(output.toLowerCase()).not.toContain("occupancy");
+    expect(output).not.toContain("sbx_");
+  });
+
   test("does not serialize unknown failures in human CLI output", () => {
     const output = formatHumanCliError(
       new Error("secret-value ciphertext-value /private/operator/key"),

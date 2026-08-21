@@ -121,6 +121,23 @@ describe("user-visible Occupancy is forbidden", () => {
         { id: "srv_hostinger", name: "hostinger" },
       ).message,
     );
+    expectNoOccupancy(
+      "folder-local-cloud-validation",
+      occupancyCloudCompatError(
+        {
+          code: "bad_request",
+          category: "user",
+          message: "Input validation failed",
+          retryable: false,
+          details: { phase: "orpc-error-normalization", orpcCode: "BAD_REQUEST" },
+        },
+        { id: "srv_4lifk0yrcecy", name: "hostinger" },
+        {
+          repositoryIdentity: "folder.local/cwd/nux-67e3a052-unlinked",
+          repository: "https://folder.local/cwd/nux-67e3a052-unlinked.git",
+        },
+      ).message,
+    );
     for (const vendor of Object.keys(OCCUPANCY_VENDOR_LABEL) as Array<
       keyof typeof OCCUPANCY_VENDOR_LABEL
     >) {

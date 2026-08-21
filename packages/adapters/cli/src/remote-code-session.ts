@@ -447,6 +447,87 @@ export function scratchRemoteRejectedError(): DomainError {
   });
 }
 
+function isFolderLocalDoor(door?: {
+  readonly repositoryIdentity?: string;
+  readonly repository?: string;
+}): boolean {
+  return Boolean(
+    (door?.repositoryIdentity && isFolderOccupancyIdentity(door.repositoryIdentity)) ||
+    door?.repository?.includes("folder.local"),
+  );
+}
+
+function isBareInputValidationFailed(error: DomainError): boolean {
+  return (
+    error.message === "Input validation failed" &&
+    (error.code === "bad_request" || error.code === "validation_error")
+  );
+}
+
+function isUnstructuredCloudValidation(error: DomainError): boolean {
+  return (
+    isBareInputValidationFailed(error) &&
+    (error.details?.phase === "orpc-error-normalization" ||
+      error.details?.orpcCode === "BAD_REQUEST")
+  );
+}
+
+function stringDetailList(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+}
+
+function folderLocalValidationAffectedField(error: DomainError): string | undefined {
+  const paths = stringDetailList(error.details?.validationIssuePaths);
+  const messages = stringDetailList(error.details?.validationIssueMessages);
+  return paths[0] ?? messages[0];
+}
+
+function folderLocalValidationMissingThing(affectedField: string | undefined): string {
+  const text = (affectedField ?? "").toLowerCase();
+  if (/project|repositoryidentity|binding|directoryname/.test(text)) return "project link";
+  if (/template|profile|harness/.test(text)) return "Pi template";
+  if (/provider|server|targetserver/.test(text)) return "Server";
+  if (/skill/.test(text)) return "skills";
+  if (/credential|secret|token|auth/.test(text)) return "credential";
+  return affectedField?.trim() || "Server";
+}
+
+function folderLocalCloudValidationError(
+  error: DomainError,
+  server: { readonly id: string; readonly name: string },
+  door?: {
+    readonly repositoryIdentity?: string;
+    readonly repository?: string;
+  },
+): DomainError {
+  if (!isBareInputValidationFailed(error)) return error;
+  const affectedField = folderLocalValidationAffectedField(error);
+  const missing = folderLocalValidationMissingThing(affectedField);
+  const issueMessages = stringDetailList(error.details?.validationIssueMessages);
+  const issuePaths = stringDetailList(error.details?.validationIssuePaths);
+  const retry = `retry appaloft code --pi --server ${server.id}`;
+  const guidance = affectedField
+    ? `Fix the ${missing} (${affectedField}), then ${retry}. If that still fails, this Cloud needs an update that accepts folder workspace create.`
+    : `Confirm Server ${server.name} (${server.id}) is enrolled, then ${retry}. If that still fails, this Cloud needs an update that accepts folder workspace create.`;
+  return remoteCodeError(
+    "workspace_open_folder_local_input_invalid",
+    `Cloud could not start this folder session on ${server.name}.`,
+    {
+      phase: "folder-local-cloud-validation",
+      serverId: server.id,
+      serverName: server.name,
+      causeCode: error.code,
+      causeMessage: error.message,
+      guidance,
+      ...(door?.repositoryIdentity ? { repositoryIdentity: door.repositoryIdentity } : {}),
+      ...(affectedField ? { affectedField } : {}),
+      ...(issueMessages.length > 0 ? { validationIssueMessages: [...issueMessages] } : {}),
+      ...(issuePaths.length > 0 ? { validationIssuePaths: [...issuePaths] } : {}),
+    },
+  );
+}
+
 export function occupancyCloudCompatError(
   error: DomainError,
   server: { readonly id: string; readonly name: string },
@@ -457,18 +538,10 @@ export function occupancyCloudCompatError(
 ): DomainError {
   if (error.details?.code === "workspace_open_repository_not_bound") return error;
   if (error.code === "workspace_open_repository_not_bound") return error;
-  if (
-    (door?.repositoryIdentity && isFolderOccupancyIdentity(door.repositoryIdentity)) ||
-    door?.repository?.includes("folder.local")
-  ) {
-    return error;
+  if (isFolderLocalDoor(door)) {
+    return folderLocalCloudValidationError(error, server, door);
   }
-  const unstructured =
-    error.message === "Input validation failed" &&
-    (error.code === "bad_request" || error.code === "validation_error") &&
-    (error.details?.phase === "orpc-error-normalization" ||
-      error.details?.orpcCode === "BAD_REQUEST");
-  if (!unstructured) return error;
+  if (!isUnstructuredCloudValidation(error)) return error;
   return remoteCodeError(
     "workspace_open_target_server_unsupported",
     `This Cloud does not accept Server targeting for ${server.name} (${server.id})`,

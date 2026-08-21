@@ -137,7 +137,7 @@ Governing spec: [139-remote-agent-door](../specs/139-remote-agent-door/spec.md).
 | WS-REMOTE-CA-127 | TUI / unit | this slice | no available door keeps a lean TUI footer | same TUI test |
 | WS-REMOTE-COMPAT-128 | CLI / unit | this slice | unstructured occupancy validation names the enrolled Server | `agent-workspace-command.test.ts` |
 | WS-REMOTE-COMPAT-129 | CLI / unit | this slice | occupancy does not retry without `targetServerId` | same command test |
-| WS-REMOTE-COMPAT-220 | CLI / unit | this slice | folder.local Cloud validation is not remapped to Server targeting | `packages/adapters/cli/test/remote-code-session.test.ts`; `packages/adapters/cli/test/folder-local-remote-open.test.ts`; `packages/adapters/cli/test/agent-workspace-command.test.ts` |
+| WS-REMOTE-COMPAT-220 | CLI / unit | this slice | folder.local unstructured `Input validation failed` after TUI is a human next step, not targeting remap, not Occupancy/`sbx_`; `1049l` then print | `packages/adapters/cli/test/remote-code-session.test.ts`; `packages/adapters/cli/test/folder-local-remote-open.test.ts`; `packages/adapters/cli/test/agent-workspace-command.test.ts`; `packages/adapters/cli/test/workspace-control-presentation.test.ts`; `packages/adapters/cli/test/runtime-error-format.test.ts` |
 | WS-REMOTE-COMPAT-130 | CLI / unit | this slice | Binding / Profile errors stay specific | same command test |
 | WS-REMOTE-RESUME-131 | application | this slice | default occupancy resume keeps preferred Profile | `packages/application/test/agent-workspace-open.test.ts` |
 | WS-REMOTE-RESUME-132 | application | this slice | explicit Profile still fail-closes | same application test |

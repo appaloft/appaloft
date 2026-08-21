@@ -369,10 +369,6 @@ function createFolderLocalRemoteOpenDependencies(input: {
           ...((value.providerKey ?? input.providerKey)
             ? { providerKey: value.providerKey ?? input.providerKey }
             : {}),
-          ...(value.name ? { name: value.name } : {}),
-          ...(value.directoryName ? { directoryName: value.directoryName } : {}),
-          ...(value.repositoryIdentity ? { repositoryIdentity: value.repositoryIdentity } : {}),
-          ...(value.commitSha ? { commitSha: value.commitSha } : {}),
         }),
       resume: async (_context, workspaceId) => resumeRemoteSandbox(input.dispatch, workspaceId),
       exec: async (_context, _workspaceId, command) => {
@@ -471,22 +467,16 @@ async function createRemoteSandbox(
     readonly templateId: string;
     readonly limits: typeof COMMUNITY_OCCUPANCY_OPENCODE_LIMITS;
     readonly providerKey?: string;
-    readonly name?: string;
-    readonly directoryName?: string;
-    readonly repositoryIdentity?: string;
-    readonly commitSha?: string;
   },
 ): Promise<Result<{ sandboxId: string; name: string; status: string }>> {
+  // Live Cloud still validates sandboxes.create with the pre-#1339 strict schema.
+  // repositoryIdentity / commitSha / name / directoryName are unrecognized extras there.
   const command = CreateSandboxCommand.create({
     source: { kind: "template", templateId: input.templateId },
     requestedIsolation: "container-trusted",
     limits: { ...input.limits },
     networkPolicy: COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY,
     ...(input.providerKey ? { providerKey: input.providerKey } : {}),
-    ...(input.name ? { name: input.name } : {}),
-    ...(input.directoryName ? { directoryName: input.directoryName } : {}),
-    ...(input.repositoryIdentity ? { repositoryIdentity: input.repositoryIdentity } : {}),
-    ...(input.commitSha ? { commitSha: input.commitSha } : {}),
   });
   if (command.isErr()) return err(command.error);
   const created = await dispatch(command.value);
@@ -502,7 +492,7 @@ async function createRemoteSandbox(
   }
   return ok({
     sandboxId,
-    name: sandboxDisplayNameFromRecord(record, input.directoryName ?? input.name ?? "workspace"),
+    name: sandboxDisplayNameFromRecord(record, "workspace"),
     status: readString(record.status) ?? "ready",
   });
 }
