@@ -1732,7 +1732,7 @@ describe("Agent Workspace CLI", () => {
       execute: async <T>(_context: unknown, command: Command<T>) => {
         expect(command).toBeInstanceOf(OpenAgentWorkspaceCommand);
         commands.push(command as OpenAgentWorkspaceCommand);
-        return ok({ workspaceId: "sbx_code", resumed: true } as T);
+        return ok({ workspaceId: "sbx_code", name: "Web@0123456", resumed: true } as T);
       },
     } as unknown as CommandBus;
     const { createCliProgram } = await import("../src");
@@ -1800,7 +1800,7 @@ describe("Agent Workspace CLI", () => {
     expect(resolvedPaths).toEqual(["."]);
     expect(commands).toHaveLength(2);
     expect(output.join("")).toContain(
-      "Remote · prj_web · github.com/Acme/Web@0123456 · mac-mini · my sandbox · sbx_code",
+      "Remote · prj_web · github.com/Acme/Web@0123456 · mac-mini · my sandbox · Web@0123456",
     );
     expect(commands[0]).toMatchObject({
       input: {
@@ -1983,7 +1983,7 @@ describe("Agent Workspace CLI", () => {
       commandBus: {
         execute: async <T>(_context: unknown, command: Command<T>) => {
           commands.push(command as Command<unknown>);
-          return ok({ workspaceId: "sbx_web", projectId: "prj_web" } as T);
+          return ok({ workspaceId: "sbx_web", name: "api@aaaaaaa", projectId: "prj_web" } as T);
         },
       } as unknown as CommandBus,
       queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
@@ -2017,7 +2017,7 @@ describe("Agent Workspace CLI", () => {
       attach: false,
     });
     expect(output.join("")).toContain(
-      "Remote · prj_web · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · sbx_web",
+      "Remote · prj_web · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · api@aaaaaaa",
     );
     expect(output.join("")).not.toContain("opencode · Appaloft skill offered");
   });
@@ -2034,7 +2034,7 @@ describe("Agent Workspace CLI", () => {
       commandBus: {
         execute: async <T>(_context: unknown, command: Command<T>) => {
           commands.push(command as Command<unknown>);
-          return ok({ workspaceId: "sbx_billing", projectId: "prj_billing" } as T);
+          return ok({ workspaceId: "sbx_billing", name: "api@aaaaaaa", projectId: "prj_billing" } as T);
         },
       } as unknown as CommandBus,
       queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
@@ -2070,7 +2070,7 @@ describe("Agent Workspace CLI", () => {
     expect(localGitResolved).toBeFalse();
     expect(commands.some((command) => command instanceof OpenAgentWorkspaceCommand)).toBeTrue();
     expect(output.join("")).toContain(
-      "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · sbx_billing",
+      "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · api@aaaaaaa",
     );
     expect(output.join("")).toContain(
       "Connect a model in OpenCode with /connect before running a Task.",
@@ -2086,7 +2086,7 @@ describe("Agent Workspace CLI", () => {
       startServer: async () => {},
       commandBus: {
         execute: async <T>() =>
-          ok({ workspaceId: "sbx_whoami", projectId: "prj_tk5lovqu2vj8" } as T),
+          ok({ workspaceId: "sbx_whoami", name: "whoami@1ce75d0", projectId: "prj_tk5lovqu2vj8" } as T),
       } as unknown as CommandBus,
       queryBus: {
         execute: async <T>() =>
@@ -2131,7 +2131,7 @@ describe("Agent Workspace CLI", () => {
       process.stdout.write = write;
     }
     expect(output.join("")).toContain(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_whoami\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · whoami@1ce75d0\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
     );
     const printed = output.join("");
     expect(printed).toContain("Connect a model in OpenCode with /connect before running a Task.");
@@ -2151,7 +2151,7 @@ describe("Agent Workspace CLI", () => {
       startServer: async () => {},
       commandBus: {
         execute: async <T>() =>
-          ok({ workspaceId: "sbx_whoami", projectId: "prj_tk5lovqu2vj8" } as T),
+          ok({ workspaceId: "sbx_whoami", name: "whoami@1ce75d0", projectId: "prj_tk5lovqu2vj8" } as T),
       } as unknown as CommandBus,
       queryBus: {
         execute: async <T>() =>
@@ -2491,6 +2491,7 @@ describe("Agent Workspace CLI", () => {
           }
           return ok({
             workspaceId: "sbx_h1swq765kcgw",
+            name: "api@aaaaaaa",
             projectId: "prj_billing",
             source: { commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
           } as T);
@@ -2530,10 +2531,10 @@ describe("Agent Workspace CLI", () => {
       forceNew: false,
     });
     expect(output.join("")).toContain(
-      "Pinned · sbx_h1swq765kcgw @ aaaaaaa · requested bbbbbbb · use --new for an isolated Workspace",
+      "Pinned · api@aaaaaaa @ aaaaaaa · requested bbbbbbb · use --new for an isolated Workspace",
     );
     expect(output.join("")).toContain(
-      "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · sbx_h1swq765kcgw",
+      "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · api@aaaaaaa",
     );
     expect(output.join("")).toContain(
       "Connect a model in OpenCode with /connect before running a Task.",
@@ -2569,6 +2570,7 @@ describe("Agent Workspace CLI", () => {
           }
           return ok({
             workspaceId: "sbx_h1swq765kcgw",
+            name: "api@aaaaaaa",
             projectId: "prj_billing",
             attach: {
               transport: "native-attach",
@@ -2630,6 +2632,7 @@ describe("Agent Workspace CLI", () => {
           commands.push(command as Command<unknown>);
           return ok({
             workspaceId: "sbx_local",
+            name: "api@aaaaaaa",
             projectId: "prj_billing",
             attach: {
               transport: "native-attach",
@@ -2673,7 +2676,7 @@ describe("Agent Workspace CLI", () => {
     expect((commands[0] as OpenAgentWorkspaceCommand).input.targetServerId).toBe("srv_local");
     expect(launched).toEqual([["opencode", "attach"]]);
     expect(output.join("")).toContain(
-      "Remote · prj_billing · github.com/acme/api@aaaaaaa · this-mac · my sandbox · sbx_local",
+      "Remote · prj_billing · github.com/acme/api@aaaaaaa · this-mac · my sandbox · api@aaaaaaa",
     );
   });
 
@@ -2691,7 +2694,7 @@ describe("Agent Workspace CLI", () => {
             expect(output.join("")).toContain("Preparing disk on hostinger…");
             events.push("occupy");
             await Bun.sleep(15);
-            return ok({ workspaceId: "sbx_progress", projectId: "prj_web" } as T);
+            return ok({ workspaceId: "sbx_progress", name: "api@aaaaaaa", projectId: "prj_web" } as T);
           }
           events.push("skill");
           return ok({} as T);
@@ -2743,7 +2746,7 @@ describe("Agent Workspace CLI", () => {
     expect(printed).not.toContain("Opening occupancy");
     expect(printed.toLowerCase()).not.toContain("occupancy");
     expect(printed).toContain(
-      "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · sbx_progress",
+      "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · api@aaaaaaa",
     );
     expect(printed.indexOf("Preparing disk on hostinger…")).toBeLessThan(
       printed.indexOf("Remote ·"),
@@ -2762,6 +2765,7 @@ describe("Agent Workspace CLI", () => {
           if (command instanceof OpenAgentWorkspaceCommand) {
             return ok({
               workspaceId: "sbx_folder",
+              name: "nux-code-silence-cwd",
               projectId: "prj_vlhs6pf8v4yp",
             } as T);
           }
@@ -2796,7 +2800,7 @@ describe("Agent Workspace CLI", () => {
     }
     const printed = output.join("");
     expect(printed).toContain(
-      "Remote · prj_7fky4yjn1l1c · folder.local/cwd/nux-code-silence-cwd@cafef00 · hostinger · my sandbox · sbx_folder",
+      "Remote · prj_7fky4yjn1l1c · folder.local/cwd/nux-code-silence-cwd@cafef00 · hostinger · my sandbox · nux-code-silence-cwd",
     );
     expect(printed).not.toContain("prj_vlhs6pf8v4yp");
     expect(printed.toLowerCase()).not.toContain("occupancy");
@@ -2826,7 +2830,7 @@ describe("Agent Workspace CLI", () => {
       commandBus: {
         execute: async <T>(_context: unknown, command: Command<T>) => {
           if (command instanceof OpenAgentWorkspaceCommand) {
-            return ok({ workspaceId: "sbx_hung_skill", projectId: "prj_web" } as T);
+            return ok({ workspaceId: "sbx_hung_skill", name: "api@aaaaaaa", projectId: "prj_web" } as T);
           }
           if (
             command instanceof WriteSandboxFileCommand &&
@@ -2879,7 +2883,7 @@ describe("Agent Workspace CLI", () => {
     }
     const printed = output.join("");
     expect(printed).toContain(
-      "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · sbx_hung_skill",
+      "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · api@aaaaaaa",
     );
     expect(printed).toContain("Preparing skills…");
     expect(printed).toContain("using your Grok credential");
@@ -2907,6 +2911,7 @@ describe("Agent Workspace CLI", () => {
             expect(attached).toBeFalse();
             return ok({
               workspaceId: "sbx_attach_first",
+              name: "api@aaaaaaa",
               projectId: "prj_web",
               attach: {
                 transport: "native-attach",
@@ -2958,7 +2963,7 @@ describe("Agent Workspace CLI", () => {
     expect(printed).toContain("Preparing skills…");
     expect(printed).toContain("Attaching…");
     expect(printed).toContain(
-      "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · sbx_attach_first",
+      "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · api@aaaaaaa",
     );
     expect(printed.indexOf("Preparing disk on hostinger…")).toBeLessThan(
       printed.indexOf("Remote ·"),
@@ -3668,7 +3673,7 @@ describe("Agent Workspace CLI", () => {
           return ok({ items: [{ sandboxId: "sbx_workspace", status: "ready" }] } as T);
         }
         if (query instanceof ShowSandboxQuery) {
-          return ok({ sandboxId: "sbx_workspace", status: "ready" } as T);
+          return ok({ sandboxId: "sbx_workspace", name: "resonant-silence", status: "ready" } as T);
         }
         return ok({
           items: [
@@ -4613,8 +4618,9 @@ function createCliFolderOccupancyOpen(options: {
         },
       },
       sandboxes: {
-        create: async () => ok({ sandboxId: "sbx_notes", status: "ready" }),
-        resume: async (_context, workspaceId) => ok({ sandboxId: workspaceId, status: "ready" }),
+        create: async () => ok({ sandboxId: "sbx_notes", name: "resonant-silence", status: "ready" }),
+        resume: async (_context, workspaceId) =>
+          ok({ sandboxId: workspaceId, name: "resonant-silence", status: "ready" }),
         exec: async (_context, _workspaceId, command) => {
           options.executedCommands.push([...command.argv]);
           return ok({ mode: "foreground", frames: [{ kind: "exit", exitCode: 1 }] });

@@ -256,6 +256,22 @@ describe("ExecutionSandboxService", () => {
     });
   });
 
+  test("[SBX-DOM-005] create persists a display name and show returns the same name", async () => {
+    const generatedApp = service(provider().adapter);
+    const generated = await generatedApp.create(context, createInput);
+    expect(generated._unsafeUnwrap().name).toMatch(/^[a-z]+-[a-z]+$/);
+    expect(
+      (await generatedApp.show(context, generated._unsafeUnwrap().sandboxId))._unsafeUnwrap().name,
+    ).toBe(generated._unsafeUnwrap().name);
+
+    const namedApp = service(provider().adapter);
+    const named = await namedApp.create(context, { ...createInput, directoryName: "hello-static" });
+    expect(named._unsafeUnwrap().name).toBe("hello-static");
+    expect((await namedApp.show(context, named._unsafeUnwrap().sandboxId))._unsafeUnwrap().name).toBe(
+      "hello-static",
+    );
+  });
+
   test("[SBX-API-003] public create closes provisioning for synchronous external callers", async () => {
     const fake = provider();
     const app = service(fake.adapter);

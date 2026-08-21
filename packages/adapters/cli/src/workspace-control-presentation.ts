@@ -70,6 +70,7 @@ export interface WorkspaceControlOccupancySummary {
 
 export interface WorkspaceControlWorkspaceSummary {
   readonly workspaceId: string;
+  readonly name: string;
   readonly status: string;
   readonly providerKey?: string;
   readonly sourceKind?: string;
@@ -480,6 +481,15 @@ function occupancySummary(
   };
 }
 
+function workspaceDisplayName(
+  record: Record<string, unknown>,
+  workspaceId: string,
+): string {
+  const named = optionalString(record, "name");
+  if (named && !named.startsWith("sbx_")) return named;
+  return workspaceId.startsWith("sbx_") ? workspaceId.slice("sbx_".length) || "workspace" : workspaceId;
+}
+
 function workspaceSummary(record: Record<string, unknown>): WorkspaceControlWorkspaceSummary {
   const workspaceId = optionalString(record, "sandboxId");
   const status = optionalString(record, "status");
@@ -494,6 +504,7 @@ function workspaceSummary(record: Record<string, unknown>): WorkspaceControlWork
   const occupancy = occupancySummary(record);
   return {
     workspaceId,
+    name: workspaceDisplayName(record, workspaceId),
     status,
     ...(providerKey ? { providerKey } : {}),
     ...(sourceKind ? { sourceKind } : {}),

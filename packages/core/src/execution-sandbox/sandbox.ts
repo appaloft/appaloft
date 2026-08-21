@@ -4,6 +4,7 @@ import { err, ok, type Result } from "../shared/result";
 import { type CreatedAt, type ExpiresAt, UpdatedAt } from "../shared/temporal";
 import { ScalarValueObject } from "../shared/value-object";
 import { type SandboxNetworkPolicy } from "./network-policy";
+import { type SandboxDisplayName } from "./display-name";
 import {
   type SandboxId,
   type SandboxIsolationLevel,
@@ -54,6 +55,7 @@ export class SandboxStatusValue extends ScalarValueObject<SandboxStatus> {
 
 export interface SandboxState {
   id: SandboxId;
+  name: SandboxDisplayName;
   source: SandboxSource;
   status: SandboxStatusValue;
   requestedIsolation: SandboxIsolationLevel;
@@ -133,6 +135,10 @@ export class Sandbox extends AggregateRoot<SandboxState, SandboxId> {
 
   canUseRuntime(): boolean {
     return this.state.status.value === "ready";
+  }
+
+  displayName(): SandboxDisplayName {
+    return this.state.name;
   }
 
   touchActivity(input: { at: UpdatedAt }): Result<void> {

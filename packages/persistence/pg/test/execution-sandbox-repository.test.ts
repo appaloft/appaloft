@@ -9,6 +9,7 @@ import {
   ExpiresAt,
   Sandbox,
   SandboxCredentialGrant,
+  SandboxDisplayName,
   SandboxId,
   SandboxIsolationLevel,
   SandboxNetworkPolicy,
@@ -45,6 +46,7 @@ function sandbox(
 ) {
   return Sandbox.create({
     id: SandboxId.rehydrate(id),
+    name: SandboxDisplayName.rehydrate("resonant-silence"),
     source,
     requestedIsolation: SandboxIsolationLevel.gvisor(),
     limits: SandboxResourceLimits.create({
@@ -85,6 +87,7 @@ describe("PgExecutionSandboxRepository", () => {
       await repository.save(context("tenant_a"), aggregate, "hermetic");
 
       const loaded = await repository.find(context("tenant_a"), "sbx_pg");
+      expect(loaded?.sandbox.displayName().value).toBe("resonant-silence");
       expect(loaded?.sandbox.toState()).toMatchObject({
         providerHandle: "opaque:runtime",
         currentAttemptId: "sat_pg",

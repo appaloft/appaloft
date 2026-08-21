@@ -136,6 +136,9 @@ export const publicDocsHelpTopics = {
       "OpenCode",
       "Pi",
       "远程开发",
+      "workspace name",
+      "sandbox display name",
+      "resonant-silence",
     ],
     specReferences: [
       "docs/specs/111-agent-workspace-entry-workflow/spec.md",
@@ -153,6 +156,34 @@ export const publicDocsHelpTopics = {
     ],
     webSurfaces: [
       "apps/web/src/routes/workspaces and workspace-collaborations: create, reconnect, collaborate, preview, review, and deliver",
+    ],
+  },
+  "agent.workspace-display-name": {
+    id: "agent.workspace-display-name",
+    title: "Workspace display name",
+    description:
+      "Opened Cloud Agents and workspace rows show a persisted readable name, never sbx_*.",
+    page: {
+      "zh-CN": "agents/workspaces",
+      "en-US": "en/agents/workspaces",
+    },
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli"],
+    anchor: "agent-workspace-display-name",
+    relatedOperation: "workspaces.open",
+    aliases: [
+      "workspace name",
+      "sandbox display name",
+      "resonant-silence",
+      "repo@sha",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-124-sandbox-display-name.md",
+      "docs/specs/139-remote-agent-door/spec.md",
+      "docs/testing/execution-sandbox-test-matrix.md",
     ],
   },
   "agent.scratch": {

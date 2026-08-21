@@ -1119,7 +1119,7 @@ Server id/host, provider handle, capacity probes or credentials.
 | Open/create-or-resume | `workspaces.open` | durable `appaloft workspace open [path|git-remote]`; `appaloft.workspaces.open(...)` |
 | Profile-aware create | `workspaces.open(forceNew=true)` | `appaloft workspace create --profile ...`; `appaloft.workspaces.create(...)` |
 | Adapter catalog | `sandboxes.agents.harnesses.list` | `appaloft workspace harness list`; Console capability-driven creation |
-| List/show | `sandboxes.list/show` + `sandboxes.agents.runtimes.list` | `appaloft workspace list/show`; `appaloft.workspaces.list/show` |
+| List/show | `sandboxes.list/show` + `sandboxes.agents.runtimes.list` | `appaloft workspace list/show`; `appaloft.workspaces.list/show`. User-facing TUI/CLI names use persisted `name`; JSON still includes `sandboxId`. |
 | Pause/resume/terminate | `sandboxes.pause/resume/terminate` | `appaloft workspace pause/resume/terminate` |
 | Terminal | `terminal-sessions.open(scope=sandbox)` | `appaloft workspace terminal <workspaceId> [--attach]` |
 | Native attach | `sandboxes.agents.runtimes.attach` | `appaloft workspace attach <workspaceId>`; `workspace.agent.attach()`; Console Attach |

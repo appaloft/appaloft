@@ -26,7 +26,7 @@ ids, Kubernetes object names, host process ids, command secret values or unbound
 
 The Sandbox read model includes:
 
-- `sandboxId`, tenant ownership and status;
+- `sandboxId`, persisted display `name`, tenant ownership and status;
 - requested and realized isolation levels;
 - safe provider key and requested resource limits;
 - template/image digest or snapshot source reference without registry credentials;

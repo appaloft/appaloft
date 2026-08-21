@@ -21,6 +21,8 @@ pub struct WorkspaceSummary {
     pub workspace_id: String,
     pub status: String,
     #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
     pub provider_key: Option<String>,
     #[serde(default)]
     pub source_kind: Option<String>,
@@ -28,22 +30,21 @@ pub struct WorkspaceSummary {
     pub occupancy: Option<OccupancySummary>,
 }
 
-fn occupancy_list_label(workspace: &WorkspaceSummary) -> String {
-    match &workspace.occupancy {
-        Some(occupancy) => {
-            let sha = occupancy
-                .commit_sha
-                .get(..7)
-                .unwrap_or(&occupancy.commit_sha);
-            let repo = occupancy
-                .repository_identity
-                .strip_prefix("github.com/")
-                .or_else(|| occupancy.repository_identity.strip_prefix("gitlab.com/"))
-                .unwrap_or(&occupancy.repository_identity);
-            format!("{repo}@{sha}")
-        }
-        None => workspace.workspace_id.clone(),
+fn workspace_list_label(workspace: &WorkspaceSummary) -> String {
+    if let Some(name) = workspace
+        .name
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty() && !value.starts_with("sbx_"))
+    {
+        return name.to_owned();
     }
+    workspace
+        .workspace_id
+        .strip_prefix("sbx_")
+        .filter(|value| !value.is_empty())
+        .unwrap_or("workspace")
+        .to_owned()
 }
 
 fn occupancy_commit_message(commit_sha: &str) -> Option<String> {
@@ -1038,6 +1039,20 @@ impl Default for AppState {
 }
 
 impl AppState {
+    fn workspace_display_name(&self, workspace_id: &str) -> String {
+        self.workspaces
+            .iter()
+            .find(|workspace| workspace.workspace_id == workspace_id)
+            .map(workspace_list_label)
+            .unwrap_or_else(|| {
+                workspace_id
+                    .strip_prefix("sbx_")
+                    .filter(|value| !value.is_empty())
+                    .unwrap_or("workspace")
+                    .to_owned()
+            })
+    }
+
     pub fn selected_workspace_id(&self) -> Option<&str> {
         self.workspaces
             .get(self.selected)
@@ -1121,7 +1136,10 @@ impl AppState {
             }
             ParentMessage::Detail { detail } => {
                 self.loading.active = false;
-                self.status_line = format!("Workspace {}", detail.workspace.workspace_id);
+                self.status_line = format!(
+                    "Workspace {}",
+                    workspace_list_label(&detail.workspace)
+                );
                 self.detail = Some(detail);
                 self.action_busy = false;
                 self.delivery_busy = false;
@@ -1171,13 +1189,19 @@ impl AppState {
                 self.delivery_busy = false;
                 self.delivery_form = None;
                 self.pending_delivery_confirmation = None;
-                self.status_line = format!("Workspace {workspace_id} delivery action completed");
+                self.status_line = format!(
+                    "Workspace {} delivery action completed",
+                    self.workspace_display_name(&workspace_id)
+                );
             }
             ParentMessage::RecoveryComplete { workspace_id } => {
                 self.recovery_busy = false;
                 self.recovery_form = None;
                 self.pending_recovery_confirmation = None;
-                self.status_line = format!("Workspace {workspace_id} recovery action completed");
+                self.status_line = format!(
+                    "Workspace {} recovery action completed",
+                    self.workspace_display_name(&workspace_id)
+                );
             }
             ParentMessage::Error {
                 code,
@@ -2499,7 +2523,7 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
                 let marker = if index == state.selected { "›" } else { " " };
                 ListItem::new(Line::from(vec![
                     Span::styled(
-                        format!("{marker} {}", occupancy_list_label(workspace)),
+                        format!("{marker} {}", workspace_list_label(workspace)),
                         if index == state.selected {
                             Style::default()
                                 .fg(Color::Cyan)
@@ -2692,7 +2716,7 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
                 .unwrap_or_default();
             format!(
                 "Workspace {}  {}\n{}\n{}\n{}\n{}\n{}\n{}\nRecovery\nIsolation  {}\nContinuity {}\nSnapshot(s)\n{}\nWorkspace-owned cleanup: {}\nactive runtimes:{}  previews:{}\nBounded readback; not host/provider proof\nAgent Runtime(s)\n{}\nPorts\n{}\nTasks\n{}\nPromotions\n{}",
-                occupancy_list_label(&detail.workspace),
+                workspace_list_label(&detail.workspace),
                 detail.workspace.status,
                 preview,
                 production,
@@ -3099,10 +3123,11 @@ mod tests {
     }
 
     #[test]
-    fn ws_remote_ca_069_occupancy_list_label_prefers_repo_sha() {
-        let occupied = WorkspaceSummary {
+    fn ws_remote_ca_069_workspace_list_label_uses_display_name() {
+        let named = WorkspaceSummary {
             workspace_id: "sbx_1".to_owned(),
             status: "ready".to_owned(),
+            name: Some("whoami@1ce75d0".to_owned()),
             provider_key: None,
             source_kind: None,
             occupancy: Some(OccupancySummary {
@@ -3111,15 +3136,52 @@ mod tests {
                 branch: Some("master".to_owned()),
             }),
         };
-        let lean = WorkspaceSummary {
+        let generated = WorkspaceSummary {
             workspace_id: "sbx_lean".to_owned(),
             status: "ready".to_owned(),
+            name: Some("resonant-silence".to_owned()),
             provider_key: None,
             source_kind: None,
             occupancy: None,
         };
-        assert_eq!(occupancy_list_label(&occupied), "traefik/whoami@1ce75d0");
-        assert_eq!(occupancy_list_label(&lean), "sbx_lean");
+        let legacy = WorkspaceSummary {
+            workspace_id: "sbx_lean".to_owned(),
+            status: "ready".to_owned(),
+            name: None,
+            provider_key: None,
+            source_kind: None,
+            occupancy: None,
+        };
+        assert_eq!(workspace_list_label(&named), "whoami@1ce75d0");
+        assert_eq!(workspace_list_label(&generated), "resonant-silence");
+        assert_eq!(workspace_list_label(&legacy), "lean");
+        assert!(!workspace_list_label(&named).contains("sbx_"));
+        assert!(!workspace_list_label(&generated).contains("sbx_"));
+        assert!(!workspace_list_label(&legacy).contains("sbx_"));
+    }
+
+    #[test]
+    fn ws_remote_ca_069_revealed_list_and_detail_never_paint_sbx() {
+        let mut state = occupancy_delivery_ready_state(None);
+        state.workspaces[0].name = Some("whoami@1ce75d0".to_owned());
+        if let Some(detail) = state.detail.as_mut() {
+            detail.workspace.name = Some("whoami@1ce75d0".to_owned());
+        }
+        state.loading.active = false;
+        state.loading.collapsed = false;
+        state.focus_mode = false;
+        let backend = ratatui::backend::TestBackend::new(100, 24);
+        let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw revealed list and detail");
+        let out = buffer_plain(&terminal);
+        assert!(out.contains("whoami@1ce75d0"), "{out}");
+        assert!(
+            !out.contains("sbx_"),
+            "revealed Cloud Agents list/detail must not paint sbx_:\n{out}"
+        );
+        assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
     }
 
     fn buffer_plain(terminal: &ratatui::Terminal<ratatui::backend::TestBackend>) -> String {
@@ -3163,6 +3225,7 @@ mod tests {
             workspaces: vec![WorkspaceSummary {
                 workspace_id: "sbx_1".to_owned(),
                 status: "ready".to_owned(),
+                name: None,
                 provider_key: None,
                 source_kind: None,
                 occupancy: None,
@@ -3280,6 +3343,7 @@ mod tests {
             workspaces: vec![WorkspaceSummary {
                 workspace_id: "sbx_1".to_owned(),
                 status: "ready".to_owned(),
+                name: None,
                 provider_key: None,
                 source_kind: None,
                 occupancy: None,
@@ -3494,6 +3558,7 @@ mod tests {
             workspaces: vec![WorkspaceSummary {
                 workspace_id: "sbx_1".to_owned(),
                 status: "ready".to_owned(),
+                name: None,
                 provider_key: None,
                 source_kind: None,
                 occupancy: None,
@@ -3599,6 +3664,7 @@ mod tests {
             workspaces: vec![WorkspaceSummary {
                 workspace_id: "sbx_1".to_owned(),
                 status: "ready".to_owned(),
+                name: None,
                 provider_key: None,
                 source_kind: None,
                 occupancy: None,
@@ -3855,6 +3921,7 @@ mod tests {
         WorkspaceSummary {
             workspace_id: id.to_owned(),
             status: status.to_owned(),
+            name: None,
             provider_key: None,
             source_kind: None,
             occupancy: None,
@@ -4082,6 +4149,7 @@ mod tests {
             workspaces: vec![WorkspaceSummary {
                 workspace_id: "sbx_1".to_owned(),
                 status: "running".to_owned(),
+                name: None,
                 provider_key: Some("registered-server".to_owned()),
                 source_kind: Some("template".to_owned()),
                 occupancy: Some(OccupancySummary {
@@ -4217,6 +4285,7 @@ mod tests {
             workspace: WorkspaceSummary {
                 workspace_id: "sbx_1".to_owned(),
                 status: "ready".to_owned(),
+                name: None,
                 provider_key: None,
                 source_kind: None,
                 occupancy: None,
@@ -4288,6 +4357,7 @@ mod tests {
             workspace: WorkspaceSummary {
                 workspace_id: "sbx_1".to_owned(),
                 status: "ready".to_owned(),
+                name: None,
                 provider_key: None,
                 source_kind: None,
                 occupancy: None,
@@ -4443,6 +4513,7 @@ mod tests {
             workspace: WorkspaceSummary {
                 workspace_id: "sbx_1".to_owned(),
                 status: "ready".to_owned(),
+                name: None,
                 provider_key: None,
                 source_kind: None,
                 occupancy: None,
@@ -4508,6 +4579,7 @@ mod tests {
             workspaces: vec![WorkspaceSummary {
                 workspace_id: "sbx_1".to_owned(),
                 status: "ready".to_owned(),
+                name: None,
                 provider_key: None,
                 source_kind: None,
                 occupancy: None,
@@ -4619,6 +4691,7 @@ mod tests {
             workspace: WorkspaceSummary {
                 workspace_id: "sbx_1".to_owned(),
                 status: "ready".to_owned(),
+                name: None,
                 provider_key: None,
                 source_kind: None,
                 occupancy: None,
@@ -4876,6 +4949,7 @@ mod tests {
             workspaces: vec![WorkspaceSummary {
                 workspace_id: "sbx_1".to_owned(),
                 status: "ready".to_owned(),
+                name: Some("resonant-silence".to_owned()),
                 provider_key: None,
                 source_kind: None,
                 occupancy: None,
@@ -4915,8 +4989,10 @@ mod tests {
             branch: Some("feat/occupancy".to_owned()),
         };
         state.workspaces[0].occupancy = Some(occupancy.clone());
+        state.workspaces[0].name = Some("whoami@1ce75d0".to_owned());
         if let Some(detail) = state.detail.as_mut() {
             detail.workspace.occupancy = Some(occupancy);
+            detail.workspace.name = Some("whoami@1ce75d0".to_owned());
             detail.pull_request = pull_request;
         }
         state

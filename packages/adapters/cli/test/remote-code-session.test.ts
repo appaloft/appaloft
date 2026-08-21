@@ -337,8 +337,8 @@ describe("remote code door", () => {
 
       expect(door.commitSha).toBe("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
       expect(door.serverId).toBe("srv_1");
-      expect(formatRemoteCodeBanner({ ...door, workspaceId: "sbx_1" })).toBe(
-        "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · sbx_1\nCompare · https://github.com/acme/api/compare/main?expand=1",
+      expect(formatRemoteCodeBanner({ ...door, name: "api@aaaaaaa" })).toBe(
+        "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · api@aaaaaaa\nCompare · https://github.com/acme/api/compare/main?expand=1",
       );
       expect(selectDefaultRemoteCodeServer([{ id: "srv_1", name: "mac-mini" }])?.name).toBe(
         "mac-mini",
@@ -363,6 +363,20 @@ describe("remote code door", () => {
     ).toBe("prj_billing");
   });
 
+  test("[SBX-DOM-005] banner never paints an sbx_ workspaceId as the sandbox name", () => {
+    expect(
+      formatRemoteCodeBanner({
+        projectId: "prj_billing",
+        repositoryIdentity: "github.com/acme/api",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        serverName: "mac-mini",
+        workspaceId: "sbx_hidden",
+      }),
+    ).toBe(
+      "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox\nCompare · https://github.com/acme/api/compare/main?expand=1",
+    );
+  });
+
   test("[WS-REMOTE-BANNER-061] occupancy banner includes generated access URL", () => {
     expect(
       formatRemoteCodeBanner({
@@ -370,11 +384,11 @@ describe("remote code door", () => {
         repositoryIdentity: "github.com/traefik/whoami",
         commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
         serverName: "occupancy-mac",
-        workspaceId: "sbx_rn32pzyp8yxr",
+        name: "whoami@1ce75d0",
         previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io",
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · whoami@1ce75d0\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
     );
   });
 
@@ -385,10 +399,10 @@ describe("remote code door", () => {
         repositoryIdentity: "github.com/traefik/whoami",
         commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
         serverName: "occupancy-mac",
-        workspaceId: "sbx_rn32pzyp8yxr",
+        name: "whoami@1ce75d0",
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr",
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · whoami@1ce75d0",
     );
   });
 
@@ -399,12 +413,12 @@ describe("remote code door", () => {
         repositoryIdentity: "github.com/traefik/whoami",
         commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
         serverName: "occupancy-mac",
-        workspaceId: "sbx_rn32pzyp8yxr",
+        name: "whoami@1ce75d0",
         previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io",
         pullRequestNumber: 928,
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nPR #928 · https://github.com/traefik/whoami/pull/928",
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · whoami@1ce75d0\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nPR #928 · https://github.com/traefik/whoami/pull/928",
     );
   });
 
@@ -415,12 +429,12 @@ describe("remote code door", () => {
         repositoryIdentity: "github.com/traefik/whoami",
         commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
         serverName: "occupancy-mac",
-        workspaceId: "sbx_rn32pzyp8yxr",
+        name: "whoami@1ce75d0",
         previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io",
         pullRequestNumber: 0,
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · whoami@1ce75d0\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
     );
   });
 
@@ -431,12 +445,12 @@ describe("remote code door", () => {
         repositoryIdentity: "github.com/traefik/whoami",
         commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
         serverName: "occupancy-mac",
-        workspaceId: "sbx_rn32pzyp8yxr",
+        name: "whoami@1ce75d0",
         previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io",
         branch: "feat/occupancy",
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nCompare · https://github.com/traefik/whoami/compare/feat/occupancy?expand=1",
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · whoami@1ce75d0\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nCompare · https://github.com/traefik/whoami/compare/feat/occupancy?expand=1",
     );
   });
 
@@ -447,13 +461,13 @@ describe("remote code door", () => {
         repositoryIdentity: "github.com/traefik/whoami",
         commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
         serverName: "occupancy-mac",
-        workspaceId: "sbx_rn32pzyp8yxr",
+        name: "whoami@1ce75d0",
         previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io",
         pullRequestNumber: 928,
         branch: "feat/occupancy",
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nPR #928 · https://github.com/traefik/whoami/pull/928",
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · whoami@1ce75d0\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nPR #928 · https://github.com/traefik/whoami/pull/928",
     );
   });
 
@@ -464,11 +478,11 @@ describe("remote code door", () => {
         repositoryIdentity: "gitlab.com/acme/api",
         commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
         serverName: "occupancy-mac",
-        workspaceId: "sbx_rn32pzyp8yxr",
+        name: "whoami@1ce75d0",
         branch: "feat/occupancy",
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · gitlab.com/acme/api@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr",
+      "Remote · prj_tk5lovqu2vj8 · gitlab.com/acme/api@1ce75d0 · occupancy-mac · my sandbox · whoami@1ce75d0",
     );
   });
 
@@ -479,13 +493,13 @@ describe("remote code door", () => {
         repositoryIdentity: "github.com/traefik/whoami",
         commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
         serverName: "occupancy-mac",
-        workspaceId: "sbx_rn32pzyp8yxr",
+        name: "whoami@1ce75d0",
         previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io",
         productionUrl: "https://whoami.example/",
         pullRequestNumber: 928,
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · sbx_rn32pzyp8yxr\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nProduction · https://whoami.example/\nPR #928 · https://github.com/traefik/whoami/pull/928",
+      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · whoami@1ce75d0\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nProduction · https://whoami.example/\nPR #928 · https://github.com/traefik/whoami/pull/928",
     );
   });
 

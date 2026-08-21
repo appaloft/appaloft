@@ -3,6 +3,7 @@ import {
   CreatedAt,
   ExpiresAt,
   Sandbox,
+  SandboxDisplayName,
   SandboxId,
   SandboxIsolationLevel,
   SandboxNetworkPolicy,
@@ -14,6 +15,7 @@ import {
 function fixture() {
   return Sandbox.create({
     id: SandboxId.rehydrate("sbx_demo"),
+    name: SandboxDisplayName.rehydrate("resonant-silence"),
     source: { kind: "image", image: "python@sha256:abc123" },
     requestedIsolation: SandboxIsolationLevel.gvisor(),
     limits: SandboxResourceLimits.create({

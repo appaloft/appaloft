@@ -85,8 +85,15 @@ in the footer.
 The banner is:
 
 ```text
-Remote · <project> · <repo@sha> · <server> · my sandbox · <workspaceId>
+Remote · <project> · <repo@sha> · <server> · my sandbox · <name>
 ```
+
+<a id="agent-workspace-display-name" />
+`<name>` is a readable workspace name, not `sbx_…`. Linked folders use the directory
+name. A git repo uses `repo@short-sha`. An unlinked open gets a generated kebab
+name such as `resonant-silence`. Reopen keeps the same name. Cloud Agents list
+and detail use that name. JSON / `--json` may still include `workspaceId`.
+`workspace show|pause|resume|terminate` accept the display name.
 
 After occupy, the CLI writes the public Appaloft skill into `/workspace/skills/appaloft`
 and `/workspace/.agents/skills/appaloft`. Matching skill directories from this laptop's
