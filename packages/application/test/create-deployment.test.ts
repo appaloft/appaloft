@@ -5318,8 +5318,8 @@ describe("CreateDeploymentUseCase", () => {
     expect(executionMetadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(packedSourceArchive);
     expect(executionMetadata?.[ORIGINAL_LOCATOR_METADATA_KEY]).toBe(folder);
     expect(executionMetadata?.[ORIGINAL_LOCATOR_METADATA_KEY]).not.toBe(parent);
-    expect(runtimePlan?.source.toState().locator).toBe(folder);
-    expect(runtimePlan?.source.toState().locator).not.toBe(parent);
+    expect(runtimePlan?.source.toState().locator.value).toBe(folder);
+    expect(runtimePlan?.source.toState().locator.value).not.toBe(parent);
   });
 
   test.skip("bootstraps a default local deployment context when ids are omitted", async () => {
