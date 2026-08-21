@@ -1,6 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::Frame;
-use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Wrap};
@@ -1060,7 +1060,7 @@ impl Default for AppState {
             pending_osc52: Vec::new(),
             osc52_carry: String::new(),
             osc52_passthrough_failed: false,
-            status_line: "preparing the agent".to_owned(),
+            status_line: OCCUPANCY_WAIT_TITLE.to_owned(),
             terminal: vt100::Parser::new(24, 80, 10_000),
             terminal_size: (80, 24),
         }
@@ -1133,7 +1133,7 @@ impl AppState {
                 if let Some(project) = project {
                     self.loading.project = project;
                 }
-                self.status_line = "preparing the agent".to_owned();
+                self.status_line = OCCUPANCY_WAIT_TITLE.to_owned();
             }
             ParentMessage::Chrome { title, project } => {
                 if let Some(title) = title {
@@ -2254,12 +2254,27 @@ fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
     }
 }
 
+const OCCUPANCY_WAIT_TITLE: &str = "preparing the agent";
+
 fn occupancy_chrome_header(state: &AppState) -> String {
     if state.loading.project.is_empty() {
         state.loading.title.clone()
     } else {
         format!("{} · {}", state.loading.title, state.loading.project)
     }
+}
+
+fn occupancy_prepare_panel_desired_width(state: &AppState) -> usize {
+    const BORDER_COLS: usize = 2;
+    state
+        .loading
+        .steps
+        .iter()
+        .map(|step| step.label.chars().count() + 2)
+        .chain(std::iter::once(OCCUPANCY_WAIT_TITLE.chars().count() + 2))
+        .max()
+        .unwrap_or(OCCUPANCY_WAIT_TITLE.chars().count() + 2)
+        + BORDER_COLS
 }
 
 pub const OSC52_PASSTHROUGH_DISABLED: &str =
@@ -2406,7 +2421,7 @@ fn occupancy_agents_tree_lines(state: &AppState) -> Vec<Line<'static>> {
             Style::default().add_modifier(Modifier::BOLD),
         )),
         Line::from(format!("  {project}")),
-        Line::from("    preparing the agent"),
+        Line::from(format!("    {OCCUPANCY_WAIT_TITLE}")),
     ]
 }
 
@@ -2428,7 +2443,20 @@ fn render_occupancy_loading(frame: &mut Frame<'_>, state: &AppState, area: Rect)
         render_occupancy_prepare_panel(frame, state, wait);
         return;
     }
-    render_occupancy_prepare_panel(frame, state, area);
+    let sections = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Min(1)])
+        .split(area);
+    frame.render_widget(
+        Paragraph::new(Span::styled(
+            occupancy_chrome_header(state),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )),
+        sections[0],
+    );
+    render_occupancy_prepare_panel(frame, state, sections[1]);
 }
 
 fn occupancy_prepare_panel_content_width(desired: usize, inner_width: u16) -> u16 {
@@ -2440,71 +2468,47 @@ fn occupancy_prepare_panel_content_width(desired: usize, inner_width: u16) -> u1
 }
 
 fn render_occupancy_prepare_panel(frame: &mut Frame<'_>, state: &AppState, area: Rect) {
-    const STEP_ROWS: u16 = 9;
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::Cyan))
-        .title(Span::styled(
-            format!(" {} ", occupancy_chrome_header(state)),
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        ));
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-    if inner.width == 0 || inner.height == 0 {
+    const STEP_ROWS: u16 = 5;
+    if area.width == 0 || area.height == 0 {
         return;
     }
     let content_w = occupancy_prepare_panel_content_width(
-        state
-            .loading
-            .steps
-            .iter()
-            .map(|step| step.label.chars().count() + 2)
-            .chain(std::iter::once(
-                occupancy_chrome_header(state).chars().count(),
-            ))
-            .max()
-            .unwrap_or(0),
-        inner.width,
+        occupancy_prepare_panel_desired_width(state),
+        area.width,
     );
-    let panel = centered_rect(content_w, (STEP_ROWS + 4).min(inner.height), inner);
+    let panel_h = (STEP_ROWS + 3).min(area.height);
+    let panel = centered_rect(content_w, panel_h, area);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Cyan));
+    let inner = block.inner(panel);
+    frame.render_widget(block, panel);
+    if inner.width == 0 || inner.height == 0 {
+        return;
+    }
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1),
             Constraint::Length(1),
-            Constraint::Length(1),
             Constraint::Length(STEP_ROWS),
             Constraint::Min(0),
         ])
-        .split(panel);
+        .split(inner);
     frame.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled(
                 format!("{} ", spinner_frame(state.loading.tick)),
                 Style::default().fg(Color::Cyan),
             ),
-            Span::styled(
-                occupancy_chrome_header(state),
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
-            ),
-        ]))
-        .alignment(Alignment::Center),
+            Span::styled(OCCUPANCY_WAIT_TITLE, Style::default().fg(Color::DarkGray)),
+        ])),
         rows[0],
     );
     frame.render_widget(
-        Paragraph::new("preparing the agent")
-            .alignment(Alignment::Center)
-            .style(Style::default().fg(Color::DarkGray)),
-        rows[1],
-    );
-    frame.render_widget(
         Paragraph::new(occupancy_loading_step_lines(state)).wrap(Wrap { trim: false }),
-        rows[3],
+        rows[2],
     );
 }
 
@@ -3239,6 +3243,64 @@ mod tests {
         out
     }
 
+    fn line_clips_agents_title(line: &str) -> bool {
+        line.replace("Appaloft Cloud Agents", "")
+            .contains("Appaloft Cloud Agen")
+    }
+
+    fn first_screen_step_columns(out: &str) -> (Option<usize>, Option<usize>, Option<usize>) {
+        let column = |label: &str| out.lines().find_map(|line| line.find(label));
+        (
+            column("Checking login"),
+            column("Preparing skills"),
+            column("Preparing disk"),
+        )
+    }
+
+    fn line_clips_wait_title(line: &str) -> bool {
+        line.replace("preparing the agent", "")
+            .contains("preparing the age")
+    }
+
+    fn assert_first_screen_one_prepare_column(out: &str) {
+        assert!(out.contains("Appaloft Cloud Agents"), "{out}");
+        assert!(out.contains("preparing the agent"), "{out}");
+        assert!(
+            !out.lines().any(line_clips_agents_title),
+            "title must not clip to Appaloft Cloud Agen:\n{out}"
+        );
+        assert!(
+            !out.lines().any(line_clips_wait_title),
+            "wait title must not clip to preparing the age:\n{out}"
+        );
+        assert_eq!(
+            out.matches("Checking login").count(),
+            1,
+            "Checking login must appear once:\n{out}"
+        );
+        assert_eq!(
+            out.matches("Preparing skills").count(),
+            1,
+            "Preparing skills must appear once:\n{out}"
+        );
+        assert_eq!(
+            out.matches("Preparing disk").count(),
+            1,
+            "Preparing disk must appear once:\n{out}"
+        );
+        let (login, skills, disk) = first_screen_step_columns(out);
+        assert_eq!(
+            login, skills,
+            "first-screen steps must share one column:\n{out}"
+        );
+        assert_eq!(
+            skills, disk,
+            "first-screen steps must share one column:\n{out}"
+        );
+        assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
+        assert!(!out.contains("sbx_"), "{out}");
+    }
+
     #[test]
     fn ws_remote_progress_193_tui_keeps_connecting_status_until_workspaces_arrive() {
         let mut state = AppState::default();
@@ -3305,6 +3367,56 @@ mod tests {
         assert!(out.contains("Checking login"), "{out}");
         assert!(out.contains("Preparing skills"), "{out}");
         assert!(out.contains("Preparing disk"), "{out}");
+        assert_first_screen_one_prepare_column(&out);
+        assert!(
+            !state.focus_mode,
+            "first paint must not start in focus_mode"
+        );
+    }
+
+    #[test]
+    fn ws_remote_progress_194_first_screen_is_one_prepare_column() {
+        let mut state = AppState::default();
+        assert!(!state.focus_mode);
+        state.apply(ParentMessage::Loading {
+            collapsed: Some(true),
+            title: Some("Appaloft Cloud Agents".to_owned()),
+            project: Some("hello-static".to_owned()),
+        });
+        state.apply(ParentMessage::Progress {
+            message: "Checking login…".to_owned(),
+            step: None,
+        });
+        state.apply(ParentMessage::Progress {
+            message: "Preparing skills…".to_owned(),
+            step: Some("skills".to_owned()),
+        });
+        state.apply(ParentMessage::Progress {
+            message: "Preparing disk on hostinger…".to_owned(),
+            step: Some("disk".to_owned()),
+        });
+        assert_eq!(
+            occupancy_chrome_header(&state),
+            "Appaloft Cloud Agents · hello-static"
+        );
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw preparing-disk first screen");
+        let out = buffer_plain(&terminal);
+        assert!(out.contains("preparing the agent"), "{out}");
+        assert!(
+            out.contains("Appaloft Cloud Agents · hello-static"),
+            "{out}"
+        );
+        assert!(out.contains("restore the tree"), "{out}");
+        assert_first_screen_one_prepare_column(&out);
+        assert!(
+            !out.contains("Preparing skills…") || out.matches("Preparing skills").count() == 1,
+            "parent-bridge progress must not add a second Preparing skills stream:\n{out}"
+        );
+        assert!(!state.focus_mode);
     }
 
     #[test]
@@ -3638,6 +3750,7 @@ mod tests {
         assert!(out.contains("Checking login"), "{out}");
         assert!(out.contains("Preparing skills"), "{out}");
         assert!(out.contains("Preparing disk"), "{out}");
+        assert_first_screen_one_prepare_column(&out);
         assert!(out.contains('✓'), "{out}");
         assert!(out.contains("restore the tree"), "{out}");
         assert!(!out.to_ascii_lowercase().contains("occupancy"), "{out}");
