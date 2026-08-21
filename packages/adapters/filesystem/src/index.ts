@@ -24,6 +24,7 @@ import {
   type ActivateStaticArtifactRouteInput,
   appaloftTraceAttributes,
   isSpecificLocalSourceLeaf,
+  withCliPackedSourceArchiveMetadata,
   withCliResolvedSourceMetadata,
   withOriginalLocatorMetadata,
   createAdapterSpanName,
@@ -1545,18 +1546,21 @@ export class FileSystemSourceDetector implements SourceDetector {
             !isSpecificLocalSourceLeaf(basename(resolvedLocator))
               ? originalLocator
               : resolvedLocator;
-          const metadata = withCliResolvedSourceMetadata(
-            withOriginalLocatorMetadata(
-              workspace
-                ? {
-                    baseDirectory: workspace.evidence.selectedRoot,
-                    detectedSourceRoot: workspace.evidence.selectedRoot,
-                  }
-                : undefined,
-              originalLocator ??
-                (isSpecificLocalSourceLeaf(basename(storedLocator)) ? storedLocator : undefined),
+          const metadata = withCliPackedSourceArchiveMetadata(
+            withCliResolvedSourceMetadata(
+              withOriginalLocatorMetadata(
+                workspace
+                  ? {
+                      baseDirectory: workspace.evidence.selectedRoot,
+                      detectedSourceRoot: workspace.evidence.selectedRoot,
+                    }
+                  : undefined,
+                originalLocator ??
+                  (isSpecificLocalSourceLeaf(basename(storedLocator)) ? storedLocator : undefined),
+              ),
+              input?.cliResolvedSource,
             ),
-            input?.cliResolvedSource,
+            input?.packedSourceArchive,
           );
           const source = SourceDescriptor.rehydrate({
             kind: SourceKindValue.rehydrate(resolved.kind),

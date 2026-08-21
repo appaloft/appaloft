@@ -27,6 +27,7 @@ import {
   CreateSshCredentialCommand,
   type CreateSshCredentialCommandInput,
   CreateStorageVolumeCommand,
+  CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY,
   CLI_RESOLVED_SOURCE_METADATA_KEY,
   compareResourceProfileDrift,
   DeleteDependencyResourceCommand,
@@ -180,7 +181,9 @@ export interface DeploymentPromptSeed {
       | "versionKind"
       | "helmChart"
     >
-  >;
+  > & {
+    packedSourceArchiveTarGz?: string;
+  };
   sourceFingerprint?: string;
   stateBackend?: DeploymentStateBackendDecision;
   stateBackendPrepared?: boolean;
@@ -548,9 +551,12 @@ export function sourceBindingForDeploymentInput(
       | "versionKind"
       | "helmChart"
     >
-  > = {},
+  > & {
+    packedSourceArchiveTarGz?: string;
+  } = {},
 ): ResourceSourceInput {
   const kind = profile.kind ?? sourceKindForDeploymentInput(sourceLocator, deploymentMethod);
+  const packedSourceArchiveTarGz = profile.packedSourceArchiveTarGz?.trim();
   return {
     kind,
     locator: sourceLocator,
@@ -567,6 +573,9 @@ export function sourceBindingForDeploymentInput(
           originalLocator: sourceLocator,
           metadata: {
             [CLI_RESOLVED_SOURCE_METADATA_KEY]: sourceLocator,
+            ...(packedSourceArchiveTarGz
+              ? { [CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]: packedSourceArchiveTarGz }
+              : {}),
           },
         }
       : {}),
@@ -1883,6 +1892,10 @@ function resolveReusableResourceSource(input: {
     }
 
     const resource = yield* showResource(input.resourceId);
+    if (input.source.metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]?.trim()) {
+      return input.source;
+    }
+
     if (sourceProfilesMatch({ current: resource.source, desired: input.source })) {
       return undefined;
     }

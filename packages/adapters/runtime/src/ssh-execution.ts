@@ -1,11 +1,12 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { ash } from "@appaloft/ash";
 import {
   resolveSshPackageLocalWorkdir,
   safeLocalSourceBaseDirectory,
 } from "./local-source-workdir";
 import {
+  cliPackedSourceArchiveFromMetadata,
   createDeploymentProgressEvent,
   deploymentProgressSteps,
   type AppLogger,
@@ -491,6 +492,30 @@ export function buildLocalWorkspaceUploadCommand(input: {
 
   return [
     gitAwareTarCommand,
+    "|",
+    "ssh",
+    ...input.sshArgs.map((arg) => ash.quote(arg)),
+    ash.quote(input.remotePrepareCommand),
+  ].join(" ");
+}
+
+export function materializeCliPackedSourceArchive(input: {
+  runtimeDir: string;
+  packedSourceArchive: string;
+}): string {
+  const localArchivePath = join(input.runtimeDir, "cli-source.tgz");
+  writeFileSync(localArchivePath, Buffer.from(input.packedSourceArchive, "base64"));
+  return localArchivePath;
+}
+
+export function buildPackedSourceUploadCommand(input: {
+  localArchivePath: string;
+  remotePrepareCommand: string;
+  sshArgs: readonly string[];
+}): string {
+  return [
+    "cat",
+    ash.quote(input.localArchivePath),
     "|",
     "ssh",
     ...input.sshArgs.map((arg) => ash.quote(arg)),
@@ -1981,6 +2006,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       };
     }
 
+    const packedSourceArchive = cliPackedSourceArchiveFromMetadata(source.metadata);
     const localWorkdir = resolveSshPackageLocalWorkdir({
       locator: source.locator,
       ...(state.runtimePlan.execution.workingDirectory
@@ -1993,7 +2019,32 @@ export class SshExecutionBackend implements ExecutionBackend {
       ...(source.metadata ? { metadata: source.metadata } : {}),
     });
 
-    if (!existsSync(localWorkdir)) {
+    let localArchivePath: string | undefined;
+    if (packedSourceArchive) {
+      try {
+        localArchivePath = materializeCliPackedSourceArchive({
+          runtimeDir: input.runtimeDir,
+          packedSourceArchive,
+        });
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : "cli-packed-source-decode-failed";
+        const message = `CLI-packed source archive could not be materialized: ${detail}`;
+        timeline.push(phaseLog("package", message, "error"));
+        return {
+          prepared: false,
+          deployment: this.applyFailure(deployment, {
+            timeline,
+            errorCode: "cli_packed_source_materialize_failed",
+            retryable: false,
+            metadata: {
+              localWorkdir,
+            },
+          }),
+        };
+      }
+    }
+
+    if (!localArchivePath && !existsSync(localWorkdir)) {
       const message = `Source working directory does not exist: ${localWorkdir}`;
       timeline.push(phaseLog("package", message, "error"));
       return {
@@ -2021,11 +2072,17 @@ export class SshExecutionBackend implements ExecutionBackend {
     const remotePrepareCommand = `${previewArtifactMarkerCommand} && rm -rf ${ash.quote(
       remoteWorkdir,
     )} && mkdir -p ${ash.quote(remoteWorkdir)} && tar -xzf - -C ${ash.quote(remoteWorkdir)}`;
-    const uploadCommand = buildLocalWorkspaceUploadCommand({
-      localWorkdir,
-      remotePrepareCommand,
-      sshArgs: this.sshArgs(input.target),
-    });
+    const uploadCommand = localArchivePath
+      ? buildPackedSourceUploadCommand({
+          localArchivePath,
+          remotePrepareCommand,
+          sshArgs: this.sshArgs(input.target),
+        })
+      : buildLocalWorkspaceUploadCommand({
+          localWorkdir,
+          remotePrepareCommand,
+          sshArgs: this.sshArgs(input.target),
+        });
     const upload = await runShell({
       command: uploadCommand,
       cwd: input.runtimeDir,

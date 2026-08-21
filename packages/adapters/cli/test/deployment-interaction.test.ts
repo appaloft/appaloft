@@ -290,6 +290,36 @@ describe("CLI quick deploy draft mapping", () => {
     ).toBe(undefined);
   });
 
+  test("[DEP-CREATE-PKG-007][QUICK-DEPLOY-ENTRY-008B] attaches the CLI-host packed archive to local-folder source metadata", async () => {
+    ensureReflectMetadata();
+    const { sourceBindingForDeploymentInput, sourceProfilesMatch } =
+      await import("../src/commands/deployment-interaction");
+    const { CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY, CLI_RESOLVED_SOURCE_METADATA_KEY } =
+      await import("@appaloft/application");
+    const locator = "/Users/nichenqin/projects/nux-055483c0-static";
+    const packedSourceArchiveTarGz = "H4sIAAAAAAAAAytKLSpILC4u1gMA";
+    const desired = sourceBindingForDeploymentInput(locator, "static", {
+      packedSourceArchiveTarGz,
+    });
+
+    expect(desired.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]).toBe(locator);
+    expect(desired.metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(
+      packedSourceArchiveTarGz,
+    );
+    expect(
+      sourceProfilesMatch({
+        current: {
+          kind: "local-folder",
+          locator,
+          displayName: "nux-055483c0-static",
+          originalLocator: locator,
+          sourceBindingFingerprint: "fp_same_locator",
+        },
+        desired,
+      }),
+    ).toBe(true);
+  });
+
   test("[DEP-CREATE-PKG-007] refreshes a reused static source when CLI-resolved metadata is missing", async () => {
     ensureReflectMetadata();
     const { sourceBindingForDeploymentInput, sourceProfilesMatch } =

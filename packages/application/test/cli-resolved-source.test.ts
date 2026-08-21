@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { DisplayNameText, SourceDescriptor, SourceKindValue, SourceLocator } from "@appaloft/core";
 import {
+  CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY,
   CLI_RESOLVED_SOURCE_METADATA_KEY,
   explicitCliResolvedSource,
   retainCliResolvedSource,
@@ -62,6 +63,22 @@ describe("CLI-resolved source", () => {
     const retained = retainLocalFolderSourceFields(source, { originalLocator: folder });
     expect(retained.locator).toBe(folder);
     expect(retained.metadata?.originalLocator).toBe(folder);
+    expect(retained.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]).toBeUndefined();
+  });
+
+  test("[DEP-CREATE-PKG-007] keeps a CLI-host packed archive when locator is already the parent", () => {
+    const parent = "/Users/nichenqin/projects";
+    const packedSourceArchive = "H4sIAAAAAAAAAytKLSpILC4u1gMA";
+    const source = SourceDescriptor.rehydrate({
+      kind: SourceKindValue.rehydrate("local-folder"),
+      locator: SourceLocator.rehydrate(parent),
+      displayName: DisplayNameText.rehydrate("workspace"),
+      metadata: { baseDirectory: "/" },
+    });
+
+    const retained = retainLocalFolderSourceFields(source, { packedSourceArchive });
+    expect(retained.locator).toBe(parent);
+    expect(retained.metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(packedSourceArchive);
     expect(retained.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]).toBeUndefined();
   });
 });

@@ -432,6 +432,31 @@ describe("FileSystemSourceDetector", () => {
     );
   });
 
+  test("[DEP-CREATE-PKG-007] keeps a CLI-host packed archive when the locator folder is missing here", async () => {
+    ensureReflectMetadata();
+    const [
+      { createExecutionContext, CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY },
+      { FileSystemSourceDetector },
+    ] = await Promise.all([import("@appaloft/application"), import("../src")]);
+    const parent = "/Users/nichenqin/projects";
+    const packedSourceArchive = "H4sIAAAAAAAAAytKLSpILC4u1gMA";
+
+    const result = await new FileSystemSourceDetector().detect(
+      createExecutionContext({ entrypoint: "cli", requestId: "req_cli_packed_archive" }),
+      parent,
+      {
+        allowUnrecognizedRoot: true,
+        packedSourceArchive,
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().source.locator).toBe(parent);
+    expect(result._unsafeUnwrap().source.metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(
+      packedSourceArchive,
+    );
+  });
+
   test("[DEP-CREATE-PKG-007] does not persist a dirname'd locator as the CLI-resolved source", async () => {
     ensureReflectMetadata();
     const [

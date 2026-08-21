@@ -78,6 +78,7 @@ import {
   runDeploymentTimelineQuery,
   runQuery,
 } from "../runtime.js";
+import { packageLocalFolderSourceOnCliHostIfPresent } from "./cli-local-source-package.js";
 import {
   applicationDeploymentPromptSeedsFromConfig,
   type DeploymentEnvironmentVariableSeed,
@@ -1897,30 +1898,30 @@ export const deployCommand = EffectCommand.make(
       );
       const hasProfileOverrides = Boolean(
         requestedDeploymentMethod ||
-          installCommand ||
-          buildCommand ||
-          startCommand ||
-          runtimeNameValue ||
-          publishDirectory ||
-          sourceBaseDirectoryValue ||
-          helmChartVersionValue ||
-          helmValuesSecretReference.length > 0 ||
-          helmHookPolicyValue ||
-          helmTimeoutSecondsValue !== undefined ||
-          dockerfilePathValue ||
-          dockerComposeFilePathValue ||
-          buildTargetValue ||
-          portValue !== undefined ||
-          upstreamProtocolValue ||
-          exposureModeValue ||
-          targetServiceNameValue ||
-          hostPortValue !== undefined ||
-          healthCheckPath ||
-          requestedConfigProfile ||
-          requestedApplicationKeys.length > 0 ||
-          flagEnvironmentVariables.length > 0 ||
-          requestedPreviewDomainTemplate ||
-          requestedPreviewTlsMode,
+        installCommand ||
+        buildCommand ||
+        startCommand ||
+        runtimeNameValue ||
+        publishDirectory ||
+        sourceBaseDirectoryValue ||
+        helmChartVersionValue ||
+        helmValuesSecretReference.length > 0 ||
+        helmHookPolicyValue ||
+        helmTimeoutSecondsValue !== undefined ||
+        dockerfilePathValue ||
+        dockerComposeFilePathValue ||
+        buildTargetValue ||
+        portValue !== undefined ||
+        upstreamProtocolValue ||
+        exposureModeValue ||
+        targetServiceNameValue ||
+        hostPortValue !== undefined ||
+        healthCheckPath ||
+        requestedConfigProfile ||
+        requestedApplicationKeys.length > 0 ||
+        flagEnvironmentVariables.length > 0 ||
+        requestedPreviewDomainTemplate ||
+        requestedPreviewTlsMode,
       );
 
       if (
@@ -2251,6 +2252,9 @@ export const deployCommand = EffectCommand.make(
           }),
         );
       }
+      const packedSourceArchiveTarGz = yield* resultToEffect(
+        packageLocalFolderSourceOnCliHostIfPresent(configuredSourceLocator),
+      );
       const sourceProfile = {
         ...configSeed.sourceProfile,
         ...(sourceBaseDirectoryValue ? { baseDirectory: sourceBaseDirectoryValue } : {}),
@@ -2265,6 +2269,7 @@ export const deployCommand = EffectCommand.make(
               },
             }
           : {}),
+        ...(packedSourceArchiveTarGz ? { packedSourceArchiveTarGz } : {}),
       };
 
       const stateSession = yield* prepareDeploymentStateSessionIfNeeded(stateBackendDecision);
@@ -2386,9 +2391,15 @@ export const deployCommand = EffectCommand.make(
           for (const application of applicationSeeds) {
             const applicationSourceLocator =
               application.seed.sourceLocator ?? configuredSourceLocator ?? configSourceLocator;
+            const applicationPackedSourceArchiveTarGz = yield* resultToEffect(
+              packageLocalFolderSourceOnCliHostIfPresent(applicationSourceLocator),
+            );
             const applicationSourceProfile = {
               ...(application.seed.sourceProfile ?? {}),
               ...(sourceBaseDirectoryValue ? { baseDirectory: sourceBaseDirectoryValue } : {}),
+              ...(applicationPackedSourceArchiveTarGz
+                ? { packedSourceArchiveTarGz: applicationPackedSourceArchiveTarGz }
+                : {}),
             };
             const applicationRuntimeName = yield* resultToEffect(
               resolveRuntimeNameSeed({

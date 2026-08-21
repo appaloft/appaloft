@@ -10053,6 +10053,8 @@ export interface SourceDetectionInput {
   originalLocator?: string;
   /** Resource/CLI display name; detector must not replace a hyphenated leaf. */
   displayName?: string;
+  /** CLI-host tar.gz of the deploy folder; detached workers apply this instead of existsSync. */
+  packedSourceArchive?: string;
 }
 
 export type RequestedDeploymentMethod =
