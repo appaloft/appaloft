@@ -432,6 +432,34 @@ describe("FileSystemSourceDetector", () => {
     );
   });
 
+  test("[DEP-CREATE-PKG-007][QUICK-DEPLOY-ENTRY-008B] keeps a packed nux-d73d53b6-static archive when the Mac leaf is missing here", async () => {
+    ensureReflectMetadata();
+    const [
+      { createExecutionContext, CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY },
+      { FileSystemSourceDetector },
+    ] = await Promise.all([import("@appaloft/application"), import("../src")]);
+    const parent = "/Users/nichenqin/projects";
+    const leaf = "nux-d73d53b6-static";
+    const packedSourceArchive = "H4sIAAAAAAAAAytKLSpILC4u1gMA";
+
+    const result = await new FileSystemSourceDetector().detect(
+      createExecutionContext({ entrypoint: "cli", requestId: "req_nux_d73d53b6_packed" }),
+      parent,
+      {
+        allowUnrecognizedRoot: true,
+        packedSourceArchive,
+        originalLocator: `${parent}/${leaf}`,
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().source.locator).toBe(`${parent}/${leaf}`);
+    expect(result._unsafeUnwrap().source.locator).not.toBe(parent);
+    expect(result._unsafeUnwrap().source.metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(
+      packedSourceArchive,
+    );
+  });
+
   test("[DEP-CREATE-PKG-007] keeps a CLI-host packed archive when the locator folder is missing here", async () => {
     ensureReflectMetadata();
     const [
