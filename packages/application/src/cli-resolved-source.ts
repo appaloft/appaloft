@@ -46,7 +46,7 @@ export function isGenericLocalSourceLeaf(leaf: string | undefined): boolean {
   return Boolean(homeLeaf && homeLeaf.toLowerCase() === lower);
 }
 
-export function isSpecificLocalSourceLeaf(leaf: string | undefined): boolean {
+export function isSpecificLocalSourceLeaf(leaf: string | undefined): leaf is string {
   const normalized = leaf?.trim();
   return Boolean(
     normalized &&
