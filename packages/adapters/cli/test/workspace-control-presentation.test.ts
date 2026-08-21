@@ -2529,4 +2529,109 @@ describe("Workspace control presentation", () => {
       setWorkspaceTuiScrollbackWriter(undefined);
     }
   });
+
+  test("[WS-REMOTE-COMPAT-222][WS-REMOTE-PROGRESS-219] occupy Cloudflare 502 after TUI restores then prints a human next step", async () => {
+    const { Effect } = await import("effect");
+    const { printCliError } = await import("../src/runtime.js");
+    const { occupancyCloudCompatError } = await import("../src/remote-code-session.js");
+    const renderer = new FakeRendererSession([], { hangUntilClose: true });
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+    const timeline: string[] = [];
+    setWorkspaceTuiScrollbackWriter((text) => {
+      timeline.push(`restore:${text}`);
+    });
+    let stdout = "";
+    let stderr = "";
+    const originalStdout = process.stdout.write.bind(process.stdout);
+    const originalStderr = process.stderr.write.bind(process.stderr);
+    const originalExitCode = process.exitCode;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      return true;
+    }) as typeof process.stdout.write;
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      const text = typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      stderr += text;
+      if (text.includes("error:")) timeline.push("error-print");
+      return true;
+    }) as typeof process.stderr.write;
+    const remapped = occupancyCloudCompatError(
+      {
+        code: "sdk_unstructured_error",
+        category: "infra",
+        message:
+          "The server returned an error that did not match the Appaloft error contract. HTTP 502 Body: {cloudflare 502 bad gateway, origin invalid or incomplete response}",
+        retryable: true,
+        details: {
+          status: 502,
+          bodyPreview: "{cloudflare 502 bad gateway, origin invalid or incomplete response}",
+        },
+      },
+      { id: "srv_4lifk0yrcecy", name: "hostinger" },
+      {
+        repositoryIdentity: "folder.local/cwd/appaloft-clo-cloud",
+        repository: "https://folder.local/cwd/appaloft-clo-cloud.git",
+      },
+      { alias: "omp", harness: "omp" },
+    );
+    try {
+      await expect(
+        presentation.start({
+          occupyBootstrap: async ({ reportProgress }) => {
+            await reportProgress("Checking login…");
+            await reportProgress("Preparing skills…");
+            await reportProgress("Preparing disk on hostinger…");
+            throw remapped;
+          },
+          executeCommand: async () => ok({}),
+          executeQuery: async <T>() => ok({ items: [] } as T),
+        }),
+      ).rejects.toMatchObject({
+        code: "workspace_open_cloud_temporarily_unreachable",
+      });
+      expect(renderer.messages[0]).toEqual({
+        type: "loading",
+        collapsed: true,
+        title: "Appaloft Cloud Agents",
+      });
+      expect(renderer.messages).toContainEqual({
+        type: "progress",
+        message: "Preparing disk on hostinger…",
+        step: "disk",
+      });
+      expect(renderer.messages.some((message) => message.type === "error")).toBeFalse();
+      expect(renderer.closed).toBeGreaterThan(0);
+      expect(timeline.some((entry) => entry.startsWith("restore:"))).toBeTrue();
+      expect(timeline.includes("error-print")).toBeFalse();
+      const restoredBeforePrint = timeline.filter((entry) => entry.startsWith("restore:")).join("");
+      expect(restoredBeforePrint).toContain(WORKSPACE_TUI_LEAVE_ALT_SCREEN);
+      expect(restoredBeforePrint).toContain("\x1b[?1049l");
+      expect(restoredBeforePrint).toContain("\x1b[?25h");
+
+      await Effect.runPromise(printCliError(remapped));
+
+      expect(timeline.includes("error-print")).toBeTrue();
+      expect(timeline.findIndex((entry) => entry.startsWith("restore:"))).toBeLessThan(
+        timeline.indexOf("error-print"),
+      );
+      expect(stdout).not.toContain("error:");
+      expect(stderr).not.toContain("did not match the Appaloft error contract");
+      expect(stderr).not.toContain("cloudflare 502 bad gateway");
+      expect(stderr).not.toContain("<html");
+      expect(stderr).toContain("Cloud is temporarily unreachable");
+      expect(stderr).toContain("HTTP 502");
+      expect(stderr).toContain("appaloft code --omp --server srv_4lifk0yrcecy");
+      expect(stderr).not.toContain("This Cloud does not accept Server targeting");
+      expect(stderr).not.toMatch(/occupancy/iu);
+      expect(stderr).not.toContain("sbx_");
+      expect(JSON.stringify(renderer.messages)).not.toMatch(/occupancy/iu);
+    } finally {
+      process.stdout.write = originalStdout;
+      process.stderr.write = originalStderr;
+      process.exitCode = originalExitCode ?? 0;
+      setWorkspaceTuiScrollbackWriter(undefined);
+    }
+  });
 });

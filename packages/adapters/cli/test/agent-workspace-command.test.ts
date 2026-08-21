@@ -3295,6 +3295,80 @@ describe("Agent Workspace CLI", () => {
     );
   });
 
+  test("[WS-REMOTE-COMPAT-222] occupy Cloudflare 502 is a human next step for --omp and --pi", async () => {
+    const cloudflare502 = {
+      code: "sdk_unstructured_error",
+      category: "infra" as const,
+      message:
+        "The server returned an error that did not match the Appaloft error contract. HTTP 502 Body: {cloudflare 502 bad gateway, origin invalid or incomplete response}",
+      retryable: true,
+      details: {
+        status: 502,
+        bodyPreview: "{cloudflare 502 bad gateway, origin invalid or incomplete response}",
+      },
+    };
+    const door = {
+      repository: "https://github.com/appaloft/appaloft-cloud.git",
+      repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+      ref: "refs/heads/main",
+      branch: "main",
+      commitSha: "414d63e8aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      projectId: "prj_rhdu3hxcj5sh",
+      projectName: "appaloft-clo-cloud",
+      serverId: "srv_4lifk0yrcecy",
+      serverName: "hostinger",
+    };
+    const run = async (alias: "--omp" | "--pi") => {
+      const { createCliProgram } = await import("../src");
+      const program = createCliProgram({
+        version: "0.1.0-test",
+        startServer: async () => {},
+        commandBus: {
+          execute: async () => err(cloudflare502),
+        } as unknown as CommandBus,
+        queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+        executionContextFactory: {
+          create: (input) => createExecutionContext({ ...input, requestId: "req_cloud_502" }),
+        },
+        resolveRemoteCodeDoor: async () => door,
+      });
+      const originalExitCode = process.exitCode;
+      const write = process.stderr.write;
+      let stderr = "";
+      process.stderr.write = ((chunk: string | Uint8Array) => {
+        stderr += String(chunk);
+        return true;
+      }) as typeof process.stderr.write;
+      try {
+        await program.parseAsync([
+          "node",
+          "appaloft",
+          "code",
+          alias,
+          "--server",
+          "srv_4lifk0yrcecy",
+          "--no-attach",
+        ]);
+        throw new Error("Expected occupy Cloudflare 502 to fail");
+      } catch (error) {
+        const printed = `${stderr}\n${JSON.stringify(error)}\n${String((error as { message?: string }).message ?? error)}`;
+        expect(printed).not.toContain("did not match the Appaloft error contract");
+        expect(printed).not.toContain("cloudflare 502 bad gateway");
+        expect(printed).toContain("Cloud is temporarily unreachable");
+        expect(printed).toContain("HTTP 502");
+        expect(printed).toContain(`appaloft code ${alias} --server srv_4lifk0yrcecy`);
+        expect(printed).not.toContain("workspace_open_target_server_unsupported");
+        expect(printed.toLowerCase()).not.toContain("occupancy");
+        expect(printed).not.toContain("sbx_");
+      } finally {
+        process.stderr.write = write;
+        process.exitCode = originalExitCode ?? 0;
+      }
+    };
+    await run("--omp");
+    await run("--pi");
+  });
+
   test("[WS-SCRATCH-INSTALL-007] refused install is the only hard scratch failure", async () => {
     let commandDispatched = false;
     const { createCliProgram } = await import("../src");

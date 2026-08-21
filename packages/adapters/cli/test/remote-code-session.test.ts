@@ -106,6 +106,77 @@ describe("remote code door", () => {
       repositoryIdentity: "folder.local/cwd/nux-54065181-unlinked",
     });
   });
+  test("[WS-REMOTE-COMPAT-222] occupy Cloudflare 502 is a human next step, not the error-contract sentence", () => {
+    const server = { id: "srv_4lifk0yrcecy", name: "hostinger" };
+    const cloud = {
+      code: "sdk_unstructured_error" as const,
+      category: "infra" as const,
+      message:
+        "The server returned an error that did not match the Appaloft error contract. HTTP 502 Body: {cloudflare 502 bad gateway, origin invalid or incomplete response}",
+      retryable: true,
+      details: {
+        status: 502,
+        bodyPreview: "{cloudflare 502 bad gateway, origin invalid or incomplete response}",
+      },
+    };
+    const remapped = occupancyCloudCompatError(cloud, server, undefined, {
+      alias: "omp",
+      harness: "omp",
+    });
+    expect(remapped.code).toBe("workspace_open_cloud_temporarily_unreachable");
+    expect(remapped.message).not.toContain("did not match the Appaloft error contract");
+    expect(remapped.message).toContain("Cloud is temporarily unreachable");
+    expect(remapped.message).toContain("HTTP 502");
+    expect(remapped.message).not.toContain("cloudflare");
+    expect(remapped.message).not.toContain("<html");
+    expect(String(remapped.details?.guidance)).toContain(
+      "appaloft code --omp --server srv_4lifk0yrcecy",
+    );
+    expect(remapped.details).not.toHaveProperty("bodyPreview");
+    expect(remapped.message).not.toContain("This Cloud does not accept Server targeting");
+    expect(remapped.message.toLowerCase()).not.toContain("occupancy");
+    expect(remapped.message).not.toContain("sbx_");
+    expect(String(remapped.details?.guidance).toLowerCase()).not.toContain("occupancy");
+    const html = occupancyCloudCompatError(
+      {
+        code: "control_plane_unexpected_html_response",
+        category: "infra",
+        message:
+          "Control plane returned HTML instead of JSON. Check the control-plane base URL and API route.",
+        retryable: true,
+        details: { status: 503, bodyKind: "html" },
+      },
+      server,
+      {
+        repositoryIdentity: "folder.local/cwd/appaloft-clo-cloud",
+        repository: "https://folder.local/cwd/appaloft-clo-cloud.git",
+      },
+      { alias: "pi", harness: "pi" },
+    );
+    expect(html.code).toBe("workspace_open_cloud_temporarily_unreachable");
+    expect(html.message).toContain("HTTP 503");
+    expect(String(html.details?.guidance)).toContain(
+      "appaloft code --pi --server srv_4lifk0yrcecy",
+    );
+    expect(String(html.details?.guidance).toLowerCase()).not.toContain("occupancy");
+    const execFailed = occupancyCloudCompatError(
+      {
+        code: "sdk_unstructured_error",
+        category: "infra",
+        message:
+          'The server returned an error that did not match the Appaloft error contract. HTTP 500 code exec_failed. Body: {"error":"omp: not found"}',
+        retryable: false,
+        details: {
+          status: 500,
+          remoteCode: "exec_failed",
+          bodyPreview: '{"error":"omp: not found"}',
+        },
+      },
+      server,
+    );
+    expect(execFailed.code).toBe("sdk_unstructured_error");
+    expect(execFailed.message).toContain("did not match the Appaloft error contract");
+  });
   test("[WS-REMOTE-OPEN-BYOS-181] --server pin keeps the enrolled Server name when the door already selected it", () => {
     const pinned = pinRemoteCodeDoorServer(
       {

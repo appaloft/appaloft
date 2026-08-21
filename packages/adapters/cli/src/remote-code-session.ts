@@ -464,6 +464,80 @@ function isBareInputValidationFailed(error: DomainError): boolean {
   );
 }
 
+function occupancyHttpStatus(error: DomainError): number | undefined {
+  return typeof error.details?.status === "number" ? error.details.status : undefined;
+}
+
+function occupancyErrorText(error: DomainError): string {
+  return [
+    error.code,
+    error.message,
+    typeof error.details?.bodyPreview === "string" ? error.details.bodyPreview : "",
+    typeof error.details?.remoteCode === "string" ? error.details.remoteCode : "",
+  ].join(" ");
+}
+
+export function occupancyRetryAgentFlag(agent?: {
+  readonly alias?: string;
+  readonly harness?: string;
+}): "--omp" | "--pi" {
+  return agent?.alias === "pi" || agent?.harness === "pi" ? "--pi" : "--omp";
+}
+
+function isCloudTemporarilyUnreachableError(error: DomainError): boolean {
+  if (isBareInputValidationFailed(error)) return false;
+  if (error.code === "workspace_open_folder_local_input_invalid") return false;
+  if (error.code === "workspace_open_target_server_unsupported") return false;
+  const status = occupancyHttpStatus(error);
+  const text = occupancyErrorText(error);
+  const gatewayStatus = status === 502 || status === 503;
+  const cloudflareShape =
+    /cloudflare/i.test(text) ||
+    /bad gateway/i.test(text) ||
+    /origin invalid/i.test(text) ||
+    /incomplete response/i.test(text);
+  const unstructured =
+    error.code === "sdk_unstructured_error" ||
+    error.code === "control_plane_unstructured_error" ||
+    error.code === "control_plane_unexpected_html_response" ||
+    /did not match the Appaloft error contract/i.test(error.message);
+  return unstructured && (gatewayStatus || cloudflareShape);
+}
+
+function occupancyCloudTemporarilyUnreachableError(
+  error: DomainError,
+  server: { readonly id: string; readonly name: string },
+  door?: {
+    readonly repositoryIdentity?: string;
+    readonly repository?: string;
+  },
+  agent?: {
+    readonly alias?: string;
+    readonly harness?: string;
+  },
+): DomainError {
+  const status = occupancyHttpStatus(error);
+  const retryFlag = occupancyRetryAgentFlag(agent);
+  return {
+    code: "workspace_open_cloud_temporarily_unreachable",
+    category: "infra",
+    message:
+      typeof status === "number"
+        ? `Cloud is temporarily unreachable (HTTP ${status}).`
+        : "Cloud is temporarily unreachable.",
+    retryable: true,
+    details: {
+      phase: "occupy-preparing-disk",
+      serverId: server.id,
+      serverName: server.name,
+      causeCode: error.code,
+      guidance: `Retry appaloft code ${retryFlag} --server ${server.id}.`,
+      ...(typeof status === "number" ? { status } : {}),
+      ...(door?.repositoryIdentity ? { repositoryIdentity: door.repositoryIdentity } : {}),
+    },
+  };
+}
+
 function isUnstructuredCloudValidation(error: DomainError): boolean {
   return (
     isBareInputValidationFailed(error) &&
@@ -535,9 +609,16 @@ export function occupancyCloudCompatError(
     readonly repositoryIdentity?: string;
     readonly repository?: string;
   },
+  agent?: {
+    readonly alias?: string;
+    readonly harness?: string;
+  },
 ): DomainError {
   if (error.details?.code === "workspace_open_repository_not_bound") return error;
   if (error.code === "workspace_open_repository_not_bound") return error;
+  if (isCloudTemporarilyUnreachableError(error)) {
+    return occupancyCloudTemporarilyUnreachableError(error, server, door, agent);
+  }
   if (isFolderLocalDoor(door)) {
     return folderLocalCloudValidationError(error, server, door);
   }

@@ -220,7 +220,14 @@ describe("public docs help registry", () => {
     expect(resolvePublicDocsHelpHref(topic.id)).toBe(
       "/docs/agents/workspaces/#agent-workspace-open",
     );
-    expect(topic.aliases).toEqual(expect.arrayContaining(["appaloft code", "workspace open"]));
+    expect(topic.aliases).toEqual(
+      expect.arrayContaining([
+        "appaloft code",
+        "workspace open",
+        "preparing disk",
+        "cloud temporarily unreachable",
+      ]),
+    );
     expect(topic.specReferences).toEqual(
       expect.arrayContaining([
         "docs/specs/125-workspace-code-activation/spec.md",

@@ -135,6 +135,8 @@ export const publicDocsHelpTopics = {
       "remote development",
       "OpenCode",
       "Pi",
+      "preparing disk",
+      "cloud temporarily unreachable",
       "远程开发",
       "workspace name",
       "sandbox display name",

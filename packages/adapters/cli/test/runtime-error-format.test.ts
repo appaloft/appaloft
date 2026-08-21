@@ -375,6 +375,51 @@ describe("CLI safe error evidence", () => {
     expect(output).not.toContain("sbx_");
   });
 
+  test("[WS-REMOTE-COMPAT-222] occupy Cloudflare 502 prints a human next step without the contract sentence", async () => {
+    const { occupancyCloudCompatError } = await import("../src/remote-code-session.js");
+    const omp = occupancyCloudCompatError(
+      {
+        code: "sdk_unstructured_error",
+        category: "infra",
+        message:
+          "The server returned an error that did not match the Appaloft error contract. HTTP 502 Body: {cloudflare 502 bad gateway, origin invalid or incomplete response}",
+        retryable: true,
+        details: {
+          status: 502,
+          bodyPreview: "{cloudflare 502 bad gateway, origin invalid or incomplete response}",
+        },
+      },
+      { id: "srv_4lifk0yrcecy", name: "hostinger" },
+      undefined,
+      { alias: "omp", harness: "omp" },
+    );
+    const output = formatHumanCliError(omp);
+    expect(output).not.toContain("did not match the Appaloft error contract");
+    expect(output).toContain("Cloud is temporarily unreachable");
+    expect(output).toContain("HTTP 502");
+    expect(output).toContain("appaloft code --omp --server srv_4lifk0yrcecy");
+    expect(output).not.toContain("cloudflare 502 bad gateway");
+    expect(output).not.toContain("<html");
+    expect(output.toLowerCase()).not.toContain("occupancy");
+    expect(output).not.toContain("sbx_");
+    const pi = occupancyCloudCompatError(
+      {
+        code: "control_plane_unexpected_html_response",
+        category: "infra",
+        message: "Control plane returned HTML instead of JSON.",
+        retryable: true,
+        details: { status: 503, bodyKind: "html" },
+      },
+      { id: "srv_4lifk0yrcecy", name: "hostinger" },
+      undefined,
+      { alias: "pi", harness: "pi" },
+    );
+    const piOutput = formatHumanCliError(pi);
+    expect(piOutput).toContain("appaloft code --pi --server srv_4lifk0yrcecy");
+    expect(piOutput.toLowerCase()).not.toContain("occupancy");
+    expect(piOutput).not.toContain("sbx_");
+  });
+
   test("does not serialize unknown failures in human CLI output", () => {
     const output = formatHumanCliError(
       new Error("secret-value ciphertext-value /private/operator/key"),

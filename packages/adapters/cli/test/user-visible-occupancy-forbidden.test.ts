@@ -138,6 +138,29 @@ describe("user-visible Occupancy is forbidden", () => {
         },
       ).message,
     );
+    const cloudUnreachable = occupancyCloudCompatError(
+      {
+        code: "sdk_unstructured_error",
+        category: "infra",
+        message:
+          "The server returned an error that did not match the Appaloft error contract. HTTP 502 Body: {cloudflare 502 bad gateway, origin invalid or incomplete response}",
+        retryable: true,
+        details: {
+          status: 502,
+          bodyPreview: "{cloudflare 502 bad gateway, origin invalid or incomplete response}",
+        },
+      },
+      { id: "srv_4lifk0yrcecy", name: "hostinger" },
+      undefined,
+      { alias: "omp", harness: "omp" },
+    );
+    expectNoOccupancy("cloud-unreachable.message", cloudUnreachable.message);
+    expectNoOccupancy(
+      "cloud-unreachable.guidance",
+      String(cloudUnreachable.details?.guidance ?? ""),
+    );
+    expect(cloudUnreachable.message).not.toContain("sbx_");
+    expect(String(cloudUnreachable.details?.guidance)).not.toContain("sbx_");
     for (const vendor of Object.keys(OCCUPANCY_VENDOR_LABEL) as Array<
       keyof typeof OCCUPANCY_VENDOR_LABEL
     >) {
