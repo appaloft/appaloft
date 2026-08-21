@@ -284,6 +284,9 @@ describe("CLI quick deploy draft mapping", () => {
     expect(
       sourceBindingForDeploymentInput("https://github.com/acme/docs.git", "static").metadata,
     ).toBe(undefined);
+    expect(
+      sourceBindingForDeploymentInput("ghcr.io/acme/api:1.7.3", "prebuilt-image").metadata,
+    ).toBe(undefined);
   });
 
   test("[DEP-CREATE-PKG-007] refreshes a reused static source when CLI-resolved metadata is missing", async () => {
