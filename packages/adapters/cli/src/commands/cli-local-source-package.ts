@@ -3,7 +3,6 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import {
   CLI_PACKED_SOURCE_ARCHIVE_MAX_BYTES,
-  isGenericLocalSourceLeaf,
   isSpecificLocalSourceLeaf,
 } from "@appaloft/application";
 import { domainError, err, ok, type Result } from "@appaloft/core";
@@ -12,6 +11,15 @@ import { isRemoteOrImageSource, resolveCliHostLocalSourceFolder } from "./deploy
 
 function pathLeaf(path: string): string {
   return basename(path.replace(/\/+$/, "") || path);
+}
+
+/**
+ * Only hyphenated source folders such as `nux-*-static` or `appaloft-cloud`
+ * are rewritten/packed. Generic or ordinary package cwd names (`workspace`,
+ * `cli`) must keep the caller's locator and must not be tarred.
+ */
+function isHyphenatedSpecificLocalSourceLeaf(leaf: string): boolean {
+  return isSpecificLocalSourceLeaf(leaf) && leaf.includes("-") && !leaf.includes(":");
 }
 
 const localWorkspaceArchiveExcludePatterns = [
@@ -91,7 +99,7 @@ export function packageLocalFolderSourceOnCliHostIfPresent(
   }
 
   const resolved = resolveCliHostLocalSourceFolder(locator);
-  if (isGenericLocalSourceLeaf(pathLeaf(resolved))) {
+  if (!isHyphenatedSpecificLocalSourceLeaf(pathLeaf(resolved))) {
     return ok(undefined);
   }
 
@@ -117,7 +125,7 @@ export function cliHostLocalFolderSourceSendFields(locator?: string): {
   }
 
   const resolved = resolveCliHostLocalSourceFolder(locator);
-  const folder = isSpecificLocalSourceLeaf(pathLeaf(resolved))
+  const folder = isHyphenatedSpecificLocalSourceLeaf(pathLeaf(resolved))
     ? resolved
     : locator?.trim() || resolved;
   const packed = packageLocalFolderSourceOnCliHostIfPresent(folder);

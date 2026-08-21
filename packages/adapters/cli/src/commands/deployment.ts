@@ -2255,11 +2255,15 @@ export const deployCommand = EffectCommand.make(
           }),
         );
       }
-      const localSourceSend = cliHostLocalFolderSourceSendFields(configuredSourceLocator);
-      const packedSourceArchiveTarGz = localSourceSend.packedSourceArchiveTarGz;
-      const sourceLocatorToSend = configuredSourceLocator
-        ? localSourceSend.folder
-        : configuredSourceLocator;
+      const localSourceSend =
+        configuredSourceLocator &&
+        !isRemoteOrImageSource(configuredSourceLocator) &&
+        deploymentMethod !== "prebuilt-image" &&
+        deploymentMethod !== "helm"
+          ? cliHostLocalFolderSourceSendFields(configuredSourceLocator)
+          : undefined;
+      const packedSourceArchiveTarGz = localSourceSend?.packedSourceArchiveTarGz;
+      const sourceLocatorToSend = localSourceSend?.folder ?? configuredSourceLocator;
       const sourceProfile = {
         ...configSeed.sourceProfile,
         ...(sourceBaseDirectoryValue ? { baseDirectory: sourceBaseDirectoryValue } : {}),

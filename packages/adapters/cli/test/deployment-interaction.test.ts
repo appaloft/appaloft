@@ -214,13 +214,24 @@ describe("CLI quick deploy draft mapping", () => {
       port: 3000,
     };
 
-    expect(
-      sourceBindingForDeploymentInput(".", "workspace-commands", seed.sourceProfile),
-    ).toMatchObject({
-      kind: "local-folder",
-      locator: ".",
-      baseDirectory: "apps/api",
-    });
+    const hostRoot = mkdtempSync(join(tmpdir(), "appaloft-cli-generic-cwd-"));
+    const cliCwd = join(hostRoot, "cli");
+    mkdirSync(cliCwd, { recursive: true });
+    const previousCwd = process.cwd();
+    try {
+      process.chdir(cliCwd);
+      const sent = sourceBindingForDeploymentInput(".", "workspace-commands", seed.sourceProfile);
+      expect(sent).toMatchObject({
+        kind: "local-folder",
+        locator: ".",
+        baseDirectory: "apps/api",
+      });
+      expect(sent.locator).not.toBe(resolve(cliCwd));
+      expect(sent.metadata?.cliPackedSourceTarGz).toBeUndefined();
+    } finally {
+      process.chdir(previousCwd);
+      rmSync(hostRoot, { recursive: true, force: true });
+    }
     expect(runtimeProfileFromDeploymentInput("workspace-commands", seed)).toEqual({
       strategy: "workspace-commands",
       installCommand: "pnpm install --frozen-lockfile",
@@ -286,6 +297,12 @@ describe("CLI quick deploy draft mapping", () => {
     expect(
       sourceBindingForDeploymentInput("https://github.com/acme/docs.git", "static").metadata,
     ).toBe(undefined);
+    expect(
+      sourceBindingForDeploymentInput("ghcr.io/acme/api:1.7.3", "prebuilt-image"),
+    ).toMatchObject({
+      kind: "docker-image",
+      locator: "ghcr.io/acme/api:1.7.3",
+    });
     expect(
       sourceBindingForDeploymentInput("ghcr.io/acme/api:1.7.3", "prebuilt-image").metadata,
     ).toBe(undefined);
