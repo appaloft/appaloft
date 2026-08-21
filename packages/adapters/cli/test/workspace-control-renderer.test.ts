@@ -1,10 +1,11 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
-import { createConnection, type Socket } from "node:net";
+import { createConnection, createServer, type Socket } from "node:net";
 import {
   openLoopbackWorkspaceControlRenderer,
   type WorkspaceControlRendererProcess,
+  writeWorkspaceControlRendererLine,
 } from "../src/workspace-control-renderer";
 
 describe("Workspace control renderer channel", () => {
@@ -234,6 +235,78 @@ describe("Workspace control renderer channel", () => {
       details: { phase: "workspace-control-renderer", reason: "process-exited" },
     });
     expect(terminated).toBe(1);
+  });
+
+  test("[WS-TUI-ERROR-008][WS-TUI-TERMINAL-012][WS-REMOTE-PROGRESS-219] parent write after renderer close swallows EPIPE", async () => {
+    let client: Socket | undefined;
+    let resolveHelloOk!: () => void;
+    const helloOk = new Promise<void>((resolve) => {
+      resolveHelloOk = resolve;
+    });
+    let resolveExited!: () => void;
+    const exited = new Promise<void>((resolve) => {
+      resolveExited = resolve;
+    });
+
+    const renderer = await openLoopbackWorkspaceControlRenderer({
+      launch: async ({ host, port, token }): Promise<WorkspaceControlRendererProcess> => {
+        client = createConnection({ host, port });
+        client.setEncoding("utf8");
+        client.on("connect", () => {
+          client?.write(`${JSON.stringify({ type: "hello", token })}\n`);
+        });
+        client.on("data", (chunk) => {
+          if (String(chunk).includes("hello-ok")) resolveHelloOk();
+        });
+        client.on("close", resolveExited);
+        return {
+          exited,
+          terminate: () => client?.destroy(),
+        };
+      },
+    });
+
+    await helloOk;
+    client?.destroy();
+    await exited;
+    await expect(
+      renderer.send({ type: "loading", title: "Appaloft Cloud Agents" }),
+    ).resolves.toBeUndefined();
+    await expect(renderer.close()).resolves.toBeUndefined();
+  });
+
+  test("[WS-TUI-ERROR-008][WS-REMOTE-PROGRESS-219] renderer line write swallows EPIPE after the peer closes", async () => {
+    let parent: Socket | undefined;
+    const server = createServer((socket) => {
+      parent = socket;
+      socket.on("error", (error) => {
+        if ((error as NodeJS.ErrnoException).code === "EPIPE") return;
+      });
+    });
+    await new Promise<void>((resolveListen, rejectListen) => {
+      server.once("error", rejectListen);
+      server.listen({ host: "127.0.0.1", port: 0, exclusive: true }, resolveListen);
+    });
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("missing test listener address");
+    const client = createConnection({ host: "127.0.0.1", port: address.port });
+    await new Promise<void>((resolveConnect, rejectConnect) => {
+      client.once("connect", resolveConnect);
+      client.once("error", rejectConnect);
+    });
+    await Bun.sleep(10);
+    client.destroy();
+    await Bun.sleep(10);
+    if (!parent) throw new Error("missing parent socket");
+    await expect(
+      writeWorkspaceControlRendererLine(parent, { type: "hello-ok" }),
+    ).resolves.toBeUndefined();
+    await expect(
+      writeWorkspaceControlRendererLine(parent, { type: "shutdown" }),
+    ).resolves.toBeUndefined();
+    await new Promise<void>((resolveClose) => {
+      server.close(() => resolveClose());
+    });
   });
 
   test("[WS-REMOTE-PROGRESS-195] source checkout cargo-builds a missing occupancy TUI sidecar", async () => {

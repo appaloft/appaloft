@@ -4,6 +4,7 @@ import { expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { createServer, type Socket } from "node:net";
 import { resolve } from "node:path";
+import { writeWorkspaceControlRendererLine } from "../src/workspace-tui-launch";
 
 const root = resolve(import.meta.dir, "../../../..");
 const binaryPath =
@@ -82,6 +83,9 @@ realRendererTest(
     const server = createServer((socket) => {
       rendererSocket = socket;
       socket.setEncoding("utf8");
+      socket.on("error", (error) => {
+        if ((error as NodeJS.ErrnoException).code === "EPIPE") return;
+      });
       let buffer = "";
       socket.on("data", (chunk) => {
         buffer += String(chunk);
@@ -89,7 +93,7 @@ realRendererTest(
         const line = buffer.slice(0, buffer.indexOf("\n"));
         const message = JSON.parse(line) as Record<string, unknown>;
         if (message.type === "hello" && message.token === token) {
-          socket.write(`${JSON.stringify({ type: "hello-ok" })}\n`);
+          void writeWorkspaceControlRendererLine(socket, { type: "hello-ok" });
         }
       });
     });

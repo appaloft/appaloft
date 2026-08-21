@@ -221,6 +221,10 @@ describe("occupancy TUI slim launch", () => {
     expect(scrollback).toContain(WORKSPACE_TUI_DISABLE_MOUSE);
     expect(scrollback).toContain("\n");
     expect(scrollback).not.toContain("preparing the agenterror:");
+    const source = readFileSync(join(import.meta.dir, "../src/workspace-tui-launch.ts"), "utf8");
+    expect(source).toContain("export function writeWorkspaceControlRendererLine");
+    expect(source).toContain("isWorkspaceControlRendererSocketReset");
+    expect(source).toContain("isErrnoEpipe");
   });
 
   test("[WS-REMOTE-PROGRESS-219] printCliError leaves alt-screen before a single human line", async () => {

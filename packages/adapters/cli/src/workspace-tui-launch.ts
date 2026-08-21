@@ -363,13 +363,45 @@ function listen(server: Server): Promise<number> {
   });
 }
 
-function writeMessage(socket: Socket, message: unknown): Promise<void> {
-  return new Promise((resolveWrite, rejectWrite) => {
-    socket.write(`${JSON.stringify(message)}\n`, (error) => {
-      if (error && !isErrnoEpipe(error)) rejectWrite(error);
-      else resolveWrite();
-    });
+function isErrnoEpipe(error: unknown): boolean {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { readonly code?: unknown }).code === "EPIPE",
+  );
+}
+
+function isWorkspaceControlRendererSocketReset(error: unknown): boolean {
+  return isErrnoEpipe(error) || (error instanceof Error && error.message.includes("ECONNRESET"));
+}
+
+function attachWorkspaceControlRendererSocketGuard(socket: Socket): void {
+  socket.on("error", (error) => {
+    if (isWorkspaceControlRendererSocketReset(error)) return;
   });
+}
+
+export function writeWorkspaceControlRendererLine(socket: Socket, message: unknown): Promise<void> {
+  return new Promise((resolveWrite, rejectWrite) => {
+    if (socket.destroyed || socket.writableEnded || !socket.writable) {
+      resolveWrite();
+      return;
+    }
+    const finish = (error: NodeJS.ErrnoException | Error | null | undefined) => {
+      if (error && !isWorkspaceControlRendererSocketReset(error)) rejectWrite(error);
+      else resolveWrite();
+    };
+    try {
+      socket.write(`${JSON.stringify(message)}\n`, finish);
+    } catch (error) {
+      finish(error instanceof Error ? error : new Error(String(error)));
+    }
+  });
+}
+
+function writeMessage(socket: Socket, message: unknown): Promise<void> {
+  return writeWorkspaceControlRendererLine(socket, message);
 }
 
 function waitWithTimeout<T>(promise: Promise<T>, timeoutMs: number, error: unknown): Promise<T> {
@@ -453,7 +485,12 @@ export async function openLoopbackWorkspaceControlRenderer(
       }
     });
     socket.on("close", () => events.end());
+    attachWorkspaceControlRendererSocketGuard(socket);
     socket.on("error", (error) => {
+      if (isWorkspaceControlRendererSocketReset(error)) {
+        events.end();
+        return;
+      }
       if (!authenticatedClient) rejectAuthenticated(error);
       events.end();
     });
@@ -489,9 +526,9 @@ export async function openLoopbackWorkspaceControlRenderer(
         closed = true;
         events.end();
         try {
-          if (!socket.destroyed) {
+          if (!socket.destroyed && socket.writable) {
             await writeMessage(socket, { type: "shutdown" });
-            socket.end();
+            if (socket.writable) socket.end();
           }
           await waitWithTimeout(
             process?.exited ?? Promise.resolve(),
@@ -709,15 +746,6 @@ export function claimWorkspaceRendererFailureReport(): boolean {
   if (workspaceRendererFailureReported) return false;
   workspaceRendererFailureReported = true;
   return true;
-}
-
-function isErrnoEpipe(error: unknown): boolean {
-  return Boolean(
-    error &&
-      typeof error === "object" &&
-      "code" in error &&
-      (error as { readonly code?: unknown }).code === "EPIPE",
-  );
 }
 
 export function restoreWorkspaceTuiScrollback(
