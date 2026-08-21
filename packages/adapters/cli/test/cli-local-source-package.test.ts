@@ -2,9 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import {
+  cliHostLocalFolderSourceSendFields,
   packageLocalFolderSourceOnCliHost,
   packageLocalFolderSourceOnCliHostIfPresent,
 } from "../src/commands/cli-local-source-package";
@@ -120,6 +121,49 @@ describe("CLI-host local source package", () => {
       expect(listing.status).toBe(0);
       expect(listing.stdout).toContain("public/index.html");
       expect(listing.stdout).not.toContain(`${leaf}/`);
+      expect(listing.stdout.split("\n").some((line) => line.endsWith("/projects"))).toBe(false);
+      rmSync(listingDir, { recursive: true, force: true });
+    } finally {
+      process.chdir(previousCwd);
+      if (previousPwd === undefined) {
+        delete process.env.PWD;
+      } else {
+        process.env.PWD = previousPwd;
+      }
+      rmSync(hostRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[DEP-CREATE-PKG-007][QUICK-DEPLOY-ENTRY-008B] send fields keep nux-c689b0f1-static off the projects parent", () => {
+    const hostRoot = mkdtempSync(join(tmpdir(), "appaloft-cli-send-nux-"));
+    const parent = join(hostRoot, "projects");
+    const leaf = "nux-c689b0f1-static";
+    const folder = join(parent, leaf);
+    mkdirSync(join(folder, "public"), { recursive: true });
+    writeFileSync(join(folder, "public", "index.html"), "<!doctype html><title>nux</title>");
+    const previousCwd = process.cwd();
+    const previousPwd = process.env.PWD;
+
+    try {
+      process.chdir(folder);
+      process.env.PWD = parent;
+
+      const fromDot = cliHostLocalFolderSourceSendFields(".");
+      expect(fromDot.folder).toBe(resolve(folder));
+      expect(fromDot.folder).not.toBe(resolve(parent));
+      expect(fromDot.packedSourceArchiveTarGz?.length).toBeGreaterThan(0);
+
+      const fromParent = cliHostLocalFolderSourceSendFields(parent);
+      expect(fromParent.folder).toBe(resolve(folder));
+      expect(fromParent.folder).not.toBe(resolve(parent));
+      expect(fromParent.packedSourceArchiveTarGz?.length).toBeGreaterThan(0);
+
+      const listingDir = mkdtempSync(join(tmpdir(), "appaloft-cli-send-nux-list-"));
+      const archivePath = join(listingDir, "source.tgz");
+      writeFileSync(archivePath, Buffer.from(fromParent.packedSourceArchiveTarGz ?? "", "base64"));
+      const listing = spawnSync("tar", ["-tzf", archivePath], { encoding: "utf8" });
+      expect(listing.status).toBe(0);
+      expect(listing.stdout).toContain("public/index.html");
       expect(listing.stdout.split("\n").some((line) => line.endsWith("/projects"))).toBe(false);
       rmSync(listingDir, { recursive: true, force: true });
     } finally {

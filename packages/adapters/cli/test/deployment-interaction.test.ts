@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -518,6 +519,59 @@ describe("CLI quick deploy draft mapping", () => {
         deploymentMethod: "static",
         publishDirectory: "public",
       });
+    } finally {
+      process.chdir(previousCwd);
+      if (previousPwd === undefined) {
+        delete process.env.PWD;
+      } else {
+        process.env.PWD = previousPwd;
+      }
+      rmSync(hostRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[DEP-CREATE-PKG-007][QUICK-DEPLOY-ENTRY-008B] create-resource send fields keep nux-c689b0f1-static off the projects parent", async () => {
+    ensureReflectMetadata();
+    const { sourceBindingForDeploymentInput } =
+      await import("../src/commands/deployment-interaction");
+    const { CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY, CLI_RESOLVED_SOURCE_METADATA_KEY } =
+      await import("@appaloft/application");
+
+    const hostRoot = mkdtempSync(join(tmpdir(), "appaloft-cli-bind-nux-"));
+    const parent = join(hostRoot, "projects");
+    const leaf = "nux-c689b0f1-static";
+    const folder = join(parent, leaf);
+    mkdirSync(join(folder, "public"), { recursive: true });
+    writeFileSync(join(folder, "public", "index.html"), "<!doctype html><title>nux</title>");
+    const previousCwd = process.cwd();
+    const previousPwd = process.env.PWD;
+
+    try {
+      process.chdir(folder);
+      process.env.PWD = parent;
+
+      for (const incoming of [".", parent, folder] as const) {
+        const sent = sourceBindingForDeploymentInput(incoming, "static");
+        expect(sent.locator).toBe(resolve(folder));
+        expect(sent.locator).not.toBe(resolve(parent));
+        expect(sent.originalLocator).toBe(resolve(folder));
+        expect(sent.originalLocator).not.toBe(resolve(parent));
+        expect(sent.displayName).toBe(leaf);
+        expect(sent.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]).toBe(resolve(folder));
+        expect(sent.metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]?.length).toBeGreaterThan(0);
+
+        const listingDir = mkdtempSync(join(tmpdir(), "appaloft-cli-bind-nux-list-"));
+        const archivePath = join(listingDir, "source.tgz");
+        writeFileSync(
+          archivePath,
+          Buffer.from(sent.metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY] ?? "", "base64"),
+        );
+        const listing = spawnSync("tar", ["-tzf", archivePath], { encoding: "utf8" });
+        expect(listing.status).toBe(0);
+        expect(listing.stdout).toContain("public/index.html");
+        expect(listing.stdout.split("\n").some((line) => line.endsWith("/projects"))).toBe(false);
+        rmSync(listingDir, { recursive: true, force: true });
+      }
     } finally {
       process.chdir(previousCwd);
       if (previousPwd === undefined) {

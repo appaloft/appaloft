@@ -4,10 +4,15 @@ import { basename, join, resolve } from "node:path";
 import {
   CLI_PACKED_SOURCE_ARCHIVE_MAX_BYTES,
   isGenericLocalSourceLeaf,
+  isSpecificLocalSourceLeaf,
 } from "@appaloft/application";
 import { domainError, err, ok, type Result } from "@appaloft/core";
 
 import { isRemoteOrImageSource, resolveCliHostLocalSourceFolder } from "./deployment-source.js";
+
+function pathLeaf(path: string): string {
+  return basename(path.replace(/\/+$/, "") || path);
+}
 
 const localWorkspaceArchiveExcludePatterns = [
   ".git",
@@ -86,7 +91,7 @@ export function packageLocalFolderSourceOnCliHostIfPresent(
   }
 
   const resolved = resolveCliHostLocalSourceFolder(locator);
-  if (isGenericLocalSourceLeaf(basename(resolved.replace(/\/+$/, "") || resolved))) {
+  if (isGenericLocalSourceLeaf(pathLeaf(resolved))) {
     return ok(undefined);
   }
 
@@ -95,4 +100,29 @@ export function packageLocalFolderSourceOnCliHostIfPresent(
   }
 
   return packageLocalFolderSourceOnCliHost(resolved);
+}
+
+/**
+ * Fields the CLI actually sends on resources.create / configureSource.
+ * Summary.Source can already be the hyphenated leaf while a raw `.` / parent
+ * locator would still hand the worker `/Users/.../projects`. Re-resolve and
+ * pack here so locator, originalLocator, and the archive all keep the leaf.
+ */
+export function cliHostLocalFolderSourceSendFields(locator?: string): {
+  folder: string;
+  packedSourceArchiveTarGz?: string;
+} {
+  if (locator && isRemoteOrImageSource(locator)) {
+    return { folder: locator };
+  }
+
+  const resolved = resolveCliHostLocalSourceFolder(locator);
+  const folder = isSpecificLocalSourceLeaf(pathLeaf(resolved))
+    ? resolved
+    : locator?.trim() || resolved;
+  const packed = packageLocalFolderSourceOnCliHostIfPresent(folder);
+  return {
+    folder,
+    ...(packed.isOk() && packed.value ? { packedSourceArchiveTarGz: packed.value } : {}),
+  };
 }
