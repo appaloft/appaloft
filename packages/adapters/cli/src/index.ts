@@ -3,6 +3,7 @@ import { NodeContext } from "@effect/platform-node";
 import { Effect, Layer } from "effect";
 
 import { tryHandleCodeHelp } from "./code-help.js";
+import { tryHandleSetupHelp } from "./setup-help.js";
 import { mainCommand } from "./commands/index.js";
 import {
   type CliProgram,
@@ -35,6 +36,14 @@ export {
   renderCodeHelp,
   tryHandleCodeHelp,
 } from "./code-help.js";
+export {
+  SETUP_AGENT_LIST,
+  SETUP_AGENT_OPTION_DESCRIPTIONS,
+  formatSetupHelp,
+  isSetupHelpInvocation,
+  renderSetupHelp,
+  tryHandleSetupHelp,
+} from "./setup-help.js";
 export {
   FileSystemServerAppliedRouteDesiredStateStore,
   FileSystemSourceLinkStore,
@@ -232,7 +241,7 @@ export function createCliProgram(input: CliProgramInput): CliProgram {
 
   return {
     parseAsync: async (argv = process.argv) => {
-      if (tryHandleCodeHelp(argv, process.stdout)) {
+      if (tryHandleCodeHelp(argv, process.stdout) || tryHandleSetupHelp(argv, process.stdout)) {
         return;
       }
       capturedStdinText = cliArgvRequestsStdinText(argv) ? sourceStdinReader() : undefined;
@@ -278,7 +287,7 @@ export function createCliHelpProgram(input: { readonly version: string }): CliPr
 
   return {
     parseAsync: async (argv = process.argv) => {
-      if (tryHandleCodeHelp(argv, process.stdout)) {
+      if (tryHandleCodeHelp(argv, process.stdout) || tryHandleSetupHelp(argv, process.stdout)) {
         return;
       }
       await EffectCommand.run(mainCommand, {

@@ -10,6 +10,7 @@ import { Command as EffectCommand } from "@effect/cli";
 import { NodeContext } from "@effect/platform-node";
 import { Effect, Layer } from "effect";
 import { tryHandleCodeHelp } from "./code-help.js";
+import { tryHandleSetupHelp } from "./setup-help.js";
 import { mainCommand } from "./commands/index.js";
 import {
   type CliControlPlaneOperation,
@@ -495,7 +496,7 @@ export function createRemoteCliProgram(input: RemoteCliProgramInput): CliProgram
 
   return {
     parseAsync: async (argv = process.argv) => {
-      if (tryHandleCodeHelp(argv, process.stdout)) {
+      if (tryHandleCodeHelp(argv, process.stdout) || tryHandleSetupHelp(argv, process.stdout)) {
         return;
       }
       capturedStdinText = cliArgvRequestsStdinText(argv) ? sourceStdinReader() : undefined;

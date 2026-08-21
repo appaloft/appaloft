@@ -3,7 +3,8 @@ import { homedir } from "node:os";
 import { createInterface } from "node:readline/promises";
 import { type DomainError, err, ok, type Result } from "@appaloft/core";
 import { type AppaloftSdkFetch } from "@appaloft/sdk";
-import { AGENT_SETUP_AGENT_LIST, runAgentHostSetup } from "./agent-host-setup.js";
+import { runAgentHostSetup } from "./agent-host-setup.js";
+import { renderSetupHelp } from "./setup-help.js";
 import {
   type CliControlPlaneEnvironment,
   type CliControlPlaneMode,
@@ -520,25 +521,7 @@ Options:
 }
 
 function renderSetupAgentHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
-  stdout.write(`Appaloft agent setup
-
-Usage:
-  appaloft setup agent [-y] [--agent <name>] [--profile <name>] [--cursor-home <path>] [--opencode-home <path>] [--agents-home <path>] [--claude-home <path>] [--command <command>] [--skill-dir <path>]
-
-Default-checks universal (~/.agents), Claude Code when ~/.claude exists, and Cursor when ~/.cursor exists. OpenCode is on the agent list (${AGENT_SETUP_AGENT_LIST.join(", ")}) but is not default-checked; pass --agent opencode or use the sibling install commands. Skills are byte-identical copies. MCP reuses appaloft login through remote-stdio: Cursor ~/.cursor/mcp.json and Claude ~/.claude.json. Universal is skills only. Tokens stay in the Appaloft CLI profile store, not in editor config. -y accepts those defaults and skips already-installed skill/MCP entries.
-
-Options:
-  -y, --yes               Skip prompts and accept detected defaults
-  --agent <name>          Target a specific agent instead of defaults (repeatable): ${AGENT_SETUP_AGENT_LIST.join(", ")}
-  --profile <name>        CLI profile to launch with remote-stdio (defaults to the active profile)
-  --cursor-home <path>    Cursor home directory (defaults to ~/.cursor)
-  --opencode-home <path>  OpenCode config directory (defaults to ~/.config/opencode)
-  --agents-home <path>    Shared skills directory (defaults to ~/.agents)
-  --claude-home <path>    Claude Code home directory (defaults to ~/.claude)
-  --command <command>     Launcher command (defaults to appaloft)
-  --skill-dir <path>      Skill source directory (defaults to packaged skills/appaloft)
-  --help, -h              Show this help
-`);
+  renderSetupHelp(stdout);
 }
 
 function controlPlaneEnv(input: StandaloneControlPlaneCliInput): CliControlPlaneEnvironment {
