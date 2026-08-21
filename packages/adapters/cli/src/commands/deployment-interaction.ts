@@ -27,6 +27,7 @@ import {
   CreateSshCredentialCommand,
   type CreateSshCredentialCommandInput,
   CreateStorageVolumeCommand,
+  CLI_RESOLVED_SOURCE_METADATA_KEY,
   compareResourceProfileDrift,
   DeleteDependencyResourceCommand,
   type DependencyResourceBackupPolicyRead,
@@ -556,6 +557,13 @@ export function sourceBindingForDeploymentInput(
     ...(profile.version ? { version: profile.version } : {}),
     ...(profile.versionKind ? { versionKind: profile.versionKind } : {}),
     ...(profile.helmChart ? { helmChart: profile.helmChart } : {}),
+    ...(!isRemoteOrImageSource(sourceLocator)
+      ? {
+          metadata: {
+            [CLI_RESOLVED_SOURCE_METADATA_KEY]: sourceLocator,
+          },
+        }
+      : {}),
   };
 }
 

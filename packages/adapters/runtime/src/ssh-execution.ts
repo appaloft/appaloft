@@ -6,6 +6,7 @@ import {
   safeLocalSourceBaseDirectory,
 } from "./local-source-workdir";
 import {
+  CLI_RESOLVED_SOURCE_METADATA_KEY,
   createDeploymentProgressEvent,
   deploymentProgressSteps,
   type AppLogger,
@@ -1984,8 +1985,12 @@ export class SshExecutionBackend implements ExecutionBackend {
         ? { workingDirectory: state.runtimePlan.execution.workingDirectory }
         : {}),
       locator: source.locator,
-      displayName: source.displayName,
+      ...(source.displayName ? { displayName: source.displayName } : {}),
       ...(source.metadata ? { metadata: source.metadata } : {}),
+      ...(source.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]
+        ? { cliResolvedSource: source.metadata[CLI_RESOLVED_SOURCE_METADATA_KEY] }
+        : {}),
+      cwd: input.runtimeDir,
     });
 
     if (!existsSync(localWorkdir)) {

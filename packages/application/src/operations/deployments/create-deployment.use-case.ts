@@ -20,6 +20,7 @@ import {
 } from "@appaloft/core";
 import { i18nKeys } from "@appaloft/i18n";
 import { inject, injectable } from "tsyringe";
+import { explicitCliResolvedSource } from "../../cli-resolved-source";
 import { deploymentProgressSteps, reportDeploymentProgress } from "../../deployment-progress";
 import { type DurableWorkQueueAdapter } from "../../durable-work";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
@@ -916,10 +917,15 @@ export class CreateDeploymentUseCase {
       const resourceSource = yield* resourceSourceResult;
       let detected = resourceSource;
       if (shouldEnrichSourceFromDetector(resource)) {
+        const cliResolvedSource = explicitCliResolvedSource({
+          ...(resourceSource.source.metadata ? { metadata: resourceSource.source.metadata } : {}),
+          locator: resourceSource.source.locator,
+        });
         const detectedResult = await sourceDetector.detect(context, resourceSource.source.locator, {
           ...(resourceSource.source.metadata?.baseDirectory
             ? { baseDirectory: resourceSource.source.metadata.baseDirectory }
             : {}),
+          ...(cliResolvedSource ? { cliResolvedSource } : {}),
           ...(resourceState.runtimeProfile?.strategy.value !== "auto"
             ? { allowUnrecognizedRoot: true }
             : {}),

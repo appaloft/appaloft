@@ -355,6 +355,34 @@ describe("FileSystemSourceDetector", () => {
     });
   });
 
+  test("[DEP-CREATE-PKG-007] persists the CLI-resolved source when locator is already the parent", async () => {
+    ensureReflectMetadata();
+    const [
+      { createExecutionContext, CLI_RESOLVED_SOURCE_METADATA_KEY },
+      { FileSystemSourceDetector },
+    ] = await Promise.all([import("@appaloft/application"), import("../src")]);
+    const parent = "/Users/nichenqin/projects";
+    const cliResolvedSource = `${parent}/nux-772b6112-static`;
+
+    const result = await new FileSystemSourceDetector().detect(
+      createExecutionContext({ entrypoint: "cli", requestId: "req_cli_resolved_parent" }),
+      parent,
+      {
+        allowUnrecognizedRoot: true,
+        cliResolvedSource,
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().source.locator).toBe(parent);
+    expect(result._unsafeUnwrap().source.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]).toBe(
+      cliResolvedSource,
+    );
+    expect(result._unsafeUnwrap().source.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]).toContain(
+      "nux-772b6112-static",
+    );
+  });
+
   test("[DEP-CREATE-PKG-007] keeps a missing hyphenated local-folder locator", async () => {
     ensureReflectMetadata();
     const [{ createExecutionContext }, { FileSystemSourceDetector }] = await Promise.all([

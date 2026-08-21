@@ -67,6 +67,7 @@ import {
   type RollbackPlan,
 } from "@appaloft/core";
 import {
+  CLI_RESOLVED_SOURCE_METADATA_KEY,
   createAdapterSpanName,
   createDeploymentProgressEvent,
   deploymentProgressSteps,
@@ -1129,6 +1130,9 @@ function chooseStrategies(input: {
           locator: source.locator,
           displayName: source.displayName,
           ...(source.metadata ? { metadata: source.metadata } : {}),
+          ...(source.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]
+            ? { cliResolvedSource: source.metadata[CLI_RESOLVED_SOURCE_METADATA_KEY] }
+            : {}),
         }),
       ),
       dockerfilePath: FilePathText.rehydrate(dockerfilePath),
