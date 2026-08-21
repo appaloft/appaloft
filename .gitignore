@@ -56,3 +56,7 @@ __pycache__/
 *.pem
 *.tsbuildinfo
 bun.lockb
+
+# Lefthook local overrides
+lefthook-local.yml
+.lefthook-local.yml

@@ -289,10 +289,11 @@ the boundary review gate is `PASS`.
 
 ## Coding Style
 
-- Biome is the repository formatter and linter
+- Oxlint is the JavaScript/TypeScript linter and Oxfmt is the formatter; Lefthook owns Git hooks
+- rustfmt stays the Workspace TUI formatter and is not replaced by Oxfmt
 - run `bun run lint` for checks and `bun run lint:fix` for auto-fixes
-- Biome branding exceptions are intentional: `noConfusingVoidType` and `noUnusedPrivateClassMembers` stay disabled because nominal `unique symbol` branding uses `private [brand]!: void`
-- `apps/web` still relies on `svelte-check` for `.svelte` semantic validation because Biome is not the full Svelte lint/type layer
+- Oxlint branding exceptions are intentional: unused private class members and confusing void stay disabled because nominal `unique symbol` branding uses `private [brand]!: void`
+- `apps/web` still relies on `svelte-check` for `.svelte` semantic validation because Oxlint is not the full Svelte lint/type layer
 - prefer Bun native APIs such as `Bun.file`, `Bun.write`, `Bun.spawn`, `Bun.spawnSync`, and `Bun.$` in scripts, smoke tests, packaging code, and runtime helpers
 - only use `node:*` APIs when Bun has no credible equivalent for the specific job; if a `node:*` API remains, that choice should be intentional
 - acceptable `node:*` exceptions include `node:path`, synchronous config/bootstrap paths where Bun has no synchronous file API, and low-level process or socket primitives that Bun does not expose with equivalent control

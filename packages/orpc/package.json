@@ -21,7 +21,7 @@
     "zod": "^4.4.3"
   },
   "scripts": {
-    "lint": "biome check .",
+    "lint": "oxlint .",
     "typecheck": "tsc -p tsconfig.json --noEmit --checkers 4"
   }
 }

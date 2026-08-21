@@ -8,7 +8,7 @@
     "build": "bun run scripts/build.mjs",
     "preview": "astro preview",
     "typecheck": "astro check",
-    "lint": "biome check ."
+    "lint": "oxlint ."
   },
   "dependencies": {
     "@appaloft/design": "workspace:*",

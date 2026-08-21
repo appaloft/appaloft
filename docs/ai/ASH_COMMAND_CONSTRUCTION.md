@@ -23,7 +23,7 @@ command-owning files. A frozen, counted budget names pre-existing remote-state d
 legacy file cannot add one more violation. Do not raise a budget for new or modified executable
 shell code: migrate that seam to `AshScript` instead.
 
-`bun run lint:ci` includes this guard. A change is not CI-complete when Biome passes but the ash
+`bun run lint:ci` includes this guard. A change is not CI-complete when Oxlint passes but the ash
 architecture check has been skipped.
 
 If `ash` cannot express a required portable command safely, extend and test `@appaloft/ash`

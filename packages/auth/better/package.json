@@ -13,7 +13,7 @@
     "reflect-metadata": "^0.2.2"
   },
   "scripts": {
-    "lint": "biome check .",
+    "lint": "oxlint .",
     "typecheck": "tsc -p tsconfig.json --noEmit --checkers 4"
   }
 }

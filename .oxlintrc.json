@@ -1,0 +1,79 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "oxc"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "off",
+    "pedantic": "off",
+    "perf": "off",
+    "style": "off",
+    "restriction": "off",
+    "nursery": "off"
+  },
+  "env": {
+    "builtin": true
+  },
+  "globals": {
+    "Bun": "readonly"
+  },
+  "ignorePatterns": [
+    "**/.git/**",
+    "**/.turbo/**",
+    "**/.astro/**",
+    "**/.svelte-kit/**",
+    "**/.next/**",
+    "**/node_modules/**",
+    "**/build/**",
+    "**/dist/**",
+    "**/coverage/**",
+    "**/test-results/**",
+    "**/playwright-report/**",
+    "**/runtime/**",
+    "**/.appaloft/**",
+    "**/.tmp/**",
+    "**/*.svelte",
+    "**/*.astro",
+    "apps/desktop/src-tauri/tauri.conf.json",
+    "apps/workspace-control-tui/**"
+  ],
+  "rules": {
+    "no-unused-private-class-members": "off",
+    "no-underscore-dangle": "off",
+    "no-shadow": "off",
+    "no-useless-concat": "off",
+    "no-unused-vars": "off",
+    "no-unused-expressions": "off",
+    "no-new": "off",
+    "no-unmodified-loop-condition": "off",
+    "no-unassigned-vars": "off",
+    "no-unsafe-optional-chaining": "off",
+    "preserve-caught-error": "off",
+    "require-yield": "off",
+    "typescript/no-confusing-void-expression": "off",
+    "typescript/no-explicit-any": "error",
+    "typescript/consistent-type-imports": "off",
+    "typescript/consistent-type-exports": "off",
+    "typescript/no-import-type-side-effects": "off",
+    "typescript/no-this-alias": "off",
+    "typescript/no-extraneous-class": "off",
+    "oxc/no-async-endpoint-handlers": "off",
+    "unicorn/no-useless-fallback-in-spread": "off",
+    "unicorn/no-useless-spread": "off",
+    "unicorn/prefer-string-starts-ends-with": "off",
+    "unicorn/no-empty-file": "off"
+  },
+  "overrides": [
+    {
+      "files": ["apps/docs/src/components/ui/**"],
+      "rules": {
+        "typescript/no-non-null-assertion": "off"
+      }
+    },
+    {
+      "files": ["packages/core/**/*.ts"],
+      "rules": {
+        "typescript/no-explicit-any": "error"
+      }
+    }
+  ]
+}

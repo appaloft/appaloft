@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "bun run --watch src/index.ts serve",
     "build": "bun build src/index.ts --outfile dist/appaloft --target bun",
-    "lint": "biome check .",
+    "lint": "oxlint .",
     "typecheck": "tsc -p tsconfig.json --noEmit --checkers 4",
     "test": "bun test",
     "test:e2e": "bun test ./test/e2e/*.e2e.ts",
