@@ -115,6 +115,7 @@ import { Effect, Either } from "effect";
 import { type CliInteraction, effectCliInteraction } from "../interaction.js";
 import { selectDefaultRemoteCodeServer } from "../remote-code-session.js";
 import { CliRuntime, resultToEffect } from "../runtime.js";
+import { cliHostLocalFolderSourceSendFields } from "./cli-local-source-package.js";
 import {
   type RemoteStateSession,
   type ServerAppliedRouteDomainIntent,
@@ -556,11 +557,17 @@ export function sourceBindingForDeploymentInput(
   } = {},
 ): ResourceSourceInput {
   const kind = profile.kind ?? sourceKindForDeploymentInput(sourceLocator, deploymentMethod);
-  const packedSourceArchiveTarGz = profile.packedSourceArchiveTarGz?.trim();
+  const send =
+    !isRemoteOrImageSource(sourceLocator) && isLocalFilesystemSourceKind(kind)
+      ? cliHostLocalFolderSourceSendFields(sourceLocator)
+      : { folder: sourceLocator };
+  const sendLocator = send.folder;
+  const packedSourceArchiveTarGz =
+    profile.packedSourceArchiveTarGz?.trim() || send.packedSourceArchiveTarGz;
   return {
     kind,
-    locator: sourceLocator,
-    displayName: inferNameFromSource(sourceLocator),
+    locator: sendLocator,
+    displayName: inferNameFromSource(sendLocator),
     ...(profile.gitRef ? { gitRef: profile.gitRef } : {}),
     ...(profile.commitSha ? { commitSha: profile.commitSha } : {}),
     ...(profile.baseDirectory ? { baseDirectory: profile.baseDirectory } : {}),
@@ -568,11 +575,11 @@ export function sourceBindingForDeploymentInput(
     ...(profile.version ? { version: profile.version } : {}),
     ...(profile.versionKind ? { versionKind: profile.versionKind } : {}),
     ...(profile.helmChart ? { helmChart: profile.helmChart } : {}),
-    ...(!isRemoteOrImageSource(sourceLocator) && isLocalFilesystemSourceKind(kind)
+    ...(!isRemoteOrImageSource(sendLocator) && isLocalFilesystemSourceKind(kind)
       ? {
-          originalLocator: sourceLocator,
+          originalLocator: sendLocator,
           metadata: {
-            [CLI_RESOLVED_SOURCE_METADATA_KEY]: sourceLocator,
+            [CLI_RESOLVED_SOURCE_METADATA_KEY]: sendLocator,
             ...(packedSourceArchiveTarGz
               ? { [CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]: packedSourceArchiveTarGz }
               : {}),

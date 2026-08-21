@@ -78,7 +78,10 @@ import {
   runDeploymentTimelineQuery,
   runQuery,
 } from "../runtime.js";
-import { packageLocalFolderSourceOnCliHostIfPresent } from "./cli-local-source-package.js";
+import {
+  cliHostLocalFolderSourceSendFields,
+  packageLocalFolderSourceOnCliHostIfPresent,
+} from "./cli-local-source-package.js";
 import {
   applicationDeploymentPromptSeedsFromConfig,
   type DeploymentEnvironmentVariableSeed,
@@ -2252,9 +2255,15 @@ export const deployCommand = EffectCommand.make(
           }),
         );
       }
-      const packedSourceArchiveTarGz = yield* resultToEffect(
-        packageLocalFolderSourceOnCliHostIfPresent(configuredSourceLocator),
-      );
+      const localSourceSend =
+        configuredSourceLocator &&
+        !isRemoteOrImageSource(configuredSourceLocator) &&
+        deploymentMethod !== "prebuilt-image" &&
+        deploymentMethod !== "helm"
+          ? cliHostLocalFolderSourceSendFields(configuredSourceLocator)
+          : undefined;
+      const packedSourceArchiveTarGz = localSourceSend?.packedSourceArchiveTarGz;
+      const sourceLocatorToSend = localSourceSend?.folder ?? configuredSourceLocator;
       const sourceProfile = {
         ...configSeed.sourceProfile,
         ...(sourceBaseDirectoryValue ? { baseDirectory: sourceBaseDirectoryValue } : {}),
@@ -2275,7 +2284,7 @@ export const deployCommand = EffectCommand.make(
       const stateSession = yield* prepareDeploymentStateSessionIfNeeded(stateBackendDecision);
       const runResolvedDeploymentFromSeed = (inputSeed: DeploymentPromptSeed) =>
         Effect.gen(function* () {
-          const sourceLocatorForSeed = inputSeed.sourceLocator ?? configuredSourceLocator;
+          const sourceLocatorForSeed = inputSeed.sourceLocator ?? sourceLocatorToSend;
           const seed = {
             ...inputSeed,
             ...(stateSession ? { stateBackendPrepared: true } : {}),
@@ -2463,7 +2472,7 @@ export const deployCommand = EffectCommand.make(
         const input = yield* resolveInteractiveDeploymentInput({
           ...seed,
           ...(stateSession ? { stateBackendPrepared: true } : {}),
-          ...(configuredSourceLocator ? { sourceLocator: configuredSourceLocator } : {}),
+          ...(sourceLocatorToSend ? { sourceLocator: sourceLocatorToSend } : {}),
         });
         if (input.projectId) {
           yield* Effect.promise(() =>

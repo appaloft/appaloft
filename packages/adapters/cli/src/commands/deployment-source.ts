@@ -22,11 +22,35 @@ export const deploymentMethods = [
 ] as const satisfies readonly DeploymentMethod[];
 
 export function isRemoteOrImageSource(locator: string): boolean {
+  const trimmed = locator.trim();
   return (
-    /^(https?|ssh|git|oci):\/\//.test(locator) ||
-    /^[^/\\]+@[^/\\]+:/.test(locator) ||
-    locator.startsWith("docker://") ||
-    locator.startsWith("image://")
+    /^(https?|ssh|git|oci):\/\//.test(trimmed) ||
+    /^[^/\\]+@[^/\\]+:/.test(trimmed) ||
+    trimmed.startsWith("docker://") ||
+    trimmed.startsWith("image://") ||
+    looksLikeRegistryImageReference(trimmed)
+  );
+}
+
+/**
+ * Bare registry refs such as `ghcr.io/acme/api:1.7.3` are not filesystem
+ * paths. Do not resolve() them against cwd.
+ */
+function looksLikeRegistryImageReference(locator: string): boolean {
+  if (
+    !locator ||
+    locator.startsWith("/") ||
+    locator.startsWith(".") ||
+    locator.startsWith("~") ||
+    locator.startsWith("\\\\") ||
+    /^[a-zA-Z]:[\\/]/.test(locator)
+  ) {
+    return false;
+  }
+
+  return (
+    /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z0-9.-]+\/[^\s]+:[^\s/]+$/i.test(locator) ||
+    /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z0-9.-]+\/[^\s]+@sha256:[a-f0-9]{64}$/i.test(locator)
   );
 }
 
