@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import {
   isFormattablePath,
   isLintablePath,
@@ -6,6 +8,9 @@ import {
   selectFormatTargets,
   selectLintTargets,
 } from "../ci/lint-changed";
+import { shouldInstallGitHooks } from "../install-git-hooks";
+
+const root = resolve(import.meta.dir, "../..");
 
 describe("changed-file JS lint selection", () => {
   test("[LINT-CHANGED-001] selects JS/TS files and ignores rustfmt-owned Workspace TUI paths", () => {
@@ -70,5 +75,16 @@ describe("changed-file JS lint selection", () => {
         refExists: (ref) => ref === "origin/main",
       }),
     ).toBe("origin/main");
+  });
+
+  test("[LINT-HOOKS-001] git-less installs skip Lefthook so Docker bun install can succeed", () => {
+    expect(shouldInstallGitHooks({ gitAvailable: false, inGitRepo: false })).toBe(false);
+    expect(shouldInstallGitHooks({ gitAvailable: true, inGitRepo: false })).toBe(false);
+    expect(shouldInstallGitHooks({ gitAvailable: true, inGitRepo: true })).toBe(true);
+
+    const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
+      readonly scripts: { readonly prepare: string };
+    };
+    expect(packageJson.scripts.prepare).toBe("bun run scripts/install-git-hooks.ts");
   });
 });

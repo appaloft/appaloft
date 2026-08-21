@@ -105,7 +105,7 @@
     "smoke:public-launch:basic-docker:evidence:verify": "bun run scripts/release/verify-ssh-smoke-evidence.ts --suite basic-docker --path dist/release/public-launch-basic-docker-evidence.json",
     "smoke:public-launch:github-repo:evidence:verify": "bun run scripts/release/verify-ssh-smoke-evidence.ts --suite github-repo --path dist/release/public-launch-github-repo-evidence.json",
     "smoke:public-launch:scheduled-task-cron:evidence:verify": "bun run scripts/release/verify-ssh-smoke-evidence.ts --suite scheduled-task-cron --path dist/release/public-launch-cron-evidence.json",
-    "prepare": "lefthook install"
+    "prepare": "bun run scripts/install-git-hooks.ts"
   },
   "type": "module",
   "workspaces": [

@@ -56,6 +56,7 @@ bun x shadcn-svelte@latest add sidebar input textarea select dropdown-menu colla
 
 - The repository standard is Oxlint plus Oxfmt, not Biome, ESLint, or Prettier.
 - Lefthook owns Git hooks. Staged JS/TS files are linted with Oxlint and formatted with Oxfmt.
+- `bun install` skips Lefthook when git is unavailable, so Docker and other git-less installs do not fail.
 - rustfmt stays the Workspace TUI formatter and is not invoked from Lefthook.
 - CI runs `bun run lint:ci`, which fail-closes Oxlint/Oxfmt on changed files, then runs the architecture guards.
 - `.svelte` files are still validated with `svelte-check`; Oxlint is not used as the Svelte semantic checker.
