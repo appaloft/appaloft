@@ -91,7 +91,9 @@ describe("remote code door", () => {
     expect(remapped.code).toBe("workspace_open_folder_local_input_invalid");
     expect(remapped.message).not.toBe("Input validation failed");
     expect(remapped.message).toContain("Cloud could not start this folder session on hostinger");
-    expect(String(remapped.details?.guidance)).toContain("appaloft code --pi --server srv_4lifk0yrcecy");
+    expect(String(remapped.details?.guidance)).toContain(
+      "appaloft code --pi --server srv_4lifk0yrcecy",
+    );
     expect(String(remapped.details?.guidance)).toContain(
       "this Cloud needs an update that accepts folder workspace create",
     );
