@@ -438,6 +438,55 @@ describe("CLI quick deploy draft mapping", () => {
     }
   });
 
+  test("[DEP-CREATE-PKG-007][QUICK-DEPLOY-ENTRY-008B] flagged static deploy keeps hyphenated appaloft-cloud under projects", async () => {
+    ensureReflectMetadata();
+    const { normalizeCliPathOrSource, resolveCliHostLocalSourceFolder } =
+      await import("../src/commands/deployment-source");
+    const { normalizeUrlFirstDeploymentEntry } =
+      await import("../src/commands/deployment-interaction");
+
+    const hostRoot = mkdtempSync(join(tmpdir(), "appaloft-cloud-cwd-"));
+    const parent = join(hostRoot, "projects");
+    const leaf = "appaloft-cloud";
+    const folder = join(parent, leaf);
+    mkdirSync(join(folder, "public"), { recursive: true });
+    writeFileSync(join(folder, "public", "index.html"), "<!doctype html><title>cloud</title>");
+    const previousCwd = process.cwd();
+    const previousPwd = process.env.PWD;
+
+    try {
+      process.chdir(folder);
+      process.env.PWD = parent;
+      expect(normalizeCliPathOrSource(".", "static")).toBe(resolve(folder));
+      expect(normalizeCliPathOrSource(parent, "static")).toBe(resolve(folder));
+      expect(resolveCliHostLocalSourceFolder(parent)).toBe(resolve(folder));
+      expect(normalizeCliPathOrSource(".", "static")).not.toBe(resolve(parent));
+
+      const flagged = normalizeUrlFirstDeploymentEntry({
+        entryMode: "static-site",
+        sourceLocator: ".",
+      });
+      expect(flagged._unsafeUnwrap()).toEqual({
+        deploymentMethod: "static",
+        publishDirectory: "public",
+      });
+
+      process.chdir(parent);
+      process.env.PWD = folder;
+      expect(normalizeCliPathOrSource(".", "static")).toBe(resolve(folder));
+      expect(normalizeCliPathOrSource(parent, "static")).toBe(resolve(folder));
+      expect(resolveCliHostLocalSourceFolder()).toBe(resolve(folder));
+    } finally {
+      process.chdir(previousCwd);
+      if (previousPwd === undefined) {
+        delete process.env.PWD;
+      } else {
+        process.env.PWD = previousPwd;
+      }
+      rmSync(hostRoot, { recursive: true, force: true });
+    }
+  });
+
   test("[QUICK-DEPLOY-ENTRY-008B][RES-CREATE-ADM-037C] root index.html defaults to source-root publish-dir", async () => {
     ensureReflectMetadata();
     const { normalizeUrlFirstDeploymentEntry } =

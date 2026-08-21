@@ -201,6 +201,15 @@ export function recoverLocalSourceFolderFromCwd(input: {
   }
 
   const leaf = sourceFolderLeaf(input);
+  const refuseGenericParent = (path: string): string => {
+    const stripped = stripTrailingSeparators(path);
+    if (!leaf || isGenericLocalSourceLeaf(leaf) || !isGenericLocalSourceLeaf(pathBasename(stripped))) {
+      return path;
+    }
+
+    const reconstructed = resolve(stripped, leaf);
+    return pathBasename(reconstructed) === leaf ? reconstructed : path;
+  };
   const plannedRoot = stripTrailingSeparators(input.plannedRoot);
   const locatorRoot = stripTrailingSeparators(input.locator);
   const plannedIsAlreadyLeaf =
@@ -222,13 +231,13 @@ export function recoverLocalSourceFolderFromCwd(input: {
 
   const cwd = existingDirectory(input.cwd ?? process.cwd());
   if (!cwd) {
-    return input.plannedRoot;
+    return refuseGenericParent(input.plannedRoot);
   }
 
   const cwdIsNamedSource = Boolean(leaf) && pathBasename(cwd) === leaf;
   const cwdIsLocator = cwd === input.locator || cwd === input.plannedRoot;
   if (!cwdIsNamedSource && !cwdIsLocator) {
-    return input.plannedRoot;
+    return refuseGenericParent(input.plannedRoot);
   }
 
   if (!existsSync(input.plannedRoot)) {
@@ -248,7 +257,7 @@ export function recoverLocalSourceFolderFromCwd(input: {
     return cwd;
   }
 
-  return input.plannedRoot;
+  return refuseGenericParent(input.plannedRoot);
 }
 
 /**
@@ -320,6 +329,18 @@ export function resolveLocalWorkspaceWorkdir(input: {
  * then execution.workingDirectory, then locator. Never treat a generic parent
  * basename as the source leaf. Do not use runtimeDir as the source cwd.
  */
+export function isGenericLocalSourceWorkdir(workdir: string): boolean {
+  return isGenericLocalSourceLeaf(pathBasename(workdir));
+}
+
+export function localSourceWorkdirMissingMessage(workdir: string): string {
+  if (isGenericLocalSourceWorkdir(workdir)) {
+    return "Source working directory does not exist: local-folder source";
+  }
+
+  return `Source working directory does not exist: ${workdir}`;
+}
+
 export function resolveSshPackageLocalWorkdir(input: {
   locator: string;
   workingDirectory?: string;
