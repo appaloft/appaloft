@@ -2938,6 +2938,39 @@ describe("DefaultRuntimePlanResolver", () => {
     }
   });
 
+  test("[DEP-CREATE-PKG-007] static plan keeps a missing hyphenated source folder", async () => {
+    ensureReflectMetadata();
+    const locator = "/Users/nichenqin/projects/nux-9859a0e9-static";
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const result = await resolver.resolve(createTestExecutionContext(), {
+      id: "plan_missing_hyphenated_static",
+      source: createSource({
+        kind: "local-folder",
+        locator,
+        displayName: "nux-9859a0e9-static",
+      }),
+      server: {
+        id: "srv_4lifk0yrcecy",
+        providerKey: "generic-ssh",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_missing_hyphenated_static"),
+      detectedReasoning: ["hyphenated local folder missing on this host"],
+      requestedDeployment: {
+        method: "static",
+        publishDirectory: "public",
+        port: 80,
+      } as never,
+      generatedAt: "2026-08-21T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.execution.workingDirectory).toBe(locator);
+    expect(plan.execution.workingDirectory).not.toBe("/Users/nichenqin/projects");
+    expect(plan.source.locator).toBe(locator);
+  });
+
   test("[RES-CREATE-ADM-037C] source-root publish-dir . is legal and COPY ./", async () => {
     ensureReflectMetadata();
     const [{ DefaultRuntimePlanResolver }, { generateStaticSiteDockerBuild }, { StaticPublishDirectory }] =

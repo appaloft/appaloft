@@ -17,6 +17,7 @@ import {
   normalizeLocalSourceWorkingDirectory,
   parseDockerRepoDigestFromInspect,
   parseRemoteDockerImageVersionMetadataOutput,
+  resolveLocalWorkspaceWorkdir,
   sshDockerUploadedWorkspaceContextPath,
   sshDockerUploadedWorkspaceFilePath,
   sshStaticPublishDirectoryMissingMessage,
@@ -27,13 +28,34 @@ import { generateStaticSiteDockerBuild } from "../src/workspace-planners";
 
 describe("SSH source upload", () => {
   test("[DEP-CREATE-PKG-007] source workdir keeps the hyphenated folder when it is missing here", () => {
-    const locator = "/Users/nichenqin/projects/nux-fb4bd8c5-static";
+    const locator = "/Users/nichenqin/projects/nux-9859a0e9-static";
+    const parent = "/Users/nichenqin/projects";
     const workdir = normalizeLocalSourceWorkingDirectory(locator);
 
     expect(workdir).toBe(locator);
-    expect(workdir).toContain("nux-fb4bd8c5-static");
-    expect(workdir).not.toBe("/Users/nichenqin/projects");
+    expect(workdir).toContain("nux-9859a0e9-static");
+    expect(workdir).not.toBe(parent);
     expect(workdir.endsWith("/projects")).toBe(false);
+
+    const packaged = resolveLocalWorkspaceWorkdir({
+      workingDirectory: locator,
+      locator,
+      metadata: { baseDirectory: "/" },
+    });
+    expect(packaged).toBe(locator);
+    expect(packaged).not.toBe(parent);
+
+    const escaped = resolveLocalWorkspaceWorkdir({
+      workingDirectory: locator,
+      locator,
+      metadata: { baseDirectory: ".." },
+    });
+    expect(escaped).toBe(locator);
+    expect(escaped).not.toBe(parent);
+
+    const missingMessage = `Source working directory does not exist: ${packaged}`;
+    expect(missingMessage).toContain("nux-9859a0e9-static");
+    expect(missingMessage).not.toBe(`Source working directory does not exist: ${parent}`);
   });
 
   test("[DEP-CREATE-PKG-001] local workspace upload excludes cache and dependency directories", () => {

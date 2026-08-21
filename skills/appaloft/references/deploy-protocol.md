@@ -154,8 +154,9 @@ Use this order:
    TTY Cloud deploy starts the existing browser login in the same command when no profile exists.
    Coding-agent / CI / non-TTY runs print a plan unless `--yes` is present. Do
    not silently reuse an unrelated session such as traefik/whoami. If `public/index.html` exists,
-   auto-select static and publish-dir `public` without requiring `--method` or `--publish-dir`. If
-   there is no current app, ask for a path or `--project`.
+   auto-select static and publish-dir `public` without requiring `--method` or `--publish-dir`. Keep
+   the real cwd folder (hyphenated names are legal). Do not dirname a missing folder to its parent.
+   If there is no current app, ask for a path or `--project`.
 3. Existing Appaloft config: `appaloft deploy <source>`; for an application graph, repeat
    `--application <key>` to deploy only the requested applications or omit it to deploy all entries.
    `source.type: image` in config is a Resource source/runtime profile declaration, not a deployment

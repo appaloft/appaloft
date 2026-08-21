@@ -79,12 +79,10 @@ describe("CLI quick deploy draft mapping", () => {
 
   test("[QUICK-DEPLOY-ENTRY-008A] source-root publish-dir aliases become / before resources.create", async () => {
     ensureReflectMetadata();
-    const { normalizeUrlFirstDeploymentEntry, runtimeProfileFromDeploymentInput } = await import(
-      "../src/commands/deployment-interaction"
-    );
-    const { wireCompatibleStaticPublishDirectory } = await import(
-      "../src/commands/static-publish-directory-wire"
-    );
+    const { normalizeUrlFirstDeploymentEntry, runtimeProfileFromDeploymentInput } =
+      await import("../src/commands/deployment-interaction");
+    const { wireCompatibleStaticPublishDirectory } =
+      await import("../src/commands/static-publish-directory-wire");
 
     expect(wireCompatibleStaticPublishDirectory(".")).toBe("/");
     expect(wireCompatibleStaticPublishDirectory("./")).toBe("/");
@@ -240,9 +238,8 @@ describe("CLI quick deploy draft mapping", () => {
 
   test("[QUICK-DEPLOY-WF-044] updates reusable resource sources for docker compose deploys", async () => {
     ensureReflectMetadata();
-    const { shouldConfigureReusableResourceSource } = await import(
-      "../src/commands/deployment-interaction"
-    );
+    const { shouldConfigureReusableResourceSource } =
+      await import("../src/commands/deployment-interaction");
 
     expect(
       shouldConfigureReusableResourceSource({
@@ -259,6 +256,14 @@ describe("CLI quick deploy draft mapping", () => {
         deploymentMethod: "workspace-commands",
       }),
     ).toBe(false);
+
+    expect(
+      shouldConfigureReusableResourceSource({
+        seed: {},
+        sourceLocator: "/Users/nichenqin/projects/nux-9859a0e9-static",
+        deploymentMethod: "static",
+      }),
+    ).toBe(true);
   });
 
   test("[QUICK-DEPLOY-WF-067] reuses an enrolled localhost local-shell instead of registering 127.0.0.1", async () => {
@@ -288,12 +293,10 @@ describe("CLI quick deploy draft mapping", () => {
 
   test("[QUICK-DEPLOY-ENTRY-008B] auto-detects static from public/index.html and defaults publish-dir", async () => {
     ensureReflectMetadata();
-    const { detectLocalStaticPublishDirectory, normalizeCliPathOrSource } = await import(
-      "../src/commands/deployment-source"
-    );
-    const { normalizeUrlFirstDeploymentEntry } = await import(
-      "../src/commands/deployment-interaction"
-    );
+    const { detectLocalStaticPublishDirectory, normalizeCliPathOrSource } =
+      await import("../src/commands/deployment-source");
+    const { normalizeUrlFirstDeploymentEntry } =
+      await import("../src/commands/deployment-interaction");
 
     const parent = mkdtempSync(join(tmpdir(), "appaloft-deploy-door-"));
     const sourceRoot = join(parent, "nux-fb4bd8c5-static");
@@ -351,9 +354,8 @@ describe("CLI quick deploy draft mapping", () => {
 
   test("[QUICK-DEPLOY-ENTRY-008B][RES-CREATE-ADM-037C] root index.html defaults to source-root publish-dir", async () => {
     ensureReflectMetadata();
-    const { normalizeUrlFirstDeploymentEntry } = await import(
-      "../src/commands/deployment-interaction"
-    );
+    const { normalizeUrlFirstDeploymentEntry } =
+      await import("../src/commands/deployment-interaction");
     const rootSite = mkdtempSync(join(tmpdir(), "appaloft-static-root-"));
     writeFileSync(join(rootSite, "index.html"), "<!doctype html><title>root</title>");
     const previousCwd = process.cwd();
