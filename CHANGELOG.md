@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.4](https://github.com/appaloft/appaloft/compare/v1.10.3...v1.10.4) (2026-08-22)
+
+
+### Bug Fixes
+
+* **shell:** make SSH PGlite sync recoverable under disk pressure ([#1388](https://github.com/appaloft/appaloft/issues/1388)) ([81a2792](https://github.com/appaloft/appaloft/commit/81a27921e3795cb6603588a5ab10b77f123a036b))
+
 ## [1.10.3](https://github.com/appaloft/appaloft/compare/v1.10.2...v1.10.3) (2026-08-22)
 
 
