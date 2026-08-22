@@ -13,6 +13,7 @@ import {
 } from "./folder-project-link.js";
 import { type FolderOnboardingResult } from "./folder-project-onboarding.js";
 import {
+  normalizeLocalWorkspaceRepositoryRemote,
   normalizeWorkspaceRepositoryRemote,
   type RemoteGitWorkspaceRef,
   type ResolveGitWorkspaceProgress,
@@ -1350,7 +1351,7 @@ export async function resolveRemoteCodeLocator(
     );
   }
 
-  const normalized = normalizeWorkspaceRepositoryRemote(remoteUrl);
+  const normalized = normalizeLocalWorkspaceRepositoryRemote(remoteUrl);
   const branch = (
     await git({
       args: ["symbolic-ref", "--quiet", "--short", "HEAD"],

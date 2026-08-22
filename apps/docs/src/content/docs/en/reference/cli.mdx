@@ -9,6 +9,8 @@ searchAliases:
   - "cli"
   - "command"
   - "terminal"
+  - "appaloft up"
+  - "appaloft deploy"
 relatedOperations:
   - "workspaces.open"
   - "projects.create"
@@ -27,7 +29,7 @@ sidebar:
 
 ```bash
 appaloft init                                 # Initialize appaloft.yml in the current directory
-appaloft deploy .                             # Deploy the current directory
+appaloft up                                   # Deploy the current directory
 appaloft login                                # Log in to Appaloft Cloud or a self-hosted instance
 appaloft context list                         # View saved local profiles/contexts
 appaloft code                                 # Occupy my Sandbox on the default Server
@@ -46,6 +48,23 @@ appaloft deployments recovery-readiness <deploymentId>  # Query recovery-readine
 ```
 
 Every command supports `--help` for the full argument list; interactive prompts and error recovery suggestions link to this documentation site's stable pages wherever possible.
+
+## Up: first deployment entrypoint <a id="cli-up-deployment-entrypoint" />
+
+```bash
+appaloft up [path-or-source] [--yes] [--project <projectId>] [--json]
+```
+
+`appaloft up` is the primary folder-to-live-app entrypoint. It uses the current directory when the
+path is omitted, and Git is not required. It reuses the folder's Project link and folds login into
+the first Cloud deployment when needed. Coding-agent, CI, and non-TTY runs must pass `--yes` before
+login writes, Project creation, or deployment mutation; `--json` keeps stdout machine-readable
+while progress stays on stderr. The command exits zero only after terminal success. Terminal failure
+is non-zero, and a reserved or previous URL is never printed as success.
+
+`appaloft deploy` remains the supported 1.x compatibility spelling for the exact same workflow.
+New commands, documentation, and automation should prefer `appaloft up`. See
+[Your First Deployment](/docs/en/start/first-deployment/#cli-up-first-deployment) for the full task.
 
 ## Workspace quick entry
 
@@ -114,7 +133,7 @@ appaloft login
 appaloft login --url https://appaloft.internal.example.com
 ```
 
-`appaloft login` and `appaloft auth login` connect to Appaloft Cloud (`https://app.appaloft.com`) by default. First Cloud `appaloft deploy` starts that same browser login when no profile exists, then continues — you do not need a separate `appaloft login` first. To connect to a self-hosted Appaloft instance or another trusted endpoint, pass `--url <url>` explicitly. After a successful login, the CLI saves the endpoint, profile name, auth reference, and handshake digest to a local CLI profile — this profile lives under `APPALOFT_HOME` or the user's local Appaloft home directory, **it is not repository config**, and it's never committed to `appaloft.yml`.
+`appaloft login` and `appaloft auth login` connect to Appaloft Cloud (`https://app.appaloft.com`) by default. First Cloud `appaloft up` starts that same browser login when no profile exists, then continues — you do not need a separate `appaloft login` first. `appaloft deploy` follows the same 1.x compatibility path. To connect to a self-hosted Appaloft instance or another trusted endpoint, pass `--url <url>` explicitly. After a successful login, the CLI saves the endpoint, profile name, auth reference, and handshake digest to a local CLI profile — this profile lives under `APPALOFT_HOME` or the user's local Appaloft home directory, **it is not repository config**, and it's never committed to `appaloft.yml`.
 
 Logging in doesn't take over deployment, and doesn't create a Project, Resource, Deployment, Source Link, or domain binding — nor does it stuff control-plane configuration into a deployment request or write a token/cookie into a committed config file.
 
@@ -137,15 +156,15 @@ appaloft login
 appaloft setup agent
 ```
 
-`appaloft setup agent` default-checks universal, Claude Code when `~/.claude` exists, and Cursor when `~/.cursor` exists. It copies byte-identical skills into `~/.agents/skills`, `~/.claude/skills`, and `~/.cursor/skills`, then writes token-free stdio launchers into `~/.claude.json` and `~/.cursor/mcp.json`. Universal is skills only. OpenCode is listed but not default-checked; pass `--agent opencode` or `appaloft auth mcp opencode install`. Explicit siblings remain: `appaloft auth mcp cursor install`, `appaloft auth mcp claude-code install`, and `appaloft auth mcp opencode install`. `npx skills add` still only copies the skill. Codex still needs the dedicated bearer profile: `appaloft auth mcp login` then `appaloft auth mcp codex install`. A directory without git can be deployed with `appaloft deploy .`.
+`appaloft setup agent` default-checks universal, Claude Code when `~/.claude` exists, and Cursor when `~/.cursor` exists. It copies byte-identical skills into `~/.agents/skills`, `~/.claude/skills`, and `~/.cursor/skills`, then writes token-free stdio launchers into `~/.claude.json` and `~/.cursor/mcp.json`. Universal is skills only. OpenCode is listed but not default-checked; pass `--agent opencode` or `appaloft auth mcp opencode install`. Explicit siblings remain: `appaloft auth mcp cursor install`, `appaloft auth mcp claude-code install`, and `appaloft auth mcp opencode install`. `npx skills add` still only copies the skill. Codex still needs the dedicated bearer profile: `appaloft auth mcp login` then `appaloft auth mcp codex install`. A directory without git can be deployed with `appaloft up`.
 
 ## Non-interactive authentication (AI agents / CI)
 
-Interactive login uses a browser verification-code flow, suited to human operators. When `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `CURSOR_AGENT`, `AIDER_MODEL`, or `CODEX_CLI` is set, or the process is non-TTY / `CI=1`, `appaloft deploy` and `appaloft setup agent` print what they would do and do not create a project, deploy, or write skills unless `--yes` is present. **AI agents and CI/automation should not use the browser/verification-code flow as their default authentication path** — they should prefer a scoped, expirable token instead:
+Interactive login uses a browser verification-code flow, suited to human operators. When `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `CURSOR_AGENT`, `AIDER_MODEL`, or `CODEX_CLI` is set, or the process is non-TTY / `CI=1`, `appaloft up` (and the 1.x compatibility spelling `appaloft deploy`) and `appaloft setup agent` print what they would do and do not create a project, deploy, or write skills unless `--yes` is present. **AI agents and CI/automation should not use the browser/verification-code flow as their default authentication path** — they should prefer a scoped, expirable token instead:
 
 ```bash
 # A one-off non-interactive command
-APPALOFT_TOKEN=<scoped-token> appaloft deploy .
+APPALOFT_TOKEN=<scoped-token> appaloft up --yes
 
 # Read a token from stdin, verify it, and write it to the local profile
 appaloft auth token login --stdin
@@ -161,7 +180,7 @@ Never pass a plaintext token as a command-line argument, and never paste a sessi
 With a logged-in profile, or when `--control-plane-mode cloud|self-hosted` or `--control-plane-url <url>` is passed explicitly, ordinary business commands first resolve the execution target:
 
 ```bash
-appaloft deploy . --control-plane-mode self-hosted --control-plane-url https://console.example.com
+appaloft up --control-plane-mode self-hosted --control-plane-url https://console.example.com
 ```
 
 `controlPlane.mode: none` (the default) keeps using the local CLI/SSH runtime. A remote target performs a compatibility/authentication handshake before the business request, then dispatches the operation through the exact same typed contract as Web/API/SDK — **the CLI never maintains a separate business schema**.
@@ -170,7 +189,7 @@ Without a profile, URL, token, or another trusted remote source, `auto` and the 
 
 `server terminal` and `resource terminal` open a session through the typed API first when targeting a remote; with `--attach`, the CLI connects directly to the control plane's WebSocket to forward local terminal input, resize, output, and close frames — it doesn't initialize local state, and doesn't read the target server's SSH credentials.
 
-Some commands (`serve`, `db`, `remote-state`, `init`, the top-level quick `deploy`, source package commands, and a few others) currently only support local execution; calling them under an explicit remote mode returns `control_plane_unsupported` rather than silently falling back to local execution.
+Some commands (`serve`, `db`, `remote-state`, `init`, source package commands, and a few others) currently only support local execution; calling them under an explicit remote mode returns `control_plane_unsupported` rather than silently falling back to local execution. Top-level `up` / `deploy` dispatch to a supported remote control plane through the selected profile.
 
 ## Local documentation links
 

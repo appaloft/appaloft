@@ -20,6 +20,11 @@ import {
 } from "./control-plane-client.js";
 import { type CliControlPlaneProfile } from "./control-plane-profile.js";
 import {
+  cliHelpInvocationError,
+  renderCliHelpInvocationError,
+  withCliHelpOutputPolicy,
+} from "./help-output.js";
+import {
   executeFolderLocalWorkspaceOpen,
   isFolderLocalWorkspaceOpenCommand,
 } from "./folder-local-remote-open.js";
@@ -518,6 +523,11 @@ export function createRemoteCliProgram(input: RemoteCliProgramInput): CliProgram
 
   return {
     parseAsync: async (argv = process.argv) => {
+      const helpError = cliHelpInvocationError(argv);
+      if (helpError) {
+        renderCliHelpInvocationError(helpError);
+        throw helpError;
+      }
       if (tryHandleCodeHelp(argv, process.stdout) || tryHandleSetupHelp(argv, process.stdout)) {
         return;
       }
@@ -526,7 +536,7 @@ export function createRemoteCliProgram(input: RemoteCliProgramInput): CliProgram
         await capturedStdinText;
       }
       try {
-        await EffectCommand.run(mainCommand, {
+        const execution = EffectCommand.run(mainCommand, {
           name: "appaloft",
           version: input.version,
         })(argv).pipe(
@@ -534,8 +544,12 @@ export function createRemoteCliProgram(input: RemoteCliProgramInput): CliProgram
           Effect.catchAll((error) =>
             printCliError(error).pipe(Effect.zipRight(Effect.fail(error))),
           ),
-          Effect.runPromise,
         );
+        const output =
+          argv.includes("--help") || argv.includes("-h")
+            ? withCliHelpOutputPolicy(execution, input.environment ?? process.env)
+            : execution;
+        await output.pipe(Effect.runPromise);
       } finally {
         capturedStdinText = undefined;
       }

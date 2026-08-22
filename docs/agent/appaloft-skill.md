@@ -24,8 +24,9 @@ The one-command local Agent door copies the skill and writes Local MCP into defa
 appaloft setup agent --yes
 ```
 
-Human TTY first Cloud `appaloft deploy` folds browser login. Coding-agent, CI, and non-TTY
-`setup agent` / `deploy` print a plan and do not write skills or deploy unless `--yes`.
+Human TTY first Cloud `appaloft up` folds browser login. `appaloft deploy` remains the supported
+1.x compatibility spelling. Coding-agent, CI, and non-TTY `setup agent` / `up` / `deploy` print a
+plan and do not write skills or deploy unless `--yes`.
 
 `appaloft setup agent` lists `universal`, `claude-code`, `cursor`, and `opencode`. Defaults copy
 byte-identical skills into `~/.agents/skills/appaloft`, `~/.claude/skills/appaloft` when `~/.claude`

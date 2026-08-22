@@ -150,27 +150,28 @@ Use this order:
    create --project <projectId> --environment <environmentId> --resource <resourceId> --server
    <serverId> [--destination <destinationId>]`; it is ids-only and does not replace source/profile
    configuration or proof verification.
-2. Current directory: `appaloft deploy` and `appaloft deploy .` deploy this tree as this app. Human
-   TTY Cloud deploy starts the existing browser login in the same command when no profile exists.
+2. Current directory: `appaloft up` and `appaloft up .` deploy this tree as this app. `appaloft
+   deploy` remains the supported 1.x compatibility spelling for the same workflow. Human TTY Cloud
+   `up` starts the existing browser login in the same command when no profile exists.
    Coding-agent / CI / non-TTY runs print a plan unless `--yes` is present. Do
    not silently reuse an unrelated session such as traefik/whoami. If `public/index.html` exists,
    auto-select static and publish-dir `public` without requiring `--method` or `--publish-dir`. Keep
    the real cwd folder (hyphenated names are legal). Persist that exact resolved
-   `deploy .` path as source metadata. The SSH package exists-check and tar read that
+   `up .` path as source metadata. The SSH package exists-check and tar read that
    path directly; do not substitute a dirname'd locator or a runtimeDir cwd. When the
    folder exists on the package host, tar packages that folder and the command can
    print this app's live URL. A missing-workdir error names the full folder.
    If there is no current app, ask for a path or `--project`.
-3. Existing Appaloft config: `appaloft deploy <source>`; for an application graph, repeat
+3. Existing Appaloft config: `appaloft up <source>`; for an application graph, repeat
    `--application <key>` to deploy only the requested applications or omit it to deploy all entries.
    `source.type: image` in config is a Resource source/runtime profile declaration, not a deployment
    command field or registry secret surface.
-4. Docker/OCI image: `appaloft deploy image://<image>:<tag> --method prebuilt-image`.
-5. Compose source: `appaloft deploy <source> --method docker-compose`.
-6. Dockerfile source: `appaloft deploy <source> --method dockerfile`.
-7. Built static output: `appaloft deploy ./dist --as static-site`. `--as static-site` may use
+4. Docker/OCI image: `appaloft up image://<image>:<tag> --method prebuilt-image`.
+5. Compose source: `appaloft up <source> --method docker-compose`.
+6. Dockerfile source: `appaloft up <source> --method dockerfile`.
+7. Built static output: `appaloft up ./dist --as static-site`. `--as static-site` may use
    `--publish-dir .` to mean the source root / current directory.
-8. Static source: `appaloft deploy <source> --method static --publish-dir <dir>`.
+8. Static source: `appaloft up <source> --method static --publish-dir <dir>`.
    Outside a TTY, omit `--publish-dir` only when a usable default exists: `public` if
    `public/index.html` is present, otherwise `.` (source root, wire `/`). `.` is a legal
    publish directory on the public validator. Relative dirs such as `public` stay `public` on
@@ -190,8 +191,9 @@ Use this order:
 
 ## Progress Streams
 
-Progress monitoring is part of deployment, not an optional afterthought. `appaloft deploy` waits
-for a terminal deployment status. Claim a URL only after `succeeded`. A failed SSH Docker image
+Progress monitoring is part of deployment, not an optional afterthought. `appaloft up` (and its
+1.x `appaloft deploy` compatibility spelling) waits for a terminal deployment status. Claim a URL
+only after `succeeded`. A failed SSH Docker image
 build is a failed deploy: non-zero exit, no live URL. When BuildKit cannot `COPY public/`, the
 CLI failure must include the last BuildKit lines such as `"/public": not found`. A missing
 uploaded `public/` fails as `static publish directory public/ not found in uploaded workspace`,

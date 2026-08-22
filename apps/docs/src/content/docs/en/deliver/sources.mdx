@@ -8,6 +8,7 @@ localeState:
 searchAliases:
   - "required checks"
   - "GitHub checks"
+  - "appaloft up"
 ---
 <a id="source-auto-deploy-setup" />
 <a id="source-auto-deploy-signatures" />
@@ -123,20 +124,20 @@ Use `appaloft source-event list --resource res_web` and
 
 ```bash
 # Zero-configuration deploy from the current directory
-# (unflagged deploy does the same; it does not silently reuse a session)
-appaloft deploy
-appaloft deploy .
+# (unflagged up does the same; it does not silently reuse a session)
+appaloft up
+appaloft up .
 
 # Local directory, explicit static publish
 # (relative dirs stay relative; `public` is not rewritten to `/public`)
-appaloft deploy ./apps/web --method static --publish-dir build
-appaloft deploy . --as static-site --publish-dir public
+appaloft up ./apps/web --method static --publish-dir build
+appaloft up . --as static-site --publish-dir public
 
 # Already-built static output directory, skip the build
-appaloft deploy ./dist --as static-site
+appaloft up ./dist --as static-site
 
 # Git repository as the source
-appaloft deploy https://github.com/example/web \
+appaloft up https://github.com/example/web \
   --method static \
   --publish-dir dist \
   --resource-name web
@@ -151,6 +152,10 @@ appaloft resource configure-source res_web \
 # Preview the plan before creating a deployment attempt
 appaloft deployments plan --project prj_prod --environment env_prod --resource res_web --server srv_prod
 ```
+
+`appaloft deploy` remains the supported 1.x compatibility spelling for the same workflow. New
+commands and automation should prefer `appaloft up`; both spellings use the exact same source
+resolution and deployment lifecycle.
 
 ## HTTP/API steps
 

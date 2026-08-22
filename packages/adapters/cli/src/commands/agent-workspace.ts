@@ -843,18 +843,22 @@ export const workspaceCodeCommand = EffectCommand.make(
                 ensureFolderOnboarding: async () => {
                   const loggedIn = await hasCliControlPlaneLogin(cli.environment ?? process.env);
                   if (!loggedIn) throw workspaceRemoteLoginRequiredError();
-                  return withImmediateSigintExit(() =>
-                    Runtime.runPromise(runtime)(
-                      ensureFolderProjectOnboarding({
-                        cwd: folderOnboardingCwdFromLocator(path),
-                        yes: true,
-                        promptPolicy: "auto-create",
-                        ...(useOccupancyTui ? { writeStatus: () => undefined } : {}),
-                        peekGitIdentity: peekThisFolderGitIdentity,
-                        ...(cli.environment ? { env: cli.environment } : {}),
-                      }),
-                    ),
-                  );
+                  return withImmediateSigintExit(async () => {
+                    const outcome = await Runtime.runPromise(runtime)(
+                      Effect.either(
+                        ensureFolderProjectOnboarding({
+                          cwd: folderOnboardingCwdFromLocator(path),
+                          yes: true,
+                          promptPolicy: "auto-create",
+                          ...(useOccupancyTui ? { writeStatus: () => undefined } : {}),
+                          peekGitIdentity: peekThisFolderGitIdentity,
+                          ...(cli.environment ? { env: cli.environment } : {}),
+                        }),
+                      ),
+                    );
+                    if (outcome._tag === "Left") throw outcome.left;
+                    return outcome.right;
+                  });
                 },
                 listServers: async () => {
                   const query = ListServersQuery.create();

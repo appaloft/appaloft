@@ -11,8 +11,9 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `https://app.appaloft.com`, print the Cloud browser login URL and user code, wait for explicit
   Enter before opening the browser when enabled, then write a local `cloud` profile only after a
   trusted local credential verifies against the current organization context. First Cloud
-  `appaloft deploy` folds that same login into the deploy command for a human TTY. Coding-agent,
-  CI, and non-TTY `deploy` / `setup agent` print a plan and do not mutate without `--yes`. This
+  `appaloft up` folds that same login into the deployment command for a human TTY. `appaloft deploy`
+  remains the supported 1.x compatibility spelling. Coding-agent, CI, and non-TTY `up` / `deploy` /
+  `setup agent` print a plan and do not mutate without `--yes`. This
   is a human interactive login path, not the default AI-agent auth handoff.
 - `appaloft auth mcp login` writes a dedicated bearer `mcp` profile through the same browser
   handoff. Use it when a host needs a bearer MCP profile. Cursor, Claude Code, and OpenCode host
@@ -37,8 +38,9 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft auth status`, `appaloft context show`, `appaloft context list`,
   `appaloft context use <profile>`, and `appaloft logout` only manage local CLI profile/context
   state. They must not create projects, resources, deployments, source links, or domain bindings.
-- `appaloft deploy` is the CLI entrypoint used by Pure SSH Action. SSH targets default to
-  server-owned `ssh-pglite` state when no control plane is selected.
+- `appaloft up` is the canonical interactive CLI entrypoint. `appaloft deploy` remains its 1.x
+  compatibility spelling and is also the CLI spelling used by Pure SSH Action. SSH targets default
+  to server-owned `ssh-pglite` state when no control plane is selected.
 - Server-owned SSH PGlite maintenance is explicit and coordinated: create an immutable backup with
   `appaloft remote-state backup create`, restore it only to a distinct
   `<runtime-parent>/recovery/<candidate>` root with `remote-state backup restore-copy`, run
@@ -101,7 +103,12 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   without a local clone. Laptop Git is not uploaded. Occupy writes the public Appaloft
   skill, a secret-free first-party Appaloft MCP file, and may write my laptop vendor
   credential onto occupancy HOME (`~/.grok/auth.json`, `~/.codex/auth.json`, or a Claude
-  setup-token — not the Claude chat cookie). Occupy may add-only copy allowlisted HOME skill directories
+  setup-token — not the Claude chat cookie). For `--codex`, this copies this Mac's
+  `~/.codex/auth.json` to `.codex/auth.json` under the selected remote Workspace HOME; Appaloft
+  never prints it or places it in MCP/env. Remove the remote copy with
+  `appaloft sandbox file remove <sandboxId> --path .codex/auth.json`. Removing that file does not revoke
+  upstream access, so also revoke the corresponding Codex/OpenAI session in the upstream account
+  security console. Occupy may add-only copy allowlisted HOME skill directories
   (`~/.claude/skills`, `~/.codex/skills`, `~/.grok/skills`, `~/.agents/skills`, plus
   `~/.cursor/skills` and `~/.config/opencode/skills` beyond Railway) into
   `/workspace/skills/<name>` and `/workspace/.agents/skills/<name>`. Only directories
@@ -165,10 +172,10 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft sandbox resume <sandboxId>` - `sandboxes.resume`
 - `appaloft sandbox terminate <sandboxId>` - `sandboxes.terminate`
 - `appaloft sandbox exec <sandboxId> -- <argv...>` - `sandboxes.exec`
-- `appaloft sandbox files list <sandboxId> <path>` - `sandbox-files.list`
-- `appaloft sandbox files read <sandboxId> <path>` - `sandbox-files.read`
-- `appaloft sandbox files write <sandboxId> <path>` - `sandbox-files.write`
-- `appaloft sandbox files remove <sandboxId> <path>` - `sandbox-files.remove`
+- `appaloft sandbox file list <sandboxId> --path <path>` - `sandbox-files.list`
+- `appaloft sandbox file read <sandboxId> --path <path>` - `sandbox-files.read`
+- `appaloft sandbox file write <sandboxId> --path <path>` - `sandbox-files.write`
+- `appaloft sandbox file remove <sandboxId> --path <path>` - `sandbox-files.remove`
 - `appaloft sandbox process list <sandboxId>` - `sandbox-processes.list`
 - `appaloft sandbox process terminate <sandboxId> <processId>` - `sandbox-processes.terminate`
 - `appaloft sandbox process show <sandboxId> <processId>` - `sandbox-processes.show`
@@ -448,7 +455,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft env sync-profile <environmentId> <targetEnvironmentId> --resource-ids <ids>` - `environments.sync-profile`
 - `appaloft env promote <environmentId> <targetName>` - `environments.promote`
 - `appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123` - `deployments.cleanup-preview`
-- `appaloft deploy [path-or-source] [--yes] [--project <projectId>] [--config appaloft.yml] [--application <config-key>] [--env KEY=VALUE] [--secret KEY=ci-env:NAME] [--preview pull-request]; appaloft deployments create --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]` - `deployments.create`; first unlinked folder may create/link a Project named after the directory (git is not required); repeat `--application` to deploy a named subset of a repository application graph, or omit it to deploy every declared application; the namespaced form is ids-only and supports remote control-plane profiles after explicit Resource profile and target setup
+- `appaloft up [path-or-source] [--yes] [--project <projectId>] [--config appaloft.yml] [--application <config-key>] [--env KEY=VALUE] [--secret KEY=ci-env:NAME] [--preview pull-request]` is canonical; `appaloft deploy [path-or-source] [--yes] [--project <projectId>] [--config appaloft.yml] [--application <config-key>] [--env KEY=VALUE] [--secret KEY=ci-env:NAME] [--preview pull-request]; appaloft deployments create --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]` - `deployments.create`; the top-level `deploy` spelling is supported throughout 1.x; first unlinked folder may create/link a Project named after the directory (git is not required); repeat `--application` to deploy a named subset of a repository application graph, or omit it to deploy every declared application; the namespaced form is ids-only and supports remote control-plane profiles after explicit Resource profile and target setup
 - `appaloft deployments retry <deploymentId>` - `deployments.retry`
 - `appaloft deployments redeploy <resourceId>` - `deployments.redeploy`
 - `appaloft deployments force-redeploy <resourceId>` - `deployments.force-redeploy`

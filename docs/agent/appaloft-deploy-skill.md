@@ -40,7 +40,7 @@ CLI, or write MCP config. Verify with `npx skills list --global --agent <agent>`
 and start a new agent session before expecting the skill to appear.
 
 The install command only copies the full Appaloft skill into a skill host. It does not deploy an
-app, create resources, call Appaloft deployment APIs, or wrap `appaloft deploy`. Deployment starts
+app, create resources, call Appaloft deployment APIs, or wrap `appaloft up`. Deployment starts
 later, when the installed skill is loaded by an agent and the user asks that agent to deploy
 something. The deploy protocol is part of the full Appaloft skill, not a separate npm installer.
 
@@ -79,11 +79,12 @@ something. The deploy protocol is part of the full Appaloft skill, not a separat
   It is a profile overlay, not a way for committed YAML to choose preview identity.
 - Apply `profiles.<key>` only when trusted CLI/Action input selects `--config-profile` or
   `config-profile`. It is a config overlay, not an Appaloft Environment selector.
-- For local static output, use `appaloft deploy ./dist --as static-site` or the equivalent Web/API
+- For local static output, use `appaloft up ./dist --as static-site` or the equivalent Web/API
   workflow. `--as static-site` may use publish directory `.` to mean the source root / current
   directory. This is only one Appaloft deploy mode; Dockerfile, Compose, prebuilt image, and
   workspace-command deployments still use the same resource and deployment operation boundary.
-- `appaloft deploy` and `appaloft deploy .` deploy the current directory as this app. Do not reuse
+- `appaloft up` and `appaloft up .` deploy the current directory as this app. `appaloft deploy`
+  remains the supported 1.x compatibility spelling for the same workflow. Do not reuse
   an unrelated occupancy such as traefik/whoami. If there is no current app, ask for a path or
   `--project`.
 - Treat CLI success as a terminal `succeeded` deployment. If Docker/SSH build fails, exit non-zero
@@ -112,16 +113,16 @@ Use this order:
 In a shell-capable agent session, the following are the CLI forms. In Web or HTTP/API contexts, use
 the equivalent Resource and Deployment operation flow instead of shelling out.
 
-1. If the repository has an Appaloft deployment config, run `appaloft deploy <source>`; if the
+1. If the repository has an Appaloft deployment config, run `appaloft up <source>`; if the
    config declares `source.type: image`, let config deploy select the prebuilt image source rather
    than inventing registry credential fields.
-2. If the user names a prebuilt image, run `appaloft deploy image://<image>:<tag> --method prebuilt-image`.
-3. If Docker Compose is the clearest source of truth, run `appaloft deploy <source> --method docker-compose`.
-4. If a Dockerfile is the clearest source of truth, run `appaloft deploy <source> --method dockerfile`.
-5. If the user points at an already built static directory, run `appaloft deploy <dir> --as static-site`.
-6. If the folder has `public/index.html`, run `appaloft deploy .` / `appaloft deploy . --yes`.
+2. If the user names a prebuilt image, run `appaloft up image://<image>:<tag> --method prebuilt-image`.
+3. If Docker Compose is the clearest source of truth, run `appaloft up <source> --method docker-compose`.
+4. If a Dockerfile is the clearest source of truth, run `appaloft up <source> --method dockerfile`.
+5. If the user points at an already built static directory, run `appaloft up <dir> --as static-site`.
+6. If the folder has `public/index.html`, run `appaloft up .` / `appaloft up . --yes`.
    Do not require `--method static` or `--publish-dir`. The CLI auto-selects static and `public`.
-   Keep the real cwd folder; persist that exact resolved `deploy .` path. The SSH package
+   Keep the real cwd folder; persist that exact resolved `up .` path. The SSH package
    exists-check and tar read that path directly, not a dirname'd locator or runtimeDir.
    When the folder exists on the package host, tar packages that folder so the command can
    print this app's live URL. A missing-workdir error names the full folder.
@@ -181,7 +182,7 @@ readiness, then give the next safe action.
 
 ## Public Help Anchors
 
-- First deployment: `/docs/start/first-deployment/#agent-deploy-skill`
+- First deployment: `/docs/start/first-deployment/#cli-up-first-deployment`
 - Sources: `/docs/deploy/sources/#local-static-output`
 - Errors and statuses: `/docs/reference/errors-statuses/#agent-readable-errors`
 - Logs and health: `/docs/observe/logs-health/#agent-deploy-follow-up`

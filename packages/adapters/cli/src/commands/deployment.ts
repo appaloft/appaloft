@@ -125,7 +125,18 @@ const helmHookPolicyOption = Options.choice("helm-hook-policy", [
 ] as const).pipe(Options.optional);
 const helmTimeoutSecondsOption = Options.text("helm-timeout-seconds").pipe(Options.optional);
 const projectOption = Options.text("project").pipe(Options.optional);
-const yesOption = Options.boolean("yes").pipe(Options.withDefault(false));
+const yesOption = Options.boolean("yes").pipe(
+  Options.withDefault(false),
+  Options.withDescription(
+    "Approve login, folder onboarding, and deployment mutations in agent, CI, or non-interactive runs",
+  ),
+);
+const deploymentJsonOption = Options.boolean("json").pipe(
+  Options.withDefault(false),
+  Options.withDescription(
+    "Keep the deployment result on machine-readable JSON stdout while progress stays on stderr",
+  ),
+);
 const deploymentCreateProjectOption = Options.text("project");
 const serverOption = Options.text("server").pipe(Options.optional);
 const deploymentCreateServerOption = Options.text("server");
@@ -1517,6 +1528,7 @@ function runCreateDeploymentCommand(
     requirePreviewUrl: boolean;
     previewOutputFile?: string;
     previewId?: string;
+    outputMode?: "legacy" | "json" | "silent";
   },
 ) {
   return Effect.gen(function* () {
@@ -1527,6 +1539,7 @@ function runCreateDeploymentCommand(
       CreateDeploymentCommand.create(effectiveInput),
       {
         appLogLines: options.appLogLines,
+        printResult: options.outputMode !== "json" && options.outputMode !== "silent",
       },
     );
     const deployment = yield* waitForSynchronousDeployment({
@@ -1553,7 +1566,18 @@ function runCreateDeploymentCommand(
     yield* failIfSynchronousDeploymentDidNotSucceed(deployment);
     const url =
       occupancyDeployUrlFromSummary(deployment) ?? (yield* readCreatedDeploymentUrl(output.id));
-    if (url) yield* print({ url });
+    const result = {
+      deploymentId: output.id,
+      resourceId: effectiveInput.resourceId,
+      status: deployment?.status ?? "unknown",
+      ...(url ? { url } : {}),
+    };
+    if (options.outputMode === "json") {
+      yield* print(result);
+    } else if (options.outputMode !== "silent" && url) {
+      yield* print({ url });
+    }
+    return result;
   });
 }
 
@@ -1669,628 +1693,833 @@ const previewCleanupCommand = EffectCommand.make(
     }),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.previewCleanup));
 
-export const deployCommand = EffectCommand.make(
-  "deploy",
-  {
-    pathOrSource: pathOrSourceArg,
-    project: projectOption,
-    yes: yesOption,
-    server: serverOption,
-    serverHost: serverHostOption,
-    serverName: serverNameOption,
-    serverProvider: serverProviderOption,
-    serverPort: serverPortOption,
-    serverSshUsername: serverSshUsernameOption,
-    serverSshPublicKey: serverSshPublicKeyOption,
-    serverSshPrivateKeyFile: serverSshPrivateKeyFileOption,
-    destination: destinationOption,
-    environment: environmentOption,
-    resource: resourceOption,
-    resourceName: resourceNameOption,
-    resourceKind: resourceKindOption,
-    resourceDescription: resourceDescriptionOption,
-    method: methodOption,
-    entryMode: entryModeOption,
-    config: configOption,
-    configProfile: configProfileOption,
-    application: applicationOption,
-    preview: previewOption,
-    previewId: previewIdOption,
-    previewDomainTemplate: previewDomainTemplateOption,
-    previewTlsMode: previewTlsModeOption,
-    requirePreviewUrl: requirePreviewUrlOption,
-    previewOutputFile: previewOutputFileOption,
-    install: installOption,
-    build: buildOption,
-    start: startOption,
-    runtimeName: runtimeNameOption,
-    publishDir: publishDirOption,
-    sourceBaseDirectory: sourceBaseDirectoryOption,
-    helmChartVersion: helmChartVersionOption,
-    helmValuesSecretReference: helmValuesSecretReferenceOption,
-    helmHookPolicy: helmHookPolicyOption,
-    helmTimeoutSeconds: helmTimeoutSecondsOption,
-    dockerfilePath: dockerfilePathOption,
-    dockerComposeFilePath: dockerComposeFilePathOption,
-    buildTarget: buildTargetOption,
-    port: portOption,
-    upstreamProtocol: upstreamProtocolOption,
-    exposureMode: exposureModeOption,
-    targetServiceName: targetServiceNameOption,
-    hostPort: hostPortOption,
-    healthPath: healthPathOption,
-    env: envOption,
-    secret: secretOption,
-    optionalSecret: optionalSecretOption,
-    acknowledgeResourceProfileDrift: acknowledgeResourceProfileDriftOption,
-    stateBackend: stateBackendOption,
-    appLogLines: appLogLinesOption,
-  },
-  ({
-    acknowledgeResourceProfileDrift,
-    application,
-    appLogLines,
-    build,
-    buildTarget,
-    config,
-    configProfile,
-    destination,
-    dockerComposeFilePath,
-    dockerfilePath,
-    environment,
-    env,
-    exposureMode,
-    healthPath,
-    hostPort,
-    install,
-    method,
-    entryMode,
-    optionalSecret,
-    pathOrSource,
-    port,
-    preview,
-    previewDomainTemplate,
-    previewId,
-    previewOutputFile,
-    previewTlsMode,
-    project,
-    publishDir,
-    requirePreviewUrl,
-    resource,
-    resourceDescription,
-    resourceKind,
-    resourceName,
-    runtimeName,
-    secret,
-    server,
-    serverHost,
-    serverName,
-    serverPort,
-    serverProvider,
-    serverSshPrivateKeyFile,
-    serverSshPublicKey,
-    serverSshUsername,
-    sourceBaseDirectory,
-    helmChartVersion,
-    helmValuesSecretReference,
-    helmHookPolicy,
-    helmTimeoutSeconds,
-    start,
-    stateBackend,
-    targetServiceName,
-    upstreamProtocol,
-    yes,
-  }) =>
-    Effect.gen(function* () {
-      const cli = yield* CliRuntime;
-      const sourceLocator = optionalValue(pathOrSource);
-      const requestedEntryMode = optionalValue(entryMode);
-      const requestedDeploymentMethodFromFlag = optionalValue(method);
-      const publishDirectoryFromFlag = optionalValue(publishDir);
-      const requestedConfigProfile = optionalValue(configProfile);
-      const requestedApplicationKeys = [...new Set(application)];
-      const urlFirstEntry = yield* resultToEffect(
-        normalizeUrlFirstDeploymentEntry({
-          ...(requestedDeploymentMethodFromFlag
-            ? { requestedDeploymentMethod: requestedDeploymentMethodFromFlag }
-            : {}),
-          ...(requestedEntryMode ? { entryMode: requestedEntryMode } : {}),
-          sourceLocator: sourceLocator ?? ".",
-          ...(publishDirectoryFromFlag ? { publishDirectory: publishDirectoryFromFlag } : {}),
-        }),
-      );
-      const requestedDeploymentMethod = urlFirstEntry.deploymentMethod;
-      const portValue = optionalNumber(port);
-      const configFilePath = optionalValue(config);
-      const requestedProjectId = optionalValue(project);
-      const deployEnv = cli.environment ?? process.env;
-      const writeStatus = (text: string) => {
-        cli.terminalIO.stderr.write(text);
-      };
-      if ((isCodingAgentEnvironment(deployEnv) || isCiEnvironment(deployEnv)) && !yes) {
-        const loggedIn = yield* Effect.promise(() =>
-          hasCliControlPlaneLogin(deployEnv, cli.readActiveControlPlaneProfile),
-        );
-        writeStatus(`${formatCliMutationPlan({ door: "deploy", loggedIn })}\n`);
-        return yield* Effect.fail(
-          cliMutationConfirmationRequiredError({ door: "deploy", loggedIn }),
-        );
-      }
-      if (cli.executionTarget === "remote") {
-        const login = yield* Effect.promise(() =>
-          ensureDeployControlPlaneLogin({
-            env: deployEnv,
-            yes,
-            ...(cli.terminalIO.stdin.isTTY === undefined
-              ? {}
-              : { stdinIsTty: cli.terminalIO.stdin.isTTY }),
-            ...(cli.terminalIO.stdout.isTTY === undefined
-              ? {}
-              : { stdoutIsTty: cli.terminalIO.stdout.isTTY }),
-            ...(cli.readActiveControlPlaneProfile
-              ? { readActiveProfile: cli.readActiveControlPlaneProfile }
+function deploymentEntrypointCommand(name: "up" | "deploy", description: string) {
+  return EffectCommand.make(
+    name,
+    {
+      pathOrSource: pathOrSourceArg,
+      project: projectOption,
+      yes: yesOption,
+      json: deploymentJsonOption,
+      server: serverOption,
+      serverHost: serverHostOption,
+      serverName: serverNameOption,
+      serverProvider: serverProviderOption,
+      serverPort: serverPortOption,
+      serverSshUsername: serverSshUsernameOption,
+      serverSshPublicKey: serverSshPublicKeyOption,
+      serverSshPrivateKeyFile: serverSshPrivateKeyFileOption,
+      destination: destinationOption,
+      environment: environmentOption,
+      resource: resourceOption,
+      resourceName: resourceNameOption,
+      resourceKind: resourceKindOption,
+      resourceDescription: resourceDescriptionOption,
+      method: methodOption,
+      entryMode: entryModeOption,
+      config: configOption,
+      configProfile: configProfileOption,
+      application: applicationOption,
+      preview: previewOption,
+      previewId: previewIdOption,
+      previewDomainTemplate: previewDomainTemplateOption,
+      previewTlsMode: previewTlsModeOption,
+      requirePreviewUrl: requirePreviewUrlOption,
+      previewOutputFile: previewOutputFileOption,
+      install: installOption,
+      build: buildOption,
+      start: startOption,
+      runtimeName: runtimeNameOption,
+      publishDir: publishDirOption,
+      sourceBaseDirectory: sourceBaseDirectoryOption,
+      helmChartVersion: helmChartVersionOption,
+      helmValuesSecretReference: helmValuesSecretReferenceOption,
+      helmHookPolicy: helmHookPolicyOption,
+      helmTimeoutSeconds: helmTimeoutSecondsOption,
+      dockerfilePath: dockerfilePathOption,
+      dockerComposeFilePath: dockerComposeFilePathOption,
+      buildTarget: buildTargetOption,
+      port: portOption,
+      upstreamProtocol: upstreamProtocolOption,
+      exposureMode: exposureModeOption,
+      targetServiceName: targetServiceNameOption,
+      hostPort: hostPortOption,
+      healthPath: healthPathOption,
+      env: envOption,
+      secret: secretOption,
+      optionalSecret: optionalSecretOption,
+      acknowledgeResourceProfileDrift: acknowledgeResourceProfileDriftOption,
+      stateBackend: stateBackendOption,
+      appLogLines: appLogLinesOption,
+    },
+    ({
+      acknowledgeResourceProfileDrift,
+      application,
+      appLogLines,
+      build,
+      buildTarget,
+      config,
+      configProfile,
+      destination,
+      dockerComposeFilePath,
+      dockerfilePath,
+      environment,
+      env,
+      exposureMode,
+      healthPath,
+      hostPort,
+      install,
+      json,
+      method,
+      entryMode,
+      optionalSecret,
+      pathOrSource,
+      port,
+      preview,
+      previewDomainTemplate,
+      previewId,
+      previewOutputFile,
+      previewTlsMode,
+      project,
+      publishDir,
+      requirePreviewUrl,
+      resource,
+      resourceDescription,
+      resourceKind,
+      resourceName,
+      runtimeName,
+      secret,
+      server,
+      serverHost,
+      serverName,
+      serverPort,
+      serverProvider,
+      serverSshPrivateKeyFile,
+      serverSshPublicKey,
+      serverSshUsername,
+      sourceBaseDirectory,
+      helmChartVersion,
+      helmValuesSecretReference,
+      helmHookPolicy,
+      helmTimeoutSeconds,
+      start,
+      stateBackend,
+      targetServiceName,
+      upstreamProtocol,
+      yes,
+    }) =>
+      Effect.gen(function* () {
+        const cli = yield* CliRuntime;
+        const sourceLocator = optionalValue(pathOrSource);
+        const requestedEntryMode = optionalValue(entryMode);
+        const requestedDeploymentMethodFromFlag = optionalValue(method);
+        const publishDirectoryFromFlag = optionalValue(publishDir);
+        const requestedConfigProfile = optionalValue(configProfile);
+        const requestedApplicationKeys = [...new Set(application)];
+        const urlFirstEntry = yield* resultToEffect(
+          normalizeUrlFirstDeploymentEntry({
+            ...(requestedDeploymentMethodFromFlag
+              ? { requestedDeploymentMethod: requestedDeploymentMethodFromFlag }
               : {}),
-            ...(cli.loginControlPlane ? { login: cli.loginControlPlane } : {}),
-            writeStatus,
+            ...(requestedEntryMode ? { entryMode: requestedEntryMode } : {}),
+            sourceLocator: sourceLocator ?? ".",
+            ...(publishDirectoryFromFlag ? { publishDirectory: publishDirectoryFromFlag } : {}),
           }),
         );
-        if (login.isErr()) {
-          return yield* Effect.fail(login.error);
+        const requestedDeploymentMethod = urlFirstEntry.deploymentMethod;
+        const portValue = optionalNumber(port);
+        const configFilePath = optionalValue(config);
+        const requestedProjectId = optionalValue(project);
+        const deployEnv = cli.environment ?? process.env;
+        const writeStatus = (text: string) => {
+          cli.terminalIO.stderr.write(text);
+        };
+        if ((isCodingAgentEnvironment(deployEnv) || isCiEnvironment(deployEnv)) && !yes) {
+          const loggedIn = yield* Effect.promise(() =>
+            hasCliControlPlaneLogin(deployEnv, cli.readActiveControlPlaneProfile),
+          );
+          writeStatus(`${formatCliMutationPlan({ door: "deploy", loggedIn })}\n`);
+          return yield* Effect.fail(
+            cliMutationConfirmationRequiredError({ door: "deploy", loggedIn }),
+          );
         }
-      }
-      const serverId = optionalValue(server);
-      const serverHostValue = optionalValue(serverHost);
-      const serverNameValue = optionalValue(serverName);
-      const serverProviderValue = optionalValue(serverProvider);
-      const serverPortValue = optionalNumber(serverPort);
-      const serverSshUsernameValue = optionalValue(serverSshUsername);
-      const serverSshPublicKeyValue = optionalValue(serverSshPublicKey);
-      const serverSshPrivateKeyFileValue = optionalValue(serverSshPrivateKeyFile);
-      const destinationId = optionalValue(destination);
-      const environmentId = optionalValue(environment);
-      const resourceId = optionalValue(resource);
-      const resourceNameValue = optionalValue(resourceName);
-      const resourceKindValue = optionalValue(resourceKind);
-      const resourceDescriptionValue = optionalValue(resourceDescription);
-      const installCommand = optionalValue(install);
-      const buildCommand = optionalValue(build);
-      const startCommand = optionalValue(start);
-      const runtimeNameValue = optionalValue(runtimeName);
-      const publishDirectory = urlFirstEntry.publishDirectory;
-      const sourceBaseDirectoryValue = optionalValue(sourceBaseDirectory);
-      const helmChartVersionValue = optionalValue(helmChartVersion);
-      const helmHookPolicyValue = optionalValue(helmHookPolicy);
-      const helmTimeoutSecondsValue = optionalNumber(helmTimeoutSeconds);
-      const dockerfilePathValue = optionalValue(dockerfilePath);
-      const dockerComposeFilePathValue = optionalValue(dockerComposeFilePath);
-      const buildTargetValue = optionalValue(buildTarget);
-      const upstreamProtocolValue = optionalValue(upstreamProtocol);
-      const exposureModeValue = optionalValue(exposureMode);
-      const targetServiceNameValue = optionalValue(targetServiceName);
-      const hostPortValue = optionalNumber(hostPort);
-      const healthCheckPath = optionalValue(healthPath);
-      const healthCheck = healthCheckPath
-        ? defaultHttpHealthCheckPolicy({ path: healthCheckPath })
-        : undefined;
-      const requestedStateBackend = optionalValue(stateBackend);
-      const requestedPreviewMode = optionalValue(preview);
-      const requestedPreviewId = optionalValue(previewId);
-      const requestedPreviewDomainTemplate = optionalValue(previewDomainTemplate);
-      const requestedPreviewTlsMode = optionalValue(previewTlsMode);
-      const previewOutputFilePath = optionalValue(previewOutputFile);
-      const previewContext = yield* resultToEffect(
-        resolvePreviewDeployContext({
-          ...(requestedPreviewMode ? { mode: requestedPreviewMode } : {}),
-          ...(requestedPreviewId ? { previewId: requestedPreviewId } : {}),
-          ...(requestedPreviewDomainTemplate
-            ? { previewDomainTemplate: requestedPreviewDomainTemplate }
-            : {}),
-          ...(requestedPreviewTlsMode ? { previewTlsMode: requestedPreviewTlsMode } : {}),
-          ...(requirePreviewUrl ? { requirePreviewUrl } : {}),
-          ...(previewOutputFilePath ? { previewOutputFile: previewOutputFilePath } : {}),
-          env: Bun.env,
-        }),
-      );
-      const flagEnvironmentVariables = yield* resultToEffect(
-        deploymentEnvironmentVariablesFromCliFlags({
-          envFlags: env,
-          secretFlags: secret,
-          optionalSecretFlags: optionalSecret,
-          env: Bun.env,
-        }),
-      );
-      const hasProfileOverrides = Boolean(
-        requestedDeploymentMethod ||
-        installCommand ||
-        buildCommand ||
-        startCommand ||
-        runtimeNameValue ||
-        publishDirectory ||
-        sourceBaseDirectoryValue ||
-        helmChartVersionValue ||
-        helmValuesSecretReference.length > 0 ||
-        helmHookPolicyValue ||
-        helmTimeoutSecondsValue !== undefined ||
-        dockerfilePathValue ||
-        dockerComposeFilePathValue ||
-        buildTargetValue ||
-        portValue !== undefined ||
-        upstreamProtocolValue ||
-        exposureModeValue ||
-        targetServiceNameValue ||
-        hostPortValue !== undefined ||
-        healthCheckPath ||
-        requestedConfigProfile ||
-        requestedApplicationKeys.length > 0 ||
-        flagEnvironmentVariables.length > 0 ||
-        requestedPreviewDomainTemplate ||
-        requestedPreviewTlsMode,
-      );
-
-      if (
-        !sourceLocator &&
-        !configFilePath &&
-        !previewContext &&
-        !hasProfileOverrides &&
-        requestedProjectId &&
-        serverId &&
-        environmentId &&
-        resourceId
-      ) {
-        yield* Effect.promise(() =>
-          persistFolderProjectAssociation({
-            cwd: folderOnboardingCwdFromLocator(sourceLocator),
-            projectId: requestedProjectId,
-            ...(cli.environment ? { env: cli.environment } : {}),
+        if (cli.executionTarget === "remote") {
+          const login = yield* Effect.promise(() =>
+            ensureDeployControlPlaneLogin({
+              env: deployEnv,
+              yes,
+              ...(cli.terminalIO.stdin.isTTY === undefined
+                ? {}
+                : { stdinIsTty: cli.terminalIO.stdin.isTTY }),
+              ...(cli.terminalIO.stdout.isTTY === undefined
+                ? {}
+                : { stdoutIsTty: cli.terminalIO.stdout.isTTY }),
+              ...(cli.readActiveControlPlaneProfile
+                ? { readActiveProfile: cli.readActiveControlPlaneProfile }
+                : {}),
+              ...(cli.loginControlPlane ? { login: cli.loginControlPlane } : {}),
+              writeStatus,
+            }),
+          );
+          if (login.isErr()) {
+            return yield* Effect.fail(login.error);
+          }
+        }
+        const serverId = optionalValue(server);
+        const serverHostValue = optionalValue(serverHost);
+        const serverNameValue = optionalValue(serverName);
+        const serverProviderValue = optionalValue(serverProvider);
+        const serverPortValue = optionalNumber(serverPort);
+        const serverSshUsernameValue = optionalValue(serverSshUsername);
+        const serverSshPublicKeyValue = optionalValue(serverSshPublicKey);
+        const serverSshPrivateKeyFileValue = optionalValue(serverSshPrivateKeyFile);
+        const destinationId = optionalValue(destination);
+        const environmentId = optionalValue(environment);
+        const resourceId = optionalValue(resource);
+        const resourceNameValue = optionalValue(resourceName);
+        const resourceKindValue = optionalValue(resourceKind);
+        const resourceDescriptionValue = optionalValue(resourceDescription);
+        const installCommand = optionalValue(install);
+        const buildCommand = optionalValue(build);
+        const startCommand = optionalValue(start);
+        const runtimeNameValue = optionalValue(runtimeName);
+        const publishDirectory = urlFirstEntry.publishDirectory;
+        const sourceBaseDirectoryValue = optionalValue(sourceBaseDirectory);
+        const helmChartVersionValue = optionalValue(helmChartVersion);
+        const helmHookPolicyValue = optionalValue(helmHookPolicy);
+        const helmTimeoutSecondsValue = optionalNumber(helmTimeoutSeconds);
+        const dockerfilePathValue = optionalValue(dockerfilePath);
+        const dockerComposeFilePathValue = optionalValue(dockerComposeFilePath);
+        const buildTargetValue = optionalValue(buildTarget);
+        const upstreamProtocolValue = optionalValue(upstreamProtocol);
+        const exposureModeValue = optionalValue(exposureMode);
+        const targetServiceNameValue = optionalValue(targetServiceName);
+        const hostPortValue = optionalNumber(hostPort);
+        const healthCheckPath = optionalValue(healthPath);
+        const healthCheck = healthCheckPath
+          ? defaultHttpHealthCheckPolicy({ path: healthCheckPath })
+          : undefined;
+        const requestedStateBackend = optionalValue(stateBackend);
+        const requestedPreviewMode = optionalValue(preview);
+        const requestedPreviewId = optionalValue(previewId);
+        const requestedPreviewDomainTemplate = optionalValue(previewDomainTemplate);
+        const requestedPreviewTlsMode = optionalValue(previewTlsMode);
+        const previewOutputFilePath = optionalValue(previewOutputFile);
+        const previewContext = yield* resultToEffect(
+          resolvePreviewDeployContext({
+            ...(requestedPreviewMode ? { mode: requestedPreviewMode } : {}),
+            ...(requestedPreviewId ? { previewId: requestedPreviewId } : {}),
+            ...(requestedPreviewDomainTemplate
+              ? { previewDomainTemplate: requestedPreviewDomainTemplate }
+              : {}),
+            ...(requestedPreviewTlsMode ? { previewTlsMode: requestedPreviewTlsMode } : {}),
+            ...(requirePreviewUrl ? { requirePreviewUrl } : {}),
+            ...(previewOutputFilePath ? { previewOutputFile: previewOutputFilePath } : {}),
+            env: Bun.env,
           }),
         );
-        const input = {
-          projectId: requestedProjectId,
-          serverId,
-          environmentId,
-          resourceId,
-          ...(destinationId ? { destinationId } : {}),
-        } satisfies CreateDeploymentCommandInput;
+        const flagEnvironmentVariables = yield* resultToEffect(
+          deploymentEnvironmentVariablesFromCliFlags({
+            envFlags: env,
+            secretFlags: secret,
+            optionalSecretFlags: optionalSecret,
+            env: Bun.env,
+          }),
+        );
+        const hasProfileOverrides = Boolean(
+          requestedDeploymentMethod ||
+          installCommand ||
+          buildCommand ||
+          startCommand ||
+          runtimeNameValue ||
+          publishDirectory ||
+          sourceBaseDirectoryValue ||
+          helmChartVersionValue ||
+          helmValuesSecretReference.length > 0 ||
+          helmHookPolicyValue ||
+          helmTimeoutSecondsValue !== undefined ||
+          dockerfilePathValue ||
+          dockerComposeFilePathValue ||
+          buildTargetValue ||
+          portValue !== undefined ||
+          upstreamProtocolValue ||
+          exposureModeValue ||
+          targetServiceNameValue ||
+          hostPortValue !== undefined ||
+          healthCheckPath ||
+          requestedConfigProfile ||
+          requestedApplicationKeys.length > 0 ||
+          flagEnvironmentVariables.length > 0 ||
+          requestedPreviewDomainTemplate ||
+          requestedPreviewTlsMode,
+        );
 
-        return yield* runCreateDeploymentCommand(input, {
-          appLogLines: parseAppLogLines(appLogLines),
-          requirePreviewUrl,
-          ...(previewOutputFilePath ? { previewOutputFile: previewOutputFilePath } : {}),
-        });
-      }
-      if (
-        sourceLocator &&
-        isRemoteCodeGitRemoteLocator(sourceLocator) &&
-        !configFilePath &&
-        !previewContext &&
-        !hasProfileOverrides
-      ) {
-        const occupancyInput = yield* occupancyDeploymentInputFromGitRemote({
-          sourceLocator,
-          ...(requestedProjectId ? { projectId: requestedProjectId } : {}),
-          ...(environmentId ? { environmentId } : {}),
-          ...(resourceId ? { resourceId } : {}),
-          ...(serverId ? { serverId } : {}),
-          ...(destinationId ? { destinationId } : {}),
-        });
-        if (occupancyInput) {
-          return yield* runCreateDeploymentCommand(occupancyInput, {
+        if (
+          !sourceLocator &&
+          !configFilePath &&
+          !previewContext &&
+          !hasProfileOverrides &&
+          requestedProjectId &&
+          serverId &&
+          environmentId &&
+          resourceId
+        ) {
+          yield* Effect.promise(() =>
+            persistFolderProjectAssociation({
+              cwd: folderOnboardingCwdFromLocator(sourceLocator),
+              projectId: requestedProjectId,
+              ...(cli.environment ? { env: cli.environment } : {}),
+            }),
+          );
+          const input = {
+            projectId: requestedProjectId,
+            serverId,
+            environmentId,
+            resourceId,
+            ...(destinationId ? { destinationId } : {}),
+          } satisfies CreateDeploymentCommandInput;
+
+          return yield* runCreateDeploymentCommand(input, {
             appLogLines: parseAppLogLines(appLogLines),
             requirePreviewUrl,
+            outputMode: json ? "json" : "legacy",
             ...(previewOutputFilePath ? { previewOutputFile: previewOutputFilePath } : {}),
           });
         }
-      }
+        if (
+          sourceLocator &&
+          isRemoteCodeGitRemoteLocator(sourceLocator) &&
+          !configFilePath &&
+          !previewContext &&
+          !hasProfileOverrides
+        ) {
+          const occupancyInput = yield* occupancyDeploymentInputFromGitRemote({
+            sourceLocator,
+            ...(requestedProjectId ? { projectId: requestedProjectId } : {}),
+            ...(environmentId ? { environmentId } : {}),
+            ...(resourceId ? { resourceId } : {}),
+            ...(serverId ? { serverId } : {}),
+            ...(destinationId ? { destinationId } : {}),
+          });
+          if (occupancyInput) {
+            return yield* runCreateDeploymentCommand(occupancyInput, {
+              appLogLines: parseAppLogLines(appLogLines),
+              requirePreviewUrl,
+              outputMode: json ? "json" : "legacy",
+              ...(previewOutputFilePath ? { previewOutputFile: previewOutputFilePath } : {}),
+            });
+          }
+        }
 
-      const configSourceLocator = sourceLocator ?? ".";
-      const configResolution = yield* resultToEffect(
-        readDeploymentConfigForCli({
-          sourceLocator: configSourceLocator,
-          ...(configFilePath ? { configFilePath } : {}),
-        }),
-      );
-      if (requestedConfigProfile && !configResolution) {
-        return yield* Effect.fail(
-          domainError.validation("Deployment config profile requires a config file", {
-            phase: "config-profile-resolution",
-            profile: requestedConfigProfile,
+        const configSourceLocator = sourceLocator ?? ".";
+        const configResolution = yield* resultToEffect(
+          readDeploymentConfigForCli({
+            sourceLocator: configSourceLocator,
+            ...(configFilePath ? { configFilePath } : {}),
           }),
         );
-      }
-      const selectedConfig =
-        configResolution && requestedConfigProfile
-          ? yield* resultToEffect(
-              applyAppaloftDeploymentConfigProfile(configResolution.config, requestedConfigProfile),
-            )
-          : configResolution?.config;
-      const effectiveConfig =
-        selectedConfig && previewContext
-          ? applyAppaloftDeploymentPreviewProfile(selectedConfig)
-          : selectedConfig;
-      const configuredApplicationSeeds = effectiveConfig
-        ? applicationDeploymentPromptSeedsFromConfig(effectiveConfig)
-        : [];
-      if (requestedApplicationKeys.length > 0) {
-        const availableApplicationKeys = configuredApplicationSeeds.map(
-          (applicationSeed) => applicationSeed.key,
-        );
-        const unknownApplicationKeys = requestedApplicationKeys.filter(
-          (applicationKey) => !availableApplicationKeys.includes(applicationKey),
-        );
-        if (unknownApplicationKeys.length > 0) {
+        if (requestedConfigProfile && !configResolution) {
           return yield* Effect.fail(
-            domainError.validation("Deployment application selector is not declared in config", {
-              phase: "config-application-resolution",
-              reason: "unknown_application",
-              applicationKeys: unknownApplicationKeys,
-              availableApplicationKeys,
+            domainError.validation("Deployment config profile requires a config file", {
+              phase: "config-profile-resolution",
+              profile: requestedConfigProfile,
             }),
           );
         }
-      }
-      const configuredDeploymentContext = effectiveConfig?.controlPlane?.deploymentContext;
-      const configuredProjectId = configuredDeploymentContext?.projectId;
-      const effectiveServerId = serverId ?? configuredDeploymentContext?.serverId;
-      const effectiveDestinationId = destinationId ?? configuredDeploymentContext?.destinationId;
-      const effectiveEnvironmentId = environmentId ?? configuredDeploymentContext?.environmentId;
-      const effectiveResourceId = resourceId ?? configuredDeploymentContext?.resourceId;
-      const configPreviewDomainTemplate = previewContext
-        ? effectiveConfig?.preview?.pullRequest?.domainTemplate
-        : undefined;
-      const configPreviewTlsMode = previewContext
-        ? effectiveConfig?.preview?.pullRequest?.tlsMode
-        : undefined;
-      const previewDomainRoutes = yield* resultToEffect(
-        resolvePreviewDomainTemplateRoutes(
-          requestedPreviewDomainTemplate ?? configPreviewDomainTemplate,
-          requestedPreviewTlsMode ?? configPreviewTlsMode,
-          previewContext,
-        ),
-      );
-      const configSeed = applyPreviewRoutePrecedence({
-        configSeed: effectiveConfig ? deploymentPromptSeedFromConfig(effectiveConfig) : {},
-        ...(configResolution ? { configResolution } : {}),
-        ...(previewContext ? { previewContext } : {}),
-        ...(previewDomainRoutes ? { previewDomainRoutes } : {}),
-      });
-      const resolvedRuntimeName = yield* resultToEffect(
-        resolveRuntimeNameSeed({
-          ...(runtimeNameValue ? { explicitRuntimeName: runtimeNameValue } : {}),
-          configSeed,
-          ...(previewContext ? { previewContext } : {}),
-        }),
-      );
-      const configEnvironmentVariables = configResolution
-        ? yield* resultToEffect(
-            deploymentEnvironmentVariablesFromConfig(effectiveConfig ?? configResolution.config, {
-              ...(previewContext
-                ? {
-                    previewContext: {
-                      previewId: previewContext.previewId,
-                      pullRequestNumber: previewContext.pullRequestNumber,
-                    },
-                  }
-                : {}),
-            }),
-          )
-        : [];
-      const environmentVariables = [...configEnvironmentVariables, ...flagEnvironmentVariables];
-      const deploymentMethod = requestedDeploymentMethod ?? configSeed.deploymentMethod;
-      if (
-        deploymentMethod === "helm" &&
-        !helmChartVersionValue &&
-        !configSeed.sourceProfile?.helmChart
-      ) {
-        return yield* Effect.fail(
-          domainError.validation(
-            "Helm deploy requires --helm-chart-version or source.version in config",
-            { phase: "helm-source-resolution" },
+        const selectedConfig =
+          configResolution && requestedConfigProfile
+            ? yield* resultToEffect(
+                applyAppaloftDeploymentConfigProfile(
+                  configResolution.config,
+                  requestedConfigProfile,
+                ),
+              )
+            : configResolution?.config;
+        const effectiveConfig =
+          selectedConfig && previewContext
+            ? applyAppaloftDeploymentPreviewProfile(selectedConfig)
+            : selectedConfig;
+        const configuredApplicationSeeds = effectiveConfig
+          ? applicationDeploymentPromptSeedsFromConfig(effectiveConfig)
+          : [];
+        if (requestedApplicationKeys.length > 0) {
+          const availableApplicationKeys = configuredApplicationSeeds.map(
+            (applicationSeed) => applicationSeed.key,
+          );
+          const unknownApplicationKeys = requestedApplicationKeys.filter(
+            (applicationKey) => !availableApplicationKeys.includes(applicationKey),
+          );
+          if (unknownApplicationKeys.length > 0) {
+            return yield* Effect.fail(
+              domainError.validation("Deployment application selector is not declared in config", {
+                phase: "config-application-resolution",
+                reason: "unknown_application",
+                applicationKeys: unknownApplicationKeys,
+                availableApplicationKeys,
+              }),
+            );
+          }
+        }
+        const configuredDeploymentContext = effectiveConfig?.controlPlane?.deploymentContext;
+        const configuredProjectId = configuredDeploymentContext?.projectId;
+        const effectiveServerId = serverId ?? configuredDeploymentContext?.serverId;
+        const effectiveDestinationId = destinationId ?? configuredDeploymentContext?.destinationId;
+        const effectiveEnvironmentId = environmentId ?? configuredDeploymentContext?.environmentId;
+        const effectiveResourceId = resourceId ?? configuredDeploymentContext?.resourceId;
+        const configPreviewDomainTemplate = previewContext
+          ? effectiveConfig?.preview?.pullRequest?.domainTemplate
+          : undefined;
+        const configPreviewTlsMode = previewContext
+          ? effectiveConfig?.preview?.pullRequest?.tlsMode
+          : undefined;
+        const previewDomainRoutes = yield* resultToEffect(
+          resolvePreviewDomainTemplateRoutes(
+            requestedPreviewDomainTemplate ?? configPreviewDomainTemplate,
+            requestedPreviewTlsMode ?? configPreviewTlsMode,
+            previewContext,
           ),
         );
-      }
-      if (
-        deploymentMethod !== "helm" &&
-        (helmChartVersionValue ||
-          helmValuesSecretReference.length > 0 ||
-          helmHookPolicyValue ||
-          helmTimeoutSecondsValue !== undefined)
-      ) {
-        return yield* Effect.fail(
-          domainError.validation("Helm source options require --method helm", {
-            phase: "helm-source-resolution",
+        const configSeed = applyPreviewRoutePrecedence({
+          configSeed: effectiveConfig ? deploymentPromptSeedFromConfig(effectiveConfig) : {},
+          ...(configResolution ? { configResolution } : {}),
+          ...(previewContext ? { previewContext } : {}),
+          ...(previewDomainRoutes ? { previewDomainRoutes } : {}),
+        });
+        const resolvedRuntimeName = yield* resultToEffect(
+          resolveRuntimeNameSeed({
+            ...(runtimeNameValue ? { explicitRuntimeName: runtimeNameValue } : {}),
+            configSeed,
+            ...(previewContext ? { previewContext } : {}),
           }),
         );
-      }
-      if (
-        helmTimeoutSecondsValue !== undefined &&
-        (!Number.isInteger(helmTimeoutSecondsValue) ||
-          helmTimeoutSecondsValue < 30 ||
-          helmTimeoutSecondsValue > 900)
-      ) {
-        return yield* Effect.fail(
-          domainError.validation("Helm timeout must be between 30 and 900 seconds", {
-            phase: "helm-source-resolution",
-          }),
-        );
-      }
-      const invalidHelmValuesReference = helmValuesSecretReference.find(
-        (reference) => !/^[a-z][a-z0-9+.-]*:\/\/[^\s]{1,480}$/i.test(reference),
-      );
-      if (invalidHelmValuesReference) {
-        return yield* Effect.fail(
-          domainError.validation("Helm values references must be opaque URIs", {
-            phase: "helm-source-resolution",
-          }),
-        );
-      }
-      const configAnchoredSourceLocator =
-        effectiveConfig?.source?.type === "image" && configSeed.sourceLocator
-          ? configSeed.sourceLocator
-          : sourceLocator
-            ? resolveConfigAnchoredSourceLocator({
-                sourceLocator,
-                ...(configResolution ? { configResolution } : {}),
-              })
-            : (configSeed.sourceLocator ??
-              resolveConfigAnchoredSourceLocator({
-                ...(configResolution ? { configResolution } : {}),
-              }) ??
-              ".");
-      const normalizedSourceLocator = configAnchoredSourceLocator
-        ? normalizeCliPathOrSource(configAnchoredSourceLocator, deploymentMethod ?? "auto")
-        : undefined;
-      const configuredSourceLocator = normalizedSourceLocator;
-      const resourceSpec =
-        !effectiveResourceId && (resourceNameValue || configuredSourceLocator)
-          ? withConfigServiceGraph(
-              {
-                name: resourceNameValue ?? inferResourceName(configuredSourceLocator ?? "."),
-                kind:
-                  resourceKindValue ??
-                  (deploymentMethod === "docker-compose"
-                    ? "compose-stack"
-                    : deploymentMethod === "static"
-                      ? "static-site"
-                      : "application"),
-                ...(resourceDescriptionValue ? { description: resourceDescriptionValue } : {}),
-              },
-              configSeed.services,
-            )
-          : undefined;
-      const serverSshPrivateKey = serverSshPrivateKeyFileValue
-        ? yield* Effect.promise(() => Bun.file(serverSshPrivateKeyFileValue).text())
-        : undefined;
-      const serverSpec =
-        serverHostValue ||
-        serverNameValue ||
-        serverProviderValue ||
-        serverPortValue !== undefined ||
-        serverSshUsernameValue ||
-        serverSshPublicKeyValue ||
-        serverSshPrivateKey
-          ? {
-              ...(serverNameValue ? { name: serverNameValue } : {}),
-              ...(serverHostValue ? { host: serverHostValue } : {}),
-              ...(serverProviderValue ? { providerKey: serverProviderValue } : {}),
-              ...(serverPortValue === undefined ? {} : { port: serverPortValue }),
-              ...(serverSshPrivateKey
-                ? {
-                    credential: {
-                      kind: "ssh-private-key" as const,
-                      ...(serverSshUsernameValue ? { username: serverSshUsernameValue } : {}),
-                      ...(serverSshPublicKeyValue ? { publicKey: serverSshPublicKeyValue } : {}),
-                      privateKey: serverSshPrivateKey,
-                    },
-                  }
-                : serverSshUsernameValue
+        const configEnvironmentVariables = configResolution
+          ? yield* resultToEffect(
+              deploymentEnvironmentVariablesFromConfig(effectiveConfig ?? configResolution.config, {
+                ...(previewContext
                   ? {
-                      credential: {
-                        kind: "local-ssh-agent" as const,
-                        username: serverSshUsernameValue,
+                      previewContext: {
+                        previewId: previewContext.previewId,
+                        pullRequestNumber: previewContext.pullRequestNumber,
                       },
                     }
                   : {}),
-            }
-          : undefined;
-      const stateBackendDecision =
-        configResolution || requestedStateBackend || previewContext || serverSpec?.host
-          ? resolveDeploymentStateBackend({
-              ...(requestedStateBackend ? { explicitBackend: requestedStateBackend } : {}),
-              ...(Bun.env.APPALOFT_DATABASE_URL
-                ? { databaseUrl: Bun.env.APPALOFT_DATABASE_URL }
-                : {}),
-              ...(Bun.env.APPALOFT_CONTROL_PLANE_URL
-                ? { controlPlaneUrl: Bun.env.APPALOFT_CONTROL_PLANE_URL }
-                : cli.executionTarget === "remote"
-                  ? { controlPlaneUrl: "remote-control-plane" }
-                  : {}),
-              ...(serverSpec?.host
-                ? {
-                    trustedSshTarget: {
-                      host: serverSpec.host,
-                      ...(serverSpec.port === undefined ? {} : { port: serverSpec.port }),
-                      ...(serverSpec.providerKey ? { providerKey: serverSpec.providerKey } : {}),
-                      ...(serverSshUsernameValue ? { username: serverSshUsernameValue } : {}),
-                      ...(serverSshPrivateKeyFileValue
-                        ? { identityFile: serverSshPrivateKeyFileValue }
-                        : {}),
-                    },
-                  }
-                : {}),
-            })
-          : undefined;
-      const sourceFingerprint =
-        configResolution || requestedStateBackend || previewContext || stateBackendDecision
-          ? sourceFingerprintForConfigDeploy({
-              sourceLocator: configuredSourceLocator ?? configSourceLocator,
-              ...(sourceBaseDirectoryValue ? { baseDirectory: sourceBaseDirectoryValue } : {}),
-              ...(configResolution ? { configResolution } : {}),
-              ...(previewContext ? { previewContext } : {}),
-            })
-          : undefined;
-      let sourceLinkProjectId: string | undefined;
-      const sourceLinkStore = cli.sourceLinkStore;
-      if (sourceFingerprint && sourceLinkStore) {
-        const existingSourceLink = yield* Effect.promise(() =>
-          sourceLinkStore.read(sourceFingerprint),
-        );
-        if (existingSourceLink.isOk() && existingSourceLink.value?.projectId) {
-          sourceLinkProjectId = existingSourceLink.value.projectId;
+              }),
+            )
+          : [];
+        const environmentVariables = [...configEnvironmentVariables, ...flagEnvironmentVariables];
+        const deploymentMethod = requestedDeploymentMethod ?? configSeed.deploymentMethod;
+        if (
+          deploymentMethod === "helm" &&
+          !helmChartVersionValue &&
+          !configSeed.sourceProfile?.helmChart
+        ) {
+          return yield* Effect.fail(
+            domainError.validation(
+              "Helm deploy requires --helm-chart-version or source.version in config",
+              { phase: "helm-source-resolution" },
+            ),
+          );
         }
-      }
-      const folderCwd = folderOnboardingCwdFromLocator(sourceLocator ?? configuredSourceLocator);
-      const linkedFolderProjectId = yield* resolveFolderLinkedProjectId(
-        folderCwd,
-        undefined,
-        cli.environment,
-      );
-      const effectiveProjectId =
-        requestedProjectId ?? configuredProjectId ?? sourceLinkProjectId ?? linkedFolderProjectId;
-      if (effectiveProjectId) {
-        yield* Effect.promise(() =>
-          persistFolderProjectAssociation({
-            cwd: folderCwd,
-            projectId: effectiveProjectId,
-            ...(cli.environment ? { env: cli.environment } : {}),
-          }),
+        if (
+          deploymentMethod !== "helm" &&
+          (helmChartVersionValue ||
+            helmValuesSecretReference.length > 0 ||
+            helmHookPolicyValue ||
+            helmTimeoutSecondsValue !== undefined)
+        ) {
+          return yield* Effect.fail(
+            domainError.validation("Helm source options require --method helm", {
+              phase: "helm-source-resolution",
+            }),
+          );
+        }
+        if (
+          helmTimeoutSecondsValue !== undefined &&
+          (!Number.isInteger(helmTimeoutSecondsValue) ||
+            helmTimeoutSecondsValue < 30 ||
+            helmTimeoutSecondsValue > 900)
+        ) {
+          return yield* Effect.fail(
+            domainError.validation("Helm timeout must be between 30 and 900 seconds", {
+              phase: "helm-source-resolution",
+            }),
+          );
+        }
+        const invalidHelmValuesReference = helmValuesSecretReference.find(
+          (reference) => !/^[a-z][a-z0-9+.-]*:\/\/[^\s]{1,480}$/i.test(reference),
         );
-      }
-      const localSourceSend =
-        configuredSourceLocator &&
-        !isRemoteOrImageSource(configuredSourceLocator) &&
-        deploymentMethod !== "prebuilt-image" &&
-        deploymentMethod !== "helm"
-          ? cliHostLocalFolderSourceSendFields(configuredSourceLocator)
+        if (invalidHelmValuesReference) {
+          return yield* Effect.fail(
+            domainError.validation("Helm values references must be opaque URIs", {
+              phase: "helm-source-resolution",
+            }),
+          );
+        }
+        const configAnchoredSourceLocator =
+          effectiveConfig?.source?.type === "image" && configSeed.sourceLocator
+            ? configSeed.sourceLocator
+            : sourceLocator
+              ? resolveConfigAnchoredSourceLocator({
+                  sourceLocator,
+                  ...(configResolution ? { configResolution } : {}),
+                })
+              : (configSeed.sourceLocator ??
+                resolveConfigAnchoredSourceLocator({
+                  ...(configResolution ? { configResolution } : {}),
+                }) ??
+                ".");
+        const normalizedSourceLocator = configAnchoredSourceLocator
+          ? normalizeCliPathOrSource(configAnchoredSourceLocator, deploymentMethod ?? "auto")
           : undefined;
-      const packedSourceArchiveTarGz = localSourceSend?.packedSourceArchiveTarGz;
-      const sourceLocatorToSend = localSourceSend?.folder ?? configuredSourceLocator;
-      const sourceProfile = {
-        ...configSeed.sourceProfile,
-        ...(sourceBaseDirectoryValue ? { baseDirectory: sourceBaseDirectoryValue } : {}),
-        ...(deploymentMethod === "helm" && helmChartVersionValue
-          ? {
-              kind: "helm-chart" as const,
-              helmChart: {
-                version: helmChartVersionValue,
-                valuesSecretReferences: helmValuesSecretReference,
-                hookPolicy: helmHookPolicyValue ?? "disabled",
-                timeoutSeconds: helmTimeoutSecondsValue ?? 300,
-              },
-            }
-          : {}),
-        ...(packedSourceArchiveTarGz ? { packedSourceArchiveTarGz } : {}),
-      };
+        const configuredSourceLocator = normalizedSourceLocator;
+        const resourceSpec =
+          !effectiveResourceId && (resourceNameValue || configuredSourceLocator)
+            ? withConfigServiceGraph(
+                {
+                  name: resourceNameValue ?? inferResourceName(configuredSourceLocator ?? "."),
+                  kind:
+                    resourceKindValue ??
+                    (deploymentMethod === "docker-compose"
+                      ? "compose-stack"
+                      : deploymentMethod === "static"
+                        ? "static-site"
+                        : "application"),
+                  ...(resourceDescriptionValue ? { description: resourceDescriptionValue } : {}),
+                },
+                configSeed.services,
+              )
+            : undefined;
+        const serverSshPrivateKey = serverSshPrivateKeyFileValue
+          ? yield* Effect.promise(() => Bun.file(serverSshPrivateKeyFileValue).text())
+          : undefined;
+        const serverSpec =
+          serverHostValue ||
+          serverNameValue ||
+          serverProviderValue ||
+          serverPortValue !== undefined ||
+          serverSshUsernameValue ||
+          serverSshPublicKeyValue ||
+          serverSshPrivateKey
+            ? {
+                ...(serverNameValue ? { name: serverNameValue } : {}),
+                ...(serverHostValue ? { host: serverHostValue } : {}),
+                ...(serverProviderValue ? { providerKey: serverProviderValue } : {}),
+                ...(serverPortValue === undefined ? {} : { port: serverPortValue }),
+                ...(serverSshPrivateKey
+                  ? {
+                      credential: {
+                        kind: "ssh-private-key" as const,
+                        ...(serverSshUsernameValue ? { username: serverSshUsernameValue } : {}),
+                        ...(serverSshPublicKeyValue ? { publicKey: serverSshPublicKeyValue } : {}),
+                        privateKey: serverSshPrivateKey,
+                      },
+                    }
+                  : serverSshUsernameValue
+                    ? {
+                        credential: {
+                          kind: "local-ssh-agent" as const,
+                          username: serverSshUsernameValue,
+                        },
+                      }
+                    : {}),
+              }
+            : undefined;
+        const stateBackendDecision =
+          configResolution || requestedStateBackend || previewContext || serverSpec?.host
+            ? resolveDeploymentStateBackend({
+                ...(requestedStateBackend ? { explicitBackend: requestedStateBackend } : {}),
+                ...(Bun.env.APPALOFT_DATABASE_URL
+                  ? { databaseUrl: Bun.env.APPALOFT_DATABASE_URL }
+                  : {}),
+                ...(Bun.env.APPALOFT_CONTROL_PLANE_URL
+                  ? { controlPlaneUrl: Bun.env.APPALOFT_CONTROL_PLANE_URL }
+                  : cli.executionTarget === "remote"
+                    ? { controlPlaneUrl: "remote-control-plane" }
+                    : {}),
+                ...(serverSpec?.host
+                  ? {
+                      trustedSshTarget: {
+                        host: serverSpec.host,
+                        ...(serverSpec.port === undefined ? {} : { port: serverSpec.port }),
+                        ...(serverSpec.providerKey ? { providerKey: serverSpec.providerKey } : {}),
+                        ...(serverSshUsernameValue ? { username: serverSshUsernameValue } : {}),
+                        ...(serverSshPrivateKeyFileValue
+                          ? { identityFile: serverSshPrivateKeyFileValue }
+                          : {}),
+                      },
+                    }
+                  : {}),
+              })
+            : undefined;
+        const sourceFingerprint =
+          configResolution || requestedStateBackend || previewContext || stateBackendDecision
+            ? sourceFingerprintForConfigDeploy({
+                sourceLocator: configuredSourceLocator ?? configSourceLocator,
+                ...(sourceBaseDirectoryValue ? { baseDirectory: sourceBaseDirectoryValue } : {}),
+                ...(configResolution ? { configResolution } : {}),
+                ...(previewContext ? { previewContext } : {}),
+              })
+            : undefined;
+        let sourceLinkProjectId: string | undefined;
+        const sourceLinkStore = cli.sourceLinkStore;
+        if (sourceFingerprint && sourceLinkStore) {
+          const existingSourceLink = yield* Effect.promise(() =>
+            sourceLinkStore.read(sourceFingerprint),
+          );
+          if (existingSourceLink.isOk() && existingSourceLink.value?.projectId) {
+            sourceLinkProjectId = existingSourceLink.value.projectId;
+          }
+        }
+        const folderCwd = folderOnboardingCwdFromLocator(sourceLocator ?? configuredSourceLocator);
+        const linkedFolderProjectId = yield* resolveFolderLinkedProjectId(
+          folderCwd,
+          undefined,
+          cli.environment,
+        );
+        const effectiveProjectId =
+          requestedProjectId ?? configuredProjectId ?? sourceLinkProjectId ?? linkedFolderProjectId;
+        if (effectiveProjectId) {
+          yield* Effect.promise(() =>
+            persistFolderProjectAssociation({
+              cwd: folderCwd,
+              projectId: effectiveProjectId,
+              ...(cli.environment ? { env: cli.environment } : {}),
+            }),
+          );
+        }
+        const localSourceSend =
+          configuredSourceLocator &&
+          !isRemoteOrImageSource(configuredSourceLocator) &&
+          deploymentMethod !== "prebuilt-image" &&
+          deploymentMethod !== "helm"
+            ? cliHostLocalFolderSourceSendFields(configuredSourceLocator)
+            : undefined;
+        const packedSourceArchiveTarGz = localSourceSend?.packedSourceArchiveTarGz;
+        const sourceLocatorToSend = localSourceSend?.folder ?? configuredSourceLocator;
+        const sourceProfile = {
+          ...configSeed.sourceProfile,
+          ...(sourceBaseDirectoryValue ? { baseDirectory: sourceBaseDirectoryValue } : {}),
+          ...(deploymentMethod === "helm" && helmChartVersionValue
+            ? {
+                kind: "helm-chart" as const,
+                helmChart: {
+                  version: helmChartVersionValue,
+                  valuesSecretReferences: helmValuesSecretReference,
+                  hookPolicy: helmHookPolicyValue ?? "disabled",
+                  timeoutSeconds: helmTimeoutSecondsValue ?? 300,
+                },
+              }
+            : {}),
+          ...(packedSourceArchiveTarGz ? { packedSourceArchiveTarGz } : {}),
+        };
 
-      const stateSession = yield* prepareDeploymentStateSessionIfNeeded(stateBackendDecision);
-      const runResolvedDeploymentFromSeed = (inputSeed: DeploymentPromptSeed) =>
-        Effect.gen(function* () {
-          const sourceLocatorForSeed = inputSeed.sourceLocator ?? sourceLocatorToSend;
-          const seed = {
-            ...inputSeed,
+        const stateSession = yield* prepareDeploymentStateSessionIfNeeded(stateBackendDecision);
+        const runResolvedDeploymentFromSeed = (
+          inputSeed: DeploymentPromptSeed,
+          outputMode: "legacy" | "json" | "silent" = json ? "json" : "legacy",
+        ) =>
+          Effect.gen(function* () {
+            const sourceLocatorForSeed = inputSeed.sourceLocator ?? sourceLocatorToSend;
+            const seed = {
+              ...inputSeed,
+              ...(stateSession ? { stateBackendPrepared: true } : {}),
+              ...(sourceLocatorForSeed ? { sourceLocator: sourceLocatorForSeed } : {}),
+            };
+            const input = yield* resolveInteractiveDeploymentInput(seed);
+            if (input.projectId) {
+              yield* Effect.promise(() =>
+                persistFolderProjectAssociation({
+                  cwd: folderCwd,
+                  projectId: input.projectId,
+                  ...(cli.environment ? { env: cli.environment } : {}),
+                }),
+              );
+            }
+
+            return yield* runCreateDeploymentCommand(input, {
+              appLogLines: parseAppLogLines(appLogLines),
+              requirePreviewUrl,
+              outputMode,
+              ...(previewOutputFilePath ? { previewOutputFile: previewOutputFilePath } : {}),
+              ...(previewContext?.previewId ? { previewId: previewContext.previewId } : {}),
+            });
+          });
+        const commonSeedInput = {
+          ...(effectiveProjectId ? { projectId: effectiveProjectId } : {}),
+          ...(effectiveServerId ? { serverId: effectiveServerId } : {}),
+          ...(serverSpec ? { serverSpec } : {}),
+          ...(effectiveDestinationId ? { destinationId: effectiveDestinationId } : {}),
+          ...(effectiveEnvironmentId ? { environmentId: effectiveEnvironmentId } : {}),
+          ...(previewContext ? { previewContext } : {}),
+          ...(effectiveResourceId ? { resourceId: effectiveResourceId } : {}),
+          ...(resourceSpec ? { resourceSpec } : {}),
+          ...(deploymentMethod ? { deploymentMethod } : {}),
+          ...(installCommand ? { installCommand } : {}),
+          ...(buildCommand ? { buildCommand } : {}),
+          ...(startCommand ? { startCommand } : {}),
+          ...(resolvedRuntimeName ? { runtimeName: resolvedRuntimeName } : {}),
+          ...(publishDirectory ? { publishDirectory } : {}),
+          ...(dockerfilePathValue ? { dockerfilePath: dockerfilePathValue } : {}),
+          ...(dockerComposeFilePathValue
+            ? { dockerComposeFilePath: dockerComposeFilePathValue }
+            : {}),
+          ...(buildTargetValue ? { buildTarget: buildTargetValue } : {}),
+          ...(portValue === undefined ? {} : { port: portValue }),
+          ...(upstreamProtocolValue ? { upstreamProtocol: upstreamProtocolValue } : {}),
+          ...(exposureModeValue ? { exposureMode: exposureModeValue } : {}),
+          ...(targetServiceNameValue ? { targetServiceName: targetServiceNameValue } : {}),
+          ...(hostPortValue === undefined ? {} : { hostPort: hostPortValue }),
+          ...(healthCheckPath ? { healthCheckPath } : {}),
+          ...(healthCheck ? { healthCheck } : {}),
+          ...(environmentVariables.length > 0 ? { environmentVariables } : {}),
+          ...(sourceFingerprint ? { sourceFingerprint } : {}),
+          ...(stateBackendDecision ? { stateBackendDecision } : {}),
+          ...(configResolution && !acknowledgeResourceProfileDrift
+            ? { profileDriftPreflight: true }
+            : {}),
+        } satisfies CommonDeploymentSeedInput;
+        const applicationSeeds =
+          effectiveConfig && configResolution
+            ? configuredApplicationSeeds
+                .filter(
+                  (applicationSeed) =>
+                    requestedApplicationKeys.length === 0 ||
+                    requestedApplicationKeys.includes(applicationSeed.key),
+                )
+                .map((applicationSeed) => ({
+                  key: applicationSeed.key,
+                  seed: applyPreviewRoutePrecedence({
+                    configSeed: applicationSeed.seed,
+                    configResolution,
+                    ...(previewContext ? { previewContext } : {}),
+                    ...(previewDomainRoutes ? { previewDomainRoutes } : {}),
+                  }),
+                }))
+            : [];
+        const runResolvedDeployment = Effect.gen(function* () {
+          if (applicationSeeds.length > 0) {
+            if (!effectiveConfig || !configResolution) {
+              return yield* Effect.fail(
+                domainError.validation("Application graph deploy requires a resolved config file", {
+                  phase: "config-application-resolution",
+                  reason: "config_missing",
+                }),
+              );
+            }
+
+            if (resourceId || resourceNameValue || resourceKindValue || resourceDescriptionValue) {
+              return yield* Effect.fail(
+                domainError.validation(
+                  "Application graph deploy cannot use a single Resource selector or Resource draft override",
+                  {
+                    phase: "config-application-resolution",
+                    reason: "single_resource_override",
+                  },
+                ),
+              );
+            }
+
+            const {
+              deploymentMethod: _topLevelDeploymentMethod,
+              environmentVariables: _topLevelEnvironmentVariables,
+              resourceId: _topLevelResourceId,
+              resourceSpec: _topLevelResourceSpec,
+              runtimeName: _topLevelRuntimeName,
+              sourceFingerprint: _topLevelSourceFingerprint,
+              ...applicationCommonSeedInput
+            } = commonSeedInput;
+            const applicationFlagSeedInput = {
+              ...applicationCommonSeedInput,
+              ...(requestedDeploymentMethod ? { deploymentMethod: requestedDeploymentMethod } : {}),
+            } satisfies CommonDeploymentSeedInput;
+
+            const results = [];
+            for (const application of applicationSeeds) {
+              const applicationSourceLocator =
+                application.seed.sourceLocator ?? configuredSourceLocator ?? configSourceLocator;
+              const applicationPackedSourceArchiveTarGz =
+                optionalPackedLocalFolderSourceOnCliHost(applicationSourceLocator);
+              const applicationSourceProfile = {
+                ...(application.seed.sourceProfile ?? {}),
+                ...(sourceBaseDirectoryValue ? { baseDirectory: sourceBaseDirectoryValue } : {}),
+                ...(applicationPackedSourceArchiveTarGz
+                  ? { packedSourceArchiveTarGz: applicationPackedSourceArchiveTarGz }
+                  : {}),
+              };
+              const applicationRuntimeName = yield* resultToEffect(
+                resolveRuntimeNameSeed({
+                  ...(runtimeNameValue ? { explicitRuntimeName: runtimeNameValue } : {}),
+                  configSeed: application.seed,
+                  ...(previewContext ? { previewContext } : {}),
+                }),
+              );
+              const applicationEnvironmentVariables = yield* resultToEffect(
+                deploymentEnvironmentVariablesFromConfig(
+                  effectiveConfig.applications?.[application.key] ?? {},
+                  {
+                    ...(previewContext
+                      ? {
+                          previewContext: {
+                            previewId: previewContext.previewId,
+                            pullRequestNumber: previewContext.pullRequestNumber,
+                          },
+                        }
+                      : {}),
+                  },
+                ),
+              );
+              const applicationSourceFingerprint =
+                configResolution || requestedStateBackend || previewContext || stateBackendDecision
+                  ? sourceFingerprintForConfigDeploy({
+                      sourceLocator: applicationSourceLocator,
+                      ...(applicationSourceProfile.baseDirectory
+                        ? { baseDirectory: applicationSourceProfile.baseDirectory }
+                        : {}),
+                      configResolution,
+                      ...(previewContext ? { previewContext } : {}),
+                      applicationKey: application.key,
+                    })
+                  : undefined;
+              const applicationSeed = applyCommonDeploymentSeed({
+                ...applicationFlagSeedInput,
+                ...(applicationSourceFingerprint
+                  ? { sourceFingerprint: applicationSourceFingerprint }
+                  : {}),
+                seed: application.seed,
+                sourceProfile: applicationSourceProfile,
+                ...(applicationRuntimeName ? { runtimeName: applicationRuntimeName } : {}),
+                environmentVariables: [
+                  ...applicationEnvironmentVariables,
+                  ...flagEnvironmentVariables,
+                ],
+              });
+
+              results.push(
+                yield* runResolvedDeploymentFromSeed(
+                  {
+                    ...applicationSeed,
+                    ...(applicationSourceLocator
+                      ? { sourceLocator: applicationSourceLocator }
+                      : {}),
+                  },
+                  json ? "silent" : "legacy",
+                ),
+              );
+            }
+            if (json) yield* print({ deployments: results });
+            return results;
+          }
+
+          const seed = applyCommonDeploymentSeed({
+            ...commonSeedInput,
+            seed: configSeed,
+            sourceProfile,
+          });
+          const input = yield* resolveInteractiveDeploymentInput({
+            ...seed,
             ...(stateSession ? { stateBackendPrepared: true } : {}),
-            ...(sourceLocatorForSeed ? { sourceLocator: sourceLocatorForSeed } : {}),
-          };
-          const input = yield* resolveInteractiveDeploymentInput(seed);
+            ...(sourceLocatorToSend ? { sourceLocator: sourceLocatorToSend } : {}),
+          });
           if (input.projectId) {
             yield* Effect.promise(() =>
               persistFolderProjectAssociation({
@@ -2304,206 +2533,29 @@ export const deployCommand = EffectCommand.make(
           return yield* runCreateDeploymentCommand(input, {
             appLogLines: parseAppLogLines(appLogLines),
             requirePreviewUrl,
+            outputMode: json ? "json" : "legacy",
             ...(previewOutputFilePath ? { previewOutputFile: previewOutputFilePath } : {}),
             ...(previewContext?.previewId ? { previewId: previewContext.previewId } : {}),
           });
         });
-      const commonSeedInput = {
-        ...(effectiveProjectId ? { projectId: effectiveProjectId } : {}),
-        ...(effectiveServerId ? { serverId: effectiveServerId } : {}),
-        ...(serverSpec ? { serverSpec } : {}),
-        ...(effectiveDestinationId ? { destinationId: effectiveDestinationId } : {}),
-        ...(effectiveEnvironmentId ? { environmentId: effectiveEnvironmentId } : {}),
-        ...(previewContext ? { previewContext } : {}),
-        ...(effectiveResourceId ? { resourceId: effectiveResourceId } : {}),
-        ...(resourceSpec ? { resourceSpec } : {}),
-        ...(deploymentMethod ? { deploymentMethod } : {}),
-        ...(installCommand ? { installCommand } : {}),
-        ...(buildCommand ? { buildCommand } : {}),
-        ...(startCommand ? { startCommand } : {}),
-        ...(resolvedRuntimeName ? { runtimeName: resolvedRuntimeName } : {}),
-        ...(publishDirectory ? { publishDirectory } : {}),
-        ...(dockerfilePathValue ? { dockerfilePath: dockerfilePathValue } : {}),
-        ...(dockerComposeFilePathValue
-          ? { dockerComposeFilePath: dockerComposeFilePathValue }
-          : {}),
-        ...(buildTargetValue ? { buildTarget: buildTargetValue } : {}),
-        ...(portValue === undefined ? {} : { port: portValue }),
-        ...(upstreamProtocolValue ? { upstreamProtocol: upstreamProtocolValue } : {}),
-        ...(exposureModeValue ? { exposureMode: exposureModeValue } : {}),
-        ...(targetServiceNameValue ? { targetServiceName: targetServiceNameValue } : {}),
-        ...(hostPortValue === undefined ? {} : { hostPort: hostPortValue }),
-        ...(healthCheckPath ? { healthCheckPath } : {}),
-        ...(healthCheck ? { healthCheck } : {}),
-        ...(environmentVariables.length > 0 ? { environmentVariables } : {}),
-        ...(sourceFingerprint ? { sourceFingerprint } : {}),
-        ...(stateBackendDecision ? { stateBackendDecision } : {}),
-        ...(configResolution && !acknowledgeResourceProfileDrift
-          ? { profileDriftPreflight: true }
-          : {}),
-      } satisfies CommonDeploymentSeedInput;
-      const applicationSeeds =
-        effectiveConfig && configResolution
-          ? configuredApplicationSeeds
-              .filter(
-                (applicationSeed) =>
-                  requestedApplicationKeys.length === 0 ||
-                  requestedApplicationKeys.includes(applicationSeed.key),
-              )
-              .map((applicationSeed) => ({
-                key: applicationSeed.key,
-                seed: applyPreviewRoutePrecedence({
-                  configSeed: applicationSeed.seed,
-                  configResolution,
-                  ...(previewContext ? { previewContext } : {}),
-                  ...(previewDomainRoutes ? { previewDomainRoutes } : {}),
-                }),
-              }))
-          : [];
-      const runResolvedDeployment = Effect.gen(function* () {
-        if (applicationSeeds.length > 0) {
-          if (!effectiveConfig || !configResolution) {
-            return yield* Effect.fail(
-              domainError.validation("Application graph deploy requires a resolved config file", {
-                phase: "config-application-resolution",
-                reason: "config_missing",
-              }),
-            );
-          }
 
-          if (resourceId || resourceNameValue || resourceKindValue || resourceDescriptionValue) {
-            return yield* Effect.fail(
-              domainError.validation(
-                "Application graph deploy cannot use a single Resource selector or Resource draft override",
-                {
-                  phase: "config-application-resolution",
-                  reason: "single_resource_override",
-                },
-              ),
-            );
-          }
-
-          const {
-            deploymentMethod: _topLevelDeploymentMethod,
-            environmentVariables: _topLevelEnvironmentVariables,
-            resourceId: _topLevelResourceId,
-            resourceSpec: _topLevelResourceSpec,
-            runtimeName: _topLevelRuntimeName,
-            sourceFingerprint: _topLevelSourceFingerprint,
-            ...applicationCommonSeedInput
-          } = commonSeedInput;
-          const applicationFlagSeedInput = {
-            ...applicationCommonSeedInput,
-            ...(requestedDeploymentMethod ? { deploymentMethod: requestedDeploymentMethod } : {}),
-          } satisfies CommonDeploymentSeedInput;
-
-          for (const application of applicationSeeds) {
-            const applicationSourceLocator =
-              application.seed.sourceLocator ?? configuredSourceLocator ?? configSourceLocator;
-            const applicationPackedSourceArchiveTarGz =
-              optionalPackedLocalFolderSourceOnCliHost(applicationSourceLocator);
-            const applicationSourceProfile = {
-              ...(application.seed.sourceProfile ?? {}),
-              ...(sourceBaseDirectoryValue ? { baseDirectory: sourceBaseDirectoryValue } : {}),
-              ...(applicationPackedSourceArchiveTarGz
-                ? { packedSourceArchiveTarGz: applicationPackedSourceArchiveTarGz }
-                : {}),
-            };
-            const applicationRuntimeName = yield* resultToEffect(
-              resolveRuntimeNameSeed({
-                ...(runtimeNameValue ? { explicitRuntimeName: runtimeNameValue } : {}),
-                configSeed: application.seed,
-                ...(previewContext ? { previewContext } : {}),
-              }),
-            );
-            const applicationEnvironmentVariables = yield* resultToEffect(
-              deploymentEnvironmentVariablesFromConfig(
-                effectiveConfig.applications?.[application.key] ?? {},
-                {
-                  ...(previewContext
-                    ? {
-                        previewContext: {
-                          previewId: previewContext.previewId,
-                          pullRequestNumber: previewContext.pullRequestNumber,
-                        },
-                      }
-                    : {}),
-                },
-              ),
-            );
-            const applicationSourceFingerprint =
-              configResolution || requestedStateBackend || previewContext || stateBackendDecision
-                ? sourceFingerprintForConfigDeploy({
-                    sourceLocator: applicationSourceLocator,
-                    ...(applicationSourceProfile.baseDirectory
-                      ? { baseDirectory: applicationSourceProfile.baseDirectory }
-                      : {}),
-                    configResolution,
-                    ...(previewContext ? { previewContext } : {}),
-                    applicationKey: application.key,
-                  })
-                : undefined;
-            const applicationSeed = applyCommonDeploymentSeed({
-              ...applicationFlagSeedInput,
-              ...(applicationSourceFingerprint
-                ? { sourceFingerprint: applicationSourceFingerprint }
-                : {}),
-              seed: application.seed,
-              sourceProfile: applicationSourceProfile,
-              ...(applicationRuntimeName ? { runtimeName: applicationRuntimeName } : {}),
-              environmentVariables: [
-                ...applicationEnvironmentVariables,
-                ...flagEnvironmentVariables,
-              ],
-            });
-
-            yield* runResolvedDeploymentFromSeed(applicationSeed);
-          }
-
-          return;
+        if (!stateSession) {
+          return yield* runResolvedDeployment;
         }
 
-        const seed = applyCommonDeploymentSeed({
-          ...commonSeedInput,
-          seed: configSeed,
-          sourceProfile,
-        });
-        const input = yield* resolveInteractiveDeploymentInput({
-          ...seed,
-          ...(stateSession ? { stateBackendPrepared: true } : {}),
-          ...(sourceLocatorToSend ? { sourceLocator: sourceLocatorToSend } : {}),
-        });
-        if (input.projectId) {
-          yield* Effect.promise(() =>
-            persistFolderProjectAssociation({
-              cwd: folderCwd,
-              projectId: input.projectId,
-              ...(cli.environment ? { env: cli.environment } : {}),
-            }),
-          );
+        const result = yield* Effect.either(runResolvedDeployment);
+        yield* releaseDeploymentStateSession(stateSession);
+        if (Either.isLeft(result)) {
+          return yield* Effect.fail(result.left);
         }
 
-        return yield* runCreateDeploymentCommand(input, {
-          appLogLines: parseAppLogLines(appLogLines),
-          requirePreviewUrl,
-          ...(previewOutputFilePath ? { previewOutputFile: previewOutputFilePath } : {}),
-          ...(previewContext?.previewId ? { previewId: previewContext.previewId } : {}),
-        });
-      });
+        return result.right;
+      }),
+  ).pipe(EffectCommand.withDescription(description));
+}
 
-      if (!stateSession) {
-        return yield* runResolvedDeployment;
-      }
-
-      const result = yield* Effect.either(runResolvedDeployment);
-      yield* releaseDeploymentStateSession(stateSession);
-      if (Either.isLeft(result)) {
-        return yield* Effect.fail(result.left);
-      }
-
-      return result.right;
-    }),
-).pipe(EffectCommand.withDescription(deployCommandDescription));
+export const upCommand = deploymentEntrypointCommand("up", cliCommandDescriptions.up);
+export const deployCommand = deploymentEntrypointCommand("deploy", deployCommandDescription);
 
 export const logsCommand = EffectCommand.make(
   "logs",

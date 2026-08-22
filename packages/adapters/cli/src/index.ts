@@ -5,6 +5,11 @@ import { Effect, Layer } from "effect";
 import { tryHandleCodeHelp } from "./code-help.js";
 import { mainCommand } from "./commands/index.js";
 import {
+  cliHelpInvocationError,
+  renderCliHelpInvocationError,
+  withCliHelpOutputPolicy,
+} from "./help-output.js";
+import {
   type CliProgram,
   type CliProgramInput,
   CliRuntime,
@@ -36,6 +41,7 @@ export {
   isCodeHelpInvocation,
   renderCodeHelp,
   tryHandleCodeHelp,
+  unsupportedCliHelpOption,
 } from "./code-help.js";
 export {
   CLI_MUTATION_CONFIRMATION_REQUIRED_CODE,
@@ -109,11 +115,9 @@ export {
   type CliExecutionTargetDiagnostics,
   parseCliControlPlaneGlobalOptions,
   resolveCliExecutionTarget,
+  validateCliTopLevelCommand,
 } from "./control-plane-target.js";
-export {
-  type DevelopmentPlanInput,
-  developmentPlanFromSource,
-} from "./development-plan.js";
+export { type DevelopmentPlanInput, developmentPlanFromSource } from "./development-plan.js";
 export {
   createRatatuiDevelopmentPresentation,
   type DevelopmentControlPresentation,
@@ -241,6 +245,24 @@ export {
   workspaceControlRendererUnavailableMessage,
 } from "./workspace-control-renderer.js";
 
+async function validateHelpInvocation(argv: readonly string[]): Promise<void> {
+  const error = cliHelpInvocationError(argv);
+  if (!error) return;
+
+  renderCliHelpInvocationError(error);
+  throw error;
+}
+
+function applyHelpOutputPolicy<A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+  argv: readonly string[],
+  env: NodeJS.ProcessEnv,
+): Effect.Effect<A, E, R> {
+  return argv.includes("--help") || argv.includes("-h")
+    ? withCliHelpOutputPolicy(effect, env)
+    : effect;
+}
+
 export function createCliProgram(input: CliProgramInput): CliProgram {
   const sourceStdinReader = input.readStdinText ?? readProcessStdinText;
   let capturedStdinText: Promise<string> | undefined;
@@ -254,6 +276,7 @@ export function createCliProgram(input: CliProgramInput): CliProgram {
 
   return {
     parseAsync: async (argv = process.argv) => {
+      await validateHelpInvocation(argv);
       if (tryHandleCodeHelp(argv, process.stdout) || tryHandleSetupHelp(argv, process.stdout)) {
         return;
       }
@@ -262,7 +285,7 @@ export function createCliProgram(input: CliProgramInput): CliProgram {
         await capturedStdinText;
       }
       try {
-        await EffectCommand.run(mainCommand, {
+        const execution = EffectCommand.run(mainCommand, {
           name: "appaloft",
           version: input.version,
         })(argv).pipe(
@@ -270,6 +293,8 @@ export function createCliProgram(input: CliProgramInput): CliProgram {
           Effect.catchAll((error) =>
             printCliError(error).pipe(Effect.zipRight(Effect.fail(error))),
           ),
+        );
+        await applyHelpOutputPolicy(execution, argv, input.environment ?? process.env).pipe(
           Effect.runPromise,
         );
       } finally {
@@ -300,17 +325,18 @@ export function createCliHelpProgram(input: { readonly version: string }): CliPr
 
   return {
     parseAsync: async (argv = process.argv) => {
+      await validateHelpInvocation(argv);
       if (tryHandleCodeHelp(argv, process.stdout) || tryHandleSetupHelp(argv, process.stdout)) {
         return;
       }
-      await EffectCommand.run(mainCommand, {
+      const execution = EffectCommand.run(mainCommand, {
         name: "appaloft",
         version: input.version,
       })(argv).pipe(
         Effect.provide(live),
         Effect.catchAll((error) => printCliError(error).pipe(Effect.zipRight(Effect.fail(error)))),
-        Effect.runPromise,
       );
+      await applyHelpOutputPolicy(execution, argv, process.env).pipe(Effect.runPromise);
     },
   };
 }

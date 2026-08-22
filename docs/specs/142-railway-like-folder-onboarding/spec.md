@@ -56,7 +56,7 @@ linked project is one command.
 | ID | Scenario | Expected result |
 | --- | --- | --- |
 | `FOLDER-ONBOARD-001` | Unlinked no-git cwd | Creates/links a Project named after the directory. |
-| `FOLDER-ONBOARD-002` | Git remote cwd | Binds identity to that remote; find-or-create matching Project. |
+| `FOLDER-ONBOARD-002` | Git remote cwd | Binds identity to that remote; find-or-create matching Project. A username-only authority in local `remote.origin.url` is stripped before lookup, so an active credential-free Repository Binding is reused and no duplicate Project is created. Explicit locator userinfo remains invalid. |
 | `FOLDER-ONBOARD-003` | Second command in the same cwd | Reuses the persisted folder link; does not create another Project. |
 | `FOLDER-ONBOARD-004` | `project use` then later command | Subsequent deploy/code use the switched project id. |
 | `FOLDER-ONBOARD-005` | Exactly one existing Project | Uses that Project without prompting. |

@@ -1,6 +1,6 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,6 +13,12 @@ import {
   type QueryBus,
 } from "@appaloft/application";
 import { ok } from "@appaloft/core";
+
+const originalExitCode = process.exitCode;
+
+afterEach(() => {
+  process.exitCode = originalExitCode ?? 0;
+});
 
 describe("first deploy door login fold and agent-env guard", () => {
   test("[DEPLOY-DOOR-LOGIN-001] unauthenticated remote deploy starts login instead of Run appaloft login", async () => {
@@ -141,5 +147,73 @@ describe("first deploy door login fold and agent-env guard", () => {
     expect(stderr).toContain("Pass --yes to continue.");
     expect(stderr).not.toContain("Run appaloft login");
     expect(stderr).not.toContain("Occupancy");
+  });
+
+  test("[UP-ENTRY-002][UP-ENTRY-004][UP-ENTRY-005] up and deploy share options and the agent mutation guard", async () => {
+    for (const commandName of ["up", "deploy"] as const) {
+      const commands: string[] = [];
+      let loginCalls = 0;
+      let stderr = "";
+      const home = await mkdtemp(join(tmpdir(), `appaloft-${commandName}-agent-guard-`));
+      const { createCliProgram } = await import("../src");
+      const program = createCliProgram({
+        version: "0.1.0-test",
+        executionTarget: "remote",
+        startServer: async () => {},
+        startWorkerRuntime: async () => {},
+        commandBus: {
+          execute: async <T>(_context: unknown, appCommand: AppCommand<T>) => {
+            commands.push(appCommand.constructor.name);
+            return ok({ id: "dep_blocked" } as T);
+          },
+        } as unknown as CommandBus,
+        queryBus: {
+          execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({ items: [] } as T),
+        } as unknown as QueryBus,
+        executionContextFactory: {
+          create: (input) =>
+            createExecutionContext({
+              ...input,
+              requestId: `req_${commandName}_agent_guard`,
+            }),
+        } as ExecutionContextFactory,
+        environment: { APPALOFT_HOME: home, CURSOR_AGENT: "1" },
+        loginControlPlane: async () => {
+          loginCalls += 1;
+          return ok({
+            name: "cloud",
+            mode: "cloud",
+            baseUrl: "https://app.appaloft.com",
+            active: true,
+            auth: { kind: "bearer", redacted: "***" },
+          });
+        },
+        terminalIO: {
+          stdin: { isTTY: false, on: () => undefined },
+          stdout: { isTTY: false, write: () => true },
+          stderr: {
+            isTTY: false,
+            write: (chunk: string | Uint8Array) => {
+              stderr += String(chunk);
+              return true;
+            },
+          },
+        },
+      });
+
+      try {
+        await program
+          .parseAsync(["node", "appaloft", commandName, ".", "--json"])
+          .catch(() => undefined);
+      } finally {
+        await rm(home, { recursive: true, force: true });
+      }
+
+      expect(loginCalls).toBe(0);
+      expect(commands).toEqual([]);
+      expect(stderr).toContain("Would sign in and deploy this folder.");
+      expect(stderr).toContain("Pass --yes to continue.");
+      expect(stderr).not.toContain("Invalid subcommand");
+    }
   });
 });

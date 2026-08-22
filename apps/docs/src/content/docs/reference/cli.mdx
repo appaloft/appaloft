@@ -9,6 +9,8 @@ searchAliases:
   - "cli"
   - "command"
   - "terminal"
+  - "appaloft up"
+  - "appaloft deploy"
   - "命令行"
 relatedOperations:
   - "workspaces.open"
@@ -28,7 +30,7 @@ sidebar:
 
 ```bash
 appaloft init                                 # 在当前目录初始化 appaloft.yml
-appaloft deploy .                             # 部署当前目录
+appaloft up                                   # 部署当前目录
 appaloft login                                # 登录 Appaloft Cloud 或自托管实例
 appaloft context list                         # 查看本机已保存的 profile/context
 appaloft code                                 # 占用默认 Server 上的我的 Sandbox
@@ -47,6 +49,21 @@ appaloft deployments recovery-readiness <deploymentId>  # 查询恢复就绪状�
 ```
 
 每个命令都支持 `--help` 查看完整参数列表；交互式提示和错误恢复建议会尽量链接到本文档站点的稳定页面。
+
+## Up：第一次部署入口 <a id="cli-up-deployment-entrypoint" />
+
+```bash
+appaloft up [path-or-source] [--yes] [--project <projectId>] [--json]
+```
+
+`appaloft up` 是从文件夹到线上应用的主入口。省略路径时使用当前目录；Git 不是前置条件。
+命令会复用现有文件夹 Project 关联，首次 Cloud 部署会在需要时折叠登录。编码 Agent、CI 和非
+TTY 环境必须传入 `--yes` 才会执行登录写入、Project 创建或部署变更；`--json` 保持 stdout
+为机器可读结果，进度仍在 stderr。命令只有在部署到达成功终态后才以 0 退出，失败终态非零
+退出，也不会把预留或旧 URL 当成成功地址。
+
+`appaloft deploy` 在 1.x 中仍是完全相同工作流的受支持兼容写法。新命令、文档和自动化应优先
+使用 `appaloft up`。完整任务流程见[第一次部署](/docs/start/first-deployment/#cli-up-first-deployment)。
 
 ## Workspace 快速入口
 
@@ -106,7 +123,7 @@ appaloft login
 appaloft login --url https://appaloft.internal.example.com
 ```
 
-`appaloft login` 和 `appaloft auth login` 默认连接 Appaloft Cloud（`https://app.appaloft.com`）。第一次 Cloud `appaloft deploy` 在没有 Profile 时会启动同一套浏览器登录，然后继续部署——不必先单独跑 `appaloft login`。要连接自托管 Appaloft 或其他受信任端点，需要显式传入 `--url <url>`。登录成功后，CLI 会把端点、Profile 名称、认证引用和握手摘要保存到本机 CLI Profile——这个 Profile 位于 `APPALOFT_HOME` 或用户本机 Appaloft home 目录，**不属于仓库配置**，不会被提交到 `appaloft.yml`。
+`appaloft login` 和 `appaloft auth login` 默认连接 Appaloft Cloud（`https://app.appaloft.com`）。第一次 Cloud `appaloft up` 在没有 Profile 时会启动同一套浏览器登录，然后继续部署——不必先单独跑 `appaloft login`。`appaloft deploy` 在 1.x 中走同一兼容路径。要连接自托管 Appaloft 或其他受信任端点，需要显式传入 `--url <url>`。登录成功后，CLI 会把端点、Profile 名称、认证引用和握手摘要保存到本机 CLI Profile——这个 Profile 位于 `APPALOFT_HOME` 或用户本机 Appaloft home 目录，**不属于仓库配置**，不会被提交到 `appaloft.yml`。
 
 登录不是部署接管，也不会创建 Project、Resource、Deployment、Source Link 或域名绑定,更不会把控制面配置塞进部署请求或把 Token/Cookie 写进已提交的配置文件。
 
@@ -129,15 +146,15 @@ appaloft login
 appaloft setup agent
 ```
 
-`appaloft setup agent` 默认勾选 Universal、存在 `~/.claude` 时的 Claude Code、存在 `~/.cursor` 时的 Cursor；把相同 Skill 复制到 `~/.agents/skills`、`~/.claude/skills`、`~/.cursor/skills`，再写入 token-free stdio 启动项到 `~/.claude.json` 和 `~/.cursor/mcp.json`。Universal 只写 Skill。OpenCode 在列表里但默认不勾选，需要 `--agent opencode` 或 `appaloft auth mcp opencode install`。显式 sibling 仍然可用：`appaloft auth mcp cursor install`、`appaloft auth mcp claude-code install` 和 `appaloft auth mcp opencode install`。`npx skills add` 仍然只复制 Skill。Codex 仍需要专用 bearer profile：`appaloft auth mcp login` 然后 `appaloft auth mcp codex install`。无 git 的目录可以用 `appaloft deploy .`。
+`appaloft setup agent` 默认勾选 Universal、存在 `~/.claude` 时的 Claude Code、存在 `~/.cursor` 时的 Cursor；把相同 Skill 复制到 `~/.agents/skills`、`~/.claude/skills`、`~/.cursor/skills`，再写入 token-free stdio 启动项到 `~/.claude.json` 和 `~/.cursor/mcp.json`。Universal 只写 Skill。OpenCode 在列表里但默认不勾选，需要 `--agent opencode` 或 `appaloft auth mcp opencode install`。显式 sibling 仍然可用：`appaloft auth mcp cursor install`、`appaloft auth mcp claude-code install` 和 `appaloft auth mcp opencode install`。`npx skills add` 仍然只复制 Skill。Codex 仍需要专用 bearer profile：`appaloft auth mcp login` 然后 `appaloft auth mcp codex install`。无 git 的目录可以用 `appaloft up`。
 
 ## 非交互认证(AI Agent / CI)
 
-交互式登录使用浏览器验证码流程,适合人类操作者。当设置了 `CLAUDECODE`、`CLAUDE_CODE_ENTRYPOINT`、`CURSOR_AGENT`、`AIDER_MODEL` 或 `CODEX_CLI`，或进程是非 TTY / `CI=1` 时，`appaloft deploy` 和 `appaloft setup agent` 会打印将要做的事，除非传入 `--yes`，否则不会创建项目、部署或写入 Skill。**AI Agent 和 CI/自动化不应该使用浏览器/验证码流程作为默认认证路径**,应该优先使用作用域受限、可过期的 Token:
+交互式登录使用浏览器验证码流程,适合人类操作者。当设置了 `CLAUDECODE`、`CLAUDE_CODE_ENTRYPOINT`、`CURSOR_AGENT`、`AIDER_MODEL` 或 `CODEX_CLI`，或进程是非 TTY / `CI=1` 时，`appaloft up`（以及 1.x 兼容写法 `appaloft deploy`）和 `appaloft setup agent` 会打印将要做的事，除非传入 `--yes`，否则不会创建项目、部署或写入 Skill。**AI Agent 和 CI/自动化不应该使用浏览器/验证码流程作为默认认证路径**,应该优先使用作用域受限、可过期的 Token:
 
 ```bash
 # 一次性非交互命令
-APPALOFT_TOKEN=<scoped-token> appaloft deploy .
+APPALOFT_TOKEN=<scoped-token> appaloft up --yes
 
 # 从标准输入读取 Token,验证后写入本机 Profile
 appaloft auth token login --stdin
@@ -153,7 +170,7 @@ appaloft auth token login --token-file <path>
 有已登录的 Profile,或显式传入 `--control-plane-mode cloud|self-hosted`、`--control-plane-url <url>` 时,普通业务命令会先解析执行目标:
 
 ```bash
-appaloft deploy . --control-plane-mode self-hosted --control-plane-url https://console.example.com
+appaloft up --control-plane-mode self-hosted --control-plane-url https://console.example.com
 ```
 
 `controlPlane.mode: none`(默认)继续使用本地 CLI/SSH 运行时。远程目标会在业务请求前执行兼容性/认证握手,再通过和 Web/API/SDK 完全相同的类型化契约调度操作——**CLI 不维护另一份业务 Schema**。
@@ -162,7 +179,7 @@ appaloft deploy . --control-plane-mode self-hosted --control-plane-url https://c
 
 `server terminal`、`resource terminal` 在远程目标下会先通过类型化 API 打开 Session;加 `--attach` 后 CLI 直接连接控制面 WebSocket 转发本地终端的输入、resize、输出和关闭帧,不会初始化本地状态,也不会读取目标服务器的 SSH 凭据。
 
-部分命令(`serve`、`db`、`remote-state`、`init`、顶层快速 `deploy`、Source Package 等)目前仍只支持本地执行;在显式远程模式下调用会返回 `control_plane_unsupported`,不会静默改走本地执行。
+部分命令(`serve`、`db`、`remote-state`、`init`、Source Package 等)目前仍只支持本地执行;在显式远程模式下调用会返回 `control_plane_unsupported`,不会静默改走本地执行。顶层 `up` / `deploy` 会按已选 Profile 调度受支持的远端控制面。
 
 ## 本地文档链接
 

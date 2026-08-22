@@ -146,7 +146,14 @@ export const cliCommandDescriptions = {
     "Uninstall an unused Agent Workspace Profile installation",
     "agent.adapter-installations",
   ),
-  deploy: withDocs("Create a deployment", "deployment.source"),
+  up: withDocs(
+    "Deploy this folder through login and project onboarding; agent, CI, and non-interactive mutations require --yes; --json keeps stdout machine-readable; waits for terminal success. deploy remains the supported 1.x compatibility spelling",
+    "deployment.source",
+  ),
+  deploy: withDocs(
+    "Create a deployment; supported 1.x compatibility spelling for appaloft up",
+    "deployment.source",
+  ),
   github: withDocs("GitHub source operations", "deployment.source"),
   githubStatus: withDocs("Show GitHub App source connection status", "deployment.source"),
   githubRepositories: withDocs(

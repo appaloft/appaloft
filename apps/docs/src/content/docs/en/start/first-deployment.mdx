@@ -2,6 +2,21 @@
 title: "Your First Deployment"
 description: "The complete path to your first successful Appaloft deployment."
 docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: complete
+searchAliases:
+  - "quick start"
+  - "getting started"
+  - "appaloft up"
+  - "railway up"
+relatedOperations:
+  - "projects.create"
+  - "servers.register"
+  - "resources.create"
+  - "deployments.create"
+sidebar:
+  order: 1
 ---
 
 ## Goal
@@ -27,7 +42,7 @@ A minimal deployment needs the following inputs:
 
 | Input | Description | Default |
 | --- | --- | --- |
-| Project | The organizing boundary for resources, environments, and deployment history | First `deploy`/`code` in an unlinked folder creates one named after the directory, or uses your only project; `project use` switches |
+| Project | The organizing boundary for resources, environments, and deployment history | First `up`/`code` in an unlinked folder creates one named after the directory, or uses your only project; `project use` switches |
 | Server | The deployment target machine (must be reachable over SSH) | None — must be registered first |
 | Deployment source | A Git repository, container image, or local static directory | None — must be explicitly provided |
 | Runtime profile | Start command, port, health check path | Attempts zero-configuration detection; falls back to explicit input on failure |
@@ -53,16 +68,16 @@ When a monorepo root has multiple candidate apps, the deployment is blocked unti
 4. Confirm the runtime profile (start command, port, health check) and click **Deploy**.
 5. The deployment panel shows the current lifecycle status; on success it displays an automatically generated access URL.
 
-## CLI steps
+## CLI steps <a id="cli-up-first-deployment" />
 
 ```bash
-# 1. First deploy signs you in when needed (Railway `up` feel). Self-hosted can still
+# 1. `up` is the primary folder deployment entrypoint and signs you in when needed.
+#    Self-hosted can still
 #    run `appaloft login --url https://your-appaloft-host` first.
 #    Coding-agent / CI / non-TTY runs print a plan unless you pass --yes.
-appaloft deploy
-appaloft deploy .
+appaloft up
 
-# 2. Create a project (optional). First deploy/code also creates one named after this folder
+# 2. Create a project (optional). First up/code also creates one named after this folder
 appaloft project create --name "my-first-project"
 appaloft project use <projectId>
 
@@ -70,22 +85,26 @@ appaloft project use <projectId>
 appaloft server register --host 203.0.113.10 --ssh-user deploy --ssh-key ~/.ssh/id_ed25519
 appaloft server capacity inspect --server-id <serverId>
 
-# 4. Already signed in? The same folder deploy continues to create or reuse this app.
+# 4. Already signed in? The same folder up continues to create or reuse this app.
 #    A folder with public/index.html auto-selects static (no --method needed).
 #    The source folder stays this directory (hyphenated names are legal), not the parent.
 #    SSH package uses this full folder; a missing-workdir error names it, never the parent.
 
 # 5. Or explicitly point at a config file / profile
-appaloft deploy --config appaloft.yml --config-profile staging
+appaloft up --config appaloft.yml --config-profile staging
 
 # 6. Already have a built static directory? Skip the build step and publish directly.
 #    `.` as --publish-dir means the source root / current directory.
-appaloft deploy ./dist --as static-site
-appaloft deploy . --as static-site --publish-dir .
+appaloft up ./dist --as static-site
+appaloft up . --as static-site --publish-dir .
 
 # 7. Watch deployment status and timeline
 appaloft deployments timeline <deploymentId> --follow --json
 ```
+
+`appaloft deploy` remains the supported 1.x compatibility spelling for this same workflow. New
+commands, documentation, and automation should prefer `appaloft up`. Both spellings share login,
+folder linking, the `--yes` guard, `--json` output, and terminal verification.
 
 ## HTTP/API steps
 
@@ -105,7 +124,7 @@ Full routes and input/output shapes are in the [HTTP API reference](/docs/en/ref
 
 ## Expected output and status
 
-`appaloft deploy` waits until the deployment reaches a terminal status. A build failure (including SSH Docker image build failure) exits non-zero and does not print a reserved or previous URL as success.
+`appaloft up` waits until the deployment reaches a terminal status. A build failure (including SSH Docker image build failure) exits non-zero and does not print a reserved or previous URL as success.
 
 A successful deployment moves through lifecycle states such as `pending → planning → building → deploying → verifying → healthy` (the exact values are governed by [Status And Events](/docs/en/troubleshoot/status-events/)) and ultimately returns:
 

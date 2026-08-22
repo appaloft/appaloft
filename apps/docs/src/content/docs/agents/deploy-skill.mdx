@@ -4,12 +4,13 @@ description: "Agent 通过既有入口触发部署的子协议。"
 docType: "task"
 localeState:
   zh-CN: complete
-  en-US: needs-update
+  en-US: complete
 searchAliases:
   - "agent deploy"
   - "AI deploy"
   - "skill"
   - "AI 部署"
+  - "appaloft up"
 relatedOperations:
   - "projects.create"
   - "servers.register"
@@ -47,9 +48,12 @@ Agent 部署子协议是完整 Skill 内部的一套流程约定，**不是新�
 ## CLI 操作步骤
 
 ```bash
-appaloft deploy .
+appaloft up --yes
 appaloft deployments timeline <deploymentId> --follow --json
 ```
+
+`appaloft up` 是主入口；`appaloft deploy` 在 1.x 中仍是同一工作流的受支持兼容写法。Agent
+或非 TTY 环境只有在用户已经授权部署变更时才应传入 `--yes`。
 
 ## GitHub Action 部署模式
 

@@ -12,7 +12,7 @@
 </div>
 
 ```bash
-appaloft deploy .
+appaloft up
 ```
 
 ```bash
@@ -60,15 +60,16 @@ archive。
 
 自己带机器时用 `appaloft server register`。Self-hosted plane 登录时加 `--url`。
 
-## 部署
+## Up 部署
 
 在任意项目目录里执行。Git 可选。一个文件夹就够。成功就是这个应用的一条线上 URL。
 
 ```bash
-appaloft deploy .
+appaloft up
 ```
 
-目录里有 `public/index.html` 时，`appaloft deploy . --yes` 会自动选 static。
+目录里有 `public/index.html` 时，`appaloft up --yes` 会自动选 static。
+`appaloft deploy` 在 1.x 中仍是同一工作流的受支持兼容写法。
 
 可选的单文件配置：
 
@@ -88,18 +89,18 @@ access:
 ```
 
 ```bash
-appaloft deploy . --config appaloft.yml
+appaloft up --config appaloft.yml
 ```
 
 同一条命令也接受文件夹、Git URL、容器镜像、Compose 文件或 zip：
 
 ```bash
 appaloft init
-appaloft deploy .
-appaloft deploy ./dist --config appaloft.yml
-appaloft deploy https://github.com/acme/web.git
-appaloft deploy ghcr.io/acme/api:1.7.3
-appaloft deploy ./docker-compose.yml
+appaloft up
+appaloft up ./dist --config appaloft.yml
+appaloft up https://github.com/acme/web.git
+appaloft up ghcr.io/acme/api:1.7.3
+appaloft up ./docker-compose.yml
 ```
 
 想先跑一个已知可用的示例？CLI 装好后再试官方
@@ -185,7 +186,7 @@ appaloft --version
 appaloft auth status
 appaloft context show
 
-appaloft deploy .
+appaloft up
 appaloft deployments list
 appaloft deployments show <deploymentId>
 appaloft deployments timeline <deploymentId> --follow --json

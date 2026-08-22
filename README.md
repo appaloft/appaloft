@@ -12,7 +12,7 @@
 </div>
 
 ```bash
-appaloft deploy .
+appaloft up
 ```
 
 ```bash
@@ -62,15 +62,16 @@ Or download a platform archive from
 If you bring your own machine, register it with `appaloft server register`. For a self-hosted
 plane, pass `--url` when you log in.
 
-## Deploy
+## Up
 
 From any project folder. Git is optional. A folder is enough. Success is a live URL for this app.
 
 ```bash
-appaloft deploy .
+appaloft up
 ```
 
-If the folder has `public/index.html`, `appaloft deploy . --yes` auto-selects static.
+If the folder has `public/index.html`, `appaloft up --yes` auto-selects static.
+`appaloft deploy` remains the supported 1.x compatibility spelling for the same workflow.
 
 Optional one-file config:
 
@@ -90,18 +91,18 @@ access:
 ```
 
 ```bash
-appaloft deploy . --config appaloft.yml
+appaloft up --config appaloft.yml
 ```
 
 The same command accepts a folder, a Git URL, a container image, a Compose file, or a zip:
 
 ```bash
 appaloft init
-appaloft deploy .
-appaloft deploy ./dist --config appaloft.yml
-appaloft deploy https://github.com/acme/web.git
-appaloft deploy ghcr.io/acme/api:1.7.3
-appaloft deploy ./docker-compose.yml
+appaloft up
+appaloft up ./dist --config appaloft.yml
+appaloft up https://github.com/acme/web.git
+appaloft up ghcr.io/acme/api:1.7.3
+appaloft up ./docker-compose.yml
 ```
 
 Want a known-good sample? Try the official
@@ -192,7 +193,7 @@ appaloft --version
 appaloft auth status
 appaloft context show
 
-appaloft deploy .
+appaloft up
 appaloft deployments list
 appaloft deployments show <deploymentId>
 appaloft deployments timeline <deploymentId> --follow --json

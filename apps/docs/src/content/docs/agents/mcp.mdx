@@ -48,7 +48,7 @@ appaloft login
 appaloft setup agent
 ```
 
-`appaloft setup agent` 默认勾选 Universal、存在 `~/.claude` 时的 Claude Code、存在 `~/.cursor` 时的 Cursor；把相同 Skill 复制到对应目录，再写入 token-free `mcp remote-stdio` 到 `~/.claude.json` 和 `~/.cursor/mcp.json`。Universal 只写 Skill。OpenCode 在列表里但默认不勾选，需要 `--agent opencode`。显式 sibling：`appaloft auth mcp cursor install`、`appaloft auth mcp claude-code install`、`appaloft auth mcp opencode install`。`npx skills add` 仍然只复制 Skill。Codex 仍需要专用 bearer profile：`appaloft auth mcp login` 然后 `appaloft auth mcp codex install`。无 git 的目录可以用 `appaloft deploy .`。
+`appaloft setup agent` 默认勾选 Universal、存在 `~/.claude` 时的 Claude Code、存在 `~/.cursor` 时的 Cursor；把相同 Skill 复制到对应目录，再写入 token-free `mcp remote-stdio` 到 `~/.claude.json` 和 `~/.cursor/mcp.json`。Universal 只写 Skill。OpenCode 在列表里但默认不勾选，需要 `--agent opencode`。显式 sibling：`appaloft auth mcp cursor install`、`appaloft auth mcp claude-code install`、`appaloft auth mcp opencode install`。`npx skills add` 仍然只复制 Skill。Codex 仍需要专用 bearer profile：`appaloft auth mcp login` 然后 `appaloft auth mcp codex install`。无 git 的目录可以用 `appaloft up`。
 
 ## 输入字段与校验：工具模型
 

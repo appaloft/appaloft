@@ -11,7 +11,7 @@
 | ID | Layer | Scenario | Expected | Automation | Status |
 | --- | --- | --- | --- | --- | --- |
 | `FOLDER-ONBOARD-001` | CLI | Unlinked no-git cwd | Decision creates a Project named after the directory; Effect path persists the link. | `packages/adapters/cli/test/folder-project-onboarding.test.ts` | Passing |
-| `FOLDER-ONBOARD-002` | CLI | Git remote cwd | Identity is the remote; binding or same-name Project is reused, else create. | `folder-project-onboarding.test.ts`, `remote-code-session.test.ts` | Passing |
+| `FOLDER-ONBOARD-002` | CLI | Git remote cwd | Identity is the credential-free remote; a username-only local HTTPS origin is stripped before lookup, so its active Repository Binding is reused without creating a duplicate Project. Explicit locator userinfo stays invalid. | `packages/adapters/cli/test/local-git-workspace-context.test.ts`, `packages/adapters/cli/test/folder-project-onboarding.test.ts`, `packages/adapters/cli/test/agent-workspace-command.test.ts`, `packages/adapters/cli/test/remote-code-session.test.ts` | Passing |
 | `FOLDER-ONBOARD-003` | CLI | Second command same cwd | Reuses persisted link; no second create. | `folder-project-onboarding.test.ts`, `project-command.test.ts` | Passing |
 | `FOLDER-ONBOARD-004` | CLI | `project use` then later command | Folder link project id changes; later resolve uses it. | `project-command.test.ts`, `occupancy-context.test.ts` | Passing |
 | `FOLDER-ONBOARD-005` | CLI | Exactly one Project | Uses that Project. | `folder-project-onboarding.test.ts` | Passing |

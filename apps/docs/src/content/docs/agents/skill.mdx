@@ -23,7 +23,7 @@ sidebar:
 Packaged skill evals: `skills/appaloft/evals/evals.json`.
 
 
-Appaloft Skill 是面向 AI Agent 的完整产品入口，与 CLI、HTTP API、Web 控制台、MCP 工具一样，都映射到同一套 Appaloft 业务操作（operation catalog）——区别只是使用者是 AI，而不是人类。它**不是**新的业务操作，也不是 `appaloft deploy` 的包装器。
+Appaloft Skill 是面向 AI Agent 的完整产品入口，与 CLI、HTTP API、Web 控制台、MCP 工具一样，都映射到同一套 Appaloft 业务操作（operation catalog）——区别只是使用者是 AI，而不是人类。它**不是**新的业务操作，也不是 `appaloft up` / `appaloft deploy` 的包装器。
 
 ## 安装
 
@@ -54,7 +54,7 @@ npx skills add appaloft/appaloft --skill appaloft --global --agent opencode --co
 
 `npx skills add` **只复制 Skill 文件**——不会安装 Appaloft CLI、不会写入 MCP 配置、不会部署应用、创建资源或调用 API。当前 `npx skills` 会把 Codex / Claude Code / Cursor / OpenCode 都复制到 `~/.agents/skills/appaloft`；Cursor 也会读取该目录。它**不会**创建 `~/.cursor/skills` 或 `~/.config/opencode/skills`。安装后运行 `npx skills list --global --agent <agent>` 确认列表中包含 Appaloft，并确认对应的 `SKILL.md` 已经存在，然后新开一个 Agent 会话让宿主重新加载 Skill 目录。
 
-显式 MCP sibling 仍然可用：`appaloft auth mcp cursor install`、`appaloft auth mcp claude-code install` 和 `appaloft auth mcp opencode install`。OpenCode Skill/MCP 需要 `--agent opencode` 或这些 sibling。Codex 仍使用专用 bearer MCP profile：`appaloft auth mcp login` 然后 `appaloft auth mcp codex install`。无 git 的目录可以直接 `appaloft deploy .`。
+显式 MCP sibling 仍然可用：`appaloft auth mcp cursor install`、`appaloft auth mcp claude-code install` 和 `appaloft auth mcp opencode install`。OpenCode Skill/MCP 需要 `--agent opencode` 或这些 sibling。Codex 仍使用专用 bearer MCP profile：`appaloft auth mcp login` 然后 `appaloft auth mcp codex install`。无 git 的目录可以直接 `appaloft up`。
 
 ## 能力范围
 

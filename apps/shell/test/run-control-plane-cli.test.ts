@@ -644,6 +644,47 @@ describe("shell CLI remote control-plane pre-dispatch", () => {
     expect(stderr).not.toContain("Occupancy");
   });
 
+  test("[UP-ENTRY-004] global control-plane options cannot bypass the non-TTY up guard", async () => {
+    const appaloftHome = await mkdtemp(join(tmpdir(), "appaloft-cli-up-global-guard-"));
+    await writeActiveProfile(appaloftHome);
+    let stderr = "";
+    let compositionCalls = 0;
+    process.argv = ["node", "appaloft", "--control-plane-profile", "local", "up"];
+    process.env = {
+      ...originalEnv,
+      APPALOFT_HOME: appaloftHome,
+    };
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      stderr += String(chunk);
+      return true;
+    }) as typeof process.stderr.write;
+    process.exit = ((code?: string | number | null) => {
+      throw new Error(`process.exit(${String(code)})`);
+    }) as typeof process.exit;
+
+    await expect(
+      runShellCli(undefined, undefined, {
+        mutationGuard: {
+          env: {},
+          stdinIsTty: false,
+          stdoutIsTty: false,
+        },
+        createShellComposition: async () => {
+          compositionCalls += 1;
+          return err(
+            domainError.infra("composition must remain unreachable", {
+              phase: "test-up-global-option-guard",
+            }),
+          );
+        },
+      }),
+    ).rejects.toThrow("process.exit(1)");
+
+    expect(compositionCalls).toBe(0);
+    expect(stderr).toContain("Would deploy this folder.");
+    expect(stderr).toContain("Pass --yes to continue.");
+  });
+
   test("[DEPLOY-DOOR-LOGIN-001] unauthenticated Cloud deploy starts login instead of a separate command", async () => {
     const appaloftHome = await mkdtemp(join(tmpdir(), "appaloft-cli-deploy-fold-"));
     const originalStderrWrite = process.stderr.write;
