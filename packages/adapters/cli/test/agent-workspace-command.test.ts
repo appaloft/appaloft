@@ -2504,6 +2504,91 @@ describe("Agent Workspace CLI", () => {
     expect((commands[0] as OpenAgentWorkspaceCommand).input.profile).toBeUndefined();
   });
 
+  test("[#1374][WS-REMOTE-PROGRESS-230] default code replaces a Git-backed partial preferred Workspace", async () => {
+    const commands: Command<unknown>[] = [];
+    const output: string[] = [];
+    const isolatedHome = await mkdtemp(join(tmpdir(), "appaloft-code-git-partial-home-"));
+    await mkdir(join(isolatedHome, ".codex"), { recursive: true });
+    await writeFile(join(isolatedHome, ".codex", "auth.json"), '{"test":"credential"}\n');
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          if (command instanceof OpenAgentWorkspaceCommand && !command.input.forceNew) {
+            return err(
+              domainError.conflict("Preferred Workspace is partially created", {
+                code: "workspace_open_partial_recovery_required",
+                workspaceId: "sbx_partial",
+                phase: "workspace-open-source-materialization",
+                guidance:
+                  "Inspect or terminate the partial Workspace, then use --new to create an isolated replacement.",
+              }),
+            );
+          }
+          return ok({
+            workspaceId: "sbx_replacement",
+            name: "appaloft-cloud@becddd1",
+            projectId: "prj_appaloft_cloud",
+          } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_code_git_partial" }),
+      },
+      environment: { HOME: isolatedHome, PATH: "/usr/bin", TERM: "dumb" },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/appaloft/appaloft-cloud.git",
+        repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "becddd1f7f67c74a54150e195b686b8a3ff48054",
+        projectId: "prj_appaloft_cloud",
+        serverId: "srv_4lifk0yrcecy",
+        serverName: "hostinger",
+      }),
+    });
+    const writeOut = process.stdout.write;
+    const writeErr = process.stderr.write;
+    const capture = ((chunk: unknown) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    process.stdout.write = capture;
+    process.stderr.write = capture;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--codex", "--no-attach"]);
+    } finally {
+      process.stdout.write = writeOut;
+      process.stderr.write = writeErr;
+      await rm(isolatedHome, { recursive: true, force: true });
+    }
+
+    const opens = commands.filter(
+      (command): command is OpenAgentWorkspaceCommand =>
+        command instanceof OpenAgentWorkspaceCommand,
+    );
+    expect(opens).toHaveLength(2);
+    expect(opens[0]?.input).toMatchObject({
+      forceNew: false,
+      attach: false,
+      repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+      targetServerId: "srv_4lifk0yrcecy",
+    });
+    expect(opens[1]?.input).toMatchObject({
+      forceNew: true,
+      attach: false,
+      repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+      targetServerId: "srv_4lifk0yrcecy",
+    });
+    const text = output.join("");
+    expect(text).not.toContain("workspace_open_partial_recovery_required");
+    expect(text).not.toContain("use --new");
+  });
+
   test("[WS-REMOTE-CODE-PROFILE-177] code --profile passes the selector through", async () => {
     const commands: Command<unknown>[] = [];
     const { createCliProgram } = await import("../src");

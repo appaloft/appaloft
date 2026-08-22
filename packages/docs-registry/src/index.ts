@@ -136,6 +136,8 @@ export const publicDocsHelpTopics = {
       "OpenCode",
       "Pi",
       "preparing disk",
+      "partial workspace recovery",
+      "isolated workspace replacement",
       "cloud temporarily unreachable",
       "远程开发",
       "workspace name",

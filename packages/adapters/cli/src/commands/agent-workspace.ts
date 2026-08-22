@@ -58,7 +58,7 @@ import {
   workspaceRemoteLoginRequiredError,
 } from "../cli-session-login.js";
 import { CODE_OPTION_DESCRIPTIONS } from "../code-help.js";
-import { folderDirectoryName, isFolderOccupancyIdentity } from "../folder-project-link.js";
+import { folderDirectoryName } from "../folder-project-link.js";
 import {
   ensureFolderProjectOnboarding,
   folderOnboardingCancelledError,
@@ -363,20 +363,7 @@ function requireOption(value: string | undefined, label: string): string {
   throw domainError.validation(`${label} is required`);
 }
 
-function isFolderOccupancyDoor(door: {
-  readonly repositoryIdentity: string;
-  readonly repository: string;
-}): boolean {
-  return (
-    isFolderOccupancyIdentity(door.repositoryIdentity) || door.repository.includes("folder.local")
-  );
-}
-
-function isFolderOccupancyPartialRecovery(
-  error: DomainError,
-  door: { readonly repositoryIdentity: string; readonly repository: string },
-): boolean {
-  if (!isFolderOccupancyDoor(door)) return false;
+function isOccupancyPartialRecovery(error: DomainError): boolean {
   return (
     error.details?.code === "workspace_open_partial_recovery_required" ||
     error.code === "workspace_open_partial_recovery_required"
@@ -950,7 +937,7 @@ export const workspaceCodeCommand = EffectCommand.make(
         if (opened.isOk()) {
           return { door, result: opened.value, bannerCommitSha: door.commitSha };
         }
-        if (isFolderOccupancyPartialRecovery(opened.error, door) && !forceNew) {
+        if (isOccupancyPartialRecovery(opened.error) && !forceNew) {
           const replace = OpenAgentWorkspaceCommand.create({
             ...openInput,
             forceNew: true,

@@ -201,6 +201,11 @@ Do not switch to `workspace open --profile <installationId>` for that case.
 `--profile` on `code` is only a fallback pin when an explicit name still matches
 more than one live session. It is distinct from `--control-plane-profile`.
 `--new` still occupies the cwd origin, not the current whoami session. A failed
+preferred Workspace in partial creation is retained for diagnostics while default
+`code` automatically creates an isolated replacement; the user does not need to
+rerun with `--new`. Lower-level `workspace open` / `workspace create` continue to
+return the original partial-recovery evidence instead of creating a replacement.
+An otherwise failed
 open prints what is missing and which repository was being opened; it does not
 pretend Cloud activation succeeded.
 When a BYOS Server is already registered, `workspace open` and `code` place on
@@ -346,8 +351,10 @@ const appaloft = createAppaloftClient({
 Use this provider only in a trusted backend or operator process, not in a browser bundle. The SDK validates the returned material and delivers its derived authorization header to network Git commands through Sandbox stdin and process-scoped Git configuration; it does not place credentials in the repository URL or process argv. A template may still prepare private-source access when the operator owns that lifecycle.
 
 If a step fails after the Sandbox identity exists, the error carries the exact phase, existing
-`workspaceId`/`runtimeId`, retryability, and recovery/terminate entrypoints. Reopening coordinates
-against that same partial identity instead of silently creating a duplicate Sandbox.
+`workspaceId`/`runtimeId`, retryability, and recovery/terminate entrypoints. Lower-level
+`workspace open` coordinates against that same partial identity instead of silently creating a
+duplicate Sandbox. The default one-command `code` door may retain that identity and create the
+documented isolated replacement.
 
 ## Reconnecting after disconnect
 

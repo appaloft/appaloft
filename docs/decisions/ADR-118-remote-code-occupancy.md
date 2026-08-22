@@ -105,6 +105,17 @@ must not use laptop HEAD as Workspace truth.
     Cloud-unreachable / disk-prep sentence, do not print
     `Opening folder.local/...`, and exit non-zero. Ctrl-C / quit on the wait
     panel while never attached aborts the in-flight open and is not success.
+11. Default `appaloft code` treats
+    `workspace_open_partial_recovery_required` as an occupy-door recovery
+    branch. It retries `workspaces.open` once with the same resolved
+    repository, commit, Profile, Server, and vendor selection plus
+    `forceNew: true`. The partial Sandbox is retained for inspection or later
+    cleanup; the retry creates an isolated replacement and must not terminate,
+    rewrite, or hide that existing identity. This applies to both Git-backed
+    and `folder.local` occupancy. Lower-level `appaloft workspace open` /
+    `workspace create` keep their fail-closed partial-recovery contract, and a
+    failed replacement still returns its structured error. A TTY `code` run
+    stays on the preparing panel until the replacement succeeds or fails.
 
 ## Consequences
 

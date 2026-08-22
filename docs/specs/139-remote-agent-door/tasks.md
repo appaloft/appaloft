@@ -466,6 +466,9 @@
 - [x] Leftover partial folder occupancy is repaired or replaced without `workspace_open_partial_recovery_required`; git-remote leftover still fail-closes
 - [x] `code --no-attach` door silently replaces a leftover partial folder occupancy and does not emit `workspace_open_partial_recovery_required`
 - [x] Unit tests FOLDER-ONBOARD-007 / WS-REMOTE-PROGRESS-201 for no remote materialize + leftover continue
+- [x] #1374 / WS-REMOTE-PROGRESS-230: Git-backed default `code` retries a partial preferred Workspace as an isolated replacement
+- [x] Keep `workspace open` / `workspace create` partial recovery fail-closed and preserve the existing Sandbox evidence
+- [ ] Source CLI production smoke: `appaloftdev code --codex` reaches a live replacement on Hostinger
 
 ## Slice 50 - vendor flags, occupancy-home credentials, connecting-step data
 
