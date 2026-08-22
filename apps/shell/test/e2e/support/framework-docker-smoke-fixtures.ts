@@ -39,7 +39,7 @@ export const frameworkDockerSmokeFixtures: FrameworkDockerSmokeFixture[] = [
     expectedDockerfile: "Dockerfile.appaloft-static",
     expectedGeneratedLog: "Generated static site Dockerfile",
     expectedPlanner: "nextjs-static",
-    expectedResourceKind: "static-site",
+    expectedResourceKind: "application",
   },
   {
     fixture: "react-spa",
@@ -99,7 +99,7 @@ export const frameworkDockerSmokeFixtures: FrameworkDockerSmokeFixture[] = [
     expectedDockerfile: "Dockerfile.appaloft-static",
     expectedGeneratedLog: "Generated static site Dockerfile",
     expectedPlanner: "angular-static",
-    expectedResourceKind: "static-site",
+    expectedResourceKind: "application",
   },
   {
     fixture: "astro-static",
@@ -112,7 +112,7 @@ export const frameworkDockerSmokeFixtures: FrameworkDockerSmokeFixture[] = [
     expectedDockerfile: "Dockerfile.appaloft-static",
     expectedGeneratedLog: "Generated static site Dockerfile",
     expectedPlanner: "astro-static",
-    expectedResourceKind: "static-site",
+    expectedResourceKind: "application",
     expectedRuntimeText: "Astro fixture ready",
   },
   {
@@ -126,7 +126,7 @@ export const frameworkDockerSmokeFixtures: FrameworkDockerSmokeFixture[] = [
     expectedDockerfile: "Dockerfile.appaloft-static",
     expectedGeneratedLog: "Generated static site Dockerfile",
     expectedPlanner: "nuxt-static",
-    expectedResourceKind: "static-site",
+    expectedResourceKind: "application",
     expectedRuntimeText: "Nuxt fixture ready",
   },
   {
@@ -140,7 +140,7 @@ export const frameworkDockerSmokeFixtures: FrameworkDockerSmokeFixture[] = [
     expectedDockerfile: "Dockerfile.appaloft-static",
     expectedGeneratedLog: "Generated static site Dockerfile",
     expectedPlanner: "sveltekit-static",
-    expectedResourceKind: "static-site",
+    expectedResourceKind: "application",
     expectedRuntimeText: "SvelteKit static fixture ready",
   },
   {
