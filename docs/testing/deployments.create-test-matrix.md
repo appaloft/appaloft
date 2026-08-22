@@ -367,7 +367,10 @@ the same file: a missing hyphenated folder locator stays that folder and is not 
 parent, including the live `prepareSshSource` exists-check when locator and `workingDirectory` are
 both already the parent, `displayName` is `workspace`/`projects` or omitted, metadata has no
 `cliResolvedSource`, and the full cwd is first-class `originalLocator` or is recovered from
-`context.resourceName` (`nux-d73d53b6-static-8xrly6`). `recoverLocalSourceFolderFromCwd`
+`context.resourceName` (`nux-d73d53b6-static-8xrly6`). Persist / rehydrate / plan after
+`resources.create` or `configureSource` must still carry the hyphenated leaf locator or
+`cliPackedSourceTarGz` on the command the worker consumes; a CLI send-fields unit test is not a
+pass if those fields are gone after persist. `recoverLocalSourceFolderFromCwd`
 must not treat `projects` as the source leaf. A non-git hyphenated leaf under a parent named
 `projects` (`nux-*-static`, not only `appaloft-cloud`) stays that leaf for CLI-host package and
 for any missing-workdir message. Summary.Source being the full path is not a pass if the worker

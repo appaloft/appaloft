@@ -8,8 +8,10 @@ import {
   explicitCliResolvedSource,
   localFolderSourceExecutionMetadata,
   localFolderSourceExecutionMetadataFromSource,
+  localFolderSourceFieldsFromResourceBinding,
   retainCliResolvedSource,
   retainLocalFolderSourceFields,
+  retainLocalFolderSourceFieldsFromResourceBinding,
 } from "../src/cli-resolved-source";
 
 describe("CLI-resolved source", () => {
@@ -128,5 +130,45 @@ describe("CLI-resolved source", () => {
     expect(fromSource[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(packedSourceArchive);
     expect(fromSource[ORIGINAL_LOCATOR_METADATA_KEY]).toBe(folder);
     expect(fromSource[ORIGINAL_LOCATOR_METADATA_KEY]).not.toBe("/Users/nichenqin/projects");
+  });
+
+  test("[DEP-CREATE-PKG-007] reads leaf and archive from a persisted resource binding after metadata is emptied", () => {
+    const parent = "/Users/nichenqin/projects";
+    const folder = `${parent}/nux-ae9c38f3-static`;
+    const packedSourceArchive = "H4sIAAAAAAAAAytKLSpILC4u1gMA";
+    const emptied = SourceDescriptor.rehydrate({
+      kind: SourceKindValue.rehydrate("local-folder"),
+      locator: SourceLocator.rehydrate(parent),
+      displayName: DisplayNameText.rehydrate("projects"),
+    });
+
+    const fromFirstClass = localFolderSourceFieldsFromResourceBinding({
+      locator: parent,
+      originalLocator: folder,
+    });
+    expect(fromFirstClass.originalLocator).toBe(folder);
+    expect(fromFirstClass.originalLocator).not.toBe(parent);
+    expect(fromFirstClass.packedSourceArchive).toBeUndefined();
+
+    const fromLocatorLeaf = localFolderSourceFieldsFromResourceBinding({
+      locator: folder,
+    });
+    expect(fromLocatorLeaf.originalLocator).toBe(folder);
+
+    const fromArchiveMetadata = localFolderSourceFieldsFromResourceBinding({
+      locator: parent,
+      metadata: { [CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]: packedSourceArchive },
+    });
+    expect(fromArchiveMetadata.packedSourceArchive).toBe(packedSourceArchive);
+
+    const retained = retainLocalFolderSourceFieldsFromResourceBinding(emptied, {
+      locator: parent,
+      originalLocator: folder,
+      metadata: { [CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]: packedSourceArchive },
+    });
+    expect(retained.locator).toBe(folder);
+    expect(retained.locator).not.toBe(parent);
+    expect(retained.metadata?.[ORIGINAL_LOCATOR_METADATA_KEY]).toBe(folder);
+    expect(retained.metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(packedSourceArchive);
   });
 });

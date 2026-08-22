@@ -23,6 +23,11 @@ import {
 } from "@appaloft/testkit";
 
 import { createExecutionContext, toRepositoryContext } from "../src";
+import {
+  CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY,
+  CLI_RESOLVED_SOURCE_METADATA_KEY,
+} from "../src/cli-resolved-source";
+import { ConfigureResourceSourceCommand } from "../src/messages";
 import { ConfigureResourceSourceUseCase } from "../src/use-cases";
 
 function applicationResourceFixture(): Resource {
@@ -248,5 +253,48 @@ describe("ConfigureResourceSourceUseCase", () => {
       },
     });
     expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[DEP-CREATE-PKG-007] configureSource persist keeps the hyphenated leaf and archive", async () => {
+    const parent = "/Users/nichenqin/projects";
+    const folder = `${parent}/nux-ae9c38f3-static`;
+    const packedSourceArchive = "H4sIAAAAAAAAAytKLSpILC4u1gMA";
+    const { context, repositoryContext, resources, useCase } = await createHarness();
+    const command = ConfigureResourceSourceCommand.create({
+      resourceId: "res_web",
+      source: {
+        kind: "local-folder",
+        locator: folder,
+        displayName: "nux-ae9c38f3-static",
+        originalLocator: folder,
+        metadata: {
+          [CLI_RESOLVED_SOURCE_METADATA_KEY]: folder,
+          [CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]: packedSourceArchive,
+        },
+      },
+    });
+    expect(command.isOk()).toBe(true);
+    const remotePayload = Object.fromEntries(
+      Object.entries(command._unsafeUnwrap() as unknown as Record<string, unknown>).filter(
+        ([, value]) => value !== undefined,
+      ),
+    );
+    const reparsed = ConfigureResourceSourceCommand.create(remotePayload as never);
+    expect(reparsed.isOk()).toBe(true);
+    const result = await useCase.execute(context, {
+      resourceId: reparsed._unsafeUnwrap().resourceId,
+      source: reparsed._unsafeUnwrap().source,
+    });
+    expect(result.isOk()).toBe(true);
+    const persisted = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate("res_web")),
+    );
+    const binding = persisted?.toState().sourceBinding;
+    expect(binding?.locator.value).toBe(folder);
+    expect(binding?.originalLocator?.value).toBe(folder);
+    expect(binding?.metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(packedSourceArchive);
+    expect(binding?.locator.value).not.toBe(parent);
+    expect(binding?.originalLocator?.value).not.toBe(parent);
   });
 });
