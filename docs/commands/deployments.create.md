@@ -345,7 +345,9 @@ context: user `--publish-dir public` stays `public/` next to the Dockerfile, not
 generic-SSH, the uploaded workspace root, Docker build context, and Dockerfile `COPY` source are
 the same tree: context is the absolute uploaded workspace root that contains that publish
 directory (`public/index.html`), not `.` in the parent of the uploaded source. `-f` may point at a
-generated Dockerfile outside that context. Before image build, generic-SSH checks
+generated Dockerfile outside that context. For `buildStrategy = dockerfile`, `-f` must open the
+same uploaded file the remote presence `test -s` just verified (absolute
+`$remoteWorkdir/Dockerfile`, not a CWD-relative `Dockerfile` on the SSH client). Before image build, generic-SSH checks
 `test -d "$remoteWorkdir/public"` (or the normalized publish directory). A missing directory fails
 with `static publish directory public/ not found in uploaded workspace` plus a workspace `ls`, not
 only `ssh_docker_build_failed`. A later BuildKit `COPY` failure still exits non-zero with no live
