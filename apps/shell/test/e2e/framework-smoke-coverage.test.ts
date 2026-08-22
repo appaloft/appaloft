@@ -421,6 +421,13 @@ describe("framework fixture real smoke coverage", () => {
     expect(representativePolyglotBodies.every(Boolean)).toBe(true);
     expect(new Set(representativePolyglotBodies).size).toBe(representativePolyglotBodies.length);
 
+    const staticArtifactResourceKinds = new Set(
+      frameworkDockerSmokeFixtures
+        .filter((fixture) => fixture.expectedBuildStrategy === "static-artifact")
+        .map((fixture) => fixture.expectedResourceKind),
+    );
+    expect([...staticArtifactResourceKinds].toSorted()).toEqual(["application", "static-site"]);
+
     for (const fixture of frameworkDockerSmokeFixtures) {
       const fixturePath = join(frameworkFixturesRoot, fixture.fixture);
       expect(existsSync(fixturePath), fixture.fixture).toBe(true);
