@@ -3,7 +3,7 @@ import "../../../application/node_modules/reflect-metadata/Reflect.js";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { describe, expect, test } from "bun:test";
 import {
   BuildStrategyKindValue,
@@ -71,7 +71,7 @@ const startedAt = StartedAt.rehydrate("2026-08-21T00:00:00.000Z");
 function runningStaticSshDeployment(input: {
   deploymentId: string;
   locator: string;
-  workingDirectory: string;
+  workingDirectory?: string;
   displayName?: string;
   omitDisplayName?: boolean;
   cliResolvedSource?: string;
@@ -113,7 +113,9 @@ function runningStaticSshDeployment(input: {
       packagingMode: PackagingModeValue.rehydrate("all-in-one-docker"),
       execution: RuntimeExecutionPlan.rehydrate({
         kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
-        workingDirectory: FilePathText.rehydrate(input.workingDirectory),
+        ...(input.workingDirectory
+          ? { workingDirectory: FilePathText.rehydrate(input.workingDirectory) }
+          : {}),
         metadata: {
           "artifact.source": "static-site",
           "static.publishDirectory": "public",
@@ -149,6 +151,144 @@ function runningStaticSshDeployment(input: {
 }
 
 describe("SSH source upload", () => {
+  test("[DEP-CREATE-PKG-007] live stored shape without workingDirectory dirnames the projects parent", () => {
+    const leaf = "/Users/nichenqin/projects/nux-d9042824-static";
+    const parent = "/Users/nichenqin/projects";
+    expect(existsSync(leaf)).toBe(false);
+    expect(existsSync(parent)).toBe(false);
+    // Live persist for res_rkd0hzp0yvp5: locator=leaf, archive present,
+    // workingDirectory ABSENT. Older workers then dirname the missing leaf.
+    const legacyExistsSyncPath = dirname(leaf);
+    expect(legacyExistsSyncPath).toBe(parent);
+    expect(`Source working directory does not exist: ${legacyExistsSyncPath}`).toBe(
+      "Source working directory does not exist: /Users/nichenqin/projects",
+    );
+  });
+
+  test("[DEP-CREATE-PKG-007] live leaf+archive with no workingDirectory applies the archive before existsSync", async () => {
+    const hostRoot = mkdtempSync(join(tmpdir(), "appaloft-nux-d9042824-"));
+    const parent = join(hostRoot, "projects");
+    const leaf = "nux-d9042824-static";
+    const folder = join(parent, leaf);
+    const macParent = "/Users/nichenqin/projects";
+    const macFolder = `${macParent}/${leaf}`;
+    const runtimeDir = mkdtempSync(join(tmpdir(), "appaloft-runtime-"));
+    const previousCwd = process.cwd();
+    mkdirSync(join(folder, "public"), { recursive: true });
+    writeFileSync(
+      join(folder, "public", "index.html"),
+      "<!doctype html><title>nux-d9042824-static</title>",
+    );
+    expect(existsSync(join(folder, ".git"))).toBe(false);
+
+    const archiveFile = join(hostRoot, "source.tgz");
+    const packed = spawnSync("tar", ["-czf", archiveFile, "-C", folder, "."], {
+      encoding: "utf8",
+    });
+    expect(packed.status).toBe(0);
+    const packedSourceArchive = readFileSync(archiveFile).toString("base64");
+    expect(packedSourceArchive.length).toBeGreaterThan(0);
+
+    const listingArchive = materializeCliPackedSourceArchive({
+      runtimeDir,
+      packedSourceArchive,
+    });
+    const listing = spawnSync("tar", ["-tzf", listingArchive], { encoding: "utf8" });
+    expect(listing.status).toBe(0);
+    expect(listing.stdout).toContain("public/index.html");
+    expect(listing.stdout.split("\n").some((line) => line.endsWith("/projects"))).toBe(false);
+
+    const deployment = runningStaticSshDeployment({
+      deploymentId: "dep_tu084dr7fln1",
+      locator: macFolder,
+      displayName: leaf,
+      emptyMetadata: true,
+      originalLocator: macFolder,
+      cliResolvedSource: macFolder,
+      packedSourceArchive,
+    });
+    expect(deployment.toState().runtimePlan.execution.workingDirectory).toBeUndefined();
+    const backend = new SshExecutionBackend(
+      runtimeDir,
+      { warn: () => undefined } as never,
+      { record: async () => ({ isErr: () => false }) } as never,
+      { report: () => undefined } as never,
+    );
+
+    try {
+      process.chdir(runtimeDir);
+      expect(process.cwd()).toBe(runtimeDir);
+      expect(existsSync(macParent)).toBe(false);
+      expect(existsSync(macFolder)).toBe(false);
+
+      const packagePath = resolveSshPackageLocalWorkdir({
+        locator: macFolder,
+        displayName: leaf,
+        originalLocator: macFolder,
+        cliResolvedSource: macFolder,
+        metadata: {
+          originalLocator: macFolder,
+          cliResolvedSource: macFolder,
+          cliPackedSourceTarGz: packedSourceArchive,
+        },
+      });
+      expect(packagePath).toBe(macFolder);
+      expect(packagePath).not.toBe(macParent);
+      expect(dirname(packagePath)).toBe(macParent);
+
+      const prepared = await (
+        backend as never as {
+          prepareSshSource: (
+            context: ExecutionContext,
+            current: Deployment,
+            timeline: unknown[],
+            input: {
+              runtimeDir: string;
+              remoteRoot: string;
+              target: { host: string; publicHost: string; port: string };
+              env: NodeJS.ProcessEnv;
+            },
+          ) => Promise<
+            | { prepared: true }
+            | { prepared: false; deployment: Deployment }
+          >;
+        }
+      ).prepareSshSource(
+        { requestId: "req_pkg_007_nux_d9042824_live_shape", entrypoint: "cli" } as ExecutionContext,
+        deployment,
+        [],
+        {
+          runtimeDir,
+          remoteRoot: "/var/lib/appaloft/runtime/ssh-deployments/dep_tu084dr7fln1",
+          target: { host: "127.0.0.1", publicHost: "127.0.0.1", port: "1" },
+          env: {},
+        },
+      );
+
+      const resultState = prepared.prepared ? deployment.toState() : prepared.deployment.toState();
+      const messages = resultState.timeline.map((entry) => entry.message);
+      const missing = messages.filter((message) =>
+        message.startsWith("Source working directory does not exist:"),
+      );
+      expect(missing).toEqual([]);
+      expect(messages.some((message) => message.endsWith(macParent))).toBe(false);
+      expect(messages.some((message) => message.endsWith("/projects"))).toBe(false);
+      expect(resultState.runtimePlan.execution.metadata?.errorCode).not.toBe(
+        "source_workdir_missing",
+      );
+      expect(resultState.runtimePlan.execution.metadata?.localWorkdir).not.toBe(macParent);
+      if (!prepared.prepared) {
+        expect(resultState.runtimePlan.execution.metadata?.errorCode).toBe(
+          "ssh_source_upload_failed",
+        );
+      }
+    } finally {
+      process.chdir(previousCwd);
+      rmSync(hostRoot, { recursive: true, force: true });
+      rmSync(runtimeDir, { recursive: true, force: true });
+    }
+  });
+
   test("[DEP-CREATE-PKG-007] source workdir keeps the hyphenated folder when it is missing here", () => {
     const locator = hyphenatedStaticLocator;
     const parent = hyphenatedStaticParent;

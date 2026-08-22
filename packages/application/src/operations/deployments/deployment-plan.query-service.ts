@@ -21,6 +21,7 @@ import {
   localFolderSourceFieldsFromResourceBinding,
   retainLocalFolderSourceFields,
   retainLocalFolderSourceFieldsFromResourceBinding,
+  withLocalFolderWorkerPackageRoot,
 } from "../../cli-resolved-source";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import {
@@ -922,14 +923,16 @@ export class DeploymentPlanQueryService {
           }),
         );
       }
-      const runtimePlan = runtimePlanResult.value.withExecutionMetadata({
-        ...localFolderSourceExecutionMetadataFromSource({
-          source: detected.source,
-          ...(runtimePlanResult.value.execution.workingDirectory
-            ? { workingDirectory: runtimePlanResult.value.execution.workingDirectory }
-            : {}),
+      const runtimePlan = withLocalFolderWorkerPackageRoot(
+        runtimePlanResult.value.withExecutionMetadata({
+          ...localFolderSourceExecutionMetadataFromSource({
+            source: detected.source,
+            ...(runtimePlanResult.value.execution.workingDirectory
+              ? { workingDirectory: runtimePlanResult.value.execution.workingDirectory }
+              : {}),
+          }),
         }),
-      });
+      );
       const runtimeTargetBackend = runtimeTargetBackendRegistry.find({
         targetKind: runtimePlan.target.kind,
         providerKey: runtimePlan.target.providerKey,

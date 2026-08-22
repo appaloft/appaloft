@@ -1,5 +1,11 @@
 import { homedir } from "node:os";
-import { SourceDescriptor, SourceLocator } from "@appaloft/core";
+import {
+  FilePathText,
+  RuntimeExecutionPlan,
+  type RuntimePlan,
+  SourceDescriptor,
+  SourceLocator,
+} from "@appaloft/core";
 
 export const CLI_RESOLVED_SOURCE_METADATA_KEY = "cliResolvedSource";
 export const ORIGINAL_LOCATOR_METADATA_KEY = "originalLocator";
@@ -370,4 +376,252 @@ export function retainLocalFolderSourceFields(
     locator: SourceLocator.rehydrate(locator),
     ...(metadata ? { metadata } : {}),
   });
+}
+
+/**
+ * Package root the detached worker must receive. Live `resource show` for
+ * dep_tu084dr7fln1 had locator + originalLocator + cliPackedSourceTarGz on
+ * the hyphenated leaf and no workingDirectory. Do not require workingDirectory.
+ * Do not dirname a hyphenated leaf under a generic parent such as `projects`.
+ */
+export function localFolderWorkerPackageRoot(input: {
+  locator?: string;
+  originalLocator?: string;
+  cliResolvedSource?: string;
+  workingDirectory?: string;
+}): string | undefined {
+  for (const candidate of [
+    input.originalLocator,
+    input.locator,
+    input.cliResolvedSource,
+    input.workingDirectory,
+  ]) {
+    const trimmed = candidate?.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    const leaf = pathBasename(trimmed);
+    if (!isSpecificLocalSourceLeaf(leaf) || !leaf.includes("-")) {
+      continue;
+    }
+
+    return trimmed;
+  }
+
+  return undefined;
+}
+
+/**
+ * Stamp the worker package root onto the execution plan the detached
+ * worker reloads. Live persist for `res_rkd0hzp0yvp5` kept the hyphenated
+ * leaf and archive but omitted `execution.workingDirectory`; an older
+ * worker then `dirname`s that leaf to `/Users/nichenqin/projects`.
+ * Always write the leaf. Do not omit the field.
+ */
+export function withLocalFolderWorkerPackageRoot(plan: RuntimePlan): RuntimePlan {
+  const packageRoot = localFolderWorkerPackageRoot({
+    locator: plan.source.locator,
+    ...(plan.source.metadata?.originalLocator
+      ? { originalLocator: plan.source.metadata.originalLocator }
+      : {}),
+    ...(plan.source.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]
+      ? { cliResolvedSource: plan.source.metadata[CLI_RESOLVED_SOURCE_METADATA_KEY] }
+      : {}),
+    ...(plan.execution.workingDirectory
+      ? { workingDirectory: plan.execution.workingDirectory }
+      : {}),
+  });
+  if (packageRoot === undefined || plan.execution.workingDirectory === packageRoot) {
+    return plan;
+  }
+
+  return plan.withExecution(
+    RuntimeExecutionPlan.rehydrate({
+      ...plan.execution.toState(),
+      workingDirectory: FilePathText.rehydrate(packageRoot),
+    }),
+  );
+}
+
+const LOCAL_FOLDER_SOURCE_WIRE_OPERATIONS = new Set([
+  "resources.create",
+  "resources.configure-source",
+]);
+
+export type LocalFolderSourceWireInspection = {
+  locator: string;
+  originalLocator: string;
+  workingDirectory: string;
+  displayName: string;
+  cliResolvedSource: string;
+  metadataKeys: string[];
+  cliPackedSourceTarGz: "absent" | `present:${number}`;
+};
+
+function dashOrValue(value: string | undefined): string {
+  const trimmed = value?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : "-";
+}
+
+function recordString(value: unknown): Record<string, string> | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const entries = Object.entries(value).flatMap(([key, child]) =>
+    typeof child === "string" ? [[key, child] as const] : [],
+  );
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+function archivePresence(
+  metadata: Record<string, string> | undefined,
+): "absent" | `present:${number}` {
+  const raw = metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]?.trim();
+  return raw ? `present:${raw.length}` : "absent";
+}
+
+function metadataKeys(metadata: Record<string, string> | undefined): string[] {
+  return Object.keys(metadata ?? {}).sort();
+}
+
+/**
+ * Compact dump of the local-folder fields the detached worker
+ * existsSync/package actually receives. Never includes archive bytes.
+ */
+export function inspectLocalFolderSourceWireFields(input: {
+  locator?: string;
+  originalLocator?: string;
+  workingDirectory?: string;
+  displayName?: string;
+  sourceMetadata?: Record<string, string>;
+  executionMetadata?: Record<string, string>;
+}): LocalFolderSourceWireInspection {
+  const sourceMetadata = input.sourceMetadata;
+  const executionMetadata = input.executionMetadata;
+  const mergedMetadata = {
+    ...(sourceMetadata ?? {}),
+    ...(executionMetadata ?? {}),
+  };
+  return {
+    locator: dashOrValue(input.locator),
+    originalLocator: dashOrValue(
+      explicitOriginalLocator({
+        ...(input.originalLocator ? { originalLocator: input.originalLocator } : {}),
+        ...(sourceMetadata ? { metadata: sourceMetadata } : {}),
+      }) ??
+        explicitOriginalLocator({
+          ...(executionMetadata ? { metadata: executionMetadata } : {}),
+        }),
+    ),
+    workingDirectory: dashOrValue(input.workingDirectory),
+    displayName: dashOrValue(input.displayName),
+    cliResolvedSource: dashOrValue(
+      explicitCliResolvedSource({
+        ...(sourceMetadata ? { metadata: sourceMetadata } : {}),
+      }) ??
+        explicitCliResolvedSource({
+          ...(executionMetadata ? { metadata: executionMetadata } : {}),
+        }),
+    ),
+    metadataKeys: metadataKeys(mergedMetadata),
+    cliPackedSourceTarGz: archivePresence(mergedMetadata),
+  };
+}
+
+export function formatLocalFolderSourceWireInspection(
+  origin: string,
+  inspection: LocalFolderSourceWireInspection,
+): string {
+  return [
+    `local-folder wire ${origin}`,
+    `locator=${inspection.locator}`,
+    `originalLocator=${inspection.originalLocator}`,
+    `workingDirectory=${inspection.workingDirectory}`,
+    `displayName=${inspection.displayName}`,
+    `cliResolvedSource=${inspection.cliResolvedSource}`,
+    `metadataKeys=${inspection.metadataKeys.join(",") || "-"}`,
+    `cliPackedSourceTarGz=${inspection.cliPackedSourceTarGz}`,
+  ].join(" ");
+}
+
+function sourceRecordFromUnknown(value: unknown): Record<string, unknown> | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+
+  if ("source" in value && typeof value.source === "object" && value.source !== null) {
+    return value.source as Record<string, unknown>;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+/**
+ * Inspect the JSON body the CLI actually POSTs for resources.create /
+ * resources.configure-source, or a JSON-roundtripped runtime plan the
+ * detached worker reloads. Archive bytes stay out of the dump.
+ */
+export function inspectLocalFolderSourceWireFromUnknown(
+  value: unknown,
+): LocalFolderSourceWireInspection | undefined {
+  const source = sourceRecordFromUnknown(value);
+  if (!source) {
+    return undefined;
+  }
+
+  const kind = typeof source.kind === "string" ? source.kind : undefined;
+  if (kind && kind !== "local-folder" && kind !== "local-git" && kind !== "compose") {
+    return undefined;
+  }
+
+  const locator = typeof source.locator === "string" ? source.locator : undefined;
+  if (!locator && kind === undefined) {
+    return undefined;
+  }
+
+  const root =
+    typeof value === "object" && value !== null && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : undefined;
+  const execution =
+    root && typeof root.execution === "object" && root.execution !== null
+      ? (root.execution as Record<string, unknown>)
+      : undefined;
+  const sourceMetadata = recordString(source.metadata);
+  const executionMetadata = execution ? recordString(execution.metadata) : undefined;
+  const workingDirectory =
+    typeof execution?.workingDirectory === "string"
+      ? execution.workingDirectory
+      : typeof source.workingDirectory === "string"
+        ? source.workingDirectory
+        : undefined;
+
+  return inspectLocalFolderSourceWireFields({
+    ...(locator ? { locator } : {}),
+    ...(typeof source.originalLocator === "string"
+      ? { originalLocator: source.originalLocator }
+      : {}),
+    ...(typeof source.displayName === "string" ? { displayName: source.displayName } : {}),
+    ...(workingDirectory ? { workingDirectory } : {}),
+    ...(sourceMetadata ? { sourceMetadata } : {}),
+    ...(executionMetadata ? { executionMetadata } : {}),
+  });
+}
+
+export function localFolderSourceWireDumpLine(
+  operationKey: string,
+  body: unknown,
+): string | undefined {
+  if (!LOCAL_FOLDER_SOURCE_WIRE_OPERATIONS.has(operationKey)) {
+    return undefined;
+  }
+
+  const inspection = inspectLocalFolderSourceWireFromUnknown(body);
+  if (!inspection) {
+    return undefined;
+  }
+
+  return formatLocalFolderSourceWireInspection(operationKey, inspection);
 }
