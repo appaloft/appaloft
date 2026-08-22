@@ -116,6 +116,7 @@ import {
   isWorkspaceGitRootUnavailable,
   nativeAttachRequiresInteractiveTerminal,
   occupancyCloudCompatError,
+  OCCUPY_DISK_GATEWAY_UNLIMITED_ATTEMPTS,
   openWorkspaceWithOccupyDiskGatewayRetry,
   pinRemoteCodeDoorServer,
   type RemoteCodeServerSummary,
@@ -816,7 +817,11 @@ export const workspaceCodeCommand = EffectCommand.make(
           message: string,
           progress?: { readonly status?: "retrying" | "failed" },
         ) => void,
-        options?: { readonly announcePin?: boolean },
+        options?: {
+          readonly announcePin?: boolean;
+          readonly keepRetryingTransientDisk?: boolean;
+          readonly signal?: AbortSignal;
+        },
       ) => {
         const explicitServerId = optionalValue(server);
         const injectedDoor = cli.resolveRemoteCodeDoor;
@@ -916,8 +921,14 @@ export const workspaceCodeCommand = EffectCommand.make(
           onProgress(OCCUPANCY_CODE_PROGRESS.usingThisProject);
         }
         onProgress(occupancyOpeningProgress(door.serverName));
+        // folder.local occupy executes OpenAgentWorkspaceCommand through
+        // executeFolderLocalWorkspaceOpen → createRemoteSandbox (sandboxes.create).
         const openDisk = (workspaceCommand: OpenAgentWorkspaceCommand) =>
           openWorkspaceWithOccupyDiskGatewayRetry(() => cli.executeCommand(workspaceCommand), {
+            ...(options?.keepRetryingTransientDisk
+              ? { attempts: OCCUPY_DISK_GATEWAY_UNLIMITED_ATTEMPTS }
+              : {}),
+            ...(options?.signal ? { signal: options.signal } : {}),
             onRetry: () => {
               onProgress(occupancyOpeningProgress(door.serverName), { status: "retrying" });
             },
@@ -1021,13 +1032,17 @@ export const workspaceCodeCommand = EffectCommand.make(
                 ? { openNativeWorkspaceTerminal: cli.openNativeWorkspaceTerminal }
                 : {}),
               occupancyChrome: { project: occupancyFolderName },
-              occupyBootstrap: async ({ reportProgress: tuiProgress }) => {
+              occupyBootstrap: async ({ reportProgress: tuiProgress, signal }) => {
                 const occupied = await withImmediateSigintExit(() =>
                   occupyRemote(
                     (message, progress) => {
                       void tuiProgress(message, progress);
                     },
-                    { announcePin: false },
+                    {
+                      announcePin: false,
+                      keepRetryingTransientDisk: true,
+                      signal,
+                    },
                   ),
                 );
                 await settleWithTimeout(

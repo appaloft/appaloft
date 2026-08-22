@@ -3478,6 +3478,114 @@ describe("Agent Workspace CLI", () => {
     expect(printed).not.toContain("sbx_");
   });
 
+  test("[WS-REMOTE-PROGRESS-223] TUI occupy 502 keeps retrying past 4 opens without Opening folder.local", async () => {
+    const cloudflare502 = {
+      code: "sdk_unstructured_error",
+      category: "infra" as const,
+      message:
+        "The server returned an error that did not match the Appaloft error contract. HTTP 502 Body: {cloudflare 502 bad gateway, origin invalid or incomplete response}",
+      retryable: true,
+      details: {
+        status: 502,
+        bodyPreview: "{cloudflare 502 bad gateway, origin invalid or incomplete response}",
+      },
+    };
+    const commands: Command<unknown>[] = [];
+    const previousDelay = process.env.APPALOFT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS;
+    process.env.APPALOFT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS = "0";
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          if (command instanceof OpenAgentWorkspaceCommand) {
+            const opens = commands.filter((item) => item instanceof OpenAgentWorkspaceCommand);
+            if (opens.length <= 4) return err(cloudflare502);
+            return ok({
+              workspaceId: "ws_hostinger",
+              resumed: true,
+              targetServerId: command.input.targetServerId,
+            } as T);
+          }
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_tui_disk_retry" }),
+      },
+      terminalIO: {
+        stdin: { isTTY: true, on: () => undefined },
+        stdout: { isTTY: true, write: () => true },
+        stderr: { isTTY: true, write: () => true },
+      },
+      environment: { TERM: "xterm-256color" },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://folder.local/cwd/appaloft-cloud.git",
+        repositoryIdentity: "folder.local/cwd/appaloft-cloud",
+        ref: "refs/heads/local",
+        branch: "local",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        projectId: "prj_appaloft_cloud",
+        projectName: "appaloft-cloud",
+        serverId: "srv_4lifk0yrcecy",
+        serverName: "hostinger",
+      }),
+      workspaceControlPresentation: {
+        start: async (context) => {
+          await context.occupyBootstrap?.({
+            signal: new AbortController().signal,
+            reportProgress: async () => undefined,
+          });
+        },
+      },
+    });
+    const originalExitCode = process.exitCode;
+    const write = process.stdout.write;
+    const errWrite = process.stderr.write;
+    let printed = "";
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      printed += String(chunk);
+      return true;
+    }) as typeof process.stdout.write;
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      printed += String(chunk);
+      return true;
+    }) as typeof process.stderr.write;
+    try {
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "code",
+        "--pi",
+        "--yes",
+        "--server",
+        "srv_4lifk0yrcecy",
+      ]);
+    } finally {
+      process.stdout.write = write;
+      process.stderr.write = errWrite;
+      process.exitCode = originalExitCode ?? 0;
+      if (previousDelay === undefined) {
+        delete process.env.APPALOFT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS;
+      } else {
+        process.env.APPALOFT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS = previousDelay;
+      }
+    }
+    const opens = commands.filter((command) => command instanceof OpenAgentWorkspaceCommand);
+    expect(opens).toHaveLength(5);
+    expect(
+      opens.every((command) => command.input.targetServerId === "srv_4lifk0yrcecy"),
+    ).toBeTrue();
+    expect(printed).not.toContain("Opening folder.local");
+    expect(printed).not.toContain("folder.local/cwd/appaloft-cloud");
+    expect(printed).not.toContain("did not match the Appaloft error contract");
+    expect(printed.toLowerCase()).not.toContain("occupancy");
+    expect(printed).not.toContain("sbx_");
+  });
+
   test("[WS-SCRATCH-INSTALL-007] refused install is the only hard scratch failure", async () => {
     let commandDispatched = false;
     const { createCliProgram } = await import("../src");

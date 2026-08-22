@@ -80,18 +80,24 @@ must not use laptop HEAD as Workspace truth.
    what is signed in or installed on this laptop. Never print token
    values. Never put long-lived secrets into occupancy env vars or `mcp.json`.
    Teammate disks stay isolated. This is not `appaloft setup agent`.
-10. Occupy-door **Preparing disk** (`workspaces.open` on the enrolled BYOS
-    Server) treats origin HTTP 502/503, Cloudflare bad-gateway, and incomplete
-    origin responses as a bounded automatic retry of that same open, not as an
-    immediate TUI tear-down. The Cloud Agents wait panel stays up; attach waits
-    until disk prep succeeds. This is occupy-door recovery only and does not
-    replay other commands, drop `targetServerId`, or change Cloud admission.
-    The wait-panel disk step is marked retrying while those retries run, or
-    failed on the last attempt. After the bounded retries are exhausted, close
-    the renderer first so rust Drop leaves alt-screen once, skip a second JS
-    `1049l`, and print the human next step from decision-adjacent
-    WS-REMOTE-COMPAT-222. Do not print the Appaloft error-contract sentence
-    while alt-screen is still up.
+10. Occupy-door **Preparing disk** treats origin HTTP 502/503, Cloudflare
+    bad-gateway, and incomplete origin responses as an automatic retry of the
+    same occupy command, not as a TUI tear-down. For folder.local `--pi` /
+    `--server`, that command is `OpenAgentWorkspaceCommand` executed through
+    `executeFolderLocalWorkspaceOpen` → `createRemoteSandbox` (`sandboxes.create`
+    on the enrolled Server, for example hostinger). It is not a second
+    `POST /api/workspaces/open` and not a persist/workdir fallback. The Cloud
+    Agents wait panel stays up and that occupy keeps retrying until disk prep
+    succeeds or the operator leaves the wait panel. This is occupy-door
+    recovery only and does not replay other commands, drop `targetServerId`,
+    change Cloud admission, or expose Occupancy. The wait-panel disk step is
+    marked retrying while those retries run. A 4-attempt helper burst is not a
+    terminal exhaust: do not `leaveWorkspaceTuiOnce`, do not print
+    `Opening folder.local/...`, and do not attach `folder.local`
+    `repositoryIdentity` to a 502 remap in a way that formats that breadcrumb.
+    The humanized WS-REMOTE-COMPAT-222 sentence may appear on the wait panel.
+    Do not leave alt-screen just to print it. Do not print the Appaloft
+    error-contract sentence while alt-screen is still up.
 
 ## Consequences
 

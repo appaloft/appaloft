@@ -485,8 +485,11 @@ export function occupancyRetryAgentFlag(agent?: {
 }
 
 export const DEFAULT_OCCUPY_DISK_GATEWAY_ATTEMPTS = 4;
+export const OCCUPY_DISK_GATEWAY_UNLIMITED_ATTEMPTS = Number.POSITIVE_INFINITY;
 export const DEFAULT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS = 750;
 export const OCCUPY_DISK_GATEWAY_RETRY_DELAY_ENV = "APPALOFT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS";
+export const WORKSPACE_OPEN_CLOUD_TEMPORARILY_UNREACHABLE =
+  "workspace_open_cloud_temporarily_unreachable";
 
 export function occupyDiskGatewayRetryDelayMs(env: NodeJS.ProcessEnv = process.env): number {
   const parsed = Number(env[OCCUPY_DISK_GATEWAY_RETRY_DELAY_ENV]);
@@ -499,12 +502,22 @@ export function isOccupyDiskGatewayTransientError(error: DomainError): boolean {
   return isCloudTemporarilyUnreachableError(error);
 }
 
+export function isWorkspaceOpenCloudTemporarilyUnreachable(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code: unknown }).code === WORKSPACE_OPEN_CLOUD_TEMPORARILY_UNREACHABLE
+  );
+}
+
 export async function openWorkspaceWithOccupyDiskGatewayRetry<T>(
   open: () => Promise<Result<T>>,
   options?: {
     readonly attempts?: number;
     readonly delayMs?: number;
     readonly sleep?: (ms: number) => Promise<void>;
+    readonly signal?: AbortSignal;
     readonly onRetry?: (error: DomainError, remainingAttempts: number) => void | Promise<void>;
   },
 ): Promise<Result<T>> {
@@ -514,8 +527,11 @@ export async function openWorkspaceWithOccupyDiskGatewayRetry<T>(
   let last = await open();
   for (let attempt = 1; last.isErr() && attempt < attempts; attempt += 1) {
     if (!isOccupyDiskGatewayTransientError(last.error)) return last;
+    if (options?.signal?.aborted) return last;
     await options?.onRetry?.(last.error, attempts - attempt);
+    if (options?.signal?.aborted) return last;
     if (delayMs > 0) await sleep(delayMs);
+    if (options?.signal?.aborted) return last;
     last = await open();
   }
   return last;
@@ -544,10 +560,6 @@ function isCloudTemporarilyUnreachableError(error: DomainError): boolean {
 function occupancyCloudTemporarilyUnreachableError(
   error: DomainError,
   server: { readonly id: string; readonly name: string },
-  door?: {
-    readonly repositoryIdentity?: string;
-    readonly repository?: string;
-  },
   agent?: {
     readonly alias?: string;
     readonly harness?: string;
@@ -556,7 +568,7 @@ function occupancyCloudTemporarilyUnreachableError(
   const status = occupancyHttpStatus(error);
   const retryFlag = occupancyRetryAgentFlag(agent);
   return {
-    code: "workspace_open_cloud_temporarily_unreachable",
+    code: WORKSPACE_OPEN_CLOUD_TEMPORARILY_UNREACHABLE,
     category: "infra",
     message:
       typeof status === "number"
@@ -570,7 +582,6 @@ function occupancyCloudTemporarilyUnreachableError(
       causeCode: error.code,
       guidance: `Retry appaloft code ${retryFlag} --server ${server.id}.`,
       ...(typeof status === "number" ? { status } : {}),
-      ...(door?.repositoryIdentity ? { repositoryIdentity: door.repositoryIdentity } : {}),
     },
   };
 }
@@ -654,7 +665,7 @@ export function occupancyCloudCompatError(
   if (error.details?.code === "workspace_open_repository_not_bound") return error;
   if (error.code === "workspace_open_repository_not_bound") return error;
   if (isCloudTemporarilyUnreachableError(error)) {
-    return occupancyCloudTemporarilyUnreachableError(error, server, door, agent);
+    return occupancyCloudTemporarilyUnreachableError(error, server, agent);
   }
   if (isFolderLocalDoor(door)) {
     return folderLocalCloudValidationError(error, server, door);

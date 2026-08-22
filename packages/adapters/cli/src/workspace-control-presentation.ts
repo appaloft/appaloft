@@ -47,6 +47,7 @@ import {
   occupancyPrepareStepForProgress,
 } from "./occupancy-code-progress.js";
 import { type OperateRendererEvent, type OperateRendererMessage } from "./operate-presentation.js";
+import { isWorkspaceOpenCloudTemporarilyUnreachable } from "./remote-code-session.js";
 import { removeProcessListener } from "./remove-process-listener.js";
 import { terminateWorkspaceWithRuntimes } from "./workspace-lifecycle-actions.js";
 import {
@@ -337,6 +338,7 @@ export interface WorkspaceControlPresentationContext {
       message: string,
       options?: { readonly status?: "retrying" | "failed" },
     ) => Promise<void>;
+    signal: AbortSignal;
   }) => Promise<
     | {
         readonly workspaceId: string;
@@ -1111,6 +1113,7 @@ export function createBoundedWorkspaceControlPresentation(
 
       let occupyFailure: unknown;
       let occupyDone: Promise<void> = Promise.resolve();
+      const occupyAbort = new AbortController();
       let lastPrepareStep:
         | {
             readonly message: string;
@@ -1129,6 +1132,7 @@ export function createBoundedWorkspaceControlPresentation(
           });
           occupyDone = context
             .occupyBootstrap({
+              signal: occupyAbort.signal,
               reportProgress: async (message, options) => {
                 if (!presentationOpen) return;
                 lastPrepareStep = {
@@ -1168,6 +1172,21 @@ export function createBoundedWorkspaceControlPresentation(
             })
             .catch(async (error) => {
               if (activeTerminal) return;
+              if (isWorkspaceOpenCloudTemporarilyUnreachable(error)) {
+                if (presentationOpen && lastPrepareStep) {
+                  try {
+                    await renderer.send({
+                      type: "progress",
+                      message: lastPrepareStep.message,
+                      step: lastPrepareStep.step,
+                      status: "retrying",
+                    });
+                  } catch {
+                    // Best-effort retrying mark; stay on the wait panel.
+                  }
+                }
+                return;
+              }
               occupyFailure = error;
               if (presentationOpen && lastPrepareStep) {
                 try {
@@ -1191,7 +1210,10 @@ export function createBoundedWorkspaceControlPresentation(
           );
         }
         for await (const event of renderer.events()) {
-          if (event.type === "quit") break;
+          if (event.type === "quit") {
+            occupyAbort.abort();
+            break;
+          }
           try {
             if (event.type === "select") {
               selectedWorkspaceId = event.workspaceId;
@@ -1564,6 +1586,7 @@ export function createBoundedWorkspaceControlPresentation(
       } catch (error) {
         await sendErrorBestEffort(error, "workspace-control-start");
       } finally {
+        occupyAbort.abort();
         presentationOpen = false;
         detailGeneration += 1;
         await detachActiveTerminal();
