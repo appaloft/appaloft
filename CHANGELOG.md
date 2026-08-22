@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.2](https://github.com/appaloft/appaloft/compare/v1.10.1...v1.10.2) (2026-08-22)
+
+
+### Bug Fixes
+
+* **release:** publish static fixture gate repair ([#1380](https://github.com/appaloft/appaloft/issues/1380)) ([778b244](https://github.com/appaloft/appaloft/commit/778b244404758d0444748c3a4411492a32e1a10b))
+
 ## [1.10.1](https://github.com/appaloft/appaloft/compare/v1.10.0...v1.10.1) (2026-08-22)
 
 
