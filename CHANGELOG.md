@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.5](https://github.com/appaloft/appaloft/compare/v1.9.4...v1.9.5) (2026-08-22)
+
+
+### Bug Fixes
+
+* **runtime:** keep live git Dockerfile after skip-pack SSH upload ([#1362](https://github.com/appaloft/appaloft/issues/1362)) ([adead24](https://github.com/appaloft/appaloft/commit/adead247362e213c61019c0a2facf54911cf5f75))
+
 ## [1.9.4](https://github.com/appaloft/appaloft/compare/v1.9.3...v1.9.4) (2026-08-22)
 
 
