@@ -2435,6 +2435,47 @@ describe("CLI remote control-plane client", () => {
     });
   });
 
+  test("[RT-CAP-REMOTE-011] explicit SSH-PGlite capacity maintenance bypasses an active remote profile", async () => {
+    for (const argv of [
+      [
+        "node",
+        "appaloft",
+        "server",
+        "capacity",
+        "inspect",
+        "srv_primary",
+        "--state-backend",
+        "ssh-pglite",
+        "--server-host",
+        "203.0.113.10",
+      ],
+      [
+        "node",
+        "appaloft",
+        "server",
+        "capacity",
+        "prune",
+        "srv_primary",
+        "--before",
+        "2026-01-01T00:00:00.000Z",
+        "--state-backend=ssh-pglite",
+        "--server-host",
+        "203.0.113.10",
+      ],
+    ]) {
+      const result = await resolveCliExecutionTarget({ argv, store: activeStore() });
+
+      expect(result._unsafeUnwrap()).toMatchObject({
+        kind: "local",
+        argv,
+        diagnostics: {
+          command: "server",
+          effectiveMode: "none",
+        },
+      });
+    }
+  });
+
   test("[WS-CODE-LOCAL-003] code preserves local dispatch when no trusted remote target is selected", async () => {
     const result = await resolveCliExecutionTarget({
       argv: ["node", "appaloft", "code"],

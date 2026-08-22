@@ -27,13 +27,13 @@ subdirectories.
 
 ## Input Model
 
-| Field | Requirement | Meaning |
-| --- | --- | --- |
-| `serverId` | Required | Deployment target/server whose runtime target capacity should be pruned. |
-| `before` | Required | ISO timestamp cutoff. Only candidates with `updatedAt < before` are eligible. |
-| `categories` | Optional | Defaults to `stopped-containers`, `preview-workspaces`, and `source-workspaces`; `docker-build-cache`, `unused-images`, and `remote-state-markers` require explicit opt-in. |
-| `target` | Optional | Exact candidate id or target filter. When present, dry-run and destructive prune report or mutate only candidates whose `id` or `target` exactly matches this value. |
-| `dryRun` | Optional | Defaults to `true`. When true, returns candidates without deleting target artifacts. |
+| Field        | Requirement | Meaning                                                                                                                                                                     |
+| ------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `serverId`   | Required    | Deployment target/server whose runtime target capacity should be pruned.                                                                                                    |
+| `before`     | Required    | ISO timestamp cutoff. Only candidates with `updatedAt < before` are eligible.                                                                                               |
+| `categories` | Optional    | Defaults to `stopped-containers`, `preview-workspaces`, and `source-workspaces`; `docker-build-cache`, `unused-images`, and `remote-state-markers` require explicit opt-in. |
+| `target`     | Optional    | Exact candidate id or target filter. When present, dry-run and destructive prune report or mutate only candidates whose `id` or `target` exactly matches this value.        |
+| `dryRun`     | Optional    | Defaults to `true`. When true, returns candidates without deleting target artifacts.                                                                                        |
 
 Allowed categories are:
 
@@ -73,6 +73,11 @@ The command must:
 ## Safety Rules
 
 - Dry-run must not mutate the target.
+- SSH-PGlite inspect and default/dry-run prune are strict read-only sessions: they may reject an
+  active mutation lock, but must not create, heartbeat, recover, or release a lock, upload state,
+  increment a revision, or create a backup/marker. Their streamed snapshot must verify both the
+  mutation-lock absence and the state revision before and after archiving, and fail closed if either
+  changes.
 - Destructive prune requires explicit `dryRun = false`.
 - Matching uses `updatedAt < before`; cutoff-equal candidates are retained.
 - Active runtimes are always skipped.
@@ -121,24 +126,37 @@ The command must:
   secret paths.
 - If audit recording fails after destructive deletion, the command must not retry deletion or report
   the runtime mutation as failed. It returns the prune result with a sanitized warning.
+- If destructive SSH-PGlite prune succeeds locally but final authoritative-state upload fails, the
+  shell preserves the local audited mirror plus its base snapshot and blocks later downloads. An
+  explicit `server capacity inspect ... --retry-pending-state-sync` retries only that
+  revision-fenced upload before the read-only inspection is dispatched. If the fence conflicts, it
+  merges onto a fresh authoritative snapshot and preserves that merged mirror across another upload
+  failure. Pending metadata binds the exact SSH target and remote state root, validates monotonic
+  revisions, generated transaction paths, and complete non-symlink PGlite mirrors, and removes
+  superseded recovery mirrors. Recovery revalidates that mirror at the archive packing boundary and
+  never recreates a missing mirror before upload. The shell persists the marker through a flushed
+  temporary file and atomic rename; after marker commit, interrupted uploads preserve the active
+  mirror and still release the remote lock. Orphaned transaction directories, marker temp files, or
+  an unreadable recovery directory block a new download.
+  Destructive prune does not accept the recovery flag and therefore cannot silently replay deletion.
 
 ## Entrypoints
 
-| Entrypoint | Contract |
-| --- | --- |
-| CLI | `appaloft server capacity prune <serverId> --before <iso> [--category <category>] [--target <id-or-target>] [--dry-run false]` dispatches this command. |
-| API/oRPC | `POST /api/servers/{serverId}/capacity/prune` uses the same command schema. |
-| Web | Server detail Capacity calls the same command after showing a dry-run-first prune surface. The Monitor handoff may prefill `before` from the observation window, but Web still dispatches an explicit dry-run preview before any destructive action. |
+| Entrypoint | Contract                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CLI        | `appaloft server capacity prune <serverId> --before <iso> [--category <category>] [--target <id-or-target>] [--dry-run false]` dispatches this command. Automation operating authoritative SSH-PGlite state may additionally provide `--state-backend ssh-pglite`, `--server-host`, `--server-port`, `--server-ssh-username`, `--server-ssh-private-key-file`, and `--remote-runtime-root`; this explicit backend selects local shell execution even when a remote Profile is active. The shell coordinates state download, command execution, audit persistence, and successful mutation sync-back. `server capacity inspect` and dry-run prune accept the same transport options but remain strict read-only sessions. If a previous destructive upload failed after runtime deletion, `server capacity inspect ... --retry-pending-state-sync` explicitly restores the preserved audited mirror before read-only dispatch; prune does not accept that flag. |
+| API/oRPC   | `POST /api/servers/{serverId}/capacity/prune` uses the same command schema.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Web        | Server detail Capacity calls the same command after showing a dry-run-first prune surface. The Monitor handoff may prefill `before` from the observation window, but Web still dispatches an explicit dry-run preview before any destructive action.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ## Error Contract
 
-| Code | Phase | Retriable | Meaning |
-| --- | --- | --- | --- |
-| `validation_error` | `command-validation` | No | Input is missing, malformed, or names an unsupported category. |
-| `not_found` | `server-read` | No | The deployment target/server does not exist or is not visible. |
-| `runtime_target_unsupported` | `runtime-target-capacity-prune` | No | The selected target provider cannot prune runtime capacity through this command. |
-| `infra_error` | `runtime-target-capacity-prune` | Conditional | Target inspection or deletion could not be completed safely. |
-| `infra_error` | `runtime-target-capacity-prune-audit` | Conditional | Audit recording failed after runtime deletion; surfaced as a result warning, not a command error. |
+| Code                         | Phase                                 | Retriable   | Meaning                                                                                           |
+| ---------------------------- | ------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------- |
+| `validation_error`           | `command-validation`                  | No          | Input is missing, malformed, or names an unsupported category.                                    |
+| `not_found`                  | `server-read`                         | No          | The deployment target/server does not exist or is not visible.                                    |
+| `runtime_target_unsupported` | `runtime-target-capacity-prune`       | No          | The selected target provider cannot prune runtime capacity through this command.                  |
+| `infra_error`                | `runtime-target-capacity-prune`       | Conditional | Target inspection or deletion could not be completed safely.                                      |
+| `infra_error`                | `runtime-target-capacity-prune-audit` | Conditional | Audit recording failed after runtime deletion; surfaced as a result warning, not a command error. |
 
 ## Tests
 
@@ -162,6 +180,11 @@ At minimum, Code Round coverage must prove:
   fences;
 - unsupported target providers return `runtime_target_unsupported` before runtime mutation;
 - CLI and HTTP/oRPC dispatch use the shared command schema.
+- SSH-PGlite CLI capacity inspection downloads authoritative state read-only, while prune downloads
+  authoritative state and synchronizes its command/audit mutation back after success.
+- an active remote Profile cannot divert an explicit SSH-PGlite capacity command to HTTP dispatch;
+  invalid SSH ports fail closed; failed commands discard rather than upload local state; and a
+  failed final destructive upload preserves a revision-fenced, explicitly retryable audited mirror.
 - remote-state marker cleanup is opt-in, dry-run-first, and preserves the state root and live
   `ssh-pglite` data.
 - large marker dry-runs return bounded candidate details plus summary counts and estimated

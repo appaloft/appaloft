@@ -1,9 +1,20 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
+import { renameSync } from "node:fs";
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  stat,
+  utimes,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { createDatabase, createMigrator } from "@appaloft/persistence-pg";
 import {
   prepareRemotePgliteStateSync,
@@ -177,6 +188,7 @@ describe("remote PGlite state sync", () => {
     const remoteStateRoot = join(remoteRuntimeRoot, "state");
     let streamedArchivePath: string | undefined;
     let streamedArchiveMode: number | undefined;
+    let streamedRemoteCommand: string | undefined;
 
     try {
       await mkdir(join(remoteStateRoot, "pglite"), { recursive: true });
@@ -195,6 +207,7 @@ describe("remote PGlite state sync", () => {
         async runToFile(input: RemotePgliteArchiveRunnerInput, outputPath: string) {
           streamedArchivePath = outputPath;
           streamedArchiveMode = (await stat(outputPath)).mode & 0o777;
+          streamedRemoteCommand = input.args.at(-1);
           const command = ["sh", "-lc", input.args.at(-1) ?? ""];
           const process = Bun.spawn(command, {
             stdout: Bun.file(outputPath),
@@ -231,9 +244,81 @@ describe("remote PGlite state sync", () => {
       expect(streamedArchivePath).toBeDefined();
       expect(streamedArchiveMode).toBe(0o600);
       expect(await Bun.file(streamedArchivePath ?? "").exists()).toBe(false);
+      expect(streamedRemoteCommand).toContain("revision_before");
+      expect(streamedRemoteCommand).toContain("revision_after");
+      expect(streamedRemoteCommand).toContain(
+        '[ ! -d "$lock_dir" ] && [ "$revision_before" = "$revision_after" ]',
+      );
     } finally {
       await rm(localDataRoot, { recursive: true, force: true });
       await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[RT-CAP-REMOTE-011] read-only archive rejects lock or revision changes during streaming", async () => {
+    for (const mutation of ["revision", "lock"] as const) {
+      const localDataRoot = await mkdtemp(join(tmpdir(), `appaloft-fenced-${mutation}-local-`));
+      const remoteRuntimeRoot = await mkdtemp(
+        join(tmpdir(), `appaloft-fenced-${mutation}-remote-`),
+      );
+      const remoteStateRoot = join(remoteRuntimeRoot, "state");
+      const baseRunner = createLocalSshArchiveRunner();
+
+      try {
+        await mkdir(join(localDataRoot, "pglite"), { recursive: true });
+        await writeFile(join(localDataRoot, "pglite", "previous.txt"), "previous-mirror");
+        await mkdir(join(remoteStateRoot, "pglite"), { recursive: true });
+        await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
+        await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
+        await mkdir(join(remoteStateRoot, "locks"), { recursive: true });
+        await writeFile(join(remoteStateRoot, "pglite", "next.txt"), "next-mirror");
+        await writeFile(join(remoteStateRoot, "sync-revision.txt"), "0\n");
+
+        const sync = new RemotePgliteArchiveSync(
+          {
+            dataRoot: remoteStateRoot,
+            localDataRoot,
+            localPgliteDataDir: join(localDataRoot, "pglite"),
+            backupRetentionDays: 7,
+            backupMaxCount: 20,
+            target: { host: "127.0.0.1" },
+            readOnly: true,
+          },
+          {
+            run: baseRunner.run,
+            async runToFile(input, outputPath) {
+              const injected = (input.args.at(-1) ?? "").replace(
+                "tar -czf - pglite source-links server-applied-routes",
+                mutation === "revision"
+                  ? 'tar -czf - pglite source-links server-applied-routes; printf "1\\n" > "$revision_file"'
+                  : 'tar -czf - pglite source-links server-applied-routes; mkdir -p "$lock_dir"',
+              );
+              const process = Bun.spawn(["sh", "-lc", injected], {
+                stdout: Bun.file(outputPath),
+                stderr: "pipe",
+              });
+              const exitCode = await process.exited;
+              return {
+                exitCode,
+                stdout: new Uint8Array(),
+                stderr: await new Response(process.stderr).text(),
+                failed: exitCode !== 0,
+              };
+            },
+          },
+        );
+
+        const result = await sync.syncFromRemote();
+
+        expect(result.isErr()).toBe(true);
+        expect(await readFile(join(localDataRoot, "pglite", "previous.txt"), "utf8")).toBe(
+          "previous-mirror",
+        );
+        expect(await Bun.file(join(localDataRoot, "pglite", "next.txt")).exists()).toBe(false);
+      } finally {
+        await rm(localDataRoot, { recursive: true, force: true });
+        await rm(remoteRuntimeRoot, { recursive: true, force: true });
+      }
     }
   });
 
@@ -543,6 +628,127 @@ describe("remote PGlite state sync", () => {
       expect(plan.value.dataRoot).toBe("/var/lib/appaloft/recovery/candidate-123/state");
       expect(plan.value.readOnly).toBe(false);
       expect(plan.value.target.host).toBe("203.0.113.10");
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  test("[RT-CAP-REMOTE-011] server capacity maintenance plans coordinated SSH PGlite state", async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), "appaloft-remote-capacity-"));
+    try {
+      const commonArgs = [
+        "--state-backend",
+        "ssh-pglite",
+        "--server-host",
+        "203.0.113.10",
+        "--server-port",
+        "2222",
+        "--server-ssh-username",
+        "deploy",
+        "--server-ssh-private-key-file",
+        "/home/runner/.ssh/appaloft",
+        "--remote-runtime-root",
+        "/var/lib/appaloft/runtime",
+      ];
+      const inspectPlan = resolveRemotePgliteStateSyncPlan(
+        ["appaloft", "server", "capacity", "inspect", "srv_primary", ...commonArgs],
+        {},
+        testConfig(dataDir),
+      );
+      const prunePlan = resolveRemotePgliteStateSyncPlan(
+        [
+          "appaloft",
+          "server",
+          "capacity",
+          "prune",
+          "srv_primary",
+          "--before",
+          "2026-01-01T00:00:00.000Z",
+          "--dry-run",
+          "false",
+          ...commonArgs,
+        ],
+        {},
+        testConfig(dataDir),
+      );
+      const dryRunPlan = resolveRemotePgliteStateSyncPlan(
+        [
+          "appaloft",
+          "server",
+          "capacity",
+          "prune",
+          "srv_primary",
+          "--before",
+          "2026-01-01T00:00:00.000Z",
+          ...commonArgs,
+        ],
+        {},
+        testConfig(dataDir),
+      );
+
+      expect(inspectPlan.isOk()).toBe(true);
+      expect(prunePlan.isOk()).toBe(true);
+      expect(dryRunPlan.isOk()).toBe(true);
+      if (
+        inspectPlan.isErr() ||
+        !inspectPlan.value ||
+        prunePlan.isErr() ||
+        !prunePlan.value ||
+        dryRunPlan.isErr() ||
+        !dryRunPlan.value
+      ) {
+        throw new Error("Expected remote PGlite capacity plans");
+      }
+      expect(inspectPlan.value).toMatchObject({
+        dataRoot: "/var/lib/appaloft/runtime/state",
+        readOnly: true,
+        target: {
+          host: "203.0.113.10",
+          port: 2222,
+          username: "deploy",
+          identityFile: "/home/runner/.ssh/appaloft",
+        },
+      });
+      expect(prunePlan.value).toMatchObject({
+        dataRoot: "/var/lib/appaloft/runtime/state",
+        readOnly: false,
+        target: {
+          host: "203.0.113.10",
+          port: 2222,
+          username: "deploy",
+          identityFile: "/home/runner/.ssh/appaloft",
+        },
+      });
+      expect(dryRunPlan.value.readOnly).toBe(true);
+
+      const invalidPort = resolveRemotePgliteStateSyncPlan(
+        [
+          "appaloft",
+          "server",
+          "capacity",
+          "prune",
+          "srv_primary",
+          "--before",
+          "2026-01-01T00:00:00.000Z",
+          "--dry-run",
+          "false",
+          "--state-backend",
+          "ssh-pglite",
+          "--server-host",
+          "203.0.113.10",
+          "--server-port",
+          "70000",
+        ],
+        {},
+        testConfig(dataDir),
+      );
+      expect(invalidPort._unsafeUnwrapErr()).toMatchObject({
+        code: "validation_error",
+        details: {
+          phase: "remote-state-resolution",
+          stateBackend: "ssh-pglite",
+        },
+      });
     } finally {
       await rm(dataDir, { recursive: true, force: true });
     }
@@ -1386,6 +1592,426 @@ describe("remote PGlite state sync", () => {
     }
   });
 
+  test("[RT-CAP-REMOTE-011] failed destructive sync preserves and explicitly retries pending audit state", async () => {
+    const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-capacity-recovery-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-capacity-recovery-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+    const baseRunner = createLocalSshArchiveRunner();
+    let failUpload = true;
+    let failRelease = false;
+    let uploadAttempts = 0;
+    let mirrorSwap: { from: string; to: string } | null = null;
+    const runner = {
+      run(input: RemotePgliteArchiveRunnerInput) {
+        if (mirrorSwap && input.command === "tar") {
+          renameSync(mirrorSwap.from, mirrorSwap.to);
+          mirrorSwap = null;
+        }
+        if (
+          failRelease &&
+          input.command === "ssh" &&
+          input.args.at(-1)?.includes('rm -rf "$data_root/locks/mutation.lock"')
+        ) {
+          return {
+            exitCode: 1,
+            stdout: new Uint8Array(),
+            stderr: "simulated lock release failure",
+            failed: true,
+          };
+        }
+        if (input.command === "ssh" && input.args.at(-1)?.includes("expected_revision")) {
+          uploadAttempts += 1;
+          if (!failUpload) return baseRunner.run(input);
+          return {
+            exitCode: 1,
+            stdout: new Uint8Array(),
+            stderr: "No space left on device",
+            failed: true,
+          };
+        }
+        return baseRunner.run(input);
+      },
+    };
+    const commonArgs = [
+      "appaloft",
+      "server",
+      "capacity",
+      "prune",
+      "srv_primary",
+      "--before",
+      "2026-01-01T00:00:00.000Z",
+      "--dry-run",
+      "false",
+      "--state-backend",
+      "ssh-pglite",
+      "--server-host",
+      "127.0.0.1",
+    ];
+
+    try {
+      await mkdir(join(remoteStateRoot, "pglite"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "locks"), { recursive: true });
+      await writeFile(join(remoteStateRoot, "schema-version.json"), '{"version":1}\n');
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "0\n");
+      await writeFile(join(remoteStateRoot, "pglite", "live.txt"), "remote-live-state");
+      await writeFile(join(remoteStateRoot, "pglite", "PG_VERSION"), "18\n");
+
+      const session = await prepareRemotePgliteStateSync({
+        argv: commonArgs,
+        config: testConfig(localDataRoot, { remoteRuntimeRoot }),
+        runner,
+      });
+      expect(session.isOk()).toBe(true);
+      if (session.isErr() || !session.value) throw new Error("Expected destructive sync session");
+
+      expect((await session.value.releaseForCliRuntime()).isOk()).toBe(true);
+      await writeFile(join(session.value.localPgliteDataDir, "audit.txt"), "capacity-prune-audit");
+      failRelease = true;
+      const failedSync = await session.value.syncBackAndRelease();
+      expect(failedSync._unsafeUnwrapErr().details).toMatchObject({
+        phase: "remote-state-sync-upload",
+        recoveryPhase: "remote-state-sync-recovery",
+        recoveryAction: "run-capacity-inspect-with---retry-pending-state-sync",
+      });
+      const pendingPath = join(session.value.localDataRoot, "recovery", "pending-sync.json");
+      expect(await Bun.file(pendingPath).exists()).toBe(true);
+      expect(await Bun.file(join(remoteStateRoot, "pglite", "audit.txt")).exists()).toBe(false);
+      expect(uploadAttempts).toBe(1);
+
+      const inspectRecoveryArgs = [
+        "appaloft",
+        "server",
+        "capacity",
+        "inspect",
+        "srv_primary",
+        "--state-backend",
+        "ssh-pglite",
+        "--server-host",
+        "127.0.0.1",
+        "--retry-pending-state-sync",
+      ];
+      const mismatchedTargetRecovery = await prepareRemotePgliteStateSync({
+        argv: inspectRecoveryArgs.map((value) => (value === "127.0.0.1" ? "127.0.0.2" : value)),
+        env: { APPALOFT_PGLITE_DATA_DIR: session.value.localPgliteDataDir },
+        config: testConfig(localDataRoot, { remoteRuntimeRoot }),
+        runner,
+      });
+      expect(mismatchedTargetRecovery._unsafeUnwrapErr().details).toMatchObject({
+        phase: "remote-state-sync-recovery",
+        reason: "remote_state_pending_sync_target_mismatch",
+      });
+      expect(uploadAttempts).toBe(1);
+
+      const originalPendingText = await readFile(pendingPath, "utf8");
+      const originalPending = JSON.parse(originalPendingText) as Record<string, unknown>;
+      expect(
+        (await readdir(join(session.value.localDataRoot, "recovery"))).filter((name) =>
+          name.startsWith("pending-sync.json.tmp-"),
+        ),
+      ).toEqual([]);
+      await writeFile(
+        pendingPath,
+        `${JSON.stringify({ ...originalPending, expectedRevision: -1, nextRevision: 0 })}\n`,
+      );
+      const invalidRevisionRecovery = await prepareRemotePgliteStateSync({
+        argv: inspectRecoveryArgs,
+        config: testConfig(localDataRoot, { remoteRuntimeRoot }),
+        runner,
+      });
+      expect(invalidRevisionRecovery._unsafeUnwrapErr().details).toMatchObject({
+        reason: "remote_state_pending_sync_invalid",
+      });
+      expect(uploadAttempts).toBe(1);
+
+      await writeFile(
+        pendingPath,
+        `${JSON.stringify({
+          ...originalPending,
+          baseSnapshotRoot: `${session.value.localDataRoot}.base-near-prefix`,
+        })}\n`,
+      );
+      const invalidPathRecovery = await prepareRemotePgliteStateSync({
+        argv: inspectRecoveryArgs,
+        config: testConfig(localDataRoot, { remoteRuntimeRoot }),
+        runner,
+      });
+      expect(invalidPathRecovery._unsafeUnwrapErr().details).toMatchObject({
+        reason: "remote_state_pending_sync_path_invalid",
+      });
+      expect(uploadAttempts).toBe(1);
+
+      await writeFile(pendingPath, "{");
+      const partialMarkerRecovery = await prepareRemotePgliteStateSync({
+        argv: inspectRecoveryArgs,
+        config: testConfig(localDataRoot, { remoteRuntimeRoot }),
+        runner,
+      });
+      expect(partialMarkerRecovery._unsafeUnwrapErr().details).toMatchObject({
+        reason: "remote_state_pending_sync_invalid",
+      });
+      expect(uploadAttempts).toBe(1);
+
+      await writeFile(pendingPath, originalPendingText);
+      const preservedPgliteRoot = `${session.value.localPgliteDataDir}.preserved`;
+      await rename(session.value.localPgliteDataDir, preservedPgliteRoot);
+      const missingMirrorRecovery = await prepareRemotePgliteStateSync({
+        argv: inspectRecoveryArgs,
+        config: testConfig(localDataRoot, { remoteRuntimeRoot }),
+        runner,
+      });
+      expect(missingMirrorRecovery._unsafeUnwrapErr().details).toMatchObject({
+        reason: "remote_state_pending_sync_mirror_unavailable",
+      });
+      expect(uploadAttempts).toBe(1);
+      await rename(preservedPgliteRoot, session.value.localPgliteDataDir);
+
+      await rm(pendingPath, { force: true });
+      const unreadableOrphanRecovery = await prepareRemotePgliteStateSync({
+        argv: inspectRecoveryArgs,
+        config: testConfig(localDataRoot, { remoteRuntimeRoot }),
+        runner,
+        readDirectory: async () => {
+          throw Object.assign(new Error("permission denied"), { code: "EACCES" });
+        },
+      });
+      expect(unreadableOrphanRecovery._unsafeUnwrapErr().details).toMatchObject({
+        reason: "remote_state_orphan_scan_failed",
+      });
+      expect(uploadAttempts).toBe(1);
+
+      const missingMarkerRecovery = await prepareRemotePgliteStateSync({
+        argv: inspectRecoveryArgs,
+        config: testConfig(localDataRoot, { remoteRuntimeRoot }),
+        runner,
+      });
+      expect(missingMarkerRecovery._unsafeUnwrapErr().details).toMatchObject({
+        reason: "remote_state_orphaned_pending_sync",
+      });
+      expect(uploadAttempts).toBe(1);
+      await writeFile(pendingPath, originalPendingText);
+
+      const rejectedNonInspectRecovery = await prepareRemotePgliteStateSync({
+        argv: [...commonArgs, "--retry-pending-state-sync"],
+        config: testConfig(localDataRoot, { remoteRuntimeRoot }),
+        runner,
+      });
+      expect(rejectedNonInspectRecovery._unsafeUnwrapErr().details).toMatchObject({
+        phase: "remote-state-sync-recovery",
+        reason: "remote_state_pending_sync_inspect_required",
+      });
+      expect(uploadAttempts).toBe(1);
+
+      failRelease = false;
+      await rm(join(remoteStateRoot, "locks", "mutation.lock"), { recursive: true, force: true });
+      const racedMirrorRoot = `${session.value.localPgliteDataDir}.packing-race`;
+      mirrorSwap = { from: session.value.localPgliteDataDir, to: racedMirrorRoot };
+      const packingRaceRecovery = await prepareRemotePgliteStateSync({
+        argv: inspectRecoveryArgs,
+        config: testConfig(localDataRoot, { remoteRuntimeRoot }),
+        runner,
+      });
+      expect(packingRaceRecovery.isErr()).toBe(true);
+      expect(uploadAttempts).toBe(1);
+      expect(await Bun.file(pendingPath).exists()).toBe(true);
+      renameSync(racedMirrorRoot, session.value.localPgliteDataDir);
+
+      failUpload = false;
+      const recovered = await prepareRemotePgliteStateSync({
+        argv: inspectRecoveryArgs,
+        config: testConfig(localDataRoot, { remoteRuntimeRoot }),
+        runner,
+      });
+      if (recovered.isErr()) {
+        throw new Error(JSON.stringify(recovered.error));
+      }
+      expect(recovered.isOk()).toBe(true);
+      if (recovered.isErr() || !recovered.value) throw new Error("Expected recovered sync session");
+      expect(await readFile(join(remoteStateRoot, "pglite", "audit.txt"), "utf8")).toBe(
+        "capacity-prune-audit",
+      );
+      expect(
+        await Bun.file(
+          join(recovered.value.localDataRoot, "recovery", "pending-sync.json"),
+        ).exists(),
+      ).toBe(false);
+      expect((await recovered.value.discardAndRelease()).isOk()).toBe(true);
+    } finally {
+      await rm(localDataRoot, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[RT-CAP-REMOTE-011] thrown destructive upload preserves recovery state and releases the mutation lock", async () => {
+    const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-capacity-throw-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-capacity-throw-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+    const baseRunner = createLocalSshArchiveRunner();
+    let throwUpload = true;
+    const runner = {
+      run(input: RemotePgliteArchiveRunnerInput) {
+        if (
+          throwUpload &&
+          input.command === "ssh" &&
+          input.args.at(-1)?.includes("expected_revision")
+        ) {
+          throwUpload = false;
+          throw new Error("simulated destructive archive runner interruption");
+        }
+        return baseRunner.run(input);
+      },
+    };
+
+    try {
+      await mkdir(join(remoteStateRoot, "pglite"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "locks"), { recursive: true });
+      await writeFile(join(remoteStateRoot, "schema-version.json"), '{"version":1}\n');
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "0\n");
+      await writeFile(join(remoteStateRoot, "pglite", "PG_VERSION"), "18\n");
+
+      const session = await prepareRemotePgliteStateSync({
+        argv: [
+          "appaloft",
+          "server",
+          "capacity",
+          "prune",
+          "srv_primary",
+          "--before",
+          "2026-01-01T00:00:00.000Z",
+          "--dry-run",
+          "false",
+          "--state-backend",
+          "ssh-pglite",
+          "--server-host",
+          "127.0.0.1",
+        ],
+        config: testConfig(localDataRoot, { remoteRuntimeRoot }),
+        runner,
+      });
+      expect(session.isOk()).toBe(true);
+      if (session.isErr() || !session.value) throw new Error("Expected destructive sync session");
+
+      expect((await session.value.releaseForCliRuntime()).isOk()).toBe(true);
+      await writeFile(join(session.value.localPgliteDataDir, "audit.txt"), "preserved-audit");
+      const failed = await session.value.syncBackAndRelease();
+      expect(failed._unsafeUnwrapErr().details).toMatchObject({
+        reason: "remote_state_sync_upload_interrupted",
+        recoveryAction: "run-capacity-inspect-with---retry-pending-state-sync",
+      });
+      const pendingPath = join(session.value.localDataRoot, "recovery", "pending-sync.json");
+      expect(await Bun.file(pendingPath).exists()).toBe(true);
+      expect(await Bun.file(join(session.value.localPgliteDataDir, "audit.txt")).exists()).toBe(
+        true,
+      );
+      expect(await Bun.file(join(remoteStateRoot, "locks", "mutation.lock")).exists()).toBe(false);
+    } finally {
+      await rm(localDataRoot, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[RT-CAP-REMOTE-011] successful upload cleans transaction roots before reporting lock release failure", async () => {
+    const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-capacity-release-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-capacity-release-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+    const baseRunner = createLocalSshArchiveRunner();
+    let failRelease = false;
+    const runner = {
+      run(input: RemotePgliteArchiveRunnerInput) {
+        if (
+          failRelease &&
+          input.command === "ssh" &&
+          input.args.at(-1)?.includes('rm -rf "$data_root/locks/mutation.lock"')
+        ) {
+          return {
+            exitCode: 1,
+            stdout: new Uint8Array(),
+            stderr: "simulated lock release failure after successful upload",
+            failed: true,
+          };
+        }
+        return baseRunner.run(input);
+      },
+    };
+    const pruneArgs = [
+      "appaloft",
+      "server",
+      "capacity",
+      "prune",
+      "srv_primary",
+      "--before",
+      "2026-01-01T00:00:00.000Z",
+      "--dry-run",
+      "false",
+      "--state-backend",
+      "ssh-pglite",
+      "--server-host",
+      "127.0.0.1",
+    ];
+
+    try {
+      await mkdir(join(remoteStateRoot, "pglite"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "locks"), { recursive: true });
+      await writeFile(join(remoteStateRoot, "schema-version.json"), '{"version":1}\n');
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "0\n");
+      await writeFile(join(remoteStateRoot, "pglite", "PG_VERSION"), "18\n");
+
+      const session = await prepareRemotePgliteStateSync({
+        argv: pruneArgs,
+        config: testConfig(localDataRoot, { remoteRuntimeRoot }),
+        runner,
+      });
+      expect(session.isOk()).toBe(true);
+      if (session.isErr() || !session.value) throw new Error("Expected destructive sync session");
+      const activeSession = session.value;
+
+      expect((await activeSession.releaseForCliRuntime()).isOk()).toBe(true);
+      await writeFile(join(activeSession.localPgliteDataDir, "audit.txt"), "uploaded-audit");
+      failRelease = true;
+      const failedRelease = await activeSession.syncBackAndRelease();
+      expect(failedRelease.isErr()).toBe(true);
+      expect(await Bun.file(join(remoteStateRoot, "pglite", "audit.txt")).exists()).toBe(true);
+      expect(
+        await Bun.file(join(activeSession.localDataRoot, "recovery", "pending-sync.json")).exists(),
+      ).toBe(false);
+      expect(
+        (await readdir(dirname(activeSession.localDataRoot))).some((name) =>
+          name.startsWith(`${basename(activeSession.localDataRoot)}.base-`),
+        ),
+      ).toBe(false);
+
+      failRelease = false;
+      await rm(join(remoteStateRoot, "locks", "mutation.lock"), { recursive: true, force: true });
+      const nextInspect = await prepareRemotePgliteStateSync({
+        argv: [
+          "appaloft",
+          "server",
+          "capacity",
+          "inspect",
+          "srv_primary",
+          "--state-backend",
+          "ssh-pglite",
+          "--server-host",
+          "127.0.0.1",
+        ],
+        config: testConfig(localDataRoot, { remoteRuntimeRoot }),
+        runner,
+      });
+      expect(nextInspect.isOk()).toBe(true);
+      if (nextInspect.isErr() || !nextInspect.value)
+        throw new Error("Expected next inspect session");
+      expect((await nextInspect.value.discardAndRelease()).isOk()).toBe(true);
+    } finally {
+      await rm(localDataRoot, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  });
+
   test("[CONFIG-FILE-STATE-010] releaseForCliRuntime releases the coarse SSH lock before final upload and reacquires it later", async () => {
     const dataDir = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-"));
     const calls: RemotePgliteArchiveRunnerInput[] = [];
@@ -1626,11 +2252,42 @@ describe("remote PGlite state sync", () => {
     }
   });
 
-  test("[CONFIG-FILE-STATE-012] final upload merges disjoint PGlite row changes onto a newer remote revision", async () => {
+  test("[CONFIG-FILE-STATE-012] failed merged upload preserves the merged audit mirror for explicit recovery", async () => {
     const localDataDir = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-local-"));
     const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-remote-"));
     const remoteStateRoot = join(remoteRuntimeRoot, "state");
-    const runner = createLocalSshArchiveRunner();
+    const baseRunner = createLocalSshArchiveRunner();
+    let uploadAttempts = 0;
+    const failedUploadAttempts = new Set<number>();
+    const thrownUploadAttempts = new Set([2, 5]);
+    let throwConflictDownload = false;
+    const runner = {
+      run(input: RemotePgliteArchiveRunnerInput) {
+        if (
+          throwConflictDownload &&
+          input.command === "ssh" &&
+          input.args.at(-1)?.includes("tar -czf -")
+        ) {
+          throwConflictDownload = false;
+          throw new Error("simulated archive runner interruption during conflict refresh");
+        }
+        if (input.command === "ssh" && input.args.at(-1)?.includes("expected_revision")) {
+          uploadAttempts += 1;
+          if (thrownUploadAttempts.has(uploadAttempts)) {
+            throw new Error("simulated archive runner interruption after marker commit");
+          }
+          if (failedUploadAttempts.has(uploadAttempts)) {
+            return {
+              exitCode: 1,
+              stdout: new Uint8Array(),
+              stderr: "No space left on device after merge",
+              failed: true,
+            };
+          }
+        }
+        return baseRunner.run(input);
+      },
+    };
     const now = "2026-04-22T00:00:00.000Z";
 
     try {
@@ -1847,7 +2504,86 @@ describe("remote PGlite state sync", () => {
       await writeFile(join(remoteStateRoot, "sync-revision.txt"), "1\n");
 
       const synced = await session.value.syncBackAndRelease();
-      expect(synced.isOk()).toBe(true);
+      expect(synced.isErr()).toBe(true);
+      expect(synced._unsafeUnwrapErr().details).toMatchObject({
+        reason: "remote_state_sync_upload_interrupted",
+        recoveryAction: "run-capacity-inspect-with---retry-pending-state-sync",
+      });
+      expect(await Bun.file(join(remoteStateRoot, "locks", "mutation.lock")).exists()).toBe(false);
+      const pendingPath = join(session.value.localDataRoot, "recovery", "pending-sync.json");
+      const pending = JSON.parse(await readFile(pendingPath, "utf8")) as {
+        expectedRevision: number;
+        nextRevision: number;
+        uploadDataRoot: string;
+      };
+      expect(pending).toMatchObject({ expectedRevision: 1, nextRevision: 2 });
+      expect(pending.uploadDataRoot).toContain(`${session.value.localDataRoot}.merged-`);
+      expect(await Bun.file(join(pending.uploadDataRoot, "pglite", "PG_VERSION")).exists()).toBe(
+        true,
+      );
+
+      const recoveryArgs = [
+        "appaloft",
+        "server",
+        "capacity",
+        "inspect",
+        "srv_main",
+        "--state-backend",
+        "ssh-pglite",
+        "--server-host",
+        "203.0.113.10",
+        "--retry-pending-state-sync",
+      ];
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "2\n");
+      throwConflictDownload = true;
+      const interruptedConflictRefresh = await prepareRemotePgliteStateSync({
+        argv: recoveryArgs,
+        config: testConfig(localDataDir, { remoteRuntimeRoot }),
+        runner,
+      });
+      expect(interruptedConflictRefresh._unsafeUnwrapErr().details).toMatchObject({
+        phase: "remote-state-sync-download",
+      });
+      expect(await Bun.file(join(remoteStateRoot, "locks", "mutation.lock")).exists()).toBe(false);
+
+      const firstRecovery = await prepareRemotePgliteStateSync({
+        argv: recoveryArgs,
+        config: testConfig(localDataDir, { remoteRuntimeRoot }),
+        runner,
+      });
+      expect(firstRecovery.isErr()).toBe(true);
+      const retriedPending = JSON.parse(await readFile(pendingPath, "utf8")) as {
+        expectedRevision: number;
+        nextRevision: number;
+        uploadDataRoot: string;
+      };
+      expect(retriedPending).toMatchObject({ expectedRevision: 2, nextRevision: 3 });
+      expect(retriedPending.uploadDataRoot).toContain(
+        `${session.value.localDataRoot}.recovery-merged-`,
+      );
+      expect(await Bun.file(join(pending.uploadDataRoot, "pglite", "PG_VERSION")).exists()).toBe(
+        false,
+      );
+      expect(
+        await Bun.file(join(retriedPending.uploadDataRoot, "pglite", "PG_VERSION")).exists(),
+      ).toBe(true);
+      expect(await Bun.file(join(remoteStateRoot, "locks", "mutation.lock")).exists()).toBe(false);
+
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "3\n");
+      const recovered = await prepareRemotePgliteStateSync({
+        argv: recoveryArgs,
+        config: testConfig(localDataDir, { remoteRuntimeRoot }),
+        runner,
+      });
+      expect(recovered.isOk()).toBe(true);
+      if (recovered.isErr() || !recovered.value) {
+        throw new Error("Expected merged remote sync recovery session");
+      }
+      expect((await recovered.value.discardAndRelease()).isOk()).toBe(true);
+      expect(await Bun.file(pendingPath).exists()).toBe(false);
+      expect(
+        await Bun.file(join(retriedPending.uploadDataRoot, "pglite", "PG_VERSION")).exists(),
+      ).toBe(false);
 
       const mergedRemote = await initializePgliteRoot(remoteStateRoot);
       try {
@@ -1874,7 +2610,7 @@ describe("remote PGlite state sync", () => {
           "source://preview/pr-13",
           "source://preview/pr-14",
         ]);
-        expect(revision.trim()).toBe("2");
+        expect(revision.trim()).toBe("4");
       } finally {
         await mergedRemote.close();
       }
@@ -1882,5 +2618,5 @@ describe("remote PGlite state sync", () => {
       await rm(localDataDir, { recursive: true, force: true });
       await rm(remoteRuntimeRoot, { recursive: true, force: true });
     }
-  }, 20_000);
+  }, 40_000);
 });

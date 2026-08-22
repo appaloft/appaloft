@@ -116,6 +116,21 @@ const optionalPolicyScopeOption = Options.choice("scope", scheduledRuntimePruneP
 );
 const optionalServerIdOption = Options.text("server-id").pipe(Options.optional);
 const serverIdsOption = Options.text("server-ids");
+const remoteStateOptions = {
+  stateBackend: Options.choice("state-backend", [
+    "ssh-pglite",
+    "local-pglite",
+    "postgres-control-plane",
+  ] as const).pipe(Options.optional),
+  serverHost: Options.text("server-host").pipe(Options.optional),
+  serverPort: Options.text("server-port").pipe(Options.optional),
+  serverSshUsername: Options.text("server-ssh-username").pipe(Options.optional),
+  serverSshPrivateKeyFile: Options.text("server-ssh-private-key-file").pipe(Options.optional),
+  remoteRuntimeRoot: Options.text("remote-runtime-root").pipe(Options.optional),
+};
+const retryPendingStateSyncOption = Options.boolean("retry-pending-state-sync").pipe(
+  Options.withDefault(false),
+);
 const startOffsetOption = Options.integer("start-offset").pipe(Options.optional);
 const enrollmentTargetArg = Args.text({ name: "target" }).pipe(Args.withDefault(""));
 const enrollmentLocalOption = Options.boolean("local").pipe(Options.withDefault(false));
@@ -813,13 +828,17 @@ const capacityInspectCommand = EffectCommand.make(
   "inspect",
   {
     serverId: serverIdArg,
+    ...remoteStateOptions,
+    retryPendingStateSync: retryPendingStateSyncOption,
   },
-  ({ serverId }) =>
-    runQuery(
+  ({ serverId, ...remoteOptions }) => {
+    void remoteOptions;
+    return runQuery(
       InspectServerCapacityQuery.create({
         serverId,
       }),
-    ),
+    );
+  },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverCapacityInspect));
 
 const capacityPruneCommand = EffectCommand.make(
@@ -833,9 +852,11 @@ const capacityPruneCommand = EffectCommand.make(
     includeOrphanRunning: Options.boolean("include-orphan-running").pipe(
       Options.withDefault(false),
     ),
+    ...remoteStateOptions,
   },
-  ({ serverId, before, category, target, dryRun, includeOrphanRunning }) =>
-    runCommand(
+  ({ serverId, before, category, target, dryRun, includeOrphanRunning, ...remoteOptions }) => {
+    void remoteOptions;
+    return runCommand(
       PruneServerCapacityCommand.create({
         serverId,
         before,
@@ -844,7 +865,8 @@ const capacityPruneCommand = EffectCommand.make(
         dryRun,
         includeOrphanRunning,
       }),
-    ),
+    );
+  },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverCapacityPrune));
 
 const capacityPolicyConfigureCommand = EffectCommand.make(

@@ -5,9 +5,30 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type DomainError, ok } from "@appaloft/core";
 import { type RemotePgliteStateSyncSession } from "../src/remote-pglite-state-sync";
-import { formatDomainError, quarantineRemotePgliteMirror } from "../src/run";
+import {
+  finalizeRemotePgliteStateSync,
+  formatDomainError,
+  quarantineRemotePgliteMirror,
+} from "../src/run";
 
 describe("shell domain error formatting", () => {
+  test("[RT-CAP-REMOTE-011] failed commands discard remote state instead of uploading", async () => {
+    const calls: string[] = [];
+    const session = {
+      discardAndRelease: async () => {
+        calls.push("discard");
+        return ok(undefined);
+      },
+      syncBackAndRelease: async () => {
+        calls.push("sync");
+        return ok(undefined);
+      },
+    } as RemotePgliteStateSyncSession;
+
+    expect((await finalizeRemotePgliteStateSync(session, false)).isOk()).toBe(true);
+    expect(calls).toEqual(["discard"]);
+  });
+
   test("prints SSH remote-state resolution diagnostics from safe details", () => {
     const error: DomainError = {
       code: "infra_error",
@@ -158,6 +179,7 @@ describe("shell domain error formatting", () => {
       },
       releaseForCliRuntime: async () => ok(undefined),
       refreshLocalMirror: async () => ok(undefined),
+      discardAndRelease: async () => ok(undefined),
       syncBackAndRelease: async () => ok(undefined),
     };
 

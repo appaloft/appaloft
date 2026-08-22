@@ -243,9 +243,8 @@ describe("CLI server commands", () => {
 
   test("[K8S-SURFACE-017] server profile command dispatches only opaque references", async () => {
     ensureReflectMetadata();
-    const { ConfigureServerRuntimeTargetProfileCommand, createExecutionContext } = await import(
-      "@appaloft/application"
-    );
+    const { ConfigureServerRuntimeTargetProfileCommand, createExecutionContext } =
+      await import("@appaloft/application");
     const { createCliProgram } = await import("../src");
     const commands: AppCommand<unknown>[] = [];
     const commandBus = {
@@ -306,9 +305,8 @@ describe("CLI server commands", () => {
 
   test("[K8S-SURFACE-017] server readiness dispatches the normalized application query", async () => {
     ensureReflectMetadata();
-    const { InspectServerRuntimeReadinessQuery, createExecutionContext } = await import(
-      "@appaloft/application"
-    );
+    const { InspectServerRuntimeReadinessQuery, createExecutionContext } =
+      await import("@appaloft/application");
     const { createCliProgram } = await import("../src");
     const queries: AppQuery<unknown>[] = [];
     const commandBus = {
@@ -356,9 +354,8 @@ describe("CLI server commands", () => {
 
   test("[RUNTIME-CAPACITY-INSPECT-001] server capacity inspect dispatches the application query", async () => {
     ensureReflectMetadata();
-    const { InspectServerCapacityQuery, createExecutionContext } = await import(
-      "@appaloft/application"
-    );
+    const { InspectServerCapacityQuery, createExecutionContext } =
+      await import("@appaloft/application");
     const { createCliProgram } = await import("../src");
     const queries: AppQuery<unknown>[] = [];
     const commandBus = {
@@ -443,6 +440,19 @@ describe("CLI server commands", () => {
         "capacity",
         "inspect",
         "srv_primary",
+        "--state-backend",
+        "ssh-pglite",
+        "--server-host",
+        "203.0.113.10",
+        "--server-port",
+        "2222",
+        "--server-ssh-username",
+        "deploy",
+        "--server-ssh-private-key-file",
+        "/home/runner/.ssh/appaloft",
+        "--remote-runtime-root",
+        "/var/lib/appaloft/runtime",
+        "--retry-pending-state-sync",
       ]);
     } finally {
       process.stdout.write = writeStdout;
@@ -457,9 +467,8 @@ describe("CLI server commands", () => {
 
   test("[RT-CAP-PRUNE-005] server capacity prune dispatches the application command", async () => {
     ensureReflectMetadata();
-    const { PruneServerCapacityCommand, createExecutionContext } = await import(
-      "@appaloft/application"
-    );
+    const { PruneServerCapacityCommand, createExecutionContext } =
+      await import("@appaloft/application");
     const { createCliProgram } = await import("../src");
     const commands: AppCommand<unknown>[] = [];
     const commandBus = {
@@ -532,6 +541,18 @@ describe("CLI server commands", () => {
         "appaloft-dep_123",
         "--dry-run",
         "false",
+        "--state-backend",
+        "ssh-pglite",
+        "--server-host",
+        "203.0.113.10",
+        "--server-port",
+        "2222",
+        "--server-ssh-username",
+        "deploy",
+        "--server-ssh-private-key-file",
+        "/home/runner/.ssh/appaloft",
+        "--remote-runtime-root",
+        "/var/lib/appaloft/runtime",
       ]);
     } finally {
       process.stdout.write = writeStdout;
@@ -552,9 +573,8 @@ describe("CLI server commands", () => {
 
   test("[RT-CAP-SCHED-007] server capacity policy configure dispatches the application command", async () => {
     ensureReflectMetadata();
-    const { ConfigureScheduledRuntimePrunePolicyCommand, createExecutionContext } = await import(
-      "@appaloft/application"
-    );
+    const { ConfigureScheduledRuntimePrunePolicyCommand, createExecutionContext } =
+      await import("@appaloft/application");
     const { createCliProgram } = await import("../src");
     const commands: AppCommand<unknown>[] = [];
     const commandBus = {
@@ -635,9 +655,8 @@ describe("CLI server commands", () => {
 
   test("[RT-CAP-SCHED-007] server capacity policy list dispatches the application query", async () => {
     ensureReflectMetadata();
-    const { ListScheduledRuntimePrunePoliciesQuery, createExecutionContext } = await import(
-      "@appaloft/application"
-    );
+    const { ListScheduledRuntimePrunePoliciesQuery, createExecutionContext } =
+      await import("@appaloft/application");
     const { createCliProgram } = await import("../src");
     const queries: AppQuery<unknown>[] = [];
     const commandBus = {
@@ -699,9 +718,8 @@ describe("CLI server commands", () => {
 
   test("[RT-CAP-SCHED-007] server capacity policy show dispatches the application query", async () => {
     ensureReflectMetadata();
-    const { ShowScheduledRuntimePrunePolicyQuery, createExecutionContext } = await import(
-      "@appaloft/application"
-    );
+    const { ShowScheduledRuntimePrunePolicyQuery, createExecutionContext } =
+      await import("@appaloft/application");
     const { createCliProgram } = await import("../src");
     const queries: AppQuery<unknown>[] = [];
     const commandBus = {
@@ -756,9 +774,8 @@ describe("CLI server commands", () => {
 
   test("[SRV-LIFE-ENTRY-005] server deactivate dispatches the application command", async () => {
     ensureReflectMetadata();
-    const { DeactivateServerCommand, createExecutionContext } = await import(
-      "@appaloft/application"
-    );
+    const { DeactivateServerCommand, createExecutionContext } =
+      await import("@appaloft/application");
     const { createCliProgram } = await import("../src");
     const commands: AppCommand<unknown>[] = [];
     const commandBus = {
@@ -918,9 +935,8 @@ describe("CLI server commands", () => {
 
   test("[SRV-LIFE-ENTRY-017] server proxy repair dispatches the application command", async () => {
     ensureReflectMetadata();
-    const { BootstrapServerProxyCommand, createExecutionContext } = await import(
-      "@appaloft/application"
-    );
+    const { BootstrapServerProxyCommand, createExecutionContext } =
+      await import("@appaloft/application");
     const { createCliProgram } = await import("../src");
     const commands: AppCommand<unknown>[] = [];
     const commandBus = {
@@ -970,9 +986,8 @@ describe("CLI server commands", () => {
 
   test("[SRV-LIFE-ENTRY-007] server delete-check dispatches the application query", async () => {
     ensureReflectMetadata();
-    const { CheckServerDeleteSafetyQuery, createExecutionContext } = await import(
-      "@appaloft/application"
-    );
+    const { CheckServerDeleteSafetyQuery, createExecutionContext } =
+      await import("@appaloft/application");
     const { createCliProgram } = await import("../src");
     const queries: AppQuery<unknown>[] = [];
     const commandBus = {
@@ -1027,9 +1042,7 @@ describe("CLI server commands", () => {
       createExecutionContext: typeof import("@appaloft/application").createExecutionContext;
     };
     const ShowSshCredentialQuery = application.ShowSshCredentialQuery as
-      | (new (
-          ...args: never[]
-        ) => AppQuery<unknown>)
+      | (new (...args: never[]) => AppQuery<unknown>)
       | undefined;
     const { createCliProgram } = await import("../src");
     const queries: AppQuery<unknown>[] = [];
@@ -1155,9 +1168,8 @@ describe("CLI server commands", () => {
 
   test("[SSH-CRED-ENTRY-007] server credential-delete dispatches the application command", async () => {
     ensureReflectMetadata();
-    const { DeleteSshCredentialCommand, createExecutionContext } = await import(
-      "@appaloft/application"
-    );
+    const { DeleteSshCredentialCommand, createExecutionContext } =
+      await import("@appaloft/application");
     const { createCliProgram } = await import("../src");
     const commands: AppCommand<unknown>[] = [];
     const commandBus = {
@@ -1212,9 +1224,8 @@ describe("CLI server commands", () => {
 
   test("[SSH-CRED-ENTRY-012] server credential-rotate dispatches the application command", async () => {
     ensureReflectMetadata();
-    const { RotateSshCredentialCommand, createExecutionContext } = await import(
-      "@appaloft/application"
-    );
+    const { RotateSshCredentialCommand, createExecutionContext } =
+      await import("@appaloft/application");
     const { createCliProgram } = await import("../src");
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-cli-ssh-credential-rotate-"));
     const privateKeyPath = join(workspaceDir, "id_appaloft");

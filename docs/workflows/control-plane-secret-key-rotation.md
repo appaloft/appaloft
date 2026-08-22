@@ -50,7 +50,8 @@ appaloft db secret-rotation plan \
   --server-ssh-private-key-file <path>
 ```
 
-The read-only plan may hold an ephemeral state-root coordination lock and removes it on release. It
+The read-only plan rejects an active state-root mutation lock without creating, heartbeating,
+recovering, or releasing one. It
 does not create a backend marker, migrate a schema marker, recover a stale lock, or upload its local
 mirror. Apply uses the normal durable preparation, remote backup, revision fence, and conflict-safe
 merge before replacing server state.

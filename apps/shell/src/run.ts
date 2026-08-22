@@ -85,6 +85,13 @@ export interface ShellCliRunHooks {
   readonly loginControlPlane?: LoginControlPlaneFn;
 }
 
+export function finalizeRemotePgliteStateSync(
+  session: RemotePgliteStateSyncSession,
+  commandSucceeded: boolean,
+): Promise<Result<void>> {
+  return commandSucceeded ? session.syncBackAndRelease() : session.discardAndRelease();
+}
+
 function shellMutationGuard(hooks: ShellCliRunHooks): {
   readonly env: NodeJS.ProcessEnv;
   readonly stdinIsTty?: boolean;
@@ -985,9 +992,12 @@ export async function runShellCli(
     }
 
     if (remotePgliteStateSyncSession) {
-      const synced = await remotePgliteStateSyncSession.syncBackAndRelease();
-      if (synced.isErr()) {
-        writeDomainError(synced.error);
+      const finalized = await finalizeRemotePgliteStateSync(
+        remotePgliteStateSyncSession,
+        exitCode === 0,
+      );
+      if (finalized.isErr()) {
+        writeDomainError(finalized.error);
         exitCode = exitCode === 0 ? 1 : exitCode;
       }
     }

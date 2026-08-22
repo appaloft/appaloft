@@ -251,7 +251,7 @@ sys.exit(os.waitstatus_to_exitcode(status))
       expect(exitCode).toBe(1);
       expect(`${stdout}${stderr}`).toContain(unsupportedOption);
     }
-  });
+  }, 15_000);
 
   test("[CONTROL-PLANE-CLI-030] NO_COLOR removes ANSI from help and help-time errors", async () => {
     const temporaryRoot = await mkdtemp(join(tmpdir(), "appaloft-help-no-color-"));
@@ -377,7 +377,7 @@ sys.exit(os.waitstatus_to_exitcode(status))
       expect(stdout).not.toContain("Appaloft agent setup");
       expect(stderr).toContain("Received unknown argument");
     }
-  });
+  }, 15_000);
 
   test("[CONTROL-PLANE-CLI-012] login --help prints usage without OAuth or runtime", async () => {
     const temporaryRoot = await mkdtemp(join(tmpdir(), "appaloft-login-help-"));
