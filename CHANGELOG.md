@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.5](https://github.com/appaloft/appaloft/compare/v1.10.4...v1.10.5) (2026-08-22)
+
+
+### Bug Fixes
+
+* **cli:** expose safe error evidence boundary ([#1391](https://github.com/appaloft/appaloft/issues/1391)) ([1d6326d](https://github.com/appaloft/appaloft/commit/1d6326d2c545136161b95eb941f854d91d788dcf))
+
 ## [1.10.4](https://github.com/appaloft/appaloft/compare/v1.10.3...v1.10.4) (2026-08-22)
 
 
