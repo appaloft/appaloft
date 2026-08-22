@@ -125,6 +125,10 @@ appaloft server capacity prune srv_primary --before 2026-01-01T00:00:00.000Z --d
 
 容量清理只会保留在 Appaloft 状态目录、运行中的运行时、回滚候选、部署快照、审计/事件、日志和业务状态之外的候选项进行操作，不会执行大范围的 Docker 系统清理。
 
+当显式 SSH-PGlite 容量清理已经删除运行时候选、但最终返回 `remote-state-sync-upload` 时，不要重跑破坏性 prune。使用完全相同的 SSH-PGlite transport 参数执行 `server capacity inspect --retry-pending-state-sync`，先解析远端 active/旧版恢复 marker，再只恢复已经保留的审计状态。普通读取在 marker 存在时会 fail closed。同步会先按保留策略为 incoming 预留空间，完整校验 incoming 后才发布 active marker 并旋转 live state；原子 revision rename 是唯一提交点，校验失败不会替换 live state，也不会新建恢复备份。
+
+会修改 SSH-PGlite 的目标机必须提供 `flock`。Appaloft 在已校验的 locks 目录描述符上使用排他的内核锁来保护短暂的 mutation-lock 状态切换；`mutation.guard/owner.json` 只是 UUID 所有权、租约和恢复证据。进程被 kill 或主机重启后，内核锁会自动释放；后续命令等待短暂的 residue grace，先写入 planned recovery 记录，再归档残留 guard。Inspect 和 dry-run 始终严格只读，不会获取这个 gate。缺少 `flock`、guard 路径不安全或磁盘已满时会保留底层错误，并且不会移动 canonical mutation lock。
+
 ## 运行时监控采样与阈值 <a id="runtime-monitoring-samples-and-rollups" /><a id="runtime-monitoring-thresholds" />
 
 Appaloft 会在控制面内保留有界的运行时监控采样与汇总，用于 Web Monitor 与诊断闭环。阈值与告警门槛通过运行时配置控制；超出保留窗口的原始样本会被清理。

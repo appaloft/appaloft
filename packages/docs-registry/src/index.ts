@@ -3003,7 +3003,7 @@ export const publicDocsHelpTopics = {
     id: "diagnostics.runtime-target-capacity",
     title: "Runtime target capacity",
     description:
-      "How to inspect disk, inode, Docker, and Appaloft runtime usage, then dry-run or prune safe target-owned artifacts.",
+      "How to inspect disk, inode, Docker, and Appaloft runtime usage, dry-run or prune safe target-owned artifacts, and recover an interrupted SSH-PGlite sync-back without replaying deletion.",
     page: {
       "zh-CN": "troubleshoot/diagnostics",
       "en-US": "en/troubleshoot/diagnostics",
@@ -3015,7 +3015,15 @@ export const publicDocsHelpTopics = {
     },
     surfaces: ["cli", "http-api", "mcp"],
     relatedOperation: "servers.capacity.inspect",
-    aliases: ["capacity", "disk full", "build cache", "docker system df", "prune", "容量诊断"],
+    aliases: [
+      "capacity",
+      "disk full",
+      "build cache",
+      "docker system df",
+      "prune",
+      "remote state sync",
+      "容量诊断",
+    ],
   },
   "diagnostics.runtime-usage": {
     id: "diagnostics.runtime-usage",

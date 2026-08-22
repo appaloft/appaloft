@@ -3,7 +3,7 @@
 ## Governing Sources
 
 - Domain model: `docs/DOMAIN_MODEL.md`
-- Decisions/ADRs: ADR-021, ADR-023, ADR-034, ADR-047
+- Decisions/ADRs: ADR-021, ADR-023, ADR-028, ADR-034, ADR-047
 - Local specs: `docs/commands/servers.capacity.prune.md`,
   `docs/workflows/deployment-runtime-target-abstraction.md`
 - Test matrix: `docs/testing/runtime-target-capacity-test-matrix.md`
@@ -23,6 +23,11 @@
 - Entrypoint impact: CLI, HTTP/oRPC, and Server detail Web Capacity controls use the command
   schema directly. Web keeps the destructive path behind dry-run preview and explicit confirmation.
 - Persistence/migration impact: none.
+- SSH-PGlite coordination impact: destructive capacity prune sync-back and the remote-state
+  backup/restore/promote/rollback maintenance paths share one short kernel `flock` transition gate
+  with prepare, heartbeat, release, failure cleanup, and explicit stale recovery. The durable guard
+  is UUID-owned audit/lease residue, not the fencing primitive. Strict inspect and dry-run sessions
+  remain write-free and never acquire that gate.
 
 ## Roadmap And Compatibility
 
@@ -40,6 +45,10 @@
   coverage proves Monitor-to-Capacity handoff, dry-run-first Web dispatch, and inherited cutoff.
 - Contract/integration/unit: application command schema and runtime adapter parse/delete intent
   tests prove safety exclusions.
+- Crash/concurrency: adapter tests cover guard owner publication failure, stale guard recovery,
+  prewritten recovery intent, token-safe detach, and preserved filesystem stderr. A Linux-only test
+  uses the real kernel `flock` to prove two concurrent transition contenders cannot enter together;
+  external SSH acceptance rechecks the same boundary on the supported target OS.
 
 ## Follow-On Extension
 
@@ -55,3 +64,6 @@
   stream/outbox publication remains outside this runtime artifact prune boundary.
 - The runtime adapter must prefer skipped diagnostics over deletion when ownership evidence is
   incomplete.
+- Mutating SSH targets must provide `flock` and kernel UUID support. Missing prerequisites, unsafe
+  path shapes, an active transition gate, or an unpublishable recovery intent fail closed before
+  canonical mutation-lock movement.

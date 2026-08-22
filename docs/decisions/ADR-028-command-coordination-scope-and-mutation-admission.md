@@ -33,6 +33,27 @@ Appaloft distinguishes two coordination layers:
    - may still use coarse locking or leases because the subject is the state root itself;
    - in SSH `ssh-pglite` mode, may also include end-of-command remote revision conflict recovery so
      the state adapter can safely retry a final mirror upload against a fresher remote snapshot;
+   - treats the lock directory as one owner-identified instance and serializes prepare/stale
+     takeover, heartbeat, release, failure cleanup, out-of-band stale recovery, and remote-state
+     maintenance through a short fail-closed transition gate. The gate takes an exclusive kernel
+     `flock` on the already validated `locks` directory descriptor; the kernel lock is the fencing
+     and liveness truth, while `mutation.guard/owner.json` is an atomic owner/lease/audit record.
+     SIGKILL and host restart release the kernel lock automatically. A later holder observes a
+     guard residue for its bounded stale grace, prewrites recovery intent, then archives the residue
+     before publishing a fresh UUID-owned guard. SSH targets that mutate this state therefore require
+     `flock`; absence fails closed with the underlying diagnostic. Strict read-only sessions never
+     open the kernel gate or create a guard;
+   - gives every ordinary lifecycle and maintenance lock instance a non-reused UUID token, stages
+     heartbeat owner replacement, waits for in-flight heartbeat before release, and atomically
+     detaches only the token-matching lock instance before deletion. Owner and correlation metadata
+     remain diagnostic and are never the destructive fence. Prepare and maintenance failures use
+     the same gate. An old session must never overwrite, detach, or delete a replacement owner's
+     lock;
+   - syncs a planned recovery record and its parent before stale guard/lock movement or a destructive
+     promote/rollback swap. Maintenance swaps rotate live components on the same filesystem, use the
+     atomic revision rename as their commit point, restore pre-commit signal interruptions, and let a
+     later token-owning maintenance session resolve crash residue deterministically from the durable
+     revision. A maintenance heartbeat integrity failure interrupts the foreground mutation;
    - remains infrastructure coordination and does not define end-user command semantics.
 
 2. **Operation coordination**
@@ -132,6 +153,24 @@ When the final mirror upload detects a remote revision change, the SSH state ada
 
 The adapter must fail instead of silently overwriting when the command and the refreshed remote
 snapshot both changed the same authoritative row incompatibly.
+
+Final upload must also remain viable when the target is under disk pressure. Before allocating an
+incoming mirror, the adapter applies the configured sync-backup retention and reserves one backup
+slot. It extracts and validates the complete incoming archive while the authoritative live state is
+untouched, then uses same-filesystem directory rotation to move live state into the new recovery
+backup and promote the incoming mirror. Before the first live rename it atomically publishes an
+active recovery marker; the atomic revision rename is the sole commit point. Traps and explicit
+recovery compare the actual revision with the marker, rolling back an uncommitted transaction or
+cleaning only staging for a committed transaction. Read paths fail closed while a marker exists.
+Both paths sync the authoritative data-root directory before deleting the marker and sync the
+recovery directory after marker deletion, so a reported rollback or commit is durably fenced.
+This bounds the normal peak at live plus incoming state, instead of copying both a full backup and a
+full incoming mirror beside live state. A staging failure removes only the incoming directory. A
+rotation or promotion failure restores the authoritative directories by rename when possible and
+keeps the marker whenever recovery is incomplete. Explicit recovery also recognizes the legacy v1
+marker, but restores it only after validating a complete backup. It retains that full backup as the
+retry source until every authoritative component and the data-root directory are durably synced,
+then removes the marker before best-effort backup cleanup.
 
 This recovery path exists to avoid unnecessary user-visible failure for different logical scopes
 that happened to mutate disjoint rows during the same wall-clock window. It does not turn

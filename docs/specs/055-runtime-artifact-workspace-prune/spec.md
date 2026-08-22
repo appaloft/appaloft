@@ -3,7 +3,7 @@
 ## Status
 
 - Round: Code Round plus Post-Implementation Sync
-- Artifact state: implemented
+- Artifact state: implementation complete; released Hostinger TTY acceptance pending
 
 ## Business Outcome
 
@@ -36,8 +36,9 @@ or Appaloft control-plane state.
 | RT-CAP-PRUNE-007 | Explicit Docker cache/image prune | target Docker build cache or unused images are older than `before` | prune runs with `docker-build-cache` or `unused-images` selected | Appaloft dry-runs or prunes only those selected categories through Docker filtered prune commands, keeps them out of the default category set, and never prunes volumes or Appaloft state roots. |
 | RT-CAP-PRUNE-010 | Explicit remote-state marker prune | old SSH remote-state journals, backups, recovery markers, or recovered-lock archives exist under fixed state-root subdirectories | prune runs with `remote-state-markers` selected | Appaloft dry-runs or prunes only those marker/archive paths, keeps the category out of the default category set, and never prunes the state root, live lock, or live PGlite state. |
 | RT-CAP-PRUNE-011 | Bounded large marker dry-run | many old SSH remote-state marker candidates exist | dry-run runs with `remote-state-markers` selected | candidate details are output-limited, summary counts remain complete, and dry-run reports estimated reclaimable bytes. |
-| RT-CAP-REMOTE-STATE-001 | SSH PGlite sync backup recovery window | upload safety backups exist under `state/backups/sync-*` | remote PGlite sync upload succeeds or marker prune later runs | sync backups are retained within the configured recovery window and bounded by the configured max-count cap; live `pglite`, `locks`, `source-links`, `server-applied-routes`, and `sync-revision.txt` are never deleted by retention. |
+| RT-CAP-REMOTE-STATE-001 | SSH PGlite sync backup recovery window and bounded upload allocation | upload safety backups exist under `state/backups/sync-*`, including a full retained set while the target is under disk pressure | remote PGlite sync upload starts, succeeds, is interrupted, or marker prune later runs | retention runs before incoming allocation and reserves one backup slot; the complete incoming mirror is validated before same-filesystem live-to-backup rotation, so normal peak is bounded to live plus incoming state; an active marker is durable before rotation and the atomic revision rename is the only commit point; reads fail closed until explicit recovery rolls back or completes committed cleanup; sync backups remain within the configured recovery window and max-count cap, while live state is never deleted or replaced by retention or failed staging. |
 | RT-CAP-REMOTE-STATE-002 | Standalone SSH PGlite live state preservation | standalone `ssh-pglite` state exists with live PGlite, source links, routes, revision, and backend marker | explicit remote-state marker prune runs | old marker archives may be deleted, but live authoritative standalone state remains intact. |
+| RT-CAP-REMOTE-STATE-003 | Serialized and recoverable SSH PGlite mutations | lifecycle or maintenance commands contend, crash, receive a signal, or resume after a partial state swap | prepare, heartbeat, release, stale recovery, backup, restore, promote, rollback, or sync changes remote state | one kernel `flock` fence serializes transition metadata; every long-lived lock has a unique token so an old session cannot renew or release a replacement; stale movement and destructive swaps publish and sync a planned recovery record before canonical movement; replacement file contents and live directory entries cross a durability fence before the atomic revision rename, and the committed revision crosses a second fence before cleanup; interrupted uncommitted swaps restore the previous live state, while a later maintenance entry deterministically resolves a crash marker from that revision commit point; strict read-only inspection performs no writes. |
 
 ## Domain Ownership
 
