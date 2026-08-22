@@ -230,6 +230,20 @@ export function sshDockerUploadedWorkspaceFilePath(
   return `${sshDockerUploadedWorkspaceContextPath(remoteWorkdir)}/${relativePath.replace(/^\/+/u, "")}`;
 }
 
+/**
+ * Dockerfile path for remote `test -s` and `docker build -f` after SSH upload.
+ * A CWD-relative `Dockerfile` is resolved against the SSH client cwd (often
+ * `/root`), not the uploaded workspace that presence just verified.
+ */
+export function sshDockerBuildDockerfilePath(
+  remoteWorkdir: string,
+  dockerfilePath: string,
+): string {
+  return dockerfilePath.startsWith("/")
+    ? dockerfilePath
+    : sshDockerUploadedWorkspaceFilePath(remoteWorkdir, dockerfilePath);
+}
+
 export function summarizeSshCommandFailureOutput(input: {
   stdout: string;
   stderr: string;
@@ -770,9 +784,7 @@ export function buildRemoteDockerfilePresenceCommand(input: {
   remoteWorkdir: string;
   dockerfilePath: string;
 }): string {
-  const remotePath = input.dockerfilePath.startsWith("/")
-    ? input.dockerfilePath
-    : sshDockerUploadedWorkspaceFilePath(input.remoteWorkdir, input.dockerfilePath);
+  const remotePath = sshDockerBuildDockerfilePath(input.remoteWorkdir, input.dockerfilePath);
   const missingMessage = sshDockerfileMissingInUploadedWorkspaceMessage(input.dockerfilePath);
   const contextPath = sshDockerUploadedWorkspaceContextPath(input.remoteWorkdir);
 
@@ -2673,7 +2685,10 @@ export class SshExecutionBackend implements ExecutionBackend {
 
         const dockerfilePath =
           state.runtimePlan.buildStrategy === "dockerfile"
-            ? (state.runtimePlan.execution.dockerfilePath ?? "Dockerfile")
+            ? sshDockerBuildDockerfilePath(
+                remoteWorkdir,
+                state.runtimePlan.execution.dockerfilePath ?? "Dockerfile",
+              )
             : `${remoteRoot}/${
                 state.runtimePlan.execution.dockerfilePath ??
                 (state.runtimePlan.buildStrategy === "static-artifact"

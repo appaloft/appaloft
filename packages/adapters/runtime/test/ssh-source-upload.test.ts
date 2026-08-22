@@ -1,7 +1,7 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, test } from "bun:test";
@@ -66,6 +66,7 @@ import {
   recoverLocalSourceFolderFromCwd,
   resolveSshPackageLocalWorkdir,
   shouldPreferLiveGitWorkspaceOverCliPackedArchive,
+  sshDockerBuildDockerfilePath,
   sshDockerUploadedWorkspaceContextPath,
   sshDockerUploadedWorkspaceFilePath,
   sshDockerfileMissingInUploadedWorkspaceMessage,
@@ -169,10 +170,13 @@ function runningDockerfileSshDeployment(input: {
   locator: string;
   workingDirectory?: string;
   displayName?: string;
+  omitDisplayName?: boolean;
   emptyMetadata?: boolean;
   packedSourceArchive?: string;
   executionPackedSourceArchive?: string;
   dockerfilePath?: string;
+  originalLocator?: string;
+  resourceName?: string;
 }): Deployment {
   const dockerfilePath = input.dockerfilePath ?? "Dockerfile";
   const deployment = Deployment.create({
@@ -187,12 +191,15 @@ function runningDockerfileSshDeployment(input: {
       source: SourceDescriptor.rehydrate({
         kind: SourceKindValue.rehydrate("local-folder"),
         locator: SourceLocator.rehydrate(input.locator),
-        displayName: DisplayNameText.rehydrate(input.displayName ?? "appaloft-cloud"),
-        ...(input.emptyMetadata && !input.packedSourceArchive
+        displayName: DisplayNameText.rehydrate(
+          input.omitDisplayName ? "workspace" : (input.displayName ?? "appaloft-cloud"),
+        ),
+        ...(input.emptyMetadata && !input.packedSourceArchive && !input.originalLocator
           ? {}
           : {
               metadata: {
                 ...(input.emptyMetadata ? {} : { baseDirectory: "/" }),
+                ...(input.originalLocator ? { originalLocator: input.originalLocator } : {}),
                 ...(input.packedSourceArchive
                   ? { cliPackedSourceTarGz: input.packedSourceArchive }
                   : {}),
@@ -208,6 +215,7 @@ function runningDockerfileSshDeployment(input: {
           : {}),
         dockerfilePath: FilePathText.rehydrate(dockerfilePath),
         metadata: {
+          ...(input.resourceName ? { "context.resourceName": input.resourceName } : {}),
           ...(input.executionPackedSourceArchive
             ? { cliPackedSourceTarGz: input.executionPackedSourceArchive }
             : {}),
@@ -269,6 +277,76 @@ function createEmptyGitAwareTarArchive(outputPath: string): Buffer {
   expect(bytes.byteLength).toBeLessThan(100);
   return bytes;
 }
+
+function writeLocalSshShim(binDir: string): void {
+  const sshPath = join(binDir, "ssh");
+  writeFileSync(
+    sshPath,
+    [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      "command=\"\"",
+      "host_seen=0",
+      "while [[ $# -gt 0 ]]; do",
+      "  case \"$1\" in",
+      "    -p|-i|-o|-l)",
+      "      shift 2",
+      "      ;;",
+      "    -*)",
+      "      shift",
+      "      ;;",
+      "    *)",
+      "      if [[ $host_seen -eq 0 ]]; then",
+      "        host_seen=1",
+      "        shift",
+      "      else",
+      "        command=\"$1\"",
+      "        shift",
+      "      fi",
+      "      ;;",
+      "  esac",
+      "done",
+      "exec bash -lc \"$command\"",
+      "",
+    ].join("\n"),
+  );
+  chmodSync(sshPath, 0o755);
+}
+
+function capturingProgressReporter(): {
+  reports: Array<{ message: string; status?: string }>;
+  reporter: { report: (_context: unknown, event: { message: string; status?: string }) => void };
+} {
+  const reports: Array<{ message: string; status?: string }> = [];
+  return {
+    reports,
+    reporter: {
+      report: (_context, event) => {
+        reports.push({ message: event.message, ...(event.status ? { status: event.status } : {}) });
+      },
+    },
+  };
+}
+
+type PrepareSshSourceBackend = {
+  prepareSshSource: (
+    context: ExecutionContext,
+    current: Deployment,
+    timeline: unknown[],
+    input: {
+      runtimeDir: string;
+      remoteRoot: string;
+      target: { host: string; publicHost: string; port: string };
+      env: NodeJS.ProcessEnv;
+    },
+  ) => Promise<
+    | {
+        prepared: true;
+        source: { remoteWorkdir?: string; metadata?: Record<string, string> };
+      }
+    | { prepared: false; deployment: Deployment }
+  >;
+};
 
 describe("SSH source upload", () => {
   test("[DEP-CREATE-PKG-007] live stored shape without workingDirectory dirnames the projects parent", () => {
@@ -2112,6 +2190,196 @@ describe("SSH source upload", () => {
       rmSync(runtimeDir, { recursive: true, force: true });
     }
   });
+
+  test("[DEP-CREATE-PKG-009] skip-pack git appaloft-cloud leftover binding extracts over SSH and docker -f matches presence", async () => {
+    const hostRoot = mkdtempSync(join(tmpdir(), "appaloft-cloud-git-ready-"));
+    const folder = join(hostRoot, "appaloft-cloud");
+    const runtimeDir = mkdtempSync(join(tmpdir(), "appaloft-runtime-"));
+    const remoteRoot = mkdtempSync(join(tmpdir(), "appaloft-remote-"));
+    const sshBin = mkdtempSync(join(tmpdir(), "appaloft-ssh-bin-"));
+    const previousCwd = process.cwd();
+    writeLocalSshShim(sshBin);
+    initGitWorktree(folder);
+    const dockerfile = writeProductionSizedDockerfile(folder);
+    expect(dockerfile.bytes).toBeGreaterThan(1000);
+    const added = spawnSync("git", ["-C", folder, "add", "Dockerfile"], { encoding: "utf8" });
+    expect(added.status).toBe(0);
+    expect(listGitAwareWorkspaceFiles(folder)).toContain("Dockerfile");
+    expect(folder.endsWith("appaloft-cloud")).toBe(true);
+    expect(folder.includes("nux-")).toBe(false);
+
+    const emptyArchiveFile = join(hostRoot, "empty.tgz");
+    const emptyArchive = createEmptyGitAwareTarArchive(emptyArchiveFile).toString("base64");
+    const persistedPlan = runningDockerfileSshDeployment({
+      deploymentId: "dep_skip_pack_ready",
+      locator: folder,
+      workingDirectory: folder,
+      displayName: "appaloft-cloud",
+      emptyMetadata: true,
+    });
+    expect(persistedPlan.toState().resourceId.value).toBe("res_jsb186k9hriq");
+    const deployment = deploymentWithLocalFolderSourceArchiveFromResourceBinding(persistedPlan, {
+      locator: folder,
+      originalLocator: folder,
+      metadata: { [CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]: emptyArchive },
+    });
+    expect(shouldPreferLiveGitWorkspaceOverCliPackedArchive(folder)).toBe(true);
+
+    const { reports, reporter } = capturingProgressReporter();
+    const backend = new SshExecutionBackend(
+      runtimeDir,
+      { warn: () => undefined } as never,
+      { record: async () => ({ isErr: () => false }) } as never,
+      reporter as never,
+    );
+
+    try {
+      process.chdir(runtimeDir);
+      const prepared = await (backend as never as PrepareSshSourceBackend).prepareSshSource(
+        { requestId: "req_pkg_009_skip_pack_ready", entrypoint: "cli" } as ExecutionContext,
+        deployment,
+        [],
+        {
+          runtimeDir,
+          remoteRoot,
+          target: { host: "127.0.0.1", publicHost: "127.0.0.1", port: "22" },
+          env: {
+            ...process.env,
+            PATH: `${sshBin}:${process.env.PATH ?? "/usr/bin:/bin"}`,
+          },
+        },
+      );
+
+      expect(existsSync(join(runtimeDir, "cli-source.tgz"))).toBe(false);
+      expect(prepared.prepared).toBe(true);
+      if (!prepared.prepared) {
+        throw new Error("expected live git skip-pack extract to report remote workspace ready");
+      }
+
+      expect(reports.some((entry) => entry.message === "Remote source workspace is ready")).toBe(
+        true,
+      );
+      expect(
+        reports.some(
+          (entry) => entry.message === "Remote source workspace is ready" && entry.status === "succeeded",
+        ),
+      ).toBe(true);
+
+      const remoteWorkdir = prepared.source.remoteWorkdir ?? `${remoteRoot}/source`;
+      const extractedDockerfile = join(remoteWorkdir, "Dockerfile");
+      expect(existsSync(extractedDockerfile)).toBe(true);
+      expect(statSync(extractedDockerfile).size).toBe(dockerfile.bytes);
+      expect(statSync(extractedDockerfile).size).toBeGreaterThan(2);
+
+      const presencePath = sshDockerBuildDockerfilePath(remoteWorkdir, "Dockerfile");
+      const presenceCommand = buildRemoteDockerfilePresenceCommand({
+        remoteWorkdir,
+        dockerfilePath: "Dockerfile",
+      });
+      expect(presencePath).toBe(sshDockerUploadedWorkspaceFilePath(remoteWorkdir, "Dockerfile"));
+      expect(presencePath).toBe(`${remoteWorkdir}/Dockerfile`);
+      expect(presenceCommand).toContain(ash.quote(presencePath));
+
+      const buildCommand = renderRuntimeCommandString(
+        RuntimeCommandBuilder.docker().buildImage({
+          image: "appaloft-image-dep_skip_pack_ready:latest",
+          dockerfilePath: presencePath,
+          contextPath: sshDockerUploadedWorkspaceContextPath(remoteWorkdir),
+        }),
+        { quote: ash.quote },
+      );
+      expect(buildCommand).toContain(`-f '${presencePath}'`);
+      expect(buildCommand).not.toMatch(/-f 'Dockerfile'(?:\s|$)/u);
+      expect(buildCommand).toContain(`'${remoteWorkdir}'`);
+    } finally {
+      process.chdir(previousCwd);
+      rmSync(hostRoot, { recursive: true, force: true });
+      rmSync(runtimeDir, { recursive: true, force: true });
+      rmSync(remoteRoot, { recursive: true, force: true });
+      rmSync(sshBin, { recursive: true, force: true });
+    }
+  });
+
+  test("[DEP-CREATE-PKG-010] leftover empty archive on reconstructed leaf/resourceName does not report ready", async () => {
+    const hostRoot = mkdtempSync(join(tmpdir(), "appaloft-empty-reconstructed-"));
+    const runtimeDir = mkdtempSync(join(tmpdir(), "appaloft-runtime-"));
+    const previousCwd = process.cwd();
+    const emptyArchiveFile = join(hostRoot, "empty.tgz");
+    const emptyArchive = createEmptyGitAwareTarArchive(emptyArchiveFile).toString("base64");
+    const parent = "/Users/nichenqin/projects";
+    const leaf = "appaloft-cloud";
+    const resourceName = "res_jsb186k9hriq";
+    const locator = `${parent}/${leaf}`;
+    const reconstructed = `${locator}/${resourceName}`;
+    expect(existsSync(locator)).toBe(false);
+    expect(existsSync(reconstructed)).toBe(false);
+    expect(
+      resolveSshPackageLocalWorkdir({
+        locator,
+        workingDirectory: locator,
+        displayName: "workspace",
+        resourceName,
+      }),
+    ).toBe(reconstructed);
+
+    const deployment = runningDockerfileSshDeployment({
+      deploymentId: "dep_empty_reconstructed_leaf",
+      locator,
+      workingDirectory: locator,
+      omitDisplayName: true,
+      emptyMetadata: true,
+      resourceName,
+      executionPackedSourceArchive: emptyArchive,
+    });
+    expect(deployment.toState().runtimePlan.source.metadata?.originalLocator).toBeUndefined();
+    expect(deployment.toState().resourceId.value).toBe("res_jsb186k9hriq");
+
+    const { reports, reporter } = capturingProgressReporter();
+    const backend = new SshExecutionBackend(
+      runtimeDir,
+      { warn: () => undefined } as never,
+      { record: async () => ({ isErr: () => false }) } as never,
+      reporter as never,
+    );
+
+    try {
+      process.chdir(runtimeDir);
+      const prepared = await (backend as never as PrepareSshSourceBackend).prepareSshSource(
+        { requestId: "req_pkg_010_reconstructed_leaf", entrypoint: "cli" } as ExecutionContext,
+        deployment,
+        [],
+        {
+          runtimeDir,
+          remoteRoot: "/var/lib/appaloft/runtime/ssh-deployments/dep_empty_reconstructed_leaf",
+          target: { host: "127.0.0.1", publicHost: "127.0.0.1", port: "1" },
+          env: {},
+        },
+      );
+
+      expect(prepared.prepared).toBe(false);
+      if (prepared.prepared) {
+        throw new Error("expected leftover empty archive on reconstructed leaf/resourceName to fail closed");
+      }
+      expect(reports.some((entry) => entry.message === "Remote source workspace is ready")).toBe(
+        false,
+      );
+      const failed = prepared.deployment.toState();
+      expect(failed.timeline.some((entry) => entry.message === "Remote source workspace is ready")).toBe(
+        false,
+      );
+      expect(failed.runtimePlan.execution.metadata?.errorCode).toBe("ssh_source_upload_failed");
+      expect(failed.runtimePlan.execution.metadata?.dockerfileReadiness).toBe("dockerfile_missing");
+      expect(
+        failed.timeline.some(
+          (entry) => entry.message === sshDockerfileMissingInUploadedWorkspaceMessage("Dockerfile"),
+        ),
+      ).toBe(true);
+    } finally {
+      process.chdir(previousCwd);
+      rmSync(hostRoot, { recursive: true, force: true });
+      rmSync(runtimeDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("SSH Docker build context", () => {
@@ -2151,6 +2419,28 @@ describe("SSH Docker build context", () => {
     expect(command).toContain(`-f '${remoteRoot}/Dockerfile.appaloft-static'`);
     expect(command.endsWith(" '.'")).toBe(false);
     expect(command).not.toContain("cd ");
+  });
+
+  test("[DEP-CREATE-PKG-009] dockerfile strategy -f is the uploaded workspace Dockerfile, not a CWD-relative path", () => {
+    const remoteWorkdir = "/var/lib/appaloft/runtime/ssh-deployments/dep_jsb186k9hriq/source";
+    const presencePath = sshDockerBuildDockerfilePath(remoteWorkdir, "Dockerfile");
+    const presenceCommand = buildRemoteDockerfilePresenceCommand({
+      remoteWorkdir,
+      dockerfilePath: "Dockerfile",
+    });
+    const spec = RuntimeCommandBuilder.docker().buildImage({
+      image: "appaloft-image-dep_jsb186k9hriq:latest",
+      dockerfilePath: presencePath,
+      contextPath: sshDockerUploadedWorkspaceContextPath(remoteWorkdir),
+    });
+    const command = renderRuntimeCommandString(spec, { quote: ash.quote });
+
+    expect(presencePath).toBe(`${remoteWorkdir}/Dockerfile`);
+    expect(presencePath).toBe(sshDockerUploadedWorkspaceFilePath(remoteWorkdir, "Dockerfile"));
+    expect(presenceCommand).toContain(ash.quote(presencePath));
+    expect(command).toContain(`-f '${presencePath}'`);
+    expect(command).not.toMatch(/-f 'Dockerfile'(?:\s|$)/u);
+    expect(command).toContain(`'${remoteWorkdir}'`);
   });
 
   test("[DEP-CREATE-PKG-005][DEP-CREATE-PKG-006] fixture public/index.html is inside context and missing public/ fails", () => {
