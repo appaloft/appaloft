@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.6](https://github.com/appaloft/appaloft/compare/v1.9.5...v1.9.6) (2026-08-22)
+
+
+### Bug Fixes
+
+* **runtime:** docker build -f must open the uploaded Dockerfile after SSH ready ([#1365](https://github.com/appaloft/appaloft/issues/1365)) ([e20fb98](https://github.com/appaloft/appaloft/commit/e20fb9883e85e0de3703bef522ebc775625600f1))
+
 ## [1.9.5](https://github.com/appaloft/appaloft/compare/v1.9.4...v1.9.5) (2026-08-22)
 
 
