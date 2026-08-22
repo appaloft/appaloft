@@ -1164,8 +1164,12 @@ function chooseStrategies(input: {
     const workingDirectory =
       localFolderWorkerPackageRoot({
         locator: source.locator,
+        displayName: source.displayName,
         ...(originalLocator ? { originalLocator } : {}),
         ...(cliResolvedSource ? { cliResolvedSource } : {}),
+        ...(requestedDeployment.runtimeMetadata?.["context.resourceName"]
+          ? { resourceName: requestedDeployment.runtimeMetadata["context.resourceName"] }
+          : {}),
         workingDirectory: resolvedWorkdir,
       }) ?? resolvedWorkdir;
     const execution = RuntimeExecutionPlan.rehydrate({

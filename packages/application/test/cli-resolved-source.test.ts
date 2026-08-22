@@ -25,6 +25,7 @@ import {
   ORIGINAL_LOCATOR_METADATA_KEY,
   cliPackedSourceArchiveFromLocalSource,
   explicitCliResolvedSource,
+  isGenericLocalSourceLeaf,
   localFolderSourceExecutionMetadata,
   localFolderSourceExecutionMetadataFromSource,
   localFolderSourceFieldsFromResourceBinding,
@@ -206,6 +207,15 @@ describe("CLI-resolved source", () => {
       }),
     ).toBe(folder);
     expect(localFolderWorkerPackageRoot({ workingDirectory: parent })).toBeUndefined();
+    expect(isGenericLocalSourceLeaf("projects")).toBe(true);
+    expect(isGenericLocalSourceLeaf("projects-jcPcj6")).toBe(true);
+    expect(
+      localFolderWorkerPackageRoot({
+        locator: "/tmp/projects-jcPcj6",
+        workingDirectory: "/tmp/projects-jcPcj6",
+        displayName: "nux-c79876d8-static",
+      }),
+    ).toBe("/tmp/projects-jcPcj6/nux-c79876d8-static");
 
     const omitted = RuntimePlan.rehydrate({
       id: RuntimePlanId.rehydrate("plan_tu084dr7fln1"),

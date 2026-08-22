@@ -50,6 +50,12 @@ export function isGenericLocalSourceLeaf(leaf: string | undefined): boolean {
     return true;
   }
 
+  // mkdtemp(`projects-`) and live lastError parent `/Users/.../projects`.
+  // A hyphenated parent must not win over `nux-*-static`.
+  if (lower.startsWith("projects-")) {
+    return true;
+  }
+
   const homeLeaf = homeDirectoryLeaf();
   return Boolean(homeLeaf && homeLeaf.toLowerCase() === lower);
 }
@@ -378,38 +384,103 @@ export function retainLocalFolderSourceFields(
   });
 }
 
+function workerPackageLeafName(input: {
+  locator?: string;
+  originalLocator?: string;
+  cliResolvedSource?: string;
+  workingDirectory?: string;
+  displayName?: string;
+  resourceName?: string;
+}): string | undefined {
+  for (const candidate of [input.originalLocator, input.cliResolvedSource]) {
+    const leaf = pathBasename(candidate?.trim() ?? "");
+    if (isSpecificLocalSourceLeaf(leaf)) {
+      return leaf;
+    }
+  }
+
+  const displayName = input.displayName?.trim().replace(/\/+$/, "");
+  if (isSpecificLocalSourceLeaf(displayName)) {
+    return displayName;
+  }
+
+  const resourceName = input.resourceName?.trim();
+  if (resourceName) {
+    const withoutGeneratedSuffix = resourceName.replace(/-[a-z0-9]{6}$/iu, "");
+    if (isSpecificLocalSourceLeaf(withoutGeneratedSuffix) && withoutGeneratedSuffix.includes("-")) {
+      return withoutGeneratedSuffix;
+    }
+    if (isSpecificLocalSourceLeaf(resourceName)) {
+      return resourceName;
+    }
+  }
+
+  const specificPaths = [input.workingDirectory, input.locator]
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value))
+    .sort((left, right) => right.length - left.length);
+  for (const path of specificPaths) {
+    const leaf = pathBasename(path);
+    if (isSpecificLocalSourceLeaf(leaf) && leaf.includes("-")) {
+      return leaf;
+    }
+  }
+
+  return undefined;
+}
+
 /**
  * Package root the detached worker must receive. Live `resource show` for
  * dep_tu084dr7fln1 had locator + originalLocator + cliPackedSourceTarGz on
  * the hyphenated leaf and no workingDirectory. Do not require workingDirectory.
- * Do not dirname a hyphenated leaf under a generic parent such as `projects`.
+ * When locator is already a generic parent such as `projects` or `projects-*`,
+ * recover the hyphenated leaf from originalLocator / displayName / resourceName.
+ * Do not dirname a hyphenated leaf under that parent.
  */
 export function localFolderWorkerPackageRoot(input: {
   locator?: string;
   originalLocator?: string;
   cliResolvedSource?: string;
   workingDirectory?: string;
+  displayName?: string;
+  resourceName?: string;
 }): string | undefined {
-  for (const candidate of [
+  const knownLeaf = workerPackageLeafName(input);
+  const candidates = [
     input.originalLocator,
-    input.locator,
     input.cliResolvedSource,
     input.workingDirectory,
-  ]) {
-    const trimmed = candidate?.trim();
-    if (!trimmed) {
-      continue;
+    input.locator,
+  ]
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value));
+
+  if (knownLeaf) {
+    const matching = candidates
+      .filter((path) => pathBasename(path) === knownLeaf)
+      .sort((left, right) => right.length - left.length)[0];
+    if (matching) {
+      return matching;
     }
 
-    const leaf = pathBasename(trimmed);
-    if (!isSpecificLocalSourceLeaf(leaf) || !leaf.includes("-")) {
-      continue;
+    const parent = candidates.find((path) => pathBasename(path) !== knownLeaf);
+    if (parent) {
+      const reconstructed = `${parent.replace(/\/+$/, "")}/${knownLeaf}`;
+      if (pathBasename(reconstructed) === knownLeaf) {
+        return reconstructed;
+      }
     }
 
-    return trimmed;
+    return knownLeaf.includes("/") ? knownLeaf : undefined;
   }
 
-  return undefined;
+  const specific = candidates
+    .filter((path) => {
+      const leaf = pathBasename(path);
+      return isSpecificLocalSourceLeaf(leaf) && leaf.includes("-");
+    })
+    .sort((left, right) => right.length - left.length);
+  return specific[0];
 }
 
 /**
@@ -427,6 +498,10 @@ export function withLocalFolderWorkerPackageRoot(plan: RuntimePlan): RuntimePlan
       : {}),
     ...(plan.source.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]
       ? { cliResolvedSource: plan.source.metadata[CLI_RESOLVED_SOURCE_METADATA_KEY] }
+      : {}),
+    ...(plan.source.displayName ? { displayName: plan.source.displayName } : {}),
+    ...(plan.execution.metadata?.["context.resourceName"]
+      ? { resourceName: plan.execution.metadata["context.resourceName"] }
       : {}),
     ...(plan.execution.workingDirectory
       ? { workingDirectory: plan.execution.workingDirectory }
