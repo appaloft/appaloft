@@ -80,7 +80,7 @@ import {
 } from "../runtime.js";
 import {
   cliHostLocalFolderSourceSendFields,
-  packageLocalFolderSourceOnCliHostIfPresent,
+  optionalPackedLocalFolderSourceOnCliHost,
 } from "./cli-local-source-package.js";
 import {
   applicationDeploymentPromptSeedsFromConfig,
@@ -2400,9 +2400,8 @@ export const deployCommand = EffectCommand.make(
           for (const application of applicationSeeds) {
             const applicationSourceLocator =
               application.seed.sourceLocator ?? configuredSourceLocator ?? configSourceLocator;
-            const applicationPackedSourceArchiveTarGz = yield* resultToEffect(
-              packageLocalFolderSourceOnCliHostIfPresent(applicationSourceLocator),
-            );
+            const applicationPackedSourceArchiveTarGz =
+              optionalPackedLocalFolderSourceOnCliHost(applicationSourceLocator);
             const applicationSourceProfile = {
               ...(application.seed.sourceProfile ?? {}),
               ...(sourceBaseDirectoryValue ? { baseDirectory: sourceBaseDirectoryValue } : {}),

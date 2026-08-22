@@ -14,12 +14,17 @@ function pathLeaf(path: string): string {
 }
 
 /**
- * Only hyphenated source folders such as `nux-*-static` or `appaloft-cloud`
- * are rewritten/packed. Generic or ordinary package cwd names (`workspace`,
+ * Only tiny no-git hyphenated source folders such as `nux-*-static` are
+ * rewritten/packed. A hyphenated name alone (`appaloft-cloud`) is not enough.
+ * Git checkouts and generic or ordinary package cwd names (`workspace`,
  * `cli`) must keep the caller's locator and must not be tarred.
  */
 function isHyphenatedSpecificLocalSourceLeaf(leaf: string): boolean {
   return isSpecificLocalSourceLeaf(leaf) && leaf.includes("-") && !leaf.includes(":");
+}
+
+function isGitWorktree(folderPath: string): boolean {
+  return existsSync(join(folderPath, ".git"));
 }
 
 const localWorkspaceArchiveExcludePatterns = [
@@ -107,7 +112,27 @@ export function packageLocalFolderSourceOnCliHostIfPresent(
     return ok(undefined);
   }
 
-  return packageLocalFolderSourceOnCliHost(resolved);
+  if (isGitWorktree(resolved)) {
+    return ok(undefined);
+  }
+
+  const packed = packageLocalFolderSourceOnCliHost(resolved);
+  if (packed.isErr()) {
+    return ok(undefined);
+  }
+
+  return packed;
+}
+
+/**
+ * Optional CLI-host archive. Skip and pack failure both yield `undefined`
+ * so `deploy --yes` of a git/large tree can continue the git/compose path.
+ */
+export function optionalPackedLocalFolderSourceOnCliHost(
+  locator: string | undefined,
+): string | undefined {
+  const packed = packageLocalFolderSourceOnCliHostIfPresent(locator);
+  return packed.isOk() ? packed.value : undefined;
 }
 
 /**
@@ -128,9 +153,9 @@ export function cliHostLocalFolderSourceSendFields(locator?: string): {
   const folder = isHyphenatedSpecificLocalSourceLeaf(pathLeaf(resolved))
     ? resolved
     : locator?.trim() || resolved;
-  const packed = packageLocalFolderSourceOnCliHostIfPresent(folder);
+  const packedSourceArchiveTarGz = optionalPackedLocalFolderSourceOnCliHost(folder);
   return {
     folder,
-    ...(packed.isOk() && packed.value ? { packedSourceArchiveTarGz: packed.value } : {}),
+    ...(packedSourceArchiveTarGz ? { packedSourceArchiveTarGz } : {}),
   };
 }
