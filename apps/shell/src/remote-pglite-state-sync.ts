@@ -109,50 +109,63 @@ function readOption(argv: readonly string[], name: string): string | undefined {
   return undefined;
 }
 
+function cliCommandArgs(argv: readonly string[]): readonly string[] {
+  const appaloftIndex = argv.indexOf("appaloft");
+  let args =
+    appaloftIndex >= 0 ? argv.slice(appaloftIndex + 1) : argv.length > 2 ? argv.slice(2) : argv;
+  if (args[0] === "--") args = args.slice(1);
+
+  while (
+    args[0] === "--control-plane-mode" ||
+    args[0] === "--control-plane-url" ||
+    args[0] === "--control-plane-profile"
+  ) {
+    args = args.slice(2);
+  }
+  while (
+    args[0]?.startsWith("--control-plane-mode=") ||
+    args[0]?.startsWith("--control-plane-url=") ||
+    args[0]?.startsWith("--control-plane-profile=")
+  ) {
+    args = args.slice(1);
+  }
+
+  return args;
+}
+
 function hasDeployCommand(argv: readonly string[]): boolean {
-  return argv.includes("deploy");
+  const command = cliCommandArgs(argv)[0];
+  return command === "up" || command === "deploy";
 }
 
 function hasSourceLinkRelinkCommand(argv: readonly string[]): boolean {
-  const sourceLinksIndex = argv.indexOf("source-links");
-  if (sourceLinksIndex === -1) {
-    return false;
-  }
-
-  return argv[sourceLinksIndex + 1] === "relink";
+  const args = cliCommandArgs(argv);
+  return args[0] === "source-links" && args[1] === "relink";
 }
 
 function hasPreviewCleanupCommand(argv: readonly string[]): boolean {
-  const previewIndex = argv.indexOf("preview");
-  if (previewIndex === -1) {
-    return false;
-  }
-
-  return argv[previewIndex + 1] === "cleanup";
+  const args = cliCommandArgs(argv);
+  return args[0] === "preview" && args[1] === "cleanup";
 }
 
 function hasSecretRotationCommand(argv: readonly string[]): boolean {
-  const dbIndex = argv.indexOf("db");
-  return dbIndex !== -1 && argv[dbIndex + 1] === "secret-rotation";
+  const args = cliCommandArgs(argv);
+  return args[0] === "db" && args[1] === "secret-rotation";
 }
 
 function hasSecretRotationPlanCommand(argv: readonly string[]): boolean {
-  const dbIndex = argv.indexOf("db");
-  return dbIndex !== -1 && argv[dbIndex + 1] === "secret-rotation" && argv[dbIndex + 2] === "plan";
+  const args = cliCommandArgs(argv);
+  return args[0] === "db" && args[1] === "secret-rotation" && args[2] === "plan";
 }
 
 function hasDbMigrateCommand(argv: readonly string[]): boolean {
-  const dbIndex = argv.indexOf("db");
-  return dbIndex !== -1 && argv[dbIndex + 1] === "migrate";
+  const args = cliCommandArgs(argv);
+  return args[0] === "db" && args[1] === "migrate";
 }
 
 function hasEnvironmentVariableMutationCommand(argv: readonly string[]): boolean {
-  const environmentIndex = argv.indexOf("env");
-  if (environmentIndex === -1) {
-    return false;
-  }
-
-  return argv[environmentIndex + 1] === "set" || argv[environmentIndex + 1] === "unset";
+  const args = cliCommandArgs(argv);
+  return args[0] === "env" && (args[1] === "set" || args[1] === "unset");
 }
 
 function requiresRemotePgliteStateCommand(argv: readonly string[]): boolean {

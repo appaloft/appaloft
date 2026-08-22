@@ -41,8 +41,8 @@ function shouldBootstrapOpenTelemetry(env: Record<string, string | undefined>): 
 
   return Boolean(
     env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ??
-      env.OTEL_EXPORTER_OTLP_ENDPOINT ??
-      env.APPALOFT_OTEL_EXPORTER_OTLP_ENDPOINT,
+    env.OTEL_EXPORTER_OTLP_ENDPOINT ??
+    env.APPALOFT_OTEL_EXPORTER_OTLP_ENDPOINT,
   );
 }
 
@@ -69,14 +69,19 @@ process.on("unhandledRejection", exitQuietlyOnOccupancyEpipe);
 const args = shellCommandArgs(process.argv);
 const command = args[0];
 if (command === "code" && isHelpFlag(args)) {
-  const { renderCodeHelp } = await import("@appaloft/adapter-cli/code-help");
-  renderCodeHelp(process.stdout);
-  exitProcess(0);
+  const { isCodeHelpInvocation, renderCodeHelp } = await import("@appaloft/adapter-cli/code-help");
+  if (isCodeHelpInvocation(process.argv)) {
+    renderCodeHelp(process.stdout);
+    exitProcess(0);
+  }
 }
 if (command === "setup" && isHelpFlag(args)) {
-  const { renderSetupHelp } = await import("@appaloft/adapter-cli/setup-help");
-  renderSetupHelp(process.stdout);
-  exitProcess(0);
+  const { isSetupHelpInvocation, renderSetupHelp } =
+    await import("@appaloft/adapter-cli/setup-help");
+  if (isSetupHelpInvocation(process.argv)) {
+    renderSetupHelp(process.stdout);
+    exitProcess(0);
+  }
 }
 if (shouldPrintOccupancyLineProgress(args)) {
   reportOccupancyCliStartupOnce(args);

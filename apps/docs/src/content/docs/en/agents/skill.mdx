@@ -9,7 +9,7 @@ docType: "reference"
 Packaged skill evals: `skills/appaloft/evals/evals.json`.
 
 
-The Appaloft Skill is the complete product entrypoint for AI agents — like the CLI, HTTP API, Web console, and MCP tools, it maps to the same set of Appaloft business operations (the operation catalog). The only difference is that the user is an AI, not a human. It is **not** a new business operation, and **not** a wrapper around `appaloft deploy`.
+The Appaloft Skill is the complete product entrypoint for AI agents — like the CLI, HTTP API, Web console, and MCP tools, it maps to the same set of Appaloft business operations (the operation catalog). The only difference is that the user is an AI, not a human. It is **not** a new business operation, and **not** a wrapper around `appaloft up` / `appaloft deploy`.
 
 ## Installation
 
@@ -40,7 +40,7 @@ npx skills add appaloft/appaloft --skill appaloft --global --agent opencode --co
 
 `npx skills add` **only copies Skill files** — it doesn't install the Appaloft CLI, write MCP host config, deploy an app, create a resource, or call any API. Current `npx skills` copies Codex, Claude Code, Cursor, and OpenCode into `~/.agents/skills/appaloft`; Cursor also reads that directory. It does **not** create `~/.cursor/skills` or `~/.config/opencode/skills`. After installing, run `npx skills list --global --agent <agent>` to confirm Appaloft appears in the list and that the corresponding `SKILL.md` exists, then start a new agent session so the host reloads the Skill directory.
 
-Explicit MCP siblings remain: `appaloft auth mcp cursor install`, `appaloft auth mcp claude-code install`, and `appaloft auth mcp opencode install`. OpenCode skill/MCP needs `--agent opencode` or those siblings. Codex still uses the dedicated bearer MCP profile: `appaloft auth mcp login` then `appaloft auth mcp codex install`. A directory without git can be deployed with `appaloft deploy .`.
+Explicit MCP siblings remain: `appaloft auth mcp cursor install`, `appaloft auth mcp claude-code install`, and `appaloft auth mcp opencode install`. OpenCode skill/MCP needs `--agent opencode` or those siblings. Codex still uses the dedicated bearer MCP profile: `appaloft auth mcp login` then `appaloft auth mcp codex install`. A directory without git can be deployed with `appaloft up`.
 
 ## Capability scope
 

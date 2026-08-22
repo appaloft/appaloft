@@ -2,6 +2,21 @@
 title: "Agent Deploy Subprotocol"
 description: "The subprotocol an agent uses to trigger deployments through existing entrypoints."
 docType: "task"
+localeState:
+  zh-CN: complete
+  en-US: complete
+searchAliases:
+  - "agent deploy"
+  - "AI deploy"
+  - "skill"
+  - "appaloft up"
+relatedOperations:
+  - "projects.create"
+  - "servers.register"
+  - "resources.create"
+  - "deployments.create"
+sidebar:
+  order: 3
 ---
 
 ## Goal <a id="agent-deploy-skill" />
@@ -32,9 +47,13 @@ The Agent Deploy Subprotocol is a set of process conventions internal to the ful
 ## CLI steps
 
 ```bash
-appaloft deploy .
+appaloft up --yes
 appaloft deployments timeline <deploymentId> --follow --json
 ```
+
+`appaloft up` is the canonical entrypoint; `appaloft deploy` remains the supported 1.x compatibility
+spelling for the same workflow. An agent or other non-TTY caller should pass `--yes` only after the
+user has authorized deployment mutation.
 
 ## GitHub Action deployment modes
 

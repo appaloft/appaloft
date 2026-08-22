@@ -34,6 +34,15 @@ describe("compact code help", () => {
     expect(isCodeHelpInvocation(["node", "appaloft", "login", "--help"])).toBeFalse();
   });
 
+  test("[WS-REMOTE-HELP-227] compact code help does not claim invalid argv", () => {
+    expect(isCodeHelpInvocation(["node", "appaloft", "code", "--bogus", "--help"])).toBeFalse();
+    expect(isCodeHelpInvocation(["node", "appaloft", "code", "--help", "--bogus"])).toBeFalse();
+    expect(
+      isCodeHelpInvocation(["node", "appaloft", "code", ".", "unexpected", "--help"]),
+    ).toBeFalse();
+    expect(isCodeHelpInvocation(["node", "appaloft", "code", "--profile", "--help"])).toBeFalse();
+  });
+
   test("[WS-REMOTE-HELP-217] compact table names real-use flags without Effect defaults", () => {
     const help = formatCodeHelp();
     expect(help).toContain("Usage:");
@@ -51,6 +60,7 @@ describe("compact code help", () => {
     expect(help).toContain(CODE_OPTION_DESCRIPTIONS.local);
     expect(help).toContain(CODE_OPTION_DESCRIPTIONS.forceNew);
     expect(help).toContain(CODE_OPTION_DESCRIPTIONS.noAttach);
+    expect(help).toContain(CODE_OPTION_DESCRIPTIONS.codex);
     expect(help).not.toContain(EFFECT_HELP_GENERIC_BOOLEAN);
     expect(help).not.toContain(EFFECT_HELP_GENERIC_TEXT);
     expect(optionalProseCount(help)).toBeLessThanOrEqual(1);
@@ -58,6 +68,16 @@ describe("compact code help", () => {
     expect(help).not.toContain("USAGE");
     expect(help).not.toContain("$ code");
     expect(help).not.toMatch(/occupancy/iu);
+  });
+
+  test("[WS-REMOTE-HELP-229] --codex help states credential copy and revocation boundaries", () => {
+    const help = formatCodeHelp();
+    expect(help).toContain("this Mac's ~/.codex/auth.json");
+    expect(help).toContain("selected remote Workspace HOME");
+    expect(help).toContain("never printed or placed in MCP/env");
+    expect(help).toContain("appaloft sandbox file remove <sandboxId> --path .codex/auth.json");
+    expect(help).toContain("does not revoke upstream access");
+    expect(help).toContain("revoke the corresponding Codex/OpenAI session");
   });
 
   test("[WS-REMOTE-HELP-217] tryHandleCodeHelp writes compact stdout and skips Effect", () => {
@@ -78,5 +98,18 @@ describe("compact code help", () => {
         },
       }),
     ).toBeFalse();
+  });
+
+  test("[WS-REMOTE-HELP-227] tryHandleCodeHelp leaves invalid argv to the parser", () => {
+    let written = "";
+    expect(
+      tryHandleCodeHelp(["node", "appaloft", "code", "--bogus", "--help"], {
+        write(chunk) {
+          written += String(chunk);
+          return true;
+        },
+      }),
+    ).toBeFalse();
+    expect(written).toBe("");
   });
 });

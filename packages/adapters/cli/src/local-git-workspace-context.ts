@@ -161,8 +161,9 @@ function normalizedRemote(
   };
 }
 
-export function normalizeWorkspaceRepositoryRemote(
+function normalizeRepositoryRemote(
   remoteValue: string,
+  allowLocalHttpsUsername: boolean,
 ): NormalizedWorkspaceRepositoryRemote {
   const remote = remoteValue.trim();
   if (
@@ -196,13 +197,25 @@ export function normalizeWorkspaceRepositoryRemote(
     url.password ||
     url.search ||
     url.hash ||
-    (url.protocol === "https:" && url.username)
+    (url.protocol === "https:" && url.username && !allowLocalHttpsUsername)
   ) {
     throw domainError.validation("Git remote must not contain credentials, query, or fragment", {
       code: "workspace_repository_remote_invalid",
     });
   }
   return normalizedRemote(url.hostname, url.port, url.pathname);
+}
+
+export function normalizeWorkspaceRepositoryRemote(
+  remoteValue: string,
+): NormalizedWorkspaceRepositoryRemote {
+  return normalizeRepositoryRemote(remoteValue, false);
+}
+
+export function normalizeLocalWorkspaceRepositoryRemote(
+  remoteValue: string,
+): NormalizedWorkspaceRepositoryRemote {
+  return normalizeRepositoryRemote(remoteValue, true);
 }
 
 export async function resolveLocalGitWorkspaceContext(
@@ -290,7 +303,7 @@ export async function resolveLocalGitWorkspaceContext(
     "workspace_git_remote_missing",
     "Current Git upstream remote has no repository URL",
   );
-  const normalizedRemoteValue = normalizeWorkspaceRepositoryRemote(remote);
+  const normalizedRemoteValue = normalizeLocalWorkspaceRepositoryRemote(remote);
   options.onProgress?.("Checking the remote Git branch…");
   const remoteTip = await gitText(
     runGit,

@@ -501,6 +501,22 @@ describe("remote PGlite state sync", () => {
     }
   });
 
+  test("[UP-ENTRY-004] a path named up is not mistaken for the deployment command", async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-"));
+    try {
+      const plan = resolveRemotePgliteStateSyncPlan(
+        ["appaloft", "code", "up", "--server-host", "203.0.113.10"],
+        {},
+        testConfig(dataDir),
+      );
+
+      expect(plan.isOk()).toBe(true);
+      expect(plan._unsafeUnwrap()).toBe(null);
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
   test("[CONFIG-FILE-STATE-022] db migrate targets an explicit isolated SSH runtime root", async () => {
     const dataDir = await mkdtemp(join(tmpdir(), "appaloft-remote-migrate-"));
     try {

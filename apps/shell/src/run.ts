@@ -21,6 +21,7 @@ import {
   isHeadlessWorkspaceInvocation,
   type LoginControlPlaneFn,
   loginRequiredWorkspaceOccupancyTree,
+  parseCliControlPlaneGlobalOptions,
   requiresCloudDeployLogin,
   requiresExplicitYesForMutation,
   resolveCliExecutionTarget,
@@ -580,7 +581,10 @@ export async function runShellCli(
   hooks: ShellCliRunHooks = {},
 ): Promise<void> {
   const argv = process.argv;
-  const startupArgs = commandArgs(argv);
+  const parsedGlobalOptions = parseCliControlPlaneGlobalOptions(argv);
+  const startupArgs = commandArgs(
+    parsedGlobalOptions.isOk() ? parsedGlobalOptions.value.argv : argv,
+  );
   if (shouldPrintOccupancyLineProgress(startupArgs)) {
     reportOccupancyCliStartupOnce(startupArgs, hooks.writeProgress);
   }
@@ -590,6 +594,16 @@ export async function runShellCli(
   const mutationGuard = shellMutationGuard(hooks);
   const controlPlaneStdinIsTty = mutationGuard.stdinIsTty ?? process.stdin.isTTY;
   const controlPlaneStdoutIsTty = mutationGuard.stdoutIsTty ?? process.stdout.isTTY;
+  if (
+    !isHelpInvocation(argv) &&
+    (startupArgs[0] === "up" || startupArgs[0] === "deploy") &&
+    requiresExplicitYesForMutation(mutationGuard) &&
+    !hasExplicitYesFlag(startupArgs)
+  ) {
+    const loggedIn = await hasCliControlPlaneLogin(process.env);
+    process.stderr.write(`${formatCliMutationPlan({ door: "deploy", loggedIn })}\n`);
+    process.exit(1);
+  }
   const controlPlaneCli = await runStandaloneControlPlaneCli({
     argv,
     env: process.env,
@@ -612,16 +626,6 @@ export async function runShellCli(
   ) {
     await runHelpWithoutRuntime(argv);
     return;
-  }
-
-  if (
-    startupArgs[0] === "deploy" &&
-    requiresExplicitYesForMutation(mutationGuard) &&
-    !hasExplicitYesFlag(startupArgs)
-  ) {
-    const loggedIn = await hasCliControlPlaneLogin(process.env);
-    process.stderr.write(`${formatCliMutationPlan({ door: "deploy", loggedIn })}\n`);
-    process.exit(1);
   }
 
   const appaloftHome = process.env.APPALOFT_HOME?.trim() || join(homedir(), ".appaloft");
@@ -805,7 +809,7 @@ export async function runShellCli(
     const mutationBlocked =
       requiresExplicitYesForMutation(guard) && !hasExplicitYesFlag(failedArgs);
     if (
-      failedArgs[0] === "deploy" &&
+      (failedArgs[0] === "up" || failedArgs[0] === "deploy") &&
       requiresCloudDeployLogin(failedArgs, process.env) &&
       !(await hasCliControlPlaneLogin(process.env))
     ) {

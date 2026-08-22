@@ -68,7 +68,7 @@ surface available in the session.
   pull request. After occupy, configure and inspect the occupied app without asking for ids:
   CLI `env set KEY VALUE` / `env unset KEY` / `env show` / `env effective-precedence`, or MCP
   `environments_list` then `environments_set_variable` / `environments_effective_precedence`.
-  Also `project show`, `resource show|logs|health|diagnose|terminal|runtime restart`, and `deploy`.
+  Also `project show`, `resource show|logs|health|diagnose|terminal|runtime restart`, and `up`.
   Occupancy `GH_TOKEN` is injected only for a writable GitHub App installation
   or a Connections OAuth token with `repo` scope. If occupy prints the GitHub PR hint, open the printed control-plane Connections URL and tell
   the user to connect GitHub at `/account/connections` or install the App with contents/PR
@@ -76,11 +76,13 @@ surface available in the session.
   project/environment/resource/server ids when those
   list/show tools are bound. Do not scrape vendor TUI text for PR or deploy state.
 
-- First deployment: `appaloft deploy` / `deploy .` deploy the current directory as this app; git is
-  not required. Human TTY Cloud deploy starts the existing browser login in the same command when
+- First deployment: `appaloft up` deploys the current directory as this app; git is not required.
+  `appaloft deploy` remains the supported 1.x compatibility spelling for the same workflow. Human
+  TTY Cloud `up` starts the existing browser login in the same command when
   no profile exists. If `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `CURSOR_AGENT`, `AIDER_MODEL`, or
-  `CODEX_CLI` is set, or the process is non-TTY / `CI=1`, print the plan and do not create a
-  project, deploy, or write skills unless `--yes` is present. Do
+  `CODEX_CLI` is set, or the process is non-TTY / `CI=1`, run `appaloft up --yes` only after the
+  user has authorized mutation; without `--yes`, print the plan and do not create a project,
+  deploy, or write skills. Do
   not silently reuse an unrelated occupancy. Inspect source safely, create or select
   project/server/environment/resource,
   persist source/runtime/network on the Resource, then `deployments.plan`. If readiness is

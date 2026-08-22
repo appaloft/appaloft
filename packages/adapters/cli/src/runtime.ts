@@ -678,6 +678,7 @@ const runLoggedCommand = <T>(
   message: Result<AppCommand<T>>,
   options: {
     appLogLines: number;
+    printResult?: boolean;
   },
 ): Effect.Effect<T, DomainError, CliRuntime> =>
   Effect.gen(function* () {
@@ -705,7 +706,9 @@ const runLoggedCommand = <T>(
       renderer.stopDeploymentProgress({ failed });
     }
 
-    yield* print(output);
+    if (options.printResult !== false) {
+      yield* print(output);
+    }
     return output as T;
   });
 
@@ -924,6 +927,7 @@ export const runDeploymentCommandResult = <T>(
   message: Result<AppCommand<T>>,
   options: {
     appLogLines: number;
+    printResult?: boolean;
   },
 ): Effect.Effect<T, DomainError, CliRuntime> => runLoggedCommand(message, options);
 

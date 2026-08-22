@@ -34,7 +34,7 @@ import {
   resolveOpenCodeHome,
 } from "./mcp-host-install.js";
 import { removeProcessListener } from "./remove-process-listener.js";
-import { renderSetupHelp } from "./setup-help.js";
+import { renderSetupHelp, unsupportedSetupHelpArgument } from "./setup-help.js";
 
 export interface StandaloneControlPlaneCliInput {
   readonly argv?: readonly string[];
@@ -311,10 +311,12 @@ function renderRootHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
   stdout.write(`Appaloft CLI
 
 Usage:
-  appaloft login [--url <url>] [--mode cloud|self-hosted] [--no-browser]
+  appaloft up [path|git-remote] [--yes] [--json]
   appaloft code [path|git-remote] [--no-attach] [--local] [--new] [--profile <name-or-id>] [--server <id>] [--opencode|--pi|--omp|--claude|--codex|--grok]
   appaloft workspace [--json]
-  appaloft deploy [path|git-remote]
+  appaloft deploy [path|git-remote] [--yes] [--json]
+    Supported 1.x compatibility spelling for appaloft up.
+  appaloft login [--url <url>] [--mode cloud|self-hosted] [--no-browser]
   appaloft server list
   appaloft auth status
   appaloft context show
@@ -869,6 +871,12 @@ export async function runStandaloneControlPlaneCli(
   }
   if (command === "setup") {
     const subcommand = args[1];
+    if (isHelpArgs(args.slice(1))) {
+      const unsupported = unsupportedSetupHelpArgument(["node", "appaloft", ...args]);
+      if (unsupported) {
+        return finish(parseError(`Received unknown argument: '${unsupported}'`), input);
+      }
+    }
     if (
       !subcommand ||
       subcommand === "--help" ||

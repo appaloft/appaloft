@@ -31,6 +31,7 @@ import {
   folderOnboardingStatusLine,
   isFolderOnboardingCancelled,
   peekThisFolderGitIdentity,
+  peekWorkspaceGitIdentity,
   persistFolderProjectAssociation,
   quitCodeSessionOnCancel,
   withImmediateSigintExit,
@@ -74,6 +75,24 @@ describe("folder project onboarding", () => {
     } finally {
       await rm(ancestor, { recursive: true, force: true });
     }
+  });
+
+  test("[FOLDER-ONBOARD-002] Git identity peek strips a local HTTPS origin username", async () => {
+    const identity = await peekWorkspaceGitIdentity("/work/repository", async ({ args }) => {
+      if (args.join(" ") === "rev-parse --show-toplevel") {
+        return { stdout: "/work/repository\n", stderr: "" };
+      }
+      if (args.join(" ") === "config --get remote.origin.url") {
+        return {
+          stdout: "https://developer@github.com/acme/private-repo.git\n",
+          stderr: "",
+        };
+      }
+      throw new Error(`Unexpected git command: ${args.join(" ")}`);
+    });
+
+    expect(identity).toBe("github.com/acme/private-repo");
+    expect(identity).not.toContain("developer@");
   });
 
   test("[FOLDER-ONBOARD-002] git remote cwd binds to that identity", () => {

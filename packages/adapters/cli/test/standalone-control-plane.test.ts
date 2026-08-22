@@ -22,7 +22,10 @@ describe("standalone control plane help", () => {
     expect(printed).toContain("[--server <id>]");
     expect(printed.indexOf("appaloft workspace [--json]")).toBeGreaterThan(-1);
     expect(printed.indexOf("appaloft workspace open [path|git-remote]")).toBeGreaterThan(-1);
-    expect(printed.indexOf("appaloft deploy [path|git-remote]")).toBeGreaterThan(-1);
+    expect(printed.indexOf("appaloft up [path|git-remote]")).toBeGreaterThan(-1);
+    expect(printed.indexOf("appaloft deploy [path|git-remote]")).toBeGreaterThan(
+      printed.indexOf("appaloft up [path|git-remote]"),
+    );
     expect(printed).not.toContain("appaloft deploy <path>");
     expect(printed.indexOf("appaloft code")).toBeLessThan(
       printed.indexOf("appaloft workspace open"),

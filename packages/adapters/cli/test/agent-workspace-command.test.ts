@@ -37,6 +37,7 @@ import {
   ResumeAgentTaskRunCommand,
   ShowAgentTaskRunQuery,
   ShowProjectQuery,
+  ShowRepositoryBindingQuery,
   ShowSandboxQuery,
   ShowWorkspaceCollaborationQuery,
   SteerAgentTaskRunCommand,
@@ -48,7 +49,7 @@ import {
   TerminateSandboxCommand,
 } from "@appaloft/application";
 import { domainError, err, ok } from "@appaloft/core";
-import { Effect } from "effect";
+import { Cause, Effect, Option, Runtime } from "effect";
 import {
   folderDirectoryName,
   folderOccupancyIdentity,
@@ -1112,6 +1113,248 @@ describe("Agent Workspace CLI", () => {
       input: { repositoryIdentity: "github.com/appaloft/examples" },
     });
     expect(commands.some((command) => command instanceof CreateProjectCommand)).toBe(true);
+  });
+
+  test("[FOLDER-ONBOARD-002][FOLDER-ONBOARD-003] code --codex reuses a username-origin binding without creating a project", async () => {
+    const repository = await mkdtemp(join(tmpdir(), "appaloft-code-username-origin-"));
+    const home = await mkdtemp(join(tmpdir(), "appaloft-code-username-home-"));
+    const git = async (args: readonly string[]) => {
+      const result = Bun.spawn(["git", ...args], {
+        cwd: repository,
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      if ((await result.exited) !== 0) {
+        throw new Error(await new Response(result.stderr).text());
+      }
+    };
+    await git(["init", "-b", "main"]);
+    await git(["remote", "add", "origin", "https://developer@github.com/acme/private-repo.git"]);
+    await mkdir(join(home, ".codex"));
+    await writeFile(join(home, ".codex", "auth.json"), "{}\n");
+
+    const commands: Command<unknown>[] = [];
+    let bindingIdentity: string | undefined;
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          if (command instanceof OpenAgentWorkspaceCommand) {
+            return ok({ workspaceId: "sbx_bound" } as T);
+          }
+          if (command instanceof CreateProjectCommand) {
+            return ok({ id: "prj_unexpected" } as T);
+          }
+          return ok({} as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: {
+        execute: async <T>(_context: unknown, query: Query<T>) => {
+          if (query instanceof ListServersQuery) {
+            return ok({
+              items: [{ id: "srv_hostinger", name: "hostinger", lifecycleStatus: "active" }],
+            } as T);
+          }
+          if (query instanceof ListSandboxesQuery) {
+            return ok({ items: [], total: 0, limit: 100, offset: 0 } as T);
+          }
+          if (query instanceof ShowRepositoryBindingQuery) {
+            bindingIdentity = query.input.repositoryIdentity;
+            return ok({
+              projectId: "prj_bound",
+              repositoryIdentity: query.input.repositoryIdentity,
+              status: "active",
+            } as T);
+          }
+          if (query instanceof ListProjectsQuery) {
+            return ok({
+              items: [
+                { id: "prj_a", name: "Alpha", lifecycleStatus: "active" },
+                { id: "prj_b", name: "Beta", lifecycleStatus: "active" },
+              ],
+              total: 2,
+              limit: 100,
+              offset: 0,
+            } as T);
+          }
+          return ok({ items: [] } as T);
+        },
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_code_username_origin" }),
+      },
+      environment: { APPALOFT_TOKEN: "token", APPALOFT_HOME: home, HOME: home },
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+      resolveRemoteWorkspaceGitRef: async (remote, ref) => {
+        expect(remote).toBe("https://github.com/acme/private-repo.git");
+        return {
+          repositoryIdentity: "github.com/acme/private-repo",
+          credentialFreeHttpsRepository: remote,
+          ref,
+          commitSha: "a".repeat(40),
+        };
+      },
+    });
+    const stdoutWrite = process.stdout.write;
+    const stderrWrite = process.stderr.write;
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+    try {
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "code",
+        repository,
+        "--codex",
+        "--server",
+        "srv_hostinger",
+        "--no-attach",
+      ]);
+    } finally {
+      process.stdout.write = stdoutWrite;
+      process.stderr.write = stderrWrite;
+      await rm(repository, { recursive: true, force: true });
+      await rm(home, { recursive: true, force: true });
+    }
+
+    expect(bindingIdentity).toBe("github.com/acme/private-repo");
+    expect(bindingIdentity).not.toContain("developer@");
+    expect(commands.some((command) => command instanceof CreateProjectCommand)).toBe(false);
+    expect(commands.some((command) => command instanceof OpenAgentWorkspaceCommand)).toBe(true);
+  });
+
+  test("[WS-REMOTE-COMPAT-221] code --codex preserves create-project operationCheckDenied across the Effect/Promise boundary", async () => {
+    const folder = await mkdtemp(join(tmpdir(), "appaloft-code-project-denied-"));
+    const home = await mkdtemp(join(tmpdir(), "appaloft-code-project-denied-home-"));
+    await mkdir(join(home, ".codex"));
+    await writeFile(join(home, ".codex", "auth.json"), "{}\n");
+    const denied = {
+      code: "operation_check_denied",
+      category: "user" as const,
+      message: "Operation check denied",
+      retryable: false,
+      details: {
+        operationKey: "projects.create",
+        operationName: "CreateProjectCommand",
+        reason: "missing-organization",
+        checkKey: "cloud.admission",
+        checkKind: "authorization",
+      },
+    };
+    const commands: Command<unknown>[] = [];
+    const output: string[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          if (command instanceof CreateProjectCommand) return err(denied) as never;
+          return ok({ workspaceId: "sbx_unexpected" } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: {
+        execute: async <T>(_context: unknown, query: Query<T>) => {
+          if (query instanceof ListServersQuery) {
+            return ok({
+              items: [{ id: "srv_hostinger", name: "hostinger", lifecycleStatus: "active" }],
+            } as T);
+          }
+          if (query instanceof ListSandboxesQuery) {
+            return ok({ items: [], total: 0, limit: 100, offset: 0 } as T);
+          }
+          if (query instanceof ListProjectsQuery) {
+            return ok({
+              items: [
+                { id: "prj_a", name: "Alpha", lifecycleStatus: "active" },
+                { id: "prj_b", name: "Beta", lifecycleStatus: "active" },
+              ],
+              total: 2,
+              limit: 100,
+              offset: 0,
+            } as T);
+          }
+          return ok({ items: [] } as T);
+        },
+      } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) =>
+          createExecutionContext({ ...input, requestId: "req_code_project_denied" }),
+      },
+      environment: { APPALOFT_TOKEN: "token", APPALOFT_HOME: home, HOME: home },
+      terminalIO: {
+        stdin: { isTTY: false, on: () => undefined },
+        stdout: { isTTY: false, write: () => true },
+        stderr: { isTTY: false, write: () => true },
+      },
+    });
+    const stdoutWrite = process.stdout.write;
+    const stderrWrite = process.stderr.write;
+    const originalExitCode = process.exitCode;
+    process.stdout.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    process.stderr.write = ((chunk) => {
+      output.push(String(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+    let rejected = false;
+    let rejection: unknown;
+    try {
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "code",
+        folder,
+        "--codex",
+        "--server",
+        "srv_hostinger",
+        "--no-attach",
+      ]);
+    } catch (error) {
+      rejected = true;
+      rejection = error;
+    } finally {
+      process.stdout.write = stdoutWrite;
+      process.stderr.write = stderrWrite;
+      process.exitCode = originalExitCode ?? 0;
+      await rm(folder, { recursive: true, force: true });
+      await rm(home, { recursive: true, force: true });
+    }
+
+    const printed = output.join("");
+    expect(rejected).toBe(true);
+    const cause = (rejection as { readonly [Runtime.FiberFailureCauseId]?: Cause.Cause<unknown> })[
+      Runtime.FiberFailureCauseId
+    ];
+    const failure = cause ? Option.getOrUndefined(Cause.failureOption(cause)) : undefined;
+    expect(failure).toMatchObject({
+      code: "operation_check_denied",
+      category: "user",
+      retryable: false,
+      details: {
+        operationKey: "projects.create",
+        checkKey: "cloud.admission",
+        reason: "missing-organization",
+      },
+    });
+    expect(printed).toContain("Cloud denied projects.create");
+    expect(printed).toContain("missing-organization");
+    expect(printed).toContain("cloud.admission");
+    expect(printed).toMatch(/login|organization|retry|Cloud/i);
+    expect(printed).not.toContain("Workspace CLI operation failed");
+    expect(commands.filter((command) => command instanceof CreateProjectCommand)).toHaveLength(1);
+    expect(commands.some((command) => command instanceof OpenAgentWorkspaceCommand)).toBe(false);
   });
 
   test("[WS-REMOTE-PROGRESS-201] code --no-attach from a no-git cwd does not resume leftover examples", async () => {

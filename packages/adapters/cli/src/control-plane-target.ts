@@ -116,6 +116,7 @@ const remoteCapableTopLevelCommands = new Set([
   "storage",
   "terminal-session",
   "tunnel",
+  "up",
   "upgrade",
   "work",
   "workspace",
@@ -127,8 +128,10 @@ const knownTopLevelCommands = new Set([
   ...remoteCapableTopLevelCommands,
   ...localOnlyTopLevelCommands,
   "context",
+  "help",
   "login",
   "logout",
+  "setup",
   "version",
 ]);
 
@@ -154,6 +157,18 @@ function controlPlaneResolutionError(
       ...(details ?? {}),
     },
   };
+}
+
+function validateKnownTopLevelCommand(command: string | undefined): Result<void> {
+  if (command && !command.startsWith("-") && !knownTopLevelCommands.has(command)) {
+    return err(
+      controlPlaneResolutionError("validation_error", "Unknown Appaloft command", {
+        command,
+      }),
+    );
+  }
+
+  return ok(undefined);
 }
 
 function configError(message: string, configPath: string): DomainError {
@@ -274,6 +289,12 @@ export function parseCliControlPlaneGlobalOptions(
     argv: nextArgv,
     options,
   });
+}
+
+export function validateCliTopLevelCommand(argv: readonly string[] = process.argv): Result<void> {
+  const parsed = parseCliControlPlaneGlobalOptions(argv);
+  if (parsed.isErr()) return err(parsed.error);
+  return validateKnownTopLevelCommand(topLevelCommand(parsed.value.argv));
 }
 
 function envSelection(env: CliControlPlaneEnvironment): CliControlPlaneGlobalOptions {
@@ -522,13 +543,8 @@ export async function resolveCliExecutionTarget(
     );
   }
 
-  if (command && !command.startsWith("-") && !knownTopLevelCommands.has(command)) {
-    return err(
-      controlPlaneResolutionError("validation_error", "Unknown Appaloft command", {
-        command,
-      }),
-    );
-  }
+  const validCommand = validateKnownTopLevelCommand(command);
+  if (validCommand.isErr()) return err(validCommand.error);
 
   const env = input.env ?? process.env;
   const config = configSelection(input.cwd ?? process.cwd());

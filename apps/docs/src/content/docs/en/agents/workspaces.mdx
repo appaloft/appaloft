@@ -27,7 +27,9 @@ sidebar:
 ---
 
 <Aside type="caution" title="Maturity: Public alpha">
-Workspace's CLI, SDK, and underlying operations are a public Appaloft capability; the specific Sandbox provider, templates, gateway, and public-address capabilities depend on the operator's deployment configuration.
+  Workspace's CLI, SDK, and underlying operations are a public Appaloft capability; the specific
+  Sandbox provider, templates, gateway, and public-address capabilities depend on the operator's
+  deployment configuration.
 </Aside>
 
 ## Short definition <a id="agent-workspace" />
@@ -100,6 +102,7 @@ After occupy, the CLI writes the public Appaloft skill into `/workspace/skills/a
 and `/workspace/.agents/skills/appaloft`. Matching skill directories from this laptop's
 HOME may also be copied **add-only** into `/workspace/skills/<name>` and
 `/workspace/.agents/skills/<name>`.
+
 <a id="agent-workspace-occupancy-skills" />
 
 Railway-aligned roots are `~/.claude/skills`, `~/.codex/skills`, `~/.grok/skills`, and
@@ -140,6 +143,16 @@ The session also keeps the public Appaloft skill and a first-party Appaloft MCP
 entry so the remote agent can list workspaces and deploy. Laptop `mcp.json` secrets
 are not copied. Token values are never printed.
 
+After the occupy ends, remove the remote copy of a Codex credential with:
+
+```bash
+appaloft sandbox file remove <sandboxId> --path .codex/auth.json
+```
+
+Removing the remote file does not revoke the corresponding upstream login session.
+If the credential may have been exposed, also revoke that session in the Codex / OpenAI
+account security settings.
+
 Pin a specific enrolled Server when more than one exists:
 
 ```bash
@@ -147,21 +160,18 @@ appaloft code --server srv_4lifk0yrcecy
 ```
 
 <a id="agent-workspace-preparing-disk" />
-If **Preparing disk** hits a temporary Cloud gateway failure (HTTP 502 or
-503, including a Cloudflare bad-gateway or incomplete origin page), the Cloud
-Agents wait stays up, marks that disk step as retrying, and keeps retrying
-disk preparation on the same enrolled Server until a typable session is bound
-or the occupy deadline expires. Attach starts only after disk prep succeeds;
-staying on the wait panel is not success. The wait panel does not leave to
-print a folder path or restore the terminal just because a short retry burst
-failed. If the deadline expires, the in-flight disk prep is cancelled, or a
-session never attaches, the CLI fails closed: restore the terminal once, print
-that Cloud is temporarily unreachable / disk preparation did not finish, exit
-non-zero, and do not print a folder path. Ctrl-C / quit on the wait panel
-aborts the in-flight open and does not look like success. This stay/retry is
-the same occupy, not a second local folder open. `--omp` is the OpenCode
-harness; use `--pi` when that is the agent you opened. The CLI keeps the HTTP
-status and does not dump the gateway page.
+If **Preparing disk** hits a temporary Cloud gateway failure (HTTP 502 or 503, including a
+Cloudflare bad-gateway or incomplete origin page), the Cloud Agents wait stays up, marks that disk
+step as retrying, and keeps retrying disk preparation on the same enrolled Server until a typable
+session is bound or the occupy deadline expires. Attach starts only after disk prep succeeds;
+staying on the wait panel is not success. The wait panel does not leave to print a folder path or
+restore the terminal just because a short retry burst failed. If the deadline expires, the in-flight
+disk prep is cancelled, or a session never attaches, the CLI fails closed: restore the terminal
+once, print that Cloud is temporarily unreachable / disk preparation did not finish, exit non-zero,
+and do not print a folder path. Ctrl-C / quit on the wait panel aborts the in-flight open and does
+not look like success. This stay/retry is the same occupy, not a second local folder open. `--omp`
+is the OpenCode harness; use `--pi` when that is the agent you opened. The CLI keeps the HTTP status
+and does not dump the gateway page.
 
 Missing login, Server, or an explicit `--claude` / `--codex` / `--grok` credential
 fails closed with guidance. It never becomes Scratch. This-Mac
@@ -170,7 +180,6 @@ Scratch remains explicit:
 ```bash
 appaloft code --local
 ```
-
 
 `--local` still opens OpenCode if present, otherwise Pi, without Git, login, Binding, or Cloud.
 The scratch banner is `Local scratch · this Mac · not saved remotely`.

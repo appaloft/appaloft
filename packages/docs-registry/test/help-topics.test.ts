@@ -314,6 +314,24 @@ describe("public docs help registry", () => {
     expect(topic.specReferences).toContain("docs/testing/operation-input-contract-test-matrix.md");
   });
 
+  test("[UP-ENTRY-007] up help resolves through the deployment-source anchor", () => {
+    const topic = publicDocsHelpTopics["deployment.source"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe("/docs/deliver/sources/#deployment-source");
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/deliver/sources/#deployment-source",
+    );
+    expect(topic.aliases).toEqual(
+      expect.arrayContaining(["appaloft up", "railway up", "appaloft deploy"]),
+    );
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/specs/144-appaloft-up-entrypoint/spec.md",
+        "docs/testing/appaloft-up-entrypoint-test-matrix.md",
+      ]),
+    );
+  });
+
   test("[AGENT-DEPLOY-SKILL-003] agent deploy skill resolves to public docs and governing source", () => {
     const topic = publicDocsHelpTopics["agent.deploy-skill"];
 
@@ -324,6 +342,7 @@ describe("public docs help registry", () => {
       "/docs/en/agents/deploy-skill/#agent-deploy-skill",
     );
     expect(topic.relatedOperation).toBe("deployments.create");
+    expect(topic.aliases).toContain("appaloft up");
     expect(topic.surfaces).toEqual(
       expect.arrayContaining(["cli", "http-api", "repository-config", "mcp"]),
     );
@@ -331,6 +350,7 @@ describe("public docs help registry", () => {
       expect.arrayContaining([
         "docs/specs/071-url-first-deployment-entry-experience/spec.md",
         "docs/specs/072-appaloft-agent-deploy-skill/spec.md",
+        "docs/specs/144-appaloft-up-entrypoint/spec.md",
         "docs/agent/appaloft-deploy-skill.md",
         "skills/appaloft/references/surfaces.md",
         "skills/appaloft/references/deploy-protocol.md",

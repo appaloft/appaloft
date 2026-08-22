@@ -543,7 +543,7 @@ describe("CLI deployment create command", () => {
     expect(queried).not.toContain("ListSandboxesQuery");
   });
 
-  test("[WS-REMOTE-DEPLOY-059] occupancy deploy prints generated access URL", async () => {
+  test("[WS-REMOTE-DEPLOY-059][UP-ENTRY-002][UP-ENTRY-005] up and deploy print one equivalent JSON result with the generated URL", async () => {
     const commands: AppCommand<unknown>[] = [];
     const commandBus = {
       execute: async <T>(_context: unknown, command: AppCommand<T>) => {
@@ -647,25 +647,36 @@ describe("CLI deployment create command", () => {
         stderr: { isTTY: false, write: () => true },
       },
     });
-    const chunks: string[] = [];
+    const outputs: unknown[] = [];
     const writeStdout = process.stdout.write;
     try {
-      process.stdout.write = ((chunk: string | Uint8Array) => {
-        chunks.push(typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk));
-        return true;
-      }) as typeof process.stdout.write;
-      await program.parseAsync([
-        "node",
-        "appaloft",
-        "deploy",
-        "https://github.com/traefik/whoami.git",
-      ]);
+      for (const commandName of ["up", "deploy"] as const) {
+        const chunks: string[] = [];
+        process.stdout.write = ((chunk: string | Uint8Array) => {
+          chunks.push(typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk));
+          return true;
+        }) as typeof process.stdout.write;
+        await program.parseAsync([
+          "node",
+          "appaloft",
+          commandName,
+          "https://github.com/traefik/whoami.git",
+          "--json",
+        ]);
+        outputs.push(JSON.parse(chunks.join("")));
+      }
     } finally {
       process.stdout.write = writeStdout;
       await rm(home, { recursive: true, force: true });
     }
-    expect(commands).toHaveLength(1);
-    expect(chunks.join("")).toContain("http://app-sc156jw98k.127.0.0.1.sslip.io");
+    expect(commands).toHaveLength(2);
+    expect(outputs[0]).toEqual(outputs[1]);
+    expect(outputs[0]).toEqual({
+      deploymentId: "dep_url",
+      resourceId: "res_dfsc156jw98k",
+      status: "succeeded",
+      url: "http://app-sc156jw98k.127.0.0.1.sslip.io",
+    });
   });
 
   test("[WS-REMOTE-DEPLOY-060] missing generated URL stays omitted", async () => {

@@ -57,6 +57,12 @@ describe("shell help without runtime composition", () => {
     expect(stdout).toContain("--opencode");
     expect(stdout).toContain("--pi");
     expect(stdout).toContain("--omp");
+    expect(stdout).toContain("this Mac's ~/.codex/auth.json");
+    expect(stdout).toContain("selected remote Workspace HOME");
+    expect(stdout).toContain("never printed or placed in MCP/env");
+    expect(stdout).toContain("appaloft sandbox file remove <sandboxId> --path .codex/auth.json");
+    expect(stdout).toContain("does not revoke upstream access");
+    expect(stdout).toContain("revoke the corresponding Codex/OpenAI session");
     expect(stdout).toContain("Skip folder-onboarding prompts");
     expect(stdout).toContain("print and open the default preview");
     expect(stdout).toContain("Agent Workspace Profile");
@@ -195,6 +201,105 @@ sys.exit(os.waitstatus_to_exitcode(status))
     expect(stderr).not.toContain("PGlite");
   });
 
+  test("[CONTROL-PLANE-CLI-028] unknown command with help fails before runtime", async () => {
+    const temporaryRoot = await mkdtemp(join(tmpdir(), "appaloft-unknown-help-"));
+    temporaryRoots.push(temporaryRoot);
+    const unusablePglitePath = join(temporaryRoot, "pglite-is-a-file");
+    await writeFile(unusablePglitePath, "unknown command must not open this path");
+
+    const child = spawnShell(["frimble", "--help"], {
+      ...process.env,
+      APPALOFT_HOME: join(temporaryRoot, "home"),
+      APPALOFT_PGLITE_DATA_DIR: unusablePglitePath,
+      OTEL_SDK_DISABLED: "true",
+    });
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+
+    expect(exitCode).toBe(1);
+    expect(`${stdout}${stderr}`).toContain("Unknown Appaloft command");
+    expect(`${stdout}${stderr}`).toContain("frimble");
+    expect(stderr).not.toContain("PGlite");
+  });
+
+  test("[CONTROL-PLANE-CLI-029][WS-REMOTE-HELP-227] help validates unsupported options in either order", async () => {
+    const temporaryRoot = await mkdtemp(join(tmpdir(), "appaloft-help-option-order-"));
+    temporaryRoots.push(temporaryRoot);
+    const env = {
+      ...process.env,
+      APPALOFT_HOME: join(temporaryRoot, "home"),
+      OTEL_SDK_DISABLED: "true",
+    };
+    const invocations = [
+      ["code", "--bogus", "--help"],
+      ["code", "--help", "--bogus"],
+      ["workspace", "open", "--json", "--help"],
+      ["workspace", "open", "--help", "--json"],
+    ] as const;
+
+    for (const args of invocations) {
+      const child = spawnShell(args, env);
+      const [exitCode, stdout, stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ]);
+      const unsupportedOption = args[0] === "code" ? "--bogus" : "--json";
+      expect(exitCode).toBe(1);
+      expect(`${stdout}${stderr}`).toContain(unsupportedOption);
+    }
+  });
+
+  test("[CONTROL-PLANE-CLI-030] NO_COLOR removes ANSI from help and help-time errors", async () => {
+    const temporaryRoot = await mkdtemp(join(tmpdir(), "appaloft-help-no-color-"));
+    temporaryRoots.push(temporaryRoot);
+    const env = {
+      ...process.env,
+      APPALOFT_HOME: join(temporaryRoot, "home"),
+      NO_COLOR: "1",
+      OTEL_SDK_DISABLED: "true",
+    };
+
+    for (const args of [
+      ["workspace", "--help"],
+      ["workspace", "open", "--json", "--help"],
+    ] as const) {
+      const child = spawnShell(args, env);
+      const [stdout, stderr] = await Promise.all([
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+        child.exited,
+      ]);
+      expect(`${stdout}${stderr}`).not.toContain("\x1b[");
+    }
+  });
+
+  test("[WS-REMOTE-HELP-228] workspace help prints canonical collaboration paths once", async () => {
+    const temporaryRoot = await mkdtemp(join(tmpdir(), "appaloft-workspace-help-paths-"));
+    temporaryRoots.push(temporaryRoot);
+    const child = spawnShell(["workspace", "--help"], {
+      ...process.env,
+      APPALOFT_HOME: join(temporaryRoot, "home"),
+      OTEL_SDK_DISABLED: "true",
+    });
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    const printed = `${stdout}${stderr}`;
+
+    expect(exitCode).toBe(0);
+    expect(printed).toContain("collaboration participant");
+    expect(printed).toContain("collaboration lane");
+    expect(printed).toContain("collaboration writer");
+    expect(printed).toContain("collaboration handoff");
+    expect(printed).not.toContain("collaboration collaboration");
+  });
+
   test("[CONTROL-PLANE-CLI-027] setup agent --help prints compact usage without runtime", async () => {
     const temporaryRoot = await mkdtemp(join(tmpdir(), "appaloft-setup-help-no-runtime-"));
     temporaryRoots.push(temporaryRoot);
@@ -252,6 +357,26 @@ sys.exit(os.waitstatus_to_exitcode(status))
     expect(stdout).not.toContain("A true or false value");
     expect(stdout).not.toMatch(/occupancy/iu);
     expect(`${stdout}${stderr}`).not.toContain("\x1b[?1049h");
+  });
+
+  test("[CONTROL-PLANE-CLI-029] setup help rejects unknown options and subcommands", async () => {
+    for (const args of [
+      ["setup", "agent", "--bogus", "--help"],
+      ["setup", "nope", "--help"],
+    ] as const) {
+      const child = spawnShell(args, {
+        ...process.env,
+        OTEL_SDK_DISABLED: "true",
+      });
+      const [exitCode, stdout, stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ]);
+      expect(exitCode).not.toBe(0);
+      expect(stdout).not.toContain("Appaloft agent setup");
+      expect(stderr).toContain("Received unknown argument");
+    }
   });
 
   test("[CONTROL-PLANE-CLI-012] login --help prints usage without OAuth or runtime", async () => {

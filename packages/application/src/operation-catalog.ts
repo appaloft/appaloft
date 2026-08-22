@@ -6253,7 +6253,7 @@ export const operationCatalog = [
         sandboxFilePathInputSchema,
         "POST",
         "/api/sandboxes/{sandboxId}/files/list",
-        "appaloft sandbox files list <sandboxId> <path>",
+        "appaloft sandbox file list <sandboxId> --path <path>",
       ],
       [
         "sandbox-files.read",
@@ -6262,7 +6262,7 @@ export const operationCatalog = [
         sandboxFilePathInputSchema,
         "POST",
         "/api/sandboxes/{sandboxId}/files/read",
-        "appaloft sandbox files read <sandboxId> <path>",
+        "appaloft sandbox file read <sandboxId> --path <path>",
       ],
       [
         "sandbox-files.write",
@@ -6271,7 +6271,7 @@ export const operationCatalog = [
         writeSandboxFileCommandInputSchema,
         "POST",
         "/api/sandboxes/{sandboxId}/files/write",
-        "appaloft sandbox files write <sandboxId> <path>",
+        "appaloft sandbox file write <sandboxId> --path <path>",
       ],
       [
         "sandbox-files.remove",
@@ -6280,7 +6280,7 @@ export const operationCatalog = [
         removeSandboxFileCommandInputSchema,
         "DELETE",
         "/api/sandboxes/{sandboxId}/files",
-        "appaloft sandbox files remove <sandboxId> <path>",
+        "appaloft sandbox file remove <sandboxId> --path <path>",
       ],
     ] as const
   ).map(([key, messageName, kind, inputSchema, method, path, cli]) => ({

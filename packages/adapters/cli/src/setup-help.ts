@@ -36,9 +36,59 @@ function cliUserArgs(argv: readonly string[]): readonly string[] {
   return afterRuntime[0] === "appaloft" ? afterRuntime.slice(1) : afterRuntime;
 }
 
+const SETUP_HELP_BOOLEAN_OPTIONS = new Set(["-y", "--yes", "--help", "-h"]);
+const SETUP_HELP_VALUE_OPTIONS = new Set([
+  "--agent",
+  "--profile",
+  "--cursor-home",
+  "--opencode-home",
+  "--agents-home",
+  "--claude-home",
+  "--command",
+  "--skill-dir",
+]);
+
+function optionName(arg: string): string {
+  const equals = arg.indexOf("=");
+  return equals === -1 ? arg : arg.slice(0, equals);
+}
+
+export function unsupportedSetupHelpArgument(argv: readonly string[]): string | undefined {
+  const args = cliUserArgs(argv);
+  if (args[0] !== "setup" || (!args.includes("--help") && !args.includes("-h"))) {
+    return undefined;
+  }
+
+  let index = 1;
+  if (args[index] && !args[index]?.startsWith("-")) {
+    if (args[index] !== "agent") return args[index];
+    index += 1;
+  }
+
+  for (; index < args.length; index += 1) {
+    const arg = args[index];
+    if (!arg) continue;
+    const name = optionName(arg);
+    if (SETUP_HELP_BOOLEAN_OPTIONS.has(name)) continue;
+    if (!SETUP_HELP_VALUE_OPTIONS.has(name)) return arg;
+    if (arg.includes("=")) {
+      if (arg.slice(arg.indexOf("=") + 1).length === 0) return arg;
+      continue;
+    }
+    const value = args[index + 1];
+    if (!value || value.startsWith("-")) return arg;
+    index += 1;
+  }
+  return undefined;
+}
+
 export function isSetupHelpInvocation(argv: readonly string[]): boolean {
   const args = cliUserArgs(argv);
-  return args[0] === "setup" && (args.includes("--help") || args.includes("-h"));
+  return (
+    args[0] === "setup" &&
+    (args.includes("--help") || args.includes("-h")) &&
+    unsupportedSetupHelpArgument(argv) === undefined
+  );
 }
 
 export function formatSetupHelp(): string {

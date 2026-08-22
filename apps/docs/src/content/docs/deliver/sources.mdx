@@ -15,6 +15,7 @@ searchAliases:
   - "零配置"
   - "required checks"
   - "GitHub checks"
+  - "appaloft up"
 relatedOperations:
   - "deployments.create"
   - "resources.configure-source"
@@ -135,18 +136,18 @@ appaloft resource auto-deploy res_web \
 
 ```bash
 # 从当前目录发起零配置部署（无路径时同样部署当前目录，不会静默复用会话）
-appaloft deploy
-appaloft deploy .
+appaloft up
+appaloft up .
 
 # 本地目录，显式指定静态发布方式（相对路径保持相对，public 不会被改写成 /public）
-appaloft deploy ./apps/web --method static --publish-dir build
-appaloft deploy . --as static-site --publish-dir public
+appaloft up ./apps/web --method static --publish-dir build
+appaloft up . --as static-site --publish-dir public
 
 # 已经构建好的静态输出目录，跳过构建
-appaloft deploy ./dist --as static-site
+appaloft up ./dist --as static-site
 
 # Git 仓库作为来源
-appaloft deploy https://github.com/example/web \
+appaloft up https://github.com/example/web \
   --method static \
   --publish-dir dist \
   --resource-name web
@@ -161,6 +162,9 @@ appaloft resource configure-source res_web \
 # 部署前先只看计划，不创建部署尝试
 appaloft deployments plan --project prj_prod --environment env_prod --resource res_web --server srv_prod
 ```
+
+`appaloft deploy` 在 1.x 中仍是同一工作流的受支持兼容写法；新的命令和自动化应优先使用
+`appaloft up`。两种写法使用完全相同的来源解析和部署生命周期。
 
 ## HTTP/API 操作步骤
 

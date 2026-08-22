@@ -23,6 +23,21 @@ describe("local Git Workspace context", () => {
     expect(normalizeWorkspaceRepositoryRemote("https://github.com/Acme/Web.git")).toEqual(expected);
   });
 
+  test("[WS-OPEN-GIT-002] explicit HTTPS repository locator still rejects userinfo", () => {
+    let rejected: unknown;
+    try {
+      normalizeWorkspaceRepositoryRemote("https://developer@github.com/acme/private-repo.git");
+    } catch (error) {
+      rejected = error;
+    }
+
+    expect(rejected).toMatchObject({
+      code: "validation_error",
+      details: { code: "workspace_repository_remote_invalid" },
+    });
+    expect(JSON.stringify(rejected)).not.toContain("developer@");
+  });
+
   test("[WS-OPEN-GIT-001][WS-OPEN-GIT-004] resolves a clean branch pinned to its remote SHA", async () => {
     const sha = "0123456789abcdef0123456789abcdef01234567";
     const outputs = new Map<string, string>([
@@ -52,6 +67,33 @@ describe("local Git Workspace context", () => {
       ref: "refs/heads/feature/open",
       headSha: sha,
     });
+  });
+
+  test("[WS-OPEN-GIT-002][FOLDER-ONBOARD-002] local HTTPS origin strips username without leaking userinfo", async () => {
+    const sha = "0123456789abcdef0123456789abcdef01234567";
+    const outputs = new Map<string, string>([
+      ["rev-parse --show-toplevel", "/work/repository\n"],
+      ["rev-parse HEAD", `${sha}\n`],
+      ["status --porcelain=v1 --untracked-files=all", ""],
+      ["symbolic-ref --quiet --short HEAD", "main\n"],
+      ["config --get branch.main.remote", "origin\n"],
+      ["config --get branch.main.merge", "refs/heads/main\n"],
+      ["config --get remote.origin.url", "https://developer@github.com/acme/private-repo.git\n"],
+      ["ls-remote --exit-code origin refs/heads/main", `${sha}\trefs/heads/main\n`],
+    ]);
+    const runGit: WorkspaceGitCommandRunner = async ({ args }) => {
+      const key = args.join(" ");
+      const stdout = outputs.get(key);
+      if (stdout === undefined) throw new Error(`Unexpected git command: ${key}`);
+      return { stdout, stderr: "" };
+    };
+
+    const context = await resolveLocalGitWorkspaceContext(".", runGit);
+
+    expect(context.repositoryIdentity).toBe("github.com/acme/private-repo");
+    expect(context.credentialFreeHttpsRepository).toBe("https://github.com/acme/private-repo.git");
+    expect(context.repositoryIdentity).not.toContain("developer@");
+    expect(context.credentialFreeHttpsRepository).not.toContain("developer@");
   });
 
   test("[WS-OPEN-GIT-003] fails dirty before inspecting any remote ref", async () => {

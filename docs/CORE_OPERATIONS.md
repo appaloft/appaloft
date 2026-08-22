@@ -1221,7 +1221,7 @@ Implemented operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
-| Create deployment | Command | `deployments.create` | `CreateDeploymentCommand` | `CreateDeploymentCommandInput` | `appaloft deploy [path-or-source] [--yes] [--project <projectId>] [--application <config-key>]` (first unlinked folder may create/link a Project named after the directory, or the only existing Project; git is not required) or `appaloft deployments create --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]` | `POST /api/deployments` |
+| Create deployment | Command | `deployments.create` | `CreateDeploymentCommand` | `CreateDeploymentCommandInput` | `appaloft up [path-or-source] [--yes] [--project <projectId>] [--application <config-key>]` (`appaloft deploy` remains the 1.x compatibility spelling; first unlinked folder may create/link a Project named after the directory, or the only existing Project; git is not required) or `appaloft deployments create --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]` | `POST /api/deployments` |
 | Cleanup preview deployment | Command | `deployments.cleanup-preview` | `CleanupPreviewCommand` | `CleanupPreviewCommandInput` | `appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123` | `POST /api/deployments/cleanup-preview` |
 | Preview deployment plan | Query | `deployments.plan` | `DeploymentPlanQuery` | `DeploymentPlanQueryInput` | `appaloft deployments plan --resource <resourceId> --server <serverId> [--project <projectId>] [--environment <environmentId>] [--destination <destinationId>]` | `GET /api/deployments/plan` |
 | List deployments | Product-session member query | `deployments.list` | `ListDeploymentsQuery` | `ListDeploymentsQueryInput` | `appaloft deployments list` | `GET /api/deployments` |
@@ -1577,7 +1577,8 @@ Product-grade preview policy operations:
   Execution still runs inline through the rollback use case rather than process-attempt atomic
   claim/completion.
 - Quick Deploy is an entry workflow over explicit operations, not a separate domain command or
-  operation-catalog entry. Web QuickDeploy and CLI interactive `appaloft deploy` must create/select
+  operation-catalog entry. Web QuickDeploy and CLI interactive `appaloft up` (`appaloft deploy` in
+  1.x compatibility mode) must create/select
   context through existing commands and queries, then dispatch `deployments.create`. See
   [ADR-010: Quick Deploy Workflow Boundary](./decisions/ADR-010-quick-deploy-workflow-boundary.md).
 - source, runtime, network, health, route, domain, and TLS fields on `deployments.create` are superseded by
@@ -2145,9 +2146,10 @@ CLI:
 - `appaloft login`, `appaloft auth token login`, `appaloft logout`, `appaloft auth status`, and
   `appaloft context *` manage local uncommitted client state; they must not write secrets to
   `appaloft.yml`, create operation-catalog aliases, or add control-plane fields to
-  `deployments.create`. First Cloud `appaloft deploy` reuses that same login and profile store
-  instead of telling the operator to run a separate login command. Coding-agent, CI, and
-  non-TTY `deploy` / `setup agent` print a plan and do not mutate without `--yes`.
+  `deployments.create`. First Cloud `appaloft up` reuses that same login and profile store
+  instead of telling the operator to run a separate login command. `appaloft deploy` remains the
+  1.x compatibility spelling. Coding-agent, CI, and non-TTY `up` / `deploy` / `setup agent` print
+  a plan and do not mutate without `--yes`.
 - `appaloft auth mcp login`, `appaloft auth mcp {codex,cursor,opencode,claude-code} install`, and
   `appaloft setup agent` are local host-config affordances, not operation-catalog entries.
   `appaloft setup agent` is the one-command local Agent door: the agent list includes `universal`,

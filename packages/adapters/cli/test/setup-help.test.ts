@@ -39,6 +39,10 @@ describe("compact setup agent help", () => {
     expect(isSetupHelpInvocation(["node", "appaloft", "setup", "agent", "-y"])).toBeFalse();
     expect(isSetupHelpInvocation(["node", "appaloft", "code", "--help"])).toBeFalse();
     expect(isSetupHelpInvocation(["node", "appaloft", "login", "--help"])).toBeFalse();
+    expect(
+      isSetupHelpInvocation(["node", "appaloft", "setup", "agent", "--bogus", "--help"]),
+    ).toBeFalse();
+    expect(isSetupHelpInvocation(["node", "appaloft", "setup", "nope", "--help"])).toBeFalse();
   });
 
   test("[CONTROL-PLANE-CLI-027] compact table names real-use flags without Effect defaults", () => {

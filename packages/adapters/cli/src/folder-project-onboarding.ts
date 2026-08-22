@@ -24,7 +24,7 @@ import {
 } from "./folder-project-link.js";
 import { type CliInteraction } from "./interaction.js";
 import {
-  normalizeWorkspaceRepositoryRemote,
+  normalizeLocalWorkspaceRepositoryRemote,
   type WorkspaceGitCommandRunner,
 } from "./local-git-workspace-context.js";
 import { removeProcessListener } from "./remove-process-listener.js";
@@ -256,7 +256,7 @@ export async function peekWorkspaceGitIdentity(
       }))
     ).stdout.trim();
     if (!remote) return undefined;
-    return normalizeWorkspaceRepositoryRemote(remote).identity;
+    return normalizeLocalWorkspaceRepositoryRemote(remote).identity;
   } catch {
     return undefined;
   }

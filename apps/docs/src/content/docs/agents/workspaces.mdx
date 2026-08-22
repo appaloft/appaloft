@@ -28,7 +28,8 @@ sidebar:
 ---
 
 <Aside type="caution" title="成熟度：Public alpha">
-Workspace 的 CLI、SDK 和底层操作属于公开 Appaloft 能力；具体 Sandbox Provider、模板、网关和公网地址能力取决于部署方的运营配置。
+  Workspace 的 CLI、SDK 和底层操作属于公开 Appaloft 能力；具体 Sandbox
+  Provider、模板、网关和公网地址能力取决于部署方的运营配置。
 </Aside>
 
 ## 简要定义 <a id="agent-workspace" />
@@ -93,6 +94,7 @@ Remote · <project> · <repo@sha> · <server> · my sandbox · <name>
 占用成功后，CLI 会把公开的 Appaloft skill 写入 `/workspace/skills/appaloft` 和
 `/workspace/.agents/skills/appaloft`。如果这台笔记本 HOME 里有匹配的 skill 目录，占用还会
 **只新增** 复制到 `/workspace/skills/<name>` 和 `/workspace/.agents/skills/<name>`。
+
 <a id="agent-workspace-occupancy-skills" />
 
 对齐 Railway 云 Agent 文档的根是 `~/.claude/skills`、`~/.codex/skills`、`~/.grok/skills`、
@@ -127,19 +129,30 @@ Cloud Agents 偏好，然后跟随这台笔记本已登录或已安装的厂商�
 会话仍提供公开 Appaloft skill 和第一方 Appaloft MCP，让远端 agent 可以列出
 workspace 并部署。不会复制笔记本 `mcp.json` 密钥。永远不会打印 token 值。
 
+占用结束后若要删除 Codex 凭证的远端副本，运行：
+
+```bash
+appaloft sandbox file remove <sandboxId> --path .codex/auth.json
+```
+
+删除远端文件不会撤销对应的上游登录会话。若凭证可能已经泄露，还要在 Codex / OpenAI
+账号安全设置中撤销对应会话。
+
 多个已注册 Server 时，用 `--server` 钉死其中一个：
 
 ```bash
 appaloft code --server srv_4lifk0yrcecy
 ```
 
-<a id="agent-workspace-preparing-disk" />
-若 **Preparing disk** 遇到暂时的 Cloud 网关失败（HTTP 502 / 503，包括
-Cloudflare bad-gateway 或 origin 不完整响应），Cloud Agents 等待画面会保持，
-将该磁盘步骤标为重试中，并在同一台已登记 Server 上继续重试磁盘准备，直到进入可输入的会话，或等待超时。
-只有磁盘准备成功并接上会话后才算成功。短重试突发失败不会为此离开等待画面、恢复终端，或打印 folder 路径。
-若截止时间到、进行中的磁盘准备被取消，或从未接上会话，CLI 会失败闭合：恢复终端一次，打印 Cloud 暂时不可达 / 磁盘准备未完成，退出非 0，不会打印 folder 路径。等待画面上的 Ctrl-C / 退出会中止进行中的打开，看起来不像成功。这是同一次 occupy 重试，不是再打开一次本地 folder。`--omp` 是 OpenCode
-harness；若你打开的是 Pi，用 `--pi`。CLI 会保留 HTTP 状态，不会倾倒网关页面。
+<a id="agent-workspace-preparing-disk" />若 **Preparing disk** 遇到暂时的 Cloud 网关失败（HTTP 502 /
+503，包括 Cloudflare bad-gateway 或 origin 不完整响应），Cloud Agents 等待画面会保持，
+将该磁盘步骤标为重试中，并在同一台已登记 Server
+上继续重试磁盘准备，直到进入可输入的会话，或等待超时。
+只有磁盘准备成功并接上会话后才算成功。短重试突发失败不会为此离开等待画面、恢复终端，或打印 folder
+路径。 若截止时间到、进行中的磁盘准备被取消，或从未接上会话，CLI 会失败闭合：恢复终端一次，打印
+Cloud 暂时不可达 / 磁盘准备未完成，退出非 0，不会打印 folder 路径。等待画面上的 Ctrl-C /
+退出会中止进行中的打开，看起来不像成功。这是同一次 occupy 重试，不是再打开一次本地 folder。`--omp`
+是 OpenCode harness；若你打开的是 Pi，用 `--pi`。CLI 会保留 HTTP 状态，不会倾倒网关页面。
 
 未登录、没有 Server，或显式 `--claude` / `--codex` / `--grok` 缺少凭证，会 fail closed
 并给出下一步，不会变成 Scratch。本机 Scratch 必须显式指定：

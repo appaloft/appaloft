@@ -4,10 +4,12 @@ description: "从零开始完成第一次 Appaloft 部署的完整路径。"
 docType: "task"
 localeState:
   zh-CN: complete
-  en-US: needs-update
+  en-US: complete
 searchAliases:
   - "quick start"
   - "getting started"
+  - "appaloft up"
+  - "railway up"
   - "首次部署"
   - "快速开始"
 relatedOperations:
@@ -42,7 +44,7 @@ sidebar:
 
 | 输入 | 说明 | 默认值 |
 | --- | --- | --- |
-| Project | 资源、环境和部署历史的组织边界 | 第一次在未关联文件夹里 `deploy`/`code` 时按目录名创建，或使用你唯一的项目；也可用 `project use` |
+| Project | 资源、环境和部署历史的组织边界 | 第一次在未关联文件夹里 `up`/`code` 时按目录名创建，或使用你唯一的项目；也可用 `project use` |
 | Server | 部署目标机器（SSH 可达） | 无，必须先注册 |
 | 部署来源 | Git 仓库、容器镜像或本地静态目录 | 无，必须显式提供 |
 | 运行时 Profile | 启动命令、端口、健康检查路径 | 尝试零配置检测，检测失败需要显式指定 |
@@ -68,16 +70,15 @@ Monorepo 根目录下存在多个候选应用时，部署会被阻塞，直到�
 4. 确认运行时 Profile（启动命令、端口、健康检查）后点击 **Deploy**。
 5. 部署面板会展示当前生命周期状态；成功后会显示自动生成的访问地址。
 
-## CLI 操作步骤
+## CLI 操作步骤 <a id="cli-up-first-deployment" />
 
 ```bash
-# 1. 第一次 deploy 会在需要时直接登录（Railway `up` 手感）。自托管仍可先跑
+# 1. `up` 是从当前文件夹部署的主入口，会在需要时直接登录。自托管仍可先跑
 #    `appaloft login --url https://your-appaloft-host`。
 #    编码 Agent / CI / 非 TTY 环境会先打印计划，除非传入 --yes。
-appaloft deploy
-appaloft deploy .
+appaloft up
 
-# 2. 创建项目（可选）。第一次 deploy/code 也会按目录名创建并记住这个文件夹
+# 2. 创建项目（可选）。第一次 up/code 也会按目录名创建并记住这个文件夹
 appaloft project create --name "my-first-project"
 appaloft project use <projectId>
 
@@ -85,21 +86,24 @@ appaloft project use <projectId>
 appaloft server register --host 203.0.113.10 --ssh-user deploy --ssh-key ~/.ssh/id_ed25519
 appaloft server capacity inspect --server-id <serverId>
 
-# 4. 已经登录时，同一条文件夹 deploy 会继续创建或复用这个应用。
+# 4. 已经登录时，同一条文件夹 up 会继续创建或复用这个应用。
 #    目录里有 public/index.html 时会自动选 static，不必再写 --method。
 #    源目录保持当前文件夹本身（带连字符的名字也合法），不会收成上一级。
 #    SSH 打包也用这个完整目录；缺目录时报这个完整路径，不会报上一级。
 
 # 5. 或者显式指定配置文件 / profile
-appaloft deploy --config appaloft.yml --config-profile staging
+appaloft up --config appaloft.yml --config-profile staging
 
 # 6. 已经构建好的静态目录，跳过构建步骤直接发布。`.` 表示把该目录本身当作发布根。
-appaloft deploy ./dist --as static-site
-appaloft deploy . --as static-site --publish-dir .
+appaloft up ./dist --as static-site
+appaloft up . --as static-site --publish-dir .
 
 # 7. 查看部署状态与时间线
 appaloft deployments timeline <deploymentId> --follow --json
 ```
+
+`appaloft deploy` 在 1.x 中仍是同一工作流的受支持兼容写法；新命令、文档和自动化应优先使用
+`appaloft up`。两种写法共享登录、文件夹关联、`--yes` 防护、`--json` 输出和终态验证。
 
 ## HTTP/API 操作步骤
 
@@ -119,7 +123,7 @@ curl -X POST https://your-appaloft-host/api/deployments \
 
 ## 预期输出与状态
 
-`appaloft deploy` 会等到部署进入终态后再退出。构建失败（例如 SSH Docker 镜像构建失败）必须非零退出，并且不会把预留/旧 URL 当成成功地址打印出来。
+`appaloft up` 会等到部署进入终态后再退出。构建失败（例如 SSH Docker 镜像构建失败）必须非零退出，并且不会把预留/旧 URL 当成成功地址打印出来。
 
 一次成功的部署会依次经过 `pending → planning → building → deploying → verifying → healthy` 等生命周期状态（具体取值以[状态与事件](/docs/troubleshoot/status-events/)为准），最终返回：
 
