@@ -80,11 +80,14 @@ must not use laptop HEAD as Workspace truth.
    what is signed in or installed on this laptop. Never print token
    values. Never put long-lived secrets into occupancy env vars or `mcp.json`.
    Teammate disks stay isolated. This is not `appaloft setup agent`.
-10. Occupy-door **Preparing disk** (`workspaces.open` on the enrolled BYOS
-    Server) treats origin HTTP 502/503, Cloudflare bad-gateway, and incomplete
-    origin responses as an automatic retry of that same open, not as a TUI
-    tear-down. The Cloud Agents wait panel stays up and `workspaces.open` keeps
-    retrying on the enrolled Server (`--server` / hostinger) until disk prep
+10. Occupy-door **Preparing disk** treats origin HTTP 502/503, Cloudflare
+    bad-gateway, and incomplete origin responses as an automatic retry of the
+    same occupy command, not as a TUI tear-down. For folder.local `--pi` /
+    `--server`, that command is `OpenAgentWorkspaceCommand` executed through
+    `executeFolderLocalWorkspaceOpen` → `createRemoteSandbox` (`sandboxes.create`
+    on the enrolled Server, for example hostinger). It is not a second
+    `POST /api/workspaces/open` and not a persist/workdir fallback. The Cloud
+    Agents wait panel stays up and that occupy keeps retrying until disk prep
     succeeds or the operator leaves the wait panel. This is occupy-door
     recovery only and does not replay other commands, drop `targetServerId`,
     change Cloud admission, or expose Occupancy. The wait-panel disk step is

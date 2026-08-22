@@ -921,6 +921,8 @@ export const workspaceCodeCommand = EffectCommand.make(
           onProgress(OCCUPANCY_CODE_PROGRESS.usingThisProject);
         }
         onProgress(occupancyOpeningProgress(door.serverName));
+        // folder.local occupy executes OpenAgentWorkspaceCommand through
+        // executeFolderLocalWorkspaceOpen → createRemoteSandbox (sandboxes.create).
         const openDisk = (workspaceCommand: OpenAgentWorkspaceCommand) =>
           openWorkspaceWithOccupyDiskGatewayRetry(() => cli.executeCommand(workspaceCommand), {
             ...(options?.keepRetryingTransientDisk

@@ -364,7 +364,7 @@
 - [x] folder.local unstructured `Input validation failed` after the Cloud Agents screen is a human next step (`1049l` then print); `sandboxes.create` omits Cloud-unknown name hints
 - [x] folder.local / `deploy .` `Operation check denied` is a human next step (operation + reason + login/enroll/retry/Cloud update); logged-in create-project keeps handshake org (WS-REMOTE-COMPAT-221)
 - [x] occupy / Preparing disk HTTP 502/503 or Cloudflare bad-gateway / origin-incomplete after TUI first paint humanizes to Cloud is temporarily unreachable without Occupancy/`sbx_` / contract sentence / `Opening folder.local`; `--omp` and `--pi` name hostinger `srv_4lifk0yrcecy` (WS-REMOTE-COMPAT-222)
-- [x] occupy / Preparing disk origin HTTP 502/503 keeps the Cloud Agents wait panel up, marks the disk step retrying, and keeps retrying disk prep on hostinger `srv_4lifk0yrcecy` past a 4-attempt helper burst; attach waits for success; do not leave alt-screen or print `Opening folder.local` (WS-REMOTE-PROGRESS-223)
+- [x] occupy / Preparing disk origin HTTP 502/503 keeps the Cloud Agents wait panel up, marks the disk step retrying, and keeps retrying folder.local `sandboxes.create` on hostinger `srv_4lifk0yrcecy` past a 4-attempt helper burst; attach waits for success; do not leave alt-screen or print `Opening folder.local` (WS-REMOTE-PROGRESS-223)
 - [x] `appaloftdev code --no-attach` would name the enrolled Server
 
 ## Slice 44 - occupancy resume keeps preferred Profile

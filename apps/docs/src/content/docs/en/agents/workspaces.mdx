@@ -152,7 +152,8 @@ If **Preparing disk** hits a temporary Cloud gateway failure (HTTP 502 or
 Agents wait stays up, marks that disk step as retrying, and keeps retrying
 disk preparation on the same enrolled Server. Attach starts only after disk
 prep succeeds. The wait panel does not leave to print a folder path or restore
-the terminal just because a short retry burst failed. `--omp` is the OpenCode
+the terminal just because a short retry burst failed. This stay/retry is the
+same occupy, not a second local folder open. `--omp` is the OpenCode
 harness; use `--pi` when that is the agent you opened. The CLI keeps the HTTP
 status and does not dump the gateway page.
 
