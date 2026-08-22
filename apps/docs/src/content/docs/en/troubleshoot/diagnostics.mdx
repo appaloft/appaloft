@@ -110,6 +110,10 @@ appaloft server capacity prune srv_primary --before 2026-01-01T00:00:00.000Z --d
 
 Capacity cleanup only operates on candidates outside of Appaloft's state directory, running runtimes, rollback candidates, deployment snapshots, audit/events, logs, and business state — it never runs a broad Docker system prune.
 
+If an explicit SSH-PGlite capacity cleanup has already removed runtime candidates but finishes with `remote-state-sync-upload`, do not replay the destructive prune. Run `server capacity inspect --retry-pending-state-sync` with the exact same SSH-PGlite transport options to resolve any remote active or legacy recovery marker first, then recover only the preserved audit state. Ordinary reads fail closed while a marker exists. Sync-back reserves incoming space through retention before allocation, validates the complete incoming mirror, and publishes an active marker before rotating live state; the atomic revision rename is the only commit point, and failed validation neither replaces live state nor creates a new recovery backup.
+
+Mutating SSH-PGlite targets must provide `flock`. Appaloft uses an exclusive kernel lock on the validated locks directory for short mutation-lock transitions; `mutation.guard/owner.json` is only UUID-owned lease and recovery evidence. A killed process or restarted host releases the kernel lock automatically. A later command waits for the short residue grace, writes a planned recovery record, and archives the residue before continuing. Inspect and dry-run remain strictly read-only and never acquire this gate. A missing `flock`, unsafe guard path, or full-disk failure is reported and does not move the canonical mutation lock.
+
 ## Runtime monitoring samples and rollups <a id="runtime-monitoring-samples-and-rollups" /><a id="runtime-monitoring-thresholds" />
 
 Appaloft keeps bounded runtime monitoring samples and rollups inside the control plane for the Web Monitor and diagnostics loop. Retention and alert thresholds are controlled by runtime configuration; raw samples outside the retention window are pruned.

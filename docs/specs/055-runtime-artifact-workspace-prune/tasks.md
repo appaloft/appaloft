@@ -9,6 +9,12 @@
 - [x] RT-CAP-PRUNE-006: add destructive prune audit output tests.
 - [x] RT-CAP-PRUNE-007: add explicit Docker build-cache and unused-image category tests.
 - [x] RT-CAP-PRUNE-013: add application protection-set and runtime adapter fail-closed tests.
+- [x] CONFIG-FILE-STATE-003/006/019: add strict read-only, guard crash recovery, ENOSPC stderr,
+  token-safe transition, public stale-recovery, maintenance entrypoint, and Linux kernel concurrency
+  regression coverage.
+- [x] RT-CAP-REMOTE-STATE-003: add lifecycle ABA fencing, durable intent ordering, maintenance owner
+  publication and heartbeat failure, signal rollback, crash-marker resolution, immutable backup
+  symlink, and overlap-based real-`flock` regression coverage.
 
 ## Source Of Truth
 
@@ -27,6 +33,12 @@
 - [x] Add audit recorder port, persistence implementation, and destructive prune audit wiring.
 - [x] Derive complete server-scoped active-runtime/rollback protection and pass it to the runtime
   adapter before stopped-container mutation.
+- [x] Serialize SSH-PGlite prepare, heartbeat, release, failure cleanup, explicit stale recovery,
+  backup, restore, promote, and rollback through the shared kernel transition gate; atomically
+  publish UUID-owned guard metadata and prewrite recovery intent before canonical movement.
+- [x] Give ordinary lifecycle locks unique tokens, sync recovery intent before canonical movement,
+  and make promote/rollback a revision-committed transaction with signal rollback and deterministic
+  crash-marker resolution.
 
 ## Entrypoints And Docs
 
@@ -45,6 +57,10 @@
 - [x] Run focused Web source/WebView coverage for `RT-CAP-WEB-001`.
 - [x] Run focused application, persistence read-model, runtime adapter, typecheck, lint, and Ash
   command-safety verification for `RT-CAP-PRUNE-013`.
+- [x] Run focused lifecycle and remote-state tests on Darwin with the narrow sequential `flock`
+  harness, and run lifecycle tests in Linux with real `flock`, including concurrent contenders.
+- [ ] Run the released source CLI against the production Hostinger target and prove exact
+  `appaloftdev code --codex` TTY attach before closing the incident.
 
 ## Post-Implementation Sync
 

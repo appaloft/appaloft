@@ -75,9 +75,15 @@ The command must:
 - Dry-run must not mutate the target.
 - SSH-PGlite inspect and default/dry-run prune are strict read-only sessions: they may reject an
   active mutation lock, but must not create, heartbeat, recover, or release a lock, upload state,
-  increment a revision, or create a backup/marker. Their streamed snapshot must verify both the
+  increment a revision, open the kernel transition gate, or create a guard, backup, or marker. Their
+  streamed snapshot must verify both the
   mutation-lock absence and the state revision before and after archiving, and fail closed if either
   changes.
+- Destructive SSH-PGlite sync and remote-state maintenance require `flock` on the target. The
+  validated locks-directory descriptor is the transition fencing truth; UUID-owned
+  `mutation.guard/owner.json` is a bounded lease/audit residue. Missing kernel support, unsafe guard
+  paths, or failure to persist recovery intent fails closed with the filesystem diagnostic before
+  moving the canonical mutation lock.
 - Destructive prune requires explicit `dryRun = false`.
 - Matching uses `updatedAt < before`; cutoff-equal candidates are retained.
 - Active runtimes are always skipped.
@@ -107,7 +113,11 @@ The command must:
   reporting and deletion before summary counts are accumulated.
 - Remote PGlite upload safety backups under `state/backups/sync-*` must remain protected by the
   configured recovery window and bounded sync-backup count before explicit marker cleanup can remove
-  older remaining archives.
+  older remaining archives. Sync-back applies retention before allocating incoming state, reserves
+  one backup slot, validates the incoming mirror before live-state rotation, and uses same-filesystem
+  renames so a capacity repair does not require live, copied backup, and incoming state at once. It
+  publishes an active recovery marker before rotation and commits only by atomically replacing the
+  revision fence; ordinary reads fail closed until explicit recovery rolls back or finishes cleanup.
 - The adapter must never run broad `docker system prune`.
 - Unused image pruning must use `docker image prune --all` so tagged and dangling images share the
   category semantics reported by capacity inspection. Docker's container-reference safety and the

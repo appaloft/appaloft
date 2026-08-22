@@ -373,39 +373,228 @@ function parseRemoteRevisionConflict(
   }
 }
 
-function remoteArchiveCommand(dataRoot: string, readOnly: boolean): string {
+function remoteArchiveCommand(dataRoot: string, readOnly: boolean): ash.Script {
   if (readOnly) {
-    return [
-      "set -eu",
-      `data_root=${ash.quote(dataRoot)}`,
-      'lock_dir="$data_root/locks/mutation.lock"',
-      'revision_file="$data_root/sync-revision.txt"',
-      'test -d "$data_root/pglite"',
-      '[ ! -d "$lock_dir" ]',
-      'revision_before=0; if [ -f "$revision_file" ]; then revision_before="$(cat "$revision_file" 2>/dev/null || printf "0")"; fi',
-      'cd "$data_root"',
-      "tar -czf - pglite source-links server-applied-routes",
-      'revision_after=0; if [ -f "$revision_file" ]; then revision_after="$(cat "$revision_file" 2>/dev/null || printf "0")"; fi',
-      '[ ! -d "$lock_dir" ] && [ "$revision_before" = "$revision_after" ]',
-    ].join("; ");
+    return ash`
+      set -eu
+      data_root=${ash.arg(dataRoot)}
+      [ -d "$data_root" ] && [ ! -L "$data_root" ] || exit 75
+      lock_dir="$data_root/locks/mutation.lock"
+      revision_file="$data_root/sync-revision.txt"
+      recovery_dir="$data_root/recovery"
+      if [ -e "$recovery_dir" ] || [ -L "$recovery_dir" ]; then [ -d "$recovery_dir" ] && [ ! -L "$recovery_dir" ] || exit 75; fi
+      recovery_file="$recovery_dir/remote-sync-upload.json"
+      if [ -e "$recovery_file" ] || [ -L "$recovery_file" ]; then printf '{"phase":"remote-state-sync-download","reason":"remote_state_recovery_required"}\n' >&2; exit 75; fi
+      test -d "$data_root/pglite"
+      test ! -L "$data_root/pglite"
+      test -d "$data_root/source-links"
+      test ! -L "$data_root/source-links"
+      test -d "$data_root/server-applied-routes"
+      test ! -L "$data_root/server-applied-routes"
+      [ ! -d "$lock_dir" ]
+      revision_before=0
+      if [ -e "$revision_file" ] || [ -L "$revision_file" ]; then
+        [ -f "$revision_file" ] && [ ! -L "$revision_file" ] || exit 75
+        revision_before="$(cat "$revision_file" 2>/dev/null || printf invalid)"
+      fi
+      case "$revision_before" in ""|*[!0-9]*) exit 75 ;; esac
+      cd "$data_root"
+      tar -czf - pglite source-links server-applied-routes
+      revision_after=0
+      if [ -e "$revision_file" ] || [ -L "$revision_file" ]; then
+        [ -f "$revision_file" ] && [ ! -L "$revision_file" ] || exit 75
+        revision_after="$(cat "$revision_file" 2>/dev/null || printf invalid)"
+      fi
+      case "$revision_after" in ""|*[!0-9]*) exit 75 ;; esac
+      [ ! -d "$lock_dir" ] && [ "$revision_before" = "$revision_after" ]
+    `;
   }
 
-  return [
-    `mkdir -p ${ash.quote(dataRoot)}/pglite ${ash.quote(dataRoot)}/source-links ${ash.quote(dataRoot)}/server-applied-routes`,
-    `cd ${ash.quote(dataRoot)}`,
-    "tar -czf - pglite source-links server-applied-routes",
-  ].join(" && ");
+  return ash`
+    set -eu
+    data_root=${ash.arg(dataRoot)}
+    if [ -e "$data_root" ] || [ -L "$data_root" ]; then
+      [ -d "$data_root" ] && [ ! -L "$data_root" ] || exit 75
+    else
+      mkdir -p "$data_root"
+    fi
+    recovery_dir="$data_root/recovery"
+    if [ -e "$recovery_dir" ] || [ -L "$recovery_dir" ]; then [ -d "$recovery_dir" ] && [ ! -L "$recovery_dir" ] || exit 75; fi
+    recovery_file="$recovery_dir/remote-sync-upload.json"
+    if [ -e "$recovery_file" ] || [ -L "$recovery_file" ]; then printf '{"phase":"remote-state-sync-download","reason":"remote_state_recovery_required"}\n' >&2; exit 75; fi
+    for component in pglite source-links server-applied-routes; do
+      component_path="$data_root/$component"
+      if [ -e "$component_path" ] || [ -L "$component_path" ]; then
+        [ -d "$component_path" ] && [ ! -L "$component_path" ] || exit 75
+      else
+        mkdir -p "$component_path"
+      fi
+    done
+    cd "$data_root"
+    tar -czf - pglite source-links server-applied-routes
+  `;
 }
 
-function remoteRevisionReadCommand(dataRoot: string, readOnly: boolean): string {
-  const quotedDataRoot = ash.quote(dataRoot);
+function remoteRevisionReadCommand(dataRoot: string, readOnly: boolean): ash.Script {
+  return ash`
+    data_root=${ash.arg(dataRoot)}
+    read_only=${ash.arg(readOnly ? "true" : "false")}
+    if [ -e "$data_root" ] || [ -L "$data_root" ]; then
+      [ -d "$data_root" ] && [ ! -L "$data_root" ] || exit 75
+    elif [ "$read_only" = true ]; then
+      exit 75
+    else
+      mkdir -p "$data_root"
+    fi
+    revision_file="$data_root/sync-revision.txt"
+    recovery_dir="$data_root/recovery"
+    if [ -e "$recovery_dir" ] || [ -L "$recovery_dir" ]; then [ -d "$recovery_dir" ] && [ ! -L "$recovery_dir" ] || exit 75; fi
+    recovery_file="$recovery_dir/remote-sync-upload.json"
+    if [ -e "$recovery_file" ] || [ -L "$recovery_file" ]; then printf '{"phase":"remote-state-sync-download","reason":"remote_state_recovery_required"}\n' >&2; exit 75; fi
+    revision=0
+    if [ -e "$revision_file" ] || [ -L "$revision_file" ]; then
+      [ -f "$revision_file" ] && [ ! -L "$revision_file" ] || exit 75
+      revision="$(cat "$revision_file" 2>/dev/null || printf invalid)"
+    fi
+    case "$revision" in ""|*[!0-9]*) exit 75 ;; esac
+    printf '%s\n' "$revision"
+  `;
+}
 
-  return [
-    `data_root=${quotedDataRoot}`,
-    'revision_file="$data_root/sync-revision.txt"',
-    ...(readOnly ? [] : ['mkdir -p "$data_root"']),
-    'if [ -f "$revision_file" ]; then cat "$revision_file"; else printf "0\\n"; fi',
-  ].join("; ");
+function remoteRecoveryResolveCommand(dataRoot: string): ash.Script {
+  return ash`
+    set -eu
+    data_root=${ash.arg(dataRoot)}
+    recovery_dir="$data_root/recovery"
+    recovery_file="$recovery_dir/remote-sync-upload.json"
+    [ -d "$data_root" ] && [ ! -L "$data_root" ] || exit 75
+    if [ -e "$recovery_dir" ] || [ -L "$recovery_dir" ]; then
+      [ -d "$recovery_dir" ] && [ ! -L "$recovery_dir" ] || exit 75
+    else
+      exit 0
+    fi
+    if [ ! -e "$recovery_file" ] && [ ! -L "$recovery_file" ]; then exit 0; fi
+    [ -f "$recovery_file" ] && [ ! -L "$recovery_file" ] || exit 75
+    marker="$(tr -d '\r\n' < "$recovery_file")"
+    sync_path() { sync "$1" 2>/dev/null || sync; }
+    json_string() { printf "%s" "$marker" | sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p"; }
+    json_number() { printf "%s" "$marker" | sed -n "s/.*\"$1\":\([0-9][0-9]*\).*/\1/p"; }
+    json_bool() { printf "%s" "$marker" | sed -n "s/.*\"$1\":\([a-z][a-z]*\).*/\1/p"; }
+    restore_component() {
+      component="$1"
+      had="$2"
+      backup_path="$backup_dir/$component"
+      live_path="$data_root/$component"
+      [ ! -L "$backup_path" ] && [ ! -L "$live_path" ] || return 1
+      if [ "$had" = true ]; then
+        if [ -d "$backup_path" ]; then
+          rm -rf "$live_path" || return 1
+          [ ! -e "$live_path" ] && [ ! -L "$live_path" ] || return 1
+          mv "$backup_path" "$live_path" || return 1
+        elif [ -d "$live_path" ]; then
+          :
+        else
+          return 1
+        fi
+      else
+        rm -rf "$live_path" || return 1
+        [ ! -e "$live_path" ] && [ ! -L "$live_path" ] || return 1
+      fi
+    }
+    schema="$(json_string schemaVersion)"
+    if [ "$schema" = remote-state-sync-recovery/v2 ]; then
+      marker_status="$(json_string status)"
+      transaction_id="$(json_string transactionId)"
+      backup_name="$(json_string backupName)"
+      incoming_name="$(json_string incomingName)"
+      revision_temp_name="$(json_string revisionTempName)"
+      marker_expected="$(json_number expectedRevision)"
+      marker_next="$(json_number nextRevision)"
+      had_pglite="$(json_bool hadPglite)"
+      had_source_links="$(json_bool hadSourceLinks)"
+      had_routes="$(json_bool hadServerAppliedRoutes)"
+      [ "$marker_status" = active ] || exit 75
+      case "$transaction_id" in sync-*) ;; *) exit 75 ;; esac
+      case "$transaction_id" in *[!A-Za-z0-9._-]*|*/*|*..*) exit 75 ;; esac
+      [ "$backup_name" = "$transaction_id" ] || exit 75
+      [ "$incoming_name" = ".incoming-$transaction_id" ] || exit 75
+      [ "$revision_temp_name" = ".sync-revision-$transaction_id.tmp" ] || exit 75
+      case "$marker_expected" in ""|*[!0-9]*) exit 75 ;; esac
+      case "$marker_next" in ""|*[!0-9]*) exit 75 ;; esac
+      case "$had_pglite:$had_source_links:$had_routes" in
+        true:true:true|true:true:false|true:false:true|true:false:false|false:true:true|false:true:false|false:false:true|false:false:false) ;;
+        *) exit 75 ;;
+      esac
+      [ "$marker_next" -eq $((marker_expected + 1)) ] || exit 75
+      [ -d "$data_root/backups" ] && [ ! -L "$data_root/backups" ] || exit 75
+      backup_dir="$data_root/backups/$backup_name"
+      incoming_dir="$data_root/$incoming_name"
+      revision_temp="$data_root/$revision_temp_name"
+      [ ! -L "$backup_dir" ] && [ ! -L "$incoming_dir" ] && [ ! -L "$revision_temp" ] || exit 75
+      actual_revision=0
+      revision_file="$data_root/sync-revision.txt"
+      if [ -e "$revision_file" ] || [ -L "$revision_file" ]; then
+        [ -f "$revision_file" ] && [ ! -L "$revision_file" ] || exit 75
+        actual_revision="$(cat "$revision_file" 2>/dev/null || printf invalid)"
+      fi
+      case "$actual_revision" in ""|*[!0-9]*) exit 75 ;; esac
+      if [ "$actual_revision" = "$marker_next" ]; then
+        for component in pglite source-links server-applied-routes; do
+          live_path="$data_root/$component"
+          [ -d "$live_path" ] && [ ! -L "$live_path" ] || exit 75
+        done
+        sync_path "$data_root" || exit 75
+        rm -rf "$incoming_dir" || exit 75
+        rm -f "$revision_temp" || exit 75
+        rm -f "$recovery_file" || exit 75
+        sync_path "$recovery_dir" || exit 75
+        exit 0
+      fi
+      [ "$actual_revision" = "$marker_expected" ] || exit 75
+      restore_component pglite "$had_pglite" || exit 75
+      restore_component source-links "$had_source_links" || exit 75
+      restore_component server-applied-routes "$had_routes" || exit 75
+      sync_path "$data_root" || exit 75
+      rm -rf "$incoming_dir" || exit 75
+      rm -f "$revision_temp" || exit 75
+      rm -rf "$backup_dir" || exit 75
+      rm -f "$recovery_file" || exit 75
+      sync_path "$recovery_dir" || exit 75
+      exit 0
+    fi
+    legacy_backup="$(json_string backup)"
+    legacy_phase="$(json_string phase)"
+    [ "$legacy_phase" = remote-state-sync-upload ] || exit 75
+    case "$legacy_backup" in "$data_root"/backups/sync-*) ;; *) exit 75 ;; esac
+    legacy_backup_name="$(basename "$legacy_backup")"
+    case "$legacy_backup_name" in *[!A-Za-z0-9._-]*|*/*|*..*|"") exit 75 ;; esac
+    [ "$legacy_backup" = "$data_root/backups/$legacy_backup_name" ] || exit 75
+    [ -d "$data_root/backups" ] && [ ! -L "$data_root/backups" ] || exit 75
+    backup_dir="$legacy_backup"
+    [ -d "$backup_dir" ] && [ ! -L "$backup_dir" ] || exit 75
+    legacy_revision=0
+    revision_file="$data_root/sync-revision.txt"
+    if [ -e "$revision_file" ] || [ -L "$revision_file" ]; then
+      [ -f "$revision_file" ] && [ ! -L "$revision_file" ] || exit 75
+      legacy_revision="$(cat "$revision_file" 2>/dev/null || printf invalid)"
+    fi
+    case "$legacy_revision" in ""|*[!0-9]*) exit 75 ;; esac
+    for component in pglite source-links server-applied-routes; do
+      [ -d "$backup_dir/$component" ] && [ ! -L "$backup_dir/$component" ] || exit 75
+      [ ! -L "$data_root/$component" ] || exit 75
+    done
+    [ -f "$backup_dir/pglite/PG_VERSION" ] && [ ! -L "$backup_dir/pglite/PG_VERSION" ] || exit 75
+    for component in pglite source-links server-applied-routes; do
+      rm -rf "$data_root/$component" || exit 75
+      [ ! -e "$data_root/$component" ] && [ ! -L "$data_root/$component" ] || exit 75
+      cp -a "$backup_dir/$component" "$data_root/$component" || exit 75
+      sync_path "$data_root/$component" || exit 75
+    done
+    sync_path "$data_root" || exit 75
+    rm -f "$recovery_file" || exit 75
+    sync_path "$recovery_dir" || exit 75
+    rm -rf "$backup_dir" || true
+  `;
 }
 
 function remoteControlPlaneBackendMarkerEnsureCommand(dataRoot: string): string {
@@ -427,33 +616,261 @@ function remoteExtractCommand(input: {
   nextRevision: number;
   backupRetentionDays: number;
   backupMaxCount: number;
-}): string {
-  const quotedDataRoot = ash.quote(input.dataRoot);
-
-  return [
-    `data_root=${quotedDataRoot}`,
-    `expected_revision=${ash.quote(String(input.expectedRevision))}`,
-    `next_revision=${ash.quote(String(input.nextRevision))}`,
-    `backup_retention_days=${ash.quote(String(input.backupRetentionDays))}`,
-    `backup_max_count=${ash.quote(String(input.backupMaxCount))}`,
-    'backup_dir="$data_root/backups/sync-$(date +%Y%m%d%H%M%S)-$$"',
-    'incoming_dir="$data_root/.incoming-sync-$$"',
-    'recovery_file="$data_root/recovery/remote-sync-upload.json"',
-    'revision_file="$data_root/sync-revision.txt"',
-    'restore_backup() { rm -rf "$data_root/pglite" "$data_root/source-links" "$data_root/server-applied-routes"; [ ! -d "$backup_dir/pglite" ] || cp -a "$backup_dir/pglite" "$data_root/pglite"; [ ! -d "$backup_dir/source-links" ] || cp -a "$backup_dir/source-links" "$data_root/source-links"; [ ! -d "$backup_dir/server-applied-routes" ] || cp -a "$backup_dir/server-applied-routes" "$data_root/server-applied-routes"; }',
-    'write_recovery() { printf \'{"phase":"remote-state-sync-upload","backup":"%s"}\\n\' "$backup_dir" > "$recovery_file"; }',
-    'path_mtime_epoch() { date -r "$1" +%s 2>/dev/null || stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || printf ""; }',
-    'prune_old_sync_backups() { [ -d "$data_root/backups" ] || return 0; now_epoch=$(date +%s); retention_seconds=$((backup_retention_days * 86400)); for candidate in "$data_root"/backups/sync-*; do [ -d "$candidate" ] || continue; [ "$candidate" != "$backup_dir" ] || continue; updated_epoch=$(path_mtime_epoch "$candidate"); [ -n "$updated_epoch" ] || continue; age_seconds=$((now_epoch - updated_epoch)); [ "$age_seconds" -gt "$retention_seconds" ] || continue; rm -rf "$candidate"; done; count=0; for candidate in $(ls -1dt "$data_root"/backups/sync-* 2>/dev/null); do [ -d "$candidate" ] || continue; count=$((count + 1)); [ "$count" -le "$backup_max_count" ] && continue; [ "$candidate" != "$backup_dir" ] || continue; rm -rf "$candidate"; done; }',
-    'mkdir -p "$data_root" "$data_root/backups" "$data_root/recovery"',
-    "current_revision=0",
-    'if [ -f "$revision_file" ]; then current_revision="$(cat "$revision_file" 2>/dev/null || printf "0")"; fi',
-    '[ -n "$current_revision" ] || current_revision=0',
-    'if [ "$current_revision" != "$expected_revision" ]; then printf \'{"phase":"remote-state-sync-upload","reason":"remote_state_revision_conflict","expectedRevision":%s,"actualRevision":%s}\\n\' "$expected_revision" "$current_revision" >&2; exit 76; fi',
-    'rm -rf "$incoming_dir"',
-    'mkdir -p "$incoming_dir"',
-    'if [ -d "$data_root/pglite" ] || [ -d "$data_root/source-links" ] || [ -d "$data_root/server-applied-routes" ]; then mkdir -p "$backup_dir"; [ ! -d "$data_root/pglite" ] || cp -a "$data_root/pglite" "$backup_dir/pglite"; [ ! -d "$data_root/source-links" ] || cp -a "$data_root/source-links" "$backup_dir/source-links"; [ ! -d "$data_root/server-applied-routes" ] || cp -a "$data_root/server-applied-routes" "$backup_dir/server-applied-routes"; fi',
-    'if tar -xzf - -C "$incoming_dir" && [ -d "$incoming_dir/pglite" ] && [ -d "$incoming_dir/source-links" ] && [ -d "$incoming_dir/server-applied-routes" ] && rm -rf "$data_root/pglite" "$data_root/source-links" "$data_root/server-applied-routes" && mv "$incoming_dir/pglite" "$data_root/pglite" && mv "$incoming_dir/source-links" "$data_root/source-links" && mv "$incoming_dir/server-applied-routes" "$data_root/server-applied-routes" && printf "%s\\n" "$next_revision" > "$revision_file"; then rm -rf "$incoming_dir"; prune_old_sync_backups; else status=$?; rm -rf "$incoming_dir"; restore_backup; write_recovery; exit "$status"; fi',
-  ].join("; ");
+}): ash.Script {
+  return ash`
+    data_root=${ash.arg(input.dataRoot)}
+    expected_revision=${ash.arg(input.expectedRevision)}
+    next_revision=${ash.arg(input.nextRevision)}
+    backup_retention_days=${ash.arg(input.backupRetentionDays)}
+    backup_max_count=${ash.arg(input.backupMaxCount)}
+    transaction_id="sync-$(date +%Y%m%d%H%M%S)-$$"
+    backup_name="$transaction_id"
+    incoming_name=".incoming-$transaction_id"
+    revision_temp_name=".sync-revision-$transaction_id.tmp"
+    backups_dir="$data_root/backups"
+    recovery_dir="$data_root/recovery"
+    backup_dir="$data_root/backups/$backup_name"
+    incoming_dir="$data_root/$incoming_name"
+    recovery_file="$recovery_dir/remote-sync-upload.json"
+    recovery_temp="$recovery_dir/.remote-sync-upload-$$.tmp"
+    revision_file="$data_root/sync-revision.txt"
+    revision_temp="$data_root/$revision_temp_name"
+    sync_path() { sync "$1" 2>/dev/null || sync; }
+    restore_component() {
+      component="$1"
+      had="$2"
+      backup_path="$backup_dir/$component"
+      live_path="$data_root/$component"
+      [ ! -L "$backup_path" ] && [ ! -L "$live_path" ] || return 1
+      if [ "$had" = true ]; then
+        if [ -d "$backup_path" ]; then
+          rm -rf "$live_path" || return 1
+          [ ! -e "$live_path" ] && [ ! -L "$live_path" ] || return 1
+          mv "$backup_path" "$live_path" || return 1
+        elif [ -d "$live_path" ]; then
+          :
+        else
+          return 1
+        fi
+      else
+        rm -rf "$live_path" || return 1
+        [ ! -e "$live_path" ] && [ ! -L "$live_path" ] || return 1
+      fi
+    }
+    rollback_transaction() {
+      restore_component pglite "$had_pglite" || return 1
+      restore_component source-links "$had_source_links" || return 1
+      restore_component server-applied-routes "$had_routes" || return 1
+      rm -rf "$incoming_dir" || return 1
+      rm -f "$revision_temp" "$recovery_temp" || return 1
+      rm -rf "$backup_dir" || return 1
+      sync_path "$data_root" || return 1
+      rm -f "$recovery_file" || return 1
+      sync_path "$recovery_dir" || return 1
+    }
+    commit_cleanup() {
+      rm -rf "$incoming_dir" || return 1
+      rm -f "$revision_temp" "$recovery_temp" || return 1
+      rm -f "$recovery_file" || return 1
+      sync_path "$recovery_dir" || return 1
+    }
+    handle_transaction_exit() {
+      original_status="$1"
+      trap - EXIT HUP INT TERM
+      actual_revision=invalid
+      if [ -e "$revision_file" ] || [ -L "$revision_file" ]; then
+        if [ -f "$revision_file" ] && [ ! -L "$revision_file" ]; then
+          actual_revision="$(cat "$revision_file" 2>/dev/null || printf invalid)"
+        fi
+      elif [ "$expected_revision" = 0 ]; then
+        actual_revision=0
+      fi
+      case "$actual_revision" in ""|*[!0-9]*) exit 75 ;; esac
+      if [ "$actual_revision" = "$next_revision" ]; then
+        [ "$commit_durable" = true ] || exit 75
+        commit_cleanup || exit 75
+        exit "$original_status"
+      fi
+      if [ "$actual_revision" = "$expected_revision" ]; then
+        rollback_transaction || exit 75
+        exit "$original_status"
+      fi
+      exit 75
+    }
+    path_mtime_epoch() {
+      date -r "$1" +%s 2>/dev/null || stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || printf ""
+    }
+    prune_old_sync_backups() {
+      reserve_slots="$1"
+      prune_status=0
+      [ -d "$backups_dir" ] && [ ! -L "$backups_dir" ] || return 1
+      now_epoch=$(date +%s)
+      retention_seconds=$((backup_retention_days * 86400))
+      for candidate in "$backups_dir"/sync-*; do
+        [ -e "$candidate" ] || [ -L "$candidate" ] || continue
+        [ -d "$candidate" ] && [ ! -L "$candidate" ] || return 1
+        candidate_name="$(basename "$candidate")"
+        case "$candidate_name" in sync-*[!A-Za-z0-9._-]*|*/*|*..*|"") return 1 ;; esac
+        [ "$candidate" = "$backups_dir/$candidate_name" ] || return 1
+        [ "$candidate" != "$backup_dir" ] || continue
+        updated_epoch=$(path_mtime_epoch "$candidate")
+        case "$updated_epoch" in ""|*[!0-9]*) return 1 ;; esac
+        age_seconds=$((now_epoch - updated_epoch))
+        [ "$age_seconds" -gt "$retention_seconds" ] || continue
+        rm -rf "$candidate" || prune_status=$?
+      done
+      target_count=$((backup_max_count - reserve_slots))
+      [ "$target_count" -ge 0 ] || target_count=0
+      while :; do
+        count=0
+        oldest_candidate=""
+        oldest_epoch=""
+        for candidate in "$backups_dir"/sync-*; do
+          [ -e "$candidate" ] || [ -L "$candidate" ] || continue
+          [ -d "$candidate" ] && [ ! -L "$candidate" ] || return 1
+          candidate_name="$(basename "$candidate")"
+          case "$candidate_name" in sync-*[!A-Za-z0-9._-]*|*/*|*..*|"") return 1 ;; esac
+          [ "$candidate" = "$backups_dir/$candidate_name" ] || return 1
+          [ "$candidate" != "$backup_dir" ] || continue
+          updated_epoch=$(path_mtime_epoch "$candidate")
+          case "$updated_epoch" in ""|*[!0-9]*) return 1 ;; esac
+          count=$((count + 1))
+          if [ -z "$oldest_candidate" ] || [ "$updated_epoch" -lt "$oldest_epoch" ]; then
+            oldest_candidate="$candidate"
+            oldest_epoch="$updated_epoch"
+          fi
+        done
+        [ "$count" -le "$target_count" ] && break
+        [ -n "$oldest_candidate" ] || return 1
+        rm -rf "$oldest_candidate" || return 1
+      done
+      return "$prune_status"
+    }
+    if [ -e "$data_root" ] || [ -L "$data_root" ]; then
+      [ -d "$data_root" ] && [ ! -L "$data_root" ] || exit 75
+    else
+      mkdir -p "$data_root" || exit $?
+    fi
+    for owned_dir in "$backups_dir" "$recovery_dir"; do
+      if [ -e "$owned_dir" ] || [ -L "$owned_dir" ]; then
+        [ -d "$owned_dir" ] && [ ! -L "$owned_dir" ] || exit 75
+      else
+        mkdir -p "$owned_dir" || exit $?
+      fi
+    done
+    if [ -e "$recovery_file" ] || [ -L "$recovery_file" ]; then
+      printf '{"phase":"remote-state-sync-upload","reason":"remote_state_recovery_required"}\n' >&2
+      exit 75
+    fi
+    current_revision=0
+    if [ -e "$revision_file" ] || [ -L "$revision_file" ]; then
+      [ -f "$revision_file" ] && [ ! -L "$revision_file" ] || exit 75
+      current_revision="$(cat "$revision_file" 2>/dev/null || printf invalid)"
+    fi
+    case "$current_revision" in ""|*[!0-9]*) exit 75 ;; esac
+    if [ "$current_revision" != "$expected_revision" ]; then
+      printf '{"phase":"remote-state-sync-upload","reason":"remote_state_revision_conflict","expectedRevision":%s,"actualRevision":%s}\n' "$expected_revision" "$current_revision" >&2
+      exit 76
+    fi
+    for generated_path in "$incoming_dir" "$backup_dir" "$revision_temp" "$recovery_temp"; do
+      [ ! -e "$generated_path" ] && [ ! -L "$generated_path" ] || exit 75
+    done
+    for component in pglite source-links server-applied-routes; do
+      live_path="$data_root/$component"
+      if [ -e "$live_path" ] || [ -L "$live_path" ]; then
+        [ -d "$live_path" ] && [ ! -L "$live_path" ] || exit 75
+      fi
+    done
+    prune_old_sync_backups 1 || {
+      retention_status=$?
+      printf '{"phase":"remote-state-sync-upload","reason":"remote_state_preallocation_retention_failed"}\n' >&2
+      exit "$retention_status"
+    }
+    mkdir -p "$incoming_dir" || {
+      incoming_status=$?
+      printf '{"phase":"remote-state-sync-upload","reason":"remote_state_incoming_prepare_failed"}\n' >&2
+      exit "$incoming_status"
+    }
+    tar -xzf - -C "$incoming_dir"
+    tar_status=$?
+    if [ "$tar_status" -ne 0 ] || [ ! -d "$incoming_dir/pglite" ] || [ -L "$incoming_dir/pglite" ] || [ ! -f "$incoming_dir/pglite/PG_VERSION" ] || [ -L "$incoming_dir/pglite/PG_VERSION" ] || [ ! -d "$incoming_dir/source-links" ] || [ -L "$incoming_dir/source-links" ] || [ ! -d "$incoming_dir/server-applied-routes" ] || [ -L "$incoming_dir/server-applied-routes" ]; then
+      [ "$tar_status" -ne 0 ] || tar_status=1
+      rm -rf "$incoming_dir"
+      printf '{"phase":"remote-state-sync-upload","reason":"remote_state_incoming_validation_failed"}\n' >&2
+      exit "$tar_status"
+    fi
+    mkdir -p "$backup_dir" || {
+      backup_status=$?
+      rm -rf "$incoming_dir"
+      printf '{"phase":"remote-state-sync-upload","reason":"remote_state_backup_prepare_failed"}\n' >&2
+      exit "$backup_status"
+    }
+    printf '%s\n' "$next_revision" > "$revision_temp" || {
+      revision_status=$?
+      rm -rf "$incoming_dir" "$backup_dir"
+      rm -f "$revision_temp"
+      printf '{"phase":"remote-state-sync-upload","reason":"remote_state_revision_write_failed"}\n' >&2
+      exit "$revision_status"
+    }
+    sync_path "$revision_temp" || {
+      rm -rf "$incoming_dir" "$backup_dir"
+      rm -f "$revision_temp"
+      exit 75
+    }
+    had_pglite=false
+    had_source_links=false
+    had_routes=false
+    commit_durable=false
+    [ ! -d "$data_root/pglite" ] || had_pglite=true
+    [ ! -d "$data_root/source-links" ] || had_source_links=true
+    [ ! -d "$data_root/server-applied-routes" ] || had_routes=true
+    printf '{"schemaVersion":"remote-state-sync-recovery/v2","status":"active","transactionId":"%s","backupName":"%s","incomingName":"%s","revisionTempName":"%s","expectedRevision":%s,"nextRevision":%s,"hadPglite":%s,"hadSourceLinks":%s,"hadServerAppliedRoutes":%s}\n' "$transaction_id" "$backup_name" "$incoming_name" "$revision_temp_name" "$expected_revision" "$next_revision" "$had_pglite" "$had_source_links" "$had_routes" > "$recovery_temp" || {
+      marker_status=$?
+      rm -rf "$incoming_dir" "$backup_dir"
+      rm -f "$revision_temp" "$recovery_temp"
+      exit "$marker_status"
+    }
+    sync_path "$recovery_temp" || {
+      rm -rf "$incoming_dir" "$backup_dir"
+      rm -f "$revision_temp" "$recovery_temp"
+      exit 75
+    }
+    mv "$recovery_temp" "$recovery_file" || {
+      marker_status=$?
+      rm -rf "$incoming_dir" "$backup_dir"
+      rm -f "$revision_temp" "$recovery_temp"
+      exit "$marker_status"
+    }
+    sync_path "$recovery_dir" || exit 75
+    trap 'status=$?; handle_transaction_exit "$status"' EXIT
+    trap 'handle_transaction_exit 129' HUP
+    trap 'handle_transaction_exit 130' INT
+    trap 'handle_transaction_exit 143' TERM
+    if [ "$had_pglite" = true ]; then
+      mv "$data_root/pglite" "$backup_dir/pglite" || { status=$?; printf '{"phase":"remote-state-sync-upload","reason":"remote_state_backup_rotation_failed"}\n' >&2; exit "$status"; }
+    fi
+    if [ "$had_source_links" = true ]; then
+      mv "$data_root/source-links" "$backup_dir/source-links" || { status=$?; printf '{"phase":"remote-state-sync-upload","reason":"remote_state_backup_rotation_failed"}\n' >&2; exit "$status"; }
+    fi
+    if [ "$had_routes" = true ]; then
+      mv "$data_root/server-applied-routes" "$backup_dir/server-applied-routes" || { status=$?; printf '{"phase":"remote-state-sync-upload","reason":"remote_state_backup_rotation_failed"}\n' >&2; exit "$status"; }
+    fi
+    mv "$incoming_dir/pglite" "$data_root/pglite" || { status=$?; printf '{"phase":"remote-state-sync-upload","reason":"remote_state_promotion_failed"}\n' >&2; exit "$status"; }
+    mv "$incoming_dir/source-links" "$data_root/source-links" || { status=$?; printf '{"phase":"remote-state-sync-upload","reason":"remote_state_promotion_failed"}\n' >&2; exit "$status"; }
+    mv "$incoming_dir/server-applied-routes" "$data_root/server-applied-routes" || { status=$?; printf '{"phase":"remote-state-sync-upload","reason":"remote_state_promotion_failed"}\n' >&2; exit "$status"; }
+    sync || exit 75
+    sync_path "$data_root" || exit 75
+    mv "$revision_temp" "$revision_file" || { status=$?; printf '{"phase":"remote-state-sync-upload","reason":"remote_state_revision_commit_failed"}\n' >&2; exit "$status"; }
+    sync_path "$revision_file" || exit 75
+    sync_path "$data_root" || exit 75
+    commit_durable=true
+    trap - EXIT HUP INT TERM
+    commit_cleanup || exit 75
+    if ! prune_old_sync_backups 0; then
+      printf '{"phase":"remote-state-sync-postcommit-retention","reason":"remote_state_postcommit_retention_failed"}\n' >&2
+    fi
+    exit 0
+  `;
 }
 
 function defaultRunner(): RemotePgliteArchiveRunner {
@@ -926,6 +1343,30 @@ export class RemotePgliteArchiveSync {
     this.runner = runner ?? defaultRunner();
   }
 
+  recoverRemoteTransaction(): Result<void> {
+    const recovered = this.runner.run({
+      command: "ssh",
+      args: [
+        ...buildSshRemoteStateProcessArgs(this.plan.target),
+        ash.render(remoteRecoveryResolveCommand(this.plan.dataRoot)),
+      ],
+      redactions: this.plan.target.identityFile ? [this.plan.target.identityFile] : [],
+    });
+    return recovered.failed
+      ? err(
+          domainError.infra("SSH remote PGlite recovery marker could not be resolved", {
+            ...errorDetails({
+              phase: "remote-state-sync-recovery",
+              target: this.plan.target,
+              exitCode: recovered.exitCode,
+              stderr: recovered.stderr,
+            }),
+            reason: "remote_state_recovery_required",
+          }),
+        )
+      : ok(undefined);
+  }
+
   async syncFromRemote(): Promise<Result<void>> {
     const stagingRoot = localTransactionRoot(this.plan.localDataRoot, "download");
     const archivePath = `${stagingRoot}.tar.gz`;
@@ -938,7 +1379,7 @@ export class RemotePgliteArchiveSync {
         command: "ssh",
         args: [
           ...buildSshRemoteStateProcessArgs(this.plan.target),
-          remoteArchiveCommand(this.plan.dataRoot, this.plan.readOnly === true),
+          ash.render(remoteArchiveCommand(this.plan.dataRoot, this.plan.readOnly === true)),
         ],
         redactions: this.plan.target.identityFile ? [this.plan.target.identityFile] : [],
       } satisfies RemotePgliteArchiveRunnerInput;
@@ -1007,7 +1448,7 @@ export class RemotePgliteArchiveSync {
       command: "ssh",
       args: [
         ...buildSshRemoteStateProcessArgs(this.plan.target),
-        remoteRevisionReadCommand(this.plan.dataRoot, this.plan.readOnly === true),
+        ash.render(remoteRevisionReadCommand(this.plan.dataRoot, this.plan.readOnly === true)),
       ],
       redactions: this.plan.target.identityFile ? [this.plan.target.identityFile] : [],
     });
@@ -1089,13 +1530,15 @@ export class RemotePgliteArchiveSync {
         command: "ssh",
         args: [
           ...buildSshRemoteStateProcessArgs(this.plan.target),
-          remoteExtractCommand({
-            dataRoot: this.plan.dataRoot,
-            expectedRevision,
-            nextRevision,
-            backupRetentionDays: this.plan.backupRetentionDays,
-            backupMaxCount: this.plan.backupMaxCount,
-          }),
+          ash.render(
+            remoteExtractCommand({
+              dataRoot: this.plan.dataRoot,
+              expectedRevision,
+              nextRevision,
+              backupRetentionDays: this.plan.backupRetentionDays,
+              backupMaxCount: this.plan.backupMaxCount,
+            }),
+          ),
         ],
         redactions: this.plan.target.identityFile ? [this.plan.target.identityFile] : [],
       } satisfies RemotePgliteArchiveRunnerInput;
@@ -1176,6 +1619,7 @@ export async function prepareRemotePgliteStateSync(
 
   const lifecycleRunner = input.runner ? lifecycleRunnerFromArchiveRunner(input.runner) : undefined;
   const pendingPath = pendingSyncPath(planValue.localDataRoot);
+  const hadPendingSync = existsSync(pendingPath);
   const retryPendingSync = hasPendingSyncRetryOption(input.argv);
   if (retryPendingSync && !hasServerCapacityInspectCommand(input.argv)) {
     return err(
@@ -1208,6 +1652,37 @@ export async function prepareRemotePgliteStateSync(
         ),
       );
     }
+  }
+  if (retryPendingSync && !hadPendingSync) {
+    const recoveryLifecycle = await new SshRemoteStateLifecycle({
+      target: planValue.target,
+      dataRoot: planValue.dataRoot,
+      owner: "appaloft-cli-remote-sync-recovery",
+      correlationId: `remote_state_recovery_${process.pid}_${Date.now().toString(36)}`,
+      staleAfterMs: remotePgliteMaintenanceLockStaleAfterMs,
+      ...(lifecycleRunner ? { runner: lifecycleRunner } : {}),
+    }).prepare();
+    if (recoveryLifecycle.isErr()) return err(recoveryLifecycle.error);
+    let recovered: Result<void>;
+    try {
+      recovered = new RemotePgliteArchiveSync(
+        { ...planValue, readOnly: false },
+        input.runner,
+      ).recoverRemoteTransaction();
+    } catch {
+      recovered = err(
+        domainError.infra("SSH remote PGlite recovery marker resolution was interrupted", {
+          ...errorDetails({
+            phase: "remote-state-sync-recovery",
+            target: planValue.target,
+          }),
+          reason: "remote_state_recovery_required",
+        }),
+      );
+    }
+    const released = await recoveryLifecycle.value.release();
+    if (recovered.isErr()) return err(recovered.error);
+    if (released.isErr()) return err(released.error);
   }
   if (existsSync(pendingPath)) {
     const pending = await readPendingSync(planValue.localDataRoot);
@@ -1276,18 +1751,23 @@ export async function prepareRemotePgliteStateSync(
     let activePending = pending;
     let recovered: Result<void>;
     try {
-      recovered = await new RemotePgliteArchiveSync(
+      const recoverySync = new RemotePgliteArchiveSync(
         {
           ...planValue,
+          readOnly: false,
           localDataRoot: activePending.uploadDataRoot,
           localPgliteDataDir: join(activePending.uploadDataRoot, "pglite"),
         },
         input.runner,
-      ).syncToRemote({
-        expectedRevision: activePending.expectedRevision,
-        nextRevision: activePending.nextRevision,
-        requireExistingMirror: true,
-      });
+      );
+      const remoteRecovered = recoverySync.recoverRemoteTransaction();
+      recovered = remoteRecovered.isErr()
+        ? err(remoteRecovered.error)
+        : await recoverySync.syncToRemote({
+            expectedRevision: activePending.expectedRevision,
+            nextRevision: activePending.nextRevision,
+            requireExistingMirror: true,
+          });
     } catch {
       recovered = err(
         domainError.infra("Pending SSH remote PGlite recovery upload was interrupted", {

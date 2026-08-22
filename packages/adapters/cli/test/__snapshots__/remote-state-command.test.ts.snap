@@ -77,11 +77,164 @@ owner_file_present=false
 stale=false
 
     recovered_by='appaloft-cli-test'
-    now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-    stamp="$(date -u +"%Y-%m-%dT%H-%M-%SZ")"
-    if [ ! -d "$lock_dir" ]; then
+    if [ ! -e "$data_root" ] && [ ! -L "$data_root" ]; then
       printf '{"status":"unlocked","phase":"remote-state-lock","stateBackend":"ssh-pglite","dataRoot":%s,"recovered":false,"stale":false}\\n' "$data_root_json"
       exit 0
+    fi
+    [ -d "$data_root" ] && [ ! -L "$data_root" ] || exit 75
+    if [ ! -e "$data_root/locks" ] && [ ! -L "$data_root/locks" ]; then
+      printf '{"status":"unlocked","phase":"remote-state-lock","stateBackend":"ssh-pglite","dataRoot":%s,"recovered":false,"stale":false}\\n' "$data_root_json"
+      exit 0
+    fi
+    [ -d "$data_root/locks" ] && [ ! -L "$data_root/locks" ] || exit 75
+    guard_operation='recover-stale'
+guard_owner_json='"appaloft-cli-test"'
+guard_correlation_id_json='"remote-state-lock-recover-stale"'
+guard_stale_after_seconds='30'
+guard_dir="$data_root/locks/mutation.guard"
+guard_owner_file="$guard_dir/owner.json"
+guard_owner_temp="$guard_dir/.owner-$$.tmp"
+guard_owned=false
+guard_kernel_owned=false
+guard_token=""
+guard_json_string() { if [ "$#" -eq 0 ] || [ -z "$1" ]; then printf null; return; fi; printf '"'; printf "%s" "$1" | sed 's/\\\\/\\\\\\\\/g; s/"/\\\\"/g'; printf '"'; }
+guard_sync_path() { sync "$1" 2>/dev/null || sync; }
+acquire_guard() {
+  command -v flock >/dev/null 2>&1 || { echo "remote state mutation guard requires flock" >&2; return 75; }
+  exec 9<"$data_root/locks" || return 75
+  if ! flock -w 5 9; then
+    exec 9<&-
+    return 73
+  fi
+  guard_kernel_owned=true
+  guard_now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  guard_now_epoch="$(date -u +%s)"
+  guard_stamp="$(date -u +"%Y-%m-%dT%H-%M-%SZ")"
+  if [ -r /proc/sys/kernel/random/uuid ]; then
+    guard_uuid="$(tr -d '\\r\\n' < /proc/sys/kernel/random/uuid)"
+  elif command -v uuidgen >/dev/null 2>&1; then
+    guard_uuid="$(uuidgen | tr '[:upper:]' '[:lower:]' | tr -d '\\r\\n')"
+  else
+    echo "remote state mutation guard requires UUID support" >&2
+    return 75
+  fi
+  case "$guard_uuid" in *[!A-Za-z0-9-]*|'') echo "remote state mutation guard UUID is invalid" >&2; return 75 ;; esac
+  guard_token="$guard_operation-$guard_uuid"
+  if [ -e "$guard_dir" ] || [ -L "$guard_dir" ]; then
+    [ -d "$guard_dir" ] && [ ! -L "$guard_dir" ] || { echo "remote state mutation guard is not a real directory" >&2; return 75; }
+    guard_observed_token=""
+    guard_observed_owner=""
+    guard_observed_correlation=""
+    guard_observed_at=""
+    guard_observed_stale_after=""
+    if [ -e "$guard_owner_file" ] || [ -L "$guard_owner_file" ]; then
+      [ -f "$guard_owner_file" ] && [ ! -L "$guard_owner_file" ] || { echo "remote state mutation guard owner is not a real file" >&2; return 75; }
+      guard_observed_token="$(sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' "$guard_owner_file" | head -n 1 || true)"
+      guard_observed_owner="$(sed -n 's/.*"owner"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' "$guard_owner_file" | head -n 1 || true)"
+      guard_observed_correlation="$(sed -n 's/.*"correlationId"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' "$guard_owner_file" | head -n 1 || true)"
+      guard_observed_at="$(sed -n 's/.*"lastHeartbeatAt"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' "$guard_owner_file" | head -n 1 || true)"
+      guard_observed_stale_after="$(sed -n 's/.*"staleAfterSeconds"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p' "$guard_owner_file" | head -n 1 || true)"
+    fi
+    [ -n "$guard_observed_stale_after" ] || guard_observed_stale_after="$guard_stale_after_seconds"
+    if [ "$guard_observed_stale_after" -gt "$guard_stale_after_seconds" ]; then guard_observed_stale_after="$guard_stale_after_seconds"; fi
+    if [ -n "$guard_observed_at" ]; then
+      guard_observed_epoch="$(date -u -d "$guard_observed_at" +%s 2>/dev/null || date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "$guard_observed_at" +%s 2>/dev/null || true)"
+    else
+      guard_observed_epoch=""
+    fi
+    if [ -z "$guard_observed_epoch" ]; then guard_observed_epoch="$(stat -c %Y "$guard_dir" 2>/dev/null || stat -f %m "$guard_dir" 2>/dev/null || true)"; fi
+    [ -n "$guard_observed_epoch" ] || { echo "remote state mutation guard age is unavailable" >&2; return 75; }
+    guard_age_seconds=$((guard_now_epoch - guard_observed_epoch))
+    if [ "$guard_age_seconds" -lt "$guard_observed_stale_after" ]; then
+      release_guard || return 75
+      return 73
+    fi
+    guard_recovered_dir="$data_root/locks/recovered"
+    if [ -e "$guard_recovered_dir" ] || [ -L "$guard_recovered_dir" ]; then
+      [ -d "$guard_recovered_dir" ] && [ ! -L "$guard_recovered_dir" ] || return 75
+    else
+      mkdir "$guard_recovered_dir" || return 75
+    fi
+    guard_recovered_path="$guard_recovered_dir/guard-$guard_stamp-$guard_uuid.guard"
+    guard_recovery_record="$guard_recovered_dir/.guard-$guard_stamp-$guard_uuid.recovered.json"
+    [ ! -e "$guard_recovered_path" ] && [ ! -L "$guard_recovered_path" ] || return 75
+    [ ! -e "$guard_recovery_record" ] && [ ! -L "$guard_recovery_record" ] || return 75
+    printf '{"phase":"remote-state-guard","status":"planned","recoveredAt":"%s","recoveredBy":"%s","observedToken":%s,"observedOwner":%s,"observedCorrelationId":%s,"lockAgeSeconds":%s,"staleAfterSeconds":%s,"plannedArchivePath":%s,"reason":"kernel-lock-owner-absent"}\\n' "$guard_now" "$guard_operation" "$(guard_json_string "$guard_observed_token")" "$(guard_json_string "$guard_observed_owner")" "$(guard_json_string "$guard_observed_correlation")" "$guard_age_seconds" "$guard_observed_stale_after" "$(guard_json_string "$guard_recovered_path")" > "$guard_recovery_record" || return 75
+    guard_sync_path "$guard_recovery_record" || return 75
+    guard_sync_path "$guard_recovered_dir" || return 75
+    mv "$guard_dir" "$guard_recovered_path" || return 75
+    mv "$guard_recovery_record" "$guard_recovered_path/recovered.json" || return 75
+    guard_sync_path "$guard_recovered_dir" || return 75
+    guard_completed_record="$guard_recovered_path/.recovered-$$.tmp"
+    printf '{"phase":"remote-state-guard","status":"completed","recoveredAt":"%s","recoveredBy":"%s","observedToken":%s,"lockAgeSeconds":%s,"archivePath":%s,"reason":"kernel-lock-owner-absent"}\\n' "$guard_now" "$guard_operation" "$(guard_json_string "$guard_observed_token")" "$guard_age_seconds" "$(guard_json_string "$guard_recovered_path")" > "$guard_completed_record" && mv "$guard_completed_record" "$guard_recovered_path/recovered.json" || true
+  fi
+  guard_mkdir_error=""
+  if ! guard_mkdir_error="$(mkdir "$guard_dir" 2>&1)"; then
+    [ -z "$guard_mkdir_error" ] || printf '%s\\n' "$guard_mkdir_error" >&2
+    return 75
+  fi
+  guard_owned=true
+  if ! printf '{"schemaVersion":1,"token":"%s","owner":%s,"correlationId":%s,"operation":"%s","pid":%s,"acquiredAt":"%s","lastHeartbeatAt":"%s","staleAfterSeconds":%s}\\n' "$guard_token" "$guard_owner_json" "$guard_correlation_id_json" "$guard_operation" "$$" "$guard_now" "$guard_now" "$guard_stale_after_seconds" > "$guard_owner_temp" || ! mv "$guard_owner_temp" "$guard_owner_file"; then
+    rm -f "$guard_owner_temp" "$guard_owner_file" 2>/dev/null || true
+    rmdir "$guard_dir" 2>/dev/null || true
+    guard_owned=false
+    return 75
+  fi
+}
+release_guard() {
+  guard_release_status=0
+  if [ "$guard_owned" = true ]; then
+    guard_token_fragment="$(printf '"token":"%s"' "$guard_token")"
+    [ -d "$guard_dir" ] && [ ! -L "$guard_dir" ] || guard_release_status=75
+    if [ "$guard_release_status" -eq 0 ]; then
+      [ -f "$guard_owner_file" ] && [ ! -L "$guard_owner_file" ] || guard_release_status=75
+    fi
+    if [ "$guard_release_status" -eq 0 ]; then
+      grep -F "$guard_token_fragment" "$guard_owner_file" >/dev/null 2>&1 || guard_release_status=75
+    fi
+    if [ "$guard_release_status" -eq 0 ]; then
+      guard_release_dir="$data_root/locks/.mutation-guard-release-$guard_token"
+      [ ! -e "$guard_release_dir" ] && [ ! -L "$guard_release_dir" ] || guard_release_status=75
+    fi
+    if [ "$guard_release_status" -eq 0 ]; then
+      mv "$guard_dir" "$guard_release_dir" || guard_release_status=75
+    fi
+    if [ "$guard_release_status" -eq 0 ]; then
+      guard_released_owner="$guard_release_dir/owner.json"
+      if [ -f "$guard_released_owner" ] && [ ! -L "$guard_released_owner" ] && grep -F "$guard_token_fragment" "$guard_released_owner" >/dev/null 2>&1; then
+        rm -rf "$guard_release_dir" || guard_release_status=75
+      else
+        if [ ! -e "$guard_dir" ] && [ ! -L "$guard_dir" ]; then mv "$guard_release_dir" "$guard_dir" 2>/dev/null || true; fi
+        guard_release_status=75
+      fi
+    fi
+    if [ "$guard_release_status" -eq 0 ]; then guard_owned=false; fi
+  fi
+  if [ "$guard_kernel_owned" = true ]; then
+    flock -u 9 || guard_release_status=75
+    exec 9<&-
+    guard_kernel_owned=false
+  fi
+  return "$guard_release_status"
+}
+
+    cleanup_recover_guard() { release_guard || true; }
+    trap cleanup_recover_guard EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    acquire_guard || exit $?
+    now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    stamp="$(date -u +"%Y-%m-%dT%H-%M-%SZ")"
+    if [ ! -e "$lock_dir" ] && [ ! -L "$lock_dir" ]; then
+      release_guard || exit $?
+      trap - EXIT HUP INT TERM
+      printf '{"status":"unlocked","phase":"remote-state-lock","stateBackend":"ssh-pglite","dataRoot":%s,"recovered":false,"stale":false}\\n' "$data_root_json"
+      exit 0
+    fi
+    [ -d "$lock_dir" ] && [ ! -L "$lock_dir" ] || exit 75
+    if [ -e "$owner_file" ] || [ -L "$owner_file" ]; then
+      [ -f "$owner_file" ] && [ ! -L "$owner_file" ] || exit 75
     fi
     if [ -f "$owner_file" ]; then
       owner_file_present=true
@@ -106,16 +259,37 @@ stale=false
     fi
     if [ -n "$lock_age_seconds" ] && [ "$lock_age_seconds" -ge "$recorded_stale_after" ]; then stale=true; fi
     if [ "$stale" != true ]; then
+      release_guard || exit $?
+      trap - EXIT HUP INT TERM
       printf '{"status":"active","phase":"remote-state-lock","stateBackend":"ssh-pglite","dataRoot":%s,"owner":%s,"correlationId":%s,"lastHeartbeatAt":%s,"staleAfterSeconds":%s,"lockAgeSeconds":%s,"recovered":false,"stale":false}\\n' "$data_root_json" "$(json_string "$owner")" "$(json_string "$correlation_id")" "$(json_string "$last_heartbeat")" "$(json_number "$recorded_stale_after")" "$(json_number "$lock_age_seconds")"
       exit 0
     fi
-    mkdir -p "$data_root/locks/recovered"
-    recovered_path="$data_root/locks/recovered/manual-$stamp-$$.lock"
-    if mv "$lock_dir" "$recovered_path" 2>/dev/null; then
-      printf '{"phase":"remote-state-lock","recoveredAt":"%s","recoveredBy":%s,"owner":%s,"correlationId":%s,"lockAgeSeconds":%s}\\n' "$now" "$(json_string "$recovered_by")" "$(json_string "$owner")" "$(json_string "$correlation_id")" "$(json_number "$lock_age_seconds")" > "$recovered_path/recovered.json"
+    recovered_dir="$data_root/locks/recovered"
+    if [ -e "$recovered_dir" ] || [ -L "$recovered_dir" ]; then
+      [ -d "$recovered_dir" ] && [ ! -L "$recovered_dir" ] || exit 75
+    else
+      mkdir "$recovered_dir"
+    fi
+    recovered_path="$recovered_dir/manual-$stamp-$$.lock"
+    recovery_record_temp="$recovered_dir/.manual-$stamp-$$.recovered.json"
+    [ ! -e "$recovered_path" ] && [ ! -L "$recovered_path" ] || exit 75
+    [ ! -e "$recovery_record_temp" ] && [ ! -L "$recovery_record_temp" ] || exit 75
+    printf '{"phase":"remote-state-lock","status":"planned","recoveredAt":"%s","recoveredBy":%s,"owner":%s,"correlationId":%s,"lockAgeSeconds":%s}\\n' "$now" "$(json_string "$recovered_by")" "$(json_string "$owner")" "$(json_string "$correlation_id")" "$(json_number "$lock_age_seconds")" > "$recovery_record_temp"
+    guard_sync_path "$recovery_record_temp" || exit 75
+    guard_sync_path "$recovered_dir" || exit 75
+    recovery_move_error=""
+    if recovery_move_error="$(mv "$lock_dir" "$recovered_path" 2>&1)"; then
+      mv "$recovery_record_temp" "$recovered_path/recovered.json"
+      guard_sync_path "$recovered_dir" || exit 75
+      release_guard || exit $?
+      trap - EXIT HUP INT TERM
       printf '{"status":"recovered","phase":"remote-state-lock","stateBackend":"ssh-pglite","dataRoot":%s,"owner":%s,"correlationId":%s,"lastHeartbeatAt":%s,"staleAfterSeconds":%s,"lockAgeSeconds":%s,"recovered":true,"recoveredPath":%s,"stale":true}\\n' "$data_root_json" "$(json_string "$owner")" "$(json_string "$correlation_id")" "$(json_string "$last_heartbeat")" "$(json_number "$recorded_stale_after")" "$(json_number "$lock_age_seconds")" "$(json_string "$recovered_path")"
     else
-      printf '{"status":"race-lost","phase":"remote-state-lock","stateBackend":"ssh-pglite","dataRoot":%s,"recovered":false,"stale":true}\\n' "$data_root_json"
+      rm -f "$recovery_record_temp"
+      [ -z "$recovery_move_error" ] || printf '%s\\n' "$recovery_move_error" >&2
+      release_guard || exit $?
+      trap - EXIT HUP INT TERM
+      exit 75
     fi
 "
 `;

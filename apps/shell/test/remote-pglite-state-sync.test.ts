@@ -10,6 +10,7 @@ import {
   rename,
   rm,
   stat,
+  symlink,
   utimes,
   writeFile,
 } from "node:fs/promises";
@@ -161,9 +162,17 @@ async function initializePgliteRoot(root: string) {
 function createLocalSshArchiveRunner() {
   return {
     run(input: RemotePgliteArchiveRunnerInput) {
+      const remoteCommand = input.args[input.args.length - 1] ?? "";
+      const executableRemoteCommand =
+        process.platform === "darwin"
+          ? remoteCommand
+              .replaceAll("command -v flock >/dev/null 2>&1", "true")
+              .replaceAll("flock -w 5 9", "true")
+              .replaceAll("flock -u 9", "true")
+          : remoteCommand;
       const command =
         input.command === "ssh"
-          ? ["sh", "-lc", input.args[input.args.length - 1] ?? ""]
+          ? ["sh", "-lc", executableRemoteCommand]
           : [input.command, ...input.args];
       const result = Bun.spawnSync(command, {
         ...(input.stdin ? { stdin: input.stdin } : {}),
@@ -179,6 +188,12 @@ function createLocalSshArchiveRunner() {
       };
     },
   };
+}
+
+function isRemoteMutationLockRelease(input: RemotePgliteArchiveRunnerInput) {
+  if (input.command !== "ssh") return false;
+  const command = input.args.join(" ");
+  return command.includes("released %s") && command.includes("released_owner");
 }
 
 describe("remote PGlite state sync", () => {
@@ -322,6 +337,123 @@ describe("remote PGlite state sync", () => {
     }
   });
 
+  test("[CONFIG-FILE-STATE-012E] read-only archive and revision fail closed on a recovery marker", async () => {
+    const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-marker-read-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-marker-read-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+    try {
+      await mkdir(join(remoteStateRoot, "pglite"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "recovery"), { recursive: true });
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "4\n");
+      await writeFile(join(remoteStateRoot, "recovery", "remote-sync-upload.json"), "{}\n");
+      const sync = new RemotePgliteArchiveSync(
+        {
+          dataRoot: remoteStateRoot,
+          localDataRoot,
+          localPgliteDataDir: join(localDataRoot, "pglite"),
+          backupRetentionDays: 7,
+          backupMaxCount: 20,
+          target: { host: "127.0.0.1" },
+          readOnly: true,
+        },
+        createLocalSshArchiveRunner(),
+      );
+
+      const archive = await sync.syncFromRemote();
+      const revision = await sync.readRemoteRevision();
+
+      expect(archive.isErr()).toBe(true);
+      expect(revision.isErr()).toBe(true);
+      expect(archive._unsafeUnwrapErr().details?.stderr).toContain(
+        "remote_state_recovery_required",
+      );
+      expect(revision._unsafeUnwrapErr().details?.stderr).toContain(
+        "remote_state_recovery_required",
+      );
+    } finally {
+      await rm(localDataRoot, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-012G] remote state paths fail closed on directories and symlinks", async () => {
+    const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-path-fence-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-path-fence-remote-"));
+    const externalRoot = await mkdtemp(join(tmpdir(), "appaloft-path-fence-external-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+    const recoveryMarker = join(remoteStateRoot, "recovery", "remote-sync-upload.json");
+    try {
+      for (const root of [localDataRoot, remoteStateRoot]) {
+        await mkdir(join(root, "pglite"), { recursive: true });
+        await mkdir(join(root, "source-links"), { recursive: true });
+        await mkdir(join(root, "server-applied-routes"), { recursive: true });
+      }
+      await mkdir(join(remoteStateRoot, "recovery"), { recursive: true });
+      await mkdir(recoveryMarker);
+      await writeFile(join(localDataRoot, "pglite", "local.txt"), "local-state");
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "0\n");
+      const sync = new RemotePgliteArchiveSync(
+        {
+          dataRoot: remoteStateRoot,
+          localDataRoot,
+          localPgliteDataDir: join(localDataRoot, "pglite"),
+          backupRetentionDays: 7,
+          backupMaxCount: 20,
+          target: { host: "127.0.0.1" },
+          readOnly: true,
+        },
+        createLocalSshArchiveRunner(),
+      );
+
+      expect((await sync.syncFromRemote()).isErr()).toBe(true);
+      expect((await sync.readRemoteRevision()).isErr()).toBe(true);
+      expect(sync.recoverRemoteTransaction().isErr()).toBe(true);
+
+      await rm(recoveryMarker, { recursive: true });
+      await rm(join(remoteStateRoot, "sync-revision.txt"));
+      const externalRevision = join(externalRoot, "revision.txt");
+      await writeFile(externalRevision, "0\n");
+      await symlink(externalRevision, join(remoteStateRoot, "sync-revision.txt"));
+      expect((await sync.syncToRemote()).isErr()).toBe(true);
+      expect(await readFile(externalRevision, "utf8")).toBe("0\n");
+
+      await rm(join(remoteStateRoot, "sync-revision.txt"));
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "0\n");
+      await rm(join(remoteStateRoot, "pglite"), { recursive: true });
+      await mkdir(join(externalRoot, "pglite"));
+      await writeFile(join(externalRoot, "pglite", "outside.txt"), "outside-state");
+      await symlink(join(externalRoot, "pglite"), join(remoteStateRoot, "pglite"));
+      expect((await sync.syncToRemote()).isErr()).toBe(true);
+      expect(await readFile(join(externalRoot, "pglite", "outside.txt"), "utf8")).toBe(
+        "outside-state",
+      );
+
+      await rm(join(remoteStateRoot, "pglite"));
+      await mkdir(join(remoteStateRoot, "pglite"));
+      await rm(join(remoteStateRoot, "backups"), { recursive: true, force: true });
+      await symlink(externalRoot, join(remoteStateRoot, "backups"));
+      expect((await sync.syncToRemote()).isErr()).toBe(true);
+      expect((await readdir(externalRoot)).sort()).toEqual(["pglite", "revision.txt"]);
+
+      await rm(join(remoteStateRoot, "backups"));
+      await mkdir(join(remoteStateRoot, "backups"));
+      await rm(join(remoteStateRoot, "recovery"), { recursive: true });
+      const externalRecovery = join(externalRoot, "recovery-parent");
+      await mkdir(externalRecovery);
+      await symlink(externalRecovery, join(remoteStateRoot, "recovery"));
+      expect((await sync.syncFromRemote()).isErr()).toBe(true);
+      expect((await sync.readRemoteRevision()).isErr()).toBe(true);
+      expect(sync.recoverRemoteTransaction().isErr()).toBe(true);
+      expect(await readdir(externalRecovery)).toEqual([]);
+    } finally {
+      await rm(localDataRoot, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+      await rm(externalRoot, { recursive: true, force: true });
+    }
+  });
+
   test("[CPS-REMOTE-015] SSH mirror upload streams the archive from a private file", async () => {
     const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-stream-upload-local-"));
     const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-stream-upload-remote-"));
@@ -338,6 +470,7 @@ describe("remote PGlite state sync", () => {
       await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
       await mkdir(join(remoteStateRoot, "locks"), { recursive: true });
       await writeFile(join(localDataRoot, "pglite", "updated.txt"), "updated-state");
+      await writeFile(join(localDataRoot, "pglite", "PG_VERSION"), "18\n");
       await writeFile(join(remoteStateRoot, "sync-revision.txt"), "3\n");
 
       const baseRunner = createLocalSshArchiveRunner();
@@ -1260,10 +1393,73 @@ describe("remote PGlite state sync", () => {
       const downloadCommand = calls[0]?.args.join(" ") ?? "";
       const uploadCommand = calls[3]?.args.join(" ") ?? "";
       expect(downloadCommand).toContain("tar -czf - pglite source-links server-applied-routes");
-      expect(uploadCommand).toContain('backup_dir="$data_root/backups/sync-');
-      expect(uploadCommand).toContain("restore_backup");
+      expect(uploadCommand).toContain('backup_dir="$data_root/backups/$backup_name"');
+      expect(uploadCommand).toContain("rollback_transaction");
+      expect(uploadCommand).toContain("handle_transaction_exit");
       expect(uploadCommand).toContain("remote-sync-upload.json");
       expect(uploadCommand).toContain('tar -xzf - -C "$incoming_dir"');
+      expect(uploadCommand).toContain("prune_old_sync_backups 1");
+      expect(uploadCommand).not.toContain("cp -a");
+      expect(uploadCommand.indexOf('tar -xzf - -C "$incoming_dir"')).toBeLessThan(
+        uploadCommand.indexOf('mv "$data_root/pglite" "$backup_dir/pglite"'),
+      );
+      expect(uploadCommand.indexOf('> "$revision_temp"')).toBeLessThan(
+        uploadCommand.indexOf('mv "$data_root/pglite" "$backup_dir/pglite"'),
+      );
+      expect(uploadCommand.indexOf('mv "$recovery_temp" "$recovery_file"')).toBeLessThan(
+        uploadCommand.indexOf('mv "$data_root/pglite" "$backup_dir/pglite"'),
+      );
+      const markerSyncIndex = uploadCommand.indexOf('sync_path "$recovery_temp"');
+      const markerPublishIndex = uploadCommand.indexOf('mv "$recovery_temp" "$recovery_file"');
+      const markerParentSyncIndex = uploadCommand.indexOf(
+        'sync_path "$recovery_dir"',
+        markerPublishIndex,
+      );
+      const revisionCommitIndex = uploadCommand.indexOf('mv "$revision_temp" "$revision_file"');
+      const liveTreeSyncIndex = uploadCommand.lastIndexOf(
+        'sync_path "$data_root"',
+        revisionCommitIndex,
+      );
+      const globalLiveTreeSyncIndex = uploadCommand.lastIndexOf(
+        "sync || exit 75",
+        revisionCommitIndex,
+      );
+      const revisionFileSyncIndex = uploadCommand.indexOf(
+        'sync_path "$revision_file"',
+        revisionCommitIndex,
+      );
+      const dataRootCommitSyncIndex = uploadCommand.indexOf(
+        'sync_path "$data_root"',
+        revisionCommitIndex,
+      );
+      const rollbackFunctionIndex = uploadCommand.indexOf("rollback_transaction() {");
+      const rollbackDataRootSyncIndex = uploadCommand.indexOf(
+        'sync_path "$data_root"',
+        rollbackFunctionIndex,
+      );
+      const rollbackMarkerRemoveIndex = uploadCommand.indexOf(
+        'rm -f "$recovery_file"',
+        rollbackFunctionIndex,
+      );
+      const rollbackRecoverySyncIndex = uploadCommand.indexOf(
+        'sync_path "$recovery_dir"',
+        rollbackMarkerRemoveIndex,
+      );
+      expect(markerSyncIndex).toBeLessThan(markerPublishIndex);
+      expect(markerPublishIndex).toBeLessThan(markerParentSyncIndex);
+      expect(globalLiveTreeSyncIndex).toBeLessThan(liveTreeSyncIndex);
+      expect(liveTreeSyncIndex).toBeLessThan(revisionCommitIndex);
+      expect(revisionCommitIndex).toBeLessThan(revisionFileSyncIndex);
+      expect(revisionFileSyncIndex).toBeLessThan(dataRootCommitSyncIndex);
+      expect(dataRootCommitSyncIndex).toBeLessThan(uploadCommand.indexOf("commit_durable=true"));
+      expect(rollbackDataRootSyncIndex).toBeLessThan(rollbackMarkerRemoveIndex);
+      expect(rollbackMarkerRemoveIndex).toBeLessThan(rollbackRecoverySyncIndex);
+      expect(uploadCommand.indexOf("commit_durable=true")).toBeLessThan(
+        uploadCommand.indexOf(
+          "trap - EXIT HUP INT TERM",
+          uploadCommand.indexOf("commit_durable=true"),
+        ),
+      );
       expect(calls.map((call) => call.args.join(" ")).join("\n")).not.toContain(
         "OPENSSH PRIVATE KEY",
       );
@@ -1337,7 +1533,7 @@ describe("remote PGlite state sync", () => {
     }
   });
 
-  test("[CONFIG-FILE-STATE-012] interrupted upload uses remote backup restore recovery command", async () => {
+  test("[CONFIG-FILE-STATE-012] interrupted upload uses staged rotation recovery commands", async () => {
     const dataDir = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-"));
     const calls: RemotePgliteArchiveRunnerInput[] = [];
     try {
@@ -1397,16 +1593,602 @@ describe("remote PGlite state sync", () => {
         },
       });
       expect(calls.map((call) => call.command)).toEqual(["tar", "ssh"]);
-      expect(remoteCommand).toContain('backup_dir="$data_root/backups/sync-');
+      expect(remoteCommand).toContain('backup_dir="$data_root/backups/$backup_name"');
       expect(remoteCommand).toContain("backup_retention_days='7'");
       expect(remoteCommand).toContain("prune_old_sync_backups");
-      expect(remoteCommand).toContain("restore_backup");
-      expect(remoteCommand).toContain("write_recovery");
+      expect(remoteCommand).toContain("rollback_transaction");
+      expect(remoteCommand).toContain("handle_transaction_exit");
+      expect(remoteCommand).toContain('"status":"active"');
       expect(remoteCommand).toContain("remote-sync-upload.json");
       expect(remoteCommand).toContain('tar -xzf - -C "$incoming_dir"');
+      expect(remoteCommand).not.toContain("cp -a");
       expect(remoteCommand).not.toContain("OPENSSH PRIVATE KEY");
     } finally {
       await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-012A] invalid incoming archive leaves live remote state untouched", async () => {
+    const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+    const backupRoot = join(remoteStateRoot, "backups");
+
+    try {
+      await mkdir(join(localDataRoot, "pglite"), { recursive: true });
+      await mkdir(join(localDataRoot, "source-links"), { recursive: true });
+      await mkdir(join(localDataRoot, "server-applied-routes"), { recursive: true });
+      await writeFile(join(localDataRoot, "pglite", "local.txt"), "local-state");
+      await writeFile(join(localDataRoot, "pglite", "PG_VERSION"), "18\n");
+      await mkdir(join(remoteStateRoot, "pglite"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
+      await writeFile(join(remoteStateRoot, "pglite", "live.txt"), "authoritative-state");
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "0\n");
+      await mkdir(join(backupRoot, "sync-20990101000300-newest"), { recursive: true });
+      await mkdir(join(backupRoot, "sync-20990101000200-middle"), { recursive: true });
+      await mkdir(join(backupRoot, "sync-20990101000100-oldest"), { recursive: true });
+      await mkdir(join(backupRoot, "manual-keep"), { recursive: true });
+
+      const baseRunner = createLocalSshArchiveRunner();
+      const sync = new RemotePgliteArchiveSync(
+        {
+          dataRoot: remoteStateRoot,
+          localDataRoot,
+          localPgliteDataDir: join(localDataRoot, "pglite"),
+          backupRetentionDays: 7,
+          backupMaxCount: 3,
+          target: {
+            host: "127.0.0.1",
+          },
+        },
+        {
+          run(input) {
+            if (input.command !== "ssh") return baseRunner.run(input);
+            return baseRunner.run({
+              ...input,
+              stdin: new TextEncoder().encode("not-a-tar-archive"),
+            });
+          },
+        },
+      );
+
+      const uploaded = await sync.syncToRemote();
+
+      expect(uploaded.isErr()).toBe(true);
+      expect(await readFile(join(remoteStateRoot, "pglite", "live.txt"), "utf8")).toBe(
+        "authoritative-state",
+      );
+      expect(await readFile(join(remoteStateRoot, "sync-revision.txt"), "utf8")).toBe("0\n");
+      expect((await readdir(backupRoot)).filter((name) => name.startsWith("sync-"))).toHaveLength(
+        2,
+      );
+      expect(await readdir(backupRoot)).toContain("manual-keep");
+      expect(await readdir(join(remoteStateRoot, "recovery"))).toEqual([]);
+      expect(
+        (await readdir(remoteStateRoot)).filter((name) => name.startsWith(".incoming-sync-")),
+      ).toEqual([]);
+    } finally {
+      await rm(localDataRoot, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-012A] incoming PGlite without version evidence leaves live state untouched", async () => {
+    const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+
+    try {
+      await mkdir(join(localDataRoot, "pglite"), { recursive: true });
+      await mkdir(join(localDataRoot, "source-links"), { recursive: true });
+      await mkdir(join(localDataRoot, "server-applied-routes"), { recursive: true });
+      await writeFile(join(localDataRoot, "pglite", "local.txt"), "local-state");
+      await mkdir(join(remoteStateRoot, "pglite"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
+      await writeFile(join(remoteStateRoot, "pglite", "live.txt"), "authoritative-state");
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "0\n");
+
+      const sync = new RemotePgliteArchiveSync(
+        {
+          dataRoot: remoteStateRoot,
+          localDataRoot,
+          localPgliteDataDir: join(localDataRoot, "pglite"),
+          backupRetentionDays: 7,
+          backupMaxCount: 20,
+          target: { host: "127.0.0.1" },
+        },
+        createLocalSshArchiveRunner(),
+      );
+
+      const uploaded = await sync.syncToRemote();
+
+      expect(uploaded.isErr()).toBe(true);
+      expect(await readFile(join(remoteStateRoot, "pglite", "live.txt"), "utf8")).toBe(
+        "authoritative-state",
+      );
+      expect(await readFile(join(remoteStateRoot, "sync-revision.txt"), "utf8")).toBe("0\n");
+      expect(await readdir(join(remoteStateRoot, "backups"))).toEqual([]);
+      expect(await readdir(join(remoteStateRoot, "recovery"))).toEqual([]);
+    } finally {
+      await rm(localDataRoot, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-012B] failed incoming promotion restores the rotated live state", async () => {
+    const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+
+    try {
+      await mkdir(join(localDataRoot, "pglite"), { recursive: true });
+      await mkdir(join(localDataRoot, "source-links"), { recursive: true });
+      await mkdir(join(localDataRoot, "server-applied-routes"), { recursive: true });
+      await writeFile(join(localDataRoot, "pglite", "local.txt"), "local-state");
+      await writeFile(join(localDataRoot, "pglite", "PG_VERSION"), "18\n");
+      await mkdir(join(remoteStateRoot, "pglite"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
+      await writeFile(join(remoteStateRoot, "pglite", "live.txt"), "authoritative-state");
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "0\n");
+
+      const baseRunner = createLocalSshArchiveRunner();
+      const sync = new RemotePgliteArchiveSync(
+        {
+          dataRoot: remoteStateRoot,
+          localDataRoot,
+          localPgliteDataDir: join(localDataRoot, "pglite"),
+          backupRetentionDays: 7,
+          backupMaxCount: 20,
+          target: {
+            host: "127.0.0.1",
+          },
+        },
+        {
+          run(input) {
+            if (input.command !== "ssh") return baseRunner.run(input);
+            const remoteCommand = input.args
+              .at(-1)
+              ?.replace('mv "$incoming_dir/source-links" "$data_root/source-links"', "false");
+            return baseRunner.run({
+              ...input,
+              args: [...input.args.slice(0, -1), remoteCommand ?? "false"],
+            });
+          },
+        },
+      );
+
+      const uploaded = await sync.syncToRemote();
+
+      expect(uploaded.isErr()).toBe(true);
+      expect(await readFile(join(remoteStateRoot, "pglite", "live.txt"), "utf8")).toBe(
+        "authoritative-state",
+      );
+      expect(await readFile(join(remoteStateRoot, "sync-revision.txt"), "utf8")).toBe("0\n");
+      expect(await readdir(join(remoteStateRoot, "backups"))).toEqual([]);
+      expect(await readdir(join(remoteStateRoot, "recovery"))).toEqual([]);
+      expect(
+        (await readdir(remoteStateRoot)).filter((name) => name.startsWith(".incoming-sync-")),
+      ).toEqual([]);
+    } finally {
+      await rm(localDataRoot, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-012C][CONFIG-FILE-STATE-012D] revision failure and signal interruption roll back the transaction", async () => {
+    const cases = [
+      {
+        name: "revision commit failure",
+        target: 'mv "$revision_temp" "$revision_file"',
+        replacement: "false",
+      },
+      {
+        name: "signal during live rotation",
+        target: 'mv "$data_root/source-links" "$backup_dir/source-links"',
+        replacement: "kill -TERM $$",
+      },
+    ];
+
+    for (const failureCase of cases) {
+      const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-local-"));
+      const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-remote-"));
+      const remoteStateRoot = join(remoteRuntimeRoot, "state");
+
+      try {
+        await mkdir(join(localDataRoot, "pglite"), { recursive: true });
+        await mkdir(join(localDataRoot, "source-links"), { recursive: true });
+        await mkdir(join(localDataRoot, "server-applied-routes"), { recursive: true });
+        await writeFile(join(localDataRoot, "pglite", "local.txt"), "local-state");
+        await mkdir(join(remoteStateRoot, "pglite"), { recursive: true });
+        await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
+        await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
+        await writeFile(join(remoteStateRoot, "pglite", "live.txt"), "authoritative-state");
+        await writeFile(join(remoteStateRoot, "source-links", "live.txt"), "source-links-state");
+        await writeFile(join(remoteStateRoot, "server-applied-routes", "live.txt"), "routes-state");
+        await writeFile(join(remoteStateRoot, "sync-revision.txt"), "0\n");
+
+        const baseRunner = createLocalSshArchiveRunner();
+        const sync = new RemotePgliteArchiveSync(
+          {
+            dataRoot: remoteStateRoot,
+            localDataRoot,
+            localPgliteDataDir: join(localDataRoot, "pglite"),
+            backupRetentionDays: 7,
+            backupMaxCount: 20,
+            target: {
+              host: "127.0.0.1",
+            },
+          },
+          {
+            run(input) {
+              if (input.command !== "ssh") return baseRunner.run(input);
+              const original = input.args.at(-1) ?? "";
+              expect(original, failureCase.name).toContain(failureCase.target);
+              return baseRunner.run({
+                ...input,
+                args: [
+                  ...input.args.slice(0, -1),
+                  original.replace(failureCase.target, failureCase.replacement),
+                ],
+              });
+            },
+          },
+        );
+
+        const uploaded = await sync.syncToRemote();
+
+        expect(uploaded.isErr(), failureCase.name).toBe(true);
+        expect(
+          await readFile(join(remoteStateRoot, "pglite", "live.txt"), "utf8"),
+          failureCase.name,
+        ).toBe("authoritative-state");
+        expect(
+          await readFile(join(remoteStateRoot, "source-links", "live.txt"), "utf8"),
+          failureCase.name,
+        ).toBe("source-links-state");
+        expect(
+          await readFile(join(remoteStateRoot, "server-applied-routes", "live.txt"), "utf8"),
+          failureCase.name,
+        ).toBe("routes-state");
+        expect(
+          await readFile(join(remoteStateRoot, "sync-revision.txt"), "utf8"),
+          failureCase.name,
+        ).toBe("0\n");
+        expect(await readdir(join(remoteStateRoot, "backups")), failureCase.name).toEqual([]);
+        expect(await readdir(join(remoteStateRoot, "recovery")), failureCase.name).toEqual([]);
+        expect(
+          (await readdir(remoteStateRoot)).filter((name) => name.startsWith(".incoming-sync-")),
+          failureCase.name,
+        ).toEqual([]);
+      } finally {
+        await rm(localDataRoot, { recursive: true, force: true });
+        await rm(remoteRuntimeRoot, { recursive: true, force: true });
+      }
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-012E] explicit retry resolves a v2 partial rotation without local pending state", async () => {
+    const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-v2-recovery-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-v2-recovery-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+    const backupName = "sync-20260823010101-42";
+    const incomingName = ".incoming-sync-20260823010101-42";
+    const revisionTempName = ".sync-revision-sync-20260823010101-42.tmp";
+    try {
+      await mkdir(join(remoteStateRoot, "backups", backupName, "pglite"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
+      await mkdir(join(remoteStateRoot, incomingName, "pglite"), { recursive: true });
+      await mkdir(join(remoteStateRoot, incomingName, "source-links"), { recursive: true });
+      await mkdir(join(remoteStateRoot, incomingName, "server-applied-routes"), {
+        recursive: true,
+      });
+      await mkdir(join(remoteStateRoot, "recovery"), { recursive: true });
+      await writeFile(join(remoteStateRoot, "backups", backupName, "pglite", "PG_VERSION"), "18\n");
+      await writeFile(join(remoteStateRoot, "backups", backupName, "pglite", "live.txt"), "old");
+      await writeFile(join(remoteStateRoot, "source-links", "live.txt"), "old-links");
+      await writeFile(join(remoteStateRoot, "server-applied-routes", "live.txt"), "old-routes");
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "4\n");
+      await writeFile(join(remoteStateRoot, revisionTempName), "5\n");
+      await writeFile(
+        join(remoteStateRoot, "recovery", "remote-sync-upload.json"),
+        `${JSON.stringify({
+          schemaVersion: "remote-state-sync-recovery/v2",
+          status: "active",
+          transactionId: backupName,
+          backupName,
+          incomingName,
+          revisionTempName,
+          expectedRevision: 4,
+          nextRevision: 5,
+          hadPglite: true,
+          hadSourceLinks: true,
+          hadServerAppliedRoutes: true,
+        })}\n`,
+      );
+
+      const prepared = await prepareRemotePgliteStateSync({
+        argv: [
+          "appaloft",
+          "server",
+          "capacity",
+          "inspect",
+          "srv_primary",
+          "--state-backend",
+          "ssh-pglite",
+          "--server-host",
+          "127.0.0.1",
+          "--retry-pending-state-sync",
+        ],
+        config: testConfig(localDataRoot, { remoteRuntimeRoot }),
+        runner: createLocalSshArchiveRunner(),
+      });
+
+      if (prepared.isErr()) throw new Error(JSON.stringify(prepared.error));
+      expect(prepared.isOk()).toBe(true);
+      if (!prepared.value) throw new Error("Expected recovered session");
+      expect(await readFile(join(remoteStateRoot, "pglite", "live.txt"), "utf8")).toBe("old");
+      expect(await readFile(join(remoteStateRoot, "source-links", "live.txt"), "utf8")).toBe(
+        "old-links",
+      );
+      expect(
+        await Bun.file(join(remoteStateRoot, "recovery", "remote-sync-upload.json")).exists(),
+      ).toBe(false);
+      expect(await Bun.file(join(remoteStateRoot, incomingName)).exists()).toBe(false);
+      expect(await Bun.file(join(remoteStateRoot, revisionTempName)).exists()).toBe(false);
+      expect((await prepared.value.discardAndRelease()).isOk()).toBe(true);
+    } finally {
+      await rm(localDataRoot, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-012F] legacy v1 recovery is strict, resumable, and fail closed", async () => {
+    const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-v1-recovery-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-v1-recovery-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+    const backupRoot = join(remoteStateRoot, "backups", "sync-legacy-42");
+    const sync = new RemotePgliteArchiveSync(
+      {
+        dataRoot: remoteStateRoot,
+        localDataRoot,
+        localPgliteDataDir: join(localDataRoot, "pglite"),
+        backupRetentionDays: 7,
+        backupMaxCount: 20,
+        target: { host: "127.0.0.1" },
+      },
+      createLocalSshArchiveRunner(),
+    );
+    try {
+      for (const component of ["pglite", "source-links", "server-applied-routes"]) {
+        await mkdir(join(backupRoot, component), { recursive: true });
+        await mkdir(join(remoteStateRoot, component), { recursive: true });
+        await writeFile(join(backupRoot, component, "state.txt"), `old-${component}`);
+        await writeFile(join(remoteStateRoot, component, "state.txt"), `new-${component}`);
+      }
+      await writeFile(join(backupRoot, "pglite", "PG_VERSION"), "18\n");
+      await mkdir(join(remoteStateRoot, "recovery"), { recursive: true });
+      const markerPath = join(remoteStateRoot, "recovery", "remote-sync-upload.json");
+      await writeFile(
+        markerPath,
+        `${JSON.stringify({ phase: "remote-state-sync-upload", backup: backupRoot })}\n`,
+      );
+
+      expect(sync.recoverRemoteTransaction().isOk()).toBe(true);
+      expect(await readFile(join(remoteStateRoot, "pglite", "state.txt"), "utf8")).toBe(
+        "old-pglite",
+      );
+      expect(await Bun.file(markerPath).exists()).toBe(false);
+
+      await writeFile(
+        markerPath,
+        `${JSON.stringify({
+          phase: "remote-state-sync-legacy-recovery",
+          backup: backupRoot,
+        })}\n`,
+      );
+      expect(sync.recoverRemoteTransaction().isErr()).toBe(true);
+      expect(await Bun.file(markerPath).exists()).toBe(true);
+
+      await writeFile(markerPath, '{"phase":"promotion","backup":"/tmp/not-authoritative"}\n');
+      expect(sync.recoverRemoteTransaction().isErr()).toBe(true);
+      expect(await Bun.file(markerPath).exists()).toBe(true);
+      expect(await readFile(join(remoteStateRoot, "pglite", "state.txt"), "utf8")).toBe(
+        "old-pglite",
+      );
+
+      await mkdir(join(backupRoot, "pglite"), { recursive: true });
+      await writeFile(join(backupRoot, "pglite", "PG_VERSION"), "18\n");
+      await writeFile(join(backupRoot, "pglite", "state.txt"), "incomplete-old-pglite");
+      await writeFile(
+        markerPath,
+        `${JSON.stringify({ phase: "remote-state-sync-upload", backup: backupRoot })}\n`,
+      );
+      expect(sync.recoverRemoteTransaction().isErr()).toBe(true);
+      expect(await Bun.file(markerPath).exists()).toBe(true);
+      expect(await readFile(join(remoteStateRoot, "pglite", "state.txt"), "utf8")).toBe(
+        "old-pglite",
+      );
+    } finally {
+      await rm(localDataRoot, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-012F] legacy recovery retries from the complete backup after an interrupted copy", async () => {
+    const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-v1-retry-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-v1-retry-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+    const backupRoot = join(remoteStateRoot, "backups", "sync-legacy-retry-42");
+    const markerPath = join(remoteStateRoot, "recovery", "remote-sync-upload.json");
+
+    try {
+      for (const component of ["pglite", "source-links", "server-applied-routes"]) {
+        await mkdir(join(backupRoot, component), { recursive: true });
+        await mkdir(join(remoteStateRoot, component), { recursive: true });
+        await writeFile(join(backupRoot, component, "state.txt"), `old-${component}`);
+        await writeFile(join(remoteStateRoot, component, "state.txt"), `partial-${component}`);
+      }
+      await writeFile(join(backupRoot, "pglite", "PG_VERSION"), "18\n");
+      await mkdir(join(remoteStateRoot, "recovery"), { recursive: true });
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "4\n");
+      await writeFile(
+        markerPath,
+        `${JSON.stringify({ phase: "remote-state-sync-upload", backup: backupRoot })}\n`,
+      );
+
+      const baseRunner = createLocalSshArchiveRunner();
+      const interruptedSync = new RemotePgliteArchiveSync(
+        {
+          dataRoot: remoteStateRoot,
+          localDataRoot,
+          localPgliteDataDir: join(localDataRoot, "pglite"),
+          backupRetentionDays: 7,
+          backupMaxCount: 20,
+          target: { host: "127.0.0.1" },
+        },
+        {
+          run(input) {
+            if (input.command !== "ssh") return baseRunner.run(input);
+            const original = input.args.at(-1) ?? "";
+            const copyCommand = 'cp -a "$backup_dir/$component" "$data_root/$component" || exit 75';
+            expect(original).toContain(copyCommand);
+            return baseRunner.run({
+              ...input,
+              args: [
+                ...input.args.slice(0, -1),
+                original.replace(
+                  copyCommand,
+                  'if [ "$component" = source-links ]; then false; else cp -a "$backup_dir/$component" "$data_root/$component"; fi || exit 75',
+                ),
+              ],
+            });
+          },
+        },
+      );
+
+      expect(interruptedSync.recoverRemoteTransaction().isErr()).toBe(true);
+      expect(await Bun.file(markerPath).exists()).toBe(true);
+      expect(await readFile(join(backupRoot, "pglite", "state.txt"), "utf8")).toBe("old-pglite");
+      expect(await readFile(join(backupRoot, "source-links", "state.txt"), "utf8")).toBe(
+        "old-source-links",
+      );
+
+      const retriedSync = new RemotePgliteArchiveSync(
+        {
+          dataRoot: remoteStateRoot,
+          localDataRoot,
+          localPgliteDataDir: join(localDataRoot, "pglite"),
+          backupRetentionDays: 7,
+          backupMaxCount: 20,
+          target: { host: "127.0.0.1" },
+        },
+        baseRunner,
+      );
+
+      expect(retriedSync.recoverRemoteTransaction().isOk()).toBe(true);
+      for (const component of ["pglite", "source-links", "server-applied-routes"]) {
+        expect(await readFile(join(remoteStateRoot, component, "state.txt"), "utf8")).toBe(
+          `old-${component}`,
+        );
+      }
+      expect(await Bun.file(markerPath).exists()).toBe(false);
+      expect(await Bun.file(backupRoot).exists()).toBe(false);
+    } finally {
+      await rm(localDataRoot, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-012E] a committed v2 marker cleans staging without rolling data back", async () => {
+    const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-v2-commit-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-v2-commit-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+    const transactionId = "sync-20260823020202-43";
+    const backupRoot = join(remoteStateRoot, "backups", transactionId);
+    const incomingName = `.incoming-${transactionId}`;
+    const revisionTempName = `.sync-revision-${transactionId}.tmp`;
+    try {
+      for (const component of ["pglite", "source-links", "server-applied-routes"]) {
+        await mkdir(join(remoteStateRoot, component), { recursive: true });
+        await mkdir(join(backupRoot, component), { recursive: true });
+        await writeFile(join(remoteStateRoot, component, "state.txt"), `committed-${component}`);
+        await writeFile(join(backupRoot, component, "state.txt"), `previous-${component}`);
+      }
+      await mkdir(join(remoteStateRoot, incomingName), { recursive: true });
+      await mkdir(join(remoteStateRoot, "recovery"), { recursive: true });
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "5\n");
+      await writeFile(join(remoteStateRoot, revisionTempName), "5\n");
+      const markerPath = join(remoteStateRoot, "recovery", "remote-sync-upload.json");
+      await writeFile(
+        markerPath,
+        `${JSON.stringify({
+          schemaVersion: "remote-state-sync-recovery/v2",
+          status: "active",
+          transactionId,
+          backupName: transactionId,
+          incomingName,
+          revisionTempName,
+          expectedRevision: 4,
+          nextRevision: 5,
+          hadPglite: true,
+          hadSourceLinks: true,
+          hadServerAppliedRoutes: true,
+        })}\n`,
+      );
+      const sync = new RemotePgliteArchiveSync(
+        {
+          dataRoot: remoteStateRoot,
+          localDataRoot,
+          localPgliteDataDir: join(localDataRoot, "pglite"),
+          backupRetentionDays: 7,
+          backupMaxCount: 20,
+          target: { host: "127.0.0.1" },
+        },
+        createLocalSshArchiveRunner(),
+      );
+
+      expect(sync.recoverRemoteTransaction().isOk()).toBe(true);
+      expect(await readFile(join(remoteStateRoot, "pglite", "state.txt"), "utf8")).toBe(
+        "committed-pglite",
+      );
+      expect(await readFile(join(backupRoot, "pglite", "state.txt"), "utf8")).toBe(
+        "previous-pglite",
+      );
+      expect(await Bun.file(markerPath).exists()).toBe(false);
+      expect(await Bun.file(join(remoteStateRoot, incomingName)).exists()).toBe(false);
+      expect(await Bun.file(join(remoteStateRoot, revisionTempName)).exists()).toBe(false);
+
+      await rm(join(remoteStateRoot, "source-links"), { recursive: true });
+      await mkdir(join(remoteStateRoot, incomingName));
+      await writeFile(join(remoteStateRoot, revisionTempName), "5\n");
+      await writeFile(
+        markerPath,
+        `${JSON.stringify({
+          schemaVersion: "remote-state-sync-recovery/v2",
+          status: "active",
+          transactionId,
+          backupName: transactionId,
+          incomingName,
+          revisionTempName,
+          expectedRevision: 4,
+          nextRevision: 5,
+          hadPglite: true,
+          hadSourceLinks: true,
+          hadServerAppliedRoutes: true,
+        })}\n`,
+      );
+      expect(sync.recoverRemoteTransaction().isErr()).toBe(true);
+      expect(await Bun.file(markerPath).exists()).toBe(true);
+      expect(await readFile(join(remoteStateRoot, "pglite", "state.txt"), "utf8")).toBe(
+        "committed-pglite",
+      );
+    } finally {
+      await rm(localDataRoot, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
     }
   });
 
@@ -1423,6 +2205,7 @@ describe("remote PGlite state sync", () => {
       await mkdir(join(localDataRoot, "source-links"), { recursive: true });
       await mkdir(join(localDataRoot, "server-applied-routes"), { recursive: true });
       await writeFile(join(localDataRoot, "pglite", "local.txt"), "local-state");
+      await writeFile(join(localDataRoot, "pglite", "PG_VERSION"), "18\n");
       await mkdir(join(remoteStateRoot, "pglite"), { recursive: true });
       await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
       await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
@@ -1457,6 +2240,7 @@ describe("remote PGlite state sync", () => {
       const uploaded = await sync.syncToRemote();
       const backups = await readdir(join(remoteStateRoot, "backups"));
 
+      if (uploaded.isErr()) throw new Error(JSON.stringify(uploaded.error));
       expect(uploaded.isOk()).toBe(true);
       expect(backups).not.toContain("sync-20200101000000-old");
       expect(backups).toContain("sync-20990101000000-recent");
@@ -1486,6 +2270,7 @@ describe("remote PGlite state sync", () => {
       await mkdir(join(localDataRoot, "source-links"), { recursive: true });
       await mkdir(join(localDataRoot, "server-applied-routes"), { recursive: true });
       await writeFile(join(localDataRoot, "pglite", "local.txt"), "local-state");
+      await writeFile(join(localDataRoot, "pglite", "PG_VERSION"), "18\n");
       await mkdir(join(remoteStateRoot, "pglite"), { recursive: true });
       await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
       await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
@@ -1519,11 +2304,58 @@ describe("remote PGlite state sync", () => {
       const backups = await readdir(backupRoot);
       const syncBackups = backups.filter((name) => name.startsWith("sync-"));
 
+      if (uploaded.isErr()) throw new Error(JSON.stringify(uploaded.error));
       expect(uploaded.isOk()).toBe(true);
       expect(syncBackups).toHaveLength(2);
       expect(backups).not.toContain("sync-20990101000000-oldest");
       expect(backups).not.toContain("sync-20990101000100-middle");
       expect(backups).toContain("manual-keep");
+    } finally {
+      await rm(localDataRoot, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-012G] retention rejects unsafe sync backup names without word splitting", async () => {
+    const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+    const unsafeBackup = join(remoteStateRoot, "backups", "sync-unsafe name");
+
+    try {
+      await mkdir(join(localDataRoot, "pglite"), { recursive: true });
+      await mkdir(join(localDataRoot, "source-links"), { recursive: true });
+      await mkdir(join(localDataRoot, "server-applied-routes"), { recursive: true });
+      await writeFile(join(localDataRoot, "pglite", "PG_VERSION"), "18\n");
+      await writeFile(join(localDataRoot, "pglite", "local.txt"), "local-state");
+      await mkdir(join(remoteStateRoot, "pglite"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
+      await mkdir(unsafeBackup, { recursive: true });
+      await writeFile(join(unsafeBackup, "keep.txt"), "keep");
+      await writeFile(join(remoteStateRoot, "pglite", "live.txt"), "authoritative-state");
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "0\n");
+
+      const sync = new RemotePgliteArchiveSync(
+        {
+          dataRoot: remoteStateRoot,
+          localDataRoot,
+          localPgliteDataDir: join(localDataRoot, "pglite"),
+          backupRetentionDays: 7,
+          backupMaxCount: 20,
+          target: { host: "127.0.0.1" },
+        },
+        createLocalSshArchiveRunner(),
+      );
+
+      const uploaded = await sync.syncToRemote();
+
+      expect(uploaded.isErr()).toBe(true);
+      expect(await readFile(join(remoteStateRoot, "pglite", "live.txt"), "utf8")).toBe(
+        "authoritative-state",
+      );
+      expect(await readFile(join(unsafeBackup, "keep.txt"), "utf8")).toBe("keep");
+      expect(await readFile(join(remoteStateRoot, "sync-revision.txt"), "utf8")).toBe("0\n");
     } finally {
       await rm(localDataRoot, { recursive: true, force: true });
       await rm(remoteRuntimeRoot, { recursive: true, force: true });
@@ -1540,6 +2372,7 @@ describe("remote PGlite state sync", () => {
       await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
       await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
       await writeFile(join(remoteStateRoot, "pglite", "live.txt"), "standalone-live-state");
+      await writeFile(join(remoteStateRoot, "pglite", "PG_VERSION"), "18\n");
       await writeFile(join(remoteStateRoot, "source-links", "other.json"), "{}\n");
       await writeFile(join(remoteStateRoot, "server-applied-routes", "other.json"), "{}\n");
       await writeFile(join(remoteStateRoot, "sync-revision.txt"), "0\n");
@@ -1607,11 +2440,7 @@ describe("remote PGlite state sync", () => {
           renameSync(mirrorSwap.from, mirrorSwap.to);
           mirrorSwap = null;
         }
-        if (
-          failRelease &&
-          input.command === "ssh" &&
-          input.args.at(-1)?.includes('rm -rf "$data_root/locks/mutation.lock"')
-        ) {
+        if (failRelease && isRemoteMutationLockRelease(input)) {
           return {
             exitCode: 1,
             stdout: new Uint8Array(),
@@ -1841,7 +2670,7 @@ describe("remote PGlite state sync", () => {
       await rm(localDataRoot, { recursive: true, force: true });
       await rm(remoteRuntimeRoot, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 
   test("[RT-CAP-REMOTE-011] thrown destructive upload preserves recovery state and releases the mutation lock", async () => {
     const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-capacity-throw-local-"));
@@ -1921,11 +2750,7 @@ describe("remote PGlite state sync", () => {
     let failRelease = false;
     const runner = {
       run(input: RemotePgliteArchiveRunnerInput) {
-        if (
-          failRelease &&
-          input.command === "ssh" &&
-          input.args.at(-1)?.includes('rm -rf "$data_root/locks/mutation.lock"')
-        ) {
+        if (failRelease && isRemoteMutationLockRelease(input)) {
           return {
             exitCode: 1,
             stdout: new Uint8Array(),
@@ -2073,19 +2898,17 @@ describe("remote PGlite state sync", () => {
       expect(sshCommands[0]).toContain("180");
       expect(sshCommands[1]).toContain("tar -czf - pglite source-links server-applied-routes");
       expect(sshCommands[2]).toContain("sync-revision.txt");
-      expect(sshCommands[3]).toContain('rm -rf "$data_root/locks/mutation.lock"');
+      expect(isRemoteMutationLockRelease(calls.filter((call) => call.command === "ssh")[3]!)).toBe(
+        true,
+      );
       expect(sshCommands[4]).toContain("mutation.lock");
       expect(sshCommands[4]).toContain("180");
       expect(sshCommands[5]).toContain("expected_revision");
       expect(sshCommands[5]).toContain("next_revision");
-      expect(sshCommands[6]).toContain('rm -rf "$data_root/locks/mutation.lock"');
-      expect(
-        calls.filter(
-          (call) =>
-            call.command === "ssh" &&
-            call.args.join(" ").includes('rm -rf "$data_root/locks/mutation.lock"'),
-        ),
-      ).toHaveLength(2);
+      expect(isRemoteMutationLockRelease(calls.filter((call) => call.command === "ssh")[6]!)).toBe(
+        true,
+      );
+      expect(calls.filter(isRemoteMutationLockRelease)).toHaveLength(2);
     } finally {
       await rm(dataDir, { recursive: true, force: true });
     }
@@ -2164,13 +2987,7 @@ describe("remote PGlite state sync", () => {
           reason: "remote_state_merge_failed",
         },
       });
-      expect(
-        calls.filter(
-          (call) =>
-            call.command === "ssh" &&
-            call.args.join(" ").includes('rm -rf "$data_root/locks/mutation.lock"'),
-        ),
-      ).toHaveLength(2);
+      expect(calls.filter(isRemoteMutationLockRelease)).toHaveLength(2);
     } finally {
       await rm(dataDir, { recursive: true, force: true });
     }
@@ -2234,11 +3051,7 @@ describe("remote PGlite state sync", () => {
       const sshCommands = calls
         .filter((call) => call.command === "ssh")
         .map((call) => call.args.join(" "));
-      expect(
-        sshCommands.filter((command) =>
-          command.includes('rm -rf "$data_root/locks/mutation.lock"'),
-        ),
-      ).toHaveLength(2);
+      expect(calls.filter(isRemoteMutationLockRelease)).toHaveLength(2);
       expect(
         sshCommands.filter((command) =>
           command.includes("tar -czf - pglite source-links server-applied-routes"),
