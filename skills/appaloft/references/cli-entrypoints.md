@@ -64,9 +64,13 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   attaches into the remote session. Origin HTTP 502/503 or a Cloudflare
   bad-gateway / incomplete origin response during **Preparing disk** keeps
   that wait panel up, marks the disk step retrying, and retries
-  `workspaces.open` on the enrolled Server; attach waits for disk prep.
-  Exhausted failure marks the disk step failed, restores the TTY once, and
-  prints a human next step, not the Appaloft error-contract dump. A matching Cloud Agents `appaloft-workspace-tui`
+  `workspaces.open` on the enrolled Server until a live session attaches or
+  the occupy deadline expires. Attach waits for disk prep. An in-flight hang
+  is abortable. Exhausted / deadline / cancelled failure marks the disk step
+  failed, restores the TTY once, prints a human Cloud-unreachable / disk-prep
+  next step (not `Opening folder.local` and not the Appaloft error-contract
+  dump), and exits non-zero. Ctrl-C on the wait panel before attach is not
+  success. A matching Cloud Agents `appaloft-workspace-tui`
   is required. Lookup includes the executed tree and sibling/dev checkouts
   (`appaloft-cloud/community/appaloft` → `appaloft`) plus
   `APPALOFT_WORKSPACE_TUI_BINARY`.   A missing or stale renderer is not launched; `code` restores the TTY and

@@ -364,7 +364,9 @@
 - [x] folder.local unstructured `Input validation failed` after the Cloud Agents screen is a human next step (`1049l` then print); `sandboxes.create` omits Cloud-unknown name hints
 - [x] folder.local / `deploy .` `Operation check denied` is a human next step (operation + reason + login/enroll/retry/Cloud update); logged-in create-project keeps handshake org (WS-REMOTE-COMPAT-221)
 - [x] occupy / Preparing disk HTTP 502/503 or Cloudflare bad-gateway / origin-incomplete after TUI first paint humanizes to Cloud is temporarily unreachable without Occupancy/`sbx_` / contract sentence / `Opening folder.local`; `--omp` and `--pi` name hostinger `srv_4lifk0yrcecy` (WS-REMOTE-COMPAT-222)
-- [x] occupy / Preparing disk origin HTTP 502/503 keeps the Cloud Agents wait panel up, marks the disk step retrying, and keeps retrying folder.local `sandboxes.create` on hostinger `srv_4lifk0yrcecy` past a 4-attempt helper burst; attach waits for success; do not leave alt-screen or print `Opening folder.local` (WS-REMOTE-PROGRESS-223)
+- [x] occupy / Preparing disk origin HTTP 502/503 keeps the Cloud Agents wait panel up, marks the disk step retrying, and keeps retrying folder.local `sandboxes.create` on hostinger `srv_4lifk0yrcecy` past a 4-attempt helper burst until attach + terminal-ready or the occupy deadline; do not leave alt-screen or print `Opening folder.local` while retrying (WS-REMOTE-PROGRESS-223)
+- [x] perpetual Preparing-disk 502 fail-closes after the occupy deadline with Cloud-unreachable / disk-prep, no `Opening folder.local`, non-zero exit (WS-REMOTE-PROGRESS-224)
+- [x] in-flight occupy open hang is abortable; Ctrl-C / quit on Preparing disk while never attached is not exit 0 success (WS-REMOTE-PROGRESS-225, WS-REMOTE-PROGRESS-226)
 - [x] `appaloftdev code --no-attach` would name the enrolled Server
 
 ## Slice 44 - occupancy resume keeps preferred Profile

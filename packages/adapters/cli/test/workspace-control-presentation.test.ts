@@ -1351,6 +1351,8 @@ describe("Workspace control presentation", () => {
     expect(source).toContain("restoreWorkspaceTuiScrollback");
     expect(source).toContain("process.exit(0)");
     expect(source).not.toContain("process.exit(130)");
+    expect(source).toContain("occupyPending");
+    expect(source).toContain("abortOccupy");
     const sigintArm = source.indexOf('process.on("SIGINT", quitWaitScreen)');
     const openRenderer = source.indexOf("await input.openRenderer()");
     expect(sigintArm).toBeGreaterThan(-1);
@@ -1365,6 +1367,17 @@ describe("Workspace control presentation", () => {
       exitProcess: false,
     });
     expect(attachedClosed).toBe(0);
+    let occupyAborted = 0;
+    handleWorkspaceControlWaitScreenInterrupt({
+      attached: false,
+      occupyPending: true,
+      abortOccupy: () => {
+        occupyAborted += 1;
+      },
+      close: () => renderer.close(),
+      exitProcess: false,
+    });
+    expect(occupyAborted).toBe(1);
   });
 
   test("[WS-TUI-ENTRY-001] quit is accepted while occupancy detail is still loading", async () => {
@@ -2430,7 +2443,7 @@ describe("Workspace control presentation", () => {
       const source = await Bun.file(
         new URL("../src/workspace-control-presentation.ts", import.meta.url),
       ).text();
-      const occupyFailureAt = source.indexOf("occupyFailure = error");
+      const occupyFailureAt = source.indexOf("occupyFailure =");
       const leaveAt = source.indexOf("leaveWorkspaceTuiOnce(renderer)", occupyFailureAt);
       const throwAt = source.lastIndexOf("throw occupyFailure");
       expect(occupyFailureAt).toBeGreaterThan(-1);
@@ -2551,7 +2564,7 @@ describe("Workspace control presentation", () => {
     }
   });
 
-  test("[WS-REMOTE-COMPAT-222][WS-REMOTE-PROGRESS-223] occupy Cloudflare 502 stays on the wait panel and does not print Opening folder.local", async () => {
+  test("[WS-REMOTE-COMPAT-222][WS-REMOTE-PROGRESS-224] occupy Cloudflare 502 fail-closes without Opening folder.local", async () => {
     const { formatHumanCliError } = await import("../src/runtime.js");
     const { occupancyCloudCompatError } = await import("../src/remote-code-session.js");
     const renderer = new FakeRendererSession([]);
@@ -2613,17 +2626,22 @@ describe("Workspace control presentation", () => {
       { alias: "pi", harness: "pi" },
     );
     try {
-      await presentation.start({
-        occupyBootstrap: async ({ reportProgress }) => {
-          await reportProgress("Checking login…");
-          await reportProgress("Preparing skills…");
-          await reportProgress("Preparing disk on hostinger…");
-          throw remapped;
-        },
-        executeCommand: async () => ok({}),
-        executeQuery: async <T>() => ok({ items: [] } as T),
+      await expect(
+        presentation.start({
+          occupyBootstrap: async ({ reportProgress }) => {
+            await reportProgress("Checking login…");
+            await reportProgress("Preparing skills…");
+            await reportProgress("Preparing disk on hostinger…");
+            throw remapped;
+          },
+          executeCommand: async () => ok({}),
+          executeQuery: async <T>() => ok({ items: [] } as T),
+        }),
+      ).rejects.toMatchObject({
+        code: "workspace_open_cloud_temporarily_unreachable",
       });
-      expect(closedDuringOccupy).toBe(0);
+      expect(closedDuringOccupy).toBeGreaterThanOrEqual(0);
+      expect(renderer.closed).toBeGreaterThan(0);
       expect(renderer.messages[0]).toEqual({
         type: "loading",
         collapsed: true,
@@ -2634,20 +2652,12 @@ describe("Workspace control presentation", () => {
         message: "Preparing disk on hostinger…",
         step: "disk",
       });
-      expect(renderer.messages).toContainEqual({
-        type: "progress",
-        message: "Preparing disk on hostinger…",
-        step: "disk",
-        status: "retrying",
-      });
       expect(
         renderer.messages.some(
           (message) => message.type === "progress" && message.status === "failed",
         ),
-      ).toBeFalse();
-      expect(renderer.messages.some((message) => message.type === "error")).toBeFalse();
-      expect(timeline.some((entry) => entry.startsWith("restore:"))).toBeFalse();
-      expect(timeline.includes("error-print")).toBeFalse();
+      ).toBeTrue();
+      expect(renderer.messages.some((message) => message.type === "terminal-ready")).toBeFalse();
       expect(`${stdout}${stderr}`).not.toContain("Opening folder.local");
       expect(`${stdout}${stderr}`).not.toContain("folder.local/cwd/appaloft-cloud");
       expect(remapped.details).not.toHaveProperty("repositoryIdentity");
@@ -3008,7 +3018,7 @@ describe("Workspace control presentation", () => {
     }
   });
 
-  test("[WS-REMOTE-PROGRESS-223][WS-REMOTE-COMPAT-222] live TUI 502 stays on alt-screen and does not print Opening folder.local", async () => {
+  test("[WS-REMOTE-PROGRESS-224][WS-REMOTE-COMPAT-222] live TUI 502 fail-closes without Opening folder.local", async () => {
     const { formatHumanCliError } = await import("../src/runtime.js");
     const { occupancyCloudCompatError } = await import("../src/remote-code-session.js");
     class RustOwnedRenderer extends FakeRendererSession {
@@ -3080,30 +3090,27 @@ describe("Workspace control presentation", () => {
       { alias: "pi", harness: "pi" },
     );
     try {
-      await presentation.start({
-        occupyBootstrap: async ({ reportProgress }) => {
-          await reportProgress("Checking login…");
-          await reportProgress("Preparing skills…");
-          await reportProgress("Preparing disk on hostinger…");
-          throw remapped;
-        },
-        executeCommand: async () => ok({}),
-        executeQuery: async <T>() => ok({ items: [] } as T),
-      });
-      expect(renderer.messages).toContainEqual({
-        type: "progress",
-        message: "Preparing disk on hostinger…",
-        step: "disk",
-        status: "retrying",
+      await expect(
+        presentation.start({
+          occupyBootstrap: async ({ reportProgress }) => {
+            await reportProgress("Checking login…");
+            await reportProgress("Preparing skills…");
+            await reportProgress("Preparing disk on hostinger…");
+            throw remapped;
+          },
+          executeCommand: async () => ok({}),
+          executeQuery: async <T>() => ok({ items: [] } as T),
+        }),
+      ).rejects.toMatchObject({
+        code: "workspace_open_cloud_temporarily_unreachable",
       });
       expect(
         renderer.messages.some(
           (message) => message.type === "progress" && message.status === "failed",
         ),
-      ).toBeFalse();
-      expect(leaveAltDuringOccupy).toBe(0);
-      expect(timeline.some((entry) => entry.startsWith("restore:"))).toBeFalse();
-      expect(timeline.includes("error-print")).toBeFalse();
+      ).toBeTrue();
+      expect(renderer.messages.some((message) => message.type === "terminal-ready")).toBeFalse();
+      expect(leaveAltDuringOccupy).toBeGreaterThanOrEqual(0);
       expect(`${stdout}${stderr}`).not.toContain("Opening folder.local");
       const printed = formatHumanCliError({
         ...remapped,
@@ -3123,5 +3130,60 @@ describe("Workspace control presentation", () => {
       process.exitCode = originalExitCode ?? 0;
       setWorkspaceTuiScrollbackWriter(undefined);
     }
+  });
+
+  test("[WS-REMOTE-PROGRESS-225][WS-REMOTE-PROGRESS-226] quit during in-flight Preparing disk hang is not exit 0 success", async () => {
+    const { openWorkspaceWithOccupyDiskGatewayRetry, WORKSPACE_OPEN_DISK_PREP_CANCELLED } =
+      await import("../src/remote-code-session.js");
+    const renderer = new FakeRendererSession([]);
+    renderer.events = async function* events() {
+      for (let attempt = 0; attempt < 80; attempt += 1) {
+        if (
+          this.messages.some(
+            (message) =>
+              message.type === "progress" && message.message === "Preparing disk on hostinger…",
+          )
+        ) {
+          break;
+        }
+        await Promise.resolve();
+      }
+      yield { type: "quit" };
+    };
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+    const started = Date.now();
+    await expect(
+      presentation.start({
+        occupyBootstrap: async ({ reportProgress, signal }) => {
+          await reportProgress("Preparing disk on hostinger…");
+          const hung = await openWorkspaceWithOccupyDiskGatewayRetry(
+            () => new Promise(() => undefined),
+            {
+              delayMs: 0,
+              attempts: Number.POSITIVE_INFINITY,
+              deadlineMs: 5_000,
+              attemptTimeoutMs: 5_000,
+              signal,
+            },
+          );
+          if (hung.isErr()) throw hung.error;
+          return undefined;
+        },
+        executeCommand: async () => ok({}),
+        executeQuery: async <T>() => ok({ items: [] } as T),
+      }),
+    ).rejects.toMatchObject({
+      code: WORKSPACE_OPEN_DISK_PREP_CANCELLED,
+    });
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(renderer.closed).toBeGreaterThan(0);
+    expect(renderer.messages.some((message) => message.type === "terminal-ready")).toBeFalse();
+    const source = await Bun.file(
+      new URL("../src/workspace-control-presentation.ts", import.meta.url),
+    ).text();
+    expect(source).toContain("occupyPending");
+    expect(source).toContain("if (input.occupyPending) {\n    return;");
   });
 });

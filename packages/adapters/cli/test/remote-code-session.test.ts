@@ -9,6 +9,11 @@ import { folderOccupancyIdentity } from "../src/folder-project-link.js";
 import { OCCUPANCY_CODE_PROGRESS } from "../src/occupancy-code-progress.js";
 import {
   DEFAULT_OCCUPY_DISK_GATEWAY_ATTEMPTS,
+  occupyDiskPrepCancelledError,
+  occupyLiveSessionMissingError,
+  WORKSPACE_OPEN_CLOUD_TEMPORARILY_UNREACHABLE,
+  WORKSPACE_OPEN_DISK_PREP_CANCELLED,
+  WORKSPACE_OPEN_LIVE_SESSION_MISSING,
   folderHasGitWorktree,
   formatRemoteCodeBanner,
   formatRemoteCodeGitHubHint,
@@ -252,6 +257,131 @@ describe("remote code door", () => {
     );
     expect(validationOpens).toBe(1);
     expect(validation.isErr()).toBeTrue();
+  });
+  test("[WS-REMOTE-PROGRESS-224] perpetual occupy disk 502 fail-closes after the deadline", async () => {
+    const cloudflare502 = {
+      code: "sdk_unstructured_error" as const,
+      category: "infra" as const,
+      message:
+        "The server returned an error that did not match the Appaloft error contract. HTTP 502 Body: {cloudflare 502 bad gateway, origin invalid or incomplete response}",
+      retryable: true,
+      details: {
+        status: 502,
+        bodyPreview: "{cloudflare 502 bad gateway, origin invalid or incomplete response}",
+      },
+    };
+    let opens = 0;
+    let nowMs = 0;
+    const exhausted = await openWorkspaceWithOccupyDiskGatewayRetry(
+      async () => {
+        opens += 1;
+        nowMs += 40;
+        return err(cloudflare502);
+      },
+      {
+        delayMs: 0,
+        attempts: Number.POSITIVE_INFINITY,
+        deadlineMs: 100,
+        now: () => nowMs,
+      },
+    );
+    expect(opens).toBeGreaterThan(1);
+    expect(opens).toBeLessThan(5);
+    expect(exhausted.isErr()).toBeTrue();
+    if (exhausted.isErr()) {
+      expect(exhausted.error.code).toBe(WORKSPACE_OPEN_CLOUD_TEMPORARILY_UNREACHABLE);
+      expect(exhausted.error.message).toContain("Disk preparation did not finish");
+      const remapped = occupancyCloudCompatError(
+        exhausted.error,
+        { id: "srv_4lifk0yrcecy", name: "hostinger" },
+        {
+          repositoryIdentity: "folder.local/cwd/appaloft-cloud",
+          repository: "https://folder.local/cwd/appaloft-cloud.git",
+        },
+        { alias: "pi", harness: "pi" },
+      );
+      expect(remapped.code).toBe(WORKSPACE_OPEN_CLOUD_TEMPORARILY_UNREACHABLE);
+      expect(remapped.message).toContain("Cloud is temporarily unreachable");
+      expect(remapped.message).toContain("HTTP 502");
+      expect(JSON.stringify(remapped)).not.toContain("Opening folder.local");
+    }
+  });
+  test("[WS-REMOTE-PROGRESS-225] in-flight occupy open hang is abortable", async () => {
+    const controller = new AbortController();
+    const started = Date.now();
+    const hung = openWorkspaceWithOccupyDiskGatewayRetry(() => new Promise(() => undefined), {
+      delayMs: 0,
+      attempts: Number.POSITIVE_INFINITY,
+      deadlineMs: 5_000,
+      attemptTimeoutMs: 5_000,
+      signal: controller.signal,
+    });
+    await Bun.sleep(15);
+    controller.abort();
+    const result = await hung;
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(result.isErr()).toBeTrue();
+    if (result.isErr()) {
+      expect(result.error.code).toBe(WORKSPACE_OPEN_DISK_PREP_CANCELLED);
+      expect(result.error.message).toBe("Cancelled while preparing the disk.");
+    }
+  });
+  test("[WS-REMOTE-PROGRESS-224] occupy hang fail-closes when the deadline expires", async () => {
+    const started = Date.now();
+    const hung = await openWorkspaceWithOccupyDiskGatewayRetry(() => new Promise(() => undefined), {
+      delayMs: 0,
+      attempts: Number.POSITIVE_INFINITY,
+      deadlineMs: 30,
+      attemptTimeoutMs: 30,
+    });
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(hung.isErr()).toBeTrue();
+    if (hung.isErr()) {
+      expect(hung.error.code).toBe(WORKSPACE_OPEN_CLOUD_TEMPORARILY_UNREACHABLE);
+      expect(hung.error.message).toContain("Disk preparation did not finish");
+    }
+  });
+  test("[WS-REMOTE-PROGRESS-223] success after transient 502 still returns the opened workspace", async () => {
+    const cloudflare502 = {
+      code: "sdk_unstructured_error" as const,
+      category: "infra" as const,
+      message:
+        "The server returned an error that did not match the Appaloft error contract. HTTP 502 Body: {cloudflare}",
+      retryable: true,
+      details: { status: 502, bodyPreview: "{cloudflare}" },
+    };
+    let opens = 0;
+    const opened = await openWorkspaceWithOccupyDiskGatewayRetry(
+      async () => {
+        opens += 1;
+        if (opens === 1) return err(cloudflare502);
+        return ok({ workspaceId: "ws_live", attach: { sessionId: "term_1" } });
+      },
+      { delayMs: 0, deadlineMs: 1_000, attempts: Number.POSITIVE_INFINITY },
+    );
+    expect(opens).toBe(2);
+    expect(opened.isOk()).toBeTrue();
+    if (opened.isOk()) {
+      expect(opened.value).toEqual({ workspaceId: "ws_live", attach: { sessionId: "term_1" } });
+    }
+  });
+  test("[WS-REMOTE-PROGRESS-224] cancelled and missing-session errors omit Opening folder.local", async () => {
+    const { formatHumanCliError } = await import("../src/runtime.js");
+    const cancelled = occupyDiskPrepCancelledError();
+    const missing = occupyLiveSessionMissingError();
+    expect(cancelled.code).toBe(WORKSPACE_OPEN_DISK_PREP_CANCELLED);
+    expect(missing.code).toBe(WORKSPACE_OPEN_LIVE_SESSION_MISSING);
+    for (const error of [cancelled, missing]) {
+      const printed = formatHumanCliError({
+        ...error,
+        details: {
+          ...error.details,
+          repositoryIdentity: "folder.local/cwd/appaloft-cloud",
+        },
+      });
+      expect(printed).not.toContain("Opening folder.local");
+      expect(printed).not.toMatch(/occupancy/iu);
+    }
   });
   test("[WS-REMOTE-OPEN-BYOS-181] --server pin keeps the enrolled Server name when the door already selected it", () => {
     const pinned = pinRemoteCodeDoorServer(

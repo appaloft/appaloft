@@ -116,6 +116,9 @@ import {
   isWorkspaceGitRootUnavailable,
   nativeAttachRequiresInteractiveTerminal,
   occupancyCloudCompatError,
+  occupyDiskGatewayAttemptTimeoutMs,
+  occupyDiskGatewayDeadlineMs,
+  occupyLiveSessionMissingError,
   OCCUPY_DISK_GATEWAY_UNLIMITED_ATTEMPTS,
   openWorkspaceWithOccupyDiskGatewayRetry,
   pinRemoteCodeDoorServer,
@@ -926,7 +929,13 @@ export const workspaceCodeCommand = EffectCommand.make(
         const openDisk = (workspaceCommand: OpenAgentWorkspaceCommand) =>
           openWorkspaceWithOccupyDiskGatewayRetry(() => cli.executeCommand(workspaceCommand), {
             ...(options?.keepRetryingTransientDisk
-              ? { attempts: OCCUPY_DISK_GATEWAY_UNLIMITED_ATTEMPTS }
+              ? {
+                  attempts: OCCUPY_DISK_GATEWAY_UNLIMITED_ATTEMPTS,
+                  deadlineMs: occupyDiskGatewayDeadlineMs(cli.environment ?? process.env),
+                  attemptTimeoutMs: occupyDiskGatewayAttemptTimeoutMs(
+                    cli.environment ?? process.env,
+                  ),
+                }
               : {}),
             ...(options?.signal ? { signal: options.signal } : {}),
             onRetry: () => {
@@ -1033,18 +1042,19 @@ export const workspaceCodeCommand = EffectCommand.make(
                 : {}),
               occupancyChrome: { project: occupancyFolderName },
               occupyBootstrap: async ({ reportProgress: tuiProgress, signal }) => {
-                const occupied = await withImmediateSigintExit(() =>
-                  occupyRemote(
-                    (message, progress) => {
-                      void tuiProgress(message, progress);
-                    },
-                    {
-                      announcePin: false,
-                      keepRetryingTransientDisk: true,
-                      signal,
-                    },
-                  ),
+                const occupied = await occupyRemote(
+                  (message, progress) => {
+                    void tuiProgress(message, progress);
+                  },
+                  {
+                    announcePin: false,
+                    keepRetryingTransientDisk: true,
+                    signal,
+                  },
                 );
+                if (!occupied.result.attach) {
+                  throw occupyLiveSessionMissingError();
+                }
                 await settleWithTimeout(
                   offerOccupancyConnectingMaterials({
                     workspaceId: occupied.result.workspaceId,
