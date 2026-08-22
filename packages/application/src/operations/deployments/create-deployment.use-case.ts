@@ -26,6 +26,7 @@ import {
   explicitOriginalLocator,
   localFolderSourceExecutionMetadataFromSource,
   localFolderSourceFieldsFromResourceBinding,
+  persistedLocalFolderSourceBinding,
   retainLocalFolderSourceFields,
   retainLocalFolderSourceFieldsFromResourceBinding,
   withLocalFolderWorkerPackageRoot,
@@ -90,19 +91,6 @@ import { deploymentResourceRuntimeScope } from "./deployment-mutation-scopes";
 import { recordDeploymentProcessAttempt } from "./deployment-process-attempt";
 import { type DeploymentSnapshotFactory } from "./deployment-snapshot.factory";
 import { type RuntimePlanResolutionInputBuilder } from "./runtime-plan-resolution-input.builder";
-
-function persistedLocalFolderSourceBinding(resource: Resource) {
-  const binding = resource.toState().sourceBinding;
-  if (!binding) {
-    return undefined;
-  }
-
-  return {
-    locator: binding.locator.value,
-    ...(binding.originalLocator ? { originalLocator: binding.originalLocator.value } : {}),
-    ...(binding.metadata ? { metadata: binding.metadata } : {}),
-  };
-}
 
 function createResourceSourceDescriptor(
   resource: Resource,
@@ -1106,8 +1094,10 @@ export class CreateDeploymentUseCase {
           destination,
         },
       );
+      const persistedBinding = persistedLocalFolderSourceBinding(resource);
       const localFolderExecutionMetadata = localFolderSourceExecutionMetadataFromSource({
         source: detected.source,
+        ...(persistedBinding ? { binding: persistedBinding } : {}),
       });
       const requestedDeploymentWithRuntimeMetadata = {
         ...requestedDeploymentWithRuntimeContext,
@@ -1133,6 +1123,7 @@ export class CreateDeploymentUseCase {
             ...(resolvedRuntimePlan.execution.workingDirectory
               ? { workingDirectory: resolvedRuntimePlan.execution.workingDirectory }
               : {}),
+            ...(persistedBinding ? { binding: persistedBinding } : {}),
           }),
         }),
       );

@@ -53,6 +53,7 @@ import {
   type QueryBus,
   type ResourceAccessFailureEvidenceRecorder,
   type ResourceReadModel,
+  type ResourceRepository,
   type RuntimeMonitoringCollectorService,
   type ScheduledDependencyBackupService,
   type ScheduledHistoryRetentionService,
@@ -1999,6 +2000,7 @@ export async function createAppaloftServer(
       childContainer,
       tokens.processAttemptRecorder,
     ),
+    resourceRepository: resolveToken<ResourceRepository>(childContainer, tokens.resourceRepository),
     scheduledTaskRunWorker: resolveToken<ScheduledTaskRunWorker>(
       childContainer,
       tokens.scheduledTaskRunWorker,

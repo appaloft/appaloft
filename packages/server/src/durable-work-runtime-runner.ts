@@ -16,6 +16,7 @@ import {
   type ExecutionBackend,
   type ExecutionContextFactory,
   type ProcessAttemptRecorder,
+  type ResourceRepository,
   ScheduledTaskRunExecutionHandler,
   type ScheduledTaskRunWorker,
   scheduledTaskRunDurableWorkKind,
@@ -35,6 +36,7 @@ export interface DurableWorkRuntimeRunnerInput {
   executionBackend: ExecutionBackend;
   eventBus: EventBus;
   processAttemptRecorder: ProcessAttemptRecorder;
+  resourceRepository?: ResourceRepository;
   scheduledTaskRunWorker: ScheduledTaskRunWorker;
   executionContextFactory: ExecutionContextFactory;
   logger: AppLogger;
@@ -55,6 +57,7 @@ function createDeploymentHandler(
     input.eventBus,
     input.logger,
     input.processAttemptRecorder,
+    input.resourceRepository,
   );
 }
 

@@ -1,6 +1,8 @@
 import { homedir } from "node:os";
 import {
+  Deployment,
   FilePathText,
+  type Resource,
   RuntimeExecutionPlan,
   type RuntimePlan,
   SourceDescriptor,
@@ -170,19 +172,24 @@ export function cliPackedSourceArchiveFromMetadata(
 
 /**
  * Live persist can empty `source.metadata` on the detached worker while
- * `execution.metadata` still carries static-plan fields. Read the CLI-host
- * archive from either bag so packaging does not `existsSync` a Mac path.
+ * `execution.metadata` still carries static-plan fields. Live rehydrate of
+ * the plan the worker reloads may also omit `cliPackedSourceTarGz` there,
+ * leaving the archive only on the resource binding. Read every surviving
+ * bag so packaging does not `existsSync` a Mac path.
  */
 export function cliPackedSourceArchiveFromLocalSource(input: {
   packedSourceArchive?: string;
   sourceMetadata?: Record<string, string>;
   executionMetadata?: Record<string, string>;
+  resourceBindingMetadata?: Record<string, string>;
 }): string | undefined {
   return (
     explicitCliPackedSourceArchive({
       ...(input.packedSourceArchive ? { packedSourceArchive: input.packedSourceArchive } : {}),
       ...(input.sourceMetadata ? { metadata: input.sourceMetadata } : {}),
-    }) ?? cliPackedSourceArchiveFromMetadata(input.executionMetadata)
+    }) ??
+    cliPackedSourceArchiveFromMetadata(input.executionMetadata) ??
+    cliPackedSourceArchiveFromMetadata(input.resourceBindingMetadata)
   );
 }
 
@@ -225,16 +232,104 @@ export function localFolderSourceExecutionMetadata(input: {
 export function localFolderSourceExecutionMetadataFromSource(input: {
   source: SourceDescriptor;
   workingDirectory?: string;
+  binding?: {
+    locator?: string;
+    originalLocator?: string;
+    metadata?: Record<string, string>;
+  };
 }): Record<string, string> {
+  const fromBinding = localFolderSourceFieldsFromResourceBinding(input.binding ?? {});
   return localFolderSourceExecutionMetadata({
     workingDirectory: input.workingDirectory ?? input.source.locator,
-    ...(input.source.metadata ? { originalLocator: input.source.metadata.originalLocator } : {}),
-    ...(input.source.metadata
-      ? { cliResolvedSource: input.source.metadata[CLI_RESOLVED_SOURCE_METADATA_KEY] }
-      : {}),
-    ...(input.source.metadata
-      ? { packedSourceArchive: input.source.metadata[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY] }
-      : {}),
+    ...(fromBinding.originalLocator
+      ? { originalLocator: fromBinding.originalLocator }
+      : input.source.metadata
+        ? { originalLocator: input.source.metadata.originalLocator }
+        : {}),
+    ...(fromBinding.cliResolvedSource
+      ? { cliResolvedSource: fromBinding.cliResolvedSource }
+      : input.source.metadata
+        ? { cliResolvedSource: input.source.metadata[CLI_RESOLVED_SOURCE_METADATA_KEY] }
+        : {}),
+    ...(fromBinding.packedSourceArchive
+      ? { packedSourceArchive: fromBinding.packedSourceArchive }
+      : input.source.metadata
+        ? { packedSourceArchive: input.source.metadata[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY] }
+        : {}),
+  });
+}
+
+export type PersistedLocalFolderSourceBinding = {
+  locator?: string;
+  originalLocator?: string;
+  metadata?: Record<string, string>;
+};
+
+export function persistedLocalFolderSourceBinding(
+  resource: Resource | null | undefined,
+): PersistedLocalFolderSourceBinding | undefined {
+  const binding = resource?.toState().sourceBinding;
+  if (!binding) {
+    return undefined;
+  }
+
+  return {
+    locator: binding.locator.value,
+    ...(binding.originalLocator ? { originalLocator: binding.originalLocator.value } : {}),
+    ...(binding.metadata ? { metadata: binding.metadata } : {}),
+  };
+}
+
+/**
+ * Live Cloud persist + rehydrate empties `source.metadata` and may omit
+ * `execution.metadata.cliPackedSourceTarGz` on the plan the worker reloads.
+ * The resource binding still has the CLI-host archive. Stamp it onto
+ * `execution.metadata` — the bag `prepareSshSource` actually reads.
+ */
+export function withLocalFolderSourceArchiveFromResourceBinding(
+  plan: RuntimePlan,
+  binding: PersistedLocalFolderSourceBinding | undefined,
+): RuntimePlan {
+  const archive = cliPackedSourceArchiveFromLocalSource({
+    ...(plan.source.metadata ? { sourceMetadata: plan.source.metadata } : {}),
+    ...(plan.execution.metadata ? { executionMetadata: plan.execution.metadata } : {}),
+    ...(binding?.metadata ? { resourceBindingMetadata: binding.metadata } : {}),
+    ...localFolderSourceFieldsFromResourceBinding(binding ?? {}),
+  });
+  if (!archive) {
+    return plan;
+  }
+
+  const alreadyOnWorkerBags = cliPackedSourceArchiveFromLocalSource({
+    ...(plan.source.metadata ? { sourceMetadata: plan.source.metadata } : {}),
+    ...(plan.execution.metadata ? { executionMetadata: plan.execution.metadata } : {}),
+  });
+  if (alreadyOnWorkerBags === archive) {
+    return plan;
+  }
+
+  return plan.withExecutionMetadata(
+    localFolderSourceExecutionMetadata({
+      workingDirectory: plan.execution.workingDirectory ?? plan.source.locator,
+      packedSourceArchive: archive,
+      ...localFolderSourceFieldsFromResourceBinding(binding ?? {}),
+    }),
+  );
+}
+
+export function deploymentWithLocalFolderSourceArchiveFromResourceBinding(
+  deployment: Deployment,
+  binding: PersistedLocalFolderSourceBinding | undefined,
+): Deployment {
+  const current = deployment.toState();
+  const nextPlan = withLocalFolderSourceArchiveFromResourceBinding(current.runtimePlan, binding);
+  if (nextPlan === current.runtimePlan) {
+    return deployment;
+  }
+
+  return Deployment.rehydrate({
+    ...current,
+    runtimePlan: nextPlan,
   });
 }
 
