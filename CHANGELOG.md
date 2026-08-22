@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.3](https://github.com/appaloft/appaloft/compare/v1.10.2...v1.10.3) (2026-08-22)
+
+
+### Bug Fixes
+
+* **server:** add guarded SSH-PGlite capacity maintenance ([#1385](https://github.com/appaloft/appaloft/issues/1385)) ([9fcb448](https://github.com/appaloft/appaloft/commit/9fcb448d900db0ed64d855b3da8d455e84fed41d))
+
 ## [1.10.2](https://github.com/appaloft/appaloft/compare/v1.10.1...v1.10.2) (2026-08-22)
 
 
