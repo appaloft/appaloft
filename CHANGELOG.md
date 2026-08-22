@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.1](https://github.com/appaloft/appaloft/compare/v1.10.0...v1.10.1) (2026-08-22)
+
+
+### Bug Fixes
+
+* **release:** restore required smoke gates ([4232294](https://github.com/appaloft/appaloft/commit/4232294c9f17fec244f3835381e6ddaebd68fff0))
+
 ## [1.10.0](https://github.com/appaloft/appaloft/compare/v1.9.6...v1.10.0) (2026-08-22)
 
 
