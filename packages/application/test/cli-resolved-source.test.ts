@@ -33,6 +33,7 @@ import {
   retainCliResolvedSource,
   retainLocalFolderSourceFields,
   retainLocalFolderSourceFieldsFromResourceBinding,
+  withLocalFolderSourceArchiveFromResourceBinding,
   withLocalFolderWorkerPackageRoot,
 } from "../src/cli-resolved-source";
 
@@ -257,5 +258,65 @@ describe("CLI-resolved source", () => {
       }),
     );
     expect(withLocalFolderWorkerPackageRoot(parentWorkdir).execution.workingDirectory).toBe(folder);
+  });
+
+  test("[DEP-CREATE-PKG-007] live c01dc5f5 persist shape stamps the binding archive onto execution.metadata", () => {
+    const parent = "/Users/nichenqin/projects";
+    const folder = `${parent}/nux-c01dc5f5-static`;
+    const packedSourceArchive = "H4sIAAAAAAAAAytKLSpILC4u1gMA";
+    const emptied = RuntimePlan.rehydrate({
+      id: RuntimePlanId.rehydrate("plan_d4odvqzx6fla"),
+      source: SourceDescriptor.rehydrate({
+        kind: SourceKindValue.rehydrate("local-folder"),
+        locator: SourceLocator.rehydrate(folder),
+        displayName: DisplayNameText.rehydrate("nux-c01dc5f5-static"),
+      }),
+      buildStrategy: BuildStrategyKindValue.rehydrate("static-artifact"),
+      packagingMode: PackagingModeValue.rehydrate("all-in-one-docker"),
+      execution: RuntimeExecutionPlan.rehydrate({
+        kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
+        workingDirectory: FilePathText.rehydrate(folder),
+        metadata: {
+          "artifact.source": "static-site",
+          localWorkdir: parent,
+        },
+      }),
+      target: DeploymentTargetDescriptor.rehydrate({
+        kind: TargetKindValue.rehydrate("single-server"),
+        providerKey: ProviderKey.rehydrate("generic-ssh"),
+        serverIds: [DeploymentTargetId.rehydrate("srv_4lifk0yrcecy")],
+      }),
+      detectSummary: DetectSummary.rehydrate("Static site from public/index.html"),
+      steps: [PlanStepText.rehydrate("Upload source workspace over SSH")],
+      generatedAt: GeneratedAt.rehydrate("2026-08-22T03:00:00.000Z"),
+    });
+
+    expect(emptied.source.metadata).toBeUndefined();
+    expect(emptied.execution.metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBeUndefined();
+    expect(emptied.execution.metadata?.localWorkdir).toBe(parent);
+    expect(
+      cliPackedSourceArchiveFromLocalSource({
+        ...(emptied.source.metadata ? { sourceMetadata: emptied.source.metadata } : {}),
+        ...(emptied.execution.metadata ? { executionMetadata: emptied.execution.metadata } : {}),
+      }),
+    ).toBeUndefined();
+
+    const stamped = withLocalFolderSourceArchiveFromResourceBinding(emptied, {
+      locator: folder,
+      originalLocator: folder,
+      metadata: { [CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]: packedSourceArchive },
+    });
+    expect(stamped.execution.metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(
+      packedSourceArchive,
+    );
+    expect(stamped.execution.workingDirectory).toBe(folder);
+    expect(stamped.execution.workingDirectory).not.toBe(parent);
+    expect(stamped.execution.metadata?.localWorkdir).toBe(parent);
+    expect(
+      cliPackedSourceArchiveFromLocalSource({
+        ...(stamped.source.metadata ? { sourceMetadata: stamped.source.metadata } : {}),
+        ...(stamped.execution.metadata ? { executionMetadata: stamped.execution.metadata } : {}),
+      }),
+    ).toBe(packedSourceArchive);
   });
 });

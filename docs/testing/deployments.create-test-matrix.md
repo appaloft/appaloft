@@ -373,7 +373,11 @@ both already the parent, `displayName` is `workspace`/`projects` or omitted, met
 pass if those fields are gone after persist. The persisted plan must stamp
 `execution.workingDirectory` to that hyphenated leaf even when live `resource show` omits
 `workingDirectory`; leaving the field absent lets an older worker `dirname` the leaf to
-`/Users/nichenqin/projects`. Worker packaging must either receive that leaf path or apply
+`/Users/nichenqin/projects`. Live Cloud persist + rehydrate can empty `source.metadata` and
+omit `execution.metadata.cliPackedSourceTarGz` while the resource binding still has the
+archive. The worker must copy that binding archive onto `execution.metadata` and apply it
+before any `existsSync` of a Mac leaf or `projects` parent. `execution.metadata.localWorkdir`
+being the parent is not a package root. Worker packaging must either receive that leaf path or apply
 `cliPackedSourceTarGz` before any `existsSync` of a Mac path. `recoverLocalSourceFolderFromCwd`
 must not treat `projects` as the source leaf. A non-git hyphenated leaf under a parent named
 `projects` (`nux-*-static`, not only `appaloft-cloud`) stays that leaf for CLI-host package and

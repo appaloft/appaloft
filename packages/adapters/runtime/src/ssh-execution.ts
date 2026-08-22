@@ -12,6 +12,7 @@ import {
   explicitCliResolvedSource,
   explicitOriginalLocator,
   inspectLocalFolderSourceWireFields,
+  localFolderWorkerPackageRoot,
   createDeploymentProgressEvent,
   deploymentProgressSteps,
   type AppLogger,
@@ -2062,21 +2063,6 @@ export class SshExecutionBackend implements ExecutionBackend {
       executionMetadata?.["context.resourceSlug"] ??
       source.metadata?.["context.resourceName"] ??
       source.metadata?.["context.resourceSlug"];
-    const localWorkdir = resolveSshPackageLocalWorkdir({
-      locator: source.locator,
-      ...(state.runtimePlan.execution.workingDirectory
-        ? { workingDirectory: state.runtimePlan.execution.workingDirectory }
-        : {}),
-      ...(source.displayName ? { displayName: source.displayName } : {}),
-      ...(originalLocator ? { originalLocator } : {}),
-      ...(cliResolvedSource ? { cliResolvedSource } : {}),
-      ...(resourceName ? { resourceName } : {}),
-      metadata: {
-        ...(source.metadata ?? {}),
-        ...(executionMetadata ?? {}),
-        ...(resourceName ? { "context.resourceName": resourceName } : {}),
-      },
-    });
     const sourceWire = inspectLocalFolderSourceWireFields({
       locator: source.locator,
       ...(originalLocator ? { originalLocator } : {}),
@@ -2087,6 +2073,38 @@ export class SshExecutionBackend implements ExecutionBackend {
       ...(source.metadata ? { sourceMetadata: source.metadata } : {}),
       ...(executionMetadata ? { executionMetadata } : {}),
     });
+    // When the CLI-host archive is present, apply it before any Mac-path
+    // existsSync/statSync. resolveSshPackageLocalWorkdir stats the leaf.
+    // Still name the hyphenated leaf (never the projects parent) for
+    // diagnostics — localFolderWorkerPackageRoot is path-only.
+    const localWorkdir = localArchivePath
+      ? (localFolderWorkerPackageRoot({
+          locator: source.locator,
+          ...(state.runtimePlan.execution.workingDirectory
+            ? { workingDirectory: state.runtimePlan.execution.workingDirectory }
+            : {}),
+          ...(source.displayName ? { displayName: source.displayName } : {}),
+          ...(originalLocator ? { originalLocator } : {}),
+          ...(cliResolvedSource ? { cliResolvedSource } : {}),
+          ...(resourceName ? { resourceName } : {}),
+        }) ??
+        state.runtimePlan.execution.workingDirectory ??
+        source.locator)
+      : resolveSshPackageLocalWorkdir({
+          locator: source.locator,
+          ...(state.runtimePlan.execution.workingDirectory
+            ? { workingDirectory: state.runtimePlan.execution.workingDirectory }
+            : {}),
+          ...(source.displayName ? { displayName: source.displayName } : {}),
+          ...(originalLocator ? { originalLocator } : {}),
+          ...(cliResolvedSource ? { cliResolvedSource } : {}),
+          ...(resourceName ? { resourceName } : {}),
+          metadata: {
+            ...(source.metadata ?? {}),
+            ...(executionMetadata ?? {}),
+            ...(resourceName ? { "context.resourceName": resourceName } : {}),
+          },
+        });
 
     // Never tar a generic parent such as /Users/.../projects. The Mac disk
     // is not on this worker; existsSync of that parent is the live throw.
@@ -2189,6 +2207,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           metadata: {
             localWorkdir,
             remoteWorkdir,
+            archiveApplied: localArchivePath ? "yes" : "no",
           },
         }),
       };
@@ -2209,6 +2228,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         metadata: {
           sourceStrategy: source.kind === "remote-git" ? "remote-git" : "local-workspace",
           remoteWorkdir,
+          archiveApplied: localArchivePath ? "yes" : "no",
           ...(source.metadata?.baseDirectory
             ? { baseDirectory: source.metadata.baseDirectory }
             : {}),

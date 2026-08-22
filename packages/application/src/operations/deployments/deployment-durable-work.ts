@@ -6,9 +6,14 @@ import {
   domainError,
   err,
   ok,
+  ResourceByIdSpec,
   type Result,
   UpsertDeploymentSpec,
 } from "@appaloft/core";
+import {
+  deploymentWithLocalFolderSourceArchiveFromResourceBinding,
+  persistedLocalFolderSourceBinding,
+} from "../../cli-resolved-source";
 import {
   type DurableWorkHandler,
   type DurableWorkHandlerResult,
@@ -27,6 +32,7 @@ import {
   type EventBus,
   type ExecutionBackend,
   type ProcessAttemptRecorder,
+  type ResourceRepository,
 } from "../../ports";
 import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
@@ -137,6 +143,7 @@ export class DeploymentDurableWorkHandler implements DurableWorkHandler {
     private readonly eventBus: EventBus,
     private readonly logger: AppLogger,
     private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
+    private readonly resourceRepository?: ResourceRepository,
   ) {}
 
   async handle(
@@ -169,7 +176,17 @@ export class DeploymentDurableWorkHandler implements DurableWorkHandler {
       return err(domainError.notFound("deployment", deploymentId));
     }
 
-    const executionResult = await this.executionBackend.execute(executionContext, deployment);
+    const resource = this.resourceRepository
+      ? await this.resourceRepository.findOne(
+          repositoryContext,
+          ResourceByIdSpec.create(deployment.toState().resourceId),
+        )
+      : null;
+    const executable = deploymentWithLocalFolderSourceArchiveFromResourceBinding(
+      deployment,
+      persistedLocalFolderSourceBinding(resource),
+    );
+    const executionResult = await this.executionBackend.execute(executionContext, executable);
     if (executionResult.isErr()) {
       const failureResult = this.deploymentLifecycleService.failExecution(
         deployment,
