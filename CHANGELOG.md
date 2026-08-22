@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.10.0](https://github.com/appaloft/appaloft/compare/v1.9.6...v1.10.0) (2026-08-22)
+
+
+### Features
+
+* **cli:** add up and harden remote entrypoints ([#1373](https://github.com/appaloft/appaloft/issues/1373)) ([becddd1](https://github.com/appaloft/appaloft/commit/becddd1f7f67c74a54150e195b686b8a3ff48054))
+
+
+### Bug Fixes
+
+* **cli:** leave Preparing disk for a live session or fail closed ([#1367](https://github.com/appaloft/appaloft/issues/1367)) ([bbeb623](https://github.com/appaloft/appaloft/commit/bbeb623cf7d776d4378a8117df7c2ad26dd0db18))
+* **cli:** replace partial occupancy from default code ([#1375](https://github.com/appaloft/appaloft/issues/1375)) ([8adc7a8](https://github.com/appaloft/appaloft/commit/8adc7a831eaefc3a50de79b6540c3495cbcb6c18))
+
 ## [1.9.6](https://github.com/appaloft/appaloft/compare/v1.9.5...v1.9.6) (2026-08-22)
 
 
