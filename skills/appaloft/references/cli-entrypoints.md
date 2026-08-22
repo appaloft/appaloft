@@ -294,13 +294,13 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft server count` - `servers.count`
 - `appaloft server show <serverId>` - `servers.show`
 - `appaloft server readiness <serverId>` - `servers.runtime-readiness`
-- `appaloft server capacity inspect <serverId>` - `servers.capacity.inspect`
+- `appaloft server capacity inspect <serverId> [--state-backend ssh-pglite --server-host <host> --server-ssh-username <user> --server-ssh-private-key-file <path> --remote-runtime-root <path>] [--retry-pending-state-sync]` - `servers.capacity.inspect`; explicit SSH-PGlite selects local shell execution even with an active remote Profile, rejects active mutation locks without writing one, downloads authoritative state read-only, and does not upload it. Use the retry flag only to finish a preserved revision-fenced audit upload before this read-only inspection
 - `appaloft runtime-usage inspect <scope>` - `runtime-usage.inspect`
 - `appaloft runtime-monitoring samples <scope> --from <iso> --to <iso>` - `runtime-monitoring.samples.list`
 - `appaloft runtime-monitoring rollup <scope> --from <iso> --to <iso> --bucket <bucket>` - `runtime-monitoring.rollup`
 - `appaloft runtime-monitoring thresholds configure <scope> --rule <json>` - `runtime-monitoring.thresholds.configure`
 - `appaloft runtime-monitoring thresholds show <scope>` - `runtime-monitoring.thresholds.show`
-- `appaloft server capacity prune <serverId> --before <iso> [--target <id-or-target>]` - `servers.capacity.prune`
+- `appaloft server capacity prune <serverId> --before <iso> [--target <id-or-target>] [--state-backend ssh-pglite --server-host <host> --server-ssh-username <user> --server-ssh-private-key-file <path> --remote-runtime-root <path>]` - `servers.capacity.prune`; keep the default strict read-only dry-run first, then pass `--dry-run false` explicitly. Successful destructive runs synchronize command/audit state; if that final upload fails, recover through `server capacity inspect ... --retry-pending-state-sync` so deletion is not replayed
 - `appaloft server capacity policy configure --scope <scope> --retention-days <days>` - `scheduled-runtime-prune-policies.configure`
 - `appaloft server capacity policy list` - `scheduled-runtime-prune-policies.list`
 - `appaloft server capacity policy show <policyId>` - `scheduled-runtime-prune-policies.show`

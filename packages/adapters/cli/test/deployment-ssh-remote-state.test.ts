@@ -107,6 +107,7 @@ describe("CLI SSH remote state lifecycle", () => {
     const dataRoot = mkdtempSync(join(tmpdir(), "appaloft-readonly-state-"));
     const schemaMarker = join(dataRoot, "schema-version.json");
     const backendMarker = join(dataRoot, "backend.json");
+    const commands: string[] = [];
 
     try {
       mkdirSync(join(dataRoot, "pglite"), { recursive: true });
@@ -121,7 +122,12 @@ describe("CLI SSH remote state lifecycle", () => {
         owner: "appaloft-cli",
         correlationId: "readonly_1",
         heartbeatIntervalMs: null,
-        runner: { run: ({ command }) => executeCommand(command) },
+        runner: {
+          run: ({ command }) => {
+            commands.push(command);
+            return executeCommand(command);
+          },
+        },
       });
 
       const prepared = await lifecycle.prepare();
@@ -138,6 +144,7 @@ describe("CLI SSH remote state lifecycle", () => {
       const released = await prepared.value.release();
 
       expect(released.isOk()).toBe(true);
+      expect(commands).toHaveLength(1);
       expect(readdirSync(join(dataRoot, "locks"))).toEqual([]);
       expect(readFileSync(join(dataRoot, "pglite", "live.txt"), "utf8")).toBe("live-state");
       expect(readFileSync(schemaMarker, "utf8")).toBe('{"version":1,"migratedAt":"legacy"}\n');

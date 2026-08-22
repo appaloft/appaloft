@@ -139,6 +139,24 @@ function localOnlyCommandLabel(argv: readonly string[]): string | null {
   const args = commandArgs(argv);
   const command = args[0];
 
+  const stateBackendIndex = args.findIndex(
+    (arg) => arg === "--state-backend" || arg.startsWith("--state-backend="),
+  );
+  const stateBackend =
+    stateBackendIndex < 0
+      ? undefined
+      : args[stateBackendIndex]?.startsWith("--state-backend=")
+        ? args[stateBackendIndex]?.slice("--state-backend=".length)
+        : args[stateBackendIndex + 1];
+  if (
+    command === "server" &&
+    args[1] === "capacity" &&
+    (args[2] === "inspect" || args[2] === "prune") &&
+    stateBackend === "ssh-pglite"
+  ) {
+    return `server capacity ${args[2]} with SSH-PGlite state`;
+  }
+
   return command && localOnlyTopLevelCommands.has(command) ? command : null;
 }
 

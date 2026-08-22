@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { cp, mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { cp, lstat, mkdir, open, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
 import {
   buildSshRemoteStateProcessArgs,
   parseServerStateBackendMarker,
@@ -33,6 +33,7 @@ export interface RemotePgliteStateSyncPlan {
 export interface RemotePgliteStateSyncSession extends RemotePgliteStateSyncPlan {
   releaseForCliRuntime(): Promise<Result<void>>;
   refreshLocalMirror(): Promise<Result<void>>;
+  discardAndRelease(): Promise<Result<void>>;
   syncBackAndRelease(): Promise<Result<void>>;
 }
 
@@ -77,6 +78,16 @@ interface LifecycleRunnerResult {
   failed: boolean;
 }
 
+interface PendingRemotePgliteSync {
+  schemaVersion: "remote-pglite-pending-sync/v1";
+  targetFingerprint: string;
+  expectedRevision: number;
+  nextRevision: number;
+  baseSnapshotRoot: string;
+  uploadDataRoot: string;
+  recordedAt: string;
+}
+
 interface LifecycleRunner {
   run(input: LifecycleRunnerInput): Promise<LifecycleRunnerResult> | LifecycleRunnerResult;
 }
@@ -87,6 +98,7 @@ export interface PrepareRemotePgliteStateSyncInput {
   config?: AppConfig;
   pgliteRuntimeAssets?: PgliteRuntimeAssets;
   runner?: RemotePgliteArchiveRunner;
+  readDirectory?: (path: string) => Promise<string[]>;
 }
 
 const explicitLocalStateBackends = new Set(["local-pglite", "postgres-control-plane"]);
@@ -168,6 +180,25 @@ function hasEnvironmentVariableMutationCommand(argv: readonly string[]): boolean
   return args[0] === "env" && (args[1] === "set" || args[1] === "unset");
 }
 
+function hasServerCapacityCommand(argv: readonly string[]): boolean {
+  const args = cliCommandArgs(argv);
+  return (
+    args[0] === "server" && args[1] === "capacity" && (args[2] === "inspect" || args[2] === "prune")
+  );
+}
+
+function hasServerCapacityInspectCommand(argv: readonly string[]): boolean {
+  const args = cliCommandArgs(argv);
+  return args[0] === "server" && args[1] === "capacity" && args[2] === "inspect";
+}
+
+function hasPendingSyncRetryOption(argv: readonly string[]): boolean {
+  return argv.some(
+    (value) =>
+      value === "--retry-pending-state-sync" || value === "--retry-pending-state-sync=true",
+  );
+}
+
 function requiresRemotePgliteStateCommand(argv: readonly string[]): boolean {
   return (
     hasDeployCommand(argv) ||
@@ -175,17 +206,9 @@ function requiresRemotePgliteStateCommand(argv: readonly string[]): boolean {
     hasPreviewCleanupCommand(argv) ||
     hasSecretRotationCommand(argv) ||
     hasDbMigrateCommand(argv) ||
-    hasEnvironmentVariableMutationCommand(argv)
+    hasEnvironmentVariableMutationCommand(argv) ||
+    hasServerCapacityCommand(argv)
   );
-}
-
-function normalizePort(value: string | undefined): number | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 function safeTargetKey(target: SshRemoteStateTarget, dataRoot: string): string {
@@ -198,22 +221,56 @@ function safeTargetKey(target: SshRemoteStateTarget, dataRoot: string): string {
     .replace(/^-|-$/g, "");
 }
 
-function sshTargetFromArgv(argv: readonly string[]): SshRemoteStateTarget | null {
+function remoteTargetFingerprint(target: SshRemoteStateTarget, dataRoot: string): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        host: target.host,
+        port: target.port ?? 22,
+        username: target.username ?? null,
+        identityFile: target.identityFile ? resolve(target.identityFile) : null,
+        dataRoot,
+      }),
+    )
+    .digest("hex");
+}
+
+function sshTargetFromArgv(argv: readonly string[]): Result<SshRemoteStateTarget | null> {
   const host = readOption(argv, "--server-host");
   if (!host) {
-    return null;
+    return ok(null);
   }
 
-  const port = normalizePort(readOption(argv, "--server-port"));
+  const portValue = readOption(argv, "--server-port");
+  const parsedPort = portValue === undefined ? undefined : Number(portValue);
+  if (
+    parsedPort !== undefined &&
+    (!Number.isInteger(parsedPort) || parsedPort < 1 || parsedPort > 65_535)
+  ) {
+    return err(
+      domainError.validation("SSH remote PGlite target port must be an integer from 1 to 65535", {
+        phase: "remote-state-resolution",
+        stateBackend: "ssh-pglite",
+      }),
+    );
+  }
   const username = readOption(argv, "--server-ssh-username");
   const identityFile = readOption(argv, "--server-ssh-private-key-file");
 
-  return {
+  return ok({
     host,
-    ...(port === undefined ? {} : { port }),
+    ...(parsedPort === undefined ? {} : { port: parsedPort }),
     ...(username ? { username } : {}),
     ...(identityFile ? { identityFile } : {}),
-  };
+  });
+}
+
+function hasExplicitDestructiveCapacityPrune(argv: readonly string[]): boolean {
+  return (
+    hasServerCapacityCommand(argv) &&
+    !hasServerCapacityInspectCommand(argv) &&
+    readOption(argv, "--dry-run") === "false"
+  );
 }
 
 function errorDetails(input: {
@@ -319,10 +376,18 @@ function parseRemoteRevisionConflict(
 function remoteArchiveCommand(dataRoot: string, readOnly: boolean): string {
   if (readOnly) {
     return [
-      `test -d ${ash.quote(dataRoot)}/pglite`,
-      `cd ${ash.quote(dataRoot)}`,
+      "set -eu",
+      `data_root=${ash.quote(dataRoot)}`,
+      'lock_dir="$data_root/locks/mutation.lock"',
+      'revision_file="$data_root/sync-revision.txt"',
+      'test -d "$data_root/pglite"',
+      '[ ! -d "$lock_dir" ]',
+      'revision_before=0; if [ -f "$revision_file" ]; then revision_before="$(cat "$revision_file" 2>/dev/null || printf "0")"; fi',
+      'cd "$data_root"',
       "tar -czf - pglite source-links server-applied-routes",
-    ].join(" && ");
+      'revision_after=0; if [ -f "$revision_file" ]; then revision_after="$(cat "$revision_file" 2>/dev/null || printf "0")"; fi',
+      '[ ! -d "$lock_dir" ] && [ "$revision_before" = "$revision_after" ]',
+    ].join("; ");
   }
 
   return [
@@ -455,6 +520,175 @@ function localTransactionRoot(localDataRoot: string, label: string): string {
   return `${localDataRoot}.${label}-${process.pid}-${Date.now()}`;
 }
 
+function pendingSyncPath(localDataRoot: string): string {
+  return join(localDataRoot, "recovery", "pending-sync.json");
+}
+
+async function readPendingSync(localDataRoot: string): Promise<PendingRemotePgliteSync | null> {
+  try {
+    const value = JSON.parse(
+      await readFile(pendingSyncPath(localDataRoot), "utf8"),
+    ) as Partial<PendingRemotePgliteSync>;
+    if (
+      value.schemaVersion !== "remote-pglite-pending-sync/v1" ||
+      typeof value.targetFingerprint !== "string" ||
+      !/^[a-f0-9]{64}$/.test(value.targetFingerprint) ||
+      !Number.isInteger(value.expectedRevision) ||
+      (value.expectedRevision ?? -1) < 0 ||
+      !Number.isInteger(value.nextRevision) ||
+      value.nextRevision !== (value.expectedRevision ?? -2) + 1 ||
+      typeof value.baseSnapshotRoot !== "string" ||
+      !value.baseSnapshotRoot ||
+      typeof value.uploadDataRoot !== "string" ||
+      !value.uploadDataRoot ||
+      typeof value.recordedAt !== "string"
+    ) {
+      return null;
+    }
+    return value as PendingRemotePgliteSync;
+  } catch {
+    return null;
+  }
+}
+
+function validatePendingSyncPaths(
+  localDataRoot: string,
+  pending: PendingRemotePgliteSync,
+): Result<void> {
+  const normalizedLocalRoot = resolve(localDataRoot);
+  const normalizedBaseRoot = resolve(pending.baseSnapshotRoot);
+  const normalizedUploadRoot = resolve(pending.uploadDataRoot);
+  const isGeneratedRoot = (candidate: string, label: string): boolean => {
+    const prefix = `${normalizedLocalRoot}.${label}-`;
+    return candidate.startsWith(prefix) && /^\d+-\d+$/.test(candidate.slice(prefix.length));
+  };
+  const validBaseRoot = isGeneratedRoot(normalizedBaseRoot, "base");
+  const validUploadRoot =
+    normalizedUploadRoot === normalizedLocalRoot ||
+    isGeneratedRoot(normalizedUploadRoot, "merged") ||
+    isGeneratedRoot(normalizedUploadRoot, "recovery-merged");
+
+  return validBaseRoot && validUploadRoot
+    ? ok(undefined)
+    : err(
+        domainError.infra("Pending SSH remote PGlite state sync paths are invalid", {
+          phase: "remote-state-sync-recovery",
+          reason: "remote_state_pending_sync_path_invalid",
+        }),
+      );
+}
+
+async function validatePendingSyncMirrors(pending: PendingRemotePgliteSync): Promise<Result<void>> {
+  const baseMirror = await validatePreservedMirrorRoot(pending.baseSnapshotRoot);
+  if (baseMirror.isErr()) return err(baseMirror.error);
+  return validatePreservedMirrorRoot(pending.uploadDataRoot);
+}
+
+async function validatePreservedMirrorRoot(root: string): Promise<Result<void>> {
+  const requiredDirectories = [
+    root,
+    join(root, "pglite"),
+    join(root, "source-links"),
+    join(root, "server-applied-routes"),
+  ];
+
+  try {
+    for (const path of requiredDirectories) {
+      const metadata = await lstat(path);
+      if (!metadata.isDirectory() || metadata.isSymbolicLink()) {
+        throw new Error("required directory is unavailable");
+      }
+    }
+    const version = await lstat(join(root, "pglite", "PG_VERSION"));
+    if (!version.isFile() || version.isSymbolicLink()) {
+      throw new Error("PGlite version marker is unavailable");
+    }
+  } catch {
+    return err(
+      domainError.infra("Pending SSH remote PGlite state sync mirror is unavailable", {
+        phase: "remote-state-sync-recovery",
+        reason: "remote_state_pending_sync_mirror_unavailable",
+      }),
+    );
+  }
+
+  return ok(undefined);
+}
+
+async function detectOrphanedPendingSyncState(
+  localDataRoot: string,
+  readDirectory: (path: string) => Promise<string[]> = (path) => readdir(path),
+): Promise<Result<boolean>> {
+  const normalizedLocalRoot = resolve(localDataRoot);
+  const siblingPrefix = `${basename(normalizedLocalRoot)}.`;
+  const transactionPattern = /^(?:base|merged|recovery-merged)-\d+-\d+$/;
+  try {
+    const siblings = await readDirectory(dirname(normalizedLocalRoot));
+    if (
+      siblings.some(
+        (name) =>
+          name.startsWith(siblingPrefix) &&
+          transactionPattern.test(name.slice(siblingPrefix.length)),
+      )
+    ) {
+      return ok(true);
+    }
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) {
+      return err(
+        domainError.infra("SSH remote PGlite recovery state could not be inspected", {
+          phase: "remote-state-sync-recovery",
+          reason: "remote_state_orphan_scan_failed",
+        }),
+      );
+    }
+  }
+
+  try {
+    const recoveryEntries = await readDirectory(join(normalizedLocalRoot, "recovery"));
+    return ok(recoveryEntries.some((name) => name.startsWith("pending-sync.json.tmp-")));
+  } catch (error) {
+    return error instanceof Error && "code" in error && error.code === "ENOENT"
+      ? ok(false)
+      : err(
+          domainError.infra("SSH remote PGlite recovery state could not be inspected", {
+            phase: "remote-state-sync-recovery",
+            reason: "remote_state_orphan_scan_failed",
+          }),
+        );
+  }
+}
+
+async function writePendingSync(
+  localDataRoot: string,
+  input: Omit<PendingRemotePgliteSync, "schemaVersion" | "recordedAt">,
+): Promise<void> {
+  const path = pendingSyncPath(localDataRoot);
+  const temporaryPath = `${path}.tmp-${process.pid}-${Date.now()}`;
+  await mkdir(dirname(path), { recursive: true });
+  const serialized = `${JSON.stringify(
+    {
+      schemaVersion: "remote-pglite-pending-sync/v1",
+      ...input,
+      recordedAt: new Date().toISOString(),
+    } satisfies PendingRemotePgliteSync,
+    null,
+    2,
+  )}\n`;
+  let handle: Awaited<ReturnType<typeof open>> | undefined;
+  try {
+    handle = await open(temporaryPath, "wx", 0o600);
+    await handle.writeFile(serialized);
+    await handle.sync();
+    await handle.close();
+    handle = undefined;
+    await rename(temporaryPath, path);
+  } finally {
+    await handle?.close().catch(() => undefined);
+    await rm(temporaryPath, { force: true });
+  }
+}
+
 async function preparePrivateArchiveFile(path: string): Promise<void> {
   await rm(path, { force: true });
   const handle = await open(path, "w", 0o600);
@@ -548,7 +782,10 @@ export function resolveRemotePgliteStateSyncPlan(
   }
 
   const target = sshTargetFromArgv(argv);
-  if (!target) {
+  if (target.isErr()) {
+    return err(target.error);
+  }
+  if (!target.value) {
     if (stateBackend === "ssh-pglite") {
       return err(
         domainError.validation("SSH remote PGlite state requires --server-host", {
@@ -565,7 +802,7 @@ export function resolveRemotePgliteStateSyncPlan(
   const dataRoot = `${remoteRuntimeRoot.replace(/\/+$/, "")}/state`;
   const localPgliteDataDir = resolve(
     env.APPALOFT_PGLITE_DATA_DIR ??
-      join(config.dataDir, "remote-pglite", safeTargetKey(target, dataRoot), "pglite"),
+      join(config.dataDir, "remote-pglite", safeTargetKey(target.value, dataRoot), "pglite"),
   );
   const localDataRoot = dirname(localPgliteDataDir);
 
@@ -575,8 +812,11 @@ export function resolveRemotePgliteStateSyncPlan(
     localPgliteDataDir,
     backupRetentionDays: config.remotePgliteSyncBackupRetentionDays,
     backupMaxCount: config.remotePgliteSyncBackupMaxCount,
-    target,
-    readOnly: hasSecretRotationPlanCommand(argv),
+    target: target.value,
+    readOnly:
+      hasSecretRotationPlanCommand(argv) ||
+      hasServerCapacityInspectCommand(argv) ||
+      (hasServerCapacityCommand(argv) && !hasExplicitDestructiveCapacityPrune(argv)),
   });
 }
 
@@ -611,7 +851,10 @@ async function verifyControlPlaneRemoteStateBackend(input: {
   }
 
   const target = sshTargetFromArgv(input.argv);
-  if (!target) {
+  if (target.isErr()) {
+    return err(target.error);
+  }
+  if (!target.value) {
     return ok(undefined);
   }
 
@@ -622,10 +865,10 @@ async function verifyControlPlaneRemoteStateBackend(input: {
   const remoteMarker = runner.run({
     command: "ssh",
     args: [
-      ...buildSshRemoteStateProcessArgs(target),
+      ...buildSshRemoteStateProcessArgs(target.value),
       remoteControlPlaneBackendMarkerEnsureCommand(dataRoot),
     ],
-    redactions: target.identityFile ? [target.identityFile] : [],
+    redactions: target.value.identityFile ? [target.value.identityFile] : [],
   });
 
   if (remoteMarker.failed) {
@@ -634,7 +877,7 @@ async function verifyControlPlaneRemoteStateBackend(input: {
         "SSH remote state backend marker could not be read",
         errorDetails({
           phase: "server-state-backend",
-          target,
+          target: target.value,
           exitCode: remoteMarker.exitCode,
           stderr: remoteMarker.stderr,
         }),
@@ -650,8 +893,8 @@ async function verifyControlPlaneRemoteStateBackend(input: {
         expectedStateBackend: "postgres-control-plane",
         actualStateBackend: "unknown",
         phase: "server-state-backend",
-        host: target.host,
-        port: target.port ?? 22,
+        host: target.value.host,
+        port: target.value.port ?? 22,
         dataRoot,
       }),
     );
@@ -663,8 +906,8 @@ async function verifyControlPlaneRemoteStateBackend(input: {
         expectedStateBackend: "postgres-control-plane",
         actualStateBackend: marker.stateBackend,
         phase: "server-state-backend",
-        host: target.host,
-        port: target.port ?? 22,
+        host: target.value.host,
+        port: target.value.port ?? 22,
         dataRoot,
       }),
     );
@@ -801,12 +1044,18 @@ export class RemotePgliteArchiveSync {
   async syncToRemote(input?: {
     expectedRevision: number;
     nextRevision: number;
+    requireExistingMirror?: boolean;
   }): Promise<Result<void>> {
     const expectedRevision = input?.expectedRevision ?? 0;
     const nextRevision = input?.nextRevision ?? expectedRevision + 1;
-    await mkdir(this.plan.localPgliteDataDir, { recursive: true });
-    await mkdir(join(this.plan.localDataRoot, "source-links"), { recursive: true });
-    await mkdir(join(this.plan.localDataRoot, "server-applied-routes"), { recursive: true });
+    if (input?.requireExistingMirror) {
+      const validMirror = await validatePreservedMirrorRoot(this.plan.localDataRoot);
+      if (validMirror.isErr()) return err(validMirror.error);
+    } else {
+      await mkdir(this.plan.localPgliteDataDir, { recursive: true });
+      await mkdir(join(this.plan.localDataRoot, "source-links"), { recursive: true });
+      await mkdir(join(this.plan.localDataRoot, "server-applied-routes"), { recursive: true });
+    }
     const archivePath = `${localTransactionRoot(this.plan.localDataRoot, "upload")}.tar.gz`;
     await preparePrivateArchiveFile(archivePath);
     try {
@@ -926,6 +1175,242 @@ export async function prepareRemotePgliteStateSync(
   const planValue = plan.value;
 
   const lifecycleRunner = input.runner ? lifecycleRunnerFromArchiveRunner(input.runner) : undefined;
+  const pendingPath = pendingSyncPath(planValue.localDataRoot);
+  const retryPendingSync = hasPendingSyncRetryOption(input.argv);
+  if (retryPendingSync && !hasServerCapacityInspectCommand(input.argv)) {
+    return err(
+      domainError.validation(
+        "Pending SSH remote PGlite state sync recovery is only available through server capacity inspect",
+        {
+          phase: "remote-state-sync-recovery",
+          reason: "remote_state_pending_sync_inspect_required",
+        },
+      ),
+    );
+  }
+  if (!existsSync(pendingPath)) {
+    const orphaned = await detectOrphanedPendingSyncState(
+      planValue.localDataRoot,
+      input.readDirectory,
+    );
+    if (orphaned.isErr()) return err(orphaned.error);
+    if (orphaned.value) {
+      return err(
+        domainError.infra(
+          "Orphaned SSH remote PGlite recovery state must be inspected before downloading",
+          {
+            ...errorDetails({
+              phase: "remote-state-sync-recovery",
+              target: planValue.target,
+            }),
+            reason: "remote_state_orphaned_pending_sync",
+          },
+        ),
+      );
+    }
+  }
+  if (existsSync(pendingPath)) {
+    const pending = await readPendingSync(planValue.localDataRoot);
+    if (!pending) {
+      return err(
+        domainError.infra("Pending SSH remote PGlite state sync metadata is invalid", {
+          ...errorDetails({
+            phase: "remote-state-sync-recovery",
+            target: planValue.target,
+          }),
+          reason: "remote_state_pending_sync_invalid",
+        }),
+      );
+    }
+    const validPendingPaths = validatePendingSyncPaths(planValue.localDataRoot, pending);
+    if (validPendingPaths.isErr()) {
+      return err(validPendingPaths.error);
+    }
+    if (
+      pending.targetFingerprint !== remoteTargetFingerprint(planValue.target, planValue.dataRoot)
+    ) {
+      return err(
+        domainError.infra(
+          "Pending SSH remote PGlite state sync belongs to a different remote target",
+          {
+            ...errorDetails({
+              phase: "remote-state-sync-recovery",
+              target: planValue.target,
+            }),
+            reason: "remote_state_pending_sync_target_mismatch",
+          },
+        ),
+      );
+    }
+    if (!retryPendingSync) {
+      return err(
+        domainError.infra(
+          "A previous SSH remote PGlite upload is pending; retry it before downloading remote state",
+          {
+            ...errorDetails({
+              phase: "remote-state-sync-recovery",
+              target: planValue.target,
+            }),
+            reason: "remote_state_pending_sync_required",
+            expectedRevision: pending.expectedRevision,
+          },
+        ),
+      );
+    }
+    const validPendingMirrors = await validatePendingSyncMirrors(pending);
+    if (validPendingMirrors.isErr()) {
+      return err(validPendingMirrors.error);
+    }
+
+    const recoveryLifecycle = await new SshRemoteStateLifecycle({
+      target: planValue.target,
+      dataRoot: planValue.dataRoot,
+      owner: "appaloft-cli-pending-sync-recovery",
+      correlationId: `remote_state_recovery_${process.pid}_${Date.now().toString(36)}`,
+      staleAfterMs: remotePgliteMaintenanceLockStaleAfterMs,
+      ...(lifecycleRunner ? { runner: lifecycleRunner } : {}),
+    }).prepare();
+    if (recoveryLifecycle.isErr()) {
+      return err(recoveryLifecycle.error);
+    }
+    let activePending = pending;
+    let recovered: Result<void>;
+    try {
+      recovered = await new RemotePgliteArchiveSync(
+        {
+          ...planValue,
+          localDataRoot: activePending.uploadDataRoot,
+          localPgliteDataDir: join(activePending.uploadDataRoot, "pglite"),
+        },
+        input.runner,
+      ).syncToRemote({
+        expectedRevision: activePending.expectedRevision,
+        nextRevision: activePending.nextRevision,
+        requireExistingMirror: true,
+      });
+    } catch {
+      recovered = err(
+        domainError.infra("Pending SSH remote PGlite recovery upload was interrupted", {
+          ...errorDetails({
+            phase: "remote-state-sync-recovery",
+            target: planValue.target,
+          }),
+          reason: "remote_state_pending_sync_upload_interrupted",
+        }),
+      );
+    }
+    if (recovered.isErr() && recovered.error.details?.reason === "remote_state_revision_conflict") {
+      try {
+        const recoveryMergedRoot = localTransactionRoot(planValue.localDataRoot, "recovery-merged");
+        const recoveryMergedSync = new RemotePgliteArchiveSync(
+          {
+            ...planValue,
+            readOnly: false,
+            localDataRoot: recoveryMergedRoot,
+            localPgliteDataDir: join(recoveryMergedRoot, "pglite"),
+          },
+          input.runner,
+        );
+        const refreshedRemote = await recoveryMergedSync.syncFromRemote();
+        if (refreshedRemote.isErr()) {
+          recovered = err(refreshedRemote.error);
+        } else {
+          const refreshedRevision = await recoveryMergedSync.readRemoteRevision();
+          if (refreshedRevision.isErr()) {
+            recovered = err(refreshedRevision.error);
+          } else {
+            const merged = await mergeRemotePgliteState({
+              baseDataRoot: activePending.baseSnapshotRoot,
+              localDataRoot: activePending.uploadDataRoot,
+              targetDataRoot: recoveryMergedRoot,
+              ...(input.pgliteRuntimeAssets
+                ? { pgliteRuntimeAssets: input.pgliteRuntimeAssets }
+                : {}),
+            });
+            if (merged.isErr()) {
+              recovered = err(merged.error);
+            } else {
+              const previousUploadRoot = activePending.uploadDataRoot;
+              activePending = {
+                ...activePending,
+                expectedRevision: refreshedRevision.value,
+                nextRevision: refreshedRevision.value + 1,
+                uploadDataRoot: recoveryMergedRoot,
+                recordedAt: new Date().toISOString(),
+              };
+              let markerCommitted = false;
+              try {
+                await writePendingSync(planValue.localDataRoot, activePending);
+                markerCommitted = true;
+              } catch {
+                await rm(recoveryMergedRoot, { recursive: true, force: true });
+                recovered = err(
+                  domainError.infra(
+                    "Pending SSH remote PGlite recovery marker could not be saved",
+                    {
+                      ...errorDetails({
+                        phase: "remote-state-sync-recovery",
+                        target: planValue.target,
+                      }),
+                      reason: "remote_state_pending_sync_marker_write_failed",
+                    },
+                  ),
+                );
+              }
+              if (markerCommitted) {
+                try {
+                  if (
+                    previousUploadRoot !== planValue.localDataRoot &&
+                    previousUploadRoot !== recoveryMergedRoot
+                  ) {
+                    await rm(previousUploadRoot, { recursive: true, force: true });
+                  }
+                  recovered = await recoveryMergedSync.syncToRemote({
+                    expectedRevision: activePending.expectedRevision,
+                    nextRevision: activePending.nextRevision,
+                    requireExistingMirror: true,
+                  });
+                } catch {
+                  recovered = err(
+                    domainError.infra("Pending SSH remote PGlite recovery upload was interrupted", {
+                      ...errorDetails({
+                        phase: "remote-state-sync-recovery",
+                        target: planValue.target,
+                      }),
+                      reason: "remote_state_pending_sync_upload_interrupted",
+                    }),
+                  );
+                }
+              }
+            }
+          }
+        }
+      } catch {
+        recovered = err(
+          domainError.infra("Pending SSH remote PGlite recovery was interrupted", {
+            ...errorDetails({
+              phase: "remote-state-sync-recovery",
+              target: planValue.target,
+            }),
+            reason: "remote_state_pending_sync_recovery_interrupted",
+          }),
+        );
+      }
+    }
+    const recoveryReleased = await recoveryLifecycle.value.release();
+    if (recovered.isErr()) {
+      return err(recovered.error);
+    }
+    if (recoveryReleased.isErr()) {
+      return err(recoveryReleased.error);
+    }
+    await rm(pendingPath, { force: true });
+    await rm(activePending.baseSnapshotRoot, { recursive: true, force: true });
+    if (activePending.uploadDataRoot !== planValue.localDataRoot) {
+      await rm(activePending.uploadDataRoot, { recursive: true, force: true });
+    }
+  }
+
   const lifecycle = new SshRemoteStateLifecycle({
     target: planValue.target,
     dataRoot: planValue.dataRoot,
@@ -1091,9 +1576,16 @@ export async function prepareRemotePgliteStateSync(
 
       return ok(undefined);
     },
+    discardAndRelease: async () => {
+      const released = await ensureReleased();
+      await rm(baseSnapshotRoot, { recursive: true, force: true });
+      return released;
+    },
     syncBackAndRelease: async () => {
       let firstError: DomainError | null = null;
       const mergedLocalRoot = localTransactionRoot(planValue.localDataRoot, "merged");
+      let pendingUploadRoot = planValue.localDataRoot;
+      let pendingExpectedRevision = activeBaseRevision;
       if (planValue.readOnly) {
         const released = await ensureReleased();
         await rm(baseSnapshotRoot, { recursive: true, force: true });
@@ -1105,49 +1597,79 @@ export async function prepareRemotePgliteStateSync(
         return err(resumed.error);
       }
 
-      let uploaded = await archiveSync.syncToRemote({
-        expectedRevision: activeBaseRevision,
-        nextRevision: activeBaseRevision + 1,
-      });
+      const guardedUpload = async (
+        sync: RemotePgliteArchiveSync,
+        expectedRevision: number,
+        nextRevision: number,
+      ): Promise<Result<void>> => {
+        try {
+          return await sync.syncToRemote({ expectedRevision, nextRevision });
+        } catch {
+          return err(
+            domainError.infra("SSH remote PGlite state upload was interrupted", {
+              ...errorDetails({
+                phase: "remote-state-sync-upload",
+                target: planValue.target,
+              }),
+              reason: "remote_state_sync_upload_interrupted",
+            }),
+          );
+        }
+      };
+
+      let uploaded = await guardedUpload(archiveSync, activeBaseRevision, activeBaseRevision + 1);
       if (uploaded.isErr() && uploaded.error.details?.reason === "remote_state_revision_conflict") {
-        const mergedArchiveSync = new RemotePgliteArchiveSync(
-          {
-            ...planValue,
-            localDataRoot: mergedLocalRoot,
-            localPgliteDataDir: join(mergedLocalRoot, "pglite"),
-          },
-          input.runner,
-        );
-        const refreshedRemote = await mergedArchiveSync.syncFromRemote();
-        if (refreshedRemote.isErr()) {
-          firstError = refreshedRemote.error;
-        } else {
-          const refreshedRevision = await mergedArchiveSync.readRemoteRevision();
-          if (refreshedRevision.isErr()) {
-            firstError = refreshedRevision.error;
+        try {
+          const mergedArchiveSync = new RemotePgliteArchiveSync(
+            {
+              ...planValue,
+              localDataRoot: mergedLocalRoot,
+              localPgliteDataDir: join(mergedLocalRoot, "pglite"),
+            },
+            input.runner,
+          );
+          const refreshedRemote = await mergedArchiveSync.syncFromRemote();
+          if (refreshedRemote.isErr()) {
+            firstError = refreshedRemote.error;
           } else {
-            const merged = await mergeRemotePgliteState({
-              baseDataRoot: baseSnapshotRoot,
-              localDataRoot: planValue.localDataRoot,
-              targetDataRoot: mergedLocalRoot,
-              ...(input.pgliteRuntimeAssets
-                ? { pgliteRuntimeAssets: input.pgliteRuntimeAssets }
-                : {}),
-            });
-            if (merged.isErr()) {
-              firstError = merged.error;
+            const refreshedRevision = await mergedArchiveSync.readRemoteRevision();
+            if (refreshedRevision.isErr()) {
+              firstError = refreshedRevision.error;
             } else {
-              uploaded = await mergedArchiveSync.syncToRemote({
-                expectedRevision: refreshedRevision.value,
-                nextRevision: refreshedRevision.value + 1,
+              const merged = await mergeRemotePgliteState({
+                baseDataRoot: baseSnapshotRoot,
+                localDataRoot: planValue.localDataRoot,
+                targetDataRoot: mergedLocalRoot,
+                ...(input.pgliteRuntimeAssets
+                  ? { pgliteRuntimeAssets: input.pgliteRuntimeAssets }
+                  : {}),
               });
-              if (uploaded.isErr()) {
-                firstError = uploaded.error;
+              if (merged.isErr()) {
+                firstError = merged.error;
               } else {
-                activeBaseRevision = refreshedRevision.value + 1;
+                pendingUploadRoot = mergedLocalRoot;
+                pendingExpectedRevision = refreshedRevision.value;
+                uploaded = await guardedUpload(
+                  mergedArchiveSync,
+                  refreshedRevision.value,
+                  refreshedRevision.value + 1,
+                );
+                if (uploaded.isErr()) {
+                  firstError = uploaded.error;
+                } else {
+                  activeBaseRevision = refreshedRevision.value + 1;
+                }
               }
             }
           }
+        } catch {
+          firstError = domainError.infra("SSH remote PGlite conflict recovery was interrupted", {
+            ...errorDetails({
+              phase: "remote-state-sync-recovery",
+              target: planValue.target,
+            }),
+            reason: "remote_state_sync_conflict_recovery_interrupted",
+          });
         }
       } else if (uploaded.isErr()) {
         firstError = uploaded.error;
@@ -1155,15 +1677,78 @@ export async function prepareRemotePgliteStateSync(
         activeBaseRevision += 1;
       }
 
-      const released = await activeLifecycleSession.release();
-      if (released.isErr()) {
-        return err(firstError ?? released.error);
+      let pendingPersistenceError: DomainError | null = null;
+      if (firstError) {
+        try {
+          await writePendingSync(planValue.localDataRoot, {
+            targetFingerprint: remoteTargetFingerprint(planValue.target, planValue.dataRoot),
+            expectedRevision: pendingExpectedRevision,
+            nextRevision: pendingExpectedRevision + 1,
+            baseSnapshotRoot,
+            uploadDataRoot: pendingUploadRoot,
+          });
+        } catch {
+          pendingPersistenceError = domainError.infra(
+            "Pending SSH remote PGlite recovery marker could not be saved",
+            {
+              ...errorDetails({
+                phase: "remote-state-sync-recovery",
+                target: planValue.target,
+              }),
+              reason: "remote_state_pending_sync_marker_write_failed",
+            },
+          );
+        }
       }
-      releasedForCliRuntime = true;
-      await rm(baseSnapshotRoot, { recursive: true, force: true });
-      await rm(mergedLocalRoot, { recursive: true, force: true });
 
-      return firstError ? err(firstError) : ok(undefined);
+      let released: Result<void>;
+      try {
+        released = await activeLifecycleSession.release();
+      } catch {
+        released = err(
+          domainError.infra("SSH remote PGlite mutation lock release was interrupted", {
+            ...errorDetails({
+              phase: "remote-state-sync-release",
+              target: planValue.target,
+            }),
+            reason: "remote_state_sync_release_interrupted",
+          }),
+        );
+      }
+      releasedForCliRuntime = released.isOk();
+      if (pendingPersistenceError) {
+        return err(pendingPersistenceError);
+      }
+      if (firstError) {
+        return err({
+          ...firstError,
+          details: {
+            ...(firstError.details ?? {}),
+            recoveryPhase: "remote-state-sync-recovery",
+            recoveryAction: "run-capacity-inspect-with---retry-pending-state-sync",
+          },
+        });
+      }
+      try {
+        await rm(mergedLocalRoot, { recursive: true, force: true });
+        await rm(baseSnapshotRoot, { recursive: true, force: true });
+        await rm(pendingSyncPath(planValue.localDataRoot), { force: true });
+      } catch {
+        return err(
+          domainError.infra("Completed SSH remote PGlite transaction could not be cleaned up", {
+            ...errorDetails({
+              phase: "remote-state-sync-cleanup",
+              target: planValue.target,
+            }),
+            reason: "remote_state_completed_sync_cleanup_failed",
+            ...(released.isErr() && typeof released.error.details?.reason === "string"
+              ? { releaseReason: released.error.details.reason }
+              : {}),
+          }),
+        );
+      }
+
+      return released;
     },
   });
 }

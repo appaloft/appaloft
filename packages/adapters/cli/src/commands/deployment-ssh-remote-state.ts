@@ -225,6 +225,20 @@ function remotePrepareCommand(input: {
     fi
     lock_dir="$data_root/locks/mutation.lock"
     owner_file="$lock_dir/owner.json"
+    if [ "$read_only" = true ]; then
+      if [ -d "$lock_dir" ]; then
+        if [ -f "$owner_file" ]; then cat "$owner_file" >&2; fi
+        exit ${lockConflictExitCode}
+      fi
+      marker="$data_root/schema-version.json"
+      actual_version="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p' "$marker" | head -n 1 || true)"
+      if [ "$actual_version" != "$schema_version" ]; then
+        echo "remote state schema marker failed integrity check" >&2
+        exit ${migrationFailureExitCode}
+      fi
+      printf "prepared %s schema=%s\n" "$data_root" "$schema_version"
+      exit 0
+    fi
     if ! mkdir "$lock_dir"; then
       if [ ! -d "$lock_dir" ]; then
         echo "remote state mutation lock could not be created" >&2
@@ -552,11 +566,13 @@ export class SshRemoteStateLifecycle {
       return err(prepared.error);
     }
 
-    this.startHeartbeat();
+    if (!this.readOnly) {
+      this.startHeartbeat();
+    }
     return ok({
       dataRoot: this.dataRoot,
       schemaVersion: this.schemaVersion,
-      release: () => this.release(),
+      release: () => (this.readOnly ? Promise.resolve(ok(undefined)) : this.release()),
     });
   }
 
