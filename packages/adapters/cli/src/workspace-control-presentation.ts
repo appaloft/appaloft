@@ -1162,10 +1162,13 @@ export function createBoundedWorkspaceControlPresentation(
               },
             })
             .then(async (occupied) => {
-              if (!presentationOpen) {
+              if (!occupied) {
+                return occupied;
+              }
+              if (!presentationOpen || occupyAbort.signal.aborted) {
                 throw occupyDiskPrepCancelledError();
               }
-              if (!occupied?.attach) {
+              if (!occupied.attach) {
                 throw occupyLiveSessionMissingError();
               }
               await attachIssuedDescriptor(occupied.attach);

@@ -733,9 +733,7 @@ export async function openWorkspaceWithOccupyDiskGatewayRetry<T>(
     if (isWorkspaceOpenCloudTemporarilyUnreachable(last.error)) return last;
     if (!isOccupyDiskGatewayTransientError(last.error)) return last;
     if (deadlineAt !== undefined && now() >= deadlineAt) {
-      return isCloudTemporarilyUnreachableError(last.error)
-        ? last
-        : err(occupyDiskPrepDeadlineError(last.error));
+      return err(occupyDiskPrepDeadlineError(last.error));
     }
     await options?.onRetry?.(last.error, attempts - attempt);
     if (options?.signal?.aborted) return err(occupyDiskPrepCancelledError());
@@ -747,10 +745,10 @@ export async function openWorkspaceWithOccupyDiskGatewayRetry<T>(
         sleep,
       });
       if (waited.isErr()) {
-        if (isOccupyDiskPrepCancelled(waited.error)) return waited;
-        return isCloudTemporarilyUnreachableError(last.error)
-          ? last
-          : err(occupyDiskPrepDeadlineError(last.error));
+        if (isOccupyDiskPrepCancelled(waited.error)) {
+          return err(occupyDiskPrepCancelledError());
+        }
+        return err(occupyDiskPrepDeadlineError(last.error));
       }
     }
     if (options?.signal?.aborted) return err(occupyDiskPrepCancelledError());
@@ -766,9 +764,7 @@ export async function openWorkspaceWithOccupyDiskGatewayRetry<T>(
     now() >= deadlineAt &&
     isOccupyDiskGatewayTransientError(last.error)
   ) {
-    return isCloudTemporarilyUnreachableError(last.error)
-      ? last
-      : err(occupyDiskPrepDeadlineError(last.error));
+    return err(occupyDiskPrepDeadlineError(last.error));
   }
   return last;
 }

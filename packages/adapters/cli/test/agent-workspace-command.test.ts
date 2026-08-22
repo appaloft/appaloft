@@ -3691,8 +3691,8 @@ describe("Agent Workspace CLI", () => {
     }) as typeof process.stderr.write;
     const started = Date.now();
     try {
-      await expect(
-        program.parseAsync([
+      try {
+        await program.parseAsync([
           "node",
           "appaloft",
           "code",
@@ -3700,10 +3700,22 @@ describe("Agent Workspace CLI", () => {
           "--yes",
           "--server",
           "srv_4lifk0yrcecy",
-        ]),
-      ).rejects.toMatchObject({
-        code: "workspace_open_cloud_temporarily_unreachable",
-      });
+        ]);
+        throw new Error("expected TUI occupy 502 deadline to fail closed");
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message === "expected TUI occupy 502 deadline to fail closed"
+        ) {
+          throw error;
+        }
+        const failure = `${printed}\n${JSON.stringify(error)}\n${String(
+          error instanceof Error ? error.message : error,
+        )}`;
+        expect(failure).toContain("workspace_open_cloud_temporarily_unreachable");
+        expect(failure).toContain("Cloud is temporarily unreachable");
+        expect(failure).not.toContain("Opening folder.local");
+      }
     } finally {
       process.stdout.write = write;
       process.stderr.write = errWrite;

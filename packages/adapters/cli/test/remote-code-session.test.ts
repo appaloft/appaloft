@@ -271,24 +271,26 @@ describe("remote code door", () => {
       },
     };
     let opens = 0;
-    const started = Date.now();
+    let nowMs = 0;
     const exhausted = await openWorkspaceWithOccupyDiskGatewayRetry(
       async () => {
         opens += 1;
+        nowMs += 40;
         return err(cloudflare502);
       },
       {
         delayMs: 0,
         attempts: Number.POSITIVE_INFINITY,
-        deadlineMs: 40,
+        deadlineMs: 100,
+        now: () => nowMs,
       },
     );
-    expect(Date.now() - started).toBeLessThan(2_000);
     expect(opens).toBeGreaterThan(1);
-    expect(opens).toBeLessThan(200);
+    expect(opens).toBeLessThan(5);
     expect(exhausted.isErr()).toBeTrue();
     if (exhausted.isErr()) {
-      expect(isOccupyDiskGatewayTransientError(exhausted.error)).toBeTrue();
+      expect(exhausted.error.code).toBe(WORKSPACE_OPEN_CLOUD_TEMPORARILY_UNREACHABLE);
+      expect(exhausted.error.message).toContain("Disk preparation did not finish");
       const remapped = occupancyCloudCompatError(
         exhausted.error,
         { id: "srv_4lifk0yrcecy", name: "hostinger" },
