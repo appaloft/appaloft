@@ -17,6 +17,14 @@ async function readPackageScripts(): Promise<Record<string, string>> {
 }
 
 describe("release build workflow", () => {
+  test("[RELEASE-HARDENING-010] public launch deploy smokes explicitly authorize headless mutations", async () => {
+    const smoke = await readText("scripts/smoke/public-launch-smoke.ts");
+
+    expect(smoke).toContain("function deployBasicDockerImage");
+    expect(smoke).toContain("function deployGitHubRepository");
+    expect(smoke.match(/"--yes"/g)?.length).toBe(2);
+  });
+
   test("[RELEASE-HARDENING-007] release state is synchronized before Release Please runs", async () => {
     const workflow = await readText(".github/workflows/release.yml");
     const scripts = await readPackageScripts();
