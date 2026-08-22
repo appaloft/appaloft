@@ -186,6 +186,7 @@ export type { CliSourceLinkStore } from "./runtime.js";
 export {
   formatHumanCliError,
   formatSafeCliError,
+  SAFE_CLI_ERROR_EVIDENCE_FIELDS,
   type SafeCliErrorEvidence,
   safeCliErrorEvidence,
 } from "./runtime.js";
