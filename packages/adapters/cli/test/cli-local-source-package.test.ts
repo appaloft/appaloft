@@ -1,4 +1,6 @@
+import { CLI_PACKED_SOURCE_ARCHIVE_MAX_BYTES } from "@appaloft/application";
 import { describe, expect, test } from "bun:test";
+import { randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -6,6 +8,7 @@ import { join, resolve } from "node:path";
 
 import {
   cliHostLocalFolderSourceSendFields,
+  optionalPackedLocalFolderSourceOnCliHost,
   packageLocalFolderSourceOnCliHost,
   packageLocalFolderSourceOnCliHostIfPresent,
 } from "../src/commands/cli-local-source-package";
@@ -51,12 +54,14 @@ describe("CLI-host local source package", () => {
     }
   });
 
-  test("[DEP-CREATE-PKG-007][QUICK-DEPLOY-ENTRY-008B] packs hyphenated appaloft-cloud under a projects parent, not the parent", () => {
-    const hostRoot = mkdtempSync(join(tmpdir(), "appaloft-cli-pack-cloud-"));
+  test("[DEP-CREATE-PKG-008] git checkout named appaloft-cloud does not pack", () => {
+    const hostRoot = mkdtempSync(join(tmpdir(), "appaloft-cli-pack-cloud-git-"));
     const parent = join(hostRoot, "projects");
     const leaf = "appaloft-cloud";
     const folder = join(parent, leaf);
+    mkdirSync(join(folder, ".git"), { recursive: true });
     mkdirSync(join(folder, "public"), { recursive: true });
+    writeFileSync(join(folder, ".git", "HEAD"), "ref: refs/heads/main\n");
     writeFileSync(join(folder, "public", "index.html"), "<!doctype html><title>cloud</title>");
     const previousCwd = process.cwd();
     const previousPwd = process.env.PWD;
@@ -67,19 +72,22 @@ describe("CLI-host local source package", () => {
 
       const fromParentLocator = packageLocalFolderSourceOnCliHostIfPresent(parent);
       expect(fromParentLocator.isOk()).toBe(true);
-      const archive = fromParentLocator._unsafeUnwrap();
-      expect(typeof archive).toBe("string");
-      expect((archive ?? "").length).toBeGreaterThan(0);
+      expect(fromParentLocator._unsafeUnwrap()).toBeUndefined();
 
-      const listingDir = mkdtempSync(join(tmpdir(), "appaloft-cli-pack-cloud-list-"));
-      const archivePath = join(listingDir, "source.tgz");
-      writeFileSync(archivePath, Buffer.from(archive ?? "", "base64"));
-      const listing = spawnSync("tar", ["-tzf", archivePath], { encoding: "utf8" });
-      expect(listing.status).toBe(0);
-      expect(listing.stdout).toContain("public/index.html");
-      expect(listing.stdout).not.toContain(`${leaf}/`);
-      expect(listing.stdout.split("\n").some((line) => line.endsWith("/projects"))).toBe(false);
-      rmSync(listingDir, { recursive: true, force: true });
+      const fromWorkspace = packageLocalFolderSourceOnCliHostIfPresent(folder);
+      expect(fromWorkspace.isOk()).toBe(true);
+      expect(fromWorkspace._unsafeUnwrap()).toBeUndefined();
+
+      expect(optionalPackedLocalFolderSourceOnCliHost(folder)).toBeUndefined();
+      expect(optionalPackedLocalFolderSourceOnCliHost(".")).toBeUndefined();
+
+      const sent = cliHostLocalFolderSourceSendFields(folder);
+      expect(sent.folder).toBe(resolve(folder));
+      expect(sent.packedSourceArchiveTarGz).toBeUndefined();
+
+      rmSync(join(folder, ".git"), { recursive: true, force: true });
+      writeFileSync(join(folder, ".git"), "gitdir: /tmp/appaloft-cloud.git\n");
+      expect(packageLocalFolderSourceOnCliHostIfPresent(folder)._unsafeUnwrap()).toBeUndefined();
     } finally {
       process.chdir(previousCwd);
       if (previousPwd === undefined) {
@@ -87,6 +95,41 @@ describe("CLI-host local source package", () => {
       } else {
         process.env.PWD = previousPwd;
       }
+      rmSync(hostRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[DEP-CREATE-PKG-008] oversized no-git hyphenated leaf does not abort deploy packing", () => {
+    const hostRoot = mkdtempSync(join(tmpdir(), "appaloft-cli-pack-oversize-"));
+    const parent = join(hostRoot, "projects");
+    const leaf = "nux-oversize-static";
+    const folder = join(parent, leaf);
+    mkdirSync(folder, { recursive: true });
+    writeFileSync(
+      join(folder, "blob.bin"),
+      randomBytes(CLI_PACKED_SOURCE_ARCHIVE_MAX_BYTES + 1024),
+    );
+    const previousCwd = process.cwd();
+
+    try {
+      process.chdir(folder);
+
+      const explicit = packageLocalFolderSourceOnCliHost(folder);
+      expect(explicit.isErr()).toBe(true);
+      expect(explicit._unsafeUnwrapErr().message).toBe(
+        "CLI source package exceeds its bounded byte limit",
+      );
+      expect(explicit._unsafeUnwrapErr().details).toMatchObject({
+        reason: "cli_source_package_too_large",
+        maximumBytes: CLI_PACKED_SOURCE_ARCHIVE_MAX_BYTES,
+      });
+
+      const optional = packageLocalFolderSourceOnCliHostIfPresent(folder);
+      expect(optional.isOk()).toBe(true);
+      expect(optional._unsafeUnwrap()).toBeUndefined();
+      expect(optionalPackedLocalFolderSourceOnCliHost(folder)).toBeUndefined();
+    } finally {
+      process.chdir(previousCwd);
       rmSync(hostRoot, { recursive: true, force: true });
     }
   });
