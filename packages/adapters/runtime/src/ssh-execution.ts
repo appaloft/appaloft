@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { ash } from "@appaloft/ash";
 import {
@@ -529,6 +529,260 @@ export function buildPackedSourceUploadCommand(input: {
     ...input.sshArgs.map((arg) => ash.quote(arg)),
     ash.quote(input.remotePrepareCommand),
   ].join(" ");
+}
+
+export function isLocalGitWorktree(folderPath: string): boolean {
+  return existsSync(join(folderPath, ".git"));
+}
+
+/**
+ * After skip-pack, a leftover `cliPackedSourceTarGz` on source/execution/
+ * resource-binding bags must not replace a live git checkout. Tiny no-git
+ * `nux-*-static` folders are not worktrees and still use the packed path.
+ */
+export function shouldPreferLiveGitWorkspaceOverCliPackedArchive(localWorkdir: string): boolean {
+  return existsSync(localWorkdir) && isLocalGitWorktree(localWorkdir);
+}
+
+export function resolveSshSourceUploadMaterial(input: {
+  localWorkdir: string;
+  packedSourceArchive?: string;
+}):
+  | { kind: "live-folder"; localWorkdir: string }
+  | { kind: "packed-archive"; packedSourceArchive: string; localWorkdir: string } {
+  if (
+    input.packedSourceArchive &&
+    !shouldPreferLiveGitWorkspaceOverCliPackedArchive(input.localWorkdir)
+  ) {
+    return {
+      kind: "packed-archive",
+      packedSourceArchive: input.packedSourceArchive,
+      localWorkdir: input.localWorkdir,
+    };
+  }
+
+  return {
+    kind: "live-folder",
+    localWorkdir: input.localWorkdir,
+  };
+}
+
+function decodeNullSeparatedGitPaths(stdout: Uint8Array): string[] {
+  return stdout
+    .toString()
+    .split("\0")
+    .map((entry) => entry.replace(/^\.\//u, ""))
+    .filter((entry) => entry.length > 0);
+}
+
+export function listGitAwareWorkspaceFiles(localWorkdir: string): string[] {
+  const cached = Bun.spawnSync(
+    ["git", "-C", localWorkdir, "ls-files", "-z", "--cached", "--recurse-submodules"],
+    {
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  );
+  const others = Bun.spawnSync(
+    ["git", "-C", localWorkdir, "ls-files", "-z", "--others", "--exclude-standard"],
+    {
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  );
+  if (!cached.success && !others.success) {
+    return [];
+  }
+
+  return [
+    ...decodeNullSeparatedGitPaths(cached.stdout),
+    ...decodeNullSeparatedGitPaths(others.stdout),
+  ];
+}
+
+export function createLocalWorkspaceUploadArchive(input: {
+  localWorkdir: string;
+  outputPath: string;
+}): { ok: boolean; fileCount: number } {
+  if (!isLocalGitWorktree(input.localWorkdir)) {
+    const packed = Bun.spawnSync(
+      [
+        "tar",
+        "-czf",
+        input.outputPath,
+        ...buildLocalWorkspaceUploadTarExcludeArgs(),
+        "-C",
+        input.localWorkdir,
+        ".",
+      ],
+      {
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
+    return { ok: packed.success, fileCount: packed.success ? 1 : 0 };
+  }
+
+  const files = listGitAwareWorkspaceFiles(input.localWorkdir);
+  if (files.length === 0) {
+    const empty = Bun.spawnSync(["tar", "--null", "-czf", input.outputPath, "--files-from", "-"], {
+      stdin: new Uint8Array(),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    return { ok: empty.success, fileCount: 0 };
+  }
+
+  const packed = Bun.spawnSync(
+    ["tar", "--null", "-czf", input.outputPath, "-C", input.localWorkdir, "--files-from", "-"],
+    {
+      stdin: new TextEncoder().encode(`${files.join("\0")}\0`),
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  );
+  return { ok: packed.success, fileCount: files.length };
+}
+
+function packedArchiveMemberBytes(archivePath: string, memberPath: string): number | undefined {
+  const candidates = [memberPath, `./${memberPath}`];
+  for (const candidate of candidates) {
+    const extracted = Bun.spawnSync(["tar", "-xOf", archivePath, candidate], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    if (extracted.success) {
+      return extracted.stdout.byteLength;
+    }
+  }
+  return undefined;
+}
+
+export function packedSourceArchiveDockerfileBytes(input: {
+  archivePath: string;
+  dockerfilePath: string;
+}): number | undefined {
+  return packedArchiveMemberBytes(input.archivePath, input.dockerfilePath);
+}
+
+const emptyDockerfilePlaceholderBytes = 2;
+
+export type DockerfileWorkspaceUploadReadiness =
+  | {
+      ready: true;
+      dockerfileBytes: number;
+      source: "live-folder" | "packed-archive";
+    }
+  | {
+      ready: false;
+      reason: "dockerfile_missing" | "dockerfile_empty" | "git_aware_file_list_empty";
+      message: string;
+    };
+
+export function sshDockerfileMissingInUploadedWorkspaceMessage(dockerfilePath: string): string {
+  return `Dockerfile ${dockerfilePath} not found in uploaded workspace`;
+}
+
+export function inspectDockerfileWorkspaceUploadReadiness(input: {
+  dockerfilePath: string;
+  localWorkdir?: string;
+  packedArchivePath?: string;
+}): DockerfileWorkspaceUploadReadiness {
+  if (input.packedArchivePath) {
+    const dockerfileBytes = packedSourceArchiveDockerfileBytes({
+      archivePath: input.packedArchivePath,
+      dockerfilePath: input.dockerfilePath,
+    });
+    if (dockerfileBytes === undefined) {
+      return {
+        ready: false,
+        reason: "dockerfile_missing",
+        message: sshDockerfileMissingInUploadedWorkspaceMessage(input.dockerfilePath),
+      };
+    }
+    if (dockerfileBytes <= emptyDockerfilePlaceholderBytes) {
+      return {
+        ready: false,
+        reason: "dockerfile_empty",
+        message: sshDockerfileMissingInUploadedWorkspaceMessage(input.dockerfilePath),
+      };
+    }
+    return {
+      ready: true,
+      dockerfileBytes,
+      source: "packed-archive",
+    };
+  }
+
+  const localWorkdir = input.localWorkdir;
+  if (!localWorkdir) {
+    return {
+      ready: false,
+      reason: "dockerfile_missing",
+      message: sshDockerfileMissingInUploadedWorkspaceMessage(input.dockerfilePath),
+    };
+  }
+
+  if (isLocalGitWorktree(localWorkdir)) {
+    const files = listGitAwareWorkspaceFiles(localWorkdir);
+    if (files.length === 0) {
+      return {
+        ready: false,
+        reason: "git_aware_file_list_empty",
+        message: "git-aware workspace file list is empty",
+      };
+    }
+    if (!files.includes(input.dockerfilePath)) {
+      return {
+        ready: false,
+        reason: "dockerfile_missing",
+        message: sshDockerfileMissingInUploadedWorkspaceMessage(input.dockerfilePath),
+      };
+    }
+  }
+
+  const dockerfileOnDisk = join(localWorkdir, input.dockerfilePath);
+  if (!existsSync(dockerfileOnDisk)) {
+    return {
+      ready: false,
+      reason: "dockerfile_missing",
+      message: sshDockerfileMissingInUploadedWorkspaceMessage(input.dockerfilePath),
+    };
+  }
+
+  const dockerfileBytes = statSync(dockerfileOnDisk).size;
+  if (dockerfileBytes <= emptyDockerfilePlaceholderBytes) {
+    return {
+      ready: false,
+      reason: "dockerfile_empty",
+      message: sshDockerfileMissingInUploadedWorkspaceMessage(input.dockerfilePath),
+    };
+  }
+
+  return {
+    ready: true,
+    dockerfileBytes,
+    source: "live-folder",
+  };
+}
+
+export function buildRemoteDockerfilePresenceCommand(input: {
+  remoteWorkdir: string;
+  dockerfilePath: string;
+}): string {
+  const remotePath = input.dockerfilePath.startsWith("/")
+    ? input.dockerfilePath
+    : sshDockerUploadedWorkspaceFilePath(input.remoteWorkdir, input.dockerfilePath);
+  const missingMessage = sshDockerfileMissingInUploadedWorkspaceMessage(input.dockerfilePath);
+  const contextPath = sshDockerUploadedWorkspaceContextPath(input.remoteWorkdir);
+
+  return ash.render(ash`
+    if ! test -s ${ash.arg(remotePath)}; then
+      printf '%s\n' ${ash.arg(missingMessage)}
+      ls -la ${ash.arg(contextPath)}
+      exit 1
+    fi
+  `);
 }
 
 function remoteSourceWorkdir(root: string, metadata?: Record<string, string>): string {
@@ -2015,35 +2269,6 @@ export class SshExecutionBackend implements ExecutionBackend {
     }
 
     const executionMetadata = state.runtimePlan.execution.metadata;
-    const packedSourceArchive = cliPackedSourceArchiveFromLocalSource({
-      ...(source.metadata ? { sourceMetadata: source.metadata } : {}),
-      ...(executionMetadata ? { executionMetadata } : {}),
-    });
-    let localArchivePath: string | undefined;
-    if (packedSourceArchive) {
-      try {
-        localArchivePath = materializeCliPackedSourceArchive({
-          runtimeDir: input.runtimeDir,
-          packedSourceArchive,
-        });
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : "cli-packed-source-decode-failed";
-        const message = `CLI-packed source archive could not be materialized: ${detail}`;
-        timeline.push(phaseLog("package", message, "error"));
-        return {
-          prepared: false,
-          deployment: this.applyFailure(deployment, {
-            timeline,
-            errorCode: "cli_packed_source_materialize_failed",
-            retryable: false,
-            metadata: {
-              localWorkdir: source.locator,
-            },
-          }),
-        };
-      }
-    }
-
     const originalLocator =
       explicitOriginalLocator({
         ...(source.metadata ? { metadata: source.metadata } : {}),
@@ -2073,10 +2298,62 @@ export class SshExecutionBackend implements ExecutionBackend {
       ...(source.metadata ? { sourceMetadata: source.metadata } : {}),
       ...(executionMetadata ? { executionMetadata } : {}),
     });
+    const liveWorkdir = resolveSshPackageLocalWorkdir({
+      locator: source.locator,
+      ...(state.runtimePlan.execution.workingDirectory
+        ? { workingDirectory: state.runtimePlan.execution.workingDirectory }
+        : {}),
+      ...(source.displayName ? { displayName: source.displayName } : {}),
+      ...(originalLocator ? { originalLocator } : {}),
+      ...(cliResolvedSource ? { cliResolvedSource } : {}),
+      ...(resourceName ? { resourceName } : {}),
+      metadata: {
+        ...(source.metadata ?? {}),
+        ...(executionMetadata ?? {}),
+        ...(resourceName ? { "context.resourceName": resourceName } : {}),
+      },
+    });
+    const candidatePackedSourceArchive = cliPackedSourceArchiveFromLocalSource({
+      ...(source.metadata ? { sourceMetadata: source.metadata } : {}),
+      ...(executionMetadata ? { executionMetadata } : {}),
+    });
+    const uploadMaterial = resolveSshSourceUploadMaterial({
+      localWorkdir: liveWorkdir,
+      ...(candidatePackedSourceArchive
+        ? { packedSourceArchive: candidatePackedSourceArchive }
+        : {}),
+    });
+    let localArchivePath: string | undefined;
+    if (uploadMaterial.kind === "packed-archive") {
+      try {
+        localArchivePath = materializeCliPackedSourceArchive({
+          runtimeDir: input.runtimeDir,
+          packedSourceArchive: uploadMaterial.packedSourceArchive,
+        });
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : "cli-packed-source-decode-failed";
+        const message = `CLI-packed source archive could not be materialized: ${detail}`;
+        timeline.push(phaseLog("package", message, "error"));
+        return {
+          prepared: false,
+          deployment: this.applyFailure(deployment, {
+            timeline,
+            errorCode: "cli_packed_source_materialize_failed",
+            retryable: false,
+            metadata: {
+              localWorkdir: source.locator,
+            },
+          }),
+        };
+      }
+    }
+
     // When the CLI-host archive is present, apply it before any Mac-path
     // existsSync/statSync. resolveSshPackageLocalWorkdir stats the leaf.
     // Still name the hyphenated leaf (never the projects parent) for
     // diagnostics — localFolderWorkerPackageRoot is path-only.
+    // A live git checkout after skip-pack keeps the real folder instead of
+    // leftover binding/execution archives.
     const localWorkdir = localArchivePath
       ? (localFolderWorkerPackageRoot({
           locator: source.locator,
@@ -2090,21 +2367,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         }) ??
         state.runtimePlan.execution.workingDirectory ??
         source.locator)
-      : resolveSshPackageLocalWorkdir({
-          locator: source.locator,
-          ...(state.runtimePlan.execution.workingDirectory
-            ? { workingDirectory: state.runtimePlan.execution.workingDirectory }
-            : {}),
-          ...(source.displayName ? { displayName: source.displayName } : {}),
-          ...(originalLocator ? { originalLocator } : {}),
-          ...(cliResolvedSource ? { cliResolvedSource } : {}),
-          ...(resourceName ? { resourceName } : {}),
-          metadata: {
-            ...(source.metadata ?? {}),
-            ...(executionMetadata ?? {}),
-            ...(resourceName ? { "context.resourceName": resourceName } : {}),
-          },
-        });
+      : liveWorkdir;
 
     // Never tar a generic parent such as /Users/.../projects. The Mac disk
     // is not on this worker; existsSync of that parent is the live throw.
@@ -2148,6 +2411,36 @@ export class SshExecutionBackend implements ExecutionBackend {
           },
         }),
       };
+    }
+
+    const dockerfilePath =
+      state.runtimePlan.buildStrategy === "dockerfile"
+        ? (state.runtimePlan.execution.dockerfilePath ?? "Dockerfile")
+        : undefined;
+    if (dockerfilePath) {
+      const readiness = inspectDockerfileWorkspaceUploadReadiness({
+        dockerfilePath,
+        ...(localArchivePath ? { packedArchivePath: localArchivePath } : { localWorkdir }),
+      });
+      if (!readiness.ready) {
+        const message = readiness.message;
+        timeline.push(phaseLog("package", message, "error"));
+        return {
+          prepared: false,
+          deployment: this.applyFailure(deployment, {
+            timeline,
+            errorCode: "ssh_source_upload_failed",
+            retryable: false,
+            metadata: {
+              localWorkdir,
+              remoteWorkdir,
+              archiveApplied: localArchivePath ? "yes" : "no",
+              dockerfilePath,
+              dockerfileReadiness: readiness.reason,
+            },
+          }),
+        };
+      }
     }
 
     timeline.push(
@@ -2211,6 +2504,46 @@ export class SshExecutionBackend implements ExecutionBackend {
           },
         }),
       };
+    }
+
+    if (dockerfilePath) {
+      const presence = await this.runRemoteCommand({
+        target: input.target,
+        command: buildRemoteDockerfilePresenceCommand({
+          remoteWorkdir,
+          dockerfilePath,
+        }),
+        cwd: input.runtimeDir,
+        env: input.env,
+      });
+      if (presence.failed) {
+        const message =
+          presence.stdout.trim() ||
+          presence.stderr.trim() ||
+          sshDockerfileMissingInUploadedWorkspaceMessage(dockerfilePath);
+        timeline.push(phaseLog("package", message, "error"));
+        await this.runRemoteCommand({
+          target: input.target,
+          command: `rm -rf ${ash.quote(remoteWorkdir)}`,
+          cwd: input.runtimeDir,
+          env: input.env,
+        });
+        return {
+          prepared: false,
+          deployment: this.applyFailure(deployment, {
+            timeline,
+            errorCode: "ssh_source_upload_failed",
+            retryable: false,
+            metadata: {
+              localWorkdir,
+              remoteWorkdir,
+              archiveApplied: localArchivePath ? "yes" : "no",
+              dockerfilePath,
+              dockerfileReadiness: "dockerfile_missing",
+            },
+          }),
+        };
+      }
     }
 
     await this.report(context, {
