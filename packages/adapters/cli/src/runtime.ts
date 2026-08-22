@@ -529,6 +529,9 @@ function shouldOmitOpeningRepositoryIdentity(
   repositoryIdentity: string,
 ): boolean {
   if (error.code === "workspace_open_cloud_temporarily_unreachable") return true;
+  if (error.code === "workspace_open_disk_prep_cancelled") return true;
+  if (error.code === "workspace_open_live_session_missing") return true;
+  if (error.code === "workspace_open_disk_prep_attempt_timeout") return true;
   const status = error.details?.status;
   const gatewayStatus = status === 502 || status === 503;
   const folderLocal = repositoryIdentity.startsWith("folder.local/");

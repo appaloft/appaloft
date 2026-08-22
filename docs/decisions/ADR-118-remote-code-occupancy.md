@@ -87,17 +87,24 @@ must not use laptop HEAD as Workspace truth.
     `executeFolderLocalWorkspaceOpen` → `createRemoteSandbox` (`sandboxes.create`
     on the enrolled Server, for example hostinger). It is not a second
     `POST /api/workspaces/open` and not a persist/workdir fallback. The Cloud
-    Agents wait panel stays up and that occupy keeps retrying until disk prep
-    succeeds or the operator leaves the wait panel. This is occupy-door
-    recovery only and does not replay other commands, drop `targetServerId`,
-    change Cloud admission, or expose Occupancy. The wait-panel disk step is
-    marked retrying while those retries run. A 4-attempt helper burst is not a
-    terminal exhaust: do not `leaveWorkspaceTuiOnce`, do not print
+    Agents wait panel stays up and that occupy keeps retrying until a live
+    session is bound (attach + terminal-ready) or the occupy deadline expires.
+    This is occupy-door recovery only and does not replay other commands, drop
+    `targetServerId`, change Cloud admission, or expose Occupancy. The
+    wait-panel disk step is marked retrying while those retries run. A
+    4-attempt helper burst is not a terminal exhaust while the deadline still
+    remains: do not `leaveWorkspaceTuiOnce`, do not print
     `Opening folder.local/...`, and do not attach `folder.local`
     `repositoryIdentity` to a 502 remap in a way that formats that breadcrumb.
-    The humanized WS-REMOTE-COMPAT-222 sentence may appear on the wait panel.
-    Do not leave alt-screen just to print it. Do not print the Appaloft
-    error-contract sentence while alt-screen is still up.
+    The humanized WS-REMOTE-COMPAT-222 sentence may appear on the wait panel
+    during retry. Do not leave alt-screen just to print it. Do not print the
+    Appaloft error-contract sentence while alt-screen is still up. A hang
+    inside an in-flight occupy open is abortable (Ctrl-C / quit / deadline),
+    not a silent Preparing disk stay. If the deadline expires or occupy never
+    binds a live session, fail closed: leave alt-screen once, print a human
+    Cloud-unreachable / disk-prep sentence, do not print
+    `Opening folder.local/...`, and exit non-zero. Ctrl-C / quit on the wait
+    panel while never attached aborts the in-flight open and is not success.
 
 ## Consequences
 

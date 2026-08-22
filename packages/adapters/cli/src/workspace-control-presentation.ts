@@ -47,7 +47,11 @@ import {
   occupancyPrepareStepForProgress,
 } from "./occupancy-code-progress.js";
 import { type OperateRendererEvent, type OperateRendererMessage } from "./operate-presentation.js";
-import { isWorkspaceOpenCloudTemporarilyUnreachable } from "./remote-code-session.js";
+import {
+  isOccupyDiskPrepCancelled,
+  occupyDiskPrepCancelledError,
+  occupyLiveSessionMissingError,
+} from "./remote-code-session.js";
 import { removeProcessListener } from "./remove-process-listener.js";
 import { terminateWorkspaceWithRuntimes } from "./workspace-lifecycle-actions.js";
 import {
@@ -58,12 +62,18 @@ import {
 
 export function handleWorkspaceControlWaitScreenInterrupt(input: {
   readonly attached: boolean;
+  readonly occupyPending?: boolean;
+  readonly abortOccupy?: () => void;
   readonly close: () => Promise<void>;
   readonly exitProcess?: boolean;
 }): void {
   if (input.attached) return;
+  input.abortOccupy?.();
   restoreWorkspaceTuiScrollback();
   void input.close();
+  if (input.occupyPending) {
+    return;
+  }
   if (input.exitProcess !== false) {
     process.exitCode = 0;
     process.exit(0);
@@ -946,17 +956,22 @@ export function createBoundedWorkspaceControlPresentation(
           }
         | undefined;
       const terminalPumps = new Set<Promise<void>>();
+      const occupyAbort = new AbortController();
       // Arm wait-screen SIGINT before the sidecar can first-paint. The Ratatui
       // default chrome already shows Cloud Agents / preparing, so a host PTY
       // ^c can arrive while openRenderer() is still connecting.
       let closeRenderer: (() => Promise<void>) | undefined;
       const quitWaitScreen = () => {
+        occupyAbort.abort();
         handleWorkspaceControlWaitScreenInterrupt({
           attached: Boolean(activeTerminal),
+          occupyPending: Boolean(context.occupyBootstrap) && !activeTerminal,
+          abortOccupy: () => occupyAbort.abort(),
           close: async () => {
             presentationOpen = false;
             await closeRenderer?.();
           },
+          exitProcess: !(context.occupyBootstrap && !activeTerminal),
         });
       };
       process.on("SIGINT", quitWaitScreen);
@@ -1113,7 +1128,6 @@ export function createBoundedWorkspaceControlPresentation(
 
       let occupyFailure: unknown;
       let occupyDone: Promise<void> = Promise.resolve();
-      const occupyAbort = new AbortController();
       let lastPrepareStep:
         | {
             readonly message: string;
@@ -1148,9 +1162,14 @@ export function createBoundedWorkspaceControlPresentation(
               },
             })
             .then(async (occupied) => {
-              if (!presentationOpen) return occupied;
-              if (occupied?.attach) await attachIssuedDescriptor(occupied.attach);
-              if (occupied?.workspaceId) selectedWorkspaceId = occupied.workspaceId;
+              if (!presentationOpen) {
+                throw occupyDiskPrepCancelledError();
+              }
+              if (!occupied?.attach) {
+                throw occupyLiveSessionMissingError();
+              }
+              await attachIssuedDescriptor(occupied.attach);
+              if (occupied.workspaceId) selectedWorkspaceId = occupied.workspaceId;
               const chromeProject = context.occupancyChrome?.project ?? occupied?.projectName;
               if (chromeProject) {
                 await renderer.send({
@@ -1172,22 +1191,10 @@ export function createBoundedWorkspaceControlPresentation(
             })
             .catch(async (error) => {
               if (activeTerminal) return;
-              if (isWorkspaceOpenCloudTemporarilyUnreachable(error)) {
-                if (presentationOpen && lastPrepareStep) {
-                  try {
-                    await renderer.send({
-                      type: "progress",
-                      message: lastPrepareStep.message,
-                      step: lastPrepareStep.step,
-                      status: "retrying",
-                    });
-                  } catch {
-                    // Best-effort retrying mark; stay on the wait panel.
-                  }
-                }
-                return;
-              }
-              occupyFailure = error;
+              occupyFailure =
+                occupyAbort.signal.aborted && !isOccupyDiskPrepCancelled(error)
+                  ? occupyDiskPrepCancelledError()
+                  : error;
               if (presentationOpen && lastPrepareStep) {
                 try {
                   await renderer.send({

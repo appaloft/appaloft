@@ -2,7 +2,7 @@ import { existsSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve, sep } from "node:path";
 
-import { type DomainError, type Result } from "@appaloft/core";
+import { type DomainError, err, ok, type Result } from "@appaloft/core";
 import { hasCliControlPlaneLogin, workspaceRemoteLoginRequiredError } from "./cli-session-login.js";
 import { activeControlPlaneProfile } from "./control-plane-service.js";
 import {
@@ -487,9 +487,17 @@ export function occupancyRetryAgentFlag(agent?: {
 export const DEFAULT_OCCUPY_DISK_GATEWAY_ATTEMPTS = 4;
 export const OCCUPY_DISK_GATEWAY_UNLIMITED_ATTEMPTS = Number.POSITIVE_INFINITY;
 export const DEFAULT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS = 750;
+export const DEFAULT_OCCUPY_DISK_GATEWAY_DEADLINE_MS = 60_000;
+export const DEFAULT_OCCUPY_DISK_GATEWAY_ATTEMPT_TIMEOUT_MS = 20_000;
 export const OCCUPY_DISK_GATEWAY_RETRY_DELAY_ENV = "APPALOFT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS";
+export const OCCUPY_DISK_GATEWAY_DEADLINE_ENV = "APPALOFT_OCCUPY_DISK_GATEWAY_DEADLINE_MS";
+export const OCCUPY_DISK_GATEWAY_ATTEMPT_TIMEOUT_ENV =
+  "APPALOFT_OCCUPY_DISK_GATEWAY_ATTEMPT_TIMEOUT_MS";
 export const WORKSPACE_OPEN_CLOUD_TEMPORARILY_UNREACHABLE =
   "workspace_open_cloud_temporarily_unreachable";
+export const WORKSPACE_OPEN_DISK_PREP_CANCELLED = "workspace_open_disk_prep_cancelled";
+export const WORKSPACE_OPEN_DISK_PREP_ATTEMPT_TIMEOUT = "workspace_open_disk_prep_attempt_timeout";
+export const WORKSPACE_OPEN_LIVE_SESSION_MISSING = "workspace_open_live_session_missing";
 
 export function occupyDiskGatewayRetryDelayMs(env: NodeJS.ProcessEnv = process.env): number {
   const parsed = Number(env[OCCUPY_DISK_GATEWAY_RETRY_DELAY_ENV]);
@@ -498,8 +506,74 @@ export function occupyDiskGatewayRetryDelayMs(env: NodeJS.ProcessEnv = process.e
     : DEFAULT_OCCUPY_DISK_GATEWAY_RETRY_DELAY_MS;
 }
 
+export function occupyDiskGatewayDeadlineMs(env: NodeJS.ProcessEnv = process.env): number {
+  const parsed = Number(env[OCCUPY_DISK_GATEWAY_DEADLINE_ENV]);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_OCCUPY_DISK_GATEWAY_DEADLINE_MS;
+}
+
+export function occupyDiskGatewayAttemptTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
+  const parsed = Number(env[OCCUPY_DISK_GATEWAY_ATTEMPT_TIMEOUT_ENV]);
+  return Number.isFinite(parsed) && parsed >= 0
+    ? parsed
+    : DEFAULT_OCCUPY_DISK_GATEWAY_ATTEMPT_TIMEOUT_MS;
+}
+
+export function occupyDiskPrepCancelledError(): DomainError {
+  return {
+    code: WORKSPACE_OPEN_DISK_PREP_CANCELLED,
+    category: "user",
+    message: "Cancelled while preparing the disk.",
+    retryable: false,
+    details: { phase: "occupy-preparing-disk" },
+  };
+}
+
+export function occupyLiveSessionMissingError(): DomainError {
+  return {
+    code: WORKSPACE_OPEN_LIVE_SESSION_MISSING,
+    category: "infra",
+    message: "Cloud did not start a live session. Disk preparation did not finish.",
+    retryable: true,
+    details: {
+      phase: "occupy-preparing-disk",
+      guidance: "Retry appaloft code. Cloud could not finish preparing the disk.",
+    },
+  };
+}
+
+export function occupyDiskPrepDeadlineError(cause?: DomainError): DomainError {
+  const status = cause ? occupancyHttpStatus(cause) : undefined;
+  return {
+    code: WORKSPACE_OPEN_CLOUD_TEMPORARILY_UNREACHABLE,
+    category: "infra",
+    message:
+      typeof status === "number"
+        ? `Cloud is temporarily unreachable (HTTP ${status}). Disk preparation did not finish.`
+        : "Cloud is temporarily unreachable. Disk preparation did not finish.",
+    retryable: true,
+    details: {
+      phase: "occupy-preparing-disk",
+      causeCode: cause?.code ?? "workspace_open_disk_prep_deadline",
+      guidance: "Retry appaloft code. Cloud could not finish preparing the disk.",
+      ...(typeof status === "number" ? { status } : {}),
+    },
+  };
+}
+
+export function isOccupyDiskPrepCancelled(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code: unknown }).code === WORKSPACE_OPEN_DISK_PREP_CANCELLED
+  );
+}
+
 export function isOccupyDiskGatewayTransientError(error: DomainError): boolean {
-  return isCloudTemporarilyUnreachableError(error);
+  return (
+    isCloudTemporarilyUnreachableError(error) ||
+    error.code === WORKSPACE_OPEN_DISK_PREP_ATTEMPT_TIMEOUT
+  );
 }
 
 export function isWorkspaceOpenCloudTemporarilyUnreachable(error: unknown): boolean {
@@ -511,28 +585,190 @@ export function isWorkspaceOpenCloudTemporarilyUnreachable(error: unknown): bool
   );
 }
 
+export function isOccupyFailClosedDiskPrepError(error: unknown): boolean {
+  return (
+    isWorkspaceOpenCloudTemporarilyUnreachable(error) ||
+    isOccupyDiskPrepCancelled(error) ||
+    (typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code: unknown }).code === WORKSPACE_OPEN_LIVE_SESSION_MISSING)
+  );
+}
+
+function occupyDiskPrepAttemptTimeoutError(): DomainError {
+  return {
+    code: WORKSPACE_OPEN_DISK_PREP_ATTEMPT_TIMEOUT,
+    category: "timeout",
+    message: "Cloud is temporarily unreachable. Disk preparation did not finish.",
+    retryable: true,
+    details: { phase: "occupy-preparing-disk" },
+  };
+}
+
+async function settleOccupyOpen<T>(
+  open: () => Promise<Result<T>>,
+  options: {
+    readonly signal?: AbortSignal;
+    readonly timeoutMs?: number;
+    readonly deadlineAt?: number;
+    readonly now?: () => number;
+  },
+): Promise<Result<T>> {
+  if (options.signal?.aborted) return err(occupyDiskPrepCancelledError());
+  const now = options.now ?? Date.now;
+  const remainingDeadline =
+    options.deadlineAt === undefined ? undefined : options.deadlineAt - now();
+  if (remainingDeadline !== undefined && remainingDeadline <= 0) {
+    return err(occupyDiskPrepDeadlineError());
+  }
+  const timeoutMs = Math.min(
+    options.timeoutMs ?? Number.POSITIVE_INFINITY,
+    remainingDeadline ?? Number.POSITIVE_INFINITY,
+  );
+  return await new Promise<Result<T>>((resolve) => {
+    let settled = false;
+    const finish = (result: Result<T>) => {
+      if (settled) return;
+      settled = true;
+      options.signal?.removeEventListener("abort", onAbort);
+      if (timer !== undefined) clearTimeout(timer);
+      resolve(result);
+    };
+    const onAbort = () => finish(err(occupyDiskPrepCancelledError()));
+    options.signal?.addEventListener("abort", onAbort);
+    const timer = Number.isFinite(timeoutMs)
+      ? setTimeout(
+          () => {
+            const deadlineHit = options.deadlineAt !== undefined && now() >= options.deadlineAt;
+            finish(
+              err(
+                deadlineHit ? occupyDiskPrepDeadlineError() : occupyDiskPrepAttemptTimeoutError(),
+              ),
+            );
+          },
+          Math.max(0, timeoutMs),
+        )
+      : undefined;
+    void open().then(
+      (result) => finish(result),
+      (error) =>
+        finish(
+          err(
+            isOccupyFailClosedDiskPrepError(error)
+              ? (error as DomainError)
+              : occupyDiskPrepDeadlineError(),
+          ),
+        ),
+    );
+  });
+}
+
+async function sleepUntilRetry(
+  delayMs: number,
+  options: {
+    readonly signal?: AbortSignal;
+    readonly deadlineAt?: number;
+    readonly now?: () => number;
+    readonly sleep: (ms: number) => Promise<void>;
+  },
+): Promise<Result<void>> {
+  if (options.signal?.aborted) return err(occupyDiskPrepCancelledError());
+  const now = options.now ?? Date.now;
+  const remainingDeadline =
+    options.deadlineAt === undefined ? undefined : options.deadlineAt - now();
+  if (remainingDeadline !== undefined && remainingDeadline <= 0) {
+    return err(occupyDiskPrepDeadlineError());
+  }
+  const waitMs = Math.min(delayMs, remainingDeadline ?? delayMs);
+  if (waitMs <= 0) return err(occupyDiskPrepDeadlineError());
+  const slept = await settleOccupyOpen(
+    async () => {
+      await options.sleep(waitMs);
+      return ok(undefined);
+    },
+    {
+      ...(options.signal ? { signal: options.signal } : {}),
+      timeoutMs: waitMs,
+      ...(options.deadlineAt === undefined ? {} : { deadlineAt: options.deadlineAt }),
+      now,
+    },
+  );
+  if (slept.isErr() && slept.error.code === WORKSPACE_OPEN_DISK_PREP_ATTEMPT_TIMEOUT) {
+    return ok(undefined);
+  }
+  return slept;
+}
+
 export async function openWorkspaceWithOccupyDiskGatewayRetry<T>(
   open: () => Promise<Result<T>>,
   options?: {
     readonly attempts?: number;
     readonly delayMs?: number;
+    readonly deadlineMs?: number;
+    readonly attemptTimeoutMs?: number;
     readonly sleep?: (ms: number) => Promise<void>;
     readonly signal?: AbortSignal;
+    readonly now?: () => number;
     readonly onRetry?: (error: DomainError, remainingAttempts: number) => void | Promise<void>;
   },
 ): Promise<Result<T>> {
   const attempts = options?.attempts ?? DEFAULT_OCCUPY_DISK_GATEWAY_ATTEMPTS;
   const delayMs = options?.delayMs ?? occupyDiskGatewayRetryDelayMs();
   const sleep = options?.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
-  let last = await open();
+  const now = options?.now ?? Date.now;
+  const deadlineAt = options?.deadlineMs === undefined ? undefined : now() + options.deadlineMs;
+  const runOpen = () =>
+    settleOccupyOpen(open, {
+      ...(options?.signal ? { signal: options.signal } : {}),
+      ...(options?.attemptTimeoutMs === undefined ? {} : { timeoutMs: options.attemptTimeoutMs }),
+      ...(deadlineAt === undefined ? {} : { deadlineAt }),
+      now,
+    });
+  let last = await runOpen();
   for (let attempt = 1; last.isErr() && attempt < attempts; attempt += 1) {
+    if (options?.signal?.aborted || isOccupyDiskPrepCancelled(last.error)) {
+      return err(occupyDiskPrepCancelledError());
+    }
+    if (isWorkspaceOpenCloudTemporarilyUnreachable(last.error)) return last;
     if (!isOccupyDiskGatewayTransientError(last.error)) return last;
-    if (options?.signal?.aborted) return last;
+    if (deadlineAt !== undefined && now() >= deadlineAt) {
+      return isCloudTemporarilyUnreachableError(last.error)
+        ? last
+        : err(occupyDiskPrepDeadlineError(last.error));
+    }
     await options?.onRetry?.(last.error, attempts - attempt);
-    if (options?.signal?.aborted) return last;
-    if (delayMs > 0) await sleep(delayMs);
-    if (options?.signal?.aborted) return last;
-    last = await open();
+    if (options?.signal?.aborted) return err(occupyDiskPrepCancelledError());
+    if (delayMs > 0) {
+      const waited = await sleepUntilRetry(delayMs, {
+        ...(options?.signal ? { signal: options.signal } : {}),
+        ...(deadlineAt === undefined ? {} : { deadlineAt }),
+        now,
+        sleep,
+      });
+      if (waited.isErr()) {
+        if (isOccupyDiskPrepCancelled(waited.error)) return waited;
+        return isCloudTemporarilyUnreachableError(last.error)
+          ? last
+          : err(occupyDiskPrepDeadlineError(last.error));
+      }
+    }
+    if (options?.signal?.aborted) return err(occupyDiskPrepCancelledError());
+    last = await runOpen();
+  }
+  if (last.isErr() && isOccupyDiskPrepCancelled(last.error)) return last;
+  if (last.isErr() && last.error.code === WORKSPACE_OPEN_DISK_PREP_ATTEMPT_TIMEOUT) {
+    return err(occupyDiskPrepDeadlineError(last.error));
+  }
+  if (
+    last.isErr() &&
+    deadlineAt !== undefined &&
+    now() >= deadlineAt &&
+    isOccupyDiskGatewayTransientError(last.error)
+  ) {
+    return isCloudTemporarilyUnreachableError(last.error)
+      ? last
+      : err(occupyDiskPrepDeadlineError(last.error));
   }
   return last;
 }
@@ -664,6 +900,24 @@ export function occupancyCloudCompatError(
 ): DomainError {
   if (error.details?.code === "workspace_open_repository_not_bound") return error;
   if (error.code === "workspace_open_repository_not_bound") return error;
+  if (isOccupyDiskPrepCancelled(error) || error.code === WORKSPACE_OPEN_LIVE_SESSION_MISSING) {
+    return error;
+  }
+  if (error.code === WORKSPACE_OPEN_CLOUD_TEMPORARILY_UNREACHABLE) {
+    const retryFlag = occupancyRetryAgentFlag(agent);
+    return {
+      ...error,
+      details: {
+        ...error.details,
+        serverId: server.id,
+        serverName: server.name,
+        guidance:
+          typeof error.details?.guidance === "string" && error.details.guidance.length > 0
+            ? error.details.guidance
+            : `Retry appaloft code ${retryFlag} --server ${server.id}.`,
+      },
+    };
+  }
   if (isCloudTemporarilyUnreachableError(error)) {
     return occupancyCloudTemporarilyUnreachableError(error, server, agent);
   }
