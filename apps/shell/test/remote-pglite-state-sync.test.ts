@@ -378,6 +378,91 @@ describe("remote PGlite state sync", () => {
     }
   });
 
+  test("[CONFIG-FILE-STATE-012E] explicit v2 rollback reclaims staging before durability sync under disk pressure", async () => {
+    const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-v2-disk-recovery-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-v2-disk-recovery-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+    const transactionId = "sync-20260823080808-75";
+    const backupRoot = join(remoteStateRoot, "backups", transactionId);
+    const incomingName = `.incoming-${transactionId}`;
+    const incomingRoot = join(remoteStateRoot, incomingName);
+    const revisionTempName = `.sync-revision-${transactionId}.tmp`;
+    const markerPath = join(remoteStateRoot, "recovery", "remote-sync-upload.json");
+    try {
+      for (const component of ["pglite", "source-links", "server-applied-routes"]) {
+        await mkdir(join(backupRoot, component), { recursive: true });
+        await mkdir(join(remoteStateRoot, component), { recursive: true });
+        await mkdir(join(incomingRoot, component), { recursive: true });
+        await writeFile(join(backupRoot, component, "state.txt"), `old-${component}`);
+        await writeFile(join(remoteStateRoot, component, "state.txt"), `partial-${component}`);
+        await writeFile(join(incomingRoot, component, "state.txt"), `staged-${component}`);
+      }
+      await writeFile(join(backupRoot, "pglite", "PG_VERSION"), "18\n");
+      await mkdir(join(remoteStateRoot, "recovery"), { recursive: true });
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "4\n");
+      await writeFile(join(remoteStateRoot, revisionTempName), "5\n");
+      await writeFile(
+        markerPath,
+        `${JSON.stringify({
+          schemaVersion: "remote-state-sync-recovery/v2",
+          status: "active",
+          transactionId,
+          backupName: transactionId,
+          incomingName,
+          revisionTempName,
+          expectedRevision: 4,
+          nextRevision: 5,
+          hadPglite: true,
+          hadSourceLinks: true,
+          hadServerAppliedRoutes: true,
+        })}\n`,
+      );
+
+      const baseRunner = createLocalSshArchiveRunner();
+      const sync = new RemotePgliteArchiveSync(
+        {
+          dataRoot: remoteStateRoot,
+          localDataRoot,
+          localPgliteDataDir: join(localDataRoot, "pglite"),
+          backupRetentionDays: 7,
+          backupMaxCount: 20,
+          target: { host: "127.0.0.1" },
+        },
+        {
+          run(input) {
+            if (input.command !== "ssh") return baseRunner.run(input);
+            const original = input.args.at(-1) ?? "";
+            const durabilitySync = 'sync_path "$data_root" || exit 75';
+            expect(original).toContain(durabilitySync);
+            return baseRunner.run({
+              ...input,
+              args: [
+                ...input.args.slice(0, -1),
+                original.replaceAll(
+                  durabilitySync,
+                  `[ ! -d "$incoming_dir" ] || exit 75\n      ${durabilitySync}`,
+                ),
+              ],
+            });
+          },
+        },
+      );
+
+      expect(sync.recoverRemoteTransaction().isOk()).toBe(true);
+      for (const component of ["pglite", "source-links", "server-applied-routes"]) {
+        expect(await readFile(join(remoteStateRoot, component, "state.txt"), "utf8")).toBe(
+          `old-${component}`,
+        );
+      }
+      expect(await Bun.file(incomingRoot).exists()).toBe(false);
+      expect(await Bun.file(join(remoteStateRoot, revisionTempName)).exists()).toBe(false);
+      expect(await Bun.file(markerPath).exists()).toBe(false);
+    } finally {
+      await rm(localDataRoot, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  });
+
   test("[CONFIG-FILE-STATE-012G] remote state paths fail closed on directories and symlinks", async () => {
     const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-path-fence-local-"));
     const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-path-fence-remote-"));

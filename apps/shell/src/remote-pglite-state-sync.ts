@@ -554,10 +554,10 @@ function remoteRecoveryResolveCommand(dataRoot: string): ash.Script {
       restore_component pglite "$had_pglite" || exit 75
       restore_component source-links "$had_source_links" || exit 75
       restore_component server-applied-routes "$had_routes" || exit 75
-      sync_path "$data_root" || exit 75
       rm -rf "$incoming_dir" || exit 75
       rm -f "$revision_temp" || exit 75
       rm -rf "$backup_dir" || exit 75
+      sync_path "$data_root" || exit 75
       rm -f "$recovery_file" || exit 75
       sync_path "$recovery_dir" || exit 75
       exit 0
