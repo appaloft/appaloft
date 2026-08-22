@@ -160,6 +160,7 @@ describe("remote code door", () => {
     );
     expect(html.code).toBe("workspace_open_cloud_temporarily_unreachable");
     expect(html.message).toContain("HTTP 503");
+    expect(html.details).not.toHaveProperty("repositoryIdentity");
     expect(String(html.details?.guidance)).toContain(
       "appaloft code --pi --server srv_4lifk0yrcecy",
     );

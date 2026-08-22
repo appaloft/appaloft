@@ -420,6 +420,42 @@ describe("CLI safe error evidence", () => {
     expect(piOutput).not.toContain("sbx_");
   });
 
+  test("[WS-REMOTE-COMPAT-222] 502 with folder.local repositoryIdentity does not print Opening folder.local", () => {
+    const output = formatHumanCliError({
+      code: "workspace_open_cloud_temporarily_unreachable",
+      category: "infra",
+      message: "Cloud is temporarily unreachable (HTTP 502).",
+      retryable: true,
+      details: {
+        phase: "occupy-preparing-disk",
+        status: 502,
+        causeCode: "sdk_unstructured_error",
+        repositoryIdentity: "folder.local/cwd/appaloft-cloud",
+        guidance: "Retry appaloft code --pi --server srv_4lifk0yrcecy.",
+      },
+    });
+    expect(output).toContain("Cloud is temporarily unreachable");
+    expect(output).toContain("HTTP 502");
+    expect(output).toContain("appaloft code --pi --server srv_4lifk0yrcecy");
+    expect(output).not.toContain("Opening folder.local");
+    expect(output).not.toContain("Opening folder.local/cwd/appaloft-cloud");
+    expect(output).not.toMatch(/occupancy/iu);
+    const raw = formatHumanCliError({
+      code: "sdk_unstructured_error",
+      category: "infra",
+      message:
+        "The server returned an error that did not match the Appaloft error contract. HTTP 502 Body: {cloudflare 502 bad gateway}",
+      retryable: true,
+      details: {
+        status: 502,
+        repositoryIdentity: "folder.local/cwd/appaloft-cloud",
+        causeCode: "sdk_unstructured_error",
+      },
+    });
+    expect(raw).not.toContain("Opening folder.local");
+    expect(raw).not.toContain("Opening folder.local/cwd/appaloft-cloud");
+  });
+
   test("does not serialize unknown failures in human CLI output", () => {
     const output = formatHumanCliError(
       new Error("secret-value ciphertext-value /private/operator/key"),

@@ -524,6 +524,23 @@ function operationCheckDeniedHumanLines(error: DomainError): string[] {
   return [`${who}${why}.`, operationCheckDeniedNextStep(error)];
 }
 
+function shouldOmitOpeningRepositoryIdentity(
+  error: DomainError,
+  repositoryIdentity: string,
+): boolean {
+  if (error.code === "workspace_open_cloud_temporarily_unreachable") return true;
+  const status = error.details?.status;
+  const gatewayStatus = status === 502 || status === 503;
+  const folderLocal = repositoryIdentity.startsWith("folder.local/");
+  return (
+    folderLocal &&
+    (gatewayStatus ||
+      error.code === "sdk_unstructured_error" ||
+      error.code === "control_plane_unstructured_error" ||
+      error.code === "control_plane_unexpected_html_response")
+  );
+}
+
 export function formatHumanCliError(error: unknown): string {
   if (isDomainError(error)) {
     const lines = (
@@ -533,7 +550,11 @@ export function formatHumanCliError(error: unknown): string {
       typeof error.details?.repositoryIdentity === "string"
         ? error.details.repositoryIdentity.trim()
         : "";
-    if (repositoryIdentity && !lines.some((line) => line.includes(repositoryIdentity))) {
+    if (
+      repositoryIdentity &&
+      !shouldOmitOpeningRepositoryIdentity(error, repositoryIdentity) &&
+      !lines.some((line) => line.includes(repositoryIdentity))
+    ) {
       lines.push(`Opening ${repositoryIdentity}.`);
     }
     const errorCode = humanErrorCode(error);
