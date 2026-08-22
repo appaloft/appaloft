@@ -176,6 +176,9 @@ appaloft workspace open [path|git-remote]
 upstream / remote tip 不一致仍会在远端创建前失败。默认 `appaloft code` 优先选 live 会话，同名 leftover 不能挡住第一次成功，
 也不要求记住 installation id。`--profile` 只是显式撞名时的兜底，不同于全局
 `--control-plane-profile`。`--new` 仍占用 cwd 源，不会静默 resume whoami 会话。
+如果默认 `code` 命中的首选 Workspace 停在部分创建状态，CLI 会保留那个 Workspace 供诊断，
+并自动创建一个隔离替代 Workspace；不需要退出后再手工补 `--new`。低层
+`workspace open` / `workspace create` 仍会返回原始 partial 恢复证据，不会自动创建替代。
 打开失败时会写出缺什么、正在打开哪个仓库，而不会把 Cloud 激活失败伪装成 CLI 成功。
 已注册 BYOS Server 时，`workspace open` 和 `code` 放到那台 Server 上（`--server <id>`
 可钉死），不会再索要 managed 容量。V1 不做隐式 sync 或 patch upload。

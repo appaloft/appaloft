@@ -92,7 +92,9 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   memorizing installation ids. `--profile` is a fallback pin; only an explicit colliding name
   with more than one live occupancy lists both ids and `appaloft code --profile <id>`.
   `--new` occupies the cwd origin and does not silently resume whoami. A non-git directory
-  occupies this folder via a git remote and does not resume an unrelated occupancy. A failed open names
+  occupies this folder via a git remote and does not resume an unrelated occupancy. If the preferred
+  Workspace is partial, default `code` preserves it and automatically creates an isolated replacement;
+  lower-level `workspace open` still fail-closes with its recovery evidence. A failed open names
   the repository and the missing Binding or Profile, and keeps `causeCode` visible; it does
   not invent a successful occupancy.   `--opencode`, `--pi`, `--omp`, `--claude`, `--codex`, and `--grok` are the mutually exclusive user-facing aliases and map onto
   existing occupancy harnesses (default OpenCode). `--harness` is compatibility only.
