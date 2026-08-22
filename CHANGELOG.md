@@ -1,5 +1,62 @@
 # Changelog
 
+## [1.10.0](https://github.com/appaloft/appaloft/compare/v1.9.2...v1.10.0) (2026-08-22)
+
+
+### Features
+
+* **cli:** fold login into first `appaloft deploy` and require `--yes` in agent envs ([#1335](https://github.com/appaloft/appaloft/issues/1335)) ([789a993](https://github.com/appaloft/appaloft/commit/789a99327740d69dd4d47c23593d15446c1470e3))
+* **cli:** local Agent door for setup agent and MCP host writes ([#1316](https://github.com/appaloft/appaloft/issues/1316)) ([4575b21](https://github.com/appaloft/appaloft/commit/4575b21e6e5c4a1c8f454bac54b4cccac6bd57bd))
+* **cli:** Railway-like folder onboarding for deploy and code ([#1320](https://github.com/appaloft/appaloft/issues/1320)) ([cc12609](https://github.com/appaloft/appaloft/commit/cc12609deeb8a3590a9532c801d0e9c644c62ca4))
+* **cli:** Railway-like vendor credentials for `appaloft code` ([#1323](https://github.com/appaloft/appaloft/issues/1323)) ([d494cf2](https://github.com/appaloft/appaloft/commit/d494cf2711b61dee78ecd83f5dea69f65792d1a7))
+* **sandbox:** persist readable display names instead of sbx_* ([#1339](https://github.com/appaloft/appaloft/issues/1339)) ([f4c05b9](https://github.com/appaloft/appaloft/commit/f4c05b9f3d78e11ca68d24b7f331943ec7440690))
+
+
+### Bug Fixes
+
+* **cli:** accept path or git-remote on workspace open ([#1314](https://github.com/appaloft/appaloft/issues/1314)) ([a0ad92e](https://github.com/appaloft/appaloft/commit/a0ad92e697f2da0e92df682fd6bb636358e84a44))
+* **cli:** Cloud Agents code TUI without Occupancy, rustup dump, or folder selector ([#1328](https://github.com/appaloft/appaloft/issues/1328)) ([fb4bd8c](https://github.com/appaloft/appaloft/commit/fb4bd8c585d2716ff14a2d79fa665f9f40c2f9ce))
+* **cli:** deploy . --yes auto-detects static from public/index.html ([#1331](https://github.com/appaloft/appaloft/issues/1331)) ([9859a0e](https://github.com/appaloft/appaloft/commit/9859a0e98de5a5d9b0f840f2bad68f91c29a7826))
+* **cli:** enter occupancy alt-screen before sidecar lookup ([#1319](https://github.com/appaloft/appaloft/issues/1319)) ([8467829](https://github.com/appaloft/appaloft/commit/84678293b59d68181218bafb6ee263290ffd9d0b))
+* **cli:** folder.local sandboxes.create stays pre-[#1339](https://github.com/appaloft/appaloft/issues/1339) so hostinger occupy can start ([#1345](https://github.com/appaloft/appaloft/issues/1345)) ([722327e](https://github.com/appaloft/appaloft/commit/722327ee34feb449d6d52e5984b5456876cae42d))
+* **cli:** humanize Operation check denied and keep create-project org ([#1347](https://github.com/appaloft/appaloft/issues/1347)) ([3b337bf](https://github.com/appaloft/appaloft/commit/3b337bf7768226f1c5cc7c0b3d63b64658fcbdeb))
+* **cli:** inquire before code TUI and restore TTY on ^C ([#1332](https://github.com/appaloft/appaloft/issues/1332)) ([7bb8b21](https://github.com/appaloft/appaloft/commit/7bb8b21d76398cfd34ffa3b3756dbc5c6ebd6419))
+* **cli:** keep --server hostinger on folder.local code ([#1342](https://github.com/appaloft/appaloft/issues/1342)) ([25755e6](https://github.com/appaloft/appaloft/commit/25755e6c346c67c21450e9692b597091395b7b0e))
+* **cli:** keep code --help off occupancy alt-screen ([#1327](https://github.com/appaloft/appaloft/issues/1327)) ([7614f99](https://github.com/appaloft/appaloft/commit/7614f99cf29b1e135b976a38df8bb274ade27d5e))
+* **cli:** keep code TUI failures visible after leave-alt-screen ([#1334](https://github.com/appaloft/appaloft/issues/1334)) ([c651211](https://github.com/appaloft/appaloft/commit/c6512110941ff3557547bc4d41d2e46239160322))
+* **cli:** keep hyphenated appaloft-cloud deploy cwd off the projects parent ([#1352](https://github.com/appaloft/appaloft/issues/1352)) ([d73d53b](https://github.com/appaloft/appaloft/commit/d73d53b6a9b545d1d9cf9426c6c88b40de454b13))
+* **cli:** keep no-git nux-d73d53b6-static off the projects parent ([#1353](https://github.com/appaloft/appaloft/issues/1353)) ([04a0bb3](https://github.com/appaloft/appaloft/commit/04a0bb31d063ca2dcf15d2e97c201c5565e04f52))
+* **cli:** keep Preparing disk TUI up and retry origin 502/503 ([#1350](https://github.com/appaloft/appaloft/issues/1350)) ([c34bdf5](https://github.com/appaloft/appaloft/commit/c34bdf58a000b9eb75334f8c313c7da3d09a34b5))
+* **cli:** occupy folder.local without remote workspaces.open ([#1324](https://github.com/appaloft/appaloft/issues/1324)) ([ae0f94a](https://github.com/appaloft/appaloft/commit/ae0f94a69996673c596e932d549e9798052d0088))
+* **cli:** package local-folder SSH source on the CLI host ([#1346](https://github.com/appaloft/appaloft/issues/1346)) ([414d63e](https://github.com/appaloft/appaloft/commit/414d63e82ebb7ada746ac8fd441374449e80a006))
+* **cli:** print compact setup agent --help before Effect ([#1330](https://github.com/appaloft/appaloft/issues/1330)) ([aafcdfd](https://github.com/appaloft/appaloft/commit/aafcdfdde9130ecf8696efe90a003ad763046dfb))
+* **cli:** remap occupy Cloudflare 502 to a human next step ([#1348](https://github.com/appaloft/appaloft/issues/1348)) ([c2d1820](https://github.com/appaloft/appaloft/commit/c2d18209c171580f0e07be2b3bda7ef2a59bdd27))
+* **cli:** send hyphenated nux leaf and archive on create-resource ([#1355](https://github.com/appaloft/appaloft/issues/1355)) ([ae9c38f](https://github.com/appaloft/appaloft/commit/ae9c38f300bbe4a6f00c1a0976397fb8eb655d2d))
+* **deploy:** apply resource-binding archive after worker rehydrate ([#1358](https://github.com/appaloft/appaloft/issues/1358)) ([ac59be1](https://github.com/appaloft/appaloft/commit/ac59be11a4c6b2b00c3066ef504f8c39f7a285c1))
+* **deploy:** keep hyphenated leaf after create-resource persist ([#1356](https://github.com/appaloft/appaloft/issues/1356)) ([d904282](https://github.com/appaloft/appaloft/commit/d90428247195183682de960ad7062f51eaae7f9d))
+* **deploy:** stamp hyphenated leaf workdir for detached workers ([#1357](https://github.com/appaloft/appaloft/issues/1357)) ([c01dc5f](https://github.com/appaloft/appaloft/commit/c01dc5f549ce7082209a85fbc427d8fb1c0fbb1a))
+* **runtime:** apply CLI archive from execution.metadata before existsSync ([#1354](https://github.com/appaloft/appaloft/issues/1354)) ([c689b0f](https://github.com/appaloft/appaloft/commit/c689b0f1debed1f5283064208ba21f5523451491))
+* **runtime:** keep hyphenated deploy cwd for SSH package existsSync+tar ([#1344](https://github.com/appaloft/appaloft/issues/1344)) ([055483c](https://github.com/appaloft/appaloft/commit/055483c0dd44457014cbb840cecd74cb773a8840))
+* **runtime:** keep hyphenated source workdir through SSH package ([#1338](https://github.com/appaloft/appaloft/issues/1338)) ([c79876d](https://github.com/appaloft/appaloft/commit/c79876d8d3be51aa883ce86df3b8f396982190cb))
+* **runtime:** reconstruct hyphenated SSH package folder without existsSync ([#1341](https://github.com/appaloft/appaloft/issues/1341)) ([772b611](https://github.com/appaloft/appaloft/commit/772b61126b8002843dd3c8b0db3a6ca3ba8bfff7))
+* **runtime:** recover hyphenated cwd when locator is already parent ([#1340](https://github.com/appaloft/appaloft/issues/1340)) ([5406518](https://github.com/appaloft/appaloft/commit/54065181efdaa7b7bf122ec19e83e66160e302fd))
+* **runtime:** SSH package existsSync and tar read the CLI folder ([#1343](https://github.com/appaloft/appaloft/issues/1343)) ([67e3a05](https://github.com/appaloft/appaloft/commit/67e3a0522e3056ca5eb5f7dd06c17f49ad7d2676))
+* **tui:** first-screen title is one top-row paint, not a stacked clip ([#1351](https://github.com/appaloft/appaloft/issues/1351)) ([65e5a2a](https://github.com/appaloft/appaloft/commit/65e5a2a2ad290ba9afe68040f67e18fd523a0dc9))
+* **tui:** first-screen wait is one prepare column, untruncated title ([#1349](https://github.com/appaloft/appaloft/issues/1349)) ([174c46c](https://github.com/appaloft/appaloft/commit/174c46c3a56c7c9fd373f41fc016a2197b1d8468))
+
+
+### Documentation
+
+* 2026-08-21 setup-agent README, replacing the Aug 20 honesty table ([#1337](https://github.com/appaloft/appaloft/issues/1337)) ([23d0c36](https://github.com/appaloft/appaloft/commit/23d0c360a35892a3f5e76b4fb0ffb15633f05727))
+* **cli:** align project command with catalog ([#1326](https://github.com/appaloft/appaloft/issues/1326)) ([9b3416c](https://github.com/appaloft/appaloft/commit/9b3416ccb712b12b8711a8c07e883fddd162fb90))
+* rewrite README around Deploy and Agent doors ([#1321](https://github.com/appaloft/appaloft/issues/1321)) ([f117cb2](https://github.com/appaloft/appaloft/commit/f117cb294c4e45d7759c528566b221eb6de5e506))
+
+
+### Miscellaneous
+
+* bump bun to 1.4.0 ([#1329](https://github.com/appaloft/appaloft/issues/1329)) ([81ccf46](https://github.com/appaloft/appaloft/commit/81ccf4688c181f78e479e8ad7da2fc06f20e4efd))
+* swap JS lint stack to Lefthook + Oxlint + Oxfmt ([#1336](https://github.com/appaloft/appaloft/issues/1336)) ([bb573cb](https://github.com/appaloft/appaloft/commit/bb573cb60bd2a728aaad7ef4cf0c1b1257e4684c))
+
 ## [1.9.2](https://github.com/appaloft/appaloft/compare/v1.9.1...v1.9.2) (2026-08-19)
 
 
