@@ -1,4 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import {
+  SAFE_CLI_ERROR_EVIDENCE_FIELDS,
+  safeCliErrorEvidence as lightweightSafeCliErrorEvidence,
+} from "@appaloft/adapter-cli/safe-error-evidence";
 import { type DomainError } from "@appaloft/core";
 import { formatHumanCliError, formatSafeCliError, safeCliErrorEvidence } from "../src/runtime";
 
@@ -23,6 +27,8 @@ describe("CLI safe error evidence", () => {
     };
 
     const evidence = safeCliErrorEvidence(error);
+    expect(lightweightSafeCliErrorEvidence(error)).toEqual(evidence);
+    expect(SAFE_CLI_ERROR_EVIDENCE_FIELDS).toEqual(Object.keys(evidence));
     expect(evidence).toEqual({
       schemaVersion: "appaloft.cli-error/v1",
       code: "infra_error",
