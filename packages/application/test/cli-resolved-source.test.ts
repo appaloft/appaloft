@@ -1,17 +1,39 @@
 import { describe, expect, test } from "bun:test";
-import { DisplayNameText, SourceDescriptor, SourceKindValue, SourceLocator } from "@appaloft/core";
+import {
+  BuildStrategyKindValue,
+  DeploymentTargetDescriptor,
+  DeploymentTargetId,
+  DetectSummary,
+  DisplayNameText,
+  ExecutionStrategyKindValue,
+  FilePathText,
+  GeneratedAt,
+  PackagingModeValue,
+  PlanStepText,
+  ProviderKey,
+  RuntimeExecutionPlan,
+  RuntimePlan,
+  RuntimePlanId,
+  SourceDescriptor,
+  SourceKindValue,
+  SourceLocator,
+  TargetKindValue,
+} from "@appaloft/core";
 import {
   CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY,
   CLI_RESOLVED_SOURCE_METADATA_KEY,
   ORIGINAL_LOCATOR_METADATA_KEY,
   cliPackedSourceArchiveFromLocalSource,
   explicitCliResolvedSource,
+  isGenericLocalSourceLeaf,
   localFolderSourceExecutionMetadata,
   localFolderSourceExecutionMetadataFromSource,
   localFolderSourceFieldsFromResourceBinding,
+  localFolderWorkerPackageRoot,
   retainCliResolvedSource,
   retainLocalFolderSourceFields,
   retainLocalFolderSourceFieldsFromResourceBinding,
+  withLocalFolderWorkerPackageRoot,
 } from "../src/cli-resolved-source";
 
 describe("CLI-resolved source", () => {
@@ -170,5 +192,70 @@ describe("CLI-resolved source", () => {
     expect(retained.locator).not.toBe(parent);
     expect(retained.metadata?.[ORIGINAL_LOCATOR_METADATA_KEY]).toBe(folder);
     expect(retained.metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]).toBe(packedSourceArchive);
+  });
+
+  test("[DEP-CREATE-PKG-007] stamps the hyphenated leaf onto a plan that omitted workingDirectory", () => {
+    const parent = "/Users/nichenqin/projects";
+    const folder = `${parent}/nux-d9042824-static`;
+    const packedSourceArchive = "H4sIAAAAAAAAAytKLSpILC4u1gMA";
+    expect(localFolderWorkerPackageRoot({ locator: folder, originalLocator: folder })).toBe(folder);
+    expect(
+      localFolderWorkerPackageRoot({
+        locator: folder,
+        originalLocator: folder,
+        workingDirectory: parent,
+      }),
+    ).toBe(folder);
+    expect(localFolderWorkerPackageRoot({ workingDirectory: parent })).toBeUndefined();
+    expect(isGenericLocalSourceLeaf("projects")).toBe(true);
+    expect(isGenericLocalSourceLeaf("projects-jcPcj6")).toBe(true);
+    expect(
+      localFolderWorkerPackageRoot({
+        locator: "/tmp/projects-jcPcj6",
+        workingDirectory: "/tmp/projects-jcPcj6",
+        displayName: "nux-c79876d8-static",
+      }),
+    ).toBe("/tmp/projects-jcPcj6/nux-c79876d8-static");
+
+    const omitted = RuntimePlan.rehydrate({
+      id: RuntimePlanId.rehydrate("plan_tu084dr7fln1"),
+      source: SourceDescriptor.rehydrate({
+        kind: SourceKindValue.rehydrate("local-folder"),
+        locator: SourceLocator.rehydrate(folder),
+        displayName: DisplayNameText.rehydrate("nux-d9042824-static"),
+        metadata: {
+          [ORIGINAL_LOCATOR_METADATA_KEY]: folder,
+          [CLI_RESOLVED_SOURCE_METADATA_KEY]: folder,
+          [CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]: packedSourceArchive,
+        },
+      }),
+      buildStrategy: BuildStrategyKindValue.rehydrate("static-artifact"),
+      packagingMode: PackagingModeValue.rehydrate("all-in-one-docker"),
+      execution: RuntimeExecutionPlan.rehydrate({
+        kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
+        metadata: { "artifact.source": "static-site" },
+      }),
+      target: DeploymentTargetDescriptor.rehydrate({
+        kind: TargetKindValue.rehydrate("single-server"),
+        providerKey: ProviderKey.rehydrate("generic-ssh"),
+        serverIds: [DeploymentTargetId.rehydrate("srv_4lifk0yrcecy")],
+      }),
+      detectSummary: DetectSummary.rehydrate("Static site from public/index.html"),
+      steps: [PlanStepText.rehydrate("Upload source workspace over SSH")],
+      generatedAt: GeneratedAt.rehydrate("2026-08-22T01:04:23.000Z"),
+    });
+    expect(omitted.execution.workingDirectory).toBeUndefined();
+
+    const stamped = withLocalFolderWorkerPackageRoot(omitted);
+    expect(stamped.execution.workingDirectory).toBe(folder);
+    expect(stamped.execution.workingDirectory).not.toBe(parent);
+
+    const parentWorkdir = omitted.withExecution(
+      RuntimeExecutionPlan.rehydrate({
+        ...omitted.execution.toState(),
+        workingDirectory: FilePathText.rehydrate(parent),
+      }),
+    );
+    expect(withLocalFolderWorkerPackageRoot(parentWorkdir).execution.workingDirectory).toBe(folder);
   });
 });

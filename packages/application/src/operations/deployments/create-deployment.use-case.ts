@@ -28,6 +28,7 @@ import {
   localFolderSourceFieldsFromResourceBinding,
   retainLocalFolderSourceFields,
   retainLocalFolderSourceFieldsFromResourceBinding,
+  withLocalFolderWorkerPackageRoot,
 } from "../../cli-resolved-source";
 import { deploymentProgressSteps, reportDeploymentProgress } from "../../deployment-progress";
 import { type DurableWorkQueueAdapter } from "../../durable-work";
@@ -1125,14 +1126,16 @@ export class CreateDeploymentUseCase {
       const runtimePlanInput = yield* runtimePlanInputResult;
       const runtimePlanResult = await runtimePlanResolver.resolve(context, runtimePlanInput);
       const resolvedRuntimePlan = yield* runtimePlanResult;
-      const runtimePlan = resolvedRuntimePlan.withExecutionMetadata({
-        ...localFolderSourceExecutionMetadataFromSource({
-          source: detected.source,
-          ...(resolvedRuntimePlan.execution.workingDirectory
-            ? { workingDirectory: resolvedRuntimePlan.execution.workingDirectory }
-            : {}),
+      const runtimePlan = withLocalFolderWorkerPackageRoot(
+        resolvedRuntimePlan.withExecutionMetadata({
+          ...localFolderSourceExecutionMetadataFromSource({
+            source: detected.source,
+            ...(resolvedRuntimePlan.execution.workingDirectory
+              ? { workingDirectory: resolvedRuntimePlan.execution.workingDirectory }
+              : {}),
+          }),
         }),
-      });
+      );
       const runtimeTargetBackend = runtimeTargetBackendRegistry.find({
         targetKind: runtimePlan.target.kind,
         providerKey: runtimePlan.target.providerKey,

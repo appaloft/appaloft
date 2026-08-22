@@ -11,6 +11,7 @@ import {
   cliPackedSourceArchiveFromLocalSource,
   explicitCliResolvedSource,
   explicitOriginalLocator,
+  inspectLocalFolderSourceWireFields,
   createDeploymentProgressEvent,
   deploymentProgressSteps,
   type AppLogger,
@@ -2076,6 +2077,16 @@ export class SshExecutionBackend implements ExecutionBackend {
         ...(resourceName ? { "context.resourceName": resourceName } : {}),
       },
     });
+    const sourceWire = inspectLocalFolderSourceWireFields({
+      locator: source.locator,
+      ...(originalLocator ? { originalLocator } : {}),
+      ...(state.runtimePlan.execution.workingDirectory
+        ? { workingDirectory: state.runtimePlan.execution.workingDirectory }
+        : {}),
+      ...(source.displayName ? { displayName: source.displayName } : {}),
+      ...(source.metadata ? { sourceMetadata: source.metadata } : {}),
+      ...(executionMetadata ? { executionMetadata } : {}),
+    });
 
     // Never tar a generic parent such as /Users/.../projects. The Mac disk
     // is not on this worker; existsSync of that parent is the live throw.
@@ -2090,6 +2101,11 @@ export class SshExecutionBackend implements ExecutionBackend {
           retryable: false,
           metadata: {
             localWorkdir,
+            archiveApplied: "no",
+            wireLocator: sourceWire.locator,
+            wireOriginalLocator: sourceWire.originalLocator,
+            wireWorkingDirectory: sourceWire.workingDirectory,
+            wireArchive: sourceWire.cliPackedSourceTarGz,
           },
         }),
       };
@@ -2106,6 +2122,11 @@ export class SshExecutionBackend implements ExecutionBackend {
           retryable: false,
           metadata: {
             localWorkdir,
+            archiveApplied: "no",
+            wireLocator: sourceWire.locator,
+            wireOriginalLocator: sourceWire.originalLocator,
+            wireWorkingDirectory: sourceWire.workingDirectory,
+            wireArchive: sourceWire.cliPackedSourceTarGz,
           },
         }),
       };

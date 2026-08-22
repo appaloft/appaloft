@@ -71,6 +71,7 @@ import {
   explicitCliResolvedSource,
   explicitOriginalLocator,
   localFolderSourceExecutionMetadata,
+  localFolderWorkerPackageRoot,
   createAdapterSpanName,
   createDeploymentProgressEvent,
   deploymentProgressSteps,
@@ -1150,7 +1151,7 @@ function chooseStrategies(input: {
         ? { executionMetadata: requestedDeployment.runtimeMetadata }
         : {}),
     });
-    const workingDirectory = resolveLocalWorkspaceWorkdir({
+    const resolvedWorkdir = resolveLocalWorkspaceWorkdir({
       locator: source.locator,
       displayName: source.displayName,
       ...(source.metadata ? { metadata: source.metadata } : {}),
@@ -1160,6 +1161,17 @@ function chooseStrategies(input: {
         ? { resourceName: requestedDeployment.runtimeMetadata["context.resourceName"] }
         : {}),
     });
+    const workingDirectory =
+      localFolderWorkerPackageRoot({
+        locator: source.locator,
+        displayName: source.displayName,
+        ...(originalLocator ? { originalLocator } : {}),
+        ...(cliResolvedSource ? { cliResolvedSource } : {}),
+        ...(requestedDeployment.runtimeMetadata?.["context.resourceName"]
+          ? { resourceName: requestedDeployment.runtimeMetadata["context.resourceName"] }
+          : {}),
+        workingDirectory: resolvedWorkdir,
+      }) ?? resolvedWorkdir;
     const execution = RuntimeExecutionPlan.rehydrate({
       kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
       workingDirectory: FilePathText.rehydrate(workingDirectory),

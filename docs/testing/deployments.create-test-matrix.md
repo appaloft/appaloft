@@ -370,7 +370,11 @@ both already the parent, `displayName` is `workspace`/`projects` or omitted, met
 `context.resourceName` (`nux-d73d53b6-static-8xrly6`). Persist / rehydrate / plan after
 `resources.create` or `configureSource` must still carry the hyphenated leaf locator or
 `cliPackedSourceTarGz` on the command the worker consumes; a CLI send-fields unit test is not a
-pass if those fields are gone after persist. `recoverLocalSourceFolderFromCwd`
+pass if those fields are gone after persist. The persisted plan must stamp
+`execution.workingDirectory` to that hyphenated leaf even when live `resource show` omits
+`workingDirectory`; leaving the field absent lets an older worker `dirname` the leaf to
+`/Users/nichenqin/projects`. Worker packaging must either receive that leaf path or apply
+`cliPackedSourceTarGz` before any `existsSync` of a Mac path. `recoverLocalSourceFolderFromCwd`
 must not treat `projects` as the source leaf. A non-git hyphenated leaf under a parent named
 `projects` (`nux-*-static`, not only `appaloft-cloud`) stays that leaf for CLI-host package and
 for any missing-workdir message. Summary.Source being the full path is not a pass if the worker

@@ -5209,6 +5209,9 @@ describe("CreateDeploymentUseCase", () => {
     expect(
       deployment?.toState().runtimePlan.toState().source.toState().locator,
     ).not.toBeUndefined();
+    expect(
+      deployment?.toState().runtimePlan.toState().execution.toState().workingDirectory?.value,
+    ).toBe(folder);
   });
 
   test("[DEP-CREATE-PKG-007] create-resource persist still gives plan the hyphenated leaf and archive", async () => {
@@ -5320,6 +5323,9 @@ describe("CreateDeploymentUseCase", () => {
     expect(executionMetadata?.[ORIGINAL_LOCATOR_METADATA_KEY]).not.toBe(parent);
     expect(runtimePlan?.source.toState().locator.value).toBe(folder);
     expect(runtimePlan?.source.toState().locator.value).not.toBe(parent);
+    const executionWorkdir = runtimePlan?.execution.toState().workingDirectory?.value;
+    expect(executionWorkdir).toBe(folder);
+    expect(executionWorkdir).not.toBe(parent);
   });
 
   test.skip("bootstraps a default local deployment context when ids are omitted", async () => {
