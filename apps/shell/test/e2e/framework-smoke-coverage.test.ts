@@ -428,6 +428,9 @@ describe("framework fixture real smoke coverage", () => {
       expect(fixture.matrixIds).toContain("WF-PLAN-SMOKE-006");
       expect(fixture.expectedGeneratedLog.length).toBeGreaterThan(0);
       expect(fixture.expectedPlanner.length).toBeGreaterThan(0);
+      expect(fixture.expectedResourceKind, fixture.fixture).toBe(
+        fixture.expectedBuildStrategy === "static-artifact" ? "static-site" : "application",
+      );
 
       if (fixture.fixture === "generic-java-jar") {
         const jarPath = join(fixturePath, "target/generic-java-jar-1.0.0.jar");

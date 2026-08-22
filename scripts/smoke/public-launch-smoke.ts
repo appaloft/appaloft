@@ -186,6 +186,7 @@ function deployBasicDockerImage(context: {
   const deployment = cli(
     [
       "deploy",
+      "--yes",
       `docker://${image}`,
       "--project",
       context.projectId,
@@ -220,6 +221,7 @@ function deployGitHubRepository(context: {
   const deployment = cli(
     [
       "deploy",
+      "--yes",
       repositoryUrl,
       "--project",
       context.projectId,
@@ -370,7 +372,7 @@ function parseJson<T>(raw: string): T {
 function parseJsonPayloads(raw: string): unknown[] {
   const payloads: unknown[] = [];
 
-  for (let offset = 0; offset < raw.length; ) {
+  for (let offset = 0; offset < raw.length;) {
     const objectStart = raw.indexOf("{", offset);
     const arrayStart = raw.indexOf("[", offset);
     const start =
