@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.4](https://github.com/appaloft/appaloft/compare/v1.9.3...v1.9.4) (2026-08-22)
+
+
+### Bug Fixes
+
+* **deploy:** do not pack git or oversized local trees ([#1360](https://github.com/appaloft/appaloft/issues/1360)) ([eb145a7](https://github.com/appaloft/appaloft/commit/eb145a70cb51a3606330ed5c8516324e00127a2d))
+
 ## [1.9.3](https://github.com/appaloft/appaloft/compare/v1.9.2...v1.9.3) (2026-08-22)
 
 
