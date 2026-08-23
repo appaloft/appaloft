@@ -67,9 +67,7 @@ function projectNameForRepository(repositoryIdentity: string): Result<ProjectNam
   return ProjectName.create(normalized || "Workspace Project");
 }
 
-export class CommunityWorkspaceActivationContextInitializer
-  implements WorkspaceActivationContextInitializerPort
-{
+export class CommunityWorkspaceActivationContextInitializer implements WorkspaceActivationContextInitializerPort {
   private readonly pending = new Map<
     string,
     Promise<CommunityWorkspaceActivationInitializationResult>
@@ -121,15 +119,23 @@ export class CommunityWorkspaceActivationContextInitializer
       );
     }
     const repositoryContext = toRepositoryContext(context);
-    let binding = await this.dependencies.repositoryBindings.findByIdentity(
-      repositoryContext,
-      input.repositoryIdentity,
-    );
+    let binding = input.projectId
+      ? await this.dependencies.repositoryBindings.findByIdentityAndProject(
+          repositoryContext,
+          input.repositoryIdentity,
+          input.projectId,
+        )
+      : await this.dependencies.repositoryBindings.findByIdentity(
+          repositoryContext,
+          input.repositoryIdentity,
+        );
     let projectDisposition: WorkspaceActivationContextDisposition = "reused";
     let bindingDisposition: WorkspaceActivationContextDisposition = "reused";
     let projectId: string;
 
-    if (binding?.binding.toState().status === "active") {
+    if (input.projectId) {
+      projectId = input.projectId;
+    } else if (binding?.binding.toState().status === "active") {
       projectId = binding.binding.toState().projectId.value;
     } else {
       const name = projectNameForRepository(input.repositoryIdentity);
@@ -163,15 +169,18 @@ export class CommunityWorkspaceActivationContextInitializer
       } else {
         projectId = project.id.value;
       }
+    }
+    if (binding?.binding.toState().status !== "active") {
       const bind = BindProjectRepositoryCommand.create({
         repositoryIdentity: input.repositoryIdentity,
         projectId,
       });
       if (bind.isErr()) return err(bind.error);
       const bound = await this.dependencies.commandBus.execute(context, bind.value);
-      binding = await this.dependencies.repositoryBindings.findByIdentity(
+      binding = await this.dependencies.repositoryBindings.findByIdentityAndProject(
         repositoryContext,
         input.repositoryIdentity,
+        projectId,
       );
       if (bound.isErr()) {
         if (

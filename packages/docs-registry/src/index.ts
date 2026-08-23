@@ -166,7 +166,7 @@ export const publicDocsHelpTopics = {
     id: "agent.workspace-display-name",
     title: "Workspace display name",
     description:
-      "Opened Cloud Agents and workspace rows show a persisted readable name, never sbx_*.",
+      "Opened Cloud Agents show a persisted Agent handle, never sbx_* or repo@sha as the name.",
     page: {
       "zh-CN": "agents/workspaces",
       "en-US": "en/agents/workspaces",
@@ -178,10 +178,17 @@ export const publicDocsHelpTopics = {
     surfaces: ["cli"],
     anchor: "agent-workspace-display-name",
     relatedOperation: "workspaces.open",
-    aliases: ["workspace name", "sandbox display name", "resonant-silence", "repo@sha"],
+    aliases: [
+      "workspace name",
+      "sandbox display name",
+      "agent name",
+      "resonant-silence",
+      "repo@sha",
+    ],
     specReferences: [
       "docs/decisions/ADR-124-sandbox-display-name.md",
-      "docs/specs/139-remote-agent-door/spec.md",
+      "docs/decisions/ADR-125-occupancy-agent-and-project-binding.md",
+      "docs/specs/146-occupancy-agent-identity/spec.md",
       "docs/testing/execution-sandbox-test-matrix.md",
     ],
   },

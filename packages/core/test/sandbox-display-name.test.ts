@@ -41,7 +41,7 @@ describe("Sandbox display name", () => {
     expect(Sandbox.rehydrate(stored.toState()).displayName().value).toBe(first.value);
   });
 
-  test("[SBX-DOM-005] linked folder and git sources prefer directory or repo@sha over random", () => {
+  test("[SBX-DOM-005][WS-AGENT-NAME-001][WS-AGENT-NAME-002][WS-AGENT-NAME-003] folder keeps directory; git occupy generates kebab", () => {
     expect(SandboxDisplayName.resolve({ directoryName: "hello-static" }).value).toBe(
       "hello-static",
     );
@@ -49,8 +49,15 @@ describe("Sandbox display name", () => {
       SandboxDisplayName.resolve({
         repositoryIdentity: "github.com/traefik/whoami",
         commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
+      }).isGeneratedKebabPair(),
+    ).toBe(true);
+    expect(
+      SandboxDisplayName.resolve({
+        name: "supportive-balance",
+        repositoryIdentity: "github.com/traefik/whoami",
+        commitSha: "1ce75d01b6978863647da42557a707a479da3a51",
       }).value,
-    ).toBe("whoami@1ce75d0");
+    ).toBe("supportive-balance");
     expect(
       SandboxDisplayName.resolve({
         repositoryIdentity: "folder.local/cwd/appaloft",

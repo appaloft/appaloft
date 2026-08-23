@@ -24,6 +24,7 @@ export interface WorkspaceOpenInput {
   readonly branch: string;
   readonly commitSha: string;
   readonly profile?: string;
+  readonly projectId?: string;
   readonly forceNew?: boolean;
   readonly attach?: boolean;
   readonly targetServerId?: string;

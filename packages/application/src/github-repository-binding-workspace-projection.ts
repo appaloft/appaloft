@@ -73,6 +73,22 @@ export class GitHubRepositoryBindingWorkspaceProjection implements RepositoryBin
     };
   }
 
+  async findByIdentityAndProject(
+    context: RepositoryContext,
+    repositoryIdentity: string,
+    projectId: string,
+  ): Promise<RepositoryBindingRecord | null> {
+    const explicit = await this.repositoryBindings.findByIdentityAndProject(
+      context,
+      repositoryIdentity,
+      projectId,
+    );
+    if (explicit) return explicit;
+    const found = await this.findByIdentity(context, repositoryIdentity);
+    if (found?.binding.toState().projectId.value === projectId) return found;
+    return null;
+  }
+
   save(context: RepositoryContext, binding: ProjectRepositoryBinding): Promise<Result<void>> {
     return this.repositoryBindings.save(context, binding);
   }

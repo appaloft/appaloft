@@ -33,6 +33,25 @@ export class RepositoryBinding extends AggregateRoot<RepositoryBindingState> {
     return new RepositoryBinding({ ...state });
   }
 
+  rebind(input: { projectId: ProjectId; at: UpdatedAt }): Result<{ changed: boolean }> {
+    if (this.state.status === "unbound") {
+      this.state.status = "active";
+      this.state.projectId = input.projectId;
+      delete this.state.unboundAt;
+      this.recordDomainEvent("repository-binding.bound", input.at, {
+        repositoryIdentity: this.state.repositoryIdentity.value,
+        projectId: input.projectId.value,
+      });
+      return ok({ changed: true });
+    }
+    if (this.state.projectId.equals(input.projectId)) return ok({ changed: false });
+    this.state.projectId = input.projectId;
+    this.recordDomainEvent("repository-binding.bound", input.at, {
+      repositoryIdentity: this.state.repositoryIdentity.value,
+      projectId: input.projectId.value,
+    });
+    return ok({ changed: true });
+  }
   unbind(input: { at: UpdatedAt }): Result<{ changed: boolean }> {
     if (this.state.status === "unbound") return ok({ changed: false });
     this.state.status = "unbound";

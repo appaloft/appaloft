@@ -141,6 +141,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-122: Railway-Like Folder Project Onboarding](./ADR-122-railway-like-folder-onboarding.md) | Accepted | First `deploy`/`code` in an unlinked folder create-or-links a Project; git is correspondence not a gate; `project use` switches the folder link. |
 | [ADR-123: First Deploy Login Fold And Agent-Env Guard](./ADR-123-first-deploy-login-fold-and-agent-env-guard.md) | Accepted | First Cloud `deploy` folds existing browser login; coding-agent/CI/non-TTY doors print a plan and do not mutate without `--yes`. |
 | [ADR-124: Sandbox Display Name](./ADR-124-sandbox-display-name.md) | Accepted | Persist a readable display name on Sandbox; user surfaces never paint `sbx_*`; ids stay `sbx_*`. Adjective-noun kebab is Appaloft's generator, not a Railway formula. |
+| [ADR-125: Occupancy Agent Identity And Project Binding](./ADR-125-occupancy-agent-and-project-binding.md) | Accepted | User-facing occupancy is Agent with kebab name; Binding rebinds default Project; Resource remains the Service. |
 
 ## Authoring Rules
 
