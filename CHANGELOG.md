@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.10](https://github.com/appaloft/appaloft/compare/v1.10.9...v1.10.10) (2026-08-23)
+
+
+### Bug Fixes
+
+* **workspace:** resolve occupancy declarative harness by template ([#1405](https://github.com/appaloft/appaloft/issues/1405)) ([7581a9b](https://github.com/appaloft/appaloft/commit/7581a9b63cbcdd5f6c6e71d43d505ce7aad5a6b0))
+
 ## [1.10.9](https://github.com/appaloft/appaloft/compare/v1.10.8...v1.10.9) (2026-08-23)
 
 
