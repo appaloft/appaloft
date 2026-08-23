@@ -579,6 +579,9 @@ describe("Agent Workspace CLI", () => {
         start: async (context) => {
           presentationStarts += 1;
           expect(context.terminalSessionGateway).toBeDefined();
+          expect(context.occupancyHome).toBe(true);
+          expect(context.occupyBootstrap).toBeTypeOf("function");
+          expect(context.occupancyChrome?.vendors).toContain("grok");
         },
       },
     });
@@ -586,6 +589,43 @@ describe("Agent Workspace CLI", () => {
     await program.parseAsync(["node", "appaloft", "workspace"]);
 
     expect(presentationStarts).toBe(1);
+  });
+
+  test("[WS-TUI-HOME-001] workspace --codex skips home and occupies Codex", async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), "appaloft-workspace-codex-"));
+    await mkdir(join(homeDir, ".codex"), { recursive: true });
+    await writeFile(join(homeDir, ".codex", "auth.json"), '{"token":"redacted"}\n');
+    let occupancyHome: boolean | undefined;
+    let selectedVendor: string | undefined;
+    const { createRemoteCliProgram } = await import("../src");
+    const program = createRemoteCliProgram({
+      version: "0.1.0-test",
+      profile: {
+        name: "cloud",
+        mode: "public-cloud",
+        baseUrl: "https://api.example.test",
+        auth: { kind: "bearer", token: "not-used-by-presentation-seam" },
+        createdAt: "2026-08-11T00:00:00.000Z",
+        updatedAt: "2026-08-11T00:00:00.000Z",
+      },
+      terminalIO: {
+        stdin: { isTTY: true, on: () => undefined },
+        stdout: { isTTY: true, write: () => true },
+        stderr: { isTTY: true, write: () => true },
+      },
+      environment: { TERM: "xterm-256color", HOME: homeDir },
+      workspaceControlPresentation: {
+        start: async (context) => {
+          occupancyHome = context.occupancyHome;
+          selectedVendor = context.occupancyChrome?.selectedVendor;
+        },
+      },
+    });
+
+    await program.parseAsync(["node", "appaloft", "workspace", "--codex"]);
+
+    expect(occupancyHome).toBe(false);
+    expect(selectedVendor).toBe("codex");
   });
 
   test("[WS-CREATE-PROFILE-009][WS-OPEN-PROFILE-006][WS-OPEN-SURFACE-019] creates Profile-aware Workspaces without Agent-name branching", async () => {

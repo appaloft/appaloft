@@ -12,6 +12,7 @@ import {
   IssueSandboxAgentAttachAccessCommand,
   ListAgentTaskRunsQuery,
   ListPreviewEnvironmentsQuery,
+  ListProjectsQuery,
   ListResourcesQuery,
   ListSandboxAgentRuntimesQuery,
   ListSandboxesQuery,
@@ -60,6 +61,8 @@ import {
   resetWorkspaceTuiScrollbackRestoreState,
   restoreWorkspaceTuiScrollback,
 } from "./workspace-tui-launch.js";
+
+const OCCUPANCY_HOME_VENDORS = ["grok", "codex", "claude", "opencode", "pi"] as const;
 
 export function handleWorkspaceControlWaitScreenInterrupt(input: {
   readonly attached: boolean;
@@ -273,6 +276,10 @@ export type WorkspaceControlRendererMessage =
       readonly type: "chrome";
       readonly title?: string;
       readonly project?: string;
+      readonly home?: boolean;
+      readonly vendors?: readonly string[];
+      readonly selectedVendor?: string;
+      readonly targets?: readonly { readonly projectId: string; readonly name: string }[];
     }
   | { readonly type: "delivery-complete"; readonly workspaceId: string }
   | { readonly type: "recovery-complete"; readonly workspaceId: string }
@@ -281,6 +288,7 @@ export type WorkspaceControlRendererMessage =
       readonly code: string;
       readonly phase: string;
       readonly retryable: boolean;
+      readonly message?: string;
     };
 
 export type WorkspaceControlRendererEvent =
@@ -341,6 +349,13 @@ export type WorkspaceControlRendererEvent =
   | { readonly type: "terminal-resize"; readonly cols: number; readonly rows: number }
   | { readonly type: "terminal-reconnect" }
   | { readonly type: "detach" }
+  | {
+      readonly type: "launch";
+      readonly vendor: string;
+      readonly forceNew?: boolean;
+      readonly prompt?: string;
+      readonly projectId?: string;
+    }
   | { readonly type: "quit" };
 
 export interface WorkspaceControlRendererSession {
@@ -365,6 +380,10 @@ export interface WorkspaceControlPresentationContext {
       options?: { readonly status?: "retrying" | "failed" },
     ) => Promise<void>;
     signal: AbortSignal;
+    vendor?: string;
+    projectId?: string;
+    forceNew?: boolean;
+    prompt?: string;
   }) => Promise<
     | {
         readonly workspaceId: string;
@@ -375,7 +394,10 @@ export interface WorkspaceControlPresentationContext {
   >;
   occupancyChrome?: {
     readonly project?: string;
+    readonly selectedVendor?: string;
+    readonly vendors?: readonly string[];
   };
+  occupancyHome?: boolean;
 }
 
 /** Framework-neutral entry point for the interactive Workspace control surface. */
@@ -686,11 +708,14 @@ function snapshotSummary(
 function safeError(error: unknown, phase: string): WorkspaceControlRendererMessage {
   if (error && typeof error === "object") {
     const record = error as Record<string, unknown>;
+    const homeMessage =
+      phase === "workspace-control-launch" ? safeHomeLaunchMessage(error) : undefined;
     return {
       type: "error",
       code: typeof record.code === "string" ? record.code : "workspace_control_failed",
       phase,
       retryable: record.retryable === true,
+      ...(homeMessage ? { message: homeMessage } : {}),
     };
   }
   return {
@@ -699,6 +724,27 @@ function safeError(error: unknown, phase: string): WorkspaceControlRendererMessa
     phase,
     retryable: false,
   };
+}
+
+function safeHomeLaunchMessage(error: unknown): string | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const record = error as Record<string, unknown>;
+  const details =
+    record.details && typeof record.details === "object"
+      ? (record.details as Record<string, unknown>)
+      : {};
+  const code =
+    typeof details.code === "string"
+      ? details.code
+      : typeof record.code === "string"
+        ? record.code
+        : "";
+  if (code === "workspace_remote_server_missing") {
+    return "No enrolled Server is available for a remote Agent session";
+  }
+  const message = typeof record.message === "string" ? record.message.trim() : "";
+  if (!message || /token|secret|=/iu.test(message)) return undefined;
+  return message;
 }
 
 function nativeClientCommand(record: Record<string, unknown>): readonly string[] {
@@ -719,6 +765,22 @@ function nativeClientCommand(record: Record<string, unknown>): readonly string[]
     throw new Error("Native attach descriptor has an invalid client command");
   }
   return argv as string[];
+}
+
+async function listOccupancyHomeTargets(
+  context: WorkspaceControlPresentationContext,
+): Promise<{ readonly projectId: string; readonly name: string }[]> {
+  const query = ListProjectsQuery.create({ limit: 100, lifecycleStatus: "active" });
+  if (query.isErr()) return [];
+  try {
+    const listed = await context.executeQuery(query.value);
+    if (listed.isErr()) return [];
+    return (listed.value.items ?? [])
+      .filter((item) => typeof item.id === "string" && typeof item.name === "string")
+      .map((item) => ({ projectId: item.id, name: item.name }));
+  } catch {
+    return [];
+  }
 }
 
 async function listWorkspaces(
@@ -1154,7 +1216,7 @@ export function createBoundedWorkspaceControlPresentation(
           }
         | undefined;
       try {
-        if (context.occupyBootstrap) {
+        if (context.occupyBootstrap && !context.occupancyHome) {
           await renderer.send({
             type: "loading",
             collapsed: true,
@@ -1232,7 +1294,20 @@ export function createBoundedWorkspaceControlPresentation(
               await leaveWorkspaceTuiOnce(renderer);
             });
         } else {
-          await renderer.send({ type: "loading", title: OCCUPANCY_CODE_CHROME_TITLE });
+          const targets = await listOccupancyHomeTargets(context);
+          const vendors = [...(context.occupancyChrome?.vendors ?? OCCUPANCY_HOME_VENDORS)];
+          const selectedVendor = context.occupancyChrome?.selectedVendor ?? vendors[0];
+          await renderer.send({
+            type: "chrome",
+            title: OCCUPANCY_CODE_CHROME_TITLE,
+            home: true,
+            vendors,
+            ...(selectedVendor ? { selectedVendor } : {}),
+            ...(context.occupancyChrome?.project
+              ? { project: context.occupancyChrome.project }
+              : {}),
+            ...(targets.length > 0 ? { targets } : {}),
+          });
           void listWorkspaces(context).then(
             (workspaces) => renderer.send({ type: "workspaces", workspaces }),
             (error) => sendErrorBestEffort(error, "workspace-control-start"),
@@ -1249,6 +1324,82 @@ export function createBoundedWorkspaceControlPresentation(
               if (!activeTerminal) {
                 requestSelectedDetail(event.workspaceId, "workspace-control-select");
               }
+              continue;
+            }
+            if (event.type === "launch") {
+              if (!context.occupyBootstrap) {
+                await renderer.send({
+                  type: "error",
+                  code: "occupancy_launch_unavailable",
+                  phase: "workspace-control-launch",
+                  retryable: false,
+                });
+                continue;
+              }
+              await renderer.send({
+                type: "loading",
+                collapsed: true,
+                title: OCCUPANCY_CODE_CHROME_TITLE,
+                ...(context.occupancyChrome?.project
+                  ? { project: context.occupancyChrome.project }
+                  : {}),
+              });
+              occupyDone = context
+                .occupyBootstrap({
+                  signal: occupyAbort.signal,
+                  vendor: event.vendor,
+                  ...(event.projectId ? { projectId: event.projectId } : {}),
+                  ...(event.forceNew ? { forceNew: true } : {}),
+                  ...(event.prompt ? { prompt: event.prompt } : {}),
+                  reportProgress: async (message, options) => {
+                    if (!presentationOpen) return;
+                    lastPrepareStep = {
+                      message,
+                      step: occupancyPrepareStepForProgress(message),
+                    };
+                    await renderer.send({
+                      type: "progress",
+                      message,
+                      step: lastPrepareStep.step,
+                      ...(options?.status ? { status: options.status } : {}),
+                    });
+                  },
+                })
+                .then(async (occupied) => {
+                  if (!occupied) return;
+                  if (!presentationOpen || occupyAbort.signal.aborted) {
+                    throw occupyDiskPrepCancelledError();
+                  }
+                  if (!occupied.attach) throw occupyLiveSessionMissingError();
+                  await attachIssuedDescriptor(occupied.attach);
+                  if (occupied.workspaceId) selectedWorkspaceId = occupied.workspaceId;
+                })
+                .catch(async (error) => {
+                  if (activeTerminal) return;
+                  if (context.occupancyHome) {
+                    const targets = await listOccupancyHomeTargets(context);
+                    const vendors = [
+                      ...(context.occupancyChrome?.vendors ?? OCCUPANCY_HOME_VENDORS),
+                    ];
+                    await renderer.send({
+                      type: "chrome",
+                      title: OCCUPANCY_CODE_CHROME_TITLE,
+                      home: true,
+                      vendors,
+                      ...(context.occupancyChrome?.selectedVendor
+                        ? { selectedVendor: context.occupancyChrome.selectedVendor }
+                        : {}),
+                      ...(context.occupancyChrome?.project
+                        ? { project: context.occupancyChrome.project }
+                        : {}),
+                      ...(targets.length > 0 ? { targets } : {}),
+                    });
+                    await renderer.send(safeError(error, "workspace-control-launch"));
+                    return;
+                  }
+                  occupyFailure = error;
+                  await leaveWorkspaceTuiOnce(renderer);
+                });
               continue;
             }
             if (
