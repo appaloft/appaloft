@@ -114,10 +114,12 @@ cookie、`.env` 或编辑器插件二进制。沙箱进程看不到笔记本 HOM
 - 我们的：`--opencode`、`--pi`、`--omp`
 - 对齐 Railway 的：`--claude`、`--codex`、`--grok`
 
-`--claude`、`--codex`、`--grok` 选择这台笔记本上的厂商凭证，并映射到现有 OpenCode
-Cloud Agents 运行时。`--opencode`、`--pi`、`--omp` 选择对应 Cloud Agents harness。它们不会
-发明新的运行时。`--harness opencode|pi|omp` 只作兼容。未传别名时，`code` 使用已保存的
-Cloud Agents 偏好，然后跟随这台笔记本已登录或已安装的厂商。
+`--claude`、`--codex`、`--grok` 在远端 Sandbox 启动对应厂商 CLI，并把本机凭证写到会话
+HOME。`--opencode`、`--pi`、`--omp` 选择对应 Cloud Agents harness。`--harness
+opencode|pi|omp|claude|codex|grok` 只作兼容。未传别名时，`code` 使用已保存的 Cloud Agents
+偏好，然后跟随这台笔记本已登录或已安装的厂商。
+
+
 
 占用会把该凭证写到会话磁盘（`HOME=/workspace`），而不是沙箱环境变量：
 

@@ -74,12 +74,18 @@ must not use laptop HEAD as Workspace truth.
    `~/.claude/setup-token`, or laptop `CLAUDE_CODE_OAUTH_TOKEN` written as a file),
    never the Claude chat cookie. User-facing aliases are `--opencode` / `--pi` /
    `--omp` (ours) and `--claude` / `--codex` / `--grok` (Railway-aligned). They are
-   mutually exclusive and map onto existing occupancy harness IDs; they do not
-   invent a new runtime. `--harness opencode|pi|omp` is compatibility only.
-   Default follows the saved `APPALOFT_HOME/occupancy-agent.json` preference, then
-   what is signed in or installed on this laptop. Never print token
-   values. Never put long-lived secrets into occupancy env vars or `mcp.json`.
-   Teammate disks stay isolated. This is not `appaloft setup agent`.
+   mutually exclusive. `--claude` / `--codex` / `--grok` launch that vendor CLI
+   on the remote Sandbox (managed-terminal `claude` / `codex` / `grok`), the
+   same way Railway `code --claude|--codex|--grok` launches those CLIs on the
+   cloud agent VM; the laptop only attaches. `--harness
+   opencode|pi|omp|claude|codex|grok` is compatibility only. Occupancy
+   OpenCode/Claude/Codex/Grok agent versions are pinned and installed onto
+   the Sandbox at occupy time so the remote binary matches the pin (currently
+   OpenCode 1.18.21, Claude Code 2.1.199, Codex 0.149.0, and Grok 1.0.5). Default follows the saved
+   `APPALOFT_HOME/occupancy-agent.json` preference, then what is signed in or
+   installed on this laptop. Never print token values. Never put long-lived
+   secrets into occupancy env vars or `mcp.json`. Teammate disks stay isolated.
+   This is not `appaloft setup agent`.
 10. Occupy-door **Preparing disk** treats origin HTTP 502/503, Cloudflare
     bad-gateway, and incomplete origin responses as an automatic retry of the
     same occupy command, not as a TUI tear-down. For folder.local `--pi` /

@@ -46,6 +46,71 @@ function isHealthProbe(input: Parameters<OpenCodeSandboxExecutionPort["exec"]>[2
 }
 
 describe("OpenCodeSandboxAgentHarness", () => {
+  test("[WS-REMOTE-VENDOR-204] installs the pinned OpenCode version when the Sandbox binary differs", async () => {
+    const calls: string[][] = [];
+    let versionReads = 0;
+    const execution: OpenCodeSandboxExecutionPort = {
+      async exec(_context, _sandboxId, input) {
+        calls.push([...input.argv]);
+        if (input.argv.includes("--version")) {
+          versionReads += 1;
+          return ok({
+            mode: "foreground",
+            frames: [
+              {
+                kind: "stdout",
+                sequence: 1,
+                data: versionReads === 1 ? "1.18.4\n" : "1.18.21\n",
+              },
+              { kind: "exit", sequence: 2, exitCode: 0 },
+            ],
+          });
+        }
+        if (input.argv.includes("add") && input.argv.includes("opencode-ai@1.18.21")) {
+          return ok({
+            mode: "foreground",
+            frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
+          });
+        }
+        throw new Error(`unexpected exec ${input.argv.join(" ")}`);
+      },
+      async listProcesses() {
+        return ok([]);
+      },
+      async terminateProcess() {
+        throw new Error("must not terminate");
+      },
+      async readFile() {
+        return err({
+          code: "sandbox_file_not_found",
+          category: "user",
+          message: "missing",
+        });
+      },
+      async writeFile() {
+        throw new Error("must not write");
+      },
+      async removeFile() {
+        throw new Error("must not remove");
+      },
+    };
+    const harness = new OpenCodeSandboxAgentHarness(execution, {
+      templateId: "aht_opencode_managed_v1",
+      sandboxTemplateId: "stp_opencode_pinned",
+      version: "1.18.21",
+      templateDigest: `sha256:${"b".repeat(64)}`,
+    });
+
+    await expect(
+      harness.prepareRuntime?.({
+        executionContext: context,
+        sandboxId: "sbx_open",
+        runtimeId: "sar_open",
+      }),
+    ).rejects.toThrow(/unexpected exec/u);
+    expect(calls.some((argv) => argv.includes("opencode-ai@1.18.21"))).toBe(true);
+  });
+
   test("[AGENT-OPENCODE-011][AGENT-WS-ATTACH-016] reuses a healthy server with a still-valid short-lived capability", async () => {
     const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
     const marker = new TextEncoder().encode(

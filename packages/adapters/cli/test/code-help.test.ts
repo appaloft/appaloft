@@ -70,14 +70,26 @@ describe("compact code help", () => {
     expect(help).not.toMatch(/occupancy/iu);
   });
 
-  test("[WS-REMOTE-HELP-229] --codex help states credential copy and revocation boundaries", () => {
+  test("[WS-REMOTE-HELP-229] --codex help states remote Codex launch and credential copy", () => {
     const help = formatCodeHelp();
+    expect(help).toContain("Launch Codex on the remote Sandbox");
     expect(help).toContain("this Mac's ~/.codex/auth.json");
     expect(help).toContain("selected remote Workspace HOME");
     expect(help).toContain("never printed or placed in MCP/env");
     expect(help).toContain("appaloft sandbox file remove <sandboxId> --path .codex/auth.json");
     expect(help).toContain("does not revoke upstream access");
     expect(help).toContain("revoke the corresponding Codex/OpenAI session");
+  });
+
+  test("[WS-REMOTE-HELP-229] --claude and --grok help launch those remote CLIs", () => {
+    const help = formatCodeHelp();
+    expect(help).toContain("Launch Claude Code on the remote Sandbox");
+    expect(help).toContain("this Mac's Claude setup-token");
+    expect(help).toContain("appaloft sandbox file remove <sandboxId> --path .claude/setup-token");
+    expect(help).toContain("Launch Grok on the remote Sandbox");
+    expect(help).toContain("this Mac's ~/.grok/auth.json");
+    expect(help).toContain("appaloft sandbox file remove <sandboxId> --path .grok/auth.json");
+    expect(help).toContain("--harness opencode|pi|omp|claude|codex|grok");
   });
 
   test("[WS-REMOTE-HELP-217] tryHandleCodeHelp writes compact stdout and skips Effect", () => {

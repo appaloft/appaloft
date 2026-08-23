@@ -1,5 +1,7 @@
 import {
+  COMMUNITY_OCCUPANCY_OPENCODE_PACKAGE,
   type ExecutionContext,
+  occupancyHarnessInstallArgv,
   type SandboxAgentHarness,
   type SandboxAgentHarnessEvent,
   type SandboxAgentMcpAccessDescriptor,
@@ -409,7 +411,27 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
     });
     if (version.isErr()) throw new Error(version.error.message);
     if (!foregroundSucceeded(version.value) || !foregroundText(version.value).includes(this.version)) {
-      throw new Error("opencode_harness_version_mismatch");
+      const installed = await this.execution.exec(input.executionContext, input.sandboxId, {
+        argv: sandboxWorkspaceProcessArgv([
+          ...occupancyHarnessInstallArgv({
+            packageName: COMMUNITY_OCCUPANCY_OPENCODE_PACKAGE,
+            version: this.version,
+          }),
+        ]),
+        ...(this.cwd === "." ? {} : { cwd: this.cwd }),
+      });
+      if (installed.isErr()) throw new Error(installed.error.message);
+      const upgraded = await this.execution.exec(input.executionContext, input.sandboxId, {
+        argv: sandboxWorkspaceProcessArgv([this.executable, "--version"]),
+        ...(this.cwd === "." ? {} : { cwd: this.cwd }),
+      });
+      if (
+        upgraded.isErr() ||
+        !foregroundSucceeded(upgraded.value) ||
+        !foregroundText(upgraded.value).includes(this.version)
+      ) {
+        throw new Error("opencode_harness_version_mismatch");
+      }
     }
 
     const capability =

@@ -2,6 +2,7 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import { ok, Sandbox } from "@appaloft/core";
 import {
+  COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY,
   createExecutionContext,
   ExecutionSandboxService,
   InMemorySandboxRepository,
@@ -697,19 +698,7 @@ describe("ExecutionSandboxService", () => {
         diskBytes: 21_474_836_480,
         maxProcesses: 128,
       },
-      networkPolicy: {
-        mode: "allowlist",
-        rules: [
-          { kind: "domain", value: "github.com", ports: [443] },
-          { kind: "domain", value: "api.github.com", ports: [443] },
-          { kind: "domain", value: "api.openai.com", ports: [443] },
-          { kind: "domain", value: "api.anthropic.com", ports: [443] },
-          { kind: "domain", value: "openrouter.ai", ports: [443] },
-          { kind: "domain", value: "api.deepseek.com", ports: [443] },
-          { kind: "domain", value: "api.x.ai", ports: [443] },
-          { kind: "domain", value: "opencode.ai", ports: [443] },
-        ],
-      },
+      networkPolicy: COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY,
     });
     expect(sandbox._unsafeUnwrap()).toMatchObject({
       sourceKind: "template",
@@ -736,19 +725,7 @@ describe("ExecutionSandboxService", () => {
         diskBytes: 21_474_836_480,
         maxProcesses: 128,
       },
-      networkPolicy: {
-        mode: "allowlist",
-        rules: [
-          { kind: "domain", value: "github.com", ports: [443] },
-          { kind: "domain", value: "api.github.com", ports: [443] },
-          { kind: "domain", value: "api.openai.com", ports: [443] },
-          { kind: "domain", value: "api.anthropic.com", ports: [443] },
-          { kind: "domain", value: "openrouter.ai", ports: [443] },
-          { kind: "domain", value: "api.deepseek.com", ports: [443] },
-          { kind: "domain", value: "api.x.ai", ports: [443] },
-          { kind: "domain", value: "opencode.ai", ports: [443] },
-        ],
-      },
+      networkPolicy: COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY,
     });
     expect(sandbox._unsafeUnwrap()).toMatchObject({
       sourceKind: "template",
@@ -777,19 +754,7 @@ describe("ExecutionSandboxService", () => {
         diskBytes: 21_474_836_480,
         maxProcesses: 128,
       },
-      networkPolicy: {
-        mode: "allowlist",
-        rules: [
-          { kind: "domain", value: "github.com", ports: [443] },
-          { kind: "domain", value: "api.github.com", ports: [443] },
-          { kind: "domain", value: "api.openai.com", ports: [443] },
-          { kind: "domain", value: "api.anthropic.com", ports: [443] },
-          { kind: "domain", value: "openrouter.ai", ports: [443] },
-          { kind: "domain", value: "api.deepseek.com", ports: [443] },
-          { kind: "domain", value: "api.x.ai", ports: [443] },
-          { kind: "domain", value: "opencode.ai", ports: [443] },
-        ],
-      },
+      networkPolicy: COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY,
     });
     const second = await app.ensureTemplate(context, {
       templateId: "stp_appaloft_remote_opencode",
@@ -803,19 +768,7 @@ describe("ExecutionSandboxService", () => {
         diskBytes: 21_474_836_480,
         maxProcesses: 128,
       },
-      networkPolicy: {
-        mode: "allowlist",
-        rules: [
-          { kind: "domain", value: "github.com", ports: [443] },
-          { kind: "domain", value: "api.github.com", ports: [443] },
-          { kind: "domain", value: "api.openai.com", ports: [443] },
-          { kind: "domain", value: "api.anthropic.com", ports: [443] },
-          { kind: "domain", value: "openrouter.ai", ports: [443] },
-          { kind: "domain", value: "api.deepseek.com", ports: [443] },
-          { kind: "domain", value: "api.x.ai", ports: [443] },
-          { kind: "domain", value: "opencode.ai", ports: [443] },
-        ],
-      },
+      networkPolicy: COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY,
     });
     expect(first._unsafeUnwrap().templateId).toBe("stp_appaloft_remote_opencode");
     expect(second._unsafeUnwrap().createdAt).toBe(first._unsafeUnwrap().createdAt);

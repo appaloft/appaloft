@@ -25,6 +25,7 @@ export * from "./certificate-handlers";
 export * from "./certificate-messages";
 export * from "./cli-resolved-source";
 export * from "./community-occupancy-opencode-template";
+export * from "./community-occupancy-codex";
 export * from "./community-occupancy-pi-template";
 export * from "./community-remote-default-network-policy";
 

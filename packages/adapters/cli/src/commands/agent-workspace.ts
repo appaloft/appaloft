@@ -700,10 +700,14 @@ export const workspaceCodeCommand = EffectCommand.make(
       Options.withDefault(false),
       Options.withDescription(CODE_OPTION_DESCRIPTIONS.grok),
     ),
-    harness: Options.choice("harness", ["opencode", "pi", "omp"] as const).pipe(
-      Options.optional,
-      Options.withDescription(CODE_OPTION_DESCRIPTIONS.harness),
-    ),
+    harness: Options.choice("harness", [
+      "opencode",
+      "pi",
+      "omp",
+      "claude",
+      "codex",
+      "grok",
+    ] as const).pipe(Options.optional, Options.withDescription(CODE_OPTION_DESCRIPTIONS.harness)),
     server: workspaceOpenServer,
     openTarget: Options.choice("open-target", [
       "preview",
@@ -1005,6 +1009,7 @@ export const workspaceCodeCommand = EffectCommand.make(
           promptPolicy: "pre-tui-inquire",
           interaction: cli.folderOnboardingInteraction ?? codeSessionInquireInteraction,
           peekGitIdentity: peekThisFolderGitIdentity,
+          ...(useOccupancyTui ? { writeStatus: () => undefined } : {}),
           ...(cli.environment ? { env: cli.environment } : {}),
         }).pipe(
           Effect.catchAll((error) => {
