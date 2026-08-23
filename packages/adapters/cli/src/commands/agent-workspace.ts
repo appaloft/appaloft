@@ -961,44 +961,41 @@ export const workspaceCodeCommand = EffectCommand.make(
           );
         }
         const details = opened.error.details;
-        const pinnedSha =
-          !forceNew &&
-          details?.code === "workspace_open_source_pin_mismatch" &&
-          typeof details.workspaceCommitSha === "string"
-            ? details.workspaceCommitSha
-            : undefined;
-        if (!pinnedSha) {
-          throw occupancyCloudCompatError(
-            opened.error,
-            {
-              id: door.serverId,
-              name: door.serverName,
-            },
-            {
-              repositoryIdentity: door.repositoryIdentity,
-              repository: door.repository,
-            },
-            occupancyAgent,
-          );
+        if (details?.code === "workspace_open_source_pin_mismatch" && !forceNew) {
+          const replace = OpenAgentWorkspaceCommand.create({
+            ...openInput,
+            forceNew: true,
+          });
+          if (replace.isErr()) throw replace.error;
+          const replaced = await openDisk(replace.value);
+          if (replaced.isErr()) {
+            throw occupancyCloudCompatError(
+              replaced.error,
+              {
+                id: door.serverId,
+                name: door.serverName,
+              },
+              {
+                repositoryIdentity: door.repositoryIdentity,
+                repository: door.repository,
+              },
+              occupancyAgent,
+            );
+          }
+          return { door, result: replaced.value, bannerCommitSha: door.commitSha };
         }
-        const retry = OpenAgentWorkspaceCommand.create({
-          ...openInput,
-          commitSha: pinnedSha,
-          forceNew: false,
-        });
-        if (retry.isErr()) throw retry.error;
-        const retried = await openDisk(retry.value);
-        if (retried.isErr()) throw retried.error;
-        const workspaceId =
-          typeof details?.workspaceId === "string"
-            ? details.workspaceId
-            : retried.value.workspaceId;
-        if (options?.announcePin !== false) {
-          process.stdout.write(
-            `Pinned · ${humanWorkspaceName(retried.value)} @ ${pinnedSha.slice(0, 7)} · requested ${door.commitSha.slice(0, 7)} · use --new for an isolated Workspace\n`,
-          );
-        }
-        return { door, result: retried.value, bannerCommitSha: pinnedSha };
+        throw occupancyCloudCompatError(
+          opened.error,
+          {
+            id: door.serverId,
+            name: door.serverName,
+          },
+          {
+            repositoryIdentity: door.repositoryIdentity,
+            repository: door.repository,
+          },
+          occupancyAgent,
+        );
       };
       const occupancyTui = cli.workspaceControlPresentation;
       if (useOccupancyTui && !yes) {

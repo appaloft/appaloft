@@ -2801,7 +2801,7 @@ describe("Agent Workspace CLI", () => {
     expect(printed).not.toContain("grok-secret");
   });
 
-  test("[R8-OCC-CODE-008] code resumes the pinned occupancy Workspace when requested SHA moved", async () => {
+  test("[MW-CP-DOOR-012][R8-OCC-CODE-008] code replaces a SHA-pinned occupancy with the requested commit", async () => {
     const commands: Command<unknown>[] = [];
     const output: string[] = [];
     const { createCliProgram } = await import("../src");
@@ -2829,10 +2829,10 @@ describe("Agent Workspace CLI", () => {
             );
           }
           return ok({
-            workspaceId: "sbx_h1swq765kcgw",
-            name: "api@aaaaaaa",
+            workspaceId: "sbx_newhead",
+            name: "api@bbbbbbb",
             projectId: "prj_billing",
-            source: { commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+            source: { commitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
           } as T);
         },
       } as unknown as CommandBus,
@@ -2866,17 +2866,12 @@ describe("Agent Workspace CLI", () => {
     expect(opens).toHaveLength(2);
     expect(opens[0]?.input.commitSha).toBe("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
     expect(opens[1]?.input).toMatchObject({
-      commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      forceNew: false,
+      commitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      forceNew: true,
     });
+    expect(output.join("")).not.toContain("Pinned ·");
     expect(output.join("")).toContain(
-      "Pinned · api@aaaaaaa @ aaaaaaa · requested bbbbbbb · use --new for an isolated Workspace",
-    );
-    expect(output.join("")).toContain(
-      "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · api@aaaaaaa",
-    );
-    expect(output.join("")).toContain(
-      "Connect a model in OpenCode with /connect before running a Task.",
+      "Remote · prj_billing · github.com/acme/api@bbbbbbb · mac-mini · my sandbox · api@bbbbbbb",
     );
   });
 
@@ -2948,9 +2943,9 @@ describe("Agent Workspace CLI", () => {
     await program.parseAsync(["node", "appaloft", "code"]);
 
     expect((commands[1] as OpenAgentWorkspaceCommand).input).toMatchObject({
-      commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      commitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       attach: true,
-      forceNew: false,
+      forceNew: true,
     });
     expect(launched).toEqual([
       ["opencode", "attach", "https://attach.example.test/capability", "--dir", "/workspace"],

@@ -35,11 +35,11 @@ describe("occupancy CLI shell progress", () => {
     expect(shouldPrintOccupancyLineProgress(["code"], { stdin: {}, stdout: {} })).toBeTrue();
   });
 
-  test("[WS-REMOTE-PROGRESS-191] workspace keeps logs and does not skip PGlite", () => {
+  test("[MW-CP-NO-RECOVERY-011][WS-REMOTE-PROGRESS-191] workspace keeps logs and skips PGlite", () => {
     const args = ["workspace", "--json"];
     expect(occupancyCliCommand(args)).toBe("workspace");
     expect(occupancyCliStartupProgress(args)).toBe(SHELL_OCCUPANCY_PROGRESS.openingRemoteSession);
-    expect(shouldSkipLocalPgliteForOccupancyCli(args)).toBeFalse();
+    expect(shouldSkipLocalPgliteForOccupancyCli(args)).toBeTrue();
     expect(shouldKeepOccupancyCliLogs(args)).toBeTrue();
   });
 

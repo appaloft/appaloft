@@ -27,6 +27,7 @@ export interface WorkspaceOpenInput {
   readonly forceNew?: boolean;
   readonly attach?: boolean;
   readonly targetServerId?: string;
+  readonly operationId?: string;
 }
 
 export interface WorkspaceOpenSourceMaterializerPort {
@@ -440,8 +441,8 @@ export type WorkspaceSourceGitCredentialCommands = {
 };
 
 const workspaceSourceCredentialCacheDirectory = "/tmp/.appaloft-workspace-source-credential";
-const workspaceSourceCredentialCacheSocket = `${workspaceSourceCredentialCacheDirectory}/credential-cache.sock`;
-const workspaceSourceCredentialHelper = `cache --timeout=60 --socket=${workspaceSourceCredentialCacheSocket}`;
+const workspaceSourceCredentialStoreFile = `${workspaceSourceCredentialCacheDirectory}/credentials`;
+const workspaceSourceCredentialHelper = `store --file=${workspaceSourceCredentialStoreFile}`;
 
 export function createWorkspaceSourceGitCredentialCommands(
   repository: string,
@@ -485,12 +486,7 @@ export function createWorkspaceSourceGitCredentialCommands(
     },
     cleanup: [
       {
-        argv: [
-          "git",
-          "credential-cache",
-          `--socket=${workspaceSourceCredentialCacheSocket}`,
-          "exit",
-        ],
+        argv: ["rm", "-f", workspaceSourceCredentialStoreFile],
       },
       {
         argv: ["rmdir", workspaceSourceCredentialCacheDirectory],
@@ -505,11 +501,17 @@ function withPartialEvidence(
     workspaceId?: string;
     runtimeId?: string;
     phase: string;
+    operationId?: string;
   },
 ): DomainError {
   const details: DomainErrorDetails = {
     ...error.details,
     phase: input.phase,
+    retryable:
+      typeof error.details?.retryable === "boolean"
+        ? error.details.retryable
+        : input.phase === "workspace-open-source-materialization",
+    ...(input.operationId ? { operationId: input.operationId } : {}),
     ...(input.workspaceId
       ? {
           workspaceId: input.workspaceId,
@@ -925,7 +927,7 @@ export class AgentWorkspaceOpenService {
       if (executed.isErr()) throw executed.error;
     };
 
-    const fetchArgv = ["git", "fetch", "--no-tags", "--depth", "1", "origin", input.ref];
+    const fetchArgv = ["git", "fetch", "--no-tags", "--depth", "1", "origin", input.commitSha];
     await requireSourceCommand({ argv: ["git", "init", "."] });
     await requireSourceCommand({
       argv: ["git", "remote", "add", "origin", input.repository],
@@ -1081,6 +1083,7 @@ export class AgentWorkspaceOpenService {
         withPartialEvidence(failure, {
           ...(workspaceId ? { workspaceId } : {}),
           ...(runtimeId ? { runtimeId } : {}),
+          ...(input.operationId ? { operationId: input.operationId } : {}),
           phase,
         }),
       );

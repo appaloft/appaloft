@@ -94,7 +94,8 @@ export function occupancyCliCommand(
 }
 
 export function shouldSkipLocalPgliteForOccupancyCli(args: readonly string[]): boolean {
-  return occupancyCliCommand(args) === "code";
+  const command = occupancyCliCommand(args);
+  return command === "code" || command === "workspace";
 }
 
 export function shouldKeepOccupancyCliLogs(args: readonly string[]): boolean {
