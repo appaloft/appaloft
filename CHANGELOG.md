@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.6](https://github.com/appaloft/appaloft/compare/v1.10.5...v1.10.6) (2026-08-23)
+
+
+### Bug Fixes
+
+* **shell:** reclaim staging before recovery sync ([#1394](https://github.com/appaloft/appaloft/issues/1394)) ([90eb9a2](https://github.com/appaloft/appaloft/commit/90eb9a2d3c71f5c77208a39407f22773c3b84ab1))
+
 ## [1.10.5](https://github.com/appaloft/appaloft/compare/v1.10.4...v1.10.5) (2026-08-22)
 
 
