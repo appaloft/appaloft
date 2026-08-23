@@ -203,6 +203,35 @@ test("[R8-OCC-TASK-001] resolves a missing declarative alias to the unique nativ
   ).toBe("opencode");
 });
 
+test("[R8-OCC-TASK-001] creates a Runtime from a missing declarative alias via the native template", async () => {
+  const { service } = fixture({
+    harness: {
+      key: "opencode",
+      templateId: "aht_opencode_managed_v1",
+      sandboxTemplateId: "stp_appaloft_remote_opencode",
+      version: "1.18.4",
+      templateDigest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      async execute() {
+        return { events: [], outcomeDigest: "sha256:opencode" };
+      },
+      async cancel() {},
+    },
+  });
+
+  const created = await service.createRuntime(context, {
+    sandboxId: "sbx_hostinger",
+    harnessKey: "declarative-appaloft-remote-890d8eef16fa",
+    harnessTemplateId: "aht_opencode_managed_v1",
+    idempotencyKey: "runtime_declarative_alias",
+  });
+
+  expect(created.isOk()).toBe(true);
+  if (created.isOk()) {
+    expect(created.value.harnessKey).toBe("declarative-appaloft-remote-890d8eef16fa");
+    expect(created.value.harnessTemplateId).toBe("aht_opencode_managed_v1");
+  }
+});
+
 test("[R8-OCC-TASK-002] reconciles an occupancy run after restart without the declarative alias", async () => {
   const executed: string[] = [];
   const native: SandboxAgentHarness = {
