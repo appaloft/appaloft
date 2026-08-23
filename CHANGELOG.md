@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.7](https://github.com/appaloft/appaloft/compare/v1.10.6...v1.10.7) (2026-08-23)
+
+
+### Bug Fixes
+
+* **shell:** reclaim committed sync staging before fsync ([#1397](https://github.com/appaloft/appaloft/issues/1397)) ([8ac31f3](https://github.com/appaloft/appaloft/commit/8ac31f3ec06d35c1b8569b8f91df2162e0211d50))
+
 ## [1.10.6](https://github.com/appaloft/appaloft/compare/v1.10.5...v1.10.6) (2026-08-23)
 
 
