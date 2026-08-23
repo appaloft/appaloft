@@ -16,13 +16,14 @@ async function tempHome(): Promise<string> {
   return mkdtemp(join(tmpdir(), "appaloft-occupancy-vendor-"));
 }
 
-test("[WS-REMOTE-VENDOR-204] vendor and harness aliases map onto existing occupancy harnesses", () => {
+test("[WS-REMOTE-VENDOR-204] vendor and harness aliases map onto occupancy harnesses", () => {
   expect(OCCUPANCY_VENDOR_HARNESS).toEqual({
     claude: "opencode",
-    codex: "opencode",
+    codex: "codex",
     grok: "opencode",
   });
   expect(occupancyHarnessForAlias("grok")).toBe("opencode");
+  expect(occupancyHarnessForAlias("codex")).toBe("codex");
   expect(occupancyHarnessForAlias("opencode")).toBe("opencode");
   expect(occupancyHarnessForAlias("pi")).toBe("pi");
   expect(occupancyHarnessForAlias("omp")).toBe("omp");

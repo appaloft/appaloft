@@ -124,11 +124,15 @@ occupy path that already writes files.
 - Ours: `--opencode`, `--pi`, `--omp`
 - Railway-aligned: `--claude`, `--codex`, `--grok`
 
-`--claude`, `--codex`, and `--grok` pick the vendor credential on this laptop and
-map onto the existing OpenCode Cloud Agents runtime. `--opencode`, `--pi`, and `--omp`
-pick that Cloud Agents harness. They do not invent a new runtime. `--harness
-opencode|pi|omp` is compatibility only. With no alias, `code` uses the saved
-Cloud Agents preference, then what is signed in or installed on this laptop.
+`--claude` and `--grok` pick the vendor credential on this laptop and map onto
+the OpenCode Cloud Agents runtime. `--codex` launches Codex on the remote
+Sandbox and copies `~/.codex/auth.json` onto session HOME. `--opencode`,
+`--pi`, and `--omp` pick that Cloud Agents harness. `--harness
+opencode|pi|omp|codex` is compatibility only. With no alias, `code` uses the
+saved Cloud Agents preference, then what is signed in or installed on this
+laptop.
+
+
 
 Occupy writes that credential onto the session disk (`HOME=/workspace`), not as a
 sandbox variable:

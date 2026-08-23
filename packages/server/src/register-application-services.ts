@@ -106,9 +106,12 @@ import {
   CloneEnvironmentCommandHandler,
   CloneEnvironmentUseCase,
   CloseTerminalSessionCommandHandler,
+  COMMUNITY_OCCUPANCY_CODEX_PACKAGE,
+  COMMUNITY_OCCUPANCY_CODEX_VERSION,
   COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_DIGEST,
   COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID,
   COMMUNITY_OCCUPANCY_OPENCODE_VERSION,
+  occupancyHarnessInstallArgv,
   COMMUNITY_OCCUPANCY_PI_TEMPLATE_DIGEST,
   COMMUNITY_OCCUPANCY_PI_TEMPLATE_ID,
   COMMUNITY_OCCUPANCY_PI_VERSION,
@@ -3623,6 +3626,29 @@ export function registerApplicationServices(
               command: ["omp"],
               sessionRecovery: "managed-run-lineage",
             },
+            healthcheck: { kind: "process" },
+          }),
+          new CommandSandboxAgentHarness(sandboxes, {
+            key: "codex",
+            templateId: "aht_codex_declarative_v1",
+            sandboxTemplateId: COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID,
+            version: COMMUNITY_OCCUPANCY_CODEX_VERSION,
+            templateDigest: COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_DIGEST,
+            start: {
+              argv: [
+                ...occupancyHarnessInstallArgv({
+                  packageName: COMMUNITY_OCCUPANCY_CODEX_PACKAGE,
+                  version: COMMUNITY_OCCUPANCY_CODEX_VERSION,
+                }),
+              ],
+            },
+            run: { argv: ["codex"] },
+            attach: {
+              transport: "managed-terminal",
+              command: ["codex"],
+              sessionRecovery: "native-session-store",
+            },
+            persistentPaths: ["/workspace/.codex"],
             healthcheck: { kind: "process" },
           }),
         ]);

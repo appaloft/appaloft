@@ -9,5 +9,6 @@ export const COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY = {
     { kind: "domain" as const, value: "api.deepseek.com", ports: [443] },
     { kind: "domain" as const, value: "api.x.ai", ports: [443] },
     { kind: "domain" as const, value: "opencode.ai", ports: [443] },
+    { kind: "domain" as const, value: "registry.npmjs.org", ports: [443] },
   ],
 };

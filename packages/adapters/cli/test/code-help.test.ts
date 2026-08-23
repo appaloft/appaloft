@@ -70,8 +70,9 @@ describe("compact code help", () => {
     expect(help).not.toMatch(/occupancy/iu);
   });
 
-  test("[WS-REMOTE-HELP-229] --codex help states credential copy and revocation boundaries", () => {
+  test("[WS-REMOTE-HELP-229] --codex help states remote Codex launch and credential copy", () => {
     const help = formatCodeHelp();
+    expect(help).toContain("Launch Codex on the remote Sandbox");
     expect(help).toContain("this Mac's ~/.codex/auth.json");
     expect(help).toContain("selected remote Workspace HOME");
     expect(help).toContain("never printed or placed in MCP/env");

@@ -753,7 +753,7 @@ export class AgentWorkspaceOpenService {
     const begun = await this.dependencies.entries.begin(context, key, {
       commitSha: input.commitSha,
       profileInstallationId: preflight.value.profileInstallationId,
-      forceNew: input.forceNew ?? false,
+      forceNew: Boolean(input.forceNew) || Boolean(input.profile && !preferred),
       targetSelection: preflight.value.reservation.targetSelection,
       activation: preflight.value.activation,
     });

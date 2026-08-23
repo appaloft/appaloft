@@ -92,6 +92,7 @@ describe("community remote default profile", () => {
       "api.deepseek.com",
       "api.x.ai",
       "opencode.ai",
+      "registry.npmjs.org",
     ]);
   });
 
@@ -153,6 +154,29 @@ describe("community remote default profile", () => {
     expect(profile?.adapterManifest).toMatchObject({
       id: "appaloft-remote-omp",
       displayName: "Appaloft Remote omp",
+      requirements: {
+        capabilities: { required: ["managed-terminal"], optional: ["headless"] },
+      },
+    });
+  });
+
+  test("[WS-REMOTE-VENDOR-204] builds terminal appaloft-remote-codex from harness interaction", () => {
+    const profile = createCommunityRemoteDefaultProfile({
+      harnessKey: "codex",
+      templateId: "aht_codex_declarative_v1",
+      sandboxTemplateId: "tpl_opencode",
+      version: "0.149.0",
+      templateDigest: `sha256:${"d".repeat(64)}`,
+      interaction: {
+        transport: "managed-terminal",
+        command: ["codex"],
+        sessionRecovery: "native-session-store",
+      },
+    });
+
+    expect(profile?.adapterManifest).toMatchObject({
+      id: "appaloft-remote-codex",
+      displayName: "Appaloft Remote codex",
       requirements: {
         capabilities: { required: ["managed-terminal"], optional: ["headless"] },
       },

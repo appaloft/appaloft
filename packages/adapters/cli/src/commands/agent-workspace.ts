@@ -1005,6 +1005,7 @@ export const workspaceCodeCommand = EffectCommand.make(
           promptPolicy: "pre-tui-inquire",
           interaction: cli.folderOnboardingInteraction ?? codeSessionInquireInteraction,
           peekGitIdentity: peekThisFolderGitIdentity,
+          ...(useOccupancyTui ? { writeStatus: () => undefined } : {}),
           ...(cli.environment ? { env: cli.environment } : {}),
         }).pipe(
           Effect.catchAll((error) => {

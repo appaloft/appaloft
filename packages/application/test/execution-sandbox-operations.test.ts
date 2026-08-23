@@ -708,6 +708,7 @@ describe("ExecutionSandboxService", () => {
           { kind: "domain", value: "api.deepseek.com", ports: [443] },
           { kind: "domain", value: "api.x.ai", ports: [443] },
           { kind: "domain", value: "opencode.ai", ports: [443] },
+          { kind: "domain", value: "registry.npmjs.org", ports: [443] },
         ],
       },
     });
@@ -747,6 +748,7 @@ describe("ExecutionSandboxService", () => {
           { kind: "domain", value: "api.deepseek.com", ports: [443] },
           { kind: "domain", value: "api.x.ai", ports: [443] },
           { kind: "domain", value: "opencode.ai", ports: [443] },
+          { kind: "domain", value: "registry.npmjs.org", ports: [443] },
         ],
       },
     });
@@ -788,6 +790,7 @@ describe("ExecutionSandboxService", () => {
           { kind: "domain", value: "api.deepseek.com", ports: [443] },
           { kind: "domain", value: "api.x.ai", ports: [443] },
           { kind: "domain", value: "opencode.ai", ports: [443] },
+          { kind: "domain", value: "registry.npmjs.org", ports: [443] },
         ],
       },
     });
@@ -814,6 +817,7 @@ describe("ExecutionSandboxService", () => {
           { kind: "domain", value: "api.deepseek.com", ports: [443] },
           { kind: "domain", value: "api.x.ai", ports: [443] },
           { kind: "domain", value: "opencode.ai", ports: [443] },
+          { kind: "domain", value: "registry.npmjs.org", ports: [443] },
         ],
       },
     });

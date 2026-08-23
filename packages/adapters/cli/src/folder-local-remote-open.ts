@@ -1,5 +1,6 @@
 import {
   AgentWorkspaceOpenService,
+  COMMUNITY_OCCUPANCY_CODEX_VERSION,
   COMMUNITY_OCCUPANCY_OPENCODE_LIMITS,
   COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_DIGEST,
   COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID,
@@ -51,11 +52,23 @@ const FOLDER_LOCAL_PI_HARNESS = {
   sandboxTemplateDigest: COMMUNITY_OCCUPANCY_PI_TEMPLATE_DIGEST,
   limits: COMMUNITY_OCCUPANCY_PI_LIMITS,
 } as const;
+const FOLDER_LOCAL_CODEX_HARNESS = {
+  harnessKey: "codex",
+  harnessTemplateId: "aht_codex_declarative_v1",
+  sandboxTemplateId: COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID,
+  sandboxTemplateVersion: COMMUNITY_OCCUPANCY_CODEX_VERSION,
+  sandboxTemplateDigest: COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_DIGEST,
+  limits: COMMUNITY_OCCUPANCY_OPENCODE_LIMITS,
+} as const;
 
 function folderLocalHarnessForProfile(profile?: string) {
-  return profile === COMMUNITY_OCCUPANCY_PI_PROFILE_ID || profile === occupancyRemoteProfileId("pi")
-    ? FOLDER_LOCAL_PI_HARNESS
-    : FOLDER_LOCAL_OPENCODE_HARNESS;
+  if (profile === COMMUNITY_OCCUPANCY_PI_PROFILE_ID || profile === occupancyRemoteProfileId("pi")) {
+    return FOLDER_LOCAL_PI_HARNESS;
+  }
+  if (profile === occupancyRemoteProfileId("codex")) {
+    return FOLDER_LOCAL_CODEX_HARNESS;
+  }
+  return FOLDER_LOCAL_OPENCODE_HARNESS;
 }
 
 function folderLocalPinFor(profile?: string) {
