@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.8](https://github.com/appaloft/appaloft/compare/v1.10.7...v1.10.8) (2026-08-23)
+
+
+### Bug Fixes
+
+* **shell:** restore legacy state without copying ([#1400](https://github.com/appaloft/appaloft/issues/1400)) ([dfaa596](https://github.com/appaloft/appaloft/commit/dfaa59673dff5cf2e488a15c983253a40f7ea355))
+
 ## [1.10.7](https://github.com/appaloft/appaloft/compare/v1.10.6...v1.10.7) (2026-08-23)
 
 
