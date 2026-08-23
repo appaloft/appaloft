@@ -56,29 +56,25 @@ describe("GitHub Repository Workspace materializer", () => {
     );
     expect(fetch?.stdin).toBeUndefined();
     expect(fetch?.argv).toContain(
-      "credential.helper=cache --timeout=60 --socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
+      "credential.helper=store --file=/tmp/.appaloft-workspace-source-credential/credentials",
     );
     expect(fetch?.argv).toContain("credential.interactive=never");
     expect(fetch?.argv).toContain("core.askPass=/bin/false");
     expect(checkout?.stdin).toBeUndefined();
     expect(checkout?.argv).toContain(
-      "credential.helper=cache --timeout=60 --socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
+      "credential.helper=store --file=/tmp/.appaloft-workspace-source-credential/credentials",
     );
     expect(checkout?.argv).toContain("credential.interactive=never");
     expect(checkout?.argv).toContain("core.askPass=/bin/false");
     expect(commands.some(({ argv }) => argv.includes("clone"))).toBe(false);
-    const cleanup = [
-      "git",
-      "credential-cache",
-      "--socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
-      "exit",
-    ];
+    const cleanup = ["rm", "-f", "/tmp/.appaloft-workspace-source-credential/credentials"];
     expect(commands.map(({ argv }) => argv)).toContainEqual(cleanup);
     const checkoutIndex = commands.findIndex(({ argv }) => argv.includes("checkout"));
+    const lastCleanupIndex = commands
+      .map(({ argv }) => argv)
+      .reduce((last, argv, index) => (argv.join("\0") === cleanup.join("\0") ? index : last), -1);
     expect(checkoutIndex).toBeGreaterThanOrEqual(0);
-    expect(checkoutIndex).toBeLessThan(
-      commands.findIndex(({ argv }) => argv.join("\0") === cleanup.join("\0")),
-    );
+    expect(checkoutIndex).toBeLessThan(lastCleanupIndex);
     expect(commands.map(({ argv }) => argv)).toContainEqual([
       "rmdir",
       "/tmp/.appaloft-workspace-source-credential",
@@ -164,10 +160,9 @@ describe("GitHub Repository Workspace materializer", () => {
     expect(result.isErr()).toBe(true);
     expect(result._unsafeUnwrapErr().details?.code).toBe("github_agent_checkout_failed");
     expect(argv).toContainEqual([
-      "git",
-      "credential-cache",
-      "--socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
-      "exit",
+      "rm",
+      "-f",
+      "/tmp/.appaloft-workspace-source-credential/credentials",
     ]);
     expect(argv.at(-1)).toEqual(["rmdir", "/tmp/.appaloft-workspace-source-credential"]);
     expect(argv.some((command) => command.includes("checkout"))).toBe(false);
@@ -217,15 +212,14 @@ describe("GitHub Repository Workspace materializer", () => {
     expect(result._unsafeUnwrapErr().details?.code).toBe("github_agent_checkout_failed");
     const checkout = argv.find((command) => command.includes("checkout"));
     expect(checkout).toContain(
-      "credential.helper=cache --timeout=60 --socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
+      "credential.helper=store --file=/tmp/.appaloft-workspace-source-credential/credentials",
     );
     expect(checkout).toContain("credential.interactive=never");
     expect(checkout).toContain("core.askPass=/bin/false");
     expect(argv).toContainEqual([
-      "git",
-      "credential-cache",
-      "--socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
-      "exit",
+      "rm",
+      "-f",
+      "/tmp/.appaloft-workspace-source-credential/credentials",
     ]);
     expect(argv.at(-1)).toEqual(["rmdir", "/tmp/.appaloft-workspace-source-credential"]);
   });
@@ -237,7 +231,7 @@ describe("GitHub Repository Workspace materializer", () => {
         exec: async (_context, _sandboxId, input) => {
           argv.push([...input.argv]);
           const cleanupFailed =
-            input.argv.includes("credential-cache") && input.argv.includes("exit");
+            input.argv.includes("rm") && input.argv.some((value) => value.endsWith("/credentials"));
           return ok({
             mode: "foreground",
             frames: [{ kind: "exit", sequence: 1, exitCode: cleanupFailed ? 1 : 0 }],

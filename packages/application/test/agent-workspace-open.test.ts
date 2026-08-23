@@ -229,7 +229,9 @@ describe("Agent Workspace open application workflow", () => {
                 kind: "exit",
                 exitCode:
                   (failSourceFetch && command.argv.includes("fetch")) ||
-                  (failSourceCredentialCacheExit && command.argv.includes("credential-cache"))
+                  (failSourceCredentialCacheExit &&
+                    command.argv.includes("rm") &&
+                    command.argv.some((value) => value.endsWith("/credentials")))
                     ? 1
                     : 0,
               },
@@ -444,7 +446,7 @@ describe("Agent Workspace open application workflow", () => {
         "-c",
         "credential.helper=",
         "-c",
-        "credential.helper=cache --timeout=60 --socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
+        "credential.helper=store --file=/tmp/.appaloft-workspace-source-credential/credentials",
         "credential",
         "approve",
       ],
@@ -453,7 +455,7 @@ describe("Agent Workspace open application workflow", () => {
         "-c",
         "credential.helper=",
         "-c",
-        "credential.helper=cache --timeout=60 --socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
+        "credential.helper=store --file=/tmp/.appaloft-workspace-source-credential/credentials",
         "-c",
         "credential.interactive=never",
         "-c",
@@ -463,14 +465,9 @@ describe("Agent Workspace open application workflow", () => {
         "--depth",
         "1",
         "origin",
-        "refs/heads/feature/open",
+        "0123456789abcdef0123456789abcdef01234567",
       ],
-      [
-        "git",
-        "credential-cache",
-        "--socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
-        "exit",
-      ],
+      ["rm", "-f", "/tmp/.appaloft-workspace-source-credential/credentials"],
       ["rmdir", "/tmp/.appaloft-workspace-source-credential"],
       ["git", "checkout", "--detach", "0123456789abcdef0123456789abcdef01234567"],
       ["git", "switch", "-c", "feature/open"],
@@ -491,15 +488,12 @@ describe("Agent Workspace open application workflow", () => {
     });
     expect(temporaryDirectory.exitCode).toBe(0);
     const credentialCacheDirectory = temporaryDirectory.stdout.toString().trim();
-    const credentialCacheSocket = `${credentialCacheDirectory}/credential-cache.sock`;
-    const productionCredentialCacheSocket =
-      "/tmp/.appaloft-workspace-source-credential/credential-cache.sock";
-    const withProbeSocket = (argv: readonly string[]): string[] =>
-      argv.map((argument) =>
-        argument.replace(productionCredentialCacheSocket, credentialCacheSocket),
-      );
+    const credentialStoreFile = `${credentialCacheDirectory}/credentials`;
+    const productionCredentialStoreFile = "/tmp/.appaloft-workspace-source-credential/credentials";
+    const withProbeStore = (argv: readonly string[]): string[] =>
+      argv.map((argument) => argument.replace(productionCredentialStoreFile, credentialStoreFile));
     try {
-      const approved = Bun.spawnSync(withProbeSocket(authenticatedApproval?.argv ?? []), {
+      const approved = Bun.spawnSync(withProbeStore(authenticatedApproval?.argv ?? []), {
         stdin: new Blob([new TextDecoder().decode(authenticatedApproval?.stdin)]),
         stdout: "pipe",
         stderr: "pipe",
@@ -511,7 +505,7 @@ describe("Agent Workspace open application workflow", () => {
       expect(fetchArgumentIndex).toBeGreaterThan(0);
       const filled = Bun.spawnSync(
         [
-          ...withProbeSocket(authenticatedFetch?.argv.slice(0, fetchArgumentIndex) ?? []),
+          ...withProbeStore(authenticatedFetch?.argv.slice(0, fetchArgumentIndex) ?? []),
           "credential",
           "fill",
         ],
@@ -526,14 +520,11 @@ describe("Agent Workspace open application workflow", () => {
       expect(filled.stdout.toString()).toContain("username=x-access-token\n");
       expect(filled.stdout.toString()).toContain("password=source-token-must-not-enter-argv\n");
     } finally {
-      const cacheExit = Bun.spawnSync(
-        ["git", "credential-cache", `--socket=${credentialCacheSocket}`, "exit"],
-        {
-          stdout: "pipe",
-          stderr: "pipe",
-        },
-      );
-      expect(cacheExit.exitCode).toBe(0);
+      const storeCleanup = Bun.spawnSync(["rm", "-f", credentialStoreFile], {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      expect(storeCleanup.exitCode).toBe(0);
       const directoryCleanup = Bun.spawnSync(["rmdir", credentialCacheDirectory], {
         stdout: "pipe",
         stderr: "pipe",
@@ -598,7 +589,7 @@ describe("Agent Workspace open application workflow", () => {
         "-c",
         "credential.helper=",
         "-c",
-        "credential.helper=cache --timeout=60 --socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
+        "credential.helper=store --file=/tmp/.appaloft-workspace-source-credential/credentials",
         "credential",
         "approve",
       ],
@@ -607,7 +598,7 @@ describe("Agent Workspace open application workflow", () => {
         "-c",
         "credential.helper=",
         "-c",
-        "credential.helper=cache --timeout=60 --socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
+        "credential.helper=store --file=/tmp/.appaloft-workspace-source-credential/credentials",
         "-c",
         "credential.interactive=never",
         "-c",
@@ -617,14 +608,9 @@ describe("Agent Workspace open application workflow", () => {
         "--depth",
         "1",
         "origin",
-        "refs/heads/feature/open",
+        "0123456789abcdef0123456789abcdef01234567",
       ],
-      [
-        "git",
-        "credential-cache",
-        "--socket=/tmp/.appaloft-workspace-source-credential/credential-cache.sock",
-        "exit",
-      ],
+      ["rm", "-f", "/tmp/.appaloft-workspace-source-credential/credentials"],
       ["rmdir", "/tmp/.appaloft-workspace-source-credential"],
     ]);
 

@@ -44,6 +44,38 @@ async function withThisFolderGitWorktree<T>(run: (gitDir: string) => Promise<T>)
   }
 }
 
+async function withCommittedGitWorktree<T>(
+  run: (gitDir: string, head: string) => Promise<T>,
+): Promise<T> {
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const execFileAsync = promisify(execFile);
+  const gitDir = await mkdtemp(join(tmpdir(), "appaloft-remote-code-committed-"));
+  const git = async (...args: string[]) =>
+    execFileAsync("git", args, {
+      cwd: gitDir,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: "t",
+        GIT_AUTHOR_EMAIL: "t@t",
+        GIT_COMMITTER_NAME: "t",
+        GIT_COMMITTER_EMAIL: "t@t",
+      },
+    });
+  await git("init");
+  await git("checkout", "-b", "main");
+  await Bun.write(join(gitDir, "README"), "occupancy");
+  await git("add", "README");
+  await git("commit", "-m", "init");
+  const head = (await git("rev-parse", "HEAD")).stdout.trim().toLowerCase();
+  try {
+    return await run(gitDir, head);
+  } finally {
+    await rm(gitDir, { recursive: true, force: true });
+  }
+}
+
 describe("remote code door", () => {
   test("[WS-REMOTE-HINT-119] occupancy door hint names existing doors", () => {
     expect(REMOTE_CODE_DOOR_HINT).toContain("--open-target");
@@ -967,45 +999,54 @@ describe("remote code door", () => {
   });
 
   test("[WS-REMOTE-RESUME-004] occupies the cwd origin when it differs from last occupancy", async () => {
-    const door = await resolveDefaultRemoteCodeDoor({
-      env: { APPALOFT_TOKEN: "token" },
-      listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
-      folderOnboarding: {
-        projectId: "prj_cloud",
-        identity: "github.com/appaloft/appaloft-cloud",
-        created: false,
-        reused: false,
-      },
-      listOccupancies: async () => [
+    const emptyDir = await mkdtemp(join(tmpdir(), "appaloft-resume-origin-"));
+    try {
+      const door = await resolveDefaultRemoteCodeDoor(
         {
-          sandboxId: "sbx_examples",
-          status: "ready",
-          occupancy: {
-            repositoryIdentity: "github.com/appaloft/examples",
-            commitSha: "d".repeat(40),
-            branch: "main",
+          env: { APPALOFT_TOKEN: "token" },
+          folderCwd: emptyDir,
+          listServers: async () => [{ id: "srv_1", name: "mac-mini", lifecycleStatus: "active" }],
+          folderOnboarding: {
+            projectId: "prj_cloud",
+            identity: "github.com/appaloft/appaloft-cloud",
+            created: false,
+            reused: false,
           },
-          lastActivityAt: "2026-08-15T12:30:00.000Z",
+          listOccupancies: async () => [
+            {
+              sandboxId: "sbx_examples",
+              status: "ready",
+              occupancy: {
+                repositoryIdentity: "github.com/appaloft/examples",
+                commitSha: "d".repeat(40),
+                branch: "main",
+              },
+              lastActivityAt: "2026-08-15T12:30:00.000Z",
+            },
+          ],
+          resolveLocator: async () => ({
+            repository: "https://github.com/appaloft/appaloft-cloud.git",
+            repositoryIdentity: "github.com/appaloft/appaloft-cloud",
+            ref: "refs/heads/main",
+            branch: "main",
+          }),
+          resolveRemoteRef: async (repository) => ({
+            repositoryIdentity: repository.includes("appaloft-cloud")
+              ? "github.com/appaloft/appaloft-cloud"
+              : "github.com/appaloft/examples",
+            credentialFreeHttpsRepository: repository,
+            ref: "refs/heads/main",
+            commitSha: repository.includes("appaloft-cloud") ? "f".repeat(40) : "e".repeat(40),
+          }),
         },
-      ],
-      resolveLocator: async () => ({
-        repository: "https://github.com/appaloft/appaloft-cloud.git",
-        repositoryIdentity: "github.com/appaloft/appaloft-cloud",
-        ref: "refs/heads/main",
-        branch: "main",
-      }),
-      resolveRemoteRef: async (repository) => ({
-        repositoryIdentity: repository.includes("appaloft-cloud")
-          ? "github.com/appaloft/appaloft-cloud"
-          : "github.com/appaloft/examples",
-        credentialFreeHttpsRepository: repository,
-        ref: "refs/heads/main",
-        commitSha: repository.includes("appaloft-cloud") ? "f".repeat(40) : "e".repeat(40),
-      }),
-    });
-    expect(door.repositoryIdentity).toBe("github.com/appaloft/appaloft-cloud");
-    expect(door.commitSha).toBe("f".repeat(40));
-    expect(door.projectId).toBe("prj_cloud");
+        emptyDir,
+      );
+      expect(door.repositoryIdentity).toBe("github.com/appaloft/appaloft-cloud");
+      expect(door.commitSha).toBe("f".repeat(40));
+      expect(door.projectId).toBe("prj_cloud");
+    } finally {
+      await rm(emptyDir, { recursive: true, force: true });
+    }
   });
 
   test("[WS-REMOTE-NO-UPLOAD-006] --new from a non-git path does not occupy the last occupancy repo", async () => {
@@ -1447,7 +1488,6 @@ describe("remote code door", () => {
           }),
           resolveRemoteRef: async () => {
             contactedRemote = true;
-            await Bun.sleep(45_000);
             throw new Error("matching occupancy must not wait on ls-remote");
           },
         },
@@ -1457,6 +1497,40 @@ describe("remote code door", () => {
       expect(door.repositoryIdentity).toBe("github.com/acme/api");
       expect(Date.now() - started).toBeLessThan(1_000);
       expect(contactedRemote).toBe(false);
+    });
+  });
+
+  test("[MW-CP-DOOR-012] committed worktree HEAD wins leftover occupancy SHA", async () => {
+    await withCommittedGitWorktree(async (gitDir, head) => {
+      const door = await resolveDefaultRemoteCodeDoor(
+        {
+          env: { APPALOFT_TOKEN: "token" },
+          folderCwd: gitDir,
+          listServers: async () => [{ id: "srv_1", name: "hostinger", lifecycleStatus: "active" }],
+          listOccupancies: async () => [
+            {
+              sandboxId: "sbx_quiet_pine",
+              status: "ready",
+              occupancy: {
+                repositoryIdentity: "github.com/acme/api",
+                commitSha: "6254e78b1d57bfa3d0806e38f73e88d434803dfa",
+                branch: "main",
+              },
+            },
+          ],
+          resolveLocator: async () => ({
+            repository: "https://github.com/acme/api.git",
+            repositoryIdentity: "github.com/acme/api",
+            ref: "refs/heads/main",
+            branch: "main",
+          }),
+          resolveRemoteRef: async () => {
+            throw new Error("committed worktree must not wait on ls-remote");
+          },
+        },
+        gitDir,
+      );
+      expect(door.commitSha).toBe(head);
     });
   });
 

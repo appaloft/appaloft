@@ -44,6 +44,11 @@ export const openAgentWorkspaceInputSchema = z
     forceNew: z.boolean().optional(),
     attach: z.boolean().optional(),
     targetServerId: z.string().trim().min(1).max(160).optional(),
+    operationId: z
+      .string()
+      .trim()
+      .regex(/^wop_[a-z0-9]{8,64}$/u)
+      .optional(),
   })
   .strict();
 
@@ -65,6 +70,7 @@ export class OpenAgentWorkspaceCommand extends Command<WorkspaceOpenResult> {
           ...(parsed.forceNew !== undefined ? { forceNew: parsed.forceNew } : {}),
           ...(parsed.attach !== undefined ? { attach: parsed.attach } : {}),
           ...(parsed.targetServerId ? { targetServerId: parsed.targetServerId } : {}),
+          ...(parsed.operationId ? { operationId: parsed.operationId } : {}),
         }),
     );
   }
