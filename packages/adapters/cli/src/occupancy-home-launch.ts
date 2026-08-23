@@ -170,21 +170,8 @@ export async function occupyFromWorkspaceHome(input: {
   });
   if (command.isErr()) throw command.error;
   const opened = await input.executeCommand(command.value);
-  if (opened.isErr()) {
-    throw occupancyCloudCompatError(
-      opened.error as DomainError,
-      { id: door.serverId, name: door.serverName },
-      {
-        repositoryIdentity: door.repositoryIdentity,
-        repository: door.repository,
-      },
-      alias ? { alias, harness } : { harness },
-    );
-  }
-  const result = opened.value as {
-    readonly workspaceId: string;
-    readonly attach?: SandboxAgentAttachDescriptor;
-  };
+  if (opened.isErr()) throw opened.error;
+  const result = opened.value;
   if (!result.attach) throw occupyLiveSessionMissingError();
   return {
     workspaceId: result.workspaceId,

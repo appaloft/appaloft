@@ -770,16 +770,21 @@ function nativeClientCommand(record: Record<string, unknown>): readonly string[]
 async function listOccupancyHomeTargets(
   context: WorkspaceControlPresentationContext,
 ): Promise<{ readonly projectId: string; readonly name: string }[]> {
+  const thisFolder = {
+    projectId: "",
+    name: context.occupancyChrome?.project?.trim() || "this folder",
+  };
   const query = ListProjectsQuery.create({ limit: 100, lifecycleStatus: "active" });
-  if (query.isErr()) return [];
+  if (query.isErr()) return [thisFolder];
   try {
     const listed = await context.executeQuery(query.value);
-    if (listed.isErr()) return [];
-    return (listed.value.items ?? [])
+    if (listed.isErr()) return [thisFolder];
+    const projects = (listed.value.items ?? [])
       .filter((item) => typeof item.id === "string" && typeof item.name === "string")
       .map((item) => ({ projectId: item.id, name: item.name }));
+    return [thisFolder, ...projects];
   } catch {
-    return [];
+    return [thisFolder];
   }
 }
 
@@ -1373,6 +1378,8 @@ export function createBoundedWorkspaceControlPresentation(
                   if (!occupied.attach) throw occupyLiveSessionMissingError();
                   await attachIssuedDescriptor(occupied.attach);
                   if (occupied.workspaceId) selectedWorkspaceId = occupied.workspaceId;
+                  const prompt = event.prompt?.trim();
+                  if (prompt) await activeTerminal?.session.write(`${prompt}\n`);
                 })
                 .catch(async (error) => {
                   if (activeTerminal) return;
