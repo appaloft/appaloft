@@ -74,13 +74,14 @@ must not use laptop HEAD as Workspace truth.
    `~/.claude/setup-token`, or laptop `CLAUDE_CODE_OAUTH_TOKEN` written as a file),
    never the Claude chat cookie. User-facing aliases are `--opencode` / `--pi` /
    `--omp` (ours) and `--claude` / `--codex` / `--grok` (Railway-aligned). They are
-   mutually exclusive. `--claude` / `--grok` map onto the OpenCode occupancy
-   harness. `--codex` launches the Codex occupancy harness on the remote Sandbox
-   (managed-terminal `codex`), the same way Railway `code --codex` launches Codex
-   on the cloud agent VM; the laptop only attaches. `--harness opencode|pi|omp|codex`
-   is compatibility only. Occupancy OpenCode/Codex agent versions are pinned and
-   installed onto the Sandbox at occupy time so the remote binary matches the pin
-   (currently OpenCode 1.18.21 and Codex 0.149.0). Default follows the saved
+   mutually exclusive. `--claude` / `--codex` / `--grok` launch that vendor CLI
+   on the remote Sandbox (managed-terminal `claude` / `codex` / `grok`), the
+   same way Railway `code --claude|--codex|--grok` launches those CLIs on the
+   cloud agent VM; the laptop only attaches. `--harness
+   opencode|pi|omp|claude|codex|grok` is compatibility only. Occupancy
+   OpenCode/Claude/Codex/Grok agent versions are pinned and installed onto
+   the Sandbox at occupy time so the remote binary matches the pin (currently
+   OpenCode 1.18.21, Claude Code 2.1.199, Codex 0.149.0, and Grok 1.0.5). Default follows the saved
    `APPALOFT_HOME/occupancy-agent.json` preference, then what is signed in or
    installed on this laptop. Never print token values. Never put long-lived
    secrets into occupancy env vars or `mcp.json`. Teammate disks stay isolated.

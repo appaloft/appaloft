@@ -93,6 +93,12 @@ describe("community remote default profile", () => {
       "api.x.ai",
       "opencode.ai",
       "registry.npmjs.org",
+      "x.ai",
+      "storage.googleapis.com",
+      "grok.com",
+      "accounts.x.ai",
+      "auth.x.ai",
+      "claude.ai",
     ]);
   });
 
@@ -177,6 +183,52 @@ describe("community remote default profile", () => {
     expect(profile?.adapterManifest).toMatchObject({
       id: "appaloft-remote-codex",
       displayName: "Appaloft Remote codex",
+      requirements: {
+        capabilities: { required: ["managed-terminal"], optional: ["headless"] },
+      },
+    });
+  });
+
+  test("[WS-REMOTE-VENDOR-204] builds terminal appaloft-remote-claude from harness interaction", () => {
+    const profile = createCommunityRemoteDefaultProfile({
+      harnessKey: "claude",
+      templateId: "aht_claude_declarative_v1",
+      sandboxTemplateId: "tpl_opencode",
+      version: "2.1.199",
+      templateDigest: `sha256:${"e".repeat(64)}`,
+      interaction: {
+        transport: "managed-terminal",
+        command: ["claude"],
+        sessionRecovery: "native-session-store",
+      },
+    });
+
+    expect(profile?.adapterManifest).toMatchObject({
+      id: "appaloft-remote-claude",
+      displayName: "Appaloft Remote claude",
+      requirements: {
+        capabilities: { required: ["managed-terminal"], optional: ["headless"] },
+      },
+    });
+  });
+
+  test("[WS-REMOTE-VENDOR-204] builds terminal appaloft-remote-grok from harness interaction", () => {
+    const profile = createCommunityRemoteDefaultProfile({
+      harnessKey: "grok",
+      templateId: "aht_grok_declarative_v1",
+      sandboxTemplateId: "tpl_opencode",
+      version: "1.0.5",
+      templateDigest: `sha256:${"f".repeat(64)}`,
+      interaction: {
+        transport: "managed-terminal",
+        command: ["grok"],
+        sessionRecovery: "native-session-store",
+      },
+    });
+
+    expect(profile?.adapterManifest).toMatchObject({
+      id: "appaloft-remote-grok",
+      displayName: "Appaloft Remote grok",
       requirements: {
         capabilities: { required: ["managed-terminal"], optional: ["headless"] },
       },

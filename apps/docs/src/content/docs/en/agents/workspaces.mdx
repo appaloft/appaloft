@@ -124,11 +124,10 @@ occupy path that already writes files.
 - Ours: `--opencode`, `--pi`, `--omp`
 - Railway-aligned: `--claude`, `--codex`, `--grok`
 
-`--claude` and `--grok` pick the vendor credential on this laptop and map onto
-the OpenCode Cloud Agents runtime. `--codex` launches Codex on the remote
-Sandbox and copies `~/.codex/auth.json` onto session HOME. `--opencode`,
+`--claude`, `--codex`, and `--grok` launch that vendor CLI on the remote
+Sandbox and copy the laptop credential onto session HOME. `--opencode`,
 `--pi`, and `--omp` pick that Cloud Agents harness. `--harness
-opencode|pi|omp|codex` is compatibility only. With no alias, `code` uses the
+opencode|pi|omp|claude|codex|grok` is compatibility only. With no alias, `code` uses the
 saved Cloud Agents preference, then what is signed in or installed on this
 laptop.
 

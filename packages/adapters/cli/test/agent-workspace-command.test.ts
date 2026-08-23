@@ -2489,7 +2489,7 @@ describe("Agent Workspace CLI", () => {
     });
 
     try {
-      await program.parseAsync(["node", "appaloft", "code", "--new", "--no-attach"]);
+      await program.parseAsync(["node", "appaloft", "code", "--opencode", "--new", "--no-attach"]);
     } finally {
       await rm(isolatedHome, { recursive: true, force: true });
     }
@@ -2787,8 +2787,8 @@ describe("Agent Workspace CLI", () => {
       forceNew: true,
       attach: false,
       targetServerId: "srv_4lifk0yrcecy",
+      profile: "appaloft-remote-grok",
     });
-    expect((commands[0] as OpenAgentWorkspaceCommand).input.profile).toBeUndefined();
     const written = commands
       .filter((command) => command instanceof WriteSandboxFileCommand)
       .map((command) => command.input.path);

@@ -19,12 +19,13 @@ export const CODE_OPTION_DESCRIPTIONS = {
   opencode: "Use the OpenCode harness.",
   pi: "Use the Pi harness.",
   omp: "Use the OMP harness.",
-  claude: "Use the Claude setup-token already on this laptop.",
+  claude:
+    "Launch Claude Code on the remote Sandbox. Copies this Mac's Claude setup-token into the selected remote Workspace HOME; it is never printed or placed in MCP/env. Remove that HOME-relative copy with `appaloft sandbox file remove <sandboxId> --path .claude/setup-token`; deleting the remote copy does not revoke upstream access, so also revoke the corresponding Claude session in the upstream account security console.",
   codex:
     "Launch Codex on the remote Sandbox. Copies this Mac's ~/.codex/auth.json into the selected remote Workspace HOME; it is never printed or placed in MCP/env. Remove that HOME-relative copy with `appaloft sandbox file remove <sandboxId> --path .codex/auth.json`; deleting the remote copy does not revoke upstream access, so also revoke the corresponding Codex/OpenAI session in the upstream account security console.",
-  grok: "Use ~/.grok/auth.json already on this laptop.",
+  grok: "Launch Grok on the remote Sandbox. Copies this Mac's ~/.grok/auth.json into the selected remote Workspace HOME; it is never printed or placed in MCP/env. Remove that HOME-relative copy with `appaloft sandbox file remove <sandboxId> --path .grok/auth.json`; deleting the remote copy does not revoke upstream access, so also revoke the corresponding Grok session in the upstream account security console.",
   harness:
-    "Compatibility only. Prefer --opencode, --pi, --omp, or --codex. Cannot combine with a different agent alias.",
+    "Compatibility only. Prefer --opencode, --pi, --omp, --claude, --codex, or --grok. Cannot combine with a different agent alias.",
   help: "Show this help.",
 } as const;
 
@@ -50,7 +51,10 @@ const CODE_HELP_OPTION_ROWS: readonly {
   { flag: "--claude", description: CODE_OPTION_DESCRIPTIONS.claude },
   { flag: "--codex", description: CODE_OPTION_DESCRIPTIONS.codex },
   { flag: "--grok", description: CODE_OPTION_DESCRIPTIONS.grok },
-  { flag: "--harness opencode|pi|omp|codex", description: CODE_OPTION_DESCRIPTIONS.harness },
+  {
+    flag: "--harness opencode|pi|omp|claude|codex|grok",
+    description: CODE_OPTION_DESCRIPTIONS.harness,
+  },
   { flag: "--help, -h", description: CODE_OPTION_DESCRIPTIONS.help },
 ];
 

@@ -96,7 +96,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   Workspace is partial, default `code` preserves it and automatically creates an isolated replacement;
   lower-level `workspace open` still fail-closes with its recovery evidence. A failed open names
   the repository and the missing Binding or Profile, and keeps `causeCode` visible; it does
-  not invent a successful occupancy.   `--opencode`, `--pi`, `--omp`, `--claude`, `--codex`, and `--grok` are mutually exclusive. `--claude` / `--grok` map onto OpenCode. `--codex` launches Codex on the remote Sandbox and still copies `~/.codex/auth.json`. `--harness` is compatibility only.
+  not invent a successful occupancy.   `--opencode`, `--pi`, `--omp`, `--claude`, `--codex`, and `--grok` are mutually exclusive. `--claude` / `--codex` / `--grok` launch that vendor CLI on the remote Sandbox and still copy the laptop credential. `--harness` is compatibility only.
   Default alias follows the saved occupancy-agent preference, then laptop sign-in or install.
   `--pi` (or compatibility `--harness pi`) occupies reserved
   `appaloft-remote-pi` and does not rewrite the project's OpenCode default; an existing

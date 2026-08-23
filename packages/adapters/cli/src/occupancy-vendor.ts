@@ -7,7 +7,7 @@ import { domainError, err, ok, type Result } from "@appaloft/core";
 export const OCCUPANCY_VENDORS = ["claude", "codex", "grok"] as const;
 export type OccupancyVendor = (typeof OCCUPANCY_VENDORS)[number];
 
-export const OCCUPANCY_HARNESSES = ["opencode", "pi", "omp", "codex"] as const;
+export const OCCUPANCY_HARNESSES = ["opencode", "pi", "omp", "claude", "codex", "grok"] as const;
 export type OccupancyHarness = (typeof OCCUPANCY_HARNESSES)[number];
 
 export const OCCUPANCY_AGENT_ALIASES = [
@@ -27,15 +27,14 @@ export const OCCUPANCY_VENDOR_LABEL: Readonly<Record<OccupancyVendor, string>> =
 };
 
 /**
- * Railway-aligned `--claude` / `--grok` map onto the OpenCode occupancy
- * harness. `--codex` launches the Codex harness on the remote Sandbox, the
- * same way Railway `code --codex` launches Codex on the cloud agent VM.
- * `--opencode` / `--pi` / `--omp` remain Appaloft harness aliases.
+ * Railway-aligned `--claude` / `--codex` / `--grok` launch that vendor CLI
+ * on the remote Sandbox. The laptop only attaches. `--opencode` / `--pi` /
+ * `--omp` remain Appaloft harness aliases.
  */
 export const OCCUPANCY_VENDOR_HARNESS: Readonly<Record<OccupancyVendor, OccupancyHarness>> = {
-  claude: "opencode",
+  claude: "claude",
   codex: "codex",
-  grok: "opencode",
+  grok: "grok",
 };
 
 export const OCCUPANCY_DEFAULT_HARNESS: OccupancyHarness = "opencode";
@@ -111,7 +110,7 @@ export function occupancyVendorAmbiguousError(): ReturnType<typeof domainError.v
       code: "workspace_occupancy_vendor_ambiguous",
       phase: "occupancy-vendor",
       guidance:
-        "Pass exactly one agent alias. --harness opencode|pi|omp|codex is compatibility only and cannot combine with a different alias.",
+        "Pass exactly one agent alias. --harness opencode|pi|omp|claude|codex|grok is compatibility only and cannot combine with a different alias.",
     },
   );
 }

@@ -18,11 +18,12 @@ async function tempHome(): Promise<string> {
 
 test("[WS-REMOTE-VENDOR-204] vendor and harness aliases map onto occupancy harnesses", () => {
   expect(OCCUPANCY_VENDOR_HARNESS).toEqual({
-    claude: "opencode",
+    claude: "claude",
     codex: "codex",
-    grok: "opencode",
+    grok: "grok",
   });
-  expect(occupancyHarnessForAlias("grok")).toBe("opencode");
+  expect(occupancyHarnessForAlias("claude")).toBe("claude");
+  expect(occupancyHarnessForAlias("grok")).toBe("grok");
   expect(occupancyHarnessForAlias("codex")).toBe("codex");
   expect(occupancyHarnessForAlias("opencode")).toBe("opencode");
   expect(occupancyHarnessForAlias("pi")).toBe("pi");
@@ -45,7 +46,7 @@ test("[WS-REMOTE-VENDOR-205] default alias follows saved preference then laptop 
   });
   expect(first.isOk()).toBe(true);
   if (first.isErr()) return;
-  expect(first.value).toMatchObject({ alias: "grok", vendor: "grok", harness: "opencode" });
+  expect(first.value).toMatchObject({ alias: "grok", vendor: "grok", harness: "grok" });
   expect(await loadOccupancyAgentPreference({ homeDir, env: {} })).toBe("grok");
 
   const saved = await resolveOccupancyAgent({

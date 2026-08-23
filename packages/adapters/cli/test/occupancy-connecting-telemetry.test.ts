@@ -22,7 +22,7 @@ import {
 test("[WS-REMOTE-CONNECT-215] connecting-step data names credential, skill count, and disk", () => {
   const telemetry = occupancyConnectingTelemetry({
     vendor: "grok",
-    harness: "opencode",
+    harness: "grok",
     skillCount: 4,
     firstPartyMcp: true,
     credential: {
@@ -80,7 +80,7 @@ test("[WS-REMOTE-MCP-214] occupancy MCP offer writes first-party stdio and not l
   const commands: WriteSandboxFileCommand[] = [];
   const telemetry = await offerOccupancyConnectingMaterials({
     workspaceId: "sbx_ready",
-    harness: "opencode",
+    harness: "grok",
     vendor: "grok",
     homeDir,
     env: {},

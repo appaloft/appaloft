@@ -81,6 +81,17 @@ describe("compact code help", () => {
     expect(help).toContain("revoke the corresponding Codex/OpenAI session");
   });
 
+  test("[WS-REMOTE-HELP-229] --claude and --grok help launch those remote CLIs", () => {
+    const help = formatCodeHelp();
+    expect(help).toContain("Launch Claude Code on the remote Sandbox");
+    expect(help).toContain("this Mac's Claude setup-token");
+    expect(help).toContain("appaloft sandbox file remove <sandboxId> --path .claude/setup-token");
+    expect(help).toContain("Launch Grok on the remote Sandbox");
+    expect(help).toContain("this Mac's ~/.grok/auth.json");
+    expect(help).toContain("appaloft sandbox file remove <sandboxId> --path .grok/auth.json");
+    expect(help).toContain("--harness opencode|pi|omp|claude|codex|grok");
+  });
+
   test("[WS-REMOTE-HELP-217] tryHandleCodeHelp writes compact stdout and skips Effect", () => {
     let written = "";
     expect(
