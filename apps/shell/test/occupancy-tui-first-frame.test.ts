@@ -6,6 +6,7 @@ import {
   exitQuietlyOnOccupancyEpipe,
   isErrnoEpipe,
   leaveOccupancyAltScreen,
+  markOccupancyRendererOwnsTerminal,
   OCCUPANCY_ALT_SCREEN,
   OCCUPANCY_DISABLE_MOUSE,
   OCCUPANCY_FIRST_FRAME_CHROME,
@@ -178,6 +179,23 @@ describe("occupancy TUI first frame", () => {
       }),
     ).toBeTrue();
     expect(written).toContain(OCCUPANCY_LEAVE_ALT_SCREEN);
+    expect(occupancyAltScreenWasEntered()).toBeFalse();
+    written = "";
+    expect(
+      restoreOccupancyAltScreenIfEntered((text) => {
+        written += text;
+      }),
+    ).toBeFalse();
+    expect(written).toBe("");
+  });
+
+  test("[WS-REMOTE-PROGRESS-205] rust handoff releases warmup SIGINT so parent does not 1049l", () => {
+    let written = "";
+    enterOccupancyAltScreen((text) => {
+      written += text;
+    });
+    expect(occupancyAltScreenWasEntered()).toBeTrue();
+    markOccupancyRendererOwnsTerminal();
     expect(occupancyAltScreenWasEntered()).toBeFalse();
     written = "";
     expect(

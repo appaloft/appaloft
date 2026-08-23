@@ -9,7 +9,26 @@ export const OCCUPANCY_FIRST_FRAME_TITLE = "preparing the agent";
 let occupancyAltScreenEntered = false;
 let occupancyAltScreenRestoreInstalled = false;
 let occupancyWarmupInterruptInstalled = false;
+let occupancyWarmupSigint: (() => void) | undefined;
+let occupancyWarmupSigterm: (() => void) | undefined;
 
+export const OCCUPANCY_RENDERER_OWNED = Symbol.for("appaloft.occupancyRendererOwned");
+
+// Bun's Process.on only types memoryPressure; warmup still uses POSIX signals.
+type OccupancySignalProcess = {
+  on(event: "SIGINT" | "SIGTERM", listener: () => void): void;
+  off(event: "SIGINT" | "SIGTERM", listener: () => void): void;
+};
+
+function occupancySignalProcess(): OccupancySignalProcess {
+  return process as unknown as OccupancySignalProcess;
+}
+
+export function occupancyRendererOwnsTerminal(): boolean {
+  return Boolean(
+    (process as NodeJS.Process & { [key: symbol]: unknown })[OCCUPANCY_RENDERER_OWNED],
+  );
+}
 export function isErrnoEpipe(error: unknown): boolean {
   return Boolean(
     error &&
@@ -50,22 +69,47 @@ export function occupancyAltScreenWasEntered(): boolean {
 
 export function resetOccupancyAltScreenState(): void {
   occupancyAltScreenEntered = false;
+  delete (process as NodeJS.Process & { [key: symbol]: unknown })[OCCUPANCY_RENDERER_OWNED];
+  releaseOccupancyWarmupInterrupt();
+}
+
+export function releaseOccupancyWarmupInterrupt(): void {
+  const nodeProcess = occupancySignalProcess();
+  if (occupancyWarmupSigint) {
+    nodeProcess.off("SIGINT", occupancyWarmupSigint);
+    occupancyWarmupSigint = undefined;
+  }
+  if (occupancyWarmupSigterm) {
+    nodeProcess.off("SIGTERM", occupancyWarmupSigterm);
+    occupancyWarmupSigterm = undefined;
+  }
+  occupancyWarmupInterruptInstalled = false;
+}
+
+export function markOccupancyRendererOwnsTerminal(): void {
+  (process as NodeJS.Process & { [key: symbol]: unknown })[OCCUPANCY_RENDERER_OWNED] = true;
+  occupancyAltScreenEntered = false;
+  releaseOccupancyWarmupInterrupt();
 }
 
 function installOccupancyWarmupInterrupt(write: (text: string) => void): void {
   if (occupancyWarmupInterruptInstalled) return;
   occupancyWarmupInterruptInstalled = true;
   const restoreAndExit = (code: number) => {
+    if (occupancyRendererOwnsTerminal()) return;
     writeOccupancyTerminalBytes(write, `${OCCUPANCY_LEAVE_ALT_SCREEN}${OCCUPANCY_DISABLE_MOUSE}\n`);
     occupancyAltScreenEntered = false;
     process.exit(code);
   };
-  process.on("SIGINT", () => {
+  occupancyWarmupSigint = () => {
     restoreAndExit(130);
-  });
-  process.on("SIGTERM", () => {
+  };
+  occupancyWarmupSigterm = () => {
     restoreAndExit(143);
-  });
+  };
+  const nodeProcess = occupancySignalProcess();
+  nodeProcess.on("SIGINT", occupancyWarmupSigint);
+  nodeProcess.on("SIGTERM", occupancyWarmupSigterm);
 }
 
 export function enterOccupancyAltScreen(
@@ -106,6 +150,7 @@ export function installOccupancyAltScreenRestore(
   if (occupancyAltScreenRestoreInstalled) return;
   occupancyAltScreenRestoreInstalled = true;
   process.on("exit", () => {
+    if (occupancyRendererOwnsTerminal()) return;
     restoreOccupancyAltScreenIfEntered(write);
   });
 }

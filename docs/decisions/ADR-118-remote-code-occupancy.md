@@ -79,9 +79,9 @@ must not use laptop HEAD as Workspace truth.
    same way Railway `code --claude|--codex|--grok` launches those CLIs on the
    cloud agent VM; the laptop only attaches. `--harness
    opencode|pi|omp|claude|codex|grok` is compatibility only. Occupancy
-   OpenCode/Claude/Codex/Grok agent versions are pinned and installed onto
-   the Sandbox at occupy time so the remote binary matches the pin (currently
-   OpenCode 1.18.21, Claude Code 2.1.199, Codex 0.149.0, and Grok 1.0.5). Default follows the saved
+   Claude/Codex/Grok use dedicated reserved images with the pinned CLI baked
+   in (Claude Code 2.1.199, Codex 0.149.0, Grok 1.0.5). Occupy does not
+   `bun add` / curl-install those CLIs at start. Default follows the saved
    `APPALOFT_HOME/occupancy-agent.json` preference, then what is signed in or
    installed on this laptop. Never print token values. Never put long-lived
    secrets into occupancy env vars or `mcp.json`. Teammate disks stay isolated.

@@ -23,6 +23,52 @@ export const OCCUPANCY_VENDOR_CREDENTIAL_PATHS = {
     occupancyRelative: ".claude/setup-token",
   },
 } as const;
+export const OCCUPANCY_OPENCODE_CONNECT_PATH = ".local/share/opencode/auth.json";
+
+export async function loadOccupancyOpenCodeConnectAuth(
+  input: {
+    readonly homeDir?: string;
+    readonly env?: NodeJS.ProcessEnv;
+  } = {},
+): Promise<OccupancyCredentialFile | undefined> {
+  const homeDir = input.homeDir ?? homedir();
+  const env = input.env ?? process.env;
+  const dataHome = env.XDG_DATA_HOME?.trim() || join(homeDir, ".local", "share");
+  const content = await readBoundedFile(join(dataHome, "opencode", "auth.json"));
+  if (!content) return undefined;
+  return {
+    occupancyPath: OCCUPANCY_OPENCODE_CONNECT_PATH,
+    kind: "auth.json",
+    content,
+  };
+}
+
+export async function offerOccupancyOpenCodeConnectAuth(input: {
+  readonly workspaceId: string;
+  readonly executeCommand: (command: WriteSandboxFileCommand) => Promise<Result<unknown>>;
+  readonly destinationExists: (relativePath: string) => Promise<boolean>;
+  readonly homeDir?: string;
+  readonly env?: NodeJS.ProcessEnv;
+}): Promise<{
+  readonly offered: boolean;
+  readonly occupancyPath?: string;
+  readonly kind?: "auth.json";
+}> {
+  const loaded = await loadOccupancyOpenCodeConnectAuth(input);
+  if (!loaded) return { offered: false };
+  if (await input.destinationExists(loaded.occupancyPath)) {
+    return { offered: true, occupancyPath: loaded.occupancyPath, kind: "auth.json" };
+  }
+  const command = WriteSandboxFileCommand.create({
+    sandboxId: input.workspaceId,
+    path: loaded.occupancyPath,
+    contentBase64: Buffer.from(loaded.content).toString("base64"),
+  });
+  if (command.isErr()) return { offered: false };
+  const written = await input.executeCommand(command.value);
+  if (written.isErr()) return { offered: false };
+  return { offered: true, occupancyPath: loaded.occupancyPath, kind: "auth.json" };
+}
 
 const CLAUDE_CHAT_COOKIE_BASENAMES = new Set([".credentials.json", "credentials.json"]);
 

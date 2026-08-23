@@ -106,16 +106,18 @@ import {
   CloneEnvironmentCommandHandler,
   CloneEnvironmentUseCase,
   CloseTerminalSessionCommandHandler,
-  COMMUNITY_OCCUPANCY_CLAUDE_PACKAGE,
+  COMMUNITY_OCCUPANCY_CLAUDE_TEMPLATE_DIGEST,
+  COMMUNITY_OCCUPANCY_CLAUDE_TEMPLATE_ID,
   COMMUNITY_OCCUPANCY_CLAUDE_VERSION,
-  COMMUNITY_OCCUPANCY_CODEX_PACKAGE,
+  COMMUNITY_OCCUPANCY_CODEX_TEMPLATE_DIGEST,
+  COMMUNITY_OCCUPANCY_CODEX_TEMPLATE_ID,
   COMMUNITY_OCCUPANCY_CODEX_VERSION,
+  COMMUNITY_OCCUPANCY_GROK_TEMPLATE_DIGEST,
+  COMMUNITY_OCCUPANCY_GROK_TEMPLATE_ID,
   COMMUNITY_OCCUPANCY_GROK_VERSION,
   COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_DIGEST,
   COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID,
   COMMUNITY_OCCUPANCY_OPENCODE_VERSION,
-  occupancyGrokInstallArgv,
-  occupancyHarnessInstallArgv,
   COMMUNITY_OCCUPANCY_PI_TEMPLATE_DIGEST,
   COMMUNITY_OCCUPANCY_PI_TEMPLATE_ID,
   COMMUNITY_OCCUPANCY_PI_VERSION,
@@ -3635,17 +3637,9 @@ export function registerApplicationServices(
           new CommandSandboxAgentHarness(sandboxes, {
             key: "codex",
             templateId: "aht_codex_declarative_v1",
-            sandboxTemplateId: COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID,
+            sandboxTemplateId: COMMUNITY_OCCUPANCY_CODEX_TEMPLATE_ID,
             version: COMMUNITY_OCCUPANCY_CODEX_VERSION,
-            templateDigest: COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_DIGEST,
-            start: {
-              argv: [
-                ...occupancyHarnessInstallArgv({
-                  packageName: COMMUNITY_OCCUPANCY_CODEX_PACKAGE,
-                  version: COMMUNITY_OCCUPANCY_CODEX_VERSION,
-                }),
-              ],
-            },
+            templateDigest: COMMUNITY_OCCUPANCY_CODEX_TEMPLATE_DIGEST,
             run: { argv: ["codex"] },
             attach: {
               transport: "managed-terminal",
@@ -3658,17 +3652,9 @@ export function registerApplicationServices(
           new CommandSandboxAgentHarness(sandboxes, {
             key: "claude",
             templateId: "aht_claude_declarative_v1",
-            sandboxTemplateId: COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID,
+            sandboxTemplateId: COMMUNITY_OCCUPANCY_CLAUDE_TEMPLATE_ID,
             version: COMMUNITY_OCCUPANCY_CLAUDE_VERSION,
-            templateDigest: COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_DIGEST,
-            start: {
-              argv: [
-                ...occupancyHarnessInstallArgv({
-                  packageName: COMMUNITY_OCCUPANCY_CLAUDE_PACKAGE,
-                  version: COMMUNITY_OCCUPANCY_CLAUDE_VERSION,
-                }),
-              ],
-            },
+            templateDigest: COMMUNITY_OCCUPANCY_CLAUDE_TEMPLATE_DIGEST,
             run: { argv: ["claude"] },
             attach: {
               transport: "managed-terminal",
@@ -3681,12 +3667,9 @@ export function registerApplicationServices(
           new CommandSandboxAgentHarness(sandboxes, {
             key: "grok",
             templateId: "aht_grok_declarative_v1",
-            sandboxTemplateId: COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_ID,
+            sandboxTemplateId: COMMUNITY_OCCUPANCY_GROK_TEMPLATE_ID,
             version: COMMUNITY_OCCUPANCY_GROK_VERSION,
-            templateDigest: COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_DIGEST,
-            start: {
-              argv: [...occupancyGrokInstallArgv()],
-            },
+            templateDigest: COMMUNITY_OCCUPANCY_GROK_TEMPLATE_DIGEST,
             run: { argv: ["grok"] },
             attach: {
               transport: "managed-terminal",

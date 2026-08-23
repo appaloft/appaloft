@@ -112,6 +112,33 @@ test("[WS-REMOTE-MCP-214] occupancy MCP offer writes first-party stdio and not l
   expect(JSON.stringify(telemetry)).not.toContain("laptop-secret");
 });
 
+test("[WS-REMOTE-AUTH-009] OpenCode occupy copies laptop /connect auth.json", async () => {
+  const homeDir = await mkdtemp(join(tmpdir(), "appaloft-occupancy-opencode-connect-"));
+  await mkdir(join(homeDir, ".local", "share", "opencode"), { recursive: true });
+  await writeFile(
+    join(homeDir, ".local", "share", "opencode", "auth.json"),
+    '{"provider":"opencode","token":"connect-secret"}\n',
+  );
+  const commands: WriteSandboxFileCommand[] = [];
+  const telemetry = await offerOccupancyConnectingMaterials({
+    workspaceId: "sbx_ready",
+    harness: "opencode",
+    homeDir,
+    env: {},
+    executeCommand: async (command) => {
+      if (command instanceof WriteSandboxFileCommand) commands.push(command);
+      return ok({});
+    },
+    executeQuery: async () => err({ message: "missing" } as never),
+  });
+
+  expect(telemetry.steps.map((step) => step.message)).toContain("using your OpenCode login");
+  expect(commands.map((command) => command.input.path)).toEqual(
+    expect.arrayContaining([".local/share/opencode/auth.json", OCCUPANCY_FIRST_PARTY_MCP_PATH]),
+  );
+  expect(JSON.stringify(telemetry)).not.toContain("connect-secret");
+});
+
 test("[WS-REMOTE-CONNECT-215] skill count includes HOME skills plus first-party Appaloft", async () => {
   const homeDir = await mkdtemp(join(tmpdir(), "appaloft-occupancy-count-"));
   await mkdir(join(homeDir, ".claude", "skills", "review"), { recursive: true });
