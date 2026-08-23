@@ -87,14 +87,14 @@ in the footer.
 The banner is:
 
 ```text
-Remote · <project> · <repo@sha> · <server> · my sandbox · <name>
+Remote · agent <name> · <repo@sha> · <server> · <project>
 ```
 
 <a id="agent-workspace-display-name" />
-`<name>` is a readable workspace name, not `sbx_…`. Linked or current-folder opens
-use the directory name. A git repo uses `repo@short-sha`. An unlinked or unnamed
-open gets an Appaloft-generated kebab name such as `resonant-silence`. Reopen
-keeps the same name. Cloud Agents list and detail use that name. JSON / `--json`
+`<name>` is the Agent handle, not `sbx_…`. A git occupy gets a generated kebab
+name such as `resonant-silence`. `folder.local` may use the directory name.
+`repo@short-sha` is the git pin on the banner, not the handle. Reopen keeps
+the same name. Cloud Agents list and detail use that name. JSON / `--json`
 may still include `workspaceId`. `workspace show|pause|resume|terminate` accept
 the display name.
 

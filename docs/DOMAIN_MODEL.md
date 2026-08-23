@@ -355,9 +355,11 @@ Accepted target model:
   `Resource`, `DeploymentTarget`, terminal session, or AI-agent orchestration record.
 - `Sandbox` persists a display name (`SandboxDisplayName`) beside `sandboxId`. The id stays
   `sbx_*`. User-facing list, inquire, details, help, and errors show the display name.
-  Linked or cwd opens prefer the directory name or `repo@short-sha`; unlinked
-  opens generate a memorable kebab name (Appaloft's generator is adjective-noun).
-  See [ADR-124](./decisions/ADR-124-sandbox-display-name.md).
+  Linked `folder.local` opens may use the directory name; git occupancy
+  generates a memorable kebab name (Appaloft adjective-noun). `repo@short-sha`
+  is occupancy metadata, not the handle. See
+  [ADR-124](./decisions/ADR-124-sandbox-display-name.md) and
+  [ADR-125](./decisions/ADR-125-occupancy-agent-and-project-binding.md).
 - `SandboxTemplate` owns reusable admitted startup policy; `SandboxSnapshot` owns reusable captured
   state. Pause preserves one Sandbox identity, while snapshot creates an independent source for
   later Sandboxes. Pause continuity is explicit: `process-frozen` retains the provider allocation,

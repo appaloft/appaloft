@@ -102,7 +102,7 @@ local path used only to discover `origin`. The laptop tree is not uploaded.
 | WS-REMOTE-CA-066 | workspace list stays complete | same occupancies | `appaloft workspace list` | still includes terminated/failed rows. |
 | WS-REMOTE-DOCS-067 | Top-level help names occupancy door | any checkout | `appaloft --help` | usage includes `appaloft code` and `appaloft workspace` before durable `workspace open`. |
 | WS-REMOTE-DOCS-068 | Top-level deploy locator is optional | any checkout | `appaloft --help` | deploy line is not a required `<path>`. |
-| WS-REMOTE-CA-069 | TUI list uses display name | TTY Cloud Agents list/detail | `appaloft workspace` | row and detail title show the persisted display name (directory, `repo@short-sha`, or generated kebab). Output never contains `sbx_`. |
+| WS-REMOTE-CA-069 | TUI list uses display name | TTY Cloud Agents list/detail | `appaloft workspace` | row and detail title show the persisted Agent handle (directory or generated kebab). Output never contains `sbx_`. |
 | WS-REMOTE-CA-070 | TUI list omits leftovers | TTY + occupancies include terminated/failed | `appaloft workspace` | TUI workspaces omit `terminated` and `failed`. |
 | WS-REMOTE-CA-071 | Missing occupancy stays lean | Sandbox has no occupancy | TUI workspaces message | row keeps workspaceId/status; no invented repo. |
 | WS-REMOTE-CA-072 | TUI detail copies Preview URL | occupancy Resource `app` has succeeded generated access | TUI detail | shows that URL. |

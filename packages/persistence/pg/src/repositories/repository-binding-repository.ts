@@ -45,11 +45,38 @@ export class PgRepositoryBindingRepository implements RepositoryBindingRepositor
     context: RepositoryContext,
     repositoryIdentity: string,
   ): Promise<RepositoryBindingRecord | null> {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    const active = await executor
+      .selectFrom("project_repository_bindings")
+      .selectAll()
+      .where("tenant_id", "=", tenantId(context))
+      .where("repository_identity", "=", repositoryIdentity)
+      .where("status", "=", "active")
+      .orderBy("created_at", "asc")
+      .executeTakeFirst();
+    if (active) return { binding: rehydrate(active) };
+    const unbound = await executor
+      .selectFrom("project_repository_bindings")
+      .selectAll()
+      .where("tenant_id", "=", tenantId(context))
+      .where("repository_identity", "=", repositoryIdentity)
+      .where("status", "=", "unbound")
+      .orderBy("unbound_at", "desc")
+      .executeTakeFirst();
+    return unbound ? { binding: rehydrate(unbound) } : null;
+  }
+
+  async findByIdentityAndProject(
+    context: RepositoryContext,
+    repositoryIdentity: string,
+    projectId: string,
+  ): Promise<RepositoryBindingRecord | null> {
     const row = await resolveRepositoryExecutor(this.db, context)
       .selectFrom("project_repository_bindings")
       .selectAll()
       .where("tenant_id", "=", tenantId(context))
       .where("repository_identity", "=", repositoryIdentity)
+      .where("project_id", "=", projectId)
       .executeTakeFirst();
     return row ? { binding: rehydrate(row) } : null;
   }
@@ -68,9 +95,8 @@ export class PgRepositoryBindingRepository implements RepositoryBindingRepositor
         unbound_at: state.unboundAt?.value ?? null,
       })
       .onConflict((conflict) =>
-        conflict.columns(["tenant_id", "repository_identity"]).doUpdateSet({
+        conflict.columns(["tenant_id", "repository_identity", "project_id"]).doUpdateSet({
           id: state.id.value,
-          project_id: state.projectId.value,
           status: state.status,
           unbound_at: state.unboundAt?.value ?? null,
         }),

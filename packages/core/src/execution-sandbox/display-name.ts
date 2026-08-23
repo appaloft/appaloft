@@ -115,20 +115,6 @@ function folderDirectoryFromIdentity(identity: string): string | undefined {
   return segment ? sanitizeDirectoryName(segment) : undefined;
 }
 
-function repoAtShortSha(identity: string, commitSha: string): string | undefined {
-  const trimmed = identity.trim();
-  if (!trimmed || trimmed.toLowerCase().includes("folder.local")) return undefined;
-  const withoutHost = trimmed
-    .replace(/^(github\.com|gitlab\.com|bitbucket\.org)\//iu, "")
-    .replace(/\.git$/u, "");
-  const segments = withoutHost.split("/").filter(Boolean);
-  const repo = segments.at(-1);
-  if (!repo || repo.toLowerCase().startsWith("sbx_")) return undefined;
-  const sha = commitSha.trim();
-  if (sha.length < 7) return undefined;
-  return `${repo}@${sha.slice(0, 7)}`;
-}
-
 export interface SandboxDisplayNameSource {
   readonly name?: string;
   readonly directoryName?: string;
@@ -190,13 +176,6 @@ export class SandboxDisplayName extends ScalarValueObject<string> {
     if (directory) {
       const created = SandboxDisplayName.create(directory);
       if (created.isOk()) return created.value;
-    }
-    if (input.repositoryIdentity && input.commitSha) {
-      const repoName = repoAtShortSha(input.repositoryIdentity, input.commitSha);
-      if (repoName) {
-        const created = SandboxDisplayName.create(repoName);
-        if (created.isOk()) return created.value;
-      }
     }
     return SandboxDisplayName.generate();
   }

@@ -695,7 +695,7 @@ describe("remote code door", () => {
       expect(door.commitSha).toBe("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
       expect(door.serverId).toBe("srv_1");
       expect(formatRemoteCodeBanner({ ...door, name: "api@aaaaaaa" })).toBe(
-        "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · api@aaaaaaa\nCompare · https://github.com/acme/api/compare/main?expand=1",
+        "Remote · agent api@aaaaaaa · github.com/acme/api@aaaaaaa · mac-mini · prj_billing\nCompare · https://github.com/acme/api/compare/main?expand=1",
       );
       expect(selectDefaultRemoteCodeServer([{ id: "srv_1", name: "mac-mini" }])?.name).toBe(
         "mac-mini",
@@ -731,7 +731,7 @@ describe("remote code door", () => {
         branch: "main",
       }),
     ).toBe(
-      "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox\nCompare · https://github.com/acme/api/compare/main?expand=1",
+      "Remote · agent · github.com/acme/api@aaaaaaa · mac-mini · prj_billing\nCompare · https://github.com/acme/api/compare/main?expand=1",
     );
   });
 
@@ -746,7 +746,7 @@ describe("remote code door", () => {
         previewUrl: "http://app-sc156jw98k.127.0.0.1.sslip.io",
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · whoami@1ce75d0\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
+      "Remote · agent whoami@1ce75d0 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · prj_tk5lovqu2vj8\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
     );
   });
 
@@ -760,7 +760,7 @@ describe("remote code door", () => {
         name: "whoami@1ce75d0",
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · whoami@1ce75d0",
+      "Remote · agent whoami@1ce75d0 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · prj_tk5lovqu2vj8",
     );
   });
 
@@ -776,7 +776,7 @@ describe("remote code door", () => {
         pullRequestNumber: 928,
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · whoami@1ce75d0\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nPR #928 · https://github.com/traefik/whoami/pull/928",
+      "Remote · agent whoami@1ce75d0 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · prj_tk5lovqu2vj8\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nPR #928 · https://github.com/traefik/whoami/pull/928",
     );
   });
 
@@ -792,7 +792,7 @@ describe("remote code door", () => {
         pullRequestNumber: 0,
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · whoami@1ce75d0\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
+      "Remote · agent whoami@1ce75d0 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · prj_tk5lovqu2vj8\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
     );
   });
 
@@ -808,7 +808,7 @@ describe("remote code door", () => {
         branch: "feat/occupancy",
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · whoami@1ce75d0\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nCompare · https://github.com/traefik/whoami/compare/feat/occupancy?expand=1",
+      "Remote · agent whoami@1ce75d0 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · prj_tk5lovqu2vj8\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nCompare · https://github.com/traefik/whoami/compare/feat/occupancy?expand=1",
     );
   });
 
@@ -825,7 +825,7 @@ describe("remote code door", () => {
         branch: "feat/occupancy",
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · whoami@1ce75d0\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nPR #928 · https://github.com/traefik/whoami/pull/928",
+      "Remote · agent whoami@1ce75d0 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · prj_tk5lovqu2vj8\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nPR #928 · https://github.com/traefik/whoami/pull/928",
     );
   });
 
@@ -840,7 +840,7 @@ describe("remote code door", () => {
         branch: "feat/occupancy",
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · gitlab.com/acme/api@1ce75d0 · occupancy-mac · my sandbox · whoami@1ce75d0",
+      "Remote · agent whoami@1ce75d0 · gitlab.com/acme/api@1ce75d0 · occupancy-mac · prj_tk5lovqu2vj8",
     );
   });
 
@@ -857,7 +857,7 @@ describe("remote code door", () => {
         pullRequestNumber: 928,
       }),
     ).toBe(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · whoami@1ce75d0\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nProduction · https://whoami.example/\nPR #928 · https://github.com/traefik/whoami/pull/928",
+      "Remote · agent whoami@1ce75d0 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · prj_tk5lovqu2vj8\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io\nProduction · https://whoami.example/\nPR #928 · https://github.com/traefik/whoami/pull/928",
     );
   });
 

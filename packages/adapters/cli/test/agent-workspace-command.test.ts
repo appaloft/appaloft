@@ -2043,7 +2043,7 @@ describe("Agent Workspace CLI", () => {
     expect(resolvedPaths).toEqual(["."]);
     expect(commands).toHaveLength(2);
     expect(output.join("")).toContain(
-      "Remote · prj_web · github.com/Acme/Web@0123456 · mac-mini · my sandbox · Web@0123456",
+      "Remote · agent Web@0123456 · github.com/Acme/Web@0123456 · mac-mini · prj_web",
     );
     expect(commands[0]).toMatchObject({
       input: {
@@ -2260,7 +2260,7 @@ describe("Agent Workspace CLI", () => {
       attach: false,
     });
     expect(output.join("")).toContain(
-      "Remote · prj_web · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · api@aaaaaaa",
+      "Remote · agent api@aaaaaaa · github.com/acme/api@aaaaaaa · mac-mini · prj_web",
     );
     expect(output.join("")).not.toContain("opencode · Appaloft skill offered");
   });
@@ -2317,7 +2317,7 @@ describe("Agent Workspace CLI", () => {
     expect(localGitResolved).toBeFalse();
     expect(commands.some((command) => command instanceof OpenAgentWorkspaceCommand)).toBeTrue();
     expect(output.join("")).toContain(
-      "Remote · prj_billing · github.com/acme/api@aaaaaaa · mac-mini · my sandbox · api@aaaaaaa",
+      "Remote · agent api@aaaaaaa · github.com/acme/api@aaaaaaa · mac-mini · prj_billing",
     );
     expect(output.join("")).toContain(
       "Connect a model in OpenCode with /connect before running a Task.",
@@ -2382,7 +2382,7 @@ describe("Agent Workspace CLI", () => {
       process.stdout.write = write;
     }
     expect(output.join("")).toContain(
-      "Remote · prj_tk5lovqu2vj8 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · my sandbox · whoami@1ce75d0\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
+      "Remote · agent whoami@1ce75d0 · github.com/traefik/whoami@1ce75d0 · occupancy-mac · prj_tk5lovqu2vj8\nPreview · http://app-sc156jw98k.127.0.0.1.sslip.io",
     );
     const printed = output.join("");
     expect(printed).toContain("Connect a model in OpenCode with /connect before running a Task.");
@@ -2871,7 +2871,7 @@ describe("Agent Workspace CLI", () => {
     });
     expect(output.join("")).not.toContain("Pinned ·");
     expect(output.join("")).toContain(
-      "Remote · prj_billing · github.com/acme/api@bbbbbbb · mac-mini · my sandbox · api@bbbbbbb",
+      "Remote · agent api@bbbbbbb · github.com/acme/api@bbbbbbb · mac-mini · prj_billing",
     );
   });
 
@@ -3010,7 +3010,7 @@ describe("Agent Workspace CLI", () => {
     expect((commands[0] as OpenAgentWorkspaceCommand).input.targetServerId).toBe("srv_local");
     expect(launched).toEqual([["opencode", "attach"]]);
     expect(output.join("")).toContain(
-      "Remote · prj_billing · github.com/acme/api@aaaaaaa · this-mac · my sandbox · api@aaaaaaa",
+      "Remote · agent api@aaaaaaa · github.com/acme/api@aaaaaaa · this-mac · prj_billing",
     );
   });
 
@@ -3084,7 +3084,7 @@ describe("Agent Workspace CLI", () => {
     expect(printed).not.toContain("Opening occupancy");
     expect(printed.toLowerCase()).not.toContain("occupancy");
     expect(printed).toContain(
-      "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · api@aaaaaaa",
+      "Remote · agent api@aaaaaaa · github.com/acme/api@aaaaaaa · hostinger · prj_web",
     );
     expect(printed.indexOf("Preparing disk on hostinger…")).toBeLessThan(
       printed.indexOf("Remote ·"),
@@ -3138,7 +3138,7 @@ describe("Agent Workspace CLI", () => {
     }
     const printed = output.join("");
     expect(printed).toContain(
-      "Remote · prj_7fky4yjn1l1c · folder.local/cwd/nux-code-silence-cwd@cafef00 · hostinger · my sandbox · nux-code-silence-cwd",
+      "Remote · agent nux-code-silence-cwd · folder.local/cwd/nux-code-silence-cwd@cafef00 · hostinger · prj_7fky4yjn1l1c",
     );
     expect(printed).not.toContain("prj_vlhs6pf8v4yp");
     expect(printed.toLowerCase()).not.toContain("occupancy");
@@ -3224,7 +3224,7 @@ describe("Agent Workspace CLI", () => {
     }
     const printed = output.join("");
     expect(printed).toContain(
-      "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · api@aaaaaaa",
+      "Remote · agent api@aaaaaaa · github.com/acme/api@aaaaaaa · hostinger · prj_web",
     );
     expect(printed).toContain("Preparing skills…");
     expect(printed).toContain("using your Grok credential");
@@ -3304,7 +3304,7 @@ describe("Agent Workspace CLI", () => {
     expect(printed).toContain("Preparing skills…");
     expect(printed).toContain("Attaching…");
     expect(printed).toContain(
-      "Remote · prj_web · github.com/acme/api@aaaaaaa · hostinger · my sandbox · api@aaaaaaa",
+      "Remote · agent api@aaaaaaa · github.com/acme/api@aaaaaaa · hostinger · prj_web",
     );
     expect(printed.indexOf("Preparing disk on hostinger…")).toBeLessThan(
       printed.indexOf("Remote ·"),

@@ -81,14 +81,14 @@ attach 之后，可选的 list/detail chrome 不得在 footer 画出
 横幅是：
 
 ```text
-Remote · <project> · <repo@sha> · <server> · my sandbox · <name>
+Remote · agent <name> · <repo@sha> · <server> · <project>
 ```
 
 <a id="agent-workspace-display-name" />
-`<name>` 是可读的 Workspace 名，不是 `sbx_…`。已关联或当前文件夹用目录名；git
-仓库用 `repo@short-sha`；未关联或未命名的打开会得到 Appaloft 生成的 kebab 名，
-例如 `resonant-silence`。再次打开仍是同一个名字。Cloud Agents 列表和详情用这个
-名字。JSON / `--json` 仍可带 `workspaceId`。`workspace show|pause|resume|terminate`
+`<name>` 是 Agent 的可读名，不是 `sbx_…`。git 占用会生成 kebab 名，例如
+`resonant-silence`。`folder.local` 可以用目录名。`repo@short-sha` 只出现在横幅的
+git pin 上，不是把手。再次打开仍是同一个名字。Cloud Agents 列表和详情用这个名字。
+JSON / `--json` 仍可带 `workspaceId`。`workspace show|pause|resume|terminate`
 接受这个展示名。
 
 占用成功后，CLI 会把公开的 Appaloft skill 写入 `/workspace/skills/appaloft` 和

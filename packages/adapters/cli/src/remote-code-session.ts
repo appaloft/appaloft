@@ -177,11 +177,11 @@ export function formatRemoteCodeBanner(input: {
   readonly branch?: string;
 }): string {
   const sha = input.commitSha.slice(0, 7);
-  const project = input.projectId?.trim() || "project";
+  const project = input.projectId?.trim();
   const displayName = humanSandboxName(input.name) ?? humanSandboxName(input.workspaceId);
-  const occupancy = displayName ? `my sandbox · ${displayName}` : "my sandbox";
+  const agent = displayName ? `agent ${displayName}` : "agent";
   const lines = [
-    `Remote · ${project} · ${input.repositoryIdentity}@${sha} · ${input.serverName} · ${occupancy}`,
+    `Remote · ${agent} · ${input.repositoryIdentity}@${sha} · ${input.serverName}${project ? ` · ${project}` : ""}`,
   ];
   const preview = input.previewUrl?.trim();
   if (preview) lines.push(`Preview · ${preview}`);

@@ -127,6 +127,7 @@ import { agentWorkspaceProfileMcpConnectionsMigration } from "./migrations/118_a
 import { workspaceActivationTargetEvidenceMigration } from "./migrations/119_workspace_activation_target_evidence";
 import { serverRuntimeTargetProfileMigration } from "./migrations/120_server_runtime_target_profile";
 import { sourceEventRequiredCheckDeliveriesMigration } from "./migrations/121_source_event_required_check_deliveries";
+import { repositoryBindingPerProjectMigration } from "./migrations/122_repository_binding_per_project";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -350,6 +351,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "119_workspace_activation_target_evidence": workspaceActivationTargetEvidenceMigration,
       "120_server_runtime_target_profile": serverRuntimeTargetProfileMigration,
       "121_source_event_required_check_deliveries": sourceEventRequiredCheckDeliveriesMigration,
+      "122_repository_binding_per_project": repositoryBindingPerProjectMigration,
     };
   }
 }

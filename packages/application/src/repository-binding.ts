@@ -28,6 +28,11 @@ export interface RepositoryBindingRepository {
     context: RepositoryContext,
     repositoryIdentity: string,
   ): Promise<RepositoryBindingRecord | null>;
+  findByIdentityAndProject(
+    context: RepositoryContext,
+    repositoryIdentity: string,
+    projectId: string,
+  ): Promise<RepositoryBindingRecord | null>;
   save(context: RepositoryContext, binding: ProjectRepositoryBinding): Promise<Result<void>>;
 }
 
@@ -46,13 +51,39 @@ export class InMemoryRepositoryBindingRepository implements RepositoryBindingRep
     context: RepositoryContext,
     repositoryIdentity: string,
   ): Promise<RepositoryBindingRecord | null> {
-    const binding = this.bindings.get(`${tenantKey(context)}:${repositoryIdentity}`);
+    const prefix = `${tenantKey(context)}:${repositoryIdentity}:`;
+    const rows = [...this.bindings.entries()]
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([, binding]) => binding);
+    const active = rows
+      .filter((binding) => binding.toState().status === "active")
+      .sort((left, right) =>
+        left.toState().createdAt.value.localeCompare(right.toState().createdAt.value),
+      );
+    const unbound = rows
+      .filter((binding) => binding.toState().status === "unbound")
+      .sort((left, right) =>
+        (right.toState().unboundAt?.value ?? "").localeCompare(
+          left.toState().unboundAt?.value ?? "",
+        ),
+      );
+    const binding = active[0] ?? unbound[0];
+    return binding ? { binding: clone(binding) } : null;
+  }
+
+  async findByIdentityAndProject(
+    context: RepositoryContext,
+    repositoryIdentity: string,
+    projectId: string,
+  ): Promise<RepositoryBindingRecord | null> {
+    const binding = this.bindings.get(`${tenantKey(context)}:${repositoryIdentity}:${projectId}`);
     return binding ? { binding: clone(binding) } : null;
   }
 
   async save(context: RepositoryContext, binding: ProjectRepositoryBinding): Promise<Result<void>> {
+    const state = binding.toState();
     this.bindings.set(
-      `${tenantKey(context)}:${binding.toState().repositoryIdentity.value}`,
+      `${tenantKey(context)}:${state.repositoryIdentity.value}:${state.projectId.value}`,
       clone(binding),
     );
     return ok(undefined);
@@ -104,23 +135,23 @@ export class RepositoryBindingService {
       ProjectByIdSpec.create(projectId.value),
     );
     if (!project) return err(domainError.notFound("project", projectId.value.value));
-    const existing = await this.dependencies.repository.findByIdentity(
+    const existing = await this.dependencies.repository.findByIdentityAndProject(
       repositoryContext,
       identity.value.value,
+      projectId.value.value,
     );
-    if (
-      existing?.binding.toState().status === "active" &&
-      existing.binding.toState().projectId.value !== projectId.value.value
-    ) {
-      return err(
-        domainError.conflict("Repository is already bound to another Project", {
-          code: "repository_binding_project_conflict",
-          repositoryIdentity: identity.value.value,
-          projectId: existing.binding.toState().projectId.value,
-        }),
-      );
-    }
-    if (existing?.binding.toState().status === "active") {
+    if (existing) {
+      const at = UpdatedAt.create(this.dependencies.clock.now());
+      if (at.isErr()) return err(at.error);
+      const rebound = existing.binding.rebind({
+        projectId: projectId.value,
+        at: at.value,
+      });
+      if (rebound.isErr()) return err(rebound.error);
+      if (rebound.value.changed) {
+        const saved = await this.dependencies.repository.save(repositoryContext, existing.binding);
+        if (saved.isErr()) return err(saved.error);
+      }
       return ok(readModel(existing.binding));
     }
     const id = ProjectRepositoryBindingId.create(this.dependencies.idGenerator.next("rbd"));

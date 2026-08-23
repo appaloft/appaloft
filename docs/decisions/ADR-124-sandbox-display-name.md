@@ -1,6 +1,6 @@
 # ADR-124: Sandbox Display Name
 
-Status: Accepted
+Status: Accepted (create-time git `repo@sha` name superseded by [ADR-125](./ADR-125-occupancy-agent-and-project-binding.md))
 
 Date: 2026-08-21
 

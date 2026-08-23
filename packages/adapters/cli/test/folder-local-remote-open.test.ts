@@ -458,7 +458,8 @@ describe("logged-in folder.local remote occupy", () => {
     expect(captured.text).toContain(
       `Using linked project ${projectName} (${currentFolderProjectId})`,
     );
-    expect(captured.text).toContain(`Remote · ${currentFolderProjectId}`);
+    expect(captured.text).toContain("Remote · agent");
+    expect(captured.text).toContain(currentFolderProjectId);
     expect(captured.text).not.toContain(leftoverBindingProjectId);
     expect(captured.text.toLowerCase()).not.toContain("occupancy");
     expect(process.exitCode === undefined || process.exitCode === 0).toBe(true);

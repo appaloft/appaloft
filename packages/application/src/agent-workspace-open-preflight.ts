@@ -76,6 +76,7 @@ export interface WorkspaceActivationContextInitializerPort {
       readonly repositoryIdentity: string;
       readonly missing: "repository-binding" | "default-profile";
       readonly profile?: string;
+      readonly projectId?: string;
     },
   ): Promise<
     Result<{
@@ -94,9 +95,7 @@ export interface WorkspaceActivationContextInitializerPort {
   ): Promise<Result<void>>;
 }
 
-export class FailClosedWorkspaceOpenCredentialAdmission
-  implements WorkspaceOpenCredentialAdmissionPort
-{
+export class FailClosedWorkspaceOpenCredentialAdmission implements WorkspaceOpenCredentialAdmissionPort {
   async admit(
     _context: ExecutionContext,
     input: {
@@ -235,6 +234,7 @@ export class AgentWorkspaceOpenPreflightService {
       repositoryIdentity: input.repositoryIdentity,
       missing,
       ...(input.profile ? { profile: input.profile } : {}),
+      ...(input.projectId ? { projectId: input.projectId } : {}),
     });
     if (initialized.isErr()) {
       return err(surfaceWorkspaceOpenFailure(initialized.error, input.repositoryIdentity));
@@ -271,10 +271,16 @@ export class AgentWorkspaceOpenPreflightService {
     },
   ): Promise<Result<WorkspaceOpenContext>> {
     const repositoryContext = toRepositoryContext(context);
-    const binding = await this.dependencies.repositoryBindings.findByIdentity(
-      repositoryContext,
-      input.repositoryIdentity,
-    );
+    const binding = input.projectId
+      ? await this.dependencies.repositoryBindings.findByIdentityAndProject(
+          repositoryContext,
+          input.repositoryIdentity,
+          input.projectId,
+        )
+      : await this.dependencies.repositoryBindings.findByIdentity(
+          repositoryContext,
+          input.repositoryIdentity,
+        );
     if (binding?.binding.toState().status !== "active") {
       return err(domainError.notFound("RepositoryBinding", input.repositoryIdentity)).mapErr(
         (error) => ({

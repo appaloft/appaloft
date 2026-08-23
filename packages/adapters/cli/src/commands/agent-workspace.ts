@@ -912,6 +912,7 @@ export const workspaceCodeCommand = EffectCommand.make(
           attach,
           forceNew,
           ...(selectedProfile ? { profile: selectedProfile } : {}),
+          ...(door.projectId && door.projectId !== "project" ? { projectId: door.projectId } : {}),
         };
         const command = OpenAgentWorkspaceCommand.create(openInput);
         if (command.isErr()) throw command.error;
