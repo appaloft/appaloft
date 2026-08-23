@@ -37,6 +37,7 @@ import {
   COMMUNITY_OCCUPANCY_PI_TEMPLATE_ID,
   communityOccupancyPiTemplateSpec,
 } from "./community-occupancy-pi-template";
+import { communityOccupancyReservedTemplateSpec } from "./community-occupancy-vendor-templates";
 import {
   type ExecutionContext,
   type RepositoryContext,
@@ -2965,7 +2966,7 @@ export class ExecutionSandboxService {
         ? communityOccupancyOpenCodeTemplateSpec()
         : templateId === COMMUNITY_OCCUPANCY_PI_TEMPLATE_ID
           ? communityOccupancyPiTemplateSpec()
-          : undefined;
+          : communityOccupancyReservedTemplateSpec(templateId);
     if (!reserved) return ok(undefined);
     const ensured = await this.ensureTemplate(context, reserved);
     return ensured.isErr() ? err(ensured.error) : ok(undefined);

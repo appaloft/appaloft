@@ -35,6 +35,7 @@ export interface OccupancyConnectingTelemetry {
 export function occupancyConnectingSteps(input: {
   readonly vendor?: OccupancyVendor;
   readonly credentialOffered?: boolean;
+  readonly opencodeConnectOffered?: boolean;
   readonly skillCount: number;
 }): OccupancyConnectingStep[] {
   const steps: OccupancyConnectingStep[] = [];
@@ -42,6 +43,11 @@ export function occupancyConnectingSteps(input: {
     steps.push({
       id: "credential",
       message: `using your ${OCCUPANCY_VENDOR_LABEL[input.vendor]} credential`,
+    });
+  } else if (input.opencodeConnectOffered) {
+    steps.push({
+      id: "credential",
+      message: "using your OpenCode login",
     });
   }
   steps.push({
@@ -65,6 +71,7 @@ export function occupancyConnectingTelemetry(input: {
   readonly vendor?: OccupancyVendor;
   readonly harness: OccupancyHarness;
   readonly credential?: OccupancyConnectingTelemetry["credential"];
+  readonly opencodeConnectOffered?: boolean;
   readonly skillCount: number;
   readonly firstPartyMcp: boolean;
 }): OccupancyConnectingTelemetry {
@@ -83,6 +90,7 @@ export function occupancyConnectingTelemetry(input: {
       skillCount: input.skillCount,
       ...(input.vendor ? { vendor: input.vendor } : {}),
       ...(input.credential ? { credentialOffered: input.credential.offered } : {}),
+      ...(input.opencodeConnectOffered ? { opencodeConnectOffered: true } : {}),
     }),
   };
 }

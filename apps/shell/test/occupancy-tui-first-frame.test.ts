@@ -6,6 +6,7 @@ import {
   exitQuietlyOnOccupancyEpipe,
   isErrnoEpipe,
   leaveOccupancyAltScreen,
+  markOccupancyRendererOwnsTerminal,
   OCCUPANCY_ALT_SCREEN,
   OCCUPANCY_DISABLE_MOUSE,
   OCCUPANCY_FIRST_FRAME_CHROME,
@@ -113,7 +114,7 @@ describe("occupancy TUI first frame", () => {
     expect(firstFrameModule).not.toContain("resolveWorkspaceControlRendererBinary");
     expect(firstFrameModule).toContain("OCCUPANCY_LEAVE_ALT_SCREEN}");
     expect(firstFrameModule).toContain("OCCUPANCY_DISABLE_MOUSE}\\n");
-    expect(firstFrameModule).toContain('process.on("SIGINT"');
+    expect(firstFrameModule).toContain('nodeProcess.on("SIGINT"');
     expect(firstFrameModule).toContain("restoreAndExit(130)");
     expect(firstFrameModule).toContain("isErrnoEpipe");
     expect(source).toContain("exitQuietlyOnOccupancyEpipe");
@@ -178,6 +179,23 @@ describe("occupancy TUI first frame", () => {
       }),
     ).toBeTrue();
     expect(written).toContain(OCCUPANCY_LEAVE_ALT_SCREEN);
+    expect(occupancyAltScreenWasEntered()).toBeFalse();
+    written = "";
+    expect(
+      restoreOccupancyAltScreenIfEntered((text) => {
+        written += text;
+      }),
+    ).toBeFalse();
+    expect(written).toBe("");
+  });
+
+  test("[WS-REMOTE-PROGRESS-205] rust handoff releases warmup SIGINT so parent does not 1049l", () => {
+    let written = "";
+    enterOccupancyAltScreen((text) => {
+      written += text;
+    });
+    expect(occupancyAltScreenWasEntered()).toBeTrue();
+    markOccupancyRendererOwnsTerminal();
     expect(occupancyAltScreenWasEntered()).toBeFalse();
     written = "";
     expect(

@@ -518,6 +518,9 @@ export async function openLoopbackWorkspaceControlRenderer(
       rendererConnectTimeoutMs,
       rendererError("Renderer did not connect", "connect-timeout"),
     );
+    // Bun's Process type is not NodeJS.Process; ownership is a session Symbol flag.
+    const rendererProcess = process as unknown as { [key: symbol]: unknown };
+    rendererProcess[Symbol.for("appaloft.occupancyRendererOwned")] = true;
     let closed = false;
     return {
       send: (message) => writeMessage(socket, message),

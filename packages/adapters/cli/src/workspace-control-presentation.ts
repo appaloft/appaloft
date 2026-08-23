@@ -56,6 +56,7 @@ import { removeProcessListener } from "./remove-process-listener.js";
 import { terminateWorkspaceWithRuntimes } from "./workspace-lifecycle-actions.js";
 import {
   leaveWorkspaceTuiOnce,
+  markWorkspaceTuiScrollbackRestored,
   resetWorkspaceTuiScrollbackRestoreState,
   restoreWorkspaceTuiScrollback,
 } from "./workspace-tui-launch.js";
@@ -64,17 +65,32 @@ export function handleWorkspaceControlWaitScreenInterrupt(input: {
   readonly attached: boolean;
   readonly occupyPending?: boolean;
   readonly abortOccupy?: () => void;
-  readonly close: () => Promise<void>;
+  readonly close: () => Promise<void> | void;
   readonly exitProcess?: boolean;
+  readonly ownsLeaveAltScreen?: boolean;
 }): void {
   if (input.attached) return;
   input.abortOccupy?.();
-  restoreWorkspaceTuiScrollback();
-  void input.close();
+  if (input.ownsLeaveAltScreen) {
+    markWorkspaceTuiScrollbackRestored();
+  }
+  void Promise.resolve(input.close()).finally(() => {
+    if (input.ownsLeaveAltScreen) return;
+    if (!input.occupyPending) {
+      restoreWorkspaceTuiScrollback();
+    }
+    if (input.occupyPending) {
+      return;
+    }
+    if (input.exitProcess !== false) {
+      process.exitCode = 0;
+      process.exit(0);
+    }
+  });
   if (input.occupyPending) {
     return;
   }
-  if (input.exitProcess !== false) {
+  if (input.exitProcess !== false && !input.ownsLeaveAltScreen) {
     process.exitCode = 0;
     process.exit(0);
   }
@@ -961,6 +977,7 @@ export function createBoundedWorkspaceControlPresentation(
       // default chrome already shows Cloud Agents / preparing, so a host PTY
       // ^c can arrive while openRenderer() is still connecting.
       let closeRenderer: (() => Promise<void>) | undefined;
+      let rendererOwnsLeave = false;
       const quitWaitScreen = () => {
         occupyAbort.abort();
         handleWorkspaceControlWaitScreenInterrupt({
@@ -972,12 +989,14 @@ export function createBoundedWorkspaceControlPresentation(
             await closeRenderer?.();
           },
           exitProcess: !(context.occupyBootstrap && !activeTerminal),
+          ownsLeaveAltScreen: rendererOwnsLeave,
         });
       };
       process.on("SIGINT", quitWaitScreen);
       const connectionsUrl = await resolveConnectionsUrlSafe();
       const renderer = await input.openRenderer();
       closeRenderer = () => renderer.close();
+      rendererOwnsLeave = Boolean(renderer.ownsLeaveAltScreen);
 
       const sendSelectedDetail = async (workspaceId: string) => {
         const generation = ++detailGeneration;
@@ -1371,6 +1390,37 @@ export function createBoundedWorkspaceControlPresentation(
                     operationValue(ResumeSandboxCommand.create({ sandboxId: event.workspaceId })),
                   ),
                 );
+                const runtimes = resultValue(
+                  await context.executeQuery(
+                    operationValue(
+                      ListSandboxAgentRuntimesQuery.create({ sandboxId: event.workspaceId }),
+                    ),
+                  ),
+                ) as {
+                  items?: readonly {
+                    runtimeId?: string;
+                    interaction?: { transport?: string };
+                  }[];
+                };
+                const runtime = runtimes.items?.find(
+                  (candidate) =>
+                    candidate.interaction?.transport === "managed-terminal" ||
+                    candidate.interaction?.transport === "native-attach",
+                );
+                if (runtime?.runtimeId) {
+                  const issued = resultValue(
+                    await context.executeCommand(
+                      operationValue(
+                        IssueSandboxAgentAttachAccessCommand.create({
+                          sandboxId: event.workspaceId,
+                          runtimeId: runtime.runtimeId,
+                          expiresAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+                        }),
+                      ),
+                    ),
+                  ) as SandboxAgentAttachDescriptor;
+                  await attachIssuedDescriptor(issued);
+                }
               } else {
                 resultValue(await terminateWorkspaceWithRuntimes(context, event.workspaceId));
               }

@@ -12,7 +12,10 @@ import {
   type OccupancyConnectingTelemetry,
   occupancyConnectingTelemetry,
 } from "./occupancy-connecting-telemetry.js";
-import { offerOccupancyVendorCredential } from "./occupancy-credential-offer.js";
+import {
+  offerOccupancyOpenCodeConnectAuth,
+  offerOccupancyVendorCredential,
+} from "./occupancy-credential-offer.js";
 import { offerOccupancyFirstPartyMcp } from "./occupancy-mcp-offer.js";
 import {
   listOccupancyHomeSkillOfferFiles,
@@ -48,8 +51,8 @@ export async function offerOccupancyConnectingMaterials(input: {
     executeQuery: input.executeQuery,
   });
   const writeOnly = (command: WriteSandboxFileCommand) => input.executeCommand(command);
-
   let credential: OccupancyConnectingTelemetry["credential"];
+  let opencodeConnectOffered = false;
   if (input.vendor) {
     const offered = await offerOccupancyVendorCredential({
       workspaceId: input.workspaceId,
@@ -67,6 +70,15 @@ export async function offerOccupancyConnectingMaterials(input: {
         offered: true,
       };
     }
+  } else if (input.harness === "opencode") {
+    const offered = await offerOccupancyOpenCodeConnectAuth({
+      workspaceId: input.workspaceId,
+      executeCommand: writeOnly,
+      destinationExists,
+      ...(input.homeDir ? { homeDir: input.homeDir } : {}),
+      ...(input.env ? { env: input.env } : {}),
+    });
+    opencodeConnectOffered = offered.offered;
   }
 
   const mcp = await offerOccupancyFirstPartyMcp({
@@ -74,7 +86,6 @@ export async function offerOccupancyConnectingMaterials(input: {
     executeCommand: writeOnly,
     destinationExists,
   });
-
   return occupancyConnectingTelemetry({
     harness: input.harness,
     skillCount:
@@ -86,5 +97,6 @@ export async function offerOccupancyConnectingMaterials(input: {
     firstPartyMcp: mcp.offered,
     ...(input.vendor ? { vendor: input.vendor } : {}),
     ...(credential ? { credential } : {}),
+    ...(opencodeConnectOffered ? { opencodeConnectOffered: true } : {}),
   });
 }
