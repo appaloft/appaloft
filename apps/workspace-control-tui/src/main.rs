@@ -194,6 +194,7 @@ fn main() -> Result<()> {
     let mut last_terminal_size = (0, 0);
     let mut reconnect_attempts = 0_u8;
     let mut running = true;
+    let mut primed = false;
     while running && !stop.load(Ordering::Relaxed) {
         if interrupt.swap(false, Ordering::Relaxed) && state.ctrl_c_quits() {
             let _ = send(&mut writer, &RendererEvent::Quit);
@@ -201,6 +202,7 @@ fn main() -> Result<()> {
             continue;
         }
         for message in message_rx.try_iter() {
+            primed = true;
             if matches!(message, ParentMessage::Shutdown) {
                 running = false;
                 break;
@@ -242,6 +244,18 @@ fn main() -> Result<()> {
                 )?;
                 last_selected = Some(workspace_id);
             }
+        }
+        if !primed {
+            if !poll(Duration::from_millis(16)).context("poll terminal input")? {
+                continue;
+            }
+            if let Event::Key(key) = read().context("read terminal input")?
+                && is_occupancy_ctrl_c(key)
+            {
+                let _ = send(&mut writer, &RendererEvent::Quit);
+                running = false;
+            }
+            continue;
         }
 
         let size = terminal.size().context("read terminal size")?;
@@ -521,9 +535,7 @@ fn main() -> Result<()> {
                         }
                     }
                     OccupancyHomeKey::Unhandled => {
-                        if occupancy_key_binding(key, false, false)
-                            == OccupancyKeyBinding::Quit
-                        {
+                        if occupancy_key_binding(key, false, false) == OccupancyKeyBinding::Quit {
                             let _ = send(&mut writer, &RendererEvent::Quit);
                             running = false;
                         }

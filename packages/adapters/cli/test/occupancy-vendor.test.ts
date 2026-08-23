@@ -31,6 +31,7 @@ test("[WS-REMOTE-VENDOR-204] vendor and harness aliases map onto occupancy harne
   expect(occupancyHarnessForAlias("omp")).toBe("omp");
   expect(occupancyHarnessForAlias()).toBe("opencode");
   expect(occupancyAliasFromHomeLabel("OpenCode")).toBe("opencode");
+  expect(occupancyAliasFromHomeLabel("grok")).toBe("grok");
   expect(occupancyAliasFromHomeLabel("Codex")).toBe("codex");
   expect(occupancyAliasFromHomeLabel("Claude")).toBe("claude");
   expect(occupancyAliasFromHomeLabel("Pi")).toBe("pi");

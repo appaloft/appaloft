@@ -3211,9 +3211,44 @@ describe("Workspace control presentation", () => {
       home: true,
       title: "Appaloft Cloud Agents",
       project: "appaloft-cloud",
-      vendors: ["OpenCode", "Codex", "Claude", "Pi", "Grok"],
+      vendors: ["grok", "codex", "claude", "opencode", "pi"],
       targets: [{ projectId: "prj_home", name: "appaloft-cloud" }],
     });
     expect(renderer.messages.some((message) => message.type === "loading")).toBe(false);
+  });
+
+  test("[WS-TUI-HOME-001] occupy failure from home stays on home", async () => {
+    const renderer = new FakeRendererSession([
+      { type: "launch", vendor: "grok", forceNew: false },
+      { type: "quit" },
+    ]);
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+    await presentation.start({
+      occupancyHome: true,
+      occupancyChrome: { project: "appaloft-cloud", selectedVendor: "grok" },
+      occupyBootstrap: async () => {
+        throw {
+          code: "workspace_remote_server_missing",
+          message: "No enrolled Server is available for a remote Agent session",
+        };
+      },
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>() => ok({ items: [] } as T),
+    });
+    expect(renderer.messages.some((message) => message.type === "loading")).toBe(true);
+    expect(
+      renderer.messages.some(
+        (message) =>
+          message.type === "error" &&
+          message.code === "workspace_remote_server_missing" &&
+          message.message === "No enrolled Server is available for a remote Agent session",
+      ),
+    ).toBe(true);
+    expect(renderer.messages.filter((message) => message.type === "chrome").length).toBeGreaterThan(
+      1,
+    );
+    expect(renderer.closed).toBe(1);
   });
 });

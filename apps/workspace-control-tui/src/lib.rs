@@ -2,7 +2,8 @@ mod home;
 
 pub use home::{
     HomeDecision, HomeFocus, HomeState, HomeTarget, OCCUPANCY_HOME_QUESTION, OCCUPANCY_HOME_TITLE,
-    OccupancyHomeKey, home_footer, occupancy_home_key, render_occupancy_home,
+    OCCUPANCY_HOME_WORDMARK, OccupancyHomeKey, home_footer, occupancy_home_key,
+    render_occupancy_home,
 };
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
@@ -743,12 +744,16 @@ pub enum ParentMessage {
         #[serde(default)]
         vendors: Vec<String>,
         #[serde(default)]
+        selected_vendor: Option<String>,
+        #[serde(default)]
         targets: Vec<HomeTarget>,
     },
     Error {
         code: String,
         phase: String,
         retryable: bool,
+        #[serde(default)]
+        message: Option<String>,
     },
     Shutdown,
 }
@@ -1177,6 +1182,7 @@ impl AppState {
                 project,
                 home,
                 vendors,
+                selected_vendor,
                 targets,
             } => {
                 if let Some(title) = title {
@@ -1188,9 +1194,13 @@ impl AppState {
                 if home {
                     self.home.visible = true;
                     self.loading.active = false;
+                    self.home.error = None;
                 }
                 if !vendors.is_empty() {
-                    self.home.apply_vendors(vendors);
+                    self.home.apply_vendors(vendors, selected_vendor.as_deref());
+                } else if let Some(selected) = selected_vendor {
+                    self.home
+                        .apply_vendors(self.home.vendors.clone(), Some(&selected));
                 }
                 if !targets.is_empty() {
                     self.home.apply_targets(targets);
@@ -1286,11 +1296,19 @@ impl AppState {
                 code,
                 phase,
                 retryable,
+                message,
             } => {
                 self.action_busy = false;
                 self.delivery_busy = false;
                 self.recovery_busy = false;
-                if occupancy_hides_error_status(&code, &phase) {
+                if self.home.visible {
+                    self.loading.active = false;
+                    self.home.error = Some(
+                        message
+                            .filter(|value| !value.trim().is_empty())
+                            .unwrap_or_else(|| format!("{code} at {phase}")),
+                    );
+                } else if occupancy_hides_error_status(&code, &phase) {
                     // Chrome/list/detail conflicts stay off the attached footer.
                 } else {
                     self.status_line = format!(
@@ -3568,6 +3586,7 @@ mod tests {
             project: Some("appaloft-cloud-agents".to_owned()),
             home: false,
             vendors: Vec::new(),
+            selected_vendor: None,
             targets: Vec::new(),
         });
         assert_eq!(
@@ -4161,11 +4180,13 @@ mod tests {
             code: "conflict".to_owned(),
             phase: "workspace-control-select".to_owned(),
             retryable: false,
+            message: None,
         });
         state.apply(ParentMessage::Error {
             code: "conflict".to_owned(),
             phase: "occupancy-code-bootstrap".to_owned(),
             retryable: false,
+            message: None,
         });
         state.apply(ParentMessage::Workspaces {
             workspaces: vec![WorkspaceSummary {
@@ -5354,6 +5375,7 @@ mod tests {
             code: "delivery_failed".to_owned(),
             phase: "workspace-control-task-deliver".to_owned(),
             retryable: true,
+            message: None,
         });
         assert!(state.delivery_form.is_some());
         assert!(state.pending_delivery_confirmation.is_some());
@@ -5513,26 +5535,33 @@ mod tests {
             title: Some("Appaloft Cloud Agents".to_owned()),
             project: Some("appaloft-cloud".to_owned()),
             home: true,
-            vendors: vec!["OpenCode".to_owned(), "Codex".to_owned()],
+            vendors: vec!["grok".to_owned(), "codex".to_owned()],
+            selected_vendor: Some("grok".to_owned()),
             targets: vec![HomeTarget {
                 project_id: "prj_1".to_owned(),
                 name: "appaloft-cloud".to_owned(),
             }],
         });
         assert!(state.home.visible);
-        let backend = ratatui::backend::TestBackend::new(80, 24);
+        assert!(!state.loading.active);
+        let backend = ratatui::backend::TestBackend::new(100, 28);
         let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
         terminal
             .draw(|frame| render(frame, &state))
             .expect("draw occupancy home");
         let out = buffer_plain(&terminal);
+        assert!(out.contains(OCCUPANCY_HOME_WORDMARK), "{out}");
         assert!(out.contains(OCCUPANCY_HOME_TITLE), "{out}");
         assert!(out.contains(OCCUPANCY_HOME_QUESTION), "{out}");
+        assert!(out.contains("Prompt"), "{out}");
         assert!(out.contains("New Session"), "{out}");
         assert!(out.contains("New Cloud Agent"), "{out}");
-        assert!(out.contains("Manage"), "{out}");
-        assert!(out.contains("shift+tab OpenCode"), "{out}");
-        assert!(out.contains("Target Project appaloft-cloud"), "{out}");
+        assert!(out.contains("Manage Cloud Agents"), "{out}");
+        assert!(out.contains("grok"), "{out}");
+        assert!(out.contains("shift+tab"), "{out}");
+        assert!(out.contains("Target Project"), "{out}");
+        assert!(out.contains("appaloft-cloud"), "{out}");
+        assert!(!out.contains("preparing the agent"), "{out}");
         state.home.insert('s');
         state.home.insert('h');
         state.home.insert('i');
@@ -5542,7 +5571,7 @@ mod tests {
             launched,
             HomeDecision::Launch {
                 prompt: Some("ship".to_owned()),
-                vendor: "OpenCode".to_owned(),
+                vendor: "grok".to_owned(),
                 project_id: Some("prj_1".to_owned()),
                 force_new: false,
             }

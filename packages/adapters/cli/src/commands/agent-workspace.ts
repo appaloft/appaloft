@@ -104,7 +104,12 @@ import {
   occupancyConnectingStepLines,
   occupancyConnectingTelemetry,
 } from "../occupancy-connecting-telemetry.js";
-import { occupyFromWorkspaceHome } from "../occupancy-home-launch.js";
+import {
+  OCCUPANCY_HOME_VENDORS,
+  occupancyHomeDoorProbe,
+  occupancyHomeVendorLabel,
+  occupyFromWorkspaceHome,
+} from "../occupancy-home-launch.js";
 import { type OccupancyHarness, resolveOccupancyAgent } from "../occupancy-vendor.js";
 import {
   formatRemoteCodeBanner,
@@ -2161,8 +2166,32 @@ export const agentWorkspaceCommand = EffectCommand.make(
   {
     noTui: workspaceNoTui,
     json: workspaceJson,
+    opencode: Options.boolean("opencode").pipe(
+      Options.withDefault(false),
+      Options.withDescription(CODE_OPTION_DESCRIPTIONS.opencode),
+    ),
+    pi: Options.boolean("pi").pipe(
+      Options.withDefault(false),
+      Options.withDescription(CODE_OPTION_DESCRIPTIONS.pi),
+    ),
+    omp: Options.boolean("omp").pipe(
+      Options.withDefault(false),
+      Options.withDescription(CODE_OPTION_DESCRIPTIONS.omp),
+    ),
+    claude: Options.boolean("claude").pipe(
+      Options.withDefault(false),
+      Options.withDescription(CODE_OPTION_DESCRIPTIONS.claude),
+    ),
+    codex: Options.boolean("codex").pipe(
+      Options.withDefault(false),
+      Options.withDescription(CODE_OPTION_DESCRIPTIONS.codex),
+    ),
+    grok: Options.boolean("grok").pipe(
+      Options.withDefault(false),
+      Options.withDescription(CODE_OPTION_DESCRIPTIONS.grok),
+    ),
   },
-  ({ json, noTui }) =>
+  ({ claude, codex, grok, json, noTui, omp, opencode, pi }) =>
     Effect.gen(function* () {
       const cli = yield* CliRuntime;
       const interactive = Boolean(cli.terminalIO.stdin.isTTY && cli.terminalIO.stdout.isTTY);
@@ -2217,24 +2246,65 @@ export const agentWorkspaceCommand = EffectCommand.make(
           occupancyTreeFromLists(reason, servers.items ?? [], sandboxes.items ?? [], resources),
         );
       }
+      const occupancyHomeDir = cli.environment?.HOME ?? process.env.HOME;
+      const occupancyAgent = yield* Effect.tryPromise({
+        try: () =>
+          resolveOccupancyAgent({
+            flags: { claude, codex, grok, omp, opencode, pi },
+            ...(occupancyHomeDir ? { homeDir: occupancyHomeDir } : {}),
+            ...(cli.environment ? { env: cli.environment } : {}),
+          }),
+        catch: (error) => workspaceCliError(error, "occupancy-vendor"),
+      }).pipe(Effect.flatMap((result) => resultToEffect(result)));
+      const skipHome = occupancyAgent.explicit;
+      const selectedVendor = occupancyHomeVendorLabel(
+        occupancyAgent.alias ?? occupancyAgent.harness,
+      );
+      const runtime = yield* Effect.runtime<CliRuntime | Prompt.Prompt.Environment>();
       yield* Effect.tryPromise({
         try: () =>
           cli.workspaceControlPresentation?.start({
             executeCommand: cli.executeCommand,
             executeQuery: cli.executeQuery,
-            occupancyHome: true,
+            occupancyHome: !skipHome,
             occupancyChrome: {
               project: folderDirectoryName(process.cwd()),
+              selectedVendor,
+              vendors: OCCUPANCY_HOME_VENDORS,
             },
             occupyBootstrap: async ({ reportProgress, signal, vendor, projectId, forceNew }) =>
               occupyFromWorkspaceHome({
                 path: process.cwd(),
                 ...(cli.environment ? { env: cli.environment } : {}),
-                ...(vendor ? { vendor } : {}),
+                ...(occupancyHomeDir ? { homeDir: occupancyHomeDir } : {}),
+                vendor: vendor ?? selectedVendor,
                 ...(projectId ? { projectId } : {}),
                 ...(forceNew ? { forceNew: true } : {}),
                 executeCommand: (command) => cli.executeCommand(command),
-                resolveDoor: resolveDefaultRemoteCodeDoor,
+                doorProbe: occupancyHomeDoorProbe({
+                  executeQuery: (query) => cli.executeQuery(query as never),
+                  ensureFolderOnboarding: async () => {
+                    const loggedIn = await hasCliControlPlaneLogin(cli.environment ?? process.env);
+                    if (!loggedIn) throw workspaceRemoteLoginRequiredError();
+                    const outcome = await Runtime.runPromise(runtime)(
+                      Effect.either(
+                        ensureFolderProjectOnboarding({
+                          cwd: process.cwd(),
+                          yes: true,
+                          promptPolicy: "auto-create",
+                          writeStatus: () => undefined,
+                          peekGitIdentity: peekThisFolderGitIdentity,
+                          ...(cli.environment ? { env: cli.environment } : {}),
+                        }),
+                      ),
+                    );
+                    if (outcome._tag === "Left") throw outcome.left;
+                    return outcome.right;
+                  },
+                  ...(cli.resolveRemoteWorkspaceGitRef
+                    ? { resolveRemoteRef: cli.resolveRemoteWorkspaceGitRef }
+                    : {}),
+                }),
                 reportProgress: (message, progress) => {
                   void reportProgress(message, progress);
                 },

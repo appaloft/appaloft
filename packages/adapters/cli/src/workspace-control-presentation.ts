@@ -62,6 +62,8 @@ import {
   restoreWorkspaceTuiScrollback,
 } from "./workspace-tui-launch.js";
 
+const OCCUPANCY_HOME_VENDORS = ["grok", "codex", "claude", "opencode", "pi"] as const;
+
 export function handleWorkspaceControlWaitScreenInterrupt(input: {
   readonly attached: boolean;
   readonly occupyPending?: boolean;
@@ -276,6 +278,7 @@ export type WorkspaceControlRendererMessage =
       readonly project?: string;
       readonly home?: boolean;
       readonly vendors?: readonly string[];
+      readonly selectedVendor?: string;
       readonly targets?: readonly { readonly projectId: string; readonly name: string }[];
     }
   | { readonly type: "delivery-complete"; readonly workspaceId: string }
@@ -285,6 +288,7 @@ export type WorkspaceControlRendererMessage =
       readonly code: string;
       readonly phase: string;
       readonly retryable: boolean;
+      readonly message?: string;
     };
 
 export type WorkspaceControlRendererEvent =
@@ -390,6 +394,8 @@ export interface WorkspaceControlPresentationContext {
   >;
   occupancyChrome?: {
     readonly project?: string;
+    readonly selectedVendor?: string;
+    readonly vendors?: readonly string[];
   };
   occupancyHome?: boolean;
 }
@@ -707,6 +713,9 @@ function safeError(error: unknown, phase: string): WorkspaceControlRendererMessa
       code: typeof record.code === "string" ? record.code : "workspace_control_failed",
       phase,
       retryable: record.retryable === true,
+      ...(typeof record.message === "string" && record.message.trim()
+        ? { message: record.message }
+        : {}),
     };
   }
   return {
@@ -1265,11 +1274,14 @@ export function createBoundedWorkspaceControlPresentation(
             });
         } else {
           const targets = await listOccupancyHomeTargets(context);
+          const vendors = [...(context.occupancyChrome?.vendors ?? OCCUPANCY_HOME_VENDORS)];
+          const selectedVendor = context.occupancyChrome?.selectedVendor ?? vendors[0];
           await renderer.send({
             type: "chrome",
             title: OCCUPANCY_CODE_CHROME_TITLE,
             home: true,
-            vendors: ["OpenCode", "Codex", "Claude", "Pi", "Grok"],
+            vendors,
+            ...(selectedVendor ? { selectedVendor } : {}),
             ...(context.occupancyChrome?.project
               ? { project: context.occupancyChrome.project }
               : {}),
@@ -1344,6 +1356,27 @@ export function createBoundedWorkspaceControlPresentation(
                 })
                 .catch(async (error) => {
                   if (activeTerminal) return;
+                  if (context.occupancyHome) {
+                    const targets = await listOccupancyHomeTargets(context);
+                    const vendors = [
+                      ...(context.occupancyChrome?.vendors ?? OCCUPANCY_HOME_VENDORS),
+                    ];
+                    await renderer.send({
+                      type: "chrome",
+                      title: OCCUPANCY_CODE_CHROME_TITLE,
+                      home: true,
+                      vendors,
+                      ...(context.occupancyChrome?.selectedVendor
+                        ? { selectedVendor: context.occupancyChrome.selectedVendor }
+                        : {}),
+                      ...(context.occupancyChrome?.project
+                        ? { project: context.occupancyChrome.project }
+                        : {}),
+                      ...(targets.length > 0 ? { targets } : {}),
+                    });
+                    await renderer.send(safeError(error, "workspace-control-launch"));
+                    return;
+                  }
                   occupyFailure = error;
                   await leaveWorkspaceTuiOnce(renderer);
                 });

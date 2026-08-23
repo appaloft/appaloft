@@ -7,11 +7,26 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use serde::{Deserialize, Serialize};
 
 use crate::RendererEvent;
-pub const OCCUPANCY_HOME_TITLE: &str = "APPALOFT CLOUD AGENTS";
-pub const OCCUPANCY_HOME_QUESTION: &str = "What should we build today?";
-pub const OCCUPANCY_HOME_DEFAULT_VENDORS: &[&str] = &["OpenCode", "Codex", "Claude", "Pi", "Grok"];
 
-const ACTIONS: [&str; 3] = ["New Session", "New Cloud Agent", "Manage"];
+pub const OCCUPANCY_HOME_WORDMARK: &str = "APPALOFT";
+pub const OCCUPANCY_HOME_TITLE: &str = "CLOUD AGENTS";
+pub const OCCUPANCY_HOME_QUESTION: &str = "What should we build today?";
+pub const OCCUPANCY_HOME_DEFAULT_VENDORS: &[&str] = &["grok", "codex", "claude", "opencode", "pi"];
+
+const ACTIONS: [(&str, &str); 3] = [
+    (
+        "New Session",
+        "Create a new session on a Cloud Agent in your default project",
+    ),
+    (
+        "New Cloud Agent",
+        "Create a new Cloud Agent in your default project",
+    ),
+    (
+        "Manage Cloud Agents",
+        "Manage Cloud Agents and Sessions across multiple projects",
+    ),
+];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HomeFocus {
@@ -57,6 +72,7 @@ pub struct HomeState {
     pub vendor_index: usize,
     pub targets: Vec<HomeTarget>,
     pub target_index: usize,
+    pub error: Option<String>,
 }
 
 impl Default for HomeState {
@@ -72,6 +88,7 @@ impl Default for HomeState {
             vendor_index: 0,
             targets: Vec::new(),
             target_index: 0,
+            error: None,
         }
     }
 }
@@ -81,7 +98,7 @@ impl HomeState {
         self.vendors
             .get(self.vendor_index)
             .cloned()
-            .unwrap_or_else(|| "OpenCode".to_owned())
+            .unwrap_or_else(|| "grok".to_owned())
     }
 
     pub fn selected_target(&self) -> Option<&HomeTarget> {
@@ -99,6 +116,7 @@ impl HomeState {
         if !character.is_control() {
             self.prompt.push(character);
             self.focus = HomeFocus::Prompt;
+            self.error = None;
         }
     }
 
@@ -109,8 +127,7 @@ impl HomeState {
 
     pub fn move_focus(&mut self, delta: isize) {
         let next = self.focus.index() as isize + delta;
-        let wrapped = next.rem_euclid(4) as usize;
-        self.focus = HomeFocus::from_index(wrapped);
+        self.focus = HomeFocus::from_index(next.rem_euclid(4) as usize);
     }
 
     pub fn cycle_vendor(&mut self, delta: isize) {
@@ -144,16 +161,18 @@ impl HomeState {
             .min(self.targets.len().saturating_sub(1));
     }
 
-    pub fn apply_vendors(&mut self, vendors: Vec<String>) {
+    pub fn apply_vendors(&mut self, vendors: Vec<String>, selected: Option<&str>) {
         if vendors.is_empty() {
             return;
         }
-        let selected = self.selected_vendor();
+        let preferred = selected
+            .map(str::to_owned)
+            .unwrap_or_else(|| self.selected_vendor());
         self.vendors = vendors;
         self.vendor_index = self
             .vendors
             .iter()
-            .position(|vendor| vendor == &selected)
+            .position(|vendor| vendor.eq_ignore_ascii_case(&preferred))
             .unwrap_or(0);
     }
 
@@ -231,10 +250,7 @@ pub fn occupancy_home_key(key: KeyEvent) -> OccupancyHomeKey {
     if matches!(key.code, KeyCode::Enter) {
         return OccupancyHomeKey::Activate;
     }
-    if matches!(key.code, KeyCode::BackTab)
-        || (shift && matches!(key.code, KeyCode::Tab))
-        || (shift && matches!(key.code, KeyCode::BackTab))
-    {
+    if matches!(key.code, KeyCode::BackTab) || (shift && matches!(key.code, KeyCode::Tab)) {
         return OccupancyHomeKey::CycleVendor(1);
     }
     if ctrl && matches!(key.code, KeyCode::Char(character) if character.eq_ignore_ascii_case(&'t'))
@@ -265,19 +281,21 @@ pub fn render_occupancy_home(frame: &mut Frame<'_>, state: &HomeState, area: Rec
     let sections = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(2),
-            Constraint::Length(2),
             Constraint::Length(3),
-            Constraint::Length(3),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(2),
+            Constraint::Length(7),
             Constraint::Length(5),
+            Constraint::Length(2),
             Constraint::Min(1),
         ])
         .split(area);
     frame.render_widget(
         Paragraph::new(Line::from(Span::styled(
-            OCCUPANCY_HOME_TITLE,
+            OCCUPANCY_HOME_WORDMARK,
             Style::default()
-                .fg(Color::Cyan)
+                .fg(Color::Rgb(167, 139, 250))
                 .add_modifier(Modifier::BOLD),
         )))
         .alignment(Alignment::Center),
@@ -285,68 +303,118 @@ pub fn render_occupancy_home(frame: &mut Frame<'_>, state: &HomeState, area: Rec
     );
     frame.render_widget(
         Paragraph::new(Line::from(Span::styled(
-            OCCUPANCY_HOME_QUESTION,
-            Style::default().add_modifier(Modifier::BOLD),
+            OCCUPANCY_HOME_TITLE,
+            Style::default().fg(Color::DarkGray),
         )))
         .alignment(Alignment::Center),
         sections[2],
     );
-    let prompt_style = if state.focus == HomeFocus::Prompt {
-        Style::default().fg(Color::Cyan)
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            OCCUPANCY_HOME_QUESTION,
+            Style::default().fg(Color::DarkGray),
+        )))
+        .alignment(Alignment::Center),
+        sections[3],
+    );
+
+    let prompt_border = if state.focus == HomeFocus::Prompt {
+        Style::default().fg(Color::Rgb(167, 139, 250))
     } else {
         Style::default().fg(Color::DarkGray)
     };
-    let prompt = if state.prompt.is_empty() {
-        "Describe a task, or press enter to occupy this folder"
+    let prompt_body = if state.prompt.is_empty() {
+        vec![
+            Line::from(""),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled(
+                    format!(" {} ", state.selected_vendor()),
+                    Style::default()
+                        .fg(Color::Rgb(167, 139, 250))
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled("shift+tab", Style::default().fg(Color::DarkGray)),
+            ]),
+        ]
     } else {
-        state.prompt.as_str()
+        vec![
+            Line::from(Span::raw(format!(" {}", state.prompt))),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled(
+                    format!(" {} ", state.selected_vendor()),
+                    Style::default()
+                        .fg(Color::Rgb(167, 139, 250))
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled("shift+tab", Style::default().fg(Color::DarkGray)),
+            ]),
+        ]
     };
     frame.render_widget(
-        Paragraph::new(prompt).style(prompt_style).block(
+        Paragraph::new(prompt_body).block(
             Block::default()
+                .title(" Prompt ")
                 .borders(Borders::ALL)
-                .border_style(prompt_style),
+                .border_style(prompt_border),
         ),
-        inset(sections[3], 6),
+        inset(sections[4], 10),
     );
-    let action_area = inset(sections[4], 4);
-    let action_cols = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(34),
-            Constraint::Percentage(33),
-            Constraint::Percentage(33),
-        ])
-        .split(action_area);
-    for (index, label) in ACTIONS.iter().enumerate() {
-        let focused = match index {
-            0 => state.focus == HomeFocus::NewSession,
-            1 => state.focus == HomeFocus::NewAgent,
-            _ => state.focus == HomeFocus::Manage,
-        };
-        let style = if focused {
+
+    let action_lines: Vec<Line> = ACTIONS
+        .iter()
+        .enumerate()
+        .map(|(index, (label, hint))| {
+            let focused = match index {
+                0 => state.focus == HomeFocus::NewSession,
+                1 => state.focus == HomeFocus::NewAgent,
+                _ => state.focus == HomeFocus::Manage,
+            };
+            let label_style = if focused {
+                Style::default()
+                    .fg(Color::Rgb(167, 139, 250))
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::DarkGray)
+            };
+            Line::from(vec![
+                Span::styled(format!("{label:<22}"), label_style),
+                Span::styled(*hint, Style::default().fg(Color::Gray)),
+            ])
+        })
+        .collect();
+    frame.render_widget(Paragraph::new(action_lines), inset(sections[5], 8));
+
+    let mut meta = vec![Line::from(vec![
+        Span::styled(
+            " ^t ",
+            Style::default().bg(Color::DarkGray).fg(Color::White),
+        ),
+        Span::raw(" Target Project  "),
+        Span::styled(
+            state.target_label(),
             Style::default()
-                .fg(Color::Black)
-                .bg(Color::Cyan)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(Color::Gray)
-        };
-        frame.render_widget(
-            Paragraph::new(*label)
-                .style(style)
-                .alignment(Alignment::Center)
-                .block(Block::default().borders(Borders::ALL).border_style(style)),
-            action_cols[index],
-        );
+                .fg(Color::Rgb(167, 139, 250))
+                .add_modifier(Modifier::BOLD),
+        ),
+    ])];
+    if let Some(error) = &state.error {
+        meta.push(Line::from(Span::styled(
+            error.clone(),
+            Style::default().fg(Color::Red),
+        )));
     }
+    frame.render_widget(
+        Paragraph::new(meta).alignment(Alignment::Center),
+        sections[6],
+    );
 }
 
 pub fn home_footer(state: &HomeState) -> String {
     format!(
-        " enter launch  shift+tab {}  ^t Target Project {}  ? ",
-        state.selected_vendor(),
-        state.target_label()
+        " enter launch   shift+tab {}   ^t Target Project   ? settings ",
+        state.selected_vendor()
     )
 }
 
@@ -360,7 +428,7 @@ fn nonempty_prompt(prompt: &str) -> Option<String> {
 }
 
 fn inset(area: Rect, pad: u16) -> Rect {
-    let gutter = pad.min(area.width / 4);
+    let gutter = pad.min(area.width / 5);
     Rect {
         x: area.x.saturating_add(gutter),
         y: area.y,
