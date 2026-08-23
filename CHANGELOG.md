@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.9](https://github.com/appaloft/appaloft/compare/v1.10.8...v1.10.9) (2026-08-23)
+
+
+### Bug Fixes
+
+* **workspace:** occupy current commit without pglite cache ([#1403](https://github.com/appaloft/appaloft/issues/1403)) ([08bc15d](https://github.com/appaloft/appaloft/commit/08bc15db343683d6602728524e838615cc45b79a))
+
 ## [1.10.8](https://github.com/appaloft/appaloft/compare/v1.10.7...v1.10.8) (2026-08-23)
 
 
