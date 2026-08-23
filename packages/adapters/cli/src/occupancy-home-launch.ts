@@ -106,9 +106,11 @@ export async function occupyFromWorkspaceHome(input: {
   readonly forceNew?: boolean;
   readonly env?: NodeJS.ProcessEnv;
   readonly homeDir?: string;
-  readonly executeCommand: <T>(
+  readonly executeCommand: (
     command: OpenAgentWorkspaceCommand,
-  ) => Promise<{ isErr(): boolean; error?: DomainError; value?: T }>;
+  ) => Promise<
+    Result<{ readonly workspaceId: string; readonly attach?: SandboxAgentAttachDescriptor }>
+  >;
   readonly resolveDoor?: typeof resolveDefaultRemoteCodeDoor;
   readonly doorProbe?: Omit<RemoteCodeDoorProbe, "env" | "forceNew" | "onProgress" | "folderCwd">;
   readonly reportProgress: (

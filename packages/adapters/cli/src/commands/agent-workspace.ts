@@ -110,6 +110,12 @@ import {
   occupancyHomeVendorLabel,
   occupyFromWorkspaceHome,
 } from "../occupancy-home-launch.js";
+import {
+  occupancyHomeSkillDestinationExists,
+  offerOccupancyAppaloftSkill,
+  offerOccupancyHomeSkills,
+} from "../occupancy-skill-offer.js";
+
 import { type OccupancyHarness, resolveOccupancyAgent } from "../occupancy-vendor.js";
 import {
   formatRemoteCodeBanner,

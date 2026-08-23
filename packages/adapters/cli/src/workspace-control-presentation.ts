@@ -708,14 +708,14 @@ function snapshotSummary(
 function safeError(error: unknown, phase: string): WorkspaceControlRendererMessage {
   if (error && typeof error === "object") {
     const record = error as Record<string, unknown>;
+    const homeMessage =
+      phase === "workspace-control-launch" ? safeHomeLaunchMessage(error) : undefined;
     return {
       type: "error",
       code: typeof record.code === "string" ? record.code : "workspace_control_failed",
       phase,
       retryable: record.retryable === true,
-      ...(typeof record.message === "string" && record.message.trim()
-        ? { message: record.message }
-        : {}),
+      ...(homeMessage ? { message: homeMessage } : {}),
     };
   }
   return {
@@ -724,6 +724,27 @@ function safeError(error: unknown, phase: string): WorkspaceControlRendererMessa
     phase,
     retryable: false,
   };
+}
+
+function safeHomeLaunchMessage(error: unknown): string | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const record = error as Record<string, unknown>;
+  const details =
+    record.details && typeof record.details === "object"
+      ? (record.details as Record<string, unknown>)
+      : {};
+  const code =
+    typeof details.code === "string"
+      ? details.code
+      : typeof record.code === "string"
+        ? record.code
+        : "";
+  if (code === "workspace_remote_server_missing") {
+    return "No enrolled Server is available for a remote Agent session";
+  }
+  const message = typeof record.message === "string" ? record.message.trim() : "";
+  if (!message || /token|secret|=/iu.test(message)) return undefined;
+  return message;
 }
 
 function nativeClientCommand(record: Record<string, unknown>): readonly string[] {
@@ -1345,14 +1366,13 @@ export function createBoundedWorkspaceControlPresentation(
                   },
                 })
                 .then(async (occupied) => {
-                  if (!occupied) return occupied;
+                  if (!occupied) return;
                   if (!presentationOpen || occupyAbort.signal.aborted) {
                     throw occupyDiskPrepCancelledError();
                   }
                   if (!occupied.attach) throw occupyLiveSessionMissingError();
                   await attachIssuedDescriptor(occupied.attach);
                   if (occupied.workspaceId) selectedWorkspaceId = occupied.workspaceId;
-                  return occupied;
                 })
                 .catch(async (error) => {
                   if (activeTerminal) return;
