@@ -45,7 +45,8 @@ export class PgRepositoryBindingRepository implements RepositoryBindingRepositor
     context: RepositoryContext,
     repositoryIdentity: string,
   ): Promise<RepositoryBindingRecord | null> {
-    const row = await resolveRepositoryExecutor(this.db, context)
+    const executor = resolveRepositoryExecutor(this.db, context);
+    const active = await executor
       .selectFrom("project_repository_bindings")
       .selectAll()
       .where("tenant_id", "=", tenantId(context))
@@ -53,7 +54,16 @@ export class PgRepositoryBindingRepository implements RepositoryBindingRepositor
       .where("status", "=", "active")
       .orderBy("created_at", "asc")
       .executeTakeFirst();
-    return row ? { binding: rehydrate(row) } : null;
+    if (active) return { binding: rehydrate(active) };
+    const unbound = await executor
+      .selectFrom("project_repository_bindings")
+      .selectAll()
+      .where("tenant_id", "=", tenantId(context))
+      .where("repository_identity", "=", repositoryIdentity)
+      .where("status", "=", "unbound")
+      .orderBy("unbound_at", "desc")
+      .executeTakeFirst();
+    return unbound ? { binding: rehydrate(unbound) } : null;
   }
 
   async findByIdentityAndProject(

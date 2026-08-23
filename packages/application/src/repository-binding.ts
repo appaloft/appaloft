@@ -52,13 +52,22 @@ export class InMemoryRepositoryBindingRepository implements RepositoryBindingRep
     repositoryIdentity: string,
   ): Promise<RepositoryBindingRecord | null> {
     const prefix = `${tenantKey(context)}:${repositoryIdentity}:`;
-    const matches = [...this.bindings.entries()]
-      .filter(([key, binding]) => key.startsWith(prefix) && binding.toState().status === "active")
-      .map(([, binding]) => binding)
+    const rows = [...this.bindings.entries()]
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([, binding]) => binding);
+    const active = rows
+      .filter((binding) => binding.toState().status === "active")
       .sort((left, right) =>
         left.toState().createdAt.value.localeCompare(right.toState().createdAt.value),
       );
-    const binding = matches[0];
+    const unbound = rows
+      .filter((binding) => binding.toState().status === "unbound")
+      .sort((left, right) =>
+        (right.toState().unboundAt?.value ?? "").localeCompare(
+          left.toState().unboundAt?.value ?? "",
+        ),
+      );
+    const binding = active[0] ?? unbound[0];
     return binding ? { binding: clone(binding) } : null;
   }
 
