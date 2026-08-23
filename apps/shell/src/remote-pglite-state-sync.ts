@@ -543,9 +543,9 @@ function remoteRecoveryResolveCommand(dataRoot: string): ash.Script {
           live_path="$data_root/$component"
           [ -d "$live_path" ] && [ ! -L "$live_path" ] || exit 75
         done
-        sync_path "$data_root" || exit 75
         rm -rf "$incoming_dir" || exit 75
         rm -f "$revision_temp" || exit 75
+        sync_path "$data_root" || exit 75
         rm -f "$recovery_file" || exit 75
         sync_path "$recovery_dir" || exit 75
         exit 0

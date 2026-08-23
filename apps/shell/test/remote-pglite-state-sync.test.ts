@@ -2188,7 +2188,7 @@ describe("remote PGlite state sync", () => {
     }
   });
 
-  test("[CONFIG-FILE-STATE-012E] a committed v2 marker cleans staging without rolling data back", async () => {
+  test("[CONFIG-FILE-STATE-012E] a committed v2 marker reclaims staging before durability sync without rolling data back", async () => {
     const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-v2-commit-local-"));
     const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-v2-commit-remote-"));
     const remoteStateRoot = join(remoteRuntimeRoot, "state");
@@ -2224,6 +2224,7 @@ describe("remote PGlite state sync", () => {
           hadServerAppliedRoutes: true,
         })}\n`,
       );
+      const baseRunner = createLocalSshArchiveRunner();
       const sync = new RemotePgliteArchiveSync(
         {
           dataRoot: remoteStateRoot,
@@ -2233,7 +2234,24 @@ describe("remote PGlite state sync", () => {
           backupMaxCount: 20,
           target: { host: "127.0.0.1" },
         },
-        createLocalSshArchiveRunner(),
+        {
+          run(input) {
+            if (input.command !== "ssh") return baseRunner.run(input);
+            const original = input.args.at(-1) ?? "";
+            const durabilitySync = 'sync_path "$data_root" || exit 75';
+            expect(original).toContain(durabilitySync);
+            return baseRunner.run({
+              ...input,
+              args: [
+                ...input.args.slice(0, -1),
+                original.replaceAll(
+                  durabilitySync,
+                  `[ ! -d "$incoming_dir" ] || exit 75\n      ${durabilitySync}`,
+                ),
+              ],
+            });
+          },
+        },
       );
 
       expect(sync.recoverRemoteTransaction().isOk()).toBe(true);
