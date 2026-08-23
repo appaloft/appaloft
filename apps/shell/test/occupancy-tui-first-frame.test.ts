@@ -114,7 +114,7 @@ describe("occupancy TUI first frame", () => {
     expect(firstFrameModule).not.toContain("resolveWorkspaceControlRendererBinary");
     expect(firstFrameModule).toContain("OCCUPANCY_LEAVE_ALT_SCREEN}");
     expect(firstFrameModule).toContain("OCCUPANCY_DISABLE_MOUSE}\\n");
-    expect(firstFrameModule).toContain('process.on("SIGINT"');
+    expect(firstFrameModule).toContain('nodeProcess.on("SIGINT"');
     expect(firstFrameModule).toContain("restoreAndExit(130)");
     expect(firstFrameModule).toContain("isErrnoEpipe");
     expect(source).toContain("exitQuietlyOnOccupancyEpipe");
