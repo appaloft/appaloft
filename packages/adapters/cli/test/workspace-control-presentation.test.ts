@@ -1312,8 +1312,9 @@ describe("Workspace control presentation", () => {
     await listStarted.promise;
     await started;
     expect(renderer.closed).toBe(1);
-    expect(renderer.messages[0]).toEqual({
-      type: "loading",
+    expect(renderer.messages[0]).toMatchObject({
+      type: "chrome",
+      home: true,
       title: "Appaloft Cloud Agents",
     });
     resolveList?.({ items: [{ sandboxId: "sbx_late", status: "ready" }] });
@@ -1334,8 +1335,9 @@ describe("Workspace control presentation", () => {
     for (let attempt = 0; attempt < 50 && renderer.messages.length === 0; attempt += 1) {
       await Bun.sleep(10);
     }
-    expect(renderer.messages[0]).toEqual({
-      type: "loading",
+    expect(renderer.messages[0]).toMatchObject({
+      type: "chrome",
+      home: true,
       title: "Appaloft Cloud Agents",
     });
     handleWorkspaceControlWaitScreenInterrupt({
@@ -3185,5 +3187,33 @@ describe("Workspace control presentation", () => {
     ).text();
     expect(source).toContain("occupyPending");
     expect(source).toContain("if (input.occupyPending) {\n    return;");
+  });
+
+  test("[WS-TUI-HOME-001] workspace TTY opens occupancy home before occupy", async () => {
+    const renderer = new FakeRendererSession([{ type: "quit" }]);
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+    await presentation.start({
+      occupancyHome: true,
+      occupancyChrome: { project: "appaloft-cloud" },
+      occupyBootstrap: async () => {
+        throw new Error("home must not occupy until enter");
+      },
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>() =>
+        ok({
+          items: [{ id: "prj_home", name: "appaloft-cloud" }],
+        } as T),
+    });
+    expect(renderer.messages[0]).toMatchObject({
+      type: "chrome",
+      home: true,
+      title: "Appaloft Cloud Agents",
+      project: "appaloft-cloud",
+      vendors: ["OpenCode", "Codex", "Claude", "Pi", "Grok"],
+      targets: [{ projectId: "prj_home", name: "appaloft-cloud" }],
+    });
+    expect(renderer.messages.some((message) => message.type === "loading")).toBe(false);
   });
 });

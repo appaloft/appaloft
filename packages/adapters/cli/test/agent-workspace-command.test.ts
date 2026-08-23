@@ -579,6 +579,8 @@ describe("Agent Workspace CLI", () => {
         start: async (context) => {
           presentationStarts += 1;
           expect(context.terminalSessionGateway).toBeDefined();
+          expect(context.occupancyHome).toBe(true);
+          expect(context.occupyBootstrap).toBeTypeOf("function");
         },
       },
     });

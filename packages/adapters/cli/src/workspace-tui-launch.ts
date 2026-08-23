@@ -339,6 +339,16 @@ function parseRendererEvent(value: unknown): WorkspaceTuiLaunchEvent | undefined
         : undefined;
     case "terminal-reconnect":
       return { type: "terminal-reconnect" };
+    case "launch":
+      return typeof record.vendor === "string"
+        ? {
+            type: "launch",
+            vendor: record.vendor,
+            forceNew: record.forceNew === true,
+            ...(typeof record.prompt === "string" ? { prompt: record.prompt } : {}),
+            ...(typeof record.projectId === "string" ? { projectId: record.projectId } : {}),
+          }
+        : undefined;
     case "detach":
       return { type: "detach" };
     case "quit":

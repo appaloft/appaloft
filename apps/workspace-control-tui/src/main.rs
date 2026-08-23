@@ -12,9 +12,10 @@ mod operate;
 use anyhow::{Context, Result, bail};
 use appaloft_workspace_control_tui::{
     ActionDecision, AppState, DeliveryDecision, DeliverySubmission, OCCUPANCY_FIRST_SCREEN_LAYOUT,
-    OccupancyKeyBinding, ParentMessage, RecoverySubmission, RendererEvent, agent_area,
-    is_occupancy_ctrl_c, occupancy_key_binding, occupancy_stop_signals, render, terminal_key_bytes,
-    terminal_mouse_bytes, write_osc52_passthrough,
+    OccupancyHomeKey, OccupancyKeyBinding, ParentMessage, RecoverySubmission, RendererEvent,
+    agent_area, is_occupancy_ctrl_c, occupancy_home_key, occupancy_key_binding,
+    occupancy_stop_signals, render, terminal_key_bytes, terminal_mouse_bytes,
+    write_osc52_passthrough,
 };
 
 use crossterm::event::{
@@ -496,6 +497,40 @@ fn main() -> Result<()> {
                     _ => {}
                 }
             }
+            Event::Key(key)
+                if key.kind == KeyEventKind::Press
+                    && state.home.visible
+                    && !state.agent_focused
+                    && !state.focus_mode =>
+            {
+                match occupancy_home_key(key) {
+                    OccupancyHomeKey::Activate => {
+                        if let Some(event) = state.home.activate().into_event() {
+                            send(&mut writer, &event)?;
+                        }
+                    }
+                    OccupancyHomeKey::CycleVendor(delta) => state.home.cycle_vendor(delta),
+                    OccupancyHomeKey::CycleTarget(delta) => state.home.cycle_target(delta),
+                    OccupancyHomeKey::Move(delta) => state.home.move_focus(delta),
+                    OccupancyHomeKey::Backspace => state.home.backspace(),
+                    OccupancyHomeKey::Insert(character) => {
+                        if character == '?' {
+                            state.toggle_help();
+                        } else {
+                            state.home.insert(character);
+                        }
+                    }
+                    OccupancyHomeKey::Unhandled => {
+                        if occupancy_key_binding(key, false, false)
+                            == OccupancyKeyBinding::Quit
+                        {
+                            let _ = send(&mut writer, &RendererEvent::Quit);
+                            running = false;
+                        }
+                    }
+                }
+                continue;
+            }
             Event::Key(key) if key.kind == KeyEventKind::Press => {
                 match occupancy_key_binding(key, false, state.session_id.is_some()) {
                     OccupancyKeyBinding::Quit => {
@@ -513,7 +548,7 @@ fn main() -> Result<()> {
                         if state.help_open {
                             state.help_open = false;
                         } else {
-                            state.show_agents_list();
+                            state.home.visible = true;
                         }
                         continue;
                     }

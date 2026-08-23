@@ -12,6 +12,7 @@ import {
   IssueSandboxAgentAttachAccessCommand,
   ListAgentTaskRunsQuery,
   ListPreviewEnvironmentsQuery,
+  ListProjectsQuery,
   ListResourcesQuery,
   ListSandboxAgentRuntimesQuery,
   ListSandboxesQuery,
@@ -273,6 +274,9 @@ export type WorkspaceControlRendererMessage =
       readonly type: "chrome";
       readonly title?: string;
       readonly project?: string;
+      readonly home?: boolean;
+      readonly vendors?: readonly string[];
+      readonly targets?: readonly { readonly projectId: string; readonly name: string }[];
     }
   | { readonly type: "delivery-complete"; readonly workspaceId: string }
   | { readonly type: "recovery-complete"; readonly workspaceId: string }
@@ -341,6 +345,13 @@ export type WorkspaceControlRendererEvent =
   | { readonly type: "terminal-resize"; readonly cols: number; readonly rows: number }
   | { readonly type: "terminal-reconnect" }
   | { readonly type: "detach" }
+  | {
+      readonly type: "launch";
+      readonly vendor: string;
+      readonly forceNew?: boolean;
+      readonly prompt?: string;
+      readonly projectId?: string;
+    }
   | { readonly type: "quit" };
 
 export interface WorkspaceControlRendererSession {
@@ -365,6 +376,10 @@ export interface WorkspaceControlPresentationContext {
       options?: { readonly status?: "retrying" | "failed" },
     ) => Promise<void>;
     signal: AbortSignal;
+    vendor?: string;
+    projectId?: string;
+    forceNew?: boolean;
+    prompt?: string;
   }) => Promise<
     | {
         readonly workspaceId: string;
@@ -376,6 +391,7 @@ export interface WorkspaceControlPresentationContext {
   occupancyChrome?: {
     readonly project?: string;
   };
+  occupancyHome?: boolean;
 }
 
 /** Framework-neutral entry point for the interactive Workspace control surface. */
@@ -719,6 +735,22 @@ function nativeClientCommand(record: Record<string, unknown>): readonly string[]
     throw new Error("Native attach descriptor has an invalid client command");
   }
   return argv as string[];
+}
+
+async function listOccupancyHomeTargets(
+  context: WorkspaceControlPresentationContext,
+): Promise<{ readonly projectId: string; readonly name: string }[]> {
+  const query = ListProjectsQuery.create({ limit: 100, lifecycleStatus: "active" });
+  if (query.isErr()) return [];
+  try {
+    const listed = await context.executeQuery(query.value);
+    if (listed.isErr()) return [];
+    return (listed.value.items ?? [])
+      .filter((item) => typeof item.id === "string" && typeof item.name === "string")
+      .map((item) => ({ projectId: item.id, name: item.name }));
+  } catch {
+    return [];
+  }
 }
 
 async function listWorkspaces(
@@ -1154,7 +1186,7 @@ export function createBoundedWorkspaceControlPresentation(
           }
         | undefined;
       try {
-        if (context.occupyBootstrap) {
+        if (context.occupyBootstrap && !context.occupancyHome) {
           await renderer.send({
             type: "loading",
             collapsed: true,
@@ -1232,7 +1264,17 @@ export function createBoundedWorkspaceControlPresentation(
               await leaveWorkspaceTuiOnce(renderer);
             });
         } else {
-          await renderer.send({ type: "loading", title: OCCUPANCY_CODE_CHROME_TITLE });
+          const targets = await listOccupancyHomeTargets(context);
+          await renderer.send({
+            type: "chrome",
+            title: OCCUPANCY_CODE_CHROME_TITLE,
+            home: true,
+            vendors: ["OpenCode", "Codex", "Claude", "Pi", "Grok"],
+            ...(context.occupancyChrome?.project
+              ? { project: context.occupancyChrome.project }
+              : {}),
+            ...(targets.length > 0 ? { targets } : {}),
+          });
           void listWorkspaces(context).then(
             (workspaces) => renderer.send({ type: "workspaces", workspaces }),
             (error) => sendErrorBestEffort(error, "workspace-control-start"),
@@ -1249,6 +1291,62 @@ export function createBoundedWorkspaceControlPresentation(
               if (!activeTerminal) {
                 requestSelectedDetail(event.workspaceId, "workspace-control-select");
               }
+              continue;
+            }
+            if (event.type === "launch") {
+              if (!context.occupyBootstrap) {
+                await renderer.send({
+                  type: "error",
+                  code: "occupancy_launch_unavailable",
+                  phase: "workspace-control-launch",
+                  retryable: false,
+                });
+                continue;
+              }
+              await renderer.send({
+                type: "loading",
+                collapsed: true,
+                title: OCCUPANCY_CODE_CHROME_TITLE,
+                ...(context.occupancyChrome?.project
+                  ? { project: context.occupancyChrome.project }
+                  : {}),
+              });
+              occupyDone = context
+                .occupyBootstrap({
+                  signal: occupyAbort.signal,
+                  vendor: event.vendor,
+                  ...(event.projectId ? { projectId: event.projectId } : {}),
+                  ...(event.forceNew ? { forceNew: true } : {}),
+                  ...(event.prompt ? { prompt: event.prompt } : {}),
+                  reportProgress: async (message, options) => {
+                    if (!presentationOpen) return;
+                    lastPrepareStep = {
+                      message,
+                      step: occupancyPrepareStepForProgress(message),
+                    };
+                    await renderer.send({
+                      type: "progress",
+                      message,
+                      step: lastPrepareStep.step,
+                      ...(options?.status ? { status: options.status } : {}),
+                    });
+                  },
+                })
+                .then(async (occupied) => {
+                  if (!occupied) return occupied;
+                  if (!presentationOpen || occupyAbort.signal.aborted) {
+                    throw occupyDiskPrepCancelledError();
+                  }
+                  if (!occupied.attach) throw occupyLiveSessionMissingError();
+                  await attachIssuedDescriptor(occupied.attach);
+                  if (occupied.workspaceId) selectedWorkspaceId = occupied.workspaceId;
+                  return occupied;
+                })
+                .catch(async (error) => {
+                  if (activeTerminal) return;
+                  occupyFailure = error;
+                  await leaveWorkspaceTuiOnce(renderer);
+                });
               continue;
             }
             if (

@@ -1,3 +1,10 @@
+mod home;
+
+pub use home::{
+    HomeDecision, HomeFocus, HomeState, HomeTarget, OCCUPANCY_HOME_QUESTION, OCCUPANCY_HOME_TITLE,
+    OccupancyHomeKey, home_footer, occupancy_home_key, render_occupancy_home,
+};
+
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
@@ -731,6 +738,12 @@ pub enum ParentMessage {
         title: Option<String>,
         #[serde(default)]
         project: Option<String>,
+        #[serde(default)]
+        home: bool,
+        #[serde(default)]
+        vendors: Vec<String>,
+        #[serde(default)]
+        targets: Vec<HomeTarget>,
     },
     Error {
         code: String,
@@ -850,6 +863,15 @@ pub enum RendererEvent {
         rows: u16,
     },
     TerminalReconnect,
+    Launch {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        prompt: Option<String>,
+        vendor: String,
+        #[serde(rename = "projectId", skip_serializing_if = "Option::is_none")]
+        project_id: Option<String>,
+        #[serde(rename = "forceNew")]
+        force_new: bool,
+    },
     Detach,
     Quit,
 }
@@ -1028,6 +1050,7 @@ pub struct AppState {
     pub recovery_busy: bool,
     pub wrap: bool,
     pub help_open: bool,
+    pub home: HomeState,
     pub open_panes: Vec<OpenPane>,
     pub pending_osc52: Vec<String>,
     pub osc52_carry: String,
@@ -1064,6 +1087,7 @@ impl Default for AppState {
             recovery_busy: false,
             wrap: false,
             help_open: false,
+            home: HomeState::default(),
             open_panes: Vec::new(),
             pending_osc52: Vec::new(),
             osc52_carry: String::new(),
@@ -1136,6 +1160,7 @@ impl AppState {
                 project,
             } => {
                 self.loading.active = true;
+                self.home.visible = false;
                 if let Some(collapsed) = collapsed {
                     self.loading.collapsed = collapsed;
                 }
@@ -1147,12 +1172,28 @@ impl AppState {
                 }
                 self.status_line = OCCUPANCY_WAIT_TITLE.to_owned();
             }
-            ParentMessage::Chrome { title, project } => {
+            ParentMessage::Chrome {
+                title,
+                project,
+                home,
+                vendors,
+                targets,
+            } => {
                 if let Some(title) = title {
                     self.loading.title = title;
                 }
                 if let Some(project) = project {
                     self.loading.project = occupancy_display_project(&project);
+                }
+                if home {
+                    self.home.visible = true;
+                    self.loading.active = false;
+                }
+                if !vendors.is_empty() {
+                    self.home.apply_vendors(vendors);
+                }
+                if !targets.is_empty() {
+                    self.home.apply_targets(targets);
                 }
             }
             ParentMessage::Workspaces { workspaces } => {
@@ -2585,6 +2626,14 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState) {
         );
         return;
     }
+    if state.home.visible && !state.agent_focused && !state.focus_mode {
+        render_occupancy_home(frame, &state.home, body);
+        frame.render_widget(
+            Paragraph::new(home_footer(&state.home)).style(Style::default().fg(Color::DarkGray)),
+            footer,
+        );
+        return;
+    }
     if state.focus_mode {
         render_terminal(
             frame,
@@ -3517,6 +3566,9 @@ mod tests {
         state.apply(ParentMessage::Chrome {
             title: Some("Appaloft Cloud Agents".to_owned()),
             project: Some("appaloft-cloud-agents".to_owned()),
+            home: false,
+            vendors: Vec::new(),
+            targets: Vec::new(),
         });
         assert_eq!(
             occupancy_chrome_header_for_width(&state, 80),
@@ -5452,5 +5504,48 @@ mod tests {
             detail.pull_request = pull_request;
         }
         state
+    }
+
+    #[test]
+    fn occupancy_home_shows_railway_first_screen() {
+        let mut state = AppState::default();
+        state.apply(ParentMessage::Chrome {
+            title: Some("Appaloft Cloud Agents".to_owned()),
+            project: Some("appaloft-cloud".to_owned()),
+            home: true,
+            vendors: vec!["OpenCode".to_owned(), "Codex".to_owned()],
+            targets: vec![HomeTarget {
+                project_id: "prj_1".to_owned(),
+                name: "appaloft-cloud".to_owned(),
+            }],
+        });
+        assert!(state.home.visible);
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &state))
+            .expect("draw occupancy home");
+        let out = buffer_plain(&terminal);
+        assert!(out.contains(OCCUPANCY_HOME_TITLE), "{out}");
+        assert!(out.contains(OCCUPANCY_HOME_QUESTION), "{out}");
+        assert!(out.contains("New Session"), "{out}");
+        assert!(out.contains("New Cloud Agent"), "{out}");
+        assert!(out.contains("Manage"), "{out}");
+        assert!(out.contains("shift+tab OpenCode"), "{out}");
+        assert!(out.contains("Target Project appaloft-cloud"), "{out}");
+        state.home.insert('s');
+        state.home.insert('h');
+        state.home.insert('i');
+        state.home.insert('p');
+        let launched = state.home.activate();
+        assert_eq!(
+            launched,
+            HomeDecision::Launch {
+                prompt: Some("ship".to_owned()),
+                vendor: "OpenCode".to_owned(),
+                project_id: Some("prj_1".to_owned()),
+                force_new: false,
+            }
+        );
     }
 }

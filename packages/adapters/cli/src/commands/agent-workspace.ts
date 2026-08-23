@@ -104,11 +104,7 @@ import {
   occupancyConnectingStepLines,
   occupancyConnectingTelemetry,
 } from "../occupancy-connecting-telemetry.js";
-import {
-  occupancyHomeSkillDestinationExists,
-  offerOccupancyAppaloftSkill,
-  offerOccupancyHomeSkills,
-} from "../occupancy-skill-offer.js";
+import { occupyFromWorkspaceHome } from "../occupancy-home-launch.js";
 import { type OccupancyHarness, resolveOccupancyAgent } from "../occupancy-vendor.js";
 import {
   formatRemoteCodeBanner,
@@ -2226,6 +2222,24 @@ export const agentWorkspaceCommand = EffectCommand.make(
           cli.workspaceControlPresentation?.start({
             executeCommand: cli.executeCommand,
             executeQuery: cli.executeQuery,
+            occupancyHome: true,
+            occupancyChrome: {
+              project: folderDirectoryName(process.cwd()),
+            },
+            occupyBootstrap: async ({ reportProgress, signal, vendor, projectId, forceNew }) =>
+              occupyFromWorkspaceHome({
+                path: process.cwd(),
+                ...(cli.environment ? { env: cli.environment } : {}),
+                ...(vendor ? { vendor } : {}),
+                ...(projectId ? { projectId } : {}),
+                ...(forceNew ? { forceNew: true } : {}),
+                executeCommand: (command) => cli.executeCommand(command),
+                resolveDoor: resolveDefaultRemoteCodeDoor,
+                reportProgress: (message, progress) => {
+                  void reportProgress(message, progress);
+                },
+                ...(signal ? { signal } : {}),
+              }),
             ...(cli.terminalSessionGateway
               ? { terminalSessionGateway: cli.terminalSessionGateway }
               : {}),

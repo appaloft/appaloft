@@ -7,6 +7,7 @@ import {
   detectOccupancyVendor,
   loadOccupancyAgentPreference,
   OCCUPANCY_VENDOR_HARNESS,
+  occupancyAliasFromHomeLabel,
   occupancyHarnessForAlias,
   occupancyVendorCredentialPresent,
   resolveOccupancyAgent,
@@ -29,6 +30,11 @@ test("[WS-REMOTE-VENDOR-204] vendor and harness aliases map onto occupancy harne
   expect(occupancyHarnessForAlias("pi")).toBe("pi");
   expect(occupancyHarnessForAlias("omp")).toBe("omp");
   expect(occupancyHarnessForAlias()).toBe("opencode");
+  expect(occupancyAliasFromHomeLabel("OpenCode")).toBe("opencode");
+  expect(occupancyAliasFromHomeLabel("Codex")).toBe("codex");
+  expect(occupancyAliasFromHomeLabel("Claude")).toBe("claude");
+  expect(occupancyAliasFromHomeLabel("Pi")).toBe("pi");
+  expect(occupancyAliasFromHomeLabel("Grok")).toBe("grok");
 });
 
 test("[WS-REMOTE-VENDOR-205] default alias follows saved preference then laptop login", async () => {

@@ -26,6 +26,19 @@ export const OCCUPANCY_VENDOR_LABEL: Readonly<Record<OccupancyVendor, string>> =
   grok: "Grok",
 };
 
+export const OCCUPANCY_HOME_VENDOR_LABELS = ["OpenCode", "Codex", "Claude", "Pi", "Grok"] as const;
+
+export function occupancyAliasFromHomeLabel(label: string): OccupancyAgentAlias | undefined {
+  const normalized = label.trim().toLowerCase();
+  if (normalized === "opencode") return "opencode";
+  if (normalized === "codex") return "codex";
+  if (normalized === "claude") return "claude";
+  if (normalized === "pi") return "pi";
+  if (normalized === "grok") return "grok";
+  if (normalized === "omp") return "omp";
+  return undefined;
+}
+
 /**
  * Railway-aligned `--claude` / `--codex` / `--grok` launch that vendor CLI
  * on the remote Sandbox. The laptop only attaches. `--opencode` / `--pi` /
