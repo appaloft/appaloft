@@ -1582,7 +1582,9 @@ export class SandboxAgentDeliveryService {
         ),
       );
     }
-    const harness = this.dependencies.harnessRegistry.resolve(input.harnessKey);
+    const harness = this.dependencies.harnessRegistry.resolve(input.harnessKey, {
+      templateId: input.harnessTemplateId,
+    });
     if (!harness) return err(domainError.notFound("SandboxAgentHarness", input.harnessKey));
     if (harness.templateId !== input.harnessTemplateId) {
       return err(domainError.conflict("Sandbox Agent harness template mismatch"));
