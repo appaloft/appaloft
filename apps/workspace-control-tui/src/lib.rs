@@ -5577,4 +5577,37 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn occupancy_home_this_folder_launch_omits_project_id() {
+        let mut state = AppState::default();
+        state.apply(ParentMessage::Chrome {
+            title: Some("Appaloft Cloud Agents".to_owned()),
+            project: Some("appaloft-cloud".to_owned()),
+            home: true,
+            vendors: vec!["grok".to_owned()],
+            selected_vendor: Some("grok".to_owned()),
+            targets: vec![
+                HomeTarget {
+                    project_id: "".to_owned(),
+                    name: "appaloft-cloud".to_owned(),
+                },
+                HomeTarget {
+                    project_id: "prj_teable".to_owned(),
+                    name: "github.com/teableio/teable-ee".to_owned(),
+                },
+            ],
+        });
+        state.home.insert('h');
+        let launched = state.home.activate();
+        assert_eq!(
+            launched,
+            HomeDecision::Launch {
+                prompt: Some("h".to_owned()),
+                vendor: "grok".to_owned(),
+                project_id: None,
+                force_new: false,
+            }
+        );
+    }
 }

@@ -177,6 +177,11 @@ impl HomeState {
     }
 
     pub fn activate(&mut self) -> HomeDecision {
+        let project_id = self
+            .selected_target()
+            .map(|target| target.project_id.trim())
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned);
         match self.focus {
             HomeFocus::Manage => {
                 self.visible = false;
@@ -185,17 +190,13 @@ impl HomeState {
             HomeFocus::NewAgent => HomeDecision::Launch {
                 prompt: nonempty_prompt(&self.prompt),
                 vendor: self.selected_vendor(),
-                project_id: self
-                    .selected_target()
-                    .map(|target| target.project_id.clone()),
+                project_id,
                 force_new: true,
             },
             HomeFocus::NewSession | HomeFocus::Prompt => HomeDecision::Launch {
                 prompt: nonempty_prompt(&self.prompt),
                 vendor: self.selected_vendor(),
-                project_id: self
-                    .selected_target()
-                    .map(|target| target.project_id.clone()),
+                project_id,
                 force_new: false,
             },
         }

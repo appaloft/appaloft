@@ -3212,7 +3212,10 @@ describe("Workspace control presentation", () => {
       title: "Appaloft Cloud Agents",
       project: "appaloft-cloud",
       vendors: ["grok", "codex", "claude", "opencode", "pi"],
-      targets: [{ projectId: "prj_home", name: "appaloft-cloud" }],
+      targets: [
+        { projectId: "", name: "appaloft-cloud" },
+        { projectId: "prj_home", name: "appaloft-cloud" },
+      ],
     });
     expect(renderer.messages.some((message) => message.type === "loading")).toBe(false);
   });
@@ -3250,5 +3253,73 @@ describe("Workspace control presentation", () => {
       1,
     );
     expect(renderer.closed).toBe(1);
+  });
+
+  test("[WS-TUI-HOME-001] enter occupies this folder and writes the prompt", async () => {
+    const written: string[] = [];
+    const terminal = {
+      detached: 0,
+      async *[Symbol.asyncIterator](): AsyncIterator<TerminalSessionFrame> {},
+      write(data: string) {
+        written.push(data);
+        return Promise.resolve();
+      },
+      resize: () => Promise.resolve(),
+      detach() {
+        this.detached += 1;
+        return Promise.resolve();
+      },
+      close: () => Promise.resolve(),
+    } satisfies TerminalSession & { detached: number };
+    const renderer = new FakeRendererSession([]);
+    renderer.events = async function* events() {
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        if (this.messages.some((message) => message.type === "chrome")) break;
+        await Promise.resolve();
+      }
+      yield { type: "launch", vendor: "grok", prompt: "hello world", forceNew: false };
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        if (written.length > 0 || this.closed > 0) break;
+        await Promise.resolve();
+      }
+      yield { type: "quit" };
+    };
+    const presentation = createBoundedWorkspaceControlPresentation({
+      openRenderer: async () => renderer,
+    });
+    let launchedProjectId: string | undefined = "unset";
+    await presentation.start({
+      occupancyHome: true,
+      occupancyChrome: { project: "appaloft-cloud", selectedVendor: "grok" },
+      occupyBootstrap: async ({ projectId }) => {
+        launchedProjectId = projectId;
+        return {
+          workspaceId: "sbx_home",
+          attach: {
+            workspaceId: "sbx_home",
+            runtimeId: "sar_home",
+            transport: "managed-terminal",
+            sessionId: "term_home",
+            processId: "proc_home",
+            access: {
+              kind: "websocket",
+              path: "/sessions/term_home",
+              expiresAt: "2099-01-01T00:00:00.000Z",
+            },
+          },
+        };
+      },
+      executeCommand: async () => ok({}),
+      executeQuery: async <T>() => ok({ items: [] } as T),
+      terminalSessionGateway: { attach: () => ok(terminal) },
+    });
+    expect(launchedProjectId).toBeUndefined();
+    expect(written).toEqual(["hello world\n"]);
+    expect(renderer.messages).toContainEqual({
+      type: "terminal-ready",
+      workspaceId: "sbx_home",
+      runtimeId: "sar_home",
+      sessionId: "term_home",
+    });
   });
 });
