@@ -2103,11 +2103,12 @@ describe("remote PGlite state sync", () => {
     }
   });
 
-  test("[CONFIG-FILE-STATE-012F] legacy recovery retries from the complete backup after an interrupted copy", async () => {
+  test("[CONFIG-FILE-STATE-012F] legacy recovery moves authoritative state without copying and resumes after interruption", async () => {
     const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-v1-retry-local-"));
     const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-v1-retry-remote-"));
     const remoteStateRoot = join(remoteRuntimeRoot, "state");
     const backupRoot = join(remoteStateRoot, "backups", "sync-legacy-retry-42");
+    const recoveringBackupRoot = join(remoteStateRoot, "backups", "rcvr-legacy-retry-42");
     const markerPath = join(remoteStateRoot, "recovery", "remote-sync-upload.json");
 
     try {
@@ -2139,15 +2140,18 @@ describe("remote PGlite state sync", () => {
           run(input) {
             if (input.command !== "ssh") return baseRunner.run(input);
             const original = input.args.at(-1) ?? "";
-            const copyCommand = 'cp -a "$backup_dir/$component" "$data_root/$component" || exit 75';
-            expect(original).toContain(copyCommand);
+            const moveCommand = 'mv "$backup_dir/$component" "$data_root/$component" || exit 75';
+            expect(original).toContain(moveCommand);
+            expect(original).not.toContain(
+              'cp -a "$backup_dir/$component" "$data_root/$component"',
+            );
             return baseRunner.run({
               ...input,
               args: [
                 ...input.args.slice(0, -1),
                 original.replace(
-                  copyCommand,
-                  'if [ "$component" = source-links ]; then false; else cp -a "$backup_dir/$component" "$data_root/$component"; fi || exit 75',
+                  moveCommand,
+                  'if [ "$component" = source-links ]; then exit 75; fi\n      mv "$backup_dir/$component" "$data_root/$component" || exit 75',
                 ),
               ],
             });
@@ -2157,8 +2161,12 @@ describe("remote PGlite state sync", () => {
 
       expect(interruptedSync.recoverRemoteTransaction().isErr()).toBe(true);
       expect(await Bun.file(markerPath).exists()).toBe(true);
-      expect(await readFile(join(backupRoot, "pglite", "state.txt"), "utf8")).toBe("old-pglite");
-      expect(await readFile(join(backupRoot, "source-links", "state.txt"), "utf8")).toBe(
+      expect(await Bun.file(backupRoot).exists()).toBe(false);
+      expect(await Bun.file(join(recoveringBackupRoot, "pglite")).exists()).toBe(false);
+      expect(await readFile(join(remoteStateRoot, "pglite", "state.txt"), "utf8")).toBe(
+        "old-pglite",
+      );
+      expect(await readFile(join(recoveringBackupRoot, "source-links", "state.txt"), "utf8")).toBe(
         "old-source-links",
       );
 
@@ -2182,6 +2190,7 @@ describe("remote PGlite state sync", () => {
       }
       expect(await Bun.file(markerPath).exists()).toBe(false);
       expect(await Bun.file(backupRoot).exists()).toBe(false);
+      expect(await Bun.file(recoveringBackupRoot).exists()).toBe(false);
     } finally {
       await rm(localDataRoot, { recursive: true, force: true });
       await rm(remoteRuntimeRoot, { recursive: true, force: true });

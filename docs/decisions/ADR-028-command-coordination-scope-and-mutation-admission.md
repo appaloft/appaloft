@@ -168,9 +168,12 @@ This bounds the normal peak at live plus incoming state, instead of copying both
 full incoming mirror beside live state. A staging failure removes only the incoming directory. A
 rotation or promotion failure restores the authoritative directories by rename when possible and
 keeps the marker whenever recovery is incomplete. Explicit recovery also recognizes the legacy v1
-marker, but restores it only after validating a complete backup. It retains that full backup as the
-retry source until every authoritative component and the data-root directory are durably synced,
-then removes the marker before best-effort backup cleanup.
+marker, but restores it only after validating a complete backup. It first atomically claims that
+backup under a same-length bounded `rcvr-*` name, then moves each authoritative component into live
+state on the same filesystem instead of allocating another full copy. The claimed path makes
+partial progress resumable even after a component has moved. It retains the marker until every
+authoritative component and the data-root directory are durably synced, then removes the marker
+before best-effort recovery-directory cleanup.
 
 This recovery path exists to avoid unnecessary user-visible failure for different logical scopes
 that happened to mutate disjoint rows during the same wall-clock window. It does not turn

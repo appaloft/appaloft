@@ -570,8 +570,10 @@ function remoteRecoveryResolveCommand(dataRoot: string): ash.Script {
     case "$legacy_backup_name" in *[!A-Za-z0-9._-]*|*/*|*..*|"") exit 75 ;; esac
     [ "$legacy_backup" = "$data_root/backups/$legacy_backup_name" ] || exit 75
     [ -d "$data_root/backups" ] && [ ! -L "$data_root/backups" ] || exit 75
-    backup_dir="$legacy_backup"
-    [ -d "$backup_dir" ] && [ ! -L "$backup_dir" ] || exit 75
+    recovering_backup_name="$(printf '%s' "$legacy_backup_name" | sed 's/^sync-/rcvr-/')"
+    recovering_backup="$data_root/backups/$recovering_backup_name"
+    case "$recovering_backup_name" in rcvr-*) ;; *) exit 75 ;; esac
+    [ ! -L "$legacy_backup" ] && [ ! -L "$recovering_backup" ] || exit 75
     legacy_revision=0
     revision_file="$data_root/sync-revision.txt"
     if [ -e "$revision_file" ] || [ -L "$revision_file" ]; then
@@ -579,16 +581,32 @@ function remoteRecoveryResolveCommand(dataRoot: string): ash.Script {
       legacy_revision="$(cat "$revision_file" 2>/dev/null || printf invalid)"
     fi
     case "$legacy_revision" in ""|*[!0-9]*) exit 75 ;; esac
+    if [ -d "$legacy_backup" ]; then
+      [ ! -e "$recovering_backup" ] && [ ! -L "$recovering_backup" ] || exit 75
+      for component in pglite source-links server-applied-routes; do
+        [ -d "$legacy_backup/$component" ] && [ ! -L "$legacy_backup/$component" ] || exit 75
+      done
+      [ -f "$legacy_backup/pglite/PG_VERSION" ] && [ ! -L "$legacy_backup/pglite/PG_VERSION" ] || exit 75
+      mv "$legacy_backup" "$recovering_backup" || exit 75
+    else
+      [ -d "$recovering_backup" ] && [ ! -L "$recovering_backup" ] || exit 75
+    fi
+    backup_dir="$recovering_backup"
     for component in pglite source-links server-applied-routes; do
-      [ -d "$backup_dir/$component" ] && [ ! -L "$backup_dir/$component" ] || exit 75
-      [ ! -L "$data_root/$component" ] || exit 75
-    done
-    [ -f "$backup_dir/pglite/PG_VERSION" ] && [ ! -L "$backup_dir/pglite/PG_VERSION" ] || exit 75
-    for component in pglite source-links server-applied-routes; do
-      rm -rf "$data_root/$component" || exit 75
-      [ ! -e "$data_root/$component" ] && [ ! -L "$data_root/$component" ] || exit 75
-      cp -a "$backup_dir/$component" "$data_root/$component" || exit 75
-      sync_path "$data_root/$component" || exit 75
+      backup_path="$backup_dir/$component"
+      live_path="$data_root/$component"
+      [ ! -L "$backup_path" ] && [ ! -L "$live_path" ] || exit 75
+      if [ -d "$backup_path" ]; then
+        rm -rf "$live_path" || exit 75
+        [ ! -e "$live_path" ] && [ ! -L "$live_path" ] || exit 75
+        mv "$backup_dir/$component" "$data_root/$component" || exit 75
+      else
+        [ -d "$live_path" ] && [ ! -L "$live_path" ] || exit 75
+      fi
+      if [ "$component" = pglite ]; then
+        [ -f "$live_path/PG_VERSION" ] && [ ! -L "$live_path/PG_VERSION" ] || exit 75
+      fi
+      sync_path "$live_path" || exit 75
     done
     sync_path "$data_root" || exit 75
     rm -f "$recovery_file" || exit 75
