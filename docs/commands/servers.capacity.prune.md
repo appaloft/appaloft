@@ -118,6 +118,9 @@ The command must:
   renames so a capacity repair does not require live, copied backup, and incoming state at once. It
   publishes an active recovery marker before rotation and commits only by atomically replacing the
   revision fence; ordinary reads fail closed until explicit recovery rolls back or finishes cleanup.
+  If an interrupted pre-commit upload left the filesystem under disk pressure, explicit recovery
+  restores the authoritative components and removes superseded incoming/revision/backup staging
+  before syncing the restored data root. The marker remains until that durability fence succeeds.
 - The adapter must never run broad `docker system prune`.
 - Unused image pruning must use `docker image prune --all` so tagged and dangling images share the
   category semantics reported by capacity inspection. Docker's container-reference safety and the
