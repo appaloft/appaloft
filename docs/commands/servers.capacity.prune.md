@@ -143,7 +143,10 @@ The command must:
 - If destructive SSH-PGlite prune succeeds locally but final authoritative-state upload fails, the
   shell preserves the local audited mirror plus its base snapshot and blocks later downloads. An
   explicit `server capacity inspect ... --retry-pending-state-sync` retries only that
-  revision-fenced upload before the read-only inspection is dispatched. If the fence conflicts, it
+  revision-fenced upload before the read-only inspection is dispatched. Legacy copy-era markers
+  are first claimed under a same-length bounded `rcvr-*` path and restored by resumable
+  same-filesystem moves, so recovery does not require another full state copy. If the fence
+  conflicts, it
   merges onto a fresh authoritative snapshot and preserves that merged mirror across another upload
   failure. Pending metadata binds the exact SSH target and remote state root, validates monotonic
   revisions, generated transaction paths, and complete non-symlink PGlite mirrors, and removes
