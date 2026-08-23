@@ -3534,6 +3534,144 @@ describe("Agent Workspace CLI", () => {
     expect(source).not.toContain("This folder is not linked");
   });
 
+  test("[WS-REMOTE-COMPAT-227] occupy retries without targetServerId when Cloud schema is older", async () => {
+    const commands: Command<unknown>[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          if (commands.length === 1) {
+            return err({
+              code: "bad_request",
+              category: "user",
+              message: "Input validation failed",
+              retryable: false,
+              details: { phase: "orpc-error-normalization", orpcCode: "BAD_REQUEST" },
+            });
+          }
+          return ok({
+            workspaceId: "sbx_compat",
+            attach: undefined,
+          } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_cloud_compat" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        projectId: "prj_web",
+        serverId: "srv_4lifk0yrcecy",
+        serverName: "hostinger",
+      }),
+    });
+    const originalExitCode = process.exitCode;
+    const write = process.stderr.write;
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
+    } finally {
+      process.stderr.write = write;
+      process.exitCode = originalExitCode ?? 0;
+    }
+    const opens = commands.filter(
+      (command): command is OpenAgentWorkspaceCommand =>
+        command instanceof OpenAgentWorkspaceCommand,
+    );
+    expect(opens.length).toBeGreaterThan(1);
+    expect(opens[0]?.input).toMatchObject({
+      targetServerId: "srv_4lifk0yrcecy",
+      projectId: "prj_web",
+    });
+    expect(opens.at(-1)?.input.targetServerId).toBeUndefined();
+    expect(opens.at(-1)?.input.projectId).toBeUndefined();
+  });
+
+  test("[WS-REMOTE-COMPAT-227] occupy forceNew after old Cloud pin mismatch keeps fields stripped", async () => {
+    const commands: Command<unknown>[] = [];
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus: {
+        execute: async <T>(_context: unknown, command: Command<T>) => {
+          commands.push(command as Command<unknown>);
+          if (!(command instanceof OpenAgentWorkspaceCommand)) {
+            return ok({} as T);
+          }
+          const opens = commands.filter((item) => item instanceof OpenAgentWorkspaceCommand);
+          if (opens.length === 1) {
+            return err({
+              code: "bad_request",
+              category: "user",
+              message: "Input validation failed",
+              retryable: false,
+              details: { phase: "orpc-error-normalization", orpcCode: "BAD_REQUEST" },
+            });
+          }
+          if (!command.input.forceNew) {
+            return err({
+              code: "conflict",
+              category: "conflict",
+              message: "Preferred Workspace is pinned to another Git commit",
+              retryable: false,
+              details: { code: "workspace_open_source_pin_mismatch" },
+            });
+          }
+          return ok({
+            workspaceId: "sbx_compat_new",
+            attach: undefined,
+          } as T);
+        },
+      } as unknown as CommandBus,
+      queryBus: { execute: async () => ok({ items: [] }) } as unknown as QueryBus,
+      executionContextFactory: {
+        create: (input) => createExecutionContext({ ...input, requestId: "req_cloud_compat_pin" }),
+      },
+      resolveRemoteCodeDoor: async () => ({
+        repository: "https://github.com/acme/api.git",
+        repositoryIdentity: "github.com/acme/api",
+        ref: "refs/heads/main",
+        branch: "main",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        projectId: "prj_web",
+        serverId: "srv_4lifk0yrcecy",
+        serverName: "hostinger",
+      }),
+    });
+    const originalExitCode = process.exitCode;
+    const write = process.stderr.write;
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+    try {
+      await program.parseAsync(["node", "appaloft", "code", "--no-attach"]);
+    } finally {
+      process.stderr.write = write;
+      process.exitCode = originalExitCode ?? 0;
+    }
+    const opens = commands.filter(
+      (command): command is OpenAgentWorkspaceCommand =>
+        command instanceof OpenAgentWorkspaceCommand,
+    );
+    expect(opens.length).toBeGreaterThan(2);
+    expect(opens[0]?.input).toMatchObject({
+      targetServerId: "srv_4lifk0yrcecy",
+      forceNew: false,
+    });
+    expect(opens.at(-1)?.input).toMatchObject({
+      forceNew: true,
+    });
+    expect(opens.at(-1)?.input.targetServerId).toBeUndefined();
+    expect(opens.at(-1)?.input.projectId).toBeUndefined();
+  });
+
   test("[WS-REMOTE-COMPAT-128][WS-REMOTE-COMPAT-129][WS-REMOTE-COMPAT-130] unstructured occupancy validation names the enrolled Server", async () => {
     const commands: Command<unknown>[] = [];
     const { createCliProgram } = await import("../src");
@@ -3580,10 +3718,13 @@ describe("Agent Workspace CLI", () => {
       process.stderr.write = write;
       process.exitCode = originalExitCode ?? 0;
     }
-    expect(commands).toHaveLength(1);
-    expect((commands[0] as OpenAgentWorkspaceCommand).input.targetServerId).toBe(
-      "srv_4lifk0yrcecy",
+    const opens = commands.filter(
+      (command): command is OpenAgentWorkspaceCommand =>
+        command instanceof OpenAgentWorkspaceCommand,
     );
+    expect(opens.length).toBeGreaterThan(1);
+    expect(opens[0]?.input.targetServerId).toBe("srv_4lifk0yrcecy");
+    expect(opens.at(-1)?.input.targetServerId).toBeUndefined();
   });
 
   test("[WS-REMOTE-COMPAT-220][WS-REMOTE-OPEN-BYOS-181] folder.local Cloud validation is a human next step, not Server targeting", async () => {
