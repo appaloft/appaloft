@@ -1,6 +1,6 @@
 {
   "name": "appaloft",
-  "version": "1.10.6",
+  "version": "1.10.7",
   "devDependencies": {
     "@appaloft/adapter-packaging": "workspace:*",
     "@appaloft/ash": "workspace:*",
