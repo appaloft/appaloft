@@ -26,6 +26,7 @@ const generatedOperationsWithoutRemoteCli = new Set([
   "organizations.delete",
   "organizations.profile.change",
   "organizations.profile.show",
+  "projects.list-summaries",
   "sandbox-credentials.grant",
   "sandbox-credentials.list",
   "sandbox-credentials.request",
