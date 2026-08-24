@@ -126,6 +126,7 @@ async function fixture(
     admission?: WorkspaceOpenCredentialAdmissionPort;
     mcpAdmission?: WorkspaceOpenMcpAdmissionPort;
     staleProfile?: boolean;
+    invalidProfileInstallationIds?: readonly string[];
     omitBinding?: boolean;
     omitDefaultProfile?: boolean;
     placement?: WorkspaceOpenPlacementPort;
@@ -256,6 +257,9 @@ async function fixture(
               code: "agent_workspace_profile_installation_stale",
             }),
           );
+        }
+        if (options.invalidProfileInstallationIds?.includes(installationId)) {
+          return err(domainError.validation("Agent Workspace Profile validation failed"));
         }
         return ok({
           ...plan,
@@ -629,6 +633,19 @@ describe("Agent Workspace open preflight", () => {
         await fromDefault.service.resolveContext(context, { ...input, profile: "agent-default" })
       )._unsafeUnwrap().profileInstallationId,
     ).toBe("awpi_default");
+  });
+
+  test("[WS-REMOTE-PROFILE-LIVE-178] occupy retries a newer Profile when the oldest install fails compile", async () => {
+    const { compiled, reserved, service } = await fixture({
+      duplicateProfile: true,
+      invalidProfileInstallationIds: ["awpi_default"],
+    });
+    const admitted = await service.resolve(context, input);
+    expect(admitted.isOk()).toBe(true);
+    if (admitted.isErr()) return;
+    expect(admitted.value.profileInstallationId).toBe("awpi_dead");
+    expect(compiled).toEqual(["awpi_default", "awpi_dead"]);
+    expect(reserved).toEqual(["awpi_dead"]);
   });
 
   test("[WS-REMOTE-PROFILE-LIVE-178] default code stays first-success when leftover and live installs both exist", async () => {

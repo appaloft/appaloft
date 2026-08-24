@@ -22,6 +22,7 @@ import {
 import {
   type AgentWorkspaceCredentialBinding,
   type AgentWorkspaceMcpBinding,
+  type AgentWorkspaceProfileCompiledPlan,
   type AgentWorkspaceProfileInstallationService,
   type AgentWorkspaceProfileRegistryRepository,
 } from "./agent-workspace-profile";
@@ -388,35 +389,29 @@ export class AgentWorkspaceOpenPreflightService {
         }),
       );
     }
-    const plan = options.precompiledProfilePlan
+    const compiled = options.precompiledProfilePlan
       ? ok(options.precompiledProfilePlan)
-      : await this.dependencies.profileCompiler.compileForNewWorkspace(
-          context,
-          resolved.profileInstallationId,
-          {
-            ...(options.credentialReferences
-              ? { credentialReferences: options.credentialReferences }
-              : {}),
-          },
-        );
-    if (plan.isErr()) return err(plan.error);
+      : await this.compileProfileForOpen(context, resolved.profileInstallationId, options);
+    if (compiled.isErr()) return err(compiled.error);
+    const plan = compiled.value;
+    const profileInstallationId = plan.pin.profileInstallationId;
     const admitted = await this.dependencies.credentialAdmission.admit(context, {
       projectId: resolved.projectId,
-      profileInstallationId: resolved.profileInstallationId,
-      bindings: plan.value.credentialBindings ?? [],
+      profileInstallationId,
+      bindings: plan.credentialBindings ?? [],
       ...(options.credentialAdmissionScope ? { scope: options.credentialAdmissionScope } : {}),
     });
     if (admitted.isErr()) return err(admitted.error);
     const mcpAdmitted = await this.dependencies.mcpAdmission.admit(context, {
       projectId: resolved.projectId,
-      profileInstallationId: resolved.profileInstallationId,
-      bindings: plan.value.mcpBindings ?? [],
+      profileInstallationId,
+      bindings: plan.mcpBindings ?? [],
     });
     if (mcpAdmitted.isErr()) return err(mcpAdmitted.error);
     const reservation = await this.dependencies.placement.reserve(context, {
       projectId: resolved.projectId,
-      profileInstallationId: resolved.profileInstallationId,
-      sandbox: plan.value.sandbox,
+      profileInstallationId,
+      sandbox: plan.sandbox,
       ...(options.placementProviderKey ? { providerKey: options.placementProviderKey } : {}),
       ...(options.targetServerId ? { targetServerId: options.targetServerId } : {}),
     });
@@ -436,9 +431,9 @@ export class AgentWorkspaceOpenPreflightService {
     }
     return ok({
       projectId: resolved.projectId,
-      profileInstallationId: resolved.profileInstallationId,
+      profileInstallationId,
       activation: resolved.activation,
-      plan: plan.value,
+      plan,
       reservation: reservation.value,
     });
   }
@@ -526,6 +521,49 @@ export class AgentWorkspaceOpenPreflightService {
       ...(liveInstallationIds.length > 0 ? { liveInstallationIds } : {}),
     });
   }
+
+  private async compileProfileForOpen(
+    context: ExecutionContext,
+    profileInstallationId: string,
+    options: Pick<WorkspaceOpenOptions, "credentialReferences">,
+  ): Promise<Result<AgentWorkspaceProfileCompiledPlan>> {
+    const compile = (installationId: string) =>
+      this.dependencies.profileCompiler.compileForNewWorkspace(context, installationId, {
+        ...(options.credentialReferences
+          ? { credentialReferences: options.credentialReferences }
+          : {}),
+      });
+    const first = await compile(profileInstallationId);
+    if (first.isOk() || !isAgentWorkspaceProfileValidationError(first.error)) {
+      return first;
+    }
+    const selected = await this.dependencies.profiles.findInstallation(
+      toRepositoryContext(context),
+      profileInstallationId,
+    );
+    if (!selected) return first;
+    const siblings = (
+      await this.dependencies.profiles.listInstallations(toRepositoryContext(context), 200)
+    )
+      .filter(
+        (candidate) =>
+          candidate.id.value !== profileInstallationId &&
+          candidate.toState().status.value === "enabled" &&
+          candidate.toState().profileId.value === selected.toState().profileId.value,
+      )
+      .sort((left, right) =>
+        right.toState().installedAt.value.localeCompare(left.toState().installedAt.value),
+      );
+    for (const sibling of siblings) {
+      const retried = await compile(sibling.id.value);
+      if (retried.isOk()) return retried;
+    }
+    return first;
+  }
+}
+
+function isAgentWorkspaceProfileValidationError(error: DomainError): boolean {
+  return error.message === "Agent Workspace Profile validation failed";
 }
 
 const SWALLOWED_WORKSPACE_OPEN_MESSAGES = [

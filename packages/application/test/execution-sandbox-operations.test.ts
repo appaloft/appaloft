@@ -815,6 +815,42 @@ describe("ExecutionSandboxService", () => {
     });
   });
 
+  test("[WS-REMOTE-HARNESS-175] occupy reuses a reserved template when the Profile network policy drifted", async () => {
+    const fake = provider({ isolation: "container-trusted", networkPolicy: ["deny", "allowlist"] });
+    const app = service(fake.adapter);
+    await app.ensureTemplate(context, {
+      templateId: "stp_appaloft_remote_pi",
+      name: "appaloft-remote-pi",
+      image: "ghcr.io/appaloft/agent-workspace-pi:0.82.0",
+      minimumIsolation: "container-trusted",
+      limits: {
+        cpuMillis: 2_000,
+        memoryBytes: 4_294_967_296,
+        diskBytes: 21_474_836_480,
+        maxProcesses: 128,
+      },
+      networkPolicy: COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY,
+    });
+    const sandbox = await app.createAndReconcile(context, {
+      source: { kind: "template", templateId: "stp_appaloft_remote_pi" },
+      requestedIsolation: "container-trusted",
+      limits: {
+        cpuMillis: 2_000,
+        memoryBytes: 4_294_967_296,
+        diskBytes: 21_474_836_480,
+        maxProcesses: 128,
+      },
+      networkPolicy: { mode: "deny", rules: [] },
+    });
+    expect(sandbox.isOk()).toBe(true);
+    if (sandbox.isErr()) return;
+    expect(sandbox.value).toMatchObject({
+      sourceKind: "template",
+      status: "ready",
+    });
+    expect(sandbox.value.networkPolicy).toMatchObject(COMMUNITY_REMOTE_DEFAULT_NETWORK_POLICY);
+  });
+
   test("[SBX-TTL-001] maintenance terminates provider runtime before durable expiry", async () => {
     let current = "2026-07-20T00:00:00.000Z";
     const fake = provider();
