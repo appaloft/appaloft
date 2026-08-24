@@ -261,7 +261,8 @@ bun run smoke:local:static
 | Path | Purpose |
 | --- | --- |
 | `apps/shell` | CLI and local server runtime entrypoint. |
-| `apps/web` | Static web console. |
+| `apps/dashboard` | Default contextual Dashboard and static console. |
+| `apps/web` | Retained legacy console for explicit rollback. |
 | `apps/docs` | Public documentation site. |
 | `packages/application` | Command/query handlers and operation catalog. |
 | `packages/adapters` | CLI, HTTP, persistence, runtime, and provider adapters. |

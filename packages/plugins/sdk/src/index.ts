@@ -62,6 +62,44 @@ export const systemPluginWebExtensionLocalizationSchema = z.object({
   description: z.string().min(1).optional(),
 });
 
+const systemPluginWebExtensionNavigationBaseSchema = z.object({
+  presentation: z.enum(["page", "section", "action"]),
+  key: z.string().min(1),
+  labelKey: z.string().min(1),
+  iconKey: z.string().min(1),
+  order: z.number().int(),
+  routeTemplate: z.string().min(1),
+  visibilityEndpoint: z.string().min(1).optional(),
+});
+
+export const systemPluginWebExtensionScopedNavigationSchema = z.discriminatedUnion("scope", [
+  systemPluginWebExtensionNavigationBaseSchema.extend({
+    scope: z.literal("workspace"),
+    destination: z.enum(["projects", "infrastructure", "activity", "marketplace", "settings"]),
+  }),
+  systemPluginWebExtensionNavigationBaseSchema.extend({
+    scope: z.literal("project"),
+    destination: z.enum(["overview", "deployments", "observability", "settings"]),
+  }),
+  systemPluginWebExtensionNavigationBaseSchema.extend({
+    scope: z.literal("resource"),
+    destination: z.enum([
+      "overview",
+      "deployments",
+      "configuration",
+      "logs-metrics",
+      "networking",
+      "settings",
+    ]),
+  }),
+]);
+
+export const systemPluginWebExtensionMetadataSchema = z
+  .object({
+    scopedNavigation: systemPluginWebExtensionScopedNavigationSchema.optional(),
+  })
+  .catchall(z.unknown());
+
 export const systemPluginWebExtensionSchema = z.object({
   key: z.string().min(1),
   title: z.string().min(1),
@@ -86,7 +124,7 @@ export const systemPluginWebExtensionSchema = z.object({
   ]),
   target: z.enum(["server-page", "external-page", "console-route"]),
   requiresAuth: z.boolean(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
+  metadata: systemPluginWebExtensionMetadataSchema.optional(),
 });
 
 export const systemPluginWebHeadContributionSchema = z.object({
@@ -101,6 +139,9 @@ export type SystemPluginWebHeadContribution = z.infer<typeof systemPluginWebHead
 export type SystemPluginWebExtensionIcon = z.infer<typeof systemPluginWebExtensionIconSchema>;
 export type SystemPluginWebExtensionLocalization = z.infer<
   typeof systemPluginWebExtensionLocalizationSchema
+>;
+export type SystemPluginWebExtensionScopedNavigation = z.infer<
+  typeof systemPluginWebExtensionScopedNavigationSchema
 >;
 export type SystemPluginWebExtension = z.infer<typeof systemPluginWebExtensionSchema>;
 

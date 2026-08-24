@@ -3586,6 +3586,24 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "project-environments.overview",
+    operationGroup: "project-environments",
+    operationMethod: "overview",
+    facadePath: ["projectEnvironments", "overview"],
+    operationId: "projects.environmentOverview",
+    kind: "query",
+    domain: "environments",
+    messageName: "ProjectEnvironmentOverviewQuery",
+    route: {
+      method: "GET",
+      path: "/projects/{projectId}/environments/{environmentId}/overview",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "projects.archive",
     operationGroup: "projects",
     operationMethod: "archive",
@@ -3713,6 +3731,24 @@ export const generatedSdkOperations = [
       path: "/projects",
     },
     docsHref: "/docs/deliver/projects/#concept-project",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "projects.list-summaries",
+    operationGroup: "projects",
+    operationMethod: "listSummaries",
+    facadePath: ["projects", "listSummaries"],
+    operationId: "projects.listSummaries",
+    kind: "query",
+    domain: "projects",
+    messageName: "ListProjectSummariesQuery",
+    route: {
+      method: "GET",
+      path: "/projects/summaries",
+    },
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -4340,6 +4376,24 @@ export const generatedSdkOperations = [
       path: "/resources/{resourceId}/dependency-bindings",
     },
     docsHref: "/docs/deliver/resources/#dependency-resource-lifecycle",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "resources.overview",
+    operationGroup: "resources",
+    operationMethod: "overview",
+    facadePath: ["resources", "overview"],
+    operationId: "resources.overview",
+    kind: "query",
+    domain: "resources",
+    messageName: "ResourceOverviewQuery",
+    route: {
+      method: "GET",
+      path: "/projects/{projectId}/environments/{environmentId}/resources/{resourceId}/overview",
+    },
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -8334,6 +8388,9 @@ export interface GeneratedAppaloftClient {
     readonly configure: AppaloftSdkFacadeMethod;
     readonly show: AppaloftSdkFacadeMethod;
   };
+  readonly projectEnvironments: {
+    readonly overview: AppaloftSdkFacadeMethod;
+  };
   readonly projects: {
     readonly archive: AppaloftSdkFacadeMethod;
     readonly configureWorkspaceProfile: AppaloftSdkFacadeMethod;
@@ -8342,6 +8399,7 @@ export interface GeneratedAppaloftClient {
     readonly delete: AppaloftSdkFacadeMethod;
     readonly deleteCheck: AppaloftSdkFacadeMethod;
     readonly list: AppaloftSdkFacadeMethod;
+    readonly listSummaries: AppaloftSdkFacadeMethod;
     readonly rename: AppaloftSdkFacadeMethod;
     readonly reorder: AppaloftSdkFacadeMethod;
     readonly restore: AppaloftSdkFacadeMethod;
@@ -8383,6 +8441,7 @@ export interface GeneratedAppaloftClient {
     readonly importVariables: AppaloftSdkFacadeMethod;
     readonly list: AppaloftSdkFacadeMethod;
     readonly listDependencyBindings: AppaloftSdkFacadeMethod;
+    readonly overview: AppaloftSdkFacadeMethod;
     readonly proxyConfiguration: {
       readonly preview: AppaloftSdkFacadeMethod;
     };

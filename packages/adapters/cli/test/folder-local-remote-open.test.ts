@@ -1,7 +1,7 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { type AppaloftSdkFetch } from "@appaloft/sdk";
@@ -27,6 +27,10 @@ function jsonResponse(value: unknown, status = 200): Response {
 
 function requestKey(request: Request): string {
   return `${request.method} ${new URL(request.url).pathname}`;
+}
+
+async function canonicalTemporaryDirectory(prefix: string): Promise<string> {
+  return realpath(await mkdtemp(join(tmpdir(), prefix)));
 }
 
 async function captureProcessOutput<T>(callback: () => Promise<T>): Promise<{
@@ -277,8 +281,8 @@ function hostingerFolderLocalFetch(input: {
 
 describe("logged-in folder.local remote occupy", () => {
   test("[FOLDER-ONBOARD-007][WS-REMOTE-PROGRESS-201] logged-in code --no-attach never POSTs workspaces.open or git", async () => {
-    const emptyDir = await mkdtemp(join(tmpdir(), "nux-code-silence-cwd-"));
-    const home = await mkdtemp(join(tmpdir(), "nux-code-silence-home-"));
+    const emptyDir = await canonicalTemporaryDirectory("nux-code-silence-cwd-");
+    const home = await canonicalTemporaryDirectory("nux-code-silence-home-");
     const requests: Request[] = [];
     const projectName = basename(emptyDir);
     const program = createRemoteCliProgram({
@@ -297,7 +301,7 @@ describe("logged-in folder.local remote occupy", () => {
         projectName,
       }),
       now: () => "2026-08-20T00:00:00.000Z",
-      environment: { APPALOFT_TOKEN: "token", APPALOFT_HOME: home, HOME: home },
+      environment: { APPALOFT_TOKEN: "token", APPALOFT_HOME: home, HOME: home, PATH: "" },
       terminalIO: {
         stdin: { isTTY: false, on: () => undefined },
         stdout: { isTTY: false, write: () => true },
@@ -346,8 +350,8 @@ describe("logged-in folder.local remote occupy", () => {
   });
 
   test("[FOLDER-ONBOARD-007] leftover logged-in code --no-attach resumes without clone or --new", async () => {
-    const emptyDir = await mkdtemp(join(tmpdir(), "nux-code-silence-partial-"));
-    const home = await mkdtemp(join(tmpdir(), "nux-code-silence-partial-home-"));
+    const emptyDir = await canonicalTemporaryDirectory("nux-code-silence-partial-");
+    const home = await canonicalTemporaryDirectory("nux-code-silence-partial-home-");
     const requests: Request[] = [];
     const projectName = basename(emptyDir);
     const program = createRemoteCliProgram({
@@ -406,8 +410,8 @@ describe("logged-in folder.local remote occupy", () => {
   });
 
   test("[WS-REMOTE-PROGRESS-231] local resume cache reopens leftover disk without occupancy identity or create", async () => {
-    const emptyDir = await mkdtemp(join(tmpdir(), "nux-code-resume-cache-cwd-"));
-    const home = await mkdtemp(join(tmpdir(), "nux-code-resume-cache-home-"));
+    const emptyDir = await canonicalTemporaryDirectory("nux-code-resume-cache-cwd-");
+    const home = await canonicalTemporaryDirectory("nux-code-resume-cache-home-");
     const requests: Request[] = [];
     const projectName = basename(emptyDir);
     await writeFolderLocalResume(
@@ -465,8 +469,8 @@ describe("logged-in folder.local remote occupy", () => {
   });
 
   test("[WS-REMOTE-PROGRESS-231] first folder.local create writes a local resume cache", async () => {
-    const emptyDir = await mkdtemp(join(tmpdir(), "nux-code-resume-write-cwd-"));
-    const home = await mkdtemp(join(tmpdir(), "nux-code-resume-write-home-"));
+    const emptyDir = await canonicalTemporaryDirectory("nux-code-resume-write-cwd-");
+    const home = await canonicalTemporaryDirectory("nux-code-resume-write-home-");
     const requests: Request[] = [];
     const projectName = basename(emptyDir);
     const program = createRemoteCliProgram({
@@ -519,8 +523,8 @@ describe("logged-in folder.local remote occupy", () => {
   });
 
   test("[FOLDER-ONBOARD-007] leftover binding project does not leak into the Remote banner", async () => {
-    const emptyDir = await mkdtemp(join(tmpdir(), "nux-code-silence-cwd-"));
-    const home = await mkdtemp(join(tmpdir(), "nux-code-silence-home-"));
+    const emptyDir = await canonicalTemporaryDirectory("nux-code-silence-cwd-");
+    const home = await canonicalTemporaryDirectory("nux-code-silence-home-");
     const requests: Request[] = [];
     const projectName = basename(emptyDir);
     const currentFolderProjectId = "prj_7fky4yjn1l1c";
@@ -592,8 +596,8 @@ describe("logged-in folder.local remote occupy", () => {
   });
 
   test("[WS-REMOTE-OPEN-BYOS-181][WS-REMOTE-HARNESS-175] code --pi --server occupies hostinger folder.local without workspaces.open", async () => {
-    const emptyDir = await mkdtemp(join(tmpdir(), "nux-54065181-unlinked-"));
-    const home = await mkdtemp(join(tmpdir(), "nux-54065181-unlinked-home-"));
+    const emptyDir = await canonicalTemporaryDirectory("nux-54065181-unlinked-");
+    const home = await canonicalTemporaryDirectory("nux-54065181-unlinked-home-");
     const requests: Request[] = [];
     const projectName = basename(emptyDir);
     const program = createRemoteCliProgram({
@@ -672,8 +676,8 @@ describe("logged-in folder.local remote occupy", () => {
   });
 
   test("[WS-REMOTE-COMPAT-220] folder.local Cloud validation is a human next step, not Server targeting", async () => {
-    const emptyDir = await mkdtemp(join(tmpdir(), "nux-54065181-unlinked-fail-"));
-    const home = await mkdtemp(join(tmpdir(), "nux-54065181-unlinked-fail-home-"));
+    const emptyDir = await canonicalTemporaryDirectory("nux-54065181-unlinked-fail-");
+    const home = await canonicalTemporaryDirectory("nux-54065181-unlinked-fail-home-");
     const requests: Request[] = [];
     const projectName = basename(emptyDir);
     const program = createRemoteCliProgram({

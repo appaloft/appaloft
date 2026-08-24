@@ -2,6 +2,8 @@ import { describe, expect, test } from "vitest";
 
 import {
   parseDashboardRoute,
+  projectDestinationHref,
+  resourceDestinationHref,
   projectNavigation,
   serializeDashboardRoute,
   workspaceNavigation,
@@ -63,6 +65,24 @@ describe("Dashboard navigation", () => {
     expect(serializeDashboardRoute(route)).toBe(canonical);
   });
 
+  test("[DASH-ROUTE-009] preserves Project collection state across Resource open, tabs, and close", () => {
+    const state = {
+      environmentId: "env_2",
+      view: "list",
+      search: "api",
+      sort: "attention",
+      cursor: "next:20",
+      filters: ["failed", "running"],
+    };
+
+    expect(resourceDestinationHref("proj_1", "res_9", "deployments", "env_2", state)).toBe(
+      "/projects/proj_1/resources/res_9/deployments?environment=env_2&view=list&search=api&sort=attention&cursor=next%3A20&filter=failed&filter=running",
+    );
+    expect(projectDestinationHref("proj_1", "overview", "env_2", state)).toBe(
+      "/projects/proj_1/overview?environment=env_2&view=list&search=api&sort=attention&cursor=next%3A20&filter=failed&filter=running",
+    );
+  });
+
   test("[DASH-GOV-022] keeps the pattern gallery outside permanent product navigation", () => {
     expect(parseDashboardRoute("/patterns")).toEqual({
       kind: "utility",
@@ -70,5 +90,27 @@ describe("Dashboard navigation", () => {
       filters: [],
     });
     expect(workspaceNavigation.some(({ id }) => id === ("patterns" as never))).toBe(false);
+  });
+
+  test("[DASH-AUTH-001] recognizes only the required public authentication recovery routes", () => {
+    expect(parseDashboardRoute("/login?next=%2Fprojects%2Fatlas%2Foverview")).toEqual({
+      kind: "auth",
+      destination: "login",
+      next: "/projects/atlas/overview",
+      filters: [],
+    });
+    expect(parseDashboardRoute("/bootstrap/auth/first-admin")).toEqual({
+      kind: "auth",
+      destination: "first-admin",
+      filters: [],
+    });
+  });
+
+  test("[DASH-NAV-005] makes the console root a useful project landing page", () => {
+    expect(parseDashboardRoute("/")).toEqual({
+      kind: "workspace",
+      destination: "projects",
+      filters: [],
+    });
   });
 });

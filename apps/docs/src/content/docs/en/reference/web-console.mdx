@@ -2,11 +2,45 @@
 title: "Web console guide"
 description: "Web console pages, form inputs, question-mark help, and status observation."
 docType: "reference"
+localeState:
+  zh-CN: complete
+  en-US: complete
+relatedOperations:
+  - "resources.create"
+  - "deployments.create"
+  - "projects.list-summaries"
+  - "project-environments.overview"
+  - "resources.overview"
 ---
 
 ## Stable identifier
 
 The Web console is Appaloft's graphical entrypoint — it's only responsible for collecting input, showing status, and calling the exact same HTTP/oRPC contract as the CLI/API. It never implements a separate set of deployment rules or lifecycle interpretation at the Web layer.
+
+## Default Dashboard navigation and data boundaries
+
+Dashboard is now the default graphical surface in release bundles. It uses contextual navigation to reduce permanent menu load: Workspace keeps only **Projects, Infrastructure, Activity, Marketplace, and Settings**; opening a Project replaces that menu with **Overview, Deployments, Observability, and Settings**; and a Resource opens in a desktop side panel or a mobile full page. `/` enters `/projects`. This is an intentional pre-1.0 route redesign: legacy Web deep links may return 404, with no redirect or feature-parity guarantee.
+
+All five Workspace destinations and all four Project destinations read real bounded data or show an explicit empty/error state. Agent remains a top-right utility: it prepares a task brief from the active Workspace or Project/Environment context, while execution stays owned by the existing Agent Workspace lifecycle instead of becoming a sixth Workspace destination.
+
+Release builds select `dashboard-v2` by default. During the stability window, build the retained legacy surface explicitly with `--console-preset=legacy-console-v1` (or `APPALOFT_CONSOLE_PRESET=legacy-console-v1`) for rollback. This cutover does not remove the legacy source.
+
+Authentication recovery is part of the Dashboard bundle: an uninitialized instance routes first
+visitors to `/bootstrap/auth/first-admin`, while signed-out users use `/login`. Both local-password
+and configured OAuth providers use the server's existing auth contracts; login return paths are
+restricted to same-origin Dashboard URLs.
+
+The Projects → Project/Environment → Resource loop uses three bounded queries:
+
+- `projects.list-summaries` returns one Project-summary page without per-Project Resource or Deployment requests;
+- `project-environments.overview` returns Environment choices, cursor-bounded Resource health/access/latest-Deployment summaries in one read;
+- `resources.overview` validates Project/Environment/Resource ownership and returns the current overview plus at most five latest Deployments.
+
+These responses are read-only observations. Deployment, configuration, networking, and runtime actions still dispatch the existing Resource/Deployment commands; Svelte pages do not reinterpret or weaken their rules. Resource logs, metrics, and other destination data load only when that destination is active, and inactive subscriptions are disposed when the panel closes or the destination changes.
+
+The Resource surface has six owner-scoped destinations: **Overview, Deployments, Configuration, Logs & Metrics, Networking, and Settings**. Overview stays compact; Deployments reads a bounded history through `deployments.list`; Configuration edits the durable runtime profile; Logs & Metrics reads masked bounded logs and retained monitoring rollups; Networking edits the Resource network and generated-access profiles; Settings uses server-side lifecycle and delete-safety operations. Destination code and data are loaded on demand, so opening one destination does not mount the others.
+
+Extensions continue to use `appaloft.console.extension-page/v1` documents. Additive scoped-navigation metadata places a contribution only inside its declared Workspace, Project, or Resource destination. A legacy extension with missing or unknown scoped metadata is never promoted to a new permanent Workspace item.
 
 ## Question-mark help
 

@@ -516,10 +516,12 @@ async function resolveWebStaticDir(
     return config.webStaticDir;
   }
 
-  const localWebBuildDir = new URL("../../../apps/web/build/", import.meta.url);
-  const localWebIndex = new URL("index.html", localWebBuildDir);
+  const localDashboardBuildDir = new URL("../../../apps/dashboard/build/", import.meta.url);
+  const localWebIndex = new URL("index.html", localDashboardBuildDir);
 
-  return (await Bun.file(localWebIndex).exists()) ? fileURLToPath(localWebBuildDir) : undefined;
+  return (await Bun.file(localWebIndex).exists())
+    ? fileURLToPath(localDashboardBuildDir)
+    : undefined;
 }
 
 async function resolveDocsStaticDir(
@@ -653,6 +655,16 @@ function configurePublicAuditLogConsoleExtension(input: {
         metadata: {
           renderer: "console-page",
           pageEndpoint: "/audit-log/console-page?query={query}",
+          scopedNavigation: {
+            scope: "workspace",
+            destination: "activity",
+            presentation: "section",
+            key: "appaloft-audit-log.navigation",
+            labelKey: "console.auditLog.title",
+            iconKey: "shield",
+            order: 120,
+            routeTemplate: "/activity",
+          },
         },
       },
       {
@@ -678,6 +690,16 @@ function configurePublicAuditLogConsoleExtension(input: {
           renderer: "console-page",
           pageEndpoint:
             "/audit-log/console-page?projectId={projectId}&aggregateId={resourceId}&basePath={pathname}&query={query}",
+          scopedNavigation: {
+            scope: "project",
+            destination: "overview",
+            presentation: "section",
+            key: "appaloft-audit-log.project-route",
+            labelKey: "console.auditLog.title",
+            iconKey: "shield",
+            order: 120,
+            routeTemplate: "/projects/{projectId}/overview?environment={environmentId}",
+          },
         },
       },
       {
@@ -703,6 +725,17 @@ function configurePublicAuditLogConsoleExtension(input: {
           renderer: "console-page",
           pageEndpoint:
             "/audit-log/console-page?aggregateId={resourceId}&basePath={pathname}&query={query}",
+          scopedNavigation: {
+            scope: "resource",
+            destination: "overview",
+            presentation: "section",
+            key: "appaloft-audit-log.resource-route",
+            labelKey: "console.auditLog.title",
+            iconKey: "shield",
+            order: 120,
+            routeTemplate:
+              "/projects/{projectId}/resources/{resourceId}/overview?environment={environmentId}",
+          },
         },
       },
     );

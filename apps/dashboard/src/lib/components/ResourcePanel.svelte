@@ -7,12 +7,16 @@
     ExternalLink,
     GitCommitHorizontal,
     Globe2,
+    LoaderCircle,
     MoreHorizontal,
+    RefreshCw,
     Rocket,
+    TriangleAlert,
     X,
   } from "@lucide/svelte";
   import { onMount } from "svelte";
 
+  import { dashboardClient, type DashboardResourceOverview } from "$lib/data-client";
   import {
     commonCopy,
     dashboardCopy as copy,
@@ -26,12 +30,67 @@
     type ResourceDestination,
   } from "$lib/navigation";
 
+  import ScopedExtensions from "./ScopedExtensions.svelte";
+
   let { route }: { route: Extract<DashboardRoute, { kind: "resource" }> } = $props();
 
   const minimumPanelWidth = 480;
   const maximumPanelWidth = 960;
   const panelWidthStorageKey = "appaloft.dashboard.resource-panel-width";
   let panelWidth = $state(736);
+  let overview = $state<DashboardResourceOverview | undefined>();
+  let loading = $state(true);
+  let error = $state(false);
+  let actionPending = $state(false);
+  let actionError = $state(false);
+  let latestRequest = 0;
+
+  async function load(): Promise<void> {
+    const request = ++latestRequest;
+    loading = true;
+    error = false;
+    try {
+      const result = await dashboardClient.resources.overview({
+        projectId: route.projectId,
+        environmentId: route.environmentId || "production",
+        resourceId: route.resourceId,
+      });
+      if (request === latestRequest) overview = result;
+    } catch {
+      if (request === latestRequest) {
+        overview = undefined;
+        error = true;
+      }
+    } finally {
+      if (request === latestRequest) loading = false;
+    }
+  }
+
+  async function forceRedeploy(): Promise<void> {
+    if (actionPending) return;
+    actionPending = true;
+    actionError = false;
+    try {
+      await dashboardClient.deployments.forceRedeploy({
+        projectId: route.projectId,
+        environmentId: route.environmentId || "production",
+        resourceId: route.resourceId,
+      });
+      await load();
+    } catch {
+      actionError = true;
+    } finally {
+      actionPending = false;
+    }
+  }
+
+  function activityLabel(value?: string): string {
+    if (!value) return "—";
+    return new Intl.DateTimeFormat(i18n.locale, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(value));
+  }
 
   function availableMaximumWidth(): number {
     return browser
@@ -86,6 +145,20 @@
     if (Number.isFinite(savedWidth) && savedWidth > 0) setPanelWidth(savedWidth);
   });
 
+  $effect(() => {
+    route.projectId;
+    route.environmentId;
+    route.resourceId;
+    if (route.destination === "overview") {
+      void load();
+    } else {
+      latestRequest += 1;
+      overview = undefined;
+      loading = false;
+      error = false;
+    }
+  });
+
   const labels: Record<ResourceDestination, string> = {
     overview: i18n.t(copy.nav.overview),
     deployments: i18n.t(copy.nav.deployments),
@@ -123,7 +196,7 @@
             <span data-icon-surface="blue" class="grid size-8 place-items-center rounded-[9px] bg-icon-blue text-icon-blue-foreground">
               <Rocket class="size-4" />
             </span>
-            <h2 class="truncate text-lg font-semibold tracking-[-0.015em]">{route.resourceId}</h2>
+            <h2 class="truncate text-lg font-semibold tracking-[-0.015em]">{overview?.resource.name || route.resourceId}</h2>
           </div>
           <p class="mt-2 max-w-xl text-sm text-muted-foreground">{i18n.t(copy.resource.description)}</p>
         </div>
@@ -135,7 +208,13 @@
             variant="ghost"
             size="icon"
             class="size-9 rounded-[9px]"
-            href={projectDestinationHref(route.projectId, "overview", route.environmentId)}
+            href={projectDestinationHref(route.projectId, "overview", route.environmentId, {
+              view: route.view,
+              search: route.search,
+              sort: route.sort,
+              cursor: route.cursor,
+              filters: route.filters,
+            })}
             aria-label={i18n.t(copy.actions.closeResource)}
           >
             <X class="size-4" />
@@ -146,7 +225,13 @@
         {#each resourceNavigation as item}
           <a
             class={`relative shrink-0 pb-3 text-sm transition-colors ${route.destination === item.id ? "font-medium text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary" : "text-muted-foreground hover:text-foreground"}`}
-            href={resourceDestinationHref(route.projectId, route.resourceId, item.id, route.environmentId)}
+            href={resourceDestinationHref(route.projectId, route.resourceId, item.id, route.environmentId, {
+              view: route.view,
+              search: route.search,
+              sort: route.sort,
+              cursor: route.cursor,
+              filters: route.filters,
+            })}
             aria-current={route.destination === item.id ? "page" : undefined}
           >{labels[item.id]}</a>
         {/each}
@@ -154,26 +239,40 @@
     </header>
 
     <div class="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
-      {#if route.destination === "overview"}
+      {#if route.destination === "overview" && loading}
+        <div class="grid min-h-64 place-items-center rounded-[14px] border border-divider bg-surface" aria-label="Loading resource">
+          <LoaderCircle class="size-6 animate-spin text-primary" />
+        </div>
+      {:else if route.destination === "overview" && (error || !overview)}
+        <section class="rounded-[14px] border border-destructive/25 bg-destructive/[0.04] p-8 text-center">
+          <TriangleAlert class="mx-auto size-6 text-destructive" />
+          <h3 class="mt-4 font-semibold">{i18n.t(copy.projects.loadError)}</h3>
+          <p class="mt-2 text-sm text-muted-foreground">{i18n.t(copy.projects.loadErrorDescription)}</p>
+          <Button variant="outline" class="mt-5 h-9 rounded-[9px] shadow-none" onclick={() => void load()}>
+            <RefreshCw class="size-4" />
+            {i18n.t(copy.actions.retry)}
+          </Button>
+        </section>
+      {:else if route.destination === "overview" && overview}
         <div class="grid gap-4 sm:grid-cols-2">
           <section class="rounded-[14px] border border-divider bg-surface p-5">
             <div class="flex items-center justify-between gap-3">
               <p class="text-xs font-medium text-muted-foreground">{i18n.t(copy.resource.activeDeployment)}</p>
-              <Badge variant="secondary" class="rounded-full border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">{i18n.t(commonCopy.status.active)}</Badge>
+              <Badge variant="secondary" class={`rounded-full ${overview.health.status === "healthy" ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}>{overview.health.status}</Badge>
             </div>
             <div class="mt-6 flex items-center gap-3">
               <GitCommitHorizontal class="size-4 text-muted-foreground" />
-              <code class="text-sm font-medium">3f8a1c2</code>
+              <code class="truncate text-sm font-medium">{overview.latestDeployments[0]?.id || "—"}</code>
             </div>
-            <p class="mt-2 text-xs text-muted-foreground">main · 8 min ago</p>
+            <p class="mt-2 text-xs text-muted-foreground">{overview.latestDeployments[0]?.status || "not deployed"} · {activityLabel(overview.latestDeployments[0]?.createdAt)}</p>
           </section>
           <section class="rounded-[14px] border border-divider bg-surface p-5">
             <p class="text-xs font-medium text-muted-foreground">{i18n.t(copy.resource.runtime)}</p>
             <div class="mt-6 flex items-center gap-2">
-              <span class="size-2 rounded-full bg-emerald-500"></span>
-              <p class="text-sm font-medium">{i18n.t(copy.resource.onlineReplicas, { count: 1 })}</p>
+              <span class={`size-2 rounded-full ${overview.health.status === "healthy" ? "bg-emerald-500" : "bg-amber-500"}`}></span>
+              <p class="text-sm font-medium capitalize">{overview.health.status.replaceAll("-", " ")}</p>
             </div>
-            <p class="mt-2 text-xs text-muted-foreground">Docker · US East</p>
+            <p class="mt-2 text-xs capitalize text-muted-foreground">{overview.resource.kind.replaceAll("-", " ")} · {overview.configuration.status}</p>
           </section>
         </div>
 
@@ -184,31 +283,129 @@
                 <CheckCircle2 class="size-[18px]" />
               </span>
               <div>
-                <h3 class="text-sm font-semibold">{i18n.t(copy.resource.deploymentSuccessful)}</h3>
-                <p class="mt-1 text-xs text-muted-foreground">CLI preview · deployed from main</p>
+                <h3 class="text-sm font-semibold">{overview.latestDeployments[0]?.status === "succeeded" ? i18n.t(copy.resource.deploymentSuccessful) : overview.latestDeployments[0]?.status || "No deployment yet"}</h3>
+                <p class="mt-1 text-xs text-muted-foreground">{activityLabel(overview.latestDeployments[0]?.finishedAt || overview.latestDeployments[0]?.createdAt)}</p>
               </div>
             </div>
-            <Button variant="outline" class="h-9 rounded-[9px] bg-transparent px-3 text-xs shadow-none">
-              {i18n.t(copy.actions.viewLogs)}
-              <ExternalLink class="size-3.5" />
-            </Button>
+            <div class="flex flex-wrap gap-2">
+              {#if overview.capabilities.deploy}
+                <Button
+                  class="h-9 rounded-[9px] px-3 text-xs"
+                  disabled={actionPending}
+                  onclick={() => void forceRedeploy()}
+                >
+                  {actionPending
+                    ? i18n.t(commonCopy.actions.redeploying)
+                    : i18n.t(commonCopy.actions.redeploy)}
+                </Button>
+              {/if}
+              <Button
+                variant="outline"
+                class="h-9 rounded-[9px] bg-transparent px-3 text-xs shadow-none"
+                href={resourceDestinationHref(route.projectId, route.resourceId, "logs-metrics", route.environmentId, {
+                  view: route.view,
+                  search: route.search,
+                  sort: route.sort,
+                  cursor: route.cursor,
+                  filters: route.filters,
+                })}
+              >
+                {i18n.t(copy.actions.viewLogs)}
+                <ExternalLink class="size-3.5" />
+              </Button>
+            </div>
           </div>
         </section>
+
+        {#if actionError}
+          <p class="mt-3 rounded-[10px] border border-destructive/20 bg-destructive/[0.04] px-3 py-2 text-xs text-destructive">
+            {i18n.t(copy.projects.loadErrorDescription)}
+          </p>
+        {/if}
 
         <section class="mt-4 rounded-[14px] border border-divider bg-surface p-5">
           <div class="flex items-center justify-between gap-4">
             <div>
               <p class="text-xs font-medium text-muted-foreground">{i18n.t(copy.resource.publicAccess)}</p>
-              <a class="mt-2 inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline" href="https://example.test">
-                api-gateway.appaloft.app
-                <ExternalLink class="size-3.5" />
-              </a>
+              {#if overview.access.url}
+                <a class="mt-2 inline-flex items-center gap-2 break-all text-sm font-medium text-primary hover:underline" href={overview.access.url} target="_blank" rel="noreferrer">
+                  {overview.access.url}
+                  <ExternalLink class="size-3.5 shrink-0" />
+                </a>
+              {:else}
+                <p class="mt-2 text-sm text-muted-foreground">{overview.access.status}</p>
+              {/if}
             </div>
             <span class="grid size-10 place-items-center rounded-[11px] bg-primary/10 text-primary">
               <Globe2 class="size-[18px]" />
             </span>
           </div>
         </section>
+      {:else if route.destination === "deployments"}
+        {#await import("./ResourceDeployments.svelte")}
+          <div class="grid min-h-64 place-items-center rounded-[14px] border border-divider bg-surface">
+            <LoaderCircle class="size-6 animate-spin text-primary" />
+          </div>
+        {:then module}
+          {@const Destination = module.default}
+          <Destination {route} />
+        {:catch}
+          <p class="rounded-[14px] border border-destructive/25 bg-destructive/[0.04] p-5 text-sm text-destructive">
+            {i18n.t(copy.projects.loadErrorDescription)}
+          </p>
+        {/await}
+      {:else if route.destination === "configuration"}
+        {#await import("./ResourceConfiguration.svelte")}
+          <div class="grid min-h-64 place-items-center rounded-[14px] border border-divider bg-surface">
+            <LoaderCircle class="size-6 animate-spin text-primary" />
+          </div>
+        {:then module}
+          {@const Destination = module.default}
+          <Destination {route} />
+        {:catch}
+          <p class="rounded-[14px] border border-destructive/25 bg-destructive/[0.04] p-5 text-sm text-destructive">
+            {i18n.t(copy.projects.loadErrorDescription)}
+          </p>
+        {/await}
+      {:else if route.destination === "logs-metrics"}
+        {#await import("./ResourceObservability.svelte")}
+          <div class="grid min-h-64 place-items-center rounded-[14px] border border-divider bg-surface">
+            <LoaderCircle class="size-6 animate-spin text-primary" />
+          </div>
+        {:then module}
+          {@const Destination = module.default}
+          <Destination {route} />
+        {:catch}
+          <p class="rounded-[14px] border border-destructive/25 bg-destructive/[0.04] p-5 text-sm text-destructive">
+            {i18n.t(copy.projects.loadErrorDescription)}
+          </p>
+        {/await}
+      {:else if route.destination === "networking"}
+        {#await import("./ResourceNetworking.svelte")}
+          <div class="grid min-h-64 place-items-center rounded-[14px] border border-divider bg-surface">
+            <LoaderCircle class="size-6 animate-spin text-primary" />
+          </div>
+        {:then module}
+          {@const Destination = module.default}
+          <Destination {route} />
+        {:catch}
+          <p class="rounded-[14px] border border-destructive/25 bg-destructive/[0.04] p-5 text-sm text-destructive">
+            {i18n.t(copy.projects.loadErrorDescription)}
+          </p>
+        {/await}
+      {:else if route.destination === "settings"}
+        {#await import("./ResourceSettings.svelte")}
+          <div class="grid min-h-64 place-items-center rounded-[14px] border border-divider bg-surface">
+            <LoaderCircle class="size-6 animate-spin text-primary" />
+          </div>
+        {:then module}
+          {@const Destination = module.default}
+          <Destination {route} />
+        {:catch}
+          <p class="rounded-[14px] border border-destructive/25 bg-destructive/[0.04] p-5 text-sm text-destructive">
+            {i18n.t(copy.projects.loadErrorDescription)}
+          </p>
+        {/await}
       {:else}
         <section class="min-h-64 rounded-[14px] border border-divider bg-surface p-5">
           <span class="inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
@@ -218,6 +415,7 @@
           <p class="mt-2 max-w-lg text-sm text-muted-foreground">{i18n.t(copy.resource.description)}</p>
         </section>
       {/if}
+      <ScopedExtensions {route} />
     </div>
   </div>
 </aside>

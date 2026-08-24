@@ -4,7 +4,7 @@ description: "Web console 页面、表单输入、问号帮助和状态观察说
 docType: "reference"
 localeState:
   zh-CN: complete
-  en-US: needs-update
+  en-US: complete
 searchAliases:
   - "web"
   - "console"
@@ -15,6 +15,9 @@ searchAliases:
 relatedOperations:
   - "resources.create"
   - "deployments.create"
+  - "projects.list-summaries"
+  - "project-environments.overview"
+  - "resources.overview"
 sidebar:
   order: 7
 ---
@@ -22,6 +25,30 @@ sidebar:
 ## 标识
 
 Web 控制台是 Appaloft 的图形化入口——它只负责收集输入、显示状态并调用和 CLI/API 完全相同的 HTTP/oRPC 契约,不会在 Web 层单独实现部署规则或生命周期解释。
+
+## Dashboard 默认导航与数据边界
+
+Dashboard 现在是发布包默认的图形界面，并使用上下文导航减少常驻菜单：Workspace 只保留 **项目、基础设施、动态、市场、设置**；进入 Project 后切换为 **概览、部署、可观测性、设置**；进入 Resource 后，详情以桌面侧板或移动全页展示。`/` 进入 `/projects`。这是一次有意的 pre-1.0 路由重构：旧 Web 深链可能直接返回 404，不提供重定向或功能对等保证。
+
+五个 Workspace destination 和四个 Project destination 都读取真实的有界数据或显示明确的空/错误状态。Agent 位于右上角工具区，可将当前 Workspace 或 Project/Environment 上下文整理为任务简报；实际执行仍由既有 Agent Workspace 生命周期负责，不会成为第六个 Workspace 菜单。
+
+发布构建默认选择 `dashboard-v2`。稳定窗口内仍可通过 `--console-preset=legacy-console-v1`（或 `APPALOFT_CONSOLE_PRESET=legacy-console-v1`）显式构建旧界面用于回滚；旧源码没有在本次切换中删除。
+
+Dashboard 发布包包含完整的认证恢复入口：未初始化实例会把首次访问引导到
+`/bootstrap/auth/first-admin`，未登录用户使用 `/login`。本地密码和已配置的 OAuth provider
+都沿用服务端既有认证契约；登录返回地址只接受同源 Dashboard 路径。
+
+Projects → Project/Environment → Resource 闭环使用三个有界查询：
+
+- `projects.list-summaries`：返回一页 Project 摘要，不为每个 Project 再请求 Resource 或 Deployment；
+- `project-environments.overview`：一次返回 Environment 选择、Resource 健康/访问/最近部署摘要和 cursor；
+- `resources.overview`：校验 Project/Environment/Resource owner 一致性，返回当前概览和最多五次最近部署。
+
+这些返回值是只读 observation。部署、配置、网络和运行时操作仍调用既有 Resource/Deployment command，不由 Svelte 页面自行解释或放宽。Resource 的日志、指标和其它 destination 数据只在对应页面激活后加载；关闭面板或切换 destination 后，不再保留非活动订阅。
+
+Resource 界面包含六个 owner-scoped destination：**概览、部署、配置、日志与指标、网络、设置**。概览保持紧凑；部署通过 `deployments.list` 读取有界历史；配置编辑持久化 runtime profile；日志与指标读取脱敏的有界日志和留存监控汇总；网络编辑 Resource network 与 generated-access profile；设置调用服务端生命周期与删除安全检查。各 destination 的代码和数据都按需加载，打开一个页面不会同时挂载其它页面。
+
+扩展继续使用 `appaloft.console.extension-page/v1` 文档。新增的 scoped navigation metadata 只把扩展放入声明的 Workspace、Project 或 Resource destination；缺少或无法识别该 metadata 的旧扩展不会被提升为新的 Workspace 常驻菜单。
 
 ## 问号帮助
 

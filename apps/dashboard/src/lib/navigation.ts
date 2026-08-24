@@ -25,8 +25,9 @@ export const resourceNavigation = [
 export type WorkspaceDestination = (typeof workspaceNavigation)[number]["id"];
 export type ProjectDestination = (typeof projectNavigation)[number]["id"];
 export type ResourceDestination = (typeof resourceNavigation)[number]["id"];
+export type AuthDestination = "login" | "first-admin";
 
-interface CollectionState {
+export interface DashboardCollectionState {
   environmentId?: string;
   view?: string;
   search?: string;
@@ -36,18 +37,19 @@ interface CollectionState {
 }
 
 export type DashboardRoute =
-  | ({ kind: "workspace"; destination: WorkspaceDestination } & CollectionState)
+  | ({ kind: "workspace"; destination: WorkspaceDestination } & DashboardCollectionState)
   | ({
       kind: "project";
       projectId: string;
       destination: ProjectDestination;
-    } & CollectionState)
+    } & DashboardCollectionState)
   | ({
       kind: "resource";
       projectId: string;
       resourceId: string;
       destination: ResourceDestination;
-    } & CollectionState)
+    } & DashboardCollectionState)
+  | { kind: "auth"; destination: AuthDestination; next?: string; filters: string[] }
   | { kind: "utility"; destination: "patterns"; filters: string[] }
   | { kind: "not-found"; pathname: string; filters: string[] };
 
@@ -65,7 +67,7 @@ function decode(segment: string): string {
   }
 }
 
-function collectionState(url: URL): CollectionState {
+function collectionState(url: URL): DashboardCollectionState {
   const value = (key: string) => url.searchParams.get(key)?.trim() || undefined;
 
   return {
@@ -86,6 +88,29 @@ export function parseDashboardRoute(input: string | URL): DashboardRoute {
   const url = input instanceof URL ? input : new URL(input, "http://dashboard.appaloft.local");
   const segments = url.pathname.split("/").filter(Boolean);
   const state = collectionState(url);
+
+  if (segments.length === 0) {
+    return { kind: "workspace", destination: "projects", ...state };
+  }
+
+  if (segments.length === 1 && segments[0] === "login") {
+    const next = url.searchParams.get("next")?.trim();
+    return {
+      kind: "auth",
+      destination: "login",
+      ...(next ? { next } : {}),
+      filters: state.filters,
+    };
+  }
+
+  if (
+    segments.length === 3 &&
+    segments[0] === "bootstrap" &&
+    segments[1] === "auth" &&
+    segments[2] === "first-admin"
+  ) {
+    return { kind: "auth", destination: "first-admin", filters: state.filters };
+  }
 
   if (segments.length === 1 && segments[0] === "patterns") {
     return { kind: "utility", destination: "patterns", filters: state.filters };
@@ -125,7 +150,7 @@ export function parseDashboardRoute(input: string | URL): DashboardRoute {
   return { kind: "not-found", pathname: url.pathname, filters: state.filters };
 }
 
-function appendCollectionState(url: URL, state: CollectionState): void {
+function appendCollectionState(url: URL, state: DashboardCollectionState): void {
   const values = [
     ["environment", state.environmentId],
     ["view", state.view],
@@ -146,6 +171,10 @@ function appendCollectionState(url: URL, state: CollectionState): void {
 export function serializeDashboardRoute(route: DashboardRoute): string {
   if (route.kind === "not-found") return route.pathname;
   if (route.kind === "utility") return `/${route.destination}`;
+  if (route.kind === "auth") {
+    if (route.destination === "first-admin") return "/bootstrap/auth/first-admin";
+    return route.next ? `/login?next=${encodeURIComponent(route.next)}` : "/login";
+  }
 
   let pathname: string;
 
@@ -166,13 +195,15 @@ export function projectDestinationHref(
   projectId: string,
   destination: ProjectDestination,
   environmentId = "production",
+  state: Partial<DashboardCollectionState> = {},
 ): string {
   return serializeDashboardRoute({
     kind: "project",
     projectId,
     destination,
     environmentId,
-    filters: [],
+    ...state,
+    filters: state.filters ?? [],
   });
 }
 
@@ -181,6 +212,7 @@ export function resourceDestinationHref(
   resourceId: string,
   destination: ResourceDestination,
   environmentId = "production",
+  state: Partial<DashboardCollectionState> = {},
 ): string {
   return serializeDashboardRoute({
     kind: "resource",
@@ -188,7 +220,8 @@ export function resourceDestinationHref(
     resourceId,
     destination,
     environmentId,
-    view: "list",
-    filters: [],
+    view: state.view ?? "list",
+    ...state,
+    filters: state.filters ?? [],
   });
 }

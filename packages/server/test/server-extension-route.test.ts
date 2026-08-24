@@ -452,6 +452,11 @@ describe("createAppaloftServer", () => {
             metadata: expect.objectContaining({
               renderer: "console-page",
               pageEndpoint: "/audit-log/console-page?query={query}",
+              scopedNavigation: expect.objectContaining({
+                scope: "workspace",
+                destination: "activity",
+                presentation: "section",
+              }),
             }),
           }),
           expect.objectContaining({
@@ -460,6 +465,11 @@ describe("createAppaloftServer", () => {
             placement: "route",
             metadata: expect.objectContaining({
               pageEndpoint: expect.stringContaining("projectId={projectId}"),
+              scopedNavigation: expect.objectContaining({
+                scope: "project",
+                destination: "overview",
+                presentation: "section",
+              }),
             }),
           }),
           expect.objectContaining({
@@ -468,6 +478,11 @@ describe("createAppaloftServer", () => {
             placement: "route",
             metadata: expect.objectContaining({
               pageEndpoint: expect.stringContaining("aggregateId={resourceId}"),
+              scopedNavigation: expect.objectContaining({
+                scope: "resource",
+                destination: "overview",
+                presentation: "section",
+              }),
             }),
           }),
         ]),

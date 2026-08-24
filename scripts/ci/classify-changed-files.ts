@@ -61,13 +61,13 @@ export function isLightweightPath(file: string): boolean {
   return isDocsOnlyPath(file) || isReleaseBumpPath(file);
 }
 
-// Isolated WebView surface: the static console and its mocked WebView harness.
-// WebView E2E starts Vite preview plus Bun.serve fixtures and does not use the
-// Appaloft backend or PostgreSQL. Product diffs that do not touch apps/web are
-// e2e_shell (shell HTTP e2e only). Mixed apps/web plus other product files,
+// Isolated WebView surface: the default Dashboard and its mocked WebView harness.
+// Dashboard WebView E2E starts Vite preview plus Bun.serve fixtures and does not use the
+// Appaloft backend or PostgreSQL. Product diffs that do not touch apps/dashboard are
+// e2e_shell (shell HTTP e2e only). Mixed apps/dashboard plus other product files,
 // empty diffs, or FORCE_E2E_FULL stay e2e_full.
 export function isWebIsolatedE2ePath(file: string): boolean {
-  return file === "apps/web" || file.startsWith("apps/web/");
+  return file === "apps/dashboard" || file.startsWith("apps/dashboard/");
 }
 
 export function isShellIsolatedE2ePath(file: string): boolean {

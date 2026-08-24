@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+* **dashboard:** make the contextual Dashboard the default release console, including first-admin and sign-in recovery, while retaining the explicit `legacy-console-v1` rollback selector.
+
+### BREAKING CHANGES
+
+* Dashboard routes replace the legacy Web information architecture. Existing deep links may return 404; this release does not promise redirects or legacy feature parity.
+
 ## [1.10.10](https://github.com/appaloft/appaloft/compare/v1.10.9...v1.10.10) (2026-08-23)
 
 

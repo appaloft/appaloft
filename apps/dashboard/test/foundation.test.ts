@@ -2,6 +2,8 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 
+import { createDashboardDevProxy, resolveDashboardDevServer } from "../src/lib/dev-server";
+
 const dashboardRoot = new URL("..", import.meta.url);
 
 async function sourceFiles(directory: URL): Promise<URL[]> {
@@ -31,6 +33,8 @@ describe("Dashboard foundation", () => {
       devDependencies?: Record<string, string>;
     };
     const svelteConfig = await readFile(new URL("svelte.config.js", dashboardRoot), "utf8");
+    const routeLayout = await readFile(new URL("src/routes/+layout.ts", dashboardRoot), "utf8");
+    const appHtml = await readFile(new URL("src/app.html", dashboardRoot), "utf8");
 
     expect(packageJson.name).toBe("@appaloft/dashboard");
     expect(packageJson.scripts?.build).toBeTruthy();
@@ -39,6 +43,8 @@ describe("Dashboard foundation", () => {
     expect(packageJson.devDependencies?.["@appaloft/i18n"]).toBe("workspace:*");
     expect(svelteConfig).toContain("@sveltejs/adapter-static");
     expect(svelteConfig).toContain('fallback: "200.html"');
+    expect(routeLayout).toContain("export const ssr = false");
+    expect(appHtml).toContain('name="application-name" content="Appaloft"');
   });
 
   test("[DASH-FOUND-001] never imports legacy apps/web source", async () => {
@@ -54,5 +60,29 @@ describe("Dashboard foundation", () => {
     expect(source).not.toMatch(/apps\/web|@appaloft\/web/);
     expect(source).toContain("@appaloft/design");
     expect(source).toContain("@appaloft/ui");
+  });
+
+  test("[DASH-EXT-004] composes the Cloud API and private extension routes in local dev", () => {
+    const server = resolveDashboardDevServer({
+      APPALOFT_WEB_DEV_HOST: "127.0.0.1",
+      APPALOFT_WEB_DEV_PORT: "4317",
+      APPALOFT_WEB_DEV_PROXY_TARGET: "http://127.0.0.1:4316",
+      APPALOFT_WEB_DEV_EXTENSION_PROXY_PREFIXES: "/cloud,/audit-log/console-page,/cloud",
+    });
+
+    expect(server).toEqual({
+      host: "127.0.0.1",
+      port: 4317,
+      proxyTarget: "http://127.0.0.1:4316",
+      extensionProxyPrefixes: ["/cloud", "/audit-log/console-page"],
+    });
+    expect(createDashboardDevProxy(server)).toEqual({
+      "/api": { target: "http://127.0.0.1:4316", changeOrigin: true },
+      "/cloud": { target: "http://127.0.0.1:4316", changeOrigin: true },
+      "/audit-log/console-page": {
+        target: "http://127.0.0.1:4316",
+        changeOrigin: true,
+      },
+    });
   });
 });

@@ -1,11 +1,11 @@
 {
   "schemaVersion": "appaloft.dashboard-foundation-evidence/v1",
-  "capturedAt": "2026-08-24T08:50:09Z",
+  "capturedAt": "2026-08-24T18:23:08Z",
   "machine": {
     "platform": "darwin-arm64",
     "bun": "1.4.0",
     "vite": "8.1.0",
-    "measurement": "sum of individually gzip-compressed JavaScript files in each static build"
+    "measurement": "all static JavaScript files plus the Vite manifest static-import closure for the Dashboard shell and one active lazy destination"
   },
   "bundle": {
     "legacy-console-v1": {
@@ -15,11 +15,13 @@
     },
     "dashboard-v2": {
       "buildDirectory": "apps/dashboard/build/_app/immutable",
-      "javascriptFiles": 14,
-      "gzipBytes": 211722,
+      "javascriptFiles": 49,
+      "gzipBytes": 327417,
+      "largestActiveRouteJavascriptFiles": 30,
+      "largestActiveRouteGzipBytes": 287040,
       "blockingBudgetBytes": 307200
     },
-    "reductionPercent": 76.7
+    "allBundleReductionPercent": 64.4
   },
   "fixtures": {
     "resourceCounts": [1, 10, 50, 100],
@@ -34,7 +36,16 @@
     "routes": [
       "/projects",
       "/projects/atlas-api/overview?environment=production",
+      "/infrastructure",
+      "/activity",
+      "/marketplace",
+      "/settings",
+      "/projects/atlas-api/deployments?environment=production",
+      "/projects/atlas-api/observability?environment=production",
+      "/projects/atlas-api/settings?environment=production",
       "/projects/atlas-api/resources/api-gateway/overview?environment=production&view=list",
+      "/login",
+      "/bootstrap/auth/first-admin",
       "/patterns"
     ],
     "outcome": "pass"
@@ -45,14 +56,75 @@
     "fixtures": [
       "projects-desktop-light.png",
       "project-desktop-light.png",
+      "workspace-infrastructure-desktop-light.png",
+      "workspace-activity-desktop-light.png",
+      "workspace-marketplace-desktop-light.png",
+      "workspace-settings-desktop-light.png",
+      "project-deployments-desktop-light.png",
+      "project-observability-desktop-light.png",
+      "project-settings-desktop-light.png",
+      "project-agent-desktop-light.png",
+      "auth-login-desktop-light.png",
+      "auth-first-admin-desktop-light.png",
+      "auth-login-mobile-light.png",
       "resource-desktop-dark.png",
+      "resource-configuration-desktop-light.png",
+      "resource-observability-desktop-dark.png",
+      "resource-networking-desktop-light.png",
+      "resource-settings-desktop-dark.png",
       "patterns-desktop-dark.png",
       "projects-mobile-dark.png",
-      "resource-mobile-dark.png"
+      "workspace-marketplace-mobile-dark.png",
+      "workspace-settings-mobile-dark.png",
+      "project-observability-mobile-dark.png",
+      "project-settings-mobile-dark.png",
+      "resource-mobile-dark.png",
+      "resource-settings-mobile-dark.png",
+      "resource-tab-performance.json",
+      "dashboard-route-performance.json",
+      "legacy-route-performance.json"
     ]
   },
+  "releaseAcceptance": {
+    "status": "pass",
+    "defaultPreset": "dashboard-v2",
+    "rollbackPreset": "legacy-console-v1",
+    "binaryVersion": "0.1.0",
+    "database": "isolated-pglite",
+    "healthStatus": 200,
+    "firstVisitPath": "/bootstrap/auth/first-admin",
+    "authenticatedLandingPath": "/projects",
+    "generatedPasswordRenderedOnce": true,
+    "horizontalOverflowPx": 0,
+    "unlabeledInteractiveControls": 0
+  },
   "productDataRequestTiming": {
-    "status": "not-comparable-in-foundation-preview",
-    "reason": "Issue 1423 intentionally has no real data or summary queries. Same-seed product-data request and p95 comparison begins with issue 1424. No zero-request preview measurement is presented as control-plane evidence."
+    "status": "pass",
+    "method": "Bun.WebView production builds on the same darwin-arm64 machine, 1440x1000 viewport, local fixture API, 20 samples per route; p95 excludes only the single cold-start outlier by standard nearest-rank calculation",
+    "scenarios": {
+      "projects": {
+        "legacy": { "requests": 7, "p95Ms": 292.56 },
+        "dashboard": { "requests": 1, "p95Ms": 125.65 },
+        "requestReductionPercent": 85.7,
+        "p95ReductionPercent": 57.1
+      },
+      "projectOverview": {
+        "legacy": { "requests": 12, "p95Ms": 315.31 },
+        "dashboard": { "requests": 1, "p95Ms": 129.41, "seededResources": 100, "mountedRows": 50 },
+        "requestReductionPercent": 91.7,
+        "p95ReductionPercent": 59
+      },
+      "resourceOverview": {
+        "legacy": { "requests": 20, "p95Ms": 311.05 },
+        "dashboard": { "requests": 2, "p95Ms": 128.09 },
+        "requestReductionPercent": 90,
+        "p95ReductionPercent": 58.8
+      },
+      "resourceTab": {
+        "dashboardCachedP95Ms": 52,
+        "blockingBudgetMs": 200,
+        "inactiveStreamCount": 0
+      }
+    }
   }
 }

@@ -160,7 +160,7 @@ jobs:
         run: bun run test
 `;
     const e2eWorkflow = `
-      - name: Web WebView Smoke
+      - name: Dashboard WebView Smoke
         run: bun run test:e2e
 `;
     const webPackageJson = JSON.stringify({
@@ -229,7 +229,7 @@ jobs:
     ).toContainEqual(
       expect.objectContaining({
         message:
-          "@appaloft/web `test` must stay vitest-only so turbo run test does not pay the WebView tax.",
+          "@appaloft/dashboard `test` must stay vitest-only so turbo run test does not pay the WebView tax.",
       }),
     );
     expect(

@@ -185,6 +185,7 @@ appaloft.previewEnvironments.list -> preview-environments.list GET /preview-envi
 appaloft.previewEnvironments.show -> preview-environments.show GET /preview-environments/{previewEnvironmentId}
 appaloft.previewPolicies.configure -> preview-policies.configure POST /preview-policies
 appaloft.previewPolicies.show -> preview-policies.show POST /preview-policies/show
+appaloft.projectEnvironments.overview -> project-environments.overview GET /projects/{projectId}/environments/{environmentId}/overview
 appaloft.projects.archive -> projects.archive POST /projects/{projectId}/archive
 appaloft.projects.configureWorkspaceProfile -> projects.configure-workspace-profile POST /projects/{projectId}/workspace-profile
 appaloft.projects.count -> projects.count GET /projects/count
@@ -192,6 +193,7 @@ appaloft.projects.create -> projects.create POST /projects
 appaloft.projects.delete -> projects.delete DELETE /projects/{projectId}
 appaloft.projects.deleteCheck -> projects.delete-check GET /projects/{projectId}/delete-check
 appaloft.projects.list -> projects.list GET /projects
+appaloft.projects.listSummaries -> projects.list-summaries GET /projects/summaries
 appaloft.projects.rename -> projects.rename POST /projects/{projectId}/rename
 appaloft.projects.reorder -> projects.reorder POST /projects/reorder
 appaloft.projects.restore -> projects.restore POST /projects/{projectId}/restore
@@ -225,6 +227,7 @@ appaloft.resources.healthHistory -> resources.health-history GET /resources/{res
 appaloft.resources.importVariables -> resources.import-variables POST /resources/{resourceId}/variables/import
 appaloft.resources.list -> resources.list GET /resources
 appaloft.resources.listDependencyBindings -> resources.list-dependency-bindings GET /resources/{resourceId}/dependency-bindings
+appaloft.resources.overview -> resources.overview GET /projects/{projectId}/environments/{environmentId}/resources/{resourceId}/overview
 appaloft.resources.proxyConfiguration.preview -> resources.proxy-configuration.preview GET /resources/{resourceId}/proxy-configuration
 appaloft.resources.resetHealth -> resources.reset-health POST /resources/{resourceId}/health-policy/reset
 appaloft.resources.restore -> resources.restore POST /resources/{resourceId}/restore

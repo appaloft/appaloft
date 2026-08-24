@@ -187,6 +187,7 @@ import { showEnvironmentQueryInputSchema } from "./operations/environments/show-
 import { syncEnvironmentProfileCommandInputSchema } from "./operations/environments/sync-environment-profile.command";
 import { unlockEnvironmentCommandInputSchema } from "./operations/environments/unlock-environment.command";
 import { unsetEnvironmentVariableCommandInputSchema } from "./operations/environments/unset-environment-variable.command";
+import { projectEnvironmentOverviewQueryInputSchema } from "./operations/project-environments/project-environment-overview.query";
 import { cancelOperatorWorkCommandInputSchema } from "./operations/operator-work/cancel-operator-work.command";
 import { deadLetterOperatorWorkCommandInputSchema } from "./operations/operator-work/dead-letter-operator-work.command";
 import { listOperatorWorkQueryInputSchema } from "./operations/operator-work/list-operator-work.query";
@@ -219,6 +220,7 @@ import { countProjectsQueryInputSchema } from "./operations/projects/count-proje
 import { createProjectCommandInputSchema } from "./operations/projects/create-project.command";
 import { deleteProjectCommandInputSchema } from "./operations/projects/delete-project.command";
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
+import { listProjectSummariesQueryInputSchema } from "./operations/projects/list-project-summaries.query";
 import { renameProjectCommandInputSchema } from "./operations/projects/rename-project.command";
 import { reorderProjectsCommandInputSchema } from "./operations/projects/reorder-projects.command";
 import { restoreProjectCommandInputSchema } from "./operations/projects/restore-project.command";
@@ -254,6 +256,7 @@ import { resourceDiagnosticSummaryQueryInputSchema } from "./operations/resource
 import { resourceEffectiveConfigQueryInputSchema } from "./operations/resources/resource-effective-config.query";
 import { resourceHealthQueryInputSchema } from "./operations/resources/resource-health.query";
 import { resourceHealthHistoryQueryInputSchema } from "./operations/resources/resource-health-history.query";
+import { resourceOverviewQueryInputSchema } from "./operations/resources/resource-overview.query";
 import { resourceProxyConfigurationPreviewQueryInputSchema } from "./operations/resources/resource-proxy-configuration-preview.query";
 import {
   restartResourceRuntimeCommandInputSchema,
@@ -1269,6 +1272,45 @@ export const operationCatalog = [
     },
   },
   {
+    key: "projects.list-summaries",
+    kind: "query",
+    domain: "projects",
+    messageName: "ListProjectSummariesQuery",
+    handlerName: "ListProjectSummariesQueryHandler",
+    serviceName: "ListProjectSummariesQueryService",
+    inputSchema: listProjectSummariesQueryInputSchema,
+    serviceToken: tokens.listProjectSummariesQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
+    transports: {
+      orpc: { method: "GET", path: "/api/projects/summaries" },
+    },
+  },
+  {
+    key: "project-environments.overview",
+    kind: "query",
+    domain: "environments",
+    messageName: "ProjectEnvironmentOverviewQuery",
+    handlerName: "ProjectEnvironmentOverviewQueryHandler",
+    serviceName: "ProjectEnvironmentOverviewQueryService",
+    inputSchema: projectEnvironmentOverviewQueryInputSchema,
+    serviceToken: tokens.projectEnvironmentOverviewQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
+    transports: {
+      orpc: {
+        method: "GET",
+        path: "/api/projects/{projectId}/environments/{environmentId}/overview",
+      },
+    },
+  },
+  {
     key: "projects.count",
     kind: "query",
     domain: "projects",
@@ -1937,6 +1979,27 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource show <resourceId>",
       orpc: { method: "GET", path: "/api/resources/{resourceId}" },
+    },
+  },
+  {
+    key: "resources.overview",
+    kind: "query",
+    domain: "resources",
+    messageName: "ResourceOverviewQuery",
+    handlerName: "ResourceOverviewQueryHandler",
+    serviceName: "ResourceOverviewQueryService",
+    inputSchema: resourceOverviewQueryInputSchema,
+    serviceToken: tokens.resourceOverviewQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
+    transports: {
+      orpc: {
+        method: "GET",
+        path: "/api/projects/{projectId}/environments/{environmentId}/resources/{resourceId}/overview",
+      },
     },
   },
   {

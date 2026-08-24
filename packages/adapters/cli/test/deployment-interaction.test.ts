@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -18,6 +18,14 @@ function ensureReflectMetadata(): void {
   reflectObject.getOwnMetadata ??= () => undefined;
   reflectObject.hasMetadata ??= () => false;
   reflectObject.metadata ??= () => () => {};
+}
+
+function missingSourceLocator(leaf: string): string {
+  return join(tmpdir(), `appaloft-missing-cli-source-${process.pid}`, "projects", leaf);
+}
+
+function expectSameExistingPath(actual: string, expected: string): void {
+  expect(realpathSync(actual)).toBe(realpathSync(expected));
 }
 
 describe("CLI quick deploy draft mapping", () => {
@@ -272,7 +280,7 @@ describe("CLI quick deploy draft mapping", () => {
     expect(
       shouldConfigureReusableResourceSource({
         seed: {},
-        sourceLocator: "/Users/nichenqin/projects/nux-9859a0e9-static",
+        sourceLocator: missingSourceLocator("nux-9859a0e9-static"),
         deploymentMethod: "static",
       }),
     ).toBe(true);
@@ -283,7 +291,7 @@ describe("CLI quick deploy draft mapping", () => {
     const { sourceBindingForDeploymentInput } =
       await import("../src/commands/deployment-interaction");
     const { CLI_RESOLVED_SOURCE_METADATA_KEY } = await import("@appaloft/application");
-    const locator = "/Users/nichenqin/projects/nux-772b6112-static";
+    const locator = missingSourceLocator("nux-772b6112-static");
 
     expect(sourceBindingForDeploymentInput(locator, "static")).toEqual({
       kind: "local-folder",
@@ -314,7 +322,7 @@ describe("CLI quick deploy draft mapping", () => {
       await import("../src/commands/deployment-interaction");
     const { CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY, CLI_RESOLVED_SOURCE_METADATA_KEY } =
       await import("@appaloft/application");
-    const locator = "/Users/nichenqin/projects/nux-055483c0-static";
+    const locator = missingSourceLocator("nux-055483c0-static");
     const packedSourceArchiveTarGz = "H4sIAAAAAAAAAytKLSpILC4u1gMA";
     const desired = sourceBindingForDeploymentInput(locator, "static", {
       packedSourceArchiveTarGz,
@@ -342,7 +350,7 @@ describe("CLI quick deploy draft mapping", () => {
     ensureReflectMetadata();
     const { sourceBindingForDeploymentInput, sourceProfilesMatch } =
       await import("../src/commands/deployment-interaction");
-    const locator = "/Users/nichenqin/projects/nux-772b6112-static";
+    const locator = missingSourceLocator("nux-772b6112-static");
     const desired = sourceBindingForDeploymentInput(locator, "static");
 
     expect(
@@ -414,9 +422,9 @@ describe("CLI quick deploy draft mapping", () => {
 
       expect(detectLocalStaticPublishDirectory(".")).toBe("public");
       expect(detectLocalStaticPublishDirectory(sourceRoot)).toBe("public");
-      expect(normalizeCliPathOrSource(".", "auto")).toBe(resolve(sourceRoot));
+      expectSameExistingPath(normalizeCliPathOrSource(".", "auto"), sourceRoot);
       expect(normalizeCliPathOrSource(".", "auto")).toContain("nux-fb4bd8c5-static");
-      expect(normalizeCliPathOrSource(".", "auto")).not.toBe(resolve(parent));
+      expect(realpathSync(normalizeCliPathOrSource(".", "auto"))).not.toBe(realpathSync(parent));
 
       const autoEntry = normalizeUrlFirstDeploymentEntry({
         sourceLocator: ".",
@@ -475,10 +483,10 @@ describe("CLI quick deploy draft mapping", () => {
     try {
       process.chdir(folder);
       process.env.PWD = parent;
-      expect(normalizeCliPathOrSource(".", "static")).toBe(resolve(folder));
-      expect(normalizeCliPathOrSource(parent, "static")).toBe(resolve(folder));
-      expect(resolveCliHostLocalSourceFolder(parent)).toBe(resolve(folder));
-      expect(normalizeCliPathOrSource(".", "static")).not.toBe(resolve(parent));
+      expectSameExistingPath(normalizeCliPathOrSource(".", "static"), folder);
+      expectSameExistingPath(normalizeCliPathOrSource(parent, "static"), folder);
+      expectSameExistingPath(resolveCliHostLocalSourceFolder(parent), folder);
+      expect(realpathSync(normalizeCliPathOrSource(".", "static"))).not.toBe(realpathSync(parent));
 
       const flagged = normalizeUrlFirstDeploymentEntry({
         entryMode: "static-site",
@@ -491,9 +499,9 @@ describe("CLI quick deploy draft mapping", () => {
 
       process.chdir(parent);
       process.env.PWD = folder;
-      expect(normalizeCliPathOrSource(".", "static")).toBe(resolve(folder));
-      expect(normalizeCliPathOrSource(parent, "static")).toBe(resolve(folder));
-      expect(resolveCliHostLocalSourceFolder()).toBe(resolve(folder));
+      expectSameExistingPath(normalizeCliPathOrSource(".", "static"), folder);
+      expectSameExistingPath(normalizeCliPathOrSource(parent, "static"), folder);
+      expectSameExistingPath(resolveCliHostLocalSourceFolder(), folder);
     } finally {
       process.chdir(previousCwd);
       if (previousPwd === undefined) {
@@ -524,10 +532,10 @@ describe("CLI quick deploy draft mapping", () => {
     try {
       process.chdir(folder);
       process.env.PWD = parent;
-      expect(normalizeCliPathOrSource(".", "auto")).toBe(resolve(folder));
-      expect(normalizeCliPathOrSource(parent, "auto")).toBe(resolve(folder));
-      expect(resolveCliHostLocalSourceFolder(parent)).toBe(resolve(folder));
-      expect(normalizeCliPathOrSource(".", "auto")).not.toBe(resolve(parent));
+      expectSameExistingPath(normalizeCliPathOrSource(".", "auto"), folder);
+      expectSameExistingPath(normalizeCliPathOrSource(parent, "auto"), folder);
+      expectSameExistingPath(resolveCliHostLocalSourceFolder(parent), folder);
+      expect(realpathSync(normalizeCliPathOrSource(".", "auto"))).not.toBe(realpathSync(parent));
 
       const autoEntry = normalizeUrlFirstDeploymentEntry({
         sourceLocator: ".",
@@ -569,12 +577,12 @@ describe("CLI quick deploy draft mapping", () => {
 
       for (const incoming of [".", parent, folder] as const) {
         const sent = sourceBindingForDeploymentInput(incoming, "static");
-        expect(sent.locator).toBe(resolve(folder));
-        expect(sent.locator).not.toBe(resolve(parent));
-        expect(sent.originalLocator).toBe(resolve(folder));
-        expect(sent.originalLocator).not.toBe(resolve(parent));
+        expectSameExistingPath(sent.locator, folder);
+        expect(realpathSync(sent.locator)).not.toBe(realpathSync(parent));
+        expectSameExistingPath(sent.originalLocator, folder);
+        expect(realpathSync(sent.originalLocator)).not.toBe(realpathSync(parent));
         expect(sent.displayName).toBe(leaf);
-        expect(sent.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY]).toBe(resolve(folder));
+        expectSameExistingPath(sent.metadata?.[CLI_RESOLVED_SOURCE_METADATA_KEY] ?? "", folder);
         expect(sent.metadata?.[CLI_PACKED_SOURCE_ARCHIVE_METADATA_KEY]?.length).toBeGreaterThan(0);
 
         const listingDir = mkdtempSync(join(tmpdir(), "appaloft-cli-bind-nux-list-"));

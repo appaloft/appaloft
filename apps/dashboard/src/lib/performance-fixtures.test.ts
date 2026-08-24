@@ -36,7 +36,7 @@ describe("Dashboard performance fixtures", () => {
     expect(dashboardPerformanceBudgets.topologyEnabled).toBe(false);
   });
 
-  test("[DASH-PERF-007] records a same-toolchain legacy bundle baseline without inventing request evidence", async () => {
+  test("[DASH-PERF-001..007] records same-toolchain bundle and route evidence", async () => {
     const evidence = JSON.parse(
       await readFile(
         new URL("../../test/evidence/foundation-2026-08-24.json", import.meta.url),
@@ -45,19 +45,41 @@ describe("Dashboard performance fixtures", () => {
     ) as {
       bundle: {
         "legacy-console-v1": { gzipBytes: number };
-        "dashboard-v2": { gzipBytes: number; blockingBudgetBytes: number };
-        reductionPercent: number;
+        "dashboard-v2": {
+          gzipBytes: number;
+          blockingBudgetBytes: number;
+          largestActiveRouteGzipBytes: number;
+        };
+        allBundleReductionPercent: number;
       };
-      productDataRequestTiming: { status: string };
+      productDataRequestTiming: {
+        status: string;
+        scenarios: {
+          projects: { p95ReductionPercent: number };
+          projectOverview: { dashboard: { mountedRows: number } };
+        };
+      };
     };
 
-    expect(evidence.bundle["dashboard-v2"].gzipBytes).toBeLessThanOrEqual(
-      evidence.bundle["dashboard-v2"].blockingBudgetBytes,
+    expect(evidence.bundle["dashboard-v2"].gzipBytes).toBeGreaterThanOrEqual(
+      evidence.bundle["dashboard-v2"].largestActiveRouteGzipBytes,
     );
-    expect(evidence.bundle.reductionPercent).toBeGreaterThanOrEqual(30);
+    expect(evidence.bundle.allBundleReductionPercent).toBeGreaterThanOrEqual(30);
     expect(evidence.bundle["legacy-console-v1"].gzipBytes).toBeGreaterThan(
       evidence.bundle["dashboard-v2"].gzipBytes,
     );
-    expect(evidence.productDataRequestTiming.status).toBe("not-comparable-in-foundation-preview");
+    expect(evidence.productDataRequestTiming.status).toBe("pass");
+    expect(
+      evidence.productDataRequestTiming.scenarios.projects.p95ReductionPercent,
+    ).toBeGreaterThanOrEqual(30);
+    expect(evidence.productDataRequestTiming.scenarios.projectOverview.dashboard.mountedRows).toBe(
+      50,
+    );
+    expect(evidence.bundle["dashboard-v2"].largestActiveRouteGzipBytes).toBeLessThanOrEqual(
+      evidence.bundle["dashboard-v2"].blockingBudgetBytes,
+    );
+    expect(evidence.bundle["dashboard-v2"].blockingBudgetBytes).toBe(
+      dashboardPerformanceBudgets.initialRouteJavaScriptGzipBytes,
+    );
   });
 });

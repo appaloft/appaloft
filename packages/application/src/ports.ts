@@ -1757,6 +1757,162 @@ export interface ProjectSummary {
   createdAt: string;
 }
 
+export interface DashboardProjectSummary {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  resourceCount: number;
+  attentionCount: number;
+  attentionStatus: "healthy" | "attention";
+  defaultEnvironment?: {
+    id: string;
+    name: string;
+    kind: EnvironmentKind;
+  };
+  latestActivityAt?: string;
+}
+
+export interface ProjectSummariesReadModel {
+  list(
+    context: RepositoryContext,
+    input: {
+      cursor?: string;
+      limit: number;
+      search?: string;
+      sort: "recent-activity-desc" | "name-asc" | "name-desc";
+      organizationIds?: readonly string[];
+      projectIds?: readonly string[];
+    },
+  ): Promise<{ items: DashboardProjectSummary[]; nextCursor?: string }>;
+}
+
+export interface DashboardEnvironmentChoice {
+  id: string;
+  name: string;
+  kind: EnvironmentKind;
+  lifecycleStatus: EnvironmentLifecycleStatus;
+}
+
+export interface DashboardResourceHealth {
+  status: ResourceHealthOverall;
+  observedAt?: string;
+}
+
+export interface DashboardResourceAccess {
+  status: "ready" | "not-ready" | "unknown";
+  url?: string;
+}
+
+export interface DashboardDeploymentSummary {
+  id: string;
+  status: DeploymentStatus;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+}
+
+export interface DashboardProjectResourceSummary {
+  id: string;
+  name: string;
+  slug: string;
+  kind: ResourceKind;
+  description?: string;
+  health: DashboardResourceHealth;
+  access: DashboardResourceAccess;
+  latestDeployment?: DashboardDeploymentSummary;
+  attentionStatus: "healthy" | "attention" | "unknown";
+}
+
+export interface ProjectEnvironmentOverview {
+  schemaVersion: "project-environments.overview/v1";
+  project: {
+    id: string;
+    name: string;
+    slug: string;
+    description?: string;
+  };
+  environment: DashboardEnvironmentChoice;
+  environmentChoices: DashboardEnvironmentChoice[];
+  resources: DashboardProjectResourceSummary[];
+  attention: {
+    total: number;
+    healthy: number;
+    attention: number;
+    unknown: number;
+  };
+  nextCursor?: string;
+  generatedAt: string;
+}
+
+export interface ProjectEnvironmentOverviewReadModel {
+  show(
+    context: RepositoryContext,
+    input: {
+      projectId: string;
+      environmentId: string;
+      cursor?: string;
+      limit: number;
+      search?: string;
+      sort: "name-asc" | "name-desc" | "recent-activity-desc";
+      health?: "all" | "healthy" | "attention" | "unknown";
+      organizationIds?: readonly string[];
+      projectIds?: readonly string[];
+    },
+  ): Promise<ProjectEnvironmentOverview | null>;
+}
+
+export interface ResourceOverview {
+  schemaVersion: "resources.overview/v1";
+  resource: {
+    id: string;
+    projectId: string;
+    environmentId: string;
+    name: string;
+    slug: string;
+    kind: ResourceKind;
+    description?: string;
+    lifecycleStatus: "active" | "archived";
+  };
+  health: DashboardResourceHealth;
+  access: DashboardResourceAccess;
+  configuration: {
+    sourceConfigured: boolean;
+    runtimeConfigured: boolean;
+    networkConfigured: boolean;
+    accessConfigured: boolean;
+    status: "ready" | "incomplete";
+  };
+  network: {
+    internalPort?: number;
+    protocol?: ResourceNetworkProtocol;
+    exposureMode?: ResourceExposureMode;
+  };
+  capabilities: {
+    deploy: boolean;
+    configure: boolean;
+    logs: boolean;
+    metrics: boolean;
+    networking: boolean;
+  };
+  latestDeployments: DashboardDeploymentSummary[];
+  generatedAt: string;
+}
+
+export interface ResourceOverviewReadModel {
+  show(
+    context: RepositoryContext,
+    input: {
+      projectId: string;
+      environmentId: string;
+      resourceId: string;
+      organizationIds?: readonly string[];
+      projectIds?: readonly string[];
+      resourceIds?: readonly string[];
+    },
+  ): Promise<ResourceOverview | null>;
+}
+
 export type ProjectListLifecycleStatus = ProjectSummary["lifecycleStatus"] | "all";
 
 export interface ProjectDeleteSafety {

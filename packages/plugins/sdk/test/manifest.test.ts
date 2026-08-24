@@ -208,4 +208,92 @@ describe("plugin manifest contract", () => {
       },
     });
   });
+
+  test("[DASH-EXT-002] accepts owner-scoped Dashboard navigation metadata", () => {
+    expect(
+      systemPluginWebExtensionSchema.parse({
+        key: "resource-audit-log",
+        title: "Audit log",
+        path: "/audit-log",
+        placement: "route",
+        target: "console-route",
+        requiresAuth: true,
+        metadata: {
+          renderer: "console-page",
+          pageEndpoint:
+            "/api/audit-log?projectId={projectId}&environmentId={environmentId}&resourceId={resourceId}",
+          scopedNavigation: {
+            scope: "resource",
+            destination: "overview",
+            presentation: "section",
+            key: "resource-audit-log",
+            labelKey: "extensions.auditLog",
+            iconKey: "activity",
+            order: 120,
+            routeTemplate:
+              "/projects/{projectId}/resources/{resourceId}/overview?environment={environmentId}",
+            visibilityEndpoint:
+              "/api/audit-log/visibility?projectId={projectId}&resourceId={resourceId}",
+          },
+        },
+      }),
+    ).toMatchObject({
+      metadata: {
+        scopedNavigation: {
+          scope: "resource",
+          destination: "overview",
+          presentation: "section",
+        },
+      },
+    });
+  });
+
+  test("[DASH-EXT-002] rejects a destination that does not belong to the declared owner scope", () => {
+    expect(() =>
+      systemPluginWebExtensionSchema.parse({
+        key: "invalid-scoped-extension",
+        title: "Invalid scoped extension",
+        path: "/invalid",
+        placement: "route",
+        target: "console-route",
+        requiresAuth: true,
+        metadata: {
+          scopedNavigation: {
+            scope: "workspace",
+            destination: "deployments",
+            presentation: "page",
+            key: "invalid-scoped-extension",
+            labelKey: "extensions.invalid",
+            iconKey: "activity",
+            order: 10,
+            routeTemplate: "/invalid",
+          },
+        },
+      }),
+    ).toThrow();
+  });
+
+  test("[DASH-EXT-003] keeps legacy and unknown metadata additive", () => {
+    expect(
+      systemPluginWebExtensionSchema.parse({
+        key: "legacy-console-page",
+        title: "Legacy page",
+        path: "/legacy",
+        placement: "navigation",
+        target: "console-route",
+        requiresAuth: true,
+        metadata: {
+          renderer: "console-page",
+          pageEndpoint: "/api/legacy",
+          futureDashboardField: { version: 2 },
+        },
+      }),
+    ).toMatchObject({
+      metadata: {
+        renderer: "console-page",
+        pageEndpoint: "/api/legacy",
+        futureDashboardField: { version: 2 },
+      },
+    });
+  });
 });

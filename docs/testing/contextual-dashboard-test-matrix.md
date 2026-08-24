@@ -28,6 +28,8 @@ rules. Legacy route parity is deliberately absent.
 | DASH-ROUTE-008 | e2e          | the same Resource URL opens on mobile                         | It renders a full page with no off-canvas loss or horizontal document overflow.                       |
 | DASH-ROUTE-009 | e2e          | panel closes after list/filter/scroll state changes           | Project route restores Environment, view, filters, cursor, and scroll restoration contract.           |
 | DASH-ROUTE-010 | e2e          | a legacy `apps/web` deep link is used after Dashboard cutover | 404 is allowed; no redirect/fallback assertion exists.                                                |
+| DASH-AUTH-001  | e2e          | an uninitialized or signed-out release console opens          | It reaches the Dashboard first-admin or sign-in surface without depending on the legacy Web bundle.   |
+| DASH-AUTH-002  | unit/e2e     | authentication completes with a requested return path         | Only same-origin paths are accepted, and the user reaches the authenticated Projects surface.         |
 
 ## Data And Ownership Matrix
 
@@ -42,6 +44,7 @@ rules. Legacy route parity is deliberately absent.
 | DASH-DATA-007 | browser/network | Resource destination changes or closes              | Previous destination polling, stream, observer, and subscription owners are disposed.                                    |
 | DASH-OWN-008  | e2e             | Project Deployments opens                           | It is a bounded rollup and exposes Resource owner links; direct Project-owned deployment mutation is absent.             |
 | DASH-OWN-009  | e2e             | Resource deploy/configure/observe actions run       | They dispatch the accepted shared operations; no Svelte-local lifecycle rule exists.                                     |
+| DASH-OWN-010  | e2e             | contextual Agent utility opens                      | It prepares the active scope as a task brief and hands execution to Agent Workspace without owning another lifecycle.    |
 
 ## Extension Matrix
 
@@ -78,6 +81,45 @@ rules. Legacy route parity is deliberately absent.
 | DASH-PERF-006 | nav/resize                | p75 INP <=200ms and no task >100ms.                                                     |
 | DASH-PERF-007 | build                     | active shell+route JavaScript <=300 KiB gzip; charts/editors/terminal are lazy.         |
 | DASH-PERF-008 | Topology 10/50/100        | p75 INP <=200ms and >=55 FPS over 2s pan/drag; otherwise feature stays disabled.        |
+
+### Recorded beta-loop evidence (2026-08-24)
+
+- Same-machine Bun.WebView production-build comparison, 20 samples per route: Projects p95
+  `292.56ms -> 125.65ms`, Project Overview `315.31ms -> 129.41ms`, and Resource Overview
+  `311.05ms -> 128.09ms`; every measured p95 reduction exceeds 30%.
+- Product-data request paths fell from `7 -> 1`, `12 -> 1`, and `20 -> 2` respectively. The
+  Dashboard Project fixture represents 100 seeded Resources and mounts the first bounded 50 rows.
+- Cached Resource destination switch p95 is `52ms`; leaving Logs & Metrics leaves zero inactive
+  streams or follow-up requests.
+- After Workspace/Project completion, the largest shell-plus-active-destination static import
+  closure is `287040` gzip bytes. All lazy destination chunks together are `327417` gzip bytes and
+  are not loaded as one active route.
+- Machine, bundle, fixture, route, and artifact details live in
+  `apps/dashboard/test/evidence/foundation-2026-08-24.json`; the two WebView suites reproduce the
+  raw route measurements under `/private/tmp/appaloft-dashboard-evidence`.
+
+### Recorded breadth and default-cutover evidence (2026-08-25)
+
+- One production-build Bun.WebView suite passes `14/14` tests and `149` assertions across every
+  Workspace, Project, and Resource destination, accepted create/configuration/lifecycle commands,
+  scoped extensions, Agent handoff, first-admin/sign-in recovery, desktop light/dark, and `390x844`
+  mobile rendering.
+- Infrastructure reads bounded Server and dependency-resource collections and registers through
+  the shared Server command. Activity uses the bounded operator-work query and URL filters.
+  Marketplace opens real Blueprint detail, while Workspace Settings reads organization profile,
+  member, permission, and unscoped-extension fallback surfaces.
+- Project Deployments uses the bounded Deployment query with Resource owner links; Observability
+  uses a Project-scoped retained monitoring rollup; Settings uses Project lifecycle/delete-safety
+  operations plus Environment list/create.
+- The public extension placement inventory is recorded at
+  `docs/specs/147-contextual-dashboard-app/extension-placement-inventory.md`.
+- Release selection defaults to `dashboard-v2`; `legacy-console-v1` remains an explicit rollback
+  preset. Bilingual docs and the Unreleased breaking-route note state that legacy deep links may
+  return 404 and that redirects/parity are not promised.
+- Both binary bundle selectors package successfully. The default compiled binary passes `/api/health`,
+  embeds `data-console-preset="dashboard-v2"`, redirects an uninitialized `/` visit to first-admin,
+  creates the administrator through the public operation, signs in through Better Auth, and reaches
+  `/projects` against an isolated PGlite database.
 
 ## Rollout Gates
 

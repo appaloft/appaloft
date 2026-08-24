@@ -28,18 +28,19 @@ Apply migrations:
 bun run db:migrate
 ```
 
-Run the local web console, public docs, and backend together:
+Run the default Dashboard, public docs, and backend together:
 
 ```bash
 bun run dev
 ```
 
-This root command starts `apps/shell`, `apps/web`, and `apps/docs`, not the desktop app. Open the Web
-URL printed by Vite. Web dev keeps `/docs/*` links working by redirecting them to the local Docs dev
-server.
+This root command starts `apps/shell`, `apps/dashboard`, and `apps/docs`, not the desktop app. Open
+the Dashboard URL printed by Vite. To exercise the retained rollback surface, run
+`bun run dev:legacy-web`; it starts `apps/web` instead of Dashboard.
 
-By default Vite proxies `/api` to `APPALOFT_WEB_DEV_PROXY_TARGET`. Override `APPALOFT_HTTP_PORT` for
-the backend, `APPALOFT_WEB_DEV_PROXY_TARGET` for Web-to-backend development traffic, and
+By default Dashboard Vite proxies `/api` to `APPALOFT_DASHBOARD_DEV_PROXY_TARGET`; legacy Web uses
+`APPALOFT_WEB_DEV_PROXY_TARGET`. Override `APPALOFT_HTTP_PORT` for the backend, the matching proxy
+target for browser-to-backend development traffic, and
 `APPALOFT_WEB_ORIGIN` for the public browser origin used by OAuth callbacks. If the local Docs dev
 server uses a non-default address, set `APPALOFT_DEV_DOCS_HOST` / `APPALOFT_DEV_DOCS_PORT`, or set
 `APPALOFT_WEB_DEV_DOCS_TARGET` to override the full Web redirect target.

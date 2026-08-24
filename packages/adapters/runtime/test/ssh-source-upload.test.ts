@@ -1,7 +1,7 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, test } from "bun:test";
@@ -76,9 +76,14 @@ import {
 } from "../src/ssh-execution";
 import { generateStaticSiteDockerBuild } from "../src/workspace-planners";
 
-const hyphenatedStaticLocator = "/Users/nichenqin/projects/nux-c79876d8-static";
-const hyphenatedStaticParent = "/Users/nichenqin/projects";
 const hyphenatedStaticLeaf = "nux-c79876d8-static";
+const unavailableProjectsParent = join(
+  tmpdir(),
+  `appaloft-missing-projects-${process.pid}`,
+  "projects",
+);
+const hyphenatedStaticParent = unavailableProjectsParent;
+const hyphenatedStaticLocator = join(hyphenatedStaticParent, hyphenatedStaticLeaf);
 const startedAt = StartedAt.rehydrate("2026-08-21T00:00:00.000Z");
 
 function runningStaticSshDeployment(input: {
@@ -350,8 +355,8 @@ type PrepareSshSourceBackend = {
 
 describe("SSH source upload", () => {
   test("[DEP-CREATE-PKG-007] live stored shape without workingDirectory dirnames the projects parent", () => {
-    const leaf = "/Users/nichenqin/projects/nux-d9042824-static";
-    const parent = "/Users/nichenqin/projects";
+    const leaf = join(unavailableProjectsParent, "nux-d9042824-static");
+    const parent = unavailableProjectsParent;
     expect(existsSync(leaf)).toBe(false);
     expect(existsSync(parent)).toBe(false);
     // Live persist for res_rkd0hzp0yvp5: locator=leaf, archive present,
@@ -359,7 +364,7 @@ describe("SSH source upload", () => {
     const legacyExistsSyncPath = dirname(leaf);
     expect(legacyExistsSyncPath).toBe(parent);
     expect(`Source working directory does not exist: ${legacyExistsSyncPath}`).toBe(
-      "Source working directory does not exist: /Users/nichenqin/projects",
+      `Source working directory does not exist: ${unavailableProjectsParent}`,
     );
   });
 
@@ -368,7 +373,7 @@ describe("SSH source upload", () => {
     const parent = join(hostRoot, "projects");
     const leaf = "nux-d9042824-static";
     const folder = join(parent, leaf);
-    const macParent = "/Users/nichenqin/projects";
+    const macParent = unavailableProjectsParent;
     const macFolder = `${macParent}/${leaf}`;
     const runtimeDir = mkdtempSync(join(tmpdir(), "appaloft-runtime-"));
     const previousCwd = process.cwd();
@@ -415,7 +420,7 @@ describe("SSH source upload", () => {
 
     try {
       process.chdir(runtimeDir);
-      expect(process.cwd()).toBe(runtimeDir);
+      expect(process.cwd()).toBe(realpathSync(runtimeDir));
       expect(existsSync(macParent)).toBe(false);
       expect(existsSync(macFolder)).toBe(false);
 
@@ -528,7 +533,7 @@ describe("SSH source upload", () => {
   });
 
   test("[DEP-CREATE-PKG-007] recover refuses a generic parent basename as the source leaf", () => {
-    const parent = "/Users/nichenqin/projects";
+    const parent = unavailableProjectsParent;
     const folder = `${parent}/nux-67e3a052-static`;
 
     expect(
@@ -589,7 +594,7 @@ describe("SSH source upload", () => {
   });
 
   test("[DEP-CREATE-PKG-007] hyphenated appaloft-cloud under projects is not reported as the parent", () => {
-    const parent = "/Users/nichenqin/projects";
+    const parent = unavailableProjectsParent;
     const folder = `${parent}/appaloft-cloud`;
 
     expect(
@@ -632,7 +637,7 @@ describe("SSH source upload", () => {
   });
 
   test("[DEP-CREATE-PKG-007] reconstructs a non-git hyphenated nux leaf under projects from the resource name", () => {
-    const parent = "/Users/nichenqin/projects";
+    const parent = unavailableProjectsParent;
     const leaf = "nux-d73d53b6-static";
     const folder = `${parent}/${leaf}`;
     const resourceName = `${leaf}-8xrly6`;
@@ -690,7 +695,7 @@ describe("SSH source upload", () => {
   });
 
   test("[DEP-CREATE-PKG-007] detached worker names the nux leaf, not the projects parent", async () => {
-    const parent = "/Users/nichenqin/projects";
+    const parent = unavailableProjectsParent;
     const leaf = "nux-d73d53b6-static";
     const folder = `${parent}/${leaf}`;
     const runtimeDir = mkdtempSync(join(tmpdir(), "appaloft-runtime-"));
@@ -766,12 +771,12 @@ describe("SSH source upload", () => {
     }
   });
 
-  test("[DEP-CREATE-PKG-007][QUICK-DEPLOY-ENTRY-008B] CLI-packed nux-d73d53b6-static is applied; worker does not package /Users/nichenqin/projects", async () => {
+  test("[DEP-CREATE-PKG-007][QUICK-DEPLOY-ENTRY-008B] CLI-packed nux-d73d53b6-static is applied; worker does not package the generic projects parent", async () => {
     const hostRoot = mkdtempSync(join(tmpdir(), "appaloft-nux-d73d53b6-"));
     const parent = join(hostRoot, "projects");
     const leaf = "nux-d73d53b6-static";
     const folder = join(parent, leaf);
-    const macParent = "/Users/nichenqin/projects";
+    const macParent = unavailableProjectsParent;
     const macFolder = `${macParent}/${leaf}`;
     const runtimeDir = mkdtempSync(join(tmpdir(), "appaloft-runtime-"));
     const previousCwd = process.cwd();
@@ -815,7 +820,7 @@ describe("SSH source upload", () => {
 
     try {
       process.chdir(runtimeDir);
-      expect(process.cwd()).toBe(runtimeDir);
+      expect(process.cwd()).toBe(realpathSync(runtimeDir));
       expect(existsSync(macParent)).toBe(false);
       expect(existsSync(macFolder)).toBe(false);
 
@@ -891,7 +896,7 @@ describe("SSH source upload", () => {
     const parent = join(hostRoot, "projects");
     const leaf = "nux-04a0bb31-static";
     const folder = join(parent, leaf);
-    const macParent = "/Users/nichenqin/projects";
+    const macParent = unavailableProjectsParent;
     const macFolder = `${macParent}/${leaf}`;
     const runtimeDir = mkdtempSync(join(tmpdir(), "appaloft-runtime-"));
     const previousCwd = process.cwd();
@@ -928,7 +933,7 @@ describe("SSH source upload", () => {
 
     try {
       process.chdir(runtimeDir);
-      expect(process.cwd()).toBe(runtimeDir);
+      expect(process.cwd()).toBe(realpathSync(runtimeDir));
       expect(existsSync(macParent)).toBe(false);
       expect(existsSync(macFolder)).toBe(false);
 
@@ -989,7 +994,7 @@ describe("SSH source upload", () => {
     const parent = join(hostRoot, "projects");
     const leaf = "nux-c01dc5f5-static";
     const folder = join(parent, leaf);
-    const macParent = "/Users/nichenqin/projects";
+    const macParent = unavailableProjectsParent;
     const macFolder = `${macParent}/${leaf}`;
     const runtimeDir = mkdtempSync(join(tmpdir(), "appaloft-runtime-"));
     const previousCwd = process.cwd();
@@ -1058,7 +1063,7 @@ describe("SSH source upload", () => {
 
     try {
       process.chdir(runtimeDir);
-      expect(process.cwd()).toBe(runtimeDir);
+      expect(process.cwd()).toBe(realpathSync(runtimeDir));
       expect(existsSync(macParent)).toBe(false);
       expect(existsSync(macFolder)).toBe(false);
 
@@ -1122,7 +1127,7 @@ describe("SSH source upload", () => {
   });
 
   test("[DEP-CREATE-PKG-007] detached worker does not name the projects parent for appaloft-cloud", async () => {
-    const parent = "/Users/nichenqin/projects";
+    const parent = unavailableProjectsParent;
     const runtimeDir = mkdtempSync(join(tmpdir(), "appaloft-runtime-"));
     const previousCwd = process.cwd();
     const deployment = runningStaticSshDeployment({
@@ -1282,7 +1287,7 @@ describe("SSH source upload", () => {
   });
 
   test("[DEP-CREATE-PKG-007][QUICK-DEPLOY-ENTRY-008B] SSH package uses originalLocator when locator, workdir, and metadata are the parent live shape", async () => {
-    const parent = "/Users/nichenqin/projects";
+    const parent = unavailableProjectsParent;
     const leaf = "nux-67e3a052-static";
     const folder = join(parent, leaf);
     const runtimeDir = mkdtempSync(join(tmpdir(), "appaloft-runtime-"));
@@ -1403,7 +1408,7 @@ describe("SSH source upload", () => {
   });
 
   test("[DEP-CREATE-PKG-007] SSH package exists-check uses the CLI-resolved source when locator and workdir are already the parent, displayName is omitted, and cwd is runtimeDir", async () => {
-    const parent = "/Users/nichenqin/projects";
+    const parent = unavailableProjectsParent;
     const leaf = "nux-772b6112-static";
     const cliResolvedSource = join(parent, leaf);
     const runtimeDir = mkdtempSync(join(tmpdir(), "appaloft-runtime-"));
@@ -1443,7 +1448,7 @@ describe("SSH source upload", () => {
       expect(localWorkdir).toBe(cliResolvedSource);
       expect(localWorkdir).toContain(leaf);
       expect(localWorkdir).not.toBe(parent);
-      expect(process.cwd()).toBe(runtimeDir);
+      expect(process.cwd()).toBe(realpathSync(runtimeDir));
       expect(process.cwd()).not.toBe(cliResolvedSource);
 
       const prepared = await (
@@ -1534,7 +1539,7 @@ describe("SSH source upload", () => {
       expect(localWorkdir).not.toBe(parent);
       expect(existsSync(localWorkdir)).toBe(true);
       expect(existsSync(join(localWorkdir, "public", "index.html"))).toBe(true);
-      expect(process.cwd()).toBe(runtimeDir);
+      expect(process.cwd()).toBe(realpathSync(runtimeDir));
       expect(process.cwd()).not.toBe(folder);
 
       const archive = join(runtimeDir, "source.tgz");
@@ -1607,7 +1612,7 @@ describe("SSH source upload", () => {
   });
 
   test("[DEP-CREATE-PKG-007] SSH package exists-check reconstructs the hyphenated folder when locator and workdir are already the parent and cwd is runtimeDir", async () => {
-    const parent = "/Users/nichenqin/projects";
+    const parent = unavailableProjectsParent;
     const leaf = "nux-54065181-static";
     const expected = join(parent, leaf);
     const runtimeDir = mkdtempSync(join(tmpdir(), "appaloft-runtime-"));
@@ -1641,7 +1646,7 @@ describe("SSH source upload", () => {
       expect(localWorkdir).toBe(expected);
       expect(localWorkdir).toContain(leaf);
       expect(localWorkdir).not.toBe(parent);
-      expect(process.cwd()).toBe(runtimeDir);
+      expect(process.cwd()).toBe(realpathSync(runtimeDir));
       expect(process.cwd()).not.toBe(expected);
 
       const prepared = await (
@@ -1728,7 +1733,7 @@ describe("SSH source upload", () => {
     expect(listing.stdout).not.toContain(`${leaf}/`);
     expect(listing.stdout.split("\n").some((line) => line.endsWith("/projects"))).toBe(false);
 
-    const macParent = "/Users/nichenqin/projects";
+    const macParent = unavailableProjectsParent;
     const deployment = runningStaticSshDeployment({
       deploymentId: "dep_055483c0_packed",
       locator: macParent,
@@ -1746,7 +1751,7 @@ describe("SSH source upload", () => {
 
     try {
       process.chdir(runtimeDir);
-      expect(process.cwd()).toBe(runtimeDir);
+      expect(process.cwd()).toBe(realpathSync(runtimeDir));
       expect(existsSync(folder)).toBe(false);
       expect(existsSync(macParent)).toBe(false);
 
@@ -2119,7 +2124,7 @@ describe("SSH source upload", () => {
     const previousCwd = process.cwd();
     const emptyArchiveFile = join(hostRoot, "empty.tgz");
     const emptyArchive = createEmptyGitAwareTarArchive(emptyArchiveFile).toString("base64");
-    const missingLeaf = "/Users/nichenqin/projects/appaloft-cloud";
+    const missingLeaf = join(unavailableProjectsParent, "appaloft-cloud");
     expect(existsSync(missingLeaf)).toBe(false);
     expect(missingLeaf.includes("nux-")).toBe(false);
 
@@ -2199,6 +2204,8 @@ describe("SSH source upload", () => {
     const sshBin = mkdtempSync(join(tmpdir(), "appaloft-ssh-bin-"));
     const previousCwd = process.cwd();
     writeLocalSshShim(sshBin);
+    const shellProfile = join(sshBin, ".profile");
+    writeFileSync(shellProfile, `export PATH="${sshBin}:$PATH"\n`);
     initGitWorktree(folder);
     const dockerfile = writeProductionSizedDockerfile(folder);
     expect(dockerfile.bytes).toBeGreaterThan(1000);
@@ -2245,15 +2252,19 @@ describe("SSH source upload", () => {
           target: { host: "127.0.0.1", publicHost: "127.0.0.1", port: "22" },
           env: {
             ...process.env,
+            BASH_ENV: shellProfile,
+            ENV: shellProfile,
+            HOME: sshBin,
             PATH: `${sshBin}:${process.env.PATH ?? "/usr/bin:/bin"}`,
           },
         },
       );
 
       expect(existsSync(join(runtimeDir, "cli-source.tgz"))).toBe(false);
-      expect(prepared.prepared).toBe(true);
       if (!prepared.prepared) {
-        throw new Error("expected live git skip-pack extract to report remote workspace ready");
+        throw new Error(
+          `expected live git skip-pack extract to report remote workspace ready: ${JSON.stringify(prepared.deployment.toState().timeline)}`,
+        );
       }
 
       expect(reports.some((entry) => entry.message === "Remote source workspace is ready")).toBe(
@@ -2306,7 +2317,7 @@ describe("SSH source upload", () => {
     const previousCwd = process.cwd();
     const emptyArchiveFile = join(hostRoot, "empty.tgz");
     const emptyArchive = createEmptyGitAwareTarArchive(emptyArchiveFile).toString("base64");
-    const parent = "/Users/nichenqin/projects";
+    const parent = unavailableProjectsParent;
     const leaf = "appaloft-cloud";
     const resourceName = "res_jsb186k9hriq";
     const locator = `${parent}/${leaf}`;

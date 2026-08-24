@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { mkdir } from "node:fs/promises";
 
 type ApiScenario = "dashboard" | "github-connected" | "static-quick-deploy";
 type ApiRouteResponse = unknown | Response;
@@ -4777,6 +4778,86 @@ describe.serial("console e2e with Bun.WebView", () => {
   afterEach(async () => {
     await Bun.sleep(100);
   });
+
+  test("[DASH-PERF-LEGACY-001] records comparable legacy route evidence", async () => {
+    activeScenario = "dashboard";
+    const scenarios = [
+      {
+        key: "projects",
+        path: "/projects",
+        ready: async (view: Bun.WebView) =>
+          waitFor(
+            () => view.evaluate<number>("document.querySelectorAll('[data-project-card]').length"),
+            (count) => count === 12,
+            "Expected legacy Projects to become usable",
+          ),
+      },
+      {
+        key: "project-overview",
+        path: demoProjectPath,
+        ready: async (view: Bun.WebView) => expectElement(view, "[data-project-runtime-monitor]"),
+      },
+      {
+        key: "resource-overview",
+        path: demoResourcePath,
+        ready: async (view: Bun.WebView) => expectAnyText(view, ["Resource overview", "资源概览"]),
+      },
+    ] as const;
+    const evidence: Record<
+      string,
+      {
+        samplesMs: number[];
+        p95Ms: number;
+        productDataRequestPaths: string[];
+        requestCount: number;
+      }
+    > = {};
+
+    await using view = createWebView({ width: 1_440, height: 1_000 });
+    for (const scenario of scenarios) {
+      const samplesMs: number[] = [];
+      let productDataRequestPaths: string[] = [];
+      for (let index = 0; index < 20; index += 1) {
+        resetRecordedApiRequests();
+        const startedAt = performance.now();
+        await view.navigate(`${previewUrl}${scenario.path}`);
+        await scenario.ready(view);
+        samplesMs.push(Number((performance.now() - startedAt).toFixed(2)));
+        await Bun.sleep(100);
+        productDataRequestPaths = [
+          ...new Set(
+            recordedApiRequests
+              .map((request) => request.pathname)
+              .filter((pathname) => pathname.startsWith("/api/rpc/")),
+          ),
+        ].toSorted();
+      }
+      const sorted = samplesMs.toSorted((left, right) => left - right);
+      evidence[scenario.key] = {
+        samplesMs,
+        p95Ms: sorted[Math.ceil(sorted.length * 0.95) - 1] ?? Number.POSITIVE_INFINITY,
+        productDataRequestPaths,
+        requestCount: productDataRequestPaths.length,
+      };
+    }
+
+    const evidenceDirectory = "/private/tmp/appaloft-dashboard-evidence";
+    await mkdir(evidenceDirectory, { recursive: true });
+    await Bun.write(
+      `${evidenceDirectory}/legacy-route-performance.json`,
+      JSON.stringify(
+        {
+          schemaVersion: "appaloft.dashboard-legacy-route-performance/v1",
+          capturedAt: new Date().toISOString(),
+          viewport: "1440x1000",
+          sampleCountPerRoute: 20,
+          scenarios: evidence,
+        },
+        undefined,
+        2,
+      ),
+    );
+  }, 45_000);
 
   test("renders the console dashboard with mocked control-plane data", async () => {
     activeScenario = "dashboard";

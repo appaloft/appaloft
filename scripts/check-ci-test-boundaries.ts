@@ -191,7 +191,7 @@ export function findCiChangeClassifierViolations(
 export function findUnitTestsWebViewOwnershipViolations(
   ciWorkflow: string,
   e2eWorkflow: string,
-  webPackageJson: string,
+  dashboardPackageJson: string,
 ): CiTestBoundaryViolation[] {
   const violations: CiTestBoundaryViolation[] = [];
   const unitTests = yamlBlock(ciWorkflow, /^ {2}unit-tests:\s*$/, 2);
@@ -218,29 +218,30 @@ export function findUnitTestsWebViewOwnershipViolations(
     });
   }
 
-  let webScripts: Record<string, string> = {};
+  let dashboardScripts: Record<string, string> = {};
   try {
-    const parsed = JSON.parse(webPackageJson) as { scripts?: Record<string, string> };
-    webScripts = parsed.scripts ?? {};
+    const parsed = JSON.parse(dashboardPackageJson) as { scripts?: Record<string, string> };
+    dashboardScripts = parsed.scripts ?? {};
   } catch {
     violations.push({
-      message: "apps/web/package.json must remain valid JSON so Unit Tests can stay vitest-only.",
+      message:
+        "apps/dashboard/package.json must remain valid JSON so Unit Tests can stay vitest-only.",
       rule: "unit-tests-webview-ownership",
     });
     return violations;
   }
 
-  if (/\btest:e2e(?::webview)?\b/.test(webScripts.test ?? "")) {
+  if (/\btest:e2e(?::webview)?\b/.test(dashboardScripts.test ?? "")) {
     violations.push({
       message:
-        "@appaloft/web `test` must stay vitest-only so turbo run test does not pay the WebView tax.",
+        "@appaloft/dashboard `test` must stay vitest-only so turbo run test does not pay the WebView tax.",
       rule: "unit-tests-webview-ownership",
     });
   }
 
-  if (!webScripts["test:e2e"] || !webScripts["test:e2e:webview"]) {
+  if (!dashboardScripts["test:e2e"] || !dashboardScripts["test:e2e:webview"]) {
     violations.push({
-      message: "@appaloft/web must keep test:e2e and test:e2e:webview for e2e.yml.",
+      message: "@appaloft/dashboard must keep test:e2e and test:e2e:webview for e2e.yml.",
       rule: "unit-tests-webview-ownership",
     });
   }
@@ -275,14 +276,14 @@ function yamlBlock(source: string, startPattern: RegExp, indentation: number): s
 async function checkRepository(): Promise<void> {
   const ciWorkflowPath = resolve(import.meta.dir, "../.github/workflows/ci.yml");
   const e2eWorkflowPath = resolve(import.meta.dir, "../.github/workflows/e2e.yml");
-  const webPackageJsonPath = resolve(import.meta.dir, "../apps/web/package.json");
+  const dashboardPackageJsonPath = resolve(import.meta.dir, "../apps/dashboard/package.json");
   const ciWorkflow = await readFile(ciWorkflowPath, "utf8");
   const e2eWorkflow = await readFile(e2eWorkflowPath, "utf8");
-  const webPackageJson = await readFile(webPackageJsonPath, "utf8");
+  const dashboardPackageJson = await readFile(dashboardPackageJsonPath, "utf8");
   const violations = [
     ...findCiTestBoundaryViolations(ciWorkflow),
     ...findCiChangeClassifierViolations(ciWorkflow, e2eWorkflow),
-    ...findUnitTestsWebViewOwnershipViolations(ciWorkflow, e2eWorkflow, webPackageJson),
+    ...findUnitTestsWebViewOwnershipViolations(ciWorkflow, e2eWorkflow, dashboardPackageJson),
   ];
   if (violations.length > 0) {
     for (const violation of violations) {

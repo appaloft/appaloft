@@ -422,12 +422,15 @@ import {
   ListPluginsQuery,
   ListPreviewEnvironmentsQuery,
   ListProjectsQuery,
+  ListProjectSummariesQuery,
+  ProjectEnvironmentOverviewQuery,
   ListProvidersQuery,
   ListRepositoryBindingsQuery,
   ListResourceDependencyBindingsQuery,
   ListResourceRuntimeLogArchivesQuery,
   ListResourceSecretReferencesQuery,
   ListResourcesQuery,
+  ResourceOverviewQuery,
   ListRetentionDefaultsQuery,
   ListRouteSurfaceDecisionsQuery,
   ListRuntimeMonitoringSamplesQuery,
@@ -495,12 +498,15 @@ import {
   listOrganizationMembersQueryInputSchema,
   listPreviewEnvironmentsQueryInputSchema,
   listProjectsQueryInputSchema,
+  listProjectSummariesQueryInputSchema,
+  projectEnvironmentOverviewQueryInputSchema,
   listRepositoryBindingsInputSchema,
   listRepositoryBindingsResponseSchema,
   listResourceDependencyBindingsQueryInputSchema,
   listResourceRuntimeLogArchivesQueryInputSchema,
   listResourceSecretReferencesQueryInputSchema,
   listResourcesQueryInputSchema,
+  resourceOverviewQueryInputSchema,
   listRetentionDefaultsQueryInputSchema,
   listRouteSurfaceDecisionsInputSchema,
   listRouteSurfaceDecisionsResponseSchema,
@@ -1064,11 +1070,14 @@ import {
   listPluginsResponseSchema,
   listPreviewEnvironmentsResponseSchema,
   listProjectsResponseSchema,
+  listProjectSummariesResponseSchema,
+  projectEnvironmentOverviewResponseSchema,
   listProvidersResponseSchema,
   listResourceDependencyBindingsResponseSchema,
   listResourceRuntimeLogArchivesResponseSchema,
   listResourceSecretReferencesResponseSchema,
   listResourcesResponseSchema,
+  resourceOverviewResponseSchema,
   listRetentionDefaultsResponseSchema,
   listScheduledRuntimePrunePoliciesResponseSchema,
   listScheduledTaskRunsResponseSchema,
@@ -3724,6 +3733,30 @@ export const listProjectsProcedure = base
   .output(listProjectsResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ListProjectsQuery.create(input)));
 
+export const listProjectSummariesProcedure = base
+  .route({
+    method: "GET",
+    path: "/projects/summaries",
+    successStatus: 200,
+  })
+  .input(listProjectSummariesQueryInputSchema)
+  .output(listProjectSummariesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListProjectSummariesQuery.create(input)),
+  );
+
+export const projectEnvironmentOverviewProcedure = base
+  .route({
+    method: "GET",
+    path: "/projects/{projectId}/environments/{environmentId}/overview",
+    successStatus: 200,
+  })
+  .input(projectEnvironmentOverviewQueryInputSchema)
+  .output(projectEnvironmentOverviewResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ProjectEnvironmentOverviewQuery.create(input)),
+  );
+
 export const countProjectsProcedure = base
   .route({
     method: "GET",
@@ -4933,6 +4966,18 @@ export const showResourceProcedure = base
   .input(showResourceQueryInputSchema)
   .output(resourceDetailSchema)
   .handler(async ({ input, context }) => executeQuery(context, ShowResourceQuery.create(input)));
+
+export const resourceOverviewProcedure = base
+  .route({
+    method: "GET",
+    path: "/projects/{projectId}/environments/{environmentId}/resources/{resourceId}/overview",
+    successStatus: 200,
+  })
+  .input(resourceOverviewQueryInputSchema)
+  .output(resourceOverviewResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ResourceOverviewQuery.create(input)),
+  );
 
 export const createResourceProcedure = base
   .route({
@@ -9006,6 +9051,8 @@ export const appaloftOrpcRouter = {
   projects: {
     count: countProjectsProcedure,
     list: listProjectsProcedure,
+    listSummaries: listProjectSummariesProcedure,
+    environmentOverview: projectEnvironmentOverviewProcedure,
     create: createProjectProcedure,
     show: showProjectProcedure,
     rename: renameProjectProcedure,
@@ -9108,6 +9155,7 @@ export const appaloftOrpcRouter = {
     count: countResourcesProcedure,
     list: listResourcesProcedure,
     show: showResourceProcedure,
+    overview: resourceOverviewProcedure,
     create: createResourceProcedure,
     archive: archiveResourceProcedure,
     restore: restoreResourceProcedure,
@@ -11171,10 +11219,10 @@ function hasPartialTrustedDeploymentContext(
 ): boolean {
   const hasAnyDeploymentId = Boolean(
     trustedContext?.projectId ||
-      trustedContext?.environmentId ||
-      trustedContext?.resourceId ||
-      trustedContext?.serverId ||
-      trustedContext?.destinationId,
+    trustedContext?.environmentId ||
+    trustedContext?.resourceId ||
+    trustedContext?.serverId ||
+    trustedContext?.destinationId,
   );
   if (!hasAnyDeploymentId) {
     return false;
@@ -11890,6 +11938,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/connections/capabilities/apply",
     "/api/domain-bindings/dns-readiness/inspect",
     "/api/projects",
+    "/api/projects/:projectId/environments/:environmentId/overview",
+    "/api/projects/:projectId/environments/:environmentId/resources/:resourceId/overview",
     "/api/projects/:projectId",
     "/api/projects/:projectId/rename",
     "/api/projects/:projectId/description",
