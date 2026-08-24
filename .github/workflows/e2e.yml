@@ -179,6 +179,8 @@ jobs:
       - name: Dashboard WebView Smoke
         if: ${{ steps.shard.outputs.need_web == 'true' }}
         working-directory: apps/dashboard
+        env:
+          APPALOFT_DASHBOARD_EVIDENCE_DIR: ${{ runner.temp }}/appaloft-dashboard-evidence
         run: bun run test:e2e
 
       - name: Select Shell E2E Shard
@@ -213,4 +215,4 @@ jobs:
           name: appaloft-e2e-logs-shard-${{ matrix.shard }}
           path: |
             runtime/logs
-            /private/tmp/appaloft-dashboard-evidence
+            ${{ runner.temp }}/appaloft-dashboard-evidence

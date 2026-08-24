@@ -3,6 +3,8 @@ import "../../../../packages/application/node_modules/reflect-metadata/Reflect.j
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   type AppLogger,
   BootstrapFirstAdminCommand,
@@ -42,7 +44,9 @@ import { Elysia } from "elysia";
 
 const previewPort = 43_000 + (process.pid % 10_000);
 const previewUrl = `http://127.0.0.1:${previewPort}`;
-const evidenceDirectory = "/private/tmp/appaloft-dashboard-evidence";
+const evidenceDirectory =
+  process.env.APPALOFT_DASHBOARD_EVIDENCE_DIR?.trim() ||
+  join(tmpdir(), "appaloft-dashboard-evidence");
 
 let previewProcess: ReturnType<typeof Bun.spawn> | undefined;
 let apiFixtureServer: ReturnType<typeof Bun.serve> | undefined;
@@ -675,7 +679,7 @@ async function navigateWithTheme(
 
 async function capture(view: Bun.WebView, name: string): Promise<string> {
   await mkdir(evidenceDirectory, { recursive: true });
-  const output = `${evidenceDirectory}/${name}.png`;
+  const output = join(evidenceDirectory, `${name}.png`);
   await Bun.write(output, await view.screenshot());
   return output;
 }
@@ -1323,7 +1327,7 @@ describe("Dashboard foundation WebView", () => {
 
     await mkdir(evidenceDirectory, { recursive: true });
     await Bun.write(
-      `${evidenceDirectory}/dashboard-route-performance.json`,
+      join(evidenceDirectory, "dashboard-route-performance.json"),
       JSON.stringify(
         {
           schemaVersion: "appaloft.dashboard-route-performance/v1",
@@ -1525,7 +1529,7 @@ describe("Dashboard foundation WebView", () => {
       sortedSamples[Math.ceil(sortedSamples.length * 0.95) - 1] ?? Number.POSITIVE_INFINITY;
     await mkdir(evidenceDirectory, { recursive: true });
     await Bun.write(
-      `${evidenceDirectory}/resource-tab-performance.json`,
+      join(evidenceDirectory, "resource-tab-performance.json"),
       JSON.stringify(
         {
           schemaVersion: "appaloft.dashboard-resource-tab-performance/v1",
