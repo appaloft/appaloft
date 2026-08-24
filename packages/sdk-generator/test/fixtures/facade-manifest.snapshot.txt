@@ -192,6 +192,7 @@ appaloft.projects.create -> projects.create POST /projects
 appaloft.projects.delete -> projects.delete DELETE /projects/{projectId}
 appaloft.projects.deleteCheck -> projects.delete-check GET /projects/{projectId}/delete-check
 appaloft.projects.list -> projects.list GET /projects
+appaloft.projects.listSummaries -> projects.list-summaries GET /projects/summaries
 appaloft.projects.rename -> projects.rename POST /projects/{projectId}/rename
 appaloft.projects.reorder -> projects.reorder POST /projects/reorder
 appaloft.projects.restore -> projects.restore POST /projects/{projectId}/restore
