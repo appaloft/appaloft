@@ -22,7 +22,7 @@
   <div class="mt-10 grid gap-4 md:grid-cols-3">
     {#each [0, 1, 2] as index}
       <article class="min-h-56 rounded-[16px] border border-divider bg-surface p-5 sm:p-6">
-        <span class="grid size-11 place-items-center rounded-[12px] bg-surface-subtle text-muted-foreground">
+        <span data-icon-surface={index === 0 ? "blue" : index === 1 ? "cyan" : "violet"} class={`grid size-11 place-items-center rounded-[12px] ${index === 0 ? "bg-icon-blue text-icon-blue-foreground" : index === 1 ? "bg-icon-cyan text-icon-cyan-foreground" : "bg-icon-violet text-icon-violet-foreground"}`}>
           {#if destination === "infrastructure"}
             {#if index === 0}<Waypoints class="size-5" />{:else}<Boxes class="size-5" />{/if}
           {:else if destination === "activity"}

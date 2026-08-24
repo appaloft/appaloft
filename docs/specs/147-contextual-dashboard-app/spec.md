@@ -3,7 +3,8 @@
 ## Status
 
 - Round: Code
-- State: confirmed by owner on 2026-08-24; issue #1423 foundation implementation in progress
+- State: confirmed by owner on 2026-08-24; foundation merged and luminous visual refinement tracked
+  by issue #1430
 - Discovery: [discovery.md](./discovery.md)
 - Governing decision: [ADR-126](../../decisions/ADR-126-contextual-dashboard-and-web-route-boundary.md)
 - Compatibility: `pre-1.0-policy`, intentionally breaking Web routes; no legacy fallback required
@@ -46,12 +47,13 @@ loading, rendering, and cache ownership use the same scope.
 | DASH-EXT-017  | Additive scoped metadata places contributions into canonical Workspace, Project, or Resource destinations; unknown/missing v2 metadata never creates another permanent Workspace item.                    |
 | DASH-EXT-018  | Extension visibility is evaluated only for the active destination/scope and is cached; Dashboard must not fan out visibility calls for every possible extension on every route.                           |
 | DASH-VIS-019  | Dashboard consumes `dashboard-v2` semantic tokens; raw copied competitor tokens/assets and private theme overrides are forbidden.                                                                         |
-| DASH-VIS-020  | Light and warm-charcoal Dark cover every primitive and state. Appaloft blue is the only primary accent; semantic status colors remain reserved for status.                                                |
+| DASH-VIS-020  | Near-white luminous Light and lifted warm-charcoal Dark cover every primitive and state. Appaloft blue is the only primary action accent; semantic status colors remain reserved for status.              |
 | DASH-VIS-021  | Layout uses the v2 spacing/radius/elevation contract and supports keyboard navigation, visible focus, reduced motion, and WCAG 2.2 AA contrast.                                                           |
 | DASH-GOV-022  | Foundation includes DESIGN/token drift validation, Dashboard design lint, a route-level pattern gallery, and Playwright screenshots for light/dark desktop/mobile.                                        |
 | DASH-CUT-023  | The first closed loop may enter opt-in beta only after IDs DASH-BETA-* in the test matrix pass.                                                                                                           |
 | DASH-CUT-024  | Default cutover requires every new Workspace destination to be usable plus core Project/Resource coverage; legacy feature parity and redirects are not gates.                                             |
 | DASH-CUT-025  | Topology stays disabled until 10/50/100 Resource benchmark rows pass and List remains available.                                                                                                          |
+| DASH-VIS-026  | Blue/cyan/violet ambient light fields and pastel icon surfaces may create non-semantic depth, but ordinary cards, text, status, and every CTA must not glow or become decorative gradients.               |
 
 ## Page Outcomes
 
@@ -154,6 +156,8 @@ and at least a 30% reduction from the matching legacy p95 where legacy can compl
 
 - Legacy route redirects, aliases, or feature parity.
 - Copying Railway visuals or Kun code/assets/tokens.
+- Dominant brand gradients, ornamental glass, glow on every card, or decorative use of status
+  colors.
 - Shipping Topology in the first slice.
 - Replacing domain command/query semantics with Dashboard-specific business logic.
 - Rebuilding extension page documents when v1 can render them.

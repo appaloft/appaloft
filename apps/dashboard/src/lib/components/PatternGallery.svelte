@@ -15,6 +15,9 @@
     ["Success", "bg-chart-2"],
     ["Warning", "bg-chart-4"],
     ["Failure", "bg-destructive"],
+    ["Icon blue", "bg-icon-blue"],
+    ["Icon cyan", "bg-icon-cyan"],
+    ["Icon violet", "bg-icon-violet"],
   ] as const;
 </script>
 
@@ -28,7 +31,7 @@
   <div class="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
     {#each colors as color}
       <div class="rounded-[14px] border border-divider bg-surface p-3">
-        <div class={`h-16 rounded-[10px] border border-divider ${color[1]}`}></div>
+        <div data-icon-surface={color[0].startsWith("Icon") ? color[0] : undefined} class={`h-16 rounded-[10px] border border-divider ${color[1]}`}></div>
         <p class="mt-3 text-xs font-medium">{color[0]}</p>
       </div>
     {/each}

@@ -24,10 +24,10 @@
   let { route }: { route: Extract<DashboardRoute, { kind: "project" | "resource" }> } = $props();
 
   const resources = [
-    { id: "api-gateway", name: "api-gateway", kind: "Dockerfile", state: "healthy", deployment: "3f8a1c2", time: "8 min ago" },
-    { id: "events-worker", name: "events-worker", kind: "Docker image", state: "healthy", deployment: "d104ba8", time: "19 min ago" },
-    { id: "postgres-main", name: "postgres-main", kind: "PostgreSQL", state: "healthy", deployment: "managed", time: "1 hr ago" },
-    { id: "billing-sync", name: "billing-sync", kind: "Scheduled task", state: "attention", deployment: "b71e932", time: "2 hr ago" },
+    { id: "api-gateway", name: "api-gateway", kind: "Dockerfile", state: "healthy", deployment: "3f8a1c2", time: "8 min ago", tone: "bg-icon-blue text-icon-blue-foreground", toneName: "blue" },
+    { id: "events-worker", name: "events-worker", kind: "Docker image", state: "healthy", deployment: "d104ba8", time: "19 min ago", tone: "bg-icon-cyan text-icon-cyan-foreground", toneName: "cyan" },
+    { id: "postgres-main", name: "postgres-main", kind: "PostgreSQL", state: "healthy", deployment: "managed", time: "1 hr ago", tone: "bg-icon-violet text-icon-violet-foreground", toneName: "violet" },
+    { id: "billing-sync", name: "billing-sync", kind: "Scheduled task", state: "attention", deployment: "b71e932", time: "2 hr ago", tone: "bg-icon-blue text-icon-blue-foreground", toneName: "blue" },
   ] as const;
 
   const activeDestination = $derived(route.kind === "resource" ? "overview" : route.destination);
@@ -80,8 +80,8 @@
           <LayoutGrid class="size-4" />
         </button>
       </div>
-      <Button class="h-10 rounded-[10px] px-4 shadow-none">
-        <Plus class="size-4" />
+      <Button class="h-10 rounded-[10px] px-4 shadow-[var(--shadow-primary)] hover:shadow-[var(--shadow-primary-hover)]">
+        <Plus data-icon="inline-start" />
         {i18n.t(copy.actions.addResource)}
       </Button>
     </div>
@@ -110,7 +110,7 @@
               class="group grid gap-3 px-5 py-4 outline-none transition-colors hover:bg-surface-subtle focus-visible:bg-surface-selected sm:grid-cols-[minmax(0,1fr)_130px_130px] sm:items-center"
             >
               <div class="flex min-w-0 items-center gap-3">
-                <span class="grid size-10 shrink-0 place-items-center rounded-[11px] border border-divider bg-surface-subtle text-muted-foreground">
+                <span data-icon-surface={resource.toneName} class={`grid size-10 shrink-0 place-items-center rounded-[11px] ${resource.tone}`}>
                   <Boxes class="size-[18px]" />
                 </span>
                 <div class="min-w-0">

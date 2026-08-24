@@ -16,6 +16,8 @@
   shadcn-svelte, `@appaloft/ui`, and `@appaloft/design` only.
 - Add `dashboard-v2` semantic tokens, light/dark theme, pattern gallery, design lint/skill, token-doc
   drift test, Playwright visual fixtures, and performance harness.
+- Refine the foundation with semantic ambient-light and pastel icon-surface roles after owner visual
+  review; keep the effect shell-scoped and preserve Appaloft blue/status semantics.
 - Make local/release static surface selection explicit without changing the default.
 
 ### Phase 1 — First Closed Loop

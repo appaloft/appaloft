@@ -58,8 +58,10 @@ The proposed `dashboard-v2` preset is governed by
 [ADR-126](../../docs/decisions/ADR-126-contextual-dashboard-and-web-route-boundary.md) and
 [Spec 147](../../docs/specs/147-contextual-dashboard-app/spec.md). Its target grammar is:
 
-- near-white neutral Light canvas and complete warm-charcoal Dark canvas;
+- near-white luminous Light canvas and complete lifted warm-charcoal Dark canvas;
 - Appaloft blue as the only primary accent;
+- restrained blue/cyan/violet ambient light fields at shell level and semantic pastel icon
+  surfaces; neither role carries status or action meaning;
 - 4px spacing base, 24-32px page/section spacing, and 20-24px card padding;
 - 40px normal controls, 10px control radius, 14-16px card radius, and 16-18px panel radius;
 - ordinary surfaces separated by fill/space without shadow; elevation reserved for overlays;
@@ -72,9 +74,9 @@ preset only after the default-cutover gate; legacy removal is a separate slice.
 
 ## Color Roles
 
-- Console canvas: near-neutral structural gray `#f7f7f8` for the workspace outside object panels. It must
-  stay neutral and low-chroma rather than reading as blue decoration, heavy gray-blue, cream, sand,
-  beige, or yellow.
+- Dashboard canvas: near-white `#fbfcff` for the workspace outside object panels. Low-chroma
+  blue/cyan/violet ambient light may soften large empty regions, but the base must still read as a
+  bright neutral workspace rather than a colored gradient page.
 - Console panel: `#ffffff` for object panels, tables, sheets, popovers, and form surfaces.
 - Console ink: `#152238` for primary text and active tab text. Do not use pure black as the brand
   fill for primary actions.
@@ -82,6 +84,10 @@ preset only after the default-cutover gate; legacy removal is a separate slice.
   states, links, focus rings, and running/planning status. Use it sparingly.
 - Appaloft soft blue: `#e8f0ff` and `#eef2f7` for selected row, subtle callout, and low-emphasis
   CTA backgrounds.
+- Ambient light: public `--ambient-blue`, `--ambient-cyan`, and `--ambient-violet` tokens are
+  non-semantic shell-level depth cues. They may not color text, status, every card, or every CTA.
+- Icon surfaces: public `--icon-blue`, `--icon-cyan`, and `--icon-violet` pairs give repeated
+  object icons a soft color identity without turning the icon into a primary action or status.
 - Quiet border: `#c5d1e0` for panel boundaries, table rows, and dividers.
 - Input hairline: `#9fadc1` for form controls so fields remain more visible than passive panels.
 - Sidebar rail: `#eef2f7` with `#bcc9da` separation. Active navigation keeps the soft-blue row tint
@@ -114,11 +120,12 @@ inside an owning surface, not as an alternate page background. Overlays always u
 surface plus a divider and shadow. Inputs use the surface fill plus the stronger control hairline;
 browser autofill must preserve the same fill instead of introducing an unrelated blue or gray.
 
-Avoid gradient backgrounds in the console. Depth comes from spacing, borders, typography, and
-restrained shadows. Semantic colors are only for real workflow meaning; absence or missing setup is
-neutral until it represents a real failure or blocker. Avoid warm yellow canvases,
-deep navy-heavy chrome, black primary buttons, and generic shadcn neutral gray as the product
-identity.
+Avoid dominant linear brand gradients and card-by-card glow. A Dashboard shell may use restrained
+radial ambient-light fields derived only from the ambient tokens; content surfaces stay solid and
+readable. Depth otherwise comes from spacing, borders, typography, and restrained shadows.
+Semantic colors are only for real workflow meaning; absence or missing setup is neutral until it
+represents a real failure or blocker. Avoid warm yellow canvases, deep navy-heavy chrome, black
+primary buttons, and generic shadcn neutral gray as the product identity.
 
 ## Typography
 
@@ -178,9 +185,10 @@ area uses one named surface:
 - The legacy light Console canvas is a Supabase-like near-white `#fdfdfd`, not a blue or visible gray page
   fill. White `#ffffff` owner surfaces remain distinct through divider hairlines, spacing, and type;
   neutral `#f7f7f8` is reserved for table headers and owned subtle groups.
-- The Dashboard light canvas uses neutral `#f7f7f7` around white owner surfaces. Dashboard Dark uses
-  warm charcoal `#181716` around `#211f1e` owner surfaces and `#292725` overlays. Neither preset may
-  borrow the other's canvas or radius recipe.
+- The Dashboard light canvas uses near-white `#fbfcff` around white owner surfaces plus restrained
+  shell-level ambient light. Dashboard Dark uses lifted charcoal-indigo `#20212c` around `#282a37`
+  owner surfaces and `#303241` overlays. Neither preset may borrow the other's canvas or radius
+  recipe.
 - Primary and nested sidebars use a neutral near-white surface with neutral hover/active fills.
   Appaloft blue is reserved for the active rail, icon, focus ring, or compact collapsed navigation
   marker rather than tinting the whole navigation surface.

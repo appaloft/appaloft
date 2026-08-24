@@ -1,6 +1,6 @@
 {
   "schemaVersion": "appaloft.dashboard-foundation-evidence/v1",
-  "capturedAt": "2026-08-24T07:15:00Z",
+  "capturedAt": "2026-08-24T08:50:09Z",
   "machine": {
     "platform": "darwin-arm64",
     "bun": "1.4.0",
@@ -16,7 +16,7 @@
     "dashboard-v2": {
       "buildDirectory": "apps/dashboard/build/_app/immutable",
       "javascriptFiles": 14,
-      "gzipBytes": 211496,
+      "gzipBytes": 211722,
       "blockingBudgetBytes": 307200
     },
     "reductionPercent": 76.7
@@ -27,7 +27,7 @@
     "topologyEnabled": false
   },
   "visualAcceptance": {
-    "browser": "Chromium via Playwright CLI",
+    "browser": "Bun.WebView",
     "desktopViewport": "1440x1000",
     "mobileViewport": "390x844",
     "themes": ["light", "dark"],
@@ -44,6 +44,8 @@
     "artifactDirectory": "/private/tmp/appaloft-dashboard-evidence",
     "fixtures": [
       "projects-desktop-light.png",
+      "project-desktop-light.png",
+      "resource-desktop-dark.png",
       "patterns-desktop-dark.png",
       "projects-mobile-dark.png",
       "resource-mobile-dark.png"

@@ -120,7 +120,7 @@
       <div class="flex items-start justify-between gap-4">
         <div class="min-w-0">
           <div class="flex items-center gap-2">
-            <span class="grid size-8 place-items-center rounded-[9px] bg-primary text-primary-foreground">
+            <span data-icon-surface="blue" class="grid size-8 place-items-center rounded-[9px] bg-icon-blue text-icon-blue-foreground">
               <Rocket class="size-4" />
             </span>
             <h2 class="truncate text-lg font-semibold tracking-[-0.015em]">{route.resourceId}</h2>
