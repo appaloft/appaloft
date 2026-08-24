@@ -524,6 +524,8 @@ export class DockerSandboxProvider implements SandboxProvider {
         "/tmp:rw,noexec,nosuid,size=64m",
         "--tmpfs",
         "/var/tmp/appaloft-exec:rw,exec,nosuid,nodev,size=64m",
+        "--tmpfs",
+        "/var/tmp/appaloft-bin:rw,exec,nosuid,nodev,size=256m",
         "--env",
         "TMPDIR=/var/tmp/appaloft-exec",
         "--env",
@@ -1841,7 +1843,7 @@ export class DockerSandboxProvider implements SandboxProvider {
         container,
         "sh",
         "-c",
-        `mkdir -p /workspace/.local/bin && cat > ${COMMUNITY_OCCUPANCY_OMP_BIN} && chmod 755 ${COMMUNITY_OCCUPANCY_OMP_BIN}`,
+        `mkdir -p /var/tmp/appaloft-bin && cat > ${COMMUNITY_OCCUPANCY_OMP_BIN} && chmod 755 ${COMMUNITY_OCCUPANCY_OMP_BIN}`,
       ],
       { stdin: bytes },
     );

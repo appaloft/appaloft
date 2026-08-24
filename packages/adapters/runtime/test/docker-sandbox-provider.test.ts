@@ -402,7 +402,7 @@ describe("DockerSandboxProvider", () => {
     const install = runner.calls.find((call) => call.argv.includes("-i") && call.stdin);
     expect(new TextDecoder().decode(install?.stdin)).toBe("omp-binary");
     expect(runner.calls.some((call) => call.argv[1] === "cp")).toBe(false);
-    expect(runner.terminalCalls[0]?.argv.at(-1)).toBe("/workspace/.local/bin/omp");
+    expect(runner.terminalCalls[0]?.argv.at(-1)).toBe("/var/tmp/appaloft-bin/omp");
   });
 
   test("[SBX-RUNTIME-002] provisions a constrained gVisor container without shell interpolation", async () => {
@@ -422,6 +422,7 @@ describe("DockerSandboxProvider", () => {
     expect(create).toContain("/workspace:rw,nosuid,nodev,size=2048m");
     expect(create).toContain("/tmp:rw,noexec,nosuid,size=64m");
     expect(create).toContain("/var/tmp/appaloft-exec:rw,exec,nosuid,nodev,size=64m");
+    expect(create).toContain("/var/tmp/appaloft-bin:rw,exec,nosuid,nodev,size=256m");
     expect(create).toContain("TMPDIR=/var/tmp/appaloft-exec");
     expect(create).toContain("BUN_TMPDIR=/var/tmp/appaloft-exec");
     expect(create).not.toContain("--storage-opt");
