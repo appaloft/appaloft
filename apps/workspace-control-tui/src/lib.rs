@@ -2526,17 +2526,16 @@ fn occupancy_loading_footer(collapsed: bool) -> String {
 }
 
 fn occupancy_session_footer(state: &AppState) -> String {
+    if state.osc52_passthrough_failed {
+        return format!(
+            " {}  │  ⌥f restore the tree  wrap  shift+esc/^] stop typing ",
+            OSC52_PASSTHROUGH_DISABLED
+        );
+    }
     if !state.received_terminal_output {
         return " ^c quit  ⌥f restore the tree  wrap  shift+esc/^] stop typing ".to_owned();
     }
-    if state.osc52_passthrough_failed {
-        format!(
-            " {}  │  ⌥f restore the tree  wrap  shift+esc/^] stop typing ",
-            OSC52_PASSTHROUGH_DISABLED
-        )
-    } else {
-        " ⌥f restore the tree  wrap  shift+esc/^] stop typing ".to_owned()
-    }
+    " ⌥f restore the tree  wrap  shift+esc/^] stop typing ".to_owned()
 }
 
 fn occupancy_agents_tree_lines(state: &AppState) -> Vec<Line<'static>> {
