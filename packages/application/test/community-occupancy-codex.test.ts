@@ -21,6 +21,10 @@ import {
   occupancyGrokInstallArgv,
   occupancyHarnessInstallArgv,
 } from "../src/community-occupancy-codex";
+import {
+  COMMUNITY_OCCUPANCY_OPENCODE_IMAGE,
+  COMMUNITY_OCCUPANCY_OPENCODE_VERSION,
+} from "../src/community-occupancy-opencode-template";
 
 test("[WS-REMOTE-VENDOR-204] occupancy harness install helper still pins exact npm packages", () => {
   expect(
@@ -52,7 +56,7 @@ test("[WS-REMOTE-VENDOR-204] occupancy harness install helper still pins exact n
   expect(
     occupancyHarnessInstallArgv({
       packageName: COMMUNITY_OCCUPANCY_OPENCODE_PACKAGE,
-      version: "1.18.21",
+      version: COMMUNITY_OCCUPANCY_OPENCODE_VERSION,
     }),
   ).toEqual([
     "bun",
@@ -60,8 +64,14 @@ test("[WS-REMOTE-VENDOR-204] occupancy harness install helper still pins exact n
     "--global",
     "--exact",
     "--trust",
-    `${COMMUNITY_OCCUPANCY_OPENCODE_PACKAGE}@1.18.21`,
+    `${COMMUNITY_OCCUPANCY_OPENCODE_PACKAGE}@${COMMUNITY_OCCUPANCY_OPENCODE_VERSION}`,
   ]);
+});
+
+test("[WS-REMOTE-TEMPLATE-019] occupancy OpenCode version matches the published image tag", () => {
+  expect(COMMUNITY_OCCUPANCY_OPENCODE_IMAGE).toBe(
+    `ghcr.io/appaloft/agent-workspace-opencode:${COMMUNITY_OCCUPANCY_OPENCODE_VERSION}`,
+  );
 });
 
 test("[WS-REMOTE-VENDOR-204] Grok occupancy install helper pins the official CLI version", () => {

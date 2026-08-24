@@ -5,7 +5,10 @@ export const COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_NAME = "appaloft-remote-openc
 
 export const COMMUNITY_OCCUPANCY_OPENCODE_IMAGE =
   "ghcr.io/appaloft/agent-workspace-opencode:1.18.4";
-export const COMMUNITY_OCCUPANCY_OPENCODE_VERSION = "1.18.21";
+// Must match the image tag. Occupancy aliases the reserved profile onto the
+// native OpenCode harness, which fail-closes if `opencode --version` does not
+// contain this pin and then tries `bun add opencode-ai@<pin>` inside the Sandbox.
+export const COMMUNITY_OCCUPANCY_OPENCODE_VERSION = "1.18.4";
 export const COMMUNITY_OCCUPANCY_OPENCODE_TEMPLATE_DIGEST =
   "sha256:27f7a3ca10124d922b35de64d17588278e5dc0d1db398d69ea5920f80e87a324";
 export const COMMUNITY_OCCUPANCY_OPENCODE_ISOLATION = "container-trusted" as const;
