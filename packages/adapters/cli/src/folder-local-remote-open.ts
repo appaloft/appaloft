@@ -41,6 +41,13 @@ import {
   type WorkspaceOpenResult,
 } from "@appaloft/application";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
+import {
+  fileFolderLocalResumeStore,
+  type FolderLocalResume,
+  type FolderLocalResumeEnvironment,
+  readFolderLocalResume,
+  writeFolderLocalResume,
+} from "./folder-local-resume.js";
 
 type RemoteDispatch = <T>(message: Command<T> | Query<T>) => Promise<Result<T>>;
 
@@ -170,6 +177,7 @@ export function isFolderLocalWorkspaceOpenCommand(
 export async function executeFolderLocalWorkspaceOpen(input: {
   readonly command: OpenAgentWorkspaceCommand;
   readonly dispatch: RemoteDispatch;
+  readonly environment?: FolderLocalResumeEnvironment;
 }): Promise<Result<WorkspaceOpenResult>> {
   if (!isFolderLocalWorkspaceOpenCommand(input.command)) {
     return err(
@@ -198,6 +206,20 @@ export async function executeFolderLocalWorkspaceOpen(input: {
   const listed = await listRemoteSandboxes(input.dispatch);
   if (listed.isErr()) return err(listed.error);
 
+  const resumeStore = fileFolderLocalResumeStore(input.environment ?? process.env);
+  const resume = input.command.input.forceNew
+    ? undefined
+    : await readFolderLocalResume(
+        {
+          repositoryIdentity: input.command.input.repositoryIdentity,
+          ...(input.command.input.targetServerId
+            ? { targetServerId: input.command.input.targetServerId }
+            : {}),
+          ...(input.command.input.profile ? { profile: input.command.input.profile } : {}),
+        },
+        resumeStore,
+      );
+
   const service = new AgentWorkspaceOpenService(
     createFolderLocalRemoteOpenDependencies({
       dispatch: input.dispatch,
@@ -208,10 +230,11 @@ export async function executeFolderLocalWorkspaceOpen(input: {
       commitSha: input.command.input.commitSha,
       ...(input.command.input.profile ? { profile: input.command.input.profile } : {}),
       ...(providerKey ? { providerKey } : {}),
+      ...(resume ? { resume } : {}),
     }),
   );
 
-  return service.open(
+  const opened = await service.open(
     createExecutionContext({
       requestId: "req_folder_local_remote_open",
       entrypoint: "cli",
@@ -224,6 +247,25 @@ export async function executeFolderLocalWorkspaceOpen(input: {
       ...(providerKey ? { placementProviderKey: providerKey } : {}),
     },
   );
+  if (opened.isOk()) {
+    try {
+      await writeFolderLocalResume(
+        {
+          repositoryIdentity: input.command.input.repositoryIdentity,
+          workspaceId: opened.value.workspaceId,
+          runtimeId: opened.value.agent.runtimeId,
+          ...(input.command.input.targetServerId
+            ? { targetServerId: input.command.input.targetServerId }
+            : {}),
+          ...(input.command.input.profile ? { profile: input.command.input.profile } : {}),
+        },
+        resumeStore,
+      );
+    } catch {
+      // Resume cache is an accelerator. Occupy already succeeded.
+    }
+  }
+  return opened;
 }
 
 async function listRemoteSandboxes(
@@ -328,6 +370,7 @@ function createFolderLocalRemoteOpenDependencies(input: {
   readonly commitSha: string;
   readonly profile?: string;
   readonly providerKey?: string;
+  readonly resume?: FolderLocalResume;
 }): WorkspaceOpenDependencies {
   const pin = folderLocalCompiledPin(input.profile);
   const harness = folderLocalHarnessForProfile(input.profile);
@@ -344,6 +387,7 @@ function createFolderLocalRemoteOpenDependencies(input: {
     input.repositoryIdentity,
     input.branch,
     input.commitSha,
+    input.resume,
   );
   return {
     preflight: {
@@ -448,8 +492,9 @@ function preferredFolderEntry(
   repositoryIdentity: string,
   branch: string,
   commitSha: string,
+  resume?: FolderLocalResume,
 ): WorkspaceOpenEntry | undefined {
-  const match = items.find((item) => {
+  const identityMatch = items.find((item) => {
     const occupancy = asRecord(item.occupancy);
     const identity =
       readString(occupancy.repositoryIdentity) ??
@@ -463,12 +508,23 @@ function preferredFolderEntry(
       readString(item.status) !== "failed"
     );
   });
+  const cachedMatch =
+    resume &&
+    items.find((item) => {
+      const workspaceId = readString(item.sandboxId) ?? readString(item.id);
+      return (
+        workspaceId === resume.workspaceId &&
+        readString(item.status) !== "terminated" &&
+        readString(item.status) !== "failed"
+      );
+    });
+  const match = identityMatch ?? cachedMatch;
   if (!match) return undefined;
   const workspaceId = readString(match.sandboxId) ?? readString(match.id);
   const occupancySha = readString(asRecord(match.occupancy).commitSha) ?? commitSha;
   if (!workspaceId) return undefined;
   const status = readString(match.status);
-  const runtimeId = readString(match.runtimeId);
+  const runtimeId = readString(match.runtimeId) ?? resume?.runtimeId;
   return {
     workspaceId,
     ...(runtimeId ? { runtimeId } : {}),
