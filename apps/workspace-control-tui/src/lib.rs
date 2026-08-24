@@ -1036,6 +1036,7 @@ pub struct AppState {
     pub detail: Option<DetailMessage>,
     pub agent_focused: bool,
     pub focus_mode: bool,
+    pub received_terminal_output: bool,
     pub loading: OccupancyLoading,
     pub session_id: Option<String>,
     pub runtime_id: Option<String>,
@@ -1073,6 +1074,7 @@ impl Default for AppState {
             detail: None,
             agent_focused: false,
             focus_mode: false,
+            received_terminal_output: false,
             loading: OccupancyLoading::default(),
             session_id: None,
             runtime_id: None,
@@ -1248,12 +1250,16 @@ impl AppState {
                 self.session_id = Some(session_id.clone());
                 self.remember_open_pane(&workspace_id, &runtime_id, &session_id);
                 self.agent_focused = true;
+                self.received_terminal_output = false;
                 self.loading.active = false;
                 // Product lock: focus_mode is after attach, never at launch.
                 self.focus_mode = true;
                 self.status_line = format!("Agent Session {session_id}");
             }
             ParentMessage::TerminalOutput { data, .. } => {
+                if !data.is_empty() {
+                    self.received_terminal_output = true;
+                }
                 let split = split_osc52(&self.osc52_carry, &data);
                 self.osc52_carry = split.carry;
                 self.pending_osc52.extend(split.sequences);
@@ -1267,6 +1273,7 @@ impl AppState {
                 }
                 self.agent_focused = false;
                 self.focus_mode = false;
+                self.received_terminal_output = false;
                 self.session_id = None;
                 self.runtime_id = None;
                 self.status_line = match exit_code {
@@ -1420,9 +1427,9 @@ impl AppState {
     }
 
     /// Wait/list chrome (including collapsed preparing) must quit on `^c`.
-    /// Only an attached harness session may swallow `^c` and forward it.
+    /// Only a live attached harness that has painted may swallow `^c`.
     pub fn ctrl_c_quits(&self) -> bool {
-        self.loading.active || !self.agent_focused
+        self.loading.active || !self.agent_focused || !self.received_terminal_output
     }
 
     pub fn toggle_focus_mode(&mut self) {
@@ -2519,6 +2526,9 @@ fn occupancy_loading_footer(collapsed: bool) -> String {
 }
 
 fn occupancy_session_footer(state: &AppState) -> String {
+    if !state.received_terminal_output {
+        return " ^c quit  ⌥f restore the tree  wrap  shift+esc/^] stop typing ".to_owned();
+    }
     if state.osc52_passthrough_failed {
         format!(
             " {}  │  ⌥f restore the tree  wrap  shift+esc/^] stop typing ",
@@ -4345,6 +4355,14 @@ mod tests {
         });
         assert!(waiting.agent_focused);
         assert!(!waiting.loading.active);
+        assert!(
+            waiting.ctrl_c_quits(),
+            "empty attach must not trap ^c before the agent paints"
+        );
+        waiting.apply(ParentMessage::TerminalOutput {
+            stream: "stdout".to_owned(),
+            data: "omp ready\n".to_owned(),
+        });
         assert!(!waiting.ctrl_c_quits());
         assert_eq!(
             occupancy_key_binding(ctrl_c, waiting.agent_focused, waiting.session_id.is_some()),
